@@ -1,16 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
-import { WebSocketClient } from '@legacy-sports/websocket-client';
 import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
-import { config } from '@legacy-sports/app-config/native';
 import {
   GetLeagueMessages,
   type GetLeagueMessagesQuery,
   useSendLeagueMessageMutation,
 } from '@legacy-sports/graphql';
-import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
+import { useLeagueWebSocketClient } from '../../../context/LeagueWebSocketContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -54,7 +52,10 @@ export function useLeagueChat(leagueId: number): {
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [wsError, setWsError] = useState<Error | null>(null);
-  const clientRef = useRef<WebSocketClient | null>(null);
+  // Consumed by LeagueChatTab, always rendered inside a league screen's
+  // LeagueWebSocketContext.Provider — reuse that shared socket instead of
+  // opening a dedicated 'chat' connection (LS-8885).
+  const { client } = useLeagueWebSocketClient();
 
   // Load message history
   const { loading, data: historyData } = useQuery<GetLeagueMessagesQuery>(
@@ -117,76 +118,44 @@ export function useLeagueChat(leagueId: number): {
     [sendMutation, leagueId],
   );
 
-  // WebSocket listener for real-time updates from other members
+  // WebSocket listener for real-time updates from other members — subscribes
+  // to the shared league socket rather than opening its own connection.
   useEffect(() => {
-    let active = true;
+    if (!client) return;
 
-    const connect = async () => {
-      try {
-        const token = await readKeychainValue(Secret.INTERNAL_JWT);
-        if (!active || !token) return;
+    const unsubscribeError = client.on('error', (err: Error) => {
+      captureError(err);
+      setWsError(err);
+    });
 
-        const wsUrl = config.websocketUrl ?? '';
-        if (!wsUrl) return;
-
-        const client = new WebSocketClient({
-          url: wsUrl,
-          token,
-          leagueId,
-          viewContext: 'chat',
-          autoConnect: true,
-          reconnect: true,
+    const unsubscribeMessage = client.on(
+      ClientNotificationType.LEAGUE_CHAT_MESSAGE,
+      (notification: NotificationData) => {
+        if (notification.type !== ClientNotificationType.LEAGUE_CHAT_MESSAGE)
+          return;
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === notification.messageId)) return prev;
+          return [
+            ...prev,
+            {
+              id: notification.messageId,
+              userId: notification.senderId,
+              username: notification.senderUsername,
+              messageText: notification.messageText,
+              messageType: notification.messageType ?? 'text',
+              gifUrl: notification.gifUrl ?? undefined,
+              createdAt: notification.timestamp,
+            },
+          ];
         });
-
-        client.on('error', (err: Error) => {
-          if (!active) return;
-          captureError(err);
-          setWsError(err);
-        });
-
-        client.on(
-          ClientNotificationType.LEAGUE_CHAT_MESSAGE,
-          (notification: NotificationData) => {
-            if (
-              notification.type !== ClientNotificationType.LEAGUE_CHAT_MESSAGE
-            )
-              return;
-            setMessages((prev) => {
-              if (prev.some((m) => m.id === notification.messageId))
-                return prev;
-              return [
-                ...prev,
-                {
-                  id: notification.messageId,
-                  userId: notification.senderId,
-                  username: notification.senderUsername,
-                  messageText: notification.messageText,
-                  messageType: notification.messageType ?? 'text',
-                  gifUrl: notification.gifUrl ?? undefined,
-                  createdAt: notification.timestamp,
-                },
-              ];
-            });
-          },
-        );
-
-        clientRef.current = client;
-      } catch (err) {
-        if (!active) return;
-        const error = err instanceof Error ? err : new Error(String(err));
-        captureError(error);
-        setWsError(error);
-      }
-    };
-
-    void connect();
+      },
+    );
 
     return () => {
-      active = false;
-      clientRef.current?.dispose();
-      clientRef.current = null;
+      unsubscribeError();
+      unsubscribeMessage();
     };
-  }, [leagueId]);
+  }, [client]);
 
   return { messages, loading, sending, wsError, sendMessage };
 }

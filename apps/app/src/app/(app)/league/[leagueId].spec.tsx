@@ -130,9 +130,12 @@ jest.mock('@legacy-sports/shared-components', () => {
     PendingTradeOffers: () => null,
     PendingWaiverClaims: () => null,
     StandingsTable: () => null,
-    useWebSocket: () => ({ connected: false }),
   };
 });
+
+jest.mock('../../../hooks/useLeagueWebSocketLifecycle', () => ({
+  useLeagueWebSocketLifecycle: () => ({ client: null, connected: false }),
+}));
 
 // Feature components
 jest.mock('../../../features/roster/LeagueRosterManagement', () => ({

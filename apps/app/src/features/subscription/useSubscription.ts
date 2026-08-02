@@ -12,6 +12,7 @@ import {
   useGetMySubscriptionQuery,
 } from '@legacy-sports/graphql';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
+import { useLeagueWebSocketClient } from '../../context/LeagueWebSocketContext';
 
 export interface SubscriptionData {
   status: string | null;
@@ -38,8 +39,27 @@ export function useSubscription() {
   // state change) and refetch the subscription on receipt. Without this the
   // mobile hook only polls, so real-time tier changes — grace-period expiry,
   // admin adjustments — were missed until the app was restarted.
+  //
+  // When rendered inside a league screen's LeagueWebSocketContext (e.g. the
+  // commissioner tab), reuse that shared socket instead of opening a second
+  // one (LS-8885). Outside that context (the other ~40 call sites across the
+  // app), fall back to this hook's own standalone connection exactly as
+  // before.
+  const { client: sharedClient } = useLeagueWebSocketClient();
   const clientRef = useRef<WebSocketClient | null>(null);
   useEffect(() => {
+    if (sharedClient) {
+      const unsubscribe = sharedClient.on(
+        ClientNotificationType.SUBSCRIPTION_UPDATED,
+        () => {
+          void refetchRef.current().catch((err: unknown) => {
+            captureError(err instanceof Error ? err : new Error(String(err)));
+          });
+        },
+      );
+      return unsubscribe;
+    }
+
     let active = true;
 
     const connect = async () => {
@@ -82,7 +102,7 @@ export function useSubscription() {
       clientRef.current?.dispose();
       clientRef.current = null;
     };
-  }, []);
+  }, [sharedClient]);
 
   return {
     subscription: subscription as SubscriptionData | null,

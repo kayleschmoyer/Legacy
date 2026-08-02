@@ -151,9 +151,15 @@ jest.mock('@legacy-sports/shared-components', () => {
       loading: false,
       error: undefined,
     })),
-    useWebSocket: jest.fn(() => ({ connected: false })),
   };
 });
+
+jest.mock('../../../../hooks/useLeagueWebSocketLifecycle', () => ({
+  useLeagueWebSocketLifecycle: jest.fn(() => ({
+    client: null,
+    connected: false,
+  })),
+}));
 
 jest.mock('../../../../features/roster/LeagueRosterManagement', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');

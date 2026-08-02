@@ -12,7 +12,6 @@ import {
   PendingTradeOffers,
   PendingWaiverClaims,
   StandingsTable,
-  useWebSocket,
 } from '@legacy-sports/shared-components';
 import {
   AppTeamMemberFragment,
@@ -37,6 +36,9 @@ import { HOME_TAB_HREF, toIntId } from '../../../common/utilities/RouteUtils';
 import { setLastVisitedLeague } from '../../../common/utilities/lastVisitedLeague';
 import { useStandings } from '../../../features/matchup/hooks/useStandings';
 import { LeagueFreeAgents } from '../FreeAgents';
+import { LeagueWebSocketContext } from '../../../context/LeagueWebSocketContext';
+import { useLeagueWebSocketLifecycle } from '../../../hooks/useLeagueWebSocketLifecycle';
+import { useLeagueWebSocket } from '../../../hooks/useLeagueWebSocket';
 
 // This screen predates the sport-aware baseball/football league-detail routes
 // and hand-rolled its own tab bar, which wrapped labels across 3 lines at
@@ -53,6 +55,22 @@ const LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'chat', label: 'Chat' },
   { id: 'manage', label: 'Manage', commishOnly: true },
 ];
+
+/**
+ * Subscribes to page-level WS events. Rendered as a child of
+ * LeagueWebSocketContext.Provider (not the provider component itself) so it
+ * can actually read the context value the provider supplies.
+ */
+function LeagueWSPageHandler({
+  onRosterUpdate,
+  onDraftCompleted,
+}: {
+  onRosterUpdate: () => void;
+  onDraftCompleted: () => void;
+}) {
+  useLeagueWebSocket({ onRosterUpdate, onDraftCompleted });
+  return null;
+}
 
 function LeagueTeamsTab({
   leagueId,
@@ -235,19 +253,12 @@ export default function LeagueContext(): React.JSX.Element {
   }, [numLeagueId, leagueSport]);
 
   const wsUrl = config.websocketUrl;
-  const { connected: _wsConnected } = useWebSocket({
-    url: wsUrl ?? undefined,
-    token: wsToken,
-    leagueId: isNaN(numLeagueId) ? undefined : numLeagueId,
-    viewContext: 'league',
-    autoConnect: !isNaN(numLeagueId) && !!wsUrl && !!wsToken,
-    onRosterUpdate: () => {
-      // roster update events handled by Apollo cache
-    },
-    onDraftCompleted: () => {
-      Alert.alert('Draft Complete', 'The draft has finished!');
-    },
-  });
+  const { client: wsClient, connected: wsConnected } =
+    useLeagueWebSocketLifecycle({
+      url: wsUrl ?? undefined,
+      token: wsToken,
+      leagueId: isNaN(numLeagueId) ? undefined : numLeagueId,
+    });
 
   const sport: string =
     (league?.sport as string | null | undefined) ?? 'baseball';
@@ -325,127 +336,141 @@ export default function LeagueContext(): React.JSX.Element {
   }
 
   return (
-    <YStack flex={1}>
-      <Tabs
-        value={selectedTab}
-        onValueChange={setSelectedTab}
-        flexDirection="column"
-        flex={1}
-      >
-        <LeagueTabBar
-          tabs={LEAGUE_TABS}
-          activeTab={selectedTab}
-          onTabChange={setSelectedTab}
-          isMember={isMember}
-          isCommissioner={isCommissioner}
-        />
-
-        <Tabs.Content value="matchup" flex={1}>
-          <MatchupList
-            matchups={matchups}
-            loading={matchupsLoading}
-            emptyMessage="No matchups found for this league"
-            onMatchupPress={(matchup) => {
-              if (matchup.id != null) {
-                router.navigate({
-                  pathname: matchupPathname,
-                  params: {
-                    matchupId: String(matchup.id),
-                    leagueId: String(numLeagueId),
-                  },
-                });
-              }
-            }}
+    <LeagueWebSocketContext.Provider
+      value={{ client: wsClient, connected: wsConnected }}
+    >
+      <LeagueWSPageHandler
+        onRosterUpdate={() => {
+          // roster update events handled by Apollo cache
+        }}
+        onDraftCompleted={() => {
+          Alert.alert('Draft Complete', 'The draft has finished!');
+        }}
+      />
+      <YStack flex={1}>
+        <Tabs
+          value={selectedTab}
+          onValueChange={setSelectedTab}
+          flexDirection="column"
+          flex={1}
+        >
+          <LeagueTabBar
+            tabs={LEAGUE_TABS}
+            activeTab={selectedTab}
+            onTabChange={setSelectedTab}
+            isMember={isMember}
+            isCommissioner={isCommissioner}
           />
-        </Tabs.Content>
 
-        <Tabs.Content value="roster" flex={1}>
-          <LeagueRosterManagement
-            positions={positionsData?.leaguePositions || []}
-            teamPlayers={
-              (teamMembersData?.teamMembers?.filter(
-                (member): member is AppTeamMemberFragment => member !== null,
-              ) as AppTeamMemberFragment[]) || []
-            }
-            onPlayerAssign={(player, position) => {
-              void handlePlayerAssign(player, position);
-            }}
-            onPlayerRemove={(position) => {
-              void handlePlayerRemove(position);
-            }}
-            onPlayerSwap={(incoming, target, displaced) => {
-              void handlePlayerSwap(incoming, target, displaced);
-            }}
-            loading={positionsLoading || teamMembersLoading || userTeamLoading}
-            leagueId={numLeagueId}
-            currentWeek={league?.currentWeekNumber}
-            totalWeeks={league?.totalMatchups}
-            myTeamId={userTeamId}
-          />
-        </Tabs.Content>
-
-        <Tabs.Content value="players" flex={1}>
-          <LeagueTeamsTab leagueId={numLeagueId} sport={league.sport} />
-        </Tabs.Content>
-
-        <Tabs.Content value="freeagents" flex={1}>
-          <LeagueFreeAgents leagueId={numLeagueId} />
-        </Tabs.Content>
-
-        <Tabs.Content value="trades" flex={1}>
-          <ScrollView>
-            <YStack padding="$3" space="$4">
-              <YStack>
-                <Text fontSize="$5" fontWeight="600" marginBottom="$2">
-                  Trade Block
-                </Text>
-                <LeagueTradeBlock
-                  leagueId={numLeagueId}
-                  userTeamId={userTeamId}
-                />
-              </YStack>
-              {userTeamId && (
-                <YStack>
-                  <Text fontSize="$5" fontWeight="600" marginBottom="$2">
-                    Pending Trade Offers
-                  </Text>
-                  <PendingTradeOffers teamId={userTeamId} />
-                </YStack>
-              )}
-              {userTeamId && <PendingWaiverClaims teamId={userTeamId} />}
-            </YStack>
-          </ScrollView>
-        </Tabs.Content>
-
-        <Tabs.Content value="standings" flex={1}>
-          <ScrollView>
-            <YStack padding="$3">
-              <StandingsTable
-                standings={standings}
-                loading={standingsLoading}
-                error={standingsError}
-              />
-            </YStack>
-          </ScrollView>
-        </Tabs.Content>
-
-        <Tabs.Content value="chat" flex={1}>
-          <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
-        </Tabs.Content>
-
-        {isCommissioner && (
-          <Tabs.Content value="manage" flex={1}>
-            <CommissionerScreen
-              leagueId={numLeagueId}
-              league={league}
-              // Straight to the Home tab. `/` only redirects there, and
-              // routing through it left the redirect in the stack (LS-8823).
-              onLeagueDeleted={() => router.navigate(HOME_TAB_HREF)}
+          <Tabs.Content value="matchup" flex={1}>
+            <MatchupList
+              matchups={matchups}
+              loading={matchupsLoading}
+              emptyMessage="No matchups found for this league"
+              onMatchupPress={(matchup) => {
+                if (matchup.id != null) {
+                  router.navigate({
+                    pathname: matchupPathname,
+                    params: {
+                      matchupId: String(matchup.id),
+                      leagueId: String(numLeagueId),
+                    },
+                  });
+                }
+              }}
             />
           </Tabs.Content>
-        )}
-      </Tabs>
-    </YStack>
+
+          <Tabs.Content value="roster" flex={1}>
+            <LeagueRosterManagement
+              positions={positionsData?.leaguePositions || []}
+              teamPlayers={
+                (teamMembersData?.teamMembers?.filter(
+                  (member): member is AppTeamMemberFragment => member !== null,
+                ) as AppTeamMemberFragment[]) || []
+              }
+              onPlayerAssign={(player, position) => {
+                void handlePlayerAssign(player, position);
+              }}
+              onPlayerRemove={(position) => {
+                void handlePlayerRemove(position);
+              }}
+              onPlayerSwap={(incoming, target, displaced) => {
+                void handlePlayerSwap(incoming, target, displaced);
+              }}
+              loading={
+                positionsLoading || teamMembersLoading || userTeamLoading
+              }
+              leagueId={numLeagueId}
+              currentWeek={league?.currentWeekNumber}
+              totalWeeks={league?.totalMatchups}
+              myTeamId={userTeamId}
+            />
+          </Tabs.Content>
+
+          <Tabs.Content value="players" flex={1}>
+            <LeagueTeamsTab leagueId={numLeagueId} sport={league.sport} />
+          </Tabs.Content>
+
+          <Tabs.Content value="freeagents" flex={1}>
+            <LeagueFreeAgents leagueId={numLeagueId} />
+          </Tabs.Content>
+
+          <Tabs.Content value="trades" flex={1}>
+            <ScrollView>
+              <YStack padding="$3" space="$4">
+                <YStack>
+                  <Text fontSize="$5" fontWeight="600" marginBottom="$2">
+                    Trade Block
+                  </Text>
+                  <LeagueTradeBlock
+                    leagueId={numLeagueId}
+                    userTeamId={userTeamId}
+                  />
+                </YStack>
+                {userTeamId && (
+                  <YStack>
+                    <Text fontSize="$5" fontWeight="600" marginBottom="$2">
+                      Pending Trade Offers
+                    </Text>
+                    <PendingTradeOffers teamId={userTeamId} />
+                  </YStack>
+                )}
+                {userTeamId && <PendingWaiverClaims teamId={userTeamId} />}
+              </YStack>
+            </ScrollView>
+          </Tabs.Content>
+
+          <Tabs.Content value="standings" flex={1}>
+            <ScrollView>
+              <YStack padding="$3">
+                <StandingsTable
+                  standings={standings}
+                  loading={standingsLoading}
+                  error={standingsError}
+                />
+              </YStack>
+            </ScrollView>
+          </Tabs.Content>
+
+          <Tabs.Content value="chat" flex={1}>
+            <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
+          </Tabs.Content>
+
+          {isCommissioner && (
+            <Tabs.Content value="manage" flex={1}>
+              <CommissionerScreen
+                leagueId={numLeagueId}
+                league={league}
+                // Straight to the Home tab. `/` only redirects there, and
+                // routing through it left the redirect in the stack (LS-8823).
+                onLeagueDeleted={() => router.navigate(HOME_TAB_HREF)}
+              />
+            </Tabs.Content>
+          )}
+        </Tabs>
+      </YStack>
+    </LeagueWebSocketContext.Provider>
   );
 }
 

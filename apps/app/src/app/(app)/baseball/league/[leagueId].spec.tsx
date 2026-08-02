@@ -190,9 +190,15 @@ jest.mock('@legacy-sports/shared-components', () => {
       loading: false,
       error: undefined,
     })),
-    useWebSocket: jest.fn(() => ({ connected: false })),
   };
 });
+
+jest.mock('../../../../hooks/useLeagueWebSocketLifecycle', () => ({
+  useLeagueWebSocketLifecycle: jest.fn(() => ({
+    client: null,
+    connected: false,
+  })),
+}));
 
 // Spy fired once per mount of the mocked roster subtree. Keep-alive means it
 // stays mounted across tab switches, so a re-visit must NOT re-fire it.
@@ -534,38 +540,38 @@ describe('BaseballLeagueId', () => {
   });
 
   describe('WebSocket token effect (LS-7627)', () => {
-    type WsProps = { token?: string; autoConnect?: boolean };
+    type LifecycleProps = { token?: string; url?: string; leagueId?: number };
 
     const getReadKeychainValue = () =>
       jest.requireMock<{ readKeychainValue: jest.Mock }>(
         '../../../../common/auth/AuthHooks',
       ).readKeychainValue;
 
-    const getUseWebSocket = () =>
-      jest.requireMock<{ useWebSocket: jest.Mock }>(
-        '@legacy-sports/shared-components',
-      ).useWebSocket;
+    const getUseLeagueWebSocketLifecycle = () =>
+      jest.requireMock<{ useLeagueWebSocketLifecycle: jest.Mock }>(
+        '../../../../hooks/useLeagueWebSocketLifecycle',
+      ).useLeagueWebSocketLifecycle;
 
     const getLogger = () =>
       jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
         '@legacy-sports/logging',
       ).LOGGER;
 
-    const lastWsProps = (): WsProps | undefined => {
-      const calls = getUseWebSocket().mock.calls as unknown as WsProps[][];
+    const lastLifecycleProps = (): LifecycleProps | undefined => {
+      const calls = getUseLeagueWebSocketLifecycle().mock
+        .calls as unknown as LifecycleProps[][];
       return calls.length ? calls[calls.length - 1][0] : undefined;
     };
 
     const KEYCHAIN_ERROR_MESSAGE = 'Failed to read WS token from keychain';
 
-    it('sets wsToken and enables autoConnect when the keychain read returns a token', async () => {
+    it('sets wsToken once the keychain read returns a token', async () => {
       getReadKeychainValue().mockResolvedValueOnce('ws-jwt-token');
       render(<BaseballLeagueId />);
 
       await waitFor(() => {
-        expect(lastWsProps()?.token).toBe('ws-jwt-token');
+        expect(lastLifecycleProps()?.token).toBe('ws-jwt-token');
       });
-      expect(lastWsProps()?.autoConnect).toBe(true);
       expect(getLogger().error).not.toHaveBeenCalledWith(
         KEYCHAIN_ERROR_MESSAGE,
         expect.anything(),
@@ -579,8 +585,7 @@ describe('BaseballLeagueId', () => {
       await waitFor(() => {
         expect(getReadKeychainValue()).toHaveBeenCalledWith('INTERNAL_JWT');
       });
-      expect(lastWsProps()?.token).toBeUndefined();
-      expect(lastWsProps()?.autoConnect).toBe(false);
+      expect(lastLifecycleProps()?.token).toBeUndefined();
       expect(getLogger().error).not.toHaveBeenCalledWith(
         KEYCHAIN_ERROR_MESSAGE,
         expect.anything(),
@@ -599,8 +604,7 @@ describe('BaseballLeagueId', () => {
           expect.any(Error),
         );
       });
-      expect(lastWsProps()?.token).toBeUndefined();
-      expect(lastWsProps()?.autoConnect).toBe(false);
+      expect(lastLifecycleProps()?.token).toBeUndefined();
     });
   });
 

@@ -21,7 +21,6 @@ import {
   StandingsTable,
   TradingCenter,
   usePlayoffBracket,
-  useWebSocket,
 } from '@legacy-sports/shared-components';
 import {
   AppTeamMemberFragment,
@@ -47,6 +46,9 @@ import { readKeychainValue, Secret } from '../../../../common/auth/AuthHooks';
 import { setLastVisitedLeague } from '../../../../common/utilities/lastVisitedLeague';
 import { HOME_TAB_HREF } from '../../../../common/utilities/RouteUtils';
 import { useSubscription } from '../../../../features/subscription/useSubscription';
+import { LeagueWebSocketContext } from '../../../../context/LeagueWebSocketContext';
+import { useLeagueWebSocketLifecycle } from '../../../../hooks/useLeagueWebSocketLifecycle';
+import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
 
 const BASE_FOOTBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'overview', label: 'Overview' },
@@ -57,6 +59,24 @@ const BASE_FOOTBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'chat', label: 'Chat' },
   { id: 'commissioner', label: 'Settings', commishOnly: true },
 ];
+
+/**
+ * Subscribes to page-level WS events. Rendered as a child of
+ * LeagueWebSocketContext.Provider (not the provider component itself) so it
+ * can actually read the context value the provider supplies.
+ */
+function LeagueWSPageHandler({
+  onRosterUpdate,
+  onTradeOffer,
+  onDraftCompleted,
+}: {
+  onRosterUpdate: () => void;
+  onTradeOffer: () => void;
+  onDraftCompleted: () => void;
+}) {
+  useLeagueWebSocket({ onRosterUpdate, onTradeOffer, onDraftCompleted });
+  return null;
+}
 
 export default function FootballLeagueId(): React.JSX.Element {
   const params = useLocalSearchParams();
@@ -241,22 +261,12 @@ export default function FootballLeagueId(): React.JSX.Element {
   );
 
   const wsUrl = config.websocketUrl;
-  const { connected: _wsConnected } = useWebSocket({
-    url: wsUrl ?? undefined,
-    token: wsToken,
-    leagueId: isNaN(numLeagueId) ? undefined : numLeagueId,
-    viewContext: 'league',
-    autoConnect: !isNaN(numLeagueId) && !!wsUrl && !!wsToken,
-    onRosterUpdate: () => {
-      tradeRefetchRef.current?.();
-    },
-    onTradeOffer: () => {
-      tradeRefetchRef.current?.();
-    },
-    onDraftCompleted: () => {
-      Alert.alert('Draft Complete', 'The draft has finished!');
-    },
-  });
+  const { client: wsClient, connected: wsConnected } =
+    useLeagueWebSocketLifecycle({
+      url: wsUrl ?? undefined,
+      token: wsToken,
+      leagueId: isNaN(numLeagueId) ? undefined : numLeagueId,
+    });
 
   const inviteCode = league?.inviteCode ?? '';
   const appBaseUrl = config.appBaseUrl ?? 'https://legacysports.app';
@@ -404,215 +414,232 @@ export default function FootballLeagueId(): React.JSX.Element {
   }
 
   return (
-    <LeagueDetailShell
-      sport="football"
-      fill
-      league={{
-        name: league.name ?? 'League',
-        scoringLabel: scoring.profileName ?? 'Standard',
-        era:
-          league.minCareerSeasons || league.minCareerGames
-            ? `Career filter · ${league.minCareerSeasons ?? 0}+ seasons`
-            : 'All-Time',
-        draftStatus: league.draftStatus ?? 'pre-draft',
-        currentWeek: league.currentWeekNumber ?? null,
-        totalMatchups: league.totalMatchups ?? null,
-        teamCount: rankedStandings.length || null,
-        inviteCode: league.inviteCode,
-      }}
-      role={role}
-      onRoleChange={setRole}
-      season={season}
-      onSeasonChange={setSeason}
-      seasons={seasonOptions}
-      isCommissioner={isCommissioner}
-      isMember={isMember}
-      tabs={leagueTabs}
-      activeTab={selectedTab}
-      onTabChange={setSelectedTab}
-      onInvite={() => void handleInviteShare()}
+    <LeagueWebSocketContext.Provider
+      value={{ client: wsClient, connected: wsConnected }}
     >
-      {userTeamId != null && (
-        <YStack paddingHorizontal="$2" paddingTop="$2">
-          <PendingTradeOfferBanner
-            teamId={userTeamId}
-            onReview={() => setSelectedTab('trades')}
-          />
-        </YStack>
-      )}
-      {selectedTab === 'overview' && (
-        <YStack flex={1}>
-          <LeagueOverviewTab
-            league={league}
-            leagueId={numLeagueId}
-            isCommissioner={isCommissioner}
-            isDrafting={isDrafting}
-            rankedStandings={rankedStandings}
-            startersCount={startersCount}
-            inviteCode={inviteCode}
-            onJoinDraft={() =>
-              router.navigate({
-                pathname: '/DraftBoardPage',
-                params: { leagueId: String(numLeagueId) },
-              })
-            }
-            onViewAllStandings={() => setSelectedTab('standings')}
-            onInviteShare={() => void handleInviteShare()}
-            onPlayerPress={(playerId) =>
-              router.push({
-                pathname: '/PlayerDetail',
-                params: { playerId: String(playerId), playerName: '' },
-              })
-            }
-          />
-        </YStack>
-      )}
-
-      {selectedTab === 'roster' && (
-        <YStack flex={1}>
-          <LeagueRosterManagement
-            positions={positionsData?.leaguePositions || []}
-            teamPlayers={
-              teamMembersData?.teamMembers?.filter(
-                (member): member is AppTeamMemberFragment => member !== null,
-              ) ?? []
-            }
-            onPlayerAssign={(player, position) => {
-              void handlePlayerAssign(player, position);
-            }}
-            onPlayerRemove={(position) => {
-              void handlePlayerRemove(position);
-            }}
-            onPlayerSwap={(incoming, target, displaced) => {
-              void handlePlayerSwap(incoming, target, displaced);
-            }}
-            onPlayerPress={handlePlayerPress}
-            loading={positionsLoading || teamMembersLoading || userTeamLoading}
-            leagueId={numLeagueId}
-            currentWeek={league?.currentWeekNumber}
-            totalWeeks={league?.totalMatchups}
-            myTeamId={userTeamId}
-          />
-        </YStack>
-      )}
-
-      {selectedTab === 'matchups' && (
-        <YStack flex={1}>
-          <MatchupList
-            matchups={matchups}
-            loading={matchupsLoading}
-            emptyMessage="No matchups found for this league"
-            onMatchupPress={(matchup) => {
-              if (matchup.id != null) {
+      <LeagueWSPageHandler
+        onRosterUpdate={() => {
+          tradeRefetchRef.current?.();
+        }}
+        onTradeOffer={() => {
+          tradeRefetchRef.current?.();
+        }}
+        onDraftCompleted={() => {
+          Alert.alert('Draft Complete', 'The draft has finished!');
+        }}
+      />
+      <LeagueDetailShell
+        sport="football"
+        fill
+        league={{
+          name: league.name ?? 'League',
+          scoringLabel: scoring.profileName ?? 'Standard',
+          era:
+            league.minCareerSeasons || league.minCareerGames
+              ? `Career filter · ${league.minCareerSeasons ?? 0}+ seasons`
+              : 'All-Time',
+          draftStatus: league.draftStatus ?? 'pre-draft',
+          currentWeek: league.currentWeekNumber ?? null,
+          totalMatchups: league.totalMatchups ?? null,
+          teamCount: rankedStandings.length || null,
+          inviteCode: league.inviteCode,
+        }}
+        role={role}
+        onRoleChange={setRole}
+        season={season}
+        onSeasonChange={setSeason}
+        seasons={seasonOptions}
+        isCommissioner={isCommissioner}
+        isMember={isMember}
+        tabs={leagueTabs}
+        activeTab={selectedTab}
+        onTabChange={setSelectedTab}
+        onInvite={() => void handleInviteShare()}
+      >
+        {userTeamId != null && (
+          <YStack paddingHorizontal="$2" paddingTop="$2">
+            <PendingTradeOfferBanner
+              teamId={userTeamId}
+              onReview={() => setSelectedTab('trades')}
+            />
+          </YStack>
+        )}
+        {selectedTab === 'overview' && (
+          <YStack flex={1}>
+            <LeagueOverviewTab
+              league={league}
+              leagueId={numLeagueId}
+              isCommissioner={isCommissioner}
+              isDrafting={isDrafting}
+              rankedStandings={rankedStandings}
+              startersCount={startersCount}
+              inviteCode={inviteCode}
+              onJoinDraft={() =>
                 router.navigate({
-                  pathname: '/football/matchup',
-                  params: {
-                    matchupId: String(matchup.id),
-                    leagueId: String(numLeagueId),
-                  },
-                });
+                  pathname: '/DraftBoardPage',
+                  params: { leagueId: String(numLeagueId) },
+                })
               }
-            }}
-          />
-        </YStack>
-      )}
+              onViewAllStandings={() => setSelectedTab('standings')}
+              onInviteShare={() => void handleInviteShare()}
+              onPlayerPress={(playerId) =>
+                router.push({
+                  pathname: '/PlayerDetail',
+                  params: { playerId: String(playerId), playerName: '' },
+                })
+              }
+            />
+          </YStack>
+        )}
 
-      {/* Trades Tab — full shared Trading Center (propose / history / veto) */}
-      {selectedTab === 'trades' && (
-        <YStack flex={1}>
-          <ScrollView>
-            <YStack padding="$3" space="$4">
-              {userTeamId ? (
-                <>
-                  <TradingCenter
-                    leagueId={numLeagueId}
-                    userTeamId={userTeamId}
-                    isCommissioner={isCommissioner}
-                    onSubscribeRefresh={onTradesSubscribeRefresh}
-                    isPremium={isPremium}
-                    onUpgradePremium={() =>
-                      router.navigate('subscription-settings')
-                    }
-                  />
-                  <PendingWaiverClaims teamId={userTeamId} />
-                </>
-              ) : (
-                <Text color="$textMuted">
-                  Join this league to propose and manage trades.
-                </Text>
-              )}
-            </YStack>
-          </ScrollView>
-        </YStack>
-      )}
+        {selectedTab === 'roster' && (
+          <YStack flex={1}>
+            <LeagueRosterManagement
+              positions={positionsData?.leaguePositions || []}
+              teamPlayers={
+                teamMembersData?.teamMembers?.filter(
+                  (member): member is AppTeamMemberFragment => member !== null,
+                ) ?? []
+              }
+              onPlayerAssign={(player, position) => {
+                void handlePlayerAssign(player, position);
+              }}
+              onPlayerRemove={(position) => {
+                void handlePlayerRemove(position);
+              }}
+              onPlayerSwap={(incoming, target, displaced) => {
+                void handlePlayerSwap(incoming, target, displaced);
+              }}
+              onPlayerPress={handlePlayerPress}
+              loading={
+                positionsLoading || teamMembersLoading || userTeamLoading
+              }
+              leagueId={numLeagueId}
+              currentWeek={league?.currentWeekNumber}
+              totalWeeks={league?.totalMatchups}
+              myTeamId={userTeamId}
+            />
+          </YStack>
+        )}
 
-      {selectedTab === 'waivers' && (
-        <YStack flex={1}>
-          <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-            <YStack padding="$3" gap="$4">
-              {userTeamId ? (
-                <>
-                  <PendingWaiverClaims teamId={userTeamId} />
-                  <Button
-                    size="$4"
-                    onPress={() =>
-                      router.navigate({
-                        pathname: '/FreeAgents',
-                        params: { leagueId: String(numLeagueId) },
-                      })
-                    }
-                    icon={<ShoppingCart size={18} />}
-                    accessibilityRole="button"
-                  >
-                    Browse Free Agents & Submit Claim
-                  </Button>
-                </>
-              ) : (
-                <Text color="$textMuted">
-                  Join this league to view and submit waiver claims.
-                </Text>
-              )}
-            </YStack>
-          </ScrollView>
-        </YStack>
-      )}
+        {selectedTab === 'matchups' && (
+          <YStack flex={1}>
+            <MatchupList
+              matchups={matchups}
+              loading={matchupsLoading}
+              emptyMessage="No matchups found for this league"
+              onMatchupPress={(matchup) => {
+                if (matchup.id != null) {
+                  router.navigate({
+                    pathname: '/football/matchup',
+                    params: {
+                      matchupId: String(matchup.id),
+                      leagueId: String(numLeagueId),
+                    },
+                  });
+                }
+              }}
+            />
+          </YStack>
+        )}
 
-      {selectedTab === 'standings' && (
-        <YStack flex={1}>
-          <ScrollView>
-            <YStack padding="$3" space="$4">
-              <StandingsTable
-                standings={standings}
-                loading={standingsLoading}
-                error={standingsError}
-                currentUserTeamId={userTeamId ?? null}
-              />
-              {playoffBracket ? (
-                <PlayoffBracket bracket={playoffBracket} />
-              ) : null}
-            </YStack>
-          </ScrollView>
-        </YStack>
-      )}
+        {/* Trades Tab — full shared Trading Center (propose / history / veto) */}
+        {selectedTab === 'trades' && (
+          <YStack flex={1}>
+            <ScrollView>
+              <YStack padding="$3" space="$4">
+                {userTeamId ? (
+                  <>
+                    <TradingCenter
+                      leagueId={numLeagueId}
+                      userTeamId={userTeamId}
+                      isCommissioner={isCommissioner}
+                      onSubscribeRefresh={onTradesSubscribeRefresh}
+                      isPremium={isPremium}
+                      onUpgradePremium={() =>
+                        router.navigate('subscription-settings')
+                      }
+                    />
+                    <PendingWaiverClaims teamId={userTeamId} />
+                  </>
+                ) : (
+                  <Text color="$textMuted">
+                    Join this league to propose and manage trades.
+                  </Text>
+                )}
+              </YStack>
+            </ScrollView>
+          </YStack>
+        )}
 
-      {selectedTab === 'chat' && (
-        <YStack flex={1}>
-          <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
-        </YStack>
-      )}
+        {selectedTab === 'waivers' && (
+          <YStack flex={1}>
+            <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+              <YStack padding="$3" gap="$4">
+                {userTeamId ? (
+                  <>
+                    <PendingWaiverClaims teamId={userTeamId} />
+                    <Button
+                      size="$4"
+                      onPress={() =>
+                        router.navigate({
+                          pathname: '/FreeAgents',
+                          params: { leagueId: String(numLeagueId) },
+                        })
+                      }
+                      icon={<ShoppingCart size={18} />}
+                      accessibilityRole="button"
+                    >
+                      Browse Free Agents & Submit Claim
+                    </Button>
+                  </>
+                ) : (
+                  <Text color="$textMuted">
+                    Join this league to view and submit waiver claims.
+                  </Text>
+                )}
+              </YStack>
+            </ScrollView>
+          </YStack>
+        )}
 
-      {selectedTab === 'commissioner' && isCommissioner && (
-        <YStack flex={1}>
-          <CommissionerScreen
-            leagueId={numLeagueId}
-            league={league}
-            // Straight to the Home tab. `/` only redirects there, and routing
-            // through it left the redirect in the stack (LS-8823).
-            onLeagueDeleted={() => router.navigate(HOME_TAB_HREF)}
-          />
-        </YStack>
-      )}
-    </LeagueDetailShell>
+        {selectedTab === 'standings' && (
+          <YStack flex={1}>
+            <ScrollView>
+              <YStack padding="$3" space="$4">
+                <StandingsTable
+                  standings={standings}
+                  loading={standingsLoading}
+                  error={standingsError}
+                  currentUserTeamId={userTeamId ?? null}
+                />
+                {playoffBracket ? (
+                  <PlayoffBracket bracket={playoffBracket} />
+                ) : null}
+              </YStack>
+            </ScrollView>
+          </YStack>
+        )}
+
+        {selectedTab === 'chat' && (
+          <YStack flex={1}>
+            <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
+          </YStack>
+        )}
+
+        {selectedTab === 'commissioner' && isCommissioner && (
+          <YStack flex={1}>
+            <CommissionerScreen
+              leagueId={numLeagueId}
+              league={league}
+              // Straight to the Home tab. `/` only redirects there, and routing
+              // through it left the redirect in the stack (LS-8823).
+              onLeagueDeleted={() => router.navigate(HOME_TAB_HREF)}
+            />
+          </YStack>
+        )}
+      </LeagueDetailShell>
+    </LeagueWebSocketContext.Provider>
   );
 }
 
