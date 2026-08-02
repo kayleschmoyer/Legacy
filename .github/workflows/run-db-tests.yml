@@ -1,18 +1,23 @@
 # =============================================================================
 # DB Integration Tests
 # =============================================================================
-# Triggered on push when migration or test files change, giving fast feedback
-# on PRs that touch the schema. Also available via manual dispatch.
+# Triggered on pull requests when migration or test files change, giving fast
+# feedback on PRs that touch the schema. Also available via manual dispatch.
 #
 # Notification policy:
-#   - push:             notify only on failure (no Discord noise for passing runs)
+#   - pull_request:      notify only on failure (no Discord noise for passing runs)
 #   - workflow_dispatch: notify on start and finish regardless of result
+#
+# concurrency: scoped to the PR (falling back to the ref for workflow_dispatch)
+# so rapid pushes/force-pushes cancel the still-running job for that PR instead
+# of stacking up redundant 15-minute Postgres-service jobs (LS-8894).
 # =============================================================================
 
 name: "DB Integration Tests"
 
 on:
-  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
     paths:
       - "lib/db-client/migrations/**"
       - "lambdas/db/src/**"
@@ -27,6 +32,10 @@ on:
         required: false
         default: ""
         type: string
+
+concurrency:
+  group: db-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -126,7 +135,7 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # Discord notification — fires after tests finish
-  # Push events: only on failure. Manual dispatch: always.
+  # pull_request events: only on failure. Manual dispatch: always.
   # ---------------------------------------------------------------------------
   notify-finish:
     name: "DB Tests — Results"
