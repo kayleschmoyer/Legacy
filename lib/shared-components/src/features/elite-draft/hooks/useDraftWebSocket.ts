@@ -26,6 +26,13 @@ import { normalizeTeamId } from '../utils';
 const RECONNECT_REFETCH_ATTEMPTS = 3;
 /** Base delay for the exponential backoff between reconnect refetch attempts. */
 const RECONNECT_REFETCH_BASE_DELAY_MS = 500;
+/**
+ * Heartbeat cadence for an active draft — much faster than the client's
+ * general-purpose default so a zombie connection is detected and reconnected
+ * within seconds instead of minutes, matching the urgency of a live draft
+ * board (LS-8880).
+ */
+const DRAFT_HEARTBEAT_MS = 15 * 1000;
 
 type ReconnectRefetchOutcome = 'ok' | 'cancelled' | 'failed';
 
@@ -367,6 +374,7 @@ export function useDraftWebSocket({
     leagueId: leagueId ?? undefined,
     viewContext: 'league',
     autoConnect: !!leagueId && isAuthenticated && !isAuctionDraft,
+    heartbeatMs: DRAFT_HEARTBEAT_MS,
     onDraftStarted: handleDraftStarted,
     onDraftPickMade: handleDraftPickMade,
     onDraftPickUndone: handleDraftPickUndone,

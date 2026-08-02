@@ -22,6 +22,7 @@ interface MockWSClient {
   disconnect: jest.Mock;
   send: jest.Mock;
   updateContext: jest.Mock;
+  setHeartbeatInterval: jest.Mock;
   dispose: jest.Mock;
   _handlers: Map<string, EventHandler[]>;
   _emit: (event: string, ...args: unknown[]) => void;
@@ -48,6 +49,7 @@ function mockMakeWSClient(): MockWSClient {
     disconnect: jest.fn(),
     send: jest.fn(),
     updateContext: jest.fn(),
+    setHeartbeatInterval: jest.fn(),
     dispose: jest.fn(),
     _handlers: handlers,
     _emit(event: string, ...args: unknown[]) {
@@ -527,5 +529,22 @@ describe('useDraftWebSocket — BFCache restoration recovery (LS-6792)', () => {
 
     expect(mockInstance.disconnect).not.toHaveBeenCalled();
     expect(mockInstance.connect).not.toHaveBeenCalled();
+  });
+});
+
+describe('useDraftWebSocket — heartbeat (LS-8880)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('requests a fast heartbeat interval so a dead draft socket is detected quickly', () => {
+    const params = makeDefaultParams();
+
+    renderHook(() => useDraftWebSocket(params));
+
+    // Matches DRAFT_HEARTBEAT_MS in useDraftWebSocket.ts (15s) — far below
+    // WebSocketClient's general-purpose default so a zombie draft connection
+    // is caught in seconds, not minutes.
+    expect(mockInstance.setHeartbeatInterval).toHaveBeenCalledWith(15_000);
   });
 });

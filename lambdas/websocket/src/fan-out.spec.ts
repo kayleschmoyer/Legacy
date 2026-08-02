@@ -604,6 +604,55 @@ describe('WebSocket fan-out (LS-8856)', () => {
     expect(messagesAfterUnsubscribe).toHaveLength(0);
   });
 
+  // ── LS-8880: heartbeat ping/pong wire format, joined to the real $default
+  // handler — previously only ever exercised against mocks of the other side
+  // (WebSocketClient.spec.ts mocks the server; index.spec.ts mocks the AWS
+  // SDK client and asserts the pong payload in isolation) ──
+
+  it('keeps a real connection alive across several genuine ping/pong heartbeat cycles (AC3)', async () => {
+    const user = registerUser('heartbeat-user');
+    const heartbeatClient = client({ token: user.token, reconnect: false });
+    await waitForEvent(heartbeatClient, 'connected');
+
+    const disconnected = jest.fn();
+    heartbeatClient.on('disconnected', disconnected);
+
+    // Exercise the production heartbeat wiring (setHeartbeatInterval) — the
+    // API this ticket found had no production caller — against the real
+    // `$default` handler instead of a mock. A very short interval forces
+    // several genuine ping/pong round-trips within the test's lifetime.
+    heartbeatClient.setHeartbeatInterval(50);
+
+    // Long enough for multiple heartbeat cycles. If the real pong's wire
+    // format didn't match what the real client expects, consecutive misses
+    // would hit MAX_CONSECUTIVE_PINGS and the client would self-disconnect —
+    // so staying connected here is proof the round trip actually worked.
+    await sleep(500);
+
+    expect(heartbeatClient.getState()).toBe('connected');
+    expect(disconnected).not.toHaveBeenCalled();
+
+    // Confirm the server's actual wire payload, not just the client's
+    // internal state, matches the `{ type: 'pong' }` contract.
+    const pongPayloads = mockApiGatewaySend.mock.calls
+      .map(([command]) => command)
+      .filter(
+        (command): command is { _type: string; input: { Data: Buffer } } =>
+          command._type === 'PostToConnection',
+      )
+      .map((command) => {
+        try {
+          return JSON.parse(command.input.Data.toString('utf-8')) as {
+            type?: string;
+          };
+        } catch {
+          return null;
+        }
+      });
+
+    expect(pongPayloads.some((payload) => payload?.type === 'pong')).toBe(true);
+  });
+
   // ── AC5: no cross-league leakage ──
 
   it('does not leak a league broadcast to a client subscribed to a different league', async () => {

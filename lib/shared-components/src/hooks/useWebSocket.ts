@@ -85,6 +85,12 @@ interface UseWebSocketOptions {
   matchupId?: number;
   viewContext?: 'general' | 'league' | 'matchup' | 'roster';
   autoConnect?: boolean;
+  /**
+   * Overrides `WebSocketClient`'s default heartbeat cadence (see
+   * `setHeartbeatInterval`) for callers with a tighter idle-detection need
+   * than the default, e.g. an active draft (LS-8880).
+   */
+  heartbeatMs?: number;
   onDraftStarted?: (notification: DraftStartedNotification) => void;
   onDraftCompleted?: (notification: DraftCompletedNotification) => void;
   onDraftPickMade?: (notification: DraftPickNotification) => void;
@@ -133,6 +139,7 @@ export function useWebSocket({
   matchupId,
   viewContext = 'general',
   autoConnect = true,
+  heartbeatMs,
   onDraftStarted,
   onDraftCompleted,
   onDraftPickMade,
@@ -282,6 +289,10 @@ export function useWebSocket({
     });
 
     clientRef.current = client;
+
+    if (heartbeatMs) {
+      client.setHeartbeatInterval(heartbeatMs);
+    }
 
     // Defer connection to next microtask so Strict Mode cleanup can cancel it
     let cancelled = false;
@@ -468,6 +479,7 @@ export function useWebSocket({
     matchupId,
     viewContext,
     autoConnect,
+    heartbeatMs,
     onDraftStartedRef,
     onDraftCompletedRef,
     onDraftPickMadeRef,

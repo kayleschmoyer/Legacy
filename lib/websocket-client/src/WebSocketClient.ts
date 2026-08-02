@@ -11,7 +11,13 @@ import type {
 } from './types';
 
 // Constants
-const DEFAULT_HEARTBEAT_MS = 8 * 60 * 1000; // 8 minutes
+/** API Gateway drops a WebSocket connection after this long with no activity. */
+const API_GATEWAY_IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+// Half the API Gateway idle timeout, so an idle connection always gets a
+// second ping cycle inside the timeout window even if the first ping's pong
+// is delayed — an 8-minute default against the same 10-minute timeout left
+// only one untried cycle before the socket died mid-draft (LS-8880).
+const DEFAULT_HEARTBEAT_MS = API_GATEWAY_IDLE_TIMEOUT_MS / 2; // 5 minutes
 const MAX_CONSECUTIVE_PINGS = 3;
 // A permanently-rejected connection (bad origin, revoked user, expired/
 // malformed token) must not retry forever — see LS-8881. Neither browsers
@@ -325,7 +331,7 @@ export class WebSocketClient {
    *
    * Use a shorter interval (e.g. 15 s) during transient high-value windows
    * like active drafts so zombie connections are detected quickly, then reset
-   * to the default (8 min) once the window closes.
+   * to the default (5 min) once the window closes.
    *
    * Pass `undefined` or `0` to restore the default interval.
    */

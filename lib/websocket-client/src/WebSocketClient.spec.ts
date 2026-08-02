@@ -820,8 +820,8 @@ describe('WebSocketClient', () => {
 
       jest.advanceTimersByTime(100);
 
-      // Advance past idle period (8 minutes)
-      jest.advanceTimersByTime(8 * 60 * 1000 + 100);
+      // Advance past idle period (5 minutes — see DEFAULT_HEARTBEAT_MS, LS-8880)
+      jest.advanceTimersByTime(5 * 60 * 1000 + 100);
 
       expect(receivedPing).toBe(true);
       client.dispose();

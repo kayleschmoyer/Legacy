@@ -12,6 +12,7 @@ interface MockWSClient {
   disconnect: jest.Mock;
   send: jest.Mock;
   updateContext: jest.Mock;
+  setHeartbeatInterval: jest.Mock;
   dispose: jest.Mock;
   _handlers: Map<string, EventHandler[]>;
   _emit: (event: string, ...args: unknown[]) => void;
@@ -38,6 +39,7 @@ function mockCreateInstance(): MockWSClient {
     disconnect: jest.fn(),
     send: jest.fn(),
     updateContext: jest.fn(),
+    setHeartbeatInterval: jest.fn(),
     dispose: jest.fn(),
     _handlers: handlers,
     _emit(event: string, ...args: unknown[]) {
@@ -115,6 +117,28 @@ describe('useWebSocket', () => {
   it('does not create client when url prop is omitted (callers must pass url)', () => {
     renderHook(() => useWebSocket({ token: 'jwt-token' }));
     expect(getConstructor()).not.toHaveBeenCalled();
+  });
+
+  // ── heartbeatMs (LS-8880) ───────────────────────────────────────────────
+
+  it('calls client.setHeartbeatInterval when heartbeatMs is provided', () => {
+    renderHook(() =>
+      useWebSocket({
+        url: 'wss://example.com',
+        token: 'jwt-token',
+        heartbeatMs: 15_000,
+      }),
+    );
+
+    expect(mockInstance.setHeartbeatInterval).toHaveBeenCalledWith(15_000);
+  });
+
+  it('does not call client.setHeartbeatInterval when heartbeatMs is omitted', () => {
+    renderHook(() =>
+      useWebSocket({ url: 'wss://example.com', token: 'jwt-token' }),
+    );
+
+    expect(mockInstance.setHeartbeatInterval).not.toHaveBeenCalled();
   });
 
   // ── Auto-connect ────────────────────────────────────────────────────────
