@@ -22,6 +22,11 @@ export default {
   transformIgnorePatterns: [
     'node_modules/(?!(react-native|@react-native|expo|@expo|@unimodules|unimodules|react-clone-referenced-element|@react-native-community|react-navigation|@react-navigation|@sentry/react-native|native-base|react-native-svg|react-native-screens|react-native-vector-icons)/)',
   ],
+  // Mobile-only regression test (LS-8852) — see jest.config.web.ts for why.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/src/features/leagues/ProposeTradeDialogNativeModal.spec.tsx',
+  ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
 };

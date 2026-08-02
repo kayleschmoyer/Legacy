@@ -22,7 +22,19 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(react-native|@react-native|@react-native-google-signin|expo|@expo|expo-secure-store|@unimodules|unimodules|react-clone-referenced-element|@react-native-community|react-navigation|@react-navigation|native-base|react-native-svg|react-native-screens|react-native-vector-icons)/)',
   ],
-  testPathIgnorePatterns: ['/node_modules/', '/src/features/leagues/'],
+  // Everything under src/features/leagues/ (at any depth) was previously
+  // blanket-excluded from mobile — those specs are web-oriented and not
+  // mobile-safe (e.g. premium/premium-fields.spec.tsx expects DOM testids
+  // the mobile icon mocks don't produce). Preserve that exclusion via a
+  // negative lookahead so it keeps covering every file (current and
+  // future) EXCEPT the one new, purpose-built mobile spec (LS-8852) — an
+  // enumerated file list silently drifts out of sync as files are added
+  // under leagues/ (subdirectories especially, as this one did on the
+  // first pass).
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/src/features/leagues/(?!ProposeTradeDialogNativeModal\\.spec\\.tsx$)',
+  ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
 };

@@ -13,6 +13,7 @@
  *  - Commissioner veto button on accepted trades
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Modal, useWindowDimensions } from 'react-native';
 import {
   Card,
   type CardProps,
@@ -756,6 +757,8 @@ function ProposeTradeDialog({
   });
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const isNative = Platform.OS !== 'web';
+  const { height: windowHeight } = useWindowDimensions();
 
   const { data: teamsData } = useGetLeagueTeamsQuery({
     variables: { leagueId },
@@ -901,24 +904,34 @@ function ProposeTradeDialog({
   const currentExpiryLabel =
     EXPIRY_OPTIONS[currentExpiryIdx >= 0 ? currentExpiryIdx : 0].label;
 
-  return (
+  // On web, anchor the overlay to the viewport (`fixed`) rather than the
+  // document (`absolute`) — at a mobile viewport the trades panel is far
+  // taller than the screen, so an `absolute` inset:0 overlay would span the
+  // tall document and center itself around the document's middle, off the
+  // current fold. (LS-8501)
+  //
+  // On native there is no `fixed`, and `absolute` only escapes the nearest
+  // *positioned* ancestor — the Trades tab hosts TradingCenter inside a
+  // ScrollView, so an inset:0 `absolute` overlay stretches over the tall
+  // scroll content instead of the device viewport, leaving the dialog
+  // unreachable. Rendering it inside React Native's `Modal` (same pattern as
+  // apps/app/src/features/leagues/CreateLeagueModal.tsx) escapes the
+  // ScrollView entirely — the Modal mounts its own top-level native window
+  // above everything and wires the Android hardware back button to dismiss.
+  // (LS-8852)
+  const dialogOverlay = (
     <YStack
-      // On web, anchor the modal overlay to the viewport (`fixed`) rather than
-      // the document (`absolute`). At a mobile viewport the trades panel is far
-      // taller than the screen, so an `absolute` inset:0 overlay spans the tall
-      // document and `justifyContent: center` centers the dialog around the
-      // middle of that document — off the current fold, where its controls are
-      // unreachable. Native keeps `absolute` (React Native has no `fixed`).
-      // (LS-8501)
-      position={Platform.OS === 'web' ? 'fixed' : 'absolute'}
-      top={0}
-      left={0}
-      right={0}
-      bottom={0}
+      position={Platform.OS === 'web' ? 'fixed' : undefined}
+      top={Platform.OS === 'web' ? 0 : undefined}
+      left={Platform.OS === 'web' ? 0 : undefined}
+      right={Platform.OS === 'web' ? 0 : undefined}
+      bottom={Platform.OS === 'web' ? 0 : undefined}
+      flex={isNative ? 1 : undefined}
       zIndex={1000}
       alignItems="center"
       justifyContent="center"
       backgroundColor={withAlpha(BLACK, 0.6)}
+      onPress={onDismiss}
     >
       <YStack
         role="dialog"
@@ -931,7 +944,12 @@ function ProposeTradeDialog({
         padding="$5"
         width={560}
         maxWidth="95%"
-        maxHeight="85%"
+        // A percentage maxHeight only resolves against a parent with a
+        // fixed/known height. On web the overlay above is viewport-`fixed`,
+        // so `%` resolves against the viewport. On native the overlay is a
+        // flex:1 child of the Modal with no intrinsic height until layout,
+        // so derive an explicit pixel value from the window instead.
+        maxHeight={isNative ? windowHeight * 0.85 : '85%'}
         gap="$4"
         onPress={(e: { stopPropagation: () => void }) => e.stopPropagation()}
       >
@@ -1426,6 +1444,22 @@ function ProposeTradeDialog({
       </YStack>
     </YStack>
   );
+
+  if (isNative) {
+    return (
+      <Modal
+        visible
+        transparent
+        animationType="fade"
+        onRequestClose={onDismiss}
+        testID="propose-trade-native-modal"
+      >
+        {dialogOverlay}
+      </Modal>
+    );
+  }
+
+  return dialogOverlay;
 }
 
 // ── TradingCenter (main component) ────────────────────────────────────────────

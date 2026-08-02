@@ -42,6 +42,14 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!(@tamagui|tamagui|react-native-svg|@react-native-google-signin)/)',
   ],
+  // Mobile-only regression test (LS-8852) — asserts native Modal-mount
+  // behavior that is only true when Platform.OS !== 'web'; this web project
+  // resolves the real 'web' platform-components module, so the assertion is
+  // correctly false here. Belongs to shared-components:mobile only.
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/src/features/leagues/ProposeTradeDialogNativeModal.spec.tsx',
+  ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
 };
