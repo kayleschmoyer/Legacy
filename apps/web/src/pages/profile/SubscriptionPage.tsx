@@ -23,6 +23,7 @@ import {
   useGetMySubscriptionQuery,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
+import { PriceSkeleton } from '../../components/PriceSkeleton';
 import { StepUpModal } from '../../components/StepUpModal';
 import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
 import { useLeagueWebSocketClient } from '../../context/LeagueWebSocketContext';
@@ -320,10 +321,12 @@ function PricingToggle({
   billingCycle,
   onChange,
   annualSavingsPct,
+  pricesLoading,
 }: {
   billingCycle: 'monthly' | 'annual';
   onChange: (cycle: 'monthly' | 'annual') => void;
   annualSavingsPct: string;
+  pricesLoading: boolean;
 }) {
   return (
     <YStack alignItems="center" gap="$3">
@@ -374,9 +377,13 @@ function PricingToggle({
               paddingHorizontal="$2"
               paddingVertical={2}
             >
-              <Paragraph size="$1" fontWeight="600" style={{ color: GREEN }}>
-                Save {annualSavingsPct}
-              </Paragraph>
+              {pricesLoading ? (
+                <PriceSkeleton width={40} height={12} radius={4} />
+              ) : (
+                <Paragraph size="$1" fontWeight="600" style={{ color: GREEN }}>
+                  Save {annualSavingsPct}
+                </Paragraph>
+              )}
             </BadgeTag>
           </XStack>
         </PlanToggleButton>
@@ -570,6 +577,11 @@ const SubscriptionPage: React.FC = () => {
     annualSavingsPct: ANNUAL_SAVINGS_PCT,
     monthlyPriceId,
     annualPriceId,
+    // Renamed on destructure — a same-named `loading` from
+    // useGetMySubscriptionQuery below shadows the unrenamed identifier,
+    // which previously made the fallback-price flash invisible at this call
+    // site (LS-8813).
+    loading: pricesLoading,
   } = useStripePrices();
 
   const { data, loading, refetch } = useGetMySubscriptionQuery();
@@ -1057,33 +1069,47 @@ const SubscriptionPage: React.FC = () => {
                   billingCycle={billingCycle}
                   onChange={setBillingCycle}
                   annualSavingsPct={ANNUAL_SAVINGS_PCT}
+                  pricesLoading={pricesLoading}
                 />
 
                 {/* Price display */}
                 <YStack alignItems="center" gap="$1">
-                  <XStack alignItems="flex-end" gap="$1">
-                    <Paragraph
-                      size="$10"
-                      fontWeight="800"
-                      style={{
-                        fontSize: 48,
-                        lineHeight: 52,
-                        color: BRAND_GOLD_LIGHT,
-                      }}
-                    >
-                      {billingCycle === 'annual'
-                        ? ANNUAL_PRICE_DISPLAY
-                        : MONTHLY_PRICE_DISPLAY}
-                    </Paragraph>
-                    <Paragraph size="$3" color="$colorPress" paddingBottom="$2">
-                      {billingCycle === 'annual' ? '/year' : '/month'}
-                    </Paragraph>
-                  </XStack>
-                  {billingCycle === 'annual' && (
-                    <Paragraph size="$3" style={{ color: GREEN }}>
-                      {ANNUAL_MONTHLY_EQUIVALENT}/month — save{' '}
-                      {ANNUAL_SAVINGS_PCT} vs monthly
-                    </Paragraph>
+                  {pricesLoading ? (
+                    <YStack alignItems="center" gap="$2" paddingVertical="$1">
+                      <PriceSkeleton width={140} height={48} radius={8} />
+                      <PriceSkeleton width={180} height={16} radius={6} />
+                    </YStack>
+                  ) : (
+                    <>
+                      <XStack alignItems="flex-end" gap="$1">
+                        <Paragraph
+                          size="$10"
+                          fontWeight="800"
+                          style={{
+                            fontSize: 48,
+                            lineHeight: 52,
+                            color: BRAND_GOLD_LIGHT,
+                          }}
+                        >
+                          {billingCycle === 'annual'
+                            ? ANNUAL_PRICE_DISPLAY
+                            : MONTHLY_PRICE_DISPLAY}
+                        </Paragraph>
+                        <Paragraph
+                          size="$3"
+                          color="$colorPress"
+                          paddingBottom="$2"
+                        >
+                          {billingCycle === 'annual' ? '/year' : '/month'}
+                        </Paragraph>
+                      </XStack>
+                      {billingCycle === 'annual' && (
+                        <Paragraph size="$3" style={{ color: GREEN }}>
+                          {ANNUAL_MONTHLY_EQUIVALENT}/month — save{' '}
+                          {ANNUAL_SAVINGS_PCT} vs monthly
+                        </Paragraph>
+                      )}
+                    </>
                   )}
                 </YStack>
 
@@ -1129,7 +1155,7 @@ const SubscriptionPage: React.FC = () => {
                 {/* CTA */}
                 <CtaButton
                   onPress={() => void handleUpgrade()}
-                  disabled={checkoutLoading}
+                  disabled={checkoutLoading || pricesLoading}
                   size="$5"
                   icon={<Zap size={18} />}
                   style={
@@ -1143,7 +1169,9 @@ const SubscriptionPage: React.FC = () => {
                 >
                   {checkoutLoading
                     ? 'Loading…'
-                    : `Upgrade to Premium — ${billingCycle === 'annual' ? `${ANNUAL_PRICE_DISPLAY}/yr` : `${MONTHLY_PRICE_DISPLAY}/mo`}`}
+                    : pricesLoading
+                      ? 'Loading pricing…'
+                      : `Upgrade to Premium — ${billingCycle === 'annual' ? `${ANNUAL_PRICE_DISPLAY}/yr` : `${MONTHLY_PRICE_DISPLAY}/mo`}`}
                 </CtaButton>
 
                 <Paragraph size="$2" color="$colorPress" textAlign="center">

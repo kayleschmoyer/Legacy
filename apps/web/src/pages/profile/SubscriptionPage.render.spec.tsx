@@ -50,6 +50,10 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
   YStack: ({ children }: ChildrenProps) => <div>{children}</div>,
 }));
 
+jest.mock('../../components/PriceSkeleton', () => ({
+  PriceSkeleton: () => <div data-testid="price-skeleton" />,
+}));
+
 jest.mock('tamagui', () => ({
   styled: <T,>(Component: T) => Component,
   Button: ({ children, onPress }: ChildrenProps & { onPress?: () => void }) => (
@@ -70,17 +74,53 @@ jest.mock('@tamagui/lucide-icons', () => ({
   Zap: () => null,
 }));
 
+interface MockStripePrices {
+  monthlyPrice: number;
+  annualTotal: number;
+  monthlyPriceDisplay: string;
+  annualPriceDisplay: string;
+  annualMonthlyEquivalent: string;
+  annualSavingsPct: string;
+  monthlyPriceId: string | null;
+  annualPriceId: string | null;
+  loading: boolean;
+  pricesFailed: boolean;
+}
+
+const LOADED_STRIPE_PRICES: MockStripePrices = {
+  monthlyPrice: 9.99,
+  annualTotal: 99.99,
+  monthlyPriceDisplay: '$9.99',
+  annualPriceDisplay: '$99.99',
+  annualMonthlyEquivalent: '$8.33',
+  annualSavingsPct: '17%',
+  monthlyPriceId: 'price_monthly',
+  annualPriceId: 'price_annual',
+  loading: false,
+  pricesFailed: false,
+};
+
+// Hardcoded fallback figures useStripePrices serves while the Stripe query
+// is in flight (FALLBACK_MONTHLY_PRICE_CENTS / FALLBACK_ANNUAL_TOTAL_CENTS) —
+// distinct from LOADED_STRIPE_PRICES so a leaked fallback render is detectable.
+const LOADING_STRIPE_PRICES: MockStripePrices = {
+  monthlyPrice: 4.99,
+  annualTotal: 39.99,
+  monthlyPriceDisplay: '$4.99',
+  annualPriceDisplay: '$39.99',
+  annualMonthlyEquivalent: '$3.33',
+  annualSavingsPct: '33%',
+  monthlyPriceId: null,
+  annualPriceId: null,
+  loading: true,
+  pricesFailed: false,
+};
+
+const mockUseStripePrices = jest.fn<MockStripePrices, []>(
+  () => LOADED_STRIPE_PRICES,
+);
 jest.mock('../../hooks/useStripePrices', () => ({
-  useStripePrices: () => ({
-    monthlyPrice: 9.99,
-    annualTotal: 99.99,
-    monthlyPriceDisplay: '$9.99',
-    annualPriceDisplay: '$99.99',
-    annualMonthlyEquivalent: '$8.33',
-    annualSavingsPct: '17%',
-    monthlyPriceId: 'price_monthly',
-    annualPriceId: 'price_annual',
-  }),
+  useStripePrices: () => mockUseStripePrices(),
 }));
 
 jest.mock('../../utils/analytics', () => ({
@@ -130,6 +170,7 @@ describe('SubscriptionPage — Manage Subscription gating (LS-5176)', () => {
       client: null,
       connected: false,
     });
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
   });
 
   it('hides the Manage Subscription button for free users with no subscription row', () => {
@@ -231,5 +272,62 @@ describe('SubscriptionPage — realtime subscription refresh (LS-7380)', () => {
     window.dispatchEvent(new Event('focus'));
 
     expect(refetch).not.toHaveBeenCalled();
+  });
+});
+
+// LS-8813: useStripePrices returns the hardcoded fallback prices ($4.99/mo,
+// $39.99/yr) together with a `loading` flag so callers can suppress the
+// fallback while the live Stripe query is in flight. SubscriptionPage
+// previously discarded that flag on destructure — a same-named `loading`
+// from useGetMySubscriptionQuery shadowed it — so the fallback rendered on
+// every cold load regardless of the hook's actual loading state.
+describe('SubscriptionPage — price loading state (LS-8813)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch: jest.fn(),
+    });
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+  });
+
+  it('never renders the hardcoded fallback price while the Stripe prices query is in flight', () => {
+    mockUseStripePrices.mockReturnValue(LOADING_STRIPE_PRICES);
+
+    renderPage();
+
+    expect(screen.queryByText(/4\.99/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/39\.99/)).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('price-skeleton').length).toBeGreaterThan(0);
+  });
+
+  it('renders the live price once the query resolves, not the fallback', () => {
+    mockUseStripePrices.mockReturnValue(LOADED_STRIPE_PRICES);
+
+    renderPage();
+
+    // Default billing cycle is annual.
+    expect(screen.getByText('$99.99')).toBeInTheDocument();
+    expect(screen.queryByText(/4\.99/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/39\.99/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('price-skeleton')).not.toBeInTheDocument();
+  });
+
+  it('still renders the fallback price when the prices query genuinely fails (not loading)', () => {
+    mockUseStripePrices.mockReturnValue({
+      ...LOADING_STRIPE_PRICES,
+      loading: false,
+      pricesFailed: true,
+    });
+
+    renderPage();
+
+    expect(screen.getByText('$39.99')).toBeInTheDocument();
+    expect(screen.queryByTestId('price-skeleton')).not.toBeInTheDocument();
   });
 });

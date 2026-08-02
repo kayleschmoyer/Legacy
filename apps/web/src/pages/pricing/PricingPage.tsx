@@ -20,6 +20,7 @@ import {
   Zap,
 } from '@tamagui/lucide-icons';
 import { PageMeta } from '../../components/PageMeta';
+import { PriceSkeleton } from '../../components/PriceSkeleton';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -442,6 +443,7 @@ export default function PricingPage() {
   // Derive per-month cost from annualTotal so display always matches the billed amount.
   const annualMonthlyPrice = prices.annualTotal / 12;
   const ANNUAL_SAVINGS_PCT = prices.annualSavingsPct;
+  const pricesLoading = prices.loading;
 
   // Build the FAQ list with a trial answer that reflects the live Stripe config
   // rather than an unconditional "14-day free trial, no credit card" claim.
@@ -536,14 +538,18 @@ export default function PricingPage() {
                   Annual
                 </Paragraph>
                 <DiscountBadge>
-                  <Paragraph
-                    marginBottom={0}
-                    size="$1"
-                    fontWeight="700"
-                    color={BRAND_SEAM_RED}
-                  >
-                    Save {ANNUAL_SAVINGS_PCT}
-                  </Paragraph>
+                  {pricesLoading ? (
+                    <PriceSkeleton width={40} height={12} radius={4} />
+                  ) : (
+                    <Paragraph
+                      marginBottom={0}
+                      size="$1"
+                      fontWeight="700"
+                      color={BRAND_SEAM_RED}
+                    >
+                      Save {ANNUAL_SAVINGS_PCT}
+                    </Paragraph>
+                  )}
                 </DiscountBadge>
               </ToggleOption>
             </ToggleContainer>
@@ -636,37 +642,46 @@ export default function PricingPage() {
                   </XStack>
                 </XStack>
 
-                <PriceRow
-                  data-testid={
-                    isAnnual ? 'plan-price-annual' : 'plan-price-monthly'
-                  }
-                >
-                  <H2
-                    fontSize="$10"
-                    fontWeight="800"
-                    marginBottom={0}
-                    color={BRAND_GOLD}
-                  >
-                    $
-                    {isAnnual
-                      ? annualMonthlyPrice.toFixed(2)
-                      : monthlyPrice.toFixed(2)}
-                  </H2>
-                  <Paragraph color="$gray11" marginBottom={4}>
-                    /mo
-                  </Paragraph>
-                </PriceRow>
-
-                {isAnnual ? (
-                  <Paragraph size="$2" color="$gray11" marginBottom={0}>
-                    Billed annually (${annualTotal}/yr) — save{' '}
-                    {ANNUAL_SAVINGS_PCT} vs monthly
-                  </Paragraph>
+                {pricesLoading ? (
+                  <YStack gap="$2" paddingVertical="$1">
+                    <PriceSkeleton width={120} height={40} radius={8} />
+                    <PriceSkeleton width={200} height={14} radius={6} />
+                  </YStack>
                 ) : (
-                  <Paragraph size="$2" color="$gray11" marginBottom={0}>
-                    Billed monthly. Switch to annual and save{' '}
-                    {ANNUAL_SAVINGS_PCT}.
-                  </Paragraph>
+                  <>
+                    <PriceRow
+                      data-testid={
+                        isAnnual ? 'plan-price-annual' : 'plan-price-monthly'
+                      }
+                    >
+                      <H2
+                        fontSize="$10"
+                        fontWeight="800"
+                        marginBottom={0}
+                        color={BRAND_GOLD}
+                      >
+                        $
+                        {isAnnual
+                          ? annualMonthlyPrice.toFixed(2)
+                          : monthlyPrice.toFixed(2)}
+                      </H2>
+                      <Paragraph color="$gray11" marginBottom={4}>
+                        /mo
+                      </Paragraph>
+                    </PriceRow>
+
+                    {isAnnual ? (
+                      <Paragraph size="$2" color="$gray11" marginBottom={0}>
+                        Billed annually (${annualTotal}/yr) — save{' '}
+                        {ANNUAL_SAVINGS_PCT} vs monthly
+                      </Paragraph>
+                    ) : (
+                      <Paragraph size="$2" color="$gray11" marginBottom={0}>
+                        Billed monthly. Switch to annual and save{' '}
+                        {ANNUAL_SAVINGS_PCT}.
+                      </Paragraph>
+                    )}
+                  </>
                 )}
               </PlanHeader>
 

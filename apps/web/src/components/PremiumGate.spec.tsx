@@ -21,6 +21,10 @@ jest.mock('../hooks/useStripePrices', () => ({
   useStripePrices: (): unknown => mockUseStripePrices(),
 }));
 
+jest.mock('./PriceSkeleton', () => ({
+  PriceSkeleton: () => <div data-testid="price-skeleton" />,
+}));
+
 // Mock the UpgradeModal — it has its own useStripePrices call and router
 // dependency; isolating it keeps this test focused on PremiumGate itself.
 jest.mock('./UpgradeModal', () => ({
@@ -73,10 +77,13 @@ describe('PremiumGate', () => {
     expect(screen.queryByText('From $3.33/mo')).not.toBeInTheDocument();
   });
 
-  it('renders the hook fallback value when live prices are unavailable', () => {
+  it('renders the hook fallback value when live prices are unavailable (loading has settled)', () => {
     // useStripePrices returns fallback display values (3999¢ / 12 = $3.33)
     // when Stripe prices cannot be fetched.
-    mockUseStripePrices.mockReturnValue({ annualMonthlyEquivalent: '$3.33' });
+    mockUseStripePrices.mockReturnValue({
+      annualMonthlyEquivalent: '$3.33',
+      loading: false,
+    });
 
     render(
       <PremiumGate isPremium={false} featureName="Player Comparison">
@@ -85,6 +92,25 @@ describe('PremiumGate', () => {
     );
 
     expect(screen.getByText('From $3.33/mo')).toBeInTheDocument();
+  });
+
+  // LS-8813: while the Stripe prices query is still in flight, useStripePrices
+  // returns the fallback $3.33 figure alongside loading: true. Previously
+  // PremiumGate ignored the flag and rendered the fallback immediately.
+  it('does not render the fallback price while the prices query is in flight', () => {
+    mockUseStripePrices.mockReturnValue({
+      annualMonthlyEquivalent: '$3.33',
+      loading: true,
+    });
+
+    render(
+      <PremiumGate isPremium={false} featureName="Player Comparison">
+        <div>locked content</div>
+      </PremiumGate>,
+    );
+
+    expect(screen.queryByText(/\$3\.33/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('price-skeleton')).toBeInTheDocument();
   });
 
   it('does not render the price string for premium users', () => {

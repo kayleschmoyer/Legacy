@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
 import { Lock } from '@tamagui/lucide-icons';
+import { PriceSkeleton } from './PriceSkeleton';
 import { UpgradeModal } from './UpgradeModal';
 import {
   trackPremiumFeatureBlocked,
@@ -91,7 +92,7 @@ export function PremiumGate({
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   // Live monthly-equivalent price (annual total / 12). Falls back to display
   // values from FALLBACK_ANNUAL_TOTAL_CENTS when Stripe prices are unavailable.
-  const { annualMonthlyEquivalent } = useStripePrices();
+  const { annualMonthlyEquivalent, loading: pricesLoading } = useStripePrices();
 
   useEffect(() => {
     if (
@@ -211,9 +212,13 @@ export function PremiumGate({
               >
                 Upgrade to Premium
               </Button>
-              <Text fontSize="$2" color={BRAND_GOLD_LIGHT} textAlign="center">
-                From {annualMonthlyEquivalent}/mo
-              </Text>
+              {pricesLoading ? (
+                <PriceSkeleton width={80} height={14} radius={4} />
+              ) : (
+                <Text fontSize="$2" color={BRAND_GOLD_LIGHT} textAlign="center">
+                  From {annualMonthlyEquivalent}/mo
+                </Text>
+              )}
             </YStack>
           </YStack>
         )}

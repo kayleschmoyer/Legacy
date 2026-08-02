@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import { AlertCircle, Check, Star } from '@tamagui/lucide-icons';
+import { PriceSkeleton } from './PriceSkeleton';
 import { BaseModal } from './BaseModal';
 import {
   AMBER,
@@ -65,6 +66,7 @@ export function UpgradeModal({
     annualPriceDisplay: ANNUAL_PRICE_DISPLAY,
     annualSavingsPct: ANNUAL_SAVINGS_PCT,
     pricesFailed,
+    loading: pricesLoading,
   } = useStripePrices({ skip: !open });
 
   return (
@@ -99,17 +101,26 @@ export function UpgradeModal({
 
         {/* ── Pricing ── */}
         <YStack alignItems="center" gap="$1">
-          <XStack alignItems="baseline" gap="$1">
-            <Text color={TEXT_PRIMARY} fontSize="$9" fontWeight="bold">
-              {MONTHLY_PRICE_DISPLAY}
-            </Text>
-            <Text color={TEXT_MUTED} fontSize="$3">
-              / month
-            </Text>
-          </XStack>
-          <Text color={TEXT_MUTED} fontSize="$2">
-            or {ANNUAL_PRICE_DISPLAY} / year — save {ANNUAL_SAVINGS_PCT}
-          </Text>
+          {pricesLoading ? (
+            <YStack alignItems="center" gap="$2" paddingVertical="$1">
+              <PriceSkeleton width={120} height={36} radius={8} />
+              <PriceSkeleton width={160} height={14} radius={6} />
+            </YStack>
+          ) : (
+            <>
+              <XStack alignItems="baseline" gap="$1">
+                <Text color={TEXT_PRIMARY} fontSize="$9" fontWeight="bold">
+                  {MONTHLY_PRICE_DISPLAY}
+                </Text>
+                <Text color={TEXT_MUTED} fontSize="$3">
+                  / month
+                </Text>
+              </XStack>
+              <Text color={TEXT_MUTED} fontSize="$2">
+                or {ANNUAL_PRICE_DISPLAY} / year — save {ANNUAL_SAVINGS_PCT}
+              </Text>
+            </>
+          )}
           {pricesFailed && (
             <XStack alignItems="center" gap="$1" marginTop="$2">
               <AlertCircle size={12} color={AMBER} />
