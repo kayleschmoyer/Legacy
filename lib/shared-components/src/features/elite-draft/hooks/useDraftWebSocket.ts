@@ -397,6 +397,16 @@ export function useDraftWebSocket({
     if (wsConnected) wsHasEverConnected.current = true;
     if (!isReconnect || draftId === null) return undefined;
 
+    // A reconnect that lands during the 300ms pick-notification debounce
+    // window must cancel that timer — otherwise both it and the reconnect
+    // recovery below fire their own refetches, doubling network traffic
+    // (LDB-031).
+    if (refetchDebounceRef.current) {
+      clearTimeout(refetchDebounceRef.current);
+      refetchDebounceRef.current = undefined;
+    }
+    pendingRefetchNotifRef.current = null;
+
     let cancelled = false;
     const pendingWaits = new Map<ReturnType<typeof setTimeout>, () => void>();
 

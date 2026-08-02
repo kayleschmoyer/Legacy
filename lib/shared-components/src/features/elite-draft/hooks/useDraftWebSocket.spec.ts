@@ -325,4 +325,45 @@ describe('useDraftWebSocket — reconnect refetch recovery (LS-8506)', () => {
     expect(errorSpy).not.toHaveBeenCalled();
     expect(params.showToast).not.toHaveBeenCalled();
   });
+
+  /**
+   * If a WS reconnect lands during the 300ms pick-notification debounce
+   * window, the debounce timer must be cancelled — otherwise it fires its own
+   * refetches on top of the reconnect-recovery refetches, doubling network
+   * traffic on every reconnect (LDB-031).
+   */
+  it('cancels the pending pick-notification debounce when a reconnect lands mid-window', async () => {
+    const params = makeDefaultParams();
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => mockInstance._emit('connected'));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, {
+        draftId: 42,
+        pickId: 105,
+        teamId: 20,
+        playerId: 1,
+        round: 1,
+        pickNumber: 5,
+        overallPick: 5,
+        nextPick: { teamId: 10 },
+        wasAutoPick: false,
+        currentPickDeadline: null,
+      });
+    });
+
+    // Reconnect lands before the 300ms debounce fires.
+    act(() => mockInstance._emit('disconnected'));
+    act(() => mockInstance._emit('connected'));
+
+    await flushBackoff();
+
+    // refetchQueue is only ever called from the debounce path — it must stay
+    // uncalled once the reconnect cancels that timer.
+    expect(params.refetchQueue).not.toHaveBeenCalled();
+    // refetchCurrentPick is called from both paths; only the reconnect
+    // recovery call should have gone through.
+    expect(params.refetchCurrentPick).toHaveBeenCalledTimes(1);
+  });
 });
