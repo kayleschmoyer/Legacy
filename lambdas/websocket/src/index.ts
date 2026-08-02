@@ -32,6 +32,7 @@ import {
   runWithPublicClient,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
+import { WireNotificationType } from '@legacy-sports/utils';
 import { and, eq } from 'drizzle-orm';
 
 /** Issuer claim minted by lambdas/oauth-proxy and required on verify. */
@@ -491,10 +492,13 @@ async function handleConnect(
 
         // Notify existing peers that this user joined
         const joinedMsg = {
-          type: 'USER_JOINED',
-          leagueId,
-          userId,
-          username,
+          type: 'notification',
+          data: {
+            type: WireNotificationType.USER_JOINED,
+            leagueId,
+            userId,
+            username,
+          },
         };
         await Promise.allSettled(
           peers.map((p) =>
@@ -506,12 +510,18 @@ async function handleConnect(
         // including the connecting user themselves so they appear as online
         // in their own draft board view.
         const userListMsg = {
-          type: 'USER_LIST',
-          leagueId,
-          users: [
-            ...peers.map((p) => ({ userId: p.userId, username: p.username })),
-            { userId, username },
-          ],
+          type: 'notification',
+          data: {
+            type: WireNotificationType.USER_LIST,
+            leagueId,
+            users: [
+              ...peers.map((p) => ({
+                userId: p.userId,
+                username: p.username,
+              })),
+              { userId, username },
+            ],
+          },
         };
         await sendMessageToConnection(endpoint, connectionId, userListMsg);
       } catch (presenceErr) {
@@ -647,9 +657,12 @@ async function handleDisconnect(
           disconnectingLeagueId,
         );
         const leftMsg = {
-          type: 'USER_LEFT',
-          leagueId: disconnectingLeagueId,
-          userId: disconnectingUserId,
+          type: 'notification',
+          data: {
+            type: WireNotificationType.USER_LEFT,
+            leagueId: disconnectingLeagueId,
+            userId: disconnectingUserId,
+          },
         };
         await Promise.allSettled(
           remainingPeers.map((p) =>

@@ -653,6 +653,67 @@ describe('WebSocket fan-out (LS-8856)', () => {
     expect(pongPayloads.some((payload) => payload?.type === 'pong')).toBe(true);
   });
 
+  // ── LS-8877: presence events reach client handlers ──
+
+  it('delivers USER_JOINED and USER_LIST in the notification envelope on connect', async () => {
+    const leagueId = 500;
+    const existing = registerUser('ivan');
+    const joining = registerUser('judy');
+    grantLeagueMembership(existing.userId, leagueId);
+    grantLeagueMembership(joining.userId, leagueId);
+
+    const existingClient = client({ token: existing.token, leagueId });
+    await waitForEvent(existingClient, 'connected');
+
+    const joinedReceived = waitForEvent<{ userId: number; username: string }>(
+      existingClient,
+      'user-joined',
+    );
+
+    const joiningClient = client({ token: joining.token, leagueId });
+    const userListReceived = waitForEvent<{
+      users: Array<{ userId: number; username: string }>;
+    }>(joiningClient, 'user-list');
+    await waitForEvent(joiningClient, 'connected');
+
+    const joined = await joinedReceived;
+    expect(joined.userId).toBe(joining.userId);
+    expect(joined.username).toBe('judy');
+
+    const userList = await userListReceived;
+    expect(userList.users).toEqual(
+      expect.arrayContaining([
+        { userId: existing.userId, username: 'ivan' },
+        { userId: joining.userId, username: 'judy' },
+      ]),
+    );
+  });
+
+  it('delivers USER_LEFT in the notification envelope on disconnect', async () => {
+    const leagueId = 501;
+    const stayer = registerUser('kevin');
+    const leaver = registerUser('laura');
+    grantLeagueMembership(stayer.userId, leagueId);
+    grantLeagueMembership(leaver.userId, leagueId);
+
+    const stayerClient = client({ token: stayer.token, leagueId });
+    const leaverClient = client({ token: leaver.token, leagueId });
+    await Promise.all([
+      waitForEvent(stayerClient, 'connected'),
+      waitForEvent(leaverClient, 'connected'),
+    ]);
+
+    const leftReceived = waitForEvent<{ userId: number }>(
+      stayerClient,
+      'user-left',
+    );
+
+    leaverClient.dispose();
+
+    const left = await leftReceived;
+    expect(left.userId).toBe(leaver.userId);
+  });
+
   // ── AC5: no cross-league leakage ──
 
   it('does not leak a league broadcast to a client subscribed to a different league', async () => {

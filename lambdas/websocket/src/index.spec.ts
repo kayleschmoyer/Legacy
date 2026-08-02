@@ -485,10 +485,18 @@ describe('WebSocket Lambda Handler', () => {
 
       // USER_LIST sent to the new connection must include the peer AND self (userId: 42)
       // so the connecting user appears as online in their own draft board view.
+      // Presence must be wrapped in the standard notification envelope
+      // ({ type: 'notification', data: { type: ..., ... } }) — the same
+      // shape every other event uses — so the client's kebab-case
+      // re-dispatch (WebSocketClient.handleMessage) actually reaches
+      // useWebSocket's onUserList handler (LS-8877).
       type PostCmd = { input?: { ConnectionId?: string; Data?: Buffer } };
       type ParsedMsg = {
         type: string;
-        users?: { userId: number; username: string }[];
+        data?: {
+          type: string;
+          users?: { userId: number; username: string }[];
+        };
       };
       const sentToNewConn = (
         mockApiGatewaySend.mock.calls as PostCmd[][]
@@ -499,15 +507,17 @@ describe('WebSocket Lambda Handler', () => {
         return [JSON.parse(cmd.input.Data.toString()) as ParsedMsg];
       });
 
-      const userListMsg = sentToNewConn.find((m) => m?.type === 'USER_LIST');
-      expect(userListMsg).toBeDefined();
-      expect(userListMsg?.users).toEqual(
+      const userListEnvelope = sentToNewConn.find(
+        (m) => m?.type === 'notification' && m.data?.type === 'USER_LIST',
+      );
+      expect(userListEnvelope).toBeDefined();
+      expect(userListEnvelope?.data?.users).toEqual(
         expect.arrayContaining([
           { userId: 99, username: 'peer' },
           { userId: 42, username: 'testuser' },
         ]),
       );
-      expect(userListMsg?.users).toHaveLength(2);
+      expect(userListEnvelope?.data?.users).toHaveLength(2);
     });
   });
 

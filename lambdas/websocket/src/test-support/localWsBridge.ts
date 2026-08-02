@@ -72,17 +72,25 @@ function buildEvent(
  * error response and destroys the socket, so a rejected client only ever
  * sees a failed connection attempt, never a spurious `open`.
  *
- * One accepted consequence: a `$connect` handler's own push back to the
- * connecting client (e.g. the production handler's USER_LIST presence
- * message) fires before the socket is registered here, so it is silently
- * dropped in this harness. The production code already treats presence
- * pushes as best-effort (wrapped in a non-fatal try/catch), so this does not
- * affect connection success — it just means presence pushed at connect time
- * isn't observable through this harness. This test suite does not assert on
- * presence messages.
+ * A `$connect` handler's own push back to the connecting client (e.g. the
+ * production handler's USER_LIST presence message) fires before the socket
+ * is registered here — the handler resolves and pushes synchronously while
+ * this bridge is still waiting to call `wss.handleUpgrade`. Rather than drop
+ * those pushes, `deliver` buffers them per-connectionId while the connection
+ * is "known" (registered in `pending`) but not yet upgraded, and `onUpgrade`
+ * flushes the buffer to the real socket immediately after registering it —
+ * so connect-time pushes (LS-8877) are observable through this harness.
  */
 export class LocalWsBridge {
   private readonly sockets = new Map<string, WsSocket>();
+  /**
+   * ConnectionIds currently between "handler invoked" and "socket
+   * registered", each mapped to any deliveries buffered during that window.
+   */
+  private readonly pending = new Map<
+    string,
+    Array<Buffer | Uint8Array | string>
+  >();
   readonly domainName = 'localhost';
   readonly stage = 'test';
 
@@ -123,14 +131,25 @@ export class LocalWsBridge {
    * `ApiGatewayManagementApiClient` calls on `PostToConnectionCommand`.
    * Returns false (the real API's 410 Gone shape) when the connectionId is
    * not currently registered, e.g. after unsubscribe/disconnect.
+   *
+   * While a connectionId is `pending` (handler invoked, socket not yet
+   * upgraded — the `$connect` handler's own connect-time pushes land in this
+   * window), the delivery is buffered and flushed once the socket registers.
    */
   deliver(connectionId: string, data: Buffer | Uint8Array | string): boolean {
     const socket = this.sockets.get(connectionId);
-    if (!socket || socket.readyState !== socket.OPEN) return false;
-    socket.send(
-      typeof data === 'string' ? data : Buffer.from(data).toString('utf-8'),
-    );
-    return true;
+    if (socket && socket.readyState === socket.OPEN) {
+      socket.send(
+        typeof data === 'string' ? data : Buffer.from(data).toString('utf-8'),
+      );
+      return true;
+    }
+    const buffered = this.pending.get(connectionId);
+    if (buffered) {
+      buffered.push(data);
+      return true;
+    }
+    return false;
   }
 
   private async onUpgrade(
@@ -157,10 +176,16 @@ export class LocalWsBridge {
       { queryStringParameters, headers },
     );
 
+    // Mark this connectionId as known before the handler runs so any
+    // connect-time pushes (e.g. presence's USER_LIST back to the connecting
+    // client) buffer instead of being reported as undelivered.
+    this.pending.set(connectionId, []);
+
     let result: APIGatewayProxyResultV2;
     try {
       result = await this.handler(connectEvent);
     } catch {
+      this.pending.delete(connectionId);
       socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
       socket.destroy();
       return;
@@ -168,6 +193,7 @@ export class LocalWsBridge {
 
     const statusCode = (result as { statusCode?: number }).statusCode ?? 500;
     if (statusCode !== 200) {
+      this.pending.delete(connectionId);
       socket.write(`HTTP/1.1 ${statusCode} Rejected\r\n\r\n`);
       socket.destroy();
       return;
@@ -175,6 +201,14 @@ export class LocalWsBridge {
 
     this.wss.handleUpgrade(req, socket, head, (ws) => {
       this.sockets.set(connectionId, ws);
+
+      const buffered = this.pending.get(connectionId) ?? [];
+      this.pending.delete(connectionId);
+      for (const data of buffered) {
+        ws.send(
+          typeof data === 'string' ? data : Buffer.from(data).toString('utf-8'),
+        );
+      }
 
       ws.on('message', (data: Buffer) => {
         void this.handler(
