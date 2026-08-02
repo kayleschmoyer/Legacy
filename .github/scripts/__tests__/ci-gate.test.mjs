@@ -136,7 +136,7 @@ describe('ci-gate — computeGateConclusion folds inputs', () => {
   });
 
   it('treats an unknown/empty status as failure', () => {
-    const results = { ...allPass(), format: '' };
+    const results = { ...allPass(), lint: '' };
     assert.strictEqual(computeGateConclusion(results).conclusion, 'failure');
   });
 });

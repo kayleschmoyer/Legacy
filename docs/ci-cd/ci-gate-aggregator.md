@@ -18,8 +18,13 @@ root cause (see LS-7988 RCA).
 
 Introduce ONE aggregator, **`CI Gate`**, posted exactly once per head SHA by the
 CI Pipeline `summarize` job, folding the real results of the granular jobs
-(`lint, format, test, build, custom-checks, lockfile-check, e2e`). The granular
+(`lint, test, build, custom-checks, lockfile-check, e2e`). The granular
 jobs remain as **informational** check runs.
+
+> **LS-8901 update:** the standalone `format` job was merged into `lint` (one
+> checkout + `pnpm install` instead of two) — the format check now runs as a
+> second step inside the `lint` job rather than as its own granular job/gate
+> input. See `GATE_INPUT_JOBS` in `.github/scripts/ci-gate.js`.
 
 `CI Gate` is a **commit status** (like `bot-review`), not a check run, on
 purpose:

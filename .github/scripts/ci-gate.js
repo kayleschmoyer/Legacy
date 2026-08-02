@@ -1,7 +1,7 @@
 /**
  * ci-gate.js — Aggregate "CI Gate" status computation + poster (LS-7991).
  *
- * Phase 2 of LS-7988: collapse the granular `🚀 CI Pipeline / {lint,format,
+ * Phase 2 of LS-7988: collapse the granular `🚀 CI Pipeline / {lint,
  * build,test,custom-checks}` required checks into ONE aggregator commit status,
  * `CI Gate`, posted exactly once per head SHA by the CI Pipeline `summarize`
  * job (.github/workflows/ci-pipeline.yml).
@@ -32,9 +32,10 @@ const MAX_DESCRIPTION_LENGTH = 140;
 
 // The granular CI Pipeline jobs folded into the gate verdict. This MUST match
 // the failure-threshold set in .github/actions/collect-results (the existing
-// definition of overall pipeline success): lint, format, test, build,
-// custom-checks, lockfile-check, e2e. Pass semantics: `success` and `skipped`
-// pass; `failure`, `timed_out`, or any missing/unknown value fail.
+// definition of overall pipeline success): lint (which also runs the format
+// check as of LS-8901 — the two share one job), test, build, custom-checks,
+// lockfile-check, e2e. Pass semantics: `success` and `skipped` pass;
+// `failure`, `timed_out`, or any missing/unknown value fail.
 //
 // `cancelled` is DELIBERATELY excluded from the verdict (LS-8219): a cancelled
 // granular job is a superseded/duplicate run (concurrency-cancel, post-merge
@@ -46,7 +47,6 @@ const MAX_DESCRIPTION_LENGTH = 140;
 // purely because a duplicate run was cancelled.
 const GATE_INPUT_JOBS = Object.freeze([
   'lint',
-  'format',
   'test',
   'build',
   'custom-checks',

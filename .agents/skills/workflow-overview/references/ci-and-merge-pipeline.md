@@ -42,13 +42,13 @@ ci-pipeline   security-scanning (conditional)
 ```
 detect-changes (~30s, incl. affected-e2e spec selection)
        |
-  +----+----+----+----+----+----+
-  |    |    |    |    |    |
-lint format test build custom- lockfile-   (6 granular jobs, PARALLEL)
-                       checks  check
-  +----+----+----+----+----+----+
+  +----+----+----+----+----+
+  |    |    |    |    |
+lint  test build custom- lockfile-   (5 granular jobs, PARALLEL)
+      (+format)         checks  check
+  +----+----+----+----+----+
        |
-     e2e              (sharded matrix; gated on the six above)
+     e2e              (sharded matrix; gated on the five above)
        |
    summarize          (always() && !cancelled() — PR comment, labels,
                        posts the `CI Gate` commit status)
@@ -58,10 +58,9 @@ When invoked via `workflow_call` from the orchestrator's `🚀 CI Pipeline` job,
 
 **Stage 1 -- Detect Changes:** `dorny/paths-filter` + git to determine which surfaces changed (web, mobile, lambdas, terraform, e2e), plus hermetic affected-e2e spec selection (LS-7846) via `apps/web-e2e/src/e2e-surface-map.json` — emits the specs/grep/shard-matrix the e2e job consumes.
 
-**Stage 2 -- Six granular jobs, in parallel:**
+**Stage 2 -- Five granular jobs, in parallel:**
 
-- `lint` — `nx affected -t lint`
-- `format` — Prettier check over the PR's changed files
+- `lint` — `nx affected -t lint`, then a Prettier format check over the PR's changed files as a second step (LS-8901: the former standalone `format` job was merged into `lint` to save a runner spin-up + `pnpm install` per PR push; the job exposes separate `lint-failure-excerpt` / `format-failure-excerpt` outputs so failure reporting/labels still distinguish the two)
 - `test` — `nx affected -t typecheck test` (with `NODE_OPTIONS=--max_old_space_size=2048` — lower than the 4096 MB global default to prevent OOM when a lockfile change marks all projects affected)
 - `build` — web/mobile/lambda builds + terraform validate as flagged by detect-changes; uploads the web artifact for e2e
 - `custom-checks` — agent-skill lint, migration immutability, workflow validation, touch-map freshness (advisory), repo-script unit suites
@@ -120,8 +119,8 @@ The CI pipeline automatically labels PRs with failure reasons. Labels are added 
 | Label                        | Source                                                                        |
 | ---------------------------- | ----------------------------------------------------------------------------- |
 | `CI: Migration Immutability` | `custom-checks` job -- a merged migration file was modified                   |
-| `CI: Formatting`             | `format` job -- Prettier check failed                                         |
-| `CI: Lint Failure`           | `lint` job -- ESLint errors                                                   |
+| `CI: Formatting`             | `lint` job's format step -- Prettier check failed                             |
+| `CI: Lint Failure`           | `lint` job's lint step -- ESLint errors                                       |
 | `CI: Test Failure`           | `test` job -- typecheck or Jest failures                                      |
 | `CI: Build Failure`          | `build` job failed                                                            |
 | `CI: E2E Failure`            | `e2e` job -- Playwright failures                                              |

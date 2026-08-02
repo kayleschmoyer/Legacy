@@ -105,6 +105,28 @@ module.exports = async ({ github, context, core }) => {
   // Per-failed-step detail blocks.
   const fixes = new Set();
   for (const step of failedSteps) {
+    // LS-8901: lint and format share one job/one step-results entry, so a
+    // failure here can mean either (or both) sub-check failed. Render a
+    // detail block for whichever excerpt(s) are actually present instead of
+    // assuming it was the lint step.
+    if (step === 'lint') {
+      for (const sub of [STEP_META.lint, STEP_META.format]) {
+        if (!excerpts[sub.key]) continue;
+        fixes.add(sub.fix);
+        const { sublabel, body } = splitExcerpt(excerpts[sub.key]);
+        parts.push(
+          detailsBlock({
+            check: sub.key,
+            label: sub.label,
+            sublabel,
+            excerpt: body,
+          }),
+          '',
+        );
+      }
+      continue;
+    }
+
     const meta = STEP_META[step];
     if (meta?.fix) fixes.add(meta.fix);
 

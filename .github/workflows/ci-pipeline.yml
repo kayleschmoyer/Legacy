@@ -5,8 +5,9 @@ name: "Legacy Sports CI Pipeline"
 # =============================================================================
 # Each logical stage runs as its own GitHub Actions job so that:
 #   - detect-changes runs quickly (~30 s) to determine affected components
-#   - lint, format, test, build, custom-checks run in PARALLEL
-#   - e2e runs only after lint, format, test, and build all pass
+#   - lint (which also runs the format check, LS-8901), test, build,
+#     custom-checks run in PARALLEL
+#   - e2e runs only after lint, test, and build all pass
 #   - summarize always runs to post PR comments and update badges
 #
 # Nx remote cache (GitHub Actions cache) provides cross-run caching.
@@ -65,7 +66,7 @@ permissions:
   pull-requests: write
   checks: read
   issues: write
-  statuses: write # Required for granular commit status posting (lint, format, test, build, custom-checks)
+  statuses: write # Required for granular commit status posting (lint/format, test, build, custom-checks)
   id-token: write # Required for OIDC auth to AWS (S3 CI artifacts)
 
 env:
@@ -226,14 +227,25 @@ jobs:
   # .agents/skills/pr-lifecycle/references/ci-checks-reference.md).
   # Jobs run in parallel after detect-changes; e2e gates on all of these passing.
   # ============================================================================
+  # LS-8901: lint and format are both fast nx-affected-style checks with no
+  # isolation requirement between them — merged into one job (one checkout,
+  # one pnpm install) to save a runner spin-up + dependency install per PR
+  # push. Tradeoff: a lint failure and a format failure now surface as ONE
+  # check-run row instead of two; `lint-failure-excerpt` / `format-failure-
+  # excerpt` outputs (and the "CI: Lint Failure" / "CI: Formatting" PR labels
+  # below) still distinguish which check actually failed. `set-nx-shas: true`
+  # (previously `false` on the standalone format job — that job never used
+  # nx affected, so the SHA range went unused) keeps both steps' SHA-range
+  # detection consistent now that they share a job.
   lint:
-    name: "lint"
+    name: "lint & format"
     needs: [detect-changes]
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     outputs:
-      failure-excerpt: ${{ steps.capture.outputs.excerpt }}
+      lint-failure-excerpt: ${{ steps.capture-lint.outputs.excerpt }}
+      format-failure-excerpt: ${{ steps.capture-format.outputs.excerpt }}
     env:
       NX_VERBOSE_LOGGING: ${{ inputs.debug_mode || contains(github.event.pull_request.labels.*.name, 'ci-debug') }}
     steps:
@@ -252,42 +264,17 @@ jobs:
           include-optional-deps: false
 
       - name: "Lint"
+        id: lint
         run: |
           set -o pipefail
           pnpm exec nx affected -t lint 2>&1 | tee "$RUNNER_TEMP/ci-lint.log"
 
-      - name: "Capture lint failure"
-        id: capture
-        if: failure()
-        uses: ./.github/actions/capture-ci-failure
-        with:
-          tool: lint
-          log: ${{ runner.temp }}/ci-lint.log
-
-  format:
-    name: "format"
-    needs: [detect-changes]
-    if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 30
-    outputs:
-      failure-excerpt: ${{ steps.capture.outputs.excerpt }}
-    steps:
-      - name: "Checkout Repository"
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          fetch-depth: 0
-          filter: tree:0
-
-      - name: "Setup Workspace"
-        uses: ./.github/actions/setup
-        with:
-          node-version: 22
-          install-dependencies: true
-          set-nx-shas: false
-          include-optional-deps: false
-
+      # Always run, even if Lint failed above, so a format issue is never
+      # masked by an unrelated lint failure (matches the two-separate-jobs
+      # behaviour this replaces). Skipped only on cancellation.
       - name: "Format Check"
+        id: format
+        if: ${{ !cancelled() }}
         run: |
           set -o pipefail
           run_format() {
@@ -314,9 +301,17 @@ jobs:
           }
           run_format 2>&1 | tee "$RUNNER_TEMP/ci-format.log"
 
+      - name: "Capture lint failure"
+        id: capture-lint
+        if: steps.lint.outcome == 'failure'
+        uses: ./.github/actions/capture-ci-failure
+        with:
+          tool: lint
+          log: ${{ runner.temp }}/ci-lint.log
+
       - name: "Capture format failure"
-        id: capture
-        if: failure()
+        id: capture-format
+        if: steps.format.outcome == 'failure'
         uses: ./.github/actions/capture-ci-failure
         with:
           tool: format
@@ -616,14 +611,13 @@ jobs:
           echo "pnpm-lock.yaml matches all workspace package.json files"
 
   # ============================================================================
-  # STAGE 3 — E2E tests (runs after lint, format, test, AND build all pass)
+  # STAGE 3 — E2E tests (runs after lint (incl. format), test, AND build all pass)
   # ============================================================================
   e2e:
     name: "E2E Tests (Shard ${{ matrix.shard }})"
-    needs: [detect-changes, lint, format, test, build]
+    needs: [detect-changes, lint, test, build]
     if: >-
       needs.lint.result == 'success' &&
-      needs.format.result == 'success' &&
       needs.test.result == 'success' &&
       needs.build.result == 'success' &&
       (needs.detect-changes.outputs.web == 'true' ||
@@ -952,7 +946,7 @@ jobs:
   # ============================================================================
   summarize:
     name: "Summarize & Report"
-    needs: [detect-changes, e2e, lint, format, test, build, custom-checks, lockfile-check]
+    needs: [detect-changes, e2e, lint, test, build, custom-checks, lockfile-check]
     if: "always() && !cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
@@ -978,8 +972,7 @@ jobs:
         run: |
           echo "::group::Raw needs.*.result values (for phantom-failure debugging)"
           echo "detect-changes.result     = ${{ needs.detect-changes.result }}"
-          echo "lint.result               = ${{ needs.lint.result }}"
-          echo "format.result             = ${{ needs.format.result }}"
+          echo "lint.result               = ${{ needs.lint.result }}"  # LS-8901: folds the former standalone format job
           echo "test.result               = ${{ needs.test.result }}"
           echo "build.result              = ${{ needs.build.result }}"
           echo "custom-checks.result      = ${{ needs.custom-checks.result }}"
@@ -995,7 +988,6 @@ jobs:
             {
               "detect-changes":  "${{ needs.detect-changes.result }}",
               "lint":            "${{ needs.lint.result }}",
-              "format":          "${{ needs.format.result }}",
               "test":            "${{ needs.test.result }}",
               "build":           "${{ needs.build.result }}",
               "custom-checks":   "${{ needs.custom-checks.result }}",
@@ -1003,7 +995,7 @@ jobs:
               "e2e-testing":     "${{ needs.e2e.result }}"
             }
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
-          failure-threshold: "lint,format,test,build,custom-checks,lockfile-check,e2e-testing"
+          failure-threshold: "lint,test,build,custom-checks,lockfile-check,e2e-testing"
 
       # Aggregate "CI Gate" required status (LS-7991, Phase 2 of LS-7988).
       # Posts ONE commit status per head SHA folding the granular job results,
@@ -1032,7 +1024,6 @@ jobs:
           GATE_RESULTS: |
             {
               "lint":           "${{ needs.lint.result }}",
-              "format":         "${{ needs.format.result }}",
               "test":           "${{ needs.test.result }}",
               "build":          "${{ needs.build.result }}",
               "custom-checks":  "${{ needs.custom-checks.result }}",
@@ -1055,7 +1046,7 @@ jobs:
         uses: ./.github/actions/deployment-gate
         with:
           artifacts-ready: ${{ needs.build.outputs.artifacts-ready }}
-          quality-passed: ${{ needs.lint.result == 'success' && needs.format.result == 'success' && needs.test.result == 'success' }}
+          quality-passed: ${{ needs.lint.result == 'success' && needs.test.result == 'success' }}
           execution-plan: "{}"
           environment: "production"
 
@@ -1066,8 +1057,8 @@ jobs:
         if: steps.collect-results.outputs.overall-status == 'failure'
         shell: bash
         env:
-          EX_LINT: ${{ needs.lint.outputs.failure-excerpt }}
-          EX_FORMAT: ${{ needs.format.outputs.failure-excerpt }}
+          EX_LINT: ${{ needs.lint.outputs.lint-failure-excerpt }}
+          EX_FORMAT: ${{ needs.lint.outputs.format-failure-excerpt }}
           EX_TEST: ${{ needs.test.outputs.failure-excerpt }}
           EX_BUILD: ${{ needs.build.outputs.failure-excerpt }}
           EX_CUSTOM: ${{ needs.custom-checks.outputs.failure-excerpt }}
@@ -1109,7 +1100,6 @@ jobs:
             {
               "migration-immutability": "${{ needs.custom-checks.result }}",
               "lint":        "${{ needs.lint.result }}",
-              "format":      "${{ needs.format.result }}",
               "test":        "${{ needs.test.result }}"
             }
           project-failures: "{}"
@@ -1126,8 +1116,6 @@ jobs:
             // Map CI stage results to label names
             const labelMap = {
               'CI: Migration Immutability': '${{ needs.custom-checks.result }}',
-              'CI: Formatting':             '${{ needs.format.result }}',
-              'CI: Lint Failure':           '${{ needs.lint.result }}',
               'CI: Test Failure':           '${{ needs.test.result }}',
               'CI: Build Failure':          '${{ needs.build.result }}',
               'CI: E2E Failure':            '${{ needs.e2e.result }}',
@@ -1141,6 +1129,27 @@ jobs:
                 labelsToAdd.push(label);
               }
               // Empty/missing results are left alone (don't add or remove)
+            }
+
+            // LS-8901: lint and format now share one job (ci-pipeline.yml's
+            // `lint` job) — its two failure-excerpt outputs are only populated
+            // when that specific step actually failed, so use them to keep
+            // 'CI: Lint Failure' / 'CI: Formatting' independently accurate
+            // instead of both firing off the merged job's single result.
+            const lintResult = '${{ needs.lint.result }}';
+            const lintExcerpt = `${{ needs.lint.outputs.lint-failure-excerpt }}`;
+            const formatExcerpt = `${{ needs.lint.outputs.format-failure-excerpt }}`;
+            // The job can fail/cancel before either step's capture ran (e.g.
+            // cancellation, a setup failure) — neither excerpt is populated
+            // then. Fall back to flagging both rather than silently dropping
+            // the failure from PR labels.
+            const excerptsUnknown = !lintExcerpt && !formatExcerpt;
+            const jobFailedOrCancelled = lintResult === 'failure' || lintResult === 'cancelled';
+            if (lintExcerpt || (excerptsUnknown && jobFailedOrCancelled)) {
+              labelsToAdd.push('CI: Lint Failure');
+            }
+            if (formatExcerpt || (excerptsUnknown && jobFailedOrCancelled)) {
+              labelsToAdd.push('CI: Formatting');
             }
 
             // Get existing labels on the PR
