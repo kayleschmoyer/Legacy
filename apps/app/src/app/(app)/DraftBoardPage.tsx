@@ -15,30 +15,27 @@ export default function DraftBoardPage() {
   useEffect(() => {
     if (!websocketUrl) {
       LOGGER.error(
-        'EXPO_PUBLIC_WEBSOCKET_URL is not configured — live draft will not receive real-time updates',
+        'EXPO_PUBLIC_WEBSOCKET_URL is not configured — falling back to polling for live draft updates',
       );
     }
   }, [websocketUrl]);
-
-  if (!websocketUrl) {
-    return (
-      <YStack flex={1} justifyContent="center" alignItems="center" padding="$6">
-        <Text color="$red10" textAlign="center" fontSize="$4">
-          WebSocket URL is not configured. Live draft updates are unavailable.
-        </Text>
-      </YStack>
-    );
-  }
 
   return (
     // Mandatory navigation-landing anchor for the Maestro live-draft-board flow
     // (LS-8446): a stable container present across every draft state so tapping
     // the draft-status chip fails the flow loudly if the board never mounts.
     <YStack flex={1} testID="elite-draft-board-screen">
+      {!websocketUrl && (
+        <YStack backgroundColor="$yellow4" padding="$2">
+          <Text color="$yellow11" textAlign="center" fontSize="$2">
+            Real-time updates unavailable — polling for picks every 5s
+          </Text>
+        </YStack>
+      )}
       <EliteDraftBoardScreen
         leagueId={leagueId}
         onNavigate={(path) => router.navigate(path)}
-        websocketUrl={websocketUrl}
+        websocketUrl={websocketUrl ?? ''}
       />
     </YStack>
   );

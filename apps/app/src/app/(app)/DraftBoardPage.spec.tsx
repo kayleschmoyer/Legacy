@@ -57,17 +57,28 @@ describe('DraftBoardPage', () => {
   });
 
   describe('when websocketUrl is not configured', () => {
-    it('renders an error message', () => {
+    it('renders a degraded-polling banner instead of a hard error', () => {
       render(<DraftBoardPage />);
-      expect(screen.getByText(/WebSocket URL is not configured/i)).toBeTruthy();
+      expect(
+        screen.getByText(
+          /Real-time updates unavailable — polling for picks every 5s/i,
+        ),
+      ).toBeTruthy();
+      expect(screen.queryByText(/WebSocket URL is not configured/i)).toBeNull();
+    });
+
+    it('still renders the EliteDraftBoardScreen so the draft remains usable', () => {
+      render(<DraftBoardPage />);
+      expect(screen.getByTestId('elite-draft-board-screen')).toBeTruthy();
     });
   });
 
   describe('when websocketUrl is configured', () => {
-    it('renders the EliteDraftBoardScreen', () => {
+    it('renders the EliteDraftBoardScreen without the degraded-polling banner', () => {
       mockWebsocketUrl = 'wss://example.com/ws';
       render(<DraftBoardPage />);
       expect(screen.getByTestId('elite-draft-board-screen')).toBeTruthy();
+      expect(screen.queryByText(/Real-time updates unavailable/i)).toBeNull();
     });
   });
 });
