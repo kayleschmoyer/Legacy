@@ -23,6 +23,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { CombinedGraphQLErrors } from '@apollo/client';
 // Static namespace import of the (jest.mock-hoisted) generated module. Using a
 // static import instead of require() keeps nx's enforce-module-boundaries happy
 // — a cross-project require() is treated as a lazy load and forbids the static
@@ -50,6 +51,11 @@ jest.mock('@legacy-sports/logging', () => ({
 
 jest.mock('../../components/PageMeta', () => ({
   PageMeta: () => null,
+}));
+
+const mockStoreCameFrom = jest.fn();
+jest.mock('../../lib/came-from', () => ({
+  storeCameFrom: (...args: unknown[]) => mockStoreCameFrom(...args),
 }));
 
 jest.mock('@legacy-sports/shared-components', () => ({
@@ -546,6 +552,157 @@ describe('JoinLeagueByCodePage', () => {
     });
 
     expect(screen.getByText(/Unable to verify code/i)).toBeInTheDocument();
+  });
+
+  /**
+   * Regression: LS-1007 baseline — a genuinely bad code (server returns null,
+   * no error) must still read as invalid, not as an auth problem.
+   */
+  it('shows invalid invite code when the server finds no matching league', () => {
+    const { useValidateInviteCodeLazyQuery } = gqlMock as {
+      useValidateInviteCodeLazyQuery: jest.Mock;
+    };
+    useValidateInviteCodeLazyQuery.mockReturnValue([
+      mockValidateCode,
+      { data: { validateInviteCode: null }, loading: false },
+    ]);
+
+    renderPage();
+
+    fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+      target: { value: 'BADCODE1' },
+    });
+
+    expect(screen.getByText(/Invalid invite code/i)).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('invite-validation-auth-required'),
+    ).not.toBeInTheDocument();
+  });
+
+  /**
+   * LS-8846 — validateInviteCode throws UNAUTHENTICATED for anonymous
+   * callers; a signed-out user following a valid invite link must see a
+   * sign-in prompt, never "Invalid invite code" or "Unable to verify code".
+   */
+  describe('anonymous invite-code validation (LS-8846)', () => {
+    function mockUnauthenticatedError() {
+      return new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'Not authenticated',
+            extensions: { code: 'UNAUTHENTICATED' },
+          },
+        ],
+      });
+    }
+
+    it('shows a sign-in prompt, not an invalid-code or unknown-error message, for a valid code while logged out', () => {
+      const { useValidateInviteCodeLazyQuery } = gqlMock as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+      useValidateInviteCodeLazyQuery.mockReturnValue([
+        mockValidateCode,
+        {
+          data: undefined,
+          loading: false,
+          error: mockUnauthenticatedError(),
+        },
+      ]);
+
+      renderPage();
+
+      fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+        target: { value: 'ABC12XYZ' },
+      });
+
+      expect(
+        screen.getByTestId('invite-validation-auth-required'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(/Sign in to check this invite/i),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText(/Invalid invite code/i),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Unable to verify code/i),
+      ).not.toBeInTheDocument();
+    });
+
+    it('still reports a genuinely invalid code while logged out (not an auth prompt)', () => {
+      const { useValidateInviteCodeLazyQuery } = gqlMock as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+      // A non-existent code returns null data with no error, regardless of
+      // auth state — auth is only checked once a matching league is looked up.
+      useValidateInviteCodeLazyQuery.mockReturnValue([
+        mockValidateCode,
+        { data: { validateInviteCode: null }, loading: false },
+      ]);
+
+      renderPage();
+
+      fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+        target: { value: 'BADCODE1' },
+      });
+
+      expect(screen.getByText(/Invalid invite code/i)).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('invite-validation-auth-required'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('clicking Sign In preserves the invite code and routes to /login', () => {
+      const { useValidateInviteCodeLazyQuery } = gqlMock as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+      useValidateInviteCodeLazyQuery.mockReturnValue([
+        mockValidateCode,
+        {
+          data: undefined,
+          loading: false,
+          error: mockUnauthenticatedError(),
+        },
+      ]);
+
+      renderPage();
+
+      fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+        target: { value: 'ABC12XYZ' },
+      });
+
+      fireEvent.click(screen.getByText(/^Sign In$/i));
+
+      expect(mockStoreCameFrom).toHaveBeenCalledWith(
+        '/baseball/league/join/ABC12XYZ',
+      );
+      expect(mockNavigate).toHaveBeenCalledWith('/login', { replace: true });
+    });
+
+    it('a network error (no GraphQL UNAUTHENTICATED code) still shows the unknown-error message, not the sign-in prompt', () => {
+      const { useValidateInviteCodeLazyQuery } = gqlMock as {
+        useValidateInviteCodeLazyQuery: jest.Mock;
+      };
+      useValidateInviteCodeLazyQuery.mockReturnValue([
+        mockValidateCode,
+        {
+          data: undefined,
+          loading: false,
+          error: new Error('Network error'),
+        },
+      ]);
+
+      renderPage();
+
+      fireEvent.change(screen.getByPlaceholderText(/Enter 8-character code/i), {
+        target: { value: 'ABC12XYZ' },
+      });
+
+      expect(screen.getByText(/Unable to verify code/i)).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('invite-validation-auth-required'),
+      ).not.toBeInTheDocument();
+    });
   });
 
   /**

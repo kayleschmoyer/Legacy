@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   Button,
@@ -97,6 +98,7 @@ export default function JoinLeagueScreen(): React.JSX.Element {
   const validationVersionRef = useRef(0);
   const [leagueInfo, setLeagueInfo] =
     useState<ValidateInviteCodeQuery['validateInviteCode']>(undefined);
+  const [validateError, setValidateError] = useState<unknown>(undefined);
 
   useEffect(() => {
     const code = inviteCode.trim().toUpperCase();
@@ -104,6 +106,7 @@ export default function JoinLeagueScreen(): React.JSX.Element {
 
     if (!codePattern.test(code)) {
       setLeagueInfo(undefined);
+      setValidateError(undefined);
       return;
     }
 
@@ -112,12 +115,28 @@ export default function JoinLeagueScreen(): React.JSX.Element {
       void validateCode({ variables: { code } }).then((result) => {
         if (validationVersionRef.current === version) {
           setLeagueInfo(result.data?.validateInviteCode ?? undefined);
+          setValidateError(result.error);
         }
       });
     }, 400);
 
     return () => clearTimeout(timer);
   }, [inviteCode, validateCode]);
+
+  // validateInviteCode requires an authenticated caller and throws
+  // UNAUTHENTICATED for anonymous callers — an expected condition (e.g. a
+  // session that expired while this screen was open), not a bad code
+  // (LS-8846). Derived from extensions.code, never from the error message.
+  const isAuthRequiredError =
+    CombinedGraphQLErrors.is(validateError) &&
+    validateError.errors.some(
+      (e) =>
+        (e.extensions?.['code'] as string | undefined) === 'UNAUTHENTICATED',
+    );
+
+  const handleSignIn = (): void => {
+    router.navigate('/login');
+  };
 
   const isLeagueFull =
     leagueInfo?.isFull ??
@@ -259,11 +278,31 @@ export default function JoinLeagueScreen(): React.JSX.Element {
                   🚫 League full — all {leagueInfo.totalSpots} spots taken
                 </Text>
               )}
-              {!validating && !leagueInfo && inviteCode.trim().length === 8 && (
-                <Text color="$red10" fontSize="$2" fontWeight="600">
-                  ❌ Invalid invite code
-                </Text>
+              {!validating && isAuthRequiredError && (
+                <YStack space="$2">
+                  <Text color="$orange10" fontSize="$2" fontWeight="600">
+                    🔒 Sign in to check this invite — this isn&apos;t a problem
+                    with your code.
+                  </Text>
+                  <Button
+                    size="$2"
+                    alignSelf="flex-start"
+                    backgroundColor="$brandNavyLight"
+                    color="white"
+                    onPress={handleSignIn}
+                  >
+                    Sign In
+                  </Button>
+                </YStack>
               )}
+              {!validating &&
+                !isAuthRequiredError &&
+                !leagueInfo &&
+                inviteCode.trim().length === 8 && (
+                  <Text color="$red10" fontSize="$2" fontWeight="600">
+                    ❌ Invalid invite code
+                  </Text>
+                )}
             </YStack>
 
             {/* Team Name Input */}

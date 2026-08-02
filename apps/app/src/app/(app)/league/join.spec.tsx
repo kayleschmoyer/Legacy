@@ -5,6 +5,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { CombinedGraphQLErrors } from '@apollo/client';
 
 import JoinLeagueScreen from './join';
 
@@ -236,6 +237,89 @@ describe('JoinLeagueScreen (unified)', () => {
       jest.advanceTimersByTime(400);
 
       expect(mockValidateCode).not.toHaveBeenCalled();
+    });
+  });
+
+  // LS-8846: validateInviteCode throws UNAUTHENTICATED for anonymous callers
+  // (or a session that expired while this screen was open); the join screen
+  // must show a sign-in prompt instead of misreporting the code as invalid.
+  describe('anonymous invite-code validation (LS-8846)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.runOnlyPendingTimers();
+      jest.useRealTimers();
+    });
+
+    function unauthenticatedError() {
+      return new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'Not authenticated',
+            extensions: { code: 'UNAUTHENTICATED' },
+          },
+        ],
+      });
+    }
+
+    it('shows a sign-in prompt, not "Invalid invite code", for a valid code while logged out', async () => {
+      mockValidateCode.mockResolvedValue({
+        data: null,
+        error: unauthenticatedError(),
+      });
+
+      render(<JoinLeagueScreen />);
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Enter 8-character code'),
+        'ABC12XYZ',
+      );
+      jest.advanceTimersByTime(400);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Sign in to check this invite/)).toBeTruthy();
+      });
+      expect(screen.queryByText(/❌ Invalid invite code/)).toBeNull();
+    });
+
+    it('still reports a genuinely invalid code (no error) while logged out', async () => {
+      mockValidateCode.mockResolvedValue({
+        data: { validateInviteCode: null },
+      });
+
+      render(<JoinLeagueScreen />);
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Enter 8-character code'),
+        'BADCODE1',
+      );
+      jest.advanceTimersByTime(400);
+
+      await waitFor(() => {
+        expect(screen.getByText(/❌ Invalid invite code/)).toBeTruthy();
+      });
+      expect(screen.queryByText(/Sign in to check this invite/)).toBeNull();
+    });
+
+    it('pressing Sign In navigates to the login screen', async () => {
+      mockValidateCode.mockResolvedValue({
+        data: null,
+        error: unauthenticatedError(),
+      });
+
+      render(<JoinLeagueScreen />);
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Enter 8-character code'),
+        'ABC12XYZ',
+      );
+      jest.advanceTimersByTime(400);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Sign In' })).toBeTruthy();
+      });
+      fireEvent.press(screen.getByRole('button', { name: 'Sign In' }));
+
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
   });
 });

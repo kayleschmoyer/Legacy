@@ -6,7 +6,7 @@
  * URL. After sign-in, `resolvePostLoginRedirect` consumes this value so the
  * user lands back where they started instead of at the app root.
  *
- * Used by three sign-in paths:
+ * Used by four sign-in paths:
  *   - Discord (LGN-037): full-page OAuth redirect wipes the URL, so we stash
  *     the path before navigating to Discord and restore it on callback.
  *   - Google popup (LS-7520): `resolvePostLoginRedirect` calls `replaceState`
@@ -14,6 +14,11 @@
  *     last-visited league instead of the original deep-link.
  *   - Google One Tap (LS-7523): same issue as the popup path — the One Tap
  *     handler calls `resolvePostLoginRedirect` and needs the stored value.
+ *   - Anonymous invite-code join (LS-8846): the current URL doesn't always
+ *     contain the code the user is trying to redeem (e.g. they typed it in
+ *     rather than following a `/league/join/:code` link), so the caller
+ *     passes the canonical destination explicitly instead of relying on
+ *     `window.location`.
  *
  * The stored value is always re-validated through `getSafeRedirectTarget` by
  * the caller before it is used for navigation, so this module never opens an
@@ -47,11 +52,13 @@ function isMeaningfulDestination(pathname: string): boolean {
 }
 
 /**
- * Capture the current location (path + query + hash) as the post-login
- * destination, when it points at a meaningful page. No-ops on the auth entry
- * points, the app root, and when `sessionStorage` is unavailable.
+ * Capture the post-login destination, when it points at a meaningful page.
+ * Defaults to the current location (path + query + hash); pass `path`
+ * explicitly when the destination the caller wants to return to is not what
+ * is currently in the address bar (LS-8846). No-ops on the auth entry points,
+ * the app root, and when `sessionStorage` is unavailable.
  */
-export function storeCameFrom(): void {
+export function storeCameFrom(path?: string): void {
   try {
     if (
       typeof window === 'undefined' ||
@@ -59,9 +66,13 @@ export function storeCameFrom(): void {
     ) {
       return;
     }
-    const { pathname, search, hash } = window.location;
-    if (!isMeaningfulDestination(pathname)) return;
-    sessionStorage.setItem(CAME_FROM_KEY, `${pathname}${search}${hash}`);
+    let target = path;
+    if (target === undefined) {
+      const { pathname, search, hash } = window.location;
+      target = `${pathname}${search}${hash}`;
+    }
+    if (!isMeaningfulDestination(pathnameOf(target))) return;
+    sessionStorage.setItem(CAME_FROM_KEY, target);
   } catch {
     // sessionStorage can throw in private-browsing / quota-exceeded modes.
     // Preserving the deep link is best-effort, so swallow and fall back to root.

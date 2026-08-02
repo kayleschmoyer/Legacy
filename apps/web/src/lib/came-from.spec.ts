@@ -38,6 +38,20 @@ describe('came-from', () => {
         expect(sessionStorage.getItem(CAME_FROM_KEY)).toBeNull();
       },
     );
+
+    it('stores an explicit path override instead of the current location (LS-8846)', () => {
+      setUrl('/baseball/league/join');
+      storeCameFrom('/baseball/league/join/ABC12XYZ');
+      expect(sessionStorage.getItem(CAME_FROM_KEY)).toBe(
+        '/baseball/league/join/ABC12XYZ',
+      );
+    });
+
+    it('rejects a non-meaningful explicit path override', () => {
+      setUrl('/baseball/league/join/ABC12XYZ');
+      storeCameFrom('/login');
+      expect(sessionStorage.getItem(CAME_FROM_KEY)).toBeNull();
+    });
   });
 
   describe('consumeCameFrom', () => {

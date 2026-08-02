@@ -14,6 +14,7 @@ import {
   useValidateInviteCodeLazyQuery,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
+import { storeCameFrom } from '../../lib/came-from';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -69,6 +70,26 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
         error.toLowerCase().includes('all teams have been claimed')),
     );
   const isAlreadyMember = leagueInfo?.isAlreadyMember ?? false;
+
+  // validateInviteCode requires an authenticated caller (it needs the
+  // user's id to compute isAlreadyMember) and throws UNAUTHENTICATED for
+  // anonymous callers — an expected condition for anyone following an
+  // invite link while signed out, not a sign that the code is bad (LS-8846).
+  // Derived from extensions.code, never from string-matching the message.
+  const isAuthRequiredError =
+    CombinedGraphQLErrors.is(validateError) &&
+    validateError.errors.some(
+      (e) =>
+        (e.extensions?.['code'] as string | undefined) === 'UNAUTHENTICATED',
+    );
+
+  const handleSignIn = (): void => {
+    // Preserve the canonical join URL rather than the current address bar
+    // value — the code may have been typed in rather than arrived via the
+    // /:inviteCode route param, so window.location alone isn't reliable.
+    storeCameFrom(`/baseball/league/join/${trimmedCode}`);
+    navigate('/login', { replace: true });
+  };
 
   const handleJoin = async (): Promise<void> => {
     // Guard against submission while validation is pending or incomplete.
@@ -307,7 +328,42 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
               {!validating &&
                 isCodeComplete &&
                 (validateData !== undefined || Boolean(validateError)) &&
-                (validateError ? (
+                (isAuthRequiredError ? (
+                  <Card
+                    data-testid="invite-validation-auth-required"
+                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.12)}
+                    borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.4)}
+                    padding="$3"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <YStack space="$2">
+                      <Text
+                        color={BRAND_GOLD_LIGHT}
+                        fontSize="$3"
+                        fontWeight="700"
+                      >
+                        <span role="img" aria-label="lock">
+                          🔒
+                        </span>{' '}
+                        Sign in to check this invite
+                      </Text>
+                      <Text color="$gray11" fontSize="$2">
+                        We can&apos;t confirm an invite code until you&apos;re
+                        signed in — this isn&apos;t a problem with your code.
+                        Sign in and we&apos;ll bring you right back here.
+                      </Text>
+                      <Button
+                        alignSelf="flex-start"
+                        backgroundColor={BRAND_NAVY_LIGHT}
+                        color="white"
+                        onPress={handleSignIn}
+                      >
+                        Sign In
+                      </Button>
+                    </YStack>
+                  </Card>
+                ) : validateError ? (
                   <Text
                     color="$orange10"
                     fontSize="$2"
