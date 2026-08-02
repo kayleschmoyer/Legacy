@@ -10,6 +10,11 @@ output "github_runners_webhook_url" {
   value       = module.github_runners.webhook.endpoint
 }
 
+output "github_runners_android_webhook_url" {
+  description = "Webhook URL for the Android runner pool's DEDICATED GitHub App (LS-8910) to send workflow_job events. Provide this to that separate App's settings — see the github_app_android_id variable for why a second App is required. Until that App exists and this URL is registered, this pool never receives webhooks and cannot scale up."
+  value       = module.github_runners_android.webhook.endpoint
+}
+
 output "runner_ami_builder_role_arn" {
   description = "ARN of the OIDC role assumed by rebuild-runner-ami.yml to run Packer (LS-2429)"
   value       = aws_iam_role.runner_ami_builder.arn

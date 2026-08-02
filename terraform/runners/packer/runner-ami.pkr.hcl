@@ -133,12 +133,31 @@ variable "ssh_source_cidr" {
   default     = "10.0.0.0/16"
 }
 
-# NOTE: The AMI name must begin with "legacy-sports-runner-pw<playwright_version>-"
+# NOTE: The base AMI name must begin with "legacy-sports-runner-pw<playwright_version>-"
 # because terraform/github-runners.tf filters by this exact prefix to select the AMI
-# without an explicit AMI ID. Changing this prefix requires a coordinated update to
-# the filter block in github-runners.tf and the drift-check workflow.
+# without an explicit AMI ID. The Android AMI name begins with
+# "legacy-sports-runner-android-pw<playwright_version>-" (LS-8910) — a distinct
+# prefix so the two variants never collide under either name filter. Changing
+# either prefix requires a coordinated update to the matching filter block in
+# github-runners.tf and the drift-check workflow (drift-check does not
+# distinguish variants — see the comment on the `verify-env-contract-android`
+# provisioner below for why that's safe).
+#
+# LS-8910: split the single runner AMI into two variants to stop every runner
+# in the fleet (regardless of whether it ever runs an Android job) from paying
+# for a 60 GB root volume sized for the Android SDK/NDK (~8 GB). The two
+# `source` blocks below share every provisioner except the Android-specific
+# ones (Java 17, Android SDK, Gradle wrapper pre-bake), which are scoped to
+# `runner_android` via `only = ["source.amazon-ebs.runner_android"]`. Both
+# variants are built in the SAME `packer build` invocation (rebuild-runner-ami.yml
+# runs a plain `packer build runner-ami.pkr.hcl` with no `-only` flag), so they
+# always stay in lockstep on the same Playwright version — no new drift
+# dimension versus the single-AMI world.
 #
 # Rebuild history (most recent first):
+# - LS-8910 — split into runner_base (30 GB* / no Android SDK) + runner_android
+#   (60 GB, unchanged) source blocks. *See the launch_block_device_mappings
+#   comment on runner_base below for how that number was chosen.
 # - LS-8500 — bake webkit + firefox (previously only chromium was baked,
 #   blocking the Mobile Safari (LS-8457) and desktop WebKit (LS-8458)
 #   scheduled Playwright projects at the AMI-baked-browsers tripwire).
@@ -148,18 +167,25 @@ variable "ssh_source_cidr" {
 #   pnpm 11.3.0 (corepack drift). See `.agents/skills/infrastructure/
 #   references/ami-build.md` for the carrier-PR + rebuild-runner-ami label
 #   process this PR exercises.
-source "amazon-ebs" "runner" {
+locals {
+  # Fields shared verbatim by both source blocks — Packer HCL has no
+  # block-level inheritance/anchors, so this local plus explicit repetition
+  # of each field below is the least-duplicative option available.
+  source_ami_filter_common = {
+    name                = "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
+    root-device-type    = "ebs"
+    virtualization-type = "hvm"
+    state               = "available"
+  }
+}
+
+source "amazon-ebs" "runner_base" {
   ami_name      = "legacy-sports-runner-pw${var.playwright_version}-{{timestamp}}"
   instance_type = var.instance_type
   region        = var.region
 
   source_ami_filter {
-    filters = {
-      name                = "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
-      root-device-type    = "ebs"
-      virtualization-type = "hvm"
-      state               = "available"
-    }
+    filters     = local.source_ami_filter_common
     most_recent = true
     owners      = ["099720109477"] # Canonical
   }
@@ -179,29 +205,37 @@ source "amazon-ebs" "runner" {
 
   # Tag the temporary EC2 build instance and its volumes with a deterministic
   # Name prefix so the runner-ami-builder IAM role's tag-scoped
-  # ec2:TerminateInstances condition (Name LIKE "Packer Builder*") matches.
-  # The amazon-ebs builder does NOT apply a default Name tag when run_tags is
-  # unset, which previously caused failed builds to leak EC2 instances and
-  # security groups (LS-4921) because cleanup TerminateInstances was denied.
-  # See terraform/runners/runner-ami-builder-iam.tf for the matching policy.
+  # ec2:TerminateInstances condition (Name LIKE "Packer Builder*") matches, and
+  # the hourly orphan sweeper (packer-orphan-sweeper.tf) can reap it too — both
+  # match on the "Packer Builder*" prefix, which this satisfies regardless of
+  # variant. The amazon-ebs builder does NOT apply a default Name tag when
+  # run_tags is unset, which previously caused failed builds to leak EC2
+  # instances and security groups (LS-4921) because cleanup TerminateInstances
+  # was denied. See terraform/runners/runner-ami-builder-iam.tf for the
+  # matching policy.
   run_tags = {
-    Name      = "Packer Builder - legacy-sports-runner"
+    Name      = "Packer Builder - legacy-sports-runner-base"
     Project   = "legacy-sports"
     ManagedBy = "packer"
   }
   run_volume_tags = {
-    Name      = "Packer Builder - legacy-sports-runner"
+    Name      = "Packer Builder - legacy-sports-runner-base"
     Project   = "legacy-sports"
     ManagedBy = "packer"
   }
 
-  # The Ubuntu 22.04 source AMI ships with an 8 GB root volume — too small for
-  # the Android NDK (~8 GB uncompressed) plus Node.js, Playwright, Docker, etc.
-  # This resizes the Packer build instance disk only; the runner AMI inherits
-  # this size (runners also need the full SDK at runtime).
+  # LS-8910: 40 GB, not the Android variant's 60 GB — this build no longer
+  # installs the Android SDK/NDK (~8 GB uncompressed). 40 GB (not 30 GB) was
+  # chosen conservatively: live SSM disk-usage measurement against a running
+  # default-pool runner was attempted before this change but blocked by an
+  # MCP tool defect on the auditing agent's platform (aws_ssm_run_command
+  # produced invalid JSON for its --parameters payload), so this is a
+  # documented estimate, not a measurement — see the LS-8910 PR description.
+  # Re-measure with `df -h /` / `du -sh` on a live runner once that tool
+  # works, and tighten this number in a follow-up if real usage supports it.
   launch_block_device_mappings {
     device_name           = "/dev/sda1"
-    volume_size           = 60
+    volume_size           = 40
     volume_type           = "gp3"
     delete_on_termination = true
   }
@@ -210,6 +244,63 @@ source "amazon-ebs" "runner" {
     Name              = "legacy-sports-runner"
     Project           = "legacy-sports"
     ManagedBy         = "packer"
+    Variant           = "base"
+    NodeVersion       = var.node_version
+    PnpmVersion       = var.pnpm_version
+    RunnerVersion     = var.runner_version
+    PlaywrightVersion = var.playwright_version
+    TerraformVersion  = var.terraform_version
+    DockerInstalled   = "true"
+  }
+}
+
+source "amazon-ebs" "runner_android" {
+  ami_name      = "legacy-sports-runner-android-pw${var.playwright_version}-{{timestamp}}"
+  instance_type = var.instance_type
+  region        = var.region
+
+  source_ami_filter {
+    filters     = local.source_ami_filter_common
+    most_recent = true
+    owners      = ["099720109477"] # Canonical
+  }
+
+  ssh_username                = "ubuntu"
+  vpc_id                      = var.vpc_id
+  subnet_id                   = var.subnet_id
+  associate_public_ip_address = true
+
+  ssh_interface                         = "private_ip"
+  temporary_security_group_source_cidrs = [var.ssh_source_cidr]
+
+  run_tags = {
+    Name      = "Packer Builder - legacy-sports-runner-android"
+    Project   = "legacy-sports"
+    ManagedBy = "packer"
+  }
+  run_volume_tags = {
+    Name      = "Packer Builder - legacy-sports-runner-android"
+    Project   = "legacy-sports"
+    ManagedBy = "packer"
+  }
+
+  # Unchanged from the pre-split single AMI: the Ubuntu 22.04 source AMI ships
+  # with an 8 GB root volume — too small for the Android NDK (~8 GB
+  # uncompressed) plus Node.js, Playwright, Docker, etc. This resizes the
+  # Packer build instance disk only; the runner AMI inherits this size
+  # (runners also need the full SDK at runtime).
+  launch_block_device_mappings {
+    device_name           = "/dev/sda1"
+    volume_size           = 60
+    volume_type           = "gp3"
+    delete_on_termination = true
+  }
+
+  tags = {
+    Name              = "legacy-sports-runner-android"
+    Project           = "legacy-sports"
+    ManagedBy         = "packer"
+    Variant           = "android"
     NodeVersion       = var.node_version
     PnpmVersion       = var.pnpm_version
     RunnerVersion     = var.runner_version
@@ -223,7 +314,7 @@ source "amazon-ebs" "runner" {
 }
 
 build {
-  sources = ["source.amazon-ebs.runner"]
+  sources = ["source.amazon-ebs.runner_base", "source.amazon-ebs.runner_android"]
 
   # System updates and base packages
   provisioner "shell" {
@@ -466,11 +557,16 @@ build {
     ]
   }
 
+  # ── LS-8910: everything below this line, up to (not including) the "Embed
+  # AMI tag values" provisioner, is Android-specific and built ONLY into
+  # runner_android via `only`. The runner_base variant skips all of it. ──
+
   # Java 17 (required by sdkmanager — Android SDK command-line tools are JVM-based).
   # The JDK (not JRE) is required so Gradle's Android build can locate javac/aapt2
   # toolchain bits; baking JAVA_HOME into the runner env lets us skip
   # actions/setup-java on self-hosted runners and saves ~60s per Android build.
   provisioner "shell" {
+    only = ["source.amazon-ebs.runner_android"]
     inline = [
       "sudo apt-get install -y -qq openjdk-17-jdk-headless",
       "java -version",
@@ -485,6 +581,7 @@ build {
 
   # Android SDK (pre-installed so CI skips android-actions/setup-android)
   provisioner "shell" {
+    only = ["source.amazon-ebs.runner_android"]
     environment_vars = [
       "ANDROID_HOME=/opt/android-sdk",
     ]
@@ -536,6 +633,7 @@ build {
   # which makes $GRADLE_USER_HOME default to /home/ubuntu/.gradle. We write
   # there directly so `gradlew` finds the dist without a download.
   provisioner "shell" {
+    only = ["source.amazon-ebs.runner_android"]
     environment_vars = [
       "GRADLE_VERSION=${var.gradle_version}",
     ]
@@ -579,7 +677,13 @@ build {
   # future drift-detection job can `source` it directly.
   #
   # This file is the single source of truth that the verify-env-contract
-  # post-provisioner below asserts against.
+  # post-provisioners below assert against.
+  #
+  # LS-8910: split into a common provisioner (both variants — the tools every
+  # runner gets) and an android-only supplemental provisioner appended below
+  # (only the Android variant gets Android-specific keys written). Writing
+  # AndroidApiLevel/AndroidNdkVersion/GradleVersion into runner_base's contract
+  # file would be actively misleading — that AMI doesn't have the SDK.
   #
   # `inline_shebang = "/bin/bash -e"` is required because the embedded
   # heredoc uses `set -euo pipefail` (bash-only — dash, Ubuntu's default
@@ -593,10 +697,6 @@ build {
       "RUNNER_VERSION=${var.runner_version}",
       "PLAYWRIGHT_VERSION=${var.playwright_version}",
       "TERRAFORM_VERSION=${var.terraform_version}",
-      "ANDROID_API_LEVEL=${var.android_api_level}",
-      "ANDROID_BUILD_TOOLS_VERSION=${var.android_build_tools_version}",
-      "ANDROID_NDK_VERSION=${var.android_ndk_version}",
-      "GRADLE_VERSION=${var.gradle_version}",
       "DOCKER_VERSION=${var.docker_version}",
       "SERVE_VERSION=${var.serve_version}",
       "SNYK_VERSION=${var.snyk_version}",
@@ -615,15 +715,36 @@ build {
         RunnerVersion=$${RUNNER_VERSION}
         PlaywrightVersion=$${PLAYWRIGHT_VERSION}
         TerraformVersion=$${TERRAFORM_VERSION}
-        AndroidApiLevel=$${ANDROID_API_LEVEL}
-        AndroidBuildToolsVersion=$${ANDROID_BUILD_TOOLS_VERSION}
-        AndroidNdkVersion=$${ANDROID_NDK_VERSION}
-        GradleVersion=$${GRADLE_VERSION}
         DockerVersion=$${DOCKER_VERSION}
         ServeVersion=$${SERVE_VERSION}
         SnykVersion=$${SNYK_VERSION}
         EOF
         sudo chmod 644 /etc/legacy-sports-runner-version
+        cat /etc/legacy-sports-runner-version
+      EOT
+    ]
+  }
+
+  # LS-8910: android-only supplemental contract keys, appended to the same
+  # file the common provisioner above just wrote (`tee -a`, not `tee`).
+  provisioner "shell" {
+    only           = ["source.amazon-ebs.runner_android"]
+    inline_shebang = "/bin/bash -e"
+    environment_vars = [
+      "ANDROID_API_LEVEL=${var.android_api_level}",
+      "ANDROID_BUILD_TOOLS_VERSION=${var.android_build_tools_version}",
+      "ANDROID_NDK_VERSION=${var.android_ndk_version}",
+      "GRADLE_VERSION=${var.gradle_version}",
+    ]
+    inline = [
+      <<-EOT
+        set -euo pipefail
+        sudo tee -a /etc/legacy-sports-runner-version > /dev/null <<EOF
+        AndroidApiLevel=$${ANDROID_API_LEVEL}
+        AndroidBuildToolsVersion=$${ANDROID_BUILD_TOOLS_VERSION}
+        AndroidNdkVersion=$${ANDROID_NDK_VERSION}
+        GradleVersion=$${GRADLE_VERSION}
+        EOF
         cat /etc/legacy-sports-runner-version
       EOT
     ]
@@ -661,6 +782,12 @@ build {
   # `inline_shebang = "/bin/bash -e"` — same reason as the embed-runner-version
   # provisioner above: the heredoc uses `set -euo pipefail` and bash arrays/
   # functions, neither of which work under dash.
+  #
+  # LS-8910: this provisioner now covers ONLY the checks common to both AMI
+  # variants (no `only` — runs on both). The Android-specific tool/tag/landmark
+  # checks (Java, Android SDK, Gradle wrapper dist) moved to a second,
+  # `runner_android`-only provisioner immediately below, so runner_base is
+  # never checked against contract keys it was never given.
   provisioner "shell" {
     inline_shebang = "/bin/bash -e"
     environment_vars = [
@@ -670,16 +797,12 @@ build {
       "EXPECT_TERRAFORM=${var.terraform_version}",
       "EXPECT_SNYK=${var.snyk_version}",
       "EXPECT_DOCKER=${var.docker_version}",
-      "EXPECT_GRADLE=${var.gradle_version}",
       # AMI tag block values (kept in sync manually — the assertion catches drift)
       "TAG_NODE_VERSION=${var.node_version}",
       "TAG_PNPM_VERSION=${var.pnpm_version}",
       "TAG_RUNNER_VERSION=${var.runner_version}",
       "TAG_PLAYWRIGHT_VERSION=${var.playwright_version}",
       "TAG_TERRAFORM_VERSION=${var.terraform_version}",
-      "TAG_ANDROID_API_LEVEL=${var.android_api_level}",
-      "TAG_ANDROID_NDK_VERSION=${var.android_ndk_version}",
-      "TAG_GRADLE_VERSION=${var.gradle_version}",
     ]
     inline = [
       <<-EOT
@@ -750,19 +873,12 @@ build {
         check_tag RunnerVersion     "$${TAG_RUNNER_VERSION}"
         check_tag PlaywrightVersion "$${TAG_PLAYWRIGHT_VERSION}"
         check_tag TerraformVersion  "$${TAG_TERRAFORM_VERSION}"
-        check_tag AndroidApiLevel   "$${TAG_ANDROID_API_LEVEL}"
-        check_tag AndroidNdkVersion "$${TAG_ANDROID_NDK_VERSION}"
-        check_tag GradleVersion     "$${TAG_GRADLE_VERSION}"
 
         # ----- (3) Pre-baked file-system landmarks -----
         for path in \
           /usr/bin/pwsh \
           /opt/playwright-browsers \
-          /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager \
-          /opt/android-sdk/platform-tools/adb \
           /opt/actions-runner \
-          /home/ubuntu/.gradle/wrapper/dists/gradle-$${EXPECT_GRADLE}-bin \
-          /usr/lib/jvm/java-17-openjdk-amd64 \
           /etc/legacy-sports-runner-version; do
           if [[ -e "$path" ]]; then
             ok "landmark present: $path"
@@ -781,6 +897,72 @@ build {
 
         echo ""
         echo "=== verify-env-contract: all checks passed ==="
+      EOT
+    ]
+  }
+
+  # LS-8910: android-only supplement to verify-env-contract above — asserts
+  # the Java/Android SDK/Gradle-wrapper contract that only runner_android
+  # carries. Split out for the same reason the contract-embed provisioner
+  # was split: runner_base was never given these tools, so checking for them
+  # there would be a false failure, not a real drift signal.
+  provisioner "shell" {
+    only           = ["source.amazon-ebs.runner_android"]
+    inline_shebang = "/bin/bash -e"
+    environment_vars = [
+      "EXPECT_GRADLE=${var.gradle_version}",
+      "TAG_ANDROID_API_LEVEL=${var.android_api_level}",
+      "TAG_ANDROID_NDK_VERSION=${var.android_ndk_version}",
+      "TAG_GRADLE_VERSION=${var.gradle_version}",
+    ]
+    inline = [
+      <<-EOT
+        set -euo pipefail
+
+        echo "=== verify-env-contract (android): simulating runner-agent shell context ==="
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin"
+
+        FAIL=0
+        fail() { echo "DRIFT: $*" >&2; FAIL=1; }
+        ok()   { echo "OK   : $*"; }
+
+        check_tag() {
+          local key="$1" expected="$2"
+          local actual
+          actual=$(grep "^$${key}=" /etc/legacy-sports-runner-version | cut -d= -f2-)
+          if [[ "$actual" == "$expected" ]]; then
+            ok "AMI tag $key=$expected matches runner-version file"
+          else
+            fail "AMI tag $key=$expected != /etc/legacy-sports-runner-version $${key}=$actual"
+          fi
+        }
+        check_tag AndroidApiLevel   "$${TAG_ANDROID_API_LEVEL}"
+        check_tag AndroidNdkVersion "$${TAG_ANDROID_NDK_VERSION}"
+        check_tag GradleVersion     "$${TAG_GRADLE_VERSION}"
+
+        # No check_version call for `gradle` here — gradle is wrapper-only by
+        # design (see ami-env-drift.md); the landmark below for
+        # /home/ubuntu/.gradle/wrapper/dists/gradle-<version>-bin is the check.
+        for path in \
+          /opt/android-sdk/cmdline-tools/latest/bin/sdkmanager \
+          /opt/android-sdk/platform-tools/adb \
+          /home/ubuntu/.gradle/wrapper/dists/gradle-$${EXPECT_GRADLE}-bin \
+          /usr/lib/jvm/java-17-openjdk-amd64; do
+          if [[ -e "$path" ]]; then
+            ok "landmark present: $path"
+          else
+            fail "landmark MISSING: $path"
+          fi
+        done
+
+        if [[ "$FAIL" -ne 0 ]]; then
+          echo ""
+          echo "verify-env-contract (android) failed — see docs/runners/ami-env-drift.md."
+          exit 1
+        fi
+
+        echo ""
+        echo "=== verify-env-contract (android): all checks passed ==="
       EOT
     ]
   }

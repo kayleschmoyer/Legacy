@@ -1,8 +1,16 @@
 # prune-runner-amis composite action — shared prune logic for runner AMIs.
 #
-# Retains the 5 most recent AMIs by creation date, plus any version still
-# referenced by main or an open PR branch's runner-ami.auto.tfvars. Keeps the
-# AMI count bounded without a cron job (LS-3885, LS-4946).
+# Retains the 5 most recent AMIs PER VARIANT (base, android) by creation date,
+# plus any version still referenced by main or an open PR branch's
+# runner-ami.auto.tfvars. Keeps the AMI count bounded without a cron job
+# (LS-3885, LS-4946).
+#
+# LS-8910: since the base + android split, both variants build in the same
+# `packer build` invocation and land in the AMI list with near-identical
+# timestamps. Retention MUST be computed per-variant — a single "keep the 5
+# most recent overall" cut, applied across both variants pooled together,
+# would unevenly starve one variant's rollback history (e.g. keeping 4 base +
+# 1 android after a few rebuild cycles) for no reason tied to actual need.
 #
 # Caller responsibilities (not done here):
 #   - actions/checkout (this action reads terraform/runners/runner-ami.auto.tfvars
@@ -87,7 +95,22 @@ runs:
 
         echo "Total AMIs: $(echo "$ALL_AMIS" | jq 'length')"
 
-        KEEP_IDS=$(echo "$ALL_AMIS" | jq -r --argjson n "$KEEP_COUNT" '.[0:$n] | .[].Id')
+        # LS-8910: keep the 5 most recent PER VARIANT, not 5 most recent overall.
+        # Variant is determined by name: "legacy-sports-runner-android-pw*" is the
+        # android variant, everything else matching the base filter above is the
+        # base variant. (pre-LS-8910 single-variant AMIs already in the account —
+        # named "legacy-sports-runner-pw*" — fall into the base bucket too, so a
+        # mixed-history account prunes correctly during the transition.)
+        BASE_AMIS=$(echo "$ALL_AMIS" | jq '[.[] | select(.Name | contains("-android-pw") | not)]')
+        ANDROID_AMIS=$(echo "$ALL_AMIS" | jq '[.[] | select(.Name | contains("-android-pw"))]')
+        echo "Base AMIs: $(echo "$BASE_AMIS" | jq 'length'), Android AMIs: $(echo "$ANDROID_AMIS" | jq 'length')"
+
+        KEEP_IDS=$(
+          {
+            echo "$BASE_AMIS" | jq -r --argjson n "$KEEP_COUNT" '.[0:$n] | .[].Id'
+            echo "$ANDROID_AMIS" | jq -r --argjson n "$KEEP_COUNT" '.[0:$n] | .[].Id'
+          }
+        )
 
         while read -r VERSION; do
           [[ -z "$VERSION" ]] && continue

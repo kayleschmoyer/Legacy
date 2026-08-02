@@ -113,7 +113,10 @@ jobs:
         github.event_name == 'workflow_dispatch' ||
         github.event.workflow_run.conclusion == 'success'
       )
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-8910: needs the Android SDK/NDK/Gradle wrapper — see the matching
+    # comment on build-android-app.yml's build-android job for why the
+    # fallback is 'ubuntu-latest' directly and not vars.CI_RUNNER_LABEL.
+    runs-on: ${{ vars.ANDROID_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 45
     env:
       # AC3: test-only session injection — the automatable native auth strategy.
@@ -134,8 +137,12 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      # LS-8910: gate uses vars.ANDROID_RUNNER_LABEL, matching the runs-on
+      # expression above — not vars.CI_RUNNER_LABEL, which now drives a
+      # different (non-Android) pool. See build-android-app.yml's build-android
+      # job for the full rationale (LS-4933 on why `runner.labels` can't be used).
       - name: Setup Java
-        if: ${{ vars.CI_RUNNER_LABEL == '' }}
+        if: ${{ vars.ANDROID_RUNNER_LABEL == '' }}
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
           distribution: "temurin"
@@ -146,13 +153,13 @@ jobs:
             pnpm-lock.yaml
 
       - name: Setup Android SDK
-        if: ${{ vars.CI_RUNNER_LABEL == '' }}
+        if: ${{ vars.ANDROID_RUNNER_LABEL == '' }}
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
 
       - name: Ensure ANDROID_HOME (self-hosted fallback)
-        if: ${{ vars.CI_RUNNER_LABEL != '' }}
+        if: ${{ vars.ANDROID_RUNNER_LABEL != '' }}
         shell: bash
         run: |
           if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then

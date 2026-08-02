@@ -48,9 +48,12 @@ resource "aws_iam_policy" "runner_self_tag" {
           "ForAllValues:StringEquals" = {
             "aws:TagKeys" = ["ghr:job_heartbeat"]
           }
-          # Only instances that are part of this runner fleet may be tagged.
+          # Only instances that are part of a runner fleet may be tagged.
+          # LS-8910: StringEquals against a list is an OR — covers both the
+          # default pool's and the Android pool's ghr:environment tag value
+          # (see local.runner_environments in main.tf).
           StringEquals = {
-            "ec2:ResourceTag/ghr:environment" = "${local.name_prefix}-runner"
+            "ec2:ResourceTag/ghr:environment" = local.runner_environments
           }
         }
       },

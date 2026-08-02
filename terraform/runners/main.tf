@@ -46,4 +46,15 @@ locals {
     staging = 30
     prod    = 90
   }
+
+  # LS-8910: the two github-aws-runners module instances (default pool +
+  # Android pool, see github-runners.tf) each tag their own instances
+  # `ghr:environment = <module's prefix var>`. Any IAM condition that pins an
+  # action to "the runner fleet" by that tag (runner_self_tag.tf's heartbeat
+  # grant, github-runners.tf's EC2SelfTerminate boundary Sid) must list BOTH
+  # values or the second pool's scale-down/heartbeat silently no-ops for it.
+  runner_environments = [
+    "${local.name_prefix}-runner",
+    "${local.name_prefix}-runner-android",
+  ]
 }

@@ -99,6 +99,42 @@ variable "github_runners_max_count" {
   default     = 30
 }
 
+# ── Android runner pool (LS-8910) ──────────────────────────────────────────────
+# A second, small self-hosted pool built from the Android-flavored AMI
+# (terraform/runners/packer/runner-ami.pkr.hcl's runner_android source), so the
+# default pool's runners no longer pay for a 60 GB root volume sized for the
+# Android SDK/NDK. See github-runners.tf's `module "github_runners_android"`
+# for the full design and the PR description on LS-8910 for the operational
+# runbook (this pool requires a dedicated GitHub App — see github_app_android_id
+# below — that does not yet exist and must be created by a repo admin before
+# this pool can receive any workflow_job webhooks).
+
+variable "github_runners_android_max_count" {
+  description = "Maximum number of concurrent Android runner instances (LS-8910). Kept small — the only consumers (build-android-app.yml, e2e-native-android.yml, run-maestro-sweep.yml) never fan out like the main CI pool does."
+  type        = number
+  default     = 3
+}
+
+variable "github_app_android_id" {
+  description = "GitHub App ID for the Android runner pool's webhook (LS-8910). MUST be a SEPARATE GitHub App from github_app_id above — a GitHub App has exactly one webhook URL, and each github-aws-runners module instance provisions its own webhook Lambda + API Gateway endpoint, so the default pool's app cannot also serve the Android pool without the (explicitly out-of-scope-for-this-ticket) multi-runner module variant. Creating this second App, installing it on the repo, and generating its private key is a one-time manual prerequisite (repo-admin action, cannot be automated from Terraform) — until it's done and these variables are populated, this module's Terraform resources apply cleanly but the Android pool never receives workflow_job webhooks and cannot scale up. No default — TF_VAR_* env vars in CI / secrets.auto.tfvars is the same mechanism github_app_id already uses."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_android_key_base64" {
+  description = "GitHub App private key (base64-encoded PEM) for the Android runner pool's dedicated GitHub App. See github_app_android_id."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "github_app_android_webhook_secret" {
+  description = "Shared secret for the Android runner pool's dedicated GitHub App webhook HMAC signature verification. See github_app_android_id."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # ── Runner AMI version pinning (LS-2429) ──────────────────────────────────────
 # Source of truth lives in terraform/runners/runner-ami.auto.tfvars (committed).
 # Has no default — terraform plan/apply must find a value here or fail fast.

@@ -58,7 +58,15 @@ env:
 jobs:
   build-android:
     name: Build Android APK
-    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # LS-8910: this job needs the Android SDK/NDK/Gradle wrapper, which only
+    # the dedicated Android runner pool's AMI carries after the base/android
+    # Packer split. Falls back straight to GitHub-hosted ubuntu-latest (NOT
+    # to vars.CI_RUNNER_LABEL) when ANDROID_RUNNER_LABEL is unset — GitHub's
+    # hosted runner images ship a usable Android SDK, so this fails safe.
+    # Falling back to the default self-hosted pool instead would be unsafe:
+    # once that pool's AMI is rebuilt off the new Android-SDK-free base
+    # source, this job would fail there with a missing-SDK error.
+    runs-on: ${{ vars.ANDROID_RUNNER_LABEL || 'ubuntu-latest' }}
     # EXPO_PUBLIC_* values are inlined into the JS bundle by Metro
     # (babel-preset-expo) during the Gradle assemble step inside the
     # build-android composite action. They MUST live in the *job* environment:
@@ -156,15 +164,16 @@ jobs:
           set-nx-shas: false
           skip-system-deps: true
 
-      # Self-hosted runners already have JDK 17 + JAVA_HOME baked in via the
-      # runner AMI (terraform/runners/packer/runner-ami.pkr.hcl), so skip the
-      # download there. The gate uses `vars.CI_RUNNER_LABEL == ''` (matching
-      # the `runs-on` expression above) because `runner.labels` is NOT a valid
-      # GitHub Actions context — the older `!contains(runner.labels, ...)` form
-      # always evaluated to true and silently re-downloaded the JDK/SDK on every
-      # self-hosted run (LS-4933).
+      # Self-hosted Android runners already have JDK 17 + JAVA_HOME baked in via
+      # the runner_android Packer source (terraform/runners/packer/runner-ami.pkr.hcl),
+      # so skip the download there. The gate uses `vars.ANDROID_RUNNER_LABEL == ''`
+      # (matching the `runs-on` expression above, not `vars.CI_RUNNER_LABEL` —
+      # LS-8910 split the Android pool onto its own label) because
+      # `runner.labels` is NOT a valid GitHub Actions context — the older
+      # `!contains(runner.labels, ...)` form always evaluated to true and
+      # silently re-downloaded the JDK/SDK on every self-hosted run (LS-4933).
       - name: Setup Java
-        if: ${{ vars.CI_RUNNER_LABEL == '' }}
+        if: ${{ vars.ANDROID_RUNNER_LABEL == '' }}
         uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
           distribution: "temurin"
@@ -175,7 +184,7 @@ jobs:
             pnpm-lock.yaml
 
       - name: Setup Android SDK
-        if: ${{ vars.CI_RUNNER_LABEL == '' }}
+        if: ${{ vars.ANDROID_RUNNER_LABEL == '' }}
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
@@ -187,7 +196,7 @@ jobs:
       # Belt-and-suspenders: if ANDROID_HOME is empty but the SDK exists on disk,
       # export it explicitly so the build doesn't depend solely on the AMI .env.
       - name: Ensure ANDROID_HOME (self-hosted fallback)
-        if: ${{ vars.CI_RUNNER_LABEL != '' }}
+        if: ${{ vars.ANDROID_RUNNER_LABEL != '' }}
         shell: bash
         run: |
           if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then

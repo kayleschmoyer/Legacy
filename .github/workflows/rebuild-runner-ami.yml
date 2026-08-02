@@ -216,7 +216,7 @@ jobs:
         with:
           version: "latest"
 
-      - name: Build AMI via Packer
+      - name: Build AMIs via Packer
         id: build
         working-directory: terraform/runners/packer
         env:
@@ -227,6 +227,11 @@ jobs:
         run: |
           set -euo pipefail
           packer init runner-ami.pkr.hcl
+          # LS-8910: no `-only` flag, so this builds BOTH sources declared in
+          # the build block (runner_base + runner_android) in one invocation —
+          # they always stay on the same Playwright version this way. The log
+          # now has two "us-east-1: ami-..." lines, one per source, each
+          # prefixed by the builder name (e.g. "amazon-ebs.runner_base:").
           packer build \
             -var "playwright_version=$VERSION" \
             -var "vpc_id=$VPC_ID" \
@@ -234,15 +239,30 @@ jobs:
             -var "ssh_source_cidr=$VPC_CIDR" \
             runner-ami.pkr.hcl 2>&1 | tee packer-build.log
 
-          # Extract the new AMI ID from the build log. Packer's amazon-ebs builder
-          # prints a line of the form "us-east-1: ami-0123456789abcdef0" at the end.
-          AMI_ID=$(grep -oE "us-east-1: ami-[0-9a-f]+" packer-build.log | tail -n 1 | awk '{print $2}')
-          if [[ -z "$AMI_ID" ]]; then
-            echo "::error::Could not extract AMI ID from Packer build log"
+          # Extract each source's AMI ID by builder name — Packer's amazon-ebs
+          # builder prints "==> amazon-ebs.<source>: AMIs were created:\nus-east-1: ami-..."
+          # per source, so grep each source name's own output block rather than
+          # blindly taking the last "us-east-1: ami-" line (which only worked
+          # when there was exactly one source).
+          extract_ami() {
+            local source_name="$1"
+            grep -A2 "amazon-ebs.$${source_name}: AMIs were created" packer-build.log \
+              | grep -oE "us-east-1: ami-[0-9a-f]+" \
+              | tail -n 1 | awk '{print $2}'
+          }
+          BASE_AMI_ID=$(extract_ami "runner_base")
+          ANDROID_AMI_ID=$(extract_ami "runner_android")
+          if [[ -z "$BASE_AMI_ID" ]]; then
+            echo "::error::Could not extract base runner AMI ID from Packer build log"
             exit 1
           fi
-          echo "ami_id=$AMI_ID" >> "$GITHUB_OUTPUT"
-          echo "✅ Built AMI $AMI_ID for Playwright $VERSION"
+          if [[ -z "$ANDROID_AMI_ID" ]]; then
+            echo "::error::Could not extract android runner AMI ID from Packer build log"
+            exit 1
+          fi
+          echo "base_ami_id=$BASE_AMI_ID" >> "$GITHUB_OUTPUT"
+          echo "android_ami_id=$ANDROID_AMI_ID" >> "$GITHUB_OUTPUT"
+          echo "✅ Built base AMI $BASE_AMI_ID and android AMI $ANDROID_AMI_ID for Playwright $VERSION"
 
       - name: Update Packer default + tfvars on PR branch
         env:
@@ -327,17 +347,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.lockfile.outputs.version }}
-          AMI_ID: ${{ steps.build.outputs.ami_id }}
+          BASE_AMI_ID: ${{ steps.build.outputs.base_ami_id }}
+          ANDROID_AMI_ID: ${{ steps.build.outputs.android_ami_id }}
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
-          gh pr comment "$PR_NUMBER" --body "🧱 **Runner AMI rebuilt**
+          gh pr comment "$PR_NUMBER" --body "🧱 **Runner AMIs rebuilt**
 
-          Built a new AMI for Playwright \`$VERSION\`: \`$AMI_ID\`
+          Built new AMIs for Playwright \`$VERSION\`:
+          - base (default pool): \`$BASE_AMI_ID\`
+          - android (LS-8910 Android pool): \`$ANDROID_AMI_ID\`
 
           Packer HCL \`playwright_version\` default and \`runner-ami.auto.tfvars\` have
           been updated on this branch. The runner-ami-drift-check workflow will re-run
           and should now pass. On merge, \`runner-terraform-apply.yml\` will roll the
-          launch template to the new AMI."
+          default pool's launch template to the new base AMI; the android pool (once
+          its Terraform resources exist — see LS-8910) rolls to the new android AMI
+          the same way."
 
       # Prune old runner AMIs as a post-build step. Retains the 5 most recent
       # AMIs by creation date plus any version still referenced by main or an
@@ -356,7 +381,7 @@ jobs:
       # crash that skips Packer's own cleanup cannot leave a costly orphan. The
       # hourly packer-orphan-sweeper Lambda is the backstop for the case where
       # the host dies before this step can run at all.
-      - name: Terminate leaked Packer build instance
+      - name: Terminate leaked Packer build instances
         if: always()
         working-directory: terraform/runners/packer
         run: |
@@ -365,27 +390,31 @@ jobs:
             echo "No packer-build.log — Packer did not start; nothing to clean up."
             exit 0
           fi
-          # amazon-ebs logs e.g. "==> amazon-ebs.runner: Instance ID: i-0abc123".
-          INSTANCE_ID=$(grep -oE "Instance ID: i-[0-9a-f]+" packer-build.log \
-            | tail -n 1 | awk '{print $3}')
-          if [[ -z "${INSTANCE_ID:-}" ]]; then
-            echo "No instance ID found in packer-build.log; nothing to clean up."
+          # LS-8910: two sources now build in this one invocation, each on its
+          # own build instance — amazon-ebs logs one "Instance ID: i-..." line
+          # per source. Reap every distinct instance ID found, not just the last.
+          INSTANCE_IDS=$(grep -oE "Instance ID: i-[0-9a-f]+" packer-build.log \
+            | awk '{print $3}' | sort -u)
+          if [[ -z "${INSTANCE_IDS:-}" ]]; then
+            echo "No instance IDs found in packer-build.log; nothing to clean up."
             exit 0
           fi
-          STATE=$(aws ec2 describe-instances \
-            --instance-ids "$INSTANCE_ID" \
-            --query 'Reservations[].Instances[].State.Name' \
-            --output text 2>/dev/null || true)
-          case "$STATE" in
-            pending|running|stopping|stopped)
-              echo "Reaping leaked Packer build instance $INSTANCE_ID (state=$STATE)"
-              # Stamp the Name the builder role's TerminateInstances condition
-              # matches, in case Packer crashed before applying run_tags.
-              aws ec2 create-tags --resources "$INSTANCE_ID" \
-                --tags Key=Name,Value="Packer Builder - ci-teardown-reaped" || true
-              aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" || true
-              ;;
-            *)
-              echo "Instance $INSTANCE_ID already gone (state=${STATE:-none}); nothing to do."
-              ;;
-          esac
+          for INSTANCE_ID in $INSTANCE_IDS; do
+            STATE=$(aws ec2 describe-instances \
+              --instance-ids "$INSTANCE_ID" \
+              --query 'Reservations[].Instances[].State.Name' \
+              --output text 2>/dev/null || true)
+            case "$STATE" in
+              pending|running|stopping|stopped)
+                echo "Reaping leaked Packer build instance $INSTANCE_ID (state=$STATE)"
+                # Stamp the Name the builder role's TerminateInstances condition
+                # matches, in case Packer crashed before applying run_tags.
+                aws ec2 create-tags --resources "$INSTANCE_ID" \
+                  --tags Key=Name,Value="Packer Builder - ci-teardown-reaped" || true
+                aws ec2 terminate-instances --instance-ids "$INSTANCE_ID" || true
+                ;;
+              *)
+                echo "Instance $INSTANCE_ID already gone (state=${STATE:-none}); nothing to do."
+                ;;
+            esac
+          done

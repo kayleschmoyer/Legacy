@@ -3,7 +3,8 @@
 # =============================================================================
 
 locals {
-  runner_log_group_base = "/github-runners/${local.name_prefix}-runner"
+  runner_log_group_base         = "/github-runners/${local.name_prefix}-runner"
+  runner_android_log_group_base = "/github-runners/${local.name_prefix}-runner-android"
 }
 
 # =============================================================================
@@ -541,6 +542,378 @@ module "github_runners" {
 }
 
 # =============================================================================
+# Android Self-Hosted GitHub Actions Runners (LS-8910)
+# =============================================================================
+# A second, independent instance of the same github-aws-runners module,
+# dedicated to the three Android-only workflows (build-android-app.yml,
+# e2e-native-android.yml, run-maestro-sweep.yml). This is the "two module
+# instances" approach, not the module's multi-runner variant — LS-8910
+# deliberately scoped out the multi-runner Terraform migration as higher-risk
+# for a first cut. The tradeoff of that choice: because a GitHub App has
+# exactly one webhook URL and each module instance provisions its own webhook
+# Lambda + API Gateway, this pool needs its OWN GitHub App (github_app_android_*
+# variables) — a one-time manual prerequisite a repo admin must complete
+# before this pool receives any workflow_job webhooks. See the LS-8910 PR
+# description for the full rollout runbook.
+#
+# Everything else mirrors the default pool above: same instance type list
+# (var.github_runners_instance_types — LS-8693's ≥16 GB RAM / 4 vCPU floor
+# applies here too, this pool is NOT a place to reintroduce smaller types),
+# same spot/capacity-optimized-prioritized config, same non-ephemeral +
+# job-heartbeat + inter-job-cleanup hooks, same egress rules, same shared IAM
+# policies (runner_cache, runner_self_tag, runner_permissions_boundary — all
+# three were widened in this same PR to cover both pools' ghr:environment tag
+# values, see local.runner_environments in main.tf). What differs: prefix,
+# GitHub App credentials, max count (small — Android jobs never fan out), the
+# AMI filter (selects the runner_android Packer source, 60 GB root volume —
+# unchanged from before the split), and the runner label
+# (var.github_runners_android... no such var; label is a literal below,
+# matched by the ANDROID_RUNNER_LABEL repo variable the three Android
+# workflows were updated to use in this same PR).
+module "github_runners_android" {
+  source  = "github-aws-runners/github-runner/aws"
+  version = "7.5.0"
+
+  aws_region = var.aws_region
+  vpc_id     = local.vpc_id
+  subnet_ids = local.public_subnet_ids
+
+  prefix = "${local.name_prefix}-runner-android"
+
+  github_app = {
+    key_base64     = var.github_app_android_key_base64
+    id             = var.github_app_android_id
+    webhook_secret = var.github_app_android_webhook_secret
+  }
+
+  webhook_lambda_zip                = "${path.module}/lambdas/webhook.zip"
+  runners_lambda_zip                = "${path.module}/lambdas/runners.zip"
+  runner_binaries_syncer_lambda_zip = "${path.module}/lambdas/runner-binaries-syncer.zip"
+
+  enable_organization_runners = false
+  enable_ephemeral_runners    = false
+  enable_jit_config           = false
+
+  delay_webhook_event     = 30
+  enable_job_queued_check = true
+
+  instance_target_capacity_type = "spot"
+  instance_allocation_strategy  = "capacity-optimized-prioritized"
+  instance_types                = var.github_runners_instance_types
+
+  scale_down_schedule_expression = "cron(* * * * ? *)"
+  runners_maximum_count          = var.github_runners_android_max_count
+
+  scale_up_reserved_concurrent_executions = 1
+
+  runner_os           = "linux"
+  runner_architecture = "x64"
+  runner_extra_labels = ["ci-runner-android"]
+  runner_run_as       = "ubuntu"
+
+  runner_iam_role_managed_policy_arns = [
+    aws_iam_policy.runner_cache.arn,
+    aws_iam_policy.runner_self_tag.arn,
+  ]
+
+  enable_cloudwatch_agent = true
+  cloudwatch_config = jsonencode({
+    logs = {
+      force_flush_interval = 5
+      logs_collected = {
+        files = {
+          collect_list = [
+            {
+              file_path       = "/var/log/user-data.log"
+              log_group_name  = "${local.runner_android_log_group_base}/cloud-init"
+              log_stream_name = "{instance_id}"
+              timezone        = "UTC"
+            },
+            {
+              file_path       = "/var/log/syslog"
+              log_group_name  = "${local.runner_android_log_group_base}/syslog"
+              log_stream_name = "{instance_id}"
+              timezone        = "UTC"
+            },
+          ]
+        }
+      }
+    }
+  })
+
+  runner_boot_time_in_minutes     = 2
+  minimum_running_time_in_minutes = 2
+
+  # AMI filter selects the "android" Packer source's name prefix — see
+  # terraform/runners/packer/runner-ami.pkr.hcl's source.amazon-ebs.runner_android.
+  # Reuses the SAME var.runner_ami_playwright_version as the default pool:
+  # both AMI variants build in one `packer build` invocation (no `-only` flag
+  # in rebuild-runner-ami.yml) and always ship the same Playwright version.
+  ami = {
+    filter = {
+      name  = ["legacy-sports-runner-android-pw${var.runner_ami_playwright_version}-*"]
+      state = ["available"]
+    }
+    owners = ["self"]
+  }
+
+  # 60 GB — unchanged from the pre-split single AMI. This pool exists
+  # specifically so the DEFAULT pool no longer has to carry this; the Android
+  # SDK/NDK genuinely need the space here.
+  block_device_mappings = [{
+    device_name           = "/dev/sda1"
+    delete_on_termination = true
+    volume_type           = "gp3"
+    volume_size           = 60
+    encrypted             = true
+    iops                  = null
+    throughput            = null
+    kms_key_id            = null
+    snapshot_id           = null
+  }]
+
+  userdata_template = "${path.module}/runner-userdata.sh"
+
+  # Same pnpm-store cache restore as the default pool — Android jobs run pnpm
+  # install too, and sharing one cache bucket (aws_iam_policy.runner_cache
+  # already grants both pools access) means whichever pool ran last warms the
+  # other's next cold boot.
+  userdata_pre_install = <<-EOT
+    echo "Using pre-baked Ubuntu AMI (android variant) - Node.js, pnpm, Playwright, Android SDK already installed"
+
+    sed -i 's|http://us-east-1.ec2.archive.ubuntu.com|https://archive.ubuntu.com|g' /etc/apt/sources.list
+    sed -i 's|http://security.ubuntu.com|https://security.ubuntu.com|g' /etc/apt/sources.list
+    echo 'Acquire::ForceIPv4 "true";' > /etc/apt/apt.conf.d/99force-ipv4
+
+    CACHE_BUCKET="${local.name_prefix}-runner-cache"
+    PNPM_STORE="/home/ubuntu/.local/share/pnpm/store"
+
+    if aws s3api head-object --bucket "$CACHE_BUCKET" --key "pnpm-store/latest.tar.gz" >/dev/null 2>&1; then
+      echo "[cache] Restoring pnpm store from s3://$CACHE_BUCKET/pnpm-store/latest.tar.gz"
+      mkdir -p /home/ubuntu/.local/share/pnpm
+      aws s3 cp "s3://$CACHE_BUCKET/pnpm-store/latest.tar.gz" - 2>/dev/null \
+        | tar xzf - -C "$PNPM_STORE" --no-same-owner --no-same-permissions 2>/dev/null \
+        || echo "[cache] Restore failed — continuing without cache"
+      chown -R ubuntu:ubuntu /home/ubuntu/.local/share/pnpm 2>/dev/null || true
+      echo "[cache] pnpm store restored"
+    else
+      echo "[cache] No pnpm cache found — first boot will download packages fresh"
+    fi
+  EOT
+
+  # Identical hooks to the default pool — see the base module block above for
+  # the full rationale on job heartbeat + inter-job cleanup. Duplicated
+  # verbatim (Packer/Terraform HCL has no shared-block mechanism for module
+  # arguments) rather than factored out, to keep each pool's config
+  # independently readable and independently editable.
+  runner_hook_job_started = <<-EOT
+    #!/bin/bash
+    set -euo pipefail
+
+    for f in /etc/profile.d/java.sh /etc/profile.d/android-sdk.sh /etc/profile.d/playwright.sh; do
+      # shellcheck disable=SC1090
+      [[ -f "$f" ]] && source "$f"
+    done
+
+    emit_env() {
+      local name="$1" value="$2"
+      if [[ -z "$value" ]]; then
+        return
+      fi
+      if [[ "$value" == *$'\n'* || "$value" == *$'\r'* ]]; then
+        echo "[hook_job_started] WARN: refusing to emit $name — value contains newline/CR" >&2
+        return
+      fi
+      echo "$name=$value" >> "$GITHUB_ENV"
+    }
+    emit_env JAVA_HOME               "$${JAVA_HOME:-}"
+    emit_env ANDROID_HOME            "$${ANDROID_HOME:-}"
+    emit_env ANDROID_SDK_ROOT        "$${ANDROID_HOME:-}"
+    emit_env PLAYWRIGHT_BROWSERS_PATH "$${PLAYWRIGHT_BROWSERS_PATH:-}"
+
+    {
+      [[ -n "$${JAVA_HOME:-}"    ]] && echo "$JAVA_HOME/bin"
+      [[ -n "$${ANDROID_HOME:-}" ]] && echo "$ANDROID_HOME/cmdline-tools/latest/bin"
+      [[ -n "$${ANDROID_HOME:-}" ]] && echo "$ANDROID_HOME/platform-tools"
+    } >> "$GITHUB_PATH"
+
+    HB_TOKEN=$(curl -sf -X PUT "http://169.254.169.254/latest/api/token" \
+      -H "X-aws-ec2-metadata-token-ttl-seconds: 600" 2>/dev/null) || HB_TOKEN=""
+    if [[ -n "$HB_TOKEN" ]]; then
+      HB_IID=$(curl -sf -H "X-aws-ec2-metadata-token: $HB_TOKEN" \
+        http://169.254.169.254/latest/meta-data/instance-id 2>/dev/null) || HB_IID=""
+      HB_REGION=$(curl -sf -H "X-aws-ec2-metadata-token: $HB_TOKEN" \
+        http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null) || HB_REGION=""
+      if [[ -n "$HB_IID" && -n "$HB_REGION" ]]; then
+        echo "[heartbeat] tagging $HB_IID in $HB_REGION every 60s (ghr:job_heartbeat)"
+        aws ec2 create-tags --region "$HB_REGION" --resources "$HB_IID" \
+          --tags "Key=ghr:job_heartbeat,Value=$(date +%s)" >/dev/null 2>&1 || true
+        nohup bash -c '
+          for _ in $(seq 1 370); do
+            sleep 60
+            aws ec2 create-tags --region "'"$HB_REGION"'" --resources "'"$HB_IID"'" \
+              --tags "Key=ghr:job_heartbeat,Value=$(date +%s)" >/dev/null 2>&1 || true
+          done
+        ' >/tmp/runner-heartbeat.log 2>&1 &
+        echo "$!" > /opt/actions-runner/.job-heartbeat.pid || true
+        printf '%s\n%s\n' "$HB_IID" "$HB_REGION" > /opt/actions-runner/.job-heartbeat.meta || true
+      fi
+    fi
+  EOT
+
+  runner_hook_job_completed = <<-EOT
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "[cleanup] Post-job cleanup started at $(date -u)"
+
+    if [[ -f /opt/actions-runner/.job-heartbeat.pid ]]; then
+      kill "$(cat /opt/actions-runner/.job-heartbeat.pid)" 2>/dev/null || true
+      rm -f /opt/actions-runner/.job-heartbeat.pid
+    fi
+    if [[ -f /opt/actions-runner/.job-heartbeat.meta ]]; then
+      HB_IID=$(sed -n '1p' /opt/actions-runner/.job-heartbeat.meta)
+      HB_REGION=$(sed -n '2p' /opt/actions-runner/.job-heartbeat.meta)
+      if [[ -n "$HB_IID" && -n "$HB_REGION" ]]; then
+        aws ec2 delete-tags --region "$HB_REGION" --resources "$HB_IID" \
+          --tags "Key=ghr:job_heartbeat" >/dev/null 2>&1 || true
+      fi
+      rm -f /opt/actions-runner/.job-heartbeat.meta
+    fi
+
+    WORKSPACE_ROOT="$${RUNNER_WORKSPACE:-/opt/actions-runner/_work}"
+
+    if [[ -n "$${GITHUB_WORKSPACE:-}" ]]; then
+      echo "[cleanup] Removing GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+      rm -rf "$GITHUB_WORKSPACE"
+    else
+      echo "[cleanup] GITHUB_WORKSPACE not set; skipping workspace deletion"
+    fi
+
+    rm -rf "$WORKSPACE_ROOT/_temp/"
+    rm -rf "$WORKSPACE_ROOT/_actions/"
+    rm -rf /tmp/npm-* /tmp/pnpm-* /tmp/nx-*
+    find "$WORKSPACE_ROOT" -name "git-credentials-*" -delete 2>/dev/null || true
+
+    if [[ -n "$${GITHUB_WORKSPACE:-}" ]]; then
+      find "$GITHUB_WORKSPACE" -name ".npmrc" -delete 2>/dev/null || true
+    fi
+
+    echo "[cleanup] Post-job cleanup completed at $(date -u)"
+
+    PNPM_STORE="/home/ubuntu/.local/share/pnpm/store"
+    CACHE_BUCKET="${local.name_prefix}-runner-cache"
+    if [[ -d "$PNPM_STORE" ]]; then
+      (
+        nohup bash -c \
+          "tar czf - \"$PNPM_STORE\" 2>/dev/null \
+             | aws s3 cp - \"s3://$CACHE_BUCKET/pnpm-store/latest.tar.gz\" \
+           && echo '[cache] pnpm store sync complete' \
+           || echo '[cache] pnpm store sync failed'" \
+          >> /tmp/cache-sync.log 2>&1 &
+        disown
+      ) || true
+      echo "[cache] pnpm store sync started in background → /tmp/cache-sync.log"
+    fi
+  EOT
+
+  # Same least-privilege egress as the default pool.
+  runner_egress_rules = [
+    {
+      cidr_blocks      = ["0.0.0.0/0"]
+      ipv6_cidr_blocks = ["::/0"]
+      prefix_list_ids  = null
+      from_port        = 443
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 443
+      description      = "HTTPS - GitHub API, npm registry, S3, VPC endpoints"
+    },
+    {
+      cidr_blocks      = [local.vpc_cidr_block]
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 53
+      protocol         = "udp"
+      security_groups  = null
+      self             = false
+      to_port          = 53
+      description      = "DNS (UDP) - VPC DNS resolver"
+    },
+    {
+      cidr_blocks      = [local.vpc_cidr_block]
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 53
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 53
+      description      = "DNS (TCP) - VPC DNS resolver"
+    },
+    {
+      cidr_blocks      = local.public_subnet_cidr_blocks
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 5432
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 5432
+      description      = "PostgreSQL - RDS in public subnets (historical placement, migration checks)"
+    },
+    {
+      cidr_blocks      = ["169.254.169.254/32"]
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 80
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 80
+      description      = "EC2 instance metadata - spot interruption notices and IMDSv2 token service"
+    },
+    {
+      cidr_blocks      = [local.vpc_cidr_block]
+      ipv6_cidr_blocks = []
+      prefix_list_ids  = null
+      from_port        = 22
+      protocol         = "tcp"
+      security_groups  = null
+      self             = false
+      to_port          = 22
+      description      = "SSH - in-VPC Packer build instances (rebuild-runner-ami)"
+    },
+  ]
+
+  # Shared boundary — widened (this PR) to cover both pools' ghr:environment
+  # tag values. See the EC2SelfTerminate Sid comment above.
+  role_permissions_boundary = aws_iam_policy.runner_permissions_boundary.arn
+
+  depends_on = [
+    aws_cloudwatch_log_group.runner_android_cloud_init,
+    aws_cloudwatch_log_group.runner_android_syslog,
+  ]
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_log_group" "runner_android_cloud_init" {
+  name              = "${local.runner_android_log_group_base}/cloud-init"
+  retention_in_days = local.log_retention_days[var.environment]
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_log_group" "runner_android_syslog" {
+  name              = "${local.runner_android_log_group_base}/syslog"
+  retention_in_days = local.log_retention_days[var.environment]
+
+  tags = local.common_tags
+}
+
+# =============================================================================
 # CloudWatch Log Groups for Runner Logs (LS-1667)
 # =============================================================================
 # Explicit log groups prevent the CloudWatch agent from creating them on first
@@ -774,8 +1147,16 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
         }
       },
       # EC2 terminate — used by the scale-down Lambda to reclaim idle runners.
-      # Scoped to instances tagged with the runner environment prefix so the Lambda
+      # Scoped to instances tagged with a runner environment prefix so the Lambda
       # cannot terminate unrelated EC2 instances in the account.
+      # LS-8910: this boundary is shared by BOTH the default pool and the
+      # Android pool (module "github_runners_android" below also sets
+      # role_permissions_boundary = aws_iam_policy.runner_permissions_boundary.arn),
+      # so the condition must list both pools' ghr:environment tag values —
+      # StringEquals against a list is an OR. Without this, the Android pool's
+      # own scale-down Lambda role would have terminate permission granted by
+      # its identity policy but DENIED by this boundary (boundary ∩ identity),
+      # and Android runners would never scale to zero.
       {
         Sid    = "EC2SelfTerminate"
         Effect = "Allow"
@@ -785,7 +1166,7 @@ resource "aws_iam_policy" "runner_permissions_boundary" {
         Resource = "arn:aws:ec2:${local.region}:${local.account_id}:instance/*"
         Condition = {
           StringEquals = {
-            "ec2:ResourceTag/ghr:environment" = "${local.name_prefix}-runner"
+            "ec2:ResourceTag/ghr:environment" = local.runner_environments
           }
         }
       }
