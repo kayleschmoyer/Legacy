@@ -14,6 +14,10 @@ This directory contains documentation for the Legacy Sports CI/CD system. The cu
 
 - **[integration-safety-system.md](integration-safety-system.md)** — **← Preventing breaking changes at integration points.** Tiered defense (GraphQL contract gate, terraform plan gate, selective integration + advisory) that shifts UI/backend and terraform breakage detection left, off the nightly suite and onto the PR that causes it.
 
+## Cost Analysis
+
+- **[live-suite-cadence-cost-analysis.md](live-suite-cadence-cost-analysis.md)** — LS-8911/LS-8893: cost-vs-detection-latency analysis and recommendation for `FULL_SUITE_MIN_INTERVAL_HOURS` and the Mobile Safari daily/weekly cadence. Analysis only — no config changed.
+
 ## Operational Guides
 
 - **[ci-system-documentation.md](ci-system-documentation.md)** — Quick reference: workflows, trigger model, common operations
