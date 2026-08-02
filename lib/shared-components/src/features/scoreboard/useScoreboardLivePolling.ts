@@ -8,7 +8,7 @@ import { shouldPollScoreboard } from './partition';
 import type { ScoreboardGame } from '../../components/scoreboard/types';
 
 /** Default cadence for the live scoreboard auto-refresh. */
-export const SCOREBOARD_LIVE_POLL_MS = 15_000;
+export const SCOREBOARD_LIVE_POLL_MS = 6_000;
 
 export interface UseScoreboardLivePollingOptions {
   games: ScoreboardGame[];
