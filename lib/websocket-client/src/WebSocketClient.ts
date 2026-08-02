@@ -245,7 +245,14 @@ export class WebSocketClient {
   }
 
   /**
-   * Update connection context (e.g., when navigating to a different page)
+   * Update connection context (e.g., when navigating to a different page).
+   *
+   * Sends the server's `updateContext` action over the existing connection
+   * rather than tearing down and reopening the socket — this is what
+   * exercises the server's re-authorization + TTL-refresh path
+   * (`lambdas/websocket/src/index.ts` `handleUpdateContext`) instead of
+   * silently reconnecting past it. If not currently connected, the new
+   * context is applied locally and takes effect on the next `connect()`.
    */
   public updateContext(context: {
     leagueId?: number;
@@ -262,10 +269,8 @@ export class WebSocketClient {
       this.options.viewContext = context.viewContext;
     }
 
-    // Reconnect with new context if currently connected
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.disconnect();
-      this.connect();
+      this.send({ action: 'updateContext', data: context });
     }
   }
 

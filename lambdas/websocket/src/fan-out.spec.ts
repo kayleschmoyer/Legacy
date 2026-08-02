@@ -589,4 +589,86 @@ describe('WebSocket fan-out (LS-8856)', () => {
 
     expect(leagueBMessages).toHaveLength(0);
   });
+
+  // ── LS-8879: client.updateContext() reaches the server's re-authorization
+  // path over the live connection instead of silently reconnecting past it ──
+
+  it('re-scopes broadcast delivery via updateContext() without dropping the connection', async () => {
+    const leagueA = 500;
+    const leagueB = 501;
+    const senderA = registerUser('ivan');
+    const senderB = registerUser('judy');
+    const viewer = registerUser('kim');
+    grantLeagueMembership(senderA.userId, leagueA);
+    grantLeagueMembership(senderB.userId, leagueB);
+    grantLeagueMembership(viewer.userId, leagueA);
+    grantLeagueMembership(viewer.userId, leagueB);
+
+    const viewerClient = client({ token: viewer.token, leagueId: leagueA });
+    await waitForEvent(viewerClient, 'connected');
+
+    const disconnectedHandler = jest.fn();
+    viewerClient.on('disconnected', disconnectedHandler);
+
+    // Still scoped to league A: a league A broadcast is delivered.
+    const firstReceived = waitForEvent(viewerClient, 'draft-pick-made');
+    await notificationService().notifyDraftPickMade(
+      leagueA,
+      1,
+      1,
+      senderA.userId,
+      1,
+      1,
+      1,
+      1,
+    );
+    await firstReceived;
+
+    // Real client API — the exact call `useWebSocket`'s `updateContext`
+    // forwards to. Must reach the server over the SAME connection: a
+    // disconnect/reconnect here would be the LS-8879 regression.
+    const leagueAMessagesAfterSwitch: unknown[] = [];
+    viewerClient.on('draft-pick-made', (n) =>
+      leagueAMessagesAfterSwitch.push(n),
+    );
+    viewerClient.updateContext({ leagueId: leagueB });
+    await sleep(200); // let the server apply the update
+
+    expect(disconnectedHandler).not.toHaveBeenCalled();
+
+    // No longer scoped to league A: a league A broadcast is not delivered.
+    await notificationService().notifyDraftPickMade(
+      leagueA,
+      1,
+      2,
+      senderA.userId,
+      2,
+      1,
+      2,
+      2,
+    );
+    await sleep(300); // bounded wait for a negative assertion — see PR body
+    expect(leagueAMessagesAfterSwitch).toHaveLength(0);
+
+    // Now scoped to league B: a league B broadcast IS delivered on the
+    // same, still-open connection.
+    const receivedAfterSwitch = waitForEvent<{ leagueId: number }>(
+      viewerClient,
+      'draft-pick-made',
+    );
+    await notificationService().notifyDraftPickMade(
+      leagueB,
+      1,
+      1,
+      senderB.userId,
+      3,
+      1,
+      1,
+      1,
+    );
+    await expect(receivedAfterSwitch).resolves.toMatchObject({
+      leagueId: leagueB,
+    });
+    expect(disconnectedHandler).not.toHaveBeenCalled();
+  });
 });

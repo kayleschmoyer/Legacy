@@ -176,7 +176,9 @@ Unsubscribe from events (alternative to using the unsubscribe function).
 
 #### `updateContext(context): void`
 
-Update connection context (reconnects if currently connected).
+Update connection context. Sends the `updateContext` action over the
+existing connection if currently connected (no reconnect); otherwise
+applies locally and takes effect on the next `connect()`.
 
 ```typescript
 client.updateContext({

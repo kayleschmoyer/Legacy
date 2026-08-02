@@ -801,8 +801,15 @@ describe('WebSocketClient', () => {
   });
 
   describe('updateContext', () => {
-    it('should update context and reconnect', (done) => {
+    it('should send an updateContext action over the existing connection instead of reconnecting', () => {
       mockServer = new Server(mockUrl);
+      let receivedMessage: string | null = null;
+
+      mockServer.on('connection', (socket) => {
+        socket.on('message', (data) => {
+          receivedMessage = data as string;
+        });
+      });
 
       const client = new WebSocketClient({
         url: mockUrl,
@@ -813,26 +820,23 @@ describe('WebSocketClient', () => {
 
       jest.advanceTimersByTime(100);
 
-      let disconnected = false;
-      let reconnected = false;
-
-      client.on('disconnected', () => {
-        disconnected = true;
-      });
-
-      client.on('connected', () => {
-        if (disconnected && !reconnected) {
-          reconnected = true;
-          client.dispose();
-          done();
-        }
-      });
+      const disconnectedHandler = jest.fn();
+      client.on('disconnected', disconnectedHandler);
 
       client.updateContext({ leagueId: 456, viewContext: 'roster' });
-      jest.advanceTimersByTime(200);
+      jest.advanceTimersByTime(100);
+
+      expect(disconnectedHandler).not.toHaveBeenCalled();
+      expect(receivedMessage).toBe(
+        JSON.stringify({
+          action: 'updateContext',
+          data: { leagueId: 456, viewContext: 'roster' },
+        }),
+      );
+      client.dispose();
     });
 
-    it('should not reconnect if not currently connected', () => {
+    it('should update options locally without sending when not currently connected', () => {
       const client = new WebSocketClient({
         url: mockUrl,
         token: 'test-token',
