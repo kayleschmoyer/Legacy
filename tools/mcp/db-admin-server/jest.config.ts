@@ -4,19 +4,29 @@ const config: Config = {
   displayName: 'mcp-db-admin-server',
   preset: '../../../jest.preset.js',
   testEnvironment: 'node',
+  // @swc/jest also transforms .js so jose's ESM dist can be required in CJS
+  // test mode (see transformIgnorePatterns below).
   transform: {
-    // ts-jest also transforms .js so jose's ESM dist can be required in CJS
-    // test mode (see transformIgnorePatterns below).
-    '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.spec.json' }],
+    '^.+\\.[tj]sx?$': [
+      '@swc/jest',
+      {
+        jsc: {
+          parser: { syntax: 'typescript', tsx: true, decorators: true },
+          transform: { legacyDecorator: true, decoratorMetadata: true },
+          target: 'es2022',
+        },
+        module: { type: 'commonjs' },
+      },
+    ],
   },
   // Allow jose (ESM-only, used by mcp-bearer-auth) through the transform so its
   // `export` syntax doesn't trip Jest with "Unexpected token 'export'".
   transformIgnorePatterns: ['/node_modules/(?!jose/)'],
   moduleFileExtensions: ['ts', 'js'],
   moduleNameMapper: {
-    // NodeNext resolution uses .js extensions in imports; strip them for ts-jest
+    // NodeNext resolution uses .js extensions in imports; strip them for @swc/jest
     '^(\\.{1,2}/.+)\\.js$': '$1',
-    // Resolve the @legacy-sports path aliases to source for ts-jest. The
+    // Resolve the @legacy-sports path aliases to source for @swc/jest. The
     // db-client mapper is only used so jest can *resolve* the specifier for
     // jest.mock(); the migrate spec replaces the module with a factory mock so
     // the real (AWS-SDK-pulling) module never executes.

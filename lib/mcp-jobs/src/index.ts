@@ -13,7 +13,7 @@ import { join } from 'node:path';
 
 // Materialized into each server's jobsDir() on first use (see
 // `ensureWrapperScript`) rather than shipped as sibling files resolved via
-// `import.meta.url` — this package's test config (ts-jest, CommonJS output)
+// `import.meta.url` — this package's test config (@swc/jest, CommonJS output)
 // cannot parse `import.meta` regardless of tsconfig module target, and a
 // source-relative path would differ between running from `src` (tsx) and any
 // future compiled output anyway. Writing a small script string to a tmpdir

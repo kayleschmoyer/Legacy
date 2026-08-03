@@ -4,10 +4,10 @@ module.exports = createNodeJestConfig({
   displayName: 'mcp-bearer-auth',
   projectPath: 'lib/mcp-bearer-auth',
   overrides: {
-    // jose is ESM-only; let ts-jest transform it (allowJs is on via
-    // tsconfig.spec.json) instead of choking on its `export` syntax.
+    // jose is ESM-only; let @swc/jest transform it (the default transform
+    // pattern also matches .js) instead of choking on its `export` syntax.
     transformIgnorePatterns: ['/node_modules/(?!jose/)'],
-    // NodeNext-style imports use .js extensions; strip them for ts-jest.
+    // NodeNext-style imports use .js extensions; strip them for @swc/jest.
     moduleNameMapper: {
       '^(\\.{1,2}/.+)\\.js$': '$1',
     },

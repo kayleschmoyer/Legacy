@@ -6,7 +6,7 @@
  * and polls the resulting async job to its terminal state (LS-8563).
  * Kept separate from `migrate-client.ts` (the pure, unit-tested library) so the
  * direct-run wiring — which uses `import.meta.url`, an ESM-only construct —
- * never reaches the CommonJS ts-jest test runner.
+ * never reaches the CommonJS @swc/jest test runner.
  *
  *   MCP_DB_ADMIN_URL     hosted server MCP endpoint (required)
  *   MCP_DB_ADMIN_BEARER  bearer token carrying the mcp/db scope (required)

@@ -2,7 +2,7 @@ import { Share } from 'react-native';
 import { DeviceFileOutputDestination, LOGGER } from '@legacy-sports/logging';
 
 // Lazily require expo-file-system/legacy so that static analysis tools
-// (esbuild, ts-jest) that process this module in non-Metro environments
+// (esbuild, @swc/jest) that process this module in non-Metro environments
 // cannot follow the import chain into react-native Flow syntax and crash.
 // Metro (which runs in the mobile app) resolves dynamic require correctly.
 const FileSystem =

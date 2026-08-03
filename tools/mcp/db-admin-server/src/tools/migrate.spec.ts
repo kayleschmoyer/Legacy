@@ -21,7 +21,7 @@ jest.mock('../db.js');
 jest.mock('../jobs.js');
 jest.mock('../invoke-worker.js');
 // Replace the migration-runner with a factory so the real module never runs
-// under ts-jest; we only need to observe applyMigrationModule's calls.
+// under @swc/jest; we only need to observe applyMigrationModule's calls.
 jest.mock('@legacy-sports/db-client/src/scripts/migration-runner.js', () => ({
   applyMigrationModule: jest.fn(),
 }));

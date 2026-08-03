@@ -10,7 +10,7 @@ jest.mock('./tools/pr-why-blocked');
 
 // getRepoRoot lives in ./repo-root and uses import.meta.url, which cannot be
 // compiled under the CommonJS tsconfig the Jest preset uses — mock it with a
-// factory so ts-jest never transforms the real module (LS-5982 pattern).
+// factory so @swc/jest never transforms the real module (LS-5982 pattern).
 jest.mock('./repo-root', () => ({
   getRepoRoot: jest.fn(() => '/tmp/repo-root-that-does-not-exist'),
 }));

@@ -7,8 +7,15 @@ const config: Config = {
   coverageDirectory: '../../coverage/tools/vite-configs',
   transform: {
     '^.+\\.tsx?$': [
-      'ts-jest',
-      { tsconfig: '<rootDir>/../../tsconfig.base.json' },
+      '@swc/jest',
+      {
+        jsc: {
+          parser: { syntax: 'typescript', tsx: true, decorators: true },
+          transform: { legacyDecorator: true, decoratorMetadata: true },
+          target: 'es2022',
+        },
+        module: { type: 'commonjs' },
+      },
     ],
   },
 };
