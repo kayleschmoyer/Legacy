@@ -60,9 +60,73 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-// ── Import after mocks ──────────────────────────────────────────────────────
+const mockWebPushSendNotification = jest.fn();
+const mockWebPushSetVapidDetails = jest.fn();
 
-import { deliverNotification } from './deliver';
+jest.mock('web-push', () => ({
+  __esModule: true,
+  default: {
+    setVapidDetails: mockWebPushSetVapidDetails,
+    sendNotification: mockWebPushSendNotification,
+    WebPushError: class WebPushError extends Error {
+      constructor(
+        message: string,
+        public statusCode: number,
+      ) {
+        super(message);
+      }
+    },
+  },
+}));
+
+// ── VAPID env control ────────────────────────────────────────────────────────
+//
+// deliver.ts reads VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT from
+// process.env at module load, so the spec must own those vars and re-import
+// the module per configuration (LS-8999) — otherwise a host .env that defines
+// VAPID keys flips the web-token branch and the suite's outcome depends on
+// the environment it runs in.
+
+const VAPID_ENV_KEYS = [
+  'VAPID_PUBLIC_KEY',
+  'VAPID_PRIVATE_KEY',
+  'VAPID_SUBJECT',
+] as const;
+const savedVapidEnv: Record<string, string | undefined> = {};
+
+beforeAll(() => {
+  for (const key of VAPID_ENV_KEYS) {
+    savedVapidEnv[key] = process.env[key];
+  }
+});
+
+afterAll(() => {
+  for (const key of VAPID_ENV_KEYS) {
+    const saved = savedVapidEnv[key];
+    if (saved === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = saved;
+    }
+  }
+});
+
+let deliverNotification: (typeof import('./deliver'))['deliverNotification'];
+
+async function loadDeliverModule(vapid?: {
+  publicKey: string;
+  privateKey: string;
+}): Promise<void> {
+  jest.resetModules();
+  for (const key of VAPID_ENV_KEYS) {
+    delete process.env[key];
+  }
+  if (vapid) {
+    process.env['VAPID_PUBLIC_KEY'] = vapid.publicKey;
+    process.env['VAPID_PRIVATE_KEY'] = vapid.privateKey;
+  }
+  ({ deliverNotification } = await import('./deliver'));
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -105,12 +169,14 @@ function makeDeviceToken(
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('deliverNotification', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     jest.clearAllMocks();
     mockIsExpoPushToken.mockReturnValue(true);
     mockSendPushNotificationsAsync.mockResolvedValue([]);
     mockLogNotificationHistory.mockResolvedValue(42);
     mockNotifyNotificationReceived.mockResolvedValue(undefined);
+    // Default: VAPID unset, regardless of the host .env
+    await loadDeliverModule();
   });
 
   describe('preference enforcement', () => {
@@ -333,6 +399,55 @@ describe('deliverNotification', () => {
       // sendPushNotificationsAsync is never called
       expect(mockSendPushNotificationsAsync).not.toHaveBeenCalled();
       expect(result.historyId).toBe(42);
+    });
+  });
+
+  describe('web push tokens (VAPID)', () => {
+    const webSubscription = JSON.stringify({
+      endpoint: 'https://push.example.com/subscription/abc',
+      keys: { p256dh: 'p256dh-key', auth: 'auth-key' },
+    });
+
+    it('skips web tokens (attempted 0) when VAPID keys are not configured', async () => {
+      // beforeEach loaded the module with VAPID env unset
+      mockGetUserNotificationPreferences.mockResolvedValue(null);
+      mockGetUserDeviceTokens.mockResolvedValue([
+        makeDeviceToken({ deviceToken: webSubscription, platform: 'web' }),
+      ]);
+
+      const result = await deliverNotification(makeEvent());
+
+      expect(result.tokensAttempted).toBe(0);
+      expect(result.tokensSent).toBe(0);
+      expect(mockWebPushSendNotification).not.toHaveBeenCalled();
+      expect(result.historyId).toBe(42);
+    });
+
+    it('attempts and sends web tokens when VAPID keys are configured', async () => {
+      await loadDeliverModule({
+        publicKey: 'test-public-key',
+        privateKey: 'test-private-key',
+      });
+      mockWebPushSendNotification.mockResolvedValue(undefined);
+      mockGetUserNotificationPreferences.mockResolvedValue(null);
+      mockGetUserDeviceTokens.mockResolvedValue([
+        makeDeviceToken({ deviceToken: webSubscription, platform: 'web' }),
+      ]);
+
+      const result = await deliverNotification(makeEvent());
+
+      expect(result.tokensAttempted).toBe(1);
+      expect(result.tokensSent).toBe(1);
+      expect(result.tokensFailed).toBe(0);
+      expect(mockWebPushSetVapidDetails).toHaveBeenCalledWith(
+        'mailto:push@legacysports.app',
+        'test-public-key',
+        'test-private-key',
+      );
+      expect(mockWebPushSendNotification).toHaveBeenCalledWith(
+        JSON.parse(webSubscription),
+        expect.any(String),
+      );
     });
   });
 });
