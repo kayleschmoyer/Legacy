@@ -33,6 +33,7 @@ import {
   TeamMember,
 } from './types';
 import { builder } from '../builder';
+import { verifyLeagueReadAccess } from '../authorization';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -476,21 +477,13 @@ builder.queryField('leaguePositions', (t) =>
       try {
         // Fetch league positions from the database
         const db = context.db;
-        // First verify user has access to this league
-        const leagueAccess = await db
-          .select()
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
-
-        if (leagueAccess.length === 0 && !context.user?.isAdmin) {
-          throw ForbiddenError('User does not have access to this league');
-        }
+        // Members, spectators of public leagues, and admins may read (LS-8939)
+        await verifyLeagueReadAccess(
+          db,
+          leagueId,
+          userId,
+          context.user.isAdmin,
+        );
 
         // Fetch league positions
         const positions = await db
@@ -551,21 +544,13 @@ builder.queryField('teamMembers', (t) =>
         throw NotFoundError('Team not found');
       }
 
-      // Check if user is a member of this league
-      const leagueMember = await db
-        .select()
-        .from(PublicSchema.leagueMembers)
-        .where(
-          and(
-            eq(PublicSchema.leagueMembers.leagueId, team[0].leagueId),
-            eq(PublicSchema.leagueMembers.userId, userId),
-          ),
-        )
-        .limit(1);
-
-      if (leagueMember.length === 0) {
-        throw new Error('User does not have access to this team');
-      }
+      // Members, spectators of public leagues, and admins may read (LS-8939)
+      await verifyLeagueReadAccess(
+        db,
+        team[0].leagueId,
+        userId,
+        context.user.isAdmin,
+      );
 
       // Fetch team members (read access granted for all league members)
       try {
@@ -880,21 +865,13 @@ builder.queryField('leagueTeams', (t) =>
       const userId = context.user.id;
 
       try {
-        // First verify user has access to this league
-        const leagueAccess = await context.db
-          .select()
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
-
-        if (leagueAccess.length === 0 && !context.user?.isAdmin) {
-          throw ForbiddenError('User does not have access to this league');
-        }
+        // Members, spectators of public leagues, and admins may read (LS-8939)
+        await verifyLeagueReadAccess(
+          context.db,
+          leagueId,
+          userId,
+          context.user.isAdmin,
+        );
 
         // Fetch all teams in the league with their primary manager userId
         const teams = await context.db

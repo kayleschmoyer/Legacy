@@ -39,6 +39,7 @@ import {
   type LeagueMembership,
   requireEntitlement,
   verifyLeagueMembership,
+  verifyLeagueReadAccess,
 } from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
 import { builder } from '../builder';
@@ -71,8 +72,13 @@ builder.queryField('getDraft', (t) =>
 
       if (!draft) return null;
 
-      // Verify user is a member of the league that owns this draft
-      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+      // Members, spectators of public leagues, and admins may read (LS-8939)
+      await verifyLeagueReadAccess(
+        context.db,
+        draft.leagueId,
+        context.user.id,
+        context.user.isAdmin,
+      );
 
       return draft;
     },
@@ -94,8 +100,13 @@ builder.queryField('getLeagueDraft', (t) =>
         throw AuthenticationError();
       }
 
-      // Verify user is a member of this league
-      await verifyLeagueMembership(context.db, args.leagueId, context.user.id);
+      // Members, spectators of public leagues, and admins may read (LS-8939)
+      await verifyLeagueReadAccess(
+        context.db,
+        args.leagueId,
+        context.user.id,
+        context.user.isAdmin,
+      );
 
       const [draft] = await context.db
         .select()
@@ -133,7 +144,13 @@ builder.queryField('getCurrentDraftPick', (t) =>
 
       if (!draft) return null;
 
-      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+      // Members, spectators of public leagues, and admins may read (LS-8939)
+      await verifyLeagueReadAccess(
+        context.db,
+        draft.leagueId,
+        context.user.id,
+        context.user.isAdmin,
+      );
 
       return getCurrentDraftPickInfo(context.db, args.draftId);
     },
@@ -186,7 +203,13 @@ builder.queryField('getDraftPicks', (t) =>
           throw UserInputError('Draft not found');
         }
 
-        await verifyLeagueMembership(context.db, draft.leagueId, userId);
+        // Members, spectators of public leagues, and admins may read (LS-8939)
+        await verifyLeagueReadAccess(
+          context.db,
+          draft.leagueId,
+          userId,
+          context.user.isAdmin,
+        );
 
         const picks = await withTransientRetry(
           () =>
@@ -615,7 +638,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
 /**
  * Query: Get draft team order
  * Returns the ordered list of teams assigned to draft slots, sorted by draftOrder.
- * Requires user is a league member.
+ * Requires league read access (member, or spectator of a public league).
  */
 builder.queryField('getDraftTeamOrder', (t) =>
   t.field({
@@ -641,7 +664,13 @@ builder.queryField('getDraftTeamOrder', (t) =>
         throw UserInputError('Draft not found');
       }
 
-      await verifyLeagueMembership(context.db, draft.leagueId, context.user.id);
+      // Members, spectators of public leagues, and admins may read (LS-8939)
+      await verifyLeagueReadAccess(
+        context.db,
+        draft.leagueId,
+        context.user.id,
+        context.user.isAdmin,
+      );
 
       // Fetch draft_teams joined with team name, sorted by draftOrder
       const rows = await context.db

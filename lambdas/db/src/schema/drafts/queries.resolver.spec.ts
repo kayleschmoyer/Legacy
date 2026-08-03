@@ -506,6 +506,10 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
           draftId: 'draftId',
           overallPick: 'overallPick',
         },
+        leagues: {
+          id: 'id',
+          isPublic: 'isPublic',
+        },
       },
       InternalSchema: {
         usersInAppInternal: {
@@ -664,11 +668,17 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
     });
   });
 
-  it('preserves FORBIDDEN when the caller is not a league member', async () => {
-    mockDb.where.mockReturnValueOnce(mockDb).mockReturnValueOnce(mockDb);
+  it('preserves FORBIDDEN when the caller is not a member and the league is private', async () => {
+    // draft lookup → exists; membership lookup → none; league lookup
+    // (spectator check, LS-8939) → private.
+    mockDb.where
+      .mockReturnValueOnce(mockDb)
+      .mockReturnValueOnce(mockDb)
+      .mockReturnValueOnce(mockDb);
     mockDb.limit
       .mockResolvedValueOnce([{ leagueId: 7 }])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ isPublic: false }]);
 
     const resolve = getResolver();
 
@@ -678,5 +688,418 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
       message: 'User is not a member of this league',
       extensions: { code: 'FORBIDDEN' },
     });
+  });
+});
+
+/**
+ * LS-8939 — spectator read access matrix.
+ *
+ * `verifyLeagueReadAccess` lets signed-in non-members read draft data for
+ * public leagues (`leagues.is_public`) as spectators, mirroring the
+ * `league(id)` resolver precedent. This matrix asserts:
+ *   1. non-member × public league succeeds on every spectator read-set query;
+ *   2. non-member × private league is still FORBIDDEN on all of them;
+ *   3. member behavior is unchanged (no league-visibility lookup is issued);
+ *   4. member-only operations (draft queue, recommendations, auto-pick
+ *      statuses, mutations) stay member-only even for public leagues.
+ */
+describe('spectator read access — LS-8939 access matrix', () => {
+  let schema: GraphQLSchema;
+  let mockDb: {
+    select: jest.Mock;
+    from: jest.Mock;
+    where: jest.Mock;
+    limit: jest.Mock;
+    orderBy: jest.Mock;
+    innerJoin: jest.Mock;
+    leftJoin: jest.Mock;
+  };
+  let mockContext: {
+    user: { id: number; isAdmin: boolean } | null;
+    db: typeof mockDb;
+  };
+
+  const DRAFT_ROW = { id: 100, leagueId: 7 };
+  const CURRENT_PICK_SENTINEL = { overallPick: 3, teamId: 11 };
+  const PICK_ROWS = [{ id: 1, draftId: 100, overallPick: 1, teamId: 11 }];
+  const TEAM_ORDER_ROWS = [{ teamId: 11, draftOrder: 1, teamName: 'Sluggers' }];
+  const TEAM_ROWS = [{ id: 11, name: 'Sluggers', leagueId: 7, managerId: 9 }];
+  const POSITION_ROWS = [{ id: 1, leagueId: 7, positionType: 'C' }];
+  const TEAM_MEMBER_ROWS = [
+    { id: 5, teamId: 11, leagueId: 7, playerId: 33, positionId: 1 },
+  ];
+
+  beforeEach(() => {
+    jest.resetModules();
+
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+    };
+
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      ...jest.requireActual('@legacy-sports/utils/node'),
+      getDbOptions: jest.fn(() => ({})),
+    }));
+
+    jest.doMock('@legacy-sports/db-client', () => ({
+      createDatabaseService: jest.fn(),
+      runWithPublicClient: jest.fn(
+        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+      ),
+      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
+      PublicSchema: {
+        drafts: { id: 'id', leagueId: 'leagueId', createdAt: 'createdAt' },
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          teamId: 'teamId',
+          permissionLevel: 'permissionLevel',
+        },
+        leagues: { id: 'id', isPublic: 'isPublic' },
+        draftPicks: {
+          id: 'id',
+          draftId: 'draftId',
+          overallPick: 'overallPick',
+          playerId: 'playerId',
+          teamId: 'teamId',
+        },
+        draftTeams: {
+          draftId: 'draftId',
+          teamId: 'teamId',
+          draftOrder: 'draftOrder',
+          autoPick: 'autoPick',
+        },
+        teams: {
+          id: 'id',
+          name: 'name',
+          leagueId: 'leagueId',
+          divisionId: 'divisionId',
+          createdAt: 'createdAt',
+          updatedAt: 'updatedAt',
+          waiverOrder: 'waiverOrder',
+          faabBudget: 'faabBudget',
+          logoUrl: 'logoUrl',
+          primaryColor: 'primaryColor',
+          secondaryColor: 'secondaryColor',
+          isLocked: 'isLocked',
+          avatarUrl: 'avatarUrl',
+          bannerUrl: 'bannerUrl',
+        },
+        leaguePosition: {
+          id: 'id',
+          leagueId: 'leagueId',
+          positionType: 'positionType',
+        },
+        teamMembers: {
+          id: 'id',
+          teamId: 'teamId',
+          leagueId: 'leagueId',
+          playerId: 'playerId',
+          positionId: 'positionId',
+          onTradeBlock: 'onTradeBlock',
+          salary: 'salary',
+          nickname: 'nickname',
+        },
+        draftQueue: {
+          draftId: 'draftId',
+          teamId: 'teamId',
+          priority: 'priority',
+        },
+      },
+      InternalSchema: {
+        usersInAppInternal: {
+          id: 'app_internal.users.id',
+          subscriptionTier: 'app_internal.users.subscription_tier',
+        },
+      },
+      BADGE_DEFINITIONS: [],
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
+    }));
+
+    // getCurrentDraftPick delegates its data read to a helper with its own
+    // query chain — stub just that helper so the guard behavior stays real.
+    jest.doMock('./helpers', () => ({
+      ...jest.requireActual('./helpers'),
+      getCurrentDraftPickInfo: jest
+        .fn()
+        .mockResolvedValue(CURRENT_PICK_SENTINEL),
+    }));
+
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
+    const schemaModule = require('../../schema') as { schema: GraphQLSchema };
+    schema = schemaModule.schema;
+
+    mockContext = {
+      user: { id: 42, isAdmin: false },
+      db: mockDb,
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function queryResolver(name: string) {
+    const field = schema.getQueryType()?.getFields()[name];
+    if (!field?.resolve) throw new Error(`${name} query resolver not found`);
+    return field.resolve;
+  }
+
+  function mutationResolver(name: string) {
+    const field = schema.getMutationType()?.getFields()[name];
+    if (!field?.resolve) throw new Error(`${name} mutation resolver not found`);
+    return field.resolve;
+  }
+
+  /**
+   * One row per spectator read-set resolver.
+   * - `preGuardLimits`: `.limit()` results consumed before the access guard
+   *   runs (draft / team lookups).
+   * - `primeData`: queues the post-guard data-read results.
+   * - `expected`: resolver result on the success paths.
+   */
+  const READ_SET: Array<{
+    field: string;
+    args: Record<string, unknown>;
+    preGuardLimits: unknown[][];
+    primeData: () => void;
+    postGuardLimits: number;
+    expected: unknown;
+  }> = [
+    {
+      field: 'getDraft',
+      args: { draftId: 100 },
+      preGuardLimits: [[DRAFT_ROW]],
+      primeData: () => undefined,
+      postGuardLimits: 0,
+      expected: DRAFT_ROW,
+    },
+    {
+      field: 'getLeagueDraft',
+      args: { leagueId: 7 },
+      preGuardLimits: [],
+      primeData: () => mockDb.limit.mockResolvedValueOnce([DRAFT_ROW]),
+      postGuardLimits: 1,
+      expected: DRAFT_ROW,
+    },
+    {
+      field: 'getCurrentDraftPick',
+      args: { draftId: 100 },
+      preGuardLimits: [[{ leagueId: 7 }]],
+      primeData: () => undefined,
+      postGuardLimits: 0,
+      expected: CURRENT_PICK_SENTINEL,
+    },
+    {
+      field: 'getDraftPicks',
+      args: { draftId: 100 },
+      preGuardLimits: [[{ leagueId: 7 }]],
+      primeData: () => mockDb.orderBy.mockResolvedValueOnce(PICK_ROWS),
+      postGuardLimits: 0,
+      expected: PICK_ROWS,
+    },
+    {
+      field: 'getDraftTeamOrder',
+      args: { draftId: 100 },
+      preGuardLimits: [[{ leagueId: 7 }]],
+      primeData: () => mockDb.orderBy.mockResolvedValueOnce(TEAM_ORDER_ROWS),
+      postGuardLimits: 0,
+      expected: TEAM_ORDER_ROWS,
+    },
+    {
+      field: 'leagueTeams',
+      args: { leagueId: 7 },
+      preGuardLimits: [],
+      primeData: () => mockDb.orderBy.mockResolvedValueOnce(TEAM_ROWS),
+      postGuardLimits: 0,
+      expected: TEAM_ROWS,
+    },
+    {
+      field: 'leaguePositions',
+      args: { leagueId: 7 },
+      preGuardLimits: [],
+      primeData: () => mockDb.orderBy.mockResolvedValueOnce(POSITION_ROWS),
+      postGuardLimits: 0,
+      expected: POSITION_ROWS,
+    },
+    {
+      field: 'teamMembers',
+      args: { teamId: 11 },
+      preGuardLimits: [[{ leagueId: 7 }]],
+      primeData: () => mockDb.orderBy.mockResolvedValueOnce(TEAM_MEMBER_ROWS),
+      postGuardLimits: 0,
+      expected: TEAM_MEMBER_ROWS,
+    },
+  ];
+
+  it.each(READ_SET)(
+    'non-member × public league succeeds: $field',
+    async ({ field, args, preGuardLimits, primeData, expected }) => {
+      for (const rows of preGuardLimits) {
+        mockDb.limit.mockResolvedValueOnce(rows);
+      }
+      // Guard: membership lookup → none; league lookup → public.
+      mockDb.limit
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ isPublic: true }]);
+      primeData();
+
+      const resolve = queryResolver(field);
+      const result = await resolve({}, args, mockContext, undefined as never);
+
+      expect(result).toEqual(expected);
+    },
+  );
+
+  it.each(READ_SET)(
+    'non-member × private league is FORBIDDEN: $field',
+    async ({ field, args, preGuardLimits }) => {
+      for (const rows of preGuardLimits) {
+        mockDb.limit.mockResolvedValueOnce(rows);
+      }
+      // Guard: membership lookup → none; league lookup → private.
+      mockDb.limit
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ isPublic: false }]);
+
+      const resolve = queryResolver(field);
+
+      await expect(
+        resolve({}, args, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message: 'User is not a member of this league',
+        extensions: { code: 'FORBIDDEN' },
+      });
+    },
+  );
+
+  it.each(READ_SET)(
+    'member access is unchanged (no league-visibility lookup): $field',
+    async ({
+      field,
+      args,
+      preGuardLimits,
+      primeData,
+      postGuardLimits,
+      expected,
+    }) => {
+      for (const rows of preGuardLimits) {
+        mockDb.limit.mockResolvedValueOnce(rows);
+      }
+      // Guard: membership found — the league row must never be consulted.
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 11, permissionLevel: 'general_manager' },
+      ]);
+      primeData();
+
+      const resolve = queryResolver(field);
+      const result = await resolve({}, args, mockContext, undefined as never);
+
+      expect(result).toEqual(expected);
+      // Exactly the pre-guard lookups + one membership read (+ any post-guard
+      // data reads that terminate in .limit) — no extra leagues query.
+      expect(mockDb.limit).toHaveBeenCalledTimes(
+        preGuardLimits.length + 1 + postGuardLimits,
+      );
+    },
+  );
+
+  it('spectator (non-member, public league) is still FORBIDDEN on getMyDraftQueue', async () => {
+    // draft lookup → exists; membership lookup → none. The resolver never
+    // consults league visibility — queues stay member-only (LS-2501).
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([]);
+
+    const resolve = queryResolver('getMyDraftQueue');
+
+    await expect(
+      resolve({}, { draftId: 100 }, mockContext, undefined as never),
+    ).rejects.toMatchObject({
+      message: 'You are not in this league',
+      extensions: { code: 'FORBIDDEN' },
+    });
+    // No league-visibility read was issued: only draft + membership lookups.
+    expect(mockDb.limit).toHaveBeenCalledTimes(2);
+  });
+
+  it('spectator (non-member, public league) is still FORBIDDEN on getDraftTeamAutoPickStatuses', async () => {
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([]);
+
+    const resolve = queryResolver('getDraftTeamAutoPickStatuses');
+
+    await expect(
+      resolve({}, { draftId: 100 }, mockContext, undefined as never),
+    ).rejects.toMatchObject({
+      message: 'User is not a member of this league',
+      extensions: { code: 'FORBIDDEN' },
+    });
+    expect(mockDb.limit).toHaveBeenCalledTimes(2);
+  });
+
+  it('non-member is still FORBIDDEN on getDraftRecommendations, even as admin', async () => {
+    // Admin bypasses the premium entitlement gate but recommendations remain
+    // strictly member-only — verifyLeagueMembership has no admin/spectator
+    // branch (LS-2495 strategy-leak guard).
+    mockContext.user = { id: 42, isAdmin: true };
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([]);
+
+    const resolve = queryResolver('getDraftRecommendations');
+
+    await expect(
+      resolve(
+        {},
+        { draftId: 100, teamId: 11 },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toMatchObject({
+      message: 'User is not a member of this league',
+      extensions: { code: 'FORBIDDEN' },
+    });
+  });
+
+  it('spectator (non-member, public league) is still FORBIDDEN on the setDraftQueue mutation', async () => {
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([]);
+
+    const resolve = mutationResolver('setDraftQueue');
+
+    await expect(
+      resolve(
+        {},
+        { draftId: 100, playerIds: [] },
+        mockContext,
+        undefined as never,
+      ),
+    ).rejects.toMatchObject({
+      message: 'You are not a member of this league',
+      extensions: { code: 'FORBIDDEN' },
+    });
+    expect(mockDb.limit).toHaveBeenCalledTimes(2);
   });
 });

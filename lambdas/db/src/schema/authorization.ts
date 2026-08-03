@@ -542,6 +542,54 @@ export async function verifyLeagueMembership(
   return membership;
 }
 
+/** Result of {@link verifyLeagueReadAccess}. */
+export interface LeagueReadAccess {
+  /** The caller's membership, or `null` when reading as a spectator. */
+  membership: LeagueMembership | null;
+  /** `true` when access was granted without a membership (public league or admin). */
+  isSpectator: boolean;
+}
+
+/**
+ * Read-only league access guard for spectator-visible queries (LS-8939).
+ *
+ * Mirrors the `league(id)` resolver's access rule: members always have
+ * access; signed-in non-members may read when the league is public
+ * (`leagues.is_public`) or the caller is an admin — both as spectators.
+ * Anyone else gets the same {@link ForbiddenError} that
+ * {@link verifyLeagueMembership} throws.
+ *
+ * Use this only for read resolvers that expose no member-private data
+ * (never the invite code). Mutations and member-only reads (e.g. draft
+ * queues, recommendations) must keep using {@link verifyLeagueMembership}.
+ *
+ * @param isAdmin - The caller's JWT admin claim (`context.user.isAdmin`),
+ *                  matching the `league(id)` precedent.
+ */
+export async function verifyLeagueReadAccess(
+  db: PublicDb,
+  leagueId: number,
+  userId: number,
+  isAdmin = false,
+): Promise<LeagueReadAccess> {
+  const membership = await getLeagueMembership(db, leagueId, userId);
+  if (membership) {
+    return { membership, isSpectator: false };
+  }
+
+  const [league] = await db
+    .select({ isPublic: PublicSchema.leagues.isPublic })
+    .from(PublicSchema.leagues)
+    .where(eq(PublicSchema.leagues.id, leagueId))
+    .limit(1);
+
+  if (league?.isPublic || isAdmin) {
+    return { membership: null, isSpectator: true };
+  }
+
+  throw ForbiddenError('User is not a member of this league');
+}
+
 /**
  * Throws unless the user is a commissioner or owner of the given league.
  *
