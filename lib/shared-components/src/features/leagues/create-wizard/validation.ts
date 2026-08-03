@@ -128,10 +128,6 @@ function validateRules(
   now: Date,
 ): WizardErrors {
   const errors: WizardErrors = {};
-  // Era filters, HOF-only, FAAB, and the salary cap are baseball-only on
-  // mobile — the football wizard routes scoring/defensive format through this
-  // step instead, and neither needs validation (both are closed chip groups).
-  if (sport !== 'baseball') return errors;
 
   if (form.baseballEraFilter === 'custom') {
     const { customEraStartYear: start, customEraEndYear: end } = form;

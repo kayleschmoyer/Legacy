@@ -631,46 +631,6 @@ function RulesStep({
   setField,
   onUpgrade,
 }: PremiumStepProps & { sport: WizardSport }): React.JSX.Element {
-  if (sport === 'football') {
-    return (
-      <>
-        <WizardFieldRow
-          label="Scoring Format"
-          testID="field-scoringFormat"
-          hint="Sets the reception bonus. All other stats are identical."
-        >
-          <WizardChipGroup
-            testIDPrefix="chip-scoringFormat"
-            value={form.scoringFormat}
-            options={SCORING_FORMAT_OPTIONS.map((option) => ({
-              value: option.value,
-              label: option.label,
-            }))}
-            onChange={(value) => setField('scoringFormat', value)}
-            disabled={disabled}
-          />
-        </WizardFieldRow>
-
-        <WizardFieldRow
-          label="Defensive Format"
-          testID="field-defensiveFormat"
-          hint="D/ST uses one team defense slot. IDP uses individual defensive players."
-        >
-          <WizardChipGroup
-            testIDPrefix="chip-defensiveFormat"
-            value={form.defensiveFormat}
-            options={DEFENSIVE_FORMAT_OPTIONS.map((option) => ({
-              value: option.value,
-              label: option.label,
-            }))}
-            onChange={(value) => setField('defensiveFormat', value)}
-            disabled={disabled}
-          />
-        </WizardFieldRow>
-      </>
-    );
-  }
-
   // While the entitlement fetch is in flight, hold a neutral placeholder rather
   // than the locked treatment — otherwise a premium user briefly sees
   // themselves treated as free on cold load (LS-8380).
@@ -690,6 +650,44 @@ function RulesStep({
 
   return (
     <>
+      {sport === 'football' && (
+        <>
+          <WizardFieldRow
+            label="Scoring Format"
+            testID="field-scoringFormat"
+            hint="Sets the reception bonus. All other stats are identical."
+          >
+            <WizardChipGroup
+              testIDPrefix="chip-scoringFormat"
+              value={form.scoringFormat}
+              options={SCORING_FORMAT_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))}
+              onChange={(value) => setField('scoringFormat', value)}
+              disabled={disabled}
+            />
+          </WizardFieldRow>
+
+          <WizardFieldRow
+            label="Defensive Format"
+            testID="field-defensiveFormat"
+            hint="D/ST uses one team defense slot. IDP uses individual defensive players."
+          >
+            <WizardChipGroup
+              testIDPrefix="chip-defensiveFormat"
+              value={form.defensiveFormat}
+              options={DEFENSIVE_FORMAT_OPTIONS.map((option) => ({
+                value: option.value,
+                label: option.label,
+              }))}
+              onChange={(value) => setField('defensiveFormat', value)}
+              disabled={disabled}
+            />
+          </WizardFieldRow>
+        </>
+      )}
+
       <WizardFieldRow
         label="Historical Era Filter"
         testID="field-eraFilter"
@@ -918,7 +916,7 @@ function ReviewStep({
         title={WIZARD_STEP_TITLES.rules}
         onEdit={() => onEditStep(3)}
       >
-        {sport === 'football' ? (
+        {sport === 'football' && (
           <>
             <WizardSummaryRow
               label="Scoring"
@@ -929,30 +927,27 @@ function ReviewStep({
               value={labelFor(DEFENSIVE_FORMAT_OPTIONS, form.defensiveFormat)}
             />
           </>
-        ) : (
-          <>
-            <WizardSummaryRow label="Era" value={eraLabel(form, sport)} />
-            <WizardSummaryRow
-              label="HOF Only"
-              value={form.baseballHofOnly ? 'On' : 'Off'}
-              premiumLocked={!isPremium && !form.baseballHofOnly}
-            />
-            <WizardSummaryRow
-              label="Waivers"
-              value={
-                form.waiverType === 'faab'
-                  ? `FAAB · $${form.faabBudgetDefault}`
-                  : 'Standard'
-              }
-              premiumLocked={!isPremium && form.waiverType !== 'faab'}
-            />
-            <WizardSummaryRow
-              label="Salary Cap"
-              value={form.salaryCapEnabled ? `$${form.salaryCap ?? 0}` : 'Off'}
-              premiumLocked={!isPremium && !form.salaryCapEnabled}
-            />
-          </>
         )}
+        <WizardSummaryRow label="Era" value={eraLabel(form, sport)} />
+        <WizardSummaryRow
+          label="HOF Only"
+          value={form.baseballHofOnly ? 'On' : 'Off'}
+          premiumLocked={!isPremium && !form.baseballHofOnly}
+        />
+        <WizardSummaryRow
+          label="Waivers"
+          value={
+            form.waiverType === 'faab'
+              ? `FAAB · $${form.faabBudgetDefault}`
+              : 'Standard'
+          }
+          premiumLocked={!isPremium && form.waiverType !== 'faab'}
+        />
+        <WizardSummaryRow
+          label="Salary Cap"
+          value={form.salaryCapEnabled ? `$${form.salaryCap ?? 0}` : 'Off'}
+          premiumLocked={!isPremium && !form.salaryCapEnabled}
+        />
       </WizardSummaryCard>
 
       {(errorMessages.length > 0 || submitError !== undefined) && (

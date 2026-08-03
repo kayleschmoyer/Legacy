@@ -584,17 +584,34 @@ describe('buildCreateLeagueInput', () => {
     ).toBe(5_000_000);
   });
 
-  it('sends football scoring fields and omits the baseball-only ones', () => {
+  it('sends football scoring fields alongside the premium fields (LS-6138)', () => {
     const input = buildCreateLeagueInput(
-      makeForm({ defensiveFormat: 'idp' }),
+      makeForm({
+        defensiveFormat: 'idp',
+        baseballEraFilter: 'pioneer',
+        baseballHofOnly: true,
+        waiverType: 'faab',
+        salaryCapEnabled: true,
+        salaryCap: 5_000_000,
+      }),
       'football',
     );
     expect(input.sport).toBe('football');
     expect(input.scoringFormat).toBe('ppr');
     expect(input.defensiveFormat).toBe('idp');
-    expect(input.eraFilter).toBeUndefined();
-    expect(input.baseballHofOnly).toBeUndefined();
-    expect(input.salaryCapEnabled).toBeUndefined();
+    expect(input.eraFilter).toBe('pioneer');
+    expect(input.baseballHofOnly).toBe(true);
+    expect(input.waiverType).toBe('faab');
+    expect(input.faabBudgetDefault).toBe(100);
+    expect(input.salaryCapEnabled).toBe(true);
+    expect(input.salaryCap).toBe(5_000_000);
+  });
+
+  it('omits baseball-only fields (sport, scoring/defensive format) for baseball', () => {
+    const input = buildCreateLeagueInput(makeForm(), 'baseball');
+    expect(input.sport).toBeUndefined();
+    expect(input.scoringFormat).toBeUndefined();
+    expect(input.defensiveFormat).toBeUndefined();
   });
 
   it('serializes the draft date as an ISO start date', () => {

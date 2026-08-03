@@ -64,22 +64,24 @@ export function buildCreateLeagueInput(
               ? DefensiveFormatEnum.Idp
               : DefensiveFormatEnum.Dst,
         }
-      : {
-          eraFilter: form.baseballEraFilter,
-          ...(form.baseballEraFilter === 'custom'
-            ? {
-                customEraStartYear: form.customEraStartYear,
-                customEraEndYear: form.customEraEndYear,
-              }
-            : {}),
-          baseballHofOnly: form.baseballHofOnly,
-          waiverType: form.waiverType,
-          ...(form.waiverType === 'faab'
-            ? { faabBudgetDefault: form.faabBudgetDefault }
-            : {}),
-          salaryCapEnabled: form.salaryCapEnabled,
-          ...(form.salaryCapEnabled ? { salaryCap: form.salaryCap } : {}),
-        }),
+      : {}),
+    // Era filter, HOF-only, waivers, and the salary cap are premium settings
+    // shared by both sports (LS-6138) — the server validates eraFilter against
+    // the sport-specific era list, so this is safe to send unconditionally.
+    eraFilter: form.baseballEraFilter,
+    ...(form.baseballEraFilter === 'custom'
+      ? {
+          customEraStartYear: form.customEraStartYear,
+          customEraEndYear: form.customEraEndYear,
+        }
+      : {}),
+    baseballHofOnly: form.baseballHofOnly,
+    waiverType: form.waiverType,
+    ...(form.waiverType === 'faab'
+      ? { faabBudgetDefault: form.faabBudgetDefault }
+      : {}),
+    salaryCapEnabled: form.salaryCapEnabled,
+    ...(form.salaryCapEnabled ? { salaryCap: form.salaryCap } : {}),
     // Auction budget/min bid only mean anything for an auction draft.
     ...(form.selectionMethod === 'auction'
       ? { auctionBudget: form.auctionBudget, auctionMinBid: form.auctionMinBid }

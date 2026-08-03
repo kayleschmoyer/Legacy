@@ -266,14 +266,15 @@ describe('validateWizardStep — rules', () => {
     expect(errors).toEqual({});
   });
 
-  it('skips baseball-only rules for football', () => {
+  it('applies the same premium rules to football (LS-6138)', () => {
     const errors = validateWizardStep(
       'rules',
       form({ salaryCapEnabled: true, baseballEraFilter: 'custom' }),
       'football',
       NOW,
     );
-    expect(errors).toEqual({});
+    expect(errors.salaryCap).toBe(WIZARD_MESSAGES.salaryCapRequired);
+    expect(errors.customEra).toBe(WIZARD_MESSAGES.customEraRequired);
   });
 });
 

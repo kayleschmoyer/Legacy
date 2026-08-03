@@ -15,13 +15,21 @@ jest.mock('../premium/EraFilterGrid', () => ({
 jest.mock('../premium/CustomEraRange', () => ({
   CustomEraRange: () => null,
 }));
-jest.mock('../premium/WaiverFields', () => ({
-  WaiverSystemField: () => null,
-  FaabBudgetField: () => null,
-}));
-jest.mock('../premium/SalaryCapField', () => ({
-  SalaryCapField: () => null,
-}));
+jest.mock('../premium/WaiverFields', () => {
+  const React_ = jest.requireActual<typeof import('react')>('react');
+  return {
+    WaiverSystemField: () =>
+      React_.createElement('div', { 'data-testid': 'waiver-system-field' }),
+    FaabBudgetField: () => null,
+  };
+});
+jest.mock('../premium/SalaryCapField', () => {
+  const React_ = jest.requireActual<typeof import('react')>('react');
+  return {
+    SalaryCapField: () =>
+      React_.createElement('div', { 'data-testid': 'salary-cap-field' }),
+  };
+});
 jest.mock('../premium/DraftSlotTradingField', () => {
   const React_ = jest.requireActual<typeof import('react')>('react');
   return {
@@ -247,7 +255,7 @@ describe('LeagueCreateWizard — rules step', () => {
     );
   });
 
-  it('routes football through scoring and defensive format instead', () => {
+  it('shows football-specific scoring and defensive format chips first', () => {
     const { getByTestId } = renderWizard({
       sport: 'football',
       initialLeagueName: VALID_NAME,
@@ -255,6 +263,18 @@ describe('LeagueCreateWizard — rules step', () => {
     pressNext(getByTestId, 3);
     expect(getByTestId('chip-scoringFormat-ppr')).toBeTruthy();
     expect(getByTestId('chip-defensiveFormat-dst')).toBeTruthy();
+  });
+
+  it('also exposes the premium era/HOF/waiver/salary-cap fields for football (LS-6138)', () => {
+    const { getByTestId, queryByTestId } = renderWizard({
+      sport: 'football',
+      initialLeagueName: VALID_NAME,
+    });
+    pressNext(getByTestId, 3);
+    expect(queryByTestId('field-eraFilter')).toBeTruthy();
+    expect(queryByTestId('toggle-baseballHofOnly')).toBeTruthy();
+    expect(queryByTestId('waiver-system-field')).toBeTruthy();
+    expect(queryByTestId('salary-cap-field')).toBeTruthy();
   });
 });
 
