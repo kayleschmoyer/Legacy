@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
+import { Dialog } from '@legacy-sports/shared-components';
 import {
   GetUserLeagues,
   GetUserLeaguesQuery,
@@ -185,6 +186,8 @@ export function CreateLeagueWizard() {
 
   // Warn dialog ref when defensive format changes with customized roster
   const prevDefensiveFormat = useRef<DefensiveFormat>(state.defensiveFormat);
+  const [pendingDefensiveFormat, setPendingDefensiveFormat] =
+    React.useState<DefensiveFormat | null>(null);
 
   const [createLeagueAndTeams, { loading }] = useCreateLeagueAndTeamsMutation({
     update: (cache, { data }) => {
@@ -235,17 +238,30 @@ export function CreateLeagueWizard() {
   const handleDefensiveFormatChange = useCallback(
     (format: DefensiveFormat) => {
       if (state.rosterCustomized && format !== prevDefensiveFormat.current) {
-        // Warn user that roster will be reset
-        const confirmed = window.confirm(
-          'Changing defensive format will reset your roster configuration. Continue?',
-        );
-        if (!confirmed) return;
+        // Warn user that roster will be reset before applying the change
+        setPendingDefensiveFormat(format);
+        return;
       }
       prevDefensiveFormat.current = format;
       dispatch({ type: 'SET_DEFENSIVE_FORMAT', format });
     },
     [state.rosterCustomized],
   );
+
+  const confirmDefensiveFormatChange = useCallback(() => {
+    if (pendingDefensiveFormat) {
+      prevDefensiveFormat.current = pendingDefensiveFormat;
+      dispatch({
+        type: 'SET_DEFENSIVE_FORMAT',
+        format: pendingDefensiveFormat,
+      });
+    }
+    setPendingDefensiveFormat(null);
+  }, [pendingDefensiveFormat]);
+
+  const cancelDefensiveFormatChange = useCallback(() => {
+    setPendingDefensiveFormat(null);
+  }, []);
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -554,6 +570,19 @@ export function CreateLeagueWizard() {
           </XStack>
         )}
       </YStack>
+
+      <Dialog
+        open={pendingDefensiveFormat !== null}
+        onOpenChange={(open) => {
+          if (!open) cancelDefensiveFormatChange();
+        }}
+        title="Reset roster configuration?"
+        description="Changing defensive format will reset your roster configuration. Continue?"
+        confirmLabel="Continue"
+        cancelLabel="Cancel"
+        onConfirm={confirmDefensiveFormatChange}
+        onCancel={cancelDefensiveFormatChange}
+      />
     </ScrollView>
   );
 }
