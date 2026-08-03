@@ -6,7 +6,6 @@ import { LOGGER } from '@legacy-sports/logging';
 import { Dialog } from '@legacy-sports/shared-components';
 import {
   GetUserLeagues,
-  GetUserLeaguesQuery,
   DefensiveFormat as GqlDefensiveFormat,
   Sport,
   useCreateLeagueAndTeamsMutation,
@@ -189,25 +188,11 @@ export function CreateLeagueWizard() {
   const [pendingDefensiveFormat, setPendingDefensiveFormat] =
     React.useState<DefensiveFormat | null>(null);
 
+  // Rely solely on refetchQueries rather than a manual cache write: the
+  // mutation response only carries the fields selected by
+  // CreateLeagueAndTeams, which can drift from what GetUserLeagues expects
+  // (LS-6137) and would otherwise render a partially-populated league row.
   const [createLeagueAndTeams, { loading }] = useCreateLeagueAndTeamsMutation({
-    update: (cache, { data }) => {
-      if (data?.createLeagueAndTeams?.league) {
-        const newLeague = data.createLeagueAndTeams.league;
-        try {
-          const existing = cache.readQuery<GetUserLeaguesQuery>({
-            query: GetUserLeagues,
-          });
-          if (existing?.userLeagues) {
-            cache.writeQuery({
-              query: GetUserLeagues,
-              data: { userLeagues: [...existing.userLeagues, newLeague] },
-            });
-          }
-        } catch {
-          // fall through to refetchQueries
-        }
-      }
-    },
     refetchQueries: [{ query: GetUserLeagues }],
   });
 

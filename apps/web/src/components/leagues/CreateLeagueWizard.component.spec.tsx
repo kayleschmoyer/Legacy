@@ -11,6 +11,10 @@ import { CreateLeagueWizard } from './CreateLeagueWizard';
 
 const mockNavigate = jest.fn();
 const mockCreateLeague = jest.fn();
+const mockUseCreateLeagueAndTeamsMutation = jest.fn(() => [
+  mockCreateLeague,
+  { loading: false },
+]);
 
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
@@ -20,7 +24,8 @@ jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
   DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   GetUserLeagues: {},
-  useCreateLeagueAndTeamsMutation: () => [mockCreateLeague, { loading: false }],
+  useCreateLeagueAndTeamsMutation: (...args: unknown[]) =>
+    mockUseCreateLeagueAndTeamsMutation(...args),
 }));
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -349,6 +354,16 @@ describe('CreateLeagueWizard', () => {
     const input = mockCreateLeague.mock.calls[0][0].variables.input;
     expect(input.auctionBudget).toBeUndefined();
     expect(input.auctionMinBid).toBeUndefined();
+  });
+
+  it('refetches GetUserLeagues instead of manually writing a partial league into the cache (LS-6137)', () => {
+    render(<CreateLeagueWizard />);
+    const options = mockUseCreateLeagueAndTeamsMutation.mock.calls[0][0] as {
+      update?: unknown;
+      refetchQueries?: Array<{ query: unknown }>;
+    };
+    expect(options.update).toBeUndefined();
+    expect(options.refetchQueries).toEqual([{ query: {} }]);
   });
 
   it('shows football-specific Roster Settings step', () => {
