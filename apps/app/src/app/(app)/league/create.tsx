@@ -1,12 +1,14 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert } from 'react-native';
+import { Text, YStack } from 'tamagui';
 import {
   getSubmitErrorMessage,
   LeagueCreateWizard,
   type LeagueCreateWizardForm,
   type WizardSport,
 } from '@legacy-sports/shared-components/leagues';
+import { Dialog } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   type CreateLeagueAndTeamsInput,
@@ -100,16 +102,25 @@ export default function CreateLeagueScreen(): React.JSX.Element {
 
   const { isPremium, loading: premiumLoading } = useSubscription();
 
+  // Post-creation interstitial (LS-6136) — web shows a "League created!"
+  // dialog with the invite code before continuing to the league page; mobile
+  // used to skip straight to `router.replace`, dropping the user into a
+  // brand-new league with no teams, invites, or draft date and no guidance.
+  const [createdLeague, setCreatedLeague] = useState<{
+    id: number;
+    name: string;
+    inviteCode: string | null;
+  } | null>(null);
+
   const [createLeagueAndTeams, { loading, error }] = useCreateLeagueMutation({
     onCompleted: (data: CreateLeagueMutation) => {
-      const leagueId = data.createLeagueAndTeams?.league?.id;
-      if (leagueId) {
-        // Replace, not push: swaps the finished wizard for the league page
-        // instead of stacking on top of it, so back lands on whatever
-        // surface opened the wizard (the Home tab) rather than a completed,
-        // non-resubmittable "step 5" (LS-8844). Same reasoning as the cancel
-        // path's closeToHomeTab below.
-        router.replace(`/${sport}/league/${leagueId}`);
+      const league = data.createLeagueAndTeams?.league;
+      if (league?.id) {
+        setCreatedLeague({
+          id: league.id,
+          name: league.name ?? '',
+          inviteCode: league.inviteCode ?? null,
+        });
       }
     },
     onError: (err: unknown) => {
@@ -142,6 +153,17 @@ export default function CreateLeagueScreen(): React.JSX.Element {
     },
     [createLeagueAndTeams, sport],
   );
+
+  const handleContinueToLeague = useCallback(() => {
+    if (!createdLeague) return;
+    // Replace, not push: swaps the finished wizard for the league page
+    // instead of stacking on top of it, so back lands on whatever surface
+    // opened the wizard (the Home tab) rather than a completed,
+    // non-resubmittable "step 5" (LS-8844). Same reasoning as the cancel
+    // path's closeToHomeTab below.
+    router.replace(`/${sport}/league/${createdLeague.id}`);
+    setCreatedLeague(null);
+  }, [createdLeague, router, sport]);
 
   const handleClose = useCallback(
     (isDirty: boolean) => {
@@ -176,19 +198,59 @@ export default function CreateLeagueScreen(): React.JSX.Element {
   );
 
   return (
-    <LeagueCreateWizard
-      sport={sport}
-      initialLeagueName={prefillName ?? ''}
-      isPremium={isPremium}
-      premiumLoading={premiumLoading}
-      submitting={loading}
-      // Same allowlist as the Alert above — `error` here is the very error
-      // `onError` already logged, so this path only decides what to display.
-      submitError={error ? getSubmitErrorMessage(error) : undefined}
-      onSubmit={handleSubmit}
-      onClose={handleClose}
-      onUpgrade={handleUpgrade}
-    />
+    <>
+      <LeagueCreateWizard
+        sport={sport}
+        initialLeagueName={prefillName ?? ''}
+        isPremium={isPremium}
+        premiumLoading={premiumLoading}
+        submitting={loading}
+        // Same allowlist as the Alert above — `error` here is the very error
+        // `onError` already logged, so this path only decides what to display.
+        submitError={error ? getSubmitErrorMessage(error) : undefined}
+        onSubmit={handleSubmit}
+        onClose={handleClose}
+        onUpgrade={handleUpgrade}
+      />
+      <Dialog
+        open={createdLeague !== null}
+        onOpenChange={(open) => {
+          if (!open) handleContinueToLeague();
+        }}
+        title="League created!"
+        description={
+          createdLeague?.inviteCode
+            ? `Share this invite code so managers can join ${createdLeague.name}.`
+            : `${createdLeague?.name ?? 'Your league'} is ready.`
+        }
+        confirmLabel="Continue to League"
+        cancelLabel="Got it"
+        onConfirm={handleContinueToLeague}
+        onCancel={handleContinueToLeague}
+      >
+        {createdLeague?.inviteCode ? (
+          <YStack
+            alignItems="center"
+            paddingVertical="$3"
+            paddingHorizontal="$4"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$outlineStrong"
+            backgroundColor="$surfacePanel"
+          >
+            <Text
+              fontFamily="$heading"
+              fontWeight="800"
+              fontSize={20}
+              letterSpacing={1.2}
+              color="$brandGoldLight"
+            >
+              {createdLeague.inviteCode}
+            </Text>
+          </YStack>
+        ) : null}
+      </Dialog>
+    </>
   );
 }
 

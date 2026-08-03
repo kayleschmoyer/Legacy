@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { act, render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type { View as RNView } from 'react-native';
 import { CombinedGraphQLErrors } from '@apollo/client';
@@ -92,6 +92,36 @@ jest.mock('../../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
 }));
 
+// The "League created!" interstitial (LS-6136) is a presentational shared
+// component with its own coverage (Storybook); here it's a prop probe so
+// this spec stays about whether the screen opens it with the right data and
+// navigates on confirm/cancel, not about Dialog's own rendering.
+type DialogProps = {
+  open: boolean;
+  onOpenChange?: (open: boolean) => void;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm?: () => void;
+  onCancel?: () => void;
+  children?: React.ReactNode;
+};
+let dialogProps: DialogProps | undefined;
+jest.mock('@legacy-sports/shared-components', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { View } = jest.requireActual<{ View: typeof RNView }>('react-native');
+  return {
+    Dialog: (props: DialogProps) => {
+      dialogProps = props;
+      if (!props.open) return null;
+      return ReactActual.createElement(View, {
+        testID: 'league-created-dialog',
+      });
+    },
+  };
+});
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
@@ -113,6 +143,12 @@ const mockCreateLeagueState: { loading: boolean; error?: unknown } = {
   loading: false,
   error: undefined,
 };
+/** Overridable per test — null by default (public/no-invite-code league). */
+let mockCreatedLeague: {
+  id: number;
+  name: string;
+  inviteCode: string | null;
+} = { id: 42, name: 'Test League', inviteCode: null };
 /** Captured so a test can drive the mutation's `onError` handler directly. */
 let mutationOptions: { onError?: (error: unknown) => void } | undefined;
 jest.mock('@legacy-sports/graphql', () => ({
@@ -125,12 +161,10 @@ jest.mock('@legacy-sports/graphql', () => ({
     mutationOptions = options;
     mockCreateLeagueMutate.mockImplementation((_args: unknown) => {
       options?.onCompleted?.({
-        createLeagueAndTeams: { league: { id: 42, name: 'Test League' } },
+        createLeagueAndTeams: { league: mockCreatedLeague },
       });
       return Promise.resolve({
-        data: {
-          createLeagueAndTeams: { league: { id: 42, name: 'Test League' } },
-        },
+        data: { createLeagueAndTeams: { league: mockCreatedLeague } },
       });
     });
     return [mockCreateLeagueMutate, mockCreateLeagueState];
@@ -184,6 +218,7 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     wizardProps = undefined;
+    dialogProps = undefined;
     mutationOptions = undefined;
     mockIsPremium = false;
     mockPremiumLoading = false;
@@ -191,6 +226,7 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
     mockCanGoBack = true;
     mockCreateLeagueState.loading = false;
     mockCreateLeagueState.error = undefined;
+    mockCreatedLeague = { id: 42, name: 'Test League', inviteCode: null };
   });
 
   describe('sport routing', () => {
@@ -307,27 +343,90 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
   // it. A push leaves the finished wizard mounted underneath the league page,
   // so swiping back lands the user on a completed, non-resubmittable "step 5"
   // instead of the Home tab the wizard was opened from.
+  // LS-6136 — success no longer replaces immediately. It opens the "League
+  // created!" interstitial (parity with web's post-creation dialog) so a
+  // brand-new league with no teams/invites/draft date isn't dropped on the
+  // user with no guidance; navigation happens once the user confirms.
   describe('submit', () => {
-    it('sends the assembled input and replaces the wizard with the new baseball league', async () => {
+    it('opens the created-league dialog instead of navigating immediately', async () => {
       const props = renderScreen();
-      props.onSubmit(makeForm());
+      await act(async () => {
+        props.onSubmit(makeForm());
+        await Promise.resolve();
+      });
 
       await waitFor(() => {
         expect(mockCreateLeagueMutate).toHaveBeenCalled();
-        expect(mockReplace).toHaveBeenCalledWith('/baseball/league/42');
+        expect(dialogProps?.open).toBe(true);
       });
+      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('replaces the wizard with the new baseball league once the dialog is confirmed', async () => {
+      const props = renderScreen();
+      await act(async () => {
+        props.onSubmit(makeForm());
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(dialogProps?.open).toBe(true));
+      await act(() => dialogProps?.onConfirm?.());
+
+      expect(mockReplace).toHaveBeenCalledWith('/baseball/league/42');
       expect(mockPush).not.toHaveBeenCalled();
     });
 
     it('replaces with the football league when entered from the football wrapper', async () => {
       mockSearchParams = { sport: 'football' };
       const props = renderScreen();
-      props.onSubmit(makeForm());
-
-      await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/football/league/42');
+      await act(async () => {
+        props.onSubmit(makeForm());
+        await Promise.resolve();
       });
+
+      await waitFor(() => expect(dialogProps?.open).toBe(true));
+      await act(() => dialogProps?.onConfirm?.());
+
+      expect(mockReplace).toHaveBeenCalledWith('/football/league/42');
       expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it('also navigates when the dialog is dismissed via "Got it" (no invite code)', async () => {
+      const props = renderScreen();
+      await act(async () => {
+        props.onSubmit(makeForm());
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(dialogProps?.open).toBe(true));
+      expect(dialogProps?.description).toBe('Test League is ready.');
+      expect(dialogProps?.cancelLabel).toBe('Got it');
+
+      await act(() => dialogProps?.onCancel?.());
+
+      expect(mockReplace).toHaveBeenCalledWith('/baseball/league/42');
+    });
+
+    it('shows the invite code and share copy when the league has one', async () => {
+      mockCreatedLeague = {
+        id: 99,
+        name: 'Diamond Dynasty',
+        inviteCode: 'ABC123',
+      };
+      const props = renderScreen();
+      await act(async () => {
+        props.onSubmit(makeForm());
+        await Promise.resolve();
+      });
+
+      await waitFor(() => expect(dialogProps?.open).toBe(true));
+      expect(dialogProps?.description).toBe(
+        'Share this invite code so managers can join Diamond Dynasty.',
+      );
+
+      await act(() => dialogProps?.onConfirm?.());
+      expect(mockReplace).toHaveBeenCalledWith('/baseball/league/99');
     });
   });
 
