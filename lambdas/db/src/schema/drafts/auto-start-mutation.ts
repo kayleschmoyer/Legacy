@@ -1,9 +1,12 @@
 /**
  * Draft domain — scheduled mutation for auto-starting drafts at their scheduled time.
  *
- * LS-8309: wired to `terraform/main/eventbridge.tf`'s
- * `auto_start_scheduled_drafts` rule (rate(1 minute), mirroring
- * `auto_process_draft_picks`). Live check:
+ * LS-8309: wired to `terraform/main/eventbridge.tf`'s `draft_scheduler_tick`
+ * rule (rate(1 minute)). LS-8907 merged this into the same EventBridge
+ * invocation as `autoProcessDraftPicks` — both mutations are sent as
+ * sibling fields in one GraphQL request/Lambda invocation, each still
+ * fully self-contained with its own try/catch, so a failure in one never
+ * blocks or delays the other. Live check:
  * `aws events list-rules --name-prefix legacy-sports-dev`.
  *
  * When invoked, finds all live drafts with `scheduled_at <= now` and
@@ -77,8 +80,9 @@ builder.objectType(AutoStartScheduledDraftsResult, {
  * whose associated league has `draft_status = 'not-started'`, then starts each
  * one as a live draft.
  *
- * Runs on an every-minute EventBridge schedule alongside `autoProcessDraftPicks`
- * (LS-8309) — see the header comment for the guarded-rollout staleness cutoff.
+ * Runs on an every-minute EventBridge schedule, sent as a sibling field in
+ * the same GraphQL request/invocation as `autoProcessDraftPicks` (LS-8907)
+ * — see the header comment for the guarded-rollout staleness cutoff.
  */
 builder.mutationField('autoStartScheduledDrafts', (t) =>
   t.field({

@@ -1,9 +1,12 @@
 /**
  * Draft domain — scheduled (system) mutation for auto-picking expired draft picks.
  *
- * Triggered every minute by EventBridge. Each invocation chains through all
- * consecutively-expired deadlines per draft (inner retry loop) so short pick
- * timers (e.g. 30s) aren't bottlenecked by the 1-minute polling interval.
+ * Triggered every minute by EventBridge (`draft_scheduler_tick` rule in
+ * terraform/main/eventbridge.tf), sent as a sibling field alongside
+ * `autoStartScheduledDrafts` in the same GraphQL request/invocation
+ * (LS-8907). Each invocation chains through all consecutively-expired
+ * deadlines per draft (inner retry loop) so short pick timers (e.g. 30s)
+ * aren't bottlenecked by the 1-minute polling interval.
  *
  * Finds all in-progress drafts where `current_pick_deadline` has passed,
  * then auto-picks the best available player for the timed-out team,

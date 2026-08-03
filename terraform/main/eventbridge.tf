@@ -167,32 +167,56 @@ resource "aws_lambda_permission" "auto_advance_matchups_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.auto_advance_matchups.arn
 }
 
-# ── Draft Pick Deadline Processing ──────────────────────────────────
-# Auto-picks for teams that exceed their pick deadline during live drafts.
-# Runs every minute (the minimum EventBridge rate). The mutation contains an
-# inner retry loop that chains through ALL consecutively-expired deadlines
-# per draft, so short pick timers (e.g. 30s) are processed back-to-back in
-# a single invocation without waiting for the next poll.
-# Short-circuits immediately if no drafts have expired deadlines, so cost
-# is negligible (~$0.04/month).
+# ── Draft Scheduler Tick (LS-8907) ──────────────────────────────────
+# Combines draft pick deadline processing and scheduled draft auto-start
+# into a single every-minute rule/target/invocation.
+#
+# Previously these were two independent rate(1 minute) rules each invoking
+# the same 512MB VPC-attached GraphQL Lambda (~86,400 combined invocations
+# /month). A single GraphQL request can carry multiple top-level mutation
+# fields, so one EventBridge target now sends both `autoProcessDraftPicks`
+# and `autoStartScheduledDrafts` in the same document — one rule, one
+# target, one invocation. (A single rule with two separate *targets* would
+# NOT achieve this — that's still two invocations; the saving requires one
+# rule with one target carrying both operations.)
+#
+# Failure isolation is preserved: per GraphQL execution semantics, an error
+# in one root mutation field does not prevent sibling fields from
+# executing, and both resolvers already wrap their entire body in their own
+# top-level try/catch that reports failures via the result's `errors` list
+# rather than throwing — see scheduled-mutations.ts (autoProcessDraftPicks)
+# and auto-start-mutation.ts (autoStartScheduledDrafts). A failure in one
+# operation can never block or delay the other.
+#
+# Tradeoff: the two schedules are now operationally coupled — you can no
+# longer disable draft-pick processing without also disabling draft-start
+# via Terraform alone (both would need a payload flag / env var to gain an
+# independent per-operation kill-switch; not added here as none is
+# currently needed — accepted as a minor coupling).
+#
+# auto_process_draft_picks' inner retry loop still chains through ALL
+# consecutively-expired pick deadlines per draft, so short pick timers
+# (e.g. 30s) are processed back-to-back without waiting for the next poll.
+# Both mutations short-circuit quickly when there's no work, so combined
+# cost remains negligible.
 
-resource "aws_cloudwatch_event_rule" "auto_process_draft_picks" {
-  name                = "${local.name_prefix}-auto-process-draft-picks"
-  description         = "Process expired draft pick deadlines every minute"
+resource "aws_cloudwatch_event_rule" "draft_scheduler_tick" {
+  name                = "${local.name_prefix}-draft-scheduler-tick"
+  description         = "Process expired draft pick deadlines and auto-start scheduled drafts every minute"
   schedule_expression = "rate(1 minute)"
 
   tags = local.common_tags
 }
 
-resource "aws_cloudwatch_event_target" "auto_process_draft_picks" {
-  rule      = aws_cloudwatch_event_rule.auto_process_draft_picks.name
-  target_id = "auto-process-draft-picks"
+resource "aws_cloudwatch_event_target" "draft_scheduler_tick" {
+  rule      = aws_cloudwatch_event_rule.draft_scheduler_tick.name
+  target_id = "draft-scheduler-tick"
   arn       = aws_lambda_function.graphql.arn
 
   input = jsonencode({
     httpMethod = "POST"
     body = jsonencode({
-      query = "mutation { autoProcessDraftPicks { draftsProcessed picksAutoMade draftsCompleted errors } }"
+      query = "mutation { autoProcessDraftPicks { draftsProcessed picksAutoMade draftsCompleted errors } autoStartScheduledDrafts { draftsStarted errors } }"
     })
     headers = {
       "content-type"     = "application/json"
@@ -206,59 +230,12 @@ resource "aws_cloudwatch_event_target" "auto_process_draft_picks" {
   })
 }
 
-resource "aws_lambda_permission" "auto_process_draft_picks_eventbridge" {
-  statement_id  = "AllowEventBridgeAutoProcessDraftPicks"
+resource "aws_lambda_permission" "draft_scheduler_tick_eventbridge" {
+  statement_id  = "AllowEventBridgeDraftSchedulerTick"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.graphql.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.auto_process_draft_picks.arn
-}
-
-# ── Scheduled Draft Auto-Start (LS-8309) ────────────────────────────
-# Starts drafts whose commissioner-set scheduled_at time has arrived.
-# Runs every minute (the minimum EventBridge rate), same cadence as
-# auto_process_draft_picks above. The resolver itself guards against a
-# mass-start surprise on rollout: any draft whose scheduled_at is more than
-# STALE_SCHEDULE_THRESHOLD_MS (15 min) in the past is skipped as stale
-# backlog and reported via the mutation's `errors` field rather than
-# auto-started (lambdas/db/src/schema/drafts/auto-start-mutation.ts).
-
-resource "aws_cloudwatch_event_rule" "auto_start_scheduled_drafts" {
-  name                = "${local.name_prefix}-auto-start-scheduled-drafts"
-  description         = "Start scheduled drafts whose scheduled_at has arrived, every minute"
-  schedule_expression = "rate(1 minute)"
-
-  tags = local.common_tags
-}
-
-resource "aws_cloudwatch_event_target" "auto_start_scheduled_drafts" {
-  rule      = aws_cloudwatch_event_rule.auto_start_scheduled_drafts.name
-  target_id = "auto-start-scheduled-drafts"
-  arn       = aws_lambda_function.graphql.arn
-
-  input = jsonencode({
-    httpMethod = "POST"
-    body = jsonencode({
-      query = "mutation { autoStartScheduledDrafts { draftsStarted errors } }"
-    })
-    headers = {
-      "content-type"     = "application/json"
-      "x-system-api-key" = random_password.system_api_key.result
-    }
-    requestContext = {
-      http = {
-        method = "POST"
-      }
-    }
-  })
-}
-
-resource "aws_lambda_permission" "auto_start_scheduled_drafts_eventbridge" {
-  statement_id  = "AllowEventBridgeAutoStartScheduledDrafts"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.graphql.function_name
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.auto_start_scheduled_drafts.arn
+  source_arn    = aws_cloudwatch_event_rule.draft_scheduler_tick.arn
 }
 
 # ── Discord Score Alerts ───────────────────────────────────────────

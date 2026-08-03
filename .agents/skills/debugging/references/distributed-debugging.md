@@ -61,17 +61,18 @@ All lambdas ──► WebSocket Notifications ──► lambdas/websocket/ ─�
 
 ### EventBridge Rules
 
-| Rule (prefix `legacy-sports-dev-`) | Schedule              | Target Mutation            |
-| ---------------------------------- | --------------------- | -------------------------- |
-| `auto-process-draft-picks`         | `rate(1 minute)`      | `autoProcessDraftPicks`    |
-| `auto-start-scheduled-drafts`      | `rate(1 minute)`      | `autoStartScheduledDrafts` |
-| `auto-select-games`                | `cron(0 5 * * ? *)`   | `autoSelectGames`          |
-| `auto-advance-matchups`            | `cron(0 8 ? * SUN *)` | `autoAdvanceMatchups`      |
-| `process-waiver-claims`            | `cron(0 7 * * ? *)`   | `processWaiverClaims`      |
+| Rule (prefix `legacy-sports-dev-`) | Schedule              | Target Mutation(s)                                   |
+| ---------------------------------- | --------------------- | ---------------------------------------------------- |
+| `draft-scheduler-tick`             | `rate(1 minute)`      | `autoProcessDraftPicks` + `autoStartScheduledDrafts` |
+| `auto-select-games`                | `cron(0 5 * * ? *)`   | `autoSelectGames`                                    |
+| `auto-advance-matchups`            | `cron(0 8 ? * SUN *)` | `autoAdvanceMatchups`                                |
+| `process-waiver-claims`            | `cron(0 7 * * ? *)`   | `processWaiverClaims`                                |
 
 Rule names and schedules live in `terraform/main/eventbridge.tf` (there are more rules than this table — Discord alerts, dues reminders, etc.; read the file for the full set). EventBridge rules invoke the GraphQL Lambda **directly** (not via API Gateway), authenticated with `x-system-api-key`.
 
 > **RESOLVED (LS-8309)**: the `autoStartScheduledDrafts` mutation (`lambdas/db/src/schema/drafts/auto-start-mutation.ts`) is now wired to the `auto-start-scheduled-drafts` rule above, mirroring `auto-process-draft-picks`. The resolver guards against a rollout mass-start: drafts whose `scheduled_at` is more than `STALE_SCHEDULE_THRESHOLD_MS` (15 min) in the past are skipped as stale backlog and reported via the mutation's `errors` field rather than auto-started. Verify live state with `aws events list-rules --name-prefix legacy-sports-dev` (MCP: none yet — shell only).
+
+> **RESOLVED (LS-8907)**: `auto-process-draft-picks` and `auto-start-scheduled-drafts` were merged into the single `draft-scheduler-tick` rule/target above — one EventBridge invocation now sends both mutations as sibling fields in one GraphQL request, halving invocation count/cold starts/log volume for this pair. Each mutation resolver still fully owns its own try/catch and reports failures via its own `errors` list, so a failure in one operation cannot block or delay the other.
 
 ---
 
