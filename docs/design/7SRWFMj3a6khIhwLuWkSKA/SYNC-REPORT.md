@@ -1,11 +1,56 @@
 # Sync report: Design System
 
 **Design ID**: `7SRWFMj3a6khIhwLuWkSKA`
-**Source**: `https://api.anthropic.com/v1/design/h/7SRWFMj3a6khIhwLuWkSKA`
-**Synced at**: 2026-05-20T16:35:55.106Z
-**Bundle hash**: `5af5d7f88b1c9e26b32de91cdc106b04957b89c790907ed34f50aa1f77f19774`
+**Source**: `designsync-local` (DesignSync MCP tool, projectId `670f7892-5193-4b8a-a54c-20b112ad11bb`)
+**Synced at**: 2026-08-03T22:28:20.000Z
+**Sync ticket**: LS-9007
+**Bundle hash**: `2ce1fb951a1c16da6b5eb9d7cbc132c8eb85e678ce9fdf7b917c669b40ae2ec8`
 **Files**: 118
-**Total size**: 2307421 bytes
+**Total size**: 2375117 bytes
+
+## What changed (vs 2026-05-20 sync, hash `5af5d7f8…`)
+
+Targeted pull after agent-driven source fixes for **LS-8957** (PROMPT.md brief
+violations, audited in LS-8954) were pushed to the Claude Design project via
+`finalize_plan` → `write_files`. Four files changed; all other bundle files are
+untouched:
+
+- `legacy-sports-design-system/project/colors_and_type.css` — removed the
+  JetBrains Mono `@import` and `--font-mono` (two-typeface rule; stat/tabular
+  styling now Literata + `tabular-nums`); deleted the
+  `.theme-light, [data-theme='light']` override block (dark-mode-only rule);
+  header now documents the brand.md `TEXT_PRIMARY`/`TEXT_SECONDARY`/`BORDER` →
+  extended-ramp token mapping (values intentionally unchanged — residual
+  conflict flagged on LS-8957 for the brief owner).
+- `legacy-sports-design-system/project/preview/components-player-card.html` —
+  position accent `border-left` 4px → 1px (banned >1px side-stripe); era
+  metadata line mono → Literata + `tabular-nums`.
+- `legacy-sports-design-system/project/preview/components-chips.html` —
+  Tailwind `#22c55e`/`#f59e0b` chip colors → `--success-*`/`--warning-*` tokens.
+- `legacy-sports-design-system/project/ui_kits/web/styles.css` —
+  `.ls-player-row` stripe 4px → 1px; `.ls-chip-active`/`.ls-chip-soon` hexes →
+  semantic tokens; `.ls-mono` → Literata + `tabular-nums`; the invented
+  `@media (max-width: 900px)` breakpoint split into canonical band edges
+  (`max-width: 979px` = below `$lg`, `max-width: 799px` = below `$sm`), matching
+  `preview/breakpoints.html` and `lib/design-tokens/src/lib/breakpoints.ts`.
+
+### Notes / gaps
+
+- **Partial pull by design**: only the four files changed at the source were
+  pulled. The remote project also contains files that have never been part of
+  this bundle (`CLAUDE.md`, `_ds_manifest.json`, `_ds_bundle.js`,
+  `_adherence.oxlintrc.json`, `.thumbnail`, `templates/breakpoint-harness/**`)
+  — added in the Claude Design app after the 2026-05-20 cloud sync. Left for
+  the next bulk `/sync-designs` (or LS-9005 reconciliation sweep) to true up.
+- **Hash discrepancy (pre-existing)**: the stored 2026-05-20 hash could not be
+  reproduced with the documented algorithm (manifest-schema.md §Hashing:
+  all files under `docs/design/<id>/` excluding `SYNC-REPORT.md`, sorted,
+  `<relpath>\t<sha256>\n`, sha256 of the joined string — computed
+  `967df6a6…` for the pre-change tree vs stored `5af5d7f8…`). The new hash
+  above IS computed per the documented algorithm; expect the next cloud sync to
+  report this design as changed regardless.
+- No truncated reads (every `get_file` returned `truncated: false`); no binary
+  fetches were needed.
 
 ## Pages
 

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-05-20T16:35:54.669Z",
+  "lastSyncedAt": "2026-08-03T22:28:20.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -49,9 +49,10 @@
       "title": "Design System",
       "slug": "legacy-sports-design-system",
       "status": "active",
-      "lastSyncedHash": "5af5d7f88b1c9e26b32de91cdc106b04957b89c790907ed34f50aa1f77f19774",
-      "lastSyncedAt": "2026-05-20T16:35:55.106Z",
-      "jiraKey": "LS-4571"
+      "lastSyncedHash": "2ce1fb951a1c16da6b5eb9d7cbc132c8eb85e678ce9fdf7b917c669b40ae2ec8",
+      "lastSyncedAt": "2026-08-03T22:28:20.000Z",
+      "jiraKey": "LS-9007",
+      "source": "designsync-local"
     },
     {
       "id": "B8P9BQz8s6NZ9Q-FqWI_yA",
