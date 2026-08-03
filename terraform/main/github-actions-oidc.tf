@@ -318,14 +318,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "s3:PutBucketPolicy",
           "s3:DeleteBucketPolicy",
           "s3:PutBucketCORS",
-          "s3:PutBucketTagging",
-          # LS-8925: the matching read statement above already grants
-          # GetBucketOwnershipControls/GetBucketNotification — the write side
-          # was missing, invisible until a brand-new bucket needed them set
-          # for the first time (the existing runner-dist bucket predates the
-          # github-aws-runners module version that manages these).
-          "s3:PutBucketOwnershipControls",
-          "s3:PutBucketNotification"
+          "s3:PutBucketTagging"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*"
@@ -698,6 +691,25 @@ resource "aws_iam_policy" "github_actions_supplemental" {
           "acm:ListCertificates"
         ]
         Resource = "*"
+      },
+      # LS-8925: s3:PutBucketOwnershipControls/PutBucketNotification, moved here
+      # from the inline policy to stay under the 10 KB limit (the matching read
+      # actions — GetBucketOwnershipControls/GetBucketNotification — already
+      # lived on the inline policy's S3 read statement and were left there;
+      # only the two new write actions needed a new home). Needed so Terraform
+      # can set both properties on a brand-new S3 bucket (e.g. the LS-8910
+      # Android runner pool's dist bucket) — the existing runner-dist bucket
+      # predates the github-aws-runners module version that manages these, so
+      # this was never exercised before.
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutBucketOwnershipControls",
+          "s3:PutBucketNotification"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-*"
+        ]
       },
       # CloudWatch Logs permissions for the CloudTrail log group — moved here from the
       # inline policy to stay under the 10 KB limit. Covers both read (refresh) and
