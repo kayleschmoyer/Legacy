@@ -89,7 +89,22 @@ describe('premium league-create fields (LS-5174)', () => {
       expect(
         queryByLabelText('Dead Ball (pre-1920)', { exact: true }),
       ).toBeNull();
-      expect(getByLabelText('Modern (2006+)')).toBeTruthy();
+      expect(getByLabelText('Modern (2006+) — Free')).toBeTruthy();
+    });
+
+    it('labels every non-premium era as Free (LS-6141)', () => {
+      const { getByLabelText } = render(
+        <EraFilterGrid {...baseProps} isPremium={false} />,
+      );
+      expect(getByLabelText('All Eras — Free')).toBeTruthy();
+      expect(getByLabelText('Modern (2006+) — Free')).toBeTruthy();
+    });
+
+    it('does not label a premium era as Free once unlocked for premium users (LS-6141)', () => {
+      const { getByLabelText } = render(
+        <EraFilterGrid {...baseProps} isPremium />,
+      );
+      expect(getByLabelText('Dead Ball (pre-1920)')).toBeTruthy();
     });
 
     it('does not mark a premium era as locked for premium users (LS-6085)', () => {
@@ -137,7 +152,7 @@ describe('premium league-create fields (LS-5174)', () => {
           isPremium={false}
         />,
       );
-      fireEvent.keyDown(getByLabelText('Modern (2006+)'), { key: ' ' });
+      fireEvent.keyDown(getByLabelText('Modern (2006+) — Free'), { key: ' ' });
       expect(onChange).toHaveBeenCalledWith('modern');
       expect(onUpgrade).not.toHaveBeenCalled();
     });
@@ -153,7 +168,7 @@ describe('premium league-create fields (LS-5174)', () => {
           isPremium={false}
         />,
       );
-      fireEvent.keyDown(getByLabelText('Modern (2006+)'), { key: 'a' });
+      fireEvent.keyDown(getByLabelText('Modern (2006+) — Free'), { key: 'a' });
       expect(onChange).not.toHaveBeenCalled();
       expect(onUpgrade).not.toHaveBeenCalled();
     });

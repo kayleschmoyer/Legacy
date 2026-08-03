@@ -73,17 +73,19 @@ export function EraFilterGrid({
           onChange(era.id);
         };
 
+        const label = locked
+          ? `${era.name} — Locked, premium required`
+          : !era.premium
+            ? `${era.name} — Free`
+            : era.name;
+
         return (
           <YStack
             key={era.id}
             testID={`era-card-${era.id}`}
             accessibilityRole="button"
-            accessibilityLabel={
-              locked ? `${era.name} — Locked, premium required` : era.name
-            }
-            aria-label={
-              locked ? `${era.name} — Locked, premium required` : era.name
-            }
+            accessibilityLabel={label}
+            aria-label={label}
             tabIndex={disabled ? -1 : 0}
             onPress={activate}
             onKeyDown={(e: React.KeyboardEvent) => {
@@ -122,6 +124,19 @@ export function EraFilterGrid({
             {era.premium && (
               <YStack position="absolute" top={8} right={8}>
                 <Lock size={11} color={BRAND_GOLD_LIGHT} />
+              </YStack>
+            )}
+            {!era.premium && (
+              <YStack position="absolute" top={8} right={8}>
+                <Text
+                  fontFamily="$body"
+                  fontWeight="700"
+                  fontSize={9}
+                  letterSpacing={0.4}
+                  color={withAlpha(themePrimary, 0.9)}
+                >
+                  FREE
+                </Text>
               </YStack>
             )}
           </YStack>
