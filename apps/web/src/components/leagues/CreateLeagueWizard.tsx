@@ -308,6 +308,13 @@ export function CreateLeagueWizard() {
     const maxRosterSize = isFootball
       ? Object.values(state.rosterSlots).reduce((sum, n) => sum + n, 0)
       : 26;
+    // BN (bench) isn't a starting-lineup position slot — it's already
+    // folded into maxRosterSize above (LS-6145).
+    const rosterSlots = isFootball
+      ? Object.entries(state.rosterSlots)
+          .filter(([slot, count]) => slot !== 'BN' && count > 0)
+          .map(([positionType, count]) => ({ positionType, count }))
+      : [];
 
     try {
       const result = await createLeagueAndTeams({
@@ -345,6 +352,7 @@ export function CreateLeagueWizard() {
                   auctionMinBid: state.auctionMinBid,
                 }
               : {}),
+            ...(rosterSlots.length > 0 ? { rosterSlots } : {}),
           },
         },
         context: { suppressGlobalError: true },

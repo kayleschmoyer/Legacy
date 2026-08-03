@@ -649,8 +649,8 @@ describe('LeagueCreatePage — per-slot roster config (LS-6147)', () => {
 
     fireEvent.click(screen.getByTestId('defensive-format-idp'));
 
-    // IDP defaults: QB1 RB2 WR2 TE1 FLEX1 K1 DL2 LB2 DB2 BN6 = 20 (LS-6148
-    // removed the unsupported DP slot).
+    // IDP defaults (LS-6148 removed the DP slot): QB1 RB2 WR2 TE1 FLEX1 K1
+    // DL2 LB2 DB2 BN6 = 20.
     expect(config).not.toHaveTextContent('DST');
     expect(config).toHaveTextContent('DL');
     expect(
@@ -665,6 +665,50 @@ describe('LeagueCreatePage — per-slot roster config (LS-6147)', () => {
     expect(
       screen.queryByTestId('roster-positions-config'),
     ).not.toBeInTheDocument();
+  });
+
+  it('sends rosterSlots (excluding bench) alongside maxRosterSize on submit (LS-6145)', async () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test Football League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    // D/ST defaults: QB1 RB2 WR2 TE1 FLEX1 K1 DST1 (BN excluded).
+    expect(input.rosterSlots).toEqual(
+      expect.arrayContaining([
+        { positionType: 'QB', count: 1 },
+        { positionType: 'RB', count: 2 },
+        { positionType: 'WR', count: 2 },
+        { positionType: 'TE', count: 1 },
+        { positionType: 'FLEX', count: 1 },
+        { positionType: 'K', count: 1 },
+        { positionType: 'DST', count: 1 },
+      ]),
+    );
+    expect(input.rosterSlots).toHaveLength(7);
+    expect(
+      input.rosterSlots.some(
+        (slot: { positionType: string }) => slot.positionType === 'BN',
+      ),
+    ).toBe(false);
+  });
+
+  it('omits rosterSlots for baseball', async () => {
+    renderPage('/baseball/league/create');
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test Baseball League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.rosterSlots).toBeUndefined();
   });
 });
 

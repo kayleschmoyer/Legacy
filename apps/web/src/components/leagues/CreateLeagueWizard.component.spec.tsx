@@ -156,6 +156,12 @@ jest.mock('./wizard/StepPremiumOptions', () => ({
 }));
 
 jest.mock('./wizard/StepRosterSettings', () => ({
+  // Real DST_ROSTER_DEFAULTS/IDP_ROSTER_DEFAULTS are consumed by
+  // CreateLeagueWizard's reducer to seed state.rosterSlots — only the
+  // presentational component itself is stubbed here.
+  ...jest.requireActual<typeof import('./wizard/StepRosterSettings')>(
+    './wizard/StepRosterSettings',
+  ),
   StepRosterSettings: ({
     rosterSlots,
     onChange,
@@ -488,5 +494,45 @@ describe('CreateLeagueWizard', () => {
     advance();
     const auctionButton = screen.getByText('Select Auction');
     expect(auctionButton).toBeDisabled();
+  });
+
+  it('sends rosterSlots (excluding bench) alongside maxRosterSize for football (LS-6145)', () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: { id: 'league-7' } } },
+    });
+    render(<CreateLeagueWizard />);
+    fireEvent.click(screen.getByText('Football'));
+    advance(); // sport -> settings
+    fillLeagueName('My Football League');
+    advance(); // settings -> premium
+    advance(); // premium -> roster
+    advance(); // roster -> defensive
+    advance(); // defensive -> confirm
+    act(() => {
+      fireEvent.click(screen.getByText('Create League'));
+    });
+
+    expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.sport).toBe('football');
+    // Default DST roster: QB:1, RB:2, WR:2, TE:1, FLEX:1, K:1, DST:1, BN:6 = 15.
+    expect(input.maxRosterSize).toBe(15);
+    expect(input.rosterSlots).toEqual(
+      expect.arrayContaining([
+        { positionType: 'QB', count: 1 },
+        { positionType: 'RB', count: 2 },
+        { positionType: 'WR', count: 2 },
+        { positionType: 'TE', count: 1 },
+        { positionType: 'FLEX', count: 1 },
+        { positionType: 'K', count: 1 },
+        { positionType: 'DST', count: 1 },
+      ]),
+    );
+    expect(input.rosterSlots).toHaveLength(7);
+    expect(
+      input.rosterSlots.some(
+        (slot: { positionType: string }) => slot.positionType === 'BN',
+      ),
+    ).toBe(false);
   });
 });

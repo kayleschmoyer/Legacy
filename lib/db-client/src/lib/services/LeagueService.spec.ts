@@ -148,6 +148,124 @@ describe('LeagueService.createLeague — atomicity (LS-6068)', () => {
   });
 });
 
+describe('LeagueService.createLeague — roster slots seeding (LS-6145)', () => {
+  const options = { type: 'pg-local' } as DbOptions;
+  let service: LeagueService;
+  let mockTx: MockTx;
+  let mockDb: MockDb;
+
+  const baseInput = {
+    name: 'Test League',
+    ownerId: 1,
+    ownerUsername: 'owner',
+    sport: 'football' as const,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new LeagueService(options);
+
+    mockTx = {
+      execute: jest.fn().mockResolvedValue(undefined),
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      innerJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockResolvedValue([{ existingCount: 0 }]),
+      insert: jest.fn().mockReturnThis(),
+      values: jest.fn().mockReturnThis(),
+      returning: jest.fn().mockResolvedValue([{ id: 1 }]),
+    };
+
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([]),
+      insert: jest.fn(),
+      transaction: jest.fn((cb: (tx: MockTx) => Promise<unknown>) =>
+        cb(mockTx),
+      ),
+    };
+
+    mockedHelpers.runWithPublicClient.mockImplementation((_opts, handler) =>
+      handler(mockDb as never),
+    );
+  });
+
+  // The 4th tx.insert()/values() call in source order is always the
+  // league_positions seed (after league, teams, commissioner membership).
+  const POSITIONS_INSERT_INDEX = 3;
+
+  function seededPositionValues(): {
+    leagueId: number;
+    positionType: string;
+  }[] {
+    const calls = mockTx.values.mock.calls as unknown[][];
+    return calls[POSITIONS_INSERT_INDEX][0] as {
+      leagueId: number;
+      positionType: string;
+    }[];
+  }
+
+  it('seeds league_positions from the sport default when rosterSlots is omitted', async () => {
+    mockTx.returning
+      .mockResolvedValueOnce([{ id: 100 }])
+      .mockResolvedValueOnce([{ id: 200 }])
+      .mockResolvedValueOnce([{ id: 300 }]);
+
+    await service.createLeague(baseInput);
+
+    const positionValues = seededPositionValues();
+    expect(positionValues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ leagueId: 100, positionType: 'QB' }),
+      ]),
+    );
+    // Default football shape: QB, RB, RB, WR, WR, TE, FLEX, K, DST (9 starters).
+    expect(positionValues).toHaveLength(9);
+  });
+
+  it('seeds league_positions from the caller-supplied rosterSlots, expanding each count into that many rows', async () => {
+    mockTx.returning
+      .mockResolvedValueOnce([{ id: 100 }])
+      .mockResolvedValueOnce([{ id: 200 }])
+      .mockResolvedValueOnce([{ id: 300 }]);
+
+    await service.createLeague({
+      ...baseInput,
+      rosterSlots: [
+        { positionType: 'QB', count: 1 },
+        { positionType: 'RB', count: 4 },
+        { positionType: 'TE', count: 1 },
+        { positionType: 'FLEX', count: 1 },
+        { positionType: 'K', count: 1 },
+        { positionType: 'DST', count: 1 },
+      ],
+    });
+
+    const positionValues = seededPositionValues();
+    expect(positionValues).toHaveLength(9);
+    expect(
+      positionValues.filter((row) => row.positionType === 'RB'),
+    ).toHaveLength(4);
+    expect(
+      positionValues.filter((row) => row.positionType === 'WR'),
+    ).toHaveLength(0);
+  });
+
+  it('falls back to the sport default when rosterSlots is an empty array', async () => {
+    mockTx.returning
+      .mockResolvedValueOnce([{ id: 100 }])
+      .mockResolvedValueOnce([{ id: 200 }])
+      .mockResolvedValueOnce([{ id: 300 }]);
+
+    await service.createLeague({ ...baseInput, rosterSlots: [] });
+
+    const positionValues = seededPositionValues();
+    expect(positionValues).toHaveLength(9);
+  });
+});
+
 describe('LeagueService.createLeague — idempotent resubmission (LS-6063)', () => {
   const options = { type: 'pg-local' } as DbOptions;
   let service: LeagueService;

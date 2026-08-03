@@ -492,6 +492,7 @@ export type CreateLeagueAndTeamsInput = {
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool: Scalars['String']['input'];
   rosterContinuity?: InputMaybe<RosterContinuity>;
+  rosterSlots?: InputMaybe<Array<RosterSlotInput>>;
   salaryCap?: InputMaybe<Scalars['Int']['input']>;
   salaryCapEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   salaryDecayPct?: InputMaybe<Scalars['Int']['input']>;
@@ -3954,6 +3955,11 @@ export enum RosterContinuity {
   Keeper = 'keeper',
   Redraft = 'redraft',
 }
+
+export type RosterSlotInput = {
+  count: Scalars['Int']['input'];
+  positionType: Scalars['String']['input'];
+};
 
 /** Live MLB scoreboard data for a single date */
 export type Scoreboard = {

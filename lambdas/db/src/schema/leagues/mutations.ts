@@ -88,6 +88,47 @@ export function validatePickTimeLimitSeconds(
   }
 }
 
+/**
+ * Validates a wizard-supplied per-slot roster config (LS-6145) and returns
+ * the subset with a non-zero count, ready to hand to
+ * `LeagueService.createLeague`. Returns `undefined` when `rosterSlots` is
+ * null/undefined (caller should fall back to the sport default).
+ *
+ * @param maxCount Upper bound for a single slot's count — the sport's max
+ *   roster size (a single slot obviously can't exceed the whole roster).
+ *   Guards against a client sending an absurd count (e.g. 999999999) that
+ *   would otherwise reach `Array.from({ length: count })` in
+ *   `LeagueService.createLeague` and allocate an enormous array.
+ */
+export function validateRosterSlots(
+  rosterSlots: { positionType: string; count: number }[] | null | undefined,
+  maxCount: number,
+): { positionType: string; count: number }[] | undefined {
+  if (rosterSlots == null) {
+    return undefined;
+  }
+  const validPositionSlots = new Set<string>(
+    PublicSchema.positionSlot.enumValues,
+  );
+  for (const slot of rosterSlots) {
+    if (!validPositionSlots.has(slot.positionType)) {
+      throw UserInputError(
+        `Invalid roster slot position "${slot.positionType}".`,
+      );
+    }
+    if (
+      !Number.isInteger(slot.count) ||
+      slot.count < 0 ||
+      slot.count > maxCount
+    ) {
+      throw UserInputError(
+        `Roster slot count for "${slot.positionType}" must be a non-negative integer no greater than ${maxCount}.`,
+      );
+    }
+  }
+  return rosterSlots.filter((slot) => slot.count > 0);
+}
+
 // Server-side validation limits — kept in sync with apps/web/src/constants/league.ts
 const MAX_LEAGUE_NAME_LENGTH = 50;
 const MIN_NUMBER_OF_TEAMS = 2;
@@ -266,6 +307,16 @@ const KeeperSettingsInput = builder.inputType('KeeperSettingsInput', {
   }),
 });
 
+// Per-slot starting roster configuration (LS-6145). Lets the wizard's
+// "QB: 1, RB: 4, ..." config actually reach the server instead of being
+// collapsed into maxRosterSize and silently discarded.
+const RosterSlotInput = builder.inputType('RosterSlotInput', {
+  fields: (t) => ({
+    positionType: t.string({ required: true }),
+    count: t.int({ required: true }),
+  }),
+});
+
 const CreateLeagueAndTeamsInput = builder.inputType(
   'CreateLeagueAndTeamsInput',
   {
@@ -305,6 +356,12 @@ const CreateLeagueAndTeamsInput = builder.inputType(
       maxBatters: t.int({ required: false }),
       maxPitchers: t.int({ required: false }),
       maxRosterSize: t.int({ required: false }), // Allow frontend to control roster size
+      // Per-slot starting lineup config (LS-6145), e.g. [{positionType: 'RB',
+      // count: 4}, ...]. When provided, overrides the sport's default
+      // starting-lineup shape for the seeded league_positions rows. Bench
+      // slots are not part of this list — bench capacity is implied by
+      // maxRosterSize minus the sum of these counts.
+      rosterSlots: t.field({ type: [RosterSlotInput], required: false }),
       tradingEnabled: t.boolean({ required: false }),
       waiverEnabled: t.boolean({ required: false }),
       waiverType: t.string({ required: false }), // 'standard' | 'faab' (optional, defaults to 'standard')
@@ -443,6 +500,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         rosterContinuity: inputRosterContinuity,
         keeperSettings: inputKeeperSettings,
         maxRosterSize,
+        rosterSlots: inputRosterSlots,
         waiverEnabled: inputWaiverEnabled,
         waiverType: inputWaiverType,
         faabBudgetDefault: inputFaabBudgetDefault,
@@ -609,6 +667,15 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           `Max roster size must be between ${range.min} and ${range.max} for ${resolvedSport} leagues.`,
         );
       }
+
+      // ── Roster slots validation (LS-6145) ───────────────────────────────
+      // The wizard collects a per-slot starting lineup (e.g. QB:1, RB:4, ...);
+      // validate it server-side before trusting it to override the sport's
+      // default league_positions seed data.
+      const validatedRosterSlots = validateRosterSlots(
+        inputRosterSlots,
+        ROSTER_RANGE_BY_SPORT[resolvedSport].max,
+      );
 
       if (
         inputGamesPerMatchup != null &&
@@ -827,6 +894,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           scoringFormat: resolvedScoringFormat,
           maxRosterSize:
             maxRosterSize ?? DEFAULT_ROSTER_SIZE_BY_SPORT[resolvedSport],
+          rosterSlots: validatedRosterSlots,
           numberOfTeams,
           numberOfDivisions: resolvedNumberOfDivisions,
           schedulingStrategy:

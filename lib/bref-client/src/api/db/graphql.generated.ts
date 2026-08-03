@@ -486,6 +486,7 @@ export type CreateLeagueAndTeamsInput = {
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool: Scalars['String']['input'];
   rosterContinuity?: InputMaybe<RosterContinuity>;
+  rosterSlots?: InputMaybe<Array<RosterSlotInput>>;
   salaryCap?: InputMaybe<Scalars['Int']['input']>;
   salaryCapEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   salaryDecayPct?: InputMaybe<Scalars['Int']['input']>;
@@ -1846,6 +1847,8 @@ export type MockDraftInit = {
   __typename?: 'MockDraftInit';
   draftId?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** False if the draft-started WebSocket notification failed to send. The draft itself was created successfully either way; when false, the client should fall back to polling immediately instead of waiting for a WS event that will never arrive. */
+  webSocketReady?: Maybe<Scalars['Boolean']['output']>;
 };
 
 /** The current user's mock-draft usage within the trailing 7-day window, relative to the free-tier weekly limit. */
@@ -3946,6 +3949,11 @@ export enum RosterContinuity {
   Keeper = 'keeper',
   Redraft = 'redraft',
 }
+
+export type RosterSlotInput = {
+  count: Scalars['Int']['input'];
+  positionType: Scalars['String']['input'];
+};
 
 /** Live MLB scoreboard data for a single date */
 export type Scoreboard = {

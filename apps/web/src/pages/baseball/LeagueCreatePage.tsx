@@ -1782,9 +1782,9 @@ export function LeagueCreatePage(): React.JSX.Element {
   // Per-slot roster config (LS-6147, football only). rosterSlots isn't a
   // primitive, so it goes through its own setter rather than
   // handleInputChange; maxRosterSize is kept derived from the slot total so
-  // validateFormFull's existing roster-range check and the submit payload
-  // (which only sends maxRosterSize — rosterSlots isn't wired server-side
-  // yet, see LS-6145) both stay accurate.
+  // validateFormFull's existing roster-range check stays accurate. The
+  // submit payload sends both maxRosterSize and rosterSlots (server-side
+  // handling added in LS-6145).
   const handleRosterSlotsChange = useCallback(
     (slots: Record<string, number>) => {
       setHasUnsavedChanges(true);
@@ -2018,6 +2018,16 @@ export function LeagueCreatePage(): React.JSX.Element {
             selectionMethod: formData.selectionMethod,
             draftOrder: formData.draftOrder,
             maxRosterSize: formData.maxRosterSize,
+            // Per-slot roster config (LS-6147 UI, wired server-side by
+            // LS-6145). BN isn't a position_slot — it's already folded into
+            // maxRosterSize above.
+            ...(formData.sport === 'football'
+              ? {
+                  rosterSlots: Object.entries(formData.rosterSlots)
+                    .filter(([slot, count]) => slot !== 'BN' && count > 0)
+                    .map(([positionType, count]) => ({ positionType, count })),
+                }
+              : {}),
             startDate: formData.draftDate
               ? formData.draftDate.toISOString()
               : undefined,

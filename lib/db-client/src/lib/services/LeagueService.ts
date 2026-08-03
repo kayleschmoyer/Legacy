@@ -65,6 +65,15 @@ export interface CreateLeagueOptions {
    *  Ignored for baseball leagues. Defaults to 'dst'. */
   defensiveFormat?: 'dst' | 'idp';
   maxRosterSize?: number;
+  /**
+   * Per-slot starting roster configuration (LS-6145). When provided
+   * (non-empty), overrides the sport/defensiveFormat default (see
+   * `getDefaultRosterPositions`) for seeding `league_positions` — each
+   * entry expands to `count` rows of `positionType`. Callers must have
+   * already validated `positionType`
+   * against the `position_slot` enum — this service does not gate.
+   */
+  rosterSlots?: { positionType: string; count: number }[];
   numberOfTeams?: number;
   numberOfDivisions?: number;
   schedulingStrategy?: 'round-robin' | 'divisional' | 'random';
@@ -206,6 +215,7 @@ export class LeagueService {
       ownerUsername,
       sport = 'baseball',
       maxRosterSize: maxRosterSizeInput,
+      rosterSlots,
       numberOfTeams = 12,
       numberOfDivisions = 2,
       schedulingStrategy = 'divisional',
@@ -522,17 +532,25 @@ export class LeagueService {
         };
         await tx.insert(PublicSchema.leagueMembers).values(ownerMember);
 
-        // 4. Create roster positions using sport-appropriate defaults
-        //    (LS-4761), branching on defensiveFormat for IDP football
-        //    leagues (LS-6134).
-        const rosterPositions = getDefaultRosterPositions(
-          sport,
-          defensiveFormat,
-        );
-        const positionData = rosterPositions.map((positionType) => ({
-          leagueId: league.id,
-          positionType,
-        }));
+        // 4. Create roster positions — from the caller's per-slot config
+        //    when provided (LS-6145), otherwise sport-appropriate defaults,
+        //    branching on defensiveFormat for IDP football leagues
+        //    (LS-4761, LS-6134).
+        const positionData =
+          rosterSlots && rosterSlots.length > 0
+            ? rosterSlots.flatMap(({ positionType, count }) =>
+                Array.from({ length: count }, () => ({
+                  leagueId: league.id,
+                  positionType:
+                    positionType as (typeof PublicSchema.positionSlot.enumValues)[number],
+                })),
+              )
+            : getDefaultRosterPositions(sport, defensiveFormat).map(
+                (positionType) => ({
+                  leagueId: league.id,
+                  positionType,
+                }),
+              );
         await tx.insert(PublicSchema.leaguePosition).values(positionData);
 
         // 5. Create draft record — always, so draft settings are never missing

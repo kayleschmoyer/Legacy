@@ -551,6 +551,7 @@ input CreateLeagueAndTeamsInput {
   pickTimeLimitSeconds: Int
   playerPool: String!
   rosterContinuity: RosterContinuity
+  rosterSlots: [RosterSlotInput!]
   salaryCap: Int
   salaryCapEnabled: Boolean
   salaryDecayPct: Int
@@ -3936,6 +3937,11 @@ enum RosterContinuity {
   dynasty
   keeper
   redraft
+}
+
+input RosterSlotInput {
+  count: Int!
+  positionType: String!
 }
 
 """
