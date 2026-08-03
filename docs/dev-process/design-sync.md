@@ -137,5 +137,5 @@ Three reasons:
 - Operator skill: [`.agents/skills/design-sync/SKILL.md`](../../.agents/skills/design-sync/SKILL.md)
 - Cloud agent prompt: [`.claude/commands/sync-designs.md`](../../.claude/commands/sync-designs.md)
 - Local agent prompt: [`.claude/commands/implement-design.md`](../../.claude/commands/implement-design.md)
-- Brand rules: [AGENTS.md](../../AGENTS.md) "Design Context" section
+- Brand rules: [docs/design/brand.md](../design/brand.md)
 - Frontend skill: [`.agents/skills/frontend-design/SKILL.md`](../../.agents/skills/frontend-design/SKILL.md)

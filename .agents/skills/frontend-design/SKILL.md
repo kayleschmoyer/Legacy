@@ -15,7 +15,7 @@ Use WebFetch to load it and apply all tokens, colors, typography, and component 
 
 ## Project Design Context
 
-See the **Design Context** section in `AGENTS.md` for brand personality, color application rules, typography, motion principles, and layout guidelines specific to this project.
+See [`docs/design/brand.md`](../../../docs/design/brand.md) for brand personality, color application rules, typography, motion principles, and layout guidelines specific to this project.
 
 ## Implementation
 

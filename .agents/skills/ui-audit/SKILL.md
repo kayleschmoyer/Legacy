@@ -26,7 +26,7 @@ Systematically visit every page of the web application at three viewports, visua
 
 ### Step 0: Setup
 
-1. Fetch the design system at https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb (canonical tokens, colors, components). Read `AGENTS.md` (Design Context section) for supplemental brand and layout guidelines.
+1. Fetch the design system at https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb (canonical tokens, colors, components). Read `docs/design/brand.md` for supplemental brand and layout guidelines.
 2. Start the dev server and **capture the returned `port`** — you'll need it for all navigation calls:
    ```
    const { port } = browser_dev_start({ worktreePath: "<your worktree path>" })
@@ -76,7 +76,7 @@ Repro:
 1. Navigate to <path>.
 2. Set viewport to <width>x<height>.
 3. Observe <element>.
-Expected: <what should happen per the design system (https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb) and AGENTS.md Design Context>
+Expected: <what should happen per the design system (https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb) and docs/design/brand.md>
 Actual: <what happens>
 Fix hint: <likely code or UI change needed>
 ```
@@ -107,7 +107,7 @@ Call `browser_cleanup()` to close the browser and kill dev servers.
 - **Bug report access varies by viewport** — on desktop/tablet the bug icon is in the top-right header; on mobile it's inside the hamburger menu. Both work — use whichever matches your current viewport.
 - **One bug = one submission** — never bundle multiple issues into a single report. Each must be independently workable.
 - **1000 char limit** — the description field has a max length. Be concise. Put the viewport, page, and defect on the first line. Repro steps and file path below.
-- **Don't file cosmetic nitpicks** — focus on clear violations of the design system or `AGENTS.md` Design Context, broken layouts, functional issues, and accessibility failures.
+- **Don't file cosmetic nitpicks** — focus on clear violations of the design system or `docs/design/brand.md`, broken layouts, functional issues, and accessibility failures.
 - **Viewport-specific bugs** — prefix the description with the viewport (e.g. `[375x812]`) so the fixer knows exactly where it breaks.
 - **If a page fails to load**, file it as a critical bug and move on.
 - **If a page requires dynamic data** (e.g. league detail with an ID), check E2E fixtures in `apps/web-e2e/` for valid mock data, or navigate from a listing page.

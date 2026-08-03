@@ -59,7 +59,7 @@ Bundle: `docs/design/<id>/`
 
 - **AC1** — Implementation reflects every HTML prototype under `docs/design/<id>/<slug>/project/` and honors the final iteration captured in `<slug>/chats/`.
 - **AC2** — Design tokens from `docs/design/<id>/<slug>/project/colors_and_type.css` (and `project/ds/` if present) are integrated (not duplicated) into the shared component library where applicable.
-- **AC3** — Brand rules from AGENTS.md ("Design Context") are honored.
+- **AC3** — Brand rules from `docs/design/brand.md` are honored.
 - **AC4** — `make pc` passes; self-review complete; PR merged.
 
 ## Next step
