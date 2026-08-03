@@ -62,6 +62,7 @@
     {
       "id": "F89Q4j6WFCFqqsZpQ4VhlQ",
       "url": "https://api.anthropic.com/v1/design/h/F89Q4j6WFCFqqsZpQ4VhlQ",
+      "projectId": "019dd2d6-75a1-7916-8566-672f7d4189fa",
       "title": "Players Page",
       "slug": "legacy-sports-players-page",
       "status": "active",
@@ -162,6 +163,7 @@
     {
       "id": "profile-settings-2026-05-26",
       "url": "https://claude.ai/design/p/b8ccd637-83f4-481b-93ba-281e9680ba4f",
+      "projectId": "b8ccd637-83f4-481b-93ba-281e9680ba4f",
       "title": "Profile Settings",
       "slug": "legacy-sports-profile-settings",
       "status": "active",
@@ -213,6 +215,7 @@
     {
       "id": "mZQ6CvdGoj6nIX4rrQKE0A",
       "url": "https://claude.ai/design/p/2b6eb2e3-82c4-4df8-9ed6-34f13edbe49b",
+      "projectId": "2b6eb2e3-82c4-4df8-9ed6-34f13edbe49b",
       "title": "User Page",
       "slug": "legacy-sports-user-page",
       "status": "active",

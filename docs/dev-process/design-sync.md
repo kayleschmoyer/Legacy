@@ -6,7 +6,7 @@ How designs in Claude Design (https://claude.ai/design) become Jira tickets and 
 
 ## Why this exists
 
-The project's design system and feature designs live in Claude Design, behind authentication. Cloud Claude Code sessions can `WebFetch` design URLs and receive the full handoff bundle (HTML prototypes, design tokens, JSX, intent transcripts); local sessions cannot. To keep designs version-controlled, reviewable, and consumable by local implementation agents, we bring the bundles into the repo via a cloud-driven sync, then consume them via a separate local agent.
+The project's design system and feature designs live in Claude Design, behind authentication. Cloud Claude Code sessions can `WebFetch` design URLs and receive the full handoff bundle (HTML prototypes, design tokens, JSX, intent transcripts); local sessions cannot fetch the URLs (share URLs 403, handoff URLs 404 — verified 2026-08-03), but they **can** reach projects through the authenticated `DesignSync` MCP tool by project id: `/pull-design <share-url>` pulls a single design, and the tool's write flow lets agents fix designs at the source (see [`designsync-tool.md`](../../.agents/skills/design-sync/references/designsync-tool.md)). To keep designs version-controlled, reviewable, and consumable by local implementation agents, we bring the bundles into the repo — via the cloud-driven bulk sync or a targeted local pull — then consume them via a separate local agent.
 
 ## The three phases
 
@@ -136,6 +136,7 @@ Three reasons:
 
 - Operator skill: [`.agents/skills/design-sync/SKILL.md`](../../.agents/skills/design-sync/SKILL.md)
 - Cloud agent prompt: [`.claude/commands/sync-designs.md`](../../.claude/commands/sync-designs.md)
+- Local single-design pull: [`.claude/commands/pull-design.md`](../../.claude/commands/pull-design.md) · DesignSync tool reference: [`designsync-tool.md`](../../.agents/skills/design-sync/references/designsync-tool.md)
 - Local agent prompt: [`.claude/commands/implement-design.md`](../../.claude/commands/implement-design.md)
 - Brand rules: [docs/design/brand.md](../design/brand.md)
 - Frontend skill: [`.agents/skills/frontend-design/SKILL.md`](../../.agents/skills/frontend-design/SKILL.md)

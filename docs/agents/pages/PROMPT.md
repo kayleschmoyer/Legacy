@@ -10,7 +10,7 @@
 
 Before designing anything, read:
 
-1. **The design system** at https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb — the canonical source of truth for tokens, colors, typography, and component patterns. Fetch it via WebFetch from cloud sessions; it is only reachable from claude.ai-authenticated environments.
+1. **The design system** at https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb — the canonical source of truth for tokens, colors, typography, and component patterns. From cloud sessions fetch it via WebFetch; from local repo sessions use the DesignSync tool (project id above; see `.agents/skills/design-sync/references/designsync-tool.md`) or read the synced bundle under `docs/design/`. Plain URL fetching only works from claude.ai-authenticated environments.
 2. **The brand guidelines** — `docs/design/brand.md` in the repo. If you are in a Claude Design session without repo access, the sections below mirror it. Every visual decision must be traceable back to the design system or the brand guidelines.
 3. **The page's reference doc** in this directory (e.g., `home.md`, `scoreboard.md`). It defines the exact data model, conditional states, and route — use it to know what content must appear and under what conditions.
 

@@ -1,6 +1,6 @@
 ---
 name: design-sync
-description: 'Bridge Claude Design (claude.ai/design) and this repo. Phase 1 (Sync): cloud-dispatched agent fetches design bundles via WebFetch, diffs against docs/design/manifest.json, files one Jira ticket per changed design under the design-sync bucket epic, and opens a single sync PR. Phase 2 (Consume): locally-dispatched agent reads a design ticket, runs a completeness gate, then either notifies on gaps, implements directly, or slices into child tickets and spawns chips. Load when running /sync-designs (cloud) or /implement-design (local), or when designing the design-to-code pipeline.'
+description: 'Bridge Claude Design (claude.ai/design) and this repo. Phase 1 (Sync): cloud-dispatched agent fetches design bundles via WebFetch, diffs against docs/design/manifest.json, files one Jira ticket per changed design under the design-sync bucket epic, and opens a single sync PR. Phase 1b (Local): the DesignSync MCP tool reads/writes Claude Design projects by project id from local sessions — /pull-design pulls one design; the write flow lets agents fix designs at the source. Phase 2 (Consume): locally-dispatched agent reads a design ticket, runs a completeness gate, then either notifies on gaps, implements directly, or slices into child tickets and spawns chips. Load when running /sync-designs (cloud), /pull-design or /implement-design (local), when updating a design via the DesignSync tool, or when designing the design-to-code pipeline.'
 metadata:
   scope: 'docs/design/**'
 ---
@@ -13,11 +13,12 @@ Both phases are **manually dispatched by the user** via slash commands; nothing 
 
 ## When to use
 
-| Trigger                               | Phase   | Where                   |
-| ------------------------------------- | ------- | ----------------------- |
-| User runs `/sync-designs`             | Sync    | Cloud (Claude Code Web) |
-| User runs `/implement-design LS-####` | Consume | Local                   |
-| Designing changes to this pipeline    | Both    | Anywhere                |
+| Trigger                                                              | Phase      | Where                   |
+| -------------------------------------------------------------------- | ---------- | ----------------------- |
+| User runs `/sync-designs`                                            | Sync       | Cloud (Claude Code Web) |
+| User runs `/pull-design <url>` or a design needs a fix at the source | Local sync | Local (DesignSync tool) |
+| User runs `/implement-design LS-####`                                | Consume    | Local                   |
+| Designing changes to this pipeline                                   | Both       | Anywhere                |
 
 > **Bucket fan-out command**: `/implement-design LS-####`. When `/work-ticket` is invoked on the design-sync bucket epic, Parent Dispatch Mode dispatches one chip per To Do child using this command (not `/work-ticket`). See [`.agents/skills/work-ticket/references/bucket-epic-routing.md`](../work-ticket/references/bucket-epic-routing.md).
 
@@ -69,6 +70,16 @@ Locally: `/implement-design LS-####`
 
 **Idempotency**: re-running `/sync-designs` against an unchanged set is a no-op (all hashes match, nothing changes, no PR opened — agent reports "nothing to sync"). If a previous run created a ticket but did not merge its sync PR, the agent detects the open PR via a targeted `gh pr list --search 'in:title chore(designs): sync'` (or branch-prefix `--head 'chore/design-sync-'` fallback) — see [`.claude/commands/sync-designs.md`](../../../.claude/commands/sync-designs.md) step 2 — and stops with a hand-off message instead of opening a competing PR. The dashboard scan is explicitly forbidden here because its page size can hide a matching PR when the repo backlog grows.
 
+## Phase 1b: Local sync via the DesignSync tool
+
+> Full access rules, caveats, and the write flow: [references/designsync-tool.md](references/designsync-tool.md). Pull procedure: [`.claude/commands/pull-design.md`](../../../.claude/commands/pull-design.md).
+
+Local sessions cannot WebFetch design URLs (share URLs → 403, handoff URLs → 404 — verified 2026-08-03), but the `DesignSync` MCP tool has full authenticated access **by project id** (the UUID in a `claude.ai/design/p/<uuid>` share URL; also recorded as `manifest.designs[].projectId` when known):
+
+- **Targeted pull** — `/pull-design <share-url>` fetches one project file-by-file into `docs/design/<id>/<slug>/`, recomputes the manifest hash, writes a SYNC-REPORT, and ships a PR. Use for single-design updates; use cloud `/sync-designs` for bulk waves.
+- **Fixing designs at the source** — design defects are still never patched in `docs/design/` (bundles are overwritten on next sync), but an agent CAN now fix them in Claude Design itself: read files, apply the fix locally, then `finalize_plan` → `write_files` to push the corrected files, and finish with a pull so the repo bundle catches up. `finalize_plan` is the user-approval boundary; keep write sets minimal and incremental.
+- `list_projects` only lists design-system projects — page projects must come from user-supplied share URLs or `projectId` fields; `get_file` is capped at 256 KiB per file (check `truncated` on every read).
+
 ## Phase 2: Consume (local agent)
 
 > Full prompt: [`.claude/commands/implement-design.md`](../../../.claude/commands/implement-design.md)
@@ -94,7 +105,7 @@ Locally: `/implement-design LS-####`
 - [ ] <missing-field-1> — <what to add and where>
 - [ ] <missing-field-2> — <what to add and where>
 
-Once addressed, run `/sync-designs` from a cloud session to update `docs/design/<id>/`, then re-dispatch `/implement-design LS-####` locally.
+Once addressed, run `/sync-designs` from a cloud session (or `/pull-design <share-url>` locally) to update `docs/design/<id>/`, then re-dispatch `/implement-design LS-####` locally.
 ```
 
 ## Common failure modes and recoveries
@@ -112,6 +123,7 @@ Once addressed, run `/sync-designs` from a cloud session to update `docs/design/
 
 - Process overview: [`docs/dev-process/design-sync.md`](../../../docs/dev-process/design-sync.md)
 - Manifest schema: [references/manifest-schema.md](references/manifest-schema.md)
+- DesignSync tool (local access): [references/designsync-tool.md](references/designsync-tool.md)
 - Completeness gate: [references/completeness-gate.md](references/completeness-gate.md)
 - Slicing heuristic: [references/slicing-heuristic.md](references/slicing-heuristic.md)
 - Cloud agent prompt: [`.claude/commands/sync-designs.md`](../../../.claude/commands/sync-designs.md)

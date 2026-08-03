@@ -26,7 +26,7 @@ When both cover a topic, the skill is operationally authoritative and the doc pr
 | A how-to for humans                                      | `docs/guides/`                        | If agents need it operationally, it belongs in a skill instead                                               |
 | Agent operating procedure                                | `.agents/skills/<name>/`              | [skill-authoring](../.agents/skills/skill-authoring/SKILL.md); lint with `node scripts/lint-skills.js`       |
 
-Never hand-edit `docs/design/` (machine-owned by `/sync-designs` — see [design/README.md](design/README.md)).
+Never hand-edit `docs/design/` (machine-owned by the sync commands `/sync-designs` and `/pull-design` — see [design/README.md](design/README.md)).
 
 ## Status markers
 

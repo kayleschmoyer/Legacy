@@ -2,11 +2,12 @@
 
 Design bundles synced from [Claude Design](https://claude.ai/design).
 
-> **Don't hand-edit this directory.** It is owned by the `/sync-designs` cloud agent. The process docs and slash commands live elsewhere:
+> **Don't hand-edit this directory.** It is owned by the sync agents (`/sync-designs` cloud bulk sync, `/pull-design` local single-design sync). The process docs and slash commands live elsewhere:
 >
 > - **Process overview**: [`docs/dev-process/design-sync.md`](../dev-process/design-sync.md)
 > - **Operator skill (authoritative)**: [`.agents/skills/design-sync/SKILL.md`](../../.agents/skills/design-sync/SKILL.md)
 > - **Cloud sync command**: [`.claude/commands/sync-designs.md`](../../.claude/commands/sync-designs.md)
+> - **Local sync command**: [`.claude/commands/pull-design.md`](../../.claude/commands/pull-design.md) (DesignSync tool: [`designsync-tool.md`](../../.agents/skills/design-sync/references/designsync-tool.md))
 > - **Local consumer command**: [`.claude/commands/implement-design.md`](../../.claude/commands/implement-design.md)
 
 ## What lives here
@@ -26,6 +27,7 @@ Design bundles synced from [Claude Design](https://claude.ai/design).
 | You want to...                                              | Do this                                                                                                       |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Pull the latest designs into the repo                       | Dispatch `/sync-designs` from a Claude Code Web session                                                       |
+| Pull ONE design without a cloud session                     | Dispatch `/pull-design <share-url>` locally (uses the DesignSync tool)                                        |
 | Implement a design that's already in the repo               | Dispatch `/implement-design LS-####` locally, where `LS-####` is the per-design ticket                        |
 | Add a brand-new design URL the agent doesn't know about yet | Add a stub entry to `manifest.json` (id + url + title + `status: "active"`), commit, then run `/sync-designs` |
 

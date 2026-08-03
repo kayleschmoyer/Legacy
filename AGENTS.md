@@ -22,22 +22,22 @@ Not a code typist — the operator who owns outcomes end-to-end: understand the 
 
 Pick the slash command first — it loads the authoritative skill. Self-invoke via `Skill` when the user's ask matches a row.
 
-| Situation                                | Command                                                       |
-| ---------------------------------------- | ------------------------------------------------------------- |
-| Jira ticket key to implement end-to-end  | `/work-ticket LS-####` — epics fan out chips automatically    |
-| Fuzzy/new work that needs a spec         | `/define`, then `/slice` if too large for one PR              |
-| Existing PR to shepherd, fix, or unblock | `/drive-pr <N>` · `/fix-pr` · `/unblock-prs` · `/sweep-prs`   |
-| Review feedback to address               | `/fix-reviews` · `/respond-to-review`                         |
-| Pre-push self-review                     | `/review`                                                     |
-| Branch behind main / conflicts           | `/rebase`                                                     |
-| Worktree setup                           | `/worktree`                                                   |
-| Design work                              | `/implement-design LS-####` (local) · `/sync-designs` (cloud) |
-| Database / migrations                    | `/database` · `/apply-pr-migrations`                          |
-| E2E tests (web)                          | `/e2e` · `/read-playwright-report`                            |
-| Mobile QA sweep (Android emulator)       | `/mobile-qa` — Maestro flows + AI screenshot judging          |
-| Backlog sweeps                           | `/work-bugs` · `/work-mcp-gaps` · `/sweep-dependabot`         |
-| Deploy lambdas                           | `/deploy`                                                     |
-| Session-end hygiene                      | `/mcp-gap-audit`                                              |
+| Situation                                | Command                                                                                                         |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Jira ticket key to implement end-to-end  | `/work-ticket LS-####` — epics fan out chips automatically                                                      |
+| Fuzzy/new work that needs a spec         | `/define`, then `/slice` if too large for one PR                                                                |
+| Existing PR to shepherd, fix, or unblock | `/drive-pr <N>` · `/fix-pr` · `/unblock-prs` · `/sweep-prs`                                                     |
+| Review feedback to address               | `/fix-reviews` · `/respond-to-review`                                                                           |
+| Pre-push self-review                     | `/review`                                                                                                       |
+| Branch behind main / conflicts           | `/rebase`                                                                                                       |
+| Worktree setup                           | `/worktree`                                                                                                     |
+| Design work                              | `/implement-design LS-####` (local) · `/sync-designs` (cloud) · `/pull-design <url>` (local single-design sync) |
+| Database / migrations                    | `/database` · `/apply-pr-migrations`                                                                            |
+| E2E tests (web)                          | `/e2e` · `/read-playwright-report`                                                                              |
+| Mobile QA sweep (Android emulator)       | `/mobile-qa` — Maestro flows + AI screenshot judging                                                            |
+| Backlog sweeps                           | `/work-bugs` · `/work-mcp-gaps` · `/sweep-dependabot`                                                           |
+| Deploy lambdas                           | `/deploy`                                                                                                       |
+| Session-end hygiene                      | `/mcp-gap-audit`                                                                                                |
 
 No command fits → pick a dev-process entrypoint (`.agents/skills/dev-process/entrypoints/README.md`) and load the matching skills via the [Skills](#skills) routing index.
 
@@ -118,7 +118,7 @@ Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scr
 
 Multi-sport data model with `sport` discriminator: [`docs/architecture/multi-sport.md`](docs/architecture/multi-sport.md). UI built once in `lib/shared-components` (Tamagui): [`docs/architecture/shared-components.md`](docs/architecture/shared-components.md). Fast path: **`.agents/skills/architecture/FILE-MAP.md`**.
 
-Design system at **https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb** — local agents read the synced bundle under [`docs/design/`](docs/design/) instead. `/sync-designs` (cloud) pulls bundles; `/implement-design LS-####` (local) consumes them. Brand: [`docs/design/brand.md`](docs/design/brand.md). When working in `docs/design/`, load `.agents/skills/design-sync/SKILL.md`.
+Design system at **https://claude.ai/design/p/670f7892-5193-4b8a-a54c-20b112ad11bb** — local agents read the synced bundle under [`docs/design/`](docs/design/), or reach Claude Design projects directly via the **DesignSync tool** (by project id — plain URL fetching fails locally; see `.agents/skills/design-sync/references/designsync-tool.md`). `/sync-designs` (cloud) bulk-pulls bundles; `/pull-design <url>` (local) pulls one design; `/implement-design LS-####` (local) consumes them. Brand: [`docs/design/brand.md`](docs/design/brand.md). When working in `docs/design/`, load `.agents/skills/design-sync/SKILL.md`.
 
 ## Skills
 

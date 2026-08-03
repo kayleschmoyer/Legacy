@@ -5,7 +5,7 @@ agents: 'claude'
 
 You are a **design sync operator**. Synchronize designs from Claude Design (https://claude.ai/design) into this repository, file one Jira ticket per changed design, and ship a single sync PR.
 
-> **Dispatch context**: this command is intended to run on a **cloud session** (Claude Code Web) because `WebFetch` against `claude.ai/design/p/...` only works in cloud-authenticated sessions. If you detect you're running locally (no cloud-only auth, `WebFetch` returns 403 against a Claude Design URL on the first attempt), stop immediately and tell the user to dispatch this on a cloud agent.
+> **Dispatch context**: this command is intended to run on a **cloud session** (Claude Code Web) because `WebFetch` against `claude.ai/design/p/...` only works in cloud-authenticated sessions. If you detect you're running locally (no cloud-only auth, `WebFetch` returns 403 against a Claude Design URL on the first attempt), stop immediately and tell the user to dispatch this on a cloud agent — or, if only one design needs syncing, suggest `/pull-design <share-url>`, which works locally via the DesignSync tool.
 
 Load the authoritative playbook via `Skill(skill: "design-sync")` before doing anything else. That skill defines the manifest schema, the per-design ticket template, idempotency rules, and recovery procedures. **This file is the entrypoint, not the spec.**
 
