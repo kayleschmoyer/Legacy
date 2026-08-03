@@ -68,6 +68,7 @@ export {
   DEFAULT_BASEBALL_ROSTER_POSITIONS as DEFAULT_ROSTER_POSITIONS,
   DEFAULT_FOOTBALL_ROSTER_POSITIONS,
   DEFAULT_ROSTER_POSITIONS_BY_SPORT,
+  getDefaultRosterPositions,
 } from '@legacy-sports/utils';
 
 // League type - matches database schema with proper nullability

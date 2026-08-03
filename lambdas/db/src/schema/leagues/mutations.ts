@@ -30,8 +30,8 @@ import {
 } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import {
-  DEFAULT_ROSTER_POSITIONS_BY_SPORT,
   DefensiveFormatEnum,
+  getDefaultRosterPositions,
   League,
   LeagueMember,
   LeaguePosition,
@@ -990,11 +990,12 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
           throw UserInputError('League already has positions configured');
         }
 
-        // Get the league's sport and maxRosterSize
+        // Get the league's sport, defensiveFormat, and maxRosterSize
         const league = await context.db
           .select({
             maxRosterSize: PublicSchema.leagues.maxRosterSize,
             sport: PublicSchema.leagues.sport,
+            defensiveFormat: PublicSchema.leagues.defensiveFormat,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, leagueId))
@@ -1004,11 +1005,13 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
           throw UserInputError('League not found');
         }
 
-        // Create sport-appropriate starter positions (LS-4761)
+        // Create sport-appropriate starter positions (LS-4761), branching on
+        // defensiveFormat for IDP football leagues (LS-6134).
         const sport = league[0].sport ?? 'baseball';
-        const defaultPositions =
-          DEFAULT_ROSTER_POSITIONS_BY_SPORT[sport] ??
-          DEFAULT_ROSTER_POSITIONS_BY_SPORT.baseball;
+        const defaultPositions = getDefaultRosterPositions(
+          sport === 'football' ? 'football' : 'baseball',
+          league[0].defensiveFormat,
+        );
         const positionData = defaultPositions.map((positionType) => ({
           leagueId: leagueId,
           positionType: positionType,

@@ -1,8 +1,8 @@
 import { and, countDistinct, eq, sql } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import {
-  DEFAULT_ROSTER_POSITIONS_BY_SPORT,
   DEFAULT_ROSTER_SIZE_BY_SPORT,
+  getDefaultRosterPositions,
 } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { runWithPublicClient } from '../client/Helpers';
@@ -522,8 +522,13 @@ export class LeagueService {
         };
         await tx.insert(PublicSchema.leagueMembers).values(ownerMember);
 
-        // 4. Create roster positions using sport-appropriate defaults (LS-4761)
-        const rosterPositions = DEFAULT_ROSTER_POSITIONS_BY_SPORT[sport];
+        // 4. Create roster positions using sport-appropriate defaults
+        //    (LS-4761), branching on defensiveFormat for IDP football
+        //    leagues (LS-6134).
+        const rosterPositions = getDefaultRosterPositions(
+          sport,
+          defensiveFormat,
+        );
         const positionData = rosterPositions.map((positionType) => ({
           leagueId: league.id,
           positionType,
