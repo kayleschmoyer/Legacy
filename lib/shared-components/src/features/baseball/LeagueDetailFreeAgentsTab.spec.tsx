@@ -5,7 +5,7 @@
  * extraction: hitter/pitcher column sets, nullable-name handling, the
  * spectator banner, the claim-action gating, and the football placeholder.
  */
-/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
+
 import React from 'react';
 import {
   type FreeAgentsTabLeague,

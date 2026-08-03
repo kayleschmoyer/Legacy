@@ -117,7 +117,6 @@ jest.mock('tamagui', () => {
         } as unknown as Event;
         onCloseAutoFocus?.(event);
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps -- mount/unmount only
     }, []);
 
     // Mirrors FocusScope's `trapped + loop` Tab cycling (Dialog.tsx uses

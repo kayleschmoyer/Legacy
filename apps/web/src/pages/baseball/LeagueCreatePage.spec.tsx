@@ -237,7 +237,6 @@ jest.mock('@tamagui/lucide-icons', () => ({
 }));
 
 jest.mock('tamagui', () => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ReactLocal = require('react');
   const passthrough = ReactLocal.forwardRef(
     ({ children, ...rest }: any, ref: any) =>
@@ -650,11 +649,12 @@ describe('LeagueCreatePage — per-slot roster config (LS-6147)', () => {
 
     fireEvent.click(screen.getByTestId('defensive-format-idp'));
 
-    // IDP defaults: QB1 RB2 WR2 TE1 FLEX1 K1 DL2 LB2 DB2 DP1 BN6 = 21.
+    // IDP defaults: QB1 RB2 WR2 TE1 FLEX1 K1 DL2 LB2 DB2 BN6 = 20 (LS-6148
+    // removed the unsupported DP slot).
     expect(config).not.toHaveTextContent('DST');
     expect(config).toHaveTextContent('DL');
     expect(
-      screen.getByText(/21 \(15 starters \+ 6 bench\)/),
+      screen.getByText(/20 \(14 starters \+ 6 bench\)/),
     ).toBeInTheDocument();
   });
 

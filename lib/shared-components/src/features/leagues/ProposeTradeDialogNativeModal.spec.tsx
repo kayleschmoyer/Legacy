@@ -65,6 +65,14 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockLoadProposerRoster,
     mockProposerRosterReturn,
   ]),
+  // LeagueTradeBlock's "Add Player" picker (LS-8855) queries the roster
+  // directly rather than lazily; skip: true keeps it inert here since this
+  // spec never expands that picker.
+  useGetTeamMembersQuery: jest.fn(() => ({
+    data: undefined,
+    loading: false,
+    error: undefined,
+  })),
   useAcceptTradeMutation: jest.fn(() => [jest.fn()]),
   useRejectTradeMutation: jest.fn(() => [jest.fn()]),
   useCancelTradeMutation: () => [jest.fn().mockResolvedValue({})],

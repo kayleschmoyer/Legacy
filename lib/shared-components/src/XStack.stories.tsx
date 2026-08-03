@@ -7,7 +7,7 @@ import { Button } from './Button';
 
 const XStackMeta: Meta<typeof XStack> = {
   title: 'Layout/XStack',
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Tamagui component type gap with Storybook Meta
+
   component: XStack,
   parameters: {
     layout: 'centered',

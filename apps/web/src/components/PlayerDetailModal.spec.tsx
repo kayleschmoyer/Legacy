@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 /* eslint-disable @typescript-eslint/no-require-imports -- jest.mock factories need runtime require */
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
