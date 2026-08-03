@@ -12,7 +12,7 @@ const baseProps: LeaguesLedgerScreenProps = {
   leagues: [],
   onViewLeague: jest.fn(),
   onCreateLeague: jest.fn(),
-  onJoinOrBrowse: jest.fn(),
+  onJoinLeague: jest.fn(),
   onBrowseLeagues: jest.fn(),
 };
 
@@ -271,23 +271,23 @@ describe('LeaguesLedgerScreen', () => {
   describe('actions', () => {
     it('renders both editorial buttons and wires their callbacks', () => {
       const onCreateLeague = jest.fn();
-      const onJoinOrBrowse = jest.fn();
+      const onJoinLeague = jest.fn();
       const { getByTestId, getByText } = render(
         <LeaguesLedgerScreen
           {...baseProps}
           leagues={[activeLeague]}
           onCreateLeague={onCreateLeague}
-          onJoinOrBrowse={onJoinOrBrowse}
+          onJoinLeague={onJoinLeague}
         />,
       );
       expect(getByText('CREATE LEAGUE')).toBeTruthy();
-      expect(getByText('JOIN OR BROWSE')).toBeTruthy();
+      expect(getByText('JOIN LEAGUE')).toBeTruthy();
 
       fireEvent.click(getByTestId('leagues-create-button'));
       expect(onCreateLeague).toHaveBeenCalledTimes(1);
 
       fireEvent.click(getByTestId('leagues-add-button'));
-      expect(onJoinOrBrowse).toHaveBeenCalledTimes(1);
+      expect(onJoinLeague).toHaveBeenCalledTimes(1);
     });
 
     it('keeps the add button available in the empty state', () => {

@@ -1,6 +1,5 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo } from 'react';
-import { Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { HomeLeagueSummary } from '@legacy-sports/shared-components';
@@ -36,24 +35,6 @@ export default function LeaguesTab() {
     [data?.getUserLeagueSummaries],
   );
 
-  const showAddActions = useCallback(() => {
-    Alert.alert('Add League', '', [
-      {
-        text: 'Browse Leagues',
-        onPress: () => router.navigate('/league-discovery'),
-      },
-      {
-        text: 'Join a League',
-        onPress: () => router.navigate('/league/join'),
-      },
-      {
-        text: 'Create a League',
-        onPress: () => router.navigate('/league/create'),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  }, [router]);
-
   const viewLeague = useCallback(
     (summary: HomeLeagueSummary) => {
       if (summary.leagueId == null) return;
@@ -77,7 +58,7 @@ export default function LeaguesTab() {
       topInset={topInset}
       onViewLeague={viewLeague}
       onCreateLeague={() => router.navigate('/league/create')}
-      onJoinOrBrowse={showAddActions}
+      onJoinLeague={() => router.navigate('/league/join')}
       onBrowseLeagues={() => router.navigate('/league-discovery')}
       refreshControl={refreshControl}
     />

@@ -67,8 +67,9 @@ export interface LeaguesLedgerScreenProps {
   topInset?: number;
   onViewLeague: (summary: HomeLeagueSummary) => void;
   onCreateLeague: () => void;
-  /** Opens the app's browse/join/create action sheet. */
-  onJoinOrBrowse: () => void;
+  /** Navigates straight to the join-league page (LS-8986) — mirrors the
+   * Home tab's "Join League" quick action rather than opening a picker. */
+  onJoinLeague: () => void;
   /** Empty-state CTA — goes straight to league discovery. */
   onBrowseLeagues: () => void;
   /** Pull-to-refresh control for the ledger's `ScrollView` (LS-8847). */
@@ -377,10 +378,10 @@ function LedgerRow({
 
 function LedgerActions({
   onCreateLeague,
-  onJoinOrBrowse,
+  onJoinLeague,
 }: {
   onCreateLeague: () => void;
-  onJoinOrBrowse: () => void;
+  onJoinLeague: () => void;
 }) {
   const labelProps = {
     fontFamily: '$heading' as const,
@@ -427,16 +428,16 @@ function LedgerActions({
         padding={13}
         cursor="pointer"
         pressStyle={{ opacity: 0.7 }}
-        onPress={onJoinOrBrowse}
+        onPress={onJoinLeague}
         tabIndex={0}
         onKeyDown={(e: React.KeyboardEvent) => {
-          if (e.key === 'Enter' || e.key === ' ') onJoinOrBrowse();
+          if (e.key === 'Enter' || e.key === ' ') onJoinLeague();
         }}
         accessibilityRole="button"
-        accessibilityLabel="Browse, join, or create a league"
+        accessibilityLabel="Join a league"
       >
         <Text {...labelProps} color={TEXT_PRIMARY}>
-          JOIN OR BROWSE
+          JOIN LEAGUE
         </Text>
       </XStack>
     </XStack>
@@ -451,7 +452,7 @@ export function LeaguesLedgerScreen({
   topInset = 0,
   onViewLeague,
   onCreateLeague,
-  onJoinOrBrowse,
+  onJoinLeague,
   onBrowseLeagues,
   refreshControl,
 }: LeaguesLedgerScreenProps) {
@@ -580,7 +581,7 @@ export function LeaguesLedgerScreen({
 
         <LedgerActions
           onCreateLeague={onCreateLeague}
-          onJoinOrBrowse={onJoinOrBrowse}
+          onJoinLeague={onJoinLeague}
         />
       </YStack>
     </ScrollView>

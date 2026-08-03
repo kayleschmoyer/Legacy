@@ -1,5 +1,4 @@
 import React from 'react';
-import { Alert } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
 // ── Subject ───────────────────────────────────────────────────────────────────
@@ -31,14 +30,14 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
       loading,
       onViewLeague,
       onCreateLeague,
-      onJoinOrBrowse,
+      onJoinLeague,
       onBrowseLeagues,
     }: {
       leagues: { leagueId?: number | null; leagueName?: string | null }[];
       loading?: boolean;
       onViewLeague: (s: unknown) => void;
       onCreateLeague: () => void;
-      onJoinOrBrowse: () => void;
+      onJoinLeague: () => void;
       onBrowseLeagues: () => void;
     }) => {
       if (loading) return <ActivityIndicator testID="spinner" />;
@@ -60,7 +59,7 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
             </View>
           )}
           <View testID="leagues-create-button" onTouchEnd={onCreateLeague} />
-          <View testID="leagues-add-button" onTouchEnd={onJoinOrBrowse} />
+          <View testID="leagues-add-button" onTouchEnd={onJoinLeague} />
         </View>
       );
     },
@@ -175,16 +174,11 @@ describe('LeaguesTab', () => {
       expect(screen.getByTestId('leagues-add-button')).toBeTruthy();
     });
 
-    it('opens the add-league action sheet when it is pressed', () => {
-      jest.spyOn(Alert, 'alert');
+    it('navigates straight to the join-league page when it is pressed', () => {
       mockSummaries([]);
       render(<LeaguesTab />);
       fireEvent(screen.getByTestId('leagues-add-button'), 'touchEnd');
-      expect(Alert.alert).toHaveBeenCalledWith(
-        'Add League',
-        '',
-        expect.any(Array),
-      );
+      expect(mockNavigate).toHaveBeenCalledWith('/league/join');
     });
 
     it('navigates to league creation from the create button', () => {
