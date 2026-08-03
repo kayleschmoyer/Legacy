@@ -24,7 +24,6 @@ export const IDP_ROSTER_DEFAULTS: Record<string, number> = {
   DL: 2,
   LB: 2,
   DB: 2,
-  DP: 1,
   BN: 6,
 };
 
@@ -39,7 +38,6 @@ const SLOT_LABELS: Record<string, string> = {
   DL: 'Defensive Line',
   LB: 'Linebacker',
   DB: 'Defensive Back',
-  DP: 'IDP Flex',
   BN: 'Bench',
 };
 
@@ -130,7 +128,7 @@ export function StepRosterSettings({
 }: StepRosterSettingsProps) {
   const slotOrder =
     defensiveFormat === 'idp'
-      ? ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DL', 'LB', 'DB', 'DP', 'BN']
+      ? ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DL', 'LB', 'DB', 'BN']
       : ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DST', 'BN'];
 
   function adjust(slot: string, delta: number) {

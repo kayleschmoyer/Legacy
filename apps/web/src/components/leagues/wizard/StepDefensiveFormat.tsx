@@ -29,7 +29,7 @@ const FORMAT_OPTIONS: Array<{
     subtitle: 'Advanced',
     description:
       'Draft DL, LB, and DB individual players. Scores on tackles, sacks, and INTs per player.',
-    slots: ['DL', 'LB', 'DB', 'DP'],
+    slots: ['DL', 'LB', 'DB'],
   },
 ];
 
