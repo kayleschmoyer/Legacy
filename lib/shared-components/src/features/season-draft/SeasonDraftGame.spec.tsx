@@ -149,9 +149,14 @@ function setupDefaultMocks() {
     .mockReturnValue([jest.fn(), { data: null }] as unknown as ReturnType<
       typeof useGetSeasonDraftGamePlayerOptionsLazyQuery
     >);
-  jest
-    .mocked(useWebSocket)
-    .mockReturnValue(undefined as unknown as ReturnType<typeof useWebSocket>);
+  jest.mocked(useWebSocket).mockReturnValue({
+    connected: true,
+    error: null,
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    sendMessage: jest.fn(),
+    updateContext: jest.fn(),
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -394,6 +399,71 @@ describe('SeasonDraftGame', () => {
       );
 
       expect(getByText('Loading game…')).toBeTruthy();
+    });
+  });
+
+  // ── WS reconnecting indicator (LS-7281) ─────────────────────────────────
+
+  describe('WS reconnecting indicator', () => {
+    it('shows the reconnecting indicator when the socket is configured but disconnected', () => {
+      jest.mocked(useWebSocket).mockReturnValue({
+        connected: false,
+        error: 'socket closed',
+        connect: jest.fn(),
+        disconnect: jest.fn(),
+        sendMessage: jest.fn(),
+        updateContext: jest.fn(),
+      });
+
+      const { getByTestId } = render(
+        <SeasonDraftGame
+          gameId={1}
+          currentUserId={1}
+          websocketUrl="wss://example.test"
+          websocketToken="token"
+        />,
+      );
+
+      expect(getByTestId('ws-reconnecting-indicator')).toBeTruthy();
+    });
+
+    it('hides the indicator once the socket is connected', () => {
+      jest.mocked(useWebSocket).mockReturnValue({
+        connected: true,
+        error: null,
+        connect: jest.fn(),
+        disconnect: jest.fn(),
+        sendMessage: jest.fn(),
+        updateContext: jest.fn(),
+      });
+
+      const { queryByTestId } = render(
+        <SeasonDraftGame
+          gameId={1}
+          currentUserId={1}
+          websocketUrl="wss://example.test"
+          websocketToken="token"
+        />,
+      );
+
+      expect(queryByTestId('ws-reconnecting-indicator')).toBeNull();
+    });
+
+    it('does not show the indicator when no websocket is configured for this game', () => {
+      jest.mocked(useWebSocket).mockReturnValue({
+        connected: false,
+        error: null,
+        connect: jest.fn(),
+        disconnect: jest.fn(),
+        sendMessage: jest.fn(),
+        updateContext: jest.fn(),
+      });
+
+      const { queryByTestId } = render(
+        <SeasonDraftGame gameId={1} currentUserId={1} />,
+      );
+
+      expect(queryByTestId('ws-reconnecting-indicator')).toBeNull();
     });
   });
 

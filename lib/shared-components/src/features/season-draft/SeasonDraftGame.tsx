@@ -191,6 +191,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   );
 
   const gameStatus = gameState?.status;
+  // Deliberate WS-down fallback (ADR-0019 rule 6): the websocket wired below
+  // only pushes player-stat-loading updates for this screen, not draft
+  // picks, so this 5s poll is the sole channel other players' picks arrive
+  // through — well within the 10-15s "still fresh while WS is down" bar
+  // (LS-7281). Do not remove without wiring draft-pick notifications first.
   useEffect(() => {
     const shouldPoll =
       !queryError && (gameStatus === 'drafting' || gameStatus === 'setup');
@@ -247,10 +252,11 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
 
   const selectedPlayerRef = useRef(selectedPlayer);
   selectedPlayerRef.current = selectedPlayer;
-  useWebSocket({
+  const isRealtimeConfigured = !!websocketUrl && !!websocketToken;
+  const { connected: wsConnected } = useWebSocket({
     url: websocketUrl,
     token: websocketToken,
-    autoConnect: !!websocketUrl && !!websocketToken,
+    autoConnect: isRealtimeConfigured,
     onPlayerStatsUpdated: (notification) => {
       setStatsLoadingPlayerIds((prev) => {
         const next = new Set(prev);
@@ -260,6 +266,13 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
       void refetchGame();
     },
   });
+  // AC1 (LS-7281): surface the connection state to the user instead of
+  // silently going stale. Only meaningful once a socket was actually
+  // configured for this game — an unconfigured screen isn't "reconnecting".
+  const showReconnecting =
+    isRealtimeConfigured &&
+    !wsConnected &&
+    (gameStatus === 'drafting' || gameStatus === 'setup');
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const isMostTeamsMode = gameState?.gameMode === SeasonDraftGameMode.MostTeams;
@@ -750,6 +763,27 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
               >
                 {sportChrome.strapline}
               </Text>
+              {showReconnecting && (
+                <XStack
+                  data-testid="ws-reconnecting-indicator"
+                  alignItems="center"
+                  gap="$1.5"
+                  paddingHorizontal="$2"
+                  paddingVertical="$0.5"
+                  borderRadius={999}
+                  backgroundColor={withAlpha(BRAND_GOLD, 0.14)}
+                >
+                  <Spinner size="small" color="$brandGoldLight" />
+                  <Text
+                    fontSize={11}
+                    color="$brandGoldLight"
+                    fontWeight="700"
+                    letterSpacing={1}
+                  >
+                    Reconnecting…
+                  </Text>
+                </XStack>
+              )}
             </XStack>
             <H1
               color="$color"
