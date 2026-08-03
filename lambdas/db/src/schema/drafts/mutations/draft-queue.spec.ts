@@ -48,6 +48,7 @@ function captureDraftQueueResolvers(): Record<string, Resolver> {
         leagueId: 'leagueMembers.leagueId',
         userId: 'leagueMembers.userId',
         teamId: 'leagueMembers.teamId',
+        permissionLevel: 'leagueMembers.permissionLevel',
       },
       draftQueue: {
         id: 'draftQueue.id',
@@ -143,7 +144,7 @@ describe('setDraftQueue', () => {
     const outerDb = makeOuterDb(
       [
         [{ leagueId: 99 }], // resolveTeamIdForDraft: draft query
-        [{ teamId: 25363 }], // resolveTeamIdForDraft: membership query
+        [{ teamId: 25363, permissionLevel: 'general_manager' }], // resolveTeamIdForDraft: membership query
       ],
       makeTxWrapper(tx),
     );
@@ -162,7 +163,10 @@ describe('setDraftQueue', () => {
   it('completes successfully when draft still exists inside the transaction', async () => {
     const tx = buildTx(true);
     const outerDb = makeOuterDb(
-      [[{ leagueId: 99 }], [{ teamId: 25363 }]],
+      [
+        [{ leagueId: 99 }],
+        [{ teamId: 25363, permissionLevel: 'general_manager' }],
+      ],
       makeTxWrapper(tx),
     );
 
@@ -218,7 +222,10 @@ describe('addToDraftQueue', () => {
   it('throws "Draft not found" when draft is deleted before the transaction insert (LS-8215)', async () => {
     const tx = buildTx(false, false);
     const outerDb = makeOuterDb(
-      [[{ leagueId: 99 }], [{ teamId: 25363 }]],
+      [
+        [{ leagueId: 99 }],
+        [{ teamId: 25363, permissionLevel: 'general_manager' }],
+      ],
       makeTxWrapper(tx),
     );
 
@@ -236,7 +243,10 @@ describe('addToDraftQueue', () => {
   it('skips insert when player is already queued', async () => {
     const tx = buildTx(true, true);
     const outerDb = makeOuterDb(
-      [[{ leagueId: 99 }], [{ teamId: 25363 }]],
+      [
+        [{ leagueId: 99 }],
+        [{ teamId: 25363, permissionLevel: 'general_manager' }],
+      ],
       makeTxWrapper(tx),
     );
 
@@ -250,6 +260,46 @@ describe('addToDraftQueue', () => {
 
     expect(tx.insert).not.toHaveBeenCalled();
   });
+});
+
+// ── non-GM authorization (LS-4737) ──────────────────────────────────────────
+//
+// resolveTeamIdForDraft must reject any league member whose permissionLevel
+// is not 'general_manager', mirroring the getMyDraftQueue read guard from
+// LS-2501. A non-GM (assistant manager, co-manager) must not be able to
+// mutate the GM's draft queue.
+
+describe('non-GM authorization (LS-4737)', () => {
+  const mutations: Array<{
+    name: string;
+    args: Record<string, unknown>;
+  }> = [
+    { name: 'setDraftQueue', args: { draftId: 5810, playerIds: [31422] } },
+    { name: 'addToDraftQueue', args: { draftId: 5810, playerId: 31422 } },
+    { name: 'removeFromDraftQueue', args: { draftId: 5810, playerId: 31422 } },
+    { name: 'reorderDraftQueue', args: { draftId: 5810, playerIds: [31422] } },
+  ];
+
+  it.each(mutations)(
+    'rejects $name for a non-GM league member (assistant_manager)',
+    async ({ name, args }) => {
+      const resolve = captureDraftQueueResolvers()[name];
+      const transaction = jest.fn();
+      const outerDb = makeOuterDb(
+        [
+          [{ leagueId: 99 }], // resolveTeamIdForDraft: draft query
+          [{ teamId: 25363, permissionLevel: 'assistant_manager' }], // membership query
+        ],
+        transaction,
+      );
+
+      await expect(
+        resolve(null, args, { user: { id: 7 }, db: outerDb }),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+
+      expect(transaction).not.toHaveBeenCalled();
+    },
+  );
 });
 
 export {};

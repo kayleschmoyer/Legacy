@@ -40,7 +40,10 @@ async function resolveTeamIdForDraft(
   if (!draft) throw UserInputError('Draft not found');
 
   const [membership] = await db
-    .select({ teamId: PublicSchema.leagueMembers.teamId })
+    .select({
+      teamId: PublicSchema.leagueMembers.teamId,
+      permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+    })
     .from(PublicSchema.leagueMembers)
     .where(
       and(
@@ -52,6 +55,10 @@ async function resolveTeamIdForDraft(
 
   if (!membership?.teamId)
     throw ForbiddenError('You are not a member of this league');
+  if (membership.permissionLevel !== 'general_manager')
+    throw ForbiddenError(
+      'Only the team general manager can modify this draft queue',
+    );
 
   return { teamId: membership.teamId, leagueId: draft.leagueId };
 }
