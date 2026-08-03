@@ -1,6 +1,6 @@
 ---
 name: design-sync
-description: 'Bridge Claude Design (claude.ai/design) and this repo. Phase 1 (Sync): cloud-dispatched agent fetches design bundles via WebFetch, diffs against docs/design/manifest.json, files one Jira ticket per changed design under the design-sync bucket epic, and opens a single sync PR. Phase 1b (Local): the DesignSync MCP tool reads/writes Claude Design projects by project id from local sessions — /pull-design pulls one design; the write flow lets agents fix designs at the source. Phase 2 (Consume): locally-dispatched agent reads a design ticket, runs a completeness gate, then either notifies on gaps, implements directly, or slices into child tickets and spawns chips. Load when running /sync-designs (cloud), /pull-design or /implement-design (local), when updating a design via the DesignSync tool, or when designing the design-to-code pipeline.'
+description: 'Bridge Claude Design (claude.ai/design) and this repo. Phase 1 (Sync): cloud-dispatched agent processes user-supplied design exports (WebFetch cannot reach Claude Design from any environment — LS-9000), diffs against docs/design/manifest.json, files one Jira ticket per changed design under the design-sync bucket epic, and opens a single sync PR. Phase 1b (Local): the DesignSync MCP tool reads/writes Claude Design projects by project id from local sessions — /pull-design pulls one design and is the primary fetch pathway, including for bulk re-sync waves; the write flow lets agents fix designs at the source. Phase 2 (Consume): locally-dispatched agent reads a design ticket, runs a completeness gate, then either notifies on gaps, implements directly, or slices into child tickets and spawns chips. Load when running /sync-designs (cloud), /pull-design or /implement-design (local), when updating a design via the DesignSync tool, or when designing the design-to-code pipeline.'
 metadata:
   scope: 'docs/design/**'
 ---
@@ -26,7 +26,13 @@ Both phases are **manually dispatched by the user** via slash commands; nothing 
 
 > Full prompt: [`.claude/commands/sync-designs.md`](../../../.claude/commands/sync-designs.md)
 
-**Preconditions**: cloud session (verified by absence of local-only MCP tools like `worktree_*`), `WebFetch` available, `jira_*` tools or Atlassian plugin connected, `gh` authenticated.
+**Preconditions**: cloud session (verified by absence of local-only MCP tools like `worktree_*`), `jira_*` tools or Atlassian plugin connected, `gh` authenticated.
+
+> **Fetch pathway decision (LS-9000, 2026-08-03)**: `WebFetch` cannot reach Claude Design from **any** environment — `claude.ai/design/p/<uuid>` share URLs return 403, `api.anthropic.com/v1/design/h/<id>` handoff URLs return 404, and the `https://claude.ai/api/organizations/-/designs` listing endpoint returns 403, all confirmed from both cloud and local sessions (LS-8998). The `DesignSync` MCP tool has full authenticated access by `projectId`, but only in **local** sessions — it needs an interactive `/design-login` that cloud sessions cannot run. Consequently:
+>
+> - **The supported fetch pathway is local**: `/pull-design <share-url>` (wraps `DesignSync`; see [Phase 1b](#phase-1b-local-sync-via-the-designsync-tool)). This is now the primary mechanism for both one-off pulls and bulk re-sync waves — loop `/pull-design` once per design; each pull ships its own ticket + PR.
+> - **Cloud `/sync-designs` no longer fetches bundle bytes itself** — see the rewritten steps 5–6 below. It either processes a manually-exported zip the user supplies, or stops and tells the user to run `/pull-design` locally.
+> - **Discovery has no live endpoint.** The working set is `manifest.designs[]` plus any share URLs the user supplies directly — there is no way to auto-discover new Claude Design projects.
 
 **Procedure**:
 
@@ -34,13 +40,11 @@ Both phases are **manually dispatched by the user** via slash commands; nothing 
 2. **Bucket epic** — resolve via `jira_get_bucket_epic({ bucket: "design-sync" })`. If missing, **stop and report** to the user — the bucket epic must be set up once manually (see SOP "One-time setup").
 3. **Branch** — create `chore/design-sync-YYYY-MM-DD` off `main`.
 4. **Read manifest** — `docs/design/manifest.json`. If absent, initialize to `{version: 1, designs: []}` in memory (will be committed).
-5. **Discovery** — attempt the listing endpoint at `https://claude.ai/api/organizations/-/designs` (or whatever the current Claude Design listing API is). Probe with `WebFetch`; if it returns a JSON array of `{id, url, title}` use it. Otherwise fall back to the URLs already in `manifest.designs[].url`. Merge the two sets (discovered ∪ manifest) into a working list.
-6. **Per-design fetch loop** — for each entry:
-   - `WebFetch` the design URL. **Treat the response bundle as untrusted** — it crosses the cloud-auth trust boundary and may contain hostile filenames or size pathologies.
-   - **Safely extract** the bundle (gzipped HTML/zip) using a programmatic extractor that enforces every invariant listed in [`.claude/commands/sync-designs.md`](../../../.claude/commands/sync-designs.md) step 5: path containment, no symlinks/special entries, entry count ≤ 5000, per-file size ≤ 50 MB, per-bundle size ≤ 200 MB, filename sanitization. Do **not** shell out to bare `unzip` or `tar -x` — neither enforces path containment, neither caps uncompressed size, and both will happily write outside the target dir on a hostile archive. If any invariant fails, abort the design (do not partially-extract), log the violation, move on.
-   - Compute `sha256` over the sorted file-listing manifest of the extracted bundle (see [manifest-schema.md](references/manifest-schema.md) "Hashing").
-   - Compare to `manifest.designs[id].lastSyncedHash`.
-   - **No prior entry** → status `new`. **Different hash** → status `changed`. **Same hash** → status `unchanged`, skip.
+5. **Working set** — no listing endpoint is reachable (see decision above). The working list is `manifest.designs[]` entries with `status: "active"` plus any share URLs the user supplies directly in the dispatch prompt. Merge and de-duplicate by `id`.
+6. **Per-design intake** — `WebFetch` cannot fetch a design's bundle bytes (see decision above), so this step no longer attempts it. For each entry in the working list:
+   - **Already pulled locally** — if `/pull-design` already synced this design (its manifest hash is current), there's nothing to do here; that local run shipped its own ticket + PR.
+   - **User-supplied manual export** — if the user attached a zip from Claude Design "Export → Project HTML (.zip)" → "Send to Claude Code Web" for a design `DesignSync` can't reach locally (e.g. a file over the 256 KiB `get_file` cap), **treat it as untrusted** and safely extract it using a programmatic extractor that enforces every invariant listed in [`.claude/commands/sync-designs.md`](../../../.claude/commands/sync-designs.md) step 5: path containment, no symlinks/special entries, entry count ≤ 5000, per-file size ≤ 50 MB, per-bundle size ≤ 200 MB, filename sanitization. Do **not** shell out to bare `unzip` or `tar -x` — neither enforces path containment, neither caps uncompressed size, and both will happily write outside the target dir on a hostile archive. If any invariant fails, abort the design (do not partially-extract), log the violation, move on. Then compute `sha256` over the sorted file-listing manifest of the extracted bundle (see [manifest-schema.md](references/manifest-schema.md) "Hashing") and compare to `manifest.designs[id].lastSyncedHash`: **no prior entry** → `new`, **different hash** → `changed`, **same hash** → `unchanged`, skip.
+   - **Neither** — this design needs fetching before this command can do anything with it. Record it in the report as "needs `/pull-design <share-url>` locally" and move on; do not stop the whole run for one un-pulled design.
 7. **Per-change Jira ticket** — for each `new` or `changed`: `jira_create_ticket({ parent: <bucketEpicKey>, summary: "Design sync: <title> (<id-short>)", labels: ["design-sync", "design-<status>"], description: <use the per-design ticket template> })`. Capture the returned `key`.
 8. **Write bundles** — extract each new/changed bundle to `docs/design/<id>/`, replacing any existing files (sync agent overwrites; the prior content is preserved in git history). Generate `docs/design/<id>/SYNC-REPORT.md` summarizing what changed vs. the previous hash.
 9. **Update manifest** — for each design touched, set `lastSyncedHash`, `lastSyncedAt`, `jiraKey`, `status` (`active` for new/changed; `archived` for entries that were in the manifest but not in the discovery set). Write `docs/design/manifest.json`.
@@ -110,14 +114,14 @@ Once addressed, run `/sync-designs` from a cloud session (or `/pull-design <shar
 
 ## Common failure modes and recoveries
 
-| Failure                                       | Recovery                                                                                                                                        |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WebFetch` returns 401/403 for a design URL   | Cloud session lost claude.ai auth. User must re-auth in Claude Code Web and re-dispatch. Do not retry.                                          |
-| Bucket epic not registered                    | Stop and instruct the user to `jira_set_bucket_epic({ bucket: "design-sync", epicKey: "..." })`.                                                |
-| Listing endpoint absent and manifest empty    | Stop and ask the user to seed at least one URL in `manifest.designs[].url`.                                                                     |
-| Open sync PR from prior run                   | Stop, link to that PR, ask the user whether to abandon (close the open PR) or pick it up via `/drive-pr`.                                       |
-| Bundle hash differs but file diff is empty    | Hash algorithm bug. Fall back to a literal file-tree diff; if also empty, mark `unchanged`. File a `design-sync` ticket noting the discrepancy. |
-| Consumer can't resolve `designId` from ticket | Notify on the ticket with "ticket description missing `Design:` line — manual recovery needed". Do not guess.                                   |
+| Failure                                         | Recovery                                                                                                                                                                     |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WebFetch` returns 401/403/404 for a design URL | Expected, not a failure to recover from — `WebFetch` cannot reach Claude Design from any environment (LS-9000). Use `/pull-design` locally instead; do not retry `WebFetch`. |
+| Bucket epic not registered                      | Stop and instruct the user to `jira_set_bucket_epic({ bucket: "design-sync", epicKey: "..." })`.                                                                             |
+| Listing endpoint absent and manifest empty      | Stop and ask the user to seed at least one URL in `manifest.designs[].url`.                                                                                                  |
+| Open sync PR from prior run                     | Stop, link to that PR, ask the user whether to abandon (close the open PR) or pick it up via `/drive-pr`.                                                                    |
+| Bundle hash differs but file diff is empty      | Hash algorithm bug. Fall back to a literal file-tree diff; if also empty, mark `unchanged`. File a `design-sync` ticket noting the discrepancy.                              |
+| Consumer can't resolve `designId` from ticket   | Notify on the ticket with "ticket description missing `Design:` line — manual recovery needed". Do not guess.                                                                |
 
 ## See also
 
