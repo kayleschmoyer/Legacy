@@ -85,6 +85,8 @@ let capturedOnSeeAllLeagues: (() => void) | null = null;
 let capturedOnOpenProfile: (() => void) | null = null;
 let capturedOnViewMatchup: ((summary: Record<string, unknown>) => void) | null =
   null;
+// Capture the "Browse Stats" quick-action callback (LS-8984)
+let capturedOnBrowseStats: (() => void) | null = null;
 
 type MobileHomeScreenMockProps = {
   onViewSport: (sport: 'baseball' | 'football') => void;
@@ -97,6 +99,7 @@ type MobileHomeScreenMockProps = {
   onSeeAllLeagues?: () => void;
   onOpenProfile?: () => void;
   onViewMatchup?: (summary: Record<string, unknown>) => void;
+  onBrowseStats?: () => void;
   refreshControl?: PullToRefreshControlElement;
 };
 
@@ -117,6 +120,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     onSeeAllLeagues,
     onOpenProfile,
     onViewMatchup,
+    onBrowseStats,
     refreshControl,
   }: MobileHomeScreenMockProps) => {
     capturedOnViewSport = onViewSport;
@@ -127,6 +131,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     capturedOnSeeAllLeagues = onSeeAllLeagues ?? null;
     capturedOnOpenProfile = onOpenProfile ?? null;
     capturedOnViewMatchup = onViewMatchup ?? null;
+    capturedOnBrowseStats = onBrowseStats ?? null;
     capturedRefreshControl = refreshControl ?? null;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
@@ -502,6 +507,7 @@ describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
     capturedOnSeeAllLeagues = null;
     capturedOnOpenProfile = null;
     capturedOnViewMatchup = null;
+    capturedOnBrowseStats = null;
     mockGetUserLeagueSummaries.mockReturnValue({
       data: { getUserLeagueSummaries: [] },
       loading: false,
@@ -529,6 +535,16 @@ describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
       capturedOnOpenProfile?.();
     });
     expect(mockNavigate).toHaveBeenCalledWith('/you');
+  });
+
+  // LS-8984 — "Browse Stats" used to push the standalone `PlayerStats` route,
+  // landing on a different screen than the bottom "Players" tab.
+  it('navigates to the Players tab from "Browse Stats"', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnBrowseStats?.();
+    });
+    expect(mockNavigate).toHaveBeenCalledWith('/players');
   });
 
   it('opens the baseball matchup detail from the live ticker', () => {

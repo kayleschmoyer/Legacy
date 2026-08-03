@@ -218,7 +218,7 @@ export default function HomeTab() {
           onMockDraft={() => router.push('/baseball/mock-draft')}
           onCreateLeague={() => router.navigate('/baseball/league/create')}
           onJoinLeague={() => router.navigate('/baseball/league/join')}
-          onBrowseStats={() => router.navigate('PlayerStats')}
+          onBrowseStats={() => router.navigate('/players')}
           onViewSport={handleViewSport}
           onStartMockDraft={() => router.push('/baseball/mock-draft')}
           refreshControl={refreshControl}
