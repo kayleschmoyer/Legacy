@@ -17,14 +17,20 @@ const baseState: WizardState = {
 };
 
 describe('getSteps', () => {
-  it('returns 3-step flow for baseball', () => {
-    expect(getSteps('BASEBALL')).toEqual(['sport', 'settings', 'confirm']);
+  it('returns 4-step flow for baseball, including the premium options step', () => {
+    expect(getSteps('BASEBALL')).toEqual([
+      'sport',
+      'settings',
+      'premium',
+      'confirm',
+    ]);
   });
 
-  it('returns 5-step flow for football', () => {
+  it('returns 6-step flow for football, including the premium options step', () => {
     expect(getSteps('FOOTBALL')).toEqual([
       'sport',
       'settings',
+      'premium',
       'roster',
       'defensive',
       'confirm',
@@ -73,39 +79,70 @@ describe('wizardReducer', () => {
   });
 
   describe('SET_SETTINGS', () => {
-    it('updates name, numTeams, draftType, and auction fields', () => {
+    it('updates name, numTeams, and draftOrder', () => {
       const action: WizardAction = {
         type: 'SET_SETTINGS',
-        settings: {
-          name: 'My League',
-          numTeams: 14,
-          draftType: 'auction',
-          auctionBudget: 300,
-          auctionMinBid: 5,
-        },
+        settings: { name: 'My League', numTeams: 14, draftOrder: 'linear' },
       };
       const next = wizardReducer(INITIAL_STATE, action);
       expect(next.name).toBe('My League');
       expect(next.numTeams).toBe(14);
-      expect(next.draftType).toBe('auction');
-      expect(next.auctionBudget).toBe(300);
-      expect(next.auctionMinBid).toBe(5);
+      expect(next.draftOrder).toBe('linear');
     });
 
     it('does not touch sport or roster', () => {
       const action: WizardAction = {
         type: 'SET_SETTINGS',
-        settings: {
-          name: 'X',
-          numTeams: 8,
-          draftType: 'snake',
-          auctionBudget: 200,
-          auctionMinBid: 1,
-        },
+        settings: { name: 'X', numTeams: 8, draftOrder: 'snake' },
       };
       const next = wizardReducer(INITIAL_STATE, action);
       expect(next.sport).toBe(INITIAL_STATE.sport);
       expect(next.rosterSlots).toBe(INITIAL_STATE.rosterSlots);
+    });
+  });
+
+  describe('SET_PREMIUM_OPTIONS', () => {
+    it('merges the new premium option values into state', () => {
+      const action: WizardAction = {
+        type: 'SET_PREMIUM_OPTIONS',
+        options: {
+          selectionMethod: 'auction',
+          auctionBudget: 300,
+          auctionMinBid: 5,
+          waiverType: 'faab',
+          faabBudgetDefault: 200,
+          eraFilter: 'modern',
+          salaryCapEnabled: true,
+          salaryCap: 50000,
+        },
+      };
+      const next = wizardReducer(INITIAL_STATE, action);
+      expect(next.selectionMethod).toBe('auction');
+      expect(next.auctionBudget).toBe(300);
+      expect(next.auctionMinBid).toBe(5);
+      expect(next.waiverType).toBe('faab');
+      expect(next.faabBudgetDefault).toBe(200);
+      expect(next.eraFilter).toBe('modern');
+      expect(next.salaryCapEnabled).toBe(true);
+      expect(next.salaryCap).toBe(50000);
+    });
+
+    it('does not touch unrelated state', () => {
+      const action: WizardAction = {
+        type: 'SET_PREMIUM_OPTIONS',
+        options: {
+          selectionMethod: 'random',
+          auctionBudget: 200,
+          auctionMinBid: 1,
+          waiverType: 'standard',
+          faabBudgetDefault: 100,
+          eraFilter: 'all',
+          salaryCapEnabled: false,
+        },
+      };
+      const next = wizardReducer(INITIAL_STATE, action);
+      expect(next.sport).toBe(INITIAL_STATE.sport);
+      expect(next.name).toBe(INITIAL_STATE.name);
     });
   });
 
@@ -198,34 +235,34 @@ describe('validateStep', () => {
     expect(validateStep('settings', state)).toBeNull();
   });
 
-  it('returns null for a snake draft regardless of auction fields', () => {
+  it('returns null on the premium step for a non-auction selection regardless of auction fields', () => {
     const state: WizardState = {
       ...baseState,
-      draftType: 'snake',
+      selectionMethod: 'standard',
       auctionBudget: 0,
       auctionMinBid: 0,
     };
-    expect(validateStep('settings', state)).toBeNull();
+    expect(validateStep('premium', state)).toBeNull();
   });
 
   it('returns null for a valid auction budget and minimum bid', () => {
     const state: WizardState = {
       ...baseState,
-      draftType: 'auction',
+      selectionMethod: 'auction',
       auctionBudget: 200,
       auctionMinBid: 1,
     };
-    expect(validateStep('settings', state)).toBeNull();
+    expect(validateStep('premium', state)).toBeNull();
   });
 
   it('returns error when auction budget is out of range', () => {
     const state: WizardState = {
       ...baseState,
-      draftType: 'auction',
+      selectionMethod: 'auction',
       auctionBudget: 10_001,
       auctionMinBid: 1,
     };
-    expect(validateStep('settings', state)).toBe(
+    expect(validateStep('premium', state)).toBe(
       'Auction budget must be 1–10000.',
     );
   });
@@ -233,24 +270,116 @@ describe('validateStep', () => {
   it('returns error when minimum bid is out of range', () => {
     const state: WizardState = {
       ...baseState,
-      draftType: 'auction',
+      selectionMethod: 'auction',
       auctionBudget: 200,
       auctionMinBid: 0,
     };
-    expect(validateStep('settings', state)).toBe(
-      'Minimum bid must be 1–10000.',
-    );
+    expect(validateStep('premium', state)).toBe('Minimum bid must be 1–10000.');
   });
 
   it('returns error when minimum bid exceeds the auction budget', () => {
     const state: WizardState = {
       ...baseState,
-      draftType: 'auction',
+      selectionMethod: 'auction',
       auctionBudget: 100,
       auctionMinBid: 150,
     };
-    expect(validateStep('settings', state)).toBe(
+    expect(validateStep('premium', state)).toBe(
       'Minimum bid cannot exceed the auction budget.',
     );
+  });
+
+  it('returns null on the premium step for a standard waiver regardless of faabBudgetDefault', () => {
+    const state: WizardState = {
+      ...baseState,
+      waiverType: 'standard',
+      faabBudgetDefault: 0,
+    };
+    expect(validateStep('premium', state)).toBeNull();
+  });
+
+  it('returns error when faab budget is out of range', () => {
+    const state: WizardState = {
+      ...baseState,
+      waiverType: 'faab',
+      faabBudgetDefault: 100_001,
+    };
+    expect(validateStep('premium', state)).toBe(
+      'FAAB budget must be 1–100000.',
+    );
+  });
+
+  it('returns null on the premium step for a non-custom era filter regardless of custom era years', () => {
+    const state: WizardState = { ...baseState, eraFilter: 'all' };
+    expect(validateStep('premium', state)).toBeNull();
+  });
+
+  it('returns error when custom era years are missing', () => {
+    const state: WizardState = { ...baseState, eraFilter: 'custom' };
+    expect(validateStep('premium', state)).toBe(
+      'Custom era start and end year are required.',
+    );
+  });
+
+  it('returns error when custom era start year is after the end year', () => {
+    const state: WizardState = {
+      ...baseState,
+      eraFilter: 'custom',
+      customEraStartYear: 2000,
+      customEraEndYear: 1990,
+    };
+    expect(validateStep('premium', state)).toBe(
+      'Custom era start year cannot be after the end year.',
+    );
+  });
+
+  it('returns null for a valid custom era range', () => {
+    const state: WizardState = {
+      ...baseState,
+      eraFilter: 'custom',
+      customEraStartYear: 1990,
+      customEraEndYear: 2000,
+    };
+    expect(validateStep('premium', state)).toBeNull();
+  });
+
+  it('returns null on the premium step when salary cap is disabled regardless of salaryCap', () => {
+    const state: WizardState = {
+      ...baseState,
+      salaryCapEnabled: false,
+      salaryCap: undefined,
+    };
+    expect(validateStep('premium', state)).toBeNull();
+  });
+
+  it('returns error when salary cap is enabled but unset', () => {
+    const state: WizardState = {
+      ...baseState,
+      salaryCapEnabled: true,
+      salaryCap: undefined,
+    };
+    expect(validateStep('premium', state)).toBe(
+      'Salary cap must be 1–1000000000.',
+    );
+  });
+
+  it('returns error when salary cap is out of range', () => {
+    const state: WizardState = {
+      ...baseState,
+      salaryCapEnabled: true,
+      salaryCap: 1_000_000_001,
+    };
+    expect(validateStep('premium', state)).toBe(
+      'Salary cap must be 1–1000000000.',
+    );
+  });
+
+  it('returns null for a valid enabled salary cap', () => {
+    const state: WizardState = {
+      ...baseState,
+      salaryCapEnabled: true,
+      salaryCap: 50_000_000,
+    };
+    expect(validateStep('premium', state)).toBeNull();
   });
 });

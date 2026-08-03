@@ -36,16 +36,12 @@ jest.mock('../PageMeta', () => ({
   PageMeta: () => null,
 }));
 
-jest.mock('../UpgradeModal', () => ({
-  UpgradeModal: () => null,
+const mockUseIsPremiumStatus = jest.fn(() => ({
+  isPremium: false,
+  isLoading: false,
 }));
-
 jest.mock('../../hooks/useIsPremium', () => ({
-  useIsPremiumStatus: () => ({ isPremium: false, isLoading: false }),
-}));
-
-jest.mock('../../utils/analytics', () => ({
-  trackPremiumFeatureClick: jest.fn(),
+  useIsPremiumStatus: () => mockUseIsPremiumStatus(),
 }));
 
 jest.mock('tamagui', () => ({
@@ -96,19 +92,11 @@ jest.mock('./wizard/StepLeagueSettings', () => ({
     settings,
     onChange,
   }: {
-    settings: {
-      name: string;
-      numTeams: number;
-      draftType: string;
-      auctionBudget: number;
-      auctionMinBid: number;
-    };
+    settings: { name: string; numTeams: number; draftOrder: string };
     onChange: (s: {
       name: string;
       numTeams: number;
-      draftType: string;
-      auctionBudget: number;
-      auctionMinBid: number;
+      draftOrder: string;
     }) => void;
   }) => (
     <div>
@@ -118,24 +106,49 @@ jest.mock('./wizard/StepLeagueSettings', () => ({
         value={settings.name}
         onChange={(e) => onChange({ ...settings, name: e.target.value })}
       />
+    </div>
+  ),
+}));
+
+jest.mock('./wizard/StepPremiumOptions', () => ({
+  StepPremiumOptions: ({
+    options,
+    onChange,
+    isPremium,
+  }: {
+    options: {
+      selectionMethod: string;
+      auctionBudget: number;
+      auctionMinBid: number;
+    };
+    onChange: (o: {
+      selectionMethod: string;
+      auctionBudget: number;
+      auctionMinBid: number;
+    }) => void;
+    isPremium: boolean;
+  }) => (
+    <div>
+      <span>Premium Options</span>
       <button
         type="button"
-        onClick={() => onChange({ ...settings, draftType: 'auction' })}
+        onClick={() => onChange({ ...options, selectionMethod: 'auction' })}
+        disabled={!isPremium}
       >
-        Auction Draft
+        Select Auction
       </button>
       <input
         placeholder="Auction Budget"
-        value={settings.auctionBudget}
+        value={options.auctionBudget}
         onChange={(e) =>
-          onChange({ ...settings, auctionBudget: Number(e.target.value) })
+          onChange({ ...options, auctionBudget: Number(e.target.value) })
         }
       />
       <input
         placeholder="Minimum Bid"
-        value={settings.auctionMinBid}
+        value={options.auctionMinBid}
         onChange={(e) =>
-          onChange({ ...settings, auctionMinBid: Number(e.target.value) })
+          onChange({ ...options, auctionMinBid: Number(e.target.value) })
         }
       />
     </div>
@@ -162,15 +175,9 @@ jest.mock('./wizard/StepRosterSettings', () => ({
 jest.mock('./wizard/StepDefensiveFormat', () => ({
   StepDefensiveFormat: ({
     onChange,
-    salaryCapEnabled,
-    onSalaryCapToggle,
-    onSalaryCapAmountChange,
   }: {
     defensiveFormat: string;
     onChange: (format: 'dst' | 'idp') => void;
-    salaryCapEnabled: boolean;
-    onSalaryCapToggle: (enabled: boolean) => void;
-    onSalaryCapAmountChange: (amount: number | undefined) => void;
   }) => (
     <div>
       <span>Defensive Format</span>
@@ -180,16 +187,6 @@ jest.mock('./wizard/StepDefensiveFormat', () => ({
       <button type="button" onClick={() => onChange('dst')}>
         Team D/ST
       </button>
-      <button
-        type="button"
-        onClick={() => onSalaryCapToggle(!salaryCapEnabled)}
-      >
-        Toggle Salary Cap
-      </button>
-      <input
-        placeholder="Salary cap amount"
-        onChange={(e) => onSalaryCapAmountChange(Number(e.target.value))}
-      />
     </div>
   ),
 }));
@@ -258,6 +255,10 @@ function fillLeagueName(name: string) {
 beforeEach(() => {
   jest.clearAllMocks();
   mockCreateLeague.mockResolvedValue({ data: null });
+  mockUseIsPremiumStatus.mockReturnValue({
+    isPremium: false,
+    isLoading: false,
+  });
 });
 
 describe('CreateLeagueWizard', () => {
@@ -281,10 +282,19 @@ describe('CreateLeagueWizard', () => {
     expect(screen.getByText('League name is required.')).toBeInTheDocument();
   });
 
-  it('advances past settings step when name is filled in', () => {
+  it('advances to premium options step when name is filled in', () => {
     render(<CreateLeagueWizard />);
     advance();
     fillLeagueName('My Test League');
+    advance();
+    expect(screen.getByText('Premium Options')).toBeInTheDocument();
+  });
+
+  it('advances past premium options step to confirmation', () => {
+    render(<CreateLeagueWizard />);
+    advance();
+    fillLeagueName('My Test League');
+    advance();
     advance();
     expect(screen.getByText('Confirm Your League')).toBeInTheDocument();
   });
@@ -297,13 +307,14 @@ describe('CreateLeagueWizard', () => {
     expect(screen.getByText('Choose Your Sport')).toBeInTheDocument();
   });
 
-  it('calls the mutation on confirmation for baseball', () => {
+  it('calls the mutation on confirmation for baseball, including default premium fields', () => {
     mockCreateLeague.mockResolvedValue({
       data: { createLeagueAndTeams: { league: { id: 'league-1' } } },
     });
     render(<CreateLeagueWizard />);
     advance();
     fillLeagueName('My League');
+    advance();
     advance();
     act(() => {
       fireEvent.click(screen.getByText('Create League'));
@@ -312,6 +323,11 @@ describe('CreateLeagueWizard', () => {
     const input = mockCreateLeague.mock.calls[0][0].variables.input;
     expect(input.sport).toBe('baseball');
     expect(input.leagueName).toBe('My League');
+    expect(input.selectionMethod).toBe('standard');
+    expect(input.draftOrder).toBe('snake');
+    expect(input.waiverType).toBe('standard');
+    expect(input.eraFilter).toBe('all');
+    expect(input.salaryCapEnabled).toBe(false);
   });
 
   it('navigates to league page on successful creation', async () => {
@@ -321,6 +337,7 @@ describe('CreateLeagueWizard', () => {
     render(<CreateLeagueWizard />);
     advance();
     fillLeagueName('My League');
+    advance();
     advance();
     act(() => {
       fireEvent.click(screen.getByText('Create League'));
@@ -336,6 +353,7 @@ describe('CreateLeagueWizard', () => {
     advance();
     fillLeagueName('My League');
     advance();
+    advance();
     act(() => {
       fireEvent.click(screen.getByText('Create League'));
     });
@@ -345,13 +363,18 @@ describe('CreateLeagueWizard', () => {
   });
 
   it('sends the chosen auction budget and minimum bid on submit', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
     mockCreateLeague.mockResolvedValue({
       data: { createLeagueAndTeams: { league: { id: 'league-1' } } },
     });
     render(<CreateLeagueWizard />);
     advance();
     fillLeagueName('My Auction League');
-    fireEvent.click(screen.getByText('Auction Draft'));
+    advance();
+    fireEvent.click(screen.getByText('Select Auction'));
     fireEvent.change(screen.getByPlaceholderText('Auction Budget'), {
       target: { value: '350' },
     });
@@ -368,13 +391,14 @@ describe('CreateLeagueWizard', () => {
     expect(input.auctionMinBid).toBe(10);
   });
 
-  it('omits auction fields for a snake draft', () => {
+  it('omits auction fields for a standard selection', () => {
     mockCreateLeague.mockResolvedValue({
       data: { createLeagueAndTeams: { league: { id: 'league-1' } } },
     });
     render(<CreateLeagueWizard />);
     advance();
-    fillLeagueName('My Snake League');
+    fillLeagueName('My Standard League');
+    advance();
     advance();
     act(() => {
       fireEvent.click(screen.getByText('Create League'));
@@ -394,11 +418,13 @@ describe('CreateLeagueWizard', () => {
     expect(options.refetchQueries).toEqual([{ query: {} }]);
   });
 
-  it('shows football-specific Roster Settings step', () => {
+  it('shows football-specific Roster Settings step after premium options', () => {
     render(<CreateLeagueWizard />);
     fireEvent.click(screen.getByText('Football'));
     advance();
     fillLeagueName('My Football League');
+    advance();
+    expect(screen.getByText('Premium Options')).toBeInTheDocument();
     advance();
     expect(screen.getByText('Roster Settings')).toBeInTheDocument();
   });
@@ -409,6 +435,7 @@ describe('CreateLeagueWizard', () => {
     advance();
     fillLeagueName('My Football League');
     advance();
+    advance();
     fireEvent.click(screen.getByText('Customize roster'));
     advance();
   }
@@ -418,6 +445,7 @@ describe('CreateLeagueWizard', () => {
     fireEvent.click(screen.getByText('Football'));
     advance();
     fillLeagueName('My Football League');
+    advance();
     advance();
     advance();
     fireEvent.click(screen.getByText('Individual Defensive Players (IDP)'));
@@ -453,26 +481,12 @@ describe('CreateLeagueWizard', () => {
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
-  it('sends the salary cap for football league creation (LS-6143)', () => {
-    mockCreateLeague.mockResolvedValue({
-      data: { createLeagueAndTeams: { league: { id: 'league-1' } } },
-    });
+  it('does not let a non-premium user select Auction selection method', () => {
     render(<CreateLeagueWizard />);
-    fireEvent.click(screen.getByText('Football'));
     advance();
-    fillLeagueName('My Football League');
-    advance(); // roster
-    advance(); // defensive
-    fireEvent.click(screen.getByText('Toggle Salary Cap'));
-    fireEvent.change(screen.getByPlaceholderText('Salary cap amount'), {
-      target: { value: '50000000' },
-    });
+    fillLeagueName('My League');
     advance();
-    act(() => {
-      fireEvent.click(screen.getByText('Create League'));
-    });
-    const input = mockCreateLeague.mock.calls[0][0].variables.input;
-    expect(input.salaryCapEnabled).toBe(true);
-    expect(input.salaryCap).toBe(50000000);
+    const auctionButton = screen.getByText('Select Auction');
+    expect(auctionButton).toBeDisabled();
   });
 });

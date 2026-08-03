@@ -1,6 +1,7 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Text, XStack, YStack } from 'tamagui';
-import { AlertCircle } from '@tamagui/lucide-icons';
+import { AlertCircle, ExternalLink } from '@tamagui/lucide-icons';
 import type { WizardState } from '../CreateLeagueWizard';
 
 interface StepConfirmationProps {
@@ -36,12 +37,22 @@ function formatRosterSlots(slots: Record<string, number>): string {
     .join(', ');
 }
 
+function formatEraFilter(eraFilter: string): string {
+  if (eraFilter === 'all') return 'All Eras';
+  if (eraFilter === 'custom') return 'Custom';
+  return eraFilter
+    .split('_')
+    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 export function StepConfirmation({
   state,
   error,
   loading,
   onSubmit,
 }: StepConfirmationProps) {
+  const navigate = useNavigate();
   const isFootball = state.sport === 'FOOTBALL';
 
   return (
@@ -74,10 +85,36 @@ export function StepConfirmation({
         <SummaryRow label="League Name" value={state.name || '—'} />
         <SummaryRow label="Teams" value={String(state.numTeams)} />
         <SummaryRow
-          label="Draft Type"
-          value={state.draftType === 'snake' ? 'Snake Draft' : 'Auction Draft'}
+          label="Selection Method"
+          value={
+            state.selectionMethod === 'auction'
+              ? 'Auction'
+              : state.selectionMethod === 'random'
+                ? 'Random'
+                : 'Standard'
+          }
         />
-        {state.draftType === 'auction' && (
+        <SummaryRow
+          label="Draft Order"
+          value={state.draftOrder === 'snake' ? 'Snake Order' : 'Linear Order'}
+        />
+        <SummaryRow
+          label="Waiver System"
+          value={
+            state.waiverType === 'faab'
+              ? `FAAB · $${state.faabBudgetDefault}`
+              : 'Standard'
+          }
+        />
+        <SummaryRow
+          label="Salary Cap"
+          value={state.salaryCapEnabled ? `$${state.salaryCap ?? 0}` : 'Off'}
+        />
+        <SummaryRow
+          label="Era Filter"
+          value={formatEraFilter(state.eraFilter)}
+        />
+        {state.selectionMethod === 'auction' && (
           <>
             <SummaryRow
               label="Auction Budget"
@@ -94,12 +131,6 @@ export function StepConfirmation({
                 state.defensiveFormat === 'idp'
                   ? 'Individual Defensive Players (IDP)'
                   : 'Team D/ST'
-              }
-            />
-            <SummaryRow
-              label="Salary Cap"
-              value={
-                state.salaryCapEnabled ? `$${state.salaryCap ?? 0}` : 'Off'
               }
             />
             <XStack
@@ -119,6 +150,23 @@ export function StepConfirmation({
           </>
         )}
       </YStack>
+
+      <XStack
+        pressStyle={{ opacity: 0.7 }}
+        onPress={() =>
+          navigate(`/${isFootball ? 'football' : 'baseball'}/league/create`)
+        }
+        alignItems="center"
+        justifyContent="center"
+        gap="$1"
+        padding="$2"
+        cursor="pointer"
+      >
+        <Text fontSize={12} color="$textMuted" textDecorationLine="underline">
+          Need more options? Use the full league creation form
+        </Text>
+        <ExternalLink size={12} color="$textMuted" />
+      </XStack>
 
       {error && (
         <XStack

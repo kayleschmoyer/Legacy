@@ -1,21 +1,11 @@
 import React from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
-import { SalaryCapField } from '@legacy-sports/shared-components/leagues';
-import { PremiumGate } from '../../PremiumGate';
 
 export type DefensiveFormat = 'dst' | 'idp';
 
 interface StepDefensiveFormatProps {
   defensiveFormat: DefensiveFormat;
   onChange: (format: DefensiveFormat) => void;
-  salaryCapEnabled: boolean;
-  salaryCap?: number;
-  onSalaryCapToggle: (enabled: boolean) => void;
-  onSalaryCapAmountChange: (amount: number | undefined) => void;
-  salaryCapError?: string;
-  isPremium: boolean;
-  premiumLoading: boolean;
-  onUpgradeSalaryCap: () => void;
 }
 
 const FORMAT_OPTIONS: Array<{
@@ -46,14 +36,6 @@ const FORMAT_OPTIONS: Array<{
 export function StepDefensiveFormat({
   defensiveFormat,
   onChange,
-  salaryCapEnabled,
-  salaryCap,
-  onSalaryCapToggle,
-  onSalaryCapAmountChange,
-  salaryCapError,
-  isPremium,
-  premiumLoading,
-  onUpgradeSalaryCap,
 }: StepDefensiveFormatProps) {
   return (
     <YStack gap="$4">
@@ -160,20 +142,6 @@ export function StepDefensiveFormat({
           );
         })}
       </YStack>
-
-      {/* Salary cap is sport-agnostic server-side (LS-6143) — premium
-          football leagues can enable it here same as baseball. */}
-      <PremiumGate isPremium={isPremium} featureName="Salary Cap">
-        <SalaryCapField
-          enabled={salaryCapEnabled}
-          amount={salaryCap}
-          onToggleEnabled={onSalaryCapToggle}
-          onAmountChange={onSalaryCapAmountChange}
-          isPremium={isPremium && !premiumLoading}
-          error={salaryCapError}
-          onUpgrade={onUpgradeSalaryCap}
-        />
-      </PremiumGate>
     </YStack>
   );
 }
