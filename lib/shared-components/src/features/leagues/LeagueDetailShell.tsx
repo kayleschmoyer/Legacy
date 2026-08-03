@@ -87,6 +87,16 @@ export interface LeagueDetailShellProps {
   children?: React.ReactNode;
 
   /**
+   * Skip the hero card and tab bar entirely and zero out the page-column
+   * padding, leaving `children` to own its full layout. Used by the League
+   * Home "Guided Home" redesign (LS-8988) so its own compact header replaces
+   * the hero while any other tab is showing (defaults to `false`, so every
+   * existing consumer — web league-detail-v2, native football, native
+   * baseball's non-Overview tabs — renders exactly as before).
+   */
+  hideHeroAndTabs?: boolean;
+
+  /**
    * Fill the available height with a flex layout so a single scrollable child
    * (e.g. a native tab's `ScrollView`) can size itself. Native screens pass
    * this; web relies on natural document scroll, so it defaults to `false`.
@@ -915,6 +925,7 @@ export function LeagueDetailShell({
   fill = false,
   className,
   pageClassName,
+  hideHeroAndTabs = false,
 }: LeagueDetailShellProps): React.JSX.Element {
   // Effective perms for the current view-as role (mirrors web v2). A
   // commissioner viewing as 'member'/'spectator' drops the commissioner chip
@@ -931,27 +942,31 @@ export function LeagueDetailShell({
         width="100%"
         maxWidth={1280}
         alignSelf="center"
-        paddingHorizontal={24}
-        paddingTop={24}
-        paddingBottom={80}
+        paddingHorizontal={hideHeroAndTabs ? 0 : 24}
+        paddingTop={hideHeroAndTabs ? 0 : 24}
+        paddingBottom={hideHeroAndTabs ? 0 : 80}
         {...(fill ? { flex: 1, minHeight: 0 } : {})}
         {...(pageClassName ? { className: pageClassName } : {})}
       >
-        <LeagueDetailHero
-          sport={sport}
-          league={league}
-          isCommissioner={effIsCommissioner}
-          onInvite={onInvite}
-        />
-        <LeagueTabBar
-          tabs={tabs}
-          activeTab={activeTab}
-          onTabChange={onTabChange}
-          isMember={effIsMember}
-          isCommissioner={effIsCommissioner}
-          pendingTradeCount={pendingTradeCount}
-          onAnalytics={onAnalytics}
-        />
+        {hideHeroAndTabs ? null : (
+          <>
+            <LeagueDetailHero
+              sport={sport}
+              league={league}
+              isCommissioner={effIsCommissioner}
+              onInvite={onInvite}
+            />
+            <LeagueTabBar
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={onTabChange}
+              isMember={effIsMember}
+              isCommissioner={effIsCommissioner}
+              pendingTradeCount={pendingTradeCount}
+              onAnalytics={onAnalytics}
+            />
+          </>
+        )}
         {children}
       </YStack>
     </YStack>

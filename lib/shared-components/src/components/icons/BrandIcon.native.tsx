@@ -20,7 +20,15 @@ export type BrandIconName =
   | 'book'
   | 'google'
   | 'discord'
-  | 'apple';
+  | 'apple'
+  // League Home "Guided Home" nav tile grid (LS-8988) — ported from the web
+  // BrandIcon glyphs of the same name for cross-platform visual parity.
+  | 'roster'
+  | 'matchup'
+  | 'standings'
+  | 'zap'
+  | 'award'
+  | 'message';
 
 type GlyphProps = {
   color: string;
@@ -415,6 +423,195 @@ function BookGlyph({ color, accentColor, strokeWidth }: GlyphProps) {
   );
 }
 
+// ─── League Home "Guided Home" nav tile glyphs (LS-8988) ─────────────────────
+// Ported 1:1 from the web BrandIcon glyphs of the same name (path data copied
+// verbatim) so the tile grid reads identically across platforms.
+
+function RosterGlyph({ color, strokeWidth }: GlyphProps) {
+  const thin = Math.max(strokeWidth - 0.4, 1);
+  return (
+    <>
+      <Rect
+        x="8"
+        y="6"
+        width="16"
+        height="20"
+        rx="2.5"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill={withAlpha(color, 0.04)}
+      />
+      <Path
+        d="M12 12h8"
+        stroke={color}
+        strokeWidth={thin}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M12 16h8"
+        stroke={color}
+        strokeWidth={thin}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M12 20h5"
+        stroke={color}
+        strokeWidth={thin}
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+function MatchupGlyph({ color, accentColor, strokeWidth }: GlyphProps) {
+  const thin = Math.max(strokeWidth - 0.4, 1);
+  const mid = Math.max(strokeWidth - 0.2, 1);
+  return (
+    <>
+      <Path
+        d="M8.5 24.5Q12 20 16 16Q20 12 23.5 7.5"
+        stroke={color}
+        strokeWidth={strokeWidth + 0.2}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <Path
+        d="M23.5 24.5Q20 20 16 16Q12 12 8.5 7.5"
+        stroke={color}
+        strokeWidth={strokeWidth + 0.2}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <Circle
+        cx="8"
+        cy="25"
+        r="1.4"
+        fill={withAlpha(color, 0.4)}
+        stroke={color}
+        strokeWidth={thin}
+      />
+      <Circle
+        cx="24"
+        cy="25"
+        r="1.4"
+        fill={withAlpha(color, 0.4)}
+        stroke={color}
+        strokeWidth={thin}
+      />
+      <Circle
+        cx="16"
+        cy="16"
+        r="2.5"
+        stroke={accentColor}
+        strokeWidth={mid}
+        fill={withAlpha(accentColor, 0.15)}
+      />
+    </>
+  );
+}
+
+function StandingsGlyph({ color, accentColor, strokeWidth }: GlyphProps) {
+  return (
+    <>
+      <Rect
+        x="7"
+        y="16"
+        width="5"
+        height="9"
+        rx="1"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill={withAlpha(color, 0.08)}
+      />
+      <Rect
+        x="13.5"
+        y="10"
+        width="5"
+        height="15"
+        rx="1"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill={withAlpha(color, 0.08)}
+      />
+      <Rect
+        x="20"
+        y="13"
+        width="5"
+        height="12"
+        rx="1"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill={withAlpha(color, 0.08)}
+      />
+      <Circle cx="16" cy="7.5" r="1.5" fill={accentColor} />
+      <Path
+        d="M7 25h18"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
+function ZapGlyph({ color, strokeWidth }: GlyphProps) {
+  return (
+    <Path
+      d="M18 5L10 17h6l-2 10 8-12h-6l2-10z"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinejoin="round"
+      fill={withAlpha(color, 0.08)}
+    />
+  );
+}
+
+function AwardGlyph({ color, accentColor, strokeWidth }: GlyphProps) {
+  return (
+    <>
+      <Circle cx="16" cy="13" r="7" stroke={color} strokeWidth={strokeWidth} />
+      <Path
+        d="M12 19l-2 8 6-3 6 3-2-8"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M16 9.5l1.3 2.6 2.9.4-2.1 2 .5 2.9L16 15.8l-2.6 1.6.5-2.9-2.1-2 2.9-.4z"
+        fill={accentColor}
+        opacity={0.8}
+      />
+    </>
+  );
+}
+
+function MessageGlyph({ color, strokeWidth }: GlyphProps) {
+  const thin = Math.max(strokeWidth - 0.4, 1);
+  return (
+    <>
+      <Path
+        d="M6 8h20a1.5 1.5 0 011.5 1.5v12a1.5 1.5 0 01-1.5 1.5H12l-4 4v-4H6a1.5 1.5 0 01-1.5-1.5v-12A1.5 1.5 0 016 8z"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinejoin="round"
+        fill={withAlpha(color, 0.04)}
+      />
+      <Path
+        d="M11 13h10"
+        stroke={color}
+        strokeWidth={thin}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M11 17h6"
+        stroke={color}
+        strokeWidth={thin}
+        strokeLinecap="round"
+      />
+    </>
+  );
+}
+
 function DiscordGlyph() {
   // Official Discord brand mark — paths use 0–24 coordinate space; scaled to
   // the 32×32 viewBox via a wrapping G transform.
@@ -551,6 +748,54 @@ function renderGlyph(
       return <DiscordGlyph />;
     case 'apple':
       return <AppleGlyph />;
+    case 'roster':
+      return (
+        <RosterGlyph
+          color={color}
+          accentColor={accentColor}
+          strokeWidth={strokeWidth}
+        />
+      );
+    case 'matchup':
+      return (
+        <MatchupGlyph
+          color={color}
+          accentColor={accentColor}
+          strokeWidth={strokeWidth}
+        />
+      );
+    case 'standings':
+      return (
+        <StandingsGlyph
+          color={color}
+          accentColor={accentColor}
+          strokeWidth={strokeWidth}
+        />
+      );
+    case 'zap':
+      return (
+        <ZapGlyph
+          color={color}
+          accentColor={accentColor}
+          strokeWidth={strokeWidth}
+        />
+      );
+    case 'award':
+      return (
+        <AwardGlyph
+          color={color}
+          accentColor={accentColor}
+          strokeWidth={strokeWidth}
+        />
+      );
+    case 'message':
+      return (
+        <MessageGlyph
+          color={color}
+          accentColor={accentColor}
+          strokeWidth={strokeWidth}
+        />
+      );
     default:
       return null;
   }

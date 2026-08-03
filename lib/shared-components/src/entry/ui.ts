@@ -19,6 +19,11 @@ export * from '../components/EmptyState';
 export * from '../components/ErrorState';
 export * from '../components/PanelCard';
 export * from '../components/UnifiedLoadingPanel';
+// Design-system MatchupCard (LS-4719). Not re-exported from the root barrel
+// (which prioritizes the features/matchup MatchupCard of the same name for
+// raw-fragment consumers) or from `./matchup` (same collision) — this is its
+// only public export path today.
+export * from '../components/MatchupCard';
 export * from '../components/Table';
 export * from '../features/common/SearchBar';
 export * from '../hooks/useThemeTokens';

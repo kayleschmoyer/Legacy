@@ -215,4 +215,26 @@ describe('LeagueDetailShell', () => {
     fireEvent.click(getByText('Analytics'));
     expect(onAnalytics).toHaveBeenCalledTimes(1);
   });
+
+  // LS-8988: the League Home "Guided Home" redesign replaces the hero + tab
+  // bar with its own compact header while on the Overview tab; every other
+  // consumer (web, football, baseball's non-Overview tabs) must render
+  // exactly as before since the prop defaults to false.
+  describe('hideHeroAndTabs (LS-8988)', () => {
+    it('renders the hero and tab bar by default', () => {
+      const { getByText, getByRole } = renderShell();
+      expect(getByText('Dead Ball Dynasty')).toBeTruthy();
+      expect(getByRole('tablist', { name: 'League sections' })).toBeTruthy();
+    });
+
+    it('hides the hero and tab bar when true, still rendering children', () => {
+      const { queryByText, queryByRole, getByText } = renderShell({
+        hideHeroAndTabs: true,
+        children: <div>Guided Home content</div>,
+      });
+      expect(queryByText('Dead Ball Dynasty')).toBeNull();
+      expect(queryByRole('tablist', { name: 'League sections' })).toBeNull();
+      expect(getByText('Guided Home content')).toBeTruthy();
+    });
+  });
 });

@@ -16,6 +16,13 @@ type RNComponents = {
   Text: typeof RNText;
 };
 
+type NextActionLike = {
+  headline: string;
+  body: string;
+  ctaLabel: string;
+  onPress: () => void;
+};
+
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 const mockNavigate = jest.fn();
@@ -277,8 +284,34 @@ jest.mock('../../../../features/matchup/components/MatchupList', () => {
   };
 });
 
+// LeagueGuidedHomeTab's own rendering (matchup mapping, standings window, nav
+// tile badges, generic up-next card rendering) is covered by its dedicated
+// spec — stubbed here the same way as the other feature-tab components in
+// this file, so this spec stays focused on [leagueId].tsx's own
+// orchestration. The `nextAction` prop is captured so this file can still
+// assert the draft-paused/live → priority-card derivation, which is
+// [leagueId].tsx's own logic (LS-8988 superseded the old standalone
+// "Draft Paused"/"Draft Is Live" banner (LS-8843) with this derivation).
+let lastGuidedHomeNextAction: NextActionLike | null | undefined;
+jest.mock('../../../../features/leagues/LeagueGuidedHomeTab', () => {
+  const { View } = jest.requireActual<RNComponents>('react-native');
+  return {
+    LeagueGuidedHomeTab: (props: { nextAction: NextActionLike | null }) => {
+      lastGuidedHomeNextAction = props.nextAction;
+      return <View testID="league-guided-home-tab" />;
+    },
+  };
+});
+
 jest.mock('../../../../features/matchup/hooks/useMatchup', () => ({
   useMatchupsForLeague: jest.fn(() => ({ matchups: [], loading: false })),
+}));
+
+jest.mock('../../../../features/leagues/hooks/useChatUnreadCount', () => ({
+  useChatUnreadCount: jest.fn(() => ({
+    unreadCount: 0,
+    markRead: jest.fn(),
+  })),
 }));
 
 jest.mock('../../../../common/scoring', () => ({
@@ -344,6 +377,14 @@ const mockGetUserTeamIdLazyQuery = jest.fn(() => [
   { data: { userTeamId: 10 }, loading: false },
 ]);
 const mockUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
+const mockGetTeamTradeOffersQuery = jest.fn(() => ({
+  data: { teamTradeOffers: [] },
+  loading: false,
+}));
+const mockGetLeagueDuesStatusQuery = jest.fn(() => ({
+  data: { leagueDuesSettings: { enabled: false }, leagueDuesStatus: [] },
+  loading: false,
+}));
 
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
@@ -358,6 +399,10 @@ jest.mock('@legacy-sports/graphql', () => ({
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
     mockUpdateTeamMemberPositionMutation(...args),
   useSwapTeamMemberPositionsMutation: () => [jest.fn()],
+  useGetTeamTradeOffersQuery: (...args: unknown[]) =>
+    mockGetTeamTradeOffersQuery(...args),
+  useGetLeagueDuesStatusQuery: (...args: unknown[]) =>
+    mockGetLeagueDuesStatusQuery(...args),
 }));
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -401,6 +446,15 @@ describe('BaseballLeagueId', () => {
         loading: false,
         error: undefined,
         refetch: jest.fn(),
+      });
+
+    jest
+      .requireMock<{
+        useChatUnreadCount: jest.Mock;
+      }>('../../../../features/leagues/hooks/useChatUnreadCount')
+      .useChatUnreadCount.mockReturnValue({
+        unreadCount: 0,
+        markRead: jest.fn(),
       });
   });
 
@@ -457,9 +511,24 @@ describe('BaseballLeagueId', () => {
       expect(screen.getByText('Chat')).toBeTruthy();
     });
 
-    it('renders the shared scoring summary in the Overview tab', () => {
+    it('renders the Guided Home layout on the Overview tab (LS-8988)', () => {
       render(<BaseballLeagueId />);
-      expect(screen.getByTestId('league-scoring-summary')).toBeTruthy();
+      expect(screen.getByTestId('league-guided-home-tab')).toBeTruthy();
+    });
+
+    it('marks league chat read when the Chat tab is selected (LS-8988)', () => {
+      const markRead = jest.fn();
+      jest
+        .requireMock<{
+          useChatUnreadCount: jest.Mock;
+        }>('../../../../features/leagues/hooks/useChatUnreadCount')
+        .useChatUnreadCount.mockReturnValue({ unreadCount: 3, markRead });
+
+      render(<BaseballLeagueId />);
+      expect(markRead).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('tab-chat'));
+      expect(markRead).toHaveBeenCalled();
     });
 
     it('keeps a visited tab mounted across tab switches (preserves scroll position)', () => {
@@ -611,40 +680,47 @@ describe('BaseballLeagueId', () => {
     });
   });
 
-  describe('paused draft banner (LS-8843)', () => {
-    it('shows a "Draft Paused" banner with a "Return to Draft Room" action when draftStatus is paused', () => {
+  describe('draft-state "Up next" priority (LS-8843, superseded by LS-8988)', () => {
+    // The old standalone "Draft Paused"/"Draft Is Live" banner (LS-8843) was
+    // replaced by the Guided Home "Up next" card (LS-8988) — the card's own
+    // rendering is covered by LeagueGuidedHomeTab.spec.tsx, so this file only
+    // asserts [leagueId].tsx's own nextAction derivation via the captured
+    // prop (see the LeagueGuidedHomeTab mock above).
+    it('derives a paused-draft nextAction with a re-entry CTA when draftStatus is paused', () => {
       mockGetLeagueByIdQuery.mockReturnValue({
         data: { league: { ...mockLeague, draftStatus: 'paused' } },
         loading: false,
       });
       render(<BaseballLeagueId />);
-      expect(screen.getByText('Draft Paused')).toBeTruthy();
-      expect(screen.queryByText('Draft Is Live')).toBeNull();
-      expect(screen.getByText('Return to Draft Room')).toBeTruthy();
+      expect(lastGuidedHomeNextAction).toEqual(
+        expect.objectContaining({
+          headline: 'The draft is paused.',
+          ctaLabel: 'Return to draft room',
+        }),
+      );
     });
 
-    it('navigates to the draft board when the paused-draft re-entry action is pressed', () => {
+    it('navigates to the draft board when the paused-draft nextAction CTA is pressed', () => {
       mockGetLeagueByIdQuery.mockReturnValue({
         data: { league: { ...mockLeague, draftStatus: 'paused' } },
         loading: false,
       });
       render(<BaseballLeagueId />);
-      fireEvent.press(screen.getByText('Return to Draft Room'));
+      lastGuidedHomeNextAction?.onPress();
       expect(mockNavigate).toHaveBeenCalledWith(
         expect.objectContaining({ pathname: '/DraftBoardPage' }),
       );
     });
 
     it.each(['not-started', 'queued', 'completed'])(
-      'does not render a draft banner when draftStatus is %s',
+      'does not derive a draft nextAction when draftStatus is %s',
       (draftStatus) => {
         mockGetLeagueByIdQuery.mockReturnValue({
           data: { league: { ...mockLeague, draftStatus } },
           loading: false,
         });
         render(<BaseballLeagueId />);
-        expect(screen.queryByText('Draft Paused')).toBeNull();
-        expect(screen.queryByText('Draft Is Live')).toBeNull();
+        expect(lastGuidedHomeNextAction?.headline ?? '').not.toMatch(/draft/i);
       },
     );
   });

@@ -28,15 +28,21 @@ import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
   useGetLeagueByIdQuery,
+  useGetLeagueDuesStatusQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
+  useGetTeamTradeOffersQuery,
   useGetUserTeamIdLazyQuery,
   useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
-import { LeagueOverviewTab } from '../../../../features/leagues/LeagueOverviewTab';
+import {
+  LeagueGuidedHomeTab,
+  type NextAction,
+} from '../../../../features/leagues/LeagueGuidedHomeTab';
+import { useChatUnreadCount } from '../../../../features/leagues/hooks/useChatUnreadCount';
 import { usePullToRefresh } from '../../../../common/hooks/usePullToRefresh';
 import { useStandings } from '../../../../features/matchup/hooks/useStandings';
 import { LeagueHistoryTab } from '../../../../features/leagues/LeagueHistoryTab';
@@ -454,6 +460,101 @@ export default function LeagueId(): React.JSX.Element {
   const startersCount =
     teamMembersData?.teamMembers?.filter((m) => m?.positionId != null).length ??
     0;
+  const emptyStarterSlots = Math.max(
+    0,
+    (positionsData?.leaguePositions?.length ?? 0) - startersCount,
+  );
+
+  // "Up next for you" priority derivation + Guided Home nav tile badges
+  // (LS-8988) — all built from data already fetched above; no new GraphQL.
+  const { data: tradeOffersData } = useGetTeamTradeOffersQuery({
+    variables: { teamId: userTeamId ?? 0, status: 'pending' },
+    skip: !userTeamId,
+  });
+  const pendingTradeCount = useMemo(() => {
+    if (!userTeamId) return 0;
+    return (tradeOffersData?.teamTradeOffers ?? []).filter(
+      (t) => t.receivingTeamId === userTeamId,
+    ).length;
+  }, [tradeOffersData, userTeamId]);
+
+  const { data: duesData } = useGetLeagueDuesStatusQuery({
+    variables: { leagueId: numLeagueId },
+    skip: isNaN(numLeagueId),
+  });
+  const duesUnpaidForMe = useMemo(() => {
+    const settings = duesData?.leagueDuesSettings;
+    if (!settings?.enabled) return false;
+    const mine = duesData?.leagueDuesStatus?.find(
+      (m) => m.userId === userInfo?.id,
+    );
+    return mine ? !mine.paid : false;
+  }, [duesData, userInfo?.id]);
+  const [showDuesPanel, setShowDuesPanel] = useState(false);
+
+  const { unreadCount: chatUnreadCount, markRead: markChatRead } =
+    useChatUnreadCount(numLeagueId, userInfo?.id ?? null);
+  useEffect(() => {
+    if (selectedTab === 'chat') markChatRead();
+  }, [selectedTab, markChatRead]);
+
+  const nextAction: NextAction | null = useMemo(() => {
+    if (isDrafting) {
+      return {
+        headline: isPausedDraft
+          ? 'The draft is paused.'
+          : 'The draft is live — make your picks.',
+        body: isPausedDraft
+          ? 'Return to the draft room when you’re ready to resume.'
+          : 'Join the draft room to make your picks.',
+        ctaLabel: isPausedDraft ? 'Return to draft room' : 'Join draft',
+        onPress: () =>
+          router.navigate({
+            pathname: '/DraftBoardPage',
+            params: { leagueId: String(numLeagueId) },
+          }),
+      };
+    }
+    if (userTeamId != null && emptyStarterSlots > 0) {
+      return {
+        headline: `${emptyStarterSlots} starter slot${emptyStarterSlots === 1 ? ' is' : 's are'} empty${
+          league?.currentWeekNumber != null
+            ? ` for Week ${league.currentWeekNumber}`
+            : ''
+        }.`,
+        body: 'Fill your lineup before first pitch.',
+        ctaLabel: 'Set my lineup',
+        onPress: () => setSelectedTab('roster'),
+      };
+    }
+    if (pendingTradeCount > 0) {
+      return {
+        headline: `You have ${pendingTradeCount} pending trade offer${pendingTradeCount === 1 ? '' : 's'}.`,
+        body: 'Review the offer before it expires.',
+        ctaLabel: 'Review trade',
+        onPress: () => setSelectedTab('trades'),
+      };
+    }
+    if (duesUnpaidForMe) {
+      return {
+        headline: 'Your league dues are unpaid.',
+        body: 'Settle up so your commissioner can mark you paid.',
+        ctaLabel: 'Pay league dues',
+        onPress: () => setShowDuesPanel(true),
+      };
+    }
+    return null;
+  }, [
+    isDrafting,
+    isPausedDraft,
+    userTeamId,
+    emptyStarterSlots,
+    league?.currentWeekNumber,
+    pendingTradeCount,
+    duesUnpaidForMe,
+    router,
+    numLeagueId,
+  ]);
 
   // Pull-to-refresh: each visited tab keeps its own `refreshing` flag and
   // only refetches its own queries — the league page keeps every visited tab
@@ -525,6 +626,8 @@ export default function LeagueId(): React.JSX.Element {
         activeTab={selectedTab}
         onTabChange={setSelectedTab}
         onInvite={() => void handleInviteShare()}
+        pendingTradeCount={pendingTradeCount}
+        hideHeroAndTabs={selectedTab === 'overview'}
       >
         {userTeamId != null && (
           <YStack paddingHorizontal="$2" paddingTop="$2">
@@ -539,31 +642,35 @@ export default function LeagueId(): React.JSX.Element {
             flex={1}
             display={selectedTab === 'overview' ? 'flex' : 'none'}
           >
-            <LeagueOverviewTab
-              league={league}
+            <LeagueGuidedHomeTab
+              league={{
+                name: league.name ?? 'League',
+                scoringLabel: scoring.profileName ?? 'Standard',
+                draftStatus: league.draftStatus ?? 'pre-draft',
+                currentWeekNumber: league.currentWeekNumber ?? null,
+                totalMatchups: league.totalMatchups ?? null,
+              }}
               leagueId={numLeagueId}
+              teamCount={rankedStandings.length}
               isCommissioner={isCommissioner}
-              isDrafting={isDrafting}
-              isPaused={isPausedDraft}
-              rankedStandings={rankedStandings}
-              startersCount={startersCount}
+              waiverEnabled={league.waiverEnabled}
               inviteCode={inviteCode}
-              scoringLoading={scoring.loading}
-              scoringError={scoring.error ?? null}
-              scoringProfileName={scoring.profileName}
-              scoringSettings={scoring.settings}
-              onJoinDraft={() =>
-                router.navigate({
-                  pathname: '/DraftBoardPage',
-                  params: { leagueId: String(numLeagueId) },
-                })
-              }
-              onViewAllStandings={() => setSelectedTab('standings')}
               onInviteShare={() => void handleInviteShare()}
-              onPlayerPress={(playerId) =>
-                router.push({
-                  pathname: '/PlayerDetail',
-                  params: { playerId: String(playerId), playerName: '' },
+              rankedStandings={rankedStandings}
+              userTeamId={userTeamId}
+              matchups={matchups}
+              pendingTradeCount={pendingTradeCount}
+              chatUnreadCount={chatUnreadCount}
+              nextAction={nextAction}
+              showDuesPanel={showDuesPanel && duesUnpaidForMe}
+              onNavigateTab={(tabId) => setSelectedTab(tabId)}
+              onMatchupPress={(matchupId) =>
+                router.navigate({
+                  pathname: '/baseball/matchup',
+                  params: {
+                    matchupId: String(matchupId),
+                    leagueId: String(numLeagueId),
+                  },
                 })
               }
               refreshControl={overviewRefresh.refreshControl}
