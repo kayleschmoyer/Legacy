@@ -119,7 +119,7 @@ const SPORTS = [
     icon: '🏈',
     league: 'NFL',
     beta: true,
-    defaultTeams: 10,
+    defaultTeams: 12,
     defaultRoster: 16,
   },
 ] as const;
