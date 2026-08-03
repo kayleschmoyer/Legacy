@@ -90,6 +90,15 @@ resource "aws_iam_policy" "github_actions_runners" {
       },
 
       # EventBridge archive operations for the runner-runners-archive resource.
+      # events:CreateArchive is authorized against the SOURCE event bus ARN
+      # (the archive doesn't exist yet at creation time) — Describe/Update/
+      # Delete/ListArchives are authorized against the archive/* ARN once it
+      # exists. Both resource patterns are listed so every action in this Sid
+      # resolves regardless of which resource type it's actually evaluated
+      # against; unused combinations grant nothing extra (LS-8910 Android
+      # pool's brand-new event bus exposed the CreateArchive gap — the
+      # long-lived default pool's archive already existed, so this call was
+      # never exercised for it).
       {
         Sid    = "RunnerEventBridgeArchive"
         Effect = "Allow"
@@ -101,7 +110,8 @@ resource "aws_iam_policy" "github_actions_runners" {
           "events:ListArchives"
         ]
         Resource = [
-          "arn:aws:events:${local.region}:${local.account_id}:archive/${local.name_prefix}-*"
+          "arn:aws:events:${local.region}:${local.account_id}:archive/${local.name_prefix}-*",
+          "arn:aws:events:${local.region}:${local.account_id}:event-bus/${local.name_prefix}-*"
         ]
       },
 
@@ -155,7 +165,11 @@ resource "aws_iam_policy" "github_actions_runners" {
         Sid    = "RunnerS3DistObjectWrite"
         Effect = "Allow"
         Action = [
-          "s3:PutObject"
+          "s3:PutObject",
+          # LS-8956 follow-up: the syncer trigger upload also sets object tags —
+          # PutObject alone got past the 403 on the object body but still 403'd
+          # on the tagging call in the same operation.
+          "s3:PutObjectTagging"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-runner-*/*"
