@@ -183,6 +183,7 @@ function makeForm(overrides: Record<string, unknown> = {}) {
     isPublic: true,
     schedulingStrategy: 'divisional' as const,
     maxRosterSize: 25,
+    rosterSlots: {},
     playerPool: 'all',
     draftMode: 'live' as const,
     selectionMethod: 'standard' as const,

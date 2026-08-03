@@ -4,8 +4,10 @@ import {
   DEFAULT_AUCTION_BUDGET,
   DEFAULT_AUCTION_MIN_BID,
   divisionsHint,
+  FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT,
   type LeagueCreateWizardForm,
   reconcileDivisions,
+  sumRosterSlots,
   validDivisionOptions,
 } from './constants';
 import {
@@ -42,6 +44,18 @@ describe('createInitialWizardForm', () => {
   it('uses the sport-specific default roster size', () => {
     expect(createInitialWizardForm('baseball').maxRosterSize).toBe(25);
     expect(createInitialWizardForm('football').maxRosterSize).toBe(16);
+  });
+
+  it('seeds football roster slots to the D/ST defaults, summing to maxRosterSize (LS-6146)', () => {
+    const initial = createInitialWizardForm('football');
+    expect(initial.rosterSlots).toEqual(
+      FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT.dst,
+    );
+    expect(sumRosterSlots(initial.rosterSlots)).toBe(initial.maxRosterSize);
+  });
+
+  it('does not seed roster slots for baseball', () => {
+    expect(createInitialWizardForm('baseball').rosterSlots).toEqual({});
   });
 });
 
@@ -107,6 +121,34 @@ describe('applyWizardFieldChange', () => {
       1,
     );
     expect(next.schedulingStrategy).toBe('round-robin');
+  });
+
+  it('derives maxRosterSize from the roster-slot sum (LS-6146)', () => {
+    const next = applyWizardFieldChange(
+      form({ rosterSlots: { QB: 1, RB: 2 } }),
+      'rosterSlots',
+      { QB: 1, RB: 4, WR: 3 },
+    );
+    expect(next.maxRosterSize).toBe(8);
+  });
+
+  it('resets roster slots to the new format defaults on a defensive-format change (LS-6146)', () => {
+    const next = applyWizardFieldChange(
+      form({
+        defensiveFormat: 'dst',
+        rosterSlots: {
+          ...FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT.dst,
+        },
+      }),
+      'defensiveFormat',
+      'idp',
+    );
+    expect(next.rosterSlots).toEqual(
+      FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT.idp,
+    );
+    expect(next.maxRosterSize).toBe(
+      sumRosterSlots(FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT.idp),
+    );
   });
 });
 

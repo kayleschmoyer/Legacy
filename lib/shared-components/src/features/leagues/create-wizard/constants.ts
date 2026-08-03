@@ -28,6 +28,13 @@ export interface LeagueCreateWizardForm {
   isPublic: boolean;
   schedulingStrategy: SchedulingStrategy;
   maxRosterSize: number;
+  /**
+   * Per-position roster slot counts (football only; empty for baseball).
+   * `maxRosterSize` is always kept as the derived sum — see
+   * `applyWizardFieldChange` — so this is the composition, not an
+   * independent value to validate on its own (LS-6146).
+   */
+  rosterSlots: Record<string, number>;
   playerPool: string;
   draftMode: DraftMode;
   selectionMethod: SelectionMethod;
@@ -117,6 +124,66 @@ export const ROSTER_SIZE_OPTIONS_BY_SPORT: Record<
 
 export const DIVISION_COUNT_OPTIONS = [1, 2, 3, 4] as const;
 
+/**
+ * Per-position roster slots for football, keyed by defensive format —
+ * mirrors the position set the server seeds via
+ * `DEFAULT_ROSTER_POSITIONS_BY_SPORT` (`lambdas/db/src/schema/leagues/mutations.ts`)
+ * and the labels used by the web wizard's own roster step
+ * (`apps/web/src/components/leagues/wizard/StepRosterSettings.tsx`).
+ *
+ * The server does not yet accept a per-slot breakdown on
+ * `CreateLeagueAndTeamsInput` (tracked separately as LS-6145) — only the
+ * derived `maxRosterSize` sum is sent. This still resolves the gap this
+ * wizard has today (LS-6146): no way at all to express "3 WRs, not 2".
+ */
+export const FOOTBALL_ROSTER_SLOT_LABELS: Record<string, string> = {
+  QB: 'Quarterback',
+  RB: 'Running Back',
+  WR: 'Wide Receiver',
+  TE: 'Tight End',
+  FLEX: 'Flex (RB/WR/TE)',
+  K: 'Kicker',
+  DST: 'Team D/ST',
+  DL: 'Defensive Line',
+  LB: 'Linebacker',
+  DB: 'Defensive Back',
+  DP: 'IDP Flex',
+  BN: 'Bench',
+};
+
+export const FOOTBALL_ROSTER_SLOTS_BY_DEFENSIVE_FORMAT: Record<
+  DefensiveFormatChoice,
+  readonly string[]
+> = {
+  dst: ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DST', 'BN'],
+  idp: ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DL', 'LB', 'DB', 'DP', 'BN'],
+};
+
+/** Sums to 16 for `dst` — matches `DEFAULT_ROSTER_BY_SPORT.football` below. */
+export const FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT: Record<
+  DefensiveFormatChoice,
+  Record<string, number>
+> = {
+  dst: { QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, K: 1, DST: 1, BN: 7 },
+  idp: {
+    QB: 1,
+    RB: 2,
+    WR: 2,
+    TE: 1,
+    FLEX: 1,
+    K: 1,
+    DL: 2,
+    LB: 2,
+    DB: 2,
+    DP: 1,
+    BN: 6,
+  },
+};
+
+export function sumRosterSlots(rosterSlots: Record<string, number>): number {
+  return Object.values(rosterSlots).reduce((sum, count) => sum + count, 0);
+}
+
 export const PLAYER_POOL_OPTIONS_BY_SPORT: Record<
   WizardSport,
   ReadonlyArray<{ label: string; value: string }>
@@ -202,13 +269,21 @@ export function createInitialWizardForm(
   leagueName = '',
   now: Date = new Date(),
 ): LeagueCreateWizardForm {
+  const rosterSlots =
+    sport === 'football'
+      ? { ...FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT.dst }
+      : {};
   return {
     leagueName: leagueName.trim().slice(0, LEAGUE_NAME_MAX_LENGTH),
     numberOfTeams: DEFAULT_TEAM_COUNT,
     numberOfDivisions: DEFAULT_NUM_DIVISIONS,
     isPublic: false,
     schedulingStrategy: 'divisional',
-    maxRosterSize: DEFAULT_ROSTER_BY_SPORT[sport],
+    maxRosterSize:
+      sport === 'football'
+        ? sumRosterSlots(rosterSlots)
+        : DEFAULT_ROSTER_BY_SPORT[sport],
+    rosterSlots,
     playerPool: 'all',
     draftMode: 'live',
     selectionMethod: 'standard',
@@ -281,6 +356,18 @@ export function applyWizardFieldChange<K extends keyof LeagueCreateWizardForm>(
       form.numberOfDivisions,
       next.numberOfTeams,
     );
+  }
+  if (field === 'rosterSlots') {
+    next.maxRosterSize = sumRosterSlots(next.rosterSlots);
+  }
+  if (field === 'defensiveFormat') {
+    // The roster step's slot picker depends on this choice — reset to that
+    // format's defaults rather than leaving stale slot keys (e.g. a leftover
+    // `DST` count after switching to IDP) behind.
+    const defaults =
+      FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT[next.defensiveFormat];
+    next.rosterSlots = { ...defaults };
+    next.maxRosterSize = sumRosterSlots(defaults);
   }
   if (field === 'draftMode' && next.draftMode === 'automated') {
     next.selectionMethod = 'random';

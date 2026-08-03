@@ -177,6 +177,61 @@ describe('LeagueCreateWizard — basics step', () => {
   });
 });
 
+describe('LeagueCreateWizard — roster step (LS-6146)', () => {
+  it('shows the roster-size chips for baseball', () => {
+    const { getByTestId, getByText } = renderWizard({
+      initialLeagueName: VALID_NAME,
+    });
+    pressNext(getByTestId);
+    expect(getByTestId('field-maxRosterSize')).toBeTruthy();
+    expect(getByText('25')).toBeTruthy();
+  });
+
+  it('shows a per-position stepper for football instead of a roster-size chip group', () => {
+    const { getByTestId, queryByTestId } = renderWizard({
+      sport: 'football',
+      initialLeagueName: VALID_NAME,
+    });
+    pressNext(getByTestId);
+    expect(queryByTestId('field-maxRosterSize')).toBeNull();
+    expect(getByTestId('field-rosterSlots')).toBeTruthy();
+    expect(getByTestId('roster-slot-WR')).toBeTruthy();
+    expect(getByTestId('roster-slots-totals').textContent).toContain(
+      'Total: 16',
+    );
+  });
+
+  it('incrementing a slot raises the total the review step will submit', () => {
+    const { getByTestId } = renderWizard({
+      sport: 'football',
+      initialLeagueName: VALID_NAME,
+    });
+    pressNext(getByTestId);
+    fireEvent.click(getByTestId('roster-slot-WR-increment'));
+    expect(getByTestId('roster-slots-totals').textContent).toContain(
+      'Total: 17',
+    );
+  });
+
+  it('does not decrement a slot below zero', () => {
+    const { getByTestId } = renderWizard({
+      sport: 'football',
+      initialLeagueName: VALID_NAME,
+    });
+    pressNext(getByTestId);
+    // DST defaults to 1 — one decrement reaches zero, the next is inert.
+    const decrement = getByTestId('roster-slot-DST-decrement');
+    fireEvent.click(decrement);
+    expect(getByTestId('roster-slots-totals').textContent).toContain(
+      'Total: 15',
+    );
+    fireEvent.click(decrement);
+    expect(getByTestId('roster-slots-totals').textContent).toContain(
+      'Total: 15',
+    );
+  });
+});
+
 describe('LeagueCreateWizard — draft step', () => {
   function goToDraft(overrides: Partial<LeagueCreateWizardProps> = {}) {
     const utils = renderWizard({ initialLeagueName: VALID_NAME, ...overrides });
@@ -275,6 +330,18 @@ describe('LeagueCreateWizard — rules step', () => {
     expect(queryByTestId('toggle-baseballHofOnly')).toBeTruthy();
     expect(queryByTestId('waiver-system-field')).toBeTruthy();
     expect(queryByTestId('salary-cap-field')).toBeTruthy();
+  });
+
+  it('switching to IDP resets the roster step to the IDP slot set (LS-6146)', () => {
+    const { getByTestId, queryByTestId } = renderWizard({
+      sport: 'football',
+      initialLeagueName: VALID_NAME,
+    });
+    pressNext(getByTestId, 3);
+    fireEvent.click(getByTestId('chip-defensiveFormat-idp'));
+    fireEvent.click(getByTestId('wizard-step-tab-roster'));
+    expect(getByTestId('roster-slot-DL')).toBeTruthy();
+    expect(queryByTestId('roster-slot-DST')).toBeNull();
   });
 });
 

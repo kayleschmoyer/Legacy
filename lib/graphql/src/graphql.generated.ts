@@ -1852,6 +1852,8 @@ export type MockDraftInit = {
   __typename?: 'MockDraftInit';
   draftId?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** False if the draft-started WebSocket notification failed to send. The draft itself was created successfully either way; when false, the client should fall back to polling immediately instead of waiting for a WS event that will never arrive. */
+  webSocketReady?: Maybe<Scalars['Boolean']['output']>;
 };
 
 /** The current user's mock-draft usage within the trailing 7-day window, relative to the free-tier weekly limit. */
