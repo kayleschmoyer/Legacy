@@ -93,7 +93,7 @@ export function FootballHubPage() {
         open={showUpgradeModal}
         onOpenChange={setShowUpgradeModal}
         featureName="Unlimited league creation"
-        featureDescription={`Free accounts can be part of up to ${FREE_TIER_LEAGUE_LIMIT} leagues. Upgrade to Premium to create and join unlimited leagues.`}
+        featureDescription={`Free accounts can be part of up to ${FREE_TIER_LEAGUE_LIMIT} leagues total, across every sport — baseball and football leagues both count toward the same limit. Upgrade to Premium to create and join unlimited leagues.`}
       />
     </>
   );

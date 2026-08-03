@@ -2371,8 +2371,10 @@ export function LeagueCreatePage(): React.JSX.Element {
                 color="$color11"
                 marginTop={2}
               >
-                Free accounts can be in up to {FREE_LEAGUE_LIMIT} leagues.
-                Upgrade to Legacy Commissioner for unlimited leagues.
+                Free accounts can be in up to {FREE_LEAGUE_LIMIT} leagues total,
+                across every sport — baseball and football leagues both count
+                toward the same limit. Upgrade to Legacy Commissioner for
+                unlimited leagues.
               </Text>
             </YStack>
             <Button
@@ -3972,7 +3974,7 @@ export function LeagueCreatePage(): React.JSX.Element {
         open={showLeagueLimitModal}
         onOpenChange={setShowLeagueLimitModal}
         featureName="Unlimited League Creation"
-        featureDescription={`Free accounts can be in up to ${FREE_LEAGUE_LIMIT} leagues. Upgrade to Legacy Commissioner for unlimited league creation.`}
+        featureDescription={`Free accounts can be in up to ${FREE_LEAGUE_LIMIT} leagues total, across every sport — baseball and football leagues both count toward the same limit. Upgrade to Legacy Commissioner for unlimited league creation.`}
       />
     </ScrollView>
   );

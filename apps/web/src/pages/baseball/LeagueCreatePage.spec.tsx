@@ -382,6 +382,28 @@ describe('LeagueCreatePage — free league limit (LS-5012)', () => {
     renderPage('/baseball/league/create');
     expect(screen.queryByTestId('league-limit-banner')).not.toBeInTheDocument();
   });
+
+  // LS-6130: the free-tier cap is global across sports (leagues of any sport
+  // count toward the same limit), but the banner previously only said "up to
+  // 3 leagues" with no indication it wasn't football-specific. A user with 3
+  // baseball leagues who opens /football/league/create must see this same
+  // clarified banner, not just be silently blocked at submit.
+  it('shows the limit banner on the football create page when the cap was reached via other sports (LS-6130)', () => {
+    mockLeagueCount = 3;
+    renderPage('/football/league/create');
+    const banner = screen.getByTestId('league-limit-banner');
+    expect(banner).toBeInTheDocument();
+    expect(banner).toHaveTextContent(/across every sport/i);
+  });
+
+  it('banner copy clarifies the cap is shared across sports, not per-sport (LS-6130)', () => {
+    mockLeagueCount = 3;
+    renderPage('/baseball/league/create');
+    const banner = screen.getByTestId('league-limit-banner');
+    expect(banner).toHaveTextContent(
+      /baseball and football leagues both count toward the same limit/i,
+    );
+  });
 });
 
 describe('LeagueCreatePage — Salary Cap upgrade modal title (LS-6096)', () => {
