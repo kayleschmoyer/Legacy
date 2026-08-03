@@ -73,21 +73,35 @@ describe('wizardReducer', () => {
   });
 
   describe('SET_SETTINGS', () => {
-    it('updates name, numTeams, and draftType', () => {
+    it('updates name, numTeams, draftType, and auction fields', () => {
       const action: WizardAction = {
         type: 'SET_SETTINGS',
-        settings: { name: 'My League', numTeams: 14, draftType: 'auction' },
+        settings: {
+          name: 'My League',
+          numTeams: 14,
+          draftType: 'auction',
+          auctionBudget: 300,
+          auctionMinBid: 5,
+        },
       };
       const next = wizardReducer(INITIAL_STATE, action);
       expect(next.name).toBe('My League');
       expect(next.numTeams).toBe(14);
       expect(next.draftType).toBe('auction');
+      expect(next.auctionBudget).toBe(300);
+      expect(next.auctionMinBid).toBe(5);
     });
 
     it('does not touch sport or roster', () => {
       const action: WizardAction = {
         type: 'SET_SETTINGS',
-        settings: { name: 'X', numTeams: 8, draftType: 'snake' },
+        settings: {
+          name: 'X',
+          numTeams: 8,
+          draftType: 'snake',
+          auctionBudget: 200,
+          auctionMinBid: 1,
+        },
       };
       const next = wizardReducer(INITIAL_STATE, action);
       expect(next.sport).toBe(INITIAL_STATE.sport);
@@ -182,5 +196,61 @@ describe('validateStep', () => {
   it('returns null when name is exactly 50 characters', () => {
     const state: WizardState = { ...baseState, name: 'A'.repeat(50) };
     expect(validateStep('settings', state)).toBeNull();
+  });
+
+  it('returns null for a snake draft regardless of auction fields', () => {
+    const state: WizardState = {
+      ...baseState,
+      draftType: 'snake',
+      auctionBudget: 0,
+      auctionMinBid: 0,
+    };
+    expect(validateStep('settings', state)).toBeNull();
+  });
+
+  it('returns null for a valid auction budget and minimum bid', () => {
+    const state: WizardState = {
+      ...baseState,
+      draftType: 'auction',
+      auctionBudget: 200,
+      auctionMinBid: 1,
+    };
+    expect(validateStep('settings', state)).toBeNull();
+  });
+
+  it('returns error when auction budget is out of range', () => {
+    const state: WizardState = {
+      ...baseState,
+      draftType: 'auction',
+      auctionBudget: 10_001,
+      auctionMinBid: 1,
+    };
+    expect(validateStep('settings', state)).toBe(
+      'Auction budget must be 1–10000.',
+    );
+  });
+
+  it('returns error when minimum bid is out of range', () => {
+    const state: WizardState = {
+      ...baseState,
+      draftType: 'auction',
+      auctionBudget: 200,
+      auctionMinBid: 0,
+    };
+    expect(validateStep('settings', state)).toBe(
+      'Minimum bid must be 1–10000.',
+    );
+  });
+
+  it('returns error when minimum bid exceeds the auction budget', () => {
+    const state: WizardState = {
+      ...baseState,
+      draftType: 'auction',
+      auctionBudget: 100,
+      auctionMinBid: 150,
+    };
+    expect(validateStep('settings', state)).toBe(
+      'Minimum bid cannot exceed the auction budget.',
+    );
   });
 });

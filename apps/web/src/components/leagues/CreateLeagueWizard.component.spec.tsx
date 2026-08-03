@@ -78,11 +78,19 @@ jest.mock('./wizard/StepLeagueSettings', () => ({
     settings,
     onChange,
   }: {
-    settings: { name: string; numTeams: number; draftType: string };
+    settings: {
+      name: string;
+      numTeams: number;
+      draftType: string;
+      auctionBudget: number;
+      auctionMinBid: number;
+    };
     onChange: (s: {
       name: string;
       numTeams: number;
       draftType: string;
+      auctionBudget: number;
+      auctionMinBid: number;
     }) => void;
   }) => (
     <div>
@@ -91,6 +99,26 @@ jest.mock('./wizard/StepLeagueSettings', () => ({
         placeholder="Enter league name"
         value={settings.name}
         onChange={(e) => onChange({ ...settings, name: e.target.value })}
+      />
+      <button
+        type="button"
+        onClick={() => onChange({ ...settings, draftType: 'auction' })}
+      >
+        Auction Draft
+      </button>
+      <input
+        placeholder="Auction Budget"
+        value={settings.auctionBudget}
+        onChange={(e) =>
+          onChange({ ...settings, auctionBudget: Number(e.target.value) })
+        }
+      />
+      <input
+        placeholder="Minimum Bid"
+        value={settings.auctionMinBid}
+        onChange={(e) =>
+          onChange({ ...settings, auctionMinBid: Number(e.target.value) })
+        }
       />
     </div>
   ),
@@ -228,6 +256,46 @@ describe('CreateLeagueWizard', () => {
     await waitFor(() =>
       expect(screen.getByText('Network error')).toBeInTheDocument(),
     );
+  });
+
+  it('sends the chosen auction budget and minimum bid on submit', () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: { id: 'league-1' } } },
+    });
+    render(<CreateLeagueWizard />);
+    advance();
+    fillLeagueName('My Auction League');
+    fireEvent.click(screen.getByText('Auction Draft'));
+    fireEvent.change(screen.getByPlaceholderText('Auction Budget'), {
+      target: { value: '350' },
+    });
+    fireEvent.change(screen.getByPlaceholderText('Minimum Bid'), {
+      target: { value: '10' },
+    });
+    advance();
+    act(() => {
+      fireEvent.click(screen.getByText('Create League'));
+    });
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.selectionMethod).toBe('auction');
+    expect(input.auctionBudget).toBe(350);
+    expect(input.auctionMinBid).toBe(10);
+  });
+
+  it('omits auction fields for a snake draft', () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: { id: 'league-1' } } },
+    });
+    render(<CreateLeagueWizard />);
+    advance();
+    fillLeagueName('My Snake League');
+    advance();
+    act(() => {
+      fireEvent.click(screen.getByText('Create League'));
+    });
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.auctionBudget).toBeUndefined();
+    expect(input.auctionMinBid).toBeUndefined();
   });
 
   it('shows football-specific Roster Settings step', () => {

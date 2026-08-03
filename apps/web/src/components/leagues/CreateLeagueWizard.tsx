@@ -27,6 +27,14 @@ import {
 import { type SportChoice, StepSportSelect } from './wizard/StepSportSelect';
 import { PageMeta } from '../PageMeta';
 
+// Mirrors the bounds/defaults in wizard/StepLeagueSettings.tsx — not
+// imported from there since that module is fully jest.mock()'d in
+// CreateLeagueWizard.component.spec.tsx.
+const AUCTION_BUDGET_RANGE = { min: 1, max: 10_000 };
+const AUCTION_MIN_BID_RANGE = { min: 1, max: 10_000 };
+const DEFAULT_AUCTION_BUDGET = 200;
+const DEFAULT_AUCTION_MIN_BID = 1;
+
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface WizardState {
@@ -35,6 +43,8 @@ export interface WizardState {
   name: string;
   numTeams: number;
   draftType: 'snake' | 'auction';
+  auctionBudget: number;
+  auctionMinBid: number;
   rosterSlots: Record<string, number>;
   /** Tracks whether the user has manually adjusted roster slots */
   rosterCustomized: boolean;
@@ -73,6 +83,8 @@ export const INITIAL_STATE: WizardState = {
   name: '',
   numTeams: 10,
   draftType: 'snake',
+  auctionBudget: DEFAULT_AUCTION_BUDGET,
+  auctionMinBid: DEFAULT_AUCTION_MIN_BID,
   rosterSlots: { ...DST_ROSTER_DEFAULTS },
   rosterCustomized: false,
 };
@@ -104,6 +116,8 @@ export function wizardReducer(
         name: action.settings.name,
         numTeams: action.settings.numTeams,
         draftType: action.settings.draftType,
+        auctionBudget: action.settings.auctionBudget,
+        auctionMinBid: action.settings.auctionMinBid,
       };
     case 'SET_DEFENSIVE_FORMAT':
       if (action.format === state.defensiveFormat) return state;
@@ -133,6 +147,25 @@ export function validateStep(step: Step, state: WizardState): string | null {
       return 'League name must be at least 3 characters.';
     if (trimmedName.length > 50)
       return 'League name must be 50 characters or fewer.';
+    if (state.draftType === 'auction') {
+      if (
+        Number.isNaN(state.auctionBudget) ||
+        state.auctionBudget < AUCTION_BUDGET_RANGE.min ||
+        state.auctionBudget > AUCTION_BUDGET_RANGE.max
+      ) {
+        return `Auction budget must be ${AUCTION_BUDGET_RANGE.min}–${AUCTION_BUDGET_RANGE.max}.`;
+      }
+      if (
+        Number.isNaN(state.auctionMinBid) ||
+        state.auctionMinBid < AUCTION_MIN_BID_RANGE.min ||
+        state.auctionMinBid > AUCTION_MIN_BID_RANGE.max
+      ) {
+        return `Minimum bid must be ${AUCTION_MIN_BID_RANGE.min}–${AUCTION_MIN_BID_RANGE.max}.`;
+      }
+      if (state.auctionMinBid > state.auctionBudget) {
+        return 'Minimum bid cannot exceed the auction budget.';
+      }
+    }
   }
   return null;
 }
@@ -243,6 +276,12 @@ export function CreateLeagueWizard() {
                     state.defensiveFormat === 'idp'
                       ? GqlDefensiveFormat.Idp
                       : GqlDefensiveFormat.Dst,
+                }
+              : {}),
+            ...(state.draftType === 'auction'
+              ? {
+                  auctionBudget: state.auctionBudget,
+                  auctionMinBid: state.auctionMinBid,
                 }
               : {}),
           },
@@ -395,6 +434,8 @@ export function CreateLeagueWizard() {
                 name: state.name,
                 numTeams: state.numTeams,
                 draftType: state.draftType,
+                auctionBudget: state.auctionBudget,
+                auctionMinBid: state.auctionMinBid,
               }}
               onChange={(settings) =>
                 dispatch({ type: 'SET_SETTINGS', settings })

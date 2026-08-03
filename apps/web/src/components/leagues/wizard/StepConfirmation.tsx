@@ -77,6 +77,15 @@ export function StepConfirmation({
           label="Draft Type"
           value={state.draftType === 'snake' ? 'Snake Draft' : 'Auction Draft'}
         />
+        {state.draftType === 'auction' && (
+          <>
+            <SummaryRow
+              label="Auction Budget"
+              value={`$${state.auctionBudget}`}
+            />
+            <SummaryRow label="Minimum Bid" value={`$${state.auctionMinBid}`} />
+          </>
+        )}
         {isFootball && (
           <>
             <SummaryRow

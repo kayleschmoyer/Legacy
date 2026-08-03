@@ -6,6 +6,8 @@ export interface LeagueSettings {
   name: string;
   numTeams: number;
   draftType: 'snake' | 'auction';
+  auctionBudget: number;
+  auctionMinBid: number;
 }
 
 interface StepLeagueSettingsProps {
@@ -15,6 +17,16 @@ interface StepLeagueSettingsProps {
 }
 
 const TEAM_COUNT_OPTIONS = [4, 6, 8, 10, 12, 14, 16, 18, 20];
+
+// Same bounds/defaults as the rich league-create form
+// (apps/web/src/pages/baseball/LeagueCreatePage.tsx), independent of sport.
+// Not shared with CreateLeagueWizard.tsx via export: that module is fully
+// jest.mock()'d in CreateLeagueWizard.component.spec.tsx, which would also
+// blank out any named constant exports re-imported from here.
+const AUCTION_BUDGET_RANGE = { min: 1, max: 10_000 };
+const AUCTION_MIN_BID_RANGE = { min: 1, max: 10_000 };
+const DEFAULT_AUCTION_BUDGET = 200;
+const DEFAULT_AUCTION_MIN_BID = 1;
 
 const DRAFT_TYPE_OPTIONS: Array<{
   value: 'snake' | 'auction';
@@ -190,6 +202,67 @@ export function StepLeagueSettings({
           ))}
         </XStack>
       </YStack>
+
+      {settings.draftType === 'auction' && (
+        <XStack gap="$4" flexWrap="wrap">
+          <YStack gap="$2" flex={1} minWidth={140}>
+            <Label htmlFor="auction-budget" color="$color" fontWeight="600">
+              Auction Budget per Team
+            </Label>
+            <Input
+              id="auction-budget"
+              value={String(settings.auctionBudget)}
+              onChangeText={(text: string) => {
+                const n = parseInt(text, 10);
+                if (Number.isNaN(n)) return;
+                set(
+                  'auctionBudget',
+                  Math.min(
+                    Math.max(n, AUCTION_BUDGET_RANGE.min),
+                    AUCTION_BUDGET_RANGE.max,
+                  ),
+                );
+              }}
+              placeholder={String(DEFAULT_AUCTION_BUDGET)}
+              keyboardType="numeric"
+              backgroundColor="$surfaceCard"
+              borderColor="$surfacePanelBorder"
+              color="$color"
+            />
+            <Text fontSize={12} color="$textMuted">
+              {AUCTION_BUDGET_RANGE.min}–{AUCTION_BUDGET_RANGE.max}
+            </Text>
+          </YStack>
+          <YStack gap="$2" flex={1} minWidth={140}>
+            <Label htmlFor="auction-min-bid" color="$color" fontWeight="600">
+              Minimum Bid
+            </Label>
+            <Input
+              id="auction-min-bid"
+              value={String(settings.auctionMinBid)}
+              onChangeText={(text: string) => {
+                const n = parseInt(text, 10);
+                if (Number.isNaN(n)) return;
+                set(
+                  'auctionMinBid',
+                  Math.min(
+                    Math.max(n, AUCTION_MIN_BID_RANGE.min),
+                    AUCTION_MIN_BID_RANGE.max,
+                  ),
+                );
+              }}
+              placeholder={String(DEFAULT_AUCTION_MIN_BID)}
+              keyboardType="numeric"
+              backgroundColor="$surfaceCard"
+              borderColor="$surfacePanelBorder"
+              color="$color"
+            />
+            <Text fontSize={12} color="$textMuted">
+              {AUCTION_MIN_BID_RANGE.min}–{AUCTION_MIN_BID_RANGE.max}
+            </Text>
+          </YStack>
+        </XStack>
+      )}
     </YStack>
   );
 }
