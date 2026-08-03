@@ -156,19 +156,12 @@ export default function CreateLeagueScreen(): React.JSX.Element {
 
   const handleSubmit = useCallback(
     (form: LeagueCreateWizardForm) => {
-      void (async () => {
-        try {
-          await createLeagueAndTeams({
-            variables: { input: buildCreateLeagueInput(form, sport) },
-          });
-        } catch (err) {
-          LOGGER.error(
-            'Error in handleSubmit:',
-            err instanceof Error ? err : new Error(String(err)),
-          );
-          Alert.alert('Error', 'Failed to create league. Please try again.');
-        }
-      })();
+      // The mutation's `onError` above already logs and alerts on failure;
+      // this catch only prevents an unhandled promise rejection, not a
+      // second Alert (LS-6135).
+      void createLeagueAndTeams({
+        variables: { input: buildCreateLeagueInput(form, sport) },
+      }).catch(() => undefined);
     },
     [createLeagueAndTeams, sport],
   );

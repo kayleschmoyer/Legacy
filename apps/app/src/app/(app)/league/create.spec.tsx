@@ -386,6 +386,41 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
       );
       expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
     });
+
+    // LS-6135 — a rejected mutation fires both Apollo's onError callback and
+    // the awaited call's rejection. A try/catch around the await used to
+    // show its own generic Alert on top of onError's, so a single failure
+    // produced two back-to-back Alerts. Only onError should surface one.
+    it('shows exactly one Alert when the mutation rejects, not a duplicate from handleSubmit', async () => {
+      const error = allowlisted();
+      const props = renderScreen();
+      // Override the default (always-succeeds) mock set up inside
+      // useCreateLeagueMutation — it must come after renderScreen() so this
+      // implementation isn't clobbered by the one the hook mock installs.
+      let mutatePromise: Promise<unknown> = Promise.resolve();
+      mockCreateLeagueMutate.mockImplementation(() => {
+        mutationOptions?.onError?.(error);
+        mutatePromise = Promise.reject(error);
+        return mutatePromise;
+      });
+
+      props.onSubmit(makeForm());
+      await waitFor(() => expect(mockCreateLeagueMutate).toHaveBeenCalled());
+      // handleSubmit attaches its own .catch to this same promise before this
+      // line runs, so awaiting it here (with a no-op catch of our own) only
+      // resolves once any handler handleSubmit chained has already run —
+      // this is what makes the assertion below catch a reintroduced second
+      // Alert instead of racing it, unlike a bare waitFor() which can
+      // short-circuit on the first (onError's) Alert before a duplicate
+      // fires.
+      await mutatePromise.catch(() => undefined);
+
+      expect(Alert.alert).toHaveBeenCalledTimes(1);
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Error',
+        'You already have a league with that name.',
+      );
+    });
   });
 
   // LS-8844 — the success handler must replace the wizard, not push on top of
