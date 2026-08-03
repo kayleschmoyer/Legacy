@@ -337,6 +337,55 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
         error,
       );
     });
+
+    // CLF-013 — a PremiumRequiredError used to hit the same generic red
+    // Alert as any other validation failure (e.g. "Draft date must be in the
+    // future"), giving the user no indication that upgrading — not editing
+    // the form — is what unblocks them.
+    it('alerts with a dedicated upgrade prompt for a PremiumRequiredError instead of the generic banner', () => {
+      renderScreen();
+      const error = new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'Upgrade to Premium to create more than 1 league.',
+            extensions: { code: 'PREMIUM_REQUIRED' },
+          },
+        ],
+      });
+
+      mutationOptions?.onError?.(error);
+
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Upgrade Required',
+        'Upgrade to Premium to create more than 1 league.',
+        expect.any(Array),
+      );
+      expect(Alert.alert).not.toHaveBeenCalledWith('Error', expect.any(String));
+    });
+
+    it('tracks the upgrade tap and routes to subscription settings from the premium-required alert', () => {
+      const { trackPremiumFeatureClick } = jest.requireMock<{
+        trackPremiumFeatureClick: jest.Mock;
+      }>('../../../utils/analytics');
+      renderScreen();
+      const error = new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'Upgrade to Premium to create more than 1 league.',
+            extensions: { code: 'PREMIUM_REQUIRED' },
+          },
+        ],
+      });
+
+      mutationOptions?.onError?.(error);
+      const buttons = jest.mocked(Alert.alert).mock.calls[0][2];
+      buttons?.find((b) => b.text === 'Upgrade')?.onPress?.();
+
+      expect(trackPremiumFeatureClick).toHaveBeenCalledWith(
+        'league-create-submit',
+      );
+      expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
+    });
   });
 
   // LS-8844 — the success handler must replace the wizard, not push on top of

@@ -4,6 +4,7 @@ import { Alert } from 'react-native';
 import { Text, YStack } from 'tamagui';
 import {
   getSubmitErrorMessage,
+  isPremiumRequiredError,
   LeagueCreateWizard,
   type LeagueCreateWizardForm,
   type WizardSport,
@@ -133,6 +134,22 @@ export default function CreateLeagueScreen(): React.JSX.Element {
         'Error creating league:',
         err instanceof Error ? err : new Error(String(err)),
       );
+      // A PremiumRequiredError gets a dedicated upgrade prompt instead of the
+      // generic red error banner — it isn't a validation mistake the user can
+      // fix by editing the form (CLF-013).
+      if (isPremiumRequiredError(err)) {
+        Alert.alert('Upgrade Required', getSubmitErrorMessage(err), [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Upgrade',
+            onPress: () => {
+              trackPremiumFeatureClick('league-create-submit');
+              void router.navigate('subscription-settings');
+            },
+          },
+        ]);
+        return;
+      }
       Alert.alert('Error', getSubmitErrorMessage(err));
     },
   });

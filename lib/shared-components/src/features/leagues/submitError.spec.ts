@@ -8,6 +8,7 @@ import { CombinedGraphQLErrors } from '@apollo/client';
 
 import {
   getSubmitErrorMessage,
+  isPremiumRequiredError,
   LEAGUE_SUBMIT_ERROR_FALLBACK,
   SAFE_TO_DISPLAY_CODES,
 } from './submitError';
@@ -71,5 +72,37 @@ describe('getSubmitErrorMessage (LS-6069)', () => {
 
   it('does not allowlist the server’s INTERNAL_SERVER_ERROR fallback code', () => {
     expect(SAFE_TO_DISPLAY_CODES.has('INTERNAL_SERVER_ERROR')).toBe(false);
+  });
+});
+
+describe('isPremiumRequiredError (CLF-013)', () => {
+  it('is true for a PremiumRequiredError (extensions.code PREMIUM_REQUIRED)', () => {
+    const error = new CombinedGraphQLErrors({
+      errors: [
+        {
+          message: 'Upgrade to Premium to create more than 1 league.',
+          extensions: { code: 'PREMIUM_REQUIRED' },
+        },
+      ],
+    });
+
+    expect(isPremiumRequiredError(error)).toBe(true);
+  });
+
+  it('is false for a different allowlisted code, e.g. a plain validation error', () => {
+    const error = new CombinedGraphQLErrors({
+      errors: [
+        {
+          message: 'Draft date must be in the future.',
+          extensions: { code: 'BAD_USER_INPUT' },
+        },
+      ],
+    });
+
+    expect(isPremiumRequiredError(error)).toBe(false);
+  });
+
+  it('is false for a plain non-GraphQL Error', () => {
+    expect(isPremiumRequiredError(new Error('network error'))).toBe(false);
   });
 });

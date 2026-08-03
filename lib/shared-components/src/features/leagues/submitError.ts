@@ -50,3 +50,19 @@ export function getSubmitErrorMessage(error: unknown): string {
   }
   return LEAGUE_SUBMIT_ERROR_FALLBACK;
 }
+
+/**
+ * True when the submit failure is the server's `PremiumRequiredError`
+ * (extensions.code `PREMIUM_REQUIRED`) rather than a generic validation
+ * failure — lets callers surface a dedicated upgrade prompt instead of the
+ * plain error banner (CLF-013).
+ */
+export function isPremiumRequiredError(error: unknown): boolean {
+  return (
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some(
+      (e) =>
+        (e.extensions?.['code'] as string | undefined) === 'PREMIUM_REQUIRED',
+    )
+  );
+}
