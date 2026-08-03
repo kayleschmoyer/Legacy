@@ -81,6 +81,11 @@ import {
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { UpgradeModal } from '../../components/UpgradeModal';
+import {
+  DST_ROSTER_DEFAULTS,
+  IDP_ROSTER_DEFAULTS,
+  StepRosterSettings,
+} from '../../components/leagues/wizard/StepRosterSettings';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { useFeatureIsOn } from '../../context/GrowthBookProvider';
 import {
@@ -214,6 +219,10 @@ export interface CreateLeagueFormData {
   // Football-only (LS-4158)
   scoringFormat: ScoringFormat;
   defensiveFormat: DefensiveFormat;
+  // Football-only per-slot roster config (LS-6147). Drives maxRosterSize
+  // (their sum) via handleRosterSlotsChange; unused for baseball, which has
+  // no roster-slot concept and keeps its flat maxRosterSize ButtonGroup.
+  rosterSlots: Record<string, number>;
 }
 
 const TEAM_COUNT_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16];
@@ -330,12 +339,18 @@ function applySportSwitch(
   nextSport: SportId,
 ): CreateLeagueFormData {
   const fresh = defaultsForSport(nextSport);
+  // Football's roster size is derived from its per-slot config (LS-6147);
+  // baseball has no roster-slot concept and keeps the flat default.
+  const freshRosterSlots = { ...DST_ROSTER_DEFAULTS };
   return {
     ...f,
     sport: nextSport,
     leagueName: '',
     numberOfTeams: fresh.numberOfTeams,
-    maxRosterSize: fresh.maxRosterSize,
+    maxRosterSize:
+      nextSport === 'football'
+        ? rosterSlotsTotals(freshRosterSlots).total
+        : fresh.maxRosterSize,
     gamesPerMatchup: fresh.gamesPerMatchup,
     baseballEraFilter: 'all',
     playerPool: 'all',
@@ -344,7 +359,25 @@ function applySportSwitch(
     // Reset football-specific fields on sport switch
     scoringFormat: 'ppr',
     defensiveFormat: 'dst',
+    rosterSlots: freshRosterSlots,
   };
+}
+
+// ── Roster-slot helpers (LS-6147) ───────────────────────────────────────────
+// Mirrors StepRosterSettings' own starters/bench/total computation so the
+// derived maxRosterSize and summary displays stay consistent with what the
+// per-slot control shows.
+
+function rosterSlotsTotals(rosterSlots: Record<string, number>): {
+  starters: number;
+  bench: number;
+  total: number;
+} {
+  const bench = rosterSlots.BN ?? 0;
+  const starters = Object.entries(rosterSlots)
+    .filter(([slot]) => slot !== 'BN')
+    .reduce((sum, [, n]) => sum + n, 0);
+  return { starters, bench, total: starters + bench };
 }
 
 // ── Display helpers for the summary sidebar ─────────────────────────────────
@@ -1156,6 +1189,7 @@ function SummarySidePanel({
   }`;
   const waiversLabel =
     f.waiverType === 'faab' ? `FAAB · $${f.faabBudgetDefault}` : 'Standard';
+  const rosterTotals = rosterSlotsTotals(f.rosterSlots);
 
   return (
     <>
@@ -1225,7 +1259,14 @@ function SummarySidePanel({
             label="Schedule"
             value={scheduleDisplayLabel(f.schedulingStrategy)}
           />
-          <SummaryRow label="Roster" value={`${f.maxRosterSize} players`} />
+          <SummaryRow
+            label="Roster"
+            value={
+              f.sport === 'football'
+                ? `${f.maxRosterSize} (${rosterTotals.starters} starters + ${rosterTotals.bench} bench)`
+                : `${f.maxRosterSize} players`
+            }
+          />
           <SummaryRow
             label="Pool"
             value={poolDisplayLabel(f.sport, f.playerPool)}
@@ -1416,6 +1457,8 @@ export function LeagueCreatePage(): React.JSX.Element {
         ? (scoringFormatParam as ScoringFormat)
         : 'ppr';
 
+    const initialRosterSlots = { ...DST_ROSTER_DEFAULTS };
+
     return {
       sport: selectedSport,
       leagueName: initialLeagueName,
@@ -1426,7 +1469,10 @@ export function LeagueCreatePage(): React.JSX.Element {
       draftMode: 'live',
       selectionMethod: 'standard',
       draftOrder: 'snake',
-      maxRosterSize: initialDefaults.maxRosterSize,
+      maxRosterSize:
+        selectedSport === 'football'
+          ? rosterSlotsTotals(initialRosterSlots).total
+          : initialDefaults.maxRosterSize,
       gamesPerMatchup: initialDefaults.gamesPerMatchup,
       draftDate: undefined,
       waiverType: 'standard',
@@ -1452,6 +1498,7 @@ export function LeagueCreatePage(): React.JSX.Element {
       rookieExempt: false,
       scoringFormat: initialScoringFormat,
       defensiveFormat: 'dst',
+      rosterSlots: initialRosterSlots,
     };
   });
 
@@ -1643,6 +1690,18 @@ export function LeagueCreatePage(): React.JSX.Element {
       if (next.selectionMethod === 'auction' && next.allowDraftSlotTrading) {
         next.allowDraftSlotTrading = false;
       }
+      // Switching D/ST vs IDP changes which slots exist (LS-6147) — reset
+      // rosterSlots to that format's defaults, mirroring
+      // CreateLeagueWizard.tsx's SET_DEFENSIVE_FORMAT reducer case, and
+      // re-derive maxRosterSize from the new slot total.
+      if (field === 'defensiveFormat') {
+        const freshSlots =
+          value === 'idp'
+            ? { ...IDP_ROSTER_DEFAULTS }
+            : { ...DST_ROSTER_DEFAULTS };
+        next.rosterSlots = freshSlots;
+        next.maxRosterSize = rosterSlotsTotals(freshSlots).total;
+      }
       if (
         field === 'numberOfTeams' &&
         typeof value === 'number' &&
@@ -1719,6 +1778,24 @@ export function LeagueCreatePage(): React.JSX.Element {
       return next;
     });
   };
+
+  // Per-slot roster config (LS-6147, football only). rosterSlots isn't a
+  // primitive, so it goes through its own setter rather than
+  // handleInputChange; maxRosterSize is kept derived from the slot total so
+  // validateFormFull's existing roster-range check and the submit payload
+  // (which only sends maxRosterSize — rosterSlots isn't wired server-side
+  // yet, see LS-6145) both stay accurate.
+  const handleRosterSlotsChange = useCallback(
+    (slots: Record<string, number>) => {
+      setHasUnsavedChanges(true);
+      setFormData((prev) => ({
+        ...prev,
+        rosterSlots: slots,
+        maxRosterSize: rosterSlotsTotals(slots).total,
+      }));
+    },
+    [],
+  );
 
   const validationErrors = useMemo(
     () => validateFormFull(formData),
@@ -2640,27 +2717,47 @@ export function LeagueCreatePage(): React.JSX.Element {
                     </div>
                   )}
 
-                  {/* Max Roster Size */}
-                  <FieldRow
-                    label="Max Roster Size"
-                    hint={`Active + bench. ${ROSTER_RANGE_BY_SPORT[formData.sport].defaultLabel}`}
-                  >
-                    <ButtonGroup
-                      data-testid="max-roster-size-group"
-                      value={formData.maxRosterSize}
-                      options={ROSTER_SIZE_OPTIONS_BY_SPORT[formData.sport].map(
-                        (size) => ({
+                  {/* Max Roster Size — baseball only. Football configures
+                      roster size per-slot below (LS-6147). */}
+                  {formData.sport === 'baseball' && (
+                    <FieldRow
+                      label="Max Roster Size"
+                      hint={`Active + bench. ${ROSTER_RANGE_BY_SPORT[formData.sport].defaultLabel}`}
+                    >
+                      <ButtonGroup
+                        data-testid="max-roster-size-group"
+                        value={formData.maxRosterSize}
+                        options={ROSTER_SIZE_OPTIONS_BY_SPORT[
+                          formData.sport
+                        ].map((size) => ({
                           value: size,
                           label: String(size),
                           recommended:
                             size ===
                             defaultsForSport(formData.sport).maxRosterSize,
-                        }),
-                      )}
-                      onChange={(v) => handleInputChange('maxRosterSize', v)}
-                      disabled={isFormDisabled}
-                    />
-                  </FieldRow>
+                        }))}
+                        onChange={(v) => handleInputChange('maxRosterSize', v)}
+                        disabled={isFormDisabled}
+                      />
+                    </FieldRow>
+                  )}
+
+                  {/* Roster Positions — football only. Per-slot config
+                      (QB/RB/WR/TE/FLEX/K/DST-or-IDP/Bench), reusing the
+                      wizard's StepRosterSettings (LS-6147). Drives
+                      maxRosterSize as the sum of slots. */}
+                  {formData.sport === 'football' && (
+                    <div
+                      style={{ gridColumn: '1 / -1' }}
+                      data-testid="roster-positions-config"
+                    >
+                      <StepRosterSettings
+                        defensiveFormat={formData.defensiveFormat}
+                        rosterSlots={formData.rosterSlots}
+                        onChange={handleRosterSlotsChange}
+                      />
+                    </div>
+                  )}
 
                   {/* Player Pool */}
                   <FieldRow

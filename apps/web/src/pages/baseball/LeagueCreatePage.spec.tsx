@@ -231,6 +231,9 @@ jest.mock('@tamagui/lucide-icons', () => ({
   ChevronRight: () => <span data-testid="icon-chevron" />,
   Copy: () => <span data-testid="icon-copy" />,
   Lock: () => <span data-testid="icon-lock" />,
+  // Used by StepRosterSettings' slot +/- steppers (LS-6147).
+  Minus: () => <span data-testid="icon-minus" />,
+  Plus: () => <span data-testid="icon-plus" />,
 }));
 
 jest.mock('tamagui', () => {
@@ -557,6 +560,89 @@ describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
     expect(screen.getByPlaceholderText('Enter your league name')).toHaveValue(
       '',
     );
+  });
+
+  it('shows the per-slot roster config (not the Max Roster Size button group) at the football URL', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+
+    expect(screen.getByTestId('roster-positions-config')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('max-roster-size-group'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the Max Roster Size button group (not the per-slot roster config) at the baseball URL', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    expect(screen.getByTestId('max-roster-size-group')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('roster-positions-config'),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('LeagueCreatePage — per-slot roster config (LS-6147)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+  });
+
+  it('defaults to the D/ST slot set and derives the roster total from the slot sum', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+
+    // D/ST defaults: QB1 RB2 WR2 TE1 FLEX1 K1 DST1 BN6 = 15.
+    expect(screen.getByTestId('roster-positions-config')).toHaveTextContent(
+      'DST',
+    );
+    expect(
+      screen.getByText(/15 \(9 starters \+ 6 bench\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('increments a slot and updates the derived roster total live', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+
+    // slotOrder for D/ST: QB, RB, WR, TE, FLEX, K, DST, BN — WR is index 2.
+    const plusIcons = screen.getAllByTestId('icon-plus');
+    fireEvent.click(plusIcons[2].parentElement as HTMLElement);
+
+    expect(
+      screen.getByText(/16 \(10 starters \+ 6 bench\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('switches to IDP slots (and resets counts to IDP defaults) when Defensive Format changes', () => {
+    renderPage('/football/league/create');
+    expandAllSections();
+
+    const config = screen.getByTestId('roster-positions-config');
+    expect(config).toHaveTextContent('DST');
+    expect(config).not.toHaveTextContent('DL');
+
+    fireEvent.click(screen.getByTestId('defensive-format-idp'));
+
+    // IDP defaults: QB1 RB2 WR2 TE1 FLEX1 K1 DL2 LB2 DB2 DP1 BN6 = 21.
+    expect(config).not.toHaveTextContent('DST');
+    expect(config).toHaveTextContent('DL');
+    expect(
+      screen.getByText(/21 \(15 starters \+ 6 bench\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('does not render the per-slot config for baseball', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+
+    expect(
+      screen.queryByTestId('roster-positions-config'),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -1963,13 +2049,15 @@ describe('LeagueCreatePage — Max Roster Size recommended marker (LS-6104)', ()
     );
   });
 
-  it('shows a Recommended marker on "16" at the football URL', () => {
+  // Football no longer has a Max Roster Size button group to mark — it
+  // configures roster size per-slot instead (LS-6147). See the
+  // "per-slot roster config (LS-6147)" describe block for football coverage.
+  it('does not render the Max Roster Size group (and so no Recommended marker) at the football URL', () => {
     renderPage('/football/league/create');
     expandAllSections();
-    const rosterButton = rosterGroup().getByRole('button', { name: '16' });
-    expect(within(rosterButton).getByTestId('status-badge')).toHaveTextContent(
-      'Recommended',
-    );
+    expect(
+      screen.queryByTestId('max-roster-size-group'),
+    ).not.toBeInTheDocument();
   });
 
   it('does not mark non-recommended roster sizes', () => {
@@ -2025,7 +2113,7 @@ describe('LeagueCreatePage — Max Roster Size recommended marker (LS-6104)', ()
     ).toBeInTheDocument();
   });
 
-  it('moves the marker to "16" and clears it from baseball values when switching to football', () => {
+  it('replaces the Max Roster Size group with the per-slot config when switching to football', () => {
     renderPage('/baseball/league/create');
     expandAllSections();
     expect(
@@ -2037,14 +2125,12 @@ describe('LeagueCreatePage — Max Roster Size recommended marker (LS-6104)', ()
     fireEvent.click(screen.getByTestId('sport-tab-football'));
     expandAllSections();
 
+    // The button group (and its "26" marker) is gone; football shows the
+    // per-slot config instead (LS-6147).
     expect(
-      within(rosterGroup().getByRole('button', { name: '16' })).getByTestId(
-        'status-badge',
-      ),
-    ).toBeInTheDocument();
-    expect(
-      rosterGroup().queryByRole('button', { name: '26' }),
+      screen.queryByTestId('max-roster-size-group'),
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId('roster-positions-config')).toBeInTheDocument();
   });
 });
 
