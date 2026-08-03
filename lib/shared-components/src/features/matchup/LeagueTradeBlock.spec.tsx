@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   useGetLeagueTradeBlockQuery,
+  useGetTeamMembersQuery,
   useSetTradeBlockMutation,
 } from '@legacy-sports/graphql';
 import { LeagueTradeBlock } from './LeagueTradeBlock';
@@ -97,6 +98,27 @@ const mockPlayers = [
   },
 ];
 
+const mockRoster = [
+  {
+    id: 1,
+    teamId: 1,
+    playerId: 10,
+    player: { firstName: 'Mike', lastName: 'Trout' },
+  },
+  {
+    id: 3,
+    teamId: 1,
+    playerId: 30,
+    player: { firstName: 'Mookie', lastName: 'Betts' },
+  },
+  {
+    id: 4,
+    teamId: 1,
+    playerId: 40,
+    player: { firstName: 'Aaron', lastName: 'Judge' },
+  },
+];
+
 function setupMock(
   overrides: Partial<ReturnType<typeof useGetLeagueTradeBlockQuery>> = {},
 ) {
@@ -115,9 +137,21 @@ function setupMock(
     ] as unknown as ReturnType<typeof useSetTradeBlockMutation>);
 }
 
+function setupRosterMock(
+  overrides: Partial<ReturnType<typeof useGetTeamMembersQuery>> = {},
+) {
+  jest.mocked(useGetTeamMembersQuery).mockReturnValue({
+    data: { teamMembers: mockRoster },
+    loading: false,
+    error: undefined,
+    ...overrides,
+  } as unknown as ReturnType<typeof useGetTeamMembersQuery>);
+}
+
 describe('LeagueTradeBlock', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    setupRosterMock({ data: { teamMembers: [] } });
   });
 
   it('renders the Trade Block header', () => {
@@ -466,6 +500,170 @@ describe('LeagueTradeBlock', () => {
           queryByText(/Failed to remove player from trade block/),
         ).toBeTruthy();
       });
+    });
+  });
+
+  describe('add player to trade block', () => {
+    it('shows the Add Player control when the user has a team in the league', () => {
+      setupMock();
+      const { getByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+      expect(getByText('Add Player')).toBeTruthy();
+    });
+
+    it('does not show the Add Player control when the user has no team in the league', () => {
+      setupMock();
+      const { queryByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={null} />,
+      );
+      expect(queryByText('Add Player')).toBeFalsy();
+    });
+
+    it('lists only roster players who are not already on the trade block', () => {
+      setupMock();
+      setupRosterMock({ data: { teamMembers: mockRoster } });
+
+      const { getByText, getAllByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+
+      act(() => {
+        fireEvent.click(getByText('Add Player'));
+      });
+
+      // Aaron Judge (id 4) is not on the block -- offered as an add option.
+      expect(getByText('Aaron Judge')).toBeTruthy();
+      // Mike Trout (id 1) and Mookie Betts (id 3) are already on the block --
+      // they must still appear exactly once (their existing row), not offered again.
+      expect(getAllByText('Mike Trout')).toHaveLength(1);
+      expect(getAllByText('Mookie Betts')).toHaveLength(1);
+    });
+
+    it('shows an explanatory message when every rostered player is already on the block', () => {
+      setupMock();
+      setupRosterMock({
+        data: {
+          teamMembers: mockRoster.filter((member) => member.id !== 4),
+        },
+      });
+
+      const { getByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+
+      act(() => {
+        fireEvent.click(getByText('Add Player'));
+      });
+
+      expect(
+        getByText('All your rostered players are already on the trade block.'),
+      ).toBeTruthy();
+    });
+
+    it('calls setTradeBlock with onTradeBlock: true and the entered asking price on confirm', async () => {
+      setupMock();
+      setupRosterMock({ data: { teamMembers: mockRoster } });
+      mockSetTradeBlock.mockResolvedValueOnce({ data: {} });
+
+      const { getByText, getByPlaceholderText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+
+      act(() => {
+        fireEvent.click(getByText('Add Player'));
+      });
+      act(() => {
+        fireEvent.click(getByText('Aaron Judge'));
+      });
+      act(() => {
+        fireEvent.change(getByPlaceholderText('Asking price (optional)'), {
+          target: { value: '$10M' },
+        });
+      });
+      act(() => {
+        fireEvent.click(getByText('Confirm Add'));
+      });
+
+      await waitFor(() => {
+        expect(mockSetTradeBlock).toHaveBeenCalledWith({
+          variables: {
+            teamMemberId: 4,
+            onTradeBlock: true,
+            askingPrice: '$10M',
+          },
+        });
+      });
+    });
+
+    it('collapses the add section back to the toggle once the add succeeds', async () => {
+      setupMock();
+      setupRosterMock({ data: { teamMembers: mockRoster } });
+      mockSetTradeBlock.mockResolvedValueOnce({ data: {} });
+
+      const { getByText, queryByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+
+      act(() => {
+        fireEvent.click(getByText('Add Player'));
+      });
+      act(() => {
+        fireEvent.click(getByText('Aaron Judge'));
+      });
+      act(() => {
+        fireEvent.click(getByText('Confirm Add'));
+      });
+
+      await waitFor(() => {
+        expect(queryByText('Confirm Add')).toBeFalsy();
+      });
+      expect(getByText('Add Player')).toBeTruthy();
+    });
+
+    it('surfaces the existing inline error treatment when the add mutation rejects', async () => {
+      setupMock();
+      setupRosterMock({ data: { teamMembers: mockRoster } });
+      mockSetTradeBlock.mockRejectedValueOnce(new Error('Server exploded'));
+
+      const { getByText, getByRole } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+
+      act(() => {
+        fireEvent.click(getByText('Add Player'));
+      });
+      act(() => {
+        fireEvent.click(getByText('Aaron Judge'));
+      });
+      act(() => {
+        fireEvent.click(getByText('Confirm Add'));
+      });
+
+      await waitFor(() => {
+        expect(getByText(/Failed to add player to trade block/)).toBeTruthy();
+      });
+      expect(getByRole('alert')).toBeTruthy();
+    });
+
+    it('cancels back to the collapsed toggle without calling setTradeBlock', () => {
+      setupMock();
+      setupRosterMock({ data: { teamMembers: mockRoster } });
+
+      const { getByText, queryByText } = render(
+        <LeagueTradeBlock leagueId={1} userTeamId={1} />,
+      );
+
+      act(() => {
+        fireEvent.click(getByText('Add Player'));
+      });
+      act(() => {
+        fireEvent.click(getByText('Cancel'));
+      });
+
+      expect(queryByText('Aaron Judge')).toBeFalsy();
+      expect(getByText('Add Player')).toBeTruthy();
+      expect(mockSetTradeBlock).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { Card, Input, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
@@ -6,9 +6,12 @@ import {
   ChevronDown,
   ChevronUp,
   DollarSign,
+  Plus,
 } from '@tamagui/lucide-icons';
 import {
+  type TeamMemberFragment,
   useGetLeagueTradeBlockQuery,
+  useGetTeamMembersQuery,
   useSetTradeBlockMutation,
 } from '@legacy-sports/graphql';
 import {
@@ -22,6 +25,11 @@ export interface LeagueTradeBlockProps {
   leagueId: number;
   /** The current user's team ID -- used to determine which toggle buttons to show. */
   userTeamId: number | null | undefined;
+}
+
+function formatPlayerName(member: TeamMemberFragment): string {
+  if (!member.player) return `Player #${member.playerId}`;
+  return `${member.player.firstName ?? ''} ${member.player.lastName ?? ''}`.trim();
 }
 
 /**
@@ -47,6 +55,28 @@ export function LeagueTradeBlock({
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
   const [priceInput, setPriceInput] = useState('');
   const [mutationError, setMutationError] = useState<string | null>(null);
+
+  const [addExpanded, setAddExpanded] = useState(false);
+  const [selectedAddId, setSelectedAddId] = useState<number | null>(null);
+  const [addPriceInput, setAddPriceInput] = useState('');
+
+  const {
+    data: rosterData,
+    loading: rosterLoading,
+    error: rosterError,
+  } = useGetTeamMembersQuery({
+    variables: { teamId: userTeamId ?? 0 },
+    skip: userTeamId == null || !addExpanded,
+  });
+
+  const blockedMemberIds = useMemo(
+    () => new Set((data?.leagueTradeBlock ?? []).map((member) => member.id)),
+    [data],
+  );
+
+  const rosterAvailableToAdd = (rosterData?.teamMembers ?? []).filter(
+    (member) => member.id != null && !blockedMemberIds.has(member.id),
+  );
 
   const handleSavePrice = async (memberId: number) => {
     setMutationError(null);
@@ -83,9 +113,192 @@ export function LeagueTradeBlock({
     }
   };
 
+  const handleAddToBlock = async () => {
+    if (selectedAddId == null) return;
+    setMutationError(null);
+    try {
+      await setTradeBlock({
+        variables: {
+          teamMemberId: selectedAddId,
+          onTradeBlock: true,
+          askingPrice: addPriceInput || null,
+        },
+      });
+      setAddExpanded(false);
+      setSelectedAddId(null);
+      setAddPriceInput('');
+    } catch (error) {
+      LOGGER.error(
+        'Failed to add player to trade block',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      setMutationError(
+        'Failed to add player to trade block. Please try again.',
+      );
+    }
+  };
+
+  const handleCancelAdd = () => {
+    setAddExpanded(false);
+    setSelectedAddId(null);
+    setAddPriceInput('');
+  };
+
   const players = data?.leagueTradeBlock ?? [];
   const displayList = expanded ? players : players.slice(0, 5);
   const hasMore = players.length > 5;
+
+  const selectedAddMember =
+    rosterAvailableToAdd.find((member) => member.id === selectedAddId) ?? null;
+  const selectedAddPlayerName = selectedAddMember
+    ? formatPlayerName(selectedAddMember)
+    : '';
+
+  const errorBanner = mutationError ? (
+    <Text
+      color="$red10"
+      fontSize="$2"
+      marginBottom="$2"
+      testID="trade-block-mutation-error"
+      role="alert"
+    >
+      {mutationError}
+    </Text>
+  ) : null;
+
+  const addSection =
+    userTeamId != null ? (
+      <YStack marginBottom="$3" gap="$2">
+        <Button
+          size="$2"
+          alignSelf="flex-start"
+          backgroundColor={withAlpha(BRAND_GOLD_LIGHT, 0.15)}
+          borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.4)}
+          borderWidth={1}
+          borderRadius="$2"
+          paddingHorizontal="$2"
+          icon={<Plus size={14} color={BRAND_GOLD_LIGHT} />}
+          onPress={() => {
+            if (addExpanded) {
+              handleCancelAdd();
+            } else {
+              setAddExpanded(true);
+            }
+          }}
+          aria-expanded={addExpanded}
+          testID="add-player-toggle"
+        >
+          <Text fontSize="$1" fontWeight="600" color={BRAND_GOLD_LIGHT}>
+            {addExpanded ? 'Cancel' : 'Add Player'}
+          </Text>
+        </Button>
+
+        {addExpanded && (
+          <YStack
+            backgroundColor="$surfaceSubtle"
+            borderRadius="$4"
+            padding="$3"
+            gap="$2"
+            testID="add-player-section"
+          >
+            {rosterLoading ? (
+              <XStack
+                alignItems="center"
+                justifyContent="center"
+                paddingVertical="$2"
+              >
+                <Spinner size="small" color={BRAND_GOLD_LIGHT} />
+              </XStack>
+            ) : rosterError ? (
+              <Text color="$red10" fontSize="$2" textAlign="center">
+                Failed to load your roster. Please try again.
+              </Text>
+            ) : rosterAvailableToAdd.length === 0 ? (
+              <Text color="$textMuted" fontSize="$2" textAlign="center">
+                All your rostered players are already on the trade block.
+              </Text>
+            ) : selectedAddId == null ? (
+              <YStack gap="$1">
+                {rosterAvailableToAdd.map((member) => {
+                  const playerName = formatPlayerName(member);
+                  return (
+                    <Button
+                      key={member.id}
+                      size="$2"
+                      justifyContent="flex-start"
+                      backgroundColor="transparent"
+                      borderColor="$outlineSubtle"
+                      borderWidth={1}
+                      borderRadius="$2"
+                      onPress={() => {
+                        if (member.id != null) setSelectedAddId(member.id);
+                      }}
+                      testID={`add-player-option-${member.id}`}
+                    >
+                      <Text fontSize="$2" color="$color">
+                        {playerName}
+                      </Text>
+                    </Button>
+                  );
+                })}
+              </YStack>
+            ) : (
+              <YStack gap="$2">
+                <Text fontSize="$2" color="$color">
+                  Adding: {selectedAddPlayerName}
+                </Text>
+                <Input
+                  size="$2"
+                  placeholder="Asking price (optional)"
+                  value={addPriceInput}
+                  onChangeText={setAddPriceInput}
+                  borderColor="$outlineSubtle"
+                  testID="add-player-price-input"
+                />
+                <XStack gap="$2">
+                  <Button
+                    size="$2"
+                    backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.18)}
+                    borderColor={withAlpha(BRAND_NAVY_LIGHT, 0.4)}
+                    borderWidth={1}
+                    borderRadius="$2"
+                    paddingHorizontal="$2"
+                    disabled={mutating}
+                    onPress={() => {
+                      void handleAddToBlock();
+                    }}
+                    testID="confirm-add-button"
+                  >
+                    <Text
+                      fontSize="$1"
+                      fontWeight="600"
+                      color={BRAND_GOLD_LIGHT}
+                    >
+                      Confirm Add
+                    </Text>
+                  </Button>
+                  <Button
+                    size="$2"
+                    backgroundColor="transparent"
+                    borderColor="$outlineSubtle"
+                    borderWidth={1}
+                    borderRadius="$2"
+                    paddingHorizontal="$2"
+                    disabled={mutating}
+                    onPress={() => setSelectedAddId(null)}
+                    testID="back-to-picker-button"
+                  >
+                    <Text fontSize="$1" fontWeight="600" color="$textMuted">
+                      Back
+                    </Text>
+                  </Button>
+                </XStack>
+              </YStack>
+            )}
+          </YStack>
+        )}
+      </YStack>
+    ) : null;
 
   const header = (
     <XStack
@@ -126,6 +339,8 @@ export function LeagueTradeBlock({
         padding="$5"
       >
         {header}
+        {addSection}
+        {errorBanner}
         <YStack alignItems="center" paddingVertical="$4">
           <Spinner size="small" color={BRAND_GOLD_LIGHT} />
         </YStack>
@@ -143,6 +358,8 @@ export function LeagueTradeBlock({
         padding="$5"
       >
         {header}
+        {addSection}
+        {errorBanner}
         <Text
           color="$red10"
           fontSize="$3"
@@ -165,6 +382,8 @@ export function LeagueTradeBlock({
         padding="$5"
       >
         {header}
+        {addSection}
+        {errorBanner}
         <YStack alignItems="center" gap="$2" paddingVertical="$5">
           <YStack
             width={44}
@@ -202,26 +421,14 @@ export function LeagueTradeBlock({
       padding="$5"
     >
       {header}
-
-      {mutationError && (
-        <Text
-          color="$red10"
-          fontSize="$2"
-          marginBottom="$2"
-          testID="trade-block-mutation-error"
-          role="alert"
-        >
-          {mutationError}
-        </Text>
-      )}
+      {addSection}
+      {errorBanner}
 
       <YStack gap="$1">
         {displayList.map((member, idx) => {
           const memberId = member.id;
           const isOwnTeam = userTeamId != null && member.teamId === userTeamId;
-          const playerName = member.player
-            ? `${member.player.firstName ?? ''} ${member.player.lastName ?? ''}`.trim()
-            : `Player #${member.playerId}`;
+          const playerName = formatPlayerName(member);
           const initial = playerName[0] ?? '?';
 
           return (

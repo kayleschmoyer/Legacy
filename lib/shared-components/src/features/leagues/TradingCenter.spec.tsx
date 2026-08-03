@@ -98,6 +98,14 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockLoadProposerRoster,
     mockProposerRosterReturn,
   ]),
+  // LeagueTradeBlock (rendered within TradingCenter) uses this to source the
+  // "Add Player" picker's roster -- default to empty since none of these
+  // integration tests exercise that add flow.
+  useGetTeamMembersQuery: jest.fn(() => ({
+    data: { teamMembers: [] },
+    loading: false,
+    error: undefined,
+  })),
   useAcceptTradeMutation: jest.fn(() => [mockAcceptTradeFn]),
   useRejectTradeMutation: jest.fn(() => [mockRejectTradeFn]),
   useCancelTradeMutation: () => [jest.fn().mockResolvedValue({})],
