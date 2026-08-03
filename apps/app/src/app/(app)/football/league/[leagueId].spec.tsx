@@ -310,6 +310,11 @@ jest.mock('@legacy-sports/graphql', () => ({
 describe('FootballLeagueId', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest
+      .requireMock<{
+        useLocalSearchParams: jest.Mock;
+      }>('expo-router')
+      .useLocalSearchParams.mockReturnValue({ leagueId: '42' });
     mockGetLeagueByIdQuery.mockReturnValue({
       data: { league: mockLeague },
       loading: false,
@@ -570,6 +575,28 @@ describe('FootballLeagueId', () => {
         expect(screen.queryByText('Draft Is Live')).toBeNull();
       },
     );
+  });
+
+  // LS-8838 — Home's "Set Lineup" pushes this route with `initialTab=roster`
+  // so it must select the Roster tab on mount, not always default to Overview.
+  describe('initial tab (LS-8838)', () => {
+    it('opens directly on the Roster tab when initialTab=roster is passed', () => {
+      const { useLocalSearchParams } = jest.requireMock<{
+        useLocalSearchParams: jest.Mock;
+      }>('expo-router');
+      useLocalSearchParams.mockReturnValue({
+        leagueId: '42',
+        initialTab: 'roster',
+      });
+
+      render(<FootballLeagueId />);
+      expect(screen.getByTestId('league-roster-management')).toBeTruthy();
+    });
+
+    it('defaults to the Overview tab when initialTab is absent', () => {
+      render(<FootballLeagueId />);
+      expect(screen.queryByTestId('league-roster-management')).toBeNull();
+    });
   });
 
   describe('waivers tab', () => {

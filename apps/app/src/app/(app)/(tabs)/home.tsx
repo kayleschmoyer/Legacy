@@ -107,6 +107,21 @@ export default function HomeTab() {
     [router],
   );
 
+  // "Set Lineup" must land directly on the Roster tab, not the league
+  // dashboard — a bare `viewLeague` push always opens on Overview, requiring
+  // an extra manual tap into Roster (LS-8838).
+  const setLineup = useCallback(
+    (s: HomeLeagueSummary) => {
+      const params = { leagueId: String(s.leagueId), initialTab: 'roster' };
+      if (s.sport === 'football') {
+        router.push({ pathname: '/football/league/[leagueId]', params });
+      } else {
+        router.push({ pathname: '/baseball/league/[leagueId]', params });
+      }
+    },
+    [router],
+  );
+
   const handleViewSport = useCallback((sport: ActiveSport) => {
     setMountedSports((prev) => {
       if (prev.has(sport)) return prev;
@@ -212,7 +227,7 @@ export default function HomeTab() {
           onRetry={() => void refetch()}
           onViewLeague={viewLeague}
           onViewMatchup={viewMatchup}
-          onSetLineup={viewLeague}
+          onSetLineup={setLineup}
           onSeeAllLeagues={() => router.navigate('/leagues')}
           onOpenProfile={() => router.navigate('/you')}
           onMockDraft={() => router.push('/baseball/mock-draft')}

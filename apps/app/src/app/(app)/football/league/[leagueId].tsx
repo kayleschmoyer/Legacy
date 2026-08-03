@@ -85,7 +85,9 @@ export default function FootballLeagueId(): React.JSX.Element {
   const params = useLocalSearchParams();
   const leagueId = params.leagueId;
   const router = useRouter();
-  const [selectedTab, setSelectedTab] = useState('overview');
+  const initialTab =
+    typeof params.initialTab === 'string' ? params.initialTab : undefined;
+  const [selectedTab, setSelectedTab] = useState(initialTab ?? 'overview');
   // View-as role preference (in-memory; mirrors web v2's derive-from-perms
   // logic). `null` means "follow the user's actual highest role".
   const [rolePref, setRolePref] = useState<LeagueRole | null>(null);

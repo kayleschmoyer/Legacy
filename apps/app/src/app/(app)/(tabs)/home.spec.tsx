@@ -87,6 +87,8 @@ let capturedOnViewMatchup: ((summary: Record<string, unknown>) => void) | null =
   null;
 // Capture the "Browse Stats" quick-action callback (LS-8984)
 let capturedOnBrowseStats: (() => void) | null = null;
+let capturedOnSetLineup: ((summary: Record<string, unknown>) => void) | null =
+  null;
 
 type MobileHomeScreenMockProps = {
   onViewSport: (sport: 'baseball' | 'football') => void;
@@ -100,6 +102,7 @@ type MobileHomeScreenMockProps = {
   onOpenProfile?: () => void;
   onViewMatchup?: (summary: Record<string, unknown>) => void;
   onBrowseStats?: () => void;
+  onSetLineup?: (summary: Record<string, unknown>) => void;
   refreshControl?: PullToRefreshControlElement;
 };
 
@@ -121,6 +124,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     onOpenProfile,
     onViewMatchup,
     onBrowseStats,
+    onSetLineup,
     refreshControl,
   }: MobileHomeScreenMockProps) => {
     capturedOnViewSport = onViewSport;
@@ -132,6 +136,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     capturedOnOpenProfile = onOpenProfile ?? null;
     capturedOnViewMatchup = onViewMatchup ?? null;
     capturedOnBrowseStats = onBrowseStats ?? null;
+    capturedOnSetLineup = onSetLineup ?? null;
     capturedRefreshControl = refreshControl ?? null;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
@@ -508,6 +513,7 @@ describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
     capturedOnOpenProfile = null;
     capturedOnViewMatchup = null;
     capturedOnBrowseStats = null;
+    capturedOnSetLineup = null;
     mockGetUserLeagueSummaries.mockReturnValue({
       data: { getUserLeagueSummaries: [] },
       loading: false,
@@ -589,6 +595,31 @@ describe('HomeTab "Scoreboard First" navigation (LS-8794)', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/baseball/league/[leagueId]',
       params: { leagueId: '7' },
+    });
+  });
+
+  // LS-8838 — "Set Lineup" must land directly on the Roster tab, not the
+  // league dashboard, so it needs its own route (not the `viewLeague` one
+  // `onViewMatchup`'s no-matchup fallback uses).
+  it('routes Set Lineup straight to the Roster tab for a baseball league', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnSetLineup?.({ leagueId: 5, sport: 'baseball' });
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/baseball/league/[leagueId]',
+      params: { leagueId: '5', initialTab: 'roster' },
+    });
+  });
+
+  it('routes Set Lineup straight to the Roster tab for a football league', () => {
+    render(<HomeTab />);
+    void act(() => {
+      capturedOnSetLineup?.({ leagueId: 9, sport: 'football' });
+    });
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/football/league/[leagueId]',
+      params: { leagueId: '9', initialTab: 'roster' },
     });
   });
 });
