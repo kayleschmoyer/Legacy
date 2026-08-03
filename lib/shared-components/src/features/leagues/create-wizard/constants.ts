@@ -104,7 +104,7 @@ export const TEAM_COUNT_OPTIONS_BY_SPORT: Record<
   readonly number[]
 > = {
   baseball: [4, 6, 8, 10, 12, 14, 16],
-  football: [8, 10, 12, 14],
+  football: [4, 6, 8, 10, 12, 14, 16],
 };
 
 export const ROSTER_SIZE_OPTIONS_BY_SPORT: Record<
