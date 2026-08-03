@@ -220,14 +220,26 @@ export const DRAFT_MODE_OPTIONS: ReadonlyArray<{
   { label: 'Automated', value: 'automated' },
 ];
 
-export const SELECTION_METHOD_OPTIONS: ReadonlyArray<{
-  label: string;
-  value: SelectionMethod;
-}> = [
-  { label: 'Standard', value: 'standard' },
-  { label: 'Auction', value: 'auction' },
-  { label: 'Random', value: 'random' },
-];
+/**
+ * Football has no documented "random" league format (LS-6128 / CLF-009) — the
+ * server-accepted `'random'` selection method is real but relabeled per sport
+ * so the football wizard doesn't imply it's a standard draft type.
+ */
+export const SELECTION_METHOD_OPTIONS_BY_SPORT: Record<
+  WizardSport,
+  ReadonlyArray<{ label: string; value: SelectionMethod }>
+> = {
+  baseball: [
+    { label: 'Standard', value: 'standard' },
+    { label: 'Auction', value: 'auction' },
+    { label: 'Random', value: 'random' },
+  ],
+  football: [
+    { label: 'Standard', value: 'standard' },
+    { label: 'Auction', value: 'auction' },
+    { label: 'Auto-Draft (Random)', value: 'random' },
+  ],
+};
 
 export const DRAFT_ORDER_OPTIONS: ReadonlyArray<{
   label: string;

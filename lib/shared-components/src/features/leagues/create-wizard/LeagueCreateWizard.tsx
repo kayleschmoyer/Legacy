@@ -38,7 +38,7 @@ import {
   ROSTER_SIZE_OPTIONS_BY_SPORT,
   SCHEDULING_STRATEGY_OPTIONS,
   SCORING_FORMAT_OPTIONS,
-  SELECTION_METHOD_OPTIONS,
+  SELECTION_METHOD_OPTIONS_BY_SPORT,
   TEAM_COUNT_OPTIONS_BY_SPORT,
   validDivisionOptions,
   WIZARD_STEP_TITLES,
@@ -255,6 +255,7 @@ export function LeagueCreateWizard({
           {step === 'draft' && (
             <DraftStep
               form={form}
+              sport={sport}
               errors={errors}
               disabled={disabled}
               isPremium={isPremium}
@@ -676,13 +677,14 @@ interface PremiumStepProps extends StepProps {
 
 function DraftStep({
   form,
+  sport,
   errors,
   disabled,
   isPremium,
   premiumLoading,
   setField,
   onUpgrade,
-}: PremiumStepProps): React.JSX.Element {
+}: PremiumStepProps & { sport: WizardSport }): React.JSX.Element {
   const isAuction = form.selectionMethod === 'auction';
   const automated = form.draftMode === 'automated';
   return (
@@ -716,7 +718,7 @@ function DraftStep({
         <WizardChipGroup
           testIDPrefix="chip-selectionMethod"
           value={form.selectionMethod}
-          options={SELECTION_METHOD_OPTIONS.map((option) => ({
+          options={SELECTION_METHOD_OPTIONS_BY_SPORT[sport].map((option) => ({
             value: option.value,
             label: option.label,
             // Auction draft is a premium selection method (LS-6125) — it
@@ -1116,7 +1118,10 @@ function ReviewStep({
         />
         <WizardSummaryRow
           label="Selection"
-          value={labelFor(SELECTION_METHOD_OPTIONS, form.selectionMethod)}
+          value={labelFor(
+            SELECTION_METHOD_OPTIONS_BY_SPORT[sport],
+            form.selectionMethod,
+          )}
         />
         {isAuction ? (
           <WizardSummaryRow
