@@ -719,8 +719,22 @@ function DraftStep({
           options={SELECTION_METHOD_OPTIONS.map((option) => ({
             value: option.value,
             label: option.label,
+            // Auction draft is a premium selection method (LS-6125) — it
+            // implicitly requires a budget, the same gate as salary-cap
+            // leagues. Lock it for free users so the gate is visible before
+            // selection; the onChange below still routes a locked tap to the
+            // upgrade modal instead of applying the selection. Mirrors the
+            // web LeagueCreatePage's ButtonGroup gating (LS-6072).
+            locked:
+              option.value === 'auction' && (!isPremium || premiumLoading),
           }))}
-          onChange={(value) => setField('selectionMethod', value)}
+          onChange={(value) => {
+            if (value === 'auction' && (!isPremium || premiumLoading)) {
+              onUpgrade('Auction Draft');
+              return;
+            }
+            setField('selectionMethod', value);
+          }}
           disabled={disabled || automated}
         />
       </WizardFieldRow>

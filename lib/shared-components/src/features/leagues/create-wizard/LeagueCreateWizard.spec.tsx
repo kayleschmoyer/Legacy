@@ -253,7 +253,9 @@ describe('LeagueCreateWizard — draft step', () => {
   });
 
   it('opens the auction sub-card, dims draft order, and hides slot trading', () => {
-    const { getByTestId, getByText, queryByTestId } = goToDraft();
+    const { getByTestId, getByText, queryByTestId } = goToDraft({
+      isPremium: true,
+    });
     expect(queryByTestId('auction-settings')).toBeNull();
     expect(getByTestId('draft-slot-trading')).toBeTruthy();
 
@@ -269,7 +271,9 @@ describe('LeagueCreateWizard — draft step', () => {
   });
 
   it('blocks NEXT with an inline error when the minimum bid exceeds the budget', () => {
-    const { getByTestId, getByText, queryByTestId } = goToDraft();
+    const { getByTestId, getByText, queryByTestId } = goToDraft({
+      isPremium: true,
+    });
     fireEvent.click(getByTestId('chip-selectionMethod-auction'));
     fireEvent.change(getByTestId('auction-min-bid-input'), {
       target: { value: '500' },
@@ -282,6 +286,22 @@ describe('LeagueCreateWizard — draft step', () => {
     ).toBeTruthy();
     // Still on the draft step — the inline error blocked the advance.
     expect(queryByTestId('field-auctionBudget')).toBeTruthy();
+  });
+
+  // LS-6125: auction draft implicitly requires a budget, the same premium
+  // gate as salary-cap leagues — a free user must not be able to select it.
+  it('routes a free user to upgrade instead of selecting auction draft', () => {
+    const onUpgrade = jest.fn();
+    const { getByTestId, queryByTestId } = goToDraft({ onUpgrade });
+
+    fireEvent.click(getByTestId('chip-selectionMethod-auction'));
+
+    expect(onUpgrade).toHaveBeenCalledWith('Auction Draft');
+    expect(getByTestId('chip-selectionMethod-standard')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(queryByTestId('auction-settings')).toBeNull();
   });
 });
 
