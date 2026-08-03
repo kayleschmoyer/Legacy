@@ -250,7 +250,12 @@ async function validateToken(
  */
 
 /**
- * Validate user has access to a league
+ * Validate user has access to a league.
+ *
+ * Members always have access. Signed-in non-members are allowed as
+ * spectators when the league is public (LS-8940) — this covers both the
+ * `$connect` check and the `updateContext` revalidation, which both route
+ * through here.
  */
 async function validateLeagueAccess(
   userId: number,
@@ -268,7 +273,19 @@ async function validateLeagueAccess(
       )
       .limit(1);
 
-    return membership.length > 0;
+    if (membership.length > 0) {
+      return true;
+    }
+
+    // Public-league spectator fallback — same DB session (avoids nested
+    // runWithPublicClient).
+    const league = await db
+      .select({ isPublic: PublicSchema.leagues.isPublic })
+      .from(PublicSchema.leagues)
+      .where(eq(PublicSchema.leagues.id, leagueId))
+      .limit(1);
+
+    return league.length > 0 && league[0].isPublic;
   });
 }
 

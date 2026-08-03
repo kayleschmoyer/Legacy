@@ -251,12 +251,15 @@ jest.mock('@legacy-sports/utils/node', () => ({
 const mockPublicSchema = {
   leagueMembers: { leagueId: 'leagueId', userId: 'userId' },
   matchups: { id: 'id', leagueId: 'leagueId' },
+  leagues: { id: 'id', isPublic: 'isPublic' },
 };
 
 /** `${userId}:${leagueId}` pairs treated as league members by the fake DB. */
 const mockLeagueMembers = new Set<string>();
 /** matchupId -> leagueId, for the fake matchup-access lookup. */
 const mockMatchupLeague = new Map<number, number>();
+/** leagueId -> is_public, for the LS-8940 spectator-fallback lookup. */
+const mockLeagueVisibility = new Map<number, boolean>();
 
 function pairsFrom(cond: unknown): Array<[string, unknown]> {
   if (Array.isArray(cond) && Array.isArray(cond[0])) {
@@ -283,6 +286,14 @@ const mockRunWithPublicClient = jest.fn(
                 const leagueId = mockMatchupLeague.get(values['id'] as number);
                 return Promise.resolve(
                   leagueId !== undefined ? [{ leagueId }] : [],
+                );
+              }
+              if (table === mockPublicSchema.leagues) {
+                const isPublic = mockLeagueVisibility.get(
+                  values['id'] as number,
+                );
+                return Promise.resolve(
+                  isPublic !== undefined ? [{ isPublic }] : [],
                 );
               }
               return Promise.resolve([]);
@@ -342,6 +353,10 @@ function registerUser(username: string): {
 
 function grantLeagueMembership(userId: number, leagueId: number): void {
   mockLeagueMembers.add(`${userId}:${leagueId}`);
+}
+
+function setLeagueVisibility(leagueId: number, isPublic: boolean): void {
+  mockLeagueVisibility.set(leagueId, isPublic);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -408,6 +423,7 @@ describe('WebSocket fan-out (LS-8856)', () => {
     mockConnectionsTable.clear();
     mockLeagueMembers.clear();
     mockMatchupLeague.clear();
+    mockLeagueVisibility.clear();
     mockJwtUsers.clear();
     nextUserId = 1;
 
@@ -1060,6 +1076,92 @@ describe('WebSocket fan-out (LS-8856)', () => {
     expect(received.sort((a, b) => a - b)).toEqual(
       Array.from({ length: BURST_SIZE }, (_, i) => i + 1),
     );
+  });
+
+  // ── LS-8940: public-league spectator access. A signed-in NON-member may
+  // connect to a PUBLIC league and receives the same league-scoped fan-out as
+  // members; a non-member on a PRIVATE league is still refused at $connect
+  // with a 403. Real handler + real clients per ADR-0019 — mock-only
+  // evidence is explicitly insufficient for this ticket. ──
+
+  it('delivers a draft pick to both a member and a non-member spectator of a public league (LS-8940)', async () => {
+    const leagueId = 700;
+    const member = registerUser('member-mallory');
+    const spectator = registerUser('spectator-sam');
+    grantLeagueMembership(member.userId, leagueId);
+    // Spectator is deliberately NOT a member — access comes from is_public.
+    setLeagueVisibility(leagueId, true);
+
+    const memberClient = client({ token: member.token, leagueId });
+    const spectatorClient = client({ token: spectator.token, leagueId });
+    await Promise.all([
+      waitForEvent(memberClient, 'connected'),
+      waitForEvent(spectatorClient, 'connected'),
+    ]);
+
+    const memberReceived = waitForEvent<{
+      leagueId: number;
+      playerId: number;
+    }>(memberClient, 'draft-pick-made');
+    const spectatorReceived = waitForEvent<{
+      leagueId: number;
+      playerId: number;
+    }>(spectatorClient, 'draft-pick-made');
+
+    await notificationService().notifyDraftPickMade(
+      leagueId,
+      /* draftId */ 8,
+      /* pickId */ 30,
+      member.userId,
+      /* playerId */ 8888,
+      /* round */ 1,
+      /* pickNumber */ 5,
+      /* overallPick */ 5,
+    );
+
+    await expect(memberReceived).resolves.toMatchObject({
+      leagueId,
+      playerId: 8888,
+    });
+    await expect(spectatorReceived).resolves.toMatchObject({
+      leagueId,
+      playerId: 8888,
+    });
+  });
+
+  it('refuses a non-member connecting to a private league at $connect with 403 (LS-8940)', async () => {
+    const leagueId = 701;
+    const outsider = registerUser('outsider-oscar');
+    setLeagueVisibility(leagueId, false);
+
+    // A real client attempt never reaches 'connected' — the bridge fails the
+    // Upgrade on the handler's non-200, exactly like API Gateway.
+    const refused = client({
+      token: outsider.token,
+      leagueId,
+      reconnect: false,
+    });
+    await expect(waitForEvent(refused, 'connected', 500)).rejects.toThrow();
+
+    // And the handler's rejection is specifically a 403 (authz), not a
+    // 401 (authn) or 500 — assert the status by invoking $connect directly.
+    const connectEvent = {
+      requestContext: {
+        routeKey: '$connect',
+        connectionId: 'ls-8940-private-conn',
+        domainName: bridge.domainName,
+        stage: bridge.stage,
+      },
+      headers: {},
+      queryStringParameters: {
+        token: outsider.token,
+        leagueId: String(leagueId),
+      },
+      body: null,
+      isBase64Encoded: false,
+    } as unknown as Parameters<typeof handler>[0];
+    const result = (await handler(connectEvent)) as { statusCode?: number };
+    expect(result.statusCode).toBe(403);
   });
 
   // ── LS-6355: matchup-scoped connections don't receive league chat/roster

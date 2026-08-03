@@ -74,12 +74,14 @@ jest.mock('@legacy-sports/utils/node', () => ({
 }));
 
 const mockRunWithPublicClient = jest.fn();
+const mockPublicSchemaTables = {
+  leagueMembers: { leagueId: 'leagueId', userId: 'userId' },
+  matchups: { id: 'id', leagueId: 'leagueId' },
+  leagues: { id: 'id', isPublic: 'isPublic' },
+};
 jest.mock('@legacy-sports/db-client', () => ({
   runWithPublicClient: (...args: unknown[]) => mockRunWithPublicClient(...args),
-  PublicSchema: {
-    leagueMembers: { leagueId: 'leagueId', userId: 'userId' },
-    matchups: { id: 'id', leagueId: 'leagueId' },
-  },
+  PublicSchema: mockPublicSchemaTables,
 }));
 
 jest.mock('drizzle-orm', () => ({
@@ -385,6 +387,65 @@ describe('WebSocket Lambda Handler', () => {
               from: () => ({
                 where: () => ({
                   limit: () => [],
+                }),
+              }),
+            }),
+          };
+          return cb(mockDb);
+        },
+      );
+
+      const event = makeEvent({
+        routeKey: '$connect',
+        queryStringParameters: { token: 'valid-jwt', leagueId: '5' },
+      });
+
+      const result = asResult(await handler(event));
+      expect(result.statusCode).toBe(403);
+    });
+
+    it('allows a signed-in non-member to connect to a public league (LS-8940)', async () => {
+      mockValidJwt();
+      // Not a member (leagueMembers → []), but the league is public.
+      mockRunWithPublicClient.mockImplementation(
+        async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => {
+          const mockDb = {
+            select: () => ({
+              from: (table: unknown) => ({
+                where: () => ({
+                  limit: () =>
+                    table === mockPublicSchemaTables.leagues
+                      ? [{ isPublic: true }]
+                      : [],
+                }),
+              }),
+            }),
+          };
+          return cb(mockDb);
+        },
+      );
+
+      const event = makeEvent({
+        routeKey: '$connect',
+        queryStringParameters: { token: 'valid-jwt', leagueId: '5' },
+      });
+
+      const result = asResult(await handler(event));
+      expect(result.statusCode).toBe(200);
+    });
+
+    it('returns 403 for a non-member when the league is private (LS-8940)', async () => {
+      mockValidJwt();
+      mockRunWithPublicClient.mockImplementation(
+        async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => {
+          const mockDb = {
+            select: () => ({
+              from: (table: unknown) => ({
+                where: () => ({
+                  limit: () =>
+                    table === mockPublicSchemaTables.leagues
+                      ? [{ isPublic: false }]
+                      : [],
                 }),
               }),
             }),
