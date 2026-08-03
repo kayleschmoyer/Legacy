@@ -1,12 +1,13 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { UpgradeModal } from './UpgradeModal';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
-  useNavigate: () => jest.fn(),
+  useNavigate: () => mockNavigate,
 }));
 
 jest.mock('./BaseModal', () => ({
@@ -62,6 +63,13 @@ jest.mock('@tamagui/lucide-icons', () => ({
 describe('UpgradeModal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUseStripePrices.mockReturnValue({
+      monthlyPriceDisplay: '$9.99',
+      annualPriceDisplay: '$99.99',
+      annualSavingsPct: '17%',
+      pricesFailed: false,
+      loading: false,
+    });
   });
 
   it('renders the live price once the query resolves', () => {
@@ -130,5 +138,43 @@ describe('UpgradeModal', () => {
         'Pricing information could not be loaded. Displayed prices may be outdated.',
       ),
     ).toBeInTheDocument();
+  });
+
+  // CLF-012 — the free-tier league-cap modal needs an escape hatch besides
+  // upgrading: a link to where the user can delete an existing league.
+  describe('secondaryAction (CLF-012)', () => {
+    it('does not render a secondary action by default', () => {
+      render(
+        <UpgradeModal
+          open
+          onOpenChange={jest.fn()}
+          featureName="Player Comparison"
+        />,
+      );
+
+      expect(screen.queryByText(/delete an existing league/i)).toBeNull();
+    });
+
+    it('renders the secondary action and navigates + closes on press', () => {
+      const onOpenChange = jest.fn();
+      render(
+        <UpgradeModal
+          open
+          onOpenChange={onOpenChange}
+          featureName="Unlimited League Creation"
+          secondaryAction={{
+            label: 'Or delete an existing league to make room',
+            to: '/football',
+          }}
+        />,
+      );
+
+      fireEvent.click(
+        screen.getByText('Or delete an existing league to make room'),
+      );
+
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+      expect(mockNavigate).toHaveBeenCalledWith('/football');
+    });
   });
 });

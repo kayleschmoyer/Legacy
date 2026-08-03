@@ -5,6 +5,7 @@ import { Text, YStack } from 'tamagui';
 import {
   FREE_LEAGUE_LIMIT,
   getSubmitErrorMessage,
+  isLeagueCapError,
   isPremiumRequiredError,
   LeagueCreateWizard,
   type LeagueCreateWizardForm,
@@ -22,7 +23,10 @@ import {
 } from '@legacy-sports/graphql';
 import { useSubscription } from '../../../features/subscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
-import { closeToHomeTab } from '../../../common/utilities/RouteUtils';
+import {
+  closeToHomeTab,
+  HOME_TAB_HREF,
+} from '../../../common/utilities/RouteUtils';
 
 /**
  * Create League — the "Line-score Wizard" (LS-8809).
@@ -149,6 +153,27 @@ export default function CreateLeagueScreen(): React.JSX.Element {
         'Error creating league:',
         err instanceof Error ? err : new Error(String(err)),
       );
+      // The free-tier 3-league cap has an actual escape hatch (deleting an
+      // existing league) besides upgrading, so it gets a third button
+      // alongside the standard upgrade prompt instead of just Not now/Upgrade
+      // (CLF-012, layered onto CLF-013's PremiumRequiredError prompt below).
+      if (isLeagueCapError(err)) {
+        Alert.alert('Upgrade Required', getSubmitErrorMessage(err), [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Manage Leagues',
+            onPress: () => router.navigate(HOME_TAB_HREF),
+          },
+          {
+            text: 'Upgrade',
+            onPress: () => {
+              trackPremiumFeatureClick('league-create-submit');
+              void router.navigate('subscription-settings');
+            },
+          },
+        ]);
+        return;
+      }
       // A PremiumRequiredError gets a dedicated upgrade prompt instead of the
       // generic red error banner — it isn't a validation mistake the user can
       // fix by editing the form (CLF-013).

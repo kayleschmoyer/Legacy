@@ -129,6 +129,12 @@ export function validateRosterSlots(
   return rosterSlots.filter((slot) => slot.count > 0);
 }
 
+// Free-tier league cap error shown on league creation (CLF-012) — points the
+// user at the one action that actually unblocks them without upgrading:
+// freeing a slot by deleting an existing league.
+const LEAGUE_LIMIT_EXCEEDED_MESSAGE =
+  'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues, or delete an existing league to make room.';
+
 // Server-side validation limits — kept in sync with apps/web/src/constants/league.ts
 const MAX_LEAGUE_NAME_LENGTH = 50;
 const MIN_NUMBER_OF_TEAMS = 2;
@@ -967,9 +973,7 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           error instanceof Error &&
           error.message === 'LEAGUE_LIMIT_EXCEEDED'
         ) {
-          throw PremiumRequiredError(
-            'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues.',
-          );
+          throw PremiumRequiredError(LEAGUE_LIMIT_EXCEEDED_MESSAGE);
         }
         if (error instanceof GraphQLError) {
           throw error;

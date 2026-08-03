@@ -8,6 +8,7 @@ import { CombinedGraphQLErrors } from '@apollo/client';
 
 import {
   getSubmitErrorMessage,
+  isLeagueCapError,
   isPremiumRequiredError,
   LEAGUE_SUBMIT_ERROR_FALLBACK,
   SAFE_TO_DISPLAY_CODES,
@@ -104,5 +105,41 @@ describe('isPremiumRequiredError (CLF-013)', () => {
 
   it('is false for a plain non-GraphQL Error', () => {
     expect(isPremiumRequiredError(new Error('network error'))).toBe(false);
+  });
+});
+
+// CLF-012 — distinguishes the free-tier 3-league cap from other
+// PREMIUM_REQUIRED upsells so callers can offer a "delete a league" escape
+// hatch only where it actually applies.
+describe('isLeagueCapError (CLF-012)', () => {
+  it('recognizes the free-tier league cap error', () => {
+    const error = new CombinedGraphQLErrors({
+      errors: [
+        {
+          message:
+            'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues, or delete an existing league to make room.',
+          extensions: { code: 'PREMIUM_REQUIRED' },
+        },
+      ],
+    });
+
+    expect(isLeagueCapError(error)).toBe(true);
+  });
+
+  it('rejects a different PREMIUM_REQUIRED upsell', () => {
+    const error = new CombinedGraphQLErrors({
+      errors: [
+        {
+          message: 'Salary cap league settings require a premium subscription.',
+          extensions: { code: 'PREMIUM_REQUIRED' },
+        },
+      ],
+    });
+
+    expect(isLeagueCapError(error)).toBe(false);
+  });
+
+  it('rejects a non-GraphQL error', () => {
+    expect(isLeagueCapError(new Error('network error'))).toBe(false);
   });
 });

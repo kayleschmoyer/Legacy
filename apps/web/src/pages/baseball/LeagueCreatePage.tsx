@@ -3985,6 +3985,10 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowLeagueLimitModal}
         featureName="Unlimited League Creation"
         featureDescription={`Free accounts can be in up to ${FREE_LEAGUE_LIMIT} leagues total, across every sport — baseball and football leagues both count toward the same limit. Upgrade to Legacy Commissioner for unlimited league creation.`}
+        secondaryAction={{
+          label: 'Or delete an existing league to make room',
+          to: `/${formData.sport}`,
+        }}
       />
     </ScrollView>
   );

@@ -66,3 +66,20 @@ export function isPremiumRequiredError(error: unknown): boolean {
     )
   );
 }
+
+/**
+ * Whether a league-create submit error is specifically the free-tier
+ * 3-league cap (`PREMIUM_REQUIRED`) rather than some other premium-gated
+ * field — so callers can offer the "delete a league" escape hatch only where
+ * it applies, instead of on every premium upsell (CLF-012).
+ */
+export function isLeagueCapError(error: unknown): boolean {
+  if (!CombinedGraphQLErrors.is(error) || error.errors.length === 0) {
+    return false;
+  }
+  const firstError = error.errors[0];
+  const code = firstError.extensions?.['code'] as string | undefined;
+  return (
+    code === 'PREMIUM_REQUIRED' && /league limit/i.test(firstError.message)
+  );
+}

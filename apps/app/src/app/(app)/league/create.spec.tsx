@@ -493,6 +493,54 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
         'You already have a league with that name.',
       );
     });
+
+    // CLF-012 — the free-tier 3-league cap has an actual escape hatch (delete
+    // an existing league) besides upgrading, so its upgrade prompt gets an
+    // extra button to the leagues list alongside Not now/Upgrade.
+    it('offers a Manage Leagues action when the error is the free-tier league cap', () => {
+      renderScreen();
+      const capError = new CombinedGraphQLErrors({
+        errors: [
+          {
+            message:
+              'You have reached the 3-league limit for your current plan. Upgrade to unlock unlimited leagues, or delete an existing league to make room.',
+            extensions: { code: 'PREMIUM_REQUIRED' },
+          },
+        ],
+      });
+
+      mutationOptions?.onError?.(capError);
+
+      const [, message, buttons] = jest.mocked(Alert.alert).mock.calls[0];
+      expect(message).toContain('delete an existing league to make room');
+      const manageButton = buttons?.find((b) => b.text === 'Manage Leagues');
+      expect(manageButton).toBeDefined();
+
+      manageButton?.onPress?.();
+      expect(mockNavigate).toHaveBeenCalledWith('/home');
+    });
+
+    it('does not offer Manage Leagues for a different PREMIUM_REQUIRED upsell', () => {
+      renderScreen();
+      const otherPremiumError = new CombinedGraphQLErrors({
+        errors: [
+          {
+            message: 'FAAB waiver type requires a premium subscription.',
+            extensions: { code: 'PREMIUM_REQUIRED' },
+          },
+        ],
+      });
+
+      mutationOptions?.onError?.(otherPremiumError);
+
+      const buttons = jest.mocked(Alert.alert).mock.calls[0][2];
+      expect(buttons?.find((b) => b.text === 'Manage Leagues')).toBeUndefined();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        'Upgrade Required',
+        'FAAB waiver type requires a premium subscription.',
+        expect.any(Array),
+      );
+    });
   });
 
   // LS-8844 — the success handler must replace the wizard, not push on top of

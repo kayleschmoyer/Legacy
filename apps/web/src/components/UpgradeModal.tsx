@@ -43,6 +43,15 @@ export interface UpgradeModalProps {
   featureName: string;
   /** Optional description shown in the feature highlight section. */
   featureDescription?: string;
+  /**
+   * Optional non-upgrade escape hatch shown below the primary CTA (e.g. the
+   * free-tier league cap modal linking to the user's leagues so they can
+   * delete one instead of upgrading — CLF-012).
+   */
+  secondaryAction?: {
+    label: string;
+    to: string;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -59,6 +68,7 @@ export function UpgradeModal({
   onOpenChange,
   featureName,
   featureDescription,
+  secondaryAction,
 }: UpgradeModalProps) {
   const navigate = useNavigate();
   const {
@@ -168,6 +178,22 @@ export function UpgradeModal({
           >
             Get Premium
           </Button>
+          {secondaryAction && (
+            <Button
+              size="$4"
+              chromeless
+              color={TEXT_MUTED}
+              fontWeight="600"
+              pressStyle={{ opacity: 0.7 }}
+              hoverStyle={{ color: TEXT_PRIMARY }}
+              onPress={() => {
+                onOpenChange(false);
+                void navigate(secondaryAction.to);
+              }}
+            >
+              {secondaryAction.label}
+            </Button>
+          )}
           <Text color={TEXT_MUTED} fontSize="$2" textAlign="center">
             Cancel anytime. No hidden fees.
           </Text>
