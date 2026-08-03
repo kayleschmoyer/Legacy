@@ -436,3 +436,62 @@ describe('LeagueCreateWizard — state and close', () => {
     expect(onClose).toHaveBeenCalledWith(false);
   });
 });
+
+// LS-6133 — a user at the free-tier league cap must see this immediately on
+// mount and be blocked from proceeding, rather than only failing on submit
+// after filling out the whole form.
+describe('LeagueCreateWizard — league limit', () => {
+  it('shows no banner and does not block NEXT when under the cap', () => {
+    const { getByTestId, queryByTestId } = renderWizard({
+      initialLeagueName: VALID_NAME,
+    });
+    expect(queryByTestId('wizard-league-limit-banner')).toBeNull();
+    expect(getByTestId('wizard-next')).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('shows the banner and disables NEXT immediately at the cap, even with a valid name', () => {
+    const { getByTestId, getByText } = renderWizard({
+      initialLeagueName: VALID_NAME,
+      atLeagueLimit: true,
+    });
+    expect(getByTestId('wizard-league-limit-banner')).toBeTruthy();
+    expect(getByText(/Free accounts can be in up to 3 leagues/)).toBeTruthy();
+    expect(getByTestId('wizard-next')).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('routes the banner Upgrade action through onUpgrade', () => {
+    const onUpgrade = jest.fn();
+    const { getByTestId } = renderWizard({ atLeagueLimit: true, onUpgrade });
+    fireEvent.click(getByTestId('wizard-league-limit-upgrade'));
+    expect(onUpgrade).toHaveBeenCalledWith('Unlimited League Creation');
+  });
+
+  it('disables CREATE LEAGUE on the review step and blocks submit if the user hits the cap after reaching review', () => {
+    // Reach review before the limit applies (mirrors a league being created
+    // by another tab/device mid-wizard), then flip atLeagueLimit like
+    // `submitting` is flipped above — same order the real screen sees it in.
+    const onSubmit = jest.fn();
+    const props: LeagueCreateWizardProps = {
+      sport: 'baseball',
+      isPremium: false,
+      premiumLoading: false,
+      initialLeagueName: VALID_NAME,
+      onSubmit,
+      onClose: jest.fn(),
+      onUpgrade: jest.fn(),
+    };
+    const { getByTestId, rerender } = render(<LeagueCreateWizard {...props} />);
+    pressNext(getByTestId, 4);
+    rerender(<LeagueCreateWizard {...props} atLeagueLimit />);
+
+    expect(getByTestId('wizard-submit')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    fireEvent.click(getByTestId('wizard-submit'));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+});

@@ -25,6 +25,7 @@ type WizardProps = {
   premiumLoading: boolean;
   submitting?: boolean;
   submitError?: string;
+  atLeagueLimit?: boolean;
   onSubmit: (form: WizardForm) => void;
   onClose: (isDirty: boolean) => void;
   onUpgrade: (featureName: string) => void;
@@ -151,9 +152,20 @@ let mockCreatedLeague: {
 } = { id: 42, name: 'Test League', inviteCode: null };
 /** Captured so a test can drive the mutation's `onError` handler directly. */
 let mutationOptions: { onError?: (error: unknown) => void } | undefined;
+let mockUserLeagueCount = 0;
+/** Overridable per test — undefined by default (query succeeds). */
+let mockUserLeaguesQueryError: unknown;
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Football: 'football', Baseball: 'baseball' },
   DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
+  useGetUserLeaguesQuery: () => ({
+    data: {
+      userLeagues: Array.from({ length: mockUserLeagueCount }, (_, i) => ({
+        id: i,
+      })),
+    },
+    error: mockUserLeaguesQueryError,
+  }),
   useCreateLeagueMutation: (options?: {
     onCompleted?: (data: unknown) => void;
     onError?: (error: unknown) => void;
@@ -228,6 +240,65 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
     mockCreateLeagueState.loading = false;
     mockCreateLeagueState.error = undefined;
     mockCreatedLeague = { id: 42, name: 'Test League', inviteCode: null };
+    mockUserLeagueCount = 0;
+    mockUserLeaguesQueryError = undefined;
+  });
+
+  // LS-6133 — a free user already at the 3-league cap must see this before
+  // spending time in the wizard, not only on final submit.
+  describe('league-cap preflight (LS-6133)', () => {
+    it('flags atLeagueLimit for a free user already at 3 leagues', () => {
+      mockIsPremium = false;
+      mockPremiumLoading = false;
+      mockUserLeagueCount = 3;
+      expect(renderScreen().atLeagueLimit).toBe(true);
+    });
+
+    it('flags atLeagueLimit for a free user over the cap', () => {
+      mockIsPremium = false;
+      mockPremiumLoading = false;
+      mockUserLeagueCount = 4;
+      expect(renderScreen().atLeagueLimit).toBe(true);
+    });
+
+    it('does not flag a free user under the cap', () => {
+      mockIsPremium = false;
+      mockPremiumLoading = false;
+      mockUserLeagueCount = 2;
+      expect(renderScreen().atLeagueLimit).toBe(false);
+    });
+
+    it('never flags a premium user regardless of league count', () => {
+      mockIsPremium = true;
+      mockPremiumLoading = false;
+      mockUserLeagueCount = 5;
+      expect(renderScreen().atLeagueLimit).toBe(false);
+    });
+
+    it('does not flag while premium status is still loading', () => {
+      mockIsPremium = false;
+      mockPremiumLoading = true;
+      mockUserLeagueCount = 5;
+      expect(renderScreen().atLeagueLimit).toBe(false);
+    });
+
+    // A failed useGetUserLeaguesQuery must fail closed (treated as at-limit)
+    // rather than silently defaulting leagueCount to 0 and letting a free
+    // user bypass the cap on a network hiccup.
+    it('flags atLeagueLimit for a free user when the league-count query errors', () => {
+      mockIsPremium = false;
+      mockPremiumLoading = false;
+      mockUserLeagueCount = 0;
+      mockUserLeaguesQueryError = new Error('network error');
+      expect(renderScreen().atLeagueLimit).toBe(true);
+    });
+
+    it('does not flag a premium user when the league-count query errors', () => {
+      mockIsPremium = true;
+      mockPremiumLoading = false;
+      mockUserLeaguesQueryError = new Error('network error');
+      expect(renderScreen().atLeagueLimit).toBe(false);
+    });
   });
 
   describe('sport routing', () => {

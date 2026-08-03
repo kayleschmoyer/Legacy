@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { Text, YStack } from 'tamagui';
 import {
+  FREE_LEAGUE_LIMIT,
   getSubmitErrorMessage,
   isPremiumRequiredError,
   LeagueCreateWizard,
@@ -17,6 +18,7 @@ import {
   DefensiveFormat as DefensiveFormatEnum,
   Sport,
   useCreateLeagueMutation,
+  useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useSubscription } from '../../../features/subscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
@@ -115,6 +117,18 @@ export default function CreateLeagueScreen(): React.JSX.Element {
     name: string;
     inviteCode: string | null;
   } | null>(null);
+
+  // Preflight league-count check (LS-6133): without this, a free user at the
+  // cap only finds out on final submit, after typing through all five steps.
+  // A failed query fails closed (treated as at-limit) rather than silently
+  // defaulting leagueCount to 0 and letting a free user bypass the cap.
+  const { data: leaguesData, error: leaguesQueryError } =
+    useGetUserLeaguesQuery();
+  const leagueCount = leaguesData?.userLeagues?.length ?? 0;
+  const atLeagueLimit =
+    !isPremium &&
+    !premiumLoading &&
+    (leagueCount >= FREE_LEAGUE_LIMIT || leaguesQueryError !== undefined);
 
   const [createLeagueAndTeams, { loading, error }] = useCreateLeagueMutation({
     onCompleted: (data: CreateLeagueMutation) => {
@@ -221,6 +235,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
         // Same allowlist as the Alert above — `error` here is the very error
         // `onError` already logged, so this path only decides what to display.
         submitError={error ? getSubmitErrorMessage(error) : undefined}
+        atLeagueLimit={atLeagueLimit}
         onSubmit={handleSubmit}
         onClose={handleClose}
         onUpgrade={handleUpgrade}

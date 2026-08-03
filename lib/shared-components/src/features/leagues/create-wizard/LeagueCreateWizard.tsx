@@ -8,6 +8,7 @@ import {
   type WizardChipOption,
   WizardFieldRow,
   WizardHeader,
+  WizardLimitBanner,
   WizardPrimaryCta,
   WizardProgressStrip,
   WizardSubCard,
@@ -29,6 +30,7 @@ import {
   DRAFT_ORDER_OPTIONS,
   FOOTBALL_ROSTER_SLOT_LABELS,
   FOOTBALL_ROSTER_SLOTS_BY_DEFENSIVE_FORMAT,
+  FREE_LEAGUE_LIMIT,
   LEAGUE_NAME_MAX_LENGTH,
   LEAGUE_NAME_MIN_LENGTH,
   type LeagueCreateWizardForm,
@@ -100,6 +102,11 @@ export interface LeagueCreateWizardProps {
   submitting?: boolean;
   /** Mutation failure surfaced inline on the review step. */
   submitError?: string;
+  /**
+   * User is already at the free-tier league cap (LS-6133). Shows a banner and
+   * blocks Next/Create up front instead of only failing on final submit.
+   */
+  atLeagueLimit?: boolean;
   onSubmit: (form: LeagueCreateWizardForm) => void;
   /** Close/cancel. The host decides whether to confirm — see `isDirty`. */
   onClose: (isDirty: boolean) => void;
@@ -115,6 +122,7 @@ export function LeagueCreateWizard({
   premiumLoading,
   submitting = false,
   submitError,
+  atLeagueLimit = false,
   onSubmit,
   onClose,
   onUpgrade,
@@ -185,6 +193,10 @@ export function LeagueCreateWizard({
   }, [goToStep, isDirty, onClose, stepIndex]);
 
   const handleSubmit = useCallback(() => {
+    // Belt-and-suspenders: the CTA is already disabled while atLeagueLimit,
+    // but guard here too in case a caller reaches this without going through
+    // the disabled button (LS-6133).
+    if (atLeagueLimit) return;
     // Re-validate everything against the current clock: a draft date that was
     // in the future when picked can slip into the past while the user works
     // through the wizard.
@@ -194,7 +206,7 @@ export function LeagueCreateWizard({
       return;
     }
     onSubmit(form);
-  }, [form, onSubmit, sport]);
+  }, [atLeagueLimit, form, onSubmit, sport]);
 
   const nameLength = form.leagueName.trim().length;
   const nameValid =
@@ -216,6 +228,12 @@ export function LeagueCreateWizard({
 
       <ScrollView flex={1} contentContainerStyle={{ flexGrow: 1 }}>
         <YStack paddingHorizontal={20} paddingVertical={18} gap={16}>
+          {atLeagueLimit && (
+            <WizardLimitBanner
+              limit={FREE_LEAGUE_LIMIT}
+              onUpgrade={() => onUpgrade('Unlimited League Creation')}
+            />
+          )}
           {step === 'basics' && (
             <BasicsStep
               form={form}
@@ -274,7 +292,7 @@ export function LeagueCreateWizard({
             <WizardPrimaryCta
               label={submitting ? 'Creating…' : 'CREATE LEAGUE'}
               onPress={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || atLeagueLimit}
               helperText={REVIEW_HELPER}
             />
           </YStack>
@@ -284,7 +302,9 @@ export function LeagueCreateWizard({
             onBack={handleBack}
             nextLabel={`NEXT — ${WIZARD_STEPS[stepIndex + 1].label}`}
             onNext={handleNext}
-            nextDisabled={disabled || (step === 'basics' && !nameValid)}
+            nextDisabled={
+              disabled || atLeagueLimit || (step === 'basics' && !nameValid)
+            }
           />
         )}
       </ScrollView>

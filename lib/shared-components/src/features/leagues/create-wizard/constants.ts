@@ -82,6 +82,9 @@ export const WIZARD_STEP_TITLES: Record<WizardStepId, string> = {
 export const LEAGUE_NAME_MIN_LENGTH = 3;
 export const LEAGUE_NAME_MAX_LENGTH = 50;
 
+/** Matches `FREE_LEAGUE_LIMIT` in `apps/web/src/constants/league.ts` (LS-6133). */
+export const FREE_LEAGUE_LIMIT = 3;
+
 export const TEAM_COUNT_MIN = 4;
 export const TEAM_COUNT_MAX = 16;
 

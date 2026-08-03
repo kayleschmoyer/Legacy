@@ -556,6 +556,88 @@ export function WizardSubCard({
   );
 }
 
+// ── League limit banner ─────────────────────────────────────────────────────
+
+export interface WizardLimitBannerProps {
+  /** Free-tier league cap, e.g. `FREE_LEAGUE_LIMIT`. */
+  limit: number;
+  onUpgrade: () => void;
+}
+
+/**
+ * Preflight warning shown the moment the wizard mounts when the user is
+ * already at their free-tier league cap — before they spend time filling out
+ * the form only to be blocked on final submit (LS-6133). Mirrors the web
+ * "League limit reached" banner (`apps/web/src/pages/baseball/LeagueCreatePage.tsx`).
+ */
+export function WizardLimitBanner({
+  limit,
+  onUpgrade,
+}: WizardLimitBannerProps): React.JSX.Element {
+  return (
+    <XStack
+      testID="wizard-league-limit-banner"
+      accessibilityRole="alert"
+      gap={12}
+      alignItems="flex-start"
+      padding={14}
+      backgroundColor={withAlpha(BRAND_GOLD, 0.08)}
+      borderWidth={1}
+      borderColor={withAlpha(BRAND_GOLD, 0.35)}
+      borderRadius={RADIUS_CARD}
+    >
+      <YStack flex={1} minWidth={0} gap={2}>
+        <Text
+          fontFamily="$heading"
+          fontWeight="800"
+          fontSize={12}
+          letterSpacing={0.8}
+          textTransform="uppercase"
+          color={BRAND_GOLD_LIGHT}
+        >
+          League limit reached
+        </Text>
+        <Text fontFamily="$body" fontSize={13} color={TEXT_MUTED}>
+          Free accounts can be in up to {limit} leagues. Upgrade to Legacy
+          Commissioner for unlimited leagues.
+        </Text>
+      </YStack>
+      <XStack
+        testID="wizard-league-limit-upgrade"
+        accessibilityRole="button"
+        accessibilityLabel="Upgrade"
+        aria-label="Upgrade"
+        tabIndex={0}
+        onPress={onUpgrade}
+        onKeyDown={(e: React.KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onUpgrade();
+          }
+        }}
+        minHeight={WIZARD_TAP_TARGET}
+        paddingHorizontal={14}
+        alignItems="center"
+        justifyContent="center"
+        borderRadius={RADIUS_CHIP}
+        backgroundColor={BRAND_GOLD}
+        cursor="pointer"
+        pressStyle={{ scale: 0.97 }}
+      >
+        <Text
+          fontFamily="$heading"
+          fontWeight="800"
+          fontSize={12}
+          letterSpacing={0.6}
+          color={BG_DARK}
+        >
+          Upgrade
+        </Text>
+      </XStack>
+    </XStack>
+  );
+}
+
 // ── Bottom bar ───────────────────────────────────────────────────────────────
 
 /**
