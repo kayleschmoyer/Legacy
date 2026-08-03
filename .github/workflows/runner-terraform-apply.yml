@@ -58,6 +58,20 @@ jobs:
           if [ -z "${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}" ]; then
             MISSING+=("RUNNER_GITHUB_APP_WEBHOOK_SECRET")
           fi
+          # LS-8910: the Android runner pool needs its OWN GitHub App (a GitHub
+          # App has exactly one webhook URL, and this module instance provisions
+          # its own webhook Lambda). Required here rather than optional so the
+          # apply fails fast with a clear message instead of the harder-to-read
+          # SSM "Member must have length greater than or equal to 1" error.
+          if [ -z "${{ secrets.RUNNER_ANDROID_GITHUB_APP_ID }}" ]; then
+            MISSING+=("RUNNER_ANDROID_GITHUB_APP_ID")
+          fi
+          if [ -z "${{ secrets.RUNNER_ANDROID_GITHUB_APP_KEY_BASE64 }}" ]; then
+            MISSING+=("RUNNER_ANDROID_GITHUB_APP_KEY_BASE64")
+          fi
+          if [ -z "${{ secrets.RUNNER_ANDROID_GITHUB_APP_WEBHOOK_SECRET }}" ]; then
+            MISSING+=("RUNNER_ANDROID_GITHUB_APP_WEBHOOK_SECRET")
+          fi
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "::error::Missing required runner secrets: ${MISSING[*]}"
             exit 1
@@ -167,6 +181,9 @@ jobs:
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+          TF_VAR_github_app_android_id: ${{ secrets.RUNNER_ANDROID_GITHUB_APP_ID }}
+          TF_VAR_github_app_android_key_base64: ${{ secrets.RUNNER_ANDROID_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_android_webhook_secret: ${{ secrets.RUNNER_ANDROID_GITHUB_APP_WEBHOOK_SECRET }}
         run: |
           set -euo pipefail
           # As of LS-2425, terraform/runners/ is its own state file. The plan
@@ -183,6 +200,9 @@ jobs:
           TF_VAR_github_app_id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
           TF_VAR_github_app_key_base64: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
           TF_VAR_github_app_webhook_secret: ${{ secrets.RUNNER_GITHUB_APP_WEBHOOK_SECRET }}
+          TF_VAR_github_app_android_id: ${{ secrets.RUNNER_ANDROID_GITHUB_APP_ID }}
+          TF_VAR_github_app_android_key_base64: ${{ secrets.RUNNER_ANDROID_GITHUB_APP_KEY_BASE64 }}
+          TF_VAR_github_app_android_webhook_secret: ${{ secrets.RUNNER_ANDROID_GITHUB_APP_WEBHOOK_SECRET }}
         run: |
           set -euo pipefail
           terraform apply -input=false -auto-approve -lock-timeout=5m runner.tfplan

@@ -145,6 +145,23 @@ resource "aws_iam_policy" "github_actions_runners" {
         ]
       },
 
+      # S3 runner-dist bucket — object-level write for `aws_s3_object.trigger`
+      # (runner-binaries-syncer module writes a trigger JSON on every apply).
+      # LS-8927: only the read side was ever granted here — invisible until the
+      # LS-8910 Android pool's brand-new dist bucket needed its trigger object
+      # written for the first time; the long-lived default-pool bucket's trigger
+      # object predates whichever module version introduced this write.
+      {
+        Sid    = "RunnerS3DistObjectWrite"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject"
+        ]
+        Resource = [
+          "arn:aws:s3:::${local.name_prefix}-runner-*/*"
+        ]
+      },
+
       # IAM OIDC provider read — required by data "aws_iam_openid_connect_provider"
       # in data.tf (looks up the GitHub Actions OIDC provider by URL).
       # ListOpenIDConnectProviders is an account-level list operation; resource
