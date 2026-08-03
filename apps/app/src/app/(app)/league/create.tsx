@@ -67,8 +67,9 @@ export function buildCreateLeagueInput(
         }
       : {}),
     // Era filter, HOF-only, waivers, and the salary cap are premium settings
-    // shared by both sports (LS-6138) — the server validates eraFilter against
-    // the sport-specific era list, so this is safe to send unconditionally.
+    // shared by both sports (LS-6138, LS-6143) — the server validates
+    // eraFilter against the sport-specific era list, so this is safe to send
+    // unconditionally.
     eraFilter: form.baseballEraFilter,
     ...(form.baseballEraFilter === 'custom'
       ? {

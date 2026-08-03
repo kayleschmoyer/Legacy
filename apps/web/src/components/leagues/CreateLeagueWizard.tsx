@@ -1,4 +1,4 @@
-import React, { useCallback, useReducer, useRef } from 'react';
+import React, { useCallback, useReducer, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft } from '@tamagui/lucide-icons';
@@ -26,6 +26,9 @@ import {
 } from './wizard/StepRosterSettings';
 import { type SportChoice, StepSportSelect } from './wizard/StepSportSelect';
 import { PageMeta } from '../PageMeta';
+import { UpgradeModal } from '../UpgradeModal';
+import { useIsPremiumStatus } from '../../hooks/useIsPremium';
+import { trackPremiumFeatureClick } from '../../utils/analytics';
 
 // Mirrors the bounds/defaults in wizard/StepLeagueSettings.tsx — not
 // imported from there since that module is fully jest.mock()'d in
@@ -48,6 +51,9 @@ export interface WizardState {
   rosterSlots: Record<string, number>;
   /** Tracks whether the user has manually adjusted roster slots */
   rosterCustomized: boolean;
+  /** Salary cap is sport-agnostic server-side (LS-6143). */
+  salaryCapEnabled: boolean;
+  salaryCap?: number;
 }
 
 type Step = 'sport' | 'settings' | 'roster' | 'defensive' | 'confirm';
@@ -75,7 +81,9 @@ export type WizardAction =
   | { type: 'SET_SPORT'; sport: SportChoice }
   | { type: 'SET_SETTINGS'; settings: LeagueSettings }
   | { type: 'SET_DEFENSIVE_FORMAT'; format: DefensiveFormat }
-  | { type: 'SET_ROSTER_SLOTS'; slots: Record<string, number> };
+  | { type: 'SET_ROSTER_SLOTS'; slots: Record<string, number> }
+  | { type: 'SET_SALARY_CAP_ENABLED'; enabled: boolean }
+  | { type: 'SET_SALARY_CAP_AMOUNT'; amount: number | undefined };
 
 export const INITIAL_STATE: WizardState = {
   sport: 'BASEBALL',
@@ -87,6 +95,7 @@ export const INITIAL_STATE: WizardState = {
   auctionMinBid: DEFAULT_AUCTION_MIN_BID,
   rosterSlots: { ...DST_ROSTER_DEFAULTS },
   rosterCustomized: false,
+  salaryCapEnabled: false,
 };
 
 export function wizardReducer(
@@ -132,6 +141,10 @@ export function wizardReducer(
       };
     case 'SET_ROSTER_SLOTS':
       return { ...state, rosterSlots: action.slots, rosterCustomized: true };
+    case 'SET_SALARY_CAP_ENABLED':
+      return { ...state, salaryCapEnabled: action.enabled };
+    case 'SET_SALARY_CAP_AMOUNT':
+      return { ...state, salaryCap: action.amount };
     default:
       return state;
   }
@@ -167,6 +180,14 @@ export function validateStep(step: Step, state: WizardState): string | null {
       }
     }
   }
+  if (step === 'defensive' && state.salaryCapEnabled) {
+    // Bounds mirror the resolver's MIN_SALARY_CAP/MAX_SALARY_CAP
+    // (lambdas/db/src/schema/leagues/mutations.ts).
+    if (state.salaryCap === undefined)
+      return 'Please enter a salary cap amount.';
+    if (state.salaryCap < 1 || state.salaryCap > 1_000_000_000)
+      return 'Salary cap must be between 1 and 1,000,000,000.';
+  }
   return null;
 }
 
@@ -182,6 +203,10 @@ export function CreateLeagueWizard() {
 
   const [stepError, setStepError] = React.useState<string | null>(null);
   const [mutationError, setMutationError] = React.useState<string | null>(null);
+
+  const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
+  const [showSalaryCapUpgradeModal, setShowSalaryCapUpgradeModal] =
+    useState(false);
 
   // Warn dialog ref when defensive format changes with customized roster
   const prevDefensiveFormat = useRef<DefensiveFormat>(state.defensiveFormat);
@@ -285,6 +310,9 @@ export function CreateLeagueWizard() {
                   auctionMinBid: state.auctionMinBid,
                 }
               : {}),
+            // Salary cap is sport-agnostic server-side (LS-6143).
+            salaryCapEnabled: state.salaryCapEnabled,
+            ...(state.salaryCapEnabled ? { salaryCap: state.salaryCap } : {}),
           },
         },
         context: { suppressGlobalError: true },
@@ -458,6 +486,20 @@ export function CreateLeagueWizard() {
             <StepDefensiveFormat
               defensiveFormat={state.defensiveFormat}
               onChange={handleDefensiveFormatChange}
+              salaryCapEnabled={state.salaryCapEnabled}
+              salaryCap={state.salaryCap}
+              onSalaryCapToggle={(enabled) =>
+                dispatch({ type: 'SET_SALARY_CAP_ENABLED', enabled })
+              }
+              onSalaryCapAmountChange={(amount) =>
+                dispatch({ type: 'SET_SALARY_CAP_AMOUNT', amount })
+              }
+              isPremium={isPremium}
+              premiumLoading={premiumLoading}
+              onUpgradeSalaryCap={() => {
+                trackPremiumFeatureClick('Salary Cap');
+                setShowSalaryCapUpgradeModal(true);
+              }}
             />
           )}
 
@@ -567,6 +609,12 @@ export function CreateLeagueWizard() {
         cancelLabel="Cancel"
         onConfirm={confirmDefensiveFormatChange}
         onCancel={cancelDefensiveFormatChange}
+      />
+      <UpgradeModal
+        open={showSalaryCapUpgradeModal}
+        onOpenChange={setShowSalaryCapUpgradeModal}
+        featureName="Salary Cap"
+        featureDescription="Track player salaries and enforce roster spending caps for a competitive salary cap league format."
       />
     </ScrollView>
   );

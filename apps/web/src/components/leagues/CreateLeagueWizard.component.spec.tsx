@@ -36,6 +36,18 @@ jest.mock('../PageMeta', () => ({
   PageMeta: () => null,
 }));
 
+jest.mock('../UpgradeModal', () => ({
+  UpgradeModal: () => null,
+}));
+
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremiumStatus: () => ({ isPremium: false, isLoading: false }),
+}));
+
+jest.mock('../../utils/analytics', () => ({
+  trackPremiumFeatureClick: jest.fn(),
+}));
+
 jest.mock('tamagui', () => ({
   ScrollView: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
@@ -150,9 +162,15 @@ jest.mock('./wizard/StepRosterSettings', () => ({
 jest.mock('./wizard/StepDefensiveFormat', () => ({
   StepDefensiveFormat: ({
     onChange,
+    salaryCapEnabled,
+    onSalaryCapToggle,
+    onSalaryCapAmountChange,
   }: {
     defensiveFormat: string;
     onChange: (format: 'dst' | 'idp') => void;
+    salaryCapEnabled: boolean;
+    onSalaryCapToggle: (enabled: boolean) => void;
+    onSalaryCapAmountChange: (amount: number | undefined) => void;
   }) => (
     <div>
       <span>Defensive Format</span>
@@ -162,6 +180,16 @@ jest.mock('./wizard/StepDefensiveFormat', () => ({
       <button type="button" onClick={() => onChange('dst')}>
         Team D/ST
       </button>
+      <button
+        type="button"
+        onClick={() => onSalaryCapToggle(!salaryCapEnabled)}
+      >
+        Toggle Salary Cap
+      </button>
+      <input
+        placeholder="Salary cap amount"
+        onChange={(e) => onSalaryCapAmountChange(Number(e.target.value))}
+      />
     </div>
   ),
 }));
@@ -423,5 +451,28 @@ describe('CreateLeagueWizard', () => {
       within(screen.getByRole('alertdialog')).getByText('Cancel'),
     );
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('sends the salary cap for football league creation (LS-6143)', () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: { id: 'league-1' } } },
+    });
+    render(<CreateLeagueWizard />);
+    fireEvent.click(screen.getByText('Football'));
+    advance();
+    fillLeagueName('My Football League');
+    advance(); // roster
+    advance(); // defensive
+    fireEvent.click(screen.getByText('Toggle Salary Cap'));
+    fireEvent.change(screen.getByPlaceholderText('Salary cap amount'), {
+      target: { value: '50000000' },
+    });
+    advance();
+    act(() => {
+      fireEvent.click(screen.getByText('Create League'));
+    });
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.salaryCapEnabled).toBe(true);
+    expect(input.salaryCap).toBe(50000000);
   });
 });

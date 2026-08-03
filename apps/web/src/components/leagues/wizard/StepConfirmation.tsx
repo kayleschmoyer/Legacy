@@ -96,6 +96,12 @@ export function StepConfirmation({
                   : 'Team D/ST'
               }
             />
+            <SummaryRow
+              label="Salary Cap"
+              value={
+                state.salaryCapEnabled ? `$${state.salaryCap ?? 0}` : 'Off'
+              }
+            />
             <XStack
               padding="$3"
               borderBottomWidth={1}
