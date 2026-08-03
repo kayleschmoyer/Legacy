@@ -12,6 +12,7 @@
     {
       "id": "1tmNnzBvKmDjeJOie3JNkg",
       "url": "https://api.anthropic.com/v1/design/h/1tmNnzBvKmDjeJOie3JNkg",
+      "projectId": "02fe66a1-9396-4158-a52e-56a7487d4262",
       "title": "Public Leagues",
       "slug": "legacy-sports-public-leagues",
       "status": "active",
@@ -22,6 +23,7 @@
     {
       "id": "2ZKwS1lG5Pb1Z6NcPzNW7g",
       "url": "https://api.anthropic.com/v1/design/h/2ZKwS1lG5Pb1Z6NcPzNW7g",
+      "projectId": "f1c2ee9f-859c-4136-bb9f-7d6fe6a2c832",
       "title": "Legacy Baseball Minigames",
       "slug": "legacy-baseball-minigames",
       "status": "active",
@@ -32,6 +34,7 @@
     {
       "id": "4k4RdTqqAbEop0ZqmEDuOg",
       "url": "https://api.anthropic.com/v1/design/h/4k4RdTqqAbEop0ZqmEDuOg",
+      "projectId": "9e1174b6-61d3-4321-88e2-ff3e318dcfed",
       "title": "Login Page",
       "slug": "legacy-sports-login-page",
       "status": "active",
@@ -42,6 +45,7 @@
     {
       "id": "7SRWFMj3a6khIhwLuWkSKA",
       "url": "https://api.anthropic.com/v1/design/h/7SRWFMj3a6khIhwLuWkSKA",
+      "projectId": "670f7892-5193-4b8a-a54c-20b112ad11bb",
       "title": "Design System",
       "slug": "legacy-sports-design-system",
       "status": "active",
@@ -52,6 +56,7 @@
     {
       "id": "B8P9BQz8s6NZ9Q-FqWI_yA",
       "url": "https://api.anthropic.com/v1/design/h/B8P9BQz8s6NZ9Q-FqWI_yA",
+      "projectId": "7b36dd68-30b1-4d94-ac78-e9385493ab94",
       "title": "Draft Board",
       "slug": "legacy-sports-draft-board",
       "status": "active",
@@ -73,6 +78,7 @@
     {
       "id": "HI6N3yPYUzeh981B5SkXmw",
       "url": "https://api.anthropic.com/v1/design/h/HI6N3yPYUzeh981B5SkXmw",
+      "projectId": "3b56ca5b-71bb-4a97-a3c6-d91c453a73d1",
       "title": "Create League",
       "slug": "legacy-sports-create-league",
       "status": "active",
@@ -83,6 +89,7 @@
     {
       "id": "QjHjpBJxAbmU7Xcc8HWarw",
       "url": "https://api.anthropic.com/v1/design/h/QjHjpBJxAbmU7Xcc8HWarw",
+      "projectId": "019de999-00d9-72cf-bb9a-3110eab0e366",
       "title": "Account Management",
       "slug": "legacy-sports-account-management",
       "status": "active",
@@ -93,6 +100,7 @@
     {
       "id": "UUCswUjg_28Xzcqii7Rt2Q",
       "url": "https://api.anthropic.com/v1/design/h/UUCswUjg_28Xzcqii7Rt2Q",
+      "projectId": "019de99b-c7df-7e9d-9f09-20f8b65fcf1d",
       "title": "Preferences",
       "slug": "legacy-sports-preferences",
       "status": "active",
@@ -103,6 +111,7 @@
     {
       "id": "V7jS9JECVtF0zt_SkADLhw",
       "url": "https://api.anthropic.com/v1/design/h/V7jS9JECVtF0zt_SkADLhw",
+      "projectId": "019de997-dc7e-7592-a71f-df4e0ea9f180",
       "title": "Help",
       "slug": "legacy-sports-help",
       "status": "active",
@@ -113,6 +122,7 @@
     {
       "id": "c8_aVxWiMWOyjkMnoD-SkA",
       "url": "https://api.anthropic.com/v1/design/h/c8_aVxWiMWOyjkMnoD-SkA",
+      "projectId": "019de999-f417-7627-9290-925dfd084b7d",
       "title": "Notifications",
       "slug": "legacy-sports-notifications",
       "status": "active",
@@ -123,6 +133,7 @@
     {
       "id": "dNpCFgIxoT5OnLy71wHjrg",
       "url": "https://api.anthropic.com/v1/design/h/dNpCFgIxoT5OnLy71wHjrg",
+      "projectId": "20f12546-37e6-4441-b8b2-a3cb113c5004",
       "title": "Nav Bar",
       "slug": "legacy-sports-nav-bar",
       "status": "active",
@@ -133,6 +144,7 @@
     {
       "id": "dzQl9ZQSmZK-brcCgMZJdg",
       "url": "https://api.anthropic.com/v1/design/h/dzQl9ZQSmZK-brcCgMZJdg",
+      "projectId": "019dca3c-0eed-7d6c-a369-e77c8c8d4200",
       "title": "Intro Video",
       "slug": "intro-video",
       "status": "active",
@@ -143,6 +155,7 @@
     {
       "id": "kXxk3B29-DRvoJthw6UifA",
       "url": "https://api.anthropic.com/v1/design/h/kXxk3B29-DRvoJthw6UifA",
+      "projectId": "50ece563-1be9-47b1-842e-28d071cebe3f",
       "title": "Player Details",
       "slug": "legacy-sports-player-details",
       "status": "active",
@@ -153,6 +166,7 @@
     {
       "id": "lMe_Ka278wF48IaGC7FOWw",
       "url": "https://api.anthropic.com/v1/design/h/lMe_Ka278wF48IaGC7FOWw",
+      "projectId": "019dd0ef-060e-7d50-8ac5-d5313459be01",
       "title": "Scoreboard Page",
       "slug": "scoreboard-page",
       "status": "active",
@@ -175,6 +189,7 @@
     {
       "id": "nxFiEGqu3yPCDKpoNDmQWA",
       "url": "https://api.anthropic.com/v1/design/h/nxFiEGqu3yPCDKpoNDmQWA",
+      "projectId": "714ce35a-d395-4e13-aadd-8d5d9f021104",
       "title": "Homepage",
       "slug": "legacy-sports-homepage",
       "status": "active",
@@ -185,6 +200,7 @@
     {
       "id": "qDGBVlOyaV-306Id0kWq0Q",
       "url": "https://api.anthropic.com/v1/design/h/qDGBVlOyaV-306Id0kWq0Q",
+      "projectId": "2e2f8052-6cc9-4fb0-9c5f-a353a7fa57ff",
       "title": "League Detail Page",
       "slug": "league-detail-page",
       "status": "active",
@@ -195,6 +211,7 @@
     {
       "id": "qtqqKYxMFf1A8GY5NL9GNQ",
       "url": "https://api.anthropic.com/v1/design/h/qtqqKYxMFf1A8GY5NL9GNQ",
+      "projectId": "26a15a22-caeb-49e6-b5c3-1604c76ea778",
       "title": "Stats Page",
       "slug": "legacy-sports-stats-page",
       "status": "active",
@@ -205,6 +222,7 @@
     {
       "id": "r09ipdRY07dJXR9hh4J1Ug",
       "url": "https://api.anthropic.com/v1/design/h/r09ipdRY07dJXR9hh4J1Ug",
+      "projectId": "019de99c-d234-7101-925b-8ca34e3b0103",
       "title": "Admin",
       "slug": "legacy-sports-admin",
       "status": "active",
@@ -227,6 +245,7 @@
     {
       "id": "d208847d-c9ca-47fd-8dc1-fe1fe8b7f3a4",
       "url": "https://claude.ai/design/p/d208847d-c9ca-47fd-8dc1-fe1fe8b7f3a4",
+      "projectId": "d208847d-c9ca-47fd-8dc1-fe1fe8b7f3a4",
       "title": "Draft Spectator",
       "status": "active"
     },
@@ -240,6 +259,13 @@
       "lastSyncedAt": "2026-07-29T00:00:00.000Z",
       "jiraKey": "LS-8832",
       "source": "manual-local-sync"
+    },
+    {
+      "id": "db205fee-0bf0-4284-9334-d6b11bbcc658",
+      "url": "https://claude.ai/design/p/db205fee-0bf0-4284-9334-d6b11bbcc658",
+      "projectId": "db205fee-0bf0-4284-9334-d6b11bbcc658",
+      "title": "MatchupRosterComparison responsive layout",
+      "status": "active"
     }
   ]
 }
