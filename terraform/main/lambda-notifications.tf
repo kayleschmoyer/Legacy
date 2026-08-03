@@ -252,8 +252,7 @@ resource "aws_cloudwatch_log_group" "notifications_lambda" {
   name              = "/aws/lambda/${aws_lambda_function.notifications.function_name}"
   retention_in_days = local.log_retention_days[var.environment]
 
-  tags       = local.common_tags
-  depends_on = [aws_vpc_endpoint.logs]
+  tags = local.common_tags
 }
 
 # SQS Event Source Mapping - connects the notifications queue to the Lambda function

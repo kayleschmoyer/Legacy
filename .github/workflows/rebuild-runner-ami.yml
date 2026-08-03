@@ -246,7 +246,7 @@ jobs:
           # when there was exactly one source).
           extract_ami() {
             local source_name="$1"
-            grep -A2 "amazon-ebs.$${source_name}: AMIs were created" packer-build.log \
+            grep -A2 "amazon-ebs.${source_name}: AMIs were created" packer-build.log \
               | grep -oE "us-east-1: ami-[0-9a-f]+" \
               | tail -n 1 | awk '{print $2}'
           }

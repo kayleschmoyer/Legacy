@@ -318,7 +318,14 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "s3:PutBucketPolicy",
           "s3:DeleteBucketPolicy",
           "s3:PutBucketCORS",
-          "s3:PutBucketTagging"
+          "s3:PutBucketTagging",
+          # LS-8925: the matching read statement above already grants
+          # GetBucketOwnershipControls/GetBucketNotification — the write side
+          # was missing, invisible until a brand-new bucket needed them set
+          # for the first time (the existing runner-dist bucket predates the
+          # github-aws-runners module version that manages these).
+          "s3:PutBucketOwnershipControls",
+          "s3:PutBucketNotification"
         ]
         Resource = [
           "arn:aws:s3:::${local.name_prefix}-*"
