@@ -62,9 +62,17 @@ describe('validateRosterSlots (LS-6145)', () => {
       { positionType: 'DL', count: 2 },
       { positionType: 'LB', count: 2 },
       { positionType: 'DB', count: 2 },
-      { positionType: 'DP', count: 1 },
     ];
     expect(validateRosterSlots(input, MAX_COUNT)).toEqual(input);
+  });
+
+  it('rejects the fictional DP (IDP Flex) slot even though the DB enum retains it (LS-8996)', () => {
+    expect(() =>
+      validateRosterSlots([{ positionType: 'DP', count: 1 }], MAX_COUNT),
+    ).toThrow(GraphQLError);
+    expect(() =>
+      validateRosterSlots([{ positionType: 'DP', count: 1 }], MAX_COUNT),
+    ).toThrow('Invalid roster slot position "DP"');
   });
 
   it('accepts a count exactly at maxCount', () => {

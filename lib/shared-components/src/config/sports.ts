@@ -386,7 +386,6 @@ export const DEFAULT_LINEUP_BY_SPORT = {
         'LB',
         'DB',
         'DB',
-        'DP',
       ],
       bench: 6,
     } satisfies LineupTemplate,

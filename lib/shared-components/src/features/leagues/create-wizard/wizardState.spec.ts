@@ -149,6 +149,8 @@ describe('applyWizardFieldChange', () => {
     expect(next.maxRosterSize).toBe(
       sumRosterSlots(FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT.idp),
     );
+    // The fictional DP (IDP Flex) slot must never default in (LS-8996).
+    expect(next.rosterSlots).not.toHaveProperty('DP');
   });
 });
 

@@ -150,7 +150,6 @@ export const FOOTBALL_ROSTER_SLOT_LABELS: Record<string, string> = {
   DL: 'Defensive Line',
   LB: 'Linebacker',
   DB: 'Defensive Back',
-  DP: 'IDP Flex',
   BN: 'Bench',
 };
 
@@ -159,7 +158,7 @@ export const FOOTBALL_ROSTER_SLOTS_BY_DEFENSIVE_FORMAT: Record<
   readonly string[]
 > = {
   dst: ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DST', 'BN'],
-  idp: ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DL', 'LB', 'DB', 'DP', 'BN'],
+  idp: ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DL', 'LB', 'DB', 'BN'],
 };
 
 /** Sums to 16 for `dst` — matches `DEFAULT_ROSTER_BY_SPORT.football` below. */
@@ -178,7 +177,6 @@ export const FOOTBALL_ROSTER_SLOT_DEFAULTS_BY_DEFENSIVE_FORMAT: Record<
     DL: 2,
     LB: 2,
     DB: 2,
-    DP: 1,
     BN: 6,
   },
 };

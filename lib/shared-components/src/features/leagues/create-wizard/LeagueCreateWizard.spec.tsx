@@ -362,6 +362,8 @@ describe('LeagueCreateWizard — rules step', () => {
     fireEvent.click(getByTestId('wizard-step-tab-roster'));
     expect(getByTestId('roster-slot-DL')).toBeTruthy();
     expect(queryByTestId('roster-slot-DST')).toBeNull();
+    // The fictional DP (IDP Flex) slot is never offered (LS-8996).
+    expect(queryByTestId('roster-slot-DP')).toBeNull();
   });
 });
 

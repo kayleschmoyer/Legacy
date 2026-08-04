@@ -110,6 +110,11 @@ export function validateRosterSlots(
   const validPositionSlots = new Set<string>(
     PublicSchema.positionSlot.enumValues,
   );
+  // 'DP' (IDP Flex) survives in the position_slot enum (enum values are
+  // effectively permanent) but is fictional end-to-end — no player
+  // eligibility, queries, or stats exist for it (LS-6148/LS-8996) — so a
+  // client-submitted DP slot is rejected like any other unsupported slot.
+  validPositionSlots.delete('DP');
   for (const slot of rosterSlots) {
     if (!validPositionSlots.has(slot.positionType)) {
       throw UserInputError(
