@@ -86,9 +86,10 @@
       "title": "Create League",
       "slug": "legacy-sports-create-league",
       "status": "active",
-      "lastSyncedHash": "8b562db2cc79f7a258fac85abad82ca8805362610d01e06b4b995ae1d2bfdf65",
-      "lastSyncedAt": "2026-05-20T16:35:55.221Z",
-      "jiraKey": "LS-4587"
+      "lastSyncedHash": "66ac81d9b458d6db315bce119d8753b7395f137983dd74c6a3ce5a8ab2d71e88",
+      "lastSyncedAt": "2026-08-04T15:22:50.000Z",
+      "jiraKey": "LS-8963",
+      "source": "designsync-local"
     },
     {
       "id": "QjHjpBJxAbmU7Xcc8HWarw",
