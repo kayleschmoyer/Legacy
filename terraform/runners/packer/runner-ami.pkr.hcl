@@ -148,7 +148,11 @@ variable "ssh_source_cidr" {
 # for a 60 GB root volume sized for the Android SDK/NDK (~8 GB). The two
 # `source` blocks below share every provisioner except the Android-specific
 # ones (Java 17, Android SDK, Gradle wrapper pre-bake), which are scoped to
-# `runner_android` via `only = ["source.amazon-ebs.runner_android"]`. Both
+# `runner_android` via `only = ["amazon-ebs.runner_android"]` (NOTE: provisioner
+# `only` takes the source address WITHOUT the "source." prefix — the prefixed
+# form silently matches nothing and skips the provisioner on every source,
+# which is exactly how the first post-split android AMI shipped without the
+# Android SDK). Both
 # variants are built in the SAME `packer build` invocation (rebuild-runner-ami.yml
 # runs a plain `packer build runner-ami.pkr.hcl` with no `-only` flag), so they
 # always stay in lockstep on the same Playwright version — no new drift
@@ -566,7 +570,7 @@ build {
   # toolchain bits; baking JAVA_HOME into the runner env lets us skip
   # actions/setup-java on self-hosted runners and saves ~60s per Android build.
   provisioner "shell" {
-    only = ["source.amazon-ebs.runner_android"]
+    only = ["amazon-ebs.runner_android"]
     inline = [
       "sudo apt-get install -y -qq openjdk-17-jdk-headless",
       "java -version",
@@ -581,7 +585,7 @@ build {
 
   # Android SDK (pre-installed so CI skips android-actions/setup-android)
   provisioner "shell" {
-    only = ["source.amazon-ebs.runner_android"]
+    only = ["amazon-ebs.runner_android"]
     environment_vars = [
       "ANDROID_HOME=/opt/android-sdk",
     ]
@@ -633,7 +637,7 @@ build {
   # which makes $GRADLE_USER_HOME default to /home/ubuntu/.gradle. We write
   # there directly so `gradlew` finds the dist without a download.
   provisioner "shell" {
-    only = ["source.amazon-ebs.runner_android"]
+    only = ["amazon-ebs.runner_android"]
     environment_vars = [
       "GRADLE_VERSION=${var.gradle_version}",
     ]
@@ -728,7 +732,7 @@ build {
   # LS-8910: android-only supplemental contract keys, appended to the same
   # file the common provisioner above just wrote (`tee -a`, not `tee`).
   provisioner "shell" {
-    only           = ["source.amazon-ebs.runner_android"]
+    only           = ["amazon-ebs.runner_android"]
     inline_shebang = "/bin/bash -e"
     environment_vars = [
       "ANDROID_API_LEVEL=${var.android_api_level}",
@@ -907,7 +911,7 @@ build {
   # was split: runner_base was never given these tools, so checking for them
   # there would be a false failure, not a real drift signal.
   provisioner "shell" {
-    only           = ["source.amazon-ebs.runner_android"]
+    only           = ["amazon-ebs.runner_android"]
     inline_shebang = "/bin/bash -e"
     environment_vars = [
       "EXPECT_GRADLE=${var.gradle_version}",
