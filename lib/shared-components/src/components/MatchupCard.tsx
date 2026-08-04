@@ -31,7 +31,13 @@ const SCORE_PROPS = {
   fontFamily: FONT_DISPLAY,
   fontWeight: '800' as const,
   fontSize: 44,
-  lineHeight: 1,
+  // Absolute px, not a unitless ratio — React Native treats a numeric
+  // lineHeight as a literal dp line box (lineHeight: 1 clips a 44px glyph
+  // to ~1dp on Android), and Tamagui-on-web appends `px` to any numeric
+  // lineHeight too (see .agents/skills/standards/references/tamagui-web-pitfalls.md),
+  // so `1` breaks both platforms. 44 matches the fontSize, same ratio used
+  // for score/display text elsewhere (MatchupScoreboardHero/View, PlayerComparison).
+  lineHeight: 44,
 };
 
 export interface MatchupTeam {

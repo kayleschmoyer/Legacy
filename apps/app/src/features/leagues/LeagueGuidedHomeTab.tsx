@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { RefreshControlProps } from 'react-native';
 import { Alert, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, XStack, YStack } from 'tamagui';
 import {
   BrandIcon,
@@ -705,6 +706,7 @@ export function LeagueGuidedHomeTab({
   onMatchupPress,
   refreshControl,
 }: LeagueGuidedHomeTabProps): React.JSX.Element {
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const matchupData = useMemo(
     () =>
       buildMatchupCardData(
@@ -742,7 +744,10 @@ export function LeagueGuidedHomeTab({
   }, [pendingTradeCount, chatUnreadCount, waiverEnabled, isCommissioner]);
 
   return (
-    <ScrollView refreshControl={refreshControl}>
+    <ScrollView
+      refreshControl={refreshControl}
+      contentContainerStyle={{ paddingBottom: bottomInset + 24 }}
+    >
       <YStack padding={16} paddingTop={20} gap={18}>
         <CompactHeader league={league} teamCount={teamCount} />
 

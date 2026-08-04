@@ -13,6 +13,10 @@ jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 44, bottom: 34, left: 0, right: 0 }),
+}));
+
 jest.mock('@legacy-sports/shared-components', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {

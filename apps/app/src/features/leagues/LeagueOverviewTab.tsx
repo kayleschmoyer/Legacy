@@ -1,5 +1,6 @@
 import React from 'react';
 import { Alert, type RefreshControlProps, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
   LeagueActivityFeed,
@@ -173,6 +174,7 @@ export function LeagueOverviewTab({
   onPlayerPress,
   refreshControl,
 }: LeagueOverviewTabProps): React.JSX.Element {
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const isFootball = league.sport === Sport.Football;
 
   const stats = [
@@ -194,7 +196,10 @@ export function LeagueOverviewTab({
   ];
 
   return (
-    <ScrollView refreshControl={refreshControl}>
+    <ScrollView
+      refreshControl={refreshControl}
+      contentContainerStyle={{ paddingBottom: bottomInset + 24 }}
+    >
       <YStack padding="$3" gap="$5">
         {/* Draft Live / Paused Banner */}
         {isDrafting ? (
