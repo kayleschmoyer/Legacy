@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Button, Dialog, H3, Text, XStack, YStack } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
+import { useReducedMotion } from '@legacy-sports/shared-components/utils';
 import {
   BRAND_NAVY,
   BRAND_NAVY_DARK,
@@ -94,6 +95,12 @@ export function BaseModal({
     }
   }, [open]);
 
+  // Springs settle at browser-dependent real-world durations; collapse to a
+  // near-instant timing animation under prefers-reduced-motion so the dialog
+  // enter/exit is deterministic for users who request it (and for E2E, which
+  // forces this media feature — LS-8995).
+  const dialogAnimation = useReducedMotion() ? '100ms' : 'quick';
+
   const headerBackground = headerAccentColor
     ? `radial-gradient(ellipse at 100% 0%, ${withAlpha(headerAccentColor, 0.32)} 0%, transparent 60%), radial-gradient(ellipse at 0% 100%, ${withAlpha(headerAccentColor, 0.18)} 0%, transparent 55%), linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`
     : `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_DARK} 100%)`;
@@ -103,7 +110,7 @@ export function BaseModal({
         {/* ── Backdrop overlay ── */}
         <Dialog.Overlay
           key="base-modal-overlay"
-          animation="quick"
+          animation={dialogAnimation}
           opacity={0.5}
           enterStyle={{ opacity: 0 }}
           exitStyle={{ opacity: 0 }}
@@ -120,7 +127,10 @@ export function BaseModal({
             ? { 'aria-label': title }
             : { 'aria-labelledby': titleId })}
           animateOnly={['transform', 'opacity']}
-          animation={['quick', { opacity: { overshootClamping: true } }]}
+          animation={[
+            dialogAnimation,
+            { opacity: { overshootClamping: true } },
+          ]}
           enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
           exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
           width="92%"

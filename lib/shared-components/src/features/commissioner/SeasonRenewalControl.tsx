@@ -13,6 +13,8 @@ import {
 } from 'tamagui';
 import { useRenewLeagueMutation } from '@legacy-sports/graphql';
 
+import { useReducedMotion } from '../../hooks/useReducedMotion';
+
 export interface SeasonRenewalControlProps {
   leagueId: number;
   leagueName: string;
@@ -50,6 +52,11 @@ export function SeasonRenewalControl({
   const [loading, setLoading] = useState(false);
 
   const [renewLeague] = useRenewLeagueMutation();
+  // Springs settle at browser-dependent real-world durations; collapse to a
+  // near-instant timing animation under prefers-reduced-motion so the dialog
+  // enter/exit is deterministic for users who request it (and for E2E, which
+  // forces this media feature — LS-8995).
+  const dialogAnimation = useReducedMotion() ? '100ms' : 'quick';
 
   // Only available when the season is complete and the league isn't already archived
   if (draftStatus !== 'completed' || frozenAt) {
@@ -116,7 +123,7 @@ export function SeasonRenewalControl({
         <Dialog.Portal>
           <Dialog.Overlay
             key="overlay"
-            animation="quick"
+            animation={dialogAnimation}
             opacity={0.5}
             enterStyle={{ opacity: 0 }}
             exitStyle={{ opacity: 0 }}
@@ -131,7 +138,7 @@ export function SeasonRenewalControl({
             aria-describedby="season-renewal-description"
             animateOnly={['transform', 'opacity']}
             animation={[
-              'quick',
+              dialogAnimation,
               {
                 opacity: {
                   overshootClamping: true,

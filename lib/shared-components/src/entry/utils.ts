@@ -17,3 +17,4 @@ export * from '../utils/typography';
 export * from '../utils/mapGraphQLToScoringFormat';
 export * from '../utils/SecureStorage';
 export * from '../constants/presets';
+export * from '../hooks/useReducedMotion';

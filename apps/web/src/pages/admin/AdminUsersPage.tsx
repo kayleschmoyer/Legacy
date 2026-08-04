@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { useReducedMotion } from '@legacy-sports/shared-components/utils';
 import { Card, Dialog, H1, Input, Paragraph, Spinner, Text } from 'tamagui';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
@@ -47,6 +48,11 @@ export default function AdminUsersPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [accessLevelFilter, setAccessLevelFilter] =
     useState<AccessLevelFilter>('all');
+  // Springs settle at browser-dependent real-world durations; collapse to a
+  // near-instant timing animation under prefers-reduced-motion so both
+  // confirmation dialogs' enter/exit is deterministic for users who request
+  // it (and for E2E, which forces this media feature — LS-8995).
+  const dialogAnimation = useReducedMotion() ? '100ms' : 'quick';
   const [pendingToggle, setPendingToggle] = useState<{
     userId: number;
     currentLevel: string | null | undefined;
@@ -586,7 +592,7 @@ export default function AdminUsersPage() {
         <Dialog.Portal>
           <Dialog.Overlay
             key="overlay"
-            animation="quick"
+            animation={dialogAnimation}
             opacity={0.5}
             enterStyle={{ opacity: 0 }}
             exitStyle={{ opacity: 0 }}
@@ -600,7 +606,10 @@ export default function AdminUsersPage() {
             aria-labelledby="impersonate-title"
             aria-describedby="impersonate-description"
             animateOnly={['transform', 'opacity']}
-            animation={['quick', { opacity: { overshootClamping: true } }]}
+            animation={[
+              dialogAnimation,
+              { opacity: { overshootClamping: true } },
+            ]}
             enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
             exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
             gap="$4"
@@ -647,7 +656,7 @@ export default function AdminUsersPage() {
         <Dialog.Portal>
           <Dialog.Overlay
             key="overlay"
-            animation="quick"
+            animation={dialogAnimation}
             opacity={0.5}
             enterStyle={{ opacity: 0 }}
             exitStyle={{ opacity: 0 }}
@@ -661,7 +670,10 @@ export default function AdminUsersPage() {
             aria-labelledby="toggle-admin-title"
             aria-describedby="toggle-admin-description"
             animateOnly={['transform', 'opacity']}
-            animation={['quick', { opacity: { overshootClamping: true } }]}
+            animation={[
+              dialogAnimation,
+              { opacity: { overshootClamping: true } },
+            ]}
             enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
             exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
             gap="$4"

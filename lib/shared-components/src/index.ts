@@ -171,6 +171,9 @@ export * from './navigation';
 // Real-time WebSocket hooks
 export * from './hooks/useWebSocket';
 
+// Reduced-motion detection (web: matchMedia; native/SSR: always false)
+export * from './hooks/useReducedMotion';
+
 // Tamagui config - should be imported directly by consumers
 // export { tamaguiConfig } from '@legacy-sports/tamagui-config';
 
