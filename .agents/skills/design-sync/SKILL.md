@@ -1,6 +1,6 @@
 ---
 name: design-sync
-description: 'Bridge Claude Design (claude.ai/design) and this repo. Phase 1 (Sync): cloud-dispatched agent processes user-supplied design exports (WebFetch cannot reach Claude Design from any environment — LS-9000), diffs against docs/design/manifest.json, files one Jira ticket per changed design under the design-sync bucket epic, and opens a single sync PR. Phase 1b (Local): the DesignSync MCP tool reads/writes Claude Design projects by project id from local sessions — /pull-design pulls one design and is the primary fetch pathway, including for bulk re-sync waves; the write flow lets agents fix designs at the source. Phase 2 (Consume): locally-dispatched agent reads a design ticket, runs a completeness gate, then either notifies on gaps, implements directly, or slices into child tickets and spawns chips. Load when running /sync-designs (cloud), /pull-design or /implement-design (local), when updating a design via the DesignSync tool, or when designing the design-to-code pipeline.'
+description: 'Bridge Claude Design (claude.ai/design) and this repo. Phase 1 (Sync): cloud agent processes user-supplied design exports (WebFetch cannot reach Claude Design — LS-9000), diffs against docs/design/manifest.json, files one Jira ticket per changed design, and opens a single sync PR. Phase 1b (Local): the DesignSync MCP tool reads/writes Claude Design projects by project id — /pull-design pulls one design (the primary fetch pathway, including bulk re-sync waves); /push-design uploads a repo bundle so devs can iterate in Claude Design before pulling back (repo stays source of truth); the write flow also fixes designs at the source. Phase 2 (Consume): local agent reads a design ticket, runs a completeness gate, then notifies on gaps, implements directly, or slices into child tickets and spawns chips. Load when running /sync-designs (cloud), /pull-design, /push-design, or /implement-design (local), when updating a design via the DesignSync tool, or when designing the design-to-code pipeline.'
 metadata:
   scope: 'docs/design/**'
 ---
@@ -17,6 +17,7 @@ Both phases are **manually dispatched by the user** via slash commands; nothing 
 | -------------------------------------------------------------------- | ---------- | ----------------------- |
 | User runs `/sync-designs`                                            | Sync       | Cloud (Claude Code Web) |
 | User runs `/pull-design <url>` or a design needs a fix at the source | Local sync | Local (DesignSync tool) |
+| User runs `/push-design <id>` to iterate on a repo bundle            | Local push | Local (DesignSync tool) |
 | User runs `/implement-design LS-####`                                | Consume    | Local                   |
 | Designing changes to this pipeline                                   | Both       | Anywhere                |
 
@@ -76,12 +77,13 @@ Locally: `/implement-design LS-####`
 
 ## Phase 1b: Local sync via the DesignSync tool
 
-> Full access rules, caveats, and the write flow: [references/designsync-tool.md](references/designsync-tool.md). Pull procedure: [`.claude/commands/pull-design.md`](../../../.claude/commands/pull-design.md).
+> Full access rules, caveats, and the write flow: [references/designsync-tool.md](references/designsync-tool.md). Pull procedure: [`.claude/commands/pull-design.md`](../../../.claude/commands/pull-design.md). Push procedure: [`.claude/commands/push-design.md`](../../../.claude/commands/push-design.md).
 
 Local sessions cannot WebFetch design URLs (share URLs → 403, handoff URLs → 404 — verified 2026-08-03), but the `DesignSync` MCP tool has full authenticated access **by project id** (the UUID in a `claude.ai/design/p/<uuid>` share URL; also recorded as `manifest.designs[].projectId` when known):
 
 - **Targeted pull** — `/pull-design <share-url>` fetches one project file-by-file into `docs/design/<id>/<slug>/`, recomputes the manifest hash, writes a SYNC-REPORT, and ships a PR. Use for single-design updates; use cloud `/sync-designs` for bulk waves.
-- **Fixing designs at the source** — design defects are still never patched in `docs/design/` (bundles are overwritten on next sync), but an agent CAN now fix them in Claude Design itself: read files, apply the fix locally, then `finalize_plan` → `write_files` to push the corrected files, and finish with a pull so the repo bundle catches up. `finalize_plan` is the user-approval boundary; keep write sets minimal and incremental.
+- **Push for iteration** — `/push-design <id>` uploads a repo bundle's `project/` files to a Claude Design project (the dev's own, or a shared one they can edit) so the dev can iterate visually. **The repo is the source of truth**; a push is repo-read-only (no commit, ticket, or PR) and the roundtrip closes with `/pull-design`, which commits the result. `create_project` can mint a new design-system project in the dev's own account; page-design projects cannot be created via the tool (type is immutable) — those need an existing editable project.
+- **Fixing designs at the source** — never hand-patch `docs/design/` bundle bytes and stop there: the next pull overwrites them. Either fix in Claude Design itself (read files, apply the fix, `finalize_plan` → `write_files`) and finish with a pull so the repo catches up, or fix in the repo bundle and `/push-design` it up so Claude Design stays in step. `finalize_plan` is the user-approval boundary; keep write sets minimal and incremental.
 - `list_projects` only lists design-system projects — page projects must come from user-supplied share URLs or `projectId` fields; `get_file` is capped at 256 KiB per file (check `truncated` on every read).
 
 ## Phase 2: Consume (local agent)

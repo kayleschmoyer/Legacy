@@ -47,5 +47,6 @@ Required order: `list_files`/`get_file` (read current state) → `finalize_plan(
 | Bulk sync of many designs (e.g. after a re-run wave) | Loop `/pull-design <share-url>` locally, one design at a time (LS-9000 — cloud `/sync-designs` can no longer fetch bundle bytes) |
 | Targeted pull of one design from a local session     | `/pull-design <share-url or id>` (wraps this tool)                                                                               |
 | Agent fixing design defects (brand/brief violations) | DesignSync write flow above, then pull to re-sync the bundle                                                                     |
+| Dev iterating on a design starting from the repo     | `/push-design <id>` (repo → Claude Design, repo-read-only) → iterate in the UI → `/pull-design` to commit the result             |
 | File exceeds 256 KiB or binary fetch fails           | Chrome Export → Project HTML .zip (user-assisted download)                                                                       |
 | Discovering what page projects exist                 | Ask the user for share URLs — `list_projects` won't show them                                                                    |
