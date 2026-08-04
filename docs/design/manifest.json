@@ -95,9 +95,10 @@
       "title": "Account Management",
       "slug": "legacy-sports-account-management",
       "status": "active",
-      "lastSyncedHash": "e561667210fa665bc33e6683712b9bb6bb09cfe4334e9af4be4818fe5ab6b353",
-      "lastSyncedAt": "2026-05-20T16:35:55.226Z",
-      "jiraKey": "LS-4574"
+      "lastSyncedHash": "b36d5d0792908ad5a482e1992441cca34f5733f64a6109fefdff0ec39a3ac4b3",
+      "lastSyncedAt": "2026-08-04T15:22:45.000Z",
+      "jiraKey": "LS-8964",
+      "source": "designsync-local"
     },
     {
       "id": "UUCswUjg_28Xzcqii7Rt2Q",
