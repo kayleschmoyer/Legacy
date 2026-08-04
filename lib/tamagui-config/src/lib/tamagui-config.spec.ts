@@ -21,12 +21,23 @@ jest.mock('tamagui', () => ({
   ),
 }));
 
-import { tamaguiConfig } from './tamagui-config';
+import { foundationTokens, tamaguiConfig } from './tamagui-config';
 
 describe('tamaguiConfig', () => {
   it('should be defined and have required properties', () => {
     expect(tamaguiConfig).toBeDefined();
     expect(tamaguiConfig).toHaveProperty('themes');
     expect(tamaguiConfig).toHaveProperty('tokens');
+  });
+});
+
+describe('foundationTokens', () => {
+  it('re-exports the design-tokens foundation categories without duplicating values', () => {
+    expect(foundationTokens.spacing[4]).toBe(16);
+    expect(foundationTokens.radii[4]).toBe(12);
+    expect(foundationTokens.typeScale.xl).toBe(22);
+    expect(foundationTokens.leading.body).toBe(1.55);
+    expect(foundationTokens.shadowsDark.gold).toContain('rgba(197, 165, 90');
+    expect(foundationTokens.shadowsLight.sm).toContain('rgba(2, 6, 23');
   });
 });

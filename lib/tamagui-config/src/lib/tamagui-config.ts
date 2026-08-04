@@ -9,14 +9,20 @@ import {
   colors as designTokenColors,
   glassDark,
   glassLight,
+  leading,
   lightSurface,
   lightText,
   positions,
   positionsLight,
+  radii,
   scaleDark,
   scaleLight,
   semantic,
   shadowBase,
+  shadowsDark,
+  shadowsLight,
+  spacing,
+  typeScale,
   withAlpha,
 } from '@legacy-sports/design-tokens';
 import { createTamagui, type TamaguiInternalConfig } from 'tamagui';
@@ -460,5 +466,33 @@ const customConfig = {
 export const tamaguiConfig: TamaguiInternalConfig = createTamagui(
   customConfig,
 ) as TamaguiInternalConfig;
+
+// Foundation tokens (spacing scale, radii, typography ramp, box-shadow
+// recipes) re-exported for downstream code paths that need the raw value
+// rather than a themed Tamagui style prop — e.g. web-only CSS, native
+// shadow objects, or code outside a themed Tamagui tree. Mirrors the
+// pattern `useThemeTokens()` already uses for colors/shadows in
+// lib/shared-components. Colors are wired directly into `brandDark`/
+// `brandLight` above (the idiomatic Tamagui mechanism for themed values);
+// breakpoints are inherited unchanged from `config.media` (mirrors
+// @legacy-sports/design-tokens' `breakpoints`/`mediaQueries`).
+//
+// Space/radii/font-size are intentionally NOT layered into Tamagui's
+// internal `$`-token scale here: `tokens.space`/`tokens.radius`/font
+// `size` are consumed via bare `$N` props at ~2,000+ call sites across
+// apps/web, apps/app, and lib/shared-components, and this repo's Jest
+// mocks for `tamagui` (lib/shared-components/jest-setup-{web,mobile}.js,
+// apps/app/src/__test-utils__/tamagui-mocks.ts, 100+ per-spec mocks) stub
+// only the primitives currently in use — none stub `createTokens`.
+// Silently reflowing every `$N` value app-wide belongs in its own ticket
+// with dedicated visual QA, not folded into this foundations slice.
+export const foundationTokens = {
+  spacing,
+  radii,
+  typeScale,
+  leading,
+  shadowsDark,
+  shadowsLight,
+} as const;
 
 export default tamaguiConfig;
