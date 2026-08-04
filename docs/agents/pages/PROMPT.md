@@ -46,26 +46,37 @@ This file is a communication tool for handoff, not a code scaffold. **The implem
 
 ## Color Palette
 
-| Token            | Hex       | Use                                            |
-| ---------------- | --------- | ---------------------------------------------- |
-| `BG_PAGE`        | `#0A0F1A` | Page canvas — the darkest layer                |
-| `BG_SUBTLE`      | `#0D1526` | Subtle section differentiation                 |
-| `BG_PANEL`       | `#111B2F` | Cards, panels                                  |
-| `BG_ELEVATED`    | `#16223A` | Elevated cards, modals, hover states           |
-| `BRAND_GOLD`     | `#C5A55A` | Wins, trophies, first place, positive outcomes |
-| `BRAND_SEAM_RED` | `#C41E3A` | Errors, losing states, critical alerts         |
-| `BRAND_NAVY`     | `#1B3A5C` | Primary interactive (buttons, selected states) |
-| `TEXT_PRIMARY`   | `#E8EDF5` | Primary text                                   |
-| `TEXT_SECONDARY` | `#8A9BB5` | Labels, secondary copy                         |
-| `BORDER`         | `#1E2D45` | Subtle dividers                                |
+| Token            | Hex       | Use                                                     |
+| ---------------- | --------- | ------------------------------------------------------- |
+| `BG_PAGE`        | `#0A0F1A` | Page canvas — the darkest layer                         |
+| `BG_SUBTLE`      | `#0D1526` | Subtle section differentiation                          |
+| `BG_PANEL`       | `#111B2F` | Cards, panels                                           |
+| `BG_ELEVATED`    | `#16223A` | Elevated cards, modals, hover states                    |
+| `BRAND_GOLD`     | `#C5A55A` | Wins, trophies, first place, positive outcomes          |
+| `BRAND_SEAM_RED` | `#C41E3A` | Errors, losing states, critical alerts                  |
+| `BRAND_NAVY`     | `#1B3A5C` | Primary interactive (buttons, selected states)          |
+| `TEXT_PRIMARY`   | `#E8EDF5` | Primary text                                            |
+| `TEXT_SECONDARY` | `#8A9BB5` | Labels, secondary copy                                  |
+| `BORDER`         | `#1E2D45` | Subtle dividers                                         |
+| `FG1`            | `#F8FAFC` | Primary body text on dark surfaces                      |
+| `FG1_STRONG`     | `#FFFFFF` | Max-contrast headline text only                         |
+| `FG2`            | `#DEE6FF` | Secondary text                                          |
+| `FG3`            | `#9CAAC5` | Muted metadata / labels                                 |
+| `FG4`            | `#6C80BA` | Quietest / disabled text                                |
+| `SUCCESS`        | `#4AAE7C` | System-status only: validation, sync/connection state   |
+| `WARNING`        | `#C89452` | System-status only: degraded state, non-critical alerts |
+| `INFO`           | `#5B84C4` | System-status only: neutral system messaging            |
 
 ### Accent rules (non-negotiable)
 
 - `BRAND_GOLD` — wins, first place, draft picks, positive outcomes **only**. Never decorative.
 - `BRAND_SEAM_RED` — errors, losing, alerts **only**.
 - `BRAND_NAVY` — buttons, selected states, primary CTAs **only**.
+- `SUCCESS` / `WARNING` / `INFO` — system status only (form validation, connection/sync state, neutral messaging), never win/loss outcomes — those stay `BRAND_GOLD` / `BRAND_SEAM_RED`. Bright hex is for icon dots and accent strokes; pair with a soft-fill + border variant for badges/toasts (see the Design System token file).
 - **Banned**: cyan, purple, neon glow, gradient text (`background-clip: text` with a gradient).
 - **Banned**: `border-left` / `border-right` accent stripes wider than 1px on cards or callouts.
+- **Banned**: any light-theme surface, including in token files — no `.theme-light` / `[data-theme='light']` override block. The app is dark-mode only (see Layout Principles).
+- **Exempt — official third-party OAuth buttons** (Discord, Google, Apple, etc.): render with the vendor's mandated brand colors and logo marks (e.g. Discord blurple `#5865F2`, Google's standard white button). Do not restyle vendor auth buttons to brand navy/gold — altering a mandated third-party mark hurts trust/recognition and often violates the vendor's own brand guidelines. Scoped to the button itself; surrounding chrome still follows brand rules.
 
 ### Token discipline
 
@@ -130,7 +141,8 @@ The implementation agent infers component structure and behavior from your marku
 
 Fictional but plausible — the mockup should read like a real league:
 
-- Invented team and player names; never real MLB/NFL players or trademarks.
+- Invented team and league names, and user personas — never implying affiliation with a real league, organization, or person.
+- **Exception — player-data surfaces**: this is a historical-baseball product whose actual domain data is real players. Pages whose product surface literally displays that data (players list/detail, stats tables, scoreboards, matchups) may use real historical MLB players (e.g. Babe Ruth, Mike Trout) as representative data — that data IS the product. Keep invented names for anything adjacent that isn't player/stat data itself (team names, league names, commissioner personas, social/chat content).
 - Sport-correct stat ranges (a batting average of `.287`, not `47.2`; an ERA of `3.64`, not `0.2`) and the decimal precision the reference doc specifies.
 - Enough rows/entries to expose the layout's behavior: at least one long team name that tests truncation, a tied score, a negative trend — the edge cases the design must survive.
 - If the page serves both baseball and football, show one sport as primary and annotate what changes for the other (columns, positions, terminology) — don't design baseball-only by default.
@@ -204,7 +216,8 @@ Before marking the design complete, verify:
 - [ ] Fonts loaded from Google Fonts CDN (Big Shoulders Display + Literata)
 - [ ] All colors/fonts/spacing declared as CSS custom properties in one `:root` block; no repeated raw hex values
 - [ ] No hardcoded colors outside the palette table above
-- [ ] No cyan, purple, or neon accents; no gradient text
+- [ ] No cyan, purple, or neon accents; no gradient text (official third-party OAuth button branding is exempt)
+- [ ] No light-theme surfaces or `.theme-light`/`[data-theme='light']` token blocks — dark mode only
 - [ ] No `border-left`/`border-right` accent stripes wider than 1px
 - [ ] Semantic HTML for every control, heading, and table
 - [ ] `:hover`, `:focus-visible`, and `[disabled]`/selected states written out in CSS for every interactive element
@@ -216,6 +229,6 @@ Before marking the design complete, verify:
 - [ ] All seven breakpoint bands (`xxs`–`xxl`) are covered — each band is either a designed frame or explicitly annotated as sharing one; `xxs` (375px) and `xxl` (1280px) are always fully designed
 - [ ] The complete state × breakpoint matrix was clicked through — no combination shows a blank, unstyled, or squeezed frame
 - [ ] Reflow behavior annotated at the canonical thresholds (660/800/860/980/1120/1280) — no invented breakpoints
-- [ ] Representative fictional data with sport-correct stat ranges and edge cases — no "Lorem ipsum", no real players
+- [ ] Representative data with sport-correct stat ranges and edge cases — no "Lorem ipsum"; real historical MLB players are allowed on player-data surfaces (players/stats/detail/scoreboard) but invented team/league names and personas elsewhere
 - [ ] `<!-- HANDOFF -->` block at the top of the file; reusable patterns annotated as components
 - [ ] Design intent comments explain _why_ choices were made, not _what_ they are

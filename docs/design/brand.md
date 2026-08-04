@@ -27,10 +27,31 @@ Fantasy sports players (25–45) who are league commissioners and active partici
   - Heritage gold `#C5A55A` — match results, wins, trophy states
   - Seam red `#C41E3A` — critical alerts, losing states, action required
   - Deep navy `#1B3A5C` — primary interactive (buttons, selected states)
+- **Text ramp** (on dark surfaces only):
+  - `#F8FAFC` — primary body text
+  - `#FFFFFF` — max-contrast headline text only
+  - `#DEE6FF` — secondary text
+  - `#9CAAC5` — muted metadata / labels
+  - `#6C80BA` — quietest / disabled text
+- **System-status hues** (semantic only — never decorative, never used for win/loss which stay gold/seam-red):
+  - Success `#4AAE7C` — form validation, connection/sync status, positive system state
+  - Warning `#C89452` — degraded state, non-critical alerts
+  - Info `#5B84C4` — neutral system messaging
+  - Each pairs with a soft-fill + border variant (see the Design System token file) for badges/toasts — the bright hex is for icon dots and accent strokes only.
 - **Banned patterns**:
   - No `border-left` / `border-right` accent stripes wider than 1px on cards or callouts
   - No gradient text (`background-clip: text` with a gradient)
   - No cyan/purple/neon glow accents
+  - No light-theme surfaces anywhere — the app is dark-mode only (see Layout Principles). This includes token files: no `.theme-light` / `[data-theme='light']` override block.
+
+### Third-party brand exemption
+
+Official third-party auth button treatments (Discord, Google, Apple, and similar OAuth providers) are **exempt** from the color and background rules above. Render them with the vendor's mandated brand colors and logo marks — e.g. Discord blurple `#5865F2`, Google's standard white button with grey border. Do not restyle vendor auth buttons to brand navy/gold: altering a mandated third-party mark undermines user trust and recognition, and often violates the vendor's own brand guidelines. The exemption is scoped to the button itself (fill, logo, label) — surrounding chrome (page background, card, headings) still follows brand rules above.
+
+## Representative Data
+
+- Mockups use fictional but plausible team names, league names, and user personas — never implying affiliation with a real league, organization, or person.
+- **Exception — player-data surfaces**: this is a historical-baseball product whose actual domain data is real players. Pages whose product surface literally displays that data (players list/detail, stats tables, scoreboards, matchups) may use real historical MLB players (e.g. Babe Ruth, Mike Trout) as representative data — that data IS the product. Keep the fictional-data rule for anything adjacent that isn't player/stat data itself (invented team names, league names, commissioner personas, social/chat content).
 
 ## Navigation & Motion
 
