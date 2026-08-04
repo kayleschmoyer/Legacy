@@ -36,7 +36,7 @@ Writes let an agent fix a design **in Claude Design itself** — the remedy path
 
 Required order: `list_files`/`get_file` (read current state) → `finalize_plan({ projectId, writes, deletes, localDir })` → `write_files({ planId, files })` / `delete_files({ planId, paths })`.
 
-- `finalize_plan` is the user-visible approval boundary: the exact write/delete path set and source directory are shown independently of your narration. Plan the **minimal** file set — designs are updated incrementally, one component/file at a time, never wholesale-replaced.
+- `finalize_plan` is the user-visible approval boundary: the exact write/delete path set and source directory are shown independently of your narration. Plan the **minimal** file set — designs are updated incrementally, one component/file at a time, never wholesale-replaced. **Always pass `deletes: []` explicitly when there are no deletions** — the tool rejects a missing `deletes` with `finalize_plan requires: deletes.` even though the schema marks it optional (observed 2026-08-03, LS-9013).
 - `write_files` prefers `localPath` (tool reads from disk; content never enters model context). Max 256 files per call.
 - After pushing changes, the repo copy is stale by definition — finish the loop with a pull (`/pull-design`) or a cloud `/sync-designs` run so `docs/design/` and the manifest hash catch up. A design edit that never lands back in the repo is invisible to `/implement-design`.
 
