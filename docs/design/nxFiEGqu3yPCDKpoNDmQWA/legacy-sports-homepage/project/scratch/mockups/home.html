@@ -385,103 +385,6 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.85); } }
 .dot-pulse { animation: pulse 1.4s var(--ease-std) infinite; }
 
-/* ── Hero league card (the "next up" feature card) ───────────────── */
-/* MOTION: on route enter, hero slides up 12px + crossfade, 300ms ease-out-quart */
-.league-hero {
-  position: relative;
-  border-radius: var(--r-7);
-  overflow: hidden;
-  background:
-    linear-gradient(135deg, rgba(27,58,92,.35) 0%, rgba(10,15,26,0) 55%),
-    linear-gradient(180deg, rgba(197,165,90,.05), transparent 45%),
-    #0F1A2D;
-  border: 1px solid rgba(197,165,90,.22);
-  box-shadow: var(--shadow-lg);
-  padding: 32px;
-  display: grid;
-  grid-template-columns: 1.3fr 1fr;
-  gap: 32px;
-  align-items: center;
-}
-.league-hero::before {
-  /* subtle stadium-lamp glow in the corner */
-  content: "";
-  position: absolute; top: -120px; right: -120px;
-  width: 360px; height: 360px;
-  background: radial-gradient(circle, rgba(197,165,90,.18) 0%, transparent 65%);
-  pointer-events: none;
-}
-.hero-left { position: relative; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.hero-head-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.hero-title {
-  font-family: var(--font-display); font-weight: 800;
-  font-size: 36px; line-height: 1.05; letter-spacing: -.01em;
-  color: var(--text-headline); margin: 0;
-}
-.hero-sub {
-  font-family: var(--font-body); font-style: italic;
-  color: var(--text-secondary); font-size: 15px; margin: 0;
-}
-.hero-footer {
-  display: flex; gap: 18px; align-items: center;
-  font-family: var(--font-display); font-weight: 700;
-  font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--text-secondary);
-}
-.hero-footer .sep { color: var(--text-muted); }
-.hero-footer b { color: var(--text-primary); font-weight: 700; }
-
-/* Hero matchup panel (right side) */
-.matchup {
-  background: rgba(10,15,26,.55);
-  border: 1px solid var(--border);
-  border-radius: var(--r-5);
-  padding: 20px 22px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  gap: 20px;
-  align-items: center;
-}
-.matchup-side { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
-.matchup-side .team-badge {
-  width: 52px; height: 52px; border-radius: 50%;
-  background: linear-gradient(135deg, #1B3A5C 0%, #0E1E33 100%);
-  border: 1px solid var(--border-strong);
-  display: inline-flex; align-items: center; justify-content: center;
-  font-family: var(--font-display); font-weight: 800;
-  font-size: 18px; color: var(--text-headline); letter-spacing: .04em;
-}
-.matchup-side .team-badge.you {
-  background: linear-gradient(135deg, #1B3A5C 0%, #C5A55A 100%);
-  border-color: rgba(197,165,90,.5);
-}
-.matchup-side .team-badge.opp {
-  background: linear-gradient(135deg, #8B1A2B 0%, #4A0F17 100%);
-  border-color: rgba(196,30,58,.4);
-}
-.matchup-side .team-name {
-  font-family: var(--font-display); font-weight: 700;
-  font-size: 13px; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--text-primary);
-}
-.matchup-side .team-rec {
-  font-family: var(--font-body); font-size: 12px;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-.matchup-side .score {
-  font-family: var(--font-display); font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  font-size: 52px; line-height: 1; color: var(--text-headline);
-  margin-top: 2px;
-}
-.matchup-side.leading .score { color: var(--brand-gold-light); }
-.vs {
-  font-family: var(--font-display); font-weight: 800;
-  font-size: 15px; letter-spacing: .22em;
-  color: var(--text-muted);
-}
-
 /* ── League list (secondary) ─────────────────────────────────────── */
 .league-list {
   display: flex; flex-direction: column; gap: 1px;
@@ -914,12 +817,6 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .frame[data-viewport="mobile"] .h2 { font-size: 24px; }
 .frame[data-viewport="mobile"] .head-ctas { display: flex; gap: 8px; }
 .frame[data-viewport="mobile"] .head-ctas .btn { flex: 1; justify-content: center; padding: 10px 12px; font-size: 11px; }
-.frame[data-viewport="mobile"] .league-hero { grid-template-columns: 1fr; padding: 22px; gap: 22px; }
-.frame[data-viewport="mobile"] .hero-title { font-size: 26px; }
-.frame[data-viewport="mobile"] .matchup { padding: 16px 12px; gap: 8px; }
-.frame[data-viewport="mobile"] .matchup-side .score { font-size: 38px; }
-.frame[data-viewport="mobile"] .matchup-side .team-badge { width: 44px; height: 44px; font-size: 15px; }
-.frame[data-viewport="mobile"] .vs { font-size: 12px; letter-spacing: .18em; }
 .frame[data-viewport="mobile"] .league-row {
   grid-template-columns: 1fr auto;
   gap: 12px;
@@ -949,8 +846,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 /* ── Tablet (800px, sm band) overrides ────────────────────────────
    BREAKPOINTS: this layout serves sm–md (800–979px) — nav still fits
    its tabs comfortably and the sport grid stays 2-up, but the
-   league-hero stacks (the matchup panel needs real estate) and the
-   right rail moves below the main column (see the 979px rule above). */
+   hero stacks and the right rail moves below the main column. */
 .frame[data-viewport="tablet"] .page { padding: 32px 28px 80px; }
 .frame[data-viewport="tablet"] .nav-inner { padding: 12px 20px; gap: 16px; }
 .frame[data-viewport="tablet"] .nav-tabs { padding: 4px; gap: 0; }
@@ -959,13 +855,6 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .frame[data-viewport="tablet"] .h2 { font-size: 28px; }
 .frame[data-viewport="tablet"] .page-head { gap: 18px; flex-wrap: wrap; }
 .frame[data-viewport="tablet"] .page-head .welcome { gap: 12px; }
-.frame[data-viewport="tablet"] .league-hero {
-  grid-template-columns: 1fr;          /* stack text + matchup */
-  padding: 26px;
-  gap: 22px;
-}
-.frame[data-viewport="tablet"] .hero-title { font-size: 30px; }
-.frame[data-viewport="tablet"] .matchup-side .score { font-size: 44px; }
 .frame[data-viewport="tablet"] .league-row {
   grid-template-columns: minmax(0, 1.4fr) auto minmax(120px, 1fr) auto 20px;
   gap: 18px;
@@ -986,10 +875,8 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .frame[data-viewport="tablet"] .modal { max-width: 520px; }
 
 /* ── Ticket-stub matchup (hero banner graphic) ─────────────────────
-   COMPONENT: ticket — printed-stock matchup stub, the graphic form of the
-   .matchup panel. Sport-skinnable: .ticket-bb (baseball, seam-red stub) and
-   .ticket-fb (football, turf green per the "turf green instead of seam red"
-   note on the Football card). Cream stock is deliberate: it is paper, an
+   COMPONENT: ticket — printed-stock matchup stub. Baseball only (.ticket-bb);
+   football uses .playboard instead. Cream stock is deliberate: it is paper, an
    artifact, and it reads as an object against the night-stadium page rather
    than as one more translucent dark panel.
    PALETTE: leading score = navy + gold-dark rule (gold is the win accent, but
@@ -1007,11 +894,11 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   box-shadow: 0 16px 38px rgba(0,0,0,.45), inset 0 0 0 1px rgba(27,37,54,.10);
 }
 /* MOTION: ticket lifts -2px / shadow deepens on hover, 220ms */
-.ticket[role="link"]:hover, .league-hero:hover .ticket { transform: translateY(-2px); box-shadow: 0 22px 44px rgba(0,0,0,.5), inset 0 0 0 1px rgba(27,37,54,.14); }
+.ticket[role="link"]:hover { transform: translateY(-2px); box-shadow: 0 22px 44px rgba(0,0,0,.5), inset 0 0 0 1px rgba(27,37,54,.14); }
 .ticket[role="link"] { cursor: pointer; }
 .ticket[role="link"]:focus-visible { outline: 2px solid var(--brand-gold-light); outline-offset: 3px; }
 .ticket { transition: transform 220ms var(--ease-std), box-shadow 220ms var(--ease-std); }
-@media (prefers-reduced-motion: reduce) { .ticket { transition: none; } .ticket[role="link"]:hover, .league-hero:hover .ticket { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ticket { transition: none; } .ticket[role="link"]:hover { transform: none; } }
 
 .tk-body { padding: 18px 22px 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .tk-top {
@@ -1161,13 +1048,10 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   .tk-meta { font-size: 10px; gap: 7px; }
 }
 
-/* Football ticket skin — retained only as the rejected alternative to the playboard */
-.ticket-fb { --tk-accent: #2F6B3C; }
 .sport-card .ticket { align-self: stretch; flex: 1 1 auto; }
 .sport-card .ticket .tk-body { justify-content: space-between; }
 .ticket-preview { opacity: .82; box-shadow: 0 10px 26px rgba(0,0,0,.35), inset 0 0 0 1px rgba(27,37,54,.10); }
 .ticket-preview .tk-num { font-size: 40px; }
-.league-hero:hover .ticket-preview { transform: none; }
 
 /* Ticket at the tablet layout (sm/md) — the hero grid stacks; the vertical
    perforation becomes a horizontal one so the fold still reads. */
@@ -1556,8 +1440,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
         </div>
       </div>
 
-      <!-- Hero league card: the most urgent one. Here, a live matchup in Week 14. -->
-      <!-- MOTION: card lift -2px on hover, 220ms; border shifts to gold-tinted -->
+      <!-- MOTION: hero lifts -2px on hover, 220ms -->
       <!-- A11Y NOTE (applies to all role="link" / role="listitem" league cards below):
            This is a static design mockup. Keyboard activation (Enter/Space → onKeyDown)
            is the implementation agent's responsibility in apps/web/src/pages/home/HomePage.tsx
@@ -1567,8 +1450,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
            is printed on the stock (title, era, meta) beside the score block,
            divided by a perforation rule; the stub carries admission + week.
            This replaced the dark league-hero card + inset ticket (one object
-           instead of an artifact sitting inside a panel). The old .league-hero
-           CSS is retained below in case we revert. -->
+           instead of an artifact sitting inside a panel). -->
       <article class="ticket ticket-bb ticket-hero" role="link" tabindex="0" aria-label="Open Dead Ball Dynasty — live, week 14, Bronx Bombers 127.5 to Fenway Nine 112.3">
         <div class="tk-body">
           <div class="tk-head">
