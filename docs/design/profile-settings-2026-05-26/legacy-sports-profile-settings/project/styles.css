@@ -245,14 +245,24 @@ body {
 /* ── Section card ────────────────────────────────────────── */
 .lg-card {
   position: relative;
-  background: linear-gradient(135deg, #0e162a 0%, #16223a 50%, #1b3a5c 130%);
+  background: linear-gradient(
+    135deg,
+    var(--surface-subtle) 0%,
+    var(--surface-card) 50%,
+    var(--brand-navy) 130%
+  );
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-5);
   margin-top: 24px;
   box-shadow: var(--shadow-md);
 }
 .lg-card-danger {
-  background: linear-gradient(135deg, #0e162a 0%, #1a1426 55%, #3a1320 120%);
+  background: linear-gradient(
+    135deg,
+    var(--surface-subtle) 0%,
+    rgba(196, 30, 58, 0.22) 55%,
+    var(--brand-seam-red-dark) 120%
+  );
   border-color: rgba(196, 30, 58, 0.4);
 }
 .lg-card-head {
@@ -387,7 +397,7 @@ body {
   min-width: 0;
 }
 .lg-field-value.lg-mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-variant-numeric: tabular-nums;
   color: var(--fg2);
   font-size: 13.5px;
@@ -506,7 +516,7 @@ body {
   border-color: #5865f2;
 }
 .lg-btn-discord:hover {
-  background: #6f7afa;
+  background: #4752c4;
 }
 .lg-btn-lg {
   padding: 11px 18px;
@@ -550,9 +560,9 @@ body {
   border: 1px solid var(--outline-default);
 }
 .lg-chip-live {
-  background: rgba(34, 197, 94, 0.14);
-  color: #6fd39a;
-  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: var(--success-soft);
+  color: var(--success-fg);
+  border: 1px solid var(--success-border);
 }
 .lg-chip-private {
   background: rgba(197, 165, 90, 0.14);
@@ -606,7 +616,7 @@ body {
       rgba(197, 165, 90, 0.08),
       transparent 50%
     ),
-    linear-gradient(135deg, #0e162a 0%, #16223a 50%, #1b3a5c 130%);
+    linear-gradient(135deg, var(--surface-subtle) 0%, var(--surface-card) 50%, var(--brand-navy) 130%);
   border-radius: var(--radius-6);
   border: 1px solid var(--panel-border);
   padding: 24px 20px;
@@ -834,12 +844,12 @@ body {
 .lg-row-icon-discord {
   background: rgba(88, 101, 242, 0.18);
   border: 1px solid #5865f2;
-  color: #aab3ff;
+  color: #5865f2;
 }
 .lg-row-icon-session {
-  background: rgba(34, 197, 94, 0.14);
-  border: 1px solid rgba(34, 197, 94, 0.4);
-  color: #6fd39a;
+  background: var(--success-soft);
+  border: 1px solid var(--success-border);
+  color: var(--success-fg);
 }
 .lg-row-icon-future {
   background: var(--surface-card);
@@ -902,8 +912,8 @@ body {
   margin-top: 2px;
 }
 
-/* Smaller screens: collapse row to wrap action */
-@container page (max-width: 519px) {
+/* Smaller screens: collapse row to wrap action (below $xs, 660px) */
+@container page (max-width: 659px) {
   .lg-row {
     flex-wrap: wrap;
   }
@@ -1185,17 +1195,17 @@ body {
   35% {
     box-shadow:
       var(--shadow-lg),
-      0 0 0 2px rgba(34, 197, 94, 0.5),
-      0 0 24px rgba(34, 197, 94, 0.35);
+      0 0 0 2px rgba(34, 110, 74, 0.6),
+      0 0 24px rgba(74, 174, 124, 0.35);
   }
 }
 .lg-stickybar.saved {
   animation: lg-flash 1s var(--ease-standard);
 }
 .lg-stickybar.saved .lg-stickybar-icon {
-  background: rgba(34, 197, 94, 0.18);
-  border-color: rgba(34, 197, 94, 0.5);
-  color: #6fd39a;
+  background: rgba(34, 110, 74, 0.35);
+  border-color: rgba(34, 110, 74, 0.6);
+  color: var(--success-fg);
 }
 
 /* ── Danger zone ─────────────────────────────────────────── */
@@ -1247,7 +1257,7 @@ body {
 .lg-pub-hero {
   background:
     radial-gradient(ellipse at 0% 0%, rgba(197, 165, 90, 0.1), transparent 55%),
-    linear-gradient(135deg, #0e162a 0%, #16223a 60%, #1b3a5c 130%);
+    linear-gradient(135deg, var(--surface-subtle) 0%, var(--surface-card) 60%, var(--brand-navy) 130%);
   border: 1px solid var(--brand-navy-light);
   border-radius: var(--radius-6);
   padding: 28px;
@@ -1286,7 +1296,7 @@ body {
   gap: 10px;
 }
 .lg-pub-handle {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 13px;
   color: var(--fg3);
 }
@@ -1370,7 +1380,7 @@ body {
   gap: 16px;
   margin-top: 18px;
 }
-@container page (min-width: 720px) {
+@container page (min-width: 660px) {
   .lg-pub-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -1462,7 +1472,7 @@ body {
   gap: 18px;
   max-width: 520px;
   margin: 60px auto;
-  background: linear-gradient(135deg, #0e162a 0%, #16223a 60%, #1b3a5c 130%);
+  background: linear-gradient(135deg, var(--surface-subtle) 0%, var(--surface-card) 60%, var(--brand-navy) 130%);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-6);
 }
@@ -1499,7 +1509,7 @@ body {
   max-width: 38ch;
 }
 .lg-locked .handle {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 13px;
   color: var(--fg4);
   margin-top: -4px;
@@ -1682,7 +1692,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 10px;
   color: var(--fg4);
   z-index: 100;

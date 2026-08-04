@@ -14,11 +14,11 @@
 //   </DesignCanvas>
 
 const DC = {
-  bg: '#f0eee9',
-  grid: 'rgba(0,0,0,0.06)',
-  label: 'rgba(60,50,40,0.7)',
-  title: 'rgba(40,30,20,0.85)',
-  subtitle: 'rgba(60,50,40,0.6)',
+  bg: '#0a0f1a',
+  grid: 'rgba(255,255,255,0.06)',
+  label: 'rgba(222,230,255,0.7)',
+  title: 'rgba(248,250,252,0.92)',
+  subtitle: 'rgba(156,170,197,0.75)',
   postitBg: '#fef4a8',
   postitText: '#5a4a2a',
   font: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
@@ -49,7 +49,7 @@ if (typeof document !== 'undefined' && !document.getElementById('dc-styles')) {
     '  display:flex;align-items:center;container-type:inline-size}',
     '.dc-labelrow{display:flex;align-items:center;gap:4px;height:24px;flex:1 1 auto;min-width:0}',
     '.dc-grip{flex:0 0 auto;cursor:grab;display:flex;align-items:center;padding:5px 4px;border-radius:4px;transition:background .12s,opacity .12s}',
-    '.dc-grip:hover{background:rgba(0,0,0,.08)}',
+    '.dc-grip:hover{background:rgba(255,255,255,.1)}',
     '.dc-grip:active{cursor:grabbing}',
     '.dc-labeltext{flex:1 1 auto;min-width:0;cursor:pointer;border-radius:4px;padding:3px 6px;',
     '  display:flex;align-items:center;transition:background .12s;overflow:hidden}',
@@ -61,15 +61,15 @@ if (typeof document !== 'undefined' && !document.getElementById('dc-styles')) {
     '  .dc-grip{opacity:0}',
     '  [data-dc-slot]:hover .dc-grip{opacity:1}',
     '}',
-    '.dc-labeltext:hover{background:rgba(0,0,0,.05)}',
+    '.dc-labeltext:hover{background:rgba(255,255,255,.08)}',
     '.dc-labeltext .dc-editable{overflow:hidden;text-overflow:ellipsis;max-width:100%}',
     '.dc-labeltext .dc-editable:focus{overflow:visible;text-overflow:clip}',
     '.dc-btns{flex:0 0 auto;margin-left:auto;display:flex;gap:2px;opacity:0;transition:opacity .12s}',
     '[data-dc-slot]:hover .dc-btns,.dc-btns:has(.dc-menu){opacity:1}',
     '.dc-expand,.dc-kebab{width:22px;height:22px;border-radius:5px;border:none;cursor:pointer;padding:0;',
-    '  background:transparent;color:rgba(60,50,40,.7);display:flex;align-items:center;justify-content:center;',
+    '  background:transparent;color:rgba(222,230,255,.7);display:flex;align-items:center;justify-content:center;',
     '  font:inherit;transition:background .12s,color .12s}',
-    '.dc-expand:hover,.dc-kebab:hover{background:rgba(0,0,0,.06);color:#2a251f}',
+    '.dc-expand:hover,.dc-kebab:hover{background:rgba(255,255,255,.08);color:#F8FAFC}',
     // Slot hosting an open menu floats above later siblings (which otherwise
     // paint on top — same z-index:auto, later DOM order) so the popup isn't
     // clipped by the next card.

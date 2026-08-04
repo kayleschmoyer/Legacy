@@ -187,10 +187,10 @@
       "title": "Profile Settings",
       "slug": "legacy-sports-profile-settings",
       "status": "active",
-      "source": "manual-local-sync",
-      "lastSyncedHash": "f9ed551882e3ef4ad53254241adc51ba725ff3f1941f8ecefeae883185be3502",
-      "lastSyncedAt": "2026-05-26T00:00:00.000Z",
-      "jiraKey": "LS-4931"
+      "source": "designsync-local",
+      "lastSyncedHash": "sha256-f8f29079116f7e827980aa768b6e1db4635c107ed835e72a0e51e1e011281b71",
+      "lastSyncedAt": "2026-08-04T15:49:13.000Z",
+      "jiraKey": "LS-8972"
     },
     {
       "id": "nxFiEGqu3yPCDKpoNDmQWA",
