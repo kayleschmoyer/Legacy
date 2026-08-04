@@ -28,7 +28,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
 <style>
 /* ── Tokens — mirrored from design-system colors_and_type.css ──────── */
@@ -51,6 +51,7 @@
   --text-primary:   #E8EDF5;
   --text-secondary: #8A9BB5;
   --text-muted:     #6C80BA;
+  --text-headline:  #FFFFFF;   /* FG1_STRONG — max-contrast headline text only */
   --border:         #1E2D45;
   --border-strong:  #2F3B53;
 
@@ -63,7 +64,8 @@
 
   --font-display: 'Big Shoulders Display', 'Oswald', system-ui, sans-serif;
   --font-body:    'Literata', Georgia, 'Times New Roman', serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, Menlo, monospace;
+  /* No third/mono typeface — brief allows exactly two faces. Stat/code text
+     uses --font-body with font-variant-numeric: tabular-nums instead. */
 
   --r-2: 6px; --r-3: 8px; --r-4: 12px; --r-5: 16px; --r-6: 20px; --r-7: 24px; --r-pill: 9999px;
 
@@ -78,7 +80,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body {
-  background: #05080F;
+  background: var(--bg-page);
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 16px;
@@ -90,7 +92,7 @@ body {
 /* ── Mockup reviewer chrome (NOT part of the product) ───────────── */
 .review-bar {
   position: sticky; top: 0; z-index: 100;
-  background: #05080F;
+  background: var(--bg-page);
   border-bottom: 1px solid #111;
   padding: 14px 24px;
   display: flex; gap: 28px; align-items: center; flex-wrap: wrap;
@@ -101,7 +103,7 @@ body {
 }
 .review-bar .rb-title { color: var(--brand-gold-light); letter-spacing: .2em; }
 .review-bar .rb-group { display: flex; align-items: center; gap: 8px; }
-.review-bar .rb-group > span:first-child { color: #445676; margin-right: 4px; }
+.review-bar .rb-group > span:first-child { color: var(--text-muted); margin-right: 4px; }
 .review-bar button {
   background: transparent;
   border: 1px solid #1E2D45;
@@ -113,9 +115,10 @@ body {
   transition: all 150ms var(--ease-std);
 }
 .review-bar button:hover { color: #E8EDF5; border-color: #2F3B53; }
-.review-bar button.on { background: #1B3A5C; border-color: #2C4A7C; color: #fff; }
+.review-bar button:focus-visible { color: #E8EDF5; border-color: #2F3B53; outline: 2px solid var(--text-primary); outline-offset: 2px; }
+.review-bar button.on { background: #1B3A5C; border-color: #2C4A7C; color: var(--text-headline); }
 .review-bar .rb-spacer { flex: 1; }
-.review-bar .rb-note { font-family: var(--font-body); font-weight: 400; font-size: 12px; letter-spacing: 0; text-transform: none; color: #445676; }
+.review-bar .rb-note { font-family: var(--font-body); font-weight: 400; font-size: 12px; letter-spacing: 0; text-transform: none; color: var(--text-muted); }
 
 /* ── Stage — single frame, sized by selected viewport ───────────── */
 .stage {
@@ -139,15 +142,17 @@ body {
   position: absolute; top: -28px; left: 0;
   font-family: var(--font-display); font-weight: 700;
   font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
-  color: #445676;
+  color: var(--text-muted);
 }
 .frame-label b { color: var(--brand-gold-light); font-weight: 700; }
 
-/* Desktop — default; cap at 1280 to keep proportions honest in a wide window. */
+/* Desktop — default; cap at 1280 to keep proportions honest in a wide window.
+   This is the xxl band (1280+, canonical breakpoints.ts). */
 .frame[data-viewport="desktop"] { max-width: 1280px; min-height: 1100px; }
 
-/* Tablet — 768px wide (iPad portrait). */
-.frame[data-viewport="tablet"]  { max-width: 768px;  min-height: 1024px; }
+/* Tablet — 800px wide (sm band start, iPad portrait). Canonical threshold,
+   not the invented 768px figure — see breakpoints.ts. */
+.frame[data-viewport="tablet"]  { max-width: 800px;  min-height: 1024px; }
 
 /* Mobile — 375px wide, rounded like a phone preview. */
 .frame[data-viewport="mobile"] {
@@ -210,8 +215,9 @@ body {
   transition: all 150ms var(--ease-std);
   text-decoration: none;
 }
-.nav-tabs a.on { background: var(--brand-navy); color: #fff; }
+.nav-tabs a.on { background: var(--brand-navy); color: var(--text-headline); }
 .nav-tabs a:hover:not(.on) { color: var(--text-primary); }
+.nav-tabs a:focus-visible:not(.on) { color: var(--text-primary); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .icon-btn {
   background: transparent;
@@ -224,6 +230,7 @@ body {
   position: relative;
 }
 .icon-btn:hover { border-color: var(--border-strong); background: rgba(255,255,255,.03); }
+.icon-btn:focus-visible { border-color: var(--border-strong); background: rgba(255,255,255,.03); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .icon-btn .bell-dot {
   position: absolute; top: 8px; right: 9px;
   width: 7px; height: 7px; border-radius: 50%;
@@ -237,7 +244,7 @@ body {
   border: 1px solid rgba(197, 165, 90, .45);
   display: inline-flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-weight: 800;
-  font-size: 12px; color: #fff; letter-spacing: .04em;
+  font-size: 12px; color: var(--text-headline); letter-spacing: .04em;
 }
 
 /* ── Page shell ──────────────────────────────────────────────────── */
@@ -267,7 +274,7 @@ body {
   font-size: clamp(36px, 4.4vw, 56px);
   line-height: 1.02;
   letter-spacing: -0.02em;
-  color: #fff; margin: 6px 0 0;
+  color: var(--text-headline); margin: 6px 0 0;
 }
 .h2 {
   font-family: var(--font-display); font-weight: 800;
@@ -303,7 +310,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   font-variant-numeric: tabular-nums;
 }
 .record-line b { color: var(--text-primary); font-weight: 800; letter-spacing: .04em; }
-.record-line .sep { color: #445676; }
+.record-line .sep { color: var(--text-muted); }
 
 .head-ctas { display: flex; gap: 10px; align-items: center; }
 
@@ -319,12 +326,15 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   display: inline-flex; align-items: center; gap: 8px;
   text-decoration: none;
 }
-.btn-primary { background: var(--brand-navy); color: #fff; border-color: var(--brand-navy-light); }
+.btn-primary { background: var(--brand-navy); color: var(--text-headline); border-color: var(--brand-navy-light); }
 .btn-primary:hover { background: var(--brand-navy-light); transform: translateY(-1px); }
+.btn-primary:focus-visible { background: var(--brand-navy-light); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .btn-gold { background: var(--brand-gold); color: #111; }
 .btn-gold:hover { background: var(--brand-gold-light); transform: translateY(-1px); }
+.btn-gold:focus-visible { background: var(--brand-gold-light); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .btn-ghost { background: transparent; color: var(--text-primary); border-color: var(--border-strong); }
 .btn-ghost:hover { border-color: #4D5D80; background: rgba(255,255,255,.03); }
+.btn-ghost:focus-visible { border-color: #4D5D80; background: rgba(255,255,255,.03); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .btn-sm { padding: 8px 14px; font-size: 11px; }
 .btn[disabled] { opacity: .45; cursor: not-allowed; }
 .btn svg { width: 14px; height: 14px; }
@@ -345,6 +355,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   display: inline-flex; align-items: center; gap: 6px;
 }
 .text-link:hover { color: var(--brand-gold); }
+.text-link:focus-visible { color: var(--brand-gold); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
 /* ── Chips / badges ──────────────────────────────────────────────── */
 .chip {
@@ -356,7 +367,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   white-space: nowrap;
   border: 1px solid transparent;
 }
-.chip-live     { background: rgba(196,30,58,.15); color: #E63950; border-color: rgba(196,30,58,.4); }
+.chip-live     { background: rgba(196,30,58,.15); color: var(--brand-seam-red-lt); border-color: rgba(196,30,58,.4); }
 .chip-active   { background: rgba(34,197,94,.12); color: #6FD39A; border-color: rgba(34,197,94,.4); }
 .chip-pre      { background: rgba(197,165,90,.12); color: var(--brand-gold-light); border-color: rgba(197,165,90,.4); }
 .chip-off      { background: rgba(108,128,186,.10); color: var(--text-muted); border-color: #1E2D45; }
@@ -402,7 +413,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .hero-title {
   font-family: var(--font-display); font-weight: 800;
   font-size: 36px; line-height: 1.05; letter-spacing: -.01em;
-  color: #fff; margin: 0;
+  color: var(--text-headline); margin: 0;
 }
 .hero-sub {
   font-family: var(--font-body); font-style: italic;
@@ -414,7 +425,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
   color: var(--text-secondary);
 }
-.hero-footer .sep { color: #445676; }
+.hero-footer .sep { color: var(--text-muted); }
 .hero-footer b { color: var(--text-primary); font-weight: 700; }
 
 /* Hero matchup panel (right side) */
@@ -435,7 +446,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   border: 1px solid var(--border-strong);
   display: inline-flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-weight: 800;
-  font-size: 18px; color: #fff; letter-spacing: .04em;
+  font-size: 18px; color: var(--text-headline); letter-spacing: .04em;
 }
 .matchup-side .team-badge.you {
   background: linear-gradient(135deg, #1B3A5C 0%, #C5A55A 100%);
@@ -458,7 +469,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .matchup-side .score {
   font-family: var(--font-display); font-weight: 800;
   font-variant-numeric: tabular-nums;
-  font-size: 52px; line-height: 1; color: #fff;
+  font-size: 52px; line-height: 1; color: var(--text-headline);
   margin-top: 2px;
 }
 .matchup-side.leading .score { color: var(--brand-gold-light); }
@@ -488,6 +499,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   /* MOTION: on hover, background shifts to --bg-raised over 150ms */
 }
 .league-row:hover { background: var(--bg-raised); }
+.league-row:focus-visible { background: var(--bg-raised); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .league-row .lr-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .league-row .lr-name {
   font-family: var(--font-display); font-weight: 700;
@@ -534,6 +546,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   transition: all 150ms var(--ease-std);
 }
 .archive-toggle:hover { color: var(--text-primary); border-color: var(--border-strong); }
+.archive-toggle:focus-visible { color: var(--text-primary); border-color: var(--border-strong); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .archive-toggle svg { width: 12px; height: 12px; }
 
 /* ── Right rail: On This Day ─────────────────────────────────────── */
@@ -544,7 +557,9 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   align-items: flex-start;
   margin-top: 56px;
 }
-@media (max-width: 1024px) { .dashboard-split { grid-template-columns: 1fr; } }
+/* BREAKPOINTS: rail returns beside main column at lg (980px) — below that,
+   xxs/xs/sm/md all stack single-column. Canonical threshold, not 1024. */
+@media (max-width: 979px) { .dashboard-split { grid-template-columns: 1fr; } }
 
 .rail {
   position: sticky; top: 88px;
@@ -594,7 +609,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   max-width: 70ch;
 }
 .otd-stat {
-  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  font-family: var(--font-body); font-variant-numeric: tabular-nums;
   font-size: 12px;
   color: var(--text-muted);
   display: inline-flex; gap: 10px;
@@ -610,7 +625,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   border-radius: var(--r-6);
   border: 1px solid rgba(255,255,255,.08);
   display: flex; align-items: center; gap: 20px;
-  color: #fff; cursor: pointer;
+  color: var(--text-headline); cursor: pointer;
   transition: all 220ms var(--ease-std);
   text-align: left;
   text-decoration: none;
@@ -619,6 +634,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 }
 .sport-bb { background: linear-gradient(135deg, #0A0F1A 0%, #1B3A5C 70%, #143050 100%); }
 .sport-bb:hover { transform: translateY(-3px); border-color: rgba(197,165,90,.35); box-shadow: var(--shadow-lg); }
+.sport-bb:focus-visible { border-color: rgba(197,165,90,.35); box-shadow: var(--shadow-lg); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .sport-fb { background: linear-gradient(135deg, #0A0F1A 0%, #0F2A1A 65%, #1A3A2A 100%); opacity: .6; cursor: not-allowed; }
 .sport-card .sc-icon {
   width: 64px; height: 64px;
@@ -667,7 +683,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   font-family: var(--font-display); font-weight: 800;
   font-size: clamp(44px, 5.2vw, 68px);
   line-height: .98; letter-spacing: -.025em;
-  color: #fff; margin: 0;
+  color: var(--text-headline); margin: 0;
 }
 .gs-hero .gs-title em {
   font-style: normal;
@@ -701,7 +717,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .error-card .ec-body p { max-width: 60ch; }
 .error-card .ec-actions { display: flex; gap: 10px; margin-top: 8px; }
 .error-inline-code {
-  font-family: var(--font-mono); font-size: 12px;
+  font-family: var(--font-body); font-size: 12px;
   color: var(--text-muted);
   background: rgba(0,0,0,.25);
   padding: 3px 7px;
@@ -812,6 +828,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   transition: all 150ms var(--ease-std);
 }
 .modal-close:hover { color: var(--text-primary); border-color: var(--border-strong); background: rgba(255,255,255,.04); }
+.modal-close:focus-visible { color: var(--text-primary); border-color: var(--border-strong); background: rgba(255,255,255,.04); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 
 /* ── Row action — small secondary button inside a league row ─────── */
 .row-action {
@@ -828,6 +845,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   white-space: nowrap;
 }
 .row-action:hover { color: var(--text-primary); border-color: #4D5D80; background: rgba(255,255,255,.03); }
+.row-action:focus-visible { color: var(--text-primary); border-color: #4D5D80; background: rgba(255,255,255,.03); outline: 2px solid var(--text-primary); outline-offset: 2px; }
 .row-action svg { width: 11px; height: 11px; }
 .lr-status { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 
@@ -924,10 +942,11 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .frame[data-viewport="mobile"] .modal-overlay { padding: 20px; }
 .frame[data-viewport="mobile"] .modal { padding: 22px; border-radius: var(--r-6); }
 
-/* ── Tablet (768px) overrides ─────────────────────────────────────
-   At 768 the nav still fits its tabs comfortably and the sport grid
-   stays 2-up, but the league-hero stacks (the matchup panel needs
-   real estate) and the right rail moves below the main column. */
+/* ── Tablet (800px, sm band) overrides ────────────────────────────
+   BREAKPOINTS: this layout serves sm–md (800–979px) — nav still fits
+   its tabs comfortably and the sport grid stays 2-up, but the
+   league-hero stacks (the matchup panel needs real estate) and the
+   right rail moves below the main column (see the 979px rule above). */
 .frame[data-viewport="tablet"] .page { padding: 32px 28px 80px; }
 .frame[data-viewport="tablet"] .nav-inner { padding: 12px 20px; gap: 16px; }
 .frame[data-viewport="tablet"] .nav-tabs { padding: 4px; gap: 0; }
@@ -969,7 +988,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .flex { display: flex; }
 .gap-8 { gap: 8px; }
 .mt-8 { margin-top: 8px; }
-.mono-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.mono-num { font-family: var(--font-body); font-variant-numeric: tabular-nums; }
 
 /* Hide-by-default state containers — JS toggles one on */
 .state { display: none; }
@@ -978,6 +997,29 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 </head>
 
 <body>
+
+<!-- HANDOFF:
+     Final file: this one (scratch/mockups/home.html). No other candidate.
+     Key decisions:
+     - Editorial hierarchy over a card grid: one "next up" league gets the
+       hero treatment (matchup panel); the rest are a denser list, not
+       repeated hero cards. Ties to the anti-Yahoo-Sports brief note.
+     - Returning vs. Getting-Started are two structurally different
+       templates (not one template with conditionals) because the
+       information hierarchy genuinely differs — new users see a
+       marketing-weight hero and a sport picker, not a personal record line.
+     - "Draft Ruth alongside Trout" (sport-card copy, new-user Baseball
+       card) intentionally keeps real MLB player names: this surface is
+       describing the actual drafting mechanic, and the players page/stats/
+       matchups exception for real historical players (brand.md
+       "Representative Data") applies to product-mechanic copy like this,
+       not just literal stat tables. Left unchanged per that ruling.
+     Deviations from home.md: none material — see home.md for the full
+     data model this mockup implements.
+     Open questions: none outstanding; LS-9004 resolved the three brand
+     rulings (OAuth colors, real players, palette source of truth) that
+     were blocking sign-off on this page.
+-->
 
 <!-- ═════════════════════════════════════════════════════════════════
      REVIEW BAR  (mockup chrome only — not part of the product)
@@ -1002,19 +1044,30 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   <div class="rb-group" role="tablist" aria-label="Viewport">
     <span>Viewport</span>
     <button data-viewport="mobile">Mobile&nbsp;·&nbsp;375</button>
-    <button data-viewport="tablet">Tablet&nbsp;·&nbsp;768</button>
+    <button data-viewport="tablet">Tablet&nbsp;·&nbsp;800</button>
     <button data-viewport="desktop" class="on">Desktop&nbsp;·&nbsp;1280</button>
   </div>
 
   <div class="rb-spacer"></div>
-  <span class="rb-note">Breakpoints: 375 / 768 / 1280</span>
+  <span class="rb-note">Bands: xxs 375 (designed) · xs 660–sm 800 (designed) · md 860–lg 980 shares sm · xl 1120–xxl 1280 (designed)</span>
 </div>
+
+<!-- BREAKPOINTS (all seven bands claimed):
+     xxs 0–659,   designed at 375  — Mobile frame
+     xs  660–799, shares xxs layout (stacked, no nav-tabs)
+     sm  800–859, designed at 800  — Tablet frame (nav-tabs visible, hero stacks, rail below)
+     md  860–979, shares sm layout
+     lg  980–1119, shares xxl layout (dashboard-split returns to two columns — see the 979px rule)
+     xl  1120–1279, shares xxl layout
+     xxl 1280+,   designed at 1280 — Desktop frame
+     Reflow thresholds used: 660 / 800 / 860 / 980 / 1120 / 1280 — no invented breakpoints. -->
+
 
 <!-- ═════════════════════════════════════════════════════════════════
      STAGE — single frame, viewport switched via the review bar.
      The frame's max-width changes; layout-internal CSS reflows based
      on [data-viewport] so the same markup behaves like it would at
-     each real breakpoint (Mobile 375 / Tablet 768 / Desktop 1280).
+     each real breakpoint (Mobile 375 / Tablet 800 / Desktop 1280).
      ───────────────────────────────────────────────────────────────── -->
 <div class="stage">
   <section class="frame" id="frame" data-viewport="desktop" aria-label="Page preview">
@@ -1105,6 +1158,8 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
            This is a static design mockup. Keyboard activation (Enter/Space → onKeyDown)
            is the implementation agent's responsibility in apps/web/src/pages/home/HomePage.tsx
            (tracked under LS-4930). Do not flag the missing handlers on the mockup. -->
+      <!-- COMPONENT: league-hero — one per page, the single "next up" league;
+           not reused elsewhere, but its matchup panel below is. -->
       <article class="league-hero" role="link" tabindex="0" aria-label="Open Dead Ball Dynasty">
         <div class="hero-left">
           <div class="hero-head-row">
@@ -1128,7 +1183,8 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
           </div>
         </div>
 
-        <!-- Matchup panel -->
+        <!-- COMPONENT: matchup — reused in Scoreboard and League Detail pages
+             wherever a head-to-head score needs to render. -->
         <div class="matchup" aria-label="Current matchup scoreboard">
           <div class="matchup-side leading">
             <div class="team-badge you" aria-hidden="true">MJ</div>
@@ -1147,6 +1203,8 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
       </article>
 
       <!-- Secondary leagues as a list (not cards) — denser, less noisy. -->
+      <!-- COMPONENT: league-row — reused anywhere a league needs a compact,
+           scannable summary (this page's list, League Detail's related-leagues rail). -->
       <div class="league-list" style="margin-top:20px" role="list" aria-label="Other leagues">
 
         <!-- ACTIVE league without a matchup shown — uses record + rank instead -->
@@ -1207,6 +1265,8 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
           <h2 class="h2">Pick your sport</h2>
         </div>
       </div>
+      <!-- COMPONENT: sport-card — reused in both variants below (compact
+           returning-user link vs. expanded new-user picker). -->
       <div class="sport-grid">
         <a class="sport-card sport-bb" href="#" aria-label="Go to Baseball">
           <div class="sc-icon"><img src="../../icons/brand/baseball.svg" alt=""></div>
@@ -1241,6 +1301,8 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   </div><!-- /main -->
 
   <!-- RIGHT RAIL: On This Day in Baseball -->
+  <!-- COMPONENT: rail-card / otd-item — reused wherever historical "on this
+       day" content appears (this rail, the new-user 2-up variant below). -->
   <aside class="rail" aria-label="On This Day in Baseball">
     <div class="rail-card">
       <div class="rail-head">
@@ -1701,7 +1763,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 
   var labels = {
     mobile:  '<b>Mobile</b> · 375px · /',
-    tablet:  '<b>Tablet</b> · 768px · /',
+    tablet:  '<b>Tablet</b> · 800px · /',
     desktop: '<b>Desktop</b> · 1280px · /'
   };
 
