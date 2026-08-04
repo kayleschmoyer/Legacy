@@ -322,7 +322,6 @@ export async function handleStatsLoadingStatus(
     LOGGER.info(`Starting watch mode (refresh every ${interval}s)...`);
     LOGGER.info('Press Ctrl+C to exit\n');
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       // Clear console
       if (process.platform === 'win32') {

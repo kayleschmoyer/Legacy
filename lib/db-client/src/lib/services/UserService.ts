@@ -314,7 +314,8 @@ export class UserService {
         { userInput: true },
       );
     }
-    if (!identity.providerEmail) {
+    const providerEmail = identity.providerEmail;
+    if (!providerEmail) {
       throw Object.assign(
         new Error('This identity has no associated email address'),
         { userInput: true },
@@ -329,7 +330,7 @@ export class UserService {
 
     // No-op when email is already canonical
     const currentUser = await this.getUserById(userId);
-    if (currentUser?.canonicalEmail === identity.providerEmail) {
+    if (currentUser?.canonicalEmail === providerEmail) {
       return { user: currentUser, changed: false };
     }
 
@@ -338,7 +339,7 @@ export class UserService {
         await db
           .update(InternalSchema.usersInAppInternal)
           .set({
-            canonicalEmail: identity.providerEmail!,
+            canonicalEmail: providerEmail,
             canonicalEmailSource: identity.provider as IdentityProvider,
             updatedAt: new Date(),
           })

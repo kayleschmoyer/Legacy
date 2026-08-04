@@ -196,7 +196,6 @@ export async function handleCheckStatsStatus(
     LOGGER.info(`Starting watch mode (refresh every ${args.interval}s)...`);
     LOGGER.info('Press Ctrl+C to exit\n');
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       // Clear console (for Windows PowerShell and Unix)
       if (process.platform === 'win32') {

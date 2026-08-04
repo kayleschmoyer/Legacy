@@ -3762,7 +3762,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                       flex={1}
                     >
                       {formData.defensiveFormat === 'idp'
-                        ? 'IDP replaces the DST slot with DL×1, LB×2, DB×2, and a DP flex. Scoring uses flat multipliers per tackle, sack, INT, etc.'
+                        ? 'IDP replaces the DST slot with DL×2, LB×2, and DB×2. Scoring uses flat multipliers per tackle, sack, INT, etc.'
                         : 'D/ST uses a single team defense slot. Scoring combines sacks, turnovers, and points-allowed bands.'}
                     </Text>
                   </XStack>

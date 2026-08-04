@@ -41,9 +41,10 @@ export const DEFAULT_FOOTBALL_ROSTER_POSITIONS = [
 ] as const;
 
 /** Default starting roster slots for a new football league (IDP format).
- *  Mirrors the DL/LB/DB/DP starter counts in
+ *  Mirrors the DL/LB/DB starter counts in
  *  apps/web/src/components/leagues/wizard/StepRosterSettings.tsx's
- *  IDP_ROSTER_DEFAULTS (LS-6134). */
+ *  IDP_ROSTER_DEFAULTS (LS-6134). The DP (IDP Flex) slot is deliberately
+ *  absent — it has no player-query or eligibility support (LS-6148). */
 export const DEFAULT_FOOTBALL_IDP_ROSTER_POSITIONS = [
   'QB',
   'RB',
@@ -59,7 +60,6 @@ export const DEFAULT_FOOTBALL_IDP_ROSTER_POSITIONS = [
   'LB',
   'DB',
   'DB',
-  'DP',
 ] as const;
 
 export const DEFAULT_ROSTER_POSITIONS_BY_SPORT = {

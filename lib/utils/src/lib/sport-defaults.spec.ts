@@ -21,11 +21,16 @@ describe('getDefaultRosterPositions (LS-6134)', () => {
     );
   });
 
-  it('returns IDP positions (DL/LB/DB/DP) for a football league with defensiveFormat "idp"', () => {
+  it('returns IDP positions (DL/LB/DB) for a football league with defensiveFormat "idp"', () => {
     const positions = getDefaultRosterPositions('football', 'idp');
     expect(positions).toBe(DEFAULT_FOOTBALL_IDP_ROSTER_POSITIONS);
-    expect(positions).toEqual(expect.arrayContaining(['DL', 'LB', 'DB', 'DP']));
+    expect(positions).toEqual(expect.arrayContaining(['DL', 'LB', 'DB']));
     expect(positions).not.toEqual(expect.arrayContaining(['DST']));
+    // DP (IDP Flex) has no backend support and was removed in LS-6148/LS-8979.
+    expect(positions).not.toEqual(expect.arrayContaining(['DP']));
+    // QB1 RB2 WR2 TE1 FLEX1 K1 DL2 LB2 DB2 — matches IDP_ROSTER_DEFAULTS'
+    // 14 starters.
+    expect(positions).toHaveLength(14);
   });
 
   it('ignores defensiveFormat for baseball leagues', () => {

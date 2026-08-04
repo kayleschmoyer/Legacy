@@ -357,7 +357,6 @@ export function buildProgram(): Command {
           localPort?: number;
           profile?: string;
         },
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
       ) => handleAuth({ action, ...options }),
     );
 
