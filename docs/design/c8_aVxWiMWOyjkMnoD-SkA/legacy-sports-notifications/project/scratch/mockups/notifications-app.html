@@ -30,7 +30,9 @@
      ?viewport= from the query string.
 
      STATES:  populated | loading | empty | error
-     VIEWPORTS: mobile (375) | desktop (1280)
+     VIEWPORTS: mobile (375) | tablet (860) | desktop (1280) — one
+     designed frame per layout tier; full seven-band (xxs-xxl)
+     coverage is annotated next to the RESPONSIVE media queries below.
 -->
 
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" />
@@ -662,6 +664,24 @@
      matching the same convention used by the Design System bundle.
      - Below $lg (979px): single column (no rail), nav collapses to logo + bell
      - Below $sm (799px): tighter card gutters, time-ago wraps to its own line
+
+     Three layout tiers total, and the two thresholds above land
+     exactly on band edges ($sm/800, $lg/980), so every one of the
+     seven bands is claimed by exactly one tier:
+
+     <!-- BREAKPOINTS: xxs (0-659px) and xs (660-799px) share the
+          tightest single-column tier — no rail, collapsed nav (logo
+          + bell only), 8px card gutter, time-ago wrapped to its own
+          line. Designed frame: 375 (xxs), harness "Mobile" viewport. -->
+     <!-- BREAKPOINTS: sm (800-859px) and md (860-979px) share the
+          "tablet" single-column tier — no rail, collapsed nav, but
+          WITHOUT the sub-800px tweaks (time-ago stays inline with the
+          title, full card gutter). Designed frame: 860 (md), harness
+          "Tablet" viewport. -->
+     <!-- BREAKPOINTS: lg (980-1119px), xl (1120-1279px), and xxl
+          (1280px+) share the two-column desktop tier — feed + sticky
+          notification-settings rail, full tab nav. Designed frame:
+          1280 (xxl), harness "Desktop" viewport. -->
      ============================================================ */
   @media (max-width: 979px) {
     .page { grid-template-columns: 1fr; gap: 0; padding: 24px 16px 80px; }

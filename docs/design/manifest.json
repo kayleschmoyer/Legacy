@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-08-04T15:47:49.000Z",
+  "lastSyncedAt": "2026-08-04T16:30:00.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -131,8 +131,8 @@
       "title": "Notifications",
       "slug": "legacy-sports-notifications",
       "status": "active",
-      "lastSyncedHash": "sha256-bfd710a0dc1589435c0c513c65896f0a5d30f760e3e72ed16c18f0c8f1d986c1",
-      "lastSyncedAt": "2026-08-04T00:00:00.000Z",
+      "lastSyncedHash": "sha256-2656d51536df5ed188a2cbc8d9c279b75e8a87e81a476ae1af76122f345d12dd",
+      "lastSyncedAt": "2026-08-04T12:00:00.000Z",
       "jiraKey": "LS-8967"
     },
     {

@@ -2,12 +2,58 @@
 
 **Design ID**: `c8_aVxWiMWOyjkMnoD-SkA`
 **Source**: `designsync-local` (DesignSync MCP tool, projectId `019de999-f417-7627-9290-925dfd084b7d`)
-**Synced at**: 2026-08-04T00:00:00.000Z
+**Synced at**: 2026-08-04T16:30:00.000Z
 **Sync ticket**: LS-8967
-**Bundle hash**: `sha256-bfd710a0dc1589435c0c513c65896f0a5d30f760e3e72ed16c18f0c8f1d986c1`
+**Bundle hash**: `sha256-2656d51536df5ed188a2cbc8d9c279b75e8a87e81a476ae1af76122f345d12dd`
 **Files**: 17
 
-## What changed (vs 2026-05-20 sync, hash `0bc21b7a9754eead84725111f2bd51113650bd7727f94d796517f83d4c8c674d`)
+## What changed (vs 2026-08-04T00:00:00.000Z sync, hash `sha256-bfd710a0dc1589435c0c513c65896f0a5d30f760e3e72ed16c18f0c8f1d986c1`)
+
+Second pass on **LS-8967**, closing the breakpoint-coverage gap the first
+pass explicitly flagged as out of scope. Two files changed; all other
+bundle files are untouched:
+
+- `legacy-sports-notifications/project/scratch/mockups/notifications-app.html`:
+  - Added `<!-- BREAKPOINTS: ... -->` annotations next to the RESPONSIVE
+    media queries, mapping all seven `xxs`–`xxl` bands
+    (`lib/design-tokens/src/lib/breakpoints.ts`) to the page's three
+    layout tiers. The existing `979px`/`799px` media-query edges land
+    exactly on the `$lg`/`$sm` band boundaries, so every band is claimed
+    by exactly one tier: `xxs`+`xs` (tightest single-column, wrapped
+    meta), `sm`+`md` ("tablet" single-column, un-wrapped meta), `lg`+`xl`+`xxl`
+    (two-column with rail).
+  - Updated the top HANDOFF comment's `VIEWPORTS` line to point at the
+    new tablet frame and the BREAKPOINTS annotations.
+- `legacy-sports-notifications/project/scratch/mockups/notifications.html`
+  (reviewer chrome):
+  - Added a third harness frame ("Tablet · 860") pinning the preview
+    iframe to 860px — the `sm`/`md` tier had no designed frame at all
+    (only `xxs`/375 and `xxl`/1280 existed), so it was previously
+    unverifiable from the mockup alone.
+  - Extended the viewport toggle from `both`/`mobile`/`desktop` to
+    `all`/`mobile`/`tablet`/`desktop`, and updated `fitDesktop()`'s
+    sibling-width budget to account for the new frame.
+  - Verified all three frames render distinct, non-blank layouts via a
+    local headless-browser screenshot pass (mobile: single column, no
+    rail; tablet: single column, no rail, inline time-ago; desktop:
+    two-column with sticky rail).
+
+### Notes / gaps
+
+- This closes AC3 of LS-8967 ("clean re-audit against
+  `docs/agents/pages/PROMPT.md`'s checklist") — the prior sync's gap note
+  about missing breakpoint coverage no longer applies to this bundle.
+- A repo-wide scan (`grep BREAKPOINTS: docs/design`) found only 3 of
+  ~21 synced bundles reference breakpoint coverage at all, so this gap
+  is very likely present in most other bundles too — tracked separately
+  under the design-sync bucket epic (LS-4568) rather than expanded here,
+  since fixing every bundle is out of scope for this ticket.
+- No truncated reads (every `get_file` returned `truncated: false`); no
+  binary fetches were needed.
+
+## Prior sync (2026-08-04T00:00:00.000Z, hash `sha256-bfd710a0dc1589435c0c513c65896f0a5d30f760e3e72ed16c18f0c8f1d986c1`)
+
+### What changed (vs 2026-05-20 sync, hash `0bc21b7a9754eead84725111f2bd51113650bd7727f94d796517f83d4c8c674d`)
 
 Targeted pull after agent-driven source fixes for **LS-8967** (PROMPT.md brief
 violations, audited in LS-8954) were pushed to the Claude Design project via

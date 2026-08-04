@@ -46,10 +46,14 @@
   we add error to satisfy PROMPT.md's checklist (4 states).
 
   VIEWPORT FRAMES
-  - PROMPT requires both 375px (mobile) and 1280px (desktop) shown
-    together. We render two embedded iframes side-by-side at >=900px
-    viewer width, and stack on narrow viewers. A toggle at the top
-    lets you hide either frame to focus on one.
+  - PROMPT requires designed coverage for all seven breakpoint bands
+    (xxs-xxl, lib/design-tokens/src/lib/breakpoints.ts). The page has
+    three distinct layout tiers (see the BREAKPOINTS annotations next
+    to notifications-app.html's RESPONSIVE media queries), so we show
+    one designed frame per tier: 375 (xxs, mobile), 860 (md, tablet),
+    1280 (xxl, desktop). We render all three embedded iframes
+    side-by-side at wide viewer widths and stack on narrow viewers.
+    A toggle at the top lets you isolate any one frame.
 -->
 
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" />
@@ -168,6 +172,23 @@
     width: 375px; height: 760px; border: 0; display: block;
     border-radius: 26px; background: var(--bg-page);
   }
+  /* Tablet frame: pins the iframe to 860px (the $md band, shared with
+     $sm/800) so the "single column, no rail, un-wrapped meta" tier
+     between mobile and desktop always renders — this tier has no
+     other designed frame, unlike xxs/xxl which get the mobile/desktop
+     frames. */
+  .frame-tablet {
+    width: 896px;
+    padding: 16px 18px;
+    border-radius: 22px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6),
+                0 0 0 1px #1A1F2C,
+                inset 0 0 0 2px #11161F;
+  }
+  .frame-tablet iframe {
+    width: 860px; height: 820px; border: 0; display: block;
+    border-radius: 14px; background: var(--bg-page);
+  }
   /* Desktop frame: the iframe is PINNED to 1280px logical width so the
      desktop layout always renders. We then scale the whole frame down
      via CSS variable --ds (set by JS based on the chrome's available
@@ -231,8 +252,9 @@
 
   <div class="chrome-group" role="tablist" aria-label="Viewport">
     <label>View</label>
-    <button type="button" class="chrome-btn on" data-view="both">Both</button>
+    <button type="button" class="chrome-btn on" data-view="all">All</button>
     <button type="button" class="chrome-btn"    data-view="mobile">Mobile · 375</button>
+    <button type="button" class="chrome-btn"    data-view="tablet">Tablet · 860</button>
     <button type="button" class="chrome-btn"    data-view="desktop">Desktop · 1280</button>
   </div>
 </div>
@@ -241,6 +263,15 @@
   <div class="frame frame-mobile" id="frame-mobile">
     <span class="frame-label">Mobile · <b>375 × 760</b></span>
     <iframe id="iframe-mobile" title="Mobile preview" src="notifications-app.html?state=populated&amp;viewport=mobile"></iframe>
+  </div>
+
+  <!-- Tablet frame: the sm/md band (800-979px) has no other designed
+       frame — it's a genuinely different single-column tier from both
+       the xxs mobile frame and the xxl desktop frame (see BREAKPOINTS
+       annotations in notifications-app.html). -->
+  <div class="frame frame-tablet" id="frame-tablet">
+    <span class="frame-label">Tablet · <b>860 wide</b></span>
+    <iframe id="iframe-tablet" title="Tablet preview" src="notifications-app.html?state=populated&amp;viewport=tablet"></iframe>
   </div>
 
   <div class="frame frame-desktop" id="frame-desktop">
@@ -255,20 +286,24 @@
   // This keeps the production UI cleanly separated from the
   // reviewer-only state switcher.
   const ifMobile = document.getElementById('iframe-mobile');
+  const ifTablet = document.getElementById('iframe-tablet');
   const ifDesktop = document.getElementById('iframe-desktop');
   const fMobile = document.getElementById('frame-mobile');
+  const fTablet = document.getElementById('frame-tablet');
   const fDesktop = document.getElementById('frame-desktop');
 
   let currentState = 'populated';
-  let currentView = 'both';
+  let currentView = 'all';
 
   function applyState() {
     ifMobile.src = `notifications-app.html?state=${currentState}&viewport=mobile`;
+    ifTablet.src = `notifications-app.html?state=${currentState}&viewport=tablet`;
     ifDesktop.src = `notifications-app.html?state=${currentState}&viewport=desktop`;
   }
   function applyView() {
-    fMobile.classList.toggle('off', currentView === 'desktop');
-    fDesktop.classList.toggle('off', currentView === 'mobile');
+    fMobile.classList.toggle('off', currentView !== 'all' && currentView !== 'mobile');
+    fTablet.classList.toggle('off', currentView !== 'all' && currentView !== 'tablet');
+    fDesktop.classList.toggle('off', currentView !== 'all' && currentView !== 'desktop');
   }
 
   document.querySelectorAll('[data-state]').forEach(btn => {
@@ -286,10 +321,13 @@
   function fitDesktop() {
     const available = document.getElementById('stage').clientWidth - 40;
     const ideal = 1296;
-    const mobileVisible = currentView !== 'desktop';
-    // When mobile frame is also visible side-by-side, leave room for it (~430px + gap).
-    const budget = (currentView === 'both' && available > 1296 + 430 + 32)
-      ? available - 430 - 32
+    // When mobile and/or tablet frames are also visible side-by-side,
+    // leave room for them (~430px mobile, ~932px tablet, plus gaps).
+    const siblingWidth = (currentView === 'all')
+      ? 430 + 32 + 932 + 32
+      : 0;
+    const budget = (siblingWidth > 0 && available > ideal + siblingWidth)
+      ? available - siblingWidth
       : available;
     const ds = Math.min(1, budget / ideal);
     fDesktop.style.setProperty('--ds', ds.toFixed(3));
