@@ -2,32 +2,28 @@
 
 **Design ID**: `nxFiEGqu3yPCDKpoNDmQWA`
 **Source**: `designsync-local` (DesignSync MCP tool, projectId `714ce35a-d395-4e13-aadd-8d5d9f021104`)
-**Synced at**: 2026-08-04T00:15:00.000Z
-**Bundle hash**: `23f32c9b49f0f536dfbcc0173bdac54b610dbe4d0c76680dfb2802ce723b67a0`
-**Files**: 18
+**Synced at**: 2026-08-04T21:40:55.000Z
+**Bundle hash**: `sha256-9b50d90fbb61077912118b894c498d0301feddeec9a0fc993f9b806f94e0fcd3`
+**Files**: 21
 **Total size**: see individual file listing below
 
-## Follow-up: restored three fixes the initial DesignSync source lacked
+## What changed (LS-9030 — new football hero exploration + home.html revisions)
 
-The Reviewer Bot caught a regression in the first pass of this sync: the Claude Design project's `home.html` was missing three accessibility fixes that existed only in the previously-committed `docs/design/` bundle on `main` (never pushed back to the design source) — `data-modal-close` on the tutorial modal's "Skip" button, `alt="Draft"` on the mock-draft icon, and an A11Y NOTE comment (LS-4930) on the league-hero card. Fetching from DesignSync and overwriting the bundle silently reverted these. Fixed by writing all three back into the Claude Design project (so the source and the bundle agree) and re-pulling — never patched in `docs/design/` alone.
+Compared to the previous sync (LS-8973, hash `23f32c9b49f0f536dfbcc0173bdac54b610dbe4d0c76680dfb2802ce723b67a0`):
 
-## What changed (LS-8973 — re-run to meet updated PROMPT.md brief)
-
-Only `project/scratch/mockups/home.html` changed. Fixed at the source in Claude Design (via `DesignSync` write) per the LS-8954 audit findings, then re-pulled here:
-
-- **Removed the third typeface** (JetBrains Mono) — Google Fonts import and the `--font-mono` token are gone; `.otd-stat`, `.error-inline-code`, and `.mono-num` now use `var(--font-body)` with `font-variant-numeric: tabular-nums`, matching the design system's "no mono face" rule.
-- **Fixed the off-token page background** — `body`/`.review-bar` background changed from raw `#05080F` to `var(--bg-page)` (`#0A0F1A`).
-- **Tokenized repeated raw hex** — added `--text-headline: #FFFFFF` and replaced all 10 raw `#fff` uses; replaced all 5 raw `#445676` uses with `var(--text-muted)`; replaced the one raw `#E63950` (chip-live) with the existing `var(--brand-seam-red-lt)`.
-- **Fixed the invented 768px breakpoint** — the "Tablet" frame now uses 800px (the `sm` band start per `lib/design-tokens/src/lib/breakpoints.ts`), and the `dashboard-split` collapse threshold moved from the invented `max-width: 1024px` to the canonical `max-width: 979px` (below `lg`). Added a `BREAKPOINTS` coverage comment claiming all seven bands (xxs/xs/sm/md/lg/xl/xxl) per the PROMPT.md checklist.
-- **Added `:focus-visible` states** — all 12 elements that had `:hover` now have a paired `:focus-visible` rule with a visible `var(--text-primary)` outline, per the Interactive & Semantic Fidelity section.
-- **Added a `<!-- HANDOFF -->` block and `<!-- COMPONENT -->` annotations** (league-hero, matchup, league-row, rail-card/otd-item, sport-card) — previously missing.
-- **Left "Draft Ruth alongside Trout" unchanged** — LS-9004 resolved the real-historical-players ruling; this copy describes the actual drafting mechanic (the product's real domain data), which the ruling covers. Documented in the new HANDOFF block.
-
-**Off-palette findings from the LS-8954 audit that turned out to be non-issues**: `--success #4AAE7C`, `--warning #C89452`, `--text-muted #6C80BA`, `--pos-outfield #2D6A4F` all already match the canonical Design System tokens (`docs/design/7SRWFMj3a6khIhwLuWkSKA/legacy-sports-design-system/project/colors_and_type.css`) and brand.md's Ruling 3 (LS-9004) — no change needed.
+- **`project/scratch/mockups/home.html`** — updated in the Claude Design project since the last pull (688 insertions / 107 deletions vs. the prior bundle copy). Re-pulled verbatim.
+- **New: `project/scratch/mockups/hero-football-directions.html`** — a design-exploration doc presenting six non-ticket hero-banner directions for football matchups (scoreboard slab, broadcast lower-third, chalk playbook, field-position strip, 1990s broadcast scorebug, and a playbook+scorebug hybrid). Explicitly scoped as filling the same slots as the ticket hero on `/` so any direction is a component swap, not a page-contract change.
+- **New: `project/scratch/mockups/ticket-hero-football-options.html`** — four football skins for the existing ticket-hero component (turf-accent token swap, dark "night game" stock, structural "game program" pre-kickoff variant, and a "chalk scoreboard" slate skin), referencing the baseball ticket in production for comparison.
+- **`project/uploads/PROMPT.md`, `project/uploads/home.md`** — re-pulled, unchanged (byte-identical to the prior sync).
+- **`project/icons/brand/*.svg`** (11 files) — re-pulled, unchanged.
+- **`project/uploads/pasted-1785877893078-0.png`** — new reference screenshot pulled successfully (44,513 bytes).
+- **Gap**: two additional pasted reference images in the Claude Design project's `uploads/` (`pasted-1785870995051-0.png`, `pasted-1785873442793-0.png`) and one more (`pasted-1785875517886-0.png`, which hit the `get_file` 256 KiB cap — `truncated: true`) could not be reliably pulled without risking silent corruption of the binary bytes, and are **not written to this bundle**. None of the three are referenced by path from the HTML mockups (they are supplementary inspiration/reference images, not rendered assets), so they do not block implementation. If a future pass needs them, use the Chrome "Export → Project HTML (.zip)" fallback per `references/designsync-tool.md`.
 
 ## Pages
 
 - `legacy-sports-homepage/project/scratch/mockups/home.html`
+- `legacy-sports-homepage/project/scratch/mockups/hero-football-directions.html`
+- `legacy-sports-homepage/project/scratch/mockups/ticket-hero-football-options.html`
 
 ## All files
 
@@ -47,7 +43,10 @@ legacy-sports-homepage/project/icons/brand/scoreboard.svg
 legacy-sports-homepage/project/icons/brand/standings.svg
 legacy-sports-homepage/project/icons/brand/stats.svg
 legacy-sports-homepage/project/icons/brand/trophy.svg
+legacy-sports-homepage/project/scratch/mockups/hero-football-directions.html
 legacy-sports-homepage/project/scratch/mockups/home.html
+legacy-sports-homepage/project/scratch/mockups/ticket-hero-football-options.html
 legacy-sports-homepage/project/uploads/PROMPT.md
 legacy-sports-homepage/project/uploads/home.md
+legacy-sports-homepage/project/uploads/pasted-1785877893078-0.png
 ```

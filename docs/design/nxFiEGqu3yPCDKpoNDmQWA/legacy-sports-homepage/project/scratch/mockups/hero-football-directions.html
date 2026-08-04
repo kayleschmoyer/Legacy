@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Legacy Sports — Football hero directions</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="design_doc_mode" content="canvas">
+<!-- Football hero banner, four non-ticket directions. The ticket stays baseball's
+     (paper artifact, sepia archive, "admit one" reads as a ballgame). Football gets
+     its own object. Every option fills the SAME slots as the ticket hero on / so the
+     page contract doesn't change: live/clock marker, rank seal, deadline, league
+     identity + meta, head-to-head score, primary + secondary action. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg-page:#0A0F1A;--bg-panel:#111827;--border:#1E2D45;--border-strong:#2F3B53;
+--text-primary:#E8EDF5;--text-secondary:#8A9BB5;--text-muted:#6C80BA;
+--brand-navy:#1B3A5C;--brand-navy-light:#2C4A7C;--brand-navy-dark:#143050;
+--brand-gold:#C5A55A;--brand-gold-light:#D4BB78;--brand-gold-dark:#A68B3E;
+--brand-seam-red:#C41E3A;--turf:#2F6B3C;--turf-light:#5FA36C;--turf-dark:#1C4225;
+--font-display:'Big Shoulders Display','Oswald',system-ui,sans-serif;
+--font-body:'Literata',Georgia,serif;
+--ease-std:cubic-bezier(.2,.8,.2,1);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg-page);font-family:var(--font-body);color:var(--text-primary)}
+a{color:var(--brand-gold-light);text-decoration:none}a:hover{color:var(--brand-gold)}
+.opt{position:absolute;width:900px}
+.opt-head{margin-bottom:18px}
+.opt-tag{font-family:var(--font-display);font-weight:800;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--turf-light)}
+.opt-name{font-family:var(--font-display);font-weight:800;font-size:30px;line-height:1.05;letter-spacing:-.02em;color:#fff;margin:4px 0 0}
+.opt-note{font-size:13.5px;line-height:1.55;color:var(--text-secondary);max-width:76ch;margin:9px 0 0}
+.opt-note b{color:var(--text-primary);font-weight:600}
+.doc-title{position:absolute;width:920px}
+.doc-title h1{font-family:var(--font-display);font-weight:800;font-size:54px;line-height:1;letter-spacing:-.03em;color:#fff;margin:8px 0 0}
+.doc-title p{font-size:15px;line-height:1.6;color:var(--text-secondary);max-width:70ch;margin:14px 0 0}
+
+/* Shared bits: buttons + meta line, same shapes as the product's hero */
+.fb-btn{font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:.12em;text-transform:uppercase;padding:12px 18px;min-height:44px;border-radius:4px;border:1px solid transparent;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:all 150ms var(--ease-std)}
+.fb-btn-solid{background:var(--turf);color:#F2F7F1;border-color:var(--turf-light)}
+.fb-btn-solid:hover{background:#377C46;color:#fff}
+.fb-btn-out{border-color:rgba(232,237,245,.28);color:var(--text-primary)}
+.fb-btn-out:hover{border-color:var(--text-primary);background:rgba(255,255,255,.05)}
+.fb-actions{display:flex;gap:10px}
+.fb-meta{font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);display:flex;flex-wrap:wrap;gap:9px;align-items:center;font-variant-numeric:tabular-nums}
+.fb-meta b{color:var(--text-primary);font-weight:800}
+.fb-seal{font-family:var(--font-display);font-weight:800;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--brand-gold-light);padding:5px 9px;border-radius:3px;border:1.5px solid rgba(197,165,90,.5);background:rgba(197,165,90,.12)}
+.fb-live{font-family:var(--font-display);font-weight:800;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--turf-light);display:inline-flex;align-items:center;gap:8px}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}
+.dot-pulse{animation:pulse 1.4s var(--ease-std) infinite}
+.fb-title{font-family:var(--font-display);font-weight:800;letter-spacing:-.02em;line-height:1.02;margin:0}
+.fb-sub{font-family:var(--font-body);font-size:14px;line-height:1.5;color:var(--text-secondary);margin:8px 0 0;max-width:46ch}
+.num{font-family:var(--font-display);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.03em;line-height:.88}
+
+/* ════ A · SCOREBOARD SLAB ════════════════════════════════════════ */
+.sb{position:relative;border-radius:10px;overflow:hidden;background:linear-gradient(180deg,#141A20 0%,#0C1116 100%);border:1px solid #29323B;box-shadow:0 18px 40px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.05)}
+.sb-strip{display:flex;align-items:center;gap:16px;padding:12px 22px;background:linear-gradient(180deg,#1D242B,#151B21);border-bottom:1px solid #29323B;font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8C9AA6}
+.sb-clock{color:#fff;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.1em}
+.sb-down{color:var(--brand-gold-light)}
+.sb-poss{display:inline-flex;align-items:center;gap:7px;color:var(--turf-light)}
+.sb-strip .sb-right{margin-left:auto;color:#6E7C88}
+.sb-grid{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:24px;padding:26px 30px 22px}
+.sb-team{display:flex;align-items:center;gap:16px;min-width:0}
+.sb-team.right{flex-direction:row-reverse;text-align:right}
+.sb-abbr{width:58px;height:58px;flex:0 0 auto;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:19px;letter-spacing:.04em;color:#fff;background:linear-gradient(150deg,#25313C,#161D24);border:1px solid #35424E}
+.sb-abbr.mine{background:linear-gradient(150deg,var(--turf),var(--turf-dark));border-color:rgba(95,163,108,.6)}
+.sb-tname{font-family:var(--font-display);font-weight:800;font-size:19px;letter-spacing:.01em;text-transform:uppercase;color:#EDF1F4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-trec{font-family:var(--font-body);font-size:12px;color:#7F8D99;font-variant-numeric:tabular-nums;margin-top:3px}
+.sb-num{font-size:64px;color:#EDF1F4;margin-top:4px}
+.sb-num.lead{color:var(--brand-gold-light);text-shadow:0 0 22px rgba(212,187,120,.28)}
+.sb-mid{display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 6px;border-left:1px solid #262F38;border-right:1px solid #262F38;align-self:stretch;justify-content:center;min-width:78px}
+.sb-mid span{font-family:var(--font-display);font-weight:800;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#5E6B77}
+.sb-foot{display:flex;align-items:center;gap:20px;padding:18px 30px 22px;border-top:1px solid #262F38;background:rgba(0,0,0,.25)}
+.sb-foot .fb-title{font-size:26px;color:#fff}
+.sb-foot .fb-actions{margin-left:auto}
+.sb-hash{position:absolute;top:0;left:0;right:0;height:3px;background:repeating-linear-gradient(90deg,var(--turf) 0 26px,transparent 26px 34px)}
+
+/* ════ B · BROADCAST LOWER-THIRD ══════════════════════════════════ */
+.bc{position:relative;padding-top:8px}
+.bc-kicker{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.bc-bar{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:stretch;background:linear-gradient(90deg,var(--brand-navy-dark) 0%,#0F2740 60%,#0C1F33 100%);border-radius:4px;overflow:hidden;box-shadow:0 16px 34px rgba(0,0,0,.5)}
+.bc-bar::after{content:"";position:absolute;inset:0;pointer-events:none;border:1px solid rgba(212,187,120,.2);border-radius:4px}
+.bc-flag{width:16px;background:linear-gradient(180deg,var(--turf-light),var(--turf));transform:skewX(-11deg) scaleX(1.6);transform-origin:top left}
+.bc-body{display:flex;align-items:center;gap:0;padding:0 4px 0 22px;min-width:0}
+.bc-side{display:flex;align-items:center;gap:14px;padding:18px 22px;min-width:0}
+.bc-side + .bc-side{border-left:1px solid rgba(232,237,245,.12)}
+.bc-chip{width:44px;height:44px;flex:0 0 auto;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:15px;color:#fff;background:#1F3D5C;border:1px solid rgba(232,237,245,.18)}
+.bc-chip.mine{background:linear-gradient(150deg,var(--turf),var(--turf-dark));border-color:rgba(95,163,108,.6)}
+.bc-side .nm{font-family:var(--font-display);font-weight:800;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:#EDF1F4;white-space:nowrap}
+.bc-side .rc{font-family:var(--font-body);font-size:11.5px;color:#8A9BB5;font-variant-numeric:tabular-nums}
+.bc-side .sc{margin-left:auto;font-family:var(--font-display);font-weight:800;font-size:34px;line-height:1;font-variant-numeric:tabular-nums;color:#EDF1F4;padding-left:18px}
+.bc-side.lead .sc{color:var(--brand-gold-light)}
+.bc-tail{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:16px 24px;background:rgba(0,0,0,.28);border-left:1px solid rgba(232,237,245,.12);text-align:right;min-width:150px}
+.bc-tail .q{font-family:var(--font-display);font-weight:800;font-size:20px;letter-spacing:.06em;color:#fff;font-variant-numeric:tabular-nums}
+.bc-tail .l{font-family:var(--font-display);font-weight:700;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--turf-light)}
+.bc-under{display:flex;align-items:center;gap:20px;margin-top:16px}
+.bc-under .fb-actions{margin-left:auto}
+
+/* ════ C · CHALK PLAYBOOK ═════════════════════════════════════════ */
+.cb{position:relative;border-radius:8px;overflow:hidden;padding:28px 32px 30px;
+background:
+ repeating-linear-gradient(122deg,rgba(255,255,255,.045) 0 1px,transparent 1px 12px),
+ radial-gradient(120% 100% at 15% 0%,rgba(255,255,255,.05),transparent 60%),
+ linear-gradient(160deg,#1B2A24 0%,#101A16 100%);
+border:1px solid #2C3D34;box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.cb::before{content:"";position:absolute;inset:14px;border:1px dashed rgba(232,237,245,.16);border-radius:4px;pointer-events:none}
+.cb-inner{position:relative;display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:30px;align-items:center}
+.cb-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.cb-head .fb-live{color:#8FD6A2}
+.cb-head .fb-seal{color:#E6EFDF;border-color:rgba(230,239,223,.4);background:rgba(230,239,223,.08)}
+.cb-head .when{margin-left:auto;font-family:var(--font-body);font-size:12.5px;color:#8FA396}
+.cb .fb-title{font-size:36px;color:#EEF4EA;text-transform:uppercase;letter-spacing:.005em}
+.cb .fb-sub{color:#93A89A;font-style:italic}
+.cb .fb-meta{color:#7D9284;margin-top:16px}
+.cb .fb-meta b{color:#EEF4EA}
+.cb .fb-actions{margin-top:20px}
+.cb .fb-btn-out{border-color:rgba(238,244,234,.35);color:#EEF4EA}
+.cb-score{padding-left:30px;border-left:1px dashed rgba(238,244,234,.22)}
+.cb-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:end;gap:14px;padding-bottom:12px}
+.cb-row .tm{font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8FA396;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb-row .rc{font-family:var(--font-body);font-size:11.5px;color:#6F8478;margin-top:2px;font-variant-numeric:tabular-nums}
+.cb-row .num{font-size:54px;color:#7C9184;margin-top:6px}
+.cb-row .lead .num{color:#F2F7EE}
+.cb-row .vs{font-family:var(--font-display);font-weight:800;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:#6F8478;padding-bottom:14px}
+.cb-row .right{text-align:right}
+.cb-row .lead{position:relative}
+.cb-rule{position:absolute;bottom:-12px;left:0;height:3px;width:46px;border-radius:2px;background:var(--brand-gold)}
+.cb-note{font-family:var(--font-display);font-weight:700;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#6F8478;margin-top:16px;display:flex;gap:8px;align-items:center}
+
+/* ════ D · FIELD-POSITION STRIP ═══════════════════════════════════ */
+.fp{position:relative;border-radius:10px;overflow:hidden;border:1px solid #26402C;box-shadow:0 18px 40px rgba(0,0,0,.5);background:linear-gradient(180deg,#12261A 0%,#0B1912 100%)}
+.fp-top{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid rgba(232,237,245,.1)}
+.fp-top .when{margin-left:auto;font-family:var(--font-body);font-size:12.5px;color:#8FA396}
+.fp-mid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:26px;align-items:center;padding:22px 24px 20px}
+.fp .fb-title{font-size:32px;color:#F1F6EF}
+.fp .fb-sub{color:#93A89A}
+.fp .fb-meta{color:#7D9284;margin-top:14px}
+.fp .fb-meta b{color:#F1F6EF}
+.fp .fb-actions{margin-top:18px}
+.fp-score{display:flex;align-items:flex-end;gap:18px}
+.fp-score .side{text-align:right}
+.fp-score .tm{font-family:var(--font-display);font-weight:700;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#8FA396}
+.fp-score .num{font-size:52px;color:#7E9587}
+.fp-score .side.lead .num{color:var(--brand-gold-light)}
+.fp-score .vs{font-family:var(--font-display);font-weight:800;font-size:11px;letter-spacing:.2em;color:#6F8478;padding-bottom:14px}
+/* the field: yard lines + hash marks + end-zone caps + a progress marker */
+.fp-field{position:relative;height:86px;display:grid;grid-template-columns:78px minmax(0,1fr) 78px;border-top:1px solid rgba(232,237,245,.1);background:linear-gradient(180deg,#1B3D26,#14301D)}
+.fp-ez{display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:#EAF2E7;writing-mode:vertical-rl;text-orientation:mixed}
+.fp-ez.mine{background:linear-gradient(180deg,var(--turf),var(--turf-dark))}
+.fp-ez.them{background:linear-gradient(180deg,#3B4A55,#25313A)}
+.fp-lanes{position:relative;background:
+ repeating-linear-gradient(90deg,rgba(255,255,255,.22) 0 1px,transparent 1px 10%),
+ repeating-linear-gradient(180deg,transparent 0 40px,rgba(255,255,255,.14) 40px 41px,transparent 41px 86px)}
+.fp-yards{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;padding:0 4%;font-family:var(--font-display);font-weight:800;font-size:12px;letter-spacing:.12em;color:rgba(234,242,231,.5);font-variant-numeric:tabular-nums}
+.fp-marker{position:absolute;top:0;bottom:0;left:62%;width:2px;background:var(--brand-gold-light);box-shadow:0 0 14px rgba(212,187,120,.6)}
+.fp-marker span{position:absolute;top:8px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:var(--font-display);font-weight:800;font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:#101A16;background:var(--brand-gold-light);padding:3px 7px;border-radius:2px}
+/* ════ E · 90s SCOREBUG ═══════════════════════════════════════════
+   Traits lifted from the reference: chrome bevel frame, stacked team plates
+   with hard inner highlights, chiselled type (1px black text-shadow), a
+   network-badge bar at the top, a machined clock bar at the bottom, and a
+   possession arrow. Small, dense, unapologetically 3D — the opposite of the
+   flat ticket, and unmistakably football broadcast. */
+.nb{position:relative;border-radius:10px;overflow:hidden;padding:26px 30px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:32px;align-items:center;
+background:radial-gradient(120% 120% at 12% 0%,rgba(47,107,60,.18),transparent 55%),linear-gradient(160deg,#101B2A 0%,#0A1220 100%);
+border:1px solid #223349;box-shadow:0 18px 40px rgba(0,0,0,.5)}
+.bug{width:250px;flex:0 0 auto;padding:4px;border-radius:4px;
+background:linear-gradient(180deg,#D3D9E0 0%,#8B95A1 42%,#4B5460 100%);
+box-shadow:0 12px 26px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.85),inset 0 -1px 0 rgba(0,0,0,.4)}
+.bug-in{border-radius:2px;overflow:hidden;border:1px solid #10192A}
+.bug-badge{display:flex;align-items:center;justify-content:center;gap:7px;padding:6px 8px;
+background:linear-gradient(180deg,#25599B 0%,#0C2A52 100%);
+border-bottom:1px solid rgba(0,0,0,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}
+.bug-badge .eye{width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 50% 40%,#fff 0 34%,#0C2A52 36% 100%);box-shadow:0 0 0 1px rgba(255,255,255,.5)}
+.bug-badge span{font-family:var(--font-display);font-weight:800;font-size:12px;letter-spacing:.22em;color:#F2F6FA;text-shadow:1px 1px 0 rgba(0,0,0,.65)}
+.bug-row{display:grid;grid-template-columns:14px minmax(0,1fr) auto;align-items:center;gap:8px;padding:6px 10px;
+background:linear-gradient(180deg,#3573B8 0%,#154680 100%);
+border-bottom:1px solid rgba(0,0,0,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.26)}
+.bug-row .poss{width:0;height:0;border-left:7px solid #F5D96A;border-top:5px solid transparent;border-bottom:5px solid transparent;filter:drop-shadow(1px 1px 0 rgba(0,0,0,.6))}
+.bug-row .abbr{font-family:var(--font-display);font-weight:800;font-size:19px;letter-spacing:.08em;color:#F4F8FC;text-shadow:1px 1px 0 rgba(0,0,0,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bug-row .pts{font-family:var(--font-display);font-weight:800;font-size:19px;letter-spacing:.02em;font-variant-numeric:tabular-nums;color:#F4F8FC;text-shadow:1px 1px 0 rgba(0,0,0,.7);min-width:52px;text-align:right}
+.bug-row.lead .pts{color:#F5D96A}
+.bug-bottom{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;
+background:linear-gradient(180deg,#9AA3AE 0%,#5C6673 100%);
+font-family:var(--font-display);font-weight:800;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:#0E1A28;text-shadow:0 1px 0 rgba(255,255,255,.4);font-variant-numeric:tabular-nums}
+.nb-detail{display:none;margin-top:22px;padding-top:18px;border-top:1px solid rgba(232,237,245,.1)}
+.nb-detail .cap{font-family:var(--font-display);font-weight:700;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-muted);line-height:1.6;margin-top:12px;max-width:62ch}
+/* box is sized by the scale, not guessed: 250×135 bug at 1.7 = 425×230 */
+.nb-zoom{--z:1.7;width:calc(250px * var(--z));height:calc(135px * var(--z));overflow:hidden}
+.nb-zoom .bug{transform:scale(var(--z));transform-origin:top left;width:250px}
+.nb .fb-title{font-size:32px;color:#fff}
+.nb .fb-meta{margin-top:14px}
+.nb .fb-actions{margin-top:20px}
+/* ════ F · PLAYBOOK + SCOREBUG ════════════════════════════════════
+   C's chalkboard becomes the surface; E's beveled bug becomes the score.
+   The bug is the only hard, machined object on a hand-drawn board — that
+   contrast is the whole composition, so nothing else gets a bevel. Plates
+   are re-tinted to the board's green so the bug reads as mounted on it
+   rather than pasted over it. */
+.cb-bug .cb-inner{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto 1fr;column-gap:32px;row-gap:20px}
+.cb-bug > .cb-inner > .cb-head{grid-column:1/-1;margin-bottom:0;padding-bottom:14px;border-bottom:1px dashed rgba(238,244,234,.2)}
+.cb-bug .fb-sub{max-width:54ch}
+.cb-bug .fb-actions{margin-top:18px}
+.cb-bug .cb-inner{align-items:stretch}
+.cb-bug .cb-score{border-left:0;padding-left:0;align-self:stretch;display:flex}
+.cb-bug .bug{display:flex;flex-direction:column;align-self:stretch}
+.cb-bug .bug-in{flex:1;display:flex;flex-direction:column}
+.cb-bug .bug-row{flex:1;align-items:center}
+.cb-bug .bug-row .abbr{font-size:24px}
+.cb-bug .bug-row .abbr i{display:block;font-style:normal;font-size:11px;font-weight:700;letter-spacing:.16em;color:rgba(244,248,252,.72);margin-top:3px;font-variant-numeric:tabular-nums}
+.cb-bug .bug-row .pts{font-size:26px}
+.cb-bug .bug-bottom{padding:7px 10px;font-size:11.5px;letter-spacing:.16em}
+.cb-bug .bug{background:linear-gradient(180deg,#DCE3D8 0%,#8F9C8B 42%,#4C5849 100%)}
+.cb-bug .bug-badge{background:linear-gradient(180deg,#2F6B3C 0%,#143021 100%)}
+.cb-bug .bug-row{background:linear-gradient(180deg,#3C8450 0%,#1B4527 100%)}
+.cb-bug .bug-bottom{background:linear-gradient(180deg,#A3AE9D 0%,#5F6B5B 100%);color:#111A12}
+.cb-bug .bug-row.lead .pts{color:#F3DD8B}
+.cb-chalk-note{font-family:var(--font-display);font-weight:700;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#7D9284;display:flex;align-items:center;gap:8px}
+.cb-chalk-note::before{content:"";width:26px;height:1px;background:repeating-linear-gradient(90deg,rgba(238,244,234,.55) 0 4px,transparent 4px 7px)}
+</style>
+</head>
+<body>
+
+<div class="doc-title" style="left:80px;top:70px">
+  <div class="opt-tag">Home · hero banner · football</div>
+  <h1>Six football directions</h1>
+  <p>Agreed — the ticket is baseball's object: paper, sepia, "admit one," a day at the ballpark. Football's hero should come from football's own visual world. Each of these fills the exact same slots as the <a href="ticket-hero-football-options.html">ticket hero</a>, so swapping is a component change, not a page change. Reference content throughout: Steel Curtain Era, Week 9, live matchup. Direction E works from the 1990s broadcast scorebug reference.</p>
+</div>
+
+<!-- A · SCOREBOARD SLAB -->
+<div class="opt" style="left:80px;top:320px">
+  <div class="opt-head">
+    <div class="opt-tag">Direction A</div>
+    <h2 class="opt-name">Scoreboard slab</h2>
+    <p class="opt-note">The stadium board itself: bolted dark slab, a status strip carrying the football-only facts a ticket can't hold (<b>quarter, clock, down &amp; distance, possession</b>), team blocks flanking a center rule, league identity and actions on the base. Strongest fit for a live in-progress matchup, and the numbers get real size.</p>
+  </div>
+  <article class="sb">
+    <div class="sb-hash" aria-hidden="true"></div>
+    <div class="sb-strip">
+      <span class="sb-clock">Q3 · 8:41</span>
+      <span class="sb-down">3rd &amp; 7</span>
+      <span class="sb-poss"><span class="dot dot-pulse"></span>Gridiron ball</span>
+      <span class="sb-right">Week 9 of 17 · Lineup locked</span>
+    </div>
+    <div class="sb-grid">
+      <div class="sb-team">
+        <div class="sb-abbr mine">GG</div>
+        <div style="min-width:0">
+          <div class="sb-tname">Gridiron Greats</div>
+          <div class="sb-trec">6-2 · Rank #2 · You</div>
+          <div class="num sb-num lead">84.5</div>
+        </div>
+      </div>
+      <div class="sb-mid"><span>vs</span></div>
+      <div class="sb-team right">
+        <div class="sb-abbr">SC</div>
+        <div style="min-width:0">
+          <div class="sb-tname">Steel Curtain</div>
+          <div class="sb-trec">5-3 · Rank #4</div>
+          <div class="num sb-num">79.2</div>
+        </div>
+      </div>
+    </div>
+    <div class="sb-foot">
+      <div>
+        <h3 class="fb-title">Steel Curtain Era</h3>
+        <div class="fb-meta" style="margin-top:8px"><span><b>10</b> teams</span><span>·</span><span>1972–1980</span><span>·</span><span>Head-to-head</span></div>
+      </div>
+      <div class="fb-actions"><a class="fb-btn fb-btn-solid" href="#">Set Lineup</a><a class="fb-btn fb-btn-out" href="#">View League</a></div>
+    </div>
+  </article>
+</div>
+
+<!-- B · BROADCAST LOWER-THIRD -->
+<div class="opt" style="left:1060px;top:320px">
+  <div class="opt-head">
+    <div class="opt-tag">Direction B</div>
+    <h2 class="opt-name">Broadcast bar</h2>
+    <p class="opt-note">The TV score bug, blown up to hero scale: angled turf flag, two team cells with records, quarter and clock on the tail. It sits <b>low and wide</b>, so it takes far less vertical space than the ticket — the leagues list moves up the page. Most modern of the four, and the least "archive."</p>
+  </div>
+  <article class="bc">
+    <div class="bc-kicker">
+      <span class="fb-live"><span class="dot dot-pulse"></span>Live · Week 9/17</span>
+      <span class="fb-seal">Rank&nbsp;#2</span>
+      <span style="margin-left:auto;font-size:12.5px;color:var(--text-secondary)">Closes Sun 1:00&nbsp;PM</span>
+    </div>
+    <div class="bc-bar">
+      <div class="bc-flag" aria-hidden="true"></div>
+      <div class="bc-body">
+        <div class="bc-side lead">
+          <div class="bc-chip mine">GG</div>
+          <div><div class="nm">Gridiron Greats</div><div class="rc">6-2 · Rank #2</div></div>
+          <div class="sc">84.5</div>
+        </div>
+        <div class="bc-side">
+          <div class="bc-chip">SC</div>
+          <div><div class="nm">Steel Curtain</div><div class="rc">5-3 · Rank #4</div></div>
+          <div class="sc">79.2</div>
+        </div>
+      </div>
+      <div class="bc-tail">
+        <span class="l">3rd &amp; 7</span>
+        <span class="q">Q3 8:41</span>
+      </div>
+    </div>
+    <div class="bc-under">
+      <div>
+        <h3 class="fb-title" style="font-size:28px;color:#fff">Steel Curtain Era</h3>
+        <div class="fb-meta" style="margin-top:8px"><span><b>10</b> teams</span><span>·</span><span>1972–1980</span><span>·</span><span>Week <b>9</b> of 17</span></div>
+      </div>
+      <div class="fb-actions"><a class="fb-btn fb-btn-solid" href="#">Set Lineup</a><a class="fb-btn fb-btn-out" href="#">View League</a></div>
+    </div>
+  </article>
+</div>
+
+<!-- C · CHALK PLAYBOOK -->
+<div class="opt" style="left:80px;top:900px">
+  <div class="opt-head">
+    <div class="opt-tag">Direction C</div>
+    <h2 class="opt-name">Chalk playbook</h2>
+    <p class="opt-note">A coach's board: dark slate-green, faint route diagonals, a dashed chalk frame, uppercase league name, chalk-white numerals with a gold rule under the leader. Closest in <b>spirit</b> to the ticket — an artifact from the sport, era-friendly — without borrowing baseball's paper. Also the calmest against the night-stadium page.</p>
+  </div>
+  <article class="cb">
+    <div class="cb-inner">
+      <div class="cb-head">
+        <span class="fb-live"><span class="dot dot-pulse"></span>Live · Week 9/17</span>
+        <span class="fb-seal">Rank&nbsp;#2</span>
+        <span class="when">Closes Sun 1:00&nbsp;PM</span>
+      </div>
+      <div>
+        <h3 class="fb-title">Steel Curtain Era</h3>
+        <p class="fb-sub">1972–1980 · ten managers, punt-heavy scoring, no shotgun formations.</p>
+        <div class="fb-meta"><span><b>10</b> teams</span><span>·</span><span>Week <b>9</b> of 17</span><span>·</span><span>Head-to-head</span></div>
+        <div class="fb-actions"><a class="fb-btn fb-btn-solid" href="#">Set Lineup</a><a class="fb-btn fb-btn-out" href="#">View League</a></div>
+      </div>
+      <div class="cb-score">
+        <div class="cb-row">
+          <div class="lead" style="position:relative">
+            <div class="tm">Gridiron Greats</div>
+            <div class="rc">6-2 · Rank #2</div>
+            <div class="num">84.5</div>
+            <div class="cb-rule"></div>
+          </div>
+          <div class="vs">vs</div>
+          <div class="right">
+            <div class="tm">Steel Curtain</div>
+            <div class="rc">5-3 · Rank #4</div>
+            <div class="num">79.2</div>
+          </div>
+        </div>
+        <div class="cb-note"><span>Install</span><span style="color:#EEF4EA">Week 9 · 3rd &amp; 7 · Q3 8:41</span></div>
+      </div>
+    </div>
+  </article>
+</div>
+
+<!-- D · FIELD-POSITION STRIP -->
+<div class="opt" style="left:1060px;top:900px">
+  <div class="opt-head">
+    <div class="opt-tag">Direction D</div>
+    <h2 class="opt-name">Field position</h2>
+    <p class="opt-note">Identity and score up top, and the hero's base <b>is the field</b>: end-zone caps for both teams, yard lines and hash marks across, and a gold marker showing where the matchup actually stands — here, drive position. The one direction that adds information rather than restyling it; also the one that needs a real data point to justify the marker, or it becomes decoration.</p>
+  </div>
+  <article class="fp">
+    <div class="fp-top">
+      <span class="fb-live"><span class="dot dot-pulse"></span>Live · Q3 8:41</span>
+      <span class="fb-seal">Rank&nbsp;#2</span>
+      <span class="when">Closes Sun 1:00&nbsp;PM</span>
+    </div>
+    <div class="fp-mid">
+      <div>
+        <h3 class="fb-title">Steel Curtain Era</h3>
+        <p class="fb-sub">1972–1980 · ten managers, punt-heavy scoring, no shotgun formations.</p>
+        <div class="fb-meta"><span><b>10</b> teams</span><span>·</span><span>Week <b>9</b> of 17</span><span>·</span><span>3rd &amp; 7</span></div>
+        <div class="fb-actions"><a class="fb-btn fb-btn-solid" href="#">Set Lineup</a><a class="fb-btn fb-btn-out" href="#">View League</a></div>
+      </div>
+      <div class="fp-score">
+        <div class="side lead"><div class="tm">Gridiron Greats</div><div class="num">84.5</div></div>
+        <div class="vs">vs</div>
+        <div class="side"><div class="tm">Steel Curtain</div><div class="num">79.2</div></div>
+      </div>
+    </div>
+    <div class="fp-field" aria-label="Drive position: Gridiron Greats at the opponent 38">
+      <div class="fp-ez mine">Greats</div>
+      <div class="fp-lanes">
+        <div class="fp-yards" aria-hidden="true"><span>10</span><span>20</span><span>30</span><span>40</span><span>50</span><span>40</span><span>30</span><span>20</span><span>10</span></div>
+        <div class="fp-marker"><span>Ball on 38</span></div>
+      </div>
+      <div class="fp-ez them">Curtain</div>
+    </div>
+  </article>
+</div>
+
+<!-- E · 90s SCOREBUG -->
+<div class="opt" style="left:570px;top:1500px">
+  <div class="opt-head">
+    <div class="opt-tag">Direction E · from the 1990s reference</div>
+    <h2 class="opt-name">Broadcast scorebug</h2>
+    <p class="opt-note">The period bug, at hero scale and not flattened: chrome bevel frame, stacked team plates with hard highlights, chiselled type, possession arrow, machined clock bar. It keeps football's own vocabulary and lands on <b>era</b> — which is the product's whole premise — where the modern broadcast bar (B) reads as any fantasy app. It also solves the sizing problem for free: the bug is a fixed 250px object, so it never has to reflow with the rail.</p>
+  </div>
+  <article class="nb">
+    <div class="bug">
+      <div class="bug-in">
+        <div class="bug-badge"><span class="eye" aria-hidden="true"></span><span>Legacy</span></div>
+        <div class="bug-row lead">
+          <span class="poss" aria-label="Possession"></span>
+          <span class="abbr">GG</span>
+          <span class="pts">84.5</span>
+        </div>
+        <div class="bug-row">
+          <span></span>
+          <span class="abbr">SC</span>
+          <span class="pts">79.2</span>
+        </div>
+        <div class="bug-bottom"><span>3rd</span><span>Q3 · 8:41</span></div>
+      </div>
+    </div>
+    <div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <span class="fb-live"><span class="dot dot-pulse"></span>Live · Week 9/17</span>
+        <span class="fb-seal">Rank&nbsp;#2</span>
+        <span style="margin-left:auto;font-size:12.5px;color:var(--text-secondary)">Closes Sun 1:00&nbsp;PM</span>
+      </div>
+      <h3 class="fb-title">Steel Curtain Era</h3>
+      <p class="fb-sub">1972–1980 · ten managers, punt-heavy scoring, no shotgun formations.</p>
+      <div class="fb-meta"><span>Gridiron Greats <b>6-2</b></span><span>·</span><span>vs Steel Curtain <b>5-3</b></span><span>·</span><span><b>10</b> teams</span></div>
+      <div class="fb-actions"><a class="fb-btn fb-btn-solid" href="#">Set Lineup</a><a class="fb-btn fb-btn-out" href="#">View League</a></div>
+    </div>
+  </article>
+</div>
+
+<!-- F · PLAYBOOK + SCOREBUG -->
+<div class="opt" style="left:570px;top:2100px">
+  <div class="opt-head">
+    <div class="opt-tag">Direction F · C + E</div>
+    <h2 class="opt-name">Playbook board with a mounted bug</h2>
+    <p class="opt-note">The chalkboard carries identity, era and actions; the bug runs the board's full height and carries the score, each team's record, and — in the machined bar where broadcast puts down &amp; distance — the fantasy facts that actually matter: <b>week and time remaining</b>. Each does what it is good at — the board is <b>era and place</b>, the bug is <b>standing and deadline</b> — and the hero stops trying to make one surface do both. Practically: the bug is a fixed 250px object, so the reflow problem that dogged the ticket at lg disappears; the board just gets narrower.</p>
+  </div>
+  <article class="cb cb-bug">
+    <div class="cb-inner">
+      <div class="cb-head">
+        <span class="fb-live"><span class="dot dot-pulse"></span>Live · Week 9/17</span>
+        <span class="fb-seal">Rank&nbsp;#2</span>
+        <span class="when">Closes Sun 1:00&nbsp;PM</span>
+      </div>
+      <div>
+        <h3 class="fb-title">Steel Curtain Era</h3>
+        <p class="fb-sub">1972–1980 · ten managers, punt-heavy scoring, no shotgun formations.</p>
+        <div class="fb-meta"><span>Gridiron Greats <b>6-2</b></span><span>·</span><span>vs Steel Curtain <b>5-3</b></span><span>·</span><span><b>10</b> teams</span></div>
+        <div class="fb-actions"><a class="fb-btn fb-btn-solid" href="#">Set Lineup</a><a class="fb-btn fb-btn-out" href="#">View League</a></div>
+      </div>
+      <div class="cb-score">
+        <div class="bug">
+          <div class="bug-in">
+            <div class="bug-badge"><span class="eye" aria-hidden="true"></span><span>Legacy</span></div>
+            <div class="bug-row lead">
+              <span class="poss" aria-label="Leading"></span>
+              <span class="abbr">GG<i>6-2 · #2</i></span>
+              <span class="pts">84.5</span>
+            </div>
+            <div class="bug-row">
+              <span></span>
+              <span class="abbr">SC<i>5-3 · #4</i></span>
+              <span class="pts">79.2</span>
+            </div>
+            <div class="bug-bottom"><span>Week 9 of 17</span><span>2 days left</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+</div>
+
+</body>
+</html>
