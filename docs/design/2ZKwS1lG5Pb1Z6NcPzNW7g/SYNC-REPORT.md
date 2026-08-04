@@ -1,11 +1,24 @@
 # Sync report: Legacy Baseball Minigames
 
 **Design ID**: `2ZKwS1lG5Pb1Z6NcPzNW7g`
-**Source**: `https://api.anthropic.com/v1/design/h/2ZKwS1lG5Pb1Z6NcPzNW7g`
-**Synced at**: 2026-05-20T16:35:54.679Z
-**Bundle hash**: `6edadff6a09d5b73036a80963a10c40a67f701139f92b375451a3ed551ba1855`
+**Source**: `designsync-local` (projectId `f1c2ee9f-859c-4136-bb9f-7d6fe6a2c832`)
+**Synced at**: 2026-08-04T15:23:01.000Z
+**Bundle hash**: `178a15e9c541dc9f1f4f7c6139836e485ef531d37d1cf7291ce9349f67fdd258`
 **Files**: 66
-**Total size**: 2403614 bytes
+**Total size**: 2418249 bytes
+**Sync ticket**: LS-8959 (re-run of the mockup against the updated `docs/agents/pages/PROMPT.md` brief)
+
+## What changed vs. previous hash (`6edadff6...`)
+
+Mechanical fixes applied at the source via the DesignSync write flow (LS-8954 audit / LS-8959), then pulled back:
+
+- **`styles-game.css`**: `.sdg-hist.me` gold accent stripe narrowed from a banned 2px `border-left` to 1px.
+- **All 7 `styles*.css` files**: every `@media (max-width: …)` query snapped to the canonical breakpoint bands (660/800/860/980/1120/1280) — no more invented 480/560/640/720/900/1100 thresholds. `styles-create.css`'s existing 860px query was already canonical and is unchanged.
+- **`styles.css`, `styles-disclosure.css`, `styles-lobby.css`**: raw hex repeats (`#E63950`, `#C5A55A`) replaced with the existing `--brand-seam-red-light` / `--brand-gold` / `--brand-gold-dark` custom properties; added a global `:focus-visible` rule (2px `--fg1` outline) plus a few per-control overrides where `:hover` was already painting over the default outline.
+- **`styles-create.css`, `styles-disclosure.css`, `styles-hub.css`, `styles-join.css`, `styles-game.css`**: raw `font-family: 'Literata', serif` declarations replaced with `var(--font-body)`.
+- **`Legacy Minigames.html`**: added a `<!-- HANDOFF -->` block at the top; `styles*.css` files gained `MOTION`, `COMPONENT`, and `BREAKPOINTS` annotation comments (previously zero across the bundle).
+
+**Not fixed here (flagged for a human-led design pass, per LS-8959 scope)**: the bundle still has no visible state switcher and no loading-skeleton state for any screen — those are design additions, not mechanical fixes, so they were intentionally left for a follow-up design session rather than invented in this pass.
 
 ## Pages
 
