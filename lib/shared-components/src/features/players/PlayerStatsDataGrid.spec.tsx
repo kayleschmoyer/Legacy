@@ -318,10 +318,7 @@ const TestWrapper: React.FC<TestWrapperProps> = ({
 // Default props for testing
 const defaultProps: PlayerStatsDataGridProps = {
   title: 'Test Player Statistics',
-  showSearch: true,
-  showFilters: true,
   showPagination: true,
-  showSorting: true,
   testId: 'test-grid',
 };
 
@@ -368,53 +365,6 @@ describe('PlayerStatsDataGrid - Rendering', () => {
       expect(screen.getByText('2297')).toBeInTheDocument(); // RBIs
       expect(screen.getByText('0.305')).toBeInTheDocument(); // Batting average
     });
-  });
-
-  test('should show search input when showSearch is true', () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} showSearch={true} />
-      </TestWrapper>,
-    );
-
-    expect(
-      screen.getByPlaceholderText('Search players...'),
-    ).toBeInTheDocument();
-  });
-
-  test('should hide search input when showSearch is false', () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} showSearch={false} />
-      </TestWrapper>,
-    );
-
-    expect(
-      screen.queryByPlaceholderText('Search players...'),
-    ).not.toBeInTheDocument();
-  });
-
-  test('should show filter controls when showFilters is true', () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} showFilters={true} />
-      </TestWrapper>,
-    );
-
-    expect(screen.getByText('Filters:')).toBeInTheDocument();
-    expect(screen.getByText('Min G:')).toBeInTheDocument();
-    expect(screen.getByText('Min HR:')).toBeInTheDocument();
-  });
-
-  test('should render position dropdown with aria-label when showFilters is true', () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} showFilters={true} />
-      </TestWrapper>,
-    );
-
-    expect(screen.getByText('Pos:')).toBeInTheDocument();
-    expect(screen.getByLabelText('Position')).toBeInTheDocument();
   });
 
   test('should show pagination controls when showPagination is true', async () => {
@@ -467,32 +417,6 @@ describe('PlayerStatsDataGrid - Interactions', () => {
         homeRuns: 755,
       }),
     );
-  });
-
-  test('should handle search input changes', () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} />
-      </TestWrapper>,
-    );
-
-    const searchInput = screen.getByPlaceholderText('Search players...');
-    fireEvent.change(searchInput, { target: { value: 'ruth' } });
-
-    expect((searchInput as HTMLInputElement).value).toBe('ruth');
-  });
-
-  test('should handle filter changes', () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} />
-      </TestWrapper>,
-    );
-
-    const minGamesInput = screen.getByLabelText('Min G');
-    fireEvent.change(minGamesInput, { target: { value: '100' } });
-
-    expect((minGamesInput as HTMLInputElement).value).toBe('100');
   });
 
   test('should handle page size changes', async () => {
@@ -672,8 +596,7 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
       ).toBeInTheDocument();
     });
 
-    // Should show clear filters button(s) — one in the filter bar (active filters)
-    // and one in the empty state panel
+    // Should show the empty-state "Clear Filters" recovery button
     expect(screen.getAllByText('Clear Filters').length).toBeGreaterThanOrEqual(
       1,
     );
@@ -830,39 +753,18 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
 // =============================================================================
 
 describe('PlayerStatsDataGrid - Accessibility', () => {
-  test('should have proper ARIA labels and roles', async () => {
+  test('should have proper ARIA labels and roles', () => {
     render(
       <TestWrapper>
         <PlayerStatsDataGrid {...defaultProps} />
       </TestWrapper>,
     );
 
-    await waitFor(() => {
-      const grid = screen.getByText('Test Player Statistics');
-      expect(grid).toBeInTheDocument();
-    });
-
-    // Check for input labels
+    expect(screen.getByText('Test Player Statistics')).toBeInTheDocument();
+    // Loading state is announced via aria-busy/aria-label
     expect(
-      screen.getByPlaceholderText('Search players...'),
+      screen.getByLabelText('Loading player statistics...'),
     ).toBeInTheDocument();
-  });
-
-  test('should support keyboard navigation', async () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} />
-      </TestWrapper>,
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Player 1486')).toBeInTheDocument();
-    });
-
-    // Test tab navigation (basic check)
-    const searchInput = screen.getByPlaceholderText('Search players...');
-    searchInput.focus();
-    expect(document.activeElement).toBe(searchInput);
   });
 });
 
@@ -959,31 +861,6 @@ describe('PlayerStatsDataGrid - Performance', () => {
     expect(screen.getByText('Player 2')).toBeInTheDocument();
     // Test passes if it completes without timeout - validates performance indirectly
   });
-
-  test('should handle rapid state updates gracefully', async () => {
-    render(
-      <TestWrapper>
-        <PlayerStatsDataGrid {...defaultProps} />
-      </TestWrapper>,
-    );
-
-    const searchInput = screen.getByPlaceholderText('Search players...');
-
-    // Simulate rapid typing
-    fireEvent.change(searchInput, { target: { value: 'a' } });
-    fireEvent.change(searchInput, { target: { value: 'ab' } });
-    fireEvent.change(searchInput, { target: { value: 'abc' } });
-    fireEvent.change(searchInput, { target: { value: 'abcd' } });
-
-    await waitFor(() => {
-      expect((searchInput as HTMLInputElement).value).toBe('abcd');
-    });
-
-    // Should not crash or show error
-    expect(
-      screen.queryByText('Error Loading Statistics'),
-    ).not.toBeInTheDocument();
-  });
 });
 
 // =============================================================================
@@ -1025,17 +902,12 @@ describe('PlayerStatsDataGrid - Integration', () => {
       expect(screen.getByText('Player 1486')).toBeInTheDocument();
     });
 
-    // Change search term
-    const searchInput = screen.getByPlaceholderText('Search players...');
-    fireEvent.change(searchInput, { target: { value: 'test search' } });
-
     // Change page size
     const pageSizeButton = screen.getByText('50');
     fireEvent.click(pageSizeButton);
 
-    // Verify both states are maintained
-    expect((searchInput as HTMLInputElement).value).toBe('test search');
     // Page size change should be reflected in the component state
+    expect(pageSizeButton).toBeInTheDocument();
   });
 });
 

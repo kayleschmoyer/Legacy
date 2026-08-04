@@ -1040,9 +1040,6 @@ export function useBaseballController(
               initialParams={battingParams}
               onPlayerSelect={handleBattingPlayerClick}
               onSortChange={handleBattingSortChange}
-              showSearch={false}
-              showFilters={false}
-              showSorting={true}
               showPagination={true}
               statsFormat={statsFormat}
               visibleColumns={gridVisibleColumns}
@@ -1063,9 +1060,6 @@ export function useBaseballController(
               title="MLB Career Pitching Leaders"
               initialParams={pitchingParams}
               onPlayerSelect={handlePitchingPlayerClick}
-              showSearch={false}
-              showFilters={false}
-              showSorting={true}
               showPagination={true}
               statsFormat={statsFormat}
               visibleColumns={gridVisibleColumns}

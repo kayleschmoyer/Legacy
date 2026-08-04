@@ -17,16 +17,9 @@
  * @since 2025-09-28
  */
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
-import { Button, Input, Select, Spinner, Text, XStack, YStack } from 'tamagui';
-import { BATTING_POSITIONS } from '@legacy-sports/utils';
+import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   type CareerStatsQueryParams,
   DEFAULT_CAREER_STATS_PARAMS,
@@ -57,25 +50,7 @@ const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const FONT_BODY = "'Literata', serif";
 const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
 
-// SVG icons — web-only; return null on native to avoid DOM svg crash
-const SearchIcon = ({ color }: { color?: string }) => {
-  if (Platform.OS !== 'web') return null;
-  return (
-    <svg
-      aria-hidden="true"
-      focusable={false}
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={color ?? TEXT_MUTED}
-      strokeWidth="2"
-    >
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  );
-};
+// SVG icon — web-only; return null on native to avoid DOM svg crash
 const AlertIcon = () => {
   if (Platform.OS !== 'web') return null;
   return (
@@ -125,14 +100,8 @@ export interface PlayerStatsDataGridProps {
   initialParams?: Partial<CareerStatsQueryParams>;
   /** Callback when a player row is selected */
   onPlayerSelect?: (player: PlayerCareerStats) => void;
-  /** Whether to show search functionality */
-  showSearch?: boolean;
-  /** Whether to show filtering controls */
-  showFilters?: boolean;
   /** Whether to show pagination controls */
   showPagination?: boolean;
-  /** Whether to show sorting controls */
-  showSorting?: boolean;
   /** Custom CSS class name */
   className?: string;
   /** Test ID for automated testing */
@@ -453,8 +422,6 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
  *   title="Top Home Run Hitters"
  *   initialParams={{ orderBy: 'homeRuns', orderDirection: 'desc', first: 50 }}
  *   onPlayerSelect={(player) => navigateToPlayer(player.playerId)}
- *   showSearch={true}
- *   showFilters={true}
  * />
  * ```
  */
@@ -462,10 +429,7 @@ export function PlayerStatsDataGrid({
   title = 'Career Batting Statistics',
   initialParams = {},
   onPlayerSelect,
-  showSearch = true,
-  showFilters = true,
   showPagination = true,
-  showSorting = true,
   className,
   testId = 'player-stats-data-grid',
   statsFormat = 'expanded',
@@ -483,16 +447,6 @@ export function PlayerStatsDataGrid({
     ...DEFAULT_CAREER_STATS_PARAMS,
     ...initialParams,
   });
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [localFilters, setLocalFilters] = useState({
-    minGames: initialParams.minGames ?? 0,
-    minHomeRuns: initialParams.minHomeRuns ?? 0,
-    minRBI: initialParams.minRBI ?? 0,
-  });
-  const [positionFilter, setPositionFilter] = useState(
-    (initialParams.position as string) ?? '',
-  );
 
   // =============================================================================
   // Data Fetching
@@ -541,64 +495,6 @@ export function PlayerStatsDataGrid({
       onSortChange?.(sortField, orderDirection);
     },
     [updateQueryParams, onSortChange],
-  );
-
-  // Debounce ref for search
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  /**
-   * Handles search input changes — debounces and propagates to server-side query
-   */
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearchTerm(value);
-
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-      }
-      searchDebounceRef.current = setTimeout(() => {
-        updateQueryParams({
-          searchTerm: value.trim() || undefined,
-          after: undefined, // reset to first page
-        });
-      }, 300);
-    },
-    [updateQueryParams],
-  );
-
-  // Clean up debounce on unmount
-  useEffect(() => {
-    return () => {
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-      }
-    };
-  }, []);
-
-  /**
-   * Handles filter changes
-   */
-  const handleFilterChange = useCallback(
-    (filterKey: string, value: number) => {
-      const newFilters = { ...localFilters, [filterKey]: value };
-      setLocalFilters(newFilters);
-      updateQueryParams({ ...newFilters, after: undefined }); // Reset to first page
-    },
-    [localFilters, updateQueryParams],
-  );
-
-  /**
-   * Handles position filter changes
-   */
-  const handlePositionFilterChange = useCallback(
-    (value: string) => {
-      setPositionFilter(value);
-      updateQueryParams({
-        position: value || undefined,
-        after: undefined,
-      });
-    },
-    [updateQueryParams],
   );
 
   /**
@@ -750,176 +646,6 @@ export function PlayerStatsDataGrid({
   // =============================================================================
   // Render Helpers
   // =============================================================================
-
-  /**
-   * Renders the search and filter controls
-   */
-  const renderControls = () => (
-    <YStack
-      gap="$3"
-      padding="$4"
-      style={{
-        background: `rgba(22,34,58,0.7)`,
-        border: `1px solid rgba(44,74,124,0.4)`,
-        borderRadius: 14,
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-      }}
-    >
-      <XStack
-        gap="$3"
-        alignItems="center"
-        flexWrap="wrap"
-        justifyContent="space-between"
-      >
-        {/* Search */}
-        {showSearch && (
-          <XStack
-            flex={1}
-            minWidth="200px"
-            alignItems="center"
-            gap="$2"
-            style={{
-              background: 'rgba(10,15,26,0.6)',
-              border: '1px solid rgba(44,74,124,0.4)',
-              borderRadius: 10,
-              paddingLeft: 12,
-              paddingRight: 8,
-            }}
-          >
-            <SearchIcon />
-            <Input
-              flex={1}
-              placeholder="Search players..."
-              value={searchTerm}
-              onChangeText={handleSearchChange}
-              backgroundColor="transparent"
-              borderWidth={0}
-              color={TEXT_HIGH_CONTRAST}
-              placeholderTextColor={TEXT_MUTED}
-            />
-          </XStack>
-        )}
-
-        {/* Filters */}
-        {showFilters && (
-          <XStack gap="$2" alignItems="center" flexWrap="wrap">
-            <Text
-              fontSize="$2"
-              fontWeight="600"
-              letterSpacing={0.8}
-              textTransform="uppercase"
-              style={{ color: BRAND_GOLD_LIGHT }}
-            >
-              Filters:
-            </Text>
-            {[
-              { label: 'Min G', key: 'minGames', val: localFilters.minGames },
-              {
-                label: 'Min HR',
-                key: 'minHomeRuns',
-                val: localFilters.minHomeRuns,
-              },
-              { label: 'Min RBI', key: 'minRBI', val: localFilters.minRBI },
-            ].map(({ label, key, val }) => (
-              <XStack key={key} alignItems="center" gap="$1">
-                <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
-                  {label}:
-                </Text>
-                <Input
-                  width={56}
-                  size="$2"
-                  value={String(val)}
-                  aria-label={label}
-                  onChangeText={(value: string) =>
-                    handleFilterChange(key, parseInt(value) || 0)
-                  }
-                  keyboardType="numeric"
-                  backgroundColor="rgba(10,15,26,0.6)" // dark input bg
-                  borderWidth={1}
-                  borderColor="rgba(44,74,124,0.4)"
-                  borderRadius={8}
-                  color={TEXT_HIGH_CONTRAST}
-                  textAlign="center"
-                />
-              </XStack>
-            ))}
-            {(localFilters.minGames > 0 ||
-              localFilters.minHomeRuns > 0 ||
-              localFilters.minRBI > 0 ||
-              searchTerm.length > 0 ||
-              positionFilter.length > 0) && (
-              <Button
-                size="$2"
-                onPress={() => {
-                  if (searchDebounceRef.current) {
-                    clearTimeout(searchDebounceRef.current);
-                  }
-                  const cleared = {
-                    minGames: DEFAULT_CAREER_STATS_PARAMS.minGames ?? 10,
-                    minHomeRuns: 0,
-                    minRBI: 0,
-                  };
-                  setSearchTerm('');
-                  setPositionFilter('');
-                  setLocalFilters(cleared);
-                  updateQueryParams({
-                    ...cleared,
-                    searchTerm: undefined,
-                    position: undefined,
-                    after: undefined,
-                  });
-                }}
-                style={{
-                  background: `rgba(197,165,90,0.12)`,
-                  border: `1px solid rgba(196,165,90,0.4)`,
-                  borderRadius: 8,
-                  color: BRAND_GOLD_LIGHT,
-                }}
-              >
-                Clear Filters
-              </Button>
-            )}
-            <XStack alignItems="center" gap="$1">
-              <Text fontSize="$2" style={{ color: TEXT_MUTED }}>
-                Pos:
-              </Text>
-              <Select
-                value={positionFilter || '__all__'}
-                onValueChange={(value) =>
-                  handlePositionFilterChange(value === '__all__' ? '' : value)
-                }
-              >
-                <Select.Trigger
-                  width={80}
-                  size="$2"
-                  backgroundColor="rgba(10,15,26,0.6)"
-                  borderWidth={1}
-                  borderColor="rgba(44,74,124,0.4)"
-                  borderRadius={8}
-                  aria-label="Position"
-                >
-                  <Select.Value placeholder="All" color={TEXT_HIGH_CONTRAST} />
-                </Select.Trigger>
-                <Select.Content zIndex={200000}>
-                  <Select.Viewport>
-                    <Select.Item index={0} value="__all__">
-                      <Select.ItemText>All</Select.ItemText>
-                    </Select.Item>
-                    {[...BATTING_POSITIONS].map((pos, idx) => (
-                      <Select.Item key={pos} index={idx + 1} value={pos}>
-                        <Select.ItemText>{pos}</Select.ItemText>
-                      </Select.Item>
-                    ))}
-                  </Select.Viewport>
-                </Select.Content>
-              </Select>
-            </XStack>
-          </XStack>
-        )}
-      </XStack>
-    </YStack>
-  );
 
   /**
    * Renders the data grid table
@@ -1099,19 +825,10 @@ export function PlayerStatsDataGrid({
               </Text>
               <Button
                 onPress={() => {
-                  if (searchDebounceRef.current) {
-                    clearTimeout(searchDebounceRef.current);
-                  }
-                  const cleared = {
+                  updateQueryParams({
                     minGames: DEFAULT_CAREER_STATS_PARAMS.minGames ?? 10,
                     minHomeRuns: 0,
                     minRBI: 0,
-                  };
-                  setSearchTerm('');
-                  setPositionFilter('');
-                  setLocalFilters(cleared);
-                  updateQueryParams({
-                    ...cleared,
                     searchTerm: undefined,
                     position: undefined,
                     after: undefined,
@@ -1299,9 +1016,6 @@ export function PlayerStatsDataGrid({
           )}
         </YStack>
       </XStack>
-
-      {/* Controls */}
-      {(showSearch || showSorting || showFilters) && renderControls()}
 
       {/* Error State */}
       {error && !loading && (
