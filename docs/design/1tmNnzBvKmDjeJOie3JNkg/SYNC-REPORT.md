@@ -1,11 +1,23 @@
 # Sync report: Public Leagues
 
 **Design ID**: `1tmNnzBvKmDjeJOie3JNkg`
-**Source**: `https://api.anthropic.com/v1/design/h/1tmNnzBvKmDjeJOie3JNkg`
-**Synced at**: 2026-05-20T16:35:54.668Z
-**Bundle hash**: `b5c72bab0b806f2495256ec5fcadaa3c4a8be07447b8231ccde522d0de79c3e8`
+**Source**: `designsync-local` (projectId `02fe66a1-9396-4158-a52e-56a7487d4262`)
+**Synced at**: 2026-08-04T15:47:00.000Z
+**Bundle hash**: `527e13f10705d61db2c7412aac75c7e930364d74468d56632cf99a75ae770762`
 **Files**: 46
-**Total size**: 1391001 bytes
+**Total size**: 1391001 bytes (project/Legacy Sports - Public Leagues.html grew by ~3.6KB)
+
+## What changed (LS-8958 brief-compliance fixes, targeted pull — only the changed file)
+
+`legacy-sports-public-leagues/project/Legacy Sports - Public Leagues.html`:
+
+- Invented max-width breakpoints (720px, 1320px) replaced with canonical band-aligned thresholds (799px = just below `sm`/800, 1279px = just below `xxl`/1280), each with a `BREAKPOINTS:` annotation comment.
+- Added a global `:focus-visible` rule (buttons, links, inputs, `[tabindex]`) plus `:focus-visible` on the two text inputs — the file previously had zero `:focus-visible` rules.
+- Tokenized raw hex outside `:root`: `#111827` (→ `var(--bg)`), `#E63950` ×4 (→ `var(--brand-seam-red-light)`), `#fff` ×5 (→ `var(--fg-on-accent)`), plus incidentally-caught exact token matches `#0a0f1a`/`#5B84C4`/`#C89452`/`#6FD39A`/`#E07A8C` (→ `var(--bg)`/`var(--info)`/`var(--warning)`/`var(--success-fg)`/`var(--danger-fg)`). Left `#000` (phone bezel) and `#2a3550` (browser-chrome traffic dot) — review-scaffold-only device-frame chrome with no exact token match, not part of the shipped product per the new HANDOFF note.
+- Opening design-intent HTML comment replaced with a proper `<!-- HANDOFF -->` block (final file, key decisions, deviations, open questions) and `<!-- COMPONENT -->` annotations added for `league-card`, `draft-chip`, `stat-row`/`stat-line`, and `state-switcher`.
+- Follow-up (review-bot HIGH finding on PR #6678): the review-scaffold's `localStorage.getItem`/`setItem` calls (state persistence across reloads, not part of the shipped product) are now wrapped in `try/catch` — private-browsing/quota errors are swallowed since this persistence is best-effort.
+
+Rationale + full audit: LS-8958 (findings from LS-8954, which rated this bundle "cleanest brand-wise, zero HIGH"). Not touched — out of scope for LS-8958's specific MED/LOW findings: this bundle's own `colors_and_type.css` copy still carries the self-hosted `@font-face` set and the `.theme-light`/`[data-theme='light']` override block that LS-8957 fixed only in the shared Design System project (`colors_and_type.css` is copied per-bundle, not referenced live, so LS-8957's fix did not propagate here automatically). Flagging for LS-9005 (reconciliation sweep) rather than fixing inline, since it wasn't part of this ticket's audited findings.
 
 ## Pages
 

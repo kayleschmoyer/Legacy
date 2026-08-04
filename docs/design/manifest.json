@@ -16,9 +16,10 @@
       "title": "Public Leagues",
       "slug": "legacy-sports-public-leagues",
       "status": "active",
-      "lastSyncedHash": "b5c72bab0b806f2495256ec5fcadaa3c4a8be07447b8231ccde522d0de79c3e8",
-      "lastSyncedAt": "2026-05-20T16:35:54.669Z",
-      "jiraKey": "LS-4569"
+      "lastSyncedHash": "527e13f10705d61db2c7412aac75c7e930364d74468d56632cf99a75ae770762",
+      "lastSyncedAt": "2026-08-04T15:47:00.000Z",
+      "jiraKey": "LS-9017",
+      "source": "designsync-local"
     },
     {
       "id": "2ZKwS1lG5Pb1Z6NcPzNW7g",
