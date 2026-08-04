@@ -833,14 +833,12 @@ const PITCHER_COLS = [
 
 /* ──────────────────────────────────────────
    FOOTBALL — Offense & Defense
-   Position colors map to existing semantic palette:
-     QB → seam-red (the playmaker)
-     RB → dirt brown (ground game)
-     WR → field green (downfield)
-     TE → steel gray (hybrid)
-     K  → aged gold (specialist)
-   Defense reuses the same palette by role:
-     LB → seam-red, DL → brown, DB → green, S → steel
+   Position colors are the app's authoritative footballPositionBadges
+   (lib/design-tokens/src/lib/colors.ts, LS-8578/LS-8526) — each
+   position gets its own distinct color, not a reused offense hue:
+     QB → seam-red, RB → dirt brown, WR → field green,
+     TE → steel gray, K → aged gold
+     LB → muted amber, DL → burnt orange, DB (covers S too) → navy
    ────────────────────────────────────────── */
 const OFFENSE = [
   // QBs (modern + legends)
@@ -1565,7 +1563,7 @@ const DEFENSE = [
   {
     name: 'Ronnie Lott',
     pos: 'S',
-    posKey: 'def-s',
+    posKey: 'def-db',
     team: 'SF',
     era: '1986',
     g: 14,
@@ -1585,7 +1583,7 @@ const DEFENSE = [
   {
     name: 'Ed Reed',
     pos: 'S',
-    posKey: 'def-s',
+    posKey: 'def-db',
     team: 'BAL',
     era: '2004',
     g: 16,
@@ -1745,8 +1743,7 @@ const FOOTBALL_LEGEND = [
   ['k', 'K'],
   ['def-lb', 'Linebacker'],
   ['def-dl', 'D-Line'],
-  ['def-db', 'Secondary'],
-  ['def-s', 'Safety'],
+  ['def-db', 'Secondary (DB/S)'],
 ];
 
 Object.assign(window, {

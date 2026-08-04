@@ -43,17 +43,44 @@ body {
   border: 0;
 }
 
-/* Football-position color extensions (additive — baseball uses pos-pitcher/etc.) */
-:root {
-  --pos-qb: #c41e3a; /* seam red — the playmaker */
-  --pos-rb: #8b6f47; /* dirt brown — ground game */
-  --pos-wr: #2d6a4f; /* field green — downfield */
-  --pos-te: #7c8794; /* steel — hybrid */
-  --pos-k: #c5a55a; /* aged gold — specialist */
-  --pos-def-lb: #c41e3a;
-  --pos-def-dl: #8b6f47;
-  --pos-def-db: #2d6a4f;
-  --pos-def-s: #7c8794;
+/* Football position tokens (--pos-qb, --pos-rb, --pos-def-lb, etc.) are
+   declared in ds/colors_and_type.css's single :root, alongside the
+   baseball tokens — no second :root block in this file. */
+
+/* ── Focus states ─────────────────────────────────────────────
+   2px TEXT_PRIMARY outline on dark surfaces per the brief — gold is
+   reserved for outcomes, never removed without a replacement. Covers
+   every interactive element on the page: nav/tab/icon buttons, the
+   breakpoint + state switchers, form controls, and the sortable
+   table headers (which are keyboard-operable via .sp-th-sortable). */
+.sp-bp-chip:focus-visible,
+.sp-brand:focus-visible,
+.sp-icon-btn:focus-visible,
+.sp-tabs a:focus-visible,
+.sp-state-btn:focus-visible,
+.sp-sport-btn:focus-visible,
+.sp-subnav button:focus-visible,
+.sp-btn:focus-visible,
+.sp-linkbtn:focus-visible,
+.sp-search-clear:focus-visible,
+.sp-page-btn:focus-visible,
+.sp-modal-close:focus-visible,
+.sp-th-sortable:focus-visible,
+.sp-search input:focus-visible,
+.sp-select select:focus-visible,
+.sp-slider input[type='range']:focus-visible {
+  outline: 2px solid var(--fg1);
+  outline-offset: 2px;
+}
+.sp-bp-chip:focus-visible,
+.sp-state-btn:focus-visible,
+.sp-sport-btn:focus-visible,
+.sp-btn:focus-visible,
+.sp-page-btn:focus-visible,
+.sp-icon-btn:focus-visible,
+.sp-modal-close:focus-visible {
+  outline-offset: 3px;
+  border-radius: inherit;
 }
 
 /* ── Page wrapper (sits outside shell so breakpoint bar is always full width) ── */
@@ -127,7 +154,7 @@ body {
 }
 .sp-bp-chip.on {
   background: var(--brand-navy);
-  color: #fff;
+  color: var(--fg1-strong);
   box-shadow: inset 0 0 0 1px var(--brand-navy-light);
 }
 .sp-bp-chip.on .sp-bp-chip-width {
@@ -267,7 +294,7 @@ body {
 }
 .sp-tabs a.on {
   background: var(--brand-navy);
-  color: #fff;
+  color: var(--fg1-strong);
 }
 .sp-tabs a.on img {
   filter: brightness(1.4) saturate(1.3);
@@ -311,7 +338,7 @@ body {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 12px;
-  color: #fff;
+  color: var(--fg1-strong);
   letter-spacing: 0.04em;
 }
 
@@ -371,7 +398,7 @@ body {
 }
 .sp-state-btn.on {
   background: var(--brand-navy);
-  color: #fff;
+  color: var(--fg1-strong);
   border-color: var(--brand-navy-light);
 }
 
@@ -455,20 +482,28 @@ body {
   opacity: 0.85;
 }
 .sp-sport-btn.on {
-  color: #fff;
+  color: var(--fg1-strong);
 }
 .sp-sport-btn.on img {
   opacity: 1;
   filter: brightness(1.15) saturate(1.15);
 }
 .sp-sport-btn.sp-sport-baseball.on {
-  background: linear-gradient(135deg, #8b1a2b 0%, #c41e3a 100%);
+  background: linear-gradient(
+    135deg,
+    var(--brand-seam-red-dark) 0%,
+    var(--brand-seam-red) 100%
+  );
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.08),
     0 2px 12px rgba(196, 30, 58, 0.35);
 }
 .sp-sport-btn.sp-sport-football.on {
-  background: linear-gradient(135deg, #1b3a5c 0%, #2c4a7c 100%);
+  background: linear-gradient(
+    135deg,
+    var(--brand-navy) 0%,
+    var(--brand-navy-light) 100%
+  );
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.08),
     0 2px 12px rgba(27, 58, 92, 0.4);
@@ -528,7 +563,7 @@ body {
 }
 .sp-btn-primary {
   background: var(--brand-navy);
-  color: #fff;
+  color: var(--fg1-strong);
   border-color: var(--brand-navy-light);
 }
 .sp-btn-primary:hover {
@@ -723,7 +758,7 @@ body {
 .sp-adv-toggle.on {
   background: rgba(27, 58, 92, 0.35);
   border-color: var(--brand-navy-light);
-  color: #fff;
+  color: var(--fg1-strong);
 }
 .sp-adv-chev {
   font-size: 10px;
@@ -912,9 +947,6 @@ body {
 .sp-pos-def-db {
   background: var(--pos-def-db);
 }
-.sp-pos-def-s {
-  background: var(--pos-def-s);
-}
 
 .sp-table-wrap {
   overflow-x: auto;
@@ -1053,7 +1085,7 @@ body {
   letter-spacing: 0.08em;
   padding: 4px 7px;
   border-radius: var(--radius-1);
-  color: #fff;
+  color: var(--fg1-strong);
   min-width: 28px;
   text-align: center;
   flex-shrink: 0;
@@ -1098,9 +1130,6 @@ body {
 }
 .sp-pchip-def-db {
   background: var(--pos-def-db);
-}
-.sp-pchip-def-s {
-  background: var(--pos-def-s);
 }
 .sp-pchip-lg {
   font-size: 13px;
@@ -1393,8 +1422,7 @@ body {
     var(--surface-card);
 }
 .sp-pos-bg-pitcher.sp-modal-head,
-.sp-pos-bg-qb.sp-modal-head,
-.sp-pos-bg-def-lb.sp-modal-head {
+.sp-pos-bg-qb.sp-modal-head {
   background:
     radial-gradient(
       ellipse at 100% 0%,
@@ -1404,8 +1432,7 @@ body {
     var(--surface-card);
 }
 .sp-pos-bg-outfield.sp-modal-head,
-.sp-pos-bg-wr.sp-modal-head,
-.sp-pos-bg-def-db.sp-modal-head {
+.sp-pos-bg-wr.sp-modal-head {
   background:
     radial-gradient(
       ellipse at 100% 0%,
@@ -1415,8 +1442,7 @@ body {
     var(--surface-card);
 }
 .sp-pos-bg-infield.sp-modal-head,
-.sp-pos-bg-rb.sp-modal-head,
-.sp-pos-bg-def-dl.sp-modal-head {
+.sp-pos-bg-rb.sp-modal-head {
   background:
     radial-gradient(
       ellipse at 100% 0%,
@@ -1426,8 +1452,7 @@ body {
     var(--surface-card);
 }
 .sp-pos-bg-catcher.sp-modal-head,
-.sp-pos-bg-te.sp-modal-head,
-.sp-pos-bg-def-s.sp-modal-head {
+.sp-pos-bg-te.sp-modal-head {
   background:
     radial-gradient(
       ellipse at 100% 0%,
@@ -1442,6 +1467,35 @@ body {
     radial-gradient(
       ellipse at 100% 0%,
       rgba(197, 165, 90, 0.22) 0%,
+      transparent 60%
+    ),
+    var(--surface-card);
+}
+/* Defensive sub-positions get their own tints — each maps to a distinct
+   footballPositionBadges color (LS-8578/LS-8526), not a reused offense hue. */
+.sp-pos-bg-def-lb.sp-modal-head {
+  background:
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgba(155, 122, 61, 0.22) 0%,
+      transparent 60%
+    ),
+    var(--surface-card);
+}
+.sp-pos-bg-def-dl.sp-modal-head {
+  background:
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgba(194, 90, 42, 0.22) 0%,
+      transparent 60%
+    ),
+    var(--surface-card);
+}
+.sp-pos-bg-def-db.sp-modal-head {
+  background:
+    radial-gradient(
+      ellipse at 100% 0%,
+      rgba(27, 58, 92, 0.25) 0%,
       transparent 60%
     ),
     var(--surface-card);
@@ -1595,10 +1649,13 @@ body {
    CONTAINER QUERIES — these fire based on shell width, NOT
    viewport, so the breakpoint bar can resize the shell and
    the layout responds exactly as it would on a real device.
+   Thresholds are the canonical bands from docs/agents/pages/PROMPT.md
+   (660 xs / 800 sm / 860 md / 980 lg / 1120 xl / 1280 xxl) — never
+   invented pixel values.
    ──────────────────────────────────────────────────────────── */
 
-/* Hide top-nav inline tabs below tablet */
-@container shell (max-width: 900px) {
+/* BREAKPOINTS: below md (860) — hide top-nav inline tabs, collapse to 2-col toolbar */
+@container shell (max-width: 859px) {
   .sp-tabs {
     display: none;
   }
@@ -1616,8 +1673,8 @@ body {
   }
 }
 
-/* Tablet / narrow — collapse adv-grid to 2 cols */
-@container shell (max-width: 720px) {
+/* BREAKPOINTS: below sm (800) — tighten header, collapse adv-grid to 1 col */
+@container shell (max-width: 799px) {
   .sp-h1 {
     font-size: 44px;
   }
@@ -1645,8 +1702,8 @@ body {
   }
 }
 
-/* Phone */
-@container shell (max-width: 520px) {
+/* BREAKPOINTS: below xs (660), i.e. the xxs phone band (375px design frame) */
+@container shell (max-width: 659px) {
   .sp-main {
     padding: 16px 12px 64px;
     gap: 16px;
@@ -1719,8 +1776,8 @@ body {
   }
 }
 
-/* Wide — comfier table spacing */
-@container shell (min-width: 1400px) {
+/* BREAKPOINTS: xxl (1280) and up — comfier table spacing */
+@container shell (min-width: 1280px) {
   .sp-table thead th,
   .sp-table tbody td {
     padding: 16px 12px;
@@ -1733,8 +1790,9 @@ body {
 
 /* ── Fallback: when @container isn't supported, narrow viewports
    still need to react. Use the parent-level breakpoint class so
-   styles fire on actual narrow windows too. ──────────────────── */
-@media (max-width: 900px) {
+   styles fire on actual narrow windows too. Same md (860) threshold
+   as the container query above. ──────────────────── */
+@media (max-width: 859px) {
   .sp-shell-full .sp-tabs {
     display: none;
   }

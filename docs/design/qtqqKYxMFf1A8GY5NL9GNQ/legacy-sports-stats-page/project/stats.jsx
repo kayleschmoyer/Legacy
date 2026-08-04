@@ -95,13 +95,16 @@ const SPORTS = {
    The shell uses container queries, so descendant
    layout responds *just like* it would at that
    actual viewport.
+   Widths are the canonical bands from docs/agents/pages/PROMPT.md —
+   xxs (375, always fully designed) through xxl (1280, always fully
+   designed) — never invented pixel values like 768/1024/1536.
    ────────────────────────────────────────── */
 const BREAKPOINTS = [
-  { id: 'mobile', label: 'Mobile', width: 375, device: 'iPhone' },
-  { id: 'tablet', label: 'Tablet', width: 768, device: 'iPad portrait' },
-  { id: 'laptop', label: 'Laptop', width: 1024, device: 'iPad landscape' },
-  { id: 'desktop', label: 'Desktop', width: 1280, device: '13" MacBook' },
-  { id: 'wide', label: 'Wide', width: 1536, device: '27" monitor' },
+  { id: 'xxs', label: 'Phone', width: 375, device: 'iPhone (xxs band, 0px+)' },
+  { id: 'xs', label: 'Lg. Phone', width: 660, device: 'Small tablet (xs band)' },
+  { id: 'md', label: 'Tablet', width: 860, device: 'Tablet landscape (md band)' },
+  { id: 'lg', label: 'Laptop', width: 980, device: 'Small laptop (lg band)' },
+  { id: 'xxl', label: 'Desktop', width: 1280, device: '13" MacBook (xxl band)' },
   { id: 'full', label: 'Full', width: null, device: 'Fill window' },
 ];
 
@@ -442,7 +445,7 @@ const BreakpointBar = ({ breakpoint, setBreakpoint, bp }) => {
 
 const BpIcon = ({ kind }) => {
   // Tiny line-art glyph per breakpoint — feels like a Storybook viewport menu.
-  if (kind === 'mobile')
+  if (kind === 'xxs')
     return (
       <svg
         width="12"
@@ -456,7 +459,7 @@ const BpIcon = ({ kind }) => {
         <line x1="5" y1="11" x2="7" y2="11" />
       </svg>
     );
-  if (kind === 'tablet')
+  if (kind === 'xs')
     return (
       <svg
         width="14"
@@ -470,7 +473,7 @@ const BpIcon = ({ kind }) => {
         <line x1="6" y1="11" x2="8" y2="11" />
       </svg>
     );
-  if (kind === 'laptop')
+  if (kind === 'md')
     return (
       <svg
         width="16"
@@ -484,7 +487,7 @@ const BpIcon = ({ kind }) => {
         <line x1="0.5" y1="12.5" x2="15.5" y2="12.5" />
       </svg>
     );
-  if (kind === 'desktop')
+  if (kind === 'lg')
     return (
       <svg
         width="16"
@@ -499,7 +502,7 @@ const BpIcon = ({ kind }) => {
         <line x1="4" y1="13" x2="12" y2="13" />
       </svg>
     );
-  if (kind === 'wide')
+  if (kind === 'xxl')
     return (
       <svg
         width="18"
@@ -962,8 +965,18 @@ const StatTable = ({ cfg, kind, rows, sort, setSort, onOpen }) => {
               {cols.map((c) => (
                 <th
                   key={c.k}
-                  className={`sp-th-num ${c.hi ? 'sp-th-hi' : ''} ${sort.key === c.k ? 'sp-th-on' : ''}`}
+                  className={`sp-th-num sp-th-sortable ${c.hi ? 'sp-th-hi' : ''} ${sort.key === c.k ? 'sp-th-on' : ''}`}
+                  tabIndex={0}
+                  role="button"
+                  aria-pressed={sort.key === c.k}
+                  aria-label={`Sort by ${c.l}`}
                   onClick={() => toggleSort(c.k)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleSort(c.k);
+                    }
+                  }}
                 >
                   <span>{c.l}</span>
                   <span className="sp-sort-ind">
