@@ -19,6 +19,18 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// LeagueDetailShell hides the hero "Invite" button entirely below the $xs
+// breakpoint (lib/design-tokens/src/lib/breakpoints.ts, maxWidth 660px) as a
+// deliberate design declutter (LS-8650, PR #6300) — the InviteCard's "Invite
+// Link" / "Invite Code" / "Show QR Code to Invite" controls remain as the
+// in-page invite entry point on small phones.
+const SMALL_PHONE_MAX_WIDTH = 660;
+
+function isSmallPhoneViewport(page: import('@playwright/test').Page) {
+  const viewport = page.viewportSize();
+  return (viewport?.width ?? Infinity) <= SMALL_PHONE_MAX_WIDTH;
+}
+
 // ── Mock Data ────────────────────────────────────────────────────────────────
 
 const COMMISSIONER_LEAGUE = {
@@ -194,10 +206,18 @@ test.describe('QR Invite Link @critical', () => {
       page.getByRole('button', { name: /show qr code to invite/i }),
     ).toBeVisible();
 
-    // Hero quick-share invite button (LeagueHero renders this when onInvite is provided)
-    await expect(
-      page.getByRole('button', { name: 'Invite', exact: true }),
-    ).toBeVisible();
+    // Hero quick-share invite button (LeagueHero renders this when onInvite is
+    // provided) — hidden on small phones (≤$xs), where the InviteCard above
+    // is the in-page invite entry point instead (LS-8994).
+    if (isSmallPhoneViewport(page)) {
+      await expect(
+        page.getByRole('button', { name: 'Invite', exact: true }),
+      ).not.toBeVisible();
+    } else {
+      await expect(
+        page.getByRole('button', { name: 'Invite', exact: true }),
+      ).toBeVisible();
+    }
   });
 
   test('non-commissioner does not see invite controls', async ({ page }) => {
@@ -205,10 +225,12 @@ test.describe('QR Invite Link @critical', () => {
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('domcontentloaded');
 
-    // Wait for page to settle — the hero "Invite" button is always shown
-    await expect(
-      page.getByRole('button', { name: 'Invite', exact: true }),
-    ).toBeVisible({ timeout: 15_000 });
+    // Wait for page to settle. The hero "Invite" button is hidden on small
+    // phones (≤$xs, LS-8994), so use the league title — always rendered
+    // regardless of viewport or commissioner status — as the settle signal.
+    await expect(page.getByTestId('league-title')).toBeVisible({
+      timeout: 15_000,
+    });
 
     // OverviewTab only renders InviteCard for the commissioner — no "Invite Friends" section for others.
     await expect(page.getByText('Invite Friends')).not.toBeVisible();
