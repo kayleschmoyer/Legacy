@@ -152,9 +152,10 @@
       "title": "Intro Video",
       "slug": "intro-video",
       "status": "active",
-      "lastSyncedHash": "60d11a1f3e599d4187bf53bf3d57857bd9601678bd4eb6d9dd12b4d2d0209020",
-      "lastSyncedAt": "2026-05-20T16:35:55.343Z",
-      "jiraKey": "LS-4578"
+      "lastSyncedHash": "sha256-f91d091e6b2a07d07d2de9afcb7574f5525c32a76f4e5d4d9c9e99eda49cbd5c",
+      "lastSyncedAt": "2026-08-04T15:20:00.000Z",
+      "jiraKey": "LS-8969",
+      "source": "designsync-local"
     },
     {
       "id": "kXxk3B29-DRvoJthw6UifA",
