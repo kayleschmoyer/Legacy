@@ -1,8 +1,8 @@
 ---
 name: shared-components-first
-description: 'Cross-platform UI principle: build shared Tamagui components in lib/shared-components, consumed by both apps/web and apps/app via viewport-responsive props. Load when building or reviewing UI for web or native.'
+description: 'Cross-platform UI principle: build platform-agnostic Tamagui components in lib/shared-components, consumed by both apps/web and apps/app, adapting by viewport breakpoint — never by platform. Load when building or reviewing any UI (web, native, or shared).'
 metadata:
-  scope: 'apps/web/**, apps/app/**'
+  scope: 'apps/web/**, apps/app/**, lib/shared-components/**'
 ---
 
 # Skill: Shared-Components-First, Viewport-Responsive UI
@@ -12,6 +12,19 @@ metadata:
 **Build UI once in `lib/shared-components` (Tamagui). Both `apps/web` and `apps/app` consume it. Adapt layout by viewport size, not by platform.**
 
 Never write a UI screen in `apps/web` or `apps/app` that the other platform will also need. If a screen or feature exists (or will exist) on both platforms, it belongs in `lib/shared-components`.
+
+### Components are platform-agnostic; only the viewport width varies
+
+A shared component must render correctly on **any** platform at **any** width. There is no "web layout" and no "native layout" — there are only breakpoints. A phone is a narrow viewport; a desktop browser window dragged narrow is the _same_ narrow viewport and must get the same layout.
+
+The decision test for any conditional in shared UI:
+
+> **"Would this differ between a narrow desktop window and a wide tablet?"**
+>
+> - Varies with **width** → it is a breakpoint concern. Use Tamagui media props / `useMedia`. Never `isWeb` / `Platform.OS`.
+> - Varies only with the **runtime** (a native-only API, font loading mechanics, DOM-only CSS like `backdrop-filter`) → a platform branch is permitted, but it must never change layout, spacing, visibility, or component structure.
+
+`isWeb ? <DesktopLayout/> : <MobileLayout/>` is always wrong: it gives mobile-web users a broken desktop layout and tablet users a cramped phone layout. The same UI decision expressed as `media.gtMd ? <TwoCol/> : <OneCol/>` is correct on every device.
 
 ## When to Extract
 
@@ -58,9 +71,9 @@ All shared UI uses Tamagui primitives (`XStack`, `YStack`, `Text`, `Card`, `Scro
 
 Entry point source files live at `lib/shared-components/src/entry/*.ts`.
 
-### Platform-specific resolution
+### Platform-specific resolution (rare — capability shims only)
 
-For components with genuinely different implementations per platform, use the magic-string system:
+Platform-specific implementations exist for **capability gaps** (a DOM API vs a native module), never for layout or visual differences. If the two implementations would differ only in layout, they are one component with breakpoints. When genuinely needed, use the magic-string system:
 
 - `lib/shared-components/src/platform-components/web/` — web implementations
 - `lib/shared-components/src/platform-components/mobile/` — native implementations
@@ -134,16 +147,37 @@ export function MinigamesHub({ isNarrow: isNarrowProp }: MinigamesHubProps) {
 }
 ```
 
-### 4. `isWeb` guard (last resort)
+### 4. `isWeb` guard (last resort — capability shims only)
 
-Tamagui exports `isWeb: boolean` for one-off platform divergences. Use sparingly — prefer media props for layout differences.
+Tamagui exports `isWeb: boolean` for one-off platform divergences. It is permitted **only** for runtime capability gaps — font-family resolution, DOM-only CSS, native-only APIs — never for layout, spacing, visibility, or choosing between component structures. Apply the decision test from [The Rule](#the-rule) before writing one.
 
 ```tsx
 import { isWeb } from 'tamagui';
+// OK: font resolution mechanics differ per runtime; layout is unchanged
 const fontFamily = isWeb ? 'Big Shoulders Display, system-ui' : undefined;
 ```
 
+> The codebase contains legacy `isWeb`/`Platform.OS` layout branches that predate this rule. **Do not pattern-match on them** — they are migration debt, not precedent. New code must use breakpoints; if you touch a file with a platform-conditional layout branch, prefer converting it to media props while you're there (or ticket it if out of scope).
+
 ## Anti-Patterns
+
+### ❌ Platform checks driving layout
+
+```tsx
+// WRONG — mobile web gets the "desktop" layout; tablets get the phone layout
+import { isWeb } from 'tamagui';
+return isWeb ? <SideBySidePanels /> : <StackedPanels />;
+
+// WRONG — same mistake with React Native's Platform module
+import { Platform } from 'react-native';
+const columns = Platform.OS === 'web' ? 3 : 1;
+
+// RIGHT — the viewport width decides, identically on every platform
+const media = useMedia();
+return media.gtMd ? <SideBySidePanels /> : <StackedPanels />;
+```
+
+The platform never determines layout. A native tablet has a wide viewport; a mobile browser has a narrow one. Only breakpoints handle both correctly.
 
 ### ❌ Bespoke per-platform screens
 
@@ -202,6 +236,7 @@ This is the canonical pattern: shared component owns all layout and visual logic
 - [ ] Is the component in `lib/shared-components`? (not duplicated in both apps)
 - [ ] Does both `apps/web` and `apps/app` consume it?
 - [ ] Does it use Tamagui media props / `useMedia` for responsive layout?
+- [ ] Zero new `isWeb` / `Platform.OS` / platform-components branches that affect layout, spacing, visibility, or structure? (Capability shims only — run `git diff | grep -E 'isWeb|Platform\.OS'` and justify every hit)
 - [ ] Did you run `grep -cE '\$sm:|\$md:|\$gtSm:|useMedia'` to verify no responsive tokens were dropped?
 - [ ] Is it exported from the correct entry point in `lib/shared-components/src/entry/`?
 - [ ] Did `make pc` pass (including the stricter shared-components lint rules)?

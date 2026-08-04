@@ -52,6 +52,7 @@ These issues appear repeatedly in reviewer bot CHANGES_REQUESTED cycles. Knowing
 | 44  | PR touches `apps/web-e2e/**` without a passing Playwright report | Dispatch `run-playwright-tests.yml` or run locally; paste report URL/evidence in PR body before merge                                                                                                             | Manual                 |
 | 45  | MCP tool returns pretty-printed JSON / repeats keys per row      | Use `@legacy-sports/mcp-format`: `markdownTable` for flat uniform lists, `minifiedJson` otherwise; `pickFields`/`truncate` to prune. See [mcp-response-format.md](../../create/references/mcp-response-format.md) | Manual                 |
 | 46  | Gated-feature spec runs as `free` with no gate assertion         | Specs default to **premium** (`useTier(page, 'premium')` / `loginAs('premium')`, usually no opt-in); use `free` (`useTier(page, 'free')` / `freeJwt`) ONLY when the spec asserts the gate fires. See #46 below.   | Manual                 |
+| 47  | Platform-conditional layout (`isWeb` / `Platform.OS` drives UI)  | Layout adapts by viewport breakpoint (`$sm`/`$gtMd` media props, `useMedia`), never by platform. Platform branches are for capability shims only. See #47 below.                                                  | Manual                 |
 
 ## Pattern Details
 
@@ -686,32 +687,57 @@ await expect(page.getByText(/upgrade to premium/i)).toBeVisible(); // ← the ga
 
 When reviewing: if a spec calls `useTier(page, 'free')` or pulls `freeJwt` / `freeJwt2`, confirm it asserts the gate (upgrade CTA, `PREMIUM_REQUIRED` error, disabled affordance, `PremiumGate` overlay). If not, switch it back to the premium default. Full convention + integration examples: [Tiered Test-User Model](../../testing/SKILL.md#tiered-test-user-model-premium-default-free-for-gates).
 
+### #47 — Platform-conditional layout instead of viewport breakpoints
+
+UI components are **platform-agnostic**: the same component renders on web (`react-native-web`) and native, and layout adapts solely by viewport width. An `isWeb` / `Platform.OS` branch that changes layout gives mobile-web users the desktop layout and native-tablet users the phone layout — both wrong.
+
+```tsx
+// Bad — platform decides layout; breaks mobile web and tablets
+import { isWeb } from 'tamagui';
+return isWeb ? <SideBySidePanels /> : <StackedPanels />;
+
+// Bad — same mistake, React Native flavor
+const columns = Platform.OS === 'web' ? 3 : 1;
+
+// Good — viewport width decides, identically on every platform
+const media = useMedia();
+return media.gtMd ? <SideBySidePanels /> : <StackedPanels />;
+
+// Good — inline media props for pure restyling
+<XStack flexDirection="row" $sm={{ flexDirection: 'column' }} />;
+```
+
+Platform branches are acceptable **only** as capability shims (native-only APIs, DOM-only CSS like `backdrop-filter`, font-family resolution) and must never change layout, spacing, visibility, or component structure. Existing `isWeb` layout branches in the codebase are migration debt, not precedent.
+
+**When to check**: any diff adding `isWeb`, `Platform.OS`, `Platform.select`, `.native.tsx`, or `platform-components/` files in `lib/shared-components/**`, `apps/web/**`, or `apps/app/**`. Also flag new UI built directly in `apps/web` or `apps/app` that the other platform will need — it belongs in `lib/shared-components` (see `.agents/skills/shared-components-first/SKILL.md`).
+
 ---
 
 ## Quick Self-Review Checklist (all patterns)
 
 Before every push, scan your diff against this checklist:
 
-| Check                                                                                  | Patterns      |
-| -------------------------------------------------------------------------------------- | ------------- |
-| Every `LOGGER.error`/`.warn` call passes a raw `Error` as the 2nd arg                  | #29           |
-| Every new component/resolver/mutation/bug-fix has a spec covering the changed behavior | #30           |
-| PR description accurately describes the diff (no missing files, no wrong filenames)    | #31           |
-| Generated `*.generated.ts` changes are explained in the PR body                        | #16, #31      |
-| GraphQL mutation args have range/null/enum validation with `UserInputError`            | #26, #28, #32 |
-| `setLoading(false)` (and equivalent) resets in `finally`, not only in success path     | #33           |
-| Every resolver that takes a resource ID checks membership/ownership, not just auth     | #4, #34       |
-| Drizzle BIGINT columns use `bigint()`, not `integer()`                                 | #35           |
-| Multi-column `orderBy` cursors encode all sort columns                                 | #36           |
-| Test assertions check concrete values, not just `toBeDefined()`                        | #37           |
-| No constant duplicated across packages — import from shared lib                        | #38           |
-| No committed symlinks or files containing `D:/` / `C:/` local paths                    | #39           |
-| No `console.*` or `process.stdout.write` in non-CLI app code (`scripts/` is exempt)    | #40           |
-| Error messages shown to users are generic strings, not `err.message`                   | #41           |
-| Terraform resource renames use `moved {}` blocks                                       | #42           |
-| Shell variables have explicit fallbacks after `\|\| true` patterns                     | #43           |
-| Gated-feature spec defaults to premium; `free` used only with a gate assertion         | #46           |
-| No `@ts-ignore` or `eslint-disable` (fix root cause instead)                           | standards     |
+| Check                                                                                             | Patterns      |
+| ------------------------------------------------------------------------------------------------- | ------------- |
+| Every `LOGGER.error`/`.warn` call passes a raw `Error` as the 2nd arg                             | #29           |
+| Every new component/resolver/mutation/bug-fix has a spec covering the changed behavior            | #30           |
+| PR description accurately describes the diff (no missing files, no wrong filenames)               | #31           |
+| Generated `*.generated.ts` changes are explained in the PR body                                   | #16, #31      |
+| GraphQL mutation args have range/null/enum validation with `UserInputError`                       | #26, #28, #32 |
+| `setLoading(false)` (and equivalent) resets in `finally`, not only in success path                | #33           |
+| Every resolver that takes a resource ID checks membership/ownership, not just auth                | #4, #34       |
+| Drizzle BIGINT columns use `bigint()`, not `integer()`                                            | #35           |
+| Multi-column `orderBy` cursors encode all sort columns                                            | #36           |
+| Test assertions check concrete values, not just `toBeDefined()`                                   | #37           |
+| No constant duplicated across packages — import from shared lib                                   | #38           |
+| No committed symlinks or files containing `D:/` / `C:/` local paths                               | #39           |
+| No `console.*` or `process.stdout.write` in non-CLI app code (`scripts/` is exempt)               | #40           |
+| Error messages shown to users are generic strings, not `err.message`                              | #41           |
+| Terraform resource renames use `moved {}` blocks                                                  | #42           |
+| Shell variables have explicit fallbacks after `\|\| true` patterns                                | #43           |
+| Gated-feature spec defaults to premium; `free` used only with a gate assertion                    | #46           |
+| No new `isWeb`/`Platform.OS` branch affecting layout — breakpoints (`useMedia`, media props) only | #47           |
+| No `@ts-ignore` or `eslint-disable` (fix root cause instead)                                      | standards     |
 
 ---
 

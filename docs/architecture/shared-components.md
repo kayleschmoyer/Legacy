@@ -6,6 +6,8 @@
 
 The rule: **build UI once, adapt by viewport size — not by platform.**
 
+Components are platform-agnostic. A shared component renders correctly on any platform at any width: a phone is a narrow viewport, and a desktop browser window dragged narrow is the _same_ narrow viewport with the same layout. There is no "web version" or "native version" of a screen — only breakpoints. Platform branches (`isWeb`, `Platform.OS`, `platform-components/`) exist solely for runtime **capability gaps** (native-only APIs, DOM-only CSS, font loading mechanics) and must never change layout, spacing, visibility, or component structure.
+
 ## Motivation: The Home Screen Drift
 
 Before the LS-7791 unification, the home screen existed in three divergent forms:
@@ -134,14 +136,14 @@ export function MinigamesHub({ isNarrow: isNarrowProp }: MinigamesHubProps) {
 }
 ```
 
-### 4. `isWeb` guard (last resort)
+### 4. `isWeb` guard (last resort — capability shims only)
 
 ```tsx
 import { isWeb } from 'tamagui';
 const fontFamily = isWeb ? 'Big Shoulders Display, system-ui' : undefined;
 ```
 
-Use sparingly. Prefer media props for layout differences; `isWeb` for unavoidable platform divergences (CSS backdrop-filter, display fonts).
+Permitted only for unavoidable runtime divergences (CSS `backdrop-filter`, display font resolution, native-only APIs). Never for layout: `isWeb ? <DesktopLayout/> : <MobileLayout/>` breaks mobile web (gets the desktop layout) and tablets (get the phone layout). The decision test: _would this differ between a narrow desktop window and a wide tablet?_ If it varies with width, it's a breakpoint, not a platform branch.
 
 ## Platform-Specific Resolution
 
@@ -177,12 +179,13 @@ The test: _"Will the other platform need this UI?"_ If yes, it belongs in shared
 
 ## Anti-Patterns
 
-| Pattern                                                               | Problem                                                                  |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Building a web screen without checking `lib/shared-components`        | Creates a divergence that costs a future extraction ticket               |
-| Orphaning a shared component (creating but not wiring both platforms) | Waste; the next agent won't know it exists                               |
-| Copy-pasting JSX from `apps/web` to `apps/app`                        | The canonical sign that extraction was needed                            |
-| Dropping `$sm`/`$gtMd` blocks during extraction                       | Loses responsive layout on web; creates the LS-7799/LS-7819 class of bug |
+| Pattern                                                               | Problem                                                                                                            |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Building a web screen without checking `lib/shared-components`        | Creates a divergence that costs a future extraction ticket                                                         |
+| Orphaning a shared component (creating but not wiring both platforms) | Waste; the next agent won't know it exists                                                                         |
+| Copy-pasting JSX from `apps/web` to `apps/app`                        | The canonical sign that extraction was needed                                                                      |
+| `isWeb` / `Platform.OS` branch that changes layout or visibility      | Breaks mobile web and tablets; the viewport width, not the platform, decides layout — use media props / `useMedia` |
+| Dropping `$sm`/`$gtMd` blocks during extraction                       | Loses responsive layout on web; creates the LS-7799/LS-7819 class of bug                                           |
 
 ## Related
 
