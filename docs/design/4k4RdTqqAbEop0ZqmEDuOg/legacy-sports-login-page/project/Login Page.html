@@ -1,40 +1,59 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Legacy Sports — Login Route Preview</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <link rel="icon" href="ds/logo.png" />
-    <link rel="stylesheet" href="ds/colors_and_type.css" />
-    <link rel="stylesheet" href="src/LoginRoute.css?v=mobile-trim" />
-    <script
-      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
-      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
-      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
-      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
-      crossorigin="anonymous"
-    ></script>
-  </head>
-  <body>
-    <div id="app"></div>
-    <!-- Preview-only bundle — real app consumes src/LoginRoute.tsx -->
-    <script
-      type="text/babel"
-      data-presets="react,typescript"
-      src="preview-bundle.tsx"
-    ></script>
-    <script type="text/babel" data-presets="react,typescript">
-      ReactDOM.createRoot(document.getElementById('app')).render(
-        <LoginRoute />,
-      );
-    </script>
-  </body>
+<head>
+<meta charset="utf-8">
+<title>Legacy Sports — Login Route Preview</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="ds/logo.png">
+<link rel="stylesheet" href="ds/colors_and_type.css">
+<link rel="stylesheet" href="src/LoginRoute.css?v=canonical-breakpoints">
+<!--
+  HANDOFF
+  ───────
+  Final file: Login Page.html (renders <LoginRoute/> from src/LoginRoute.tsx).
+  Re-run of the original LS-4570 design to close the LS-8954 audit's
+  remaining source findings (LS-8960):
+
+    • Breakpoints rebuilt on the canonical seven-band scale (xxs/xs/sm/md/
+      lg/xl/xxl — see docs/agents/pages/PROMPT.md) instead of the invented
+      960/640/380px thresholds. xs/sm/md (660–979px) share one single-column
+      centered layout; lg/xl/xxl (980px+) share one two-column split layout.
+      xxs (0–659px) is its own compact/mobile frame. The old dedicated
+      "Login Page - Breakpoints.html" artboard set has been re-pinned to the
+      four canonical widths that actually carry distinct or boundary layouts
+      (375 / 660 / 980 / 1280).
+    • Explicit :focus-visible written out for every interactive element
+      (brand link, nav link, OAuth buttons, email toggle, form inputs,
+      submit button, back link, legal links, tweaks-panel controls) — the
+      audit found only one such rule covering 5+ controls.
+    • Design-intent comments added throughout src/LoginRoute.css: MOTION
+      annotations for every animated/transitioning property, COMPONENT
+      annotations for the three reusable patterns (brand lockup, stat-cell,
+      auth card, oauth-button), and this HANDOFF block.
+
+  OAuth button colors (Discord blurple #5865F2, Google white-on-dark) are
+  UNCHANGED — LS-9004 ruled official third-party OAuth brand treatments
+  exempt from the app's banned-color/background rules (docs/design/brand.md
+  "Third-party brand exemption"). No fix needed there.
+
+  OPEN QUESTION (not fixed here, flagged for a human-led follow-up per
+  LS-8960's ticket note): this design still has no auth-error state or
+  four-state switcher. A login page needs at minimum a visible error state
+  (bad credentials / OAuth failure / network error) per PROMPT.md's
+  Conditional States section — that's a design *addition*, not a source
+  fix, and needs product/design input on the copy and affordance before an
+  agent should draft it.
+-->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="app"></div>
+<!-- Preview-only bundle — real app consumes src/LoginRoute.tsx -->
+<script type="text/babel" data-presets="react,typescript" src="preview-bundle.tsx"></script>
+<script type="text/babel" data-presets="react,typescript">
+ReactDOM.createRoot(document.getElementById('app')).render(<LoginRoute/>);
+</script>
+</body>
 </html>

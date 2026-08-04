@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-08-03T22:28:20.000Z",
+  "lastSyncedAt": "2026-08-04T15:24:57.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -38,9 +38,10 @@
       "title": "Login Page",
       "slug": "legacy-sports-login-page",
       "status": "active",
-      "lastSyncedHash": "66dc788c5a266938370ea6d07ec4e9331b7be1bea5d97b8937db789ad365698a",
-      "lastSyncedAt": "2026-05-20T16:35:54.861Z",
-      "jiraKey": "LS-4570"
+      "lastSyncedHash": "sha256-11464365a6129246318aa1a617d7267b0e74eb337151549e98ce348650af7241",
+      "lastSyncedAt": "2026-08-04T15:24:57.000Z",
+      "jiraKey": "LS-8960",
+      "source": "designsync-local"
     },
     {
       "id": "7SRWFMj3a6khIhwLuWkSKA",

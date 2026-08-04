@@ -1,11 +1,25 @@
 # Sync report: Login Page
 
 **Design ID**: `4k4RdTqqAbEop0ZqmEDuOg`
-**Source**: `https://api.anthropic.com/v1/design/h/4k4RdTqqAbEop0ZqmEDuOg`
-**Synced at**: 2026-05-20T16:35:54.860Z
-**Bundle hash**: `66dc788c5a266938370ea6d07ec4e9331b7be1bea5d97b8937db789ad365698a`
+**Source**: DesignSync local (projectId `9e1174b6-61d3-4321-88e2-ff3e318dcfed`)
+**Synced at**: 2026-08-04T15:24:57.000Z
+**Bundle hash**: `sha256-11464365a6129246318aa1a617d7267b0e74eb337151549e98ce348650af7241`
+**Previous hash**: `66dc788c5a266938370ea6d07ec4e9331b7be1bea5d97b8937db789ad365698a`
 **Files**: 54
-**Total size**: 1507725 bytes
+**Total size**: 1522022 bytes
+
+## What changed (LS-8960, closing the remaining LS-8954 audit findings)
+
+Fixed at the source via the DesignSync MCP tool (`get_project` → `list_files` → `get_file` → `finalize_plan` → `write_files`), then pulled back into this bundle:
+
+- **Breakpoints rebuilt on the canonical seven-band scale** (`xxs`/`xs`/`sm`/`md`/`lg`/`xl`/`xxl` per `docs/agents/pages/PROMPT.md`) in `project/src/LoginRoute.css`, replacing the invented 960/640/380px thresholds. `xs`/`sm`/`md` (660–979px) share one single-column centered layout; `lg`/`xl`/`xxl` (980px+) share one two-column split layout; `xxs` (0–659px) is its own compact/mobile frame with fluid `clamp()` type sizing down to a 320px floor.
+- **`project/Login Page - Breakpoints.html`** re-pinned from four non-canonical artboards (1280/820/414/360px) to the four canonical reference widths (375 / 660 / 980 / 1280px), with captions naming the bands they represent and which bands share a layout.
+- **Explicit `:focus-visible` written out for every interactive element** in `LoginRoute.css` (brand link, nav link, OAuth buttons, email toggle, form inputs, submit button, back link, legal links, tweaks-panel close/option/checkbox controls) — the audit found only one such rule covering 5+ controls.
+- **Design-intent annotations added**: `MOTION` comments for every animated/transitioning property, `COMPONENT` comments for the three reusable patterns (brand lockup, stat-cell, auth card, oauth-button), a `BREAKPOINTS` block explaining the band mapping, and a `<!-- HANDOFF -->` block at the top of `project/Login Page.html`.
+
+**Not changed**: OAuth button colors (Discord blurple `#5865F2`, Google white-on-dark) — LS-9004 ruled official third-party OAuth brand treatments exempt from the app's banned-color rules (`docs/design/brand.md` "Third-party brand exemption"). The HIGH audit finding on OAuth colors needed no fix.
+
+**Not fixed here (flagged for human-led follow-up)**: the design still has no auth-error state or four-state switcher. Per `docs/agents/pages/PROMPT.md`'s Conditional States section, a login page needs at minimum a visible error state — that is a design *addition*, not a source fix, and needs product/design input on copy and affordance before an agent should draft it. See LS-8960's ticket notes.
 
 ## Pages
 
