@@ -14,7 +14,15 @@ interface UseDraftTimerParams {
   setPickDeadline: (v: Date | null) => void;
   setPickTimeLimitSeconds: (v: number) => void;
   setAutoPickDisabled: (v: boolean) => void;
-  nudgeExpiredDraftPick: (opts: {
+  /**
+   * Read-only mode for spectator surfaces (LS-8942): the countdown still
+   * runs, but the clock never calls `nudgeExpiredDraftPick` — at 0:00 it
+   * simply waits for the server to advance the pick. Defaults to false,
+   * preserving the member draft room's nudge timing exactly.
+   */
+  readOnly?: boolean;
+  /** Required unless `readOnly` is true — spectators mount no mutations. */
+  nudgeExpiredDraftPick?: (opts: {
     variables: { leagueId: number };
   }) => Promise<unknown>;
   refetchDraft: () => unknown;
@@ -35,6 +43,7 @@ export function useDraftTimer({
   setPickDeadline,
   setPickTimeLimitSeconds,
   setAutoPickDisabled,
+  readOnly = false,
   nudgeExpiredDraftPick,
   refetchDraft,
   refetchCurrentPick,
@@ -117,6 +126,7 @@ export function useDraftTimer({
   }, [currentPickInfo?.overallPick]);
 
   useEffect(() => {
+    if (readOnly || !nudgeExpiredDraftPick) return;
     if (!leagueId || !draftId || draftComplete || draftPaused) return;
     if (timeRemaining > 0) return;
 
@@ -147,6 +157,7 @@ export function useDraftTimer({
     draftPaused,
     timeRemaining,
     currentPickInfo?.overallPick,
+    readOnly,
     nudgeExpiredDraftPick,
     refetchDraft,
     refetchCurrentPick,

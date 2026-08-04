@@ -5,3 +5,7 @@ export { useDraftActions } from './useDraftActions';
 export { useDraftWebSocket } from './useDraftWebSocket';
 export { useDraftTimer } from './useDraftTimer';
 export { useDraftEffects } from './useDraftEffects';
+export {
+  useSpectatorDraftData,
+  SPECTATOR_POLL_INTERVAL_MS,
+} from './useSpectatorDraftData';

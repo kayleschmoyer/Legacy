@@ -11818,6 +11818,7 @@ export type GetDraftPicksQuery = {
       firstName?: string | null;
       lastName?: string | null;
       eligiblePositions?: Array<string> | null;
+      mlbPlayerId?: number | null;
     } | null;
   }> | null;
 };
@@ -29902,6 +29903,7 @@ export const GetDraftPicks = gql`
         firstName
         lastName
         eligiblePositions
+        mlbPlayerId
       }
     }
   }

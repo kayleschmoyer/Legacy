@@ -9,6 +9,21 @@ import {
 } from './types';
 
 // ---------------------------------------------------------------------------
+// Player headshots (spectator splash, LS-8942)
+// ---------------------------------------------------------------------------
+
+/**
+ * Client-side MLB headshot URL for a player, keyed by their MLB Stats API id
+ * (`players.mlb_player_id`). The `d_people:generic:headshot` transform makes
+ * the CDN itself serve a generic silhouette for unknown ids (verified: a
+ * bogus id returns 200 image/jpeg silhouette), so this never 404s — consumers
+ * should still attach an `onError` fallback for network failures.
+ */
+export function getMlbHeadshotUrl(mlbPlayerId: number, width = 213): string {
+  return `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png,q_auto:best,w_${width}/v1/people/${mlbPlayerId}/headshot/67/current`;
+}
+
+// ---------------------------------------------------------------------------
 // Commentary
 // ---------------------------------------------------------------------------
 

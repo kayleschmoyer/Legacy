@@ -93,6 +93,12 @@ interface UseDraftWebSocketParams {
   token?: string;
   /** Optional callback fired when a pick is made (for analytics). */
   onPlayerDrafted?: (playerId: number, position: string) => void;
+  /**
+   * Optional callback fired when a pick is undone, with the undone pick's
+   * overall pick number. The spectator screen uses it to drop the pick from
+   * its splash queue (LS-8942).
+   */
+  onPickUndone?: (overallPick: number) => void;
 }
 
 export function useDraftWebSocket({
@@ -123,6 +129,7 @@ export function useDraftWebSocket({
   websocketUrl,
   token,
   onPlayerDrafted,
+  onPickUndone,
 }: UseDraftWebSocketParams) {
   // Holds the latest pick notification while debouncing refetches for batch auto-picks.
   const pendingRefetchNotifRef = useRef<DraftPickNotification | null>(null);
@@ -340,6 +347,7 @@ export function useDraftWebSocket({
         setPickDeadline(new Date(notification.newPickDeadline));
       }
       setDraftComplete(false);
+      onPickUndone?.(notification.overallPick);
       if (draftId) void refetchCurrentPick({ draftId });
       void refetchPickHistory();
       void refetchAvailablePlayers();
@@ -351,6 +359,7 @@ export function useDraftWebSocket({
       setLiveMessage,
       setDraftComplete,
       setPickDeadline,
+      onPickUndone,
       refetchCurrentPick,
       refetchPickHistory,
       refetchAvailablePlayers,

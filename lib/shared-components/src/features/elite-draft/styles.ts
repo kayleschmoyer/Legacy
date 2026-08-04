@@ -1876,4 +1876,244 @@ export const CSS = `
   font-family: 'Big Shoulders Display', sans-serif;
   font-variant-numeric: tabular-nums;
 }
+
+/* ===== Spectator screen (LS-8942) =====
+   Big-screen-first layout: slim top band, dominant board, on-the-clock rail.
+   Rail stacks below the board on narrow viewports. */
+.d-spec-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    'topband topband'
+    'board rail';
+  gap: 14px;
+  padding: 14px;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+@media (max-width: 900px) {
+  .d-spec-layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'topband'
+      'board'
+      'rail';
+  }
+}
+.d-spec-topband {
+  grid-area: topband;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 10px 18px;
+  background: var(--d-panel);
+  border: 1px solid var(--d-panel-border);
+  border-radius: var(--d-radius-lg);
+}
+.d-spec-league {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.d-spec-league-name {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 24px;
+  color: var(--d-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d-spec-live-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--d-success);
+  animation: liveDot 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.d-spec-live-dot.paused {
+  background: var(--d-warning);
+  animation: none;
+}
+.d-spec-live-label {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--d-text-secondary);
+}
+.d-spec-pickinfo {
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--d-text);
+  white-space: nowrap;
+}
+.d-spec-onclock {
+  margin-left: auto;
+  min-width: 0;
+  text-align: right;
+}
+.d-spec-onclock-team {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--d-accent-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d-spec-board {
+  grid-area: board;
+  min-width: 0;
+  overflow: auto;
+}
+/* TV-distance legibility: bump the grid's cell type on the spectator board. */
+.d-spec-board .d-draft-grid-cell-name { font-size: 13px; }
+.d-spec-rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.d-spec-depth-team {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--d-text);
+  margin: 4px 0 10px;
+}
+.d-spec-depth-bucket {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--d-border);
+}
+.d-spec-depth-bucket:last-child { border-bottom: none; }
+.d-spec-depth-pos {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 13px;
+  min-width: 34px;
+}
+.d-spec-depth-fill {
+  font-size: 11px;
+  color: var(--d-text-secondary);
+}
+.d-spec-depth-players {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.d-spec-depth-player {
+  font-size: 12px;
+  color: var(--d-text);
+}
+.d-spec-depth-open {
+  font-size: 11px;
+  color: var(--d-accent-light);
+  font-style: italic;
+}
+.d-spec-recent-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--d-border);
+  min-width: 0;
+}
+.d-spec-recent-row:last-child { border-bottom: none; }
+.d-spec-recent-num {
+  font-size: 11px;
+  color: var(--d-text-muted);
+  min-width: 28px;
+}
+.d-spec-recent-pos {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 11px;
+}
+.d-spec-recent-name {
+  font-size: 12.5px;
+  color: var(--d-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.d-spec-recent-team {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--d-text-secondary);
+  white-space: nowrap;
+}
+.d-spec-recent-empty {
+  font-size: 12px;
+  color: var(--d-text-muted);
+  padding: 6px 0;
+}
+.d-spec-lobby-order {
+  margin: 8px 0 0;
+  padding: 0 0 0 20px;
+  text-align: left;
+  color: var(--d-text-secondary);
+  font-size: 14px;
+  columns: 2;
+  column-gap: 32px;
+}
+/* Splash chrome sits above the reused announcement overlay (z-index 9999). */
+.d-splash-chrome {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  animation: fadeSlideUp 0.3s ease-out;
+}
+.d-splash-chrome.leaving {
+  animation: announceOut 0.4s ease-in forwards;
+}
+.d-splash-headshot {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--d-accent);
+  background: var(--d-card);
+}
+.d-splash-headshot-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+}
+.d-splash-team {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--d-accent-light);
+  text-shadow: 0 1px 8px var(--d-bg);
+}
+.d-splash-queue-badge {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--d-text-secondary);
+  background: var(--d-panel);
+  border: 1px solid var(--d-panel-border);
+  border-radius: var(--d-radius-pill);
+  padding: 3px 10px;
+}
 `;

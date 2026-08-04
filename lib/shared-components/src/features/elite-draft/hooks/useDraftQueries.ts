@@ -265,6 +265,7 @@ export function useDraftQueries({
                   firstName: p.player.firstName ?? '',
                   lastName: p.player.lastName ?? '',
                   eligiblePositions: p.player.eligiblePositions ?? null,
+                  mlbPlayerId: p.player.mlbPlayerId ?? null,
                 }
               : null,
         })),

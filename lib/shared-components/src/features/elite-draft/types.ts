@@ -92,6 +92,8 @@ export interface DraftPickRecord {
     firstName: string;
     lastName: string;
     eligiblePositions?: string[] | null;
+    /** MLB Stats API id — keys the spectator splash headshot (img.mlbstatic.com). */
+    mlbPlayerId?: number | null;
   } | null;
 }
 
