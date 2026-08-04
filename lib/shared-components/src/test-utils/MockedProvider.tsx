@@ -5,7 +5,8 @@ import { InMemoryCache } from '@apollo/client';
 
 /**
  * Custom MockedProvider that creates a cache without deprecated options
- * to avoid deprecation warnings in tests
+ * to avoid deprecation warnings in tests.
+ * Kept: imported by multiple production .spec.tsx suites (players, elite-draft, analytics), not just stories.
  */
 export function MockedProvider({
   children,
