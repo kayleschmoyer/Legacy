@@ -97,6 +97,11 @@ const ALLOWED_TARGETS = new Set([
   // generated-file sync with these before committing routing/command changes.
   'lint-skill-index',
   'lint-agent-prompts',
+  // Generated-file resync targets (LS-9027) — AGENTS.md mandates running these whenever
+  // skill frontmatter or .claude/commands/*.md change; without them agents
+  // fell back to raw `node scripts/*.mjs` via Bash.
+  'sync-skill-index',
+  'sync-agent-prompts',
   'format',
   'fmt',
   'format-commit',

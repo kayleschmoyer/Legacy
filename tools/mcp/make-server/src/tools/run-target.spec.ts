@@ -39,6 +39,12 @@ describe('runTarget — allowlist gate', () => {
     expect(result.content[0].text).toContain('lint-skill-index');
     expect(result.content[0].text).toContain('lint-agent-prompts');
   });
+
+  it('allows the generated-file resync targets (LS-9027)', async () => {
+    const result = await runTarget({ target: '__not_a_real_target__' });
+    expect(result.content[0].text).toContain('sync-skill-index');
+    expect(result.content[0].text).toContain('sync-agent-prompts');
+  });
 });
 
 describe('runTarget — variable injection guard', () => {
