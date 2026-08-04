@@ -7,7 +7,6 @@ import {
   type SeasonEligibilityParams,
   type SeasonSelectionParams,
   selectRandomSeason,
-  validateSeasonForMatchup,
 } from './season-selector';
 import type { PlayerGameCount, SeasonInfo, TeamRoster } from './types';
 
@@ -178,25 +177,5 @@ describe('selectRandomSeason', () => {
 
     // With min usage, 2022 and 2021 should be picked more often
     expect(countOthers).toBeGreaterThan(count2023);
-  });
-});
-
-describe('validateSeasonForMatchup', () => {
-  const eligibleSeasons: SeasonInfo[] = [
-    { season: 2023, eligibleTeamIds: [1, 2, 3], totalGames: 1000 },
-    { season: 2022, eligibleTeamIds: [1, 2], totalGames: 950 },
-  ];
-
-  it('should return true when season is eligible for all teams', () => {
-    expect(validateSeasonForMatchup(2023, [1, 2], eligibleSeasons)).toBe(true);
-    expect(validateSeasonForMatchup(2022, [1, 2], eligibleSeasons)).toBe(true);
-  });
-
-  it('should return false when season is not eligible for a team', () => {
-    expect(validateSeasonForMatchup(2022, [1, 3], eligibleSeasons)).toBe(false);
-  });
-
-  it('should return false when season does not exist', () => {
-    expect(validateSeasonForMatchup(2021, [1, 2], eligibleSeasons)).toBe(false);
   });
 });

@@ -145,19 +145,3 @@ export function selectRandomSeason(
   const randomIndex = cryptoRandomInt(validSeasons.length);
   return validSeasons[randomIndex].season;
 }
-
-/**
- * Validates that a season is eligible for a specific matchup
- */
-export function validateSeasonForMatchup(
-  season: number,
-  teamIds: number[],
-  eligibleSeasons: SeasonInfo[],
-): boolean {
-  const seasonInfo = eligibleSeasons.find((s) => s.season === season);
-  if (!seasonInfo) {
-    return false;
-  }
-
-  return teamIds.every((teamId) => seasonInfo.eligibleTeamIds.includes(teamId));
-}

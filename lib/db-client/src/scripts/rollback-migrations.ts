@@ -38,8 +38,11 @@ interface MigrationFile {
 
 type Command = 'up' | 'down' | 'status' | 'fresh' | 'refresh';
 
-// Create migrations table if it doesn't exist
-export async function ensureMigrationsTable(db: ReturnType<typeof drizzle>) {
+// Create migrations table if it doesn't exist. Not exported: only called
+// internally by runRollbackCommand — nothing outside this file references it
+// (the hosted db-admin Lambda applies migrations via applyMigrationModule in
+// migration-runner.ts, which does its own bookkeeping insert; LS-8992).
+async function ensureMigrationsTable(db: ReturnType<typeof drizzle>) {
   await db.execute(`CREATE SCHEMA IF NOT EXISTS drizzle;`);
 
   await db.execute(`
@@ -98,20 +101,6 @@ export async function getAppliedMigrations(
   } catch {
     return [];
   }
-}
-
-// Record migration as applied
-export async function recordMigration(
-  db: ReturnType<typeof drizzle>,
-  hash: string,
-) {
-  // Parameterized to keep the hash out of the SQL string — this is a public
-  // export reused by the hosted Lambda (LS-8119).
-  await db.execute(sql`
-    INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-    VALUES (${hash}, ${Date.now()})
-    ON CONFLICT (hash) DO NOTHING;
-  `);
 }
 
 // Remove migration record

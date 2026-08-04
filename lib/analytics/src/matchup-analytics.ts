@@ -494,39 +494,3 @@ export function calculateMatchupWinProbability(
     simulationCount,
   };
 }
-
-/**
- * Export analytics data to CSV format
- */
-export function exportToCSV(data: TeamStats[] | PowerRanking[]): string {
-  if (data.length === 0) return '';
-
-  // Get headers from first object
-  const headers = Object.keys(data[0]);
-  const csvHeaders = headers.join(',');
-
-  // Convert data to CSV rows
-  const csvRows = data.map((item) => {
-    return headers
-      .map((header) => {
-        const value = item[header as keyof typeof item] as unknown;
-        // Handle nested objects and arrays
-        if (typeof value === 'object' && value !== null) {
-          return JSON.stringify(value);
-        }
-        // Safe to convert to string after checking it's not an object
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- value is primitive after object check
-        return String(value ?? '');
-      })
-      .join(',');
-  });
-
-  return [csvHeaders, ...csvRows].join('\n');
-}
-
-/**
- * Export analytics data to JSON format
- */
-export function exportToJSON(data: unknown): string {
-  return JSON.stringify(data, null, 2);
-}

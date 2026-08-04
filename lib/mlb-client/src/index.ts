@@ -19,7 +19,4 @@ export type {
 } from './lib/types';
 // MlbStatsApiProvider is intentionally NOT exported: it is dev/staging only and
 // must be accessed through createMlbDataProvider() so the production guard is enforced.
-export {
-  BallDontLieProvider,
-  NotImplementedError,
-} from './lib/providers/balldontlie';
+export { BallDontLieProvider } from './lib/providers/balldontlie';
