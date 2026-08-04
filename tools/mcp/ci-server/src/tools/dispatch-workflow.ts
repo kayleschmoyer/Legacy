@@ -45,6 +45,23 @@ interface DispatchWorkflowParams {
   timeoutSeconds?: number;
 }
 
+// Workflows whose AWS OIDC role (terraform/main/github-actions-oidc.tf ->
+// aws_iam_role.github_actions_plan) only trusts pull_request events or
+// ref:refs/heads/main. A workflow_dispatch run against any other ref
+// produces sub = "repo:.../ref:refs/heads/<branch>", which matches neither
+// trust condition -- the job's `sts:AssumeRoleWithWebIdentity` step fails
+// every single time, not flakily (LS-9029). Fail fast instead of dispatching
+// into a guaranteed failure. Keep this list in lockstep with which
+// workflows assume that role AND declare workflow_dispatch as a trigger.
+const OIDC_PLAN_ROLE_MAIN_ONLY_WORKFLOWS = new Set([
+  'check-migrations-applied.yml',
+  'terraform-plan.yml',
+]);
+
+function isNonMainRef(ref: string): boolean {
+  return ref !== 'main' && ref !== 'refs/heads/main';
+}
+
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -157,6 +174,30 @@ export async function dispatchWorkflow(
 
     const workflow = String(params.workflow);
     const ref = String(body.ref);
+
+    if (OIDC_PLAN_ROLE_MAIN_ONLY_WORKFLOWS.has(workflow) && isNonMainRef(ref)) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: [
+              `Refusing to dispatch "${workflow}" on ref "${ref}": this workflow assumes the ` +
+                `legacy-sports-dev-github-actions-plan AWS OIDC role, whose trust policy only allows ` +
+                `pull_request events or ref:refs/heads/main (terraform/main/github-actions-oidc.tf).`,
+              '',
+              `A workflow_dispatch run on any other branch is not flaky -- it is structurally guaranteed ` +
+                `to fail "sts:AssumeRoleWithWebIdentity" inside the job every time. Retrying this call will ` +
+                `not help (LS-9029).`,
+              '',
+              'To retrigger this required check on a PR branch, fire a genuine pull_request event instead:',
+              '  worktree_commit({ message: "chore: retrigger ci" }) + worktree_push()',
+              '  or: git commit --allow-empty -m "chore: retrigger ci" && git push',
+            ].join('\n'),
+          },
+        ],
+      };
+    }
 
     const dispatchedAt = new Date();
     await githubPost(

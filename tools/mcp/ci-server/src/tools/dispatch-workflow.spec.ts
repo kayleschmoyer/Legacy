@@ -73,6 +73,45 @@ describe('dispatchWorkflow', () => {
     expect(result.content[0].text).not.toContain('ci_rerun_failed_jobs');
   });
 
+  describe('OIDC plan-role main-only workflows (LS-9029)', () => {
+    it('fails fast without dispatching when ref is a non-main branch', async () => {
+      const result = await dispatchWorkflow({
+        workflow: 'check-migrations-applied.yml',
+        ref: 'claude/some-feature-branch',
+      });
+
+      expect(mockGithubPost).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Refusing to dispatch');
+      expect(result.content[0].text).toContain('AssumeRoleWithWebIdentity');
+      expect(result.content[0].text).toContain('worktree_commit');
+    });
+
+    it('allows dispatch when ref is main', async () => {
+      mockGithubPost.mockResolvedValue(undefined);
+
+      const result = await dispatchWorkflow({
+        workflow: 'check-migrations-applied.yml',
+        ref: 'main',
+      });
+
+      expect(mockGithubPost).toHaveBeenCalled();
+      expect(result.isError).toBeUndefined();
+    });
+
+    it('allows dispatch of workflows not on the gated list to a feature branch', async () => {
+      mockGithubPost.mockResolvedValue(undefined);
+
+      const result = await dispatchWorkflow({
+        workflow: 'ci.yml',
+        ref: 'my-branch',
+      });
+
+      expect(mockGithubPost).toHaveBeenCalled();
+      expect(result.isError).toBeUndefined();
+    });
+  });
+
   it('surfaces other errors without throwing', async () => {
     mockGithubPost.mockRejectedValue(new Error('GitHub API 500: oops'));
 

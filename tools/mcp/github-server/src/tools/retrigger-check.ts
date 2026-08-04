@@ -145,9 +145,16 @@ export async function retriggerCheck(
           retriggered: false,
           error:
             `This check run belongs to GitHub Actions and cannot be re-requested via the Checks API. ` +
-            `Dispatch the source workflow directly using: ` +
-            `ci_dispatch_workflow(workflow: '<workflow-file>', ref: '<branch>').`,
-          fallback: 'ci_dispatch_workflow',
+            `Push a new commit to fire a fresh pull_request event instead (e.g. an empty commit: ` +
+            `worktree_commit({ message: 'chore: retrigger ci' }) + worktree_push(), or ` +
+            `git commit --allow-empty -m "chore: retrigger ci" && git push). ` +
+            `Do NOT use ci_dispatch_workflow(workflow, ref: '<pr-branch>') as a substitute unless you have ` +
+            `confirmed the workflow's AWS OIDC role trusts that ref -- required-check workflows that assume ` +
+            `the legacy-sports-dev-github-actions-plan role (e.g. check-migrations-applied.yml, terraform-plan.yml) ` +
+            `only trust pull_request events or ref:refs/heads/main (terraform/main/github-actions-oidc.tf), so a ` +
+            `workflow_dispatch run on any other branch is structurally guaranteed to fail ` +
+            `"sts:AssumeRoleWithWebIdentity" -- retrying it will not help (LS-9029).`,
+          fallback: 'push-empty-commit',
         });
       } else {
         results.push({

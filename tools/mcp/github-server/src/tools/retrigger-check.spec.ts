@@ -74,11 +74,13 @@ describe('retriggerCheck — workflow_dispatch 403 hint', () => {
     expect(body.failed).toBe(1);
     const [entry] = body.results as Array<Record<string, unknown>>;
     expect(entry.retriggered).toBe(false);
-    expect(entry.fallback).toBe('ci_dispatch_workflow');
+    expect(entry.fallback).toBe('push-empty-commit');
     expect(String(entry.error)).toMatch(
       /cannot be re-requested via the Checks API/,
     );
-    expect(String(entry.error)).toMatch(/ci_dispatch_workflow/);
+    expect(String(entry.error)).toMatch(/fire a fresh pull_request event/);
+    expect(String(entry.error)).toMatch(/AssumeRoleWithWebIdentity/);
+    expect(String(entry.error)).toMatch(/Do NOT use ci_dispatch_workflow/);
   });
 
   it('does not emit fallback hint when 403 "Invalid check_run_id" comes from a non-github-actions app', async () => {

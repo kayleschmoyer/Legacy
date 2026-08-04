@@ -83,7 +83,7 @@ Two consumers already bridge the config/live gap — useful when debugging:
 - A migration was applied under a different hash (file edited after applying).
 - `"This workflow requires a self-hosted runner"` — the author lacks write permission or the runner is offline; contact the repo owner.
 
-**Fix:** apply the PR's migrations before merge — `db_migration_status` then `db_migrate` (hosted DB MCP, tunnel-free), shell fallback `pnpm --prefix lib/db-client run db:status` / `db:up`. Multi-PR situations: the [apply-pr-migrations skill](../../apply-pr-migrations/SKILL.md). The check re-runs on the next push, or re-dispatch it via `workflow_dispatch`.
+**Fix:** apply the PR's migrations before merge — `db_migration_status` then `db_migrate` (hosted DB MCP, tunnel-free), shell fallback `pnpm --prefix lib/db-client run db:status` / `db:up`. Multi-PR situations: the [apply-pr-migrations skill](../../apply-pr-migrations/SKILL.md). The check re-runs on the next push — **do not** re-dispatch it via `workflow_dispatch` on the PR branch; see [OIDC-gated required checks](#oidc-gated-required-checks-workflow_dispatch-on-a-pr-branch-always-fails) below.
 
 ### `CI Gate`
 
@@ -110,6 +110,33 @@ Two consumers already bridge the config/live gap — useful when debugging:
 **Lint + format merge (LS-8901):** the `lint` job runs both the ESLint check and the Prettier format check as sequential steps (one checkout + one `pnpm install` instead of two), so they now surface as a single `🚀 CI Pipeline / lint` check-run row instead of two. The job still exposes separate `lint-failure-excerpt` / `format-failure-excerpt` outputs so the PR failure comment and the `CI: Lint Failure` / `CI: Formatting` labels still identify which check actually failed — but the two no longer have independent job-level pass/fail states for the check-run UI.
 
 Root-cause discipline for lint/type failures: fix the cause — `eslint-disable` and `@ts-ignore` are banned ([standards](../../standards/SKILL.md)). For flaky infra failures rerun first: `ci_rerun(runId: RUN_ID, failedOnly: true)`.
+
+---
+
+## OIDC-Gated Required Checks: `workflow_dispatch` on a PR Branch Always Fails
+
+`github_retrigger_check` correctly refuses to re-request Actions-backed check runs via the Checks API (GitHub 403 "Invalid check_run_id") and points the caller at `ci_dispatch_workflow(workflow, ref: '<branch>')` as the fallback. **For a subset of required-check workflows, that fallback is guaranteed to fail — not flaky, structurally impossible to succeed — when `ref` is the PR's own feature branch.**
+
+**Why:** `check-migrations-applied.yml` and `terraform-plan.yml` assume the read-only `legacy-sports-dev-github-actions-plan` AWS role. Its OIDC trust policy (`terraform/main/github-actions-oidc.tf` → `aws_iam_role.github_actions_plan.assume_role_policy`, `StringLike` condition on `token.actions.githubusercontent.com:sub`) only allows:
+
+```
+repo:bkrupa/legacy-sports:pull_request
+repo:bkrupa/legacy-sports:ref:refs/heads/main
+```
+
+A `workflow_dispatch` run on any other branch produces `sub = repo:bkrupa/legacy-sports:ref:refs/heads/<branch>`, which matches neither pattern. The job fails immediately with `Could not assume role with OIDC: Not authorized to perform sts:AssumeRoleWithWebIdentity` — retrying the same dispatch reproduces the identical failure every time (confirmed 3/3 on PR #6622 / LS-6149, root-caused in LS-9029).
+
+**Recognize it:** a `workflow_dispatch`-triggered run failing with `AssumeRoleWithWebIdentity` for a role ending in `-github-actions-plan`, dispatched against a non-`main` ref. Treat this as a wrong-recovery-mechanism signal, not an outage — do not rerun or redispatch.
+
+**Fix:** fire a genuine `pull_request` event instead — push a new commit to the PR branch:
+
+```
+worktree_commit({ message: "chore: retrigger ci" }) + worktree_push()
+```
+
+(or `git commit --allow-empty -m "chore: retrigger ci" && git push`). This is exactly what unblocked PR #6622: empty commit `4bc07bf92` on `claude/adoring-hopper-0achdg` fired a fresh `pull_request` event and passed.
+
+`ci_dispatch_workflow` itself fails fast with an explanation (no wasted OIDC retries) when called with `workflow: "check-migrations-applied.yml"` or `workflow: "terraform-plan.yml"` and a non-`main` `ref` — see `OIDC_PLAN_ROLE_MAIN_ONLY_WORKFLOWS` in `tools/mcp/ci-server/src/tools/dispatch-workflow.ts`. Any other OIDC-gated `pull_request`-triggered workflow added later should be added to that set in lockstep.
 
 ---
 
@@ -180,3 +207,5 @@ Rewritten 2026-07-02 from the Phase-1 skills audit (merge-gates-and-ci workstrea
 - CI Gate step's PR-event gate: `grep -n "Post CI Gate" -A 2 .github/workflows/ci-pipeline.yml`
 - bot-review writer: `grep -n "context: 'bot-review'" .github/scripts/reviewer/lib/github.mjs`
 - Live-state check tooling: `grep -n 'requiredStatusChecks' tools/mcp/github-server/src/tools/get-branch-protection.ts`
+- OIDC plan-role trust conditions: `grep -n -A 10 'aws_iam_role" "github_actions_plan"' terraform/main/github-actions-oidc.tf`
+- OIDC-gated fail-fast workflow list: `grep -n -A 5 'OIDC_PLAN_ROLE_MAIN_ONLY_WORKFLOWS' tools/mcp/ci-server/src/tools/dispatch-workflow.ts`
