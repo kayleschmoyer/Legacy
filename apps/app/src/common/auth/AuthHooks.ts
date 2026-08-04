@@ -103,7 +103,7 @@ function useLastUpdateTime(): number {
 // clean empty read (logged-out user, no value stored — which logs nothing and
 // simply resolves to null). Alerting/grep can key off this token to tell the
 // two cases apart, since both otherwise return null (LS-7627).
-export const SECURE_STORAGE_READ_FAILURE_MARKER = 'secure-storage-read-failure';
+const SECURE_STORAGE_READ_FAILURE_MARKER = 'secure-storage-read-failure';
 
 export async function readKeychainValue(
   secret: Secret,

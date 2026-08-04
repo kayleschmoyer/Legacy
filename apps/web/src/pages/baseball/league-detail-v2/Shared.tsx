@@ -23,7 +23,7 @@ const POS_TO_CLASS: Record<string, string> = {
   DH: 'utility',
 };
 
-export const positionClass = (pos?: string | null) =>
+const positionClass = (pos?: string | null) =>
   pos ? (POS_TO_CLASS[pos.toUpperCase()] ?? 'utility') : 'utility';
 
 export const colorFromString = (s?: string | null): AvatarColor => {
@@ -40,23 +40,6 @@ export const initialsFromName = (name?: string | null) => {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
-
-export const TeamAvatar: React.FC<{
-  name: string;
-  color?: AvatarColor;
-  size?: AvatarSize;
-  initials?: string;
-  onClick?: () => void;
-}> = ({ name, color = 'navy', size = 'md', initials, onClick }) => (
-  <div
-    className={`ls-avatar ${size} ${color}`}
-    onClick={onClick}
-    style={onClick ? { cursor: 'pointer' } : undefined}
-    title={name}
-  >
-    {initials ?? initialsFromName(name)}
-  </div>
-);
 
 export const Rank: React.FC<{ n: number }> = ({ n }) => {
   const cls = n === 1 ? 'gold' : n === 2 ? 'silver' : n === 3 ? 'bronze' : '';

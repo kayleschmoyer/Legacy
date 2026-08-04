@@ -122,30 +122,6 @@ export function trackSignup(method: string): void {
 }
 
 /**
- * Track league creation
- * @param leagueId - The created league ID
- */
-export function trackLeagueCreated(leagueId: number): void {
-  trackEvent('league_created', {
-    league_id: leagueId,
-    category: 'league',
-  });
-}
-
-/**
- * Track draft start
- * @param leagueId - The league ID
- * @param draftType - Type of draft (e.g., 'random', 'snake')
- */
-export function trackDraftStarted(leagueId: number, draftType: string): void {
-  trackEvent('draft_started', {
-    league_id: leagueId,
-    draft_type: draftType,
-    category: 'draft',
-  });
-}
-
-/**
  * Track player selection
  * @param playerId - The selected player ID
  * @param position - Player position
@@ -260,47 +236,6 @@ export function setUserProperties(properties: {
 }
 
 // =============================================================================
-// League Events
-// =============================================================================
-
-/**
- * Track league join
- * @param leagueId - The league ID
- * @param method - How the user joined
- */
-export function trackLeagueJoined(
-  leagueId: number,
-  method: 'invite_code' | 'direct_link',
-): void {
-  trackEvent('league_joined', {
-    league_id: leagueId,
-    join_method: method,
-    category: 'league',
-  });
-}
-
-/**
- * Track league settings configuration
- * @param config - League configuration details
- */
-export function trackLeagueConfigured(config: {
-  leagueId: number;
-  maxRosterSize: number;
-  scoringType: string;
-  draftType: string;
-  teamCount: number;
-}): void {
-  trackEvent('league_configured', {
-    league_id: config.leagueId,
-    max_roster_size: config.maxRosterSize,
-    scoring_type: config.scoringType,
-    draft_type: config.draftType,
-    team_count: config.teamCount,
-    category: 'league',
-  });
-}
-
-// =============================================================================
 // Roster Management Events
 // =============================================================================
 
@@ -348,86 +283,6 @@ export function trackMatchupViewed(
     league_id: leagueId,
     week_number: weekNumber,
     category: 'matchup',
-  });
-}
-
-/**
- * Track analytics page usage
- * @param leagueId - The league ID
- * @param tab - Which analytics tab was viewed
- */
-export function trackAnalyticsViewed(
-  leagueId: number,
-  tab: 'overview' | 'power' | 'playoff' | 'h2h',
-): void {
-  trackEvent('analytics_viewed', {
-    league_id: leagueId,
-    analytics_tab: tab,
-    category: 'analytics',
-  });
-}
-
-// =============================================================================
-// Search & Discovery Events
-// =============================================================================
-
-/**
- * Track search usage
- * @param searchTerm - What the user searched for
- * @param resultCount - Number of results returned
- * @param context - Where the search occurred
- */
-export function trackSearch(
-  searchTerm: string,
-  resultCount: number,
-  context: 'players' | 'leagues' | 'teams',
-): void {
-  trackEvent('search', {
-    search_term: searchTerm,
-    result_count: resultCount,
-    search_context: context,
-    category: 'search',
-  });
-}
-
-// =============================================================================
-// Performance & Error Tracking
-// =============================================================================
-
-/**
- * Track errors for debugging and monitoring
- * @param errorType - Type/category of error
- * @param errorMessage - Error message
- * @param context - Additional context about the error
- */
-export function trackError(
-  errorType: string,
-  errorMessage: string,
-  context?: Record<string, unknown>,
-): void {
-  trackEvent('app_error', {
-    error_type: errorType,
-    error_message: errorMessage,
-    ...context,
-    category: 'error',
-  });
-}
-
-/**
- * Track feature engagement timing
- * @param category - Timing category (e.g., 'page_load', 'api_call')
- * @param variable - What is being timed
- * @param timeMs - Time in milliseconds
- */
-export function trackTiming(
-  category: string,
-  variable: string,
-  timeMs: number,
-): void {
-  trackEvent('timing_complete', {
-    timing_category: category,
-    timing_var: variable,
-    value: timeMs,
   });
 }
 

@@ -18,7 +18,7 @@ const SHARE_MAX_CHARS = 200_000;
  * generic `Error` so callers can differentiate user-actionable failures from
  * unexpected ones in catch blocks and analytics.
  */
-export class DeviceLogShareError extends Error {
+class DeviceLogShareError extends Error {
   constructor(
     message: string,
     public readonly reason: 'disabled' | 'missing-file',
@@ -29,10 +29,6 @@ export class DeviceLogShareError extends Error {
 }
 
 let activeDestination: DeviceFileOutputDestination | null = null;
-
-export function isDeviceLoggingEnabled(): boolean {
-  return activeDestination !== null;
-}
 
 /** Register the device-file destination. Idempotent. */
 export async function enableDeviceLogging(): Promise<void> {

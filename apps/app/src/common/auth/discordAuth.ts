@@ -35,7 +35,7 @@ export const DISCORD_REDIRECT_URI = 'legacysports://auth/discord/callback';
 export const DISCORD_SIGN_IN_CANCELLED = 'DISCORD_SIGN_IN_CANCELLED';
 
 /** Typed error so callers (AuthHooks) can distinguish a user cancel from a real failure. */
-export class DiscordAuthError extends Error {
+class DiscordAuthError extends Error {
   readonly code: string;
 
   constructor(message: string, code: string) {
