@@ -176,9 +176,9 @@
       "title": "Scoreboard Page",
       "slug": "scoreboard-page",
       "status": "active",
-      "lastSyncedHash": "19fa30c709b60775d40fd83a045a01e90116304ee2889c59415baa681a1d1519",
-      "lastSyncedAt": "2026-05-20T16:35:55.350Z",
-      "jiraKey": "LS-4584"
+      "lastSyncedHash": "666df2e245f355b077f667dc29f3e7be6237d935dac2698b056ac9e9567fd93b",
+      "lastSyncedAt": "2026-08-04T11:20:00.000Z",
+      "jiraKey": "LS-8971"
     },
     {
       "id": "profile-settings-2026-05-26",
