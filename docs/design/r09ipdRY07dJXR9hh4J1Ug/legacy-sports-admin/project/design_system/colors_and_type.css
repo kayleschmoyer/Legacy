@@ -317,9 +317,6 @@
     U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
 }
 
-/* JetBrains Mono (stat tables) — still served from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap');
-
 :root {
   /* ── Heritage brand anchors ───────────────────────────────── */
   --brand-navy: #1b3a5c; /* deep baseball navy */
@@ -455,12 +452,11 @@
     );
 
   /* ── Typography ──────────────────────────────────────────── */
-  /* Display: condensed grotesque — scores, scoreboard chrome, team abbrs */
-  --font-display: 'Big Shoulders Display', 'Oswald', system-ui, sans-serif;
+  /* Display: condensed grotesque — scores, scoreboard chrome, team abbrs.
+     Two-typeface rule (brand.md): no third named font in the stack. */
+  --font-display: 'Big Shoulders Display', sans-serif;
   /* Body: warm optical-size serif — editorial, readable prose */
   --font-body: 'Literata', Georgia, 'Times New Roman', serif;
-  /* Mono: tabular stats */
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Type scale (matches Tamagui approx.) */
   --text-xs: 12px;
@@ -486,42 +482,7 @@
   --dur-slow: 380ms;
 }
 
-/* ── Light theme override ────────────────────────────────── */
-.theme-light,
-[data-theme='light'] {
-  --bg: #ffffff;
-  --bg-hover: #f8fafc;
-  --bg-press: #f2f4f8;
-  --surface-subtle: #edf1f7;
-  --surface-panel: #eff4fb;
-  --surface-card: #f5f7fa;
-  --surface-raised: #ffffff;
-
-  --outline-subtle: #e1e7f0;
-  --outline-default: #cbd5e1;
-  --outline-strong: #7f90ae;
-  --panel-border: #d0dae8;
-
-  --fg1: #0b1220;
-  --fg1-strong: #000000;
-  --fg2: #1f2937;
-  --fg3: #4a6080;
-  --fg4: #7d8ead;
-
-  --brand-gold: #b8942b;
-  --brand-gold-light: #d4b24a;
-  --brand-gold-dark: #967828;
-
-  --glass-surface: rgba(255, 255, 255, 0.75);
-  --glass-surface-light: rgba(255, 255, 255, 0.55);
-  --glass-border: rgba(0, 0, 0, 0.06);
-  --glass-border-hover: rgba(0, 0, 0, 0.12);
-
-  --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.08);
-  --shadow-md: 0 4px 14px rgba(2, 6, 23, 0.12);
-  --shadow-lg: 0 12px 32px rgba(2, 6, 23, 0.16);
-  --shadow-xl: 0 20px 48px rgba(2, 6, 23, 0.2);
-}
+/* Dark-mode only (brand.md): no light-theme override block. */
 
 /* ────────────────────────────────────────────────────────────
    Semantic type recipes — drop straight onto elements
@@ -652,7 +613,7 @@ small,
 code,
 .code,
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 0.92em;
   font-variant-numeric: tabular-nums;
 }

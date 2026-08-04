@@ -5,11 +5,43 @@
      but the surfaces are quieter than marketing — fewer gradients,
      no gold-glow drama. Editorial seriousness.
    - Big Shoulders Display for headings and labels (scoreboard chrome).
-   - Literata for everything readable (descriptions, emails, paste text).
-   - JetBrains Mono for IDs, JSON payloads, JWT bodies.
+   - Literata for everything readable (descriptions, emails, paste text,
+     IDs, JSON payloads, JWT bodies — two-typeface rule, no mono font).
    - Accent rules from PROMPT.md: gold = positive only (here, "valid"),
      red = error/expired only, navy = primary CTAs only. No cyan/purple.
 */
+
+:root {
+  /* Admin-local tints — named once so repeated backgrounds/borders
+     reference a variable instead of restating raw rgba() (PROMPT.md
+     token discipline: no repeated raw hex/rgba values). */
+  --admin-glow-navy: rgba(27, 58, 92, 0.28);
+  --admin-glow-navy-soft: rgba(27, 58, 92, 0.18);
+  --admin-glow-navy-strong: rgba(27, 58, 92, 0.35);
+  --admin-glow-seam: rgba(196, 30, 58, 0.07);
+  --admin-glow-seam-soft: rgba(196, 30, 58, 0.06);
+  --admin-glow-gold-soft: rgba(197, 165, 90, 0.06);
+  --admin-gold-ring: rgba(197, 165, 90, 0.6);
+  --admin-gold-tint: rgba(197, 165, 90, 0.1);
+  --admin-gold-border: rgba(197, 165, 90, 0.45);
+  --admin-gold-badge-bg: rgba(197, 165, 90, 0.08);
+  --admin-gold-alg-border: rgba(197, 165, 90, 0.3);
+  --admin-danger-icon-bg: rgba(176, 46, 68, 0.12);
+  --admin-danger-card-bg: rgba(176, 46, 68, 0.1);
+  --admin-danger-card-border: rgba(176, 46, 68, 0.4);
+  --admin-danger-banner-bg: rgba(176, 46, 68, 0.14);
+  --admin-success-banner-bg: rgba(34, 110, 74, 0.14);
+  --admin-hover-wash: rgba(255, 255, 255, 0.04);
+  --admin-glass: rgba(10, 15, 26, 0.78);
+  --admin-glass-strong: rgba(10, 15, 26, 0.82);
+  --admin-shadow-ink: rgba(8, 12, 20, 0.4);
+  /* rgba(78, 142, 214, X) is --focus-ring (#4e8ed6) at a low soft-glow alpha. */
+  --admin-focus-glow: rgba(78, 142, 214, 0.18);
+  /* Contrast ink for text on the gold-gradient avatar (BG_ELEVATED-dark reads
+     too light for AA here; this is the same "ink on gold" pairing brand.md's
+     button treatments use). */
+  --admin-ink-on-gold: #1b1208;
+}
 
 /* ───────── Page shell ───────── */
 .app {
@@ -18,17 +50,17 @@
   background-image:
     radial-gradient(
       ellipse at 20% 0%,
-      rgba(27, 58, 92, 0.28) 0%,
+      var(--admin-glow-navy) 0%,
       transparent 55%
     ),
     radial-gradient(
       ellipse at 85% 8%,
-      rgba(196, 30, 58, 0.07) 0%,
+      var(--admin-glow-seam) 0%,
       transparent 45%
     ),
     radial-gradient(
       ellipse at 50% 100%,
-      rgba(197, 165, 90, 0.06) 0%,
+      var(--admin-glow-gold-soft) 0%,
       transparent 55%
     );
   background-attachment: fixed;
@@ -40,7 +72,7 @@
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(10, 15, 26, 0.78);
+  background: var(--admin-glass);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid var(--glass-border);
@@ -72,7 +104,7 @@
   height: 7px;
   border-radius: 50%;
   background: var(--brand-gold);
-  box-shadow: 0 0 8px rgba(197, 165, 90, 0.6);
+  box-shadow: 0 0 8px var(--admin-gold-ring);
 }
 .review-bar h1 strong {
   color: var(--fg1);
@@ -110,7 +142,11 @@
 }
 .review-tabs button:hover {
   color: var(--fg1);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--admin-hover-wash);
+}
+.review-tabs button:focus-visible {
+  outline: 2px solid var(--fg1);
+  outline-offset: 2px;
 }
 .review-tabs button.on {
   background: var(--brand-navy);
@@ -160,6 +196,10 @@
 .width-toggle button:hover {
   color: var(--fg1);
 }
+.width-toggle button:focus-visible {
+  outline: 2px solid var(--fg1);
+  outline-offset: 2px;
+}
 .width-toggle button.on {
   background: var(--surface-card);
   color: var(--fg1-strong);
@@ -191,6 +231,13 @@
   padding: 7px 11px;
   border-radius: 7px;
   cursor: pointer;
+}
+.surface-toggle button:hover {
+  color: var(--fg1);
+}
+.surface-toggle button:focus-visible {
+  outline: 2px solid var(--fg1);
+  outline-offset: 2px;
 }
 .surface-toggle button.on {
   background: var(--brand-navy);
@@ -229,7 +276,7 @@
   gap: 10px;
 }
 .frame-caption .px {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 11px;
   color: var(--fg4);
   font-weight: 500;
@@ -244,12 +291,12 @@
   background-image:
     radial-gradient(
       ellipse at 50% -10%,
-      rgba(27, 58, 92, 0.35) 0%,
+      var(--admin-glow-navy-strong) 0%,
       transparent 55%
     ),
     radial-gradient(
       ellipse at 90% 0%,
-      rgba(196, 30, 58, 0.06) 0%,
+      var(--admin-glow-seam-soft) 0%,
       transparent 50%
     );
   display: flex;
@@ -261,7 +308,7 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  background: rgba(10, 15, 26, 0.82);
+  background: var(--admin-glass-strong);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid var(--glass-border);
@@ -414,6 +461,11 @@
 .page-head .quick-link:hover {
   color: var(--brand-gold);
 }
+.page-head .quick-link:focus-visible {
+  outline: 2px solid var(--fg1);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 
 /* ───────── Section / accordion ───────── */
 .section {
@@ -427,35 +479,42 @@
 .section.open {
   border-color: var(--outline-default);
 }
+.section-head-heading {
+  margin: 0;
+}
 .section-head {
+  appearance: none;
+  width: 100%;
+  border: 0;
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 18px 20px;
   cursor: pointer;
   user-select: none;
+  text-align: left;
   background: linear-gradient(
     180deg,
-    rgba(27, 58, 92, 0.18) 0%,
+    var(--admin-glow-navy-soft) 0%,
     transparent 100%
   );
 }
 .section-head:hover {
-  background: linear-gradient(
-    180deg,
-    rgba(27, 58, 92, 0.28) 0%,
-    transparent 100%
-  );
+  background: linear-gradient(180deg, var(--admin-glow-navy) 0%, transparent 100%);
+}
+.section-head:focus-visible {
+  outline: 2px solid var(--fg1);
+  outline-offset: -2px;
 }
 .section-head .num {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 12px;
   font-weight: 500;
   color: var(--fg4);
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
 }
-.section-head h2 {
+.section-head .title {
   font-family: var(--font-display);
   font-weight: 800;
   font-size: 22px;
@@ -520,9 +579,9 @@
   color: var(--fg4);
   font-style: italic;
 }
-.search input:focus {
+.search input:focus-visible {
   border-color: var(--brand-navy-light);
-  box-shadow: 0 0 0 3px rgba(78, 142, 214, 0.18);
+  box-shadow: 0 0 0 3px var(--admin-focus-glow);
 }
 .search .icon {
   position: absolute;
@@ -576,7 +635,7 @@
     var(--brand-gold) 0%,
     var(--brand-gold-dark) 100%
   );
-  color: #1b1208;
+  color: var(--admin-ink-on-gold);
 }
 .user-card.is-admin .av {
   background: linear-gradient(
@@ -614,7 +673,7 @@
   font-weight: 400;
 }
 .user-card .email {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 12.5px;
   color: var(--fg3);
   white-space: nowrap;
@@ -625,7 +684,7 @@
   color: var(--fg4);
 }
 .user-card .id {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 11px;
   color: var(--fg4);
   letter-spacing: 0.02em;
@@ -645,8 +704,8 @@
 }
 .lv-admin {
   color: var(--brand-gold-light);
-  border-color: rgba(197, 165, 90, 0.45);
-  background: rgba(197, 165, 90, 0.1);
+  border-color: var(--admin-gold-border);
+  background: var(--admin-gold-tint);
 }
 .lv-none {
   color: var(--fg3);
@@ -703,6 +762,10 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--fg1);
+  outline-offset: 2px;
 }
 .btn-ghost {
   background: transparent;
@@ -799,8 +862,8 @@
   color: var(--fg3);
 }
 .callout-icon.warn {
-  border-color: rgba(176, 46, 68, 0.55);
-  background: rgba(176, 46, 68, 0.12);
+  border-color: var(--danger-border);
+  background: var(--admin-danger-icon-bg);
   color: var(--danger-fg);
 }
 .callout-icon.empty {
@@ -822,9 +885,9 @@
   max-width: 50ch;
 }
 .callout .term {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   color: var(--brand-gold-light);
-  background: rgba(197, 165, 90, 0.08);
+  background: var(--admin-gold-badge-bg);
   padding: 1px 6px;
   border-radius: 4px;
 }
@@ -834,8 +897,8 @@
   align-items: flex-start;
   gap: 14px;
   padding: 16px 18px;
-  background: rgba(176, 46, 68, 0.1);
-  border: 1px solid rgba(176, 46, 68, 0.4);
+  background: var(--admin-danger-card-bg);
+  border: 1px solid var(--admin-danger-card-border);
   border-radius: var(--radius-5);
 }
 .error-card .icon {
@@ -863,10 +926,10 @@
   margin: 0;
 }
 .error-card .body code {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 12.5px;
   color: var(--fg3);
-  background: rgba(8, 12, 20, 0.4);
+  background: var(--admin-shadow-ink);
   padding: 1px 6px;
   border-radius: 4px;
 }
@@ -910,7 +973,7 @@
   height: 64px;
   border-radius: 50%;
   background: var(--surface-card);
-  border: 1px solid rgba(176, 46, 68, 0.4);
+  border: 1px solid var(--admin-danger-card-border);
   display: grid;
   place-items: center;
   color: var(--danger-fg);
@@ -954,7 +1017,7 @@
   background: var(--surface-card);
   border: 1px solid var(--outline-subtle);
   color: var(--fg1);
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 12.5px;
   line-height: 1.55;
   padding: 12px 14px;
@@ -973,9 +1036,9 @@
   font-style: italic;
   font-family: var(--font-body);
 }
-.jwt-input:focus {
+.jwt-input:focus-visible {
   border-color: var(--brand-navy-light);
-  box-shadow: 0 0 0 3px rgba(78, 142, 214, 0.18);
+  box-shadow: 0 0 0 3px var(--admin-focus-glow);
 }
 .jwt-actions {
   margin-top: 12px;
@@ -1014,21 +1077,21 @@
   text-transform: uppercase;
 }
 .expiry .when {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 .expiry-valid {
-  background: rgba(34, 110, 74, 0.14);
-  border-color: rgba(34, 110, 74, 0.5);
+  background: var(--admin-success-banner-bg);
+  border-color: var(--success-border);
   color: var(--success-fg);
 }
 .expiry-valid .label {
   color: var(--success-fg);
 }
 .expiry-expired {
-  background: rgba(176, 46, 68, 0.14);
-  border-color: rgba(176, 46, 68, 0.5);
+  background: var(--admin-danger-banner-bg);
+  border-color: var(--danger-border);
   color: var(--danger-fg);
 }
 .expiry-expired .label {
@@ -1061,7 +1124,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: linear-gradient(180deg, rgba(27, 58, 92, 0.18), transparent);
+  background: linear-gradient(180deg, var(--admin-glow-navy-soft), transparent);
   border-bottom: 1px solid var(--outline-subtle);
 }
 .json-block .head .label {
@@ -1073,18 +1136,18 @@
   color: var(--fg2);
 }
 .json-block .head .alg {
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 11px;
   color: var(--brand-gold-light);
-  background: rgba(197, 165, 90, 0.1);
-  border: 1px solid rgba(197, 165, 90, 0.3);
+  background: var(--admin-gold-tint);
+  border: 1px solid var(--admin-gold-alg-border);
   padding: 2px 8px;
   border-radius: var(--radius-pill);
 }
 .json-block pre {
   margin: 0;
   padding: 14px 16px;
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
   font-size: 12.5px;
   line-height: 1.6;
   color: var(--fg1);
@@ -1113,8 +1176,8 @@
   align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
-  background: rgba(176, 46, 68, 0.1);
-  border: 1px solid rgba(176, 46, 68, 0.4);
+  background: var(--admin-danger-card-bg);
+  border: 1px solid var(--admin-danger-card-border);
   border-radius: var(--radius-3);
   font-family: var(--font-body);
   font-size: 14px;
@@ -1153,7 +1216,7 @@
   padding: 14px 14px;
   gap: 10px;
 }
-.mobile-shell .section-head h2 {
+.mobile-shell .section-head .title {
   font-size: 17px;
 }
 .mobile-shell .section-head .num {

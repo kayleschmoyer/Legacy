@@ -100,7 +100,7 @@
         padding: 18px 30px 0;
         pointer-events: none;
         color: #fff;
-        font-family: -apple-system, 'SF Pro', system-ui;
+        font-family: var(--font-display);
         font-weight: 600;
         font-size: 16px;
       }
@@ -190,7 +190,7 @@
       .desktop-chrome .url {
         flex: 1;
         text-align: center;
-        font-family: var(--font-mono);
+        font-family: var(--font-body);
         font-size: 11px;
         color: var(--fg4);
         letter-spacing: 0.02em;
@@ -441,8 +441,9 @@
               <footer className="foot" style={{ width: '100%' }}>
                 <strong>Mockup notes</strong>
                 State tabs above swap the conditional render across both
-                surfaces. Search filters live (try "ruth"); accordions expand
-                and collapse. Motion intent is annotated in HTML/JSX comments —
+                surfaces. Search filters live (try "calloway"); accordions
+                expand and collapse (Enter/Space toggles, headers are real
+                buttons). Motion intent is annotated in HTML/JSX comments —
                 no real animations are wired. All copy uses fictional
                 placeholder data; no real users are represented.
               </footer>

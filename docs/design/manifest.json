@@ -234,9 +234,9 @@
       "title": "Admin",
       "slug": "legacy-sports-admin",
       "status": "active",
-      "lastSyncedHash": "9a61976a288210f38325b96318d58dfee52b2b53e75938fc034f179e4c4a11d1",
-      "lastSyncedAt": "2026-05-20T16:35:55.380Z",
-      "jiraKey": "LS-4580"
+      "lastSyncedHash": "sha256-72095bd10902bb24684be54f9567af7489ef6fd9179eb1ecd7be09c414ada29e",
+      "lastSyncedAt": "2026-08-04T15:49:28.000Z",
+      "jiraKey": "LS-8976"
     },
     {
       "id": "mZQ6CvdGoj6nIX4rrQKE0A",

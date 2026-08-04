@@ -6,48 +6,51 @@
 const { useState, useMemo, useEffect } = React;
 
 // ───────── fixture data ─────────
+// Fictional personas — Admin is a user-management surface, not a
+// player-data surface, so the real-historical-player exception
+// (brand.md § Representative Data) does not apply here (LS-9004).
 const USERS = [
   {
     id: 'usr_8a3c2f',
-    username: 'mickey_legend',
-    email: 'mickey@legacysports.io',
+    username: 'duke_larrigan',
+    email: 'duke@legacysports.io',
     accessLevel: 'admin',
     isMe: true,
   },
   {
     id: 'usr_4b1d9e',
-    username: 'ruth_bambino',
-    email: 'gruth@dynastyleague.com',
+    username: 'birch_calloway',
+    email: 'bcalloway@dynastyleague.com',
     accessLevel: 'none',
   },
   {
     id: 'usr_7f0a55',
-    username: 'cobb_tyrus',
-    email: 'tyrus.c@oldfield.co',
+    username: 'tuck_delaney',
+    email: 'delaney.t@oldfield.co',
     accessLevel: 'none',
   },
   {
     id: 'usr_22e8b1',
-    username: 'gehrig_iron',
-    email: 'lou.gehrig@yankees.dev',
+    username: 'sully_vance',
+    email: 'sully.vance@ironhorse.dev',
     accessLevel: 'admin',
   },
   {
     id: 'usr_91c4d2',
-    username: 'wagner_honus',
+    username: 'hank_prewitt',
     email: null,
     accessLevel: 'none',
   },
   {
     id: 'usr_55a7c8',
-    username: 'aaron_hammer',
-    email: 'h.aaron@bravesfan.net',
+    username: 'earl_boswell',
+    email: 'e.boswell@dustbowlnine.net',
     accessLevel: 'none',
   },
   {
     id: 'usr_03f6e4',
-    username: 'mays_say_hey',
-    email: 'willie@giants.io',
+    username: 'gus_favreau',
+    email: 'gus@sayhey.io',
     accessLevel: 'none',
   },
   {
@@ -58,34 +61,34 @@ const USERS = [
   },
   {
     id: 'usr_6ec0aa',
-    username: 'clemente_pride',
-    email: 'r.clemente@pirates.dev',
+    username: 'ray_delacroix',
+    email: 'r.delacroix@pridefc.dev',
     accessLevel: 'none',
   },
   {
     id: 'usr_2d44b7',
-    username: 'koufax_southpaw',
-    email: 'sandy@dodgers.io',
+    username: 'lefty_okafor',
+    email: 'lefty@southpawnine.io',
     accessLevel: 'none',
   },
   {
     id: 'usr_e91f23',
-    username: 'robinson_jackie',
-    email: 'j.robinson42@dodgers.dev',
+    username: 'jt_marsalis',
+    email: 'jt.marsalis@breakerfc.dev',
     accessLevel: 'none',
   },
   {
     id: 'usr_a07258',
-    username: 'griffey_jr',
-    email: 'ken.griffey@mariners.io',
+    username: 'trey_ashworth',
+    email: 'trey.ashworth@juniorcircuit.io',
     accessLevel: 'none',
   },
 ];
 
 const SAMPLE_JWT_VALID =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNGIxZDllIiwidXNlcm5hbWUiOiJydXRoX2JhbWJpbm8iLCJhY2Nlc3NMZXZlbCI6Im5vbmUiLCJpYXQiOjE3NDYxNTY4MDAsImV4cCI6MTc0Nzk2NDgwMH0.s8M1nXbCq5_aB7';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfNGIxZDllIiwidXNlcm5hbWUiOiJiaXJjaF9jYWxsb3dheSIsImFjY2Vzc0xldmVsIjoibm9uZSIsImlhdCI6MTc0NjE1NjgwMCwiZXhwIjoxNzQ3OTY0ODAwfQ.s8M1nXbCq5_aB7';
 const SAMPLE_JWT_EXPIRED =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfMjJlOGIxIiwidXNlcm5hbWUiOiJnZWhyaWdfaXJvbiIsImFjY2Vzc0xldmVsIjoiYWRtaW4iLCJpYXQiOjE3MDgwOTI4MDAsImV4cCI6MTcwOTI5OTIwMH0.expiredsig';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfMjJlOGIxIiwidXNlcm5hbWUiOiJzdWxseV92YW5jZSIsImFjY2Vzc0xldmVsIjoiYWRtaW4iLCJpYXQiOjE3MDgwOTI4MDAsImV4cCI6MTcwOTI5OTIwMH0.expiredsig';
 
 // ───────── tiny svg icons (inline; lucide style 1.8 stroke) ─────────
 const Ico = {
@@ -310,18 +313,33 @@ function SkeletonRow() {
 }
 
 // ───────── Section (accordion) ─────────
+// Heading > button, per the WAI-ARIA APG accordion pattern — a real,
+// keyboard-operable control instead of a clickable <header> div.
 function Section({ num, title, count, defaultOpen = true, children }) {
   const [open, setOpen] = useState(defaultOpen);
+  const bodyId = `section-body-${num}`;
   return (
     <section className={`section ${open ? 'open' : ''}`}>
       {/* MOTION: chevron rotate 90deg on toggle, 200ms ease-standard */}
-      <header className="section-head" onClick={() => setOpen((o) => !o)}>
-        <span className="num">{num}</span>
-        <h2>{title}</h2>
-        {count != null && <span className="count">{count}</span>}
-        {Ico.chev}
-      </header>
-      {open && <div className="section-body">{children}</div>}
+      <h2 className="section-head-heading">
+        <button
+          type="button"
+          className="section-head"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => setOpen((o) => !o)}
+        >
+          <span className="num">{num}</span>
+          <span className="title">{title}</span>
+          {count != null && <span className="count">{count}</span>}
+          {Ico.chev}
+        </button>
+      </h2>
+      {open && (
+        <div id={bodyId} className="section-body">
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -428,7 +446,7 @@ function UsersSection({
           <h3>No users found</h3>
           <p>
             No matches for{' '}
-            <span className="term">"{query || 'griffey42'}"</span>. Try a
+            <span className="term">"{query || 'ashworth99'}"</span>. Try a
             different name, email, or user ID.
           </p>
         </div>
@@ -453,7 +471,7 @@ function JwtSection({ state }) {
         header: { alg: 'HS256', typ: 'JWT' },
         payload: {
           sub: 'usr_4b1d9e',
-          username: 'ruth_bambino',
+          username: 'birch_calloway',
           accessLevel: 'none',
           iat: 1746156800,
           exp: 1747964800,
@@ -468,7 +486,7 @@ function JwtSection({ state }) {
         header: { alg: 'HS256', typ: 'JWT' },
         payload: {
           sub: 'usr_22e8b1',
-          username: 'gehrig_iron',
+          username: 'sully_vance',
           accessLevel: 'admin',
           iat: 1708092800,
           exp: 1709299200,
@@ -500,13 +518,21 @@ function JwtSection({ state }) {
 
   return (
     <section className={`section ${open ? 'open' : ''}`}>
-      <header className="section-head" onClick={() => setOpen((o) => !o)}>
-        <span className="num">02</span>
-        <h2>JWT Decoder</h2>
-        {Ico.chev}
-      </header>
+      <h2 className="section-head-heading">
+        <button
+          type="button"
+          className="section-head"
+          aria-expanded={open}
+          aria-controls="section-body-02"
+          onClick={() => setOpen((o) => !o)}
+        >
+          <span className="num">02</span>
+          <span className="title">JWT Decoder</span>
+          {Ico.chev}
+        </button>
+      </h2>
       {open && (
-        <div className="section-body">
+        <div id="section-body-02" className="section-body">
           <textarea
             className="jwt-input"
             placeholder="Paste JWT here…"
@@ -670,7 +696,7 @@ function AdminPage({ state, compact }) {
 
   // For dedicated forced-empty-search state, prefill an unmatched query
   useEffect(() => {
-    if (state === 'empty-search') setQuery('griffey42');
+    if (state === 'empty-search') setQuery('ashworth99');
     else if (state !== 'populated' && state !== 'impersonating') setQuery('');
   }, [state]);
   useEffect(() => {
@@ -746,8 +772,8 @@ function AdminNav({ compact }) {
       </span>
       <span className="grow" />
       <div className="me">
-        <span className="av">MJ</span>
-        <span className="who">Mickey J.</span>
+        <span className="av">DL</span>
+        <span className="who">Duke L.</span>
       </div>
     </header>
   );
