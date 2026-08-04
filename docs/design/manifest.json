@@ -131,9 +131,9 @@
       "title": "Notifications",
       "slug": "legacy-sports-notifications",
       "status": "active",
-      "lastSyncedHash": "0bc21b7a9754eead84725111f2bd51113650bd7727f94d796517f83d4c8c674d",
-      "lastSyncedAt": "2026-05-20T16:35:55.293Z",
-      "jiraKey": "LS-4583"
+      "lastSyncedHash": "sha256-bfd710a0dc1589435c0c513c65896f0a5d30f760e3e72ed16c18f0c8f1d986c1",
+      "lastSyncedAt": "2026-08-04T00:00:00.000Z",
+      "jiraKey": "LS-8967"
     },
     {
       "id": "dNpCFgIxoT5OnLy71wHjrg",
