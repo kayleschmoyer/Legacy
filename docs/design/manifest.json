@@ -212,9 +212,10 @@
       "title": "League Detail Page",
       "slug": "league-detail-page",
       "status": "active",
-      "lastSyncedHash": "6c6859b0ba44abd9142714c4a96ed04d7296569c75d297d1114f66cd6bdc1b8d",
-      "lastSyncedAt": "2026-05-20T16:35:55.364Z",
-      "jiraKey": "LS-4588"
+      "lastSyncedHash": "sha256-943abd19581657db297173da1d6749d1ebf15faec8d95d31ad0cab0c0651a188",
+      "lastSyncedAt": "2026-08-04T17:10:00.000Z",
+      "jiraKey": "LS-8974",
+      "source": "designsync-local"
     },
     {
       "id": "qtqqKYxMFf1A8GY5NL9GNQ",

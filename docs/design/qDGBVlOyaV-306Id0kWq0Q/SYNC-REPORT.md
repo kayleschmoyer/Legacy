@@ -1,24 +1,59 @@
 # Sync report: League Detail Page
 
 **Design ID**: `qDGBVlOyaV-306Id0kWq0Q`
-**Source**: `https://api.anthropic.com/v1/design/h/qDGBVlOyaV-306Id0kWq0Q`
-**Synced at**: 2026-05-20T16:35:55.364Z
-**Bundle hash**: `6c6859b0ba44abd9142714c4a96ed04d7296569c75d297d1114f66cd6bdc1b8d`
+**Source**: `https://claude.ai/design/p/2e2f8052-6cc9-4fb0-9c5f-a353a7fa57ff`
+**Synced at**: 2026-08-04T17:10:00.000Z
+**Bundle hash**: `943abd19581657db297173da1d6749d1ebf15faec8d95d31ad0cab0c0651a188`
 **Files**: 90
-**Total size**: 1815864 bytes
+**Source**: `designsync-local` (LS-8974)
 
-## Pages
+## What changed vs. previous sync (2026-05-20)
 
-- `league-detail-page/project/League Detail.html`
-- `league-detail-page/project/Tab Commish.html`
-- `league-detail-page/project/Tab Free Agents.html`
-- `league-detail-page/project/Tab History.html`
-- `league-detail-page/project/Tab Matchup.html`
-- `league-detail-page/project/Tab Overview.html`
-- `league-detail-page/project/Tab Roster.html`
-- `league-detail-page/project/Tab Standings.html`
-- `league-detail-page/project/Tab Team.html`
-- `league-detail-page/project/Tab Trades.html`
+This is a **mechanical-fix-only** partial re-sync, not the full "re-run" the parent ticket
+calls for. Scope: agent-safe fixes only — banned purple accent, oversized position-color
+border stripes, off-palette hex, and missing focus states. All other drift called out in the
+LS-8954 audit (9-tab content, WebSocket states, shared TradingCenter, mobile Guided Home, no
+375px mockup, loading/error states, heading hierarchy, self-hosted-font choice) is **not**
+addressed here and remains for the human-led Claude Design re-run.
+
+Fixed at the source (`DesignSync` write flow) and pulled back into this bundle:
+
+- **`league-styles.css`**
+  - Removed `.ls-avatar.purple` (banned purple gradient `#4A3F6B → #7C6CAE`).
+  - `.ls-player-row` border-left width `4px → 1px` (brand rule: no accent stripe wider than 1px)
+    — cascades to every position-color variant (baseball + football).
+  - Football DEF/FLEX position colors were purple-family hex (`#4A3F6B` / `#7C6CAE`, both the
+    border-left variant and the `.ls-pchip` badge variant) — remapped to existing brand tokens
+    `var(--pos-catcher)` (steel) and `var(--info)` (muted sky) respectively.
+  - `.ls-chip-active` / `.ls-chip-queued` used raw off-palette Tailwind hex (`#22C55E`, `#F59E0B`)
+    — replaced with the brand `--success-*` / `--warning-*` token set.
+  - Raw hex duplicating existing tokens (`#6FD39A` ×3, `#2D6A4F` ×4) replaced with `var(--success-fg)`
+    / `var(--pos-outfield)` references.
+  - Added a brand-compliant `:focus-visible` rule (`outline: 2px solid var(--focus-ring)`) — the
+    bundle had zero focus-visible treatment on any interactive element (hover-only).
+- **`TabTeam.jsx`** — removed `'purple'` from the `AVATAR_OPTS` picker (the banned color was a
+  user-selectable team avatar option).
+- **`Shared.jsx`** — `AVATAR_TONE.flex` mapped to `'purple'` (mini player-row avatar); remapped to
+  `'navy'` now that the purple avatar variant no longer exists in CSS.
+- **`TabMatchup.jsx`**, **`TabStandings.jsx`** — same off-palette Tailwind green (`#22C55E`) found
+  duplicated in inline styles outside `league-styles.css`; fixed at the source but **not yet
+  reflected in this local bundle pull** (see Known gaps below).
+- **Bot-review round 1 (`TabTeam.jsx`)** — three more `#6FD39A`/`#E63950` raw-hex instances
+  (the "Saved" checkmark and the primary/secondary hex-validation checkmarks) missed on the
+  first pass; replaced with `var(--success-fg)` / `var(--brand-seam-red-light)`.
+
+## Known gaps in this partial sync
+
+- `TabMatchup.jsx` and `TabStandings.jsx` were fixed at the Claude Design source but this bundle
+  still has their pre-fix content (cost/scope tradeoff — re-run `/pull-design` for a full pull).
+- The 10 `Tab *.html` static exports and the `ds/`, `screenshots/` binary assets were **not**
+  re-fetched — this hash was computed over the local tree as of this partial write, not a true
+  file-for-file mirror of the live project. A full `/pull-design` (or the human-led re-run) is
+  still required to bring the HTML exports and any other drifted files current.
+- Everything in the LS-8954 audit's MED/LOW buckets (no loading/error states, invented
+  max-widths + no 375px design, raw hex in JSX/HTML beyond what's listed above, heading hierarchy
+  h1→h3, self-hosted fonts + JetBrains Mono, unused light-theme block) is untouched — explicitly
+  out of scope for this mechanical pass per LS-8974.
 
 ## All files
 
