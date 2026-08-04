@@ -165,9 +165,10 @@
       "title": "Player Details",
       "slug": "legacy-sports-player-details",
       "status": "active",
-      "lastSyncedHash": "26aa670ff2d8ff83ce6a82ecfc1dd213167fb34981da9eb2b96bf12322872920",
-      "lastSyncedAt": "2026-05-20T16:35:55.345Z",
-      "jiraKey": "LS-4586"
+      "lastSyncedHash": "sha256-870f2524366f76073ba504be5bb243be498d5497e4d78b594b78e20a18434999",
+      "lastSyncedAt": "2026-08-04T00:00:00.000Z",
+      "jiraKey": "LS-8970",
+      "source": "designsync-local"
     },
     {
       "id": "lMe_Ka278wF48IaGC7FOWw",
