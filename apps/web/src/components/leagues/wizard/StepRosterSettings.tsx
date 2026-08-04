@@ -41,6 +41,11 @@ const SLOT_LABELS: Record<string, string> = {
   BN: 'Bench',
 };
 
+// Matches the server's football roster-size floor (`ROSTER_RANGE_BY_SPORT.football.min`
+// in lambdas/db/src/schema/leagues/sport-validation.ts) so the wizard can never submit
+// a total the server will reject.
+const MIN_ROSTER_SIZE = 10;
+
 interface StepRosterSettingsProps {
   defensiveFormat: DefensiveFormat;
   rosterSlots: Record<string, number>;
@@ -50,11 +55,13 @@ interface StepRosterSettingsProps {
 function SlotRow({
   slot,
   count,
+  canDecrement,
   onIncrement,
   onDecrement,
 }: {
   slot: string;
   count: number;
+  canDecrement: boolean;
   onIncrement: () => void;
   onDecrement: () => void;
 }) {
@@ -79,19 +86,22 @@ function SlotRow({
       <XStack alignItems="center" gap="$3">
         <XStack
           pressStyle={{ opacity: 0.7 }}
-          onPress={count > 0 ? onDecrement : undefined}
+          onPress={canDecrement ? onDecrement : undefined}
           width={28}
           height={28}
           borderRadius="$full"
           backgroundColor={
-            count > 0 ? '$brandNavyLight' : '$surfacePanelBorder'
+            canDecrement ? '$brandNavyLight' : '$surfacePanelBorder'
           }
           alignItems="center"
           justifyContent="center"
-          cursor={count > 0 ? 'pointer' : 'default'}
+          cursor={canDecrement ? 'pointer' : 'default'}
           animation="quick"
         >
-          <Minus size={12} color={count > 0 ? '$textOnAccent' : '$textMuted'} />
+          <Minus
+            size={12}
+            color={canDecrement ? '$textOnAccent' : '$textMuted'}
+          />
         </XStack>
         <Text
           fontSize={16}
@@ -131,17 +141,19 @@ export function StepRosterSettings({
       ? ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DL', 'LB', 'DB', 'BN']
       : ['QB', 'RB', 'WR', 'TE', 'FLEX', 'K', 'DST', 'BN'];
 
-  function adjust(slot: string, delta: number) {
-    const current = rosterSlots[slot] ?? 0;
-    const next = Math.max(0, current + delta);
-    onChange({ ...rosterSlots, [slot]: next });
-  }
-
   const totalStarters = Object.entries(rosterSlots)
     .filter(([slot]) => slot !== 'BN')
     .reduce((sum, [, n]) => sum + n, 0);
   const bench = rosterSlots['BN'] ?? 0;
   const totalRoster = totalStarters + bench;
+
+  function adjust(slot: string, delta: number) {
+    const current = rosterSlots[slot] ?? 0;
+    const next = Math.max(0, current + delta);
+    if (next === current) return;
+    if (delta < 0 && totalRoster <= MIN_ROSTER_SIZE) return;
+    onChange({ ...rosterSlots, [slot]: next });
+  }
 
   return (
     <YStack gap="$4">
@@ -201,6 +213,9 @@ export function StepRosterSettings({
             key={slot}
             slot={slot}
             count={rosterSlots[slot] ?? 0}
+            canDecrement={
+              (rosterSlots[slot] ?? 0) > 0 && totalRoster > MIN_ROSTER_SIZE
+            }
             onIncrement={() => adjust(slot, 1)}
             onDecrement={() => adjust(slot, -1)}
           />
