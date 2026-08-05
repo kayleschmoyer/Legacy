@@ -263,6 +263,44 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('no-current-matchup hero state (LS-9047)', () => {
+    it('renders the baseball standing block (record + rank) in place of the score zone', () => {
+      // `league` has no matchupId/matchupStatus — the no-matchup branch.
+      const { getByText } = render(
+        <HomeScreen {...baseProps} leagues={[league]} />,
+      );
+      expect(getByText('Active · Week 8/14')).toBeTruthy();
+      expect(getByText('6-2')).toBeTruthy();
+      expect(getByText('Record')).toBeTruthy();
+      expect(getByText('#1')).toBeTruthy();
+      expect(getByText('of 10')).toBeTruthy();
+    });
+
+    it('renders the football bye-week header and standing row on the bug', () => {
+      const byeWeekLeague: HomeLeagueSummary = {
+        leagueId: 52,
+        leagueName: 'Steel Curtain Era',
+        sport: 'football',
+        leaguePhase: 'active',
+        wins: 5,
+        losses: 3,
+        rank: 2,
+        totalTeams: 10,
+        teamCount: 10,
+        currentWeekNumber: 9,
+        totalMatchups: 17,
+      };
+      const { getByText, getByTestId } = render(
+        <HomeScreen {...baseProps} leagues={[byeWeekLeague]} />,
+      );
+      expect(getByText('Bye week · Week 9/17')).toBeTruthy();
+      expect(getByText('Standing')).toBeTruthy();
+      expect(getByText('#2')).toBeTruthy();
+      expect(getByText('5-3')).toBeTruthy();
+      expect(getByTestId('home-playboard-hero')).toBeTruthy();
+    });
+  });
+
   describe('mock draft CTA', () => {
     it('renders the Start Mock Draft button when onStartMockDraft is provided', () => {
       const onStartMockDraft = jest.fn();

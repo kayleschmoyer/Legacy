@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { H1, H2, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
-import type { GestureResponderEvent } from 'react-native';
+import type { GestureResponderEvent, LayoutChangeEvent } from 'react-native';
 import { ArrowRight } from '@tamagui/lucide-icons';
 import { formatDraftDate } from '@legacy-sports/utils';
 // Football playboard-hero palette (LS-9035) — theme-invariant physical-object
@@ -374,7 +374,12 @@ function TicketHeroHead({ summary }: { summary: HomeLeagueSummary }) {
   } else if (isPreDraft) {
     label = 'Draft Scheduled';
   } else if (summary.leaguePhase === 'active') {
-    label = 'Active';
+    // No-current-matchup state (LS-9047): between weeks, matches the
+    // mockup's plain "Active · Week X/Y" header (no live pulse dot).
+    label =
+      summary.currentWeekNumber != null && summary.totalMatchups != null
+        ? `Active · Week ${summary.currentWeekNumber}/${summary.totalMatchups}`
+        : 'Active';
   } else {
     label = 'Offseason';
   }
@@ -455,6 +460,39 @@ function TicketScoreStat({
         letterSpacing={1.1}
         textTransform="uppercase"
         color={TICKET_INK_SOFT}
+      >
+        {label}
+      </Text>
+    </YStack>
+  );
+}
+
+/** One cell of the no-current-matchup standing block (`.tk-stat` in the
+ *  mockup) — centered value + label, reusing the same stock/ink tokens as
+ *  the live score zone. */
+function TicketStandingStat({ big, label }: { big: string; label: string }) {
+  return (
+    <YStack alignItems="center" paddingHorizontal={8}>
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="800"
+        fontSize={40}
+        $gtXs={{ fontSize: 46 }}
+        lineHeight={42}
+        letterSpacing={-0.5}
+        color={BRAND_NAVY}
+        fontVariant={['tabular-nums']}
+      >
+        {big}
+      </Text>
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="700"
+        fontSize={10.5}
+        letterSpacing={1.8}
+        textTransform="uppercase"
+        color={TICKET_INK_TRAIL}
+        marginTop={8}
       >
         {label}
       </Text>
@@ -627,19 +665,24 @@ function TicketHeroScoreZone({
     );
   }
 
+  // No-current-matchup standing block (LS-9047, `.tk-standing` in the
+  // mockup): two centered stat cells separated by a dashed rule, in place
+  // of the head-to-head score block.
   return (
-    <XStack gap="$5" alignItems="flex-end">
-      <TicketScoreStat
-        big={recordOf(summary)}
-        label="Record"
-        color={TICKET_INK}
-      />
+    <XStack justifyContent="flex-end">
+      <TicketStandingStat big={recordOf(summary)} label="Record" />
       {summary.rank != null && summary.totalTeams != null ? (
-        <TicketScoreStat
-          big={`#${summary.rank}`}
-          label={`of ${summary.totalTeams}`}
-          color={TICKET_INK_SOFT}
-        />
+        <XStack
+          borderLeftWidth={1}
+          borderLeftColor={TICKET_RULE}
+          borderStyle="dashed"
+          marginLeft={18}
+        >
+          <TicketStandingStat
+            big={`#${summary.rank}`}
+            label={`of ${summary.totalTeams}`}
+          />
+        </XStack>
       ) : null}
     </XStack>
   );
@@ -887,11 +930,14 @@ function PlayboardButton({
   onPress,
   variant,
   testID,
+  fullWidth = false,
 }: {
   label: string;
   onPress?: () => void;
   variant: 'solid' | 'outline';
   testID?: string;
+  /** `@container pboard (max-width: 380px)` — actions go full-width (LS-9047). */
+  fullWidth?: boolean;
 }) {
   const isSolid = variant === 'solid';
   return (
@@ -905,6 +951,7 @@ function PlayboardButton({
       }}
       tabIndex={0}
       minHeight={44}
+      width={fullWidth ? '100%' : undefined}
       paddingVertical={12}
       paddingHorizontal={18}
       borderRadius={4}
@@ -986,11 +1033,15 @@ function BugPlate({
   sub,
   points,
   leading,
+  standing = false,
 }: {
   abbr: string;
   sub?: string | null;
   points: string;
   leading: boolean;
+  /** Shrinks abbr/points type, matching the mockup's `.bug-row.bug-standing`
+   *  no-current-matchup row (LS-9047). */
+  standing?: boolean;
 }) {
   return (
     <GradientSurface
@@ -1020,8 +1071,8 @@ function BugPlate({
         <Text
           fontFamily={DISPLAY_FONT}
           fontWeight="800"
-          fontSize={24}
-          letterSpacing={1.3}
+          fontSize={standing ? 13 : 24}
+          letterSpacing={standing ? 1.6 : 1.3}
           color={playboardTokens.bug.textOnChrome}
           numberOfLines={1}
         >
@@ -1043,7 +1094,7 @@ function BugPlate({
       <Text
         fontFamily={DISPLAY_FONT}
         fontWeight="800"
-        fontSize={26}
+        fontSize={standing ? 22 : 26}
         minWidth={56}
         textAlign="right"
         color={
@@ -1130,11 +1181,21 @@ function BugBottomBar({
 }
 
 /** The beveled-chrome scorebug — fixed 250px, mounted on the board. */
-function PlayboardBug({ summary }: { summary: HomeLeagueSummary }) {
+function PlayboardBug({
+  summary,
+  fullWidth = false,
+}: {
+  summary: HomeLeagueSummary;
+  /** Forces the bug to 100% width even at wide viewports — set when the
+   *  board's own rendered width has dropped below the `@container pboard`
+   *  560px breakpoint (LS-9047). */
+  fullWidth?: boolean;
+}) {
   const isDraftLive = summary.draftStatus === 'in-progress';
   const hasMatchup =
     summary.matchupId != null && summary.matchupStatus === 'in_progress';
   const isPreDraft = summary.leaguePhase === 'pre-draft';
+  const isBye = summary.leaguePhase === 'active' && !hasMatchup;
 
   let body: React.ReactNode;
   let bottomLeft: string;
@@ -1178,6 +1239,26 @@ function PlayboardBug({ summary }: { summary: HomeLeagueSummary }) {
     bottomLeft = 'Draft scheduled';
     bottomRight =
       summary.teamCount != null ? `${summary.teamCount} teams` : null;
+  } else if (isBye) {
+    // No-current-matchup ("bye week") standing row (LS-9047): the bug keeps
+    // its two plates, but the second becomes a `.bug-row.bug-standing` rank
+    // row instead of an opponent score.
+    body = (
+      <>
+        <BugPlate abbr="You" points={recordOf(summary)} leading={false} />
+        <BugPlate
+          abbr="Standing"
+          points={summary.rank != null ? `#${summary.rank}` : '—'}
+          leading={false}
+          standing
+        />
+      </>
+    );
+    bottomLeft =
+      summary.currentWeekNumber != null && summary.totalMatchups != null
+        ? `Week ${summary.currentWeekNumber} of ${summary.totalMatchups}`
+        : 'This week';
+    bottomRight = 'Bye';
   } else {
     body = <BugStatusPlate label={recordOf(summary)} />;
     bottomLeft =
@@ -1187,7 +1268,11 @@ function PlayboardBug({ summary }: { summary: HomeLeagueSummary }) {
   }
 
   return (
-    <YStack width="100%" $gtSm={{ width: 250 }} alignSelf="stretch">
+    <YStack
+      width="100%"
+      $gtSm={{ width: fullWidth ? '100%' : 250 }}
+      alignSelf="stretch"
+    >
       <GradientSurface
         testID="home-playboard-bug"
         colors={[
@@ -1233,6 +1318,20 @@ function PlayboardHeroCard({
   const isActive = summary.leaguePhase === 'active';
   const eraDesc = formatEraDescriptor(summary);
 
+  // `@container pboard` breakpoints (LS-9047): the mockup keys these off the
+  // board's own rendered width, not the viewport, so — unlike the rest of
+  // this file's `$gtXs`/`$gtSm` viewport breakpoints — they're measured via
+  // `onLayout`. React Native has no CSS container-query equivalent; this is
+  // the platform-agnostic substitute (works identically on web and native).
+  const [boardWidth, setBoardWidth] = useState<number | null>(null);
+  const stackBug = boardWidth != null && boardWidth <= 560;
+  const compactActions = boardWidth != null && boardWidth <= 380;
+
+  // No-current-matchup ("bye week") state (LS-9047): active league, no live
+  // matchup. Header drops the live pulse dot and switches to the muted
+  // secondary color, matching the mockup's plain "Bye week · Week X/Y" text.
+  const isBye = isActive && !hasMatchup;
+
   let headerLabel: string;
   if (isDraftLive) {
     headerLabel = 'Draft Live';
@@ -1242,11 +1341,17 @@ function PlayboardHeroCard({
     headerLabel = 'Live';
   } else if (isPreDraft) {
     headerLabel = 'Draft Scheduled';
-  } else if (isActive) {
-    headerLabel = 'Active';
+  } else if (isBye) {
+    headerLabel =
+      summary.currentWeekNumber != null && summary.totalMatchups != null
+        ? `Bye week · Week ${summary.currentWeekNumber}/${summary.totalMatchups}`
+        : 'Bye week';
   } else {
     headerLabel = 'Offseason';
   }
+  const headerColor = isBye
+    ? playboardTokens.textSecondary
+    : playboardTokens.liveMint;
 
   const whenLabel = hasMatchup
     ? formatMatchupCloses(summary.matchupEndTime)
@@ -1260,6 +1365,9 @@ function PlayboardHeroCard({
       accessibilityRole="button"
       accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
       onPress={onPress}
+      onLayout={(e: LayoutChangeEvent) =>
+        setBoardWidth(e.nativeEvent.layout.width)
+      }
       tabIndex={0}
       cursor="pointer"
       position="relative"
@@ -1309,19 +1417,21 @@ function PlayboardHeroCard({
           borderStyle="dashed"
         >
           <XStack alignItems="center" gap="$2">
-            <YStack
-              width={8}
-              height={8}
-              borderRadius={9999}
-              backgroundColor={playboardTokens.liveMint}
-            />
+            {isBye ? null : (
+              <YStack
+                width={8}
+                height={8}
+                borderRadius={9999}
+                backgroundColor={playboardTokens.liveMint}
+              />
+            )}
             <Text
               fontFamily={DISPLAY_FONT}
               fontWeight="800"
               fontSize={11}
               letterSpacing={1.6}
               textTransform="uppercase"
-              color={playboardTokens.liveMint}
+              color={headerColor}
             >
               {headerLabel}
             </Text>
@@ -1359,15 +1469,18 @@ function PlayboardHeroCard({
 
         <YStack
           gap="$5"
-          $gtSm={{ flexDirection: 'row', alignItems: 'stretch' }}
+          $gtSm={{
+            flexDirection: stackBug ? 'column' : 'row',
+            alignItems: 'stretch',
+          }}
         >
           <YStack flex={1} minWidth={0} justifyContent="space-between" gap="$4">
             <YStack gap="$2">
               <Text
                 fontFamily={DISPLAY_FONT}
                 fontWeight="800"
-                fontSize={26}
-                $gtSm={{ fontSize: 34 }}
+                fontSize={compactActions ? 24 : 26}
+                $gtSm={{ fontSize: compactActions ? 24 : 34 }}
                 lineHeight={32}
                 textTransform="uppercase"
                 color={playboardTokens.textPrimary}
@@ -1401,23 +1514,29 @@ function PlayboardHeroCard({
                 ) : null}
               </XStack>
             </YStack>
-            <XStack gap="$2" flexWrap="wrap">
+            <XStack
+              gap="$2"
+              flexDirection={compactActions ? 'column' : 'row'}
+              flexWrap="wrap"
+            >
               <PlayboardButton
                 label="Set Lineup"
                 variant="solid"
                 onPress={onSetLineup}
                 testID="home-playboard-set-lineup"
+                fullWidth={compactActions}
               />
               <PlayboardButton
                 label="View League"
                 variant="outline"
                 onPress={onPress}
                 testID="home-playboard-view-league"
+                fullWidth={compactActions}
               />
             </XStack>
           </YStack>
 
-          <PlayboardBug summary={summary} />
+          <PlayboardBug summary={summary} fullWidth={stackBug} />
         </YStack>
       </YStack>
     </YStack>
