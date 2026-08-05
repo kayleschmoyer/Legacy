@@ -238,6 +238,7 @@ export const GRADIENT_AVATAR = `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAN
 
 export const OVERLAY_BLACK_30 = 'rgba(0, 0, 0, 0.3)';
 export const OVERLAY_BLACK_40 = 'rgba(0, 0, 0, 0.4)';
+export const OVERLAY_BLACK_50 = 'rgba(0, 0, 0, 0.5)';
 export const OVERLAY_WHITE_05 = 'rgba(255, 255, 255, 0.05)';
 export const OVERLAY_WHITE_10 = 'rgba(255, 255, 255, 0.1)';
 
@@ -245,6 +246,26 @@ export const OVERLAY_WHITE_10 = 'rgba(255, 255, 255, 0.1)';
 
 /** Danger/destructive accent — decline/cancel actions, error surfaces. */
 export const STATUS_DANGER = '#EF4444';
+
+// -- Ticket-stock hero card (LS-9034) ---------------------------------
+// Design source: docs/design/nxFiEGqu3yPCDKpoNDmQWA/legacy-sports-homepage.
+// Cream-stock "printed ticket" motif for the baseball home hero card — the
+// one light surface on an otherwise dark-theme page. Dark-on-light text
+// tokens scoped to that one card; do NOT reuse dark-theme text tokens here,
+// and do NOT reuse these on any dark-surface component.
+
+/** Ticket stock gradient — top stop. */
+export const TICKET_STOCK = '#F4EEDC';
+/** Ticket stock gradient — bottom stop. */
+export const TICKET_STOCK_2 = '#E9E0C8';
+/** Ticket primary ink (titles, leading team name). */
+export const TICKET_INK = '#1B2536';
+/** Ticket secondary ink (sub-copy, deadlines). */
+export const TICKET_INK_SOFT = '#6E6A5C';
+/** Ticket tertiary ink (trailing team name/score, "vs" divider). */
+export const TICKET_INK_TRAIL = '#918A77';
+/** Ticket dashed-rule / perforation color. */
+export const TICKET_RULE = '#CFC3A6';
 
 // -- Stats Page Brand Tokens (LS-4612) --------------------------------
 // Design source: docs/design/qtqqKYxMFf1A8GY5NL9GNQ/legacy-sports-stats-page/

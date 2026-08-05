@@ -23,6 +23,8 @@ export interface GradientSurfaceProps {
   onPress?: () => void;
   width?: number | string;
   height?: number | string;
+  flex?: number;
+  minWidth?: number | string;
   /** Radius applied to every corner that has no explicit per-corner value. */
   borderRadius?: number;
   borderTopLeftRadius?: number;

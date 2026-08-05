@@ -1,8 +1,13 @@
 import React, { useMemo } from 'react';
 import { H1, H2, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import type { GestureResponderEvent } from 'react-native';
+import { ArrowRight } from '@tamagui/lucide-icons';
 import { formatDraftDate } from '@legacy-sports/utils';
-import { formatEraDescriptor, formatEraYears } from './homeSummaryFormatters';
+import {
+  formatEraDescriptor,
+  formatEraYears,
+  formatMatchupCloses,
+} from './homeSummaryFormatters';
 import {
   deriveHomeUserStats,
   type HomeLeagueSummary,
@@ -12,11 +17,13 @@ import {
   sortByUrgency,
 } from './leagueSummaryStats';
 import { BODY_FONT, DISPLAY_FONT } from './homeFonts';
+import { GradientSurface } from './GradientSurface';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
 import {
   AMBER_WARM,
   BG_DARK,
   BRAND_GOLD,
+  BRAND_GOLD_DARK,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
@@ -25,8 +32,16 @@ import {
   GREEN,
   GREEN_DEEP,
   GREEN_LIGHTER,
+  OVERLAY_BLACK_40,
+  OVERLAY_BLACK_50,
   SCORE_LOSS,
   TEXT_TERTIARY,
+  TICKET_INK,
+  TICKET_INK_SOFT,
+  TICKET_INK_TRAIL,
+  TICKET_RULE,
+  TICKET_STOCK,
+  TICKET_STOCK_2,
   WHITE,
   withAlpha,
 } from '../../utils/colors';
@@ -216,54 +231,50 @@ function ActionButton({
   );
 }
 
-function PhaseChip({
-  phase,
-  draftStatus,
-  hasMatchup,
+/* ─── Ticket-stock hero card (LS-9034) ───
+   Baseball hero replaces the dark league-hero panel with a printed-ticket
+   motif: a cream-stock card carrying league identity + score, plus a
+   perforated stub. Dark-on-light ink tokens only — never the dark-theme
+   `$color`/`$textMuted` tokens used elsewhere in this file. */
+
+function TicketButton({
+  label,
+  onPress,
+  variant,
+  testID,
 }: {
-  phase?: string | null;
-  draftStatus?: string | null;
-  hasMatchup?: boolean;
+  label: string;
+  onPress?: () => void;
+  variant: 'solid' | 'outline';
+  testID?: string;
 }) {
-  const isDraftLive = draftStatus === 'in-progress';
-  const isActive = phase === 'active';
-  const isPreDraft = phase === 'pre-draft';
-
-  let label: string;
-  let bg: string;
-  let textColor: string;
-
-  if (isDraftLive) {
-    label = 'Draft Live';
-    bg = withAlpha(BRAND_SEAM_RED, 0.15);
-    textColor = BRAND_SEAM_RED_LIGHT;
-  } else if (isActive && hasMatchup) {
-    label = 'Active · Live';
-    bg = withAlpha(GREEN, 0.12);
-    textColor = GREEN_LIGHTER;
-  } else if (isActive) {
-    label = 'Active';
-    bg = withAlpha(GREEN, 0.12);
-    textColor = GREEN_LIGHTER;
-  } else if (isPreDraft) {
-    label = 'Draft Scheduled';
-    bg = withAlpha(BRAND_GOLD, 0.12);
-    textColor = BRAND_GOLD_LIGHT;
-  } else {
-    label = 'Offseason';
-    bg = withAlpha(TEXT_TERTIARY, 0.1);
-    textColor = TEXT_TERTIARY;
-  }
-
+  const isSolid = variant === 'solid';
   return (
     <XStack
-      alignSelf="flex-start"
-      backgroundColor={bg}
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      cursor="pointer"
+      minHeight={44}
+      paddingVertical={12}
+      paddingHorizontal={18}
+      borderRadius={4}
       borderWidth={1}
-      borderColor={withAlpha(textColor, 0.4)}
-      borderRadius={9999}
-      paddingVertical={5}
-      paddingHorizontal={11}
+      borderColor={isSolid ? BRAND_NAVY : withAlpha(TICKET_INK, 0.32)}
+      backgroundColor={isSolid ? BRAND_NAVY : 'transparent'}
+      alignItems="center"
+      justifyContent="center"
+      hoverStyle={{
+        backgroundColor: isSolid
+          ? BRAND_NAVY_LIGHT
+          : withAlpha(TICKET_INK, 0.05),
+        borderColor: isSolid ? BRAND_NAVY_LIGHT : TICKET_INK,
+      }}
+      focusStyle={{
+        borderColor: isSolid ? BRAND_NAVY_LIGHT : TICKET_INK,
+        borderWidth: 2,
+      }}
     >
       <Text
         fontFamily={DISPLAY_FONT}
@@ -271,7 +282,7 @@ function PhaseChip({
         fontSize={11}
         letterSpacing={1.3}
         textTransform="uppercase"
-        color={textColor}
+        color={isSolid ? WHITE : TICKET_INK}
       >
         {label}
       </Text>
@@ -279,14 +290,142 @@ function PhaseChip({
   );
 }
 
-function Stat({
+function TicketMatchupLink({ onPress }: { onPress?: () => void }) {
+  return (
+    <XStack
+      testID="home-hero-full-matchup"
+      accessibilityRole="link"
+      accessibilityLabel="View full matchup"
+      onPress={onPress}
+      alignSelf="flex-start"
+      alignItems="center"
+      gap="$1.5"
+      marginTop="$2"
+      cursor="pointer"
+      borderBottomWidth={1}
+      borderBottomColor={withAlpha(TICKET_INK, 0.28)}
+      paddingBottom={2}
+      hoverStyle={{ borderBottomColor: TICKET_INK }}
+      focusStyle={{ borderBottomColor: BRAND_NAVY, borderBottomWidth: 2 }}
+    >
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="700"
+        fontSize={11}
+        letterSpacing={1.2}
+        textTransform="uppercase"
+        color={BRAND_NAVY}
+      >
+        Full matchup
+      </Text>
+      <ArrowRight size={12} color={BRAND_NAVY} />
+    </XStack>
+  );
+}
+
+function TicketRankSeal({ rank }: { rank: number }) {
+  return (
+    <XStack
+      borderWidth={1.5}
+      borderColor={withAlpha(BRAND_GOLD_DARK, 0.65)}
+      backgroundColor={withAlpha(BRAND_GOLD_DARK, 0.1)}
+      borderRadius={3}
+      paddingVertical={5}
+      paddingHorizontal={9}
+    >
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="800"
+        fontSize={10}
+        letterSpacing={1.6}
+        textTransform="uppercase"
+        color={BRAND_GOLD_DARK}
+      >
+        Rank #{rank}
+      </Text>
+    </XStack>
+  );
+}
+
+/** Dashed-rule header: live/deadline pulse, rank seal, close time. */
+function TicketHeroHead({ summary }: { summary: HomeLeagueSummary }) {
+  const isDraftLive = summary.draftStatus === 'in-progress';
+  const hasMatchup =
+    summary.matchupId != null && summary.matchupStatus === 'in_progress';
+  const isPreDraft = summary.leaguePhase === 'pre-draft';
+
+  let label: string;
+  if (isDraftLive) {
+    label = 'Draft Live';
+  } else if (hasMatchup) {
+    label =
+      summary.currentWeekNumber != null && summary.totalMatchups != null
+        ? `Live · Week ${summary.currentWeekNumber}/${summary.totalMatchups}`
+        : 'Live';
+  } else if (isPreDraft) {
+    label = 'Draft Scheduled';
+  } else if (summary.leaguePhase === 'active') {
+    label = 'Active';
+  } else {
+    label = 'Offseason';
+  }
+
+  const showDot = isDraftLive || hasMatchup;
+  const deadline = hasMatchup
+    ? formatMatchupCloses(summary.matchupEndTime)
+    : null;
+
+  return (
+    <XStack
+      alignItems="center"
+      justifyContent="space-between"
+      flexWrap="wrap"
+      gap="$2"
+      paddingBottom={13}
+      borderBottomWidth={1}
+      borderBottomColor={TICKET_RULE}
+      borderStyle="dashed"
+    >
+      <XStack alignItems="center" gap="$2" flexWrap="wrap">
+        <XStack alignItems="center" gap="$2">
+          {showDot ? (
+            <YStack
+              width={7}
+              height={7}
+              borderRadius={9999}
+              backgroundColor={BRAND_SEAM_RED}
+            />
+          ) : null}
+          <Text
+            fontFamily={DISPLAY_FONT}
+            fontWeight="800"
+            fontSize={11}
+            letterSpacing={1.6}
+            textTransform="uppercase"
+            color={showDot ? BRAND_SEAM_RED : TICKET_INK_SOFT}
+          >
+            {label}
+          </Text>
+        </XStack>
+        {summary.rank != null ? <TicketRankSeal rank={summary.rank} /> : null}
+      </XStack>
+      {deadline ? (
+        <Text fontFamily={BODY_FONT} fontSize={12.5} color={TICKET_INK_SOFT}>
+          Closes {deadline}
+        </Text>
+      ) : null}
+    </XStack>
+  );
+}
+
+function TicketScoreStat({
   big,
   label,
-  color = '$color',
+  color,
 }: {
   big: string;
   label: string;
-  color?: string;
+  color: string;
 }) {
   return (
     <YStack gap="$1">
@@ -306,7 +445,7 @@ function Stat({
         fontSize={11}
         letterSpacing={1.1}
         textTransform="uppercase"
-        color="$textMuted"
+        color={TICKET_INK_SOFT}
       >
         {label}
       </Text>
@@ -314,130 +453,186 @@ function Stat({
   );
 }
 
-/* ─── Hero right panel ─── */
-
-function HeroRightPanel({ summary }: { summary: HomeLeagueSummary }) {
+/**
+ * Score zone — the ticket-stock replacement for the old dark-panel
+ * `HeroRightPanel`. Score-zone logic (live draft / active matchup /
+ * record+rank / offseason) is unchanged from the prior implementation; only
+ * the visual treatment moved from dark-panel tokens to on-stock ink tokens.
+ */
+function TicketHeroScoreZone({
+  summary,
+  onFullMatchup,
+}: {
+  summary: HomeLeagueSummary;
+  onFullMatchup?: () => void;
+}) {
   const isDraftLive = summary.draftStatus === 'in-progress';
   const hasMatchup =
     summary.matchupId != null && summary.matchupStatus === 'in_progress';
   const isPreDraft = summary.leaguePhase === 'pre-draft';
 
-  const panel = (children: React.ReactNode) => (
-    <YStack
-      backgroundColor="$glassSurfaceLight"
-      borderWidth={1}
-      borderColor="$surfacePanelBorder"
-      borderRadius={16}
-      padding={20}
-      gap="$3"
-    >
-      {children}
-    </YStack>
-  );
-
   if (isDraftLive) {
-    return panel(
-      <>
+    return (
+      <YStack gap="$2">
         <Text
           fontFamily={DISPLAY_FONT}
           fontWeight="800"
-          fontSize={28}
+          fontSize={26}
           lineHeight={28}
-          color={BRAND_SEAM_RED_LIGHT}
+          color={TICKET_INK}
         >
           Draft in Progress
         </Text>
         {summary.draftMode ? (
-          <Text fontFamily={BODY_FONT} fontSize={15} color="$textMuted">
+          <Text fontFamily={BODY_FONT} fontSize={14} color={TICKET_INK_SOFT}>
             {summary.draftMode === 'snake' ? 'Snake draft' : summary.draftMode}
             {summary.selectionMethod === 'auto' ? ' · Auto-pick' : ''}
           </Text>
         ) : null}
-      </>,
+      </YStack>
     );
   }
 
   if (hasMatchup) {
     const userScore = safeScore(summary.userScore);
     const oppScore = safeScore(summary.opponentScore);
+    // Ties read as the user leading — mirrors the prior dark-panel logic.
     const isLeading = userScore >= oppScore;
-    return panel(
-      <XStack alignItems="center" justifyContent="space-between" gap="$4">
-        <YStack alignItems="center" gap="$2" flex={1}>
-          <Text
-            fontFamily={DISPLAY_FONT}
-            fontWeight="700"
-            fontSize={13}
-            letterSpacing={0.8}
-            textTransform="uppercase"
-            color="$color"
-          >
-            My Team
-          </Text>
+    return (
+      <YStack gap="$3">
+        <XStack gap="$3.5" alignItems="flex-end">
+          <YStack flex={1} minWidth={0} position="relative" paddingBottom={12}>
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="700"
+              fontSize={11}
+              letterSpacing={1.4}
+              textTransform="uppercase"
+              color={TICKET_INK_SOFT}
+              numberOfLines={1}
+            >
+              My Team
+            </Text>
+            <Text
+              fontFamily={BODY_FONT}
+              fontSize={11.5}
+              color={TICKET_INK_TRAIL}
+              fontVariant={['tabular-nums']}
+              marginTop={2}
+            >
+              {recordOf(summary)}
+              {summary.rank != null ? ` · Rank #${summary.rank}` : ''}
+            </Text>
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="800"
+              fontSize={38}
+              $gtXs={{ fontSize: 48 }}
+              $gtMd={{ fontSize: 56 }}
+              letterSpacing={-0.5}
+              fontVariant={['tabular-nums']}
+              color={isLeading ? BRAND_NAVY : TICKET_INK_TRAIL}
+              marginTop={6}
+            >
+              {userScore.toFixed(1)}
+            </Text>
+            {isLeading ? (
+              <YStack
+                position="absolute"
+                bottom={0}
+                left={0}
+                height={3}
+                width={46}
+                borderRadius={2}
+                backgroundColor={BRAND_GOLD_DARK}
+              />
+            ) : null}
+          </YStack>
           <Text
             fontFamily={DISPLAY_FONT}
             fontWeight="800"
-            fontSize={isLeading ? 48 : 40}
-            lineHeight={isLeading ? 48 : 40}
-            color={isLeading ? BRAND_GOLD_LIGHT : '$color'}
-            fontVariant={['tabular-nums']}
-          >
-            {userScore.toFixed(1)}
-          </Text>
-        </YStack>
-        <Text
-          fontFamily={DISPLAY_FONT}
-          fontWeight="800"
-          fontSize={15}
-          letterSpacing={2.5}
-          color={TEXT_TERTIARY}
-        >
-          VS
-        </Text>
-        <YStack alignItems="center" gap="$2" flex={1}>
-          <Text
-            fontFamily={DISPLAY_FONT}
-            fontWeight="700"
-            fontSize={13}
-            letterSpacing={0.8}
+            fontSize={11}
+            letterSpacing={2}
             textTransform="uppercase"
-            color="$color"
-            numberOfLines={1}
+            color={TICKET_INK_TRAIL}
+            paddingBottom={16}
           >
-            {summary.opponentTeamName ?? 'Opponent'}
+            vs
           </Text>
-          <Text
-            fontFamily={DISPLAY_FONT}
-            fontWeight="800"
-            fontSize={!isLeading ? 48 : 40}
-            lineHeight={!isLeading ? 48 : 40}
-            color={!isLeading ? BRAND_GOLD_LIGHT : '$color'}
-            fontVariant={['tabular-nums']}
+          <YStack
+            flex={1}
+            minWidth={0}
+            position="relative"
+            alignItems="flex-end"
+            paddingBottom={12}
           >
-            {oppScore.toFixed(1)}
-          </Text>
-        </YStack>
-      </XStack>,
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="700"
+              fontSize={11}
+              letterSpacing={1.4}
+              textTransform="uppercase"
+              color={TICKET_INK_SOFT}
+              numberOfLines={1}
+            >
+              {summary.opponentTeamName ?? 'Opponent'}
+            </Text>
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="800"
+              fontSize={38}
+              $gtXs={{ fontSize: 48 }}
+              $gtMd={{ fontSize: 56 }}
+              letterSpacing={-0.5}
+              fontVariant={['tabular-nums']}
+              color={!isLeading ? BRAND_NAVY : TICKET_INK_TRAIL}
+              marginTop={6}
+            >
+              {oppScore.toFixed(1)}
+            </Text>
+            {!isLeading ? (
+              <YStack
+                position="absolute"
+                bottom={0}
+                right={0}
+                height={3}
+                width={46}
+                borderRadius={2}
+                backgroundColor={BRAND_GOLD_DARK}
+              />
+            ) : null}
+          </YStack>
+        </XStack>
+        <TicketMatchupLink onPress={onFullMatchup} />
+      </YStack>
     );
   }
 
   if (isPreDraft && summary.draftScheduledAt) {
-    return panel(
-      <Stat
+    return (
+      <TicketScoreStat
         big={formatDraftDate(summary.draftScheduledAt)}
         label="Draft Scheduled"
-        color={BRAND_GOLD_LIGHT}
-      />,
+        color={BRAND_GOLD_DARK}
+      />
     );
   }
 
-  return panel(
-    <XStack gap="$6" alignItems="center">
-      <Stat big={recordOf(summary)} label="Record" color={BRAND_GOLD_LIGHT} />
+  return (
+    <XStack gap="$5" alignItems="flex-end">
+      <TicketScoreStat
+        big={recordOf(summary)}
+        label="Record"
+        color={TICKET_INK}
+      />
       {summary.rank != null && summary.totalTeams != null ? (
-        <Stat big={`#${summary.rank}`} label={`of ${summary.totalTeams}`} />
+        <TicketScoreStat
+          big={`#${summary.rank}`}
+          label={`of ${summary.totalTeams}`}
+          color={TICKET_INK_SOFT}
+        />
       ) : null}
-    </XStack>,
+    </XStack>
   );
 }
 
@@ -452,95 +647,203 @@ function LeagueHeroCard({
   onPress: () => void;
   onSetLineup?: () => void;
 }) {
-  const hasMatchup =
-    summary.matchupId != null && summary.matchupStatus === 'in_progress';
   const eraDesc = formatEraDescriptor(summary);
+  const stubLabel =
+    summary.currentWeekNumber != null
+      ? `Admit One · Week ${summary.currentWeekNumber}`
+      : 'Admit One';
 
   return (
-    <YStack
+    <XStack
       testID="home-hero-card"
       accessibilityRole="button"
       accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
       onPress={onPress}
       cursor="pointer"
-      borderRadius={24}
-      borderWidth={1}
-      borderColor={withAlpha(BRAND_GOLD, 0.22)}
-      backgroundColor="$surfaceCard"
-      padding={32}
-      gap="$5"
-      $gtSm={{ flexDirection: 'row', alignItems: 'center' }}
-      hoverStyle={{ borderColor: withAlpha(BRAND_GOLD, 0.4) }}
+      borderRadius={6}
+      borderWidth={2}
+      borderColor="transparent"
+      shadowColor={OVERLAY_BLACK_40}
+      shadowOffset={{ width: 0, height: 16 }}
+      shadowRadius={38}
+      hoverStyle={{
+        y: -2,
+        shadowColor: OVERLAY_BLACK_50,
+        shadowOffset: { width: 0, height: 22 },
+        shadowRadius: 44,
+      }}
+      focusStyle={{
+        borderColor: BRAND_GOLD_LIGHT,
+        shadowColor: OVERLAY_BLACK_50,
+        shadowOffset: { width: 0, height: 22 },
+        shadowRadius: 44,
+      }}
     >
-      <YStack flex={1} gap="$4" minWidth={0}>
-        <XStack gap="$2" flexWrap="wrap" alignItems="center">
-          <PhaseChip
-            phase={summary.leaguePhase}
-            draftStatus={summary.draftStatus}
-            hasMatchup={hasMatchup}
-          />
-        </XStack>
-        <Text
-          fontFamily={DISPLAY_FONT}
-          fontWeight="800"
-          fontSize={36}
-          lineHeight={38}
-          color="$color"
+      <GradientSurface
+        flex={1}
+        minWidth={0}
+        colors={[TICKET_STOCK, TICKET_STOCK_2]}
+        angle={155}
+        borderRadius={6}
+        flexDirection="row"
+      >
+        <YStack
+          flex={1}
+          minWidth={0}
+          gap="$4"
+          paddingVertical={18}
+          paddingHorizontal={16}
+          $gtXs={{ paddingVertical: 22, paddingHorizontal: 24 }}
+          $gtMd={{ paddingTop: 26, paddingHorizontal: 30, paddingBottom: 28 }}
         >
-          {summary.leagueName ?? 'League'}
-        </Text>
-        {eraDesc ? (
-          <Text fontFamily={BODY_FONT} fontSize={15} color="$textMuted">
-            {eraDesc}
-          </Text>
-        ) : null}
-        <XStack gap="$3" flexWrap="wrap" alignItems="center">
-          {summary.currentWeekNumber != null &&
-          summary.totalMatchups != null ? (
-            <Text
-              fontFamily={DISPLAY_FONT}
-              fontWeight="700"
-              fontSize={12}
-              letterSpacing={1.1}
-              textTransform="uppercase"
-              color="$textMuted"
+          <TicketHeroHead summary={summary} />
+          <YStack
+            gap="$5"
+            $gtMd={{ flexDirection: 'row', alignItems: 'center' }}
+          >
+            <YStack flex={1.1} minWidth={0}>
+              <Text
+                fontFamily={DISPLAY_FONT}
+                fontWeight="800"
+                fontSize={26}
+                $gtXs={{ fontSize: 32 }}
+                $gtMd={{ fontSize: 40 }}
+                lineHeight={30}
+                letterSpacing={-0.5}
+                color={TICKET_INK}
+              >
+                {summary.leagueName ?? 'League'}
+              </Text>
+              {eraDesc ? (
+                <Text
+                  fontFamily={BODY_FONT}
+                  fontSize={13.5}
+                  $gtMd={{ fontSize: 14.5 }}
+                  lineHeight={20}
+                  color={TICKET_INK_SOFT}
+                  marginTop={9}
+                  maxWidth={460}
+                >
+                  {eraDesc}
+                </Text>
+              ) : null}
+              <XStack
+                gap="$2"
+                flexWrap="wrap"
+                alignItems="center"
+                marginTop={16}
+              >
+                {summary.teamCount != null ? (
+                  <Text
+                    fontFamily={DISPLAY_FONT}
+                    fontWeight="700"
+                    fontSize={10}
+                    $gtMd={{ fontSize: 11 }}
+                    letterSpacing={1}
+                    textTransform="uppercase"
+                    color={TICKET_INK_TRAIL}
+                    fontVariant={['tabular-nums']}
+                  >
+                    {summary.teamCount} teams
+                  </Text>
+                ) : null}
+                {summary.currentWeekNumber != null &&
+                summary.totalMatchups != null ? (
+                  <Text
+                    fontFamily={DISPLAY_FONT}
+                    fontWeight="700"
+                    fontSize={10}
+                    $gtMd={{ fontSize: 11 }}
+                    letterSpacing={1}
+                    textTransform="uppercase"
+                    color={TICKET_INK_TRAIL}
+                    fontVariant={['tabular-nums']}
+                  >
+                    Week {summary.currentWeekNumber} of {summary.totalMatchups}
+                  </Text>
+                ) : null}
+              </XStack>
+              <XStack gap="$2" marginTop={20} flexWrap="wrap">
+                <TicketButton
+                  label="View League"
+                  variant="solid"
+                  onPress={onPress}
+                  testID="home-hero-view-league"
+                />
+                {onSetLineup ? (
+                  <TicketButton
+                    label="Set Lineup"
+                    variant="outline"
+                    onPress={onSetLineup}
+                    testID="home-hero-set-lineup"
+                  />
+                ) : null}
+              </XStack>
+            </YStack>
+            <YStack
+              minWidth={0}
+              borderTopWidth={1}
+              borderTopColor={TICKET_RULE}
+              borderStyle="dashed"
+              paddingTop={20}
+              $gtMd={{
+                borderTopWidth: 0,
+                borderLeftWidth: 1,
+                borderLeftColor: TICKET_RULE,
+                paddingTop: 0,
+                paddingLeft: 30,
+              }}
             >
-              Week {summary.currentWeekNumber}/{summary.totalMatchups}
-            </Text>
-          ) : null}
-          {summary.teamCount != null ? (
-            <Text
-              fontFamily={DISPLAY_FONT}
-              fontWeight="700"
-              fontSize={12}
-              letterSpacing={1.1}
-              textTransform="uppercase"
-              color="$textMuted"
-            >
-              {summary.teamCount} teams
-            </Text>
-          ) : null}
-        </XStack>
-        <XStack gap="$2" marginTop="$1" flexWrap="wrap">
-          <ActionButton
-            label="View League"
-            variant="gold"
-            onPress={onPress}
-            testID="home-hero-view-league"
+              <TicketHeroScoreZone summary={summary} onFullMatchup={onPress} />
+            </YStack>
+          </YStack>
+        </YStack>
+        <YStack
+          testID="home-hero-stub"
+          width={34}
+          $gtMd={{ width: 56 }}
+          position="relative"
+          alignItems="center"
+          justifyContent="center"
+          borderLeftWidth={2}
+          borderLeftColor={TICKET_RULE}
+          borderStyle="dashed"
+          backgroundColor={withAlpha(TICKET_INK, 0.03)}
+        >
+          <YStack
+            position="absolute"
+            left={-7}
+            top={-7}
+            width={14}
+            height={14}
+            borderRadius={9999}
+            backgroundColor="$background"
           />
-          {onSetLineup ? (
-            <ActionButton
-              label="Set Lineup"
-              variant="outline"
-              onPress={onSetLineup}
-            />
-          ) : null}
-        </XStack>
-      </YStack>
-      <YStack $gtSm={{ width: 280 }} width="100%">
-        <HeroRightPanel summary={summary} />
-      </YStack>
-    </YStack>
+          <YStack
+            position="absolute"
+            left={-7}
+            bottom={-7}
+            width={14}
+            height={14}
+            borderRadius={9999}
+            backgroundColor="$background"
+          />
+          <Text
+            rotate="-90deg"
+            numberOfLines={1}
+            fontFamily={DISPLAY_FONT}
+            fontWeight="800"
+            fontSize={9}
+            $gtMd={{ fontSize: 10 }}
+            letterSpacing={2.2}
+            textTransform="uppercase"
+            color={BRAND_SEAM_RED}
+          >
+            {stubLabel}
+          </Text>
+        </YStack>
+      </GradientSurface>
+    </XStack>
   );
 }
 
