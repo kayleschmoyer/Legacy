@@ -203,9 +203,9 @@
       "title": "Homepage",
       "slug": "legacy-sports-homepage",
       "status": "active",
-      "lastSyncedHash": "sha256-17f28c2041df0346097b9f44bfdbfb2875a850a30c2f74697435644e433d049c",
-      "lastSyncedAt": "2026-08-04T21:59:27.000Z",
-      "jiraKey": "LS-9032",
+      "lastSyncedHash": "sha256-800946e3e8e76a226f245eb0219a1d272ff0bcecef85e3b5b5aab25e3df0762d",
+      "lastSyncedAt": "2026-08-04T23:55:00.000Z",
+      "jiraKey": "LS-9046",
       "source": "designsync-local"
     },
     {

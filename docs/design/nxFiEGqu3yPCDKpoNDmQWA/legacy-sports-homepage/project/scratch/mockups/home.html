@@ -1102,6 +1102,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   border: 1px solid #2C3D34;
   box-shadow: 0 14px 32px rgba(0,0,0,.45);
 }
+.playboard { container-type: inline-size; container-name: pboard; }
 .playboard::before { content: ""; position: absolute; inset: 11px; border: 1px dashed rgba(232,237,245,.16); border-radius: 4px; pointer-events: none; }
 .pb-inner { position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; grid-template-rows: auto 1fr; column-gap: 24px; row-gap: 16px; align-items: stretch; }
 .pb-head {
@@ -1220,6 +1221,35 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .frame[data-viewport="mobile"] .quick-actions { display: grid; grid-template-columns: 1fr 1fr; }
 .frame[data-viewport="mobile"] .qa-btn { padding: 12px 10px; font-size: 11px; }
 
+/* ── No current matchup (between weeks / pre-season) ───────────────
+   Both heroes keep their object and their slots; only the score block changes.
+   With no head-to-head to show, the panel carries the two facts that still
+   matter — record and rank — and the deadline line names the next matchup.
+   Applies to baseball (.tk-standing on the ticket) and football (the bug's
+   plates become record + standing). */
+.frame[data-matchup="live"] .m-none, .frame[data-matchup="none"] .m-live { display: none; }
+
+.tk-standing { display: grid; grid-template-columns: auto auto; gap: 26px; justify-content: end; padding-bottom: 4px; }
+.tk-stat { text-align: center; padding: 0 8px; }
+.tk-stat + .tk-stat { border-left: 1px dashed var(--tk-rule); padding-left: 26px; }
+.tk-stat .v {
+  font-family: var(--font-display); font-weight: 800;
+  font-size: 46px; line-height: .9; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; color: var(--brand-navy);
+}
+.tk-stat .k {
+  font-family: var(--font-display); font-weight: 700;
+  font-size: 10.5px; letter-spacing: .18em; text-transform: uppercase;
+  color: var(--tk-ink-trail); margin-top: 8px;
+}
+.tk-standing-note {
+  font-family: var(--font-body); font-size: 12.5px; color: var(--tk-ink-soft);
+  margin-top: 14px; text-align: right;
+}
+/* Football: the bug's second plate becomes the standing line */
+.bug-row.bug-standing .abbr { font-size: 13px; letter-spacing: .16em; }
+.bug-row.bug-standing .pts { font-size: 22px; }
+
 /* Sport switch (review-bar chrome): the page renders one sport at a time, the
    way it will in production once a manager picks their default sport. */
 .frame[data-sport="baseball"] .s-fb, .frame[data-sport="football"] .s-bb { display: none; }
@@ -1246,6 +1276,21 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .pb-btn-out { border-color: rgba(238,244,234,.35); color: #EEF4EA; }
 .pb-btn-out:hover { border-color: #EEF4EA; background: rgba(238,244,234,.07); }
 @media (prefers-reduced-motion: reduce) { .playboard.pb-hero { transition: none; } .playboard.pb-hero:hover { transform: none; } }
+
+/* CONTAINER QUERIES (after the base rules — @container adds no specificity):
+   below ~560px of board width the bug drops under the identity block, and below
+   ~380px the actions go full-width. Catches lg automatically and any future
+   change to the rail or the bug's fixed 250px. */
+@container pboard (max-width: 560px) {
+  .pb-inner { grid-template-columns: 1fr; }
+  .bug { width: 100%; }
+  .pb-hero .pb-inner > div:not(.pb-head) { display: block; }
+}
+@container pboard (max-width: 380px) {
+  .pb-actions { flex-direction: column; }
+  .pb-btn { width: 100%; }
+  .pb-name { font-size: 24px; }
+}
 
 /* Preview state inside the Football card: no actions, slightly held back */
 .playboard.pb-preview { opacity: .92; }
@@ -1315,6 +1360,12 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
     <button data-sport="football">Football</button>
   </div>
 
+  <div class="rb-group" role="tablist" aria-label="Matchup">
+    <span>Matchup</span>
+    <button data-matchup="live" class="on">Live</button>
+    <button data-matchup="none">None</button>
+  </div>
+
   <div class="rb-group" role="tablist" aria-label="State">
     <span>State</span>
     <button data-state="populated" class="on">Populated</button>
@@ -1335,7 +1386,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   </div>
 
   <div class="rb-spacer"></div>
-  <span class="rb-note">Sport switches the hero and the leagues list; the On This Day rail stays baseball for now. All seven canonical bands. Three layouts serve them: mobile (xxs, xs) · tablet (sm, md) · desktop (lg, xl, xxl).</span>
+  <span class="rb-note">Sport switches the hero and the leagues list; Matchup covers the between-weeks case; the On This Day rail stays baseball for now. All seven canonical bands. Three layouts serve them: mobile (xxs, xs) · tablet (sm, md) · desktop (lg, xl, xxl).</span>
 </div>
 
 <!-- BREAKPOINTS (all seven bands selectable in the review bar):
@@ -1358,7 +1409,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
      each real band (375 / 660 / 800 / 860 / 980 / 1120 / 1280).
      ───────────────────────────────────────────────────────────────── -->
 <div class="stage">
-  <section class="frame" id="frame" data-viewport="desktop" data-band="xxl" data-sport="baseball" style="--frame-w:1280px" aria-label="Page preview">
+  <section class="frame" id="frame" data-viewport="desktop" data-band="xxl" data-sport="baseball" data-matchup="live" style="--frame-w:1280px" aria-label="Page preview">
     <span class="frame-label" id="frame-label"><b>xxl</b> · 1280px · desktop layout · 1280+ (designed)</span>
     <!-- TOUCH TARGETS (mobile viewport): all interactive elements (avatar,
          icon-btn, buttons, league rows) must measure ≥44×44 on touch
@@ -1446,6 +1497,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
            is the implementation agent's responsibility in apps/web/src/pages/home/HomePage.tsx
            (tracked under LS-4930). Do not flag the missing handlers on the mockup. -->
       <div class="sport-only s-bb">
+      <div class="m-live">
       <!-- COMPONENT: ticket-hero — the hero IS the ticket now. League identity
            is printed on the stock (title, era, meta) beside the score block,
            divided by a perforation rule; the stub carries admission + week.
@@ -1499,10 +1551,52 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
       </article>
       </div>
 
+      <!-- NO CURRENT MATCHUP (baseball) — between weeks, or before the season's
+           first pitch. Same ticket, same slots; the score block becomes record +
+           rank, and the deadline line names the next matchup instead of a lock. -->
+      <div class="m-none">
+      <article class="ticket ticket-bb ticket-hero" role="link" tabindex="0" aria-label="Open Dead Ball Dynasty — active, week 1 of 22, record 1-1, rank 7 of 12">
+        <div class="tk-body">
+          <div class="tk-head">
+            <span class="tk-live" style="color:var(--tk-ink-soft)">Active · Week 1/22</span>
+            <span class="tk-seal">Rank&nbsp;#7</span>
+            <span class="tk-deadline">Next matchup <b>Thu 7:05&nbsp;PM</b></span>
+          </div>
+          <div class="tk-hero-grid">
+            <div class="tk-hero-id">
+              <h3 class="tk-title">Dead Ball Dynasty</h3>
+              <p class="tk-sub">Deadball era · 1901–1919 · twelve managers drafting from a sepia-toned pool.</p>
+              <div class="tk-meta">
+                <span><b>12</b> teams</span>
+                <span aria-hidden="true">·</span>
+                <span>Week <b>1</b> of 22</span>
+                <span aria-hidden="true">·</span>
+                <span>Head-to-head</span>
+              </div>
+              <div class="tk-actions">
+                <a class="tk-btn tk-btn-solid" href="#" onclick="event.stopPropagation()">View League</a>
+                <a class="tk-btn tk-btn-out" href="#" onclick="event.stopPropagation()">Set Lineup</a>
+              </div>
+            </div>
+            <div class="tk-hero-score">
+              <div class="tk-standing">
+                <div class="tk-stat"><div class="v">1-1</div><div class="k">Record</div></div>
+                <div class="tk-stat"><div class="v">#7</div><div class="k">of 12</div></div>
+              </div>
+              <div class="tk-standing-note">Matchups resume Thursday · lineup locks 7:00&nbsp;PM</div>
+            </div>
+          </div>
+        </div>
+        <div class="tk-stub" aria-hidden="true"><span>Admit One · Week 1</span></div>
+      </article>
+      </div>
+      </div>
+
       <!-- FOOTBALL hero — the playboard: chalk board carries era + identity, the
            mounted period scorebug carries standing and deadline. Same slots as the
            ticket hero, so the page contract is unchanged between sports. -->
       <div class="sport-only s-fb">
+      <div class="m-live">
       <article class="playboard pb-hero" role="link" tabindex="0" aria-label="Open Steel Curtain Era — live, week 9, Gridiron Greats 84.5 to Steel Curtain 79.2">
         <div class="pb-inner">
           <div class="pb-head">
@@ -1529,6 +1623,39 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
           </div>
         </div>
       </article>
+      </div>
+
+      <!-- NO CURRENT MATCHUP (football) — bye week or pre-season. The bug keeps
+           its plates but shows the team's record and standing, and the machined
+           bar carries the week plus the wait until the next matchup. -->
+      <div class="m-none">
+      <article class="playboard pb-hero" role="link" tabindex="0" aria-label="Open Steel Curtain Era — bye week, record 5-3, rank 2 of 10">
+        <div class="pb-inner">
+          <div class="pb-head">
+            <span style="color:#8FA396">Bye week · Week 9/17</span>
+            <span class="tk-seal" style="color:#E6EFDF;border-color:rgba(230,239,223,.4);background:rgba(230,239,223,.08)">Rank&nbsp;#2</span>
+            <span class="pb-when">Next matchup <b>Sun 1:00&nbsp;PM</b>, Week 10</span>
+          </div>
+          <div>
+            <h3 class="pb-name">Steel Curtain Era</h3>
+            <p class="pb-era">1972–1980 · ten managers, punt-heavy scoring, no shotgun formations.</p>
+            <div class="pb-meta"><span>Gridiron Greats <b>5-3</b></span><span aria-hidden="true">·</span><span>No opponent this week</span><span aria-hidden="true">·</span><span><b>10</b> teams</span></div>
+            <div class="pb-actions">
+              <a class="pb-btn pb-btn-solid" href="#" onclick="event.stopPropagation()">Set Week 10 Lineup</a>
+              <a class="pb-btn pb-btn-out" href="#" onclick="event.stopPropagation()">View League</a>
+            </div>
+          </div>
+          <div class="bug">
+            <div class="bug-in">
+              <div class="bug-badge"><span class="eye" aria-hidden="true"></span><span>Legacy</span></div>
+              <div class="bug-row"><span></span><span class="abbr">GG<i>Gridiron Greats</i></span><span class="pts">5-3</span></div>
+              <div class="bug-row bug-standing"><span></span><span class="abbr">Standing</span><span class="pts">#2</span></div>
+              <div class="bug-bottom"><span>Week 9 of 17</span><span>Bye</span></div>
+            </div>
+          </div>
+        </div>
+      </article>
+      </div>
       </div>
 
       <!-- Secondary leagues as a list (not cards) — denser, less noisy. -->
@@ -2200,6 +2327,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   var state   = 'populated';
   var band    = 'xxl';
   var sport   = 'baseball';
+  var matchup = 'live';
 
   var frame     = document.getElementById('frame');
   var frameMain = document.getElementById('frame-main');
@@ -2226,6 +2354,7 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
     frameMain.appendChild(tpl.content.cloneNode(true));
     var b = BANDS[band];
     frame.setAttribute('data-sport', sport);
+    frame.setAttribute('data-matchup', matchup);
     frame.setAttribute('data-band', band);
     frame.setAttribute('data-viewport', b.layout);
     frame.style.setProperty('--frame-w', b.w + 'px');
@@ -2240,6 +2369,14 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
       document.querySelectorAll('.review-bar button[data-variant]').forEach(function (x) { x.classList.remove('on'); });
       b.classList.add('on');
       variant = b.getAttribute('data-variant');
+      render();
+    });
+  });
+  document.querySelectorAll('.review-bar button[data-matchup]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.review-bar button[data-matchup]').forEach(function (x) { x.classList.remove('on'); });
+      btn.classList.add('on');
+      matchup = btn.getAttribute('data-matchup');
       render();
     });
   });
