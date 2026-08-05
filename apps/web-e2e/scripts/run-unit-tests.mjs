@@ -67,10 +67,23 @@ console.log(
 
 const require = createRequire(import.meta.url);
 const tsxCli = require.resolve('tsx/cli');
+// Pin the tsconfig explicitly: tsx resolves the nearest tsconfig.json by
+// walking up from process.cwd(), not from the test files' location. The
+// `web-e2e:test` target runs with cwd at the workspace root, so without this
+// flag tsx picks up the root tsconfig.json (extends expo/tsconfig.base, no
+// @legacy-sports/* path aliases) instead of apps/web-e2e/tsconfig.json.
+const tsconfigPath = join(__dirname, '..', 'tsconfig.json');
 
 const result = spawnSync(
   process.execPath,
-  [tsxCli, '--test', ...forwardedArgs, ...testFiles],
+  [
+    tsxCli,
+    '--tsconfig',
+    tsconfigPath,
+    '--test',
+    ...forwardedArgs,
+    ...testFiles,
+  ],
   { stdio: 'inherit' },
 );
 

@@ -1,6 +1,11 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import type { UseLeagueWebSocketOptions } from './useLeagueWebSocket';
-import { useIsPremiumStatus } from './useIsPremium';
+import {
+  useEntitlements,
+  useHasEntitlement,
+  useIsPremiumStatus,
+} from './useIsPremium';
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: jest.fn(),
@@ -8,6 +13,11 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: jest.fn(),
+  useMyEntitlementsQuery: jest.fn(),
+}));
+
+jest.mock('../lib/jwt-refresh', () => ({
+  silentlyRefreshJwt: jest.fn().mockResolvedValue('new-jwt'),
 }));
 
 jest.mock('./useLeagueWebSocket', () => ({
@@ -22,9 +32,14 @@ const { useAuth } = jest.requireMock(
   '@legacy-sports/shared-components/auth',
 ) as unknown as { useAuth: jest.Mock };
 
-const { useGetUserByIdQuery } = jest.requireMock(
+const { useGetUserByIdQuery, useMyEntitlementsQuery } = jest.requireMock(
   '@legacy-sports/graphql',
-) as unknown as { useGetUserByIdQuery: jest.Mock };
+) as unknown as {
+  useGetUserByIdQuery: jest.Mock;
+  useMyEntitlementsQuery: jest.Mock;
+};
+
+const { silentlyRefreshJwt } = jest.requireMock('../lib/jwt-refresh');
 
 const { useLeagueWebSocket } = jest.requireMock('./useLeagueWebSocket');
 
@@ -204,6 +219,9 @@ describe('useIsPremiumStatus', () => {
       status: 'canceled',
     } as never);
     expect(refetch).toHaveBeenCalledTimes(1);
+    // Proactive path (LS-8645): the same notification re-mints the JWT so the
+    // fresh entitlement claim propagates before any request is rejected.
+    expect(silentlyRefreshJwt).toHaveBeenCalledTimes(1);
   });
 
   it('does not refetch on SUBSCRIPTION_UPDATED when there is no authed user', () => {
@@ -294,5 +312,92 @@ describe('useIsPremiumStatus', () => {
 
       expect(refetch).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('useEntitlements / useHasEntitlement', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('returns isLoading: true (empty set) while auth is loading', () => {
+    useAuth.mockReturnValue({ user: undefined, isLoading: true });
+    useMyEntitlementsQuery.mockReturnValue({ data: undefined, loading: false });
+
+    const { result } = renderHook(() => useEntitlements());
+
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.entitlements).toEqual([]);
+  });
+
+  it('skips the query until a user is authenticated', () => {
+    useAuth.mockReturnValue({ user: undefined, isLoading: false });
+    useMyEntitlementsQuery.mockReturnValue({ data: undefined, loading: false });
+
+    renderHook(() => useEntitlements());
+
+    expect(useMyEntitlementsQuery).toHaveBeenCalledWith({ skip: true });
+  });
+
+  it('exposes the token-derived entitlement set for an authed user', () => {
+    useAuth.mockReturnValue({ user: { id: 1 }, isLoading: false });
+    useMyEntitlementsQuery.mockReturnValue({
+      data: { myEntitlements: [ENTITLEMENTS.player_comparison] },
+      loading: false,
+    });
+
+    const { result } = renderHook(() => useEntitlements());
+
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.entitlements).toEqual([
+      ENTITLEMENTS.player_comparison,
+    ]);
+  });
+
+  it('useHasEntitlement returns true only for a granted key', () => {
+    useAuth.mockReturnValue({ user: { id: 1 }, isLoading: false });
+    useMyEntitlementsQuery.mockReturnValue({
+      data: { myEntitlements: [ENTITLEMENTS.player_comparison] },
+      loading: false,
+    });
+
+    const granted = renderHook(() =>
+      useHasEntitlement(ENTITLEMENTS.player_comparison),
+    );
+    const notGranted = renderHook(() =>
+      useHasEntitlement(ENTITLEMENTS.trade_analyzer),
+    );
+
+    expect(granted.result.current).toBe(true);
+    expect(notGranted.result.current).toBe(false);
+  });
+
+  it('useHasEntitlement returns false while the set is still loading', () => {
+    useAuth.mockReturnValue({ user: { id: 1 }, isLoading: false });
+    useMyEntitlementsQuery.mockReturnValue({ data: undefined, loading: true });
+
+    const { result } = renderHook(() =>
+      useHasEntitlement(ENTITLEMENTS.player_comparison),
+    );
+
+    expect(result.current).toBe(false);
+  });
+
+  it('refetches the entitlement set on an auth:token-refreshed event', () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    useAuth.mockReturnValue({ user: { id: 1 }, isLoading: false });
+    useMyEntitlementsQuery.mockReturnValue({
+      data: { myEntitlements: [] },
+      loading: false,
+      refetch,
+    });
+
+    renderHook(() => useEntitlements());
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('auth:token-refreshed'));
+    });
+
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

@@ -16,6 +16,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { SecureStorageProvider } from '@legacy-sports/shared-components';
 import { GetUserById, UserFragment } from '@legacy-sports/graphql';
 import { INTERNAL_JWT_KEY, silentlyRefreshJwt } from './jwtRefresh';
+import { emitSessionExpired } from './sessionEvents';
 
 export class DbClient {
   public readonly apolloClient: ApolloClient;
@@ -62,6 +63,50 @@ export class DbClient {
             (e.extensions?.['code'] as string | undefined) ===
             'UNAUTHENTICATED',
         );
+
+      // Stale-entitlements refresh signal (LS-8643/LS-8645): the token is valid
+      // but its Stripe-minted entitlement claim predates the user's
+      // `entitlements_updated_at` marker. Silently re-mint the JWT and retry the
+      // operation ONCE (a per-operation flag caps it); on refresh failure or a
+      // still-stale retry, fail safe — clear the session so the user drops to
+      // free and is prompted to re-login (epic LS-8638 SHARED CONTRACTS #1).
+      const isEntitlementsStale =
+        CombinedGraphQLErrors.is(error) &&
+        error.errors.some(
+          (e) =>
+            (e.extensions?.['code'] as string | undefined) ===
+            'ENTITLEMENTS_STALE',
+        );
+
+      if (isEntitlementsStale) {
+        const alreadyRetried = Boolean(
+          operation.getContext()['entitlementsStaleRetried'],
+        );
+        return new Observable<ApolloLink.Result>((observer) => {
+          if (alreadyRetried) {
+            emitSessionExpired();
+            observer.error(error);
+            return;
+          }
+          operation.setContext({ entitlementsStaleRetried: true });
+          silentlyRefreshJwt()
+            .then((newToken) => {
+              if (!newToken) {
+                emitSessionExpired();
+                observer.error(error);
+                return;
+              }
+              forward(operation).subscribe({
+                next: (value) => observer.next(value),
+                error: (err: unknown) => observer.error(err),
+                complete: () => observer.complete(),
+              });
+            })
+            .catch((err: unknown) => {
+              observer.error(err);
+            });
+        });
+      }
 
       if (is401 || isUnauthenticated) {
         // Attempt a silent JWT refresh via /refresh-jwt and replay the

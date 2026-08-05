@@ -2,8 +2,12 @@ import { useCallback, useEffect, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { type EntitlementKey } from '@legacy-sports/utils';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { useGetUserByIdQuery } from '@legacy-sports/graphql';
+import {
+  useGetUserByIdQuery,
+  useMyEntitlementsQuery,
+} from '@legacy-sports/graphql';
 import { useLeagueWebSocket } from './useLeagueWebSocket';
+import { silentlyRefreshJwt } from '../lib/jwt-refresh';
 import { useLeagueWebSocketClient } from '../context/LeagueWebSocketContext';
 
 /**
@@ -74,7 +78,15 @@ export function useIsPremiumStatus(): {
   );
 
   useLeagueWebSocket({
-    onSubscriptionUpdated: () => refetchSafely('SUBSCRIPTION_UPDATED'),
+    onSubscriptionUpdated: () => {
+      // Proactive path (LS-8645): a Stripe entitlement change bumps the user's
+      // `entitlements_updated_at` marker, so silently re-mint the JWT with the
+      // fresh entitlement claim + new `iat` before any request is rejected as
+      // stale. `silentlyRefreshJwt` dedupes concurrent calls and dispatches
+      // `auth:token-refreshed` on success, which refetches the entitlement set.
+      void silentlyRefreshJwt();
+      refetchSafely('SUBSCRIPTION_UPDATED');
+    },
   });
 
   // Immediately refetch after a same-tab Stripe checkout redirect so the
@@ -120,20 +132,66 @@ export function useIsPremiumStatus(): {
 }
 
 /**
+ * Returns the set of entitlement lookup_keys the current user's plan grants,
+ * read from the server's `myEntitlements` resolver (LS-8645), which derives them
+ * from the token's Stripe-minted entitlement claim. Admins receive the full
+ * catalog server-side.
+ *
+ * The set only changes when the JWT changes, so it refetches on
+ * `auth:token-refreshed` — dispatched after both the proactive
+ * `SUBSCRIPTION_UPDATED` re-mint and the Apollo error-link's `ENTITLEMENTS_STALE`
+ * retry — so a plan change propagates without a reload. Returns an empty set
+ * (and `isLoading: true`) until auth and the query resolve.
+ */
+export function useEntitlements(): {
+  entitlements: EntitlementKey[];
+  isLoading: boolean;
+} {
+  const { user, isLoading: authLoading } = useAuth();
+
+  const {
+    data,
+    loading: queryLoading,
+    refetch,
+  } = useMyEntitlementsQuery({ skip: !user?.id });
+
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    const onTokenRefreshed = () => {
+      refetch().catch((err: unknown) => {
+        LOGGER.error(
+          'useEntitlements: refetch after token refresh failed',
+          err instanceof Error ? err : new Error(String(err)),
+          { userId },
+        );
+      });
+    };
+    window.addEventListener('auth:token-refreshed', onTokenRefreshed);
+    return () =>
+      window.removeEventListener('auth:token-refreshed', onTokenRefreshed);
+  }, [userId, refetch]);
+
+  const isLoading = authLoading || queryLoading;
+  return {
+    entitlements: (data?.myEntitlements ?? []) as EntitlementKey[],
+    isLoading,
+  };
+}
+
+/**
  * Returns whether the current user's plan grants a specific entitlement. Prefer
  * this over `useIsPremium()` at feature gates so each gate is framed around the
  * capability it unlocks (the Stripe entitlement) rather than the tier that
  * happens to grant it today.
  *
- * Interim behavior (LS-8643): premium plans grant every catalog entitlement, so
- * this resolves to the user's premium status. Wiring it to the token's per-user
- * Stripe entitlement claim — so a plan can grant only a subset — is LS-8645. The
- * `key` argument is retained now so call sites already name their capability and
- * need no change when LS-8645 lands.
- *
- * Returns `false` while premium status is still loading (same conservative
+ * Backed by the token's per-user Stripe entitlement claim (LS-8645) via
+ * {@link useEntitlements}, so a plan can grant only a subset of premium features.
+ * Returns `false` while the entitlement set is still loading (same conservative
  * behavior as `useIsPremium`).
  */
-export function useHasEntitlement(_key: EntitlementKey): boolean {
-  return useIsPremiumStatus().isPremium;
+export function useHasEntitlement(key: EntitlementKey): boolean {
+  const { entitlements, isLoading } = useEntitlements();
+  if (isLoading) return false;
+  return entitlements.includes(key);
 }

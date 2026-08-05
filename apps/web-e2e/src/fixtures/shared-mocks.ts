@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 import {
   leagueByIdResponse,
@@ -54,6 +55,28 @@ const TIER_USER_FIELDS: Record<
   free: { subscriptionTier: null, accessLevel: 'none' },
   admin: { subscriptionTier: 'premium', accessLevel: 'admin' },
 };
+
+/**
+ * The `myEntitlements` lookup_key set for each tier — the JWT-derived entitlement
+ * claim the server's `myEntitlements` resolver returns (LS-8645). Premium and
+ * admin currently unlock the full catalog; free has an empty claim. Mirrors the
+ * server: admins are all-entitled for reads, free users mint an empty claim.
+ */
+const TIER_ENTITLEMENTS: Record<EntitlementTier, string[]> = {
+  premium: Object.values(ENTITLEMENTS),
+  free: [],
+  admin: Object.values(ENTITLEMENTS),
+};
+
+/**
+ * Build a `MyEntitlements` response for an entitlement tier. `useHasEntitlement`
+ * (apps/web/src/hooks/useIsPremium.ts) reads this to drive per-entitlement
+ * feature gates, so a hermetic spec's gate state must be seeded here alongside
+ * the `GetUserById` tier (they move together via `useTier`).
+ */
+export function tierEntitlementsResponse(tier: EntitlementTier) {
+  return { data: { myEntitlements: TIER_ENTITLEMENTS[tier] } };
+}
 
 /**
  * Build a `GetUserById` response for an entitlement tier. The shape mirrors the
@@ -113,6 +136,11 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   // `themePreference` is null so ThemeContext's ThemeServerSync (LS-4913) hydrates
   // without clobbering the locally-selected theme the theme specs assert on.
   getuserbyid: tierUserByIdResponse('premium'),
+  // Per-entitlement claim set read by `useHasEntitlement` (LS-8645). Built from
+  // the `premium` tier so PREMIUM is the default entitlement, matching the
+  // `getuserbyid` baseline above — a spec flips both in one line via
+  // `useTier(page, …)`.
+  myentitlements: tierEntitlementsResponse('premium'),
   // ThemeServerSync best-effort pushes the user's theme choice to the server on
   // every change (LS-4913). Without this baseline mock the hermetic API-isolation
   // fixture flags it as an unmocked operation and fails every theme spec.
@@ -391,10 +419,12 @@ export const unmockedGraphQLFallback = routerUnmockedFallback;
  * await page.goto('/baseball/league/1');
  * ```
  *
- * Premium status is sourced server-side from `GetUserById` by `useIsPremium()`
- * (apps/web/src/hooks/useIsPremium.ts) — NOT the client JWT — so overriding that
- * one operation is enough to flip the entitlement the app sees. Every other
- * ambient operation falls through to BASELINE_GRAPHQL_RESPONSES.
+ * Premium status is sourced server-side from two operations: `GetUserById`
+ * (`useIsPremium()` reads `subscriptionTier` / `accessLevel`) and `MyEntitlements`
+ * (`useHasEntitlement()` reads the per-entitlement claim set, LS-8645) — NOT the
+ * client JWT — so overriding those two operations is enough to flip the
+ * entitlement the app sees. Every other ambient operation falls through to
+ * BASELINE_GRAPHQL_RESPONSES.
  *
  * Must be called BEFORE `page.goto()`.
  */
@@ -403,11 +433,20 @@ export async function useTier(
   tier: EntitlementTier,
 ): Promise<void> {
   await page.route(isGraphQLEndpoint, async (route) => {
-    if (extractOperationName(route).toLowerCase() === 'getuserbyid') {
+    const op = extractOperationName(route).toLowerCase();
+    if (op === 'getuserbyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(tierUserByIdResponse(tier)),
+      });
+      return;
+    }
+    if (op === 'myentitlements') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(tierEntitlementsResponse(tier)),
       });
       return;
     }

@@ -3162,8 +3162,6 @@ export type Query = {
   getUserLeagueSummaries: Array<UserLeagueSummary>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
   getUserPreferences?: Maybe<UserPreference>;
-  /** Returns true when the authenticated user holds the given entitlement. Admin users always return true. */
-  hasEntitlement: Scalars['Boolean']['output'];
   hello?: Maybe<Scalars['String']['output']>;
   /** The caller's roster players eligible for keeper designation, with rookie-exemption and cost-preview info. Empty when the league is not in keeper mode or the caller has no team in it. (LS-8673) */
   keeperEligibleRoster?: Maybe<Array<KeeperEligiblePlayer>>;
@@ -3193,6 +3191,8 @@ export type Query = {
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
   myDataRequests?: Maybe<Array<DataRequest>>;
+  /** Returns the lookup_keys of the entitlements the authenticated user's plan grants (derived from the token claim). Admin users receive the full catalog. */
+  myEntitlements: Array<Scalars['String']['output']>;
   /** List the authenticated user's linked authentication provider identities. */
   myIdentities: Array<UserIdentity>;
   myLeagues: Array<League>;
@@ -3590,10 +3590,6 @@ export type QueryGetTiebreakerHistoryArgs = {
 
 export type QueryGetTiebreakerRulesArgs = {
   leagueId: Scalars['Int']['input'];
-};
-
-export type QueryHasEntitlementArgs = {
-  key: Scalars['String']['input'];
 };
 
 export type QueryKeeperEligibleRosterArgs = {
@@ -12190,6 +12186,13 @@ export type MatchupWinProbabilityFragmentFragment = {
   team1ProjectedScore: number;
   team2ProjectedScore: number;
   simulationCount: number;
+};
+
+export type MyEntitlementsQueryVariables = Exact<{ [key: string]: never }>;
+
+export type MyEntitlementsQuery = {
+  __typename?: 'Query';
+  myEntitlements: Array<string>;
 };
 
 export type NextClueMutationVariables = Exact<{
@@ -30649,6 +30652,89 @@ export type MakeSeasonDraftPickMutationResult =
 export type MakeSeasonDraftPickMutationOptions = BaseMutationOptions<
   MakeSeasonDraftPickMutation,
   MakeSeasonDraftPickMutationVariables
+>;
+export const MyEntitlements = gql`
+  query MyEntitlements {
+    myEntitlements
+  }
+`;
+
+/**
+ * __useMyEntitlementsQuery__
+ *
+ * To run a query within a React component, call `useMyEntitlementsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMyEntitlementsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMyEntitlementsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useMyEntitlementsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    MyEntitlementsQuery,
+    MyEntitlementsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<MyEntitlementsQuery, MyEntitlementsQueryVariables>(
+    MyEntitlements,
+    options,
+  );
+}
+export function useMyEntitlementsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    MyEntitlementsQuery,
+    MyEntitlementsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<MyEntitlementsQuery, MyEntitlementsQueryVariables>(
+    MyEntitlements,
+    options,
+  );
+}
+export function useMyEntitlementsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        MyEntitlementsQuery,
+        MyEntitlementsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    MyEntitlementsQuery,
+    MyEntitlementsQueryVariables
+  >(
+    MyEntitlements,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          MyEntitlementsQuery,
+          MyEntitlementsQueryVariables
+        >,
+  );
+}
+export type MyEntitlementsQueryHookResult = ReturnType<
+  typeof useMyEntitlementsQuery
+>;
+export type MyEntitlementsLazyQueryHookResult = ReturnType<
+  typeof useMyEntitlementsLazyQuery
+>;
+export type MyEntitlementsSuspenseQueryHookResult = ReturnType<
+  typeof useMyEntitlementsSuspenseQuery
+>;
+export type MyEntitlementsQueryResult = Apollo.QueryResult<
+  MyEntitlementsQuery,
+  MyEntitlementsQueryVariables
 >;
 export const NextClue = gql`
   mutation NextClue($sessionId: Int!) {

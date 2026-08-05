@@ -1,6 +1,7 @@
 import type { GraphQLSchema } from 'graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
-describe('hasEntitlement query', () => {
+describe('myEntitlements query', () => {
   let schema: GraphQLSchema;
   let mockDb: {
     select: jest.Mock;
@@ -8,6 +9,14 @@ describe('hasEntitlement query', () => {
     where: jest.Mock;
     limit: jest.Mock;
   };
+
+  /** Point the chained drizzle mock at a specific gating row result. */
+  function mockGatingRow(row: Record<string, unknown> | undefined): void {
+    mockDb.limit = jest.fn().mockResolvedValue(row ? [row] : []);
+    mockDb.where = jest.fn(() => ({ limit: mockDb.limit }));
+    mockDb.from = jest.fn(() => ({ where: mockDb.where }));
+    mockDb.select = jest.fn(() => ({ from: mockDb.from }));
+  }
 
   beforeEach(() => {
     jest.resetModules();
@@ -139,6 +148,7 @@ describe('hasEntitlement query', () => {
         usersInAppInternal: {
           id: 'app_internal.users.id',
           subscriptionTier: 'app_internal.users.subscription_tier',
+          entitlementsUpdatedAt: 'app_internal.users.entitlements_updated_at',
         },
       },
       PublicDb: {},
@@ -164,9 +174,9 @@ describe('hasEntitlement query', () => {
 
   function getResolver() {
     const queryType = schema.getQueryType();
-    const field = queryType?.getFields().hasEntitlement;
+    const field = queryType?.getFields().myEntitlements;
     if (!field?.resolve) {
-      throw new Error('hasEntitlement resolver not found');
+      throw new Error('myEntitlements resolver not found');
     }
     return field.resolve.bind(field);
   }
@@ -174,76 +184,64 @@ describe('hasEntitlement query', () => {
   it('throws UNAUTHENTICATED when user is null', async () => {
     const resolve = getResolver();
     await expect(
-      resolve(
-        {},
-        { key: 'advanced_search_filters' },
-        { user: null, db: mockDb },
-        undefined as never,
-      ),
+      resolve({}, {}, { user: null, db: mockDb }, undefined as never),
     ).rejects.toThrow(/Authentication required|UNAUTHENTICATED/i);
   });
 
-  it('returns true for admin users without a DB call', async () => {
+  it('returns the full catalog for admin users without a DB call', async () => {
     const resolve = getResolver();
     const adminContext = { user: { id: 1, isAdmin: true }, db: mockDb };
-    const result = await resolve(
-      {},
-      { key: 'advanced_search_filters' },
-      adminContext,
-      undefined as never,
-    );
-    expect(result).toBe(true);
+    const result = await resolve({}, {}, adminContext, undefined as never);
+    expect(result).toEqual(Object.values(ENTITLEMENTS));
     expect(mockDb.select).not.toHaveBeenCalled();
   });
 
-  it('returns true for a premium user holding the entitlement', async () => {
-    mockDb.limit = jest.fn().mockResolvedValue([{ tier: 'premium' }]);
-    mockDb.where = jest.fn(() => ({ limit: mockDb.limit }));
-    mockDb.from = jest.fn(() => ({ where: mockDb.where }));
-    mockDb.select = jest.fn(() => ({ from: mockDb.from }));
+  it("returns a premium user's token entitlement claim", async () => {
+    // No marker row → the token claim is trusted as-is (nothing to compare iat against).
+    mockGatingRow(undefined);
 
     const resolve = getResolver();
-    const premiumContext = { user: { id: 2, isAdmin: false }, db: mockDb };
-    const result = await resolve(
-      {},
-      { key: 'advanced_search_filters' },
-      premiumContext,
-      undefined as never,
-    );
-    expect(result).toBe(true);
+    const entitlements = ['advanced_search_filters', 'player_comparison'];
+    const premiumContext = {
+      user: { id: 2, isAdmin: false, entitlements, iat: 1_700_000_000 },
+      db: mockDb,
+    };
+    const result = await resolve({}, {}, premiumContext, undefined as never);
+    expect(result).toEqual(entitlements);
   });
 
-  it('returns false for a free user', async () => {
-    mockDb.limit = jest.fn().mockResolvedValue([{ tier: 'free' }]);
-    mockDb.where = jest.fn(() => ({ limit: mockDb.limit }));
-    mockDb.from = jest.fn(() => ({ where: mockDb.where }));
-    mockDb.select = jest.fn(() => ({ from: mockDb.from }));
+  it('returns an empty set for a free user (no claim)', async () => {
+    mockGatingRow(undefined);
 
     const resolve = getResolver();
-    const freeContext = { user: { id: 3, isAdmin: false }, db: mockDb };
-    const result = await resolve(
-      {},
-      { key: 'advanced_search_filters' },
-      freeContext,
-      undefined as never,
-    );
-    expect(result).toBe(false);
+    const freeContext = {
+      user: { id: 3, isAdmin: false, entitlements: [], iat: 1_700_000_000 },
+      db: mockDb,
+    };
+    const result = await resolve({}, {}, freeContext, undefined as never);
+    expect(result).toEqual([]);
   });
 
-  it('returns false for an unknown entitlement key', async () => {
-    mockDb.limit = jest.fn().mockResolvedValue([{ tier: 'premium' }]);
-    mockDb.where = jest.fn(() => ({ limit: mockDb.limit }));
-    mockDb.from = jest.fn(() => ({ where: mockDb.where }));
-    mockDb.select = jest.fn(() => ({ from: mockDb.from }));
+  it('throws ENTITLEMENTS_STALE when the token iat predates the marker', async () => {
+    // Marker is newer than the token iat → the claim can no longer be trusted.
+    const iatSeconds = 1_700_000_000;
+    mockGatingRow({
+      tier: 'premium',
+      entitlementsUpdatedAt: new Date((iatSeconds + 60) * 1000),
+    });
 
     const resolve = getResolver();
-    const premiumContext = { user: { id: 2, isAdmin: false }, db: mockDb };
-    const result = await resolve(
-      {},
-      { key: 'nonexistent_entitlement' },
-      premiumContext,
-      undefined as never,
-    );
-    expect(result).toBe(false);
+    const staleContext = {
+      user: {
+        id: 4,
+        isAdmin: false,
+        entitlements: ['advanced_search_filters'],
+        iat: iatSeconds,
+      },
+      db: mockDb,
+    };
+    await expect(
+      resolve({}, {}, staleContext, undefined as never),
+    ).rejects.toThrow(/ENTITLEMENTS_STALE|refreshed/i);
   });
 });

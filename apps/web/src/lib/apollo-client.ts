@@ -11,10 +11,19 @@ import { ErrorLink } from '@apollo/client/link/error';
 import { RetryLink } from '@apollo/client/link/retry';
 import { setContext } from '@apollo/client/link/context';
 import type { ApolloLink } from '@apollo/client/link';
-import { LOGGER } from '@legacy-sports/logging';
 import { captureError } from '@legacy-sports/rollbar/web';
-import { CSRF_HEADER, getCsrfToken, storeCsrfToken } from './csrf';
+import { CSRF_HEADER, getCsrfToken } from './csrf';
+import {
+  decodeJwtPayload,
+  silentlyRefreshJwt,
+  syncUserProfileFromJwt,
+} from './jwt-refresh';
 import { env } from '../config/environment';
+
+// Re-exported for backwards compatibility — these helpers moved to
+// ./jwt-refresh (LS-8645) so non-Apollo modules can import the refresh helper
+// without triggering this module's ApolloClient side effects.
+export { decodeJwtPayload, silentlyRefreshJwt, syncUserProfileFromJwt };
 
 const httpLink = createHttpLink({
   uri: (operation) => `${env.graphqlUrl}?ref=${operation.operationName}`,
@@ -42,156 +51,6 @@ const authLink = setContext((_, { headers }) => {
     },
   };
 });
-
-// ─── Silent JWT refresh ────────────────────────────────────────────────────
-
-let refreshInFlight: Promise<string | null> | null = null;
-
-/**
- * Decode a JWT payload without signature verification.
- * Returns null if the token cannot be decoded.
- */
-export function decodeJwtPayload(jwt: string): Record<string, unknown> | null {
-  try {
-    const parts = jwt.split('.');
-    if (parts.length !== 3) return null;
-    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
-    return JSON.parse(atob(padded)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * After a successful JWT refresh, update the cached user profile in
- * localStorage and notify the AuthProvider via a window event so the
- * UI immediately reflects any claim changes (e.g. accessLevel promotion).
- */
-export function syncUserProfileFromJwt(jwt: string): void {
-  const payload = decodeJwtPayload(jwt);
-  if (!payload) return;
-
-  const updatedProfile = {
-    id: (payload['id'] as number) || 0,
-    email: (payload['email'] as string) || '',
-    username:
-      (payload['username'] as string) ||
-      (payload['name'] as string) ||
-      'Unknown',
-    picture: payload['picture'] as string | undefined,
-    accessLevel: (payload['accessLevel'] as 'none' | 'admin') || 'none',
-  };
-
-  // Update the localStorage cache so page reloads also pick up the change.
-  // Both writes are best-effort; errors (private browsing, quota) are silently ignored.
-  const exp = payload['exp'] as number | undefined;
-  try {
-    localStorage.setItem('ls_user_profile', JSON.stringify(updatedProfile));
-    if (exp) {
-      localStorage.setItem('ls_token_expiry', String(exp));
-    }
-  } catch {
-    // Storage unavailable — the event dispatch below is the primary mechanism
-  }
-
-  // Dispatch a window event so the AuthProvider can update React state
-  // without tight coupling between the Apollo module and the React context.
-  window.dispatchEvent(
-    new CustomEvent('auth:token-refreshed', {
-      detail: { user: updatedProfile, exp },
-    }),
-  );
-}
-
-/**
- * Silently refresh the JWT by calling the oauth proxy's /refresh-jwt endpoint.
- * The server reads the JWT from the HttpOnly cookie and returns a new one
- * (also set as a cookie). Deduplicates concurrent calls so only one network
- * request is made even when multiple queries fail simultaneously.
- *
- * After a successful refresh, the cached user profile in localStorage is
- * updated and an `auth:token-refreshed` event is dispatched so the
- * AuthProvider can reflect any claim changes (e.g. accessLevel) immediately.
- */
-async function silentlyRefreshJwt(): Promise<string | null> {
-  // Deduplicate: if a refresh is already in-flight, wait for it
-  if (refreshInFlight) {
-    return refreshInFlight;
-  }
-
-  refreshInFlight = (async () => {
-    try {
-      const csrfToken = getCsrfToken();
-      const response = await fetch(`${env.oauthProxyUrl}/refresh-jwt`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(csrfToken ? { [CSRF_HEADER]: csrfToken } : {}),
-        },
-        // Send the HttpOnly cookie so the server can read the current JWT
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        // A 401 or 403 from the refresh endpoint is a definitive server-side
-        // rejection — the session is invalid, not merely expired on the clock.
-        // Signal the AuthProvider to clear local state so the user is prompted
-        // to re-authenticate rather than being stuck in a 401 retry loop.
-        // Other non-OK statuses (5xx, rate limits) are transient; do not force
-        // logout for those.
-        if (response.status === 401 || response.status === 403) {
-          window.dispatchEvent(new CustomEvent('auth:session-expired'));
-        }
-        return null;
-      }
-
-      const result = (await response.json()) as {
-        jwt?: string;
-        csrfToken?: string;
-      };
-      if (!result.jwt) return null;
-
-      // Persist the refreshed CSRF token so subsequent requests include it.
-      if (result.csrfToken) {
-        storeCsrfToken(result.csrfToken);
-      }
-
-      // Sync the cached user profile and notify the AuthProvider so the UI
-      // immediately reflects any claim changes (e.g. accessLevel promotion).
-      // The refreshed JWT is always the admin's real token (ls_jwt cookie).
-      // During impersonation, the server also refreshes ls_imp_jwt in the
-      // same response — no client-side coordination needed.
-      syncUserProfileFromJwt(result.jwt);
-
-      // The server also sets updated cookies automatically.
-      // Return the token so the retry flow knows refresh succeeded.
-      return result.jwt;
-    } catch (err) {
-      // Network errors (device offline, CORS, DNS) are expected — swallow silently.
-      // Anything else (JSON parse failures, programming errors, missing config) is
-      // a structural bug that must be surfaced in Sentry/Rollbar.
-      const isNetworkError =
-        err instanceof TypeError &&
-        (err.message === 'Failed to fetch' ||
-          err.message === 'NetworkError when attempting to fetch resource.' ||
-          err.message === 'Network request failed');
-      if (!isNetworkError) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        LOGGER.error(
-          'silentlyRefreshJwt: unexpected error during JWT refresh',
-          error.message,
-        );
-        captureError(error, { context: 'silentlyRefreshJwt' });
-      }
-      return null;
-    } finally {
-      refreshInFlight = null;
-    }
-  })();
-
-  return refreshInFlight;
-}
 
 // ─── Dispatch a window event so the ApolloErrorToast component can display it ──
 
@@ -257,11 +116,62 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   // Check for 401 HTTP error
   const is401 = ServerError.is(error) && error.statusCode === 401;
 
+  // Check for the stale-entitlements refresh signal (LS-8643/LS-8645): the token
+  // is still valid but its Stripe-minted entitlement claim predates the user's
+  // `entitlements_updated_at` marker, so the server rejected the request with
+  // `ENTITLEMENTS_STALE` to force a silent re-mint.
+  const isEntitlementsStale =
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some(
+      (e) =>
+        (e.extensions?.['code'] as string | undefined) === 'ENTITLEMENTS_STALE',
+    );
+
   // Allow callers to opt out of the global toast by passing
   // `context: { suppressGlobalError: true }` in the mutation/query options.
   const suppressGlobalError = Boolean(
     operation.getContext()['suppressGlobalError'],
   );
+
+  // ENTITLEMENTS_STALE → silently re-mint the JWT (fresh entitlements + new
+  // `iat`) and retry the operation ONCE. Unlike the auth path, the token is
+  // valid so the refresh will succeed; the retry can still come back stale if
+  // the marker moved again mid-flight, so a per-operation flag caps it at a
+  // single retry. On refresh failure or a still-stale retry we fail safe:
+  // clear the session (the user drops to free) and prompt re-login, matching
+  // the epic LS-8638 SHARED CONTRACTS #1 client contract. This code is an
+  // expected control signal, so it is never surfaced as a toast or to Rollbar.
+  if (isEntitlementsStale) {
+    const alreadyRetried = Boolean(
+      operation.getContext()['entitlementsStaleRetried'],
+    );
+    return new Observable<ApolloLink.Result>((observer) => {
+      if (alreadyRetried) {
+        // Retry still stale → fail safe: fall back to free + prompt re-login.
+        window.dispatchEvent(new CustomEvent('auth:session-expired'));
+        observer.error(error);
+        return;
+      }
+      operation.setContext({ entitlementsStaleRetried: true });
+      silentlyRefreshJwt()
+        .then((newToken) => {
+          if (!newToken) {
+            // Refresh failed → fail safe: fall back to free + prompt re-login.
+            window.dispatchEvent(new CustomEvent('auth:session-expired'));
+            observer.error(error);
+            return;
+          }
+          forward(operation).subscribe({
+            next: (value) => observer.next(value),
+            error: (err: unknown) => observer.error(err),
+            complete: () => observer.complete(),
+          });
+        })
+        .catch((err: unknown) => {
+          observer.error(err);
+        });
+    });
+  }
 
   // Auth errors (UNAUTHENTICATED / 401) → attempt a silent token refresh and retry.
   // These are not reported to Rollbar: an expired/invalid token is an expected

@@ -19,6 +19,7 @@ import {
   errorLink,
   syncUserProfileFromJwt,
 } from './apollo-client';
+import { __resetJwtRefreshStateForTests } from './jwt-refresh';
 
 // Capture the uri factory that apollo-client.ts passes to createHttpLink at
 // module init time. Stored here so it survives clearMocks: true (jest.preset.js
@@ -269,6 +270,7 @@ describe('errorLink', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    __resetJwtRefreshStateForTests();
   });
 
   afterEach(() => {
@@ -329,6 +331,98 @@ describe('errorLink', () => {
       expect.stringContaining('/refresh-jwt'),
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('ENTITLEMENTS_STALE triggers a silent refresh and marks the operation as retried', async () => {
+    // Refresh fails (ok:false) so the retry-once path falls straight through to
+    // the fail-safe branch without looping.
+    const fetchMock = jest.fn().mockResolvedValue({ ok: false });
+    global.fetch = fetchMock;
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+
+    const op = makeOperation({});
+    const staleError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          { message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } },
+        ],
+      },
+      [{ message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } }],
+    );
+    const forward = () =>
+      new Observable<never>((observer) => observer.error(staleError));
+
+    await new Promise<void>((resolve) => {
+      const result = errorLink.request(op as never, forward as never);
+      result?.subscribe({
+        next: () => {
+          /* ignore */
+        },
+        error: () => resolve(),
+        complete: () => resolve(),
+      });
+    });
+
+    // The operation is flagged so a second stale response won't refresh again.
+    expect(op.setContext).toHaveBeenCalledWith({
+      entitlementsStaleRetried: true,
+    });
+    // A silent re-mint was attempted.
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/refresh-jwt'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+    // Refresh failed → fail safe: fall back to free + prompt re-login.
+    const sessionExpired = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'auth:session-expired',
+      );
+    expect(sessionExpired).toHaveLength(1);
+
+    dispatchSpy.mockRestore();
+  });
+
+  it('ENTITLEMENTS_STALE on an already-retried operation fails safe without refreshing again', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+
+    const op = makeOperation({ entitlementsStaleRetried: true });
+    const staleError = new CombinedGraphQLErrors(
+      {
+        errors: [
+          { message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } },
+        ],
+      },
+      [{ message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } }],
+    );
+    const forward = () =>
+      new Observable<never>((observer) => observer.error(staleError));
+
+    await new Promise<void>((resolve) => {
+      const result = errorLink.request(op as never, forward as never);
+      result?.subscribe({
+        next: () => {
+          /* ignore */
+        },
+        error: () => resolve(),
+        complete: () => resolve(),
+      });
+    });
+
+    // No second refresh — the retry cap already fired.
+    expect(fetchMock).not.toHaveBeenCalled();
+    const sessionExpired = dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'auth:session-expired',
+      );
+    expect(sessionExpired).toHaveLength(1);
+
+    dispatchSpy.mockRestore();
   });
 
   it('calls silentlyRefreshJwt for a 401 ServerError', async () => {

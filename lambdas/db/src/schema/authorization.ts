@@ -51,6 +51,7 @@ import {
 import {
   ENTITLEMENT_LABELS,
   type EntitlementKey,
+  ENTITLEMENTS,
   type SubscriptionTier,
 } from './entitlements';
 
@@ -305,6 +306,32 @@ export async function hasEntitlement(
   if (user.isAdmin && context.impersonatedTier !== 'free') return true;
   await assertEntitlementsFresh(context, user);
   return user.entitlements?.includes(key) ?? false;
+}
+
+/**
+ * Returns the full set of entitlement lookup_keys the authenticated user holds,
+ * derived from the token's Stripe-minted claim (LS-8644) — the same fast path as
+ * {@link hasEntitlement}, with no per-request Stripe call. Powers the current-user
+ * entitlement-check resolver (LS-8042/LS-8645) that seeds the client's
+ * per-entitlement feature gates.
+ *
+ * Resolution order mirrors {@link hasEntitlement}:
+ *   1. Admins are all-entitled for reads (the full catalog) unless explicitly
+ *      impersonating the free tier for testing.
+ *   2. {@link assertEntitlementsFresh} throws ENTITLEMENTS_STALE when the token's
+ *      claim is stale, signalling the client to refresh + retry — a stale token
+ *      never yields a (possibly outdated) set.
+ *   3. Otherwise return the token's entitlement claim (empty for free users).
+ */
+export async function getEntitlements(
+  context: Context,
+): Promise<EntitlementKey[]> {
+  const user = requireAuth(context);
+  if (user.isAdmin && context.impersonatedTier !== 'free') {
+    return Object.values(ENTITLEMENTS);
+  }
+  await assertEntitlementsFresh(context, user);
+  return user.entitlements ?? [];
 }
 
 /**

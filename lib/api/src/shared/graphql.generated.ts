@@ -3156,8 +3156,6 @@ export type Query = {
   getUserLeagueSummaries: Array<UserLeagueSummary>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
   getUserPreferences?: Maybe<UserPreference>;
-  /** Returns true when the authenticated user holds the given entitlement. Admin users always return true. */
-  hasEntitlement: Scalars['Boolean']['output'];
   hello?: Maybe<Scalars['String']['output']>;
   /** The caller's roster players eligible for keeper designation, with rookie-exemption and cost-preview info. Empty when the league is not in keeper mode or the caller has no team in it. (LS-8673) */
   keeperEligibleRoster?: Maybe<Array<KeeperEligiblePlayer>>;
@@ -3187,6 +3185,8 @@ export type Query = {
   myConsents?: Maybe<Array<UserConsent>>;
   /** Get all data export/deletion requests for the authenticated user */
   myDataRequests?: Maybe<Array<DataRequest>>;
+  /** Returns the lookup_keys of the entitlements the authenticated user's plan grants (derived from the token claim). Admin users receive the full catalog. */
+  myEntitlements: Array<Scalars['String']['output']>;
   /** List the authenticated user's linked authentication provider identities. */
   myIdentities: Array<UserIdentity>;
   myLeagues: Array<League>;
@@ -3584,10 +3584,6 @@ export type QueryGetTiebreakerHistoryArgs = {
 
 export type QueryGetTiebreakerRulesArgs = {
   leagueId: Scalars['Int']['input'];
-};
-
-export type QueryHasEntitlementArgs = {
-  key: Scalars['String']['input'];
 };
 
 export type QueryKeeperEligibleRosterArgs = {

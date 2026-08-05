@@ -3539,11 +3539,6 @@ type Query {
   getUserLeagueSummaries: [UserLeagueSummary!]!
   getUserNotificationPreferences: NotificationPreference
   getUserPreferences: UserPreference
-
-  """
-  Returns true when the authenticated user holds the given entitlement. Admin users always return true.
-  """
-  hasEntitlement(key: String!): Boolean!
   hello: String
 
   """
@@ -3612,6 +3607,11 @@ type Query {
   Get all data export/deletion requests for the authenticated user
   """
   myDataRequests: [DataRequest!]
+
+  """
+  Returns the lookup_keys of the entitlements the authenticated user's plan grants (derived from the token claim). Admin users receive the full catalog.
+  """
+  myEntitlements: [String!]!
 
   """
   List the authenticated user's linked authentication provider identities.

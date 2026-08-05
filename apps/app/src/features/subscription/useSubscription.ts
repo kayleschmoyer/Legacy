@@ -10,9 +10,11 @@ import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
   useGetMySubscriptionQuery,
+  useMyEntitlementsQuery,
 } from '@legacy-sports/graphql';
 import { readKeychainValue, Secret } from '../../common/auth/AuthHooks';
 import { useLeagueWebSocketClient } from '../../context/LeagueWebSocketContext';
+import { silentlyRefreshJwt } from '../../common/auth/jwtRefresh';
 
 export interface SubscriptionData {
   status: string | null;
@@ -22,29 +24,25 @@ export interface SubscriptionData {
   gracePeriodEndsAt: string | null;
 }
 
-export function useSubscription() {
-  const { data, loading, error, refetch } = useGetMySubscriptionQuery();
-  const subscription = data?.mySubscription ?? null;
+/**
+ * Subscribe to user-scoped SUBSCRIPTION_UPDATED push notifications (emitted by
+ * the stripe-webhook lambda after every Stripe state change) and invoke
+ * `onUpdate` on receipt. The WebSocket is created once on mount; the latest
+ * `onUpdate` is always called via a ref so callers can pass an inline closure
+ * without re-creating the socket. Without this the mobile hooks only poll, so
+ * real-time changes — grace-period expiry, admin adjustments, entitlement
+ * changes — were missed until the app was restarted.
+ *
+ * When rendered inside a league screen's LeagueWebSocketContext (e.g. the
+ * commissioner tab), reuse that shared socket instead of opening a second
+ * one (LS-8885). Outside that context (the other ~40 call sites across the
+ * app), fall back to this hook's own standalone connection exactly as
+ * before.
+ */
+function useOnSubscriptionUpdated(onUpdate: () => void): void {
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
 
-  const isPremium = subscription?.tier === 'premium';
-  const tier = subscription?.tier ?? 'free';
-
-  // Keep the latest refetch in a ref so the WebSocket effect can run once on
-  // mount yet always invoke the current refetch without re-creating the socket.
-  const refetchRef = useRef(refetch);
-  refetchRef.current = refetch;
-
-  // Mirror the web `useIsPremium` hook: listen for SUBSCRIPTION_UPDATED push
-  // notifications (emitted by the stripe-webhook lambda after every Stripe
-  // state change) and refetch the subscription on receipt. Without this the
-  // mobile hook only polls, so real-time tier changes — grace-period expiry,
-  // admin adjustments — were missed until the app was restarted.
-  //
-  // When rendered inside a league screen's LeagueWebSocketContext (e.g. the
-  // commissioner tab), reuse that shared socket instead of opening a second
-  // one (LS-8885). Outside that context (the other ~40 call sites across the
-  // app), fall back to this hook's own standalone connection exactly as
-  // before.
   const { client: sharedClient } = useLeagueWebSocketClient();
   const clientRef = useRef<WebSocketClient | null>(null);
   useEffect(() => {
@@ -52,9 +50,7 @@ export function useSubscription() {
       const unsubscribe = sharedClient.on(
         ClientNotificationType.SUBSCRIPTION_UPDATED,
         () => {
-          void refetchRef.current().catch((err: unknown) => {
-            captureError(err instanceof Error ? err : new Error(String(err)));
-          });
+          onUpdateRef.current();
         },
       );
       return unsubscribe;
@@ -83,9 +79,7 @@ export function useSubscription() {
         // client.on dispatches only for the subscribed type, so no per-event
         // type guard is needed here.
         client.on(ClientNotificationType.SUBSCRIPTION_UPDATED, () => {
-          void refetchRef.current().catch((err: unknown) => {
-            captureError(err instanceof Error ? err : new Error(String(err)));
-          });
+          onUpdateRef.current();
         });
 
         clientRef.current = client;
@@ -103,6 +97,24 @@ export function useSubscription() {
       clientRef.current = null;
     };
   }, [sharedClient]);
+}
+
+export function useSubscription() {
+  const { data, loading, error, refetch } = useGetMySubscriptionQuery();
+  const subscription = data?.mySubscription ?? null;
+
+  const isPremium = subscription?.tier === 'premium';
+  const tier = subscription?.tier ?? 'free';
+
+  useOnSubscriptionUpdated(() => {
+    // Proactive path (LS-8645): re-mint the JWT so the fresh entitlement claim
+    // propagates before any request is rejected as stale, then refresh the
+    // coarse subscription state the UI displays.
+    void silentlyRefreshJwt();
+    void refetch().catch((err: unknown) => {
+      captureError(err instanceof Error ? err : new Error(String(err)));
+    });
+  });
 
   return {
     subscription: subscription as SubscriptionData | null,
@@ -115,18 +127,46 @@ export function useSubscription() {
 }
 
 /**
+ * Returns the set of entitlement lookup_keys the current user's plan grants,
+ * read from the server's `myEntitlements` resolver (LS-8645) which derives them
+ * from the token's Stripe-minted entitlement claim (admins receive the full
+ * catalog server-side). On a SUBSCRIPTION_UPDATED notification it re-mints the
+ * JWT and refetches so a plan change propagates without an app restart.
+ */
+export function useEntitlements(): {
+  entitlements: EntitlementKey[];
+  loading: boolean;
+} {
+  const { data, loading, refetch } = useMyEntitlementsQuery();
+
+  useOnSubscriptionUpdated(() => {
+    void silentlyRefreshJwt()
+      .then(() => refetch())
+      .catch((err: unknown) => {
+        captureError(err instanceof Error ? err : new Error(String(err)));
+      });
+  });
+
+  return {
+    entitlements: (data?.myEntitlements ?? []) as EntitlementKey[],
+    loading,
+  };
+}
+
+/**
  * Returns whether the current user's plan grants a specific entitlement. Mobile
  * counterpart of the web `useHasEntitlement` hook — prefer it over a bare
  * `isPremium` check at feature gates so each gate is framed around the Stripe
  * entitlement it unlocks.
  *
- * Interim behavior (LS-8643): premium plans grant every catalog entitlement, so
- * this resolves to the user's premium status. Wiring it to the token's per-user
- * Stripe entitlement claim is LS-8645; the `key` argument is retained now so
- * call sites already name their capability.
+ * Backed by the token's per-user Stripe entitlement claim (LS-8645) via
+ * {@link useEntitlements}, so a plan can grant only a subset of premium
+ * features. Returns `false` while the entitlement set is still loading.
  */
-export function useHasEntitlement(_key: EntitlementKey): boolean {
-  return useSubscription().isPremium;
+export function useHasEntitlement(key: EntitlementKey): boolean {
+  const { entitlements, loading } = useEntitlements();
+  if (loading) return false;
+  return entitlements.includes(key);
 }
 
 export function useCheckoutSession() {

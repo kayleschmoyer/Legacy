@@ -1,27 +1,29 @@
-import type { EntitlementKey } from '@legacy-sports/utils';
 import { builder } from './builder';
-import { hasEntitlement, requireAuth } from './authorization';
+import { getEntitlements, requireAuth } from './authorization';
 
 /**
- * Query: hasEntitlement(key: String!): Boolean!
+ * Query: myEntitlements: [String!]!
  *
- * Returns true when the authenticated user holds the given entitlement key.
- * Admin users always return true (consistent with the authorization layer).
- * Delegates to {@link hasEntitlement}, which enforces the token's Stripe-minted
- * entitlement claim (no runtime Stripe API call on this fast path) and may throw
- * ENTITLEMENTS_STALE to force a client token refresh (LS-8643).
+ * Returns the set of entitlement lookup_keys the authenticated user's plan
+ * grants, read from the token's Stripe-minted entitlement claim (LS-8644) — the
+ * current-user entitlement-check resolver (LS-8042, rewired in LS-8645). Admins
+ * receive the full catalog (all-entitled for reads). Delegates to
+ * {@link getEntitlements}, which enforces the token claim on the fast path (no
+ * runtime Stripe API call) and may throw ENTITLEMENTS_STALE to force a client
+ * token refresh + retry when the claim is stale (LS-8643).
+ *
+ * The client consumes this to power per-entitlement feature gates
+ * (`useHasEntitlement`) instead of collapsing every gate to the coarse premium
+ * tier.
  */
-builder.queryField('hasEntitlement', (t) =>
-  t.boolean({
+builder.queryField('myEntitlements', (t) =>
+  t.stringList({
     nullable: false,
     description:
-      'Returns true when the authenticated user holds the given entitlement. Admin users always return true.',
-    args: {
-      key: t.arg.string({ required: true }),
-    },
-    resolve: async (_parent, { key }, context) => {
+      "Returns the lookup_keys of the entitlements the authenticated user's plan grants (derived from the token claim). Admin users receive the full catalog.",
+    resolve: async (_parent, _args, context) => {
       requireAuth(context);
-      return hasEntitlement(context, key as EntitlementKey);
+      return getEntitlements(context);
     },
   }),
 );

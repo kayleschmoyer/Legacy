@@ -1,9 +1,13 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
-import { ClientNotificationType } from '@legacy-sports/utils';
+import { ClientNotificationType, ENTITLEMENTS } from '@legacy-sports/utils';
 
 // ── Module under test ─────────────────────────────────────────────────────────
 
-import { useSubscription } from './useSubscription';
+import {
+  useEntitlements,
+  useHasEntitlement,
+  useSubscription,
+} from './useSubscription';
 
 // ── Mocks (hoisted before imports) ───────────────────────────────────────────
 
@@ -24,14 +28,26 @@ jest.mock('@legacy-sports/utils', () => ({
     typeof import('../../../../../lib/utils/src/lib/notification-types')
   >('../../../../../lib/utils/src/lib/notification-types')
     .ClientNotificationType,
+  ENTITLEMENTS: jest.requireActual<
+    typeof import('../../../../../lib/utils/src/lib/entitlements')
+  >('../../../../../lib/utils/src/lib/entitlements').ENTITLEMENTS,
 }));
 
 const mockUseGetMySubscriptionQuery = jest.fn();
+const mockUseMyEntitlementsQuery = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMySubscriptionQuery: (...args: unknown[]): unknown =>
     mockUseGetMySubscriptionQuery(...args),
+  useMyEntitlementsQuery: (...args: unknown[]): unknown =>
+    mockUseMyEntitlementsQuery(...args),
   useCreateBillingPortalSessionMutation: jest.fn(() => [jest.fn(), {}]),
   useCreateCheckoutSessionMutation: jest.fn(() => [jest.fn(), {}]),
+}));
+
+const mockSilentlyRefreshJwt = jest.fn().mockResolvedValue('new-jwt');
+jest.mock('../../common/auth/jwtRefresh', () => ({
+  silentlyRefreshJwt: (...args: unknown[]): unknown =>
+    mockSilentlyRefreshJwt(...args),
 }));
 
 const mockReadKeychainValue = jest.fn();
@@ -220,6 +236,9 @@ describe('useSubscription — real-time SUBSCRIPTION_UPDATED listener', () => {
     });
 
     expect(refetch).toHaveBeenCalledTimes(1);
+    // Proactive path (LS-8645): the same notification re-mints the JWT so the
+    // fresh entitlement claim propagates before any request is rejected.
+    expect(mockSilentlyRefreshJwt).toHaveBeenCalledTimes(1);
   });
 
   it('connects with the user-scoped general view context (no leagueId)', async () => {
@@ -265,5 +284,91 @@ describe('useSubscription — real-time SUBSCRIPTION_UPDATED listener', () => {
     unmount();
 
     expect(mockClientDispose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useEntitlements / useHasEntitlement', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockCtorOpts = null;
+    mockRegisteredHandlers.clear();
+    mockSilentlyRefreshJwt.mockResolvedValue('new-jwt');
+    // No token → the socket effect short-circuits and the entitlement tests
+    // stay isolated from the socket machinery unless they opt in.
+    mockReadKeychainValue.mockResolvedValue(null);
+  });
+
+  it('exposes the token-derived entitlement set', () => {
+    mockUseMyEntitlementsQuery.mockReturnValue({
+      data: { myEntitlements: [ENTITLEMENTS.player_comparison] },
+      loading: false,
+    });
+
+    const { result } = renderHook(() => useEntitlements());
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.entitlements).toEqual([
+      ENTITLEMENTS.player_comparison,
+    ]);
+  });
+
+  it('useHasEntitlement returns true only for a granted key', () => {
+    mockUseMyEntitlementsQuery.mockReturnValue({
+      data: { myEntitlements: [ENTITLEMENTS.player_comparison] },
+      loading: false,
+    });
+
+    const granted = renderHook(() =>
+      useHasEntitlement(ENTITLEMENTS.player_comparison),
+    );
+    const notGranted = renderHook(() =>
+      useHasEntitlement(ENTITLEMENTS.trade_analyzer),
+    );
+
+    expect(granted.result.current).toBe(true);
+    expect(notGranted.result.current).toBe(false);
+  });
+
+  it('useHasEntitlement returns false while the set is still loading', () => {
+    mockUseMyEntitlementsQuery.mockReturnValue({
+      data: undefined,
+      loading: true,
+    });
+
+    const { result } = renderHook(() =>
+      useHasEntitlement(ENTITLEMENTS.player_comparison),
+    );
+
+    expect(result.current).toBe(false);
+  });
+
+  it('re-mints the JWT and refetches on a SUBSCRIPTION_UPDATED notification', async () => {
+    const refetch = jest.fn().mockResolvedValue(undefined);
+    mockWebsocketUrl = 'wss://example.com/ws';
+    mockReadKeychainValue.mockResolvedValue('jwt-token');
+    mockUseMyEntitlementsQuery.mockReturnValue({
+      data: { myEntitlements: [] },
+      loading: false,
+      refetch,
+    });
+
+    renderHook(() => useEntitlements());
+
+    await waitFor(() => {
+      expect(
+        mockRegisteredHandlers.has(ClientNotificationType.SUBSCRIPTION_UPDATED),
+      ).toBe(true);
+    });
+
+    emitNotification(ClientNotificationType.SUBSCRIPTION_UPDATED, {
+      tier: 'premium',
+      status: 'active',
+    });
+
+    expect(mockSilentlyRefreshJwt).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+    mockWebsocketUrl = undefined;
   });
 });
