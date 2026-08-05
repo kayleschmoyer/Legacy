@@ -123,9 +123,10 @@
       "title": "Help",
       "slug": "legacy-sports-help",
       "status": "active",
-      "lastSyncedHash": "564894d973bbc0a9e76e10d9821dba433f441d87e5b6a1e1f6994cbf8bef9335",
-      "lastSyncedAt": "2026-05-20T16:35:55.292Z",
-      "jiraKey": "LS-4577"
+      "lastSyncedHash": "3f2485a209e2b185cda9ae9daa5ce8855dc9237991d76646fc0f8d28a167f01d",
+      "lastSyncedAt": "2026-08-04T15:24:04.000Z",
+      "jiraKey": "LS-8966",
+      "source": "designsync-local"
     },
     {
       "id": "c8_aVxWiMWOyjkMnoD-SkA",

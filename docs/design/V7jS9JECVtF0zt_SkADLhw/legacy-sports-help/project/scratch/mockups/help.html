@@ -1,16 +1,44 @@
 <!doctype html>
 <html lang="en">
+  <!-- HANDOFF: apps/web/src/pages/help/HelpPage.tsx · /help. This is the
+       final file. Re-run (LS-8966) against the updated PROMPT.md brief to
+       fix mechanical violations found in the LS-8954 audit: dropped the
+       unauthorized JetBrains Mono Google Fonts load (the brief allows only
+       Big Shoulders Display + Literata — --font-mono now aliases
+       --font-body, matching the canonical design system's "no mono face"
+       rule) and the unused Big Shoulders weight 900; corrected the
+       mockup's own stale pre-brief text-ramp hexes (--fg1/--fg2/--fg3) to
+       the canonical brand.md values and replaced two off-palette one-off
+       strays (#0f1a30, #070b14) with existing tokens; replaced the
+       invented `@media (max-width: 900px)` breakpoint with the canonical
+       979px edge (just below the `lg` 980px band); added a --focus-ring
+       token + :focus-visible rules across every interactive component
+       class; replaced the real "Babe Ruth (1927) / Mike Trout (2019)"
+       example in the "How does drafting across eras work?" FAQ answer
+       with fictional players, per LS-9004 Ruling 2 — this Help page is
+       documentation copy, not a player-data surface, so it doesn't
+       qualify for the real-historical-player exemption. Deliberately
+       left unchanged: the extended-ramp brand tints flagged by the
+       original audit (#2c4a7c/#143050/#d4bb78/#a68b3e/#e63950/#6c80ba/
+       #4d5d80) — all match sanctioned tokens in the canonical Design
+       System file per LS-9004 Ruling 3 — and the other real-player
+       mentions on this page (Walter Johnson in the tutorial copy; Bob
+       Gibson, Josh Gibson, Satchel Paige, Cool Papa Bell in the
+       Historical Stats FAQ), which are out of this ticket's named
+       finding (Babe Ruth/Mike Trout only) — flag for a follow-up ticket
+       if a broader real-player sweep of this page is wanted. Open
+       question: none blocking. -->
   <head>
     <meta charset="utf-8" />
     <title>Help & Support — Legacy Sports — Mockup</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="icon" href="../../assets/favicon.ico" />
 
-    <!-- Google Fonts: Big Shoulders Display + Literata + JetBrains Mono -->
+    <!-- Google Fonts: Big Shoulders Display + Literata (no mono face — see colors_and_type.css) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Literata:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
       rel="stylesheet"
     />
 
@@ -35,19 +63,20 @@
         --bg-elevated: #16223a;
         --bg-raised: #1c2a47;
 
-        --fg1: #e8edf5;
+        --fg1: #f8fafc;
         --fg1-strong: #ffffff;
-        --fg2: #c9d2e2;
-        --fg3: #8a9bb5;
+        --fg2: #dee6ff;
+        --fg3: #9caac5;
         --fg4: #6c80ba;
 
         --border: #1e2d45;
         --border-strong: #2f3b53;
+        --focus-ring: #4e8ed6;
 
         --font-display:
           'Big Shoulders Display', 'Oswald', system-ui, sans-serif;
         --font-body: 'Literata', Georgia, serif;
-        --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        --font-mono: var(--font-body);
 
         --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 
@@ -82,8 +111,8 @@
         position: sticky;
         top: 0;
         z-index: 100;
-        background: #070b14;
-        border-bottom: 1px solid #1e2d45;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
         padding: 14px 22px;
         display: flex;
         flex-wrap: wrap;
@@ -110,7 +139,7 @@
         display: flex;
         gap: 4px;
         padding: 4px;
-        background: #0d1526;
+        background: var(--bg-subtle);
         border: 1px solid var(--border);
         border-radius: 9999px;
       }
@@ -133,13 +162,13 @@
       }
       .rb-tabs button.on {
         background: var(--brand-navy);
-        color: #fff;
+        color: var(--fg1-strong);
       }
       .rb-vp {
         display: flex;
         gap: 4px;
         padding: 4px;
-        background: #0d1526;
+        background: var(--bg-subtle);
         border: 1px solid var(--border);
         border-radius: 9999px;
       }
@@ -194,7 +223,7 @@
         display: flex;
         gap: 6px;
         padding: 5px;
-        background: #0d1526;
+        background: var(--bg-subtle);
         border: 1px solid var(--border);
         border-radius: 9999px;
       }
@@ -217,7 +246,7 @@
       }
       .bp-bar button.on {
         background: var(--brand-navy);
-        color: #fff;
+        color: var(--fg1-strong);
       }
       .bp-label {
         font-family: var(--font-mono);
@@ -363,7 +392,7 @@
       }
       .ls-tabs a.on {
         background: var(--brand-navy);
-        color: #fff;
+        color: var(--fg1-strong);
       }
       .ls-nav-right {
         display: flex;
@@ -390,7 +419,7 @@
         width: 38px;
         height: 38px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #1b3a5c 0%, #c5a55a 100%);
+        background: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-gold) 100%);
         border: 1px solid rgba(197, 165, 90, 0.45);
         display: inline-flex;
         align-items: center;
@@ -398,7 +427,7 @@
         font-family: var(--font-display);
         font-weight: 800;
         font-size: 12px;
-        color: #fff;
+        color: var(--fg1-strong);
       }
 
       /* ── Mobile nav ─────────────────────────────────────────────── */
@@ -537,9 +566,9 @@
         gap: 0;
         background: linear-gradient(
           135deg,
-          #0f1a30 0%,
-          #16223a 60%,
-          #1b3a5c 100%
+          var(--bg) 0%,
+          var(--bg-elevated) 60%,
+          var(--brand-navy) 100%
         );
         border: 1px solid rgba(197, 165, 90, 0.45);
         border-radius: 24px;
@@ -627,7 +656,7 @@
       }
       .btn-primary {
         background: var(--brand-navy);
-        color: #fff;
+        color: var(--fg1-strong);
         border-color: var(--brand-navy-light);
       }
       .btn-primary:hover {
@@ -650,6 +679,23 @@
       .btn-ghost:hover {
         background: rgba(255, 255, 255, 0.04);
         border-color: #4d5d80;
+      }
+
+      /* Focus-visible: one consolidated rule for every interactive
+   component class on the page (54 buttons/links) rather than repeating
+   the same three declarations per selector. */
+      .rb-tabs button:focus-visible,
+      .rb-vp button:focus-visible,
+      .bp-bar button:focus-visible,
+      .ls-tabs a:focus-visible,
+      .ls-icon-btn:focus-visible,
+      .btn:focus-visible,
+      .chip:focus-visible,
+      .faq-q:focus-visible,
+      .contact-card:focus-visible,
+      .m-nav .back:focus-visible {
+        outline: 2px solid var(--focus-ring);
+        outline-offset: 2px;
       }
 
       /* Tutorial right side: "the 6 cards laid out like a stat sheet" */
@@ -1269,7 +1315,11 @@
 
       /* ── Annotation comments visible in dev ─────────────────── */
 
-      @media (max-width: 900px) {
+      /* BREAKPOINTS: this layout serves xxs–md (0–979px) with the desktop
+   nav/tutorial/contact collapse below the canonical `lg` (980px) edge;
+   979px matches that band boundary rather than inventing a bespoke
+   threshold. */
+      @media (max-width: 979px) {
         .ls-tabs {
           display: none;
         }
@@ -1532,12 +1582,14 @@
               </div>
               <div class="tutorial-actions">
                 <!-- MOTION: opens OnboardingTutorial modal — modal slides up 240ms ease-out -->
+                <!-- COMPONENT: btn (.btn-primary/.btn-gold/.btn-ghost) — reused for every CTA on this page and across bundles (login, create-league, profile-settings) -->
                 <button class="btn btn-gold">Launch Tutorial</button>
                 <button class="btn btn-ghost">Watch the Highlights ▸</button>
               </div>
             </div>
             <div class="tutorial-r" aria-hidden="true">
               <!-- Visual preview of the 6 modal steps (illustrative, not interactive) -->
+              <!-- COMPONENT: tutorial-step — numbered step row, reused 6x here -->
               <div class="step">
                 <div class="step-n">01</div>
                 <div>
@@ -1598,6 +1650,7 @@
           </div>
           <!-- DESIGN INTENT: chips, not a card grid. Five short labels read
            naturally in a row — uniform card grid would over-design them. -->
+          <!-- COMPONENT: chip — pill quick-link, reused in the desktop + mobile quick-links rows and the error-state fallback nav -->
           <nav class="chips" aria-label="Quick links">
             <a class="chip"
               ><img src="../../icons/league.svg" alt="" />My Leagues<span
@@ -1640,6 +1693,7 @@
             </p>
           </div>
 
+          <!-- COMPONENT: faq-item — single-open accordion row, reused across both FAQ groups on this page (13x total) -->
           <div class="faq" id="faq-common">
             <div class="faq-item open">
               <button class="faq-q" aria-expanded="true">
@@ -1690,8 +1744,12 @@
               </button>
               <div class="faq-a">
                 <p>
+                  <!-- Fictional example players (LS-9004 Ruling 2): this
+                       FAQ's prose isn't a player-data surface, so real
+                       historical players don't apply here — keeps the
+                       illustrative era-spanning structure. -->
                   Every player in your league's era window is in the pool. Pick
-                  Babe Ruth (1927) and Mike Trout (2019) on the same roster —
+                  Dutch Callahan (1931) and Marcus Webb (2019) on the same roster —
                   their performance is scored against the actual season they
                   played, not normalized.
                 </p>
@@ -1886,6 +1944,7 @@
 
           <div class="contact-grid">
             <!-- MOTION: hover translateY(-2px) 200ms; press scale(.98) 100ms -->
+            <!-- COMPONENT: contact-card — icon + title + description row, reused 4x desktop + 4x mobile -->
             <a class="contact-card">
               <div class="ico" aria-hidden="true">
                 <!-- Lucide bug -->
@@ -2752,7 +2811,7 @@
                   </button>
                   <div class="faq-a">
                     <p>
-                      Pick Babe Ruth (1927) and Mike Trout (2019) on the same
+                      Pick Dutch Callahan (1931) and Marcus Webb (2019) on the same
                       roster. Each player scores against their actual season —
                       no normalization by default.
                     </p>
