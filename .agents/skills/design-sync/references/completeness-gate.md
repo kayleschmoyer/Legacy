@@ -84,6 +84,21 @@ These get logged in the agent's report but the agent still proceeds. Warnings ex
 | W4  | An error-state mockup is present for any form in the design                                                         | "No error state defined. Defaulting to inline field errors per AGENTS.md."                    |
 | W5  | A loading-state mockup is present for any data-bound region                                                         | "No loading state defined. Defaulting to a skeleton per the shared component library."        |
 
+### Decision (LS-9050): W2–W5 stay warning-level — not promoted to blocking
+
+Considered and decided during LS-9050 (the visual-fidelity gate ticket). Improvised interactive/empty/error/loading states are exactly the "generic AI aesthetics" failure this gate's rationale warns about, so promotion to blocking was on the table. Decision: **keep W2–W5 as warnings**, for three reasons:
+
+1. **Blocking would stall the pipeline on routine designer omissions.** Most real bundles do not mock all four states for every surface; a B-level failure here forces a designer round-trip per missing state, which costs more than the defect it prevents. B-checks are reserved for inputs without which implementation _cannot_ proceed; for W2–W5 a documented, brand-compliant default exists (the exact defaults named in each warning's text: generic empty illustration, inline field errors per AGENTS.md, skeleton per the shared component library).
+2. **The risk W2–W5 guard against is now covered downstream.** As of LS-9050, Branch A of `/implement-design` has a **blocking visual-verification gate** before mark-ready: rendered screenshots at ≥2 viewport widths are judged against the mockup by a fresh subagent, and material mismatches — including missing states that _are_ visible in the mockup — block mark-ready like a failed B-check. Improvised output no longer ships unseen.
+3. **Warnings are already surfaced where humans decide.** W-check warnings are mandatory in the first commit message and PR body, so a reviewer sees exactly which states were improvised and from which default.
+
+Two obligations make this tenable (binding on the implementing agent):
+
+- An improvised state **must** use the named default from its warning row — never an invented design.
+- Each improvised state reachable with fixture data **must** be included in the visual-verification captures (e.g. a Storybook story variant per state), so the fresh judge sees it too.
+
+Revisit if visual-verification rounds repeatedly catch improvised-state defects that trace back to missing mockups — that would be evidence the downstream gate is not a sufficient substitute for blocking at the source.
+
 ## How to apply
 
 1. Resolve `<slug>` from `manifest.json` (or fallback enumeration) before running any check.
