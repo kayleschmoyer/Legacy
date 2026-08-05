@@ -16,8 +16,8 @@ Pull request and review lifecycle management via the GitHub REST and GraphQL API
 
 - **github_list_prs** — List PRs with filters (state, branch, author, label, search)
 - **github_view_pr** — View detailed PR info (title, body, state, checks, reviews, diff stats)
-- **github_create_pr** — Create a PR; auto-prepends the `<!-- jira-link -->` marker (primary from `jiraPrimary` param → first `LS-####` in title → `none`)
-- **github_edit_pr** — Update a PR's title and/or body; a new body whose `<!-- jira-link -->` marker is missing or malformed gets the PR's existing well-formed block re-injected (reported under `warnings`), or is rejected when there is none to fall back on
+- **github_create_pr** — Create a PR; auto-prepends the jira-link marker (primary from `jiraPrimary` param → first `LS-####` in title → `none`)
+- **github_edit_pr** — Update a PR's title and/or body; a new body whose jira-link marker is missing or malformed (e.g. an opening comment with no `primary:` line) gets the PR's existing well-formed block re-injected (reported under `warnings`), or is rejected when there is none to fall back on
 - **github_close_pr** — Close a PR without merging
 - **github_reopen_pr** — Reopen a closed PR (e.g. after an auto-close on a flaky CI failure)
 - **github_merge_pr** — Merge a PR (default: queue; or direct with --admin)

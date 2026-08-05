@@ -42,7 +42,7 @@ const server = new McpServer({
 // --- github_create_pr ---
 server.tool(
   'github_create_pr',
-  'Prefer this over `gh pr create` via shell. Create a pull request. Title should include Jira key. Automatically prepends the structured `<!-- jira-link -->` marker (the source of truth for ticket linkage) to the body: primary key from jiraPrimary, else the first LS-#### in the title, else "none".',
+  'Prefer this over `gh pr create` via shell. Create a pull request. Title should include Jira key. Automatically prepends the structured jira-link marker (the source of truth for ticket linkage) to the body: primary key from jiraPrimary, else the first LS-#### in the title, else "none".',
   {
     title: z.string().describe('PR title with Jira key'),
     body: z.string().describe('PR body (markdown)'),
