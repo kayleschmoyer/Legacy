@@ -198,6 +198,54 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('quick actions (LS-9048)', () => {
+    it('renders the quick-action row and fires its handlers', () => {
+      const onCreateLeague = jest.fn();
+      const onJoinLeague = jest.fn();
+      const onBrowseStats = jest.fn();
+      const onStartMockDraft = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onCreateLeague={onCreateLeague}
+          onJoinLeague={onJoinLeague}
+          onBrowseStats={onBrowseStats}
+          onStartMockDraft={onStartMockDraft}
+        />,
+      );
+      fireEvent.click(getByTestId('home-quick-create-league'));
+      fireEvent.click(getByTestId('home-quick-join-league'));
+      fireEvent.click(getByTestId('home-quick-mock-draft'));
+      fireEvent.click(getByTestId('home-quick-browse-stats'));
+      expect(onCreateLeague).toHaveBeenCalledTimes(1);
+      expect(onJoinLeague).toHaveBeenCalledTimes(1);
+      expect(onStartMockDraft).toHaveBeenCalledTimes(1);
+      expect(onBrowseStats).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables the Mock Draft pill at the weekly cap', () => {
+      const onStartMockDraft = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onStartMockDraft={onStartMockDraft}
+          mockDraftAtCap
+        />,
+      );
+      fireEvent.click(getByTestId('home-quick-mock-draft'));
+      expect(onStartMockDraft).not.toHaveBeenCalled();
+    });
+
+    it('omits the Mock Draft pill when no onStartMockDraft handler is provided', () => {
+      const { queryByTestId } = render(
+        <HomeScreen {...baseProps} leagues={[league]} />,
+      );
+      expect(queryByTestId('home-quick-mock-draft')).toBeNull();
+    });
+  });
+
   describe('football playboard hero (LS-9035)', () => {
     const footballLeague: HomeLeagueSummary = {
       leagueId: 51,

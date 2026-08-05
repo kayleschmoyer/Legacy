@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { H1, H2, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import type { GestureResponderEvent, LayoutChangeEvent } from 'react-native';
-import { ArrowRight } from '@tamagui/lucide-icons';
+import { ArrowRight, Plus, TrendingUp, Users } from '@tamagui/lucide-icons';
 import { formatDraftDate } from '@legacy-sports/utils';
 // Football playboard-hero palette (LS-9035) — theme-invariant physical-object
 // colors, sourced from the sanctioned unscanned palette home so they never
@@ -396,6 +396,7 @@ function TicketHeroHead({ summary }: { summary: HomeLeagueSummary }) {
       flexWrap="wrap"
       gap="$2"
       paddingBottom={13}
+      borderWidth={0}
       borderBottomWidth={1}
       borderBottomColor={TICKET_RULE}
       borderStyle="dashed"
@@ -673,6 +674,7 @@ function TicketHeroScoreZone({
       <TicketStandingStat big={recordOf(summary)} label="Record" />
       {summary.rank != null && summary.totalTeams != null ? (
         <XStack
+          borderWidth={0}
           borderLeftWidth={1}
           borderLeftColor={TICKET_RULE}
           borderStyle="dashed"
@@ -834,6 +836,7 @@ function LeagueHeroCard({
             </YStack>
             <YStack
               minWidth={0}
+              borderWidth={0}
               borderTopWidth={1}
               borderTopColor={TICKET_RULE}
               borderStyle="dashed"
@@ -852,11 +855,12 @@ function LeagueHeroCard({
         </YStack>
         <YStack
           testID="home-hero-stub"
-          width={34}
+          width={42}
           $gtMd={{ width: 56 }}
           position="relative"
           alignItems="center"
           justifyContent="center"
+          borderWidth={0}
           borderLeftWidth={2}
           borderLeftColor={TICKET_RULE}
           borderStyle="dashed"
@@ -880,19 +884,31 @@ function LeagueHeroCard({
             borderRadius={9999}
             backgroundColor="$background"
           />
-          <Text
-            rotate="-90deg"
-            numberOfLines={1}
-            fontFamily={DISPLAY_FONT}
-            fontWeight="800"
-            fontSize={9}
-            $gtMd={{ fontSize: 10 }}
-            letterSpacing={2.2}
-            textTransform="uppercase"
-            color={BRAND_SEAM_RED}
+          {/* `rotate` doesn't change the layout box, so the label must NOT
+              inherit the stub column's width — a fixed-width wrapper lays out
+              wide enough for the longest label, centered, then rotates 90°
+              (reading top-to-bottom, matching the mockup's vertical-rl). The
+              rotation lives on the stack, not the Text, because Text's
+              ellipsis handling clamps its width back to the column. */}
+          <YStack
+            width={190}
+            flexShrink={0}
+            alignItems="center"
+            style={{ transform: 'rotate(90deg)' }}
           >
-            {stubLabel}
-          </Text>
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="800"
+              fontSize={9}
+              $gtMd={{ fontSize: 10 }}
+              letterSpacing={2.2}
+              textTransform="uppercase"
+              color={BRAND_SEAM_RED}
+              whiteSpace="nowrap"
+            >
+              {stubLabel}
+            </Text>
+          </YStack>
         </YStack>
       </GradientSurface>
     </XStack>
@@ -1412,6 +1428,7 @@ function PlayboardHeroCard({
           gap="$3"
           flexWrap="wrap"
           paddingBottom={12}
+          borderWidth={0}
           borderBottomWidth={1}
           borderBottomColor={withAlpha(playboardTokens.textPrimary, 0.2)}
           borderStyle="dashed"
@@ -1598,12 +1615,31 @@ function LeagueListRow({
       accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
       onPress={onPress}
       cursor="pointer"
-      backgroundColor="$surfaceCard"
+      backgroundColor="$glassSurfaceLight"
+      borderWidth={1}
+      borderColor="$glassBorder"
+      borderRadius={12}
       paddingVertical={18}
       paddingHorizontal={22}
       gap="$3"
       alignItems="center"
-      hoverStyle={{ backgroundColor: '$color4' }}
+      shadowColor={OVERLAY_BLACK_40}
+      shadowOffset={{ width: 0, height: 8 }}
+      shadowRadius={22}
+      style={
+        {
+          backdropFilter: 'blur(12px) saturate(1.1)',
+          WebkitBackdropFilter: 'blur(12px) saturate(1.1)',
+        } as never
+      }
+      hoverStyle={{
+        backgroundColor: '$glassSurface',
+        borderColor: '$glassBorderHover',
+      }}
+      focusStyle={{
+        backgroundColor: '$glassSurface',
+        borderColor: '$glassBorderHover',
+      }}
     >
       <YStack flex={1} gap="$1" minWidth={0}>
         <Text
@@ -1678,6 +1714,95 @@ function LeagueListRow({
       </YStack>
       <Text fontSize={20} color={TEXT_TERTIARY}>
         ›
+      </Text>
+    </XStack>
+  );
+}
+
+/* ─── Quick actions (`.quick-actions` in the mockup) ───
+   The things a manager does from home that aren't "open a league" — one
+   glass-pill row under the league list. Create is the only pill that
+   carries gold; the rest stay neutral glass. */
+
+function QuickActionPill({
+  icon,
+  label,
+  onPress,
+  gold,
+  disabled,
+  testID,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress: () => void;
+  gold?: boolean;
+  disabled?: boolean;
+  testID?: string;
+}) {
+  return (
+    <XStack
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={disabled ? undefined : onPress}
+      disabled={disabled}
+      opacity={disabled ? 0.45 : 1}
+      alignItems="center"
+      justifyContent="center"
+      gap={9}
+      minHeight={44}
+      paddingVertical={12}
+      paddingHorizontal={18}
+      borderRadius={12}
+      borderWidth={1}
+      borderColor={gold ? withAlpha(BRAND_GOLD, 0.42) : '$glassBorder'}
+      backgroundColor="$glassSurfaceLight"
+      cursor={disabled ? 'not-allowed' : 'pointer'}
+      flexGrow={1}
+      flexBasis="45%"
+      $gtSm={{ flexGrow: 0, flexBasis: 'auto' }}
+      style={
+        {
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        } as never
+      }
+      hoverStyle={
+        disabled
+          ? undefined
+          : gold
+            ? {
+                borderColor: BRAND_GOLD,
+                backgroundColor: withAlpha(BRAND_GOLD, 0.12),
+              }
+            : {
+                borderColor: '$glassBorderHover',
+                backgroundColor: '$glassSurface',
+              }
+      }
+      focusStyle={
+        gold
+          ? {
+              borderColor: BRAND_GOLD,
+              backgroundColor: withAlpha(BRAND_GOLD, 0.12),
+            }
+          : {
+              borderColor: '$glassBorderHover',
+              backgroundColor: '$glassSurface',
+            }
+      }
+    >
+      {icon}
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="700"
+        fontSize={11.5}
+        letterSpacing={1.4}
+        textTransform="uppercase"
+        color={gold ? BRAND_GOLD_LIGHT : '$color'}
+        numberOfLines={1}
+      >
+        {label}
       </Text>
     </XStack>
   );
@@ -2288,14 +2413,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                   />
                 )}
                 {secondaryLeagues.length > 0 ? (
-                  <YStack
-                    borderWidth={1}
-                    borderColor="$surfacePanelBorder"
-                    borderRadius={12}
-                    overflow="hidden"
-                    gap={1}
-                    backgroundColor="$surfacePanelBorder"
-                  >
+                  <YStack gap={10}>
                     {secondaryLeagues.map((s) => (
                       <LeagueListRow
                         key={s.leagueId}
@@ -2389,14 +2507,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                         </Text>
                       </XStack>
                     ) : archivedLeagues.length > 0 ? (
-                      <YStack
-                        borderWidth={1}
-                        borderColor="$surfacePanelBorder"
-                        borderRadius={12}
-                        overflow="hidden"
-                        gap={1}
-                        backgroundColor="$surfacePanelBorder"
-                      >
+                      <YStack gap={10}>
                         {archivedLeagues.map((s) => (
                           <LeagueListRow
                             key={s.leagueId}
@@ -2420,6 +2531,44 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                     )}
                   </YStack>
                 )}
+
+                <XStack testID="home-quick-actions" flexWrap="wrap" gap={10}>
+                  <QuickActionPill
+                    testID="home-quick-create-league"
+                    icon={<Plus size={15} color={BRAND_GOLD_LIGHT} />}
+                    label="Create League"
+                    gold
+                    onPress={onCreateLeague}
+                  />
+                  <QuickActionPill
+                    testID="home-quick-join-league"
+                    icon={<Users size={15} color="$color" />}
+                    label="Join League"
+                    onPress={onJoinLeague}
+                  />
+                  {onStartMockDraft ? (
+                    <QuickActionPill
+                      testID="home-quick-mock-draft"
+                      icon={
+                        <BrandIcon
+                          name="draft"
+                          size={15}
+                          decorative={false}
+                          title="Mock draft"
+                        />
+                      }
+                      label="Mock Draft"
+                      disabled={mockDraftAtCap}
+                      onPress={onStartMockDraft}
+                    />
+                  ) : null}
+                  <QuickActionPill
+                    testID="home-quick-browse-stats"
+                    icon={<TrendingUp size={15} color="$color" />}
+                    label="Browse Stats"
+                    onPress={onBrowseStats}
+                  />
+                </XStack>
               </YStack>
 
               <YStack gap="$5">
@@ -2441,9 +2590,14 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
               <StatsCta onPress={onBrowseStats} />
             </YStack>
 
-            {/* Right rail */}
+            {/* Right rail — sticky beside the main column on desktop
+                (`.rail { position: sticky; top: 88px }` in the mockup);
+                static when the layout stacks below $gtMd. */}
             {onThisDay ? (
-              <YStack width="100%" $gtMd={{ width: 360 }}>
+              <YStack
+                width="100%"
+                $gtMd={{ width: 360, position: 'sticky', top: 88 }}
+              >
                 <OnThisDayPanel>{onThisDay}</OnThisDayPanel>
               </YStack>
             ) : null}
