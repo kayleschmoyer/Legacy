@@ -543,7 +543,13 @@ server.tool(
       .email()
       .optional()
       .describe(
-        "Only used when action='claim'. Email of the user to assign the ticket to. Overrides JIRA_ASSIGNEE_EMAIL.",
+        "Only used when action='claim'. Email of the user to assign the ticket to. Overridden by `assigneeAccountId` and JIRA_ASSIGNEE_ACCOUNT_ID — email-based lookup requires the read:jira-user scope, which the hosted Lambda lacks and therefore always 401s (LS-7891). Prefer `assigneeAccountId` when the assignee's Jira accountId is known.",
+      ),
+    assigneeAccountId: z
+      .string()
+      .optional()
+      .describe(
+        "Only used when action='claim'. Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works under the hosted Lambda's client-credentials scopes where email-based assignment always 401s (LS-7891). Takes precedence over `assignee` and both JIRA_ASSIGNEE_* env vars.",
       ),
     cascade: z
       .boolean()
@@ -574,6 +580,7 @@ server.tool(
       action: params.action,
       cascade: params.cascade,
       assignee: params.assignee,
+      assigneeAccountId: params.assigneeAccountId,
     });
   },
 );
@@ -623,7 +630,13 @@ server.tool(
       .email()
       .optional()
       .describe(
-        'Email of the user to assign the ticket to. Overrides the JIRA_ASSIGNEE_EMAIL env var.',
+        'Email of the user to assign the ticket to. Overridden by `assigneeAccountId` — email-based lookup always 401s under the hosted Lambda (LS-7891). Prefer `assigneeAccountId` when known.',
+      ),
+    assigneeAccountId: z
+      .string()
+      .optional()
+      .describe(
+        'Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works where email-based assignment always 401s (LS-7891). Takes precedence over `assignee`.',
       ),
   },
   async (params) => {
@@ -642,8 +655,11 @@ server.tool(
     'and sets the assignee in a single call. Idempotent on already-In-Progress tickets ' +
     '(no-op success). Refuses Done tickets with an error. ' +
     'Returns { key, status, previousStatus, assignee, idempotent, warnings }. ' +
-    'Assignee precedence matches jira_claim_ticket: explicit `assignee` param > ' +
-    'JIRA_ASSIGNEE_EMAIL > JIRA_ASSIGNEE_ACCOUNT_ID > authenticated service account. ' +
+    'Assignee precedence: explicit `assigneeAccountId` > explicit `assignee` (email) > ' +
+    'JIRA_ASSIGNEE_ACCOUNT_ID env var > JIRA_ASSIGNEE_EMAIL env var > authenticated ' +
+    'service account. accountId-based paths are checked first because email-based ' +
+    'lookup always 401s under the hosted Lambda (LS-7891) — prefer `assigneeAccountId` ' +
+    "when the assignee's Jira accountId is known. " +
     "Prefer this over the four-call chain (jira_view → jira_view({ include: ['transitions'] }) → " +
     'jira_transition → assignee PUT) for the standard "start work" flow. Use ' +
     'jira_claim_ticket when you also need blocker checks, child summaries, or branch ' +
@@ -661,7 +677,13 @@ server.tool(
       .email()
       .optional()
       .describe(
-        'Email of the user to assign the ticket to. Overrides JIRA_ASSIGNEE_EMAIL.',
+        'Email of the user to assign the ticket to. Overridden by `assigneeAccountId` — email-based lookup always 401s under the hosted Lambda (LS-7891). Prefer `assigneeAccountId` when known.',
+      ),
+    assigneeAccountId: z
+      .string()
+      .optional()
+      .describe(
+        'Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works where email-based assignment always 401s (LS-7891). Takes precedence over `assignee`.',
       ),
   },
   async (params) => startWork(params),

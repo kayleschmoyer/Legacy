@@ -277,6 +277,53 @@ describe('consolidatedTransition — claim action', () => {
     expect(putCalls).toHaveLength(1);
   });
 
+  it('passes assigneeAccountId through to claimTicket, skipping any lookup', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve({
+            transitions: [
+              { id: '21', name: 'Start', to: { name: 'In Progress' } },
+            ],
+          });
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/LS-1')) {
+          return Promise.resolve(makeIssue('LS-1'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await consolidatedTransition({
+      keys: 'LS-1',
+      status: 'In Progress',
+      action: 'claim',
+      assignee: 'ignored@example.com',
+      assigneeAccountId: 'direct-account-id',
+    });
+    const data = parse(result);
+    expect(data['success']).toBe(true);
+
+    const lookupCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) =>
+        opts.path === '/rest/api/3/myself' ||
+        opts.path === '/rest/api/3/user/search',
+    );
+    expect(lookupCalls).toHaveLength(0);
+
+    const putCalls = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.endsWith('/assignee'),
+    );
+    expect(putCalls).toHaveLength(1);
+    expect(putCalls[0][0].body).toEqual({ accountId: 'direct-account-id' });
+  });
+
   it('returns ALREADY_CLAIMED without re-transitioning', async () => {
     mockJiraRequest.mockImplementation(
       (opts: { method: string; path: string }) => {

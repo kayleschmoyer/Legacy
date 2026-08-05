@@ -1,23 +1,20 @@
-import { LOGGER } from '@legacy-sports/logging/server';
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
 import { matchesStatus } from '../locale.js';
+import { resolveAndAssign } from '../assignee.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface ClaimTicketParams {
   key: string;
   /**
-   * Precedence: explicit `assignee` param > `JIRA_ASSIGNEE_ACCOUNT_ID` env var
-   * (direct, no lookup) > `JIRA_ASSIGNEE_EMAIL` env var (via
-   * `/rest/api/3/user/search`) > the authenticated service account (via
-   * `GET /rest/api/3/myself`). ACCOUNT_ID is checked before EMAIL because
-   * `/rest/api/3/user/search` and `/rest/api/3/myself` both require the
-   * `read:jira-user` scope, which the hosted Lambda's client-credentials
-   * token lacks (LS-7891) and therefore always 401s.
+   * See `resolveAndAssign` in `../assignee.ts` for the full precedence order.
+   * Prefer `assigneeAccountId` when known — the email-based paths always
+   * 401 under the Lambda's client-credentials scopes (LS-7891/LS-9049).
    */
   assignee?: string;
+  assigneeAccountId?: string;
 }
 
 interface JiraIssueLink {
@@ -59,7 +56,7 @@ interface JiraIssueResponse {
 export async function claimTicket(
   params: ClaimTicketParams,
 ): Promise<CallToolResult> {
-  const { key, assignee } = params;
+  const { key, assignee, assigneeAccountId } = params;
 
   try {
     // Fetch ticket details, child status counts, and available transitions concurrently
@@ -208,67 +205,13 @@ export async function claimTicket(
     });
 
     // --- Assign the ticket ---
-    // Precedence: explicit `assignee` param > JIRA_ASSIGNEE_ACCOUNT_ID env var
-    // (direct) > JIRA_ASSIGNEE_EMAIL env var (user/search) > the
-    // authenticated service account (self). ACCOUNT_ID is checked before
-    // EMAIL because /rest/api/3/user/search and /rest/api/3/myself both
-    // require the read:jira-user scope, which the hosted Lambda's
-    // client-credentials token (read:jira-work write:jira-work) lacks
-    // (LS-7891) and therefore always 401s.
-    const configuredAccountId = process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
-    const assigneeEmail =
-      assignee ??
-      (configuredAccountId ? undefined : process.env['JIRA_ASSIGNEE_EMAIL']);
-    try {
-      let accountId: string | undefined;
-
-      if (assigneeEmail) {
-        const userSearch = await jiraRequest<{ accountId: string }[]>({
-          method: 'GET',
-          path: '/rest/api/3/user/search',
-          query: { query: assigneeEmail, maxResults: '1' },
-        });
-        accountId = userSearch?.[0]?.accountId;
-        if (!accountId) {
-          LOGGER.warn(
-            'jira_claim_ticket: no Jira user found for assignee; skipping assignee',
-            { assigneeEmail, key },
-          );
-          warnings.push(
-            `Could not assign ticket: no Jira user found for email "${assigneeEmail}".`,
-          );
-        }
-      } else if (configuredAccountId) {
-        // Pre-resolved accountId — assign directly without any user-lookup
-        // API call.
-        accountId = configuredAccountId;
-      } else {
-        // No email or accountId configured — default to the authenticated
-        // service account. Requires read:jira-user; works under basic auth.
-        const self = await jiraRequest<{ accountId: string }>({
-          method: 'GET',
-          path: '/rest/api/3/myself',
-        });
-        accountId = self?.accountId;
-      }
-
-      if (accountId) {
-        await jiraRequest({
-          method: 'PUT',
-          path: `/rest/api/3/issue/${key}/assignee`,
-          body: { accountId },
-        });
-      }
-    } catch (assignErr) {
-      const msg =
-        assignErr instanceof Error ? assignErr.message : String(assignErr);
-      LOGGER.error(
-        'jira_claim_ticket: assignee update failed (non-fatal)',
-        assignErr instanceof Error ? assignErr : new Error(msg),
-        { key },
-      );
-      warnings.push(`Assignee update failed (non-fatal): ${msg}`);
-    }
+    const assignResult = await resolveAndAssign({
+      key,
+      explicitAssignee: assignee,
+      explicitAssigneeAccountId: assigneeAccountId,
+      toolName: 'jira_claim_ticket',
+    });
+    warnings.push(...assignResult.warnings);
 
     return makeResult({
       action: 'PROCEED',

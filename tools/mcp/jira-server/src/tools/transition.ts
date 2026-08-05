@@ -34,6 +34,7 @@ interface ConsolidatedParams {
   action?: TransitionAction;
   cascade?: boolean;
   assignee?: string;
+  assigneeAccountId?: string;
   /**
    * Optional deprecation label. When set, the response includes a
    * `deprecation` field so callers can surface the warning. Used by the
@@ -272,7 +273,11 @@ export async function consolidatedTransition(
   async function runOne(key: string): Promise<void> {
     try {
       if (action === 'claim') {
-        const claim = await claimTicket({ key, assignee: params.assignee });
+        const claim = await claimTicket({
+          key,
+          assignee: params.assignee,
+          assigneeAccountId: params.assigneeAccountId,
+        });
         const text = (claim.content[0] as { text: string }).text;
         const parsed = JSON.parse(text) as Record<string, unknown>;
         if (claim.isError) {

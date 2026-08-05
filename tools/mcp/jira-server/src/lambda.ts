@@ -227,6 +227,7 @@ export function createMcpServer(): McpServer {
         ),
       action: z.enum(['transition', 'claim']).default('transition'),
       assignee: z.string().email().optional(),
+      assigneeAccountId: z.string().optional(),
       cascade: z.boolean().default(false),
     },
     async (params) => {
@@ -251,6 +252,7 @@ export function createMcpServer(): McpServer {
         action: params.action,
         cascade: params.cascade,
         assignee: params.assignee,
+        assigneeAccountId: params.assigneeAccountId,
       });
     },
   );
@@ -284,6 +286,7 @@ export function createMcpServer(): McpServer {
     {
       key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
       assignee: z.string().email().optional(),
+      assigneeAccountId: z.string().optional(),
     },
     async (p) => {
       process.stderr.write(

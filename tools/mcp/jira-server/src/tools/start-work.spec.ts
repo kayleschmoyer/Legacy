@@ -309,6 +309,41 @@ describe('startWork', () => {
     expect(putAssignee[0][0].body).toEqual({ accountId: 'env-account-id' });
   });
 
+  it('assigns from the explicit assigneeAccountId param without any lookup call', async () => {
+    process.env['JIRA_ASSIGNEE_EMAIL'] = 'agent@example.com';
+    process.env['JIRA_ASSIGNEE_ACCOUNT_ID'] = 'env-account-id';
+
+    const result = await startWork({
+      key: 'LS-1',
+      assignee: 'explicit@example.com',
+      assigneeAccountId: 'explicit-account-id',
+    });
+    const data = parse(result);
+
+    expect(data['status']).toBe('In Progress');
+
+    const lookupCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) =>
+        opts.path === '/rest/api/3/myself' ||
+        opts.path === '/rest/api/3/user/search',
+    );
+    expect(lookupCalls).toHaveLength(0);
+
+    const putAssignee = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putAssignee).toHaveLength(1);
+    expect(putAssignee[0][0].body).toEqual({
+      accountId: 'explicit-account-id',
+    });
+  });
+
   it('proceeds with a warning when /myself 401s (LS-7891 scope error)', async () => {
     mockJiraRequest.mockImplementation(
       (opts: { method: string; path: string }) => {
