@@ -216,9 +216,11 @@ worktree_push()
 After fixing all known issues, **arm the canonical PR watch, then idle** — the watch re-invokes this session on the next actionable event:
 
 ```
-Monitor({ command: "bash <worktree>/scripts/watch-pr.sh <PR#>",
+Monitor({ command: "bash <worktree-abs-path>/scripts/watch-pr.sh <PR#>",
           persistent: true, description: "PR #<N> watch" })
 ```
+
+The script path must be **absolute** — `Monitor` is not guaranteed to run with the worktree root as its cwd, and a bare relative `scripts/watch-pr.sh` exits 127 before the script runs a single line (LS-9045).
 
 > **Precondition for waiting on PR events (LS-8544)**: never end a turn with the PR in a non-terminal state unless the watch is armed. The watch polls harness-side (zero tokens) and emits only actionable transitions — red required contexts, corroborated conflicts, new reviews, escalation labels, SKIPPED-pipeline stalls, MERGED/CLOSED — and heartbeats `.claude/.pr-watch-armed-<PR#>` so the stop guard permits idling. Native push notifications remain a bonus accelerant, but they are not load-bearing: **merge-conflict transitions from main advancing are never delivered natively**, and CI/review notifications have observably failed to arrive (stuck PRs #6161/#6163). Treat `github_view_pr` and `ci_view_run` as one-shot lookups (e.g. to fetch a `runId` after a failure event), never poll targets — `Start-Sleep`/`sleep` + repeated reads are still banned. See the [mcp-first CI Operations section](../../mcp-first/SKILL.md#ci-operations).
 >

@@ -3,8 +3,11 @@ set -uo pipefail
 # scripts/watch-pr.sh <PR#> [interval-seconds] — canonical PR watch monitor (LS-8544)
 #
 # Armed by an agent session via the Claude Code harness Monitor tool:
-#   Monitor({ command: "bash <abs-path>/scripts/watch-pr.sh <PR#>",
+#   Monitor({ command: "bash <worktree-abs-path>/scripts/watch-pr.sh <PR#>",
 #             persistent: true, description: "PR #<N> watch" })
+# The path MUST be absolute — Monitor is not guaranteed to run with the repo
+# root as its cwd, and bash resolves the script path before executing the first
+# line, so a relative `scripts/watch-pr.sh` exits 127 instantly (LS-9045).
 # Each stdout line becomes a notification that re-invokes the idle session, which
 # then routes the event through the triage table in
 # .agents/skills/pr-lifecycle/references/ci-event-response.md.
@@ -30,6 +33,11 @@ set -uo pipefail
 #    not readable by agents (block-tmp-polling.mjs blocks Temp\claude reads).
 #  - Windows/Git Bash-safe: python for JSON (repo hook precedent — no bare jq),
 #    clock-gap re-baseline after machine sleep, absolute paths only.
+#  - Never trusts the caller's cwd: the repo root is derived from ${BASH_SOURCE[0]}
+#    and cd'd into, so the gh lookup and the heartbeat resolve correctly no
+#    matter where Monitor starts the script (LS-9045). Arm it with an ABSOLUTE
+#    path regardless — bash resolves the script path before the first line runs,
+#    so a relative invocation still dies with exit 127 before any of this helps.
 
 PR_NUMBER="${1:?usage: watch-pr.sh <PR#> [interval-seconds]}"
 INTERVAL="${2:-90}"
@@ -46,7 +54,21 @@ fi
 MAX_CONSEC_FAILURES=5
 STALL_SECONDS=900
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+# Self-locating (LS-9045). Neither $(pwd) nor CLAUDE_PROJECT_DIR is trustworthy
+# in the harness Monitor environment: Monitor is not guaranteed to run with the
+# repo root as its cwd, and it does not export CLAUDE_PROJECT_DIR. This script
+# always lives at <repo-root>/scripts/watch-pr.sh, so derive the root from its
+# own path and cd there — `gh pr view` needs a repo cwd to resolve the remote,
+# and the heartbeat MUST land at <repo-root>/.claude/ because that is where
+# .claude/hooks/check-open-pr.sh reads it. An explicit CLAUDE_PROJECT_DIR still
+# wins for the flag path so the script and the hook always agree.
+# NOTE: this hardens the cwd-dependent paths only. It cannot rescue a relative
+# *invocation* — bash resolves the script path before executing a single line,
+# so `bash scripts/watch-pr.sh` still exits 127 from the wrong cwd. Callers must
+# arm the watch with an absolute path; see the usage block above.
+SCRIPT_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd) || exit 1
+cd -- "$SCRIPT_ROOT" || exit 1
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$SCRIPT_ROOT}"
 PROJECT_DIR="${PROJECT_DIR//\\//}"
 FLAG_FILE="${PROJECT_DIR}/.claude/.pr-watch-armed-${PR_NUMBER}"
 STATE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/watch-pr-${PR_NUMBER}.XXXXXX") || exit 1

@@ -196,7 +196,13 @@ Not every event requires a response. Skip when:
 After pushing any fix (conflict resolution, CI fix, or review fix):
 
 1. Apply `bot:ready-for-review` label — this fires the Reviewer Bot for the next cycle AND re-arms CI orchestration: `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`. This is the most common stall: plain pushes do NOT trigger a new review cycle without this label.
-2. Confirm the watch monitor is still armed — if `.claude/.pr-watch-armed-<PR#>` is stale (>5 min) or absent, re-arm it (`Monitor` + `scripts/watch-pr.sh <PR#>`, `persistent: true`) before idling.
+2. Confirm the watch monitor is still armed — if `.claude/.pr-watch-armed-<PR#>` is stale (>5 min) or absent, re-arm it before idling, always with an **absolute** script path (`Monitor` does not reliably run with the worktree root as its cwd — a bare relative path exits 127, LS-9045):
+
+   ```
+   Monitor({ command: "bash <worktree-abs-path>/scripts/watch-pr.sh <PR#>",
+             persistent: true, description: "PR #<N> watch" })
+   ```
+
 3. Continue watching. The next event will arrive when CI completes or a new review is posted.
 
 ---

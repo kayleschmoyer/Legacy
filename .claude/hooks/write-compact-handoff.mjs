@@ -77,7 +77,7 @@ try {
       `- PR #${f.slice('.pr-watch-armed-'.length)}: heartbeat ${age}s ago — ${
         age < 300
           ? 'LIVE, do NOT re-arm'
-          : 'STALE, the watch died; re-arm (Monitor + scripts/watch-pr.sh) after resuming'
+          : `STALE, the watch died; after resuming re-arm with Monitor + "bash ${projectDir(input)}/scripts/watch-pr.sh ${f.slice('.pr-watch-armed-'.length)}" (absolute path required — a relative one exits 127)`
       }`,
     );
   }
@@ -119,7 +119,7 @@ ${commits || '(none)'}
 ${tail || '(no evidence ledger for this session)'}
 
 ## PR watch (LS-8544)
-${watchFlags.join('\n') || '- no armed watch flags — if an open PR is mid-flight, arm Monitor + scripts/watch-pr.sh <PR#> (persistent: true) before idling'}
+${watchFlags.join('\n') || `- no armed watch flags — if an open PR is mid-flight, arm Monitor + "bash ${projectDir(input)}/scripts/watch-pr.sh <PR#>" (persistent: true) before idling; the absolute path is required, a relative one exits 127`}
 - A persistent Monitor normally survives compaction. Re-arm ONLY if the flag above is stale or absent.
 
 ## Resuming

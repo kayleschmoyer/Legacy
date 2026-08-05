@@ -148,7 +148,7 @@ if [ -f "$WATCH_FLAG" ]; then
   fi
   {
     echo ""
-    echo "⚠️  Watch flag for PR #${PR_NUMBER} is STALE (${flag_age}s old) — the watch monitor has died. Re-arm it (Monitor + scripts/watch-pr.sh ${PR_NUMBER}) before idling."
+    echo "⚠️  Watch flag for PR #${PR_NUMBER} is STALE (${flag_age}s old) — the watch monitor has died. Re-arm it before idling: Monitor + \"bash ${WORKTREE_NORM}/scripts/watch-pr.sh ${PR_NUMBER}\" (persistent: true) — absolute path required, a relative one exits 127."
     echo ""
   } >&2
 fi
@@ -184,7 +184,7 @@ fi
 if [ "$PR_IS_DRAFT" = "true" ]; then
   MSG="Draft PR #${PR_NUMBER} is not a terminal state. Mark ready with github_mark_pr_ready before ending the session, or explain why you cannot."
 else
-  MSG="PR #${PR_NUMBER} is open and ready for review but not merged. Per AGENTS.md (Drive to merge): fix anything actionable now; if you are only waiting on in-flight CI/review, arm the watch monitor (Monitor tool + scripts/watch-pr.sh ${PR_NUMBER}, persistent: true) so this session is re-invoked on the next event — an armed watch makes stopping safe and is the sanctioned way to idle."
+  MSG="PR #${PR_NUMBER} is open and ready for review but not merged. Per AGENTS.md (Drive to merge): fix anything actionable now; if you are only waiting on in-flight CI/review, arm the watch monitor (Monitor tool + \"bash ${WORKTREE_NORM}/scripts/watch-pr.sh ${PR_NUMBER}\", persistent: true — the absolute path is required, a relative one exits 127) so this session is re-invoked on the next event — an armed watch makes stopping safe and is the sanctioned way to idle."
 fi
 
 if [ "$block_count" -ge "$MAX_BLOCKS" ]; then
