@@ -37,26 +37,6 @@ body {
   background-attachment: fixed;
 }
 
-[data-theme='light'] #app {
-  background:
-    radial-gradient(
-      ellipse at 15% -5%,
-      rgba(27, 58, 92, 0.1) 0%,
-      transparent 50%
-    ),
-    radial-gradient(
-      ellipse at 85% 5%,
-      rgba(196, 30, 58, 0.05) 0%,
-      transparent 45%
-    ),
-    radial-gradient(
-      ellipse at 50% 95%,
-      rgba(197, 165, 90, 0.08) 0%,
-      transparent 55%
-    ),
-    var(--bg);
-}
-
 /* ── Canvas shell ────────────────────────────────────────── */
 .canvas {
   max-width: 1480px;
@@ -187,10 +167,6 @@ body {
   align-items: flex-start;
   gap: 24px;
 }
-[data-theme='light'] .slab-content {
-  background:
-    linear-gradient(180deg, rgba(0, 0, 0, 0.03) 0%, transparent 40px), var(--bg);
-}
 .slab-content .placeholder {
   font-family: var(--font-body);
   font-size: 14px;
@@ -232,9 +208,6 @@ body {
   backdrop-filter: blur(16px) saturate(140%);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   border-bottom: 1px solid var(--panel-border);
-}
-[data-theme='light'] .ls-nav {
-  background: rgba(255, 255, 255, 0.82);
 }
 .ls-nav--draft {
   border-bottom-color: rgba(196, 30, 58, 0.45);
@@ -388,9 +361,6 @@ body {
   border-radius: 9999px;
   padding: 4px;
 }
-[data-theme='light'] .ls-tabs {
-  background: rgba(255, 255, 255, 0.7);
-}
 .ls-tabs button,
 .ls-tabs a {
   font-family: var(--font-display);
@@ -449,7 +419,7 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--brand-seam-red-light);
+  background: var(--brand-seam-red);
   box-shadow: 0 0 0 2px rgba(10, 15, 26, 0.9);
 }
 
@@ -505,9 +475,6 @@ body {
   justify-content: center;
   border: 2px solid rgba(10, 15, 26, 0.95);
   letter-spacing: 0;
-}
-[data-theme='light'] .ls-icon-btn .notif-count {
-  border-color: rgba(255, 255, 255, 0.95);
 }
 .ls-icon-btn .status-dot {
   position: absolute;
@@ -590,7 +557,7 @@ body {
 }
 .ls-btn-gold {
   background: var(--brand-gold);
-  color: #111;
+  color: var(--bg);
   border-color: rgba(197, 165, 90, 0.6);
 }
 .ls-btn-gold:hover {
@@ -627,7 +594,7 @@ body {
 }
 .ls-chip-live {
   background: rgba(196, 30, 58, 0.15);
-  color: #e63950;
+  color: var(--brand-seam-red);
   border: 1px solid rgba(196, 30, 58, 0.45);
 }
 .ls-dot-pulse {
@@ -763,7 +730,7 @@ body {
 }
 .ls-dropdown-row .avatar.gold {
   background: var(--grad-gold);
-  color: #111;
+  color: var(--bg);
 }
 .ls-dropdown-row .title {
   font-family: var(--font-body);
@@ -828,7 +795,7 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--brand-seam-red-light);
+  background: var(--brand-seam-red);
 }
 .ls-notif-row.unread {
   padding-left: 18px;
@@ -1105,9 +1072,6 @@ body {
   backdrop-filter: blur(10px);
   overflow: hidden;
 }
-[data-theme='light'] .ls-ticker {
-  background: rgba(239, 244, 251, 0.95);
-}
 .ls-ticker-label {
   display: flex;
   align-items: center;
@@ -1127,8 +1091,8 @@ body {
   box-shadow: 2px 0 8px rgba(10, 15, 26, 0.5);
 }
 .ls-ticker-label.live {
-  background: #8b1a2b;
-  background-image: linear-gradient(135deg, #8b1a2b 0%, #c41e3a 100%);
+  background: var(--brand-seam-red-dark);
+  background-image: var(--grad-seam);
   color: #fff;
 }
 .ls-ticker-scroll {
@@ -1179,7 +1143,7 @@ body {
   text-transform: uppercase;
 }
 .ls-ticker-item .status.live {
-  color: #e63950;
+  color: var(--brand-seam-red);
 }
 .ls-ticker-item .sep {
   color: var(--fg4);
@@ -1199,9 +1163,6 @@ body {
   position: sticky;
   top: 0;
   z-index: 15;
-}
-[data-theme='light'] .ls-mob-header {
-  background: rgba(255, 255, 255, 0.88);
 }
 .ls-mob-header .ls-brand img {
   height: 30px;
@@ -1240,9 +1201,6 @@ body {
   display: flex;
   justify-content: space-around;
   gap: 4px;
-}
-[data-theme='light'] .ls-mob-bottom {
-  background: rgba(255, 255, 255, 0.94);
 }
 .ls-mob-tab {
   flex: 1;
@@ -1304,7 +1262,7 @@ body {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--brand-seam-red-light);
+  background: var(--brand-seam-red);
   border: 1.5px solid rgba(10, 15, 26, 0.95);
 }
 
@@ -1580,9 +1538,6 @@ body {
   overflow: hidden;
   font-family: var(--font-body);
 }
-[data-theme='light'] .tweaks-panel {
-  background: rgba(255, 255, 255, 0.95);
-}
 .tweaks-head {
   display: flex;
   align-items: center;
@@ -1690,7 +1645,7 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 .frame-label .fl-left .tag.live {
-  color: #e63950;
+  color: var(--brand-seam-red);
   border-color: rgba(196, 30, 58, 0.4);
   background: rgba(196, 30, 58, 0.1);
 }
@@ -1835,8 +1790,10 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Responsive */
-@media (max-width: 1200px) {
+/* Responsive — canonical bands (docs/agents/pages/PROMPT.md #Breakpoints):
+   xxs 0 / xs 660 / sm 800 / md 860 / lg 980 / xl 1120 / xxl 1280 */
+@media (max-width: 1119px) {
+  /* below xl — lg and down */
   .slab-grid-2 {
     grid-template-columns: 1fr;
   }
@@ -1847,7 +1804,8 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
-@media (max-width: 760px) {
+@media (max-width: 659px) {
+  /* below xs — xxs phones only */
   .canvas {
     padding: 32px 16px 120px;
   }

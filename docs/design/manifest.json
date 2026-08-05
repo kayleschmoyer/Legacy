@@ -145,9 +145,10 @@
       "title": "Nav Bar",
       "slug": "legacy-sports-nav-bar",
       "status": "active",
-      "lastSyncedHash": "4e6fdf1e36d3edbdf584154b36f1a6190308dea09b1a4aa6c98911adc447a810",
-      "lastSyncedAt": "2026-05-20T16:35:55.299Z",
-      "jiraKey": "LS-4582"
+      "lastSyncedHash": "03e6532014da7cca0f493ca6b9d72fae44755c3891887971f5c3b86f57ad97a1",
+      "lastSyncedAt": "2026-08-04T19:30:00.000Z",
+      "jiraKey": "LS-8968",
+      "source": "designsync-local"
     },
     {
       "id": "dzQl9ZQSmZK-brcCgMZJdg",

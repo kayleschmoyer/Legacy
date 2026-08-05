@@ -51,6 +51,18 @@
       );
 
       // ── The top-level canvas ──────────────────────────────────
+      // Preview-host origin for the EDITMODE protocol: this mockup is loaded
+      // in an iframe by Claude Design's editor at whatever origin is hosting
+      // that session, so the target can't be a fixed hostname. Derive it from
+      // document.referrer (set by the embedding frame) instead of '*'.
+      const editModeTargetOrigin = (() => {
+        try {
+          return document.referrer ? new URL(document.referrer).origin : '*';
+        } catch (e) {
+          return '*';
+        }
+      })();
+
       const App = () => {
         const initial =
           JSON.parse(localStorage.getItem('ls-tweaks') || 'null') ||
@@ -66,7 +78,7 @@
           if (window.parent !== window) {
             window.parent.postMessage(
               { type: '__edit_mode_set_keys', edits: { theme } },
-              '*',
+              editModeTargetOrigin,
             );
           }
         }, [theme]);
@@ -80,7 +92,10 @@
             if (d.type === '__deactivate_edit_mode') setEditMode(false);
           };
           window.addEventListener('message', handler);
-          window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+          window.parent.postMessage(
+            { type: '__edit_mode_available' },
+            editModeTargetOrigin,
+          );
           return () => window.removeEventListener('message', handler);
         }, []);
 
@@ -257,7 +272,7 @@
               </div>
 
               <p className="caption">
-                <span className="dot" style={{ background: '#E63950' }} />
+                <span className="dot" style={{ background: 'var(--brand-seam-red)' }} />
                 Draft live · seam-red glow
                 <span className="hint">
                   League switcher crest pulses; ticker label turns seam-red
@@ -584,8 +599,8 @@
                   <span className="k">Glass surface</span>
                   <span className="v">rgba(10,15,26,.78)</span>
                   <span className="desc">
-                    backdrop-filter: blur(16px) saturate(140%). Light theme
-                    flips to rgba white.
+                    backdrop-filter: blur(16px) saturate(140%). Dark mode
+                    only — no light-theme variant.
                   </span>
                 </div>
                 <div className="spec-card">
@@ -674,35 +689,16 @@
                   <span className="title">Tweaks</span>
                 </div>
                 <div className="tweaks-body">
-                  <div className="tweak-row">
-                    <label>Theme</label>
-                    <div className="toggle-group">
-                      <button
-                        className={theme === 'dark' ? 'on' : ''}
-                        onClick={() => setTheme('dark')}
-                      >
-                        Dark
-                      </button>
-                      <button
-                        className={theme === 'light' ? 'on' : ''}
-                        onClick={() => setTheme('light')}
-                      >
-                        Light
-                      </button>
-                    </div>
-                  </div>
                   <div
                     style={{
                       fontFamily: 'var(--font-body)',
                       fontSize: 11,
                       color: 'var(--fg4)',
                       lineHeight: 1.5,
-                      paddingTop: 4,
-                      borderTop: '1px solid var(--outline-subtle)',
                     }}
                   >
-                    Theme persists in localStorage and syncs to the host for
-                    reloads.
+                    Dark mode only — the app has no light theme (see
+                    brand.md).
                   </div>
                 </div>
               </div>
