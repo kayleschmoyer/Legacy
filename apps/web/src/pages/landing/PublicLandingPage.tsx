@@ -293,6 +293,15 @@ const SPORTS = [
     accent: 'color-mix(in srgb, var(--brandNavy) 55%, transparent)',
     available: true,
   },
+  {
+    icon: 'football' as const,
+    label: 'football',
+    title: 'Football',
+    description:
+      'Kickoff for the 2026 season. Same archive-first format, turf green instead of seam red.',
+    accent: 'color-mix(in srgb, var(--brandGold) 55%, transparent)',
+    available: true,
+  },
 ] satisfies Array<{
   icon: BrandIconName;
   label: string;
