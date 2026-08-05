@@ -97,6 +97,19 @@ const BOT_REVIEW_STATUS_CONTEXT = 'bot-review';
 // wakes the queue via pull_request_review) picks up the remainder.
 const MAX_REVIEW_REMEDIATIONS_PER_RUN = 10;
 
+// The CI Gate commit status (and the granular 🚀 CI Pipeline / * check runs)
+// are only produced by a pull_request-triggered orchestrator run. If that run
+// is cancelled — e.g. displaced from the concurrency queue by a later review
+// event while still pending (LS-9053, PR #6711) — no future event recreates
+// it, and the required contexts stay "(not yet registered)" on the head SHA
+// forever. The queue self-heals by re-running the cancelled run.
+const ORCHESTRATOR_WORKFLOW_FILE = 'ci-orchestrator.yml';
+// Stop re-running a run that keeps getting cancelled — after this many
+// attempts something other than a transient displacement is wrong.
+const MAX_ORCHESTRATOR_RUN_ATTEMPTS = 3;
+// Per-queue-cycle cap, mirroring MAX_REVIEW_REMEDIATIONS_PER_RUN.
+const MAX_CI_RERUNS_PER_RUN = 3;
+
 module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
@@ -172,6 +185,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
 
   let hasPendingPRs = false;
   let reviewRemediationsThisRun = 0;
+  let ciRerunsThisRun = 0;
 
   for (const pr of mergeReadyPRs) {
     console.log(`\n🔍 Processing PR #${pr.number}: ${pr.title}`);
@@ -203,6 +217,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         );
         await reportMergeBlocker(prDetails.data, validationResult);
         await remediateStaleBotReview(prDetails.data, validationResult);
+        await remediateCancelledCiRun(prDetails.data, validationResult);
       }
     } catch (error) {
       console.error(
@@ -771,6 +786,103 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     } catch (labelError) {
       console.warn(
         `⚠️ PR #${pr.number}: could not apply '${REVIEW_TRIGGER_LABEL}': ${labelError.message}`,
+      );
+    }
+  }
+
+  // Self-heal the "CI never ran for the head SHA" deadlock (LS-9053). GitHub
+  // keeps at most one PENDING run per concurrency group: while a previous
+  // SHA's orchestrator run is in progress, a review event arriving after a
+  // push displaces (cancels) the queued pull_request run — the only run that
+  // posts the CI Gate status and the granular pipeline check runs for the new
+  // SHA. Nothing ever recreates it, so the required contexts stay
+  // "(not yet registered)" forever. Detect that state and re-run the
+  // cancelled pull_request-event orchestrator run.
+  // Guards: only fires when NO orchestrator run for the head SHA is queued or
+  // in progress (CI that is merely slow heals itself), only re-runs
+  // pull_request-event runs (workflow_dispatch runs lack the pull_request
+  // context and never post CI Gate), and gives up after
+  // MAX_ORCHESTRATOR_RUN_ATTEMPTS so a repeatedly-cancelled run cannot loop.
+  async function remediateCancelledCiRun(pr, validation) {
+    const unregistered = (validation.pendingChecks ?? []).filter(
+      (c) =>
+        c.endsWith('(not yet registered)') &&
+        !c.startsWith(`${BOT_REVIEW_STATUS_CONTEXT} `),
+    );
+    if (unregistered.length === 0) return;
+
+    let runs;
+    try {
+      const res = await github.rest.actions.listWorkflowRuns({
+        owner,
+        repo,
+        workflow_id: ORCHESTRATOR_WORKFLOW_FILE,
+        head_sha: pr.head.sha,
+        per_page: 100,
+      });
+      runs = res.data.workflow_runs ?? [];
+    } catch (e) {
+      console.warn(
+        `⚠️ PR #${pr.number}: could not list orchestrator runs for ${pr.head.sha}: ${e.message}`,
+      );
+      return;
+    }
+
+    if (runs.some((r) => r.status !== 'completed')) {
+      // An orchestrator run is queued or executing — CI is on its way.
+      return;
+    }
+
+    const candidate = runs
+      .filter((r) => r.event === 'pull_request' && r.conclusion === 'cancelled')
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+    if (!candidate) {
+      console.log(
+        `⚠️ PR #${pr.number}: required checks not registered on ${pr.head.sha} but no ` +
+          `cancelled pull_request orchestrator run found to re-run (${unregistered.join(', ')})`,
+      );
+      return;
+    }
+
+    if ((candidate.run_attempt ?? 1) >= MAX_ORCHESTRATOR_RUN_ATTEMPTS) {
+      console.log(
+        `⚠️ PR #${pr.number}: orchestrator run ${candidate.id} already at attempt ` +
+          `${candidate.run_attempt} — not re-running again. Needs manual attention.`,
+      );
+      return;
+    }
+
+    if (ciRerunsThisRun >= MAX_CI_RERUNS_PER_RUN) {
+      console.log(
+        `⏭️ PR #${pr.number}: cancelled orchestrator run detected but the per-run ` +
+          `rerun cap (${MAX_CI_RERUNS_PER_RUN}) is reached — next cycle.`,
+      );
+      return;
+    }
+
+    if (isDryRun) {
+      console.log(
+        `🏃 DRY RUN: Would re-run cancelled orchestrator run ${candidate.id} for ` +
+          `PR #${pr.number} (${unregistered.join(', ')})`,
+      );
+      return;
+    }
+
+    ciRerunsThisRun++;
+    console.log(
+      `🩹 PR #${pr.number}: pull_request orchestrator run ${candidate.id} for ` +
+        `${pr.head.sha} was cancelled and ${unregistered.join(', ')} never registered — ` +
+        `re-running it (${ciRerunsThisRun}/${MAX_CI_RERUNS_PER_RUN} this cycle)`,
+    );
+    try {
+      await github.rest.actions.reRunWorkflow({
+        owner,
+        repo,
+        run_id: candidate.id,
+      });
+    } catch (rerunError) {
+      console.warn(
+        `⚠️ PR #${pr.number}: could not re-run orchestrator run ${candidate.id}: ${rerunError.message}`,
       );
     }
   }

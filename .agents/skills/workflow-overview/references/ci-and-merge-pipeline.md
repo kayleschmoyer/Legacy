@@ -35,7 +35,7 @@ ci-pipeline   security-scanning (conditional)
 - `restore-merge-label-on-success` — restores `merge-when-ready` when CI passes and bot approval is still active
 - `report-runner-shutdown` — fires only when `ci-pipeline` is cancelled; checks job logs for `"runner has received a shutdown signal"` and, if confirmed, applies the `CI: Runner Flake` label and posts a PR comment with a re-run link. The label is cleared at the start of the next CI run by a step in `determine-scope`.
 
-**Concurrency:** `orchestrator-{PR#}` with `cancel-in-progress: false` — a review event (which skips all jobs when CI already passed) must not cancel an in-progress synchronize-triggered CI run for the same PR.
+**Concurrency:** `orchestrator-{PR#}` with `cancel-in-progress: false` — a review event (which skips all jobs when CI already passed) must not cancel an in-progress synchronize-triggered CI run for the same PR. `cancel-in-progress: false` does **not** protect the _queued_ run: GitHub keeps at most one pending run per group, and a newer event cancels the queued run and takes its place. Non-approved `pull_request_review` events (bot comment reviews, JUSTIFY replies) would therefore displace a queued synchronize run and then skip all jobs themselves, leaving the head SHA with no CI and the merge queue stuck at `CI Gate (not yet registered)` (LS-9053, PR #6711). Two defenses: (1) non-approved review events get a unique `orchestrator-noop-{run_id}` group so they never enter the real queue; (2) the merge-queue processor's `remediateCancelledCiRun` self-heal re-runs the latest cancelled `pull_request`-event orchestrator run when required checks never registered and no orchestrator run is active for the head SHA.
 
 ### CI Pipeline Stages (`ci-pipeline.yml`)
 

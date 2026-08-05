@@ -82,6 +82,7 @@ function makeGithub({
   checkRuns = DEFAULT_CHECK_RUNS,
   commitStatuses = [],
   branchRules = [],
+  workflowRuns = [],
 } = {}) {
   const calls = {
     merges: [],
@@ -89,6 +90,7 @@ function makeGithub({
     updateBranch: [],
     labels: [],
     dispatches: [],
+    reruns: [],
   };
 
   const github = {
@@ -165,6 +167,16 @@ function makeGithub({
         removeLabel: async () => {},
       },
       git: { deleteRef: async () => {} },
+      actions: {
+        // remediateCancelledCiRun (LS-9053)
+        listWorkflowRuns: async () => ({
+          data: { workflow_runs: workflowRuns },
+        }),
+        reRunWorkflow: async (args) => {
+          calls.reruns.push(args);
+          return {};
+        },
+      },
     },
 
     // Serves the ruleset endpoint (GET /repos/.../rules/branches/{branch}) so
@@ -1808,5 +1820,180 @@ describe('merge-queue-processor — codeowner-blocked 405 is a clean blocker (LS
       calls.comments.some((c) => c.body?.includes('Processing Error')),
       'unknown 405 causes still surface as processing errors',
     );
+  });
+});
+
+// ── LS-9053 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — cancelled orchestrator run self-heal (LS-9053)', () => {
+  const CI_GATE_ONLY_RULES = [
+    {
+      type: 'required_status_checks',
+      parameters: {
+        required_status_checks: [{ context: 'CI Gate' }],
+      },
+    },
+  ];
+
+  // "CI Gate (not yet registered)": required context with no status posted and
+  // no check runs beyond a lightweight auto-registering one.
+  const baseArgs = {
+    reviews: [
+      { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+    ],
+    unresolvedThreads: [],
+    branchRules: CI_GATE_ONLY_RULES,
+    checkRuns: [],
+    commitStatuses: [],
+  };
+
+  const cancelledPullRequestRun = (overrides = {}) => ({
+    id: 111,
+    event: 'pull_request',
+    status: 'completed',
+    conclusion: 'cancelled',
+    run_attempt: 1,
+    created_at: '2026-01-01T00:05:00Z',
+    ...overrides,
+  });
+
+  it('re-runs the latest cancelled pull_request orchestrator run when CI Gate never registered', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [
+        cancelledPullRequestRun({
+          id: 110,
+          created_at: '2026-01-01T00:01:00Z',
+        }),
+        cancelledPullRequestRun({ id: 111 }),
+        // review-event runs are never rerun candidates
+        {
+          id: 112,
+          event: 'pull_request_review',
+          status: 'completed',
+          conclusion: 'cancelled',
+          run_attempt: 1,
+          created_at: '2026-01-01T00:06:00Z',
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.merges.length,
+      0,
+      'must not merge without CI Gate',
+    );
+    assert.deepStrictEqual(
+      calls.reruns.map((r) => r.run_id),
+      [111],
+      'should re-run only the newest cancelled pull_request run',
+    );
+  });
+
+  it('does not re-run while an orchestrator run for the SHA is still active', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [
+        cancelledPullRequestRun(),
+        {
+          id: 113,
+          event: 'pull_request_review',
+          status: 'in_progress',
+          conclusion: null,
+          run_attempt: 1,
+          created_at: '2026-01-01T00:06:00Z',
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.reruns.length, 0, 'active run means CI is coming');
+  });
+
+  it('gives up after MAX_ORCHESTRATOR_RUN_ATTEMPTS', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [cancelledPullRequestRun({ run_attempt: 3 })],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.reruns.length,
+      0,
+      'a thrice-cancelled run must not loop forever',
+    );
+  });
+
+  it('does not fire when only bot-review is unregistered', async () => {
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+      branchRules: [
+        {
+          type: 'required_status_checks',
+          parameters: {
+            required_status_checks: [{ context: 'bot-review' }],
+          },
+        },
+      ],
+      checkRuns: [],
+      commitStatuses: [],
+      workflowRuns: [cancelledPullRequestRun()],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.reruns.length,
+      0,
+      'bot-review gaps are healed by the label remediation, not a CI rerun',
+    );
+  });
+
+  it('dry run logs but does not re-run', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [cancelledPullRequestRun()],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: true,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.reruns.length, 0, 'dry run must not mutate');
   });
 });
