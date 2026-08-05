@@ -37,6 +37,10 @@ export default {
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
     '^@legacy-sports/utils$': '<rootDir>/../../lib/utils/src',
     '^@legacy-sports/utils/node$': '<rootDir>/../../lib/utils/src/node.ts',
+    // The real package pulls in @tamagui/config (font-silkscreen etc.), which
+    // throws under Jest — see src/__mocks__/legacy-sports-tamagui-config.js.
+    '^@legacy-sports/tamagui-config$':
+      '<rootDir>/src/__mocks__/legacy-sports-tamagui-config.js',
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: '../../coverage/web',

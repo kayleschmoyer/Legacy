@@ -495,4 +495,54 @@ export const foundationTokens = {
   shadowsLight,
 } as const;
 
+// Homepage: Football Playboard Hero (LS-9035). Design source: docs/design/
+// nxFiEGqu3yPCDKpoNDmQWA/legacy-sports-homepage/project/scratch/mockups/
+// home.html (.playboard/.pb-*/.bug* selectors, ~lines 1095-1259).
+//
+// The playboard is a physical scoreboard object — a chalk-textured board
+// with a mounted chrome scorebug — so its palette is deliberately
+// theme-invariant, the same rationale as `textOnGold`/`discordBlurple`
+// above: chalk-green and chrome bevel read the same regardless of the
+// surrounding app theme, just like the sibling ticket-hero's cream paper
+// stock (LS-9034). These live here (not `lib/shared-components/src/utils/
+// colors.ts`, which is dark-only and being retired per LS-8526, and not
+// scanned into the theme-compliance ratchet like `lib/shared-components/
+// src` is — LS-8519) rather than as raw hex/rgba literals in component
+// code, exactly the pattern `foundationTokens` above documents.
+export const playboardTokens = {
+  // Flat native fallback (no CSS gradients on native) and the web gradient's
+  // own stops, kept as separate fields since native needs a single color.
+  bgTop: '#1B2A24',
+  bgBottom: '#101A16',
+  boardBackgroundImage:
+    'repeating-linear-gradient(122deg, rgba(255,255,255,.045) 0 1px, transparent 1px 12px), radial-gradient(120% 100% at 15% 0%, rgba(255,255,255,.05), transparent 60%), linear-gradient(160deg, #1B2A24 0%, #101A16 100%)',
+  boardShadow: '0 14px 32px rgba(0,0,0,.45)',
+  boardShadowHover: '0 20px 40px rgba(0,0,0,.5)',
+  border: '#2C3D34',
+  liveMint: '#8FD6A2',
+  textSecondary: '#93A89A',
+  textMeta: '#7D9284',
+  textPrimary: '#EEF4EA',
+  dashedInsetBorder: 'rgba(238,244,234,.16)',
+  buttonBorder: '#5FA36C',
+  buttonHover: '#377C46',
+  buttonText: '#F2F7F1',
+  bug: {
+    chromeLight: '#DCE3D8',
+    chromeDark: '#4C5849',
+    badgeTop: '#2F6B3C',
+    badgeBottom: '#143021',
+    badgeEyeText: '#F2F6FA',
+    innerBorder: '#10192A',
+    plateTop: '#3C8450',
+    plateBottom: '#1B4527',
+    bottomLight: '#A3AE9D',
+    bottomDark: '#5F6B5B',
+    textOnChrome: '#F4F8FC',
+    textOnBottomBar: '#111A12',
+    leadGold: '#F3DD8B',
+    possessionGold: '#F5D96A',
+  },
+} as const;
+
 export default tamaguiConfig;

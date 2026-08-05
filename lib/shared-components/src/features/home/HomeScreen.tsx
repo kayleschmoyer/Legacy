@@ -3,6 +3,11 @@ import { H1, H2, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import type { GestureResponderEvent } from 'react-native';
 import { ArrowRight } from '@tamagui/lucide-icons';
 import { formatDraftDate } from '@legacy-sports/utils';
+// Football playboard-hero palette (LS-9035) — theme-invariant physical-object
+// colors, sourced from the sanctioned unscanned palette home so they never
+// count against the theme-compliance ratchet (LS-8519). See the
+// `playboardTokens` doc comment in tamagui-config.ts.
+import { playboardTokens } from '@legacy-sports/tamagui-config';
 import {
   formatEraDescriptor,
   formatEraYears,
@@ -136,7 +141,11 @@ const SPORTS: SportConfig[] = [
       'Kickoff for the 2026 season. Same archive-first format, turf green instead of seam red.',
     accentBase: GREEN_DEEP,
     accentAlpha: 0.35,
-    available: false,
+    // LS-9035: football's Home dashboard gating is live — the playboard hero
+    // and this card both reflect it now. Other football "Coming Soon" gates
+    // elsewhere in the app (landing page, mock draft setup, Commish tab) are
+    // out of this ticket's target files and are tracked separately.
+    available: true,
   },
 ];
 
@@ -844,6 +853,574 @@ function LeagueHeroCard({
         </YStack>
       </GradientSurface>
     </XStack>
+  );
+}
+
+/* ─── Football playboard hero (LS-9035) ───
+   Football's answer to the baseball hero above: a chalk-textured "playboard"
+   carrying league identity, with a beveled-chrome broadcast "bug" mounted on
+   it carrying live score/standing. Design source: home.html .playboard,
+   .pb-, and .bug selectors (~lines 1095-1259) and the pb-hero markup
+   (~lines 1502-1532).
+   The bug's chrome/badge/plate/bottom-bar gradients are load-bearing for the
+   "mounted hardware" effect, so they render via `GradientSurface` for real
+   cross-platform gradients (native SVG) rather than a flat card. The board's
+   diagonal-hatch + radial-highlight texture is decorative, not load-bearing,
+   and is web-only CSS (`style.backgroundImage`, same pattern as `Card.tsx`'s
+   premium gradient) — native falls back to the flat board top color. */
+
+/** First-initials abbreviation for the bug's team-plate label, e.g. "Steel
+ *  Curtain" → "SC". The data model has no team-abbreviation field, so this is
+ *  derived from the same name the rest of the UI already shows. */
+function teamAbbr(name: string): string {
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0))
+    .join('')
+    .toUpperCase();
+  return (initials || name).slice(0, 3);
+}
+
+function PlayboardButton({
+  label,
+  onPress,
+  variant,
+  testID,
+}: {
+  label: string;
+  onPress?: () => void;
+  variant: 'solid' | 'outline';
+  testID?: string;
+}) {
+  const isSolid = variant === 'solid';
+  return (
+    <XStack
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={(e: GestureResponderEvent) => {
+        e.stopPropagation?.();
+        onPress?.();
+      }}
+      tabIndex={0}
+      minHeight={44}
+      paddingVertical={12}
+      paddingHorizontal={18}
+      borderRadius={4}
+      borderWidth={1}
+      alignItems="center"
+      justifyContent="center"
+      cursor="pointer"
+      backgroundColor={isSolid ? playboardTokens.bug.badgeTop : 'transparent'}
+      borderColor={
+        isSolid
+          ? playboardTokens.buttonBorder
+          : withAlpha(playboardTokens.textPrimary, 0.35)
+      }
+      hoverStyle={{
+        backgroundColor: isSolid
+          ? playboardTokens.buttonHover
+          : withAlpha(WHITE, 0.07),
+        borderColor: isSolid
+          ? playboardTokens.buttonBorder
+          : playboardTokens.textPrimary,
+      }}
+      focusStyle={{
+        borderColor: playboardTokens.liveMint,
+        borderWidth: 2,
+      }}
+    >
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="700"
+        fontSize={11}
+        letterSpacing={1.1}
+        textTransform="uppercase"
+        color={
+          isSolid ? playboardTokens.buttonText : playboardTokens.textPrimary
+        }
+      >
+        {label}
+      </Text>
+    </XStack>
+  );
+}
+
+/** The bug's "Legacy" wordmark badge bar. */
+function BugBadge() {
+  return (
+    <GradientSurface
+      colors={[playboardTokens.bug.badgeTop, playboardTokens.bug.badgeBottom]}
+      angle={180}
+      flexDirection="row"
+      alignItems="center"
+      justifyContent="center"
+      gap="$2"
+      paddingVertical={6}
+      paddingHorizontal={8}
+    >
+      <YStack
+        width={13}
+        height={13}
+        borderRadius={9999}
+        backgroundColor={WHITE}
+      />
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="800"
+        fontSize={12}
+        letterSpacing={2.2}
+        color={playboardTokens.bug.badgeEyeText}
+      >
+        Legacy
+      </Text>
+    </GradientSurface>
+  );
+}
+
+/** One stacked team plate — the leading plate is highlighted gold with a
+ *  possession arrow, matching the mockup's `.bug-row.lead`. */
+function BugPlate({
+  abbr,
+  sub,
+  points,
+  leading,
+}: {
+  abbr: string;
+  sub?: string | null;
+  points: string;
+  leading: boolean;
+}) {
+  return (
+    <GradientSurface
+      colors={[playboardTokens.bug.plateTop, playboardTokens.bug.plateBottom]}
+      angle={180}
+      flexDirection="row"
+      alignItems="center"
+      gap="$2"
+      paddingVertical={8}
+      paddingHorizontal={10}
+    >
+      <YStack width={14} alignItems="center">
+        {leading ? (
+          <YStack
+            width={0}
+            height={0}
+            borderLeftWidth={7}
+            borderTopWidth={5}
+            borderBottomWidth={5}
+            borderLeftColor={playboardTokens.bug.possessionGold}
+            borderTopColor="transparent"
+            borderBottomColor="transparent"
+          />
+        ) : null}
+      </YStack>
+      <YStack flex={1} minWidth={0}>
+        <Text
+          fontFamily={DISPLAY_FONT}
+          fontWeight="800"
+          fontSize={24}
+          letterSpacing={1.3}
+          color={playboardTokens.bug.textOnChrome}
+          numberOfLines={1}
+        >
+          {abbr}
+        </Text>
+        {sub ? (
+          <Text
+            fontFamily={DISPLAY_FONT}
+            fontWeight="700"
+            fontSize={11}
+            letterSpacing={1.6}
+            color={withAlpha(playboardTokens.bug.textOnChrome, 0.72)}
+            fontVariant={['tabular-nums']}
+          >
+            {sub}
+          </Text>
+        ) : null}
+      </YStack>
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="800"
+        fontSize={26}
+        minWidth={56}
+        textAlign="right"
+        color={
+          leading
+            ? playboardTokens.bug.leadGold
+            : playboardTokens.bug.textOnChrome
+        }
+        fontVariant={['tabular-nums']}
+      >
+        {points}
+      </Text>
+    </GradientSurface>
+  );
+}
+
+/** A single non-score status plate — draft-live / pre-draft / offseason. */
+function BugStatusPlate({ label }: { label: string }) {
+  return (
+    <GradientSurface
+      colors={[playboardTokens.bug.plateTop, playboardTokens.bug.plateBottom]}
+      angle={180}
+      alignItems="center"
+      justifyContent="center"
+      paddingVertical={16}
+      paddingHorizontal={10}
+    >
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="800"
+        fontSize={15}
+        letterSpacing={0.6}
+        color={playboardTokens.bug.textOnChrome}
+        textAlign="center"
+      >
+        {label}
+      </Text>
+    </GradientSurface>
+  );
+}
+
+function BugBottomBar({
+  left,
+  right,
+}: {
+  left: string;
+  right?: string | null;
+}) {
+  return (
+    <GradientSurface
+      colors={[playboardTokens.bug.bottomLight, playboardTokens.bug.bottomDark]}
+      angle={180}
+      flexDirection="row"
+      alignItems="center"
+      justifyContent="space-between"
+      paddingVertical={7}
+      paddingHorizontal={10}
+    >
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="800"
+        fontSize={11.5}
+        letterSpacing={1.6}
+        textTransform="uppercase"
+        color={playboardTokens.bug.textOnBottomBar}
+        fontVariant={['tabular-nums']}
+      >
+        {left}
+      </Text>
+      {right ? (
+        <Text
+          fontFamily={DISPLAY_FONT}
+          fontWeight="800"
+          fontSize={11.5}
+          letterSpacing={1.6}
+          textTransform="uppercase"
+          color={playboardTokens.bug.textOnBottomBar}
+          fontVariant={['tabular-nums']}
+        >
+          {right}
+        </Text>
+      ) : null}
+    </GradientSurface>
+  );
+}
+
+/** The beveled-chrome scorebug — fixed 250px, mounted on the board. */
+function PlayboardBug({ summary }: { summary: HomeLeagueSummary }) {
+  const isDraftLive = summary.draftStatus === 'in-progress';
+  const hasMatchup =
+    summary.matchupId != null && summary.matchupStatus === 'in_progress';
+  const isPreDraft = summary.leaguePhase === 'pre-draft';
+
+  let body: React.ReactNode;
+  let bottomLeft: string;
+  let bottomRight: string | null = null;
+
+  if (isDraftLive) {
+    body = (
+      <BugStatusPlate
+        label={summary.draftMode === 'snake' ? 'Snake Draft' : 'Draft Live'}
+      />
+    );
+    bottomLeft = 'Draft in progress';
+  } else if (hasMatchup) {
+    const userScore = safeScore(summary.userScore);
+    const oppScore = safeScore(summary.opponentScore);
+    const isLeading = userScore >= oppScore;
+    body = (
+      <>
+        <BugPlate
+          abbr="You"
+          sub={recordOf(summary)}
+          points={userScore.toFixed(1)}
+          leading={isLeading}
+        />
+        <BugPlate
+          abbr={teamAbbr(summary.opponentTeamName ?? 'Opponent')}
+          points={oppScore.toFixed(1)}
+          leading={!isLeading}
+        />
+      </>
+    );
+    bottomLeft =
+      summary.currentWeekNumber != null && summary.totalMatchups != null
+        ? `Week ${summary.currentWeekNumber} of ${summary.totalMatchups}`
+        : 'This week';
+    bottomRight = formatMatchupCloses(summary.matchupEndTime)
+      ? `Closes ${formatMatchupCloses(summary.matchupEndTime)}`
+      : null;
+  } else if (isPreDraft && summary.draftScheduledAt) {
+    body = <BugStatusPlate label={formatDraftDate(summary.draftScheduledAt)} />;
+    bottomLeft = 'Draft scheduled';
+    bottomRight =
+      summary.teamCount != null ? `${summary.teamCount} teams` : null;
+  } else {
+    body = <BugStatusPlate label={recordOf(summary)} />;
+    bottomLeft =
+      summary.rank != null && summary.totalTeams != null
+        ? `Rank #${summary.rank} of ${summary.totalTeams}`
+        : 'Season record';
+  }
+
+  return (
+    <YStack width="100%" $gtSm={{ width: 250 }} alignSelf="stretch">
+      <GradientSurface
+        testID="home-playboard-bug"
+        colors={[
+          playboardTokens.bug.chromeLight,
+          playboardTokens.bug.chromeDark,
+        ]}
+        angle={180}
+        width="100%"
+        height="100%"
+        borderRadius={4}
+        padding={4}
+      >
+        <YStack
+          flex={1}
+          borderRadius={2}
+          overflow="hidden"
+          borderWidth={1}
+          borderColor={playboardTokens.bug.innerBorder}
+        >
+          <BugBadge />
+          {body}
+          <BugBottomBar left={bottomLeft} right={bottomRight} />
+        </YStack>
+      </GradientSurface>
+    </YStack>
+  );
+}
+
+/** Football's hero card: the chalk-textured playboard + mounted bug. */
+function PlayboardHeroCard({
+  summary,
+  onPress,
+  onSetLineup,
+}: {
+  summary: HomeLeagueSummary;
+  onPress: () => void;
+  onSetLineup?: () => void;
+}) {
+  const isDraftLive = summary.draftStatus === 'in-progress';
+  const hasMatchup =
+    summary.matchupId != null && summary.matchupStatus === 'in_progress';
+  const isPreDraft = summary.leaguePhase === 'pre-draft';
+  const isActive = summary.leaguePhase === 'active';
+  const eraDesc = formatEraDescriptor(summary);
+
+  let headerLabel: string;
+  if (isDraftLive) {
+    headerLabel = 'Draft Live';
+  } else if (hasMatchup && summary.currentWeekNumber != null) {
+    headerLabel = `Live · Week ${summary.currentWeekNumber}${summary.totalMatchups != null ? `/${summary.totalMatchups}` : ''}`;
+  } else if (hasMatchup) {
+    headerLabel = 'Live';
+  } else if (isPreDraft) {
+    headerLabel = 'Draft Scheduled';
+  } else if (isActive) {
+    headerLabel = 'Active';
+  } else {
+    headerLabel = 'Offseason';
+  }
+
+  const whenLabel = hasMatchup
+    ? formatMatchupCloses(summary.matchupEndTime)
+    : isPreDraft && summary.draftScheduledAt
+      ? formatDraftDate(summary.draftScheduledAt)
+      : null;
+
+  return (
+    <YStack
+      testID="home-playboard-hero"
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
+      onPress={onPress}
+      tabIndex={0}
+      cursor="pointer"
+      position="relative"
+      overflow="hidden"
+      borderRadius={8}
+      borderWidth={1}
+      borderColor={playboardTokens.border}
+      backgroundColor={playboardTokens.bgTop}
+      padding={26}
+      $gtSm={{ padding: 28 }}
+      style={{
+        backgroundImage: playboardTokens.boardBackgroundImage,
+        boxShadow: playboardTokens.boardShadow,
+        transition: 'transform 220ms ease, box-shadow 220ms ease',
+      }}
+      hoverStyle={{
+        borderColor: withAlpha(playboardTokens.textPrimary, 0.3),
+        y: -2,
+      }}
+      focusStyle={{
+        borderColor: playboardTokens.liveMint,
+        borderWidth: 2,
+      }}
+    >
+      {/* Dashed chalk-board inset border — decorative, matches .playboard::before. */}
+      <YStack
+        position="absolute"
+        top={11}
+        left={11}
+        right={11}
+        bottom={11}
+        borderWidth={1}
+        borderStyle="dashed"
+        borderColor={withAlpha(playboardTokens.textPrimary, 0.16)}
+        borderRadius={4}
+        pointerEvents="none"
+      />
+
+      <YStack gap="$4">
+        <XStack
+          alignItems="center"
+          gap="$3"
+          flexWrap="wrap"
+          paddingBottom={12}
+          borderBottomWidth={1}
+          borderBottomColor={withAlpha(playboardTokens.textPrimary, 0.2)}
+          borderStyle="dashed"
+        >
+          <XStack alignItems="center" gap="$2">
+            <YStack
+              width={8}
+              height={8}
+              borderRadius={9999}
+              backgroundColor={playboardTokens.liveMint}
+            />
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="800"
+              fontSize={11}
+              letterSpacing={1.6}
+              textTransform="uppercase"
+              color={playboardTokens.liveMint}
+            >
+              {headerLabel}
+            </Text>
+          </XStack>
+          {summary.rank != null ? (
+            <XStack
+              borderWidth={1}
+              borderColor={withAlpha(playboardTokens.textPrimary, 0.4)}
+              backgroundColor={withAlpha(playboardTokens.textPrimary, 0.08)}
+              borderRadius={9999}
+              paddingVertical={3}
+              paddingHorizontal={9}
+            >
+              <Text
+                fontFamily={DISPLAY_FONT}
+                fontWeight="700"
+                fontSize={11}
+                color={playboardTokens.textPrimary}
+              >
+                {`Rank #${summary.rank}`}
+              </Text>
+            </XStack>
+          ) : null}
+          {whenLabel ? (
+            <Text
+              marginLeft="auto"
+              fontFamily={BODY_FONT}
+              fontSize={12}
+              color={playboardTokens.textSecondary}
+            >
+              {hasMatchup ? `Closes ${whenLabel}` : `Drafts ${whenLabel}`}
+            </Text>
+          ) : null}
+        </XStack>
+
+        <YStack
+          gap="$5"
+          $gtSm={{ flexDirection: 'row', alignItems: 'stretch' }}
+        >
+          <YStack flex={1} minWidth={0} justifyContent="space-between" gap="$4">
+            <YStack gap="$2">
+              <Text
+                fontFamily={DISPLAY_FONT}
+                fontWeight="800"
+                fontSize={26}
+                $gtSm={{ fontSize: 34 }}
+                lineHeight={32}
+                textTransform="uppercase"
+                color={playboardTokens.textPrimary}
+              >
+                {summary.leagueName ?? 'League'}
+              </Text>
+              {eraDesc ? (
+                <Text
+                  fontFamily={BODY_FONT}
+                  fontStyle="italic"
+                  fontSize={13.5}
+                  lineHeight={19}
+                  color={playboardTokens.textSecondary}
+                >
+                  {eraDesc}
+                </Text>
+              ) : null}
+              <XStack gap="$2" flexWrap="wrap" alignItems="center">
+                {summary.teamCount != null ? (
+                  <Text
+                    fontFamily={DISPLAY_FONT}
+                    fontWeight="700"
+                    fontSize={10.5}
+                    letterSpacing={1.2}
+                    textTransform="uppercase"
+                    color={playboardTokens.textMeta}
+                    fontVariant={['tabular-nums']}
+                  >
+                    {`${summary.teamCount} teams`}
+                  </Text>
+                ) : null}
+              </XStack>
+            </YStack>
+            <XStack gap="$2" flexWrap="wrap">
+              <PlayboardButton
+                label="Set Lineup"
+                variant="solid"
+                onPress={onSetLineup}
+                testID="home-playboard-set-lineup"
+              />
+              <PlayboardButton
+                label="View League"
+                variant="outline"
+                onPress={onPress}
+                testID="home-playboard-view-league"
+              />
+            </XStack>
+          </YStack>
+
+          <PlayboardBug summary={summary} />
+        </YStack>
+      </YStack>
+    </YStack>
   );
 }
 
@@ -1574,13 +2151,23 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
             <YStack flex={1} gap="$8" minWidth={0}>
               <YStack gap="$5">
                 <SectionHead eyebrow="Active Season" title="Your Leagues" />
-                <LeagueHeroCard
-                  summary={heroLeague}
-                  onPress={() => onViewLeague(heroLeague)}
-                  onSetLineup={
-                    onSetLineup ? () => onSetLineup(heroLeague) : undefined
-                  }
-                />
+                {heroLeague.sport === 'football' ? (
+                  <PlayboardHeroCard
+                    summary={heroLeague}
+                    onPress={() => onViewLeague(heroLeague)}
+                    onSetLineup={
+                      onSetLineup ? () => onSetLineup(heroLeague) : undefined
+                    }
+                  />
+                ) : (
+                  <LeagueHeroCard
+                    summary={heroLeague}
+                    onPress={() => onViewLeague(heroLeague)}
+                    onSetLineup={
+                      onSetLineup ? () => onSetLineup(heroLeague) : undefined
+                    }
+                  />
+                )}
                 {secondaryLeagues.length > 0 ? (
                   <YStack
                     borderWidth={1}

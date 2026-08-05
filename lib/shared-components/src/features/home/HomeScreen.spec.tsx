@@ -189,13 +189,77 @@ describe('HomeScreen', () => {
       ).not.toThrow();
     });
 
-    it('shows a "Coming Soon" badge on the unavailable sport card in the compact "Pick your sport" section', () => {
-      const { getByText } = render(
+    it('shows a "Live Season" badge on both sport cards in the compact "Pick your sport" section (LS-9035: football is live)', () => {
+      const { getByText, getAllByText } = render(
         <HomeScreen {...baseProps} leagues={[league]} />,
       );
       expect(getByText('Pick your sport')).toBeTruthy();
-      expect(getByText('Coming Soon')).toBeTruthy();
-      expect(getByText('Live Season')).toBeTruthy();
+      expect(getAllByText('Live Season').length).toBe(2);
+    });
+  });
+
+  describe('football playboard hero (LS-9035)', () => {
+    const footballLeague: HomeLeagueSummary = {
+      leagueId: 51,
+      leagueName: 'Steel Curtain Era',
+      sport: 'football',
+      leaguePhase: 'active',
+      eraFilter: 'super_bowl_era',
+      matchupId: 9,
+      matchupStatus: 'in_progress',
+      userScore: 84.5,
+      opponentScore: 79.2,
+      opponentTeamName: 'Steel Curtain',
+      rank: 2,
+      totalTeams: 10,
+      teamCount: 10,
+      currentWeekNumber: 9,
+      totalMatchups: 17,
+    };
+
+    it('renders the playboard hero instead of the ticket hero for a football top league', () => {
+      const { getByTestId, queryByTestId } = render(
+        <HomeScreen {...baseProps} leagues={[footballLeague]} />,
+      );
+      expect(getByTestId('home-playboard-hero')).toBeTruthy();
+      expect(queryByTestId('home-hero-card')).toBeNull();
+    });
+
+    it('renders the league identity, live header, and bug team plates', () => {
+      const { getByText } = render(
+        <HomeScreen {...baseProps} leagues={[footballLeague]} />,
+      );
+      expect(getByText('Steel Curtain Era')).toBeTruthy();
+      expect(getByText(/Live · Week 9\/17/)).toBeTruthy();
+      expect(getByText('Rank #2')).toBeTruthy();
+      expect(getByText('84.5')).toBeTruthy();
+      expect(getByText('79.2')).toBeTruthy();
+      expect(getByText('SC')).toBeTruthy();
+    });
+
+    it('fires onViewLeague and onSetLineup from the playboard action buttons', () => {
+      const onViewLeague = jest.fn();
+      const onSetLineup = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[footballLeague]}
+          onViewLeague={onViewLeague}
+          onSetLineup={onSetLineup}
+        />,
+      );
+      fireEvent.click(getByText('View League'));
+      expect(onViewLeague).toHaveBeenCalledWith(footballLeague);
+      fireEvent.click(getByText('Set Lineup'));
+      expect(onSetLineup).toHaveBeenCalledWith(footballLeague);
+    });
+
+    it('still renders the baseball ticket hero when the top league is baseball', () => {
+      const { getByTestId, queryByTestId } = render(
+        <HomeScreen {...baseProps} leagues={[league]} />,
+      );
+      expect(getByTestId('home-hero-card')).toBeTruthy();
+      expect(queryByTestId('home-playboard-hero')).toBeNull();
     });
   });
 
