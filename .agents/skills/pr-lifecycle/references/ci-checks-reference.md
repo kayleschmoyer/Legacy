@@ -165,7 +165,7 @@ The merge queue waits for _all_ checks to finish and blocks on failing ones, so 
 | `🚀 CI Pipeline / *` granular check runs | `ci-orchestrator.yml` → `ci-pipeline.yml`         | Informational since the LS-8014 config cutover; results reach the gate via `CI Gate`                 |
 | `GraphQL Schema & Codegen`               | `check-schema.yml` (GraphQL-touching paths)       | Fails on SDL drift: `pnpm exec nx run db:print-schema && pnpm run codegen`, commit regenerated files |
 | Security Scanning                        | `security-scanning.yml` (orchestrator-dispatched) | `CI: Security` label on failure; CVE → update dep; secret → rotate immediately                       |
-| `jira-link-check`                        | `jira-link-check.yml`                             | Validates the `<!-- jira-link -->` PR-body marker                                                    |
+| `jira-link-check`                        | `jira-link-check.yml`                             | Validates the `jira-link` PR-body marker                                                             |
 | Deploy PR Preview                        | `deploy-pr-preview.yml`                           | Fix the underlying build first; preview failures are usually transient                               |
 | Jira Branch Sync                         | `jira-branch-sync.yml`                            | Best-effort; never block a merge on it — `jira_transition` manually if needed                        |
 | Check Ruleset Drift                      | `check-ruleset.yml`                               | Expected to warn mid-cutover (see [staging model](#config-vs-live-the-staged-cutover-model))         |

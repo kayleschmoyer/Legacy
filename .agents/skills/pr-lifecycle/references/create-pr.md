@@ -147,9 +147,18 @@ primary: LS-####
 
 ## If the PR Was Auto-Created by Claude Code
 
-Claude Code's built-in auto-create paths (the desktop "Create PR" affordance, cloud sessions, `/batch` subagents) produce a PR that satisfies **none** of this repo's contract: no `<!-- jira-link -->` marker (Jira Link Check fails), no labels (subsequent pushes fire no `Reviewer (W1)` cycle — silent stall), a `claude/<slug>` branch with no ticket key, and no Gate B validation or self-review. Run this remediation pass before expecting any repo automation to touch the PR:
+Claude Code's built-in auto-create paths (the desktop "Create PR" affordance, cloud sessions, `/batch` subagents) produce a PR that satisfies **none** of this repo's contract: no jira-link marker (Jira Link Check fails), no labels (subsequent pushes fire no `Reviewer (W1)` cycle — silent stall), a `claude/<slug>` branch with no ticket key, and no Gate B validation or self-review. Run this remediation pass before expecting any repo automation to touch the PR:
 
-1. **Add the jira-link marker** — edit the PR body (`github_edit_pr`) to include the marker block with the correct `primary` key. Never rename the branch to add a ticket key (breaks PR detection) — on a `claude/<slug>` branch the marker is the **only** linkage signal.
+1. **Add the jira-link marker** — edit the PR body (`github_edit_pr`) to prepend the full three-line marker block with the correct `primary` key:
+
+   ```markdown
+   <!-- jira-link
+   primary: LS-####
+   -->
+   ```
+
+   All three lines are required; an opening comment with no `primary:` line fails Jira Link Check. Never rename the branch to add a ticket key (breaks PR detection) — on a `claude/<slug>` branch the marker is the **only** linkage signal.
+
 2. **Apply `agent-in-progress`** — `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` so sweep and review agents skip the PR while you remediate.
 3. **Run Gate B** — migrations + validation to green; the auto-create path ran none of it.
 4. **Self-review** — Phase 1 of [pr-lifecycle](../SKILL.md) is still mandatory before the PR is treated as ready.
@@ -160,7 +169,14 @@ Claude Code's built-in auto-create paths (the desktop "Create PR" affordance, cl
 - **Never** create a PR from the `main` branch
 - **Never** skip `make pc` — each CI failure costs 40-60 min. It must pass before **mark-ready** (Gate B), but run it **after** the draft PR is open, not before — see the draft-PR-first note under [Prerequisites](#prerequisites). Running `make pc` before the draft PR exists is the dominant cloud-agent timeout failure mode.
 - **Never** inline `--body` in PowerShell — always use `--body-file` or MCP tool
-- **Never** create a PR body without the `<!-- jira-link -->` marker — it is the source of truth for ticket linkage. `github_create_pr` injects it automatically; if you create a PR any other way (e.g. `gh pr create` fallback), include the marker block manually with exactly one `primary` (or `primary: none` for ticket-less bot PRs)
+- **Never** create a PR body without the jira-link marker — it is the source of truth for ticket linkage. `github_create_pr` injects it automatically; if you create a PR any other way (e.g. `gh pr create` fallback), include the full three-line block manually, with exactly one `primary` (or `primary: none` for ticket-less bot PRs). An opening comment with no `primary:` line is **not** a valid marker and fails Jira Link Check:
+
+  ```markdown
+  <!-- jira-link
+  primary: LS-####
+  -->
+  ```
+
 - **Never** create a PR body without a `## Context` section that includes a Jira link and problem statement — Copilot reads the PR description when fixing review comments; omitting context causes repeated, misaligned fixes
 - **Never** create a bug-fix PR without a `## Verification` section — `make pc` passing does not prove the bug is fixed
 - **Batch review comments** via "Start a review" before clicking "Fix with Copilot" — submitting each comment individually spawns a separate Copilot agent session per comment, causing duplicate or conflicting fixes

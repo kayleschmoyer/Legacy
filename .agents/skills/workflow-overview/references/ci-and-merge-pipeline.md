@@ -108,7 +108,7 @@ These run independently from the orchestrator, triggered directly by PR events. 
 | `check-migrations-applied.yml` | PR (migration file changes)      | `check-runner-access` pre-job      | Verifies all migrations are applied to production DB |
 | `check-conflicts.yml`          | PR (opened/sync/reopened/edited) | `check-runner-access` pre-job      | Merge conflict detection                             |
 | `integration-advisory.yml`     | PR (opened/sync/reopened)        | `check-runner-access` pre-job      | Advisory comment recommending integration specs      |
-| `jira-link-check.yml`          | PR (7 event types)               | `check-runner-access` pre-job      | Validates `<!-- jira-link -->` marker in PR body     |
+| `jira-link-check.yml`          | PR (7 event types)               | `check-runner-access` pre-job      | Validates the `jira-link` marker in PR body          |
 | `review.yml`                   | PR (opened/ready/labeled/sync)   | `check-runner-access` pre-job      | Reviewer bot W1                                      |
 | `security-scanning.yml`        | Dispatched by orchestrator       | `runner-label` workflow_call input | Dependency audit, SAST, secret scanning              |
 
@@ -158,7 +158,7 @@ with bare `node` from a sparse checkout of `main`.
 | `pull_request` closed + merged                      | `primary`                             | Done            |
 | `pull_request` closed without merge                 | `primary`                             | In Progress     |
 
-> **Ticket key selection (PR events):** the `<!-- jira-link -->` marker in the
+> **Ticket key selection (PR events):** the `jira-link` marker in the
 > PR body is the source of truth; when no marker exists, the sync falls back to
 > PR-title key parsing. `primary: none` and invalid markers transition nothing.
 > **Commit-message key sweeping no longer exists** — it swept foreign keys from

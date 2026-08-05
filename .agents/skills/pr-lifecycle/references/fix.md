@@ -45,7 +45,15 @@ Build a triage list:
 
 **Conflict signals**: the `CI: Conflicts` label and the required "No Merge Conflicts" check come from a deterministic `git merge` test (check-conflicts.yml + the base-push sweep) and are the source of truth. `mergeable` is GitHub's lazily-computed hint — it goes `UNKNOWN`/stale every time main advances. Any ONE of the three signals firing means rebase; never treat a red "No Merge Conflicts" check as a CI failure to debug.
 
-**Jira-link marker check (do this during assessment)**: the PR body must carry the structured `<!-- jira-link -->` marker — the source of truth for ticket linkage (see [create-pr reference](./create-pr.md#jira-link-marker-source-of-truth-for-ticket-linkage)). If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number: <PR#>, body: "<marker block>\n\n<existing body>" })` with `primary:` set to the PR's ticket key (from title/branch), or `primary: none` for ticket-less bot PRs. Editing the body is the supported correction path — never force-push or rename the branch to fix linkage.
+**Jira-link marker check (do this during assessment)**: the PR body must carry the structured jira-link marker — the source of truth for ticket linkage (see [create-pr reference](./create-pr.md#jira-link-marker-source-of-truth-for-ticket-linkage)). It is a three-line block, and all three lines are required — an opening comment with no `primary:` line fails Jira Link Check:
+
+```markdown
+<!-- jira-link
+primary: LS-####
+-->
+```
+
+If the body from `github_view_pr` lacks it, add it via `github_edit_pr({ number: <PR#>, body: "<!-- jira-link\nprimary: LS-####\n-->\n\n<existing body>" })` with `primary:` set to the PR's ticket key (from title/branch), or `primary: none` for ticket-less bot PRs. Editing the body is the supported correction path — never force-push or rename the branch to fix linkage.
 
 **Order matters**: always rebase first (Step 1), then fix reviews (Step 2), then fix CI (Step 3). Rebasing can resolve outdated review comments and change CI results.
 
