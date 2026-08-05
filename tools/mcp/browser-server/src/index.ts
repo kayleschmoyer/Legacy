@@ -84,7 +84,7 @@ server.tool(
 // Tool 4: browser_navigate
 server.tool(
   'browser_navigate',
-  'Open a URL in headless Chromium. Launches the browser on first call. Injects CSS to hide dynamic content (timestamps, spinners) and disable animations for consistent screenshots. If port is provided and url is a relative path, builds http://localhost:{port}{url}.',
+  'Open a URL in headless Chromium. Launches the browser on first call. Injects CSS to hide dynamic content (timestamps, spinners), disable animations/transitions, and hide scrollbars for consistent screenshots. CSS transforms are preserved, so rotated/translated elements screenshot as they really render. If port is provided and url is a relative path, builds http://localhost:{port}{url}.',
   {
     url: z
       .string()

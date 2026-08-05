@@ -26,7 +26,9 @@ const SNAPSHOT_PREP_CSS = `
     visibility: hidden !important;
   }
 
-  /* Disable animations for consistent snapshots */
+  /* Disable animations for consistent snapshots.
+     Do NOT reset transform here: static rotations/translations are real layout
+     (e.g. rotated labels) and suppressing them makes screenshots lie (LS-9051). */
   *,
   *::before,
   *::after {
@@ -34,7 +36,6 @@ const SNAPSHOT_PREP_CSS = `
     animation-delay: 0s !important;
     transition-duration: 0s !important;
     transition-delay: 0s !important;
-    transform: none !important;
   }
 
   /* Hide scrollbars */
