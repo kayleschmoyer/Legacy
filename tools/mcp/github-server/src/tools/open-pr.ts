@@ -259,6 +259,31 @@ async function openPRWorker(
     const prUrl = pr.html_url;
     const warnings: string[] = [];
 
+    // Jira Link Check requires the visible `no-jira` label whenever the marker
+    // declares `primary: none` — `primary` falls back to 'none' above when no
+    // jiraKey was passed and the title carries no key, so without this the
+    // tool can mint a PR with a guaranteed-failing check entirely on its own
+    // (LS-9043). `create_pr` has done this since LS-8298; `open_pr` never did.
+    // Must precede the `bot:ready-for-review` apply below, which has to stay
+    // the last label op — the Reviewer Bot runs cancel-in-progress, so a later
+    // label queues a run that kills the review before it can post.
+    let noJiraLabelApplied: boolean | undefined;
+    if (primary === 'none') {
+      try {
+        await githubRest({
+          method: 'POST',
+          path: `/repos/${repo.owner}/${repo.name}/issues/${prNumber}/labels`,
+          body: { labels: ['no-jira'] },
+        });
+        noJiraLabelApplied = true;
+      } catch (e) {
+        noJiraLabelApplied = false;
+        warnings.push(
+          `no-jira label apply failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+
     // If draft requested, stop here
     if (params.draft) {
       return ok({
@@ -268,6 +293,7 @@ async function openPRWorker(
         jiraKey: primary !== 'none' ? primary : undefined,
         draft: true,
         warnings,
+        ...(noJiraLabelApplied === undefined ? {} : { noJiraLabelApplied }),
         ...(pushOutput !== undefined ? { pushed: true } : {}),
       });
     }
@@ -320,6 +346,7 @@ async function openPRWorker(
       markedReady,
       readyLabelApplied,
       warnings,
+      ...(noJiraLabelApplied === undefined ? {} : { noJiraLabelApplied }),
       ...(pushOutput !== undefined ? { pushed: true } : {}),
     });
   } catch (e) {

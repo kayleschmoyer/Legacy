@@ -123,7 +123,7 @@ describe('jira-link marker (LS-7895)', () => {
       expect(result.match(/\*\*Jira:\*\*/g)).toHaveLength(1);
     });
 
-    it('is a no-op when the body already carries a marker', () => {
+    it('is a no-op when the body already carries a VALID marker', () => {
       const body =
         '<!-- jira-link\nprimary: LS-1\n-->\n\n**Jira:** [LS-1](https://bkrupa.atlassian.net/browse/LS-1)\n\nbody';
       expect(ensureJiraLinkMarker(body, { primary: 'LS-2' })).toBe(body);
@@ -152,6 +152,61 @@ describe('jira-link marker (LS-7895)', () => {
       expect(result.startsWith('<!-- jira-link\nprimary: LS-7914\n-->')).toBe(
         true,
       );
+    });
+
+    // A malformed marker used to short-circuit this function via a
+    // presence-only check, so it reached GitHub verbatim and failed Jira Link
+    // Check. These are the exact shapes seen live on agent PRs.
+    describe('repairs a present-but-invalid marker (LS-9043)', () => {
+      const WELL_FORMED = '<!-- jira-link\nprimary: LS-9043\n-->';
+
+      it.each([
+        ['bare marker', '<!-- jira-link -->'],
+        ['one-line marker', '<!-- jira-link: LS-8504 -->'],
+        [
+          'two primary lines',
+          '<!-- jira-link\nprimary: LS-1\nprimary: LS-2\n-->',
+        ],
+        ['lowercase primary', '<!-- jira-link\nprimary: ls-1234\n-->'],
+        [
+          'malformed related key',
+          '<!-- jira-link\nprimary: LS-1\nrelated: garbage\n-->',
+        ],
+      ])('replaces a %s', (_name, badMarker) => {
+        const result = ensureJiraLinkMarker(
+          `${badMarker}\n\n## Summary\n\n- did things`,
+          { primary: 'LS-9043' },
+        );
+        expect(result.startsWith(WELL_FORMED)).toBe(true);
+        expect(validateJiraLinkMarker(result).valid).toBe(true);
+        expect(result).toContain('## Summary');
+        expect(result).toContain('- did things');
+      });
+
+      it('collapses duplicate valid markers into a single declaration', () => {
+        const dup = '<!-- jira-link\nprimary: LS-1\n-->';
+        const result = ensureJiraLinkMarker(`${dup}\n\n${dup}\n\nbody`, {
+          primary: 'LS-9043',
+        });
+        expect(validateJiraLinkMarker(result).valid).toBe(true);
+        expect(result.match(/<!--\s*jira-link/g)).toHaveLength(1);
+        expect(result).toContain('body');
+      });
+
+      it('leaves exactly one visible **Jira:** line when repairing', () => {
+        const body =
+          '<!-- jira-link -->\n\n**Jira:** [LS-1](https://bkrupa.atlassian.net/browse/LS-1)\n\nbody';
+        const result = ensureJiraLinkMarker(body, { primary: 'LS-9043' });
+        expect(result.match(/\*\*Jira:\*\*/g)).toHaveLength(1);
+        expect(result).toContain('**Jira:** [LS-9043]');
+      });
+
+      it('does not repair a marker that is only quoted in code (LS-7914)', () => {
+        const body = 'Write `<!-- jira-link -->` in the body.\n\nbody';
+        const result = ensureJiraLinkMarker(body, { primary: 'LS-9043' });
+        expect(result.startsWith(WELL_FORMED)).toBe(true);
+        expect(result).toContain('Write `<!-- jira-link -->` in the body.');
+      });
     });
   });
 

@@ -221,17 +221,32 @@ export function buildJiraLinkBlock(options: JiraLinkOptions): string {
 
 /**
  * Prepend the jira-link marker to a PR body. No-op when the body already
- * carries a marker (caller templated it). When the body already has a visible
- * **Jira:** line (the standard PR body template does), only the HTML comment
- * is prepended to avoid duplicating the human-facing link.
+ * carries a *valid* marker (caller templated it). When the body already has a
+ * visible **Jira:** line (the standard PR body template does), only the HTML
+ * comment is prepended to avoid duplicating the human-facing link.
+ *
+ * A caller-supplied marker that is present but **malformed** is replaced
+ * rather than passed through (LS-9043). Presence alone used to short-circuit
+ * this function, so a bare `<!-- jira-link -->` or a one-line
+ * `<!-- jira-link: LS-1234 -->` — the forms agents actually write, since the
+ * docs name the marker by its bare literal — reached GitHub untouched and
+ * failed Jira Link Check with "marker has no `primary:` line". That was the
+ * single most common agent-PR CI failure. `edit-pr` already validated rather
+ * than detected (LS-8721); this brings the create path in line.
+ *
+ * Stripping is deliberately all-blocks: a body carrying duplicate markers is
+ * itself a check failure, so re-emitting one good block only helps if the
+ * others are gone.
  */
 export function ensureJiraLinkMarker(
   body: string,
   options: JiraLinkOptions,
 ): string {
-  if (hasJiraLinkMarker(body)) return body;
-  const block = body.includes('**Jira:**')
+  const marker = validateJiraLinkMarker(body);
+  if (marker.valid) return body;
+  const rest = marker.present ? stripJiraLinkBlocks(body) : body;
+  const block = rest.includes('**Jira:**')
     ? buildJiraLinkComment(options)
     : buildJiraLinkBlock(options);
-  return `${block}\n\n${body}`;
+  return `${block}\n\n${rest}`;
 }

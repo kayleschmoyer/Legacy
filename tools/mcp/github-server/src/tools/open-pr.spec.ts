@@ -275,4 +275,63 @@ describe('openPR', () => {
       );
     });
   });
+
+  // `primary` falls back to 'none' when no jiraKey is passed and the title
+  // carries no key. Jira Link Check requires the `no-jira` label in that case,
+  // so without this openPR could mint a guaranteed-failing PR on its own.
+  describe('no-jira label for keyless PRs (LS-9043)', () => {
+    const NO_JIRA_LABEL_CALL = expect.objectContaining({
+      method: 'POST',
+      path: '/repos/bkrupa/legacy-sports/issues/99/labels',
+      body: { labels: ['no-jira'] },
+    });
+
+    it('applies the no-jira label when primary resolves to none', async () => {
+      makeExecFileSuccess('feature-branch');
+      const result = await openPR({
+        title: 'chore(deps): bump lodash',
+        body: 'body',
+        head: 'feature-branch',
+        draft: true,
+        push: false,
+      });
+      expect(mockGithubRest).toHaveBeenCalledWith(NO_JIRA_LABEL_CALL);
+      expect(result.content[0].text).toContain('"noJiraLabelApplied":true');
+    });
+
+    it('does not apply the no-jira label when a real key is present', async () => {
+      makeExecFileSuccess('feature-branch');
+      const result = await openPR({
+        title: 'LS-8537 fix(web): validate JWT payload',
+        body: 'body',
+        head: 'feature-branch',
+        draft: true,
+        push: false,
+      });
+      expect(mockGithubRest).not.toHaveBeenCalledWith(NO_JIRA_LABEL_CALL);
+      expect(result.content[0].text).not.toContain('noJiraLabelApplied');
+    });
+
+    it('treats a label failure as non-fatal and still returns the PR', async () => {
+      makeExecFileSuccess('feature-branch');
+      mockGithubRest.mockImplementation((req: { path: string }) =>
+        req.path.endsWith('/labels')
+          ? Promise.reject(new Error('403 label forbidden'))
+          : Promise.resolve({
+              number: 99,
+              html_url: 'https://example/pr/99',
+            }),
+      );
+      const result = await openPR({
+        title: 'chore(deps): bump lodash',
+        body: 'body',
+        head: 'feature-branch',
+        draft: true,
+        push: false,
+      });
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toContain('"noJiraLabelApplied":false');
+      expect(result.content[0].text).toContain('403 label forbidden');
+    });
+  });
 });
