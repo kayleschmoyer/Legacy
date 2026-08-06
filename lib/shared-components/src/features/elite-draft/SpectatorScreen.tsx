@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback } from 'react';
 import { CSS } from './styles';
 import { CircularTimer } from './CircularTimer';
 import { DraftGrid } from './DraftGrid';
@@ -9,17 +9,10 @@ import {
   NoLeagueScreen,
 } from './DraftStateScreens';
 import { SpectatorDepthChart } from './SpectatorDepthChart';
-import { type SplashPick, SplashQueue, useSplashQueue } from './SplashQueue';
+import { type SplashPick, SplashQueue } from './SplashQueue';
 import { getDraftCommentary } from './draftUtils';
 import { getPositionColor } from './utils';
-import { DEFAULT_PICK_TIME } from './constants';
-import {
-  useDraftTimer,
-  useDraftWebSocket,
-  useSpectatorDraftData,
-} from './hooks';
-import type { AvailableDraftPlayer, DraftPlayer } from './types';
-import { useAuth } from '../../features/auth';
+import { useSpectatorScreenState } from './hooks';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
 
@@ -28,6 +21,15 @@ import { hasErrorCode } from '../../utils/graphql-errors';
 // (LS-8942). No interactive draft controls of any kind: no search, no queue,
 // no draft buttons, no commissioner tools, no chat, and no mutations
 // (including nudgeExpiredDraftPick — the clock waits at 0:00 for the server).
+//
+// Renders its own DOM/CSS tree rather than Tamagui (LS-9056): the broadcast
+// visual language (glow pulses, shimmer sweeps, gradient bg-fx, keyframe
+// animations — see styles.ts) is built on DOM-only CSS that Tamagui/React
+// Native has no equivalent for, mirroring the identical, pre-existing split
+// on EliteDraftBoardScreen.tsx/.native.tsx for the same feature area. All
+// non-render wiring (draft data, WebSocket, timer, splash queue, derived
+// pick/round state) lives in the shared `useSpectatorScreenState` hook so
+// only the genuinely platform-divergent rendering is duplicated.
 // ---------------------------------------------------------------------------
 
 /**
@@ -92,99 +94,20 @@ export function SpectatorScreen({
   sport = 'baseball',
   minSplashMs,
 }: SpectatorScreenProps): React.JSX.Element {
-  const { user, token: authToken } = useAuth();
-  const isAuthenticated = !!user;
-
-  const data = useSpectatorDraftData({ leagueId });
-
-  // ---- Read-only realtime state (slim replacement for useDraftUIState) ----
-  const [draftComplete, setDraftComplete] = useState(false);
-  const [draftPaused, setDraftPaused] = useState(false);
-  const [pickDeadline, setPickDeadline] = useState<Date | null>(null);
-  const [pickTimeLimitSeconds, setPickTimeLimitSeconds] =
-    useState(DEFAULT_PICK_TIME);
-  const [liveMessage, setLiveMessage] = useState('');
-  const notifiedPicksRef = useRef<Set<number>>(new Set());
-
-  const splash = useSplashQueue({ minSplashMs });
-  const { enqueue, removePick } = splash;
-
-  // Adapter: the WS hook's announcement callback feeds the splash queue.
-  // Only live socket events reach this — historical picks are never enqueued.
-  const showAnnouncement = useCallback(
-    (
-      player: DraftPlayer | AvailableDraftPlayer,
-      pickNumber: number,
-      round: number,
-      roundPickNumber: number,
-      _myPick: boolean,
-      auto: boolean,
-      teamName: string,
-    ) => {
-      enqueue({
-        player,
-        overallPick: pickNumber,
-        round,
-        roundPickNumber,
-        isAuto: auto,
-        teamName,
-      });
-    },
-    [enqueue],
-  );
-
-  // Spectators surface no toasts and no presence — quiet no-ops.
-  const noop = useCallback(() => undefined, []);
-  const asyncNoop = useCallback(() => Promise.resolve(undefined), []);
-
-  useDraftWebSocket({
-    leagueId,
-    draftId: data.draftId,
-    isAuthenticated,
-    isAuctionDraft: data.isAuctionDraft,
-    myTeamId: null,
-    enrichedPlayers: [],
-    statsLookup: data.statsLookup,
-    teamNameById: data.teamNameById,
-    notifiedPicksRef,
-    showAnnouncement,
-    showToast: noop,
-    setDraftComplete,
-    setDraftPaused,
-    setPickDeadline,
-    setPickTimeLimitSeconds,
-    setLiveMessage,
-    setOnlineUserIds: noop,
-    refetchDraft: data.refetchDraft,
-    refetchLeague: data.refetchLeague,
-    refetchCurrentPick: data.refetchCurrentPick,
-    refetchPickHistory: data.refetchPickHistory,
-    refetchAvailablePlayers: asyncNoop,
-    refetchQueue: asyncNoop,
-    refetchAutoPickStatuses: asyncNoop,
-    websocketUrl,
-    token: token ?? authToken ?? undefined,
-    onPickUndone: removePick,
-  });
-
-  const { timeRemaining } = useDraftTimer({
-    draftId: data.draftId,
-    leagueId,
+  const {
+    data,
     draftComplete,
-    draftOrderMissing: false,
     draftPaused,
-    currentPickInfo: data.currentPickInfo,
     pickDeadline,
-    leagueDraft: data.leagueDraft,
-    setPickDeadline,
-    setPickTimeLimitSeconds,
-    setAutoPickDisabled: noop,
-    readOnly: true,
-    refetchDraft: data.refetchDraft,
-    refetchCurrentPick: data.refetchCurrentPick,
-    refetchPickHistory: data.refetchPickHistory,
-    refetchAvailablePlayers: asyncNoop,
-  });
+    liveMessage,
+    splash,
+    timeRemaining,
+    round,
+    currentPick,
+    onClockTeamName,
+    recentPicks,
+    pickTimeLimitSeconds,
+  } = useSpectatorScreenState({ leagueId, websocketUrl, token, minSplashMs });
 
   const commentaryFor = useCallback((pick: SplashPick) => {
     if (!('name' in pick.player)) return undefined;
@@ -283,15 +206,6 @@ export function SpectatorScreen({
   }
 
   // ---- Main live spectator layout ----
-  const round =
-    data.currentPickInfo?.round ??
-    Math.ceil(
-      (data.currentPickInfo?.overallPick ?? 1) /
-        Math.max(data.leagueTeams.length, 1),
-    );
-  const currentPick =
-    data.currentPickInfo?.overallPick ?? data.pickHistory.length + 1;
-  const onClockTeamName = data.teamNameById(data.currentPickTeamId);
   const maxRounds =
     data.leagueTeams.length > 0
       ? Math.max(
@@ -304,9 +218,6 @@ export function SpectatorScreen({
           MIN_GRID_ROUNDS,
         )
       : MIN_GRID_ROUNDS;
-  const recentPicks = [...data.pickHistory]
-    .sort((a, b) => b.overallPick - a.overallPick)
-    .slice(0, 5);
 
   return (
     <div className="d-root" data-sport={sport} data-testid="spectator-screen">

@@ -11,18 +11,21 @@ import React from 'react';
 import { act } from '@testing-library/react';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { SpectatorScreen } from './SpectatorScreen';
-import {
-  useDraftTimer,
-  useDraftWebSocket,
-  useSpectatorDraftData,
-} from './hooks';
+import { useDraftTimer } from './hooks/useDraftTimer';
+import { useDraftWebSocket } from './hooks/useDraftWebSocket';
+import { useSpectatorDraftData } from './hooks/useSpectatorDraftData';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { useAuth } from '../../features/auth';
 import { render } from '../../test-utils';
 
-jest.mock('./hooks', () => ({
-  useDraftTimer: jest.fn(),
+// The screen consumes the real `useSpectatorScreenState` controller (LS-9056)
+// so its wiring is exercised end-to-end; only the lower-level hooks it
+// composes are mocked.
+jest.mock('./hooks/useDraftTimer', () => ({ useDraftTimer: jest.fn() }));
+jest.mock('./hooks/useDraftWebSocket', () => ({
   useDraftWebSocket: jest.fn(),
+}));
+jest.mock('./hooks/useSpectatorDraftData', () => ({
   useSpectatorDraftData: jest.fn(),
 }));
 

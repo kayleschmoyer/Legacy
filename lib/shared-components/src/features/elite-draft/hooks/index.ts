@@ -9,3 +9,4 @@ export {
   useSpectatorDraftData,
   SPECTATOR_POLL_INTERVAL_MS,
 } from './useSpectatorDraftData';
+export { useSpectatorScreenState } from './useSpectatorScreenState';

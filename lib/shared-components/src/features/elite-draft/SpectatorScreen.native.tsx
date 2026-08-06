@@ -1,6 +1,5 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
-import type { AvailableDraftPlayer, DraftPlayer } from './types';
 import { getPositionColor } from './utils';
 import { buildDepthChartBuckets } from './DraftPlayerBoard';
 import { DraftClockRing } from './DraftClockRing.native';
@@ -8,15 +7,8 @@ import { DraftMiniBoard } from './DraftMiniBoard.native';
 import { DraftPickAnnouncement } from './DraftPickAnnouncement.native';
 import { useDraftPalette } from './nativeDraftPalette';
 import { resolveBoardRounds } from './nativeDraftBoard';
-import { useSplashQueue } from './SplashQueue';
-import { DEFAULT_PICK_TIME } from './constants';
-import {
-  useDraftTimer,
-  useDraftWebSocket,
-  useSpectatorDraftData,
-} from './hooks';
+import { useSpectatorScreenState } from './hooks';
 import type { AnnouncementData } from './hooks/useDraftUIState';
-import { useAuth } from '../../features/auth';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
 
@@ -24,6 +16,15 @@ import { hasErrorCode } from '../../utils/graphql-errors';
 // SpectatorScreen (native) — read-only live draft watch view (LS-8942).
 // Mirrors the web SpectatorScreen's states with the native member screen's
 // Tamagui chrome: no draft controls, no chat, no mutations.
+//
+// Kept as a genuine platform fork rather than folded into the web screen
+// (LS-9056): the web screen renders a bespoke DOM/CSS "broadcast" tree
+// (keyframe glow/shimmer animations, gradient backgrounds — see styles.ts)
+// that has no Tamagui/React Native equivalent, the same pre-existing split
+// as EliteDraftBoardScreen.tsx/.native.tsx for this feature area. All
+// non-render wiring (draft data, WebSocket, timer, splash queue, derived
+// pick/round state) lives in the shared `useSpectatorScreenState` hook so
+// only the genuinely platform-divergent rendering is duplicated.
 // ---------------------------------------------------------------------------
 
 export interface SpectatorScreenProps {
@@ -107,95 +108,24 @@ export function SpectatorScreen({
   sport = 'baseball',
   minSplashMs,
 }: SpectatorScreenProps): React.JSX.Element {
-  const { user, token: authToken } = useAuth();
-  const isAuthenticated = !!user;
   const palette = useDraftPalette();
 
-  const data = useSpectatorDraftData({ leagueId });
-
-  const [draftComplete, setDraftComplete] = useState(false);
-  const [draftPaused, setDraftPaused] = useState(false);
-  const [pickDeadline, setPickDeadline] = useState<Date | null>(null);
-  const [pickTimeLimitSeconds, setPickTimeLimitSeconds] =
-    useState(DEFAULT_PICK_TIME);
-  const [, setLiveMessage] = useState('');
-  const notifiedPicksRef = useRef<Set<number>>(new Set());
-
-  const splash = useSplashQueue({ minSplashMs });
-  const { enqueue, removePick } = splash;
-
-  const showAnnouncement = useCallback(
-    (
-      player: DraftPlayer | AvailableDraftPlayer,
-      pickNumber: number,
-      round: number,
-      roundPickNumber: number,
-      _myPick: boolean,
-      auto: boolean,
-      teamName: string,
-    ) => {
-      enqueue({
-        player,
-        overallPick: pickNumber,
-        round,
-        roundPickNumber,
-        isAuto: auto,
-        teamName,
-      });
-    },
-    [enqueue],
-  );
-
-  const noop = useCallback(() => undefined, []);
-  const asyncNoop = useCallback(() => Promise.resolve(undefined), []);
-
-  useDraftWebSocket({
-    leagueId,
-    draftId: data.draftId,
-    isAuthenticated,
-    isAuctionDraft: data.isAuctionDraft,
-    myTeamId: null,
-    enrichedPlayers: [],
-    statsLookup: data.statsLookup,
-    teamNameById: data.teamNameById,
-    notifiedPicksRef,
-    showAnnouncement,
-    showToast: noop,
-    setDraftComplete,
-    setDraftPaused,
-    setPickDeadline,
-    setPickTimeLimitSeconds,
-    setLiveMessage,
-    setOnlineUserIds: noop,
-    refetchDraft: data.refetchDraft,
-    refetchLeague: data.refetchLeague,
-    refetchCurrentPick: data.refetchCurrentPick,
-    refetchPickHistory: data.refetchPickHistory,
-    refetchAvailablePlayers: asyncNoop,
-    refetchQueue: asyncNoop,
-    refetchAutoPickStatuses: asyncNoop,
-    websocketUrl,
-    token: websocketToken ?? authToken ?? undefined,
-    onPickUndone: removePick,
-  });
-
-  const { timeRemaining } = useDraftTimer({
-    draftId: data.draftId,
-    leagueId,
+  const {
+    data,
     draftComplete,
-    draftOrderMissing: false,
     draftPaused,
-    currentPickInfo: data.currentPickInfo,
-    pickDeadline,
-    leagueDraft: data.leagueDraft,
-    setPickDeadline,
-    setPickTimeLimitSeconds,
-    setAutoPickDisabled: noop,
-    readOnly: true,
-    refetchDraft: data.refetchDraft,
-    refetchCurrentPick: data.refetchCurrentPick,
-    refetchPickHistory: data.refetchPickHistory,
-    refetchAvailablePlayers: asyncNoop,
+    pickTimeLimitSeconds,
+    splash,
+    timeRemaining,
+    round,
+    currentPick,
+    onClockTeamName,
+    recentPicks,
+  } = useSpectatorScreenState({
+    leagueId,
+    websocketUrl,
+    token: websocketToken,
+    minSplashMs,
   });
 
   const boardTeams =
@@ -444,19 +374,6 @@ export function SpectatorScreen({
   }
 
   // ---- Main live spectator UI ----
-  const round =
-    data.currentPickInfo?.round ??
-    Math.ceil(
-      (data.currentPickInfo?.overallPick ?? 1) /
-        Math.max(data.leagueTeams.length, 1),
-    );
-  const currentPick =
-    data.currentPickInfo?.overallPick ?? data.pickHistory.length + 1;
-  const onClockTeamName = data.teamNameById(data.currentPickTeamId);
-  const recentPicks = [...data.pickHistory]
-    .sort((a, b) => b.overallPick - a.overallPick)
-    .slice(0, 5);
-
   return (
     <YStack flex={1} backgroundColor="$background">
       {/* ---- Slim top band ---- */}
