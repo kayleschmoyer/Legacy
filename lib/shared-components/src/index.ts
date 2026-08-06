@@ -108,7 +108,6 @@ export * from './features/sports/SportScreens';
 
 // Home components
 export * from './features/home/HomeScreen';
-export * from './features/home/MobileHomeScreen';
 
 // Player components
 export * from './features/players/PlayerRow';

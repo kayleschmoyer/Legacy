@@ -64,7 +64,7 @@ const HEADER_PAGE_PADDING = 16;
  * Top padding for the card feed header: the page gutter plus the top
  * safe-area inset, so the "Players" title and search bar always clear the
  * status bar (LS-8834, the same status-bar-overlap regression class as
- * LS-8808/MobileHomeScreen's `homeContentTopPadding`). Non-finite or negative
+ * LS-8808/HomeScreen's `homeContentTopPadding`). Non-finite or negative
  * insets are ignored so a missing safe-area provider degrades to the gutter
  * rather than collapsing or inflating the layout.
  */

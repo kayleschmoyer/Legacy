@@ -1,10 +1,18 @@
 import React from 'react';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, within } from '@testing-library/react';
+import { useMedia } from 'tamagui';
 import {
+  homeContentTopPadding,
   type HomeLeagueSummary,
   HomeScreen,
   type HomeScreenProps,
 } from './HomeScreen';
+
+// `useMedia` is stubbed to `jest.fn(() => ({}))` by the package-wide `tamagui`
+// mock in jest-setup-web.js — every breakpoint false (desktop) by default.
+// Reset explicitly in `beforeEach` (rather than relying on that default) so
+// the narrow-viewport describe block below can override it per test without
+// leaking into unrelated wide-viewport tests.
 
 const baseProps: HomeScreenProps = {
   userName: 'Casey',
@@ -30,8 +38,29 @@ const league: HomeLeagueSummary = {
   totalMatchups: 14,
 };
 
+// LS-8808 defect 3: the greeting sat flush against the Android status bar.
+// The inset now lands on the scroll *content*, and this is the arithmetic
+// behind it — style props themselves are stripped by the Tamagui jest mock.
+describe('homeContentTopPadding (LS-8808)', () => {
+  it('adds the full top safe-area inset to the page gutter', () => {
+    expect(homeContentTopPadding(44)).toBe(62);
+  });
+
+  it('falls back to the page gutter alone on platforms without an inset', () => {
+    expect(homeContentTopPadding(0)).toBe(18);
+  });
+
+  it('ignores negative and non-finite insets', () => {
+    expect(homeContentTopPadding(-20)).toBe(18);
+    expect(homeContentTopPadding(Number.NaN)).toBe(18);
+  });
+});
+
 describe('HomeScreen', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useMedia as jest.Mock).mockReturnValue({});
+  });
 
   describe('new-user empty state', () => {
     it('renders the getting-started hero and both sport cards', () => {
@@ -349,6 +378,244 @@ describe('HomeScreen', () => {
     });
   });
 
+  // Folded in from MobileHomeScreen.spec.tsx (LS-8794) by LS-9055 — the
+  // narrow branch now reuses the hero card / league list / quick-action
+  // pieces above instead of a separate mobile-only implementation, so this
+  // section only covers what's still narrow-specific (greeting, live-matchup
+  // ticker) plus the fold's port-forward of AC4.
+  describe('narrow-viewport "Scoreboard First" layout (LS-8794, folded by LS-9055)', () => {
+    const liveLeague: HomeLeagueSummary = {
+      leagueId: 43,
+      leagueName: 'Deadball Diamonds',
+      sport: 'baseball',
+      leaguePhase: 'active',
+      matchupId: 7,
+      matchupStatus: 'in_progress',
+      userScore: 12.5,
+      opponentScore: 9.25,
+      opponentTeamName: 'Rival FC',
+      currentWeekNumber: 8,
+      totalMatchups: 14,
+      matchupEndTime: '2026-05-10T20:00:00.000Z',
+      wins: 4,
+      losses: 4,
+      teamCount: 12,
+    };
+
+    beforeEach(() => {
+      (useMedia as jest.Mock).mockReturnValue({ sm: true });
+    });
+
+    it('renders the compact greeting instead of the wide GreetingHeader', () => {
+      const { getByTestId, getByText, queryByText } = render(
+        <HomeScreen {...baseProps} leagues={[league]} />,
+      );
+      expect(getByTestId('home-greeting')).toBeTruthy();
+      expect(getByText('Casey')).toBeTruthy();
+      // The wide branch's H1-based greeting shows "Welcome, {name}" copy on
+      // the new-user view only; the returning-user H1 greeting has no
+      // distinguishing text of its own, so assert structurally via testID
+      // instead — `home-greeting` only exists on the narrow branch.
+      expect(queryByText('Pick your sport')).toBeNull();
+    });
+
+    it('fires onOpenProfile when the avatar is pressed', () => {
+      const onOpenProfile = jest.fn();
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onOpenProfile={onOpenProfile}
+        />,
+      );
+      fireEvent.click(getByText('C'));
+      expect(onOpenProfile).toHaveBeenCalledTimes(1);
+    });
+
+    it('fires onSeeAllLeagues from "See all"', () => {
+      const onSeeAllLeagues = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onSeeAllLeagues={onSeeAllLeagues}
+        />,
+      );
+      fireEvent.click(getByTestId('home-see-all-leagues'));
+      expect(onSeeAllLeagues).toHaveBeenCalledTimes(1);
+    });
+
+    it('omits "See all" when no handler is supplied', () => {
+      const { queryByTestId } = render(
+        <HomeScreen {...baseProps} leagues={[league]} />,
+      );
+      expect(queryByTestId('home-see-all-leagues')).toBeNull();
+    });
+
+    describe('live matchup ticker', () => {
+      it('is hidden entirely when no league has a live matchup', () => {
+        const { queryByTestId } = render(
+          <HomeScreen {...baseProps} leagues={[league]} />,
+        );
+        expect(queryByTestId('home-live-ticker')).toBeNull();
+      });
+
+      it('renders week, scores and the opponent when a matchup is in progress', () => {
+        // `liveLeague` is also the most-urgent (hero) league, so its score
+        // legitimately appears twice — once in the ticker banner, once in
+        // the hero card below. Scope assertions to the ticker itself.
+        const { getByTestId } = render(
+          <HomeScreen {...baseProps} leagues={[league, liveLeague]} />,
+        );
+        const ticker = within(getByTestId('home-live-ticker'));
+        expect(ticker.getByText('Live · Week 8')).toBeTruthy();
+        expect(ticker.getByText(/^Closes /)).toBeTruthy();
+        expect(ticker.getByText('12.5')).toBeTruthy();
+        expect(ticker.getByText('9.3')).toBeTruthy();
+        expect(ticker.getByText('Rival FC')).toBeTruthy();
+      });
+
+      it('falls back to 0.0 rather than throwing on a non-numeric score (LS-8668)', () => {
+        const malformed: HomeLeagueSummary = {
+          ...liveLeague,
+          userScore: 'DNP' as unknown as number,
+        };
+        expect(() =>
+          render(<HomeScreen {...baseProps} leagues={[malformed]} />),
+        ).not.toThrow();
+      });
+
+      it('fires onSetLineup for the live league', () => {
+        const onSetLineup = jest.fn();
+        const { getByTestId } = render(
+          <HomeScreen
+            {...baseProps}
+            leagues={[league, liveLeague]}
+            onSetLineup={onSetLineup}
+          />,
+        );
+        fireEvent.click(getByTestId('home-ticker-set-lineup'));
+        expect(onSetLineup).toHaveBeenCalledWith(liveLeague);
+      });
+
+      it('fires onViewMatchup for the live league', () => {
+        const onViewMatchup = jest.fn();
+        const { getByTestId } = render(
+          <HomeScreen
+            {...baseProps}
+            leagues={[liveLeague]}
+            onViewMatchup={onViewMatchup}
+          />,
+        );
+        fireEvent.click(getByTestId('home-ticker-matchup'));
+        expect(onViewMatchup).toHaveBeenCalledWith(liveLeague);
+      });
+
+      it('falls back to onViewLeague when no onViewMatchup handler is supplied', () => {
+        const onViewLeague = jest.fn();
+        const { getByTestId } = render(
+          <HomeScreen
+            {...baseProps}
+            leagues={[liveLeague]}
+            onViewLeague={onViewLeague}
+          />,
+        );
+        fireEvent.click(getByTestId('home-ticker-matchup'));
+        expect(onViewLeague).toHaveBeenCalledWith(liveLeague);
+      });
+    });
+
+    // AC4 — the hero card, glass league rows and quick-action pills are the
+    // exact same components the wide branch renders (see the "returning-user
+    // dashboard", "quick actions (LS-9048)" and "football playboard hero
+    // (LS-9035)" describe blocks above), so this only proves they show up on
+    // the narrow branch too rather than re-asserting their internals.
+    describe('ported wide-viewport features (AC4)', () => {
+      it('renders the baseball ticket hero for a baseball top league', () => {
+        const { getByTestId } = render(
+          <HomeScreen {...baseProps} leagues={[league]} />,
+        );
+        expect(getByTestId('home-hero-card')).toBeTruthy();
+      });
+
+      it('renders the football playboard hero for a football top league', () => {
+        const footballLeague: HomeLeagueSummary = {
+          ...league,
+          leagueId: 51,
+          leagueName: 'Steel Curtain Era',
+          sport: 'football',
+        };
+        const { getByTestId } = render(
+          <HomeScreen {...baseProps} leagues={[footballLeague]} />,
+        );
+        expect(getByTestId('home-playboard-hero')).toBeTruthy();
+      });
+
+      it('renders a glass secondary league row', () => {
+        const secondary: HomeLeagueSummary = {
+          ...league,
+          leagueId: 99,
+          leagueName: 'Second League',
+        };
+        const { getByText } = render(
+          <HomeScreen {...baseProps} leagues={[league, secondary]} />,
+        );
+        expect(getByText('Second League')).toBeTruthy();
+      });
+
+      it('renders the quick-action pill row and fires its handlers', () => {
+        const onCreateLeague = jest.fn();
+        const { getByTestId } = render(
+          <HomeScreen
+            {...baseProps}
+            leagues={[league]}
+            onCreateLeague={onCreateLeague}
+          />,
+        );
+        fireEvent.click(getByTestId('home-quick-create-league'));
+        expect(onCreateLeague).toHaveBeenCalledTimes(1);
+      });
+
+      it('renders the On This Day panel, preferring the condensed node', () => {
+        const { getByText, queryByText } = render(
+          <HomeScreen
+            {...baseProps}
+            leagues={[league]}
+            onThisDay={<span>FULL-FEED</span>}
+            onThisDayCondensed={<span>CONDENSED-FEED</span>}
+          />,
+        );
+        expect(getByText('CONDENSED-FEED')).toBeTruthy();
+        expect(queryByText('FULL-FEED')).toBeNull();
+      });
+
+      it('falls back to the full On This Day node when no condensed node is supplied', () => {
+        const { getByText } = render(
+          <HomeScreen
+            {...baseProps}
+            leagues={[league]}
+            onThisDay={<span>FULL-FEED</span>}
+          />,
+        );
+        expect(getByText('FULL-FEED')).toBeTruthy();
+      });
+    });
+
+    // Matches MobileHomeScreen's deliberate pre-fold behavior — the narrow
+    // layout still has no archived-leagues affordance.
+    it('does not render the archived-leagues toggle', () => {
+      const { queryByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          archivedCount={3}
+          onShowArchived={jest.fn()}
+        />,
+      );
+      expect(queryByText('Show 3 archived leagues')).toBeNull();
+    });
+  });
+
   describe('mock draft CTA', () => {
     it('renders the Start Mock Draft button when onStartMockDraft is provided', () => {
       const onStartMockDraft = jest.fn();
@@ -502,8 +769,10 @@ describe('HomeScreen', () => {
     // The global `tamagui` jest mock strips layout props (including
     // paddingTop) before they reach the DOM, so this only asserts that
     // passing topInset through every render branch doesn't throw. The
-    // paddingTop wiring itself is covered by reading HomeScreen.tsx's four
-    // ScrollView returns and by home.spec.tsx (HomeTab forwards topInset).
+    // paddingTop wiring itself is covered by reading HomeScreen.tsx's five
+    // ScrollView returns (loading, error, new-user, and the narrow/wide
+    // returning-user branches) and by home.spec.tsx (HomeTab forwards
+    // topInset).
     it('accepts topInset on every render branch without throwing', () => {
       expect(() =>
         render(<HomeScreen {...baseProps} topInset={44} />),
@@ -516,6 +785,13 @@ describe('HomeScreen', () => {
       ).not.toThrow();
       expect(() =>
         render(<HomeScreen {...baseProps} error topInset={44} />),
+      ).not.toThrow();
+    });
+
+    it('accepts topInset on the narrow returning-user branch without throwing', () => {
+      (useMedia as jest.Mock).mockReturnValue({ sm: true });
+      expect(() =>
+        render(<HomeScreen {...baseProps} leagues={[league]} topInset={44} />),
       ).not.toThrow();
     });
   });

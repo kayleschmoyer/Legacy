@@ -90,7 +90,7 @@ let capturedOnBrowseStats: (() => void) | null = null;
 let capturedOnSetLineup: ((summary: Record<string, unknown>) => void) | null =
   null;
 
-type MobileHomeScreenMockProps = {
+type HomeScreenMockProps = {
   onViewSport: (sport: 'baseball' | 'football') => void;
   testID?: string;
   topInset?: number;
@@ -108,11 +108,10 @@ type MobileHomeScreenMockProps = {
 
 // Capture the refreshControl element so pull-to-refresh tests can assert it's
 // wired to the screen's refetch (LS-8847).
-let capturedRefreshControl: MobileHomeScreenMockProps['refreshControl'] | null =
-  null;
+let capturedRefreshControl: HomeScreenMockProps['refreshControl'] | null = null;
 
 jest.mock('@legacy-sports/shared-components', () => ({
-  MobileHomeScreen: ({
+  HomeScreen: ({
     onViewSport,
     testID,
     topInset,
@@ -126,7 +125,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     onBrowseStats,
     onSetLineup,
     refreshControl,
-  }: MobileHomeScreenMockProps) => {
+  }: HomeScreenMockProps) => {
     capturedOnViewSport = onViewSport;
     capturedTopInset = topInset;
     capturedOnShowArchived = onShowArchived ?? null;
@@ -642,7 +641,7 @@ describe('HomeTab pull-to-refresh (LS-8847)', () => {
     mockGetArchivedCached.mockReturnValue({ data: null });
   });
 
-  it('passes MobileHomeScreen a refreshControl wired to the leagues refetch', async () => {
+  it('passes HomeScreen a refreshControl wired to the leagues refetch', async () => {
     render(<HomeTab />);
 
     expect(capturedRefreshControl).toBeTruthy();

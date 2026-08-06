@@ -1,4 +1,4 @@
-# League home: "Scoreboard First" home tab (greeting, ticker, league rail,
+# League home: "Scoreboard First" home tab (greeting, ticker, hero card,
 # quick actions), then the leagues tab list.
 appId: com.legacysports.app
 tags:
@@ -18,20 +18,23 @@ tags:
         id: "home-live-ticker"
     commands:
       - takeScreenshot: maestro/artifacts/baseball-home/02-live-ticker
-# Core navigation (LS-8446, retargeted by LS-8794): the home sport-switcher
-# cards are gone from the returning-user layout — sport switching now lives
-# behind the league rail and the Leagues tab. The rail and the quick-action
-# grid are the static elements of the redesigned home, so assert them loudly:
-# a broken home tab fails the flow instead of emitting a screenshot of a blank
-# dashboard.
+# Core navigation (LS-8446, retargeted by LS-8794, re-retargeted by LS-9055):
+# the home sport-switcher cards are gone from the returning-user layout —
+# sport switching now lives behind the league hero card and the Leagues tab.
+# The narrow layout was folded back into the shared `HomeScreen` (LS-9055) and
+# now renders the same baseball ticket-hero card as web instead of a
+# mobile-only rail (this flow's fixture account is baseball-only, so it never
+# hits the football `home-playboard-hero` variant). The hero card is the
+# static element of the redesigned home, so assert it loudly: a broken home
+# tab fails the flow instead of emitting a screenshot of a blank dashboard.
 - scrollUntilVisible:
     element:
-      id: "home-league-rail"
+      id: "home-hero-card"
     direction: DOWN
     timeout: 15000
 - assertVisible:
-    id: "home-league-rail"
-- takeScreenshot: maestro/artifacts/baseball-home/03-league-rail
+    id: "home-hero-card"
+- takeScreenshot: maestro/artifacts/baseball-home/03-league-hero
 - scrollUntilVisible:
     element:
       id: "home-quick-actions"

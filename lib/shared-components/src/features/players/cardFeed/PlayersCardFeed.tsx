@@ -44,7 +44,7 @@ export interface PlayersCardFeedProps {
   showSportToggle?: boolean;
   /** Top safe-area inset (`useSafeAreaInsets().top`) so the header clears the
    *  status bar — the screen wiring owns reading the inset, per
-   *  shared-components-first (mirrors `MobileHomeScreen`'s `topInset` prop). */
+   *  shared-components-first (mirrors `HomeScreen`'s `topInset` prop). */
   topInset?: number;
   positions: readonly string[];
   position: string;

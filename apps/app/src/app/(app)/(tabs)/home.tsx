@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   formatDisplayName,
   type HomeLeagueSummary,
-  MobileHomeScreen,
+  HomeScreen,
 } from '@legacy-sports/shared-components';
 import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
 import {
@@ -30,11 +30,12 @@ function parseActiveSport(value: string | undefined): ActiveSport | null {
 }
 
 /**
- * The Home tab renders `MobileHomeScreen` from `lib/shared-components` — the
- * compact "Scoreboard First" layout (LS-8794) — wired to mobile's GraphQL data
- * layer and expo-router navigation. `MobileHomeScreen` delegates its loading,
- * error and new-user states back to the shared `HomeScreen`, which still owns
- * the web dashboard unchanged (shared-components-first, LS-7790).
+ * The Home tab renders `HomeScreen` from `lib/shared-components` — wired to
+ * mobile's GraphQL data layer and expo-router navigation. `HomeScreen` picks
+ * the compact "Scoreboard First" returning-user layout (originally LS-8794,
+ * folded back into `HomeScreen` as a `useMedia` breakpoint branch by LS-9055)
+ * at narrow viewport widths; loading, error and new-user states render
+ * identically to web at every width (shared-components-first, LS-7790).
  *
  * Sport switching uses local state rather than router.push so that the baseball
  * and football home screens stay mounted once visited — preserving scroll
@@ -209,7 +210,7 @@ export default function HomeTab() {
       <View
         style={{ display: activeSport !== null ? 'none' : 'flex', flex: 1 }}
       >
-        <MobileHomeScreen
+        <HomeScreen
           userName={userName}
           isLight={resolvedTheme === 'light'}
           topInset={topInset}

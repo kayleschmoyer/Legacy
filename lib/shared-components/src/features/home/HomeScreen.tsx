@@ -1,7 +1,26 @@
 import React, { useMemo, useState } from 'react';
-import { H1, H2, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
-import type { GestureResponderEvent, LayoutChangeEvent } from 'react-native';
-import { ArrowRight, Plus, TrendingUp, Users } from '@tamagui/lucide-icons';
+import {
+  H1,
+  H2,
+  ScrollView,
+  Spinner,
+  Text,
+  useMedia,
+  XStack,
+  YStack,
+} from 'tamagui';
+import type {
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  RefreshControlProps,
+} from 'react-native';
+import {
+  ArrowRight,
+  ChevronRight,
+  Plus,
+  TrendingUp,
+  Users,
+} from '@tamagui/lucide-icons';
 import { formatDraftDate } from '@legacy-sports/utils';
 // Football playboard-hero palette (LS-9035) — theme-invariant physical-object
 // colors, sourced from the sanctioned unscanned palette home so they never
@@ -24,6 +43,7 @@ import {
 import { BODY_FONT, DISPLAY_FONT } from './homeFonts';
 import { GradientSurface } from './GradientSurface';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
+import { useThemeTokens } from '../../hooks/useThemeTokens';
 import {
   AMBER_WARM,
   BG_DARK,
@@ -108,6 +128,26 @@ export interface HomeScreenProps {
   onCreateSalaryCapLeague?: () => void;
   /** Navigate to create an auction draft league. Shown only when isPremium is true. */
   onCreateAuctionLeague?: () => void;
+
+  /* ── Narrow-viewport ("Scoreboard First") returning-user layout ──
+     Folded in from MobileHomeScreen (LS-8794) by LS-9055; unused by the
+     wide-viewport branch. */
+  /** Navigates to the Leagues tab — the narrow layout's "See all ›" control. */
+  onSeeAllLeagues?: () => void;
+  /** Navigates to the You/profile tab — the narrow greeting's avatar. */
+  onOpenProfile?: () => void;
+  /**
+   * Opens the live matchup from the narrow layout's live-matchup ticker.
+   * Falls back to `onViewLeague` when not supplied.
+   */
+  onViewMatchup?: (summary: HomeLeagueSummary) => void;
+  /**
+   * Condensed On This Day node for the narrow layout. Falls back to
+   * `onThisDay`, which is also what the loading/error/new-user states render.
+   */
+  onThisDayCondensed?: React.ReactNode;
+  /** Pull-to-refresh control for the narrow layout's `ScrollView` (LS-8847). */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 /* ─── Sport config ─── */
@@ -2174,6 +2214,394 @@ function PremiumEmptyStateCtas({
   );
 }
 
+/* ─── Narrow-viewport ("Scoreboard First") returning-user layout ───
+   Folded in from MobileHomeScreen (LS-8794) by LS-9055: this was previously
+   a full file-level fork, which let three home-screen PRs (LS-9048 sticky
+   rail/glass league rows/quick actions, LS-9037 football-live flip, LS-9035
+   playboard-hero card) land on the wide-viewport branch above without ever
+   reaching mobile. The narrow branch below now reuses those same pieces
+   (`LeagueHeroCard`/`PlayboardHeroCard`, `LeagueListRow`, `QuickActionPill`,
+   `OnThisDayPanel`) directly instead of maintaining a second, divergence-prone
+   set — only the greeting and the live-matchup ticker stay narrow-specific,
+   since neither has a wide-viewport equivalent. */
+
+/** Page gutter — the design's 16–20px range. */
+const PAGE_PADDING = 18;
+const AVATAR_SIZE = 40;
+/** Live-ticker card corner radius and hairline border. */
+const TICKER_RADIUS = 16;
+const TICKER_BORDER = 1;
+/**
+ * Radius of the ticker's *inner* top corners — the gradient header sits inside
+ * the card's 1px border, so it needs a slightly tighter radius to sit flush.
+ */
+const TICKER_HEADER_RADIUS = TICKER_RADIUS - TICKER_BORDER;
+
+/**
+ * Top padding for the scroll content: the page gutter plus the full top
+ * safe-area inset, so the greeting always clears the status bar (LS-8808
+ * defect 3, a mobile-fork regression of LS-8625).
+ *
+ * Applied to the scroll *content* rather than to the `ScrollView`'s own style:
+ * padding set on a Tamagui/RN `ScrollView` pads the scroll container, which
+ * does not reliably inset the content on Android. Non-finite or negative
+ * insets are ignored so a missing safe-area provider degrades to the gutter
+ * rather than collapsing or inflating the layout.
+ */
+export function homeContentTopPadding(topInset: number): number {
+  return (
+    PAGE_PADDING + (Number.isFinite(topInset) && topInset > 0 ? topInset : 0)
+  );
+}
+
+function Eyebrow({
+  children,
+  color = '$textMuted',
+  testID,
+}: {
+  children: React.ReactNode;
+  color?: string;
+  testID?: string;
+}) {
+  return (
+    <Text
+      testID={testID}
+      fontFamily={DISPLAY_FONT}
+      fontWeight="700"
+      fontSize={11}
+      letterSpacing={1.6}
+      textTransform="uppercase"
+      color={color}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** "See all ›" style affordance. */
+function LinkAction({
+  label,
+  onPress,
+  testID,
+}: {
+  label: string;
+  onPress?: () => void;
+  testID?: string;
+}) {
+  if (!onPress) return null;
+  return (
+    <XStack
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      alignItems="center"
+      gap="$1"
+      cursor="pointer"
+      hitSlop={8}
+      pressStyle={{ opacity: 0.7 }}
+    >
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="700"
+        fontSize={12}
+        letterSpacing={1.1}
+        textTransform="uppercase"
+        color="$textMuted"
+      >
+        {label}
+      </Text>
+      <ChevronRight size={14} color="$textMuted" />
+    </XStack>
+  );
+}
+
+/** Compact uppercase pill button used by the live matchup ticker. */
+function TickerButton({
+  label,
+  onPress,
+  variant,
+  testID,
+}: {
+  label: string;
+  onPress?: () => void;
+  variant: 'gold' | 'outline';
+  testID?: string;
+}) {
+  const isGold = variant === 'gold';
+  return (
+    <XStack
+      testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      flex={1}
+      alignItems="center"
+      justifyContent="center"
+      paddingVertical={9}
+      borderRadius={10}
+      borderWidth={1}
+      backgroundColor={isGold ? '$brandGold' : 'transparent'}
+      borderColor={isGold ? '$brandGold' : '$outlineStrong'}
+      cursor="pointer"
+      pressStyle={{ opacity: 0.8 }}
+    >
+      <Text
+        fontFamily={DISPLAY_FONT}
+        fontWeight="700"
+        fontSize={12}
+        letterSpacing={1.1}
+        textTransform="uppercase"
+        color={isGold ? '$textOnGold' : '$color'}
+      >
+        {label}
+      </Text>
+    </XStack>
+  );
+}
+
+/** Compact greeting + profile avatar, used in place of `GreetingHeader` on
+ *  narrow viewports. */
+function GreetingRow({
+  userName,
+  onOpenProfile,
+}: {
+  userName: string;
+  onOpenProfile?: () => void;
+}) {
+  const { brand } = useThemeTokens();
+  const initial = userName.trim().charAt(0).toUpperCase() || 'M';
+
+  return (
+    <XStack testID="home-greeting" alignItems="center" gap="$3">
+      <YStack flex={1} gap="$1" minWidth={0}>
+        <Eyebrow color="$brandGoldLight">Welcome back</Eyebrow>
+        <Text
+          testID="home-greeting-name"
+          fontFamily={DISPLAY_FONT}
+          fontWeight="900"
+          fontSize={24}
+          lineHeight={27}
+          color="$color"
+          numberOfLines={1}
+        >
+          {userName}
+        </Text>
+      </YStack>
+      <GradientSurface
+        testID="home-profile-avatar"
+        accessibilityRole="button"
+        accessibilityLabel="Open your profile"
+        onPress={onOpenProfile}
+        colors={[brand.navy, brand.gold]}
+        angle={135}
+        width={AVATAR_SIZE}
+        height={AVATAR_SIZE}
+        borderRadius={9999}
+        overflow="hidden"
+        alignItems="center"
+        justifyContent="center"
+        cursor="pointer"
+        pressStyle={{ opacity: 0.85 }}
+      >
+        <Text
+          fontFamily={DISPLAY_FONT}
+          fontWeight="800"
+          fontSize={16}
+          color="$textOnAccent"
+        >
+          {initial}
+        </Text>
+      </GradientSurface>
+    </XStack>
+  );
+}
+
+/** Compact "at a glance" banner for a live matchup — narrow-viewport only;
+ *  the wide layout surfaces live-matchup state through the hero card
+ *  instead. Header gradient flips baseball/football (LS-9037 pattern),
+ *  mirroring the sport branch `HomeScreen` already applies to the hero card. */
+function LiveMatchupTicker({
+  summary,
+  onSetLineup,
+  onViewMatchup,
+}: {
+  summary: HomeLeagueSummary;
+  onSetLineup?: () => void;
+  onViewMatchup?: () => void;
+}) {
+  const { brand } = useThemeTokens();
+  const isFootball = summary.sport === 'football';
+
+  const userScore = safeScore(summary.userScore);
+  const oppScore = safeScore(summary.opponentScore);
+  // Leader-gold logic mirrors HeroRightPanel: ties read as the user leading.
+  const isLeading = userScore >= oppScore;
+
+  const closes = formatMatchupCloses(summary.matchupEndTime);
+  const week = summary.currentWeekNumber;
+  const totalWeeks = summary.totalMatchups;
+  const progress =
+    week != null && totalWeeks != null && totalWeeks > 0
+      ? Math.min(1, Math.max(0, week / totalWeeks))
+      : 0;
+
+  return (
+    <YStack
+      testID="home-live-ticker"
+      borderRadius={TICKER_RADIUS}
+      borderWidth={TICKER_BORDER}
+      borderColor="$surfacePanelBorder"
+      backgroundColor="$surfacePanel"
+      overflow="hidden"
+    >
+      {/* The header rounds its own top corners rather than relying on the
+          card's `overflow: 'hidden'` — Android does not reliably clip a
+          non-background child to its parent's border radius (LS-8808). */}
+      <GradientSurface
+        testID="home-live-ticker-header"
+        colors={
+          isFootball ? [GREEN_DEEP, GREEN] : [brand.seamRed, brand.seamRedDark]
+        }
+        angle={90}
+        flexDirection="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap="$2"
+        paddingVertical={8}
+        paddingHorizontal={14}
+        borderTopLeftRadius={TICKER_HEADER_RADIUS}
+        borderTopRightRadius={TICKER_HEADER_RADIUS}
+      >
+        <XStack alignItems="center" gap="$2">
+          <YStack
+            testID="home-live-dot"
+            width={7}
+            height={7}
+            borderRadius={9999}
+            backgroundColor="$statusSuccessFg"
+          />
+          <Text
+            fontFamily={DISPLAY_FONT}
+            fontWeight="700"
+            fontSize={11}
+            letterSpacing={1.4}
+            textTransform="uppercase"
+            color="$textOnAccent"
+            fontVariant={['tabular-nums']}
+          >
+            {week != null ? `Live · Week ${week}` : 'Live'}
+          </Text>
+        </XStack>
+        {closes ? (
+          <Text
+            fontFamily={BODY_FONT}
+            fontSize={11}
+            color="$textOnAccent"
+            fontVariant={['tabular-nums']}
+            numberOfLines={1}
+          >
+            {`Closes ${closes}`}
+          </Text>
+        ) : null}
+      </GradientSurface>
+
+      <YStack padding={14} gap="$3">
+        <XStack alignItems="center" justifyContent="space-between" gap="$3">
+          <YStack flex={1} gap="$1" minWidth={0}>
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="700"
+              fontSize={11}
+              letterSpacing={1.1}
+              textTransform="uppercase"
+              color="$textMuted"
+              numberOfLines={1}
+            >
+              My Team
+            </Text>
+            <Text
+              testID="home-ticker-user-score"
+              fontFamily={DISPLAY_FONT}
+              fontWeight="800"
+              fontSize={30}
+              lineHeight={32}
+              color={isLeading ? '$brandGoldLight' : '$color'}
+              fontVariant={['tabular-nums']}
+            >
+              {userScore.toFixed(1)}
+            </Text>
+          </YStack>
+          <Text
+            fontFamily={DISPLAY_FONT}
+            fontWeight="800"
+            fontSize={12}
+            letterSpacing={2.5}
+            color="$textMuted"
+          >
+            VS
+          </Text>
+          <YStack flex={1} gap="$1" minWidth={0} alignItems="flex-end">
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="700"
+              fontSize={11}
+              letterSpacing={1.1}
+              textTransform="uppercase"
+              color="$textMuted"
+              numberOfLines={1}
+            >
+              {summary.opponentTeamName ?? 'Opponent'}
+            </Text>
+            <Text
+              testID="home-ticker-opponent-score"
+              fontFamily={DISPLAY_FONT}
+              fontWeight="800"
+              fontSize={30}
+              lineHeight={32}
+              color={!isLeading ? '$brandGoldLight' : '$color'}
+              fontVariant={['tabular-nums']}
+            >
+              {oppScore.toFixed(1)}
+            </Text>
+          </YStack>
+        </XStack>
+
+        <YStack
+          testID="home-ticker-progress"
+          height={4}
+          borderRadius={9999}
+          backgroundColor="$surfaceInteractive"
+          overflow="hidden"
+        >
+          <GradientSurface
+            colors={[brand.gold, brand.goldLight]}
+            angle={90}
+            width={`${progress * 100}%`}
+            height={4}
+            borderRadius={9999}
+          />
+        </YStack>
+
+        <XStack gap="$2">
+          <TickerButton
+            label="Set Lineup"
+            variant="gold"
+            onPress={onSetLineup}
+            testID="home-ticker-set-lineup"
+          />
+          <TickerButton
+            label="Matchup"
+            variant="outline"
+            onPress={onViewMatchup}
+            testID="home-ticker-matchup"
+          />
+        </XStack>
+      </YStack>
+    </YStack>
+  );
+}
+
 /* ─── HomeScreen ─── */
 
 /**
@@ -2214,10 +2642,25 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     onHowItWorks,
     onCreateSalaryCapLeague,
     onCreateAuctionLeague,
+    onSeeAllLeagues,
+    onOpenProfile,
+    onViewMatchup,
+    onThisDayCondensed,
+    refreshControl,
   } = props;
 
   const sortedSummaries = useMemo(() => sortByUrgency(leagues), [leagues]);
   const hasLeagues = sortedSummaries.length > 0;
+  // Narrow-viewport gate for the "Scoreboard First" returning-user layout
+  // (folded in from MobileHomeScreen by LS-9055) — never the platform. Reads
+  // the `$sm` (≤640px) breakpoint explicitly, rather than `!gtSm`, so the
+  // Tamagui jest mock's base tier (every breakpoint false/undefined) resolves
+  // to the wide branch by default, matching the "base = desktop" convention
+  // the rest of this codebase's tests rely on. Bind `useMedia` through an
+  // explicit signature so the call/result stay type-safe under this
+  // project's typed ESLint rules (same pattern as `LeagueDetailShell.tsx`).
+  const readMedia = useMedia as () => { sm?: boolean };
+  const isNarrow = Boolean(readMedia().sm);
 
   const orderedSports = useMemo(
     () =>
@@ -2328,6 +2771,135 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   if (hasLeagues) {
     const heroLeague = sortedSummaries[0];
     const secondaryLeagues = sortedSummaries.slice(1);
+
+    /* ── Narrow-viewport ("Scoreboard First") branch (LS-8794, folded in by
+       LS-9055) — greeting + live-matchup ticker + the same hero
+       card/league-list/quick-actions/On-This-Day pieces the wide branch
+       below uses, so the two branches can never re-diverge in styling. */
+    if (isNarrow) {
+      const liveMatchup =
+        sortedSummaries.find((s) => s.matchupStatus === 'in_progress') ?? null;
+      const onThisDayNode = onThisDayCondensed ?? onThisDay;
+
+      return (
+        <ScrollView
+          testID="home-screen"
+          backgroundColor="$background"
+          refreshControl={refreshControl}
+        >
+          <YStack
+            testID="home-content"
+            width="100%"
+            paddingTop={homeContentTopPadding(topInset)}
+            paddingHorizontal={PAGE_PADDING}
+            paddingBottom={PAGE_PADDING}
+            gap="$5"
+          >
+            <GreetingRow userName={userName} onOpenProfile={onOpenProfile} />
+
+            {liveMatchup ? (
+              <LiveMatchupTicker
+                summary={liveMatchup}
+                onSetLineup={
+                  onSetLineup ? () => onSetLineup(liveMatchup) : undefined
+                }
+                onViewMatchup={() =>
+                  onViewMatchup
+                    ? onViewMatchup(liveMatchup)
+                    : onViewLeague(liveMatchup)
+                }
+              />
+            ) : null}
+
+            <YStack gap="$5">
+              <XStack alignItems="center" justifyContent="space-between">
+                <SectionHead eyebrow="Active Season" title="Your Leagues" />
+                <LinkAction
+                  label="See all"
+                  onPress={onSeeAllLeagues}
+                  testID="home-see-all-leagues"
+                />
+              </XStack>
+              {heroLeague.sport === 'football' ? (
+                <PlayboardHeroCard
+                  summary={heroLeague}
+                  onPress={() => onViewLeague(heroLeague)}
+                  onSetLineup={
+                    onSetLineup ? () => onSetLineup(heroLeague) : undefined
+                  }
+                />
+              ) : (
+                <LeagueHeroCard
+                  summary={heroLeague}
+                  onPress={() => onViewLeague(heroLeague)}
+                  onSetLineup={
+                    onSetLineup ? () => onSetLineup(heroLeague) : undefined
+                  }
+                />
+              )}
+              {secondaryLeagues.length > 0 ? (
+                <YStack gap={10}>
+                  {secondaryLeagues.map((s) => (
+                    <LeagueListRow
+                      key={s.leagueId}
+                      summary={s}
+                      onPress={() => onViewLeague(s)}
+                      onMockDraft={
+                        onMockDraft ? () => onMockDraft(s) : undefined
+                      }
+                    />
+                  ))}
+                </YStack>
+              ) : null}
+
+              <XStack testID="home-quick-actions" flexWrap="wrap" gap={10}>
+                <QuickActionPill
+                  testID="home-quick-create-league"
+                  icon={<Plus size={15} color={BRAND_GOLD_LIGHT} />}
+                  label="Create League"
+                  gold
+                  onPress={onCreateLeague}
+                />
+                <QuickActionPill
+                  testID="home-quick-join-league"
+                  icon={<Users size={15} color="$color" />}
+                  label="Join League"
+                  onPress={onJoinLeague}
+                />
+                {onStartMockDraft ? (
+                  <QuickActionPill
+                    testID="home-quick-mock-draft"
+                    icon={
+                      <BrandIcon
+                        name="draft"
+                        size={15}
+                        decorative={false}
+                        title="Mock draft"
+                      />
+                    }
+                    label="Mock Draft"
+                    disabled={mockDraftAtCap}
+                    onPress={onStartMockDraft}
+                  />
+                ) : null}
+                <QuickActionPill
+                  testID="home-quick-browse-stats"
+                  icon={<TrendingUp size={15} color="$color" />}
+                  label="Browse Stats"
+                  onPress={onBrowseStats}
+                />
+              </XStack>
+            </YStack>
+
+            {onThisDayNode ? (
+              <YStack testID="home-on-this-day" gap="$3">
+                <OnThisDayPanel>{onThisDayNode}</OnThisDayPanel>
+              </YStack>
+            ) : null}
+          </YStack>
+        </ScrollView>
+      );
+    }
 
     return (
       <ScrollView
