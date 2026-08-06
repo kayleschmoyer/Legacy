@@ -18,6 +18,7 @@
  */
 
 import { expect, test } from '../fixtures/pages';
+import { tierEntitlementsResponse } from '../fixtures/shared-mocks';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
 // ── Mock Data ──────────────────────────────────────────────────────────────────
@@ -204,6 +205,11 @@ async function setupMocks(
 ): Promise<void> {
   await createGraphQLRouter(page, {
     getuserbyid: (route) => fulfillJson(route, USER_BY_ID_PREMIUM),
+    // The modal gate reads `useHasEntitlement` → `MyEntitlements` (LS-8645),
+    // not `GetUserById.subscriptionTier` — mock it alongside the user record
+    // so the entitlement pair stays consistent and resolves immediately.
+    myentitlements: (route) =>
+      fulfillJson(route, tierEntitlementsResponse('premium')),
     getcareerbattingstats: (route) =>
       fulfillJson(route, BATTING_STATS_RESPONSE),
     getcareerpitchingstatscount: (route) =>
@@ -298,6 +304,12 @@ test.describe('Player Stats — Modal Premium Gate (LS-5595) @regression', () =>
   }) => {
     await createGraphQLRouter(page, {
       getuserbyid: (route) => fulfillJson(route, USER_BY_ID_FREE),
+      // LS-9068: without this, `MyEntitlements` (which the modal gate reads
+      // via `useHasEntitlement` since LS-8645) cascaded to the _apiIsolation
+      // baseline — which serves the PREMIUM catalog — so the "free" user was
+      // fully entitled and the modal mounted.
+      myentitlements: (route) =>
+        fulfillJson(route, tierEntitlementsResponse('free')),
       getcareerbattingstats: (route) =>
         fulfillJson(route, BATTING_STATS_RESPONSE),
       getcareerpitchingstatscount: (route) =>
@@ -310,14 +322,31 @@ test.describe('Player Stats — Modal Premium Gate (LS-5595) @regression', () =>
       careerarcquery: (route) => fulfillJson(route, BONDS_CAREER_ARC),
     });
 
+    // Register BEFORE goto so the response can't be missed. The gate only
+    // reaches its settled state once `MyEntitlements` resolves — asserting
+    // before that would pass spuriously while the entitlement set is still
+    // loading (the modal only mounts after resolution), masking a gate
+    // bypass as a flake (LS-9068).
+    const entitlementsResolved = page.waitForResponse(
+      (resp) =>
+        resp.url().includes('/graphql') &&
+        (resp.request().postData() ?? '').includes('MyEntitlements'),
+    );
+
     // Navigate directly with ?playerId=101 — exercises the premium gate
     // without relying on a row click to set the URL param.
     await page.goto('/players/stats?playerId=101');
     await page.waitForLoadState('load');
     await playersPage.stats.expectLoaded();
+    await entitlementsResolved;
 
-    // The modal should not mount for a free-tier user even when the URL
-    // contains ?playerId, because isPremium is false.
+    // With the entitlement set settled as free, the premium-gate overlay
+    // must be up (it renders from the same `useHasEntitlement` state that
+    // gates the modal)…
+    await expect(page.getByTestId('premium-feature-gate')).toBeVisible();
+
+    // …and the modal must not mount even though the URL carries ?playerId,
+    // because the entitlement gate is false.
     await playersPage.detail.expectClosed();
   });
 });
