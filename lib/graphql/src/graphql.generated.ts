@@ -2344,6 +2344,7 @@ export type MutationInitializeMockDraftArgs = {
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   rosterSize: Scalars['Int']['input'];
+  sport?: InputMaybe<Scalars['String']['input']>;
   userPickPosition: Scalars['Int']['input'];
 };
 
@@ -11956,6 +11957,7 @@ export type InitializeMockDraftMutationVariables = Exact<{
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 export type InitializeMockDraftMutation = {
@@ -30524,6 +30526,7 @@ export const InitializeMockDraft = gql`
     $pickTimeLimitSeconds: Int
     $draftOrder: String
     $playerPool: String
+    $sport: String
   ) {
     initializeMockDraft(
       numTeams: $numTeams
@@ -30532,6 +30535,7 @@ export const InitializeMockDraft = gql`
       pickTimeLimitSeconds: $pickTimeLimitSeconds
       draftOrder: $draftOrder
       playerPool: $playerPool
+      sport: $sport
     ) {
       leagueId
       draftId
@@ -30562,6 +30566,7 @@ export type InitializeMockDraftMutationFn = MutationFunction<
  *      pickTimeLimitSeconds: // value for 'pickTimeLimitSeconds'
  *      draftOrder: // value for 'draftOrder'
  *      playerPool: // value for 'playerPool'
+ *      sport: // value for 'sport'
  *   },
  * });
  */

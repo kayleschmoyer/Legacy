@@ -168,6 +168,7 @@ describe('MockDraftPage', () => {
             pickTimeLimitSeconds: 90,
             draftOrder: 'snake',
             playerPool: 'all',
+            sport: 'baseball',
           },
         });
       });

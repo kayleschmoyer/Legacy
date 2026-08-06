@@ -1,9 +1,10 @@
 /**
- * Unit tests for filterPlayerIdsByLeagueEligibility (LS-4835 / LS-4896).
+ * Unit tests for filterPlayerIdsByLeagueEligibility (LS-4835 / LS-4896 / LS-9040).
  *
- * Covers the football early-return path: football leagues must skip all
- * baseball-specific filters (playerPool, career games/seasons, HoF, era) and
- * return every candidate as eligible.
+ * Covers the football path: football leagues always skip the baseball-only
+ * filters (career games/seasons, HoF, era). The playerPool filter DOES apply
+ * to football via a real nfl_teams.conference join for 'afc'/'nfc' pools
+ * (LS-9040) — 'all'/'nfl' impose no restriction and skip the DB entirely.
  *
  * Also verifies the baseball path still applies filters when sport is
  * 'baseball' (or omitted for backwards-compatibility).
@@ -73,8 +74,8 @@ describe('filterPlayerIdsByLeagueEligibility', () => {
       expect(result.excludedByEraFilter).toBe(0);
     });
 
-    it('returns all IDs for afc/nfc pools without hitting the DB', async () => {
-      const db = makeNeverCalledDb();
+    it('applies a real conference filter for afc/nfc pools (LS-9040)', async () => {
+      const db = makeAlwaysEmptyDb();
 
       const result = await filterPlayerIdsByLeagueEligibility(db, PLAYER_IDS, {
         playerPool: 'afc',
@@ -83,7 +84,23 @@ describe('filterPlayerIdsByLeagueEligibility', () => {
         sport: 'football',
       });
 
+      // Empty DB (no matching nfl_teams.conference join rows) → all excluded
+      expect(result.eligibleIds.size).toBe(0);
+      expect(result.excludedByPool).toBe(PLAYER_IDS.length);
+    });
+
+    it('skips the conference filter (no DB call) for the "nfl" pool', async () => {
+      const db = makeNeverCalledDb();
+
+      const result = await filterPlayerIdsByLeagueEligibility(db, PLAYER_IDS, {
+        playerPool: 'nfl',
+        minCareerGames: 10,
+        minCareerSeasons: 1,
+        sport: 'football',
+      });
+
       expect(result.eligibleIds).toEqual(new Set(PLAYER_IDS));
+      expect(result.excludedByPool).toBe(0);
     });
 
     it('returns an empty eligible set when player list is empty', async () => {
@@ -202,7 +219,7 @@ describe('resolveEraRange', () => {
 });
 
 describe('buildEligibilityConditions', () => {
-  it('returns no predicates for football leagues', () => {
+  it('returns no predicates for football leagues with the "nfl" pool', () => {
     expect(
       buildEligibilityConditions({
         playerPool: 'nfl',
@@ -213,6 +230,26 @@ describe('buildEligibilityConditions', () => {
         sport: 'football',
       }),
     ).toEqual([]);
+  });
+
+  it('returns a single conference-pool predicate for football afc/nfc pools (LS-9040)', () => {
+    const afcConditions = buildEligibilityConditions({
+      playerPool: 'afc',
+      minCareerGames: 0,
+      minCareerSeasons: 0,
+      sport: 'football',
+    });
+    expect(afcConditions).toHaveLength(1);
+    expect(afcConditions[0].key).toBe('pool');
+
+    const nfcConditions = buildEligibilityConditions({
+      playerPool: 'nfc',
+      minCareerGames: 0,
+      minCareerSeasons: 0,
+      sport: 'football',
+    });
+    expect(nfcConditions).toHaveLength(1);
+    expect(nfcConditions[0].key).toBe('pool');
   });
 
   it('returns no predicates when the league imposes no restrictions', () => {

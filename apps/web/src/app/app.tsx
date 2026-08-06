@@ -678,6 +678,14 @@ function App() {
                 </FootballGate>
               }
             />
+            <Route
+              path="/football/league/:id/draft"
+              element={
+                <FootballGate>
+                  <EliteDraftBoardScreen />
+                </FootballGate>
+              }
+            />
             <Route path="/baseball" element={<BaseballScreen />} />
             <Route
               path="/baseball/league/:id/draft"

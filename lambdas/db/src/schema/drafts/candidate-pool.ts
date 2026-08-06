@@ -52,6 +52,13 @@ interface LeagueSettings {
   pitcherStartsPerMatchup: number;
 }
 
+/** Sport discriminator used to branch every football-aware query below. */
+type CandidatePoolSport = 'baseball' | 'football';
+
+function isCandidatePoolSport(sport: string): sport is CandidatePoolSport {
+  return sport === 'baseball' || sport === 'football';
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────────
 
 /**
@@ -112,6 +119,17 @@ export async function fetchCandidatePool(
     return null;
   }
 
+  // Guard the sport discriminator once, up front — every downstream query
+  // below narrows on `league.sport === 'football'` and silently falls back to
+  // the baseball branch for anything else, which would fetch the wrong
+  // candidate pool rather than fail loudly (LS-9040 review).
+  const rawSport: string = league.sport;
+  if (!isCandidatePoolSport(rawSport)) {
+    throw new Error(
+      `League ${draftLeagueId} has an unexpected sport value: ${rawSport}`,
+    );
+  }
+
   const settings: LeagueSettings = {
     gamesPerMatchup: league.gamesPerMatchup ?? 5,
     pitcherStartsPerMatchup: league.pitcherStartsPerMatchup ?? 1,
@@ -133,6 +151,7 @@ export async function fetchCandidatePool(
     db,
     eligibleIds,
     settings,
+    league.sport,
   );
 
   // 3. Pre-compute bench versatility
@@ -166,14 +185,34 @@ async function fetchUndraftedCandidates(
 ): Promise<number[]> {
   const { gamesPerMatchup, pitcherStartsPerMatchup } = settings;
 
-  // Rank undrafted candidates by projected FPG from player_scoring_cache
+  // Football has no per-game scoring cache yet (real stat-based scoring is a
+  // separate follow-up outside epic LS-4568 — see strategies/football.ts):
+  // rank by the projections/ADP pipeline's `players.projected_fantasy_points`
+  // instead. Baseball ranks by projected FPG from player_scoring_cache
   // (default/NULL league row). The cache stores per-game scoring components
   // (batting_ppg/pitching_ppg/fielding_ppg) precomputed from the default
   // scoring profile and refreshed by stats-lambda after each career stat
   // update, so this avoids the 11-term CASE-WHEN over career_batting /
   // career_pitching / career_fielding at query time (LS-4689).
-  const undraftedRows = await db.execute(
-    sql`SELECT p.id,
+  const undraftedRows =
+    league.sport === 'football'
+      ? await db.execute(
+          sql`SELECT p.id, COALESCE(p.projected_fantasy_points, 0) AS fpg
+      FROM players p
+      WHERE NOT EXISTS (
+        SELECT 1 FROM draft_picks dp
+        WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM team_members tm
+        WHERE tm.league_id = ${league.id} AND tm.player_id = p.id
+      )
+      AND p.sport = ${league.sport}
+      ORDER BY fpg DESC
+      LIMIT 1000`,
+        )
+      : await db.execute(
+          sql`SELECT p.id,
         (
           COALESCE(cs.batting_ppg, 0)  * ${gamesPerMatchup} +
           COALESCE(cs.pitching_ppg, 0) * ${pitcherStartsPerMatchup} +
@@ -197,7 +236,7 @@ async function fetchUndraftedCandidates(
       AND p.sport = ${league.sport}
       ORDER BY fpg DESC
       LIMIT 1000`,
-  );
+        );
   const undraftedIds = undraftedRows.rows.map((r) => r.id as number);
 
   // Apply eligibility filters (playerPool, minCareerGames, etc.)
@@ -228,15 +267,27 @@ async function computePlayerDraftInfo(
   db: PublicDb,
   eligibleIds: number[],
   settings: LeagueSettings,
+  sport: 'baseball' | 'football',
 ): Promise<{
   playerDraftInfo: Map<number, PlayerDraftInfo>;
   rankedEligibleIds: number[];
 }> {
   const { gamesPerMatchup, pitcherStartsPerMatchup } = settings;
 
-  // Projected FPG from player_scoring_cache
-  const statsRows = await db.execute(
-    sql`SELECT
+  // Projected FPG — football reads the projections/ADP pipeline's
+  // `players.projected_fantasy_points` (no per-game scoring cache exists for
+  // football yet); baseball reads player_scoring_cache as before.
+  const statsRows =
+    sport === 'football'
+      ? await db.execute(
+          sql`SELECT p.id AS player_id, COALESCE(p.projected_fantasy_points, 0) AS projected_fpg
+    FROM players p
+    WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
+    ORDER BY projected_fpg DESC
+    LIMIT 1000`,
+        )
+      : await db.execute(
+          sql`SELECT
       p.id AS player_id,
       (
         COALESCE(cs.batting_ppg, 0)  * ${gamesPerMatchup} +
@@ -249,16 +300,33 @@ async function computePlayerDraftInfo(
     WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
     ORDER BY projected_fpg DESC
     LIMIT 1000`,
-  );
+        );
 
-  // Position eligibility from the mat view
-  const positionRows = await db
-    .select({
-      playerId: PublicSchema.playerEligiblePositions.playerId,
-      position: PublicSchema.playerEligiblePositions.position,
-    })
-    .from(PublicSchema.playerEligiblePositions)
-    .where(inArray(PublicSchema.playerEligiblePositions.playerId, eligibleIds));
+  // Position eligibility — football reads the football_player_eligible_positions
+  // view (LS-9040); baseball reads the player_eligible_positions mat view.
+  const positionRows =
+    sport === 'football'
+      ? await db
+          .select({
+            playerId: PublicSchema.footballPlayerEligiblePositions.playerId,
+            position: PublicSchema.footballPlayerEligiblePositions.position,
+          })
+          .from(PublicSchema.footballPlayerEligiblePositions)
+          .where(
+            inArray(
+              PublicSchema.footballPlayerEligiblePositions.playerId,
+              eligibleIds,
+            ),
+          )
+      : await db
+          .select({
+            playerId: PublicSchema.playerEligiblePositions.playerId,
+            position: PublicSchema.playerEligiblePositions.position,
+          })
+          .from(PublicSchema.playerEligiblePositions)
+          .where(
+            inArray(PublicSchema.playerEligiblePositions.playerId, eligibleIds),
+          );
 
   const eligiblePositionsByPlayer = new Map<number, string[]>();
   for (const row of positionRows) {

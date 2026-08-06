@@ -416,6 +416,7 @@ mutation InitializeMockDraft(
   $pickTimeLimitSeconds: Int
   $draftOrder: String
   $playerPool: String
+  $sport: String
 ) {
   initializeMockDraft(
     numTeams: $numTeams
@@ -424,6 +425,7 @@ mutation InitializeMockDraft(
     pickTimeLimitSeconds: $pickTimeLimitSeconds
     draftOrder: $draftOrder
     playerPool: $playerPool
+    sport: $sport
   ) {
     leagueId
     draftId

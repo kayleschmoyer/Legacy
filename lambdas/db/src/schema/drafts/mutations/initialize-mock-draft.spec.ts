@@ -179,6 +179,34 @@ describe('initializeMockDraft input validation', () => {
       resolve({}, { ...VALID_ARGS, pickTimeLimitSeconds: 301 }, ctx, undefined),
     ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
   });
+
+  it('throws BAD_USER_INPUT when sport is neither baseball nor football', async () => {
+    await expect(
+      resolve({}, { ...VALID_ARGS, sport: 'hockey' }, ctx, undefined),
+    ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+  });
+
+  it('throws BAD_USER_INPUT when sport=football with a baseball-only playerPool', async () => {
+    await expect(
+      resolve(
+        {},
+        { ...VALID_ARGS, sport: 'football', playerPool: 'nl' },
+        ctx,
+        undefined,
+      ),
+    ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+  });
+
+  it('throws BAD_USER_INPUT when sport=baseball with a football-only playerPool', async () => {
+    await expect(
+      resolve(
+        {},
+        { ...VALID_ARGS, sport: 'baseball', playerPool: 'afc' },
+        ctx,
+        undefined,
+      ),
+    ).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+  });
 });
 
 describe('initializeMockDraft transaction behavior', () => {
@@ -277,6 +305,43 @@ describe('initializeMockDraft transaction behavior', () => {
       leagueId: 1,
       draftId: 100,
       webSocketReady: true,
+    });
+  });
+
+  it('persists sport="football" on the league insert for a football mock draft (LS-9040 AC1)', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }]) // league
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }]) // teams
+      .mockResolvedValueOnce([{ id: 100 }]); // draft
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    const result = await resolve(
+      {},
+      { ...VALID_ARGS, sport: 'football', playerPool: 'afc' },
+      { user: { id: 1 }, db },
+      undefined,
+    );
+
+    expect(result).toMatchObject({ leagueId: 1, draftId: 100 });
+    // First insert().values() call is the league insert (leagueValues).
+    expect(chain.values.mock.calls[0][0]).toMatchObject({
+      sport: 'football',
+      playerPool: 'afc',
     });
   });
 

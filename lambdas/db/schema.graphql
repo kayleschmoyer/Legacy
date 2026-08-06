@@ -2476,6 +2476,11 @@ type Mutation {
     rosterSize: Int!
 
     """
+    Sport for the mock draft league: "baseball" (default) or "football" (LS-9040).
+    """
+    sport: String
+
+    """
     The 1-based draft slot the human user will draft from
     """
     userPickPosition: Int!

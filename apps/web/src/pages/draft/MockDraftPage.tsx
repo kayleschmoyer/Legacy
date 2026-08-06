@@ -395,8 +395,6 @@ export function MockDraftPage(): React.JSX.Element {
     orderParam === 'linear' || orderParam === 'snake' ? orderParam : undefined;
 
   const handleStart = async (s: MockDraftSettings) => {
-    // Football mock draft is preview-only until the sport-aware engine ships.
-    if (s.sport === 'football') return;
     setMissingLeagueIdError(null);
     const result = await initializeMockDraft({
       variables: {
@@ -406,11 +404,12 @@ export function MockDraftPage(): React.JSX.Element {
         pickTimeLimitSeconds: 90,
         draftOrder: s.draftOrder,
         playerPool: s.playerPool,
+        sport: s.sport,
       },
     });
     const leagueId = result.data?.initializeMockDraft?.leagueId;
     if (leagueId) {
-      navigate(`/baseball/league/${leagueId}/draft`);
+      navigate(`/${s.sport}/league/${leagueId}/draft`);
     } else {
       setMissingLeagueIdError("Couldn't start mock draft — please try again.");
     }

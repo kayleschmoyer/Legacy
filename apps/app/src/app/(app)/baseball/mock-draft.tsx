@@ -184,10 +184,6 @@ export function MockDraftPage(): React.JSX.Element {
       : undefined;
 
   const handleStart = async (settings: MockDraftSettings) => {
-    // Football mock draft is preview-only until the sport-aware engine ships
-    // (LS-4657 → LS-4665); the shared form keeps Start disabled, but guard here
-    // too so the mutation is never fired for football.
-    if (settings.sport === 'football') return;
     setMissingLeagueIdError(null);
     const result = await initializeMockDraft({
       variables: {
@@ -197,6 +193,7 @@ export function MockDraftPage(): React.JSX.Element {
         pickTimeLimitSeconds: PICK_TIME_LIMIT_SECONDS,
         draftOrder: settings.draftOrder,
         playerPool: settings.playerPool,
+        sport: settings.sport,
       },
     });
     const leagueId = result.data?.initializeMockDraft?.leagueId;

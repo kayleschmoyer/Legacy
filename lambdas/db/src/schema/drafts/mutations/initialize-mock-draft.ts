@@ -36,9 +36,13 @@ import {
 
 const VALID_DRAFT_ORDERS = ['snake', 'linear'] as const;
 const VALID_PLAYER_POOLS = ['all', 'nl', 'al', 'nfl', 'afc', 'nfc'] as const;
+const VALID_SPORTS = ['baseball', 'football'] as const;
+const BASEBALL_ONLY_POOLS = ['nl', 'al'] as const;
+const FOOTBALL_ONLY_POOLS = ['nfl', 'afc', 'nfc'] as const;
 
 type DraftOrder = (typeof VALID_DRAFT_ORDERS)[number];
 type PlayerPool = (typeof VALID_PLAYER_POOLS)[number];
+type MockDraftSport = (typeof VALID_SPORTS)[number];
 
 function isValidDraftOrder(v: string): v is DraftOrder {
   return (VALID_DRAFT_ORDERS as readonly string[]).includes(v);
@@ -46,6 +50,10 @@ function isValidDraftOrder(v: string): v is DraftOrder {
 
 function isValidPlayerPool(v: string): v is PlayerPool {
   return (VALID_PLAYER_POOLS as readonly string[]).includes(v);
+}
+
+function isValidSport(v: string): v is MockDraftSport {
+  return (VALID_SPORTS as readonly string[]).includes(v);
 }
 
 // ── Response type ────────────────────────────────────────────────────────────
@@ -121,6 +129,11 @@ builder.mutationField('initializeMockDraft', (t) =>
         description:
           'Player pool to draft from. Baseball: "all" (default), "nl" (NL only), "al" (AL only). Football: "all", "nfl", "afc" (AFC only), "nfc" (NFC only).',
       }),
+      sport: t.arg.string({
+        required: false,
+        description:
+          'Sport for the mock draft league: "baseball" (default) or "football" (LS-9040).',
+      }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -136,6 +149,7 @@ builder.mutationField('initializeMockDraft', (t) =>
         pickTimeLimitSeconds: rawTimeLimit,
         draftOrder: rawDraftOrder,
         playerPool: rawPlayerPool,
+        sport: rawSport,
       } = args;
       const userId = context.user.id;
       // Mock drafts use a shorter default timer (30 s) so practice sessions
@@ -143,6 +157,7 @@ builder.mutationField('initializeMockDraft', (t) =>
       const pickTimeLimit = rawTimeLimit ?? 30;
       const draftOrder = rawDraftOrder ?? 'snake';
       const playerPool = rawPlayerPool ?? 'all';
+      const sport = rawSport ?? 'baseball';
 
       // Validate inputs
       if (numTeams < 2 || numTeams > 12) {
@@ -162,6 +177,25 @@ builder.mutationField('initializeMockDraft', (t) =>
       if (!isValidPlayerPool(playerPool)) {
         throw UserInputError(
           'playerPool must be one of: "all", "nl", "al", "nfl", "afc", "nfc"',
+        );
+      }
+      if (!isValidSport(sport)) {
+        throw UserInputError('sport must be "baseball" or "football"');
+      }
+      if (
+        sport === 'baseball' &&
+        (FOOTBALL_ONLY_POOLS as readonly string[]).includes(playerPool)
+      ) {
+        throw UserInputError(
+          `playerPool "${playerPool}" is not valid for a baseball mock draft`,
+        );
+      }
+      if (
+        sport === 'football' &&
+        (BASEBALL_ONLY_POOLS as readonly string[]).includes(playerPool)
+      ) {
+        throw UserInputError(
+          `playerPool "${playerPool}" is not valid for a football mock draft`,
         );
       }
       if (rawTimeLimit !== null && rawTimeLimit !== undefined) {
@@ -194,6 +228,7 @@ builder.mutationField('initializeMockDraft', (t) =>
         userPickPosition,
         draftOrder,
         playerPool,
+        sport,
       });
 
       try {
@@ -215,6 +250,7 @@ builder.mutationField('initializeMockDraft', (t) =>
         const leagueValues = {
           name: 'Mock Draft Practice',
           owner: userId,
+          sport,
           playerPool,
           maxRosterSize: rosterSize,
           draftStatus: 'not-started' as const,
@@ -362,6 +398,7 @@ builder.mutationField('initializeMockDraft', (t) =>
           humanTeamId: txResult.humanTeamId,
           draftOrder,
           playerPool,
+          sport,
           webSocketReady,
         });
 

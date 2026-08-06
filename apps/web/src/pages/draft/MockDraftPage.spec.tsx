@@ -8,9 +8,20 @@
  *   4. Unlimited (premium) → setup form, no usage helper.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { MockDraftPage } from './MockDraftPage';
+
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => {
+  const actual: typeof import('react-router-dom') =
+    jest.requireActual('react-router-dom');
+  const mocked: typeof import('react-router-dom') = {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+  return mocked;
+});
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -61,6 +72,18 @@ jest.mock('@legacy-sports/shared-components', () => ({
 // page tests cover MockDraftPage's state selection (skeleton vs limit-reached
 // vs form) and the usage-label wiring, so we stub the shared form to surface
 // the usageLabel it receives plus a Start button.
+// Settings passed to `onStart` when the mock "Start Mock Draft" button is
+// clicked — each test can override `mockStartSettings` to exercise a
+// specific sport (LS-9040).
+let mockStartSettings: Record<string, unknown> = {
+  numTeams: 8,
+  rosterSize: 15,
+  userPickPosition: 1,
+  draftOrder: 'snake',
+  playerPool: 'all',
+  sport: 'baseball',
+};
+
 jest.mock('@legacy-sports/shared-components/draft', () => ({
   MockDraftSetup: ({
     usageLabel,
@@ -72,7 +95,9 @@ jest.mock('@legacy-sports/shared-components/draft', () => ({
   }) => (
     <div data-testid="mock-draft-setup">
       {usageLabel ? <p>{usageLabel}</p> : null}
-      <button onClick={() => onStart?.({})}>Start Mock Draft</button>
+      <button onClick={() => onStart?.(mockStartSettings)}>
+        Start Mock Draft
+      </button>
     </div>
   ),
 }));
@@ -114,10 +139,14 @@ let mockUsageResult: {
   loading: boolean;
 } = { data: undefined, loading: false };
 
+const mockInitializeMockDraft = jest.fn(() =>
+  Promise.resolve({ data: { initializeMockDraft: { leagueId: 42 } } }),
+);
+
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMyMockDraftUsageQuery: () => mockUsageResult,
   useInitializeMockDraftMutation: () => [
-    jest.fn(() => Promise.resolve({ data: undefined })),
+    mockInitializeMockDraft,
     { loading: false, error: undefined },
   ],
 }));
@@ -203,5 +232,58 @@ describe('MockDraftPage — weekly limit reflected in UI (LS-5178)', () => {
     expect(
       screen.queryByTestId('mock-draft-limit-reached'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  it('forwards sport to initializeMockDraft and navigates to the baseball draft board', async () => {
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    mockStartSettings = {
+      numTeams: 8,
+      rosterSize: 15,
+      userPickPosition: 1,
+      draftOrder: 'snake',
+      playerPool: 'all',
+      sport: 'baseball',
+    };
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
+
+    await screen.findByRole('button', { name: /Start Mock Draft/i });
+    expect(mockInitializeMockDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({ sport: 'baseball' }),
+      }),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42/draft');
+  });
+
+  it('forwards sport=football to initializeMockDraft and navigates to the football draft board', async () => {
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    mockStartSettings = {
+      numTeams: 8,
+      rosterSize: 15,
+      userPickPosition: 1,
+      draftOrder: 'snake',
+      playerPool: 'afc',
+      sport: 'football',
+    };
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
+
+    await screen.findByRole('button', { name: /Start Mock Draft/i });
+    expect(mockInitializeMockDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          sport: 'football',
+          playerPool: 'afc',
+        }),
+      }),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith('/football/league/42/draft');
   });
 });

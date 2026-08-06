@@ -396,12 +396,29 @@ function formatEraLabel(eraFilter: string): string {
  * vice-versa. Only rules that actually apply (given the league config) are
  * returned, in display order.
  *
- * All rules are baseball-specific; football leagues get an empty list.
+ * Football leagues only support the conference (AFC/NFC) player-pool rule —
+ * the remaining rules (career games/seasons, HoF, era) are baseball-specific
+ * concepts with no football equivalent (LS-9040).
  */
 export function buildEligibilityConditions(
   settings: LeagueEligibilitySettings,
 ): EligibilityCondition[] {
-  if (settings.sport === 'football') return [];
+  if (settings.sport === 'football') {
+    if (settings.playerPool === 'afc' || settings.playerPool === 'nfc') {
+      const conference = settings.playerPool.toUpperCase();
+      return [
+        {
+          key: 'pool',
+          condition: sql`EXISTS (
+            SELECT 1 FROM nfl_teams nt
+            WHERE nt.abbreviation = p.nfl_team AND nt.conference = ${conference}
+          )`,
+          message: `Player is not on an ${conference} team`,
+        },
+      ];
+    }
+    return [];
+  }
 
   const conditions: EligibilityCondition[] = [];
 
@@ -580,13 +597,38 @@ export async function filterPlayerIdsByLeagueEligibility(
   let excludedByHofOnly = 0;
   let excludedByEraFilter = 0;
 
-  // All current filters (playerPool, career games/seasons, HoF, era) are
-  // baseball-specific. Football leagues skip them entirely until sport-specific
-  // filter logic is implemented.
+  // The career games/seasons, HoF, and era filters are baseball-specific
+  // concepts with no football equivalent — football leagues skip them
+  // entirely. The player-pool filter does apply to football (AFC/NFC
+  // conference restriction), mirroring the real conference filter already
+  // proven out by the footballPlayers query (LS-9040).
   if (settings.sport === 'football') {
-    LOGGER.info(
-      `[filterPlayerIdsByLeagueEligibility] Football league — skipping baseball filters, ${currentIds.length} players eligible`,
-    );
+    if (
+      (settings.playerPool === 'afc' || settings.playerPool === 'nfc') &&
+      currentIds.length > 0
+    ) {
+      const conference = settings.playerPool.toUpperCase();
+      const poolRows = await db.execute(
+        sql`SELECT p.id AS player_id
+            FROM players p
+            JOIN nfl_teams nt ON nt.abbreviation = p.nfl_team
+            WHERE p.id = ANY(${sql.param(currentIds)}::integer[])
+              AND nt.conference = ${conference}`,
+      );
+      const poolEligible = new Set(
+        poolRows.rows.map((r: Record<string, unknown>) => Number(r.player_id)),
+      );
+      const before = currentIds.length;
+      currentIds = currentIds.filter((id) => poolEligible.has(id));
+      excludedByPool = before - currentIds.length;
+      LOGGER.info(
+        `Football conference filter (${conference}): ${before} → ${currentIds.length} (excluded ${excludedByPool})`,
+      );
+    } else {
+      LOGGER.info(
+        `[filterPlayerIdsByLeagueEligibility] Football league, pool='${settings.playerPool}' — no conference restriction, ${currentIds.length} players eligible`,
+      );
+    }
     return {
       eligibleIds: new Set(currentIds),
       excludedByPool,
