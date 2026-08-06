@@ -25,18 +25,19 @@ describe('DraftChatOverlay', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // Regression for LS-8070: the close button reuses the `.d-btn-glass` class,
-  // which is a full-width sidebar button (display: block; width: 100%). Without
-  // inline overrides the close "X" stretched across the chat header and looked
-  // massive. The button must neutralize the full-width layout so it renders as
-  // a compact icon button.
-  it('renders the close button as a compact icon button, not full width', () => {
+  // Regression for LS-8070: the close button used to reuse the shared
+  // `.d-btn-glass` class (display: block; width: 100%), which stretched the
+  // close "X" across the chat header. The Tamagui port builds the control
+  // from scratch with no shared full-width class to inherit from, so it
+  // renders alongside the title as a sibling in a space-between header row
+  // instead of stretching to fill it.
+  it('renders the close button as a sibling of the title, not a full-width block', () => {
     renderOverlay();
     const closeButton = screen.getByRole('button', {
       name: 'Close league chat',
     });
-    expect(closeButton.style.width).toBe('auto');
-    expect(closeButton.style.display).toBe('inline-flex');
-    expect(closeButton.style.marginBottom).toBe('0px');
+    expect(closeButton.parentElement).toContainElement(
+      screen.getByText('League Chat'),
+    );
   });
 });

@@ -1,5 +1,8 @@
 import React from 'react';
+import { Text, XStack, YStack } from 'tamagui';
 import type { LeagueTeam } from './types';
+import { GradientSurface } from '../home/GradientSurface';
+import { useThemeTokens } from '../../hooks/useThemeTokens';
 
 export interface DraftChatProps {
   leagueId: number;
@@ -17,6 +20,16 @@ interface DraftChatOverlayProps {
   renderChat: DraftChatRenderer;
 }
 
+const OVERLAY_WIDTH = 320;
+
+const handleKeyActivate =
+  (fn: (() => void) | undefined) => (e: React.KeyboardEvent<HTMLElement>) => {
+    if (fn != null && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      e.currentTarget.click();
+    }
+  };
+
 export function DraftChatOverlay({
   leagueId,
   userId,
@@ -24,75 +37,94 @@ export function DraftChatOverlay({
   onClose,
   renderChat,
 }: DraftChatOverlayProps): React.JSX.Element {
+  const tokens = useThemeTokens();
+
   return (
-    <div
-      className="d-chat-overlay"
+    <YStack
       role="complementary"
       aria-label="League chat"
+      position="fixed"
+      top={0}
+      right={0}
+      bottom={0}
+      width={OVERLAY_WIDTH}
+      zIndex={200}
+      overflow="hidden"
+      borderLeftWidth={1}
+      borderLeftColor="$glassBorder"
+      shadowColor="$shadowColor"
+      shadowOffset={{ width: -4, height: 0 }}
+      shadowRadius={32}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '12px 16px',
-          borderBottom: '1px solid var(--d-border)',
-          flexShrink: 0,
-        }}
+      {/* Both stops resolve to theme tokens: 'surface.bg' is the closest match
+          to the pre-port panel's darkest stop (no exact token exists), and
+          'surface.surfacePanel' is an exact match for the second stop. */}
+      <GradientSurface
+        colors={[tokens.surface.bg, tokens.surface.surfacePanel]}
+        angle={160}
+        flex={1}
+        flexDirection="column"
       >
-        <span
-          style={{
-            fontSize: 13,
-            fontWeight: 700,
-            letterSpacing: 1.04,
-            color: 'var(--d-accent)',
-            textTransform: 'uppercase',
-          }}
+        <XStack
+          alignItems="center"
+          justifyContent="space-between"
+          paddingHorizontal="$4"
+          paddingVertical="$3"
+          borderBottomWidth={1}
+          borderBottomColor="$glassBorder"
+          flexShrink={0}
         >
-          <span role="img" aria-label="chat">
-            💬
-          </span>{' '}
-          League Chat
-        </span>
-        <button
-          className="d-btn-glass"
-          style={{
-            // .d-btn-glass is a full-width sidebar button (display:block;
-            // width:100%); override the layout properties so the close control
-            // renders as a compact icon button instead of stretching across
-            // the chat header.
-            width: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 0,
-            lineHeight: 1,
-            padding: '4px 10px',
-            fontSize: 14,
-          }}
-          onClick={onClose}
-          aria-label="Close league chat"
-        >
-          ✕
-        </button>
-      </div>
-      <div
-        style={{
-          flex: 1,
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {renderChat({
-          leagueId,
-          userId,
-          mentionableTeams: leagueTeams.map((t) => ({
-            id: parseInt(t.id, 10),
-            name: t.name,
-          })),
-        })}
-      </div>
-    </div>
+          <XStack alignItems="center" gap="$1.5">
+            <Text role="img" accessibilityLabel="chat" fontSize={13}>
+              {'\u{1F4AC}'}
+            </Text>
+            <Text
+              fontSize={13}
+              fontWeight="700"
+              letterSpacing={1.04}
+              color="$brandGold"
+              textTransform="uppercase"
+            >
+              League Chat
+            </Text>
+          </XStack>
+          <XStack
+            role="button"
+            tabIndex={0}
+            aria-label="Close league chat"
+            onPress={onClose}
+            onKeyDown={handleKeyActivate(onClose)}
+            alignItems="center"
+            justifyContent="center"
+            paddingHorizontal={10}
+            paddingVertical={4}
+            borderRadius="$2"
+            backgroundColor="$surfaceInteractive"
+            borderWidth={1}
+            borderColor="$glassBorder"
+            cursor="pointer"
+            hoverStyle={{
+              backgroundColor: '$backgroundHover',
+              borderColor: '$glassBorderHover',
+            }}
+            pressStyle={{ backgroundColor: '$backgroundPress' }}
+          >
+            <Text fontSize={14} lineHeight={14} color="$color">
+              ✕
+            </Text>
+          </XStack>
+        </XStack>
+        <YStack flex={1} overflow="hidden">
+          {renderChat({
+            leagueId,
+            userId,
+            mentionableTeams: leagueTeams.map((t) => ({
+              id: parseInt(t.id, 10),
+              name: t.name,
+            })),
+          })}
+        </YStack>
+      </GradientSurface>
+    </YStack>
   );
 }
