@@ -14,7 +14,7 @@ import {
  * presentational chrome lives in the shared shell. The NFL stats browser renders
  * through the same shell via its own controller (LS-8442).
  *
- * Design: nostalgic, sporty, professional (see AGENTS.md § Design Context).
+ * Design: nostalgic, sporty, professional (see docs/design/brand.md).
  * Tables are the product; chrome is restrained so numbers read like a Sunday
  * paper box score.
  */

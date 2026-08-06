@@ -164,7 +164,7 @@ import {
   updateTeamMember,
 } from '../../store/leagueSlice';
 
-/** Editorial typography: Big Shoulders Display for headings & stat values (see AGENTS.md § Design Context) */
+/** Editorial typography: Big Shoulders Display for headings & stat values (see docs/design/brand.md) */
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 const DraftOrderControl = React.lazy(() =>
   import('../../components/commissioner/DraftOrderControl').then((m) => ({

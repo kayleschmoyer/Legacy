@@ -44,7 +44,7 @@ export function buildFreeAgentAriaLabel(
   return `Add ${name}`;
 }
 
-/** Editorial typography: Big Shoulders Display for headings & stat labels (see AGENTS.md § Design Context) */
+/** Editorial typography: Big Shoulders Display for headings & stat labels (see docs/design/brand.md) */
 const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
 
 type PlayerType = 'hitters' | 'pitchers';
