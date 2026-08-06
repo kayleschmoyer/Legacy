@@ -14,6 +14,7 @@
       "executor": "@nx/vite:build",
       "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
+      "inputs": ["production", "^production", { "env": "GRAPHQL_HOST" }],
       "options": {
         "outputPath": "dist/apps/graphql-explorer",
         "configFile": "apps/graphql-explorer/vite.config.mts"

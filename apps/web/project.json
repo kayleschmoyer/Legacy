@@ -53,6 +53,15 @@
       "executor": "@nx/vite:build",
       "outputs": ["{options.outputPath}"],
       "defaultConfiguration": "production",
+      "inputs": [
+        "production",
+        "^production",
+        { "env": "VITE_BASE_PATH" },
+        { "env": "VITE_COMMIT_SHA" },
+        { "env": "GITHUB_SHA" },
+        { "env": "VITE_APP_VERSION" },
+        { "env": "COLLECT_COVERAGE" }
+      ],
       "options": {
         "outputPath": "dist/apps/web"
       },

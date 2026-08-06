@@ -74,11 +74,14 @@
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
     },
-    "build:lambda": {
+    "@nx/vite:build": {
       "cache": true,
-      "executor": "nx:run-commands",
       "inputs": ["production", "^production"],
-      "outputs": ["{projectRoot}/dist"]
+      "outputs": ["{options.outputPath}"]
+    },
+    "@nx/storybook:build": {
+      "cache": true,
+      "inputs": ["production", "^production"]
     },
     "package": {
       "cache": false,
