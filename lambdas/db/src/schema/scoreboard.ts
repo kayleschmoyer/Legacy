@@ -226,7 +226,7 @@ builder.queryField('scoreboard', (t) =>
         );
         throw new GraphQLError(
           'Failed to fetch scoreboard data. Please try again.',
-          { extensions: { code: 'INTERNAL_SERVER_ERROR' } },
+          { extensions: { code: 'SCOREBOARD_FETCH_FAILED' } },
         );
       }
     },

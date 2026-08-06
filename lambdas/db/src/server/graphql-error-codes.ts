@@ -53,4 +53,16 @@ export const CLIENT_FACING_CODES = new Set([
   // client-side Rollbar occurrence just becomes self-diagnosing (LS-8397,
   // mirroring LS-8287).
   'DRAFT_PICKS_LOAD_FAILED',
+  // scoreboard re-throws a sanitized error when the upstream MLB data
+  // provider fails (e.g. a BallDontLie API timeout with no stale cache to
+  // fall back on). The resolver already LOGGER.errors the real cause
+  // ("Scoreboard provider error", with the underlying provider error and
+  // its stack). Without this code, the formatter treated the sanitized
+  // GraphQLError as an unexpected internal error and re-logged it too —
+  // but since the resolver throws a GraphQLError directly (no
+  // `originalError` for the formatter to recover), that second report just
+  // duplicated the first with the generic wrapper message and no stack,
+  // producing a less-useful Rollbar item that obscured the real cause
+  // (LS-4409, mirroring LS-8287/LS-8397).
+  'SCOREBOARD_FETCH_FAILED',
 ]);

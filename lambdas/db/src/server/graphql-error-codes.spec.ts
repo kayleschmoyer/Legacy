@@ -14,6 +14,7 @@ describe('CLIENT_FACING_CODES', () => {
     'PERSISTED_QUERY_NOT_FOUND',
     'PERSISTED_QUERY_NOT_SUPPORTED',
     'DRAFT_START_FAILED',
+    'SCOREBOARD_FETCH_FAILED',
   ])('classifies %s as client-facing', (code) => {
     expect(CLIENT_FACING_CODES.has(code)).toBe(true);
   });

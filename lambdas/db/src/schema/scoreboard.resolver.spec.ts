@@ -279,7 +279,15 @@ describe('scoreboard resolver', () => {
         {},
         undefined as never,
       ),
-    ).rejects.toThrow('Failed to fetch scoreboard data. Please try again.');
+    ).rejects.toMatchObject({
+      message: 'Failed to fetch scoreboard data. Please try again.',
+      // Must be a code registered in CLIENT_FACING_CODES (graphql-error-codes.ts)
+      // so Apollo's formatError doesn't re-log this as an unexpected internal
+      // error — it has no `originalError` to recover the real cause from
+      // (the resolver already logged it below), so a duplicate log would just
+      // repeat the generic wrapper message and lose the actual cause (LS-4409).
+      extensions: { code: 'SCOREBOARD_FETCH_FAILED' },
+    });
 
     expect(mockLogger.error).toHaveBeenCalledWith(
       'Scoreboard provider error',
