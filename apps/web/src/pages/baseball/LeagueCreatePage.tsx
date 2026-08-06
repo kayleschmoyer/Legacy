@@ -143,7 +143,7 @@ function sanitizeLeagueNameInput(raw: string): string {
 // ── Football scoring presets (LS-4158) ──────────────────────────────────────
 // Only `receiving_rec` differs across Standard / Half-PPR / PPR. All other
 // multipliers (passing yds, rush yds, TDs, etc.) are identical.
-type ScoringFormat = 'standard' | 'half_ppr' | 'ppr' | 'custom';
+type ScoringFormat = 'standard' | 'half_ppr' | 'ppr';
 type DefensiveFormat = 'dst' | 'idp';
 
 const SCORING_FORMAT_OPTIONS: ReadonlyArray<{
@@ -1999,8 +1999,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                 ? (formData.defensiveFormat as GqlDefensiveFormat)
                 : undefined,
             scoringFormat:
-              formData.sport === 'football' &&
-              formData.scoringFormat !== 'custom'
+              formData.sport === 'football'
                 ? formData.scoringFormat
                 : undefined,
             leagueName: trimmedLeagueName,
