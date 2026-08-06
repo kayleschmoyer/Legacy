@@ -1,6 +1,77 @@
 import React from 'react';
-import { CSS } from './styles';
+import { Button, Text, XStack, YStack } from 'tamagui';
+import { brand, scaleDark, withAlpha } from '@legacy-sports/design-tokens';
 import { SkeletonCard } from './SkeletonCard';
+import { Skeleton } from '../../components/Skeleton';
+
+// Matches the sticky nav height the live draft board root also sits below,
+// so these full-screen states stay flush with the nav bar.
+const NAV_HEIGHT_PX = 75;
+const NAV_Z_INDEX = 200;
+
+// Fixed "night stadium" bloom — deliberately not theme-adaptive (matches the
+// original decorative background layer, which was also a static dark wash
+// regardless of light/dark mode). Colors resolved via `withAlpha` from named
+// design tokens rather than literal hex/rgba (theme-compliance ratchet).
+const BG_FX_IMAGE = [
+  `radial-gradient(ellipse 80% 50% at 15% 15%, ${withAlpha(brand.gold, 0.06)} 0%, transparent 60%)`,
+  `radial-gradient(ellipse 60% 40% at 85% 80%, ${withAlpha(brand.navy, 0.08)} 0%, transparent 60%)`,
+  `radial-gradient(ellipse 40% 30% at 50% 50%, ${withAlpha(scaleDark.blue9, 0.04)} 0%, transparent 60%)`,
+].join(', ');
+
+/**
+ * Shared full-screen root for every draft-board state screen. `position:
+ * fixed` has no Tamagui/RN prop — the `style` escape hatch is a web-only
+ * capability shim (this file has no `.native` counterpart), not a layout
+ * branch.
+ */
+function DraftRootShell({
+  children,
+  testID,
+  role,
+  'aria-live': ariaLive,
+  'aria-busy': ariaBusy,
+  'aria-label': ariaLabel,
+}: {
+  children: React.ReactNode;
+  testID?: string;
+  role?: 'status';
+  'aria-live'?: 'polite' | 'assertive' | 'off';
+  'aria-busy'?: boolean;
+  'aria-label'?: string;
+}): React.JSX.Element {
+  return (
+    <YStack
+      testID={testID}
+      role={role}
+      aria-live={ariaLive}
+      aria-busy={ariaBusy}
+      aria-label={ariaLabel}
+      style={{
+        position: 'fixed',
+        top: NAV_HEIGHT_PX,
+        right: 0,
+        bottom: 0,
+        left: 0,
+      }}
+      zIndex={NAV_Z_INDEX - 2}
+      backgroundColor="$background"
+      overflow="hidden"
+      animation="quick"
+      enterStyle={{ opacity: 0, y: 12 }}
+      opacity={1}
+      y={0}
+    >
+      <YStack
+        position="absolute"
+        inset={0}
+        pointerEvents="none"
+        style={{ backgroundImage: BG_FX_IMAGE }}
+      />
+      {children}
+    </YStack>
+  );
+}
 
 interface StateScreenProps {
   icon: string;
@@ -20,24 +91,56 @@ function StateScreen({
   onButtonClick,
 }: StateScreenProps): React.JSX.Element {
   return (
-    <div className="d-root">
-      <style>{CSS}</style>
-      <div className="d-bg-fx" />
-      <div className="d-state-center">
-        <div className="d-state-icon">
-          <span role="img" aria-label={iconLabel}>
-            {icon}
-          </span>
-        </div>
-        <div className="d-state-title">{title}</div>
-        <div className="d-state-desc">{description}</div>
+    <DraftRootShell>
+      <YStack
+        flex={1}
+        alignItems="center"
+        justifyContent="center"
+        gap="$4"
+        padding="$8"
+        position="relative"
+        zIndex={1}
+      >
+        <Text fontSize={56} lineHeight={56} role="img" aria-label={iconLabel}>
+          {icon}
+        </Text>
+        <Text
+          fontFamily="$heading"
+          fontWeight="800"
+          fontSize={36}
+          color="$brandGold"
+          letterSpacing={0.7}
+          textAlign="center"
+        >
+          {title}
+        </Text>
+        <Text
+          fontSize={14}
+          color="$textMuted"
+          maxWidth={380}
+          lineHeight={21}
+          textAlign="center"
+        >
+          {description}
+        </Text>
         {buttonText && onButtonClick && (
-          <button className="d-state-btn" onClick={onButtonClick}>
+          <Button
+            onPress={onButtonClick}
+            backgroundColor="$brandGold"
+            color="white"
+            fontWeight="700"
+            fontSize={14}
+            height={44}
+            paddingHorizontal={28}
+            borderRadius="$4"
+            pressStyle={{ scale: 0.98 }}
+            hoverStyle={{ backgroundColor: '$brandGoldDark' }}
+          >
             {buttonText}
-          </button>
+          </Button>
         )}
-      </div>
-    </div>
+      </YStack>
+    </DraftRootShell>
   );
 }
 
@@ -58,187 +161,172 @@ export function NoLeagueScreen({
   );
 }
 
-// Skeleton primitive — shimmer block sized by inline width/height. Inline
-// `borderRadius` overrides the default rectangle radius (e.g. for circles or
-// pills). Geometry should mirror the populated element it replaces so the
-// loading → populated reveal is a content swap, not a reflow.
-function Skel({ style }: { style: React.CSSProperties }): React.JSX.Element {
-  return <div className="d-skel-line" style={style} aria-hidden="true" />;
-}
+const RAIL_PANELS = [
+  { title: 160, subtitle: 220, rows: [56, 56, 56] },
+  { title: 120, subtitle: null, rows: [28, 28, 28] },
+  { title: 110, subtitle: null, rows: [14, 14, 14, 14, 14, 14, 14, 14] },
+  { title: 120, subtitle: null, rows: [36, 36, 36, 36, 36] },
+] as const;
+
+const PILL_WIDTHS = [72, 48, 52, 52, 52, 52, 56, 48] as const;
 
 export function LoadingScreen(): React.JSX.Element {
   return (
-    <div
-      className="d-root"
-      data-testid="draft-board-loading"
+    <DraftRootShell
+      testID="draft-board-loading"
       role="status"
       aria-live="polite"
-      aria-busy="true"
+      aria-busy
       aria-label="Loading draft board"
     >
-      <style>{CSS}</style>
-      <div className="d-bg-fx" />
-      <div className="d-layout">
-        {/* TOPBAND skeleton — mirrors DraftTopBand's 5-column grid:
-            status · divider · timer · current-pick slab · autopick toggle. */}
-        <div className="d-topband" aria-hidden="true">
-          {/* Pick status block */}
-          <div className="d-tb-status">
-            <Skel style={{ width: 76, height: 11, marginBottom: 8 }} />
-            <Skel style={{ width: 90, height: 20, marginBottom: 6 }} />
-            <Skel style={{ width: 130, height: 11 }} />
-          </div>
-          {/* Vertical divider — real geometry, no shimmer */}
-          <span className="d-topband-divider" />
-          {/* Inline ring timer + caption */}
-          <div className="d-tb-timer">
-            <Skel
-              style={{
-                width: 58,
-                height: 58,
-                borderRadius: '50%',
-                flex: '0 0 58px',
-              }}
-            />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <Skel style={{ width: 64, height: 10 }} />
-              <Skel style={{ width: 48, height: 10 }} />
-            </div>
-          </div>
-          {/* On-the-clock slab — keep real container dimensions */}
-          <div
-            className="d-tb-clock"
-            style={{
-              boxShadow: 'none',
-              background: 'var(--d-panel)',
-              borderColor: 'rgba(255,255,255,0.06)',
-            }}
+      <YStack
+        testID="draft-loading-layout"
+        flex={1}
+        position="relative"
+        zIndex={1}
+        overflow="hidden"
+      >
+        {/* TOPBAND skeleton — mirrors DraftTopBand's 5-column layout: status ·
+            divider · timer · current-pick slab · autopick toggle. */}
+        <XStack
+          testID="draft-loading-topband"
+          aria-hidden
+          flexShrink={0}
+          backgroundColor="$surfaceSubtle"
+          borderBottomWidth={1}
+          borderBottomColor="$borderColor"
+          paddingHorizontal="$5"
+          paddingVertical="$3"
+          gap="$4"
+          alignItems="center"
+        >
+          <YStack testID="draft-loading-tb-status" gap="$1">
+            <Skeleton width={76} height={11} />
+            <Skeleton width={90} height={20} />
+            <Skeleton width={130} height={11} />
+          </YStack>
+          <YStack width={1} height={52} backgroundColor="$borderColor" />
+          <XStack testID="draft-loading-tb-timer" alignItems="center" gap="$3">
+            <Skeleton width={58} height={58} radius={29} />
+            <YStack gap="$2">
+              <Skeleton width={64} height={10} />
+              <Skeleton width={48} height={10} />
+            </YStack>
+          </XStack>
+          <XStack
+            testID="draft-loading-tb-clock"
+            flex={1}
+            alignItems="center"
+            gap="$3"
+            backgroundColor="$surfacePanel"
+            borderWidth={1}
+            borderColor="$borderColor"
+            borderRadius="$4"
+            paddingHorizontal="$3"
+            paddingVertical="$2"
           >
-            <div
-              style={{
-                flex: 1,
-                minWidth: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 7,
-              }}
-            >
-              <Skel style={{ width: 92, height: 10 }} />
-              <Skel style={{ width: 170, height: 20 }} />
-              <Skel style={{ width: 140, height: 11 }} />
-            </div>
-          </div>
-          {/* Auto-pick toggle */}
-          <div className="d-tb-autopick" style={{ gap: 8 }}>
-            <Skel style={{ width: 110, height: 10 }} />
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <Skel style={{ width: 34, height: 20, borderRadius: 9999 }} />
-              <Skel style={{ width: 26, height: 12 }} />
-            </div>
-            <Skel style={{ width: 118, height: 10 }} />
-          </div>
-        </div>
+            <YStack flex={1} gap="$2">
+              <Skeleton width={92} height={10} />
+              <Skeleton width={170} height={20} />
+              <Skeleton width={140} height={11} />
+            </YStack>
+          </XStack>
+          <YStack testID="draft-loading-tb-autopick" gap="$2">
+            <Skeleton width={110} height={10} />
+            <XStack alignItems="center" gap="$2">
+              <Skeleton width={34} height={20} radius={9999} />
+              <Skeleton width={26} height={12} />
+            </XStack>
+            <Skeleton width={118} height={10} />
+          </YStack>
+        </XStack>
 
-        {/* MAIN skeleton — view tabs, controls toolbar, filter pills, card grid. */}
-        <section className="d-main">
-          <div className="d-view-tabs" style={{ gap: 20 }}>
-            <Skel style={{ width: 90, height: 14 }} />
-            <Skel style={{ width: 110, height: 14 }} />
-            <Skel style={{ width: 108, height: 14 }} />
-            <Skel style={{ width: 118, height: 14 }} />
-          </div>
-          <div className="d-controls">
-            <Skel style={{ flex: 1, minWidth: 180, height: 36 }} />
-            <Skel style={{ width: 180, height: 36 }} />
-          </div>
-          <div className="d-pills" style={{ marginBottom: 14 }}>
-            <Skel style={{ width: 72, height: 32, borderRadius: 9999 }} />
-            <Skel style={{ width: 48, height: 32, borderRadius: 9999 }} />
-            <Skel style={{ width: 52, height: 32, borderRadius: 9999 }} />
-            <Skel style={{ width: 52, height: 32, borderRadius: 9999 }} />
-            <Skel style={{ width: 52, height: 32, borderRadius: 9999 }} />
-            <Skel style={{ width: 52, height: 32, borderRadius: 9999 }} />
-            <Skel style={{ width: 56, height: 32, borderRadius: 9999 }} />
-            <Skel style={{ width: 48, height: 32, borderRadius: 9999 }} />
-          </div>
-          <div
-            className="d-player-grid"
-            style={{
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            }}
+        <XStack flex={1} overflow="hidden">
+          {/* MAIN skeleton — view tabs, controls toolbar, filter pills, card grid. */}
+          <YStack
+            testID="draft-loading-main"
+            flex={1}
+            padding="$4"
+            gap="$3"
+            overflow="hidden"
           >
-            {Array.from({ length: 9 }).map((_, i) => (
-              <SkeletonCard key={i} delay={i * 0.06} />
+            <XStack gap="$5">
+              <Skeleton width={90} height={14} />
+              <Skeleton width={110} height={14} />
+              <Skeleton width={108} height={14} />
+              <Skeleton width={118} height={14} />
+            </XStack>
+            <XStack gap="$3">
+              <Skeleton width="100%" height={36} />
+              <Skeleton width={180} height={36} />
+            </XStack>
+            <XStack gap="$2" flexWrap="wrap">
+              {PILL_WIDTHS.map((w, i) => (
+                <Skeleton key={i} width={w} height={32} radius={9999} />
+              ))}
+            </XStack>
+            <XStack testID="draft-loading-player-grid" flexWrap="wrap" gap="$3">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <SkeletonCard key={i} delay={i * 0.06} />
+              ))}
+            </XStack>
+          </YStack>
+
+          {/* RIGHT RAIL skeleton — intel · queue · roster · history panels. */}
+          <YStack
+            testID="draft-loading-rail"
+            aria-hidden
+            width={320}
+            flexShrink={0}
+            borderLeftWidth={1}
+            borderLeftColor="$borderColor"
+            backgroundColor="$surfaceSubtle"
+            padding="$3"
+            gap="$3"
+            overflow="hidden"
+          >
+            {RAIL_PANELS.map((panel, i) => (
+              <YStack
+                key={i}
+                testID="draft-loading-rail-panel"
+                backgroundColor="$surfacePanel"
+                borderWidth={1}
+                borderColor="$borderColor"
+                borderRadius="$5"
+                padding="$3"
+                gap="$2"
+              >
+                <Skeleton width={panel.title} height={12} />
+                {panel.subtitle && (
+                  <Skeleton width={panel.subtitle} height={10} />
+                )}
+                <YStack gap="$2">
+                  {panel.rows.map((h, ri) => (
+                    <Skeleton key={ri} height={h} />
+                  ))}
+                </YStack>
+              </YStack>
             ))}
-          </div>
-        </section>
+          </YStack>
+        </XStack>
+      </YStack>
 
-        {/* RIGHT RAIL skeleton — intel · queue · roster · history panels. */}
-        <aside className="d-rail" aria-hidden="true">
-          {/* Draft Intelligence */}
-          <div className="d-rail-panel">
-            <Skel style={{ width: 160, height: 12, marginBottom: 10 }} />
-            <Skel style={{ width: 220, height: 10, marginBottom: 12 }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Skel style={{ height: 56 }} />
-              <Skel style={{ height: 56 }} />
-              <Skel style={{ height: 56 }} />
-            </div>
-          </div>
-          {/* Auto-pick Queue */}
-          <div className="d-rail-panel">
-            <Skel style={{ width: 120, height: 12, marginBottom: 10 }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <Skel style={{ height: 28 }} />
-              <Skel style={{ height: 28 }} />
-              <Skel style={{ height: 28 }} />
-            </div>
-          </div>
-          {/* My Roster */}
-          <div className="d-rail-panel">
-            <Skel style={{ width: 110, height: 12, marginBottom: 10 }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Skel style={{ height: 14 }} />
-              <Skel style={{ height: 14 }} />
-              <Skel style={{ height: 14 }} />
-              <Skel style={{ height: 14 }} />
-              <Skel style={{ height: 14 }} />
-              <Skel style={{ height: 14 }} />
-              <Skel style={{ height: 14 }} />
-              <Skel style={{ height: 14 }} />
-            </div>
-          </div>
-          {/* Pick History */}
-          <div className="d-rail-panel">
-            <Skel style={{ width: 120, height: 12, marginBottom: 10 }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <Skel style={{ height: 36 }} />
-              <Skel style={{ height: 36 }} />
-              <Skel style={{ height: 36 }} />
-              <Skel style={{ height: 36 }} />
-              <Skel style={{ height: 36 }} />
-            </div>
-          </div>
-        </aside>
-      </div>
       {/* Visually hidden status text so screen readers announce the loading
           state without disturbing the skeleton geometry. */}
-      <span
-        style={{
-          position: 'absolute',
-          width: 1,
-          height: 1,
-          padding: 0,
-          margin: -1,
-          overflow: 'hidden',
-          clip: 'rect(0,0,0,0)',
-          whiteSpace: 'nowrap',
-          border: 0,
-        }}
+      <Text
+        position="absolute"
+        width={1}
+        height={1}
+        padding={0}
+        margin={-1}
+        overflow="hidden"
+        whiteSpace="nowrap"
+        borderWidth={0}
+        style={{ clip: 'rect(0,0,0,0)' }}
       >
         Loading draft board...
-      </span>
-    </div>
+      </Text>
+    </DraftRootShell>
   );
 }
 
