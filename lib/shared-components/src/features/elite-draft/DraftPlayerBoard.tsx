@@ -1,4 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   ALLOWED_POSITIONS_BY_SPORT,
   DEFAULT_ROSTER_SIZE_BY_SPORT,
@@ -15,6 +16,9 @@ import { getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
 import type { SportKind } from '../../config/sports';
 import { getPositionLabel, isPitcherSlot } from '../roster/rosterEligibility';
+import { csp } from '../players/crossPlatformStyle';
+import { tamaguiStyled } from '../../utils/tamaguiStyled';
+
 // PlayerDetailModal is web-specific; consumers can provide their own via composition.
 // Inline a no-op stub so the component compiles in all environments.
 const PlayerDetailModal: React.FC<{
@@ -26,6 +30,83 @@ const PlayerDetailModal: React.FC<{
 }> = () => null;
 
 const positions = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
+
+// ── Styled primitives ───────────────────────────────────────────────────────
+// tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint;
+// casting the result to a concrete component type keeps call sites lint-clean.
+// $md breakpoint keys mirror the ≤768px rules in the original styles.ts
+// (.d-main / .d-controls / .d-search-wrap / .d-view-tabs / .d-view-tab /
+// .d-pills / .d-pill), and $lg mirrors the 1200/900px depth-grid rules.
+type StyledComponent = React.ComponentType<Record<string, unknown>>;
+
+const MainContainer = tamaguiStyled(YStack, {
+  flex: 1,
+  paddingVertical: 16,
+  paddingHorizontal: 22,
+  $md: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+}) as StyledComponent;
+
+const ViewTabsRow = tamaguiStyled(XStack, {
+  gap: 0,
+  borderBottomWidth: 1,
+  borderBottomColor: 'var(--d-border)',
+  marginBottom: 14,
+  flexShrink: 0,
+  $md: {
+    overflow: 'scroll',
+  },
+}) as StyledComponent;
+
+const ControlsBar = tamaguiStyled(XStack, {
+  alignItems: 'center',
+  gap: 12,
+  flexWrap: 'wrap',
+  flexShrink: 0,
+  marginBottom: 18,
+  $md: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+  },
+}) as StyledComponent;
+
+const SearchWrap = tamaguiStyled(XStack, {
+  flex: 1,
+  minWidth: 180,
+  position: 'relative',
+  alignItems: 'center',
+  $md: {
+    minWidth: 0,
+  },
+}) as StyledComponent;
+
+const PillsRow = tamaguiStyled(XStack, {
+  gap: 4,
+  flexWrap: 'wrap',
+  $md: {
+    flexWrap: 'nowrap',
+    overflow: 'scroll',
+    paddingBottom: 4,
+  },
+}) as StyledComponent;
+
+const DepthGrid = tamaguiStyled(YStack, {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: 10,
+  // Column count itself is driven by `depthGridColumns` (`useDepthGridColumns()`
+  // below) since Tamagui's `styled()` breakpoints can't express a
+  // percentage that depends on more than two tiers; these two keys still
+  // carry the ≤900px / ≤768px gap tightening from the original CSS.
+  $gtSm: {
+    gap: 10,
+  },
+  $md: {
+    gap: 8,
+  },
+}) as StyledComponent;
 
 /** A single depth-chart slot bucket: one or more league-configured roster
  *  positions of the same canonical type (e.g. all SP/RP rows collapse into
@@ -195,6 +276,57 @@ const VIEW_TABS: Array<{ mode: ViewMode; label: string }> = [
   { mode: 'depth', label: 'My Depth Chart' },
 ];
 
+/**
+ * Depth-grid column count, mirroring the original CSS's 1200px/900px
+ * `grid-template-columns` breakpoints. Uses a local `window.matchMedia`
+ * listener (the `useIsNarrow()` custom-breakpoint pattern from
+ * `.agents/skills/shared-components-first/SKILL.md`) rather than Tamagui's
+ * `useMedia()`, which reads from a `TamaguiProvider` context this component's
+ * consumers don't all supply (e.g. `apps/web/src/components/
+ * EliteDraftBoard.a11y.spec.tsx` renders it bare).
+ */
+function useDepthGridColumns(): number {
+  const [columns, setColumns] = useState(4);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const gtLg = window.matchMedia('(min-width: 1201px)');
+    const gtMd = window.matchMedia('(min-width: 901px)');
+    const gtSm = window.matchMedia('(min-width: 641px)');
+    const update = () => {
+      setColumns(gtLg.matches ? 4 : gtMd.matches ? 3 : gtSm.matches ? 2 : 1);
+    };
+    update();
+    gtLg.addEventListener('change', update);
+    gtMd.addEventListener('change', update);
+    gtSm.addEventListener('change', update);
+    return () => {
+      gtLg.removeEventListener('change', update);
+      gtMd.removeEventListener('change', update);
+      gtSm.removeEventListener('change', update);
+    };
+  }, []);
+  return columns;
+}
+
+// Colors are sourced exclusively from the CSS custom properties `styles.ts`
+// injects (every consumer of this component renders `<style>{CSS}</style>`
+// before it) rather than hex/rgba literals, per the theme-compliance ratchet
+// (LS-8518/8519) — `scripts/check-theme-compliance.mjs`.
+const ACCENT = 'var(--d-accent)';
+const ACCENT_DARK = 'var(--d-accent-dark)';
+const ACCENT_DIM = 'var(--d-accent-dim)';
+const BORDER = 'var(--d-border)';
+const SURFACE = 'var(--d-surface)';
+// Commissioner "Force Pick" override reuses the danger token — no dedicated
+// purple brand token exists, and this communicates "bypasses draft order"
+// more clearly than an arbitrary color would.
+const COMM_OVERRIDE = 'var(--d-danger)';
+const PANEL_SHADOW = 'var(--d-panel-shadow)';
+const TEXT = 'var(--d-text)';
+const TEXT_SECONDARY = 'var(--d-text-secondary)';
+const TEXT_MUTED = 'var(--d-text-muted)';
+const PANEL = 'var(--d-panel)';
+
 export function DraftPlayerBoard({
   viewMode,
   sport,
@@ -234,6 +366,8 @@ export function DraftPlayerBoard({
   onPlayerDragStart,
   onPlayerDragEnd,
 }: DraftPlayerBoardProps): React.JSX.Element {
+  const depthGridColumns = useDepthGridColumns();
+
   const gridCols =
     viewMode === 'grid' ? 'repeat(auto-fill, minmax(320px, 1fr))' : '1fr';
 
@@ -354,6 +488,12 @@ export function DraftPlayerBoard({
     viewMode === 'compact' ||
     viewMode === 'table';
 
+  const STATE_BTN_STYLE = csp({
+    background: `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_DARK} 100%)`,
+    borderRadius: 8,
+    boxShadow: `0 4px 20px ${ACCENT_DIM}`,
+  });
+
   return (
     <>
       <PlayerDetailModal
@@ -363,63 +503,124 @@ export function DraftPlayerBoard({
         open={detailOpen}
         onOpenChange={setDetailOpen}
       />
-      <div
-        className="d-main"
+      <MainContainer
         role="main"
         aria-label="Player draft board"
         data-testid="draft-board"
       >
         {/* View tabs */}
-        <div className="d-view-tabs" role="tablist" aria-label="View mode">
-          {VIEW_TABS.map(({ mode, label }) => (
-            <button
-              key={mode}
-              className={`d-view-tab${viewMode === mode ? ' active' : ''}`}
-              role="tab"
-              aria-selected={viewMode === mode}
-              onClick={() => onSetViewMode(mode)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          flexShrink={0}
+        >
+          <ViewTabsRow
+            role="tablist"
+            accessibilityRole="tablist"
+            aria-label="View mode"
+          >
+            {VIEW_TABS.map(({ mode, label }) => {
+              const active = viewMode === mode;
+              return (
+                <XStack
+                  key={mode}
+                  role="tab"
+                  accessibilityRole="tab"
+                  aria-selected={active}
+                  accessibilityState={{ selected: active }}
+                  onPress={() => onSetViewMode(mode)}
+                  cursor="pointer"
+                  paddingVertical={10}
+                  paddingHorizontal={16}
+                  borderBottomWidth={2}
+                  borderBottomColor={active ? ACCENT : 'transparent'}
+                  marginBottom={-1}
+                  // mirrors the original `.d-view-tab`'s `$md:` (≤768px) padding tighten
+                  $md={{ paddingVertical: 12, paddingHorizontal: 14 }}
+                >
+                  <Text
+                    fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
+                    fontWeight="700"
+                    fontSize={12}
+                    letterSpacing={1.68}
+                    textTransform="uppercase"
+                    color={active ? ACCENT : TEXT_SECONDARY}
+                    whiteSpace="nowrap"
+                  >
+                    {label}
+                  </Text>
+                </XStack>
+              );
+            })}
+          </ViewTabsRow>
+        </ScrollView>
 
         {/* Search + position filter — only for player pool views */}
         {showSearchControls && (
-          <div className="d-controls">
-            <div className="d-search-wrap">
-              <svg
-                className="d-search-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          <ControlsBar
+            style={csp({
+              background: PANEL,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 12,
+              paddingVertical: 14,
+              paddingHorizontal: 18,
+              boxShadow: PANEL_SHADOW,
+            })}
+          >
+            <SearchWrap>
+              <YStack
+                position="absolute"
+                left={12}
+                zIndex={1}
+                pointerEvents="none"
               >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                className="d-search-input"
-                type="text"
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke={TEXT_MUTED}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  width={15}
+                  height={15}
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </YStack>
+              <Input
+                flex={1}
+                size="$3"
+                borderRadius={10}
+                borderWidth={1}
+                borderColor={BORDER}
+                backgroundColor={PANEL}
+                color={TEXT}
+                fontSize={13}
+                paddingLeft={38}
+                paddingRight={searchTerm ? 34 : 14}
                 placeholder="Search available players..."
+                placeholderTextColor={TEXT_MUTED}
                 aria-label="Search players"
                 value={searchTerm}
-                onChange={(e) => onSetSearchTerm(e.target.value)}
-                style={searchTerm ? { paddingRight: 34 } : undefined}
+                onChangeText={onSetSearchTerm}
               />
               {searchTerm ? (
-                <button
-                  className="d-search-clear"
-                  type="button"
+                <YStack
+                  role="button"
+                  accessibilityRole="button"
                   aria-label="Clear search"
-                  onClick={() => onSetSearchTerm('')}
+                  onPress={() => onSetSearchTerm('')}
+                  cursor="pointer"
+                  position="absolute"
+                  right={8}
+                  padding={4}
+                  borderRadius={999}
                 >
                   <svg
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="currentColor"
+                    stroke={TEXT_MUTED}
                     strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -429,30 +630,18 @@ export function DraftPlayerBoard({
                     <line x1="18" y1="6" x2="6" y2="18" />
                     <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
-                </button>
+                </YStack>
               ) : availablePlayersLoading ? (
-                <span
-                  style={{
-                    position: 'absolute',
-                    right: 12,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    display: 'inline-block',
-                    width: 14,
-                    height: 14,
-                    border: '2px solid rgba(197, 165, 90, 0.2)',
-                    borderTopColor: 'var(--d-accent)',
-                    borderRadius: '50%',
-                    animation: 'spin 0.8s linear infinite',
-                  }}
-                />
+                <YStack position="absolute" right={12}>
+                  <Spinner size="small" color={ACCENT} />
+                </YStack>
               ) : null}
-            </div>
-            <div
-              className="d-pills"
+            </SearchWrap>
+            <PillsRow
               role="radiogroup"
+              accessibilityRole="radiogroup"
               aria-label="Filter by position"
-              onKeyDown={(e) => {
+              onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
                 const idx = positions.indexOf(selectedPosition);
                 let next = idx;
                 if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
@@ -476,20 +665,43 @@ export function DraftPlayerBoard({
                 }
               }}
             >
-              {positions.map((pos) => (
-                <button
-                  key={pos}
-                  className={`d-pill${selectedPosition === pos ? ' active' : ''}`}
-                  onClick={() => onSetSelectedPosition(pos)}
-                  role="radio"
-                  aria-checked={selectedPosition === pos}
-                  tabIndex={selectedPosition === pos ? 0 : -1}
-                >
-                  {pos}
-                </button>
-              ))}
-            </div>
-          </div>
+              {positions.map((pos) => {
+                const active = selectedPosition === pos;
+                return (
+                  <XStack
+                    key={pos}
+                    role="radio"
+                    accessibilityRole="radio"
+                    aria-checked={active}
+                    accessibilityState={{ selected: active }}
+                    tabIndex={active ? 0 : -1}
+                    onPress={() => onSetSelectedPosition(pos)}
+                    cursor="pointer"
+                    paddingVertical={6}
+                    paddingHorizontal={13}
+                    borderRadius={999}
+                    borderWidth={1}
+                    borderColor={active ? ACCENT_DIM : BORDER}
+                    style={csp({
+                      background: active
+                        ? `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_DARK} 100%)`
+                        : SURFACE,
+                    })}
+                    // mirrors the original `.d-pill`'s `$md:` (≤768px) min-height bump
+                    $md={{ minHeight: 36 }}
+                  >
+                    <Text
+                      fontSize={12}
+                      fontWeight="600"
+                      color={active ? 'white' : TEXT_SECONDARY}
+                    >
+                      {pos}
+                    </Text>
+                  </XStack>
+                );
+              })}
+            </PillsRow>
+          </ControlsBar>
         )}
 
         {/* Draft Board view */}
@@ -521,248 +733,327 @@ export function DraftPlayerBoard({
 
         {/* Data Table view */}
         {viewMode === 'table' && (
-          <div className="d-data-table-wrap">
-            <table className="d-data-table">
-              <thead>
-                <tr>
-                  {(
-                    [
-                      { key: 'rank', label: 'Rank', className: '' },
-                      { key: 'name', label: 'Player', className: '' },
-                      { key: 'position', label: 'Pos', className: '' },
-                      { key: 'adp', label: 'ADP', className: 'num' },
-                    ] as Array<{
-                      key: string;
-                      label: string;
-                      className: string;
-                    }>
-                  ).map(({ key, label, className }) => (
-                    <th
-                      key={key}
-                      className={[
-                        className,
-                        sortKey === key ? 'sort-active' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      onClick={() => handleHeaderClick(key)}
-                      aria-sort={
-                        sortKey === key
-                          ? sortDir === 'asc'
-                            ? 'ascending'
-                            : 'descending'
-                          : 'none'
-                      }
+          <YStack
+            style={csp({
+              background: PANEL,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 10,
+              overflowX: 'auto',
+            })}
+          >
+            <YStack role="table" minWidth="100%">
+              <XStack role="row">
+                {(
+                  [
+                    { key: 'rank', label: 'Rank', width: 64, align: 'right' },
+                    {
+                      key: 'name',
+                      label: 'Player',
+                      width: undefined,
+                      align: 'left',
+                    },
+                    { key: 'position', label: 'Pos', width: 60, align: 'left' },
+                    { key: 'adp', label: 'ADP', width: 70, align: 'right' },
+                  ] as Array<{
+                    key: string;
+                    label: string;
+                    width: number | undefined;
+                    align: 'left' | 'right';
+                  }>
+                ).map(({ key, label, width, align }) => (
+                  <XStack
+                    key={key}
+                    role="columnheader"
+                    accessibilityRole="button"
+                    aria-sort={
+                      sortKey === key
+                        ? sortDir === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                    onPress={() => handleHeaderClick(key)}
+                    cursor="pointer"
+                    flex={width ? undefined : 1}
+                    width={width}
+                    justifyContent={
+                      align === 'right' ? 'flex-end' : 'flex-start'
+                    }
+                    paddingVertical={9}
+                    paddingHorizontal={12}
+                    style={csp({
+                      background: PANEL,
+                      borderBottom: `1px solid ${BORDER}`,
+                    })}
+                  >
+                    <Text
+                      fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
+                      fontWeight="700"
+                      fontSize={10}
+                      letterSpacing={1.4}
+                      textTransform="uppercase"
+                      color={sortKey === key ? ACCENT : TEXT_SECONDARY}
+                      whiteSpace="nowrap"
                     >
                       {label}
-                      {sortKey === key && (
-                        <span className="d-sort-arrow" aria-hidden="true">
-                          {sortDir === 'asc' ? ' ↑' : ' ↓'}
-                        </span>
-                      )}
-                    </th>
-                  ))}
-                  {STAT_COLUMNS_BY_SPORT[sport].map((col) => (
-                    <th
-                      key={col.label}
-                      className={[
-                        'num',
-                        sortKey === col.label ? 'sort-active' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      onClick={() => handleHeaderClick(col.label)}
-                      aria-sort={
-                        sortKey === col.label
-                          ? sortDir === 'asc'
-                            ? 'ascending'
-                            : 'descending'
-                          : 'none'
-                      }
+                      {sortKey === key && (sortDir === 'asc' ? ' ↑' : ' ↓')}
+                    </Text>
+                  </XStack>
+                ))}
+                {STAT_COLUMNS_BY_SPORT[sport].map((col) => (
+                  <XStack
+                    key={col.label}
+                    role="columnheader"
+                    accessibilityRole="button"
+                    aria-sort={
+                      sortKey === col.label
+                        ? sortDir === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    }
+                    onPress={() => handleHeaderClick(col.label)}
+                    cursor="pointer"
+                    width={70}
+                    justifyContent="flex-end"
+                    paddingVertical={9}
+                    paddingHorizontal={12}
+                    style={csp({
+                      background: PANEL,
+                      borderBottom: `1px solid ${BORDER}`,
+                    })}
+                  >
+                    <Text
+                      fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
+                      fontWeight="700"
+                      fontSize={10}
+                      letterSpacing={1.4}
+                      textTransform="uppercase"
+                      color={sortKey === col.label ? ACCENT : TEXT_SECONDARY}
+                      whiteSpace="nowrap"
                     >
                       {col.label}
-                      {sortKey === col.label && (
-                        <span className="d-sort-arrow" aria-hidden="true">
-                          {sortDir === 'asc' ? ' ↑' : ' ↓'}
-                        </span>
-                      )}
-                    </th>
-                  ))}
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedPlayers.map((player, idx) => {
-                  const posColor = getPositionColor(
-                    sport,
-                    player.position ?? '',
-                  );
-                  return (
-                    <tr
-                      key={player.id}
-                      className={
-                        watchlistSet.has(player.id) ? 'watched' : undefined
-                      }
-                      onClick={() => handlePlayerClick(player.id)}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <td
-                        className="num"
-                        style={{ color: 'var(--d-text-muted)', fontSize: 11 }}
-                      >
+                      {sortKey === col.label &&
+                        (sortDir === 'asc' ? ' ↑' : ' ↓')}
+                    </Text>
+                  </XStack>
+                ))}
+                <XStack width={90} />
+              </XStack>
+              {sortedPlayers.map((player, idx) => {
+                const posColor = getPositionColor(sport, player.position ?? '');
+                return (
+                  <XStack
+                    key={player.id}
+                    role="row"
+                    accessibilityRole="button"
+                    onPress={() => handlePlayerClick(player.id)}
+                    cursor="pointer"
+                    alignItems="center"
+                    opacity={watchlistSet.has(player.id) ? 0.85 : 1}
+                    style={csp({
+                      borderBottom: `1px solid ${BORDER}`,
+                    })}
+                  >
+                    <XStack width={64} justifyContent="flex-end" padding={8}>
+                      <Text color={TEXT_MUTED} fontSize={11}>
                         {rankMap.get(player.id) ?? idx + 1}
-                      </td>
-                      <td>
-                        <span style={{ fontWeight: 600, fontSize: 13 }}>
-                          {player.name}
-                        </span>
-                      </td>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-block',
-                            padding: '1px 5px',
-                            borderRadius: 3,
-                            fontSize: 10,
-                            fontWeight: 700,
-                            color: posColor,
-                            background: `${posColor}26`,
-                            fontFamily: "'Big Shoulders Display', sans-serif",
-                            letterSpacing: 0.6,
-                          }}
+                      </Text>
+                    </XStack>
+                    <XStack flex={1} padding={8}>
+                      <Text fontWeight="600" fontSize={13} color={TEXT}>
+                        {player.name}
+                      </Text>
+                    </XStack>
+                    <XStack width={60} padding={8}>
+                      <XStack
+                        paddingHorizontal={5}
+                        paddingVertical={1}
+                        borderRadius={3}
+                        backgroundColor={`${posColor}26`}
+                      >
+                        <Text
+                          fontSize={10}
+                          fontWeight="700"
+                          color={posColor}
+                          fontFamily="'Big Shoulders Display', sans-serif"
+                          letterSpacing={0.6}
                         >
                           {player.position ?? '?'}
-                        </span>
-                      </td>
-                      <td className="num">
+                        </Text>
+                      </XStack>
+                    </XStack>
+                    <XStack width={70} justifyContent="flex-end" padding={8}>
+                      <Text fontSize={12} color={TEXT}>
                         {(
                           player as DraftPlayer & { adp?: number }
                         ).adp?.toFixed(1) ?? '—'}
-                      </td>
-                      {STAT_COLUMNS_BY_SPORT[sport].map((col) => (
-                        <td key={col.label} className="num">
+                      </Text>
+                    </XStack>
+                    {STAT_COLUMNS_BY_SPORT[sport].map((col) => (
+                      <XStack
+                        key={col.label}
+                        width={70}
+                        justifyContent="flex-end"
+                        padding={8}
+                      >
+                        <Text fontSize={12} color={TEXT}>
                           {col.render(player)}
-                        </td>
-                      ))}
-                      <td>
-                        {(commPickMode ? isOwner : isMyPick) && (
-                          <button
-                            className={`d-state-btn${commPickMode && isOwner ? ' force-pick' : ''}`}
-                            style={{ padding: '3px 10px', fontSize: 11 }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDraftPlayer(player.id);
-                            }}
-                            disabled={pickLoading}
-                          >
+                        </Text>
+                      </XStack>
+                    ))}
+                    <XStack width={90} justifyContent="flex-end" padding={8}>
+                      {(commPickMode ? isOwner : isMyPick) && (
+                        <XStack
+                          role="button"
+                          accessibilityRole="button"
+                          disabled={pickLoading}
+                          onPress={(e: { stopPropagation: () => void }) => {
+                            e.stopPropagation();
+                            handleDraftPlayer(player.id);
+                          }}
+                          cursor="pointer"
+                          paddingVertical={3}
+                          paddingHorizontal={10}
+                          borderRadius={8}
+                          style={csp({
+                            background:
+                              commPickMode && isOwner
+                                ? COMM_OVERRIDE
+                                : `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_DARK} 100%)`,
+                          })}
+                        >
+                          <Text fontSize={11} fontWeight="700" color="white">
                             {commPickMode && isOwner ? 'Force Pick' : 'Draft'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-                {sortedPlayers.length === 0 && !availablePlayersLoading && (
-                  <tr>
-                    <td
-                      colSpan={10}
-                      style={{
-                        textAlign: 'center',
-                        padding: '40px 20px',
-                        color: 'var(--d-text-muted)',
-                      }}
-                    >
-                      {searchTerm
-                        ? 'No players match your search'
-                        : 'All available players have been drafted'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                          </Text>
+                        </XStack>
+                      )}
+                    </XStack>
+                  </XStack>
+                );
+              })}
+              {sortedPlayers.length === 0 && !availablePlayersLoading && (
+                <YStack padding={24} alignItems="center">
+                  <Text color={TEXT_MUTED}>
+                    {searchTerm
+                      ? 'No players match your search'
+                      : 'All available players have been drafted'}
+                  </Text>
+                </YStack>
+              )}
+            </YStack>
+          </YStack>
         )}
 
         {/* My Depth Chart view */}
         {viewMode === 'depth' && (
-          <div className="d-depth-grid">
+          <DepthGrid>
             {depthChartBuckets.map(({ positionType, total, players }) => {
               const complete = total > 0 && players.length >= total;
               const posColor = getPositionColor(sport, positionType);
               return (
-                <div
+                <YStack
                   key={positionType}
-                  className={`d-depth-slot${complete ? ' complete' : ''}`}
+                  flexBasis={`${100 / depthGridColumns}%`}
+                  minWidth={0}
+                  paddingHorizontal={5}
+                  paddingBottom={10}
                 >
-                  <div className="d-depth-slot-head">
-                    <span
-                      className="d-depth-slot-pos"
-                      style={{ color: posColor }}
-                      title={
-                        positionType === BENCH_SLOT
-                          ? 'Bench'
-                          : getPositionLabel(positionType)
-                      }
+                  <YStack
+                    style={csp({
+                      background: PANEL,
+                      border: complete ? undefined : `1px solid ${BORDER}`,
+                      borderRadius: 8,
+                      padding: 12,
+                    })}
+                  >
+                    <XStack
+                      alignItems="center"
+                      justifyContent="space-between"
+                      marginBottom={8}
                     >
-                      {positionType}
-                    </span>
-                    <span className="d-depth-slot-ct">
-                      {players.length} / {total}
-                    </span>
-                  </div>
-                  {Array.from({ length: Math.max(total, players.length) }).map(
-                    (_, i) => {
+                      <Text
+                        color={posColor}
+                        fontFamily="'Big Shoulders Display', 'Arial Narrow', sans-serif"
+                        fontWeight="800"
+                        fontSize={13}
+                        letterSpacing={1.3}
+                        aria-label={
+                          positionType === BENCH_SLOT
+                            ? 'Bench'
+                            : getPositionLabel(positionType)
+                        }
+                      >
+                        {positionType}
+                      </Text>
+                      <Text
+                        fontSize={11}
+                        color={complete ? '$statusSuccessFg' : TEXT_SECONDARY}
+                      >
+                        {players.length} / {total}
+                      </Text>
+                    </XStack>
+                    {Array.from({
+                      length: Math.max(total, players.length),
+                    }).map((_, i) => {
                       const player = players[i];
                       return (
-                        <div
+                        <XStack
                           key={i}
-                          className={`d-depth-row${player ? ' filled' : ' empty'}`}
+                          alignItems="center"
+                          justifyContent={player ? 'space-between' : 'center'}
+                          paddingVertical={5}
+                          paddingHorizontal={8}
+                          marginBottom={3}
+                          borderRadius={4}
+                          style={csp({
+                            background: player ? PANEL : 'transparent',
+                            border: player ? undefined : `1px dashed ${BORDER}`,
+                          })}
                         >
                           {player ? (
                             <>
-                              <span
-                                style={{
-                                  fontWeight: 600,
+                              <Text
+                                fontWeight="600"
+                                fontSize={12}
+                                color={TEXT}
+                                numberOfLines={1}
+                                style={csp({
                                   overflow: 'hidden',
                                   textOverflow: 'ellipsis',
                                   whiteSpace: 'nowrap',
-                                }}
+                                })}
                               >
                                 {player.name}
-                              </span>
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  color: 'var(--d-text-muted)',
-                                  flexShrink: 0,
-                                }}
-                              >
+                              </Text>
+                              <Text fontSize={10} color={TEXT_MUTED}>
                                 {player.position}
-                              </span>
+                              </Text>
                             </>
                           ) : (
-                            'Open'
+                            <Text
+                              fontSize={12}
+                              color={TEXT_MUTED}
+                              fontStyle="italic"
+                            >
+                              Open
+                            </Text>
                           )}
-                        </div>
+                        </XStack>
                       );
-                    },
-                  )}
-                </div>
+                    })}
+                  </YStack>
+                </YStack>
               );
             })}
             {myTeam.length === 0 && (
-              <div
-                style={{
-                  gridColumn: '1 / -1',
-                  textAlign: 'center',
-                  padding: '60px 20px',
-                  color: 'var(--d-text-muted)',
-                }}
-              >
-                <div style={{ fontSize: 13 }}>No players drafted yet</div>
-              </div>
+              <YStack flexBasis="100%" alignItems="center" padding={24}>
+                <Text fontSize={13} color={TEXT_MUTED}>
+                  No players drafted yet
+                </Text>
+              </YStack>
             )}
-          </div>
+          </DepthGrid>
         )}
 
         {/* Cards / List / Compact view */}
@@ -770,10 +1061,13 @@ export function DraftPlayerBoard({
           viewMode === 'list' ||
           viewMode === 'compact') && (
           <>
-            <div
-              className="d-player-grid"
+            <YStack
               data-testid="player-pool"
-              style={{ gridTemplateColumns: gridCols }}
+              style={csp({
+                display: 'grid',
+                gridTemplateColumns: gridCols,
+                gap: 14,
+              })}
             >
               {filteredPlayers.map((player, idx) => (
                 <PlayerCard
@@ -798,46 +1092,55 @@ export function DraftPlayerBoard({
                 />
               ))}
               {filteredPlayers.length === 0 && !availablePlayersLoading && (
-                <div
-                  style={{
-                    gridColumn: '1 / -1',
-                    textAlign: 'center',
-                    padding: '60px 20px',
-                    color: 'var(--d-text-muted)',
-                  }}
+                <YStack
+                  style={csp({ gridColumn: '1 / -1' })}
+                  alignItems="center"
+                  padding={24}
                 >
-                  <div style={{ fontSize: 48, marginBottom: 12 }}>
+                  <Text fontSize={48} marginBottom={12}>
                     <span role="img" aria-label="search">
                       🔍
                     </span>
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  </Text>
+                  <Text fontSize={16} fontWeight="600" color={TEXT}>
                     No players found
-                  </div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>
+                  </Text>
+                  <Text fontSize={13} marginTop={4} color={TEXT_MUTED}>
                     {searchTerm
                       ? 'Try a different search term'
                       : 'All available players have been drafted'}
-                  </div>
-                </div>
+                  </Text>
+                </YStack>
               )}
-            </div>
+            </YStack>
             {hasMorePlayers &&
               !availablePlayersLoading &&
               filteredPlayers.length > 0 && (
-                <div style={{ textAlign: 'center', padding: '16px 20px' }}>
-                  <button
-                    className="d-state-btn"
-                    onClick={onLoadMore}
+                <YStack
+                  alignItems="center"
+                  paddingVertical={16}
+                  paddingHorizontal={20}
+                >
+                  <XStack
+                    role="button"
+                    accessibilityRole="button"
                     disabled={loadingMore}
+                    onPress={onLoadMore}
+                    cursor="pointer"
+                    paddingVertical={12}
+                    paddingHorizontal={28}
+                    borderRadius={8}
+                    style={STATE_BTN_STYLE}
                   >
-                    {loadingMore ? 'Loading…' : 'Load More Players'}
-                  </button>
-                </div>
+                    <Text fontSize={14} fontWeight="700" color="white">
+                      {loadingMore ? 'Loading…' : 'Load More Players'}
+                    </Text>
+                  </XStack>
+                </YStack>
               )}
           </>
         )}
-      </div>
+      </MainContainer>
     </>
   );
 }

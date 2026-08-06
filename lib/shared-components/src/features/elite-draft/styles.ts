@@ -30,6 +30,7 @@ export const CSS = `
   --d-navy: var(--brandNavy, #1B3A5C);
   --d-navy-light: var(--brandNavyLight, #2C4A7C);
   --d-seam-red: var(--brandSeamRed, #C41E3A);
+  --d-panel-shadow: 0 4px 24px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.04);
   --d-radius-sm: 8px;
   --d-radius-md: 12px;
   --d-radius-lg: 16px;

@@ -13,6 +13,72 @@ jest.mock('../features/baseball/LeagueChatTab', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Tamagui (LS-9065) — DraftPlayerBoard now renders via Tamagui primitives.
+// The real `tamagui` package needs a `TamaguiProvider` (media/animation
+// config) this suite doesn't set up — without one, `useMedia` isn't callable
+// and press handling never wires up, so `userEvent.click` on an `XStack`
+// with `onPress` silently no-ops (see BaseModal.spec.tsx and
+// CommissionerToolsControl.spec.tsx for the same trade-off elsewhere in
+// apps/web). Render every primitive as a plain DOM passthrough, mapping
+// `onPress` → `onClick` and `onChangeText` → `onChange`, so this suite
+// exercises real click/keyboard events and role/aria attributes instead.
+// ---------------------------------------------------------------------------
+jest.mock('tamagui', () => {
+  const ReactActual: typeof React = jest.requireActual('react');
+
+  function passthrough(tag: string) {
+    return ReactActual.forwardRef(function Passthrough(
+      {
+        children,
+        onPress,
+        ...props
+      }: {
+        children?: React.ReactNode;
+        onPress?: React.MouseEventHandler;
+      } & Record<string, unknown>,
+      ref: React.Ref<HTMLElement>,
+    ) {
+      return ReactActual.createElement(
+        tag,
+        { ...props, ref, onClick: onPress },
+        children,
+      );
+    });
+  }
+
+  const Input = ReactActual.forwardRef(function Input(
+    {
+      value,
+      onChangeText,
+      ...props
+    }: {
+      value?: string;
+      onChangeText?: (v: string) => void;
+    } & Record<string, unknown>,
+    ref: React.Ref<HTMLInputElement>,
+  ) {
+    return ReactActual.createElement('input', {
+      ...props,
+      ref,
+      value,
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+        onChangeText?.(e.target.value),
+    });
+  });
+
+  return {
+    YStack: passthrough('div'),
+    XStack: passthrough('div'),
+    Text: passthrough('span'),
+    ScrollView: passthrough('div'),
+    Input,
+    Spinner: () => ReactActual.createElement('span', { role: 'status' }),
+    styled: (Component: unknown) => Component,
+    useMedia: () => ({}),
+  };
+});
+
+// ---------------------------------------------------------------------------
 // EliteDraftBoardScreen (in shared-components) calls useAuth() internally via
 // a relative import.  Mock the auth barrel so the component gets a fake user
 // without requiring a full AuthProvider tree.
