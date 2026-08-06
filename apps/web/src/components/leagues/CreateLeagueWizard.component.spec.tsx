@@ -181,9 +181,12 @@ jest.mock('./wizard/StepRosterSettings', () => ({
 jest.mock('./wizard/StepDefensiveFormat', () => ({
   StepDefensiveFormat: ({
     onChange,
+    onScoringFormatChange,
   }: {
     defensiveFormat: string;
     onChange: (format: 'dst' | 'idp') => void;
+    scoringFormat: string;
+    onScoringFormatChange: (format: 'standard' | 'half_ppr' | 'ppr') => void;
   }) => (
     <div>
       <span>Defensive Format</span>
@@ -192,6 +195,12 @@ jest.mock('./wizard/StepDefensiveFormat', () => ({
       </button>
       <button type="button" onClick={() => onChange('dst')}>
         Team D/ST
+      </button>
+      <button type="button" onClick={() => onScoringFormatChange('standard')}>
+        Standard
+      </button>
+      <button type="button" onClick={() => onScoringFormatChange('half_ppr')}>
+        Half-PPR
       </button>
     </div>
   ),
@@ -534,5 +543,62 @@ describe('CreateLeagueWizard', () => {
         (slot: { positionType: string }) => slot.positionType === 'BN',
       ),
     ).toBe(false);
+  });
+
+  it('defaults scoringFormat to ppr for a wizard-created football league (LS-6152)', () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: { id: 'league-8' } } },
+    });
+    render(<CreateLeagueWizard />);
+    fireEvent.click(screen.getByText('Football'));
+    advance(); // sport -> settings
+    fillLeagueName('My Football League');
+    advance(); // settings -> premium
+    advance(); // premium -> roster
+    advance(); // roster -> defensive
+    advance(); // defensive -> confirm
+    act(() => {
+      fireEvent.click(screen.getByText('Create League'));
+    });
+
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.scoringFormat).toBe('ppr');
+  });
+
+  it('sends the chosen scoring format for a wizard-created football league (LS-6152)', () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: { id: 'league-9' } } },
+    });
+    render(<CreateLeagueWizard />);
+    fireEvent.click(screen.getByText('Football'));
+    advance(); // sport -> settings
+    fillLeagueName('My Football League');
+    advance(); // settings -> premium
+    advance(); // premium -> roster
+    advance(); // roster -> defensive
+    fireEvent.click(screen.getByText('Standard'));
+    advance(); // defensive -> confirm
+    act(() => {
+      fireEvent.click(screen.getByText('Create League'));
+    });
+
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.scoringFormat).toBe('standard');
+  });
+
+  it('omits scoringFormat for baseball leagues', () => {
+    mockCreateLeague.mockResolvedValue({
+      data: { createLeagueAndTeams: { league: { id: 'league-1' } } },
+    });
+    render(<CreateLeagueWizard />);
+    advance();
+    fillLeagueName('My League');
+    advance();
+    advance();
+    act(() => {
+      fireEvent.click(screen.getByText('Create League'));
+    });
+    const input = mockCreateLeague.mock.calls[0][0].variables.input;
+    expect(input.scoringFormat).toBeUndefined();
   });
 });

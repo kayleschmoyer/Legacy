@@ -46,6 +46,14 @@ function formatEraFilter(eraFilter: string): string {
     .join(' ');
 }
 
+function formatScoringFormat(
+  scoringFormat: WizardState['scoringFormat'],
+): string {
+  if (scoringFormat === 'standard') return 'Standard';
+  if (scoringFormat === 'half_ppr') return 'Half-PPR';
+  return 'PPR';
+}
+
 export function StepConfirmation({
   state,
   error,
@@ -125,6 +133,10 @@ export function StepConfirmation({
         )}
         {isFootball && (
           <>
+            <SummaryRow
+              label="Scoring Format"
+              value={formatScoringFormat(state.scoringFormat)}
+            />
             <SummaryRow
               label="Defensive Format"
               value={

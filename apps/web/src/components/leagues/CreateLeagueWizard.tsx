@@ -13,6 +13,7 @@ import {
 import { StepConfirmation } from './wizard/StepConfirmation';
 import {
   type DefensiveFormat,
+  type ScoringFormat,
   StepDefensiveFormat,
 } from './wizard/StepDefensiveFormat';
 import {
@@ -49,6 +50,7 @@ const SALARY_CAP_RANGE = { min: 1, max: 1_000_000_000 };
 export interface WizardState extends PremiumOptions {
   sport: SportChoice;
   defensiveFormat: DefensiveFormat;
+  scoringFormat: ScoringFormat;
   name: string;
   numTeams: number;
   draftOrder: 'snake' | 'linear';
@@ -90,11 +92,13 @@ export type WizardAction =
   | { type: 'SET_SETTINGS'; settings: LeagueSettings }
   | { type: 'SET_PREMIUM_OPTIONS'; options: PremiumOptions }
   | { type: 'SET_DEFENSIVE_FORMAT'; format: DefensiveFormat }
+  | { type: 'SET_SCORING_FORMAT'; format: ScoringFormat }
   | { type: 'SET_ROSTER_SLOTS'; slots: Record<string, number> };
 
 export const INITIAL_STATE: WizardState = {
   sport: 'BASEBALL',
   defensiveFormat: 'dst',
+  scoringFormat: 'ppr',
   name: '',
   numTeams: 10,
   draftOrder: 'snake',
@@ -150,6 +154,8 @@ export function wizardReducer(
             ? { ...IDP_ROSTER_DEFAULTS }
             : { ...DST_ROSTER_DEFAULTS },
       };
+    case 'SET_SCORING_FORMAT':
+      return { ...state, scoringFormat: action.format };
     case 'SET_ROSTER_SLOTS':
       return { ...state, rosterSlots: action.slots, rosterCustomized: true };
     default:
@@ -344,6 +350,7 @@ export function CreateLeagueWizard() {
                     state.defensiveFormat === 'idp'
                       ? GqlDefensiveFormat.Idp
                       : GqlDefensiveFormat.Dst,
+                  scoringFormat: state.scoringFormat,
                 }
               : {}),
             ...(state.selectionMethod === 'auction'
@@ -547,6 +554,10 @@ export function CreateLeagueWizard() {
             <StepDefensiveFormat
               defensiveFormat={state.defensiveFormat}
               onChange={handleDefensiveFormatChange}
+              scoringFormat={state.scoringFormat}
+              onScoringFormatChange={(format) =>
+                dispatch({ type: 'SET_SCORING_FORMAT', format })
+              }
             />
           )}
 

@@ -2,11 +2,40 @@ import React from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
 
 export type DefensiveFormat = 'dst' | 'idp';
+export type ScoringFormat = 'standard' | 'half_ppr' | 'ppr';
 
 interface StepDefensiveFormatProps {
   defensiveFormat: DefensiveFormat;
   onChange: (format: DefensiveFormat) => void;
+  scoringFormat: ScoringFormat;
+  onScoringFormatChange: (format: ScoringFormat) => void;
 }
+
+// Mirrors SCORING_FORMAT_OPTIONS in
+// lib/shared-components/src/features/leagues/create-wizard/constants.ts and
+// apps/web/src/pages/baseball/LeagueCreatePage.tsx — only the reception
+// bonus differs across formats (LS-4158).
+const SCORING_FORMAT_OPTIONS: Array<{
+  id: ScoringFormat;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: 'standard',
+    label: 'Standard',
+    description: 'No bonus points for receptions.',
+  },
+  {
+    id: 'half_ppr',
+    label: 'Half-PPR',
+    description: '0.5 points per reception.',
+  },
+  {
+    id: 'ppr',
+    label: 'PPR',
+    description: '1 point per reception.',
+  },
+];
 
 const FORMAT_OPTIONS: Array<{
   id: DefensiveFormat;
@@ -36,9 +65,78 @@ const FORMAT_OPTIONS: Array<{
 export function StepDefensiveFormat({
   defensiveFormat,
   onChange,
+  scoringFormat,
+  onScoringFormatChange,
 }: StepDefensiveFormatProps) {
   return (
     <YStack gap="$4">
+      <YStack gap="$1">
+        <Text
+          fontSize={22}
+          fontWeight="700"
+          fontFamily="$heading"
+          color="$color"
+        >
+          Scoring Format
+        </Text>
+        <Text fontSize={14} color="$textMuted">
+          Sets the reception bonus. All other stats are identical across
+          formats.
+        </Text>
+      </YStack>
+
+      <XStack gap="$2" flexWrap="wrap">
+        {SCORING_FORMAT_OPTIONS.map((option) => {
+          const isSelected = scoringFormat === option.id;
+          return (
+            <XStack
+              key={option.id}
+              testID={`scoring-format-${option.id}`}
+              accessibilityRole="button"
+              accessibilityLabel={option.label}
+              tabIndex={0}
+              onPress={() => onScoringFormatChange(option.id)}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onScoringFormatChange(option.id);
+                }
+              }}
+              pressStyle={{ opacity: 0.8 }}
+              padding="$3"
+              flex={1}
+              minWidth={100}
+              gap="$1"
+              backgroundColor={isSelected ? '$brandNavyLight' : '$surfaceCard'}
+              borderWidth={isSelected ? 2 : 1}
+              borderColor={
+                isSelected ? '$brandNavyLight' : '$surfacePanelBorder'
+              }
+              borderRadius="$2"
+              cursor="pointer"
+              animation="quick"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <Text
+                fontSize={14}
+                fontWeight="700"
+                color={isSelected ? '$textOnAccent' : '$color'}
+              >
+                {option.label}
+              </Text>
+              <Text
+                fontSize={11}
+                color={isSelected ? '$textOnAccent' : '$textMuted'}
+                textAlign="center"
+              >
+                {option.description}
+              </Text>
+            </XStack>
+          );
+        })}
+      </XStack>
+
       <YStack gap="$1">
         <Text
           fontSize={22}
