@@ -104,6 +104,16 @@ const rateLimitRetryLink = new RetryLink({
 
 // ─── Error link with token-refresh + retry ─────────────────────────────────
 
+// ENTITLEMENTS_STALE bounded retry (LS-9067): the dominant trigger is
+// transient webhook-propagation lag (Stripe entitlements bump landing after
+// the JWT refresh has already re-read the row), not a genuine failure, so a
+// single-shot retry fires the terminal fallback far more often than the
+// underlying staleness actually warrants. Three total attempts (1 immediate +
+// 2 backed off) absorb that race; worst-case added latency is bounded at
+// ~3s (0 + 800 + 2000ms) — never unbounded.
+const ENTITLEMENTS_STALE_MAX_ATTEMPTS = 3;
+const ENTITLEMENTS_STALE_RETRY_DELAYS_MS = [0, 800, 2000];
+
 export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   // Check for UNAUTHENTICATED GraphQL error
   const isUnauthenticated =
@@ -134,42 +144,57 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   );
 
   // ENTITLEMENTS_STALE → silently re-mint the JWT (fresh entitlements + new
-  // `iat`) and retry the operation ONCE. Unlike the auth path, the token is
-  // valid so the refresh will succeed; the retry can still come back stale if
-  // the marker moved again mid-flight, so a per-operation flag caps it at a
-  // single retry. On refresh failure or a still-stale retry we fail safe:
-  // clear the session (the user drops to free) and prompt re-login, matching
-  // the epic LS-8638 SHARED CONTRACTS #1 client contract. This code is an
-  // expected control signal, so it is never surfaced as a toast or to Rollbar.
+  // `iat`) and retry the operation, up to ENTITLEMENTS_STALE_MAX_ATTEMPTS
+  // times with backoff. A replay that comes back stale again re-enters this
+  // same branch and reads the incremented attempt count from context (a
+  // bounded counter, not the old single-shot boolean). On refresh failure
+  // (silentlyRefreshJwt resolves null — the /refresh-jwt call itself failed)
+  // we exit immediately to the terminal fallback without waiting out the
+  // remaining budget: retrying against a broken refresh endpoint won't
+  // un-stale anything. Once the budget is exhausted we fail safe: clear the
+  // session (the user drops to free) and prompt re-login, matching the epic
+  // LS-8638 SHARED CONTRACTS #1 client contract. This code is an expected
+  // control signal, so it is never surfaced as a toast or to Rollbar.
   if (isEntitlementsStale) {
-    const alreadyRetried = Boolean(
-      operation.getContext()['entitlementsStaleRetried'],
+    const attempt = Number(
+      operation.getContext()['entitlementsStaleAttempt'] ?? 0,
     );
     return new Observable<ApolloLink.Result>((observer) => {
-      if (alreadyRetried) {
-        // Retry still stale → fail safe: fall back to free + prompt re-login.
+      if (attempt >= ENTITLEMENTS_STALE_MAX_ATTEMPTS) {
+        // Budget exhausted → fail safe: fall back to free + prompt re-login.
         window.dispatchEvent(new CustomEvent('auth:session-expired'));
         observer.error(error);
         return;
       }
-      operation.setContext({ entitlementsStaleRetried: true });
-      silentlyRefreshJwt()
-        .then((newToken) => {
-          if (!newToken) {
-            // Refresh failed → fail safe: fall back to free + prompt re-login.
-            window.dispatchEvent(new CustomEvent('auth:session-expired'));
-            observer.error(error);
-            return;
-          }
-          forward(operation).subscribe({
-            next: (value) => observer.next(value),
-            error: (err: unknown) => observer.error(err),
-            complete: () => observer.complete(),
+      operation.setContext({ entitlementsStaleAttempt: attempt + 1 });
+
+      const attemptRefreshAndRetry = () => {
+        silentlyRefreshJwt()
+          .then((newToken) => {
+            if (!newToken) {
+              // Hard refresh failure → fail safe immediately, do not consume
+              // the remaining retry budget waiting on a broken endpoint.
+              window.dispatchEvent(new CustomEvent('auth:session-expired'));
+              observer.error(error);
+              return;
+            }
+            forward(operation).subscribe({
+              next: (value) => observer.next(value),
+              error: (err: unknown) => observer.error(err),
+              complete: () => observer.complete(),
+            });
+          })
+          .catch((err: unknown) => {
+            observer.error(err);
           });
-        })
-        .catch((err: unknown) => {
-          observer.error(err);
-        });
+      };
+
+      const delayMs = ENTITLEMENTS_STALE_RETRY_DELAYS_MS[attempt] ?? 0;
+      if (delayMs > 0) {
+        setTimeout(attemptRefreshAndRetry, delayMs);
+      } else {
+        attemptRefreshAndRetry();
+      }
     });
   }
 

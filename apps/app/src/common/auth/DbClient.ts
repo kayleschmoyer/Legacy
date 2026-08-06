@@ -18,6 +18,114 @@ import { GetUserById, UserFragment } from '@legacy-sports/graphql';
 import { INTERNAL_JWT_KEY, silentlyRefreshJwt } from './jwtRefresh';
 import { emitSessionExpired } from './sessionEvents';
 
+// ENTITLEMENTS_STALE bounded retry (LS-9067): the dominant trigger is
+// transient webhook-propagation lag, not a genuine failure, so a single-shot
+// retry fires the terminal fallback far more often than the underlying
+// staleness actually warrants. Three total attempts (1 immediate + 2 backed
+// off) absorb that race; worst-case added latency is bounded at ~3s
+// (0 + 800 + 2000ms) — never unbounded.
+const ENTITLEMENTS_STALE_MAX_ATTEMPTS = 3;
+const ENTITLEMENTS_STALE_RETRY_DELAYS_MS = [0, 800, 2000];
+
+// Extracted to module scope (rather than built inside the DbClient
+// constructor) so unit tests can drive the ENTITLEMENTS_STALE / auth retry
+// decision logic directly via `errorLink.request(...)`, mirroring
+// apps/web/src/lib/apollo-client.ts's exported `errorLink`.
+export const errorLink = new ErrorLink(({ error, operation, forward }) => {
+  const is401 = ServerError.is(error) && error.statusCode === 401;
+  const isUnauthenticated =
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some(
+      (e) =>
+        (e.extensions?.['code'] as string | undefined) === 'UNAUTHENTICATED',
+    );
+
+  // Stale-entitlements refresh signal (LS-8643/LS-8645): the token is valid
+  // but its Stripe-minted entitlement claim predates the user's
+  // `entitlements_updated_at` marker. Silently re-mint the JWT and retry
+  // the operation, up to ENTITLEMENTS_STALE_MAX_ATTEMPTS times with
+  // backoff (LS-9067; a bounded counter on operation context, not a
+  // single-shot flag). A hard refresh failure (silentlyRefreshJwt
+  // resolves null) exits immediately to the terminal fallback without
+  // waiting out the remaining budget. Once the budget is exhausted, fail
+  // safe — clear the session so the user drops to free and is prompted
+  // to re-login (epic LS-8638 SHARED CONTRACTS #1).
+  const isEntitlementsStale =
+    CombinedGraphQLErrors.is(error) &&
+    error.errors.some(
+      (e) =>
+        (e.extensions?.['code'] as string | undefined) === 'ENTITLEMENTS_STALE',
+    );
+
+  if (isEntitlementsStale) {
+    const attempt = Number(
+      operation.getContext()['entitlementsStaleAttempt'] ?? 0,
+    );
+    return new Observable<ApolloLink.Result>((observer) => {
+      if (attempt >= ENTITLEMENTS_STALE_MAX_ATTEMPTS) {
+        emitSessionExpired();
+        observer.error(error);
+        return;
+      }
+      operation.setContext({ entitlementsStaleAttempt: attempt + 1 });
+
+      const attemptRefreshAndRetry = () => {
+        silentlyRefreshJwt()
+          .then((newToken) => {
+            if (!newToken) {
+              emitSessionExpired();
+              observer.error(error);
+              return;
+            }
+            forward(operation).subscribe({
+              next: (value) => observer.next(value),
+              error: (err: unknown) => observer.error(err),
+              complete: () => observer.complete(),
+            });
+          })
+          .catch((err: unknown) => {
+            observer.error(err);
+          });
+      };
+
+      const delayMs = ENTITLEMENTS_STALE_RETRY_DELAYS_MS[attempt] ?? 0;
+      if (delayMs > 0) {
+        setTimeout(attemptRefreshAndRetry, delayMs);
+      } else {
+        attemptRefreshAndRetry();
+      }
+    });
+  }
+
+  if (is401 || isUnauthenticated) {
+    // Attempt a silent JWT refresh via /refresh-jwt and replay the
+    // operation with the new token (authLink re-reads it from secure
+    // storage). silentlyRefreshJwt() clears the session itself on a
+    // definitive rejection, so here we just propagate the original error
+    // when no fresh token comes back. This stops the 24h JWT expiry from
+    // force-bouncing the user through a full Google Sign-In (LS-8103).
+    return new Observable<ApolloLink.Result>((observer) => {
+      silentlyRefreshJwt()
+        .then((newToken) => {
+          if (!newToken) {
+            observer.error(error);
+            return;
+          }
+          forward(operation).subscribe({
+            next: (value) => observer.next(value),
+            error: (err: unknown) => observer.error(err),
+            complete: () => observer.complete(),
+          });
+        })
+        .catch((err: unknown) => {
+          observer.error(err);
+        });
+    });
+  }
+
+  return;
+});
+
 export class DbClient {
   public readonly apolloClient: ApolloClient;
 
@@ -52,89 +160,6 @@ export class DbClient {
         retryIf: (error: unknown) =>
           error instanceof Error && !('statusCode' in error),
       },
-    });
-
-    const errorLink = new ErrorLink(({ error, operation, forward }) => {
-      const is401 = ServerError.is(error) && error.statusCode === 401;
-      const isUnauthenticated =
-        CombinedGraphQLErrors.is(error) &&
-        error.errors.some(
-          (e) =>
-            (e.extensions?.['code'] as string | undefined) ===
-            'UNAUTHENTICATED',
-        );
-
-      // Stale-entitlements refresh signal (LS-8643/LS-8645): the token is valid
-      // but its Stripe-minted entitlement claim predates the user's
-      // `entitlements_updated_at` marker. Silently re-mint the JWT and retry the
-      // operation ONCE (a per-operation flag caps it); on refresh failure or a
-      // still-stale retry, fail safe — clear the session so the user drops to
-      // free and is prompted to re-login (epic LS-8638 SHARED CONTRACTS #1).
-      const isEntitlementsStale =
-        CombinedGraphQLErrors.is(error) &&
-        error.errors.some(
-          (e) =>
-            (e.extensions?.['code'] as string | undefined) ===
-            'ENTITLEMENTS_STALE',
-        );
-
-      if (isEntitlementsStale) {
-        const alreadyRetried = Boolean(
-          operation.getContext()['entitlementsStaleRetried'],
-        );
-        return new Observable<ApolloLink.Result>((observer) => {
-          if (alreadyRetried) {
-            emitSessionExpired();
-            observer.error(error);
-            return;
-          }
-          operation.setContext({ entitlementsStaleRetried: true });
-          silentlyRefreshJwt()
-            .then((newToken) => {
-              if (!newToken) {
-                emitSessionExpired();
-                observer.error(error);
-                return;
-              }
-              forward(operation).subscribe({
-                next: (value) => observer.next(value),
-                error: (err: unknown) => observer.error(err),
-                complete: () => observer.complete(),
-              });
-            })
-            .catch((err: unknown) => {
-              observer.error(err);
-            });
-        });
-      }
-
-      if (is401 || isUnauthenticated) {
-        // Attempt a silent JWT refresh via /refresh-jwt and replay the
-        // operation with the new token (authLink re-reads it from secure
-        // storage). silentlyRefreshJwt() clears the session itself on a
-        // definitive rejection, so here we just propagate the original error
-        // when no fresh token comes back. This stops the 24h JWT expiry from
-        // force-bouncing the user through a full Google Sign-In (LS-8103).
-        return new Observable<ApolloLink.Result>((observer) => {
-          silentlyRefreshJwt()
-            .then((newToken) => {
-              if (!newToken) {
-                observer.error(error);
-                return;
-              }
-              forward(operation).subscribe({
-                next: (value) => observer.next(value),
-                error: (err: unknown) => observer.error(err),
-                complete: () => observer.complete(),
-              });
-            })
-            .catch((err: unknown) => {
-              observer.error(err);
-            });
-        });
-      }
-
-      return;
     });
 
     this.apolloClient = new ApolloClient({

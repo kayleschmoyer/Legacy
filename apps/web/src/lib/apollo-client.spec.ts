@@ -333,71 +333,130 @@ describe('errorLink', () => {
     );
   });
 
-  it('ENTITLEMENTS_STALE triggers a silent refresh and marks the operation as retried', async () => {
-    // Refresh fails (ok:false) so the retry-once path falls straight through to
-    // the fail-safe branch without looping.
-    const fetchMock = jest.fn().mockResolvedValue({ ok: false });
+  // ─── ENTITLEMENTS_STALE bounded retry (LS-9067) ─────────────────────────────
+
+  function makeStaleError(): CombinedGraphQLErrors {
+    return new CombinedGraphQLErrors(
+      {
+        errors: [
+          { message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } },
+        ],
+      },
+      [{ message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } }],
+    );
+  }
+
+  function collectSessionExpiredCount(
+    dispatchSpy: jest.SpyInstance<boolean, [Event]>,
+  ): number {
+    return dispatchSpy.mock.calls
+      .map(([event]) => event)
+      .filter(
+        (e): e is CustomEvent =>
+          e instanceof CustomEvent && e.type === 'auth:session-expired',
+      ).length;
+  }
+
+  it('stale-once-then-succeeds: retries immediately (0ms, attempt 0) and forwards the clean replay', async () => {
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({ jwt: fakeJwt({ id: 1, email: 'a@b.com' }) }),
+    });
     global.fetch = fetchMock;
     const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
 
     const op = makeOperation({});
-    const staleError = new CombinedGraphQLErrors(
-      {
-        errors: [
-          { message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } },
-        ],
-      },
-      [{ message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } }],
-    );
-    const forward = () =>
-      new Observable<never>((observer) => observer.error(staleError));
+    const staleError = makeStaleError();
+    let forwardCalls = 0;
+    const forward = () => {
+      forwardCalls += 1;
+      if (forwardCalls === 1) {
+        return new Observable<never>((observer) => observer.error(staleError));
+      }
+      return new Observable<ApolloLink.Result>((observer) => {
+        observer.next({ data: { ok: true } });
+        observer.complete();
+      });
+    };
 
-    await new Promise<void>((resolve) => {
+    const value = await new Promise<unknown>((resolve) => {
       const result = errorLink.request(op as never, forward as never);
       result?.subscribe({
-        next: () => {
+        next: (v) => resolve(v),
+        error: (e) => resolve(e),
+        complete: () => {
           /* ignore */
         },
-        error: () => resolve(),
-        complete: () => resolve(),
       });
     });
 
-    // The operation is flagged so a second stale response won't refresh again.
     expect(op.setContext).toHaveBeenCalledWith({
-      entitlementsStaleRetried: true,
+      entitlementsStaleAttempt: 1,
     });
-    // A silent re-mint was attempted.
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/refresh-jwt'),
-      expect.objectContaining({ method: 'POST' }),
-    );
-    // Refresh failed → fail safe: fall back to free + prompt re-login.
-    const sessionExpired = dispatchSpy.mock.calls
-      .map(([event]) => event)
-      .filter(
-        (e): e is CustomEvent =>
-          e instanceof CustomEvent && e.type === 'auth:session-expired',
-      );
-    expect(sessionExpired).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(value).toEqual({ data: { ok: true } });
+    expect(collectSessionExpiredCount(dispatchSpy)).toBe(0);
 
     dispatchSpy.mockRestore();
   });
 
-  it('ENTITLEMENTS_STALE on an already-retried operation fails safe without refreshing again', async () => {
+  it.each([
+    [0, 0],
+    [1, 800],
+    [2, 2000],
+  ])(
+    'uses the [0, 800, 2000]ms backoff schedule: attempt index %i waits %dms before refreshing',
+    async (attempt, expectedDelay) => {
+      const fetchMock = jest.fn().mockResolvedValue({ ok: false });
+      global.fetch = fetchMock;
+      jest.spyOn(window, 'dispatchEvent').mockImplementation(() => true);
+      const setTimeoutSpy = jest
+        .spyOn(global, 'setTimeout')
+        .mockImplementation((cb: () => void) => {
+          cb();
+          return 0;
+        });
+
+      const op = makeOperation({ entitlementsStaleAttempt: attempt });
+      const staleError = makeStaleError();
+      const forward = () =>
+        new Observable<never>((observer) => observer.error(staleError));
+
+      await new Promise<void>((resolve) => {
+        const result = errorLink.request(op as never, forward as never);
+        result?.subscribe({
+          next: () => {
+            /* ignore */
+          },
+          error: () => resolve(),
+          complete: () => resolve(),
+        });
+      });
+
+      if (expectedDelay > 0) {
+        expect(setTimeoutSpy).toHaveBeenCalledWith(
+          expect.any(Function),
+          expectedDelay,
+        );
+      } else {
+        expect(setTimeoutSpy).not.toHaveBeenCalled();
+      }
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      setTimeoutSpy.mockRestore();
+    },
+  );
+
+  it('stale-through-full-budget-then-terminal-fallback: fails safe once the 3-attempt budget is exhausted', async () => {
     const fetchMock = jest.fn();
     global.fetch = fetchMock;
     const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
 
-    const op = makeOperation({ entitlementsStaleRetried: true });
-    const staleError = new CombinedGraphQLErrors(
-      {
-        errors: [
-          { message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } },
-        ],
-      },
-      [{ message: 'stale', extensions: { code: 'ENTITLEMENTS_STALE' } }],
-    );
+    // Attempt count already at the max (3 attempts consumed) → the 4th entry
+    // into this branch must fail safe WITHOUT attempting another refresh.
+    const op = makeOperation({ entitlementsStaleAttempt: 3 });
+    const staleError = makeStaleError();
     const forward = () =>
       new Observable<never>((observer) => observer.error(staleError));
 
@@ -412,15 +471,43 @@ describe('errorLink', () => {
       });
     });
 
-    // No second refresh — the retry cap already fired.
     expect(fetchMock).not.toHaveBeenCalled();
-    const sessionExpired = dispatchSpy.mock.calls
-      .map(([event]) => event)
-      .filter(
-        (e): e is CustomEvent =>
-          e instanceof CustomEvent && e.type === 'auth:session-expired',
-      );
-    expect(sessionExpired).toHaveLength(1);
+    expect(collectSessionExpiredCount(dispatchSpy)).toBe(1);
+
+    dispatchSpy.mockRestore();
+  });
+
+  it('hard-refresh-failure-short-circuits: a null refresh result fails safe immediately without consuming remaining budget', async () => {
+    // silentlyRefreshJwt resolves null (the /refresh-jwt call itself failed —
+    // e.g. a network/5xx error, distinct from a still-stale replay).
+    const fetchMock = jest
+      .fn()
+      .mockRejectedValue(new TypeError('Failed to fetch'));
+    global.fetch = fetchMock;
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+
+    // Early attempt (0 of 3) — even though budget remains, a hard refresh
+    // failure must exit immediately rather than schedule further retries.
+    const op = makeOperation({});
+    const staleError = makeStaleError();
+    const forward = () =>
+      new Observable<never>((observer) => observer.error(staleError));
+
+    await new Promise<void>((resolve) => {
+      const result = errorLink.request(op as never, forward as never);
+      result?.subscribe({
+        next: () => {
+          /* ignore */
+        },
+        error: () => resolve(),
+        complete: () => resolve(),
+      });
+    });
+
+    // Only the one (failed) refresh attempt was made — no retry loop against
+    // a broken refresh endpoint.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(collectSessionExpiredCount(dispatchSpy)).toBe(1);
 
     dispatchSpy.mockRestore();
   });
