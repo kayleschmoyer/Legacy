@@ -9,6 +9,11 @@
  *
  * Order: greeting → live matchup ticker → league rail → quick actions →
  * condensed On This Day.
+ *
+ * Re-merge tracked in LS-9055: fold this layout back into `HomeScreen` as a
+ * `useMedia`-gated branch and delete this file. See the "Re-forking an
+ * already-unified component" anti-pattern in
+ * .agents/skills/shared-components-first/SKILL.md (LS-9054).
  */
 import React, { useMemo } from 'react';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';

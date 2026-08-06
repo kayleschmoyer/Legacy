@@ -189,6 +189,32 @@ lib/shared-components/src/features/home/HomeScreen.tsx ← orphaned, 0 consumers
 
 This is three divergent homes. The shared version should be the only source of truth.
 
+### ❌ Re-forking an already-unified component
+
+A component that was previously unified under this skill (e.g. via a "Worked Example" migration) must never be split back into per-platform files later — not even temporarily, not even to avoid regressing the other platform mid-build.
+
+```
+lib/shared-components/src/features/home/HomeScreen.tsx        ← web + native, unified in PR #4937 (LS-7791)
+lib/shared-components/src/features/home/MobileHomeScreen.tsx  ← re-fork added later (LS-8794), 796 lines
+```
+
+"I don't want to risk regressing the other platform's layout while I build this" is not a license to fork — it is exactly the case breakpoints exist for. Gate the new layout behind `useMedia`/`$sm`/`$gtMd` inside the _same_ component instead:
+
+```tsx
+const media = useMedia();
+return media.gtMd ? <CurrentLayout /> : <NewReturningUserLayout />;
+```
+
+This ships the new narrow-viewport layout without touching the wide-viewport JSX path at all — the regression risk the fork was trying to avoid doesn't exist under the breakpoint approach, because the two render branches are already independent.
+
+If a temporary file-level fork is truly unavoidable (rare — justify it in the PR description), it must:
+
+1. Carry a top-of-file comment naming the ticket that will re-merge it, same as any other tracked debt.
+2. Have that re-merge ticket filed and linked **before the PR merges**, not left implicit. "Follow-up tracked separately" in a commit message is not a ticket — if you can't point to a Jira key, it isn't tracked.
+3. Be treated as a review blocker (see pattern #47 in `common-review-patterns.md`) until that ticket exists.
+
+Forks that skip step 2 are exactly how the same screen gets unified once and re-diverges later without anyone noticing — see LS-8794 vs. the LS-7791 unification above.
+
 ### ❌ Copy-pasting JSX between apps
 
 If you find yourself copying layout code from `apps/web` to `apps/app` (or vice versa), stop — extract to shared-components instead.
@@ -231,9 +257,12 @@ If shared < original, the extraction dropped responsive behavior — treat this 
 
 This is the canonical pattern: shared component owns all layout and visual logic; app wrappers own only platform-specific concerns (routing, data fetching, navigation callbacks).
 
+**Known regression**: LS-8794 later re-forked this exact component into `MobileHomeScreen.tsx` (see [Re-forking an already-unified component](#-re-forking-an-already-unified-component) above) — unifying it once was not sufficient to prevent a second divergence. This guidance tightening is tracked in LS-9054; the actual re-merge of `MobileHomeScreen.tsx` back into `HomeScreen.tsx` is tracked in LS-9055.
+
 ## Checklist Before Opening a UI PR
 
 - [ ] Is the component in `lib/shared-components`? (not duplicated in both apps)
+- [ ] If this component already exists and is shared today, does this PR keep it that way — no new `Mobile*`/`*.native.tsx`-style sibling file that duplicates its layout? (see "Re-forking an already-unified component")
 - [ ] Does both `apps/web` and `apps/app` consume it?
 - [ ] Does it use Tamagui media props / `useMedia` for responsive layout?
 - [ ] Zero new `isWeb` / `Platform.OS` / platform-components branches that affect layout, spacing, visibility, or structure? (Capability shims only — run `git diff | grep -E 'isWeb|Platform\.OS'` and justify every hit)

@@ -711,33 +711,36 @@ Platform branches are acceptable **only** as capability shims (native-only APIs,
 
 **When to check**: any diff adding `isWeb`, `Platform.OS`, `Platform.select`, `.native.tsx`, or `platform-components/` files in `lib/shared-components/**`, `apps/web/**`, or `apps/app/**`. Also flag new UI built directly in `apps/web` or `apps/app` that the other platform will need — it belongs in `lib/shared-components` (see `.agents/skills/shared-components-first/SKILL.md`).
 
+**The same-size escalation of this pattern is a full file-level fork**, not just an inline branch: a new `Mobile<Feature>Screen.tsx` (or similar) sitting next to an existing `<Feature>Screen.tsx` in `lib/shared-components`, duplicating substantial layout/JSX instead of branching by breakpoint inside the shared component. This is worse than an inline `isWeb` branch because it's harder to spot in review (two whole files, not one conditional) and it can re-diverge a component that was already unified — see LS-8794 re-forking `HomeScreen.tsx` after LS-7791 had unified it. "I don't want to risk regressing the other platform mid-build" is not a valid reason to fork; it's exactly what `useMedia`/`$sm`/`$gtMd` branches inside one component are for, since the two render paths are already independent. If a temporary fork is unavoidable, block the PR until a re-merge ticket is filed and linked in a top-of-file comment — a commit-message mention of "tracked separately" without a Jira key does not count. See the "Re-forking an already-unified component" anti-pattern in `.agents/skills/shared-components-first/SKILL.md`.
+
 ---
 
 ## Quick Self-Review Checklist (all patterns)
 
 Before every push, scan your diff against this checklist:
 
-| Check                                                                                             | Patterns      |
-| ------------------------------------------------------------------------------------------------- | ------------- |
-| Every `LOGGER.error`/`.warn` call passes a raw `Error` as the 2nd arg                             | #29           |
-| Every new component/resolver/mutation/bug-fix has a spec covering the changed behavior            | #30           |
-| PR description accurately describes the diff (no missing files, no wrong filenames)               | #31           |
-| Generated `*.generated.ts` changes are explained in the PR body                                   | #16, #31      |
-| GraphQL mutation args have range/null/enum validation with `UserInputError`                       | #26, #28, #32 |
-| `setLoading(false)` (and equivalent) resets in `finally`, not only in success path                | #33           |
-| Every resolver that takes a resource ID checks membership/ownership, not just auth                | #4, #34       |
-| Drizzle BIGINT columns use `bigint()`, not `integer()`                                            | #35           |
-| Multi-column `orderBy` cursors encode all sort columns                                            | #36           |
-| Test assertions check concrete values, not just `toBeDefined()`                                   | #37           |
-| No constant duplicated across packages — import from shared lib                                   | #38           |
-| No committed symlinks or files containing `D:/` / `C:/` local paths                               | #39           |
-| No `console.*` or `process.stdout.write` in non-CLI app code (`scripts/` is exempt)               | #40           |
-| Error messages shown to users are generic strings, not `err.message`                              | #41           |
-| Terraform resource renames use `moved {}` blocks                                                  | #42           |
-| Shell variables have explicit fallbacks after `\|\| true` patterns                                | #43           |
-| Gated-feature spec defaults to premium; `free` used only with a gate assertion                    | #46           |
-| No new `isWeb`/`Platform.OS` branch affecting layout — breakpoints (`useMedia`, media props) only | #47           |
-| No `@ts-ignore` or `eslint-disable` (fix root cause instead)                                      | standards     |
+| Check                                                                                                                                               | Patterns      |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| Every `LOGGER.error`/`.warn` call passes a raw `Error` as the 2nd arg                                                                               | #29           |
+| Every new component/resolver/mutation/bug-fix has a spec covering the changed behavior                                                              | #30           |
+| PR description accurately describes the diff (no missing files, no wrong filenames)                                                                 | #31           |
+| Generated `*.generated.ts` changes are explained in the PR body                                                                                     | #16, #31      |
+| GraphQL mutation args have range/null/enum validation with `UserInputError`                                                                         | #26, #28, #32 |
+| `setLoading(false)` (and equivalent) resets in `finally`, not only in success path                                                                  | #33           |
+| Every resolver that takes a resource ID checks membership/ownership, not just auth                                                                  | #4, #34       |
+| Drizzle BIGINT columns use `bigint()`, not `integer()`                                                                                              | #35           |
+| Multi-column `orderBy` cursors encode all sort columns                                                                                              | #36           |
+| Test assertions check concrete values, not just `toBeDefined()`                                                                                     | #37           |
+| No constant duplicated across packages — import from shared lib                                                                                     | #38           |
+| No committed symlinks or files containing `D:/` / `C:/` local paths                                                                                 | #39           |
+| No `console.*` or `process.stdout.write` in non-CLI app code (`scripts/` is exempt)                                                                 | #40           |
+| Error messages shown to users are generic strings, not `err.message`                                                                                | #41           |
+| Terraform resource renames use `moved {}` blocks                                                                                                    | #42           |
+| Shell variables have explicit fallbacks after `\|\| true` patterns                                                                                  | #43           |
+| Gated-feature spec defaults to premium; `free` used only with a gate assertion                                                                      | #46           |
+| No new `isWeb`/`Platform.OS` branch affecting layout — breakpoints (`useMedia`, media props) only                                                   | #47           |
+| No new `Mobile*`/`*.native.tsx`-style file forking an existing shared screen's layout — use breakpoints in one file, or file+link a re-merge ticket | #47           |
+| No `@ts-ignore` or `eslint-disable` (fix root cause instead)                                                                                        | standards     |
 
 ---
 
