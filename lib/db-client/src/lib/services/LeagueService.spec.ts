@@ -264,6 +264,40 @@ describe('LeagueService.createLeague — roster slots seeding (LS-6145)', () => 
     const positionValues = seededPositionValues();
     expect(positionValues).toHaveLength(9);
   });
+
+  // LS-6156 (CLF-037): the create-league UI shows an info line claiming "a
+  // single D/ST slot is included in the default roster" for IDP leagues,
+  // but that claim is only checked against client-side form-building logic
+  // (apps/app .../league/create.spec.tsx) — never against what the server
+  // actually seeds into league_positions. This asserts the real,
+  // server-side contract for an IDP football league: no DST slot, and the
+  // individual-defensive-player slots (DL/LB/DB) from
+  // DEFAULT_FOOTBALL_IDP_ROSTER_POSITIONS in its place.
+  it('seeds league_positions with individual defensive positions (no DST) for an IDP football league when rosterSlots is omitted', async () => {
+    mockTx.returning
+      .mockResolvedValueOnce([{ id: 100 }])
+      .mockResolvedValueOnce([{ id: 200 }])
+      .mockResolvedValueOnce([{ id: 300 }]);
+
+    await service.createLeague({ ...baseInput, defensiveFormat: 'idp' });
+
+    const positionValues = seededPositionValues();
+    // Default football IDP shape: QB, RB, RB, WR, WR, TE, FLEX, K, DL, DL,
+    // LB, LB, DB, DB (14 starters) — no DST slot.
+    expect(positionValues).toHaveLength(14);
+    expect(
+      positionValues.filter((row) => row.positionType === 'DST'),
+    ).toHaveLength(0);
+    expect(
+      positionValues.filter((row) => row.positionType === 'DL'),
+    ).toHaveLength(2);
+    expect(
+      positionValues.filter((row) => row.positionType === 'LB'),
+    ).toHaveLength(2);
+    expect(
+      positionValues.filter((row) => row.positionType === 'DB'),
+    ).toHaveLength(2);
+  });
 });
 
 describe('LeagueService.createLeague — idempotent resubmission (LS-6063)', () => {
