@@ -136,12 +136,8 @@ export function DateTimePicker({
 
   const navigateMonth = (direction: 'prev' | 'next') => {
     setCurrentMonth((prev) => {
-      const newMonth = new Date(prev);
-      if (direction === 'prev') {
-        newMonth.setMonth(prev.getMonth() - 1);
-      } else {
-        newMonth.setMonth(prev.getMonth() + 1);
-      }
+      const newMonth = new Date(prev.getFullYear(), prev.getMonth(), 1);
+      newMonth.setMonth(newMonth.getMonth() + (direction === 'prev' ? -1 : 1));
       return newMonth;
     });
   };

@@ -34,6 +34,12 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/src/features/leagues/(?!ProposeTradeDialogNativeModal\\.spec\\.tsx$)',
+    // Web-only regression test (LS-8873): exercises the custom Popover-based
+    // calendar picker (Platform.OS === 'web' branch), which crashes here
+    // because Tamagui's Popover.Trigger/Overlay compound components aren't
+    // resolvable under the RN mobile jest environment. Belongs to
+    // shared-components:web only.
+    '/src/components/DateTimePicker\\.navigateMonth\\.spec\\.tsx$',
   ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
