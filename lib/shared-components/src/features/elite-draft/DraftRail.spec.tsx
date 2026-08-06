@@ -84,26 +84,26 @@ describe('DraftRail roster depth chart', () => {
   // pool isn't pushed below the fold on mobile.
   describe('mobile collapse toggle (LS-4824)', () => {
     it('renders collapsed by default with aria-expanded=false', () => {
-      const { getByRole, container } = render(<DraftRail {...baseProps} />);
+      const { getByRole, getByTestId } = render(<DraftRail {...baseProps} />);
       const toggle = getByRole('button', { name: /draft panel/i });
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
       expect(toggle.getAttribute('aria-controls')).toBe('d-rail-content');
-      const aside = container.querySelector('.d-rail');
-      expect(aside?.classList.contains('collapsed')).toBe(true);
+      const aside = getByTestId('draft-rail');
+      expect(aside.getAttribute('data-collapsed')).toBe('true');
     });
 
     it('toggles collapsed/expanded state on click', () => {
-      const { getByRole, container } = render(<DraftRail {...baseProps} />);
+      const { getByRole, getByTestId } = render(<DraftRail {...baseProps} />);
       const toggle = getByRole('button', { name: /draft panel/i });
-      const aside = container.querySelector('.d-rail');
+      const aside = getByTestId('draft-rail');
 
       fireEvent.click(toggle);
       expect(toggle.getAttribute('aria-expanded')).toBe('true');
-      expect(aside?.classList.contains('collapsed')).toBe(false);
+      expect(aside.getAttribute('data-collapsed')).toBe('false');
 
       fireEvent.click(toggle);
       expect(toggle.getAttribute('aria-expanded')).toBe('false');
-      expect(aside?.classList.contains('collapsed')).toBe(true);
+      expect(aside.getAttribute('data-collapsed')).toBe('true');
     });
 
     it('keeps roster content in the DOM when collapsed (CSS-only hide)', () => {
@@ -201,12 +201,12 @@ describe('DraftRail roster depth chart', () => {
       const { getByLabelText } = render(
         <DraftRail {...baseProps} isMyPick draggedPlayer={player(['SS'])} />,
       );
-      expect(
-        getByLabelText('SS: 0 of 1').classList.contains('drop-eligible'),
-      ).toBe(true);
-      expect(
-        getByLabelText('C: 0 of 1').classList.contains('drop-ineligible'),
-      ).toBe(true);
+      expect(getByLabelText('SS: 0 of 1').getAttribute('data-drop-state')).toBe(
+        'eligible',
+      );
+      expect(getByLabelText('C: 0 of 1').getAttribute('data-drop-state')).toBe(
+        'ineligible',
+      );
     });
   });
 
@@ -223,7 +223,7 @@ describe('DraftRail roster depth chart', () => {
       />,
     );
     const fills = Array.from(
-      container.querySelectorAll<HTMLElement>('.d-pos-progress-fill'),
+      container.querySelectorAll<HTMLElement>('[data-testid^="pos-fill-"]'),
     );
     const colors = fills.map((f) => f.style.background.toLowerCase());
     // Browsers normalize hex to rgb; assert via inline-style equality after lowercasing.

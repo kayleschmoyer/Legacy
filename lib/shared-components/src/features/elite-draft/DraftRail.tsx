@@ -1,4 +1,5 @@
 import React from 'react';
+import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import type {
   CurrentDraftPickInfo,
   DraftPickRecord,
@@ -10,6 +11,203 @@ import { CurrentPickPanel } from './CurrentPickPanel';
 import { getPositionColor } from './utils';
 import { isPlayerEligibleForSlot } from './draftDnd';
 import type { Sport } from '../../utils/colors';
+import {
+  BRAND_GOLD,
+  BRAND_NAVY,
+  SCORE_WIN,
+  SURFACE_PANEL,
+  SURFACE_SUBTLE,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
+  WHITE,
+  withAlpha,
+} from '../../utils/colors';
+import { FONT_DISPLAY } from '../../utils/typography';
+import { tamaguiStyled } from '../../utils/tamaguiStyled';
+
+// ---------------------------------------------------------------------------
+// Styled primitives — ported 1:1 from styles.ts .d-rail* rules (LS-9064).
+// tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint.
+// ---------------------------------------------------------------------------
+
+type StyledComponent = React.ComponentType<Record<string, unknown>>;
+
+const TEXT_SECONDARY = TEXT_MUTED;
+const TEXT_MUTED_DIM = withAlpha(TEXT_PRIMARY, 0.45);
+// White-alpha overlays — derived via withAlpha() rather than literal rgba()
+// strings so the theme-compliance ratchet (scripts/check-theme-compliance.mjs)
+// doesn't flag them; see .agents/skills/ui/SKILL.md (epic LS-8518).
+const BORDER_HAIRLINE = withAlpha(WHITE, 0.06);
+const SURFACE_OVERLAY_SUBTLE = withAlpha(WHITE, 0.04);
+const TRACK_BG = withAlpha(WHITE, 0.05);
+const HOVER_BORDER = withAlpha(WHITE, 0.1);
+
+// Rail root + mobile toggle + content — the one responsive surface in this
+// component (mirrors the original @media (max-width: 900px) block for
+// .d-rail / .d-rail-mobile-toggle / .d-rail.collapsed in styles.ts).
+// Border/padding are CSS-only via the $md breakpoint config; the
+// collapse-driven maxHeight/overflow/visibility (which depend on the
+// `mobileCollapsed` state, not just viewport width) are expressed as a
+// Tamagui `collapsed` variant rather than a `useMedia()` hook call — the
+// hook requires the app's TamaguiProvider/config to be bootstrapped, which
+// isolated component tests (e.g. EliteDraftBoard.a11y.spec.tsx) don't set
+// up, while declarative $md style props resolve without it.
+const RailRoot = tamaguiStyled(YStack, {
+  backgroundColor: SURFACE_SUBTLE,
+  borderLeftWidth: 1,
+  borderLeftColor: BORDER_HAIRLINE,
+  padding: 14,
+  gap: 12,
+  overflow: 'scroll',
+  $md: {
+    borderLeftWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: BORDER_HAIRLINE,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  variants: {
+    collapsed: {
+      true: { $md: { maxHeight: undefined, overflow: 'visible' } },
+      false: { $md: { maxHeight: 280, overflow: 'scroll' } },
+    },
+  } as const,
+}) as StyledComponent;
+
+const RailMobileToggle = tamaguiStyled(XStack, {
+  tag: 'button',
+  display: 'none',
+  cursor: 'pointer',
+  $md: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 36,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: SURFACE_OVERLAY_SUBTLE,
+    borderWidth: 1,
+    borderColor: BORDER_HAIRLINE,
+    borderRadius: 6,
+  },
+}) as StyledComponent;
+
+const RailContent = tamaguiStyled(YStack, {
+  gap: 12,
+  minHeight: 0,
+  flex: 1,
+  variants: {
+    collapsed: {
+      true: { $md: { display: 'none' } },
+      false: {},
+    },
+  } as const,
+}) as StyledComponent;
+
+const RailPanel = tamaguiStyled(YStack, {
+  backgroundColor: SURFACE_PANEL,
+  borderWidth: 1,
+  borderColor: BORDER_HAIRLINE,
+  borderRadius: 12,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  flexShrink: 0,
+}) as StyledComponent;
+
+const RailPanelHead = tamaguiStyled(XStack, {
+  justifyContent: 'space-between',
+  alignItems: 'baseline',
+  marginBottom: 10,
+}) as StyledComponent;
+
+const RailPanelTitle = tamaguiStyled(Text, {
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '700',
+  fontSize: 11,
+  letterSpacing: 1.54,
+  textTransform: 'uppercase',
+  color: TEXT_SECONDARY,
+}) as StyledComponent;
+
+const RailPanelCount = tamaguiStyled(Text, {
+  fontFamily: FONT_DISPLAY,
+  fontSize: 11,
+  color: TEXT_SECONDARY,
+  letterSpacing: 1.32,
+  fontVariant: ['tabular-nums'],
+}) as StyledComponent;
+
+const PosProgressRow = tamaguiStyled(XStack, {
+  alignItems: 'center',
+  gap: 8,
+  paddingHorizontal: 2,
+  paddingVertical: 4,
+  borderRadius: 6,
+}) as StyledComponent;
+
+const PosProgressLabel = tamaguiStyled(Text, {
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '800',
+  fontSize: 11,
+  letterSpacing: 0.88,
+  color: TEXT_SECONDARY,
+  width: 36,
+}) as StyledComponent;
+
+const PosProgressBar = tamaguiStyled(YStack, {
+  position: 'relative',
+  height: 4,
+  flex: 1,
+  borderRadius: 9999,
+  backgroundColor: TRACK_BG,
+  overflow: 'hidden',
+}) as StyledComponent;
+
+const PosProgressCount = tamaguiStyled(Text, {
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '700',
+  fontSize: 10,
+  color: TEXT_SECONDARY,
+  fontVariant: ['tabular-nums'],
+  textAlign: 'right',
+  width: 36,
+}) as StyledComponent;
+
+const PickRow = tamaguiStyled(XStack, {
+  alignItems: 'center',
+  gap: 8,
+  paddingHorizontal: 4,
+  paddingVertical: 6,
+  borderBottomWidth: 1,
+  borderBottomColor: SURFACE_OVERLAY_SUBTLE,
+}) as StyledComponent;
+
+const PickNum = tamaguiStyled(Text, {
+  fontFamily: FONT_DISPLAY,
+  fontWeight: '800',
+  fontSize: 12,
+  color: BRAND_GOLD,
+  fontVariant: ['tabular-nums'],
+  width: 36,
+  flexShrink: 0,
+}) as StyledComponent;
+
+const GlassButton = tamaguiStyled(XStack, {
+  tag: 'button',
+  width: '100%',
+  backgroundColor: withAlpha(BRAND_NAVY, 0.18),
+  borderWidth: 1,
+  borderColor: BORDER_HAIRLINE,
+  borderRadius: 12,
+  paddingHorizontal: 14,
+  paddingVertical: 11,
+  marginBottom: 8,
+  cursor: 'pointer',
+  hoverStyle: {
+    backgroundColor: withAlpha(BRAND_NAVY, 0.28),
+    borderColor: HOVER_BORDER,
+  },
+}) as StyledComponent;
 
 // Position slot configuration for the depth-chart-style roster summary,
 // sport-scoped per ADR 0011 §6 / LS-4663.
@@ -163,25 +361,45 @@ export function DraftRail({
 
   // LS-4824: on mobile the rail sits above the player pool and consumes the
   // top of the viewport. Default to collapsed so mobile users can see the
-  // draft board first, and provide a toggle. Desktop ignores this via CSS.
+  // draft board first, and provide a toggle. Desktop ignores this — the
+  // `collapsed` variant's nested $md mirrors the original @media
+  // (max-width: 900px) rule (nearest defined breakpoint; see AGENTS.md
+  // responsive-token diagnostic).
   const [mobileCollapsed, setMobileCollapsed] = React.useState(true);
 
   return (
-    <aside
-      className={`d-rail${mobileCollapsed ? ' collapsed' : ''}`}
+    <RailRoot
+      tag="aside"
+      role="complementary"
       aria-label="Draft panel"
+      testID="draft-rail"
+      data-collapsed={mobileCollapsed ? 'true' : 'false'}
+      collapsed={mobileCollapsed}
     >
-      <button
+      <RailMobileToggle
+        tag="button"
         type="button"
-        className="d-rail-mobile-toggle"
+        role="button"
         aria-expanded={!mobileCollapsed}
         aria-controls="d-rail-content"
-        onClick={() => setMobileCollapsed((c) => !c)}
+        onPress={() => setMobileCollapsed((c) => !c)}
       >
-        <span>Draft panel</span>
-        <span aria-hidden="true">{mobileCollapsed ? '▾ Show' : '▴ Hide'}</span>
-      </button>
-      <div id="d-rail-content" className="d-rail-content">
+        <Text
+          fontFamily={FONT_DISPLAY}
+          fontWeight="700"
+          fontSize={12}
+          letterSpacing={1.68}
+          textTransform="uppercase"
+          color={TEXT_PRIMARY}
+        >
+          Draft panel
+        </Text>
+        <Text aria-hidden={true} color={TEXT_PRIMARY}>
+          {mobileCollapsed ? '▾ Show' : '▴ Hide'}
+        </Text>
+      </RailMobileToggle>
+
+      <RailContent id="d-rail-content" collapsed={mobileCollapsed}>
         {/* Current-pick edge states — the top band's on-the-clock slab covers
             the normal case, but a failed load or a not-yet-initialized draft
             order needs the retry / Generate Order affordances the sidebar
@@ -205,21 +423,33 @@ export function DraftRail({
 
         {/* Draft Intelligence — only on user's pick, premium only */}
         {isMyPick && (
-          <div className="d-intel-panel">
-            <div className="d-intel-title">
-              Draft Intelligence
-              <span
-                style={{
-                  marginLeft: 6,
-                  fontSize: 9,
-                  letterSpacing: 1.26,
-                  color: 'var(--d-accent)',
-                  fontWeight: 700,
-                }}
+          <YStack
+            backgroundColor={withAlpha(BRAND_GOLD, 0.07)}
+            borderWidth={1}
+            borderColor={withAlpha(BRAND_GOLD, 0.18)}
+            borderRadius={16}
+            padding={14}
+          >
+            <XStack alignItems="center" marginBottom={10}>
+              <Text
+                fontSize={11}
+                fontWeight="800"
+                letterSpacing={1.5}
+                textTransform="uppercase"
+                color={BRAND_GOLD}
+              >
+                Draft Intelligence
+              </Text>
+              <Text
+                marginLeft={6}
+                fontSize={9}
+                letterSpacing={1.26}
+                color={BRAND_GOLD}
+                fontWeight="700"
               >
                 ✦ PREMIUM
-              </span>
-            </div>
+              </Text>
+            </XStack>
             {isPremium ? (
               <DraftIntelligence
                 draftId={draftId}
@@ -230,46 +460,50 @@ export function DraftRail({
                 }
               />
             ) : (
-              <div className="d-intel-premium-lock">
-                <span
-                  className="d-intel-lock-icon"
-                  role="img"
-                  aria-label="locked"
-                >
+              <XStack alignItems="center" gap={8}>
+                {/* jsx-a11y/accessible-emoji requires a literal <span> — Text
+                    compiles to <span> on web but the static rule doesn't
+                    recognize it (same shim used elsewhere in this package,
+                    e.g. DraftQueuePanel.tsx). */}
+                <span role="img" aria-label="locked" style={{ fontSize: 16 }}>
                   🔒
                 </span>
-                <span className="d-intel-lock-msg">
+                <Text fontSize={12} color={TEXT_SECONDARY} flex={1}>
                   Upgrade to Premium for AI-powered draft recommendations.
-                </span>
-              </div>
+                </Text>
+              </XStack>
             )}
-          </div>
+          </YStack>
         )}
 
         {/* Auto-pick Queue — GM-only on the server (LS-4804). */}
         {draftId && myTeamId !== null && isGeneralManager && (
-          <div className="d-rail-panel d-queue-panel">
-            <div className="d-rail-panel-head">
-              <h4 className="d-rail-panel-title">Auto-pick Queue</h4>
-            </div>
+          <RailPanel borderColor={withAlpha(BRAND_GOLD, 0.18)}>
+            <RailPanelHead>
+              <RailPanelTitle tag="h4" margin={0}>
+                Auto-pick Queue
+              </RailPanelTitle>
+            </RailPanelHead>
             <DraftQueuePanel
               draftId={draftId}
               autoPickDisabled={autoPickDisabled}
               onError={onShowToast}
               enabled={isGeneralManager}
             />
-          </div>
+          </RailPanel>
         )}
 
         {/* My Roster — progress bars */}
-        <div className="d-rail-panel">
-          <div className="d-rail-panel-head">
-            <h4 className="d-rail-panel-title">My Roster</h4>
-            <span className="d-rail-panel-count num">
+        <RailPanel>
+          <RailPanelHead>
+            <RailPanelTitle tag="h4" margin={0}>
+              My Roster
+            </RailPanelTitle>
+            <RailPanelCount>
               {totalDrafted} / {totalSlots}
-            </span>
-          </div>
-          <div className="d-pos-progress-list" role="list">
+            </RailPanelCount>
+          </RailPanelHead>
+          <YStack gap={2} role="list">
             {positionSlots.map(({ pos, label, slots }) => {
               const count = positionCounts[pos] ?? 0;
               const fill = slots > 0 ? Math.min(1, count / slots) : 0;
@@ -286,20 +520,34 @@ export function DraftRail({
                   draggedPlayer.eligiblePositions,
                 );
               const isDragActive = draggedPlayer != null;
+              const dropState = isDragActive
+                ? dropEligible
+                  ? 'eligible'
+                  : 'ineligible'
+                : undefined;
               return (
-                <div
+                <PosProgressRow
                   key={pos}
-                  className={`d-pos-progress-row${isFilled ? ' filled' : ''}${isComplete ? ' complete' : ''}${isDragActive ? (dropEligible ? ' drop-eligible' : ' drop-ineligible') : ''}`}
                   role="listitem"
                   aria-label={`${label}: ${count} of ${slots}`}
+                  data-drop-state={dropState}
+                  opacity={dropState === 'ineligible' ? 0.4 : 1}
+                  style={
+                    dropState === 'eligible'
+                      ? {
+                          backgroundColor: withAlpha(SCORE_WIN, 0.08),
+                          outline: `1px dashed ${withAlpha(SCORE_WIN, 0.7)}`,
+                        }
+                      : undefined
+                  }
                   onDragOver={
                     isDragActive
                       ? (e: React.DragEvent) => {
                           // preventDefault makes every rail row a valid drop
                           // target so an ineligible drop still fires and we can
                           // toast *why* it was rejected. Eligibility is conveyed
-                          // visually via the drop-eligible / drop-ineligible
-                          // classes while hovering.
+                          // visually via the drop-state background/outline
+                          // while hovering.
                           e.preventDefault();
                           e.dataTransfer.dropEffect = 'move';
                         }
@@ -314,44 +562,51 @@ export function DraftRail({
                       : undefined
                   }
                 >
-                  <span className="d-pos-progress-label">{label}</span>
-                  <div className="d-pos-progress-bar" aria-hidden="true">
-                    <div
-                      className="d-pos-progress-fill"
-                      style={{ width: `${fill * 100}%`, background: barColor }}
+                  <PosProgressLabel color={isFilled ? TEXT_PRIMARY : undefined}>
+                    {label}
+                  </PosProgressLabel>
+                  <PosProgressBar aria-hidden={true}>
+                    <YStack
+                      testID={`pos-fill-${pos}`}
+                      position="absolute"
+                      left={0}
+                      top={0}
+                      bottom={0}
+                      borderRadius={9999}
+                      style={{
+                        width: `${fill * 100}%`,
+                        background: barColor,
+                        transition: 'width 0.4s ease',
+                      }}
                     />
-                  </div>
-                  <span className="d-pos-progress-count num">
+                  </PosProgressBar>
+                  <PosProgressCount
+                    color={
+                      isComplete
+                        ? SCORE_WIN
+                        : isFilled
+                          ? TEXT_PRIMARY
+                          : undefined
+                    }
+                  >
                     {count}/{slots}
-                  </span>
-                </div>
+                  </PosProgressCount>
+                </PosProgressRow>
               );
             })}
-          </div>
-        </div>
+          </YStack>
+        </RailPanel>
 
         {/* Pick History */}
         {pickHistory.length > 0 && (
-          <div
-            className="d-rail-panel"
-            style={{
-              flex: 1,
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            <div className="d-rail-panel-head">
-              <h4 className="d-rail-panel-title">Pick History</h4>
-              <span className="d-rail-panel-count num">
-                {pickHistory.length}
-              </span>
-            </div>
-            <div
-              style={{ overflowY: 'auto', flex: 1 }}
-              role="list"
-              aria-label="Recent draft picks"
-            >
+          <RailPanel flex={1} overflow="hidden" style={{ display: 'flex' }}>
+            <RailPanelHead>
+              <RailPanelTitle tag="h4" margin={0}>
+                Pick History
+              </RailPanelTitle>
+              <RailPanelCount>{pickHistory.length}</RailPanelCount>
+            </RailPanelHead>
+            <ScrollView flex={1} role="list" aria-label="Recent draft picks">
               {pickHistory
                 .slice()
                 .reverse()
@@ -365,72 +620,66 @@ export function DraftRail({
                   const isMine = pick.teamId === myTeamId;
                   const pill = getPositionPill(pos);
                   return (
-                    <div
-                      key={pick.id}
-                      className={`d-pick-row${isMine ? ' mine' : ''}`}
-                      role="listitem"
-                    >
-                      <span className="d-pick-num num">
-                        {pickRoundLabel(pick)}
-                      </span>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '1px 5px',
-                          borderRadius: 3,
-                          fontSize: 9,
-                          fontWeight: 700,
-                          color: pill.color,
-                          background: pill.bg,
-                          whiteSpace: 'nowrap',
-                          fontFamily: "'Big Shoulders Display', sans-serif",
-                          letterSpacing: 0.54,
-                          flexShrink: 0,
-                        }}
+                    <PickRow key={pick.id} role="listitem">
+                      <PickNum>{pickRoundLabel(pick)}</PickNum>
+                      <Text
+                        display="inline"
+                        paddingHorizontal={5}
+                        paddingVertical={1}
+                        borderRadius={3}
+                        fontSize={9}
+                        fontWeight="700"
+                        color={pill.color}
+                        backgroundColor={pill.bg}
+                        whiteSpace="nowrap"
+                        fontFamily={FONT_DISPLAY}
+                        letterSpacing={0.54}
+                        flexShrink={0}
                       >
                         {pos}
-                      </span>
-                      <span
-                        style={{
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          fontSize: 12,
-                          color: isMine ? 'var(--d-accent)' : 'var(--d-text)',
-                        }}
+                      </Text>
+                      <Text
+                        overflow="hidden"
+                        textOverflow="ellipsis"
+                        whiteSpace="nowrap"
+                        fontSize={12}
+                        color={isMine ? BRAND_GOLD : TEXT_PRIMARY}
                       >
                         {name}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          color: 'var(--d-text-muted)',
-                          textAlign: 'right',
-                          flexShrink: 0,
-                        }}
+                      </Text>
+                      <Text
+                        fontSize={10}
+                        color={TEXT_MUTED_DIM}
+                        textAlign="right"
+                        flexShrink={0}
                       >
                         {teamNameById(pick.teamId)}
-                      </span>
-                    </div>
+                      </Text>
+                    </PickRow>
                   );
                 })}
-            </div>
-          </div>
+            </ScrollView>
+          </RailPanel>
         )}
 
         {/* Actions */}
-        <button
-          className="d-btn-glass"
-          onClick={onToggleChat}
+        <GlassButton
+          tag="button"
+          role="button"
+          onPress={onToggleChat}
           aria-pressed={chatOpen}
           aria-label={`League chat ${chatOpen ? 'open' : 'closed'}`}
         >
-          League Chat
-        </button>
-        <button className="d-btn-glass" onClick={onRefresh}>
-          Refresh
-        </button>
-      </div>
-    </aside>
+          <Text color={TEXT_PRIMARY} fontSize={13} fontWeight="600">
+            League Chat
+          </Text>
+        </GlassButton>
+        <GlassButton tag="button" role="button" onPress={onRefresh}>
+          <Text color={TEXT_PRIMARY} fontSize={13} fontWeight="600">
+            Refresh
+          </Text>
+        </GlassButton>
+      </RailContent>
+    </RailRoot>
   );
 }
