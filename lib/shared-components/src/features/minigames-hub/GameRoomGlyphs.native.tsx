@@ -36,6 +36,8 @@ function paths(name: GameRoomGlyphName): React.ReactNode {
       return <Path d="m9 18 6-6-6-6" />;
     case 'play':
       return <Path d="m9.5 7.5 7 4.5-7 4.5V7.5Z" />;
+    case 'arrowRight':
+      return <Path d="M5 12h14M13 6l6 6-6 6" />;
   }
 }
 
@@ -43,6 +45,7 @@ export function GameRoomGlyph({
   name,
   size = 22,
   color,
+  strokeWidth = 1.8,
 }: GameRoomGlyphProps): React.JSX.Element {
   return (
     <Svg
@@ -51,7 +54,7 @@ export function GameRoomGlyph({
       viewBox="0 0 24 24"
       fill={name === 'play' ? color : 'none'}
       stroke={color}
-      strokeWidth={1.8}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
       // Decorative: every glyph sits inside a row or banner that already

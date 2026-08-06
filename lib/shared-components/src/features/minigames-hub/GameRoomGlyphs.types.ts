@@ -18,7 +18,9 @@ export type GameRoomGlyphName =
   /** Row affordance */
   | 'chevronRight'
   /** Resume banner */
-  | 'play';
+  | 'play'
+  /** MinigamesHub game-card CTA */
+  | 'arrowRight';
 
 export interface GameRoomGlyphProps {
   name: GameRoomGlyphName;
@@ -30,4 +32,6 @@ export interface GameRoomGlyphProps {
    * because neither `<svg>` nor `react-native-svg` understands `$tokens`.
    */
   color: string;
+  /** Stroke width. Defaults to 1.8. */
+  strokeWidth?: number;
 }

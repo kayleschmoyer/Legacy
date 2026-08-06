@@ -1,11 +1,12 @@
 /**
- * Game catalog shared between the web (`MinigamesHub.tsx`) and native
- * (`MinigamesHub.native.tsx`) implementations, so the two platforms can't
- * drift on copy, ordering, or ids (LS-8669 review).
+ * Game catalog shared by `MinigamesHub.tsx` (one breakpoint-driven component
+ * for both web and native as of LS-9058) and `GameRoomScreen.tsx`, so the
+ * layouts can't drift on copy, ordering, or ids (LS-8669 review).
  *
- * Icons are platform-specific (JSX on web, react-native-svg on native), so
- * each template carries an `iconKind` discriminator rather than a rendered
- * icon — each platform maps it to its own icon component.
+ * Icons are resolved through the platform-split `GameRoomGlyph`
+ * (`GameRoomGlyphs.tsx` / `.native.tsx`), so each template carries an
+ * `iconKind` discriminator rather than a rendered icon — callers map it to a
+ * glyph name.
  */
 
 export type MinigameId = 'season-draft' | 'disclosure' | 'twenty-questions';
@@ -15,11 +16,10 @@ export type MinigameId = 'season-draft' | 'disclosure' | 'twenty-questions';
  * redesign; `quiz` was split out of `stats` so 20 Questions can carry its own
  * mark instead of reusing Who Am I?'s bar chart.
  *
- * Splitting the kind is deliberately behaviour-neutral for the two existing
- * hubs: both `MinigamesHub.tsx` and `MinigamesHub.native.tsx` map with
- * `kind === 'draft' ? draftIcon : statsIcon`, so `quiz` falls through to the
- * same stats mark they rendered before. Only `GameRoomScreen` distinguishes
- * all three.
+ * Splitting the kind is deliberately behaviour-neutral for `MinigamesHub`:
+ * it maps with `kind === 'draft' ? 'clipboard' : 'barChart'`, so `quiz` falls
+ * through to the same stats mark it rendered before. Only `GameRoomScreen`
+ * distinguishes all three.
  */
 export type MinigameIconKind = 'draft' | 'stats' | 'quiz';
 

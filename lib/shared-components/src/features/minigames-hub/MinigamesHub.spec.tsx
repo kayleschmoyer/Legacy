@@ -6,7 +6,7 @@ import {
   useGetMinigamesStatsQuery,
   useGetSeasonDraftGamesQuery,
 } from '@legacy-sports/graphql';
-import { MinigamesHub } from './MinigamesHub.native';
+import { MinigamesHub } from './MinigamesHub';
 import { render } from '../../test-utils';
 
 jest.mock('@legacy-sports/graphql');
@@ -14,30 +14,6 @@ jest.mock('@legacy-sports/graphql');
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: { error: jest.fn(), warn: jest.fn(), info: jest.fn() },
 }));
-
-// react-native-svg's real implementation pulls in RN's native Touchable
-// mixin, which the shared mobile jest mock of 'react-native' doesn't
-// provide. Stub the handful of primitives MinigamesHub.native uses.
-jest.mock('react-native-svg', () => {
-  /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- jest.mock factory needs runtime require */
-  const ReactLocal = require('react') as typeof import('react');
-  /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
-  const stub = (tag: string) => {
-    const Component = ({
-      children,
-      ...props
-    }: { children?: React.ReactNode } & Record<string, unknown>) =>
-      ReactLocal.createElement(tag, props, children);
-    Component.displayName = tag;
-    return Component;
-  };
-  return {
-    __esModule: true,
-    default: stub('svg'),
-    Circle: stub('circle'),
-    Path: stub('path'),
-  };
-});
 
 function setupDefaultMocks() {
   jest.mocked(useGetSeasonDraftGamesQuery).mockReturnValue({
@@ -69,16 +45,16 @@ function setupDefaultMocks() {
   } as unknown as ReturnType<typeof useGetMinigamesStatsQuery>);
 }
 
-describe('MinigamesHub (native)', () => {
+describe('MinigamesHub', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupDefaultMocks();
   });
 
-  // Regression test for LS-8669: the web MinigamesHub renders raw HTML/SVG
-  // host tags, which crash React Native with "View config getter callback
-  // for component `div` must be a function". This asserts the native
-  // implementation mounts cleanly instead.
+  // Regression test for LS-8669/LS-9058: MinigamesHub used to fork into a
+  // raw-HTML/SVG web file and a Tamagui native file because the raw host
+  // tags crashed React Native. The single merged component now builds on
+  // Tamagui + platform-split icon/artwork shims, so it renders cleanly.
   it('renders without throwing', () => {
     const onNavigate = jest.fn();
     expect(() =>

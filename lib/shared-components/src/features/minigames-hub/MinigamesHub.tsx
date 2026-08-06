@@ -1,38 +1,61 @@
-import React from 'react';
+/**
+ * MinigamesHub — a single breakpoint-driven component shared by web and
+ * native (LS-9058).
+ *
+ * Previously forked into `MinigamesHub.tsx` (web) and `MinigamesHub.native.tsx`
+ * (LS-8669) because the web version was written directly in raw HTML/SVG
+ * host tags (`<div>`/`<span>`/`<svg>`), which crash React Native with "View
+ * config getter callback for component `div` must be a function" — RN has no
+ * view config for lowercase host tags. That crash was a real capability gap,
+ * but it only applied to the raw-DOM/raw-SVG pieces, not the whole 800-line
+ * layout: the fix is to build the layout once in Tamagui (which compiles to
+ * both react-native-web and RN) and isolate the two genuinely irreducible
+ * pieces — the decorative baseball artwork and the icon glyph set — behind
+ * narrow `.native.tsx` shims, matching the repo's established pattern for
+ * raw-SVG art (`SportGlyph.tsx`, `GameRoomGlyphs.tsx`).
+ *
+ * Colors come from Tamagui theme tokens (`$surfaceCard`, `$textMuted`, …) or,
+ * for `react-native-svg`/raw-string props, `useThemeTokens()` — never inline
+ * hex — so the hub renders correctly in both light and dark themes
+ * (`.agents/skills/ui/SKILL.md`).
+ */
+import React, { useEffect } from 'react';
+import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
   SeasonDraftGameStatus,
   useGetDisclosureGameBestScoreQuery,
   useGetMinigamesStatsQuery,
   useGetSeasonDraftGamesQuery,
 } from '@legacy-sports/graphql';
+import { LOGGER } from '@legacy-sports/logging';
 import {
   GAME_TEMPLATES,
-  type MinigameId,
   type MinigamesHubProps,
   type MinigameStat,
   type MinigameTemplate,
   statFor,
 } from './MinigamesHub.shared';
-import {
-  BRAND_GOLD,
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY,
-  BRAND_SEAM_RED,
-  BRAND_SEAM_RED_LIGHT,
-  SURFACE_CARD,
-  withAlpha,
-} from '../../utils/colors';
+import { GameRoomGlyph } from './GameRoomGlyphs';
+import { MinigamesHubBaseballMark } from './MinigamesHubBaseballMark';
+import { useThemeTokens } from '../../hooks/useThemeTokens';
+import { FONT_BODY, FONT_DISPLAY, TABULAR_NUMS } from '../../utils/typography';
 
-export type { MinigameId, MinigamesHubProps };
+export type { MinigameId, MinigamesHubProps } from './MinigamesHub.shared';
+
+type Accent = MinigameTemplate['accent'];
+
+type GameDef = MinigameTemplate & { stat: MinigameStat };
 
 // Narrow-viewport breakpoint: at <=720px the hero stacks and cards become
-// single-column so copy and CTAs remain readable/tappable on phones.
+// single-column so copy and CTAs remain readable/tappable on phones. Native
+// callers pass `isNarrow` explicitly (from `useWindowDimensions`) instead —
+// see the `isNarrow` prop override below.
 const NARROW_QUERY = '(max-width: 720px)';
 
 function useIsNarrow(): boolean {
   const [narrow, setNarrow] = React.useState(false);
   React.useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !window.matchMedia) return;
     const mq = window.matchMedia(NARROW_QUERY);
     setNarrow(mq.matches);
     const handler = (e: MediaQueryListEvent) => setNarrow(e.matches);
@@ -42,222 +65,32 @@ function useIsNarrow(): boolean {
   return narrow;
 }
 
-const EYEBROW_STYLE: React.CSSProperties = {
-  fontFamily: 'var(--font-display, "Big Shoulders Display", sans-serif)',
-  fontWeight: 700,
-  fontSize: 12,
-  letterSpacing: 1.68,
-  textTransform: 'uppercase',
-};
+/** Icon box / border / stroke colors per game accent. Icon strokes are raw
+ *  values (react-native-svg has no concept of Tamagui tokens); everything
+ *  else stays as a `$token` for the caller to apply directly. */
+function useAccentColors(accent: Accent): {
+  iconBg: string;
+  iconBorder: string;
+  iconColor: string;
+} {
+  const tokens = useThemeTokens();
+  return accent === 'navy'
+    ? {
+        iconBg: '$accentMuted',
+        iconBorder: '$focusRing',
+        iconColor: tokens.semantic.infoFg,
+      }
+    : {
+        iconBg: '$statusDangerBg',
+        iconBorder: '$statusDangerBorder',
+        iconColor: tokens.brand.seamRedLight,
+      };
+}
 
-// ── Baseball SVG ───────────────────────────────────────────────────────────
-
-const BaseballMark: React.FC = () => (
-  <svg
-    viewBox="0 0 240 240"
-    fill="none"
-    style={{
-      width: '100%',
-      maxWidth: 200,
-      filter: 'drop-shadow(0 12px 32px rgba(0,0,0,0.5))',
-      transform: 'rotate(-8deg)',
-    }}
-    aria-hidden="true"
-  >
-    <defs>
-      <radialGradient id="mg-ballGrad" cx="36%" cy="30%" r="72%">
-        <stop offset="0%" stopColor="#FFFFFF" />
-        <stop offset="45%" stopColor="#F4EEDA" />
-        <stop offset="100%" stopColor="#A89A76" />
-      </radialGradient>
-      <radialGradient id="mg-ballShine" cx="32%" cy="26%" r="26%">
-        <stop offset="0%" stopColor="rgba(255,255,255,0.85)" />
-        <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-      </radialGradient>
-      <radialGradient id="mg-ballShadow" cx="70%" cy="78%" r="50%">
-        <stop offset="0%" stopColor="rgba(40,30,15,0.28)" />
-        <stop offset="100%" stopColor="rgba(40,30,15,0)" />
-      </radialGradient>
-    </defs>
-    <ellipse cx="120" cy="222" rx="82" ry="8" fill="rgba(0,0,0,0.35)" />
-    <circle cx="120" cy="118" r="100" fill="url(#mg-ballGrad)" />
-    <circle cx="120" cy="118" r="100" fill="url(#mg-ballShadow)" />
-    <circle cx="120" cy="118" r="100" fill="url(#mg-ballShine)" />
-    <circle
-      cx="120"
-      cy="118"
-      r="100"
-      fill="none"
-      stroke="#6B5F47"
-      strokeWidth="1"
-      opacity="0.35"
-    />
-    {/* Left seam */}
-    <path
-      d="M60 38 C95 78 95 158 60 198"
-      stroke="#B01E37"
-      strokeWidth="1.6"
-      fill="none"
-      strokeLinecap="round"
-      opacity="0.9"
-    />
-    {/* Right seam */}
-    <path
-      d="M180 38 C145 78 145 158 180 198"
-      stroke="#B01E37"
-      strokeWidth="1.6"
-      fill="none"
-      strokeLinecap="round"
-      opacity="0.9"
-    />
-    {/* Left stitches */}
-    {[0.09, 0.18, 0.27, 0.36, 0.45, 0.55, 0.64, 0.73, 0.82, 0.91].map(
-      (t, i) => {
-        const p0 = [60, 38];
-        const p1 = [95, 78];
-        const p2 = [95, 158];
-        const p3 = [60, 198];
-        const u = 1 - t;
-        const x =
-          u * u * u * p0[0] +
-          3 * u * u * t * p1[0] +
-          3 * u * t * t * p2[0] +
-          t * t * t * p3[0];
-        const y =
-          u * u * u * p0[1] +
-          3 * u * u * t * p1[1] +
-          3 * u * t * t * p2[1] +
-          t * t * t * p3[1];
-        const dir = i % 2 === 0 ? 1 : -1;
-        return (
-          <line
-            key={`ls-${i}`}
-            x1={x - 5}
-            y1={y - 3 * dir}
-            x2={x + 5}
-            y2={y + 3 * dir}
-            stroke="#8B1A2B"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        );
-      },
-    )}
-    {/* Right stitches */}
-    {[0.09, 0.18, 0.27, 0.36, 0.45, 0.55, 0.64, 0.73, 0.82, 0.91].map(
-      (t, i) => {
-        const p0 = [180, 38];
-        const p1 = [145, 78];
-        const p2 = [145, 158];
-        const p3 = [180, 198];
-        const u = 1 - t;
-        const x =
-          u * u * u * p0[0] +
-          3 * u * u * t * p1[0] +
-          3 * u * t * t * p2[0] +
-          t * t * t * p3[0];
-        const y =
-          u * u * u * p0[1] +
-          3 * u * u * t * p1[1] +
-          3 * u * t * t * p2[1] +
-          t * t * t * p3[1];
-        const dir = i % 2 === 0 ? 1 : -1;
-        return (
-          <line
-            key={`rs-${i}`}
-            x1={x - 5}
-            y1={y - 3 * dir}
-            x2={x + 5}
-            y2={y + 3 * dir}
-            stroke="#8B1A2B"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        );
-      },
-    )}
-  </svg>
-);
-
-// ── Draft icon SVG ─────────────────────────────────────────────────────────
-
-const DraftIcon: React.FC = () => (
-  <svg
-    width="26"
-    height="26"
-    viewBox="0 0 24 24"
-    fill="none"
-    aria-hidden="true"
-  >
-    <path
-      d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    />
-    <rect
-      x="9"
-      y="3"
-      width="6"
-      height="4"
-      rx="1"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    />
-    <path
-      d="M9 12h6M9 16h4"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    />
-  </svg>
-);
-
-const StatsIcon: React.FC = () => (
-  <svg
-    width="26"
-    height="26"
-    viewBox="0 0 24 24"
-    fill="none"
-    aria-hidden="true"
-  >
-    <path
-      d="M18 20V10M12 20V4M6 20v-6"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const ArrowRight: React.FC = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    aria-hidden="true"
-  >
-    <path
-      d="M5 12h14M13 6l6 6-6 6"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-// ── Game card ──────────────────────────────────────────────────────────────
-
-type GameDef = MinigameTemplate & {
-  icon: React.ReactNode;
-  stat: MinigameStat;
-};
-
-function iconFor(kind: MinigameTemplate['iconKind']): React.ReactNode {
-  return kind === 'draft' ? <DraftIcon /> : <StatsIcon />;
+function glyphFor(
+  kind: MinigameTemplate['iconKind'],
+): 'clipboard' | 'barChart' {
+  return kind === 'draft' ? 'clipboard' : 'barChart';
 }
 
 const GameCard: React.FC<{
@@ -265,267 +98,201 @@ const GameCard: React.FC<{
   onPress: () => void;
   isNarrow: boolean;
 }> = ({ game, onPress, isNarrow }) => {
-  const iconBg =
-    game.accent === 'navy'
-      ? withAlpha(BRAND_NAVY, 0.55)
-      : withAlpha(BRAND_SEAM_RED, 0.2);
-  const iconBorder =
-    game.accent === 'navy'
-      ? withAlpha('#4E8ED6', 0.3)
-      : withAlpha(BRAND_SEAM_RED, 0.4);
-  const cardAccentGradient =
-    game.accent === 'navy'
-      ? `radial-gradient(ellipse at 90% 0%, ${withAlpha(BRAND_NAVY, 0.55)} 0%, transparent 55%)`
-      : `radial-gradient(ellipse at 90% 0%, ${withAlpha(BRAND_SEAM_RED, 0.35)} 0%, transparent 55%)`;
+  const { iconBg, iconBorder, iconColor } = useAccentColors(game.accent);
+  const tokens = useThemeTokens();
 
   return (
-    <button
-      onClick={onPress}
-      style={{
-        textAlign: 'left',
-        background: SURFACE_CARD,
-        border: `1px solid ${withAlpha('#ffffff', 0.08)}`,
-        borderRadius: 16,
-        padding: isNarrow ? 20 : 28,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 14,
-        cursor: 'pointer',
-        transition: 'all 240ms ease',
-        position: 'relative',
-        overflow: 'hidden',
-        minHeight: isNarrow ? 0 : 360,
-        color: '#F5F7FA',
-        fontFamily: 'inherit',
-        flex: isNarrow ? '1 1 100%' : '1 1 280px',
-        width: isNarrow ? '100%' : undefined,
+    <YStack
+      role="button"
+      tabIndex={0}
+      onPress={onPress}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPress();
+        }
       }}
-      onMouseEnter={(e) => {
-        const el = e.currentTarget;
-        el.style.transform = 'translateY(-4px)';
-        el.style.borderColor = withAlpha(BRAND_GOLD, 0.5);
-        el.style.boxShadow = '0 20px 60px rgba(0,0,0,0.5)';
-      }}
-      onMouseLeave={(e) => {
-        const el = e.currentTarget;
-        el.style.transform = '';
-        el.style.borderColor = withAlpha('#ffffff', 0.08);
-        el.style.boxShadow = '';
-      }}
+      cursor="pointer"
+      animation="quick"
+      flex={isNarrow ? undefined : 1}
+      minWidth={isNarrow ? '100%' : 280}
+      backgroundColor="$surfaceCard"
+      borderWidth={1}
+      borderColor="$glassBorder"
+      borderRadius={16}
+      padding={isNarrow ? 20 : 24}
+      gap={14}
+      hoverStyle={{ borderColor: '$brandGold' }}
+      pressStyle={{ opacity: 0.9 }}
     >
-      {/* Accent gradient overlay */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: cardAccentGradient,
-          opacity: 0.55,
-          pointerEvents: 'none',
-        }}
-      />
+      <XStack alignItems="center" justifyContent="space-between" gap={12}>
+        <XStack
+          width={52}
+          height={52}
+          borderRadius={12}
+          alignItems="center"
+          justifyContent="center"
+          backgroundColor={iconBg}
+          borderWidth={1}
+          borderColor={iconBorder}
+        >
+          <GameRoomGlyph
+            name={glyphFor(game.iconKind)}
+            size={26}
+            color={iconColor}
+          />
+        </XStack>
+        <Text
+          fontFamily={FONT_DISPLAY}
+          fontWeight="700"
+          fontSize={isNarrow ? 11.5 : 10.5}
+          letterSpacing={isNarrow ? 1.38 : 1.26}
+          textTransform="uppercase"
+          color="$textMuted"
+          paddingHorizontal={11}
+          paddingVertical={6}
+          borderRadius={9999}
+          backgroundColor="$surfaceSubtle"
+          borderWidth={1}
+          borderColor="$glassBorder"
+        >
+          {game.tag}
+        </Text>
+      </XStack>
 
-      <div
-        style={{
-          position: 'relative',
-          zIndex: 1,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 14,
-          flex: 1,
-        }}
+      <Text
+        fontFamily={FONT_DISPLAY}
+        fontWeight="800"
+        fontSize={isNarrow ? 34 : 40}
+        lineHeight={isNarrow ? 36 : 42}
+        letterSpacing={isNarrow ? -0.68 : -0.88}
+        color="$fg1"
       >
-        {/* Top row: icon + tag */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              width: 52,
-              height: 52,
-              borderRadius: 12,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: iconBg,
-              border: `1px solid ${iconBorder}`,
-              color: game.accent === 'navy' ? '#8FB4E8' : BRAND_SEAM_RED_LIGHT,
-            }}
-          >
-            {game.icon}
-          </div>
-          <div
-            style={{
-              fontFamily:
-                'var(--font-display, "Big Shoulders Display", sans-serif)',
-              fontWeight: 700,
-              fontSize: isNarrow ? 11.5 : 10.5,
-              letterSpacing: isNarrow ? 1.38 : 1.26,
-              textTransform: 'uppercase',
-              color: isNarrow ? '#B8C5DC' : '#9CAAC5',
-              padding: '6px 11px',
-              borderRadius: 9999,
-              background: withAlpha('#ffffff', 0.04),
-              border: `1px solid ${withAlpha('#ffffff', 0.1)}`,
-            }}
-          >
-            {game.tag}
-          </div>
-        </div>
+        {game.title}
+      </Text>
 
-        {/* Title */}
-        <div
-          style={{
-            fontFamily:
-              'var(--font-display, "Big Shoulders Display", sans-serif)',
-            fontWeight: 800,
-            fontSize: isNarrow ? 34 : 44,
-            lineHeight: 1,
-            letterSpacing: isNarrow ? -0.68 : -0.88,
-            color: '#F8FAFC',
-          }}
-        >
-          {game.title}
-        </div>
+      <Text
+        fontFamily={FONT_BODY}
+        fontSize={isNarrow ? 15.5 : 15}
+        lineHeight={22}
+        color="$textMuted"
+      >
+        {game.desc}
+      </Text>
 
-        {/* Description */}
-        <p
-          style={{
-            fontSize: isNarrow ? 15.5 : 15,
-            lineHeight: 1.6,
-            color: isNarrow ? '#C5D0E3' : '#9CAAC5',
-            margin: 0,
-            maxWidth: '48ch',
-          }}
-        >
-          {game.desc}
-        </p>
-
-        {/* Meta list */}
-        <ul
-          style={{
-            listStyle: 'none',
-            padding: 0,
-            margin: 0,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: isNarrow ? 8 : 6,
-          }}
-        >
-          {game.meta.map((m) => (
-            <li
-              key={m}
-              style={{
-                fontFamily: 'inherit',
-                fontSize: isNarrow ? 14 : 13,
-                color: isNarrow ? '#A2B3D0' : '#7A8BAA',
-                paddingLeft: 18,
-                position: 'relative',
-              }}
-            >
-              <span
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  top: 9,
-                  width: 8,
-                  height: 1,
-                  background: BRAND_GOLD,
-                  display: 'block',
-                }}
-              />
+      <YStack gap={isNarrow ? 8 : 6}>
+        {game.meta.map((m) => (
+          <XStack key={m} alignItems="flex-start" gap={8}>
+            <YStack
+              width={8}
+              height={1}
+              marginTop={9}
+              backgroundColor="$brandGold"
+            />
+            <Text flex={1} fontSize={isNarrow ? 14 : 13} color="$textMuted">
               {m}
-            </li>
-          ))}
-        </ul>
+            </Text>
+          </XStack>
+        ))}
+      </YStack>
 
-        {/* Footer: stat + CTA */}
-        <div
-          style={{
-            marginTop: 'auto',
-            paddingTop: 16,
-            borderTop: `1px dashed ${withAlpha('#ffffff', 0.1)}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
+      <XStack
+        alignItems="center"
+        justifyContent="space-between"
+        gap={12}
+        paddingTop={16}
+        borderTopWidth={1}
+        borderColor="$glassBorder"
+      >
+        <YStack>
+          <Text
+            fontFamily={FONT_DISPLAY}
+            fontWeight="800"
+            fontSize={26}
+            color="$brandGoldLight"
+            {...TABULAR_NUMS}
+          >
+            {game.stat.value}
+          </Text>
+          <Text
+            fontFamily={FONT_DISPLAY}
+            fontWeight="700"
+            fontSize={isNarrow ? 11 : 10}
+            letterSpacing={isNarrow ? 1.54 : 1.4}
+            textTransform="uppercase"
+            color="$textMuted"
+            marginTop={4}
+          >
+            {game.stat.label}
+          </Text>
+        </YStack>
+        <XStack
+          alignItems="center"
+          gap={8}
+          paddingHorizontal={isNarrow ? 18 : 16}
+          paddingVertical={isNarrow ? 12 : 10}
+          borderRadius={9999}
+          backgroundColor="$statusAccentBg"
+          borderWidth={1}
+          borderColor="$statusAccentBorder"
         >
-          <div>
-            <div
-              style={{
-                fontFamily:
-                  'var(--font-display, "Big Shoulders Display", sans-serif)',
-                fontWeight: 800,
-                fontSize: 26,
-                color: BRAND_GOLD_LIGHT,
-                lineHeight: 1,
-                fontVariantNumeric: 'tabular-nums',
-              }}
-            >
-              {game.stat.value}
-            </div>
-            <div
-              style={{
-                fontFamily:
-                  'var(--font-display, "Big Shoulders Display", sans-serif)',
-                fontWeight: 700,
-                fontSize: isNarrow ? 11 : 10,
-                letterSpacing: isNarrow ? 1.54 : 1.4,
-                textTransform: 'uppercase',
-                color: isNarrow ? '#9AABCB' : '#7A8BAA',
-                marginTop: 4,
-              }}
-            >
-              {game.stat.label}
-            </div>
-          </div>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              fontFamily:
-                'var(--font-display, "Big Shoulders Display", sans-serif)',
-              fontWeight: 800,
-              fontSize: isNarrow ? 14 : 13,
-              letterSpacing: isNarrow ? 1.4 : 1.3,
-              textTransform: 'uppercase',
-              color: BRAND_GOLD_LIGHT,
-              padding: isNarrow ? '12px 18px' : '10px 16px',
-              borderRadius: 9999,
-              background: withAlpha(BRAND_GOLD, 0.08),
-              border: `1px solid ${withAlpha(BRAND_GOLD, 0.35)}`,
-            }}
+          <Text
+            fontFamily={FONT_DISPLAY}
+            fontWeight="800"
+            fontSize={isNarrow ? 14 : 13}
+            letterSpacing={isNarrow ? 1.4 : 1.3}
+            textTransform="uppercase"
+            color="$brandGoldLight"
           >
             {game.cta}
-            <ArrowRight />
-          </div>
-        </div>
-      </div>
-    </button>
+          </Text>
+          <GameRoomGlyph
+            name="arrowRight"
+            size={16}
+            strokeWidth={2}
+            color={tokens.brand.goldLight}
+          />
+        </XStack>
+      </XStack>
+    </YStack>
   );
 };
 
-// ── Main component ─────────────────────────────────────────────────────────
-
-export const MinigamesHub: React.FC<MinigamesHubProps> = ({
+export function MinigamesHub({
   onNavigate,
   isNarrow: isNarrowProp,
-}) => {
+}: MinigamesHubProps): React.JSX.Element {
   const isNarrowHook = useIsNarrow();
   const isNarrow = isNarrowProp ?? isNarrowHook;
+
   const {
     data: sdGamesData,
     loading: sdLoading,
     error: sdError,
   } = useGetSeasonDraftGamesQuery();
-  const { data: bestScoreData } = useGetDisclosureGameBestScoreQuery();
-  const { data: minigamesStatsData } = useGetMinigamesStatsQuery();
+  const { data: bestScoreData, error: bestScoreError } =
+    useGetDisclosureGameBestScoreQuery();
+  const { data: minigamesStatsData, error: minigamesStatsError } =
+    useGetMinigamesStatsQuery();
+
+  // Errors are non-fatal — the UI falls back to '—' for null data — but log
+  // them so a broken query doesn't silently disappear from Rollbar/Discord.
+  useEffect(() => {
+    if (bestScoreError) {
+      LOGGER.error(
+        'MinigamesHub: disclosureGameBestScore query failed:',
+        bestScoreError,
+      );
+    }
+  }, [bestScoreError]);
+  useEffect(() => {
+    if (minigamesStatsError) {
+      LOGGER.error(
+        'MinigamesHub: minigamesStats query failed:',
+        minigamesStatsError,
+      );
+    }
+  }, [minigamesStatsError]);
 
   // Count only in-progress games (setup or drafting).
   // Show "—" while loading or if the query errored; show "0" for a successful
@@ -544,7 +311,6 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({
 
   const games: GameDef[] = GAME_TEMPLATES.map((template) => ({
     ...template,
-    icon: iconFor(template.iconKind),
     stat: statFor(template.id, { activeGamesCount, bestScore }),
   }));
 
@@ -572,249 +338,186 @@ export const MinigamesHub: React.FC<MinigamesHubProps> = ({
   ];
 
   return (
-    <div
-      style={{
-        maxWidth: 1280,
-        width: '100%',
-        alignSelf: 'center',
-        padding: isNarrow ? '20px 16px 64px' : '32px 20px 80px',
-        margin: '0 auto',
-      }}
-    >
-      {/* ── Hero section ── */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: isNarrow ? '1fr' : '1fr 260px',
-          gap: isNarrow ? 24 : 40,
-          alignItems: 'center',
-          padding: isNarrow ? '28px 22px' : '48px 44px',
-          marginBottom: 28,
-          background: [
-            `radial-gradient(ellipse at 85% 30%, ${withAlpha(BRAND_GOLD, 0.12)} 0%, transparent 55%)`,
-            `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.45)} 0%, ${withAlpha('#111B2F', 0.3)} 50%, transparent 100%)`,
-            SURFACE_CARD,
-          ].join(', '),
-          border: `1px solid ${withAlpha(BRAND_GOLD, 0.22)}`,
-          borderRadius: 24,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <YStack
+        maxWidth={1280}
+        width="100%"
+        alignSelf="center"
+        paddingHorizontal={isNarrow ? 16 : 20}
+        paddingTop={isNarrow ? 20 : 32}
+        paddingBottom={isNarrow ? 64 : 80}
+        gap={isNarrow ? 24 : 32}
       >
-        {/* Subtle horizontal line pattern */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
-            backgroundImage:
-              'linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px)',
-            backgroundSize: '100% 28px',
-            maskImage:
-              'linear-gradient(to bottom, transparent, black 30%, black 70%, transparent)',
-          }}
-        />
+        {/* Hero section */}
+        <XStack
+          flexWrap="wrap"
+          alignItems="center"
+          gap={isNarrow ? 24 : 40}
+          padding={isNarrow ? 22 : 44}
+          backgroundColor="$surfaceCard"
+          borderWidth={1}
+          borderColor="$statusAccentBorder"
+          borderRadius={24}
+        >
+          <YStack flex={1} minWidth={240}>
+            <XStack alignItems="center" gap={8}>
+              <YStack
+                width={7}
+                height={7}
+                borderRadius={9999}
+                backgroundColor="$brandGold"
+              />
+              <Text
+                fontFamily={FONT_DISPLAY}
+                fontWeight="700"
+                fontSize={12}
+                letterSpacing={1.68}
+                textTransform="uppercase"
+                color="$brandGoldLight"
+              >
+                Minigames · Off-Season
+              </Text>
+            </XStack>
 
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          {/* Eyebrow */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <span
-              style={{
-                width: 7,
-                height: 7,
-                borderRadius: '50%',
-                background: BRAND_GOLD,
-                boxShadow: `0 0 0 3px ${withAlpha(BRAND_GOLD, 0.22)}`,
-              }}
-            />
-            <div style={{ ...EYEBROW_STYLE, color: BRAND_GOLD_LIGHT }}>
-              Minigames · Off-Season
-            </div>
-          </div>
-
-          {/* H1 */}
-          <div
-            style={{
-              fontFamily:
-                'var(--font-display, "Big Shoulders Display", sans-serif)',
-              fontWeight: 800,
-              fontSize: isNarrow
-                ? 'clamp(30px, 8vw, 38px)'
-                : 'clamp(38px, 6vw, 64px)',
-              lineHeight: 0.98,
-              // Web-only hero div (fluid clamp() fontSize) — ≈ -0.025em across the rendered range.
-              letterSpacing: isNarrow ? -0.85 : -1.25,
-              color: '#F8FAFC',
-              margin: '16px 0 18px',
-              maxWidth: '18ch',
-            }}
-          >
-            The game doesn't stop
-            <br />
-            <span
-              style={{
-                color: BRAND_GOLD_LIGHT,
-                fontStyle: 'italic',
-                fontFamily: 'Literata, serif',
-                fontWeight: 400,
-                // Web-only accent inheriting the hero's fluid fontSize — ≈ -0.01em.
-                letterSpacing: isNarrow ? -0.34 : -0.5,
-              }}
+            <Text
+              fontFamily={FONT_DISPLAY}
+              fontWeight="800"
+              fontSize={isNarrow ? 34 : 52}
+              lineHeight={isNarrow ? 36 : 54}
+              letterSpacing={isNarrow ? -0.85 : -1.25}
+              color="$fg1"
+              marginTop={16}
+              marginBottom={18}
             >
-              when the season does.
-            </span>
-          </div>
+              The game doesn&apos;t stop{'\n'}
+              <Text
+                fontFamily={FONT_BODY}
+                fontStyle="italic"
+                fontWeight="400"
+                color="$brandGoldLight"
+                fontSize={isNarrow ? 34 : 52}
+              >
+                when the season does.
+              </Text>
+            </Text>
 
-          {/* Lede */}
-          <p
-            style={{
-              fontFamily: 'inherit',
-              fontSize: isNarrow ? 15 : 17,
-              lineHeight: 1.55,
-              color: isNarrow ? '#B8C5DC' : '#9CAAC5',
-              maxWidth: '52ch',
-              margin: '0 0 24px',
-            }}
-          >
-            Quick-draft showdowns and trivia built on 150 years of archived
-            statistics. Play with friends or solo against the record book.
-          </p>
+            <Text
+              fontFamily={FONT_BODY}
+              fontSize={isNarrow ? 15 : 17}
+              lineHeight={1.55 * (isNarrow ? 15 : 17)}
+              color="$textMuted"
+              marginBottom={24}
+            >
+              Quick-draft showdowns and trivia built on 150 years of archived
+              statistics. Play with friends or solo against the record book.
+            </Text>
 
-          {/* Stats row */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: isNarrow ? 16 : 22,
-              flexWrap: 'wrap',
-              paddingTop: 20,
-              borderTop: `1px solid ${withAlpha('#ffffff', 0.08)}`,
-            }}
-          >
-            {heroStats.map((item, i) =>
-              item === null ? (
-                <div
-                  key={i}
-                  style={{
-                    width: 1,
-                    height: 34,
-                    background: withAlpha('#ffffff', 0.1),
-                    display: isNarrow ? 'none' : 'block',
-                  }}
-                />
-              ) : (
-                <div key={i}>
-                  <div
-                    style={{
-                      fontFamily:
-                        'var(--font-display, "Big Shoulders Display", sans-serif)',
-                      fontWeight: 800,
-                      fontSize: isNarrow ? 22 : 24,
-                      color: '#F8FAFC',
-                      lineHeight: 1,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    {item.n}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily:
-                        'var(--font-display, "Big Shoulders Display", sans-serif)',
-                      fontWeight: 700,
-                      fontSize: isNarrow ? 11 : 10.5,
-                      letterSpacing: isNarrow ? 1.54 : 1.47,
-                      textTransform: 'uppercase',
-                      color: isNarrow ? '#9AABCB' : '#7A8BAA',
-                      marginTop: 6,
-                    }}
-                  >
-                    {item.l}
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-        </div>
+            <XStack
+              alignItems="center"
+              flexWrap="wrap"
+              gap={isNarrow ? 16 : 22}
+              paddingTop={20}
+              borderTopWidth={1}
+              borderColor="$glassBorder"
+            >
+              {heroStats.map((item, i) =>
+                item === null ? (
+                  !isNarrow && (
+                    <YStack
+                      key={i}
+                      width={1}
+                      height={34}
+                      backgroundColor="$outlineSubtle"
+                    />
+                  )
+                ) : (
+                  <YStack key={i}>
+                    <Text
+                      fontFamily={FONT_DISPLAY}
+                      fontWeight="800"
+                      fontSize={isNarrow ? 22 : 24}
+                      color="$fg1"
+                      {...TABULAR_NUMS}
+                    >
+                      {item.n}
+                    </Text>
+                    <Text
+                      fontFamily={FONT_DISPLAY}
+                      fontWeight="700"
+                      fontSize={isNarrow ? 11 : 10.5}
+                      letterSpacing={isNarrow ? 1.54 : 1.47}
+                      textTransform="uppercase"
+                      color="$textMuted"
+                      marginTop={6}
+                    >
+                      {item.l}
+                    </Text>
+                  </YStack>
+                ),
+              )}
+            </XStack>
+          </YStack>
 
-        {/* Baseball artwork — hidden on narrow viewports to keep the hero
-            compact and avoid pushing the mode cards below the fold. */}
-        {!isNarrow && (
-          <div
-            style={{
-              position: 'relative',
-              zIndex: 1,
-              width: '100%',
-              maxWidth: 220,
-              justifySelf: 'end',
-            }}
-          >
-            <BaseballMark />
-          </div>
-        )}
-      </div>
+          {/* Baseball artwork — hidden on narrow viewports to keep the hero
+              compact and avoid pushing the mode cards below the fold. */}
+          {!isNarrow && (
+            <YStack width={220} alignItems="flex-end">
+              <MinigamesHubBaseballMark />
+            </YStack>
+          )}
+        </XStack>
 
-      {/* ── Game cards ── */}
-      <div
-        style={{ display: 'flex', gap: 18, marginBottom: 32, flexWrap: 'wrap' }}
-      >
-        {games.map((g) => (
-          <GameCard
-            key={g.id}
-            game={g}
-            onPress={() => onNavigate(g.id)}
-            isNarrow={isNarrow}
-          />
-        ))}
-      </div>
+        {/* Game cards */}
+        <XStack flexWrap="wrap" gap={18}>
+          {games.map((g) => (
+            <GameCard
+              key={g.id}
+              game={g}
+              onPress={() => onNavigate(g.id)}
+              isNarrow={isNarrow}
+            />
+          ))}
+        </XStack>
 
-      {/* ── Coming soon footer ── */}
-      <div
-        style={{
-          background: withAlpha('#ffffff', 0.02),
-          border: `1px dashed ${withAlpha('#ffffff', 0.1)}`,
-          borderRadius: 12,
-          padding: '20px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontFamily:
-                'var(--font-display, "Big Shoulders Display", sans-serif)',
-              fontWeight: 700,
-              fontSize: 12,
-              letterSpacing: 1.68,
-              textTransform: 'uppercase',
-              color: '#7A8BAA',
-            }}
-          >
-            Coming Soon
-          </div>
-          <div
-            style={{
-              fontFamily:
-                'var(--font-display, "Big Shoulders Display", sans-serif)',
-              fontWeight: 700,
-              fontSize: 16,
-              color: '#9CAAC5',
-              marginTop: 4,
-              letterSpacing: 0.16,
-            }}
-          >
-            Trade Deadline · Pennant Picks · Box Score Quiz
-          </div>
-        </div>
-        <div style={{ fontSize: 13, color: '#4D5D80', fontStyle: 'italic' }}>
-          Three more modes in the dugout. Winter is long.
-        </div>
-      </div>
-    </div>
+        {/* Coming soon footer */}
+        <XStack
+          flexWrap="wrap"
+          alignItems="center"
+          justifyContent="space-between"
+          gap={16}
+          backgroundColor="$surfaceSubtle"
+          borderWidth={1}
+          borderColor="$glassBorder"
+          borderRadius={12}
+          padding={20}
+        >
+          <YStack>
+            <Text
+              fontFamily={FONT_DISPLAY}
+              fontWeight="700"
+              fontSize={12}
+              letterSpacing={1.68}
+              textTransform="uppercase"
+              color="$textMuted"
+            >
+              Coming Soon
+            </Text>
+            <Text
+              fontFamily={FONT_DISPLAY}
+              fontWeight="700"
+              fontSize={16}
+              color="$textMuted"
+              marginTop={4}
+              letterSpacing={0.16}
+            >
+              Trade Deadline · Pennant Picks · Box Score Quiz
+            </Text>
+          </YStack>
+          <Text fontSize={13} color="$textMuted" fontStyle="italic">
+            Three more modes in the dugout. Winter is long.
+          </Text>
+        </XStack>
+      </YStack>
+    </ScrollView>
   );
-};
+}
