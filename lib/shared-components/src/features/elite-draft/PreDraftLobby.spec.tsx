@@ -1,11 +1,16 @@
 import React from 'react';
 import { PreDraftLobby } from './PreDraftLobby';
+import type { LeagueTeam } from './types';
 import { render } from '../../test-utils';
 
-jest.mock('./styles', () => ({ CSS: '' }));
 jest.mock('./DraftSlotTradePanel', () => ({
   DraftSlotTradePanel: () => <div data-testid="mock-trade-panel" />,
 }));
+
+const TEAMS: LeagueTeam[] = [
+  { id: '1', name: 'Alpha Squad', leagueId: 42 },
+  { id: '2', name: 'Beta Force', leagueId: 42 },
+];
 
 function makeProps(overrides: Record<string, unknown> = {}) {
   return {
@@ -89,5 +94,101 @@ describe('PreDraftLobby — draft slot trading visibility (LS-8677)', () => {
       />,
     );
     expect(queryByTestId('mock-trade-panel')).toBeNull();
+  });
+});
+
+describe('PreDraftLobby — draft order list (LS-9061)', () => {
+  it('lists teams in default order and marks the current user', () => {
+    const { getByText } = render(
+      <PreDraftLobby {...makeProps({ leagueTeams: TEAMS, myTeamId: 1 })} />,
+    );
+    expect(getByText('Alpha Squad (You)')).toBeTruthy();
+    expect(getByText('Beta Force')).toBeTruthy();
+  });
+
+  it('respects a custom draft order', () => {
+    const { container } = render(
+      <PreDraftLobby
+        {...makeProps({ leagueTeams: TEAMS, customDraftOrder: ['2', '1'] })}
+      />,
+    );
+    const text = container.textContent ?? '';
+    expect(text.indexOf('Beta Force')).toBeLessThan(
+      text.indexOf('Alpha Squad'),
+    );
+  });
+
+  it('reorders via the up/down arrows when the viewer is the owner', () => {
+    const setCustomDraftOrder = jest.fn();
+    const { getByLabelText } = render(
+      <PreDraftLobby
+        {...makeProps({
+          leagueTeams: TEAMS,
+          isOwner: true,
+          setCustomDraftOrder,
+        })}
+      />,
+    );
+    getByLabelText('Move Beta Force up').click();
+    expect(setCustomDraftOrder).toHaveBeenCalledWith(['2', '1']);
+  });
+
+  it('does not render reorder arrows for non-owners', () => {
+    const { queryByLabelText } = render(
+      <PreDraftLobby {...makeProps({ leagueTeams: TEAMS, isOwner: false })} />,
+    );
+    expect(queryByLabelText('Move Beta Force up')).toBeNull();
+  });
+});
+
+describe('PreDraftLobby — commissioner start controls (LS-9061)', () => {
+  it('shows Start Snake/Normal Draft for the owner once 2+ teams exist', () => {
+    const onInitializeDraft = jest.fn().mockResolvedValue(undefined);
+    const { getByText } = render(
+      <PreDraftLobby
+        {...makeProps({
+          leagueTeams: TEAMS,
+          isOwner: true,
+          onInitializeDraft,
+        })}
+      />,
+    );
+    getByText('Start Snake Draft').click();
+    expect(onInitializeDraft).toHaveBeenCalledWith('snake');
+
+    getByText('Start Normal Draft').click();
+    expect(onInitializeDraft).toHaveBeenCalledWith('linear');
+  });
+
+  it('hides start controls for a non-owner', () => {
+    const { queryByText } = render(
+      <PreDraftLobby {...makeProps({ leagueTeams: TEAMS, isOwner: false })} />,
+    );
+    expect(queryByText('Start Snake Draft')).toBeNull();
+    expect(queryByText(/notified when the commissioner starts/i)).toBeTruthy();
+  });
+
+  it('hides start controls with fewer than 2 teams even for the owner', () => {
+    const { queryByText } = render(
+      <PreDraftLobby
+        {...makeProps({ leagueTeams: [TEAMS[0]], isOwner: true })}
+      />,
+    );
+    expect(queryByText('Start Snake Draft')).toBeNull();
+  });
+});
+
+describe('PreDraftLobby — init error state (LS-9061)', () => {
+  it('surfaces the init error message', () => {
+    const { getByText } = render(
+      <PreDraftLobby
+        {...makeProps({
+          leagueTeams: TEAMS,
+          isOwner: true,
+          initError: 'Failed to start the draft.',
+        })}
+      />,
+    );
+    expect(getByText('Failed to start the draft.')).toBeTruthy();
   });
 });

@@ -1,6 +1,6 @@
 import React from 'react';
+import { Button, ScrollView, Text, useMedia, XStack, YStack } from 'tamagui';
 import type { LeagueTeam } from './types';
-import { CSS } from './styles';
 import { DraftSlotTradePanel } from './DraftSlotTradePanel';
 import type { SportKind } from '../../config/sports';
 
@@ -49,6 +49,54 @@ const LOBBY_CHROME: Record<
   },
 };
 
+// Mirrors styles.ts's private NAV_HEIGHT_PX/NAV_Z_INDEX. Kept local (rather
+// than exported from styles.ts) since this screen no longer pulls in that
+// raw-CSS bundle (LS-9061) — the lobby still needs to sit below the fixed
+// nav bar the same way the rest of the draft board does.
+const NAV_HEIGHT_PX = 75;
+const NAV_Z_INDEX = 200;
+
+// DraftSlotTradePanel (LS-8677) is rendered exclusively by this screen but is
+// its own component, out of scope for this port (see LS-9061) — it still
+// styles itself via raw `var(--d-*)` CSS custom properties that were
+// previously supplied by styles.ts's global `<style>{CSS}</style>` injection.
+// Re-declare just the handful it reads (as CSS custom properties, not a
+// style-tag) so it keeps rendering correctly without pulling that bundle
+// back in. No hardcoded hex/rgba fallbacks — Tamagui's theme provider always
+// has these tokens set by the time this screen renders (theme-compliance
+// ratchet forbids raw color literals; see .agents/skills/ui/SKILL.md).
+const draftSlotTradePanelVars = {
+  '--d-text': 'var(--color)',
+  '--d-text-secondary': 'var(--textMuted)',
+  '--d-text-muted': 'var(--glassTextMuted)',
+  '--d-surface': 'var(--surfaceInteractive)',
+  '--d-border': 'var(--glassBorder)',
+  '--d-accent': 'var(--brandGold)',
+  '--d-success': 'var(--green8)',
+  '--d-danger': 'var(--statusDangerFg)',
+} as React.CSSProperties;
+
+/** Uppercase, wide-tracked label — mirrors the mockup's `.eyebrow` recipe. */
+function Eyebrow({
+  children,
+  color = '$textMuted',
+}: {
+  children: React.ReactNode;
+  color?: string;
+}): React.JSX.Element {
+  return (
+    <Text
+      fontSize={11}
+      fontWeight="700"
+      letterSpacing={1.5}
+      textTransform="uppercase"
+      color={color}
+    >
+      {children}
+    </Text>
+  );
+}
+
 export function PreDraftLobby({
   league,
   sport,
@@ -70,272 +118,293 @@ export function PreDraftLobby({
     Boolean(league?.allowDraftSlotTrading) &&
     league?.draftStatus === 'not-started';
   const chrome = LOBBY_CHROME[sport];
+  const orderedTeams = customDraftOrder
+    ? (customDraftOrder
+        .map((id) => leagueTeams.find((t) => String(t.id) === id))
+        .filter(Boolean) as LeagueTeam[])
+    : leagueTeams;
+
+  // Bind useMedia through an explicit signature so the call/result stay
+  // type-safe under this project's typed ESLint rules (same pattern as
+  // LeagueDetailShell's crestIconSize and useThemeColors). Optional-chained
+  // because this file's spec runs under both the web and mobile Jest
+  // projects (elite-draft/ has no mobile blanket-exclusion) and the mobile
+  // Tamagui mock doesn't stub useMedia — real Tamagui on web always provides it.
+  const readMedia = useMedia as (() => { sm?: boolean }) | undefined;
+  const iconFontSize = readMedia?.().sm ? 40 : 56;
+
+  const moveTeam = (idx: number, direction: -1 | 1): void => {
+    const order = customDraftOrder ?? leagueTeams.map((t) => String(t.id));
+    const next = [...order];
+    const swapWith = idx + direction;
+    [next[idx], next[swapWith]] = [next[swapWith], next[idx]];
+    setCustomDraftOrder(next);
+  };
+
   return (
-    <div className="d-root" data-sport={sport}>
-      <style>{CSS}</style>
-      <div className="d-bg-fx" />
-      <div className="d-state-center">
-        <div className="d-state-icon">
-          <span role="img" aria-label={chrome.iconLabel}>
-            {chrome.icon}
-          </span>
-        </div>
-        <div
-          className="d-state-eyebrow"
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 2,
-            textTransform: 'uppercase',
-            color: 'var(--d-accent)',
-            marginBottom: 4,
+    <YStack
+      position="fixed"
+      top={NAV_HEIGHT_PX}
+      right={0}
+      bottom={0}
+      left={0}
+      zIndex={NAV_Z_INDEX - 2}
+      backgroundColor="$background"
+      overflow="hidden"
+      data-sport={sport}
+      style={draftSlotTradePanelVars}
+    >
+      <ScrollView flex={1}>
+        <YStack
+          minHeight="100%"
+          alignItems="center"
+          justifyContent="center"
+          gap="$4"
+          paddingVertical="$8"
+          paddingHorizontal="$6"
+          $sm={{
+            paddingVertical: '$6',
+            paddingHorizontal: '$4',
+            // Small viewports commonly overflow the visible area, and a
+            // fixed bottom tab bar sits above this screen's own fixed
+            // positioning — anchor to the top and pad generously so the
+            // trailing "Start Normal Draft" button always scrolls clear of
+            // it instead of centering the block off-screen (LS-9061).
+            justifyContent: 'flex-start',
+            paddingBottom: 96,
           }}
         >
-          {chrome.strapline}
-        </div>
-        <div className="d-state-title">
-          {league?.name ? `${league.name} — Live Draft` : 'Live Draft Lobby'}
-        </div>
-        <div className="d-state-desc">
-          {leagueTeams.length < 2
-            ? 'At least 2 teams are required to start a draft. Invite more teams to your league.'
-            : isOwner
-              ? 'As the commissioner, you can start the live draft when all teams are ready.'
-              : 'Waiting for the commissioner to start the live draft.'}
-        </div>
+          <Text
+            fontSize={iconFontSize}
+            lineHeight={iconFontSize}
+            role="img"
+            aria-label={chrome.iconLabel}
+          >
+            {chrome.icon}
+          </Text>
 
-        {leagueTeams.length > 0 && (
-          <div style={{ maxWidth: 320, width: '100%', marginTop: 8 }}>
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: 1.5,
-                textTransform: 'uppercase',
-                color: 'var(--d-text-secondary)',
-                marginBottom: 8,
-              }}
+          <YStack alignItems="center" gap="$1.5">
+            <Eyebrow color="$brandGold">{chrome.strapline}</Eyebrow>
+            <Text
+              fontFamily="$heading"
+              fontSize={36}
+              fontWeight="800"
+              letterSpacing={0.5}
+              color="$brandGold"
+              textAlign="center"
+              $sm={{ fontSize: 28 }}
             >
-              {isOwner ? 'Draft Order (use arrows to reorder)' : 'Teams'} (
-              {leagueTeams.length})
-            </div>
-            {(customDraftOrder
-              ? (customDraftOrder
-                  .map((id) => leagueTeams.find((t) => String(t.id) === id))
-                  .filter(Boolean) as LeagueTeam[])
-              : leagueTeams
-            ).map((team, idx, arr) => (
-              <div
-                key={team.id}
-                style={{
-                  padding: '8px 12px',
-                  background: 'var(--d-surface)',
-                  border: '1px solid var(--d-border)',
-                  borderRadius: 8,
-                  marginBottom: 4,
-                  fontSize: 13,
-                  fontWeight: 500,
-                  color:
-                    String(team.id) === String(myTeamId)
-                      ? 'var(--d-accent)'
-                      : 'var(--d-text)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
+              {league?.name
+                ? `${league.name} — Live Draft`
+                : 'Live Draft Lobby'}
+            </Text>
+            <Text
+              color="$textMuted"
+              fontSize={14}
+              textAlign="center"
+              maxWidth={380}
+              lineHeight={20}
+            >
+              {leagueTeams.length < 2
+                ? 'At least 2 teams are required to start a draft. Invite more teams to your league.'
+                : isOwner
+                  ? 'As the commissioner, you can start the live draft when all teams are ready.'
+                  : 'Waiting for the commissioner to start the live draft.'}
+            </Text>
+          </YStack>
+
+          {leagueTeams.length > 0 && (
+            <YStack
+              width="100%"
+              maxWidth={360}
+              gap="$2"
+              backgroundColor="$surfacePanel"
+              borderWidth={1}
+              borderColor="$surfacePanelBorder"
+              borderRadius="$4"
+              padding="$3"
+            >
+              <Eyebrow>
+                {isOwner ? 'Draft Order (use arrows to reorder)' : 'Teams'} (
+                {leagueTeams.length})
+              </Eyebrow>
+              {orderedTeams.map((team, idx, arr) => {
+                const isMine = String(team.id) === String(myTeamId);
+                const isOnline = onlineTeamIds.has(String(team.id));
+                return (
+                  <XStack
+                    key={team.id}
+                    alignItems="center"
+                    gap="$2"
+                    paddingVertical={8}
+                    paddingHorizontal={10}
+                    backgroundColor="$background"
+                    borderWidth={1}
+                    borderColor="$surfacePanelBorder"
+                    borderRadius="$3"
+                  >
+                    <Text
+                      fontFamily="$heading"
+                      fontWeight="800"
+                      fontSize={13}
+                      color="$textMuted"
+                      minWidth={20}
+                    >
+                      {idx + 1}.
+                    </Text>
+                    <YStack
+                      width={7}
+                      height={7}
+                      borderRadius={999}
+                      backgroundColor={
+                        isOnline ? '$statusSuccessFg' : '$textMuted'
+                      }
+                      role="img"
+                      aria-label={isOnline ? 'online' : 'offline'}
+                    />
+                    <Text
+                      flex={1}
+                      fontSize={13}
+                      fontWeight="600"
+                      numberOfLines={1}
+                      color={isMine ? '$brandGoldLight' : '$color'}
+                    >
+                      {team.name} {isMine ? '(You)' : ''}
+                    </Text>
+                    {isOwner && (
+                      <XStack gap={2}>
+                        <Button
+                          size="$2"
+                          padding={0}
+                          width={22}
+                          height={22}
+                          backgroundColor="$backgroundHover"
+                          borderColor="$surfacePanelBorder"
+                          disabled={idx === 0}
+                          opacity={idx === 0 ? 0.3 : 1}
+                          onPress={() => moveTeam(idx, -1)}
+                          aria-label={`Move ${team.name} up`}
+                        >
+                          <Text fontSize={11} color="$textMuted">
+                            ▲
+                          </Text>
+                        </Button>
+                        <Button
+                          size="$2"
+                          padding={0}
+                          width={22}
+                          height={22}
+                          backgroundColor="$backgroundHover"
+                          borderColor="$surfacePanelBorder"
+                          disabled={idx === arr.length - 1}
+                          opacity={idx === arr.length - 1 ? 0.3 : 1}
+                          onPress={() => moveTeam(idx, 1)}
+                          aria-label={`Move ${team.name} down`}
+                        >
+                          <Text fontSize={11} color="$textMuted">
+                            ▼
+                          </Text>
+                        </Button>
+                      </XStack>
+                    )}
+                  </XStack>
+                );
+              })}
+              {isOwner && customDraftOrder && (
+                <Button
+                  size="$3"
+                  marginTop="$1"
+                  backgroundColor="transparent"
+                  borderWidth={1}
+                  borderColor="$surfacePanelBorder"
+                  onPress={() => setCustomDraftOrder(null)}
+                >
+                  <Text fontSize={11} color="$textMuted">
+                    Reset to Default Order
+                  </Text>
+                </Button>
+              )}
+            </YStack>
+          )}
+
+          {showTrading && (
+            <DraftSlotTradePanel
+              leagueId={leagueId}
+              myTeamId={myTeamId}
+              leagueTeams={leagueTeams}
+              canManageOwnTeam={canManageOwnTeam}
+              isCommissioner={isCommissioner}
+              onTradeExecuted={onDraftSlotTradeExecuted}
+            />
+          )}
+
+          {initError && (
+            <YStack
+              width="100%"
+              maxWidth={400}
+              marginTop="$3"
+              padding="$3"
+              borderRadius="$4"
+              borderWidth={1}
+              backgroundColor="$statusDangerBg"
+              borderColor="$statusDangerBorder"
+            >
+              <Text color="$statusDangerFg" fontSize={13}>
+                {initError}
+              </Text>
+            </YStack>
+          )}
+
+          {isOwner && leagueTeams.length >= 2 && (
+            <XStack
+              gap="$2"
+              marginTop="$3"
+              $sm={{ flexDirection: 'column', width: '100%', maxWidth: 320 }}
+            >
+              <Button
+                backgroundColor="$brandGold"
+                color="$textOnAccent"
+                disabled={initDraftLoading}
+                opacity={initDraftLoading ? 0.6 : 1}
+                onPress={() => {
+                  void onInitializeDraft('snake');
                 }}
               >
-                <span
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 11,
-                    color: 'var(--d-text-muted)',
-                    minWidth: 20,
-                  }}
-                >
-                  {idx + 1}.
-                </span>
-                <span
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 5,
-                  }}
-                >
-                  <span
-                    role="img"
-                    aria-label={
-                      onlineTeamIds.has(String(team.id)) ? 'online' : 'offline'
-                    }
-                    title={
-                      onlineTeamIds.has(String(team.id))
-                        ? 'Manager is online'
-                        : 'Manager is offline'
-                    }
-                    style={{
-                      display: 'inline-block',
-                      width: 7,
-                      height: 7,
-                      borderRadius: '50%',
-                      background: onlineTeamIds.has(String(team.id))
-                        ? 'var(--d-success)'
-                        : 'var(--d-text-muted)',
-                      flexShrink: 0,
-                    }}
-                  />
-                  {team.name}{' '}
-                  {String(team.id) === String(myTeamId) ? '(You)' : ''}
-                </span>
-                {isOwner && (
-                  <span style={{ display: 'flex', gap: 2 }}>
-                    <button
-                      style={{
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid var(--d-border)',
-                        borderRadius: 4,
-                        color: 'var(--d-text-secondary)',
-                        cursor: idx === 0 ? 'default' : 'pointer',
-                        opacity: idx === 0 ? 0.3 : 1,
-                        padding: '2px 6px',
-                        fontSize: 11,
-                        fontFamily: 'inherit',
-                      }}
-                      disabled={idx === 0}
-                      onClick={() => {
-                        const order =
-                          customDraftOrder ??
-                          leagueTeams.map((t) => String(t.id));
-                        const next = [...order];
-                        [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                        setCustomDraftOrder(next);
-                      }}
-                      aria-label={`Move ${team.name} up`}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      style={{
-                        background: 'rgba(255,255,255,0.06)',
-                        border: '1px solid var(--d-border)',
-                        borderRadius: 4,
-                        color: 'var(--d-text-secondary)',
-                        cursor: idx === arr.length - 1 ? 'default' : 'pointer',
-                        opacity: idx === arr.length - 1 ? 0.3 : 1,
-                        padding: '2px 6px',
-                        fontSize: 11,
-                        fontFamily: 'inherit',
-                      }}
-                      disabled={idx === arr.length - 1}
-                      onClick={() => {
-                        const order =
-                          customDraftOrder ??
-                          leagueTeams.map((t) => String(t.id));
-                        const next = [...order];
-                        [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-                        setCustomDraftOrder(next);
-                      }}
-                      aria-label={`Move ${team.name} down`}
-                    >
-                      ▼
-                    </button>
-                  </span>
-                )}
-              </div>
-            ))}
-            {isOwner && customDraftOrder && (
-              <button
-                style={{
-                  marginTop: 4,
-                  background: 'transparent',
-                  border: '1px solid var(--d-border)',
-                  borderRadius: 6,
-                  color: 'var(--d-text-muted)',
-                  fontSize: 11,
-                  padding: '4px 10px',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
+                <Text fontWeight="700" fontSize={14} color="$textOnAccent">
+                  {initDraftLoading ? 'Starting...' : 'Start Snake Draft'}
+                </Text>
+              </Button>
+              <Button
+                backgroundColor="$brandNavyLight"
+                disabled={initDraftLoading}
+                opacity={initDraftLoading ? 0.6 : 1}
+                onPress={() => {
+                  void onInitializeDraft('linear');
                 }}
-                onClick={() => setCustomDraftOrder(null)}
               >
-                Reset to Default Order
-              </button>
-            )}
-          </div>
-        )}
+                <Text fontWeight="700" fontSize={14} color="$color">
+                  {initDraftLoading ? 'Starting...' : 'Start Normal Draft'}
+                </Text>
+              </Button>
+            </XStack>
+          )}
 
-        {showTrading && (
-          <DraftSlotTradePanel
-            leagueId={leagueId}
-            myTeamId={myTeamId}
-            leagueTeams={leagueTeams}
-            canManageOwnTeam={canManageOwnTeam}
-            isCommissioner={isCommissioner}
-            onTradeExecuted={onDraftSlotTradeExecuted}
-          />
-        )}
-
-        {initError && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: '10px 16px',
-              background: 'rgba(239,68,68,0.12)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: 8,
-              color: '#ef4444',
-              fontSize: 13,
-              maxWidth: 400,
-            }}
-          >
-            {initError}
-          </div>
-        )}
-
-        {isOwner && leagueTeams.length >= 2 && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <button
-              className="d-state-btn"
-              onClick={() => {
-                void onInitializeDraft('snake');
-              }}
-              disabled={initDraftLoading}
-              style={{ opacity: initDraftLoading ? 0.6 : 1 }}
+          {!isOwner && (
+            <YStack
+              marginTop="$3"
+              padding="$3"
+              borderRadius="$4"
+              borderWidth={1}
+              backgroundColor="$accentMuted"
+              borderColor="$brandGold"
             >
-              {initDraftLoading ? 'Starting...' : 'Start Snake Draft'}
-            </button>
-            <button
-              className="d-state-btn"
-              onClick={() => {
-                void onInitializeDraft('linear');
-              }}
-              disabled={initDraftLoading}
-              style={{
-                opacity: initDraftLoading ? 0.6 : 1,
-                background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                boxShadow: '0 4px 16px rgba(59,130,246,0.25)',
-              }}
-            >
-              {initDraftLoading ? 'Starting...' : 'Start Normal Draft'}
-            </button>
-          </div>
-        )}
-
-        {!isOwner && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: '10px 16px',
-              background: 'rgba(59,130,246,0.1)',
-              border: '1px solid rgba(59,130,246,0.2)',
-              borderRadius: 8,
-              color: '#60a5fa',
-              fontSize: 13,
-            }}
-          >
-            You&apos;ll be notified when the commissioner starts the draft.
-          </div>
-        )}
-      </div>
-    </div>
+              <Text color="$brandGoldLight" fontSize={13}>
+                You&apos;ll be notified when the commissioner starts the draft.
+              </Text>
+            </YStack>
+          )}
+        </YStack>
+      </ScrollView>
+    </YStack>
   );
 }
