@@ -14,6 +14,7 @@ import {
   type PlayerStatsLoadingNotification,
   type PlayerStatsUpdatedNotification,
   type RosterUpdateNotification,
+  type SubscriptionUpdatedNotification,
   type TradeOfferNotification,
   type UserJoinedNotification,
   type UserLeftNotification,
@@ -71,6 +72,7 @@ export type {
   PlayerStatsUpdatedNotification,
   MatchupStatsCompleteNotification,
   RosterUpdateNotification,
+  SubscriptionUpdatedNotification,
   TradeOfferNotification,
   UserJoinedNotification,
   UserLeftNotification,
@@ -103,6 +105,9 @@ interface UseWebSocketOptions {
     notification: MatchupStatsCompleteNotification,
   ) => void;
   onRosterUpdate?: (notification: RosterUpdateNotification) => void;
+  onSubscriptionUpdated?: (
+    notification: SubscriptionUpdatedNotification,
+  ) => void;
   onTradeOffer?: (notification: TradeOfferNotification) => void;
   onLeagueChatMessage?: (notification: LeagueChatMessageNotification) => void;
   onNotificationReceived?: (
@@ -150,6 +155,7 @@ export function useWebSocket({
   onPlayerStatsUpdated,
   onMatchupStatsComplete,
   onRosterUpdate,
+  onSubscriptionUpdated,
   onTradeOffer,
   onLeagueChatMessage,
   onNotificationReceived,
@@ -177,6 +183,7 @@ export function useWebSocket({
   const onPlayerStatsUpdatedRef = useLatestRef(onPlayerStatsUpdated);
   const onMatchupStatsCompleteRef = useLatestRef(onMatchupStatsComplete);
   const onRosterUpdateRef = useLatestRef(onRosterUpdate);
+  const onSubscriptionUpdatedRef = useLatestRef(onSubscriptionUpdated);
   const onTradeOfferRef = useLatestRef(onTradeOffer);
   const onLeagueChatMessageRef = useLatestRef(onLeagueChatMessage);
   const onNotificationReceivedRef = useLatestRef(onNotificationReceived);
@@ -423,6 +430,15 @@ export function useWebSocket({
         LOGGER.info('[useWebSocket] received roster-update', n);
         onRosterUpdateRef.current?.(n as RosterUpdateNotification);
       }),
+      client.on(
+        ClientNotificationType.SUBSCRIPTION_UPDATED,
+        (n: NotificationData) => {
+          LOGGER.info('[useWebSocket] received subscription-updated', n);
+          onSubscriptionUpdatedRef.current?.(
+            n as SubscriptionUpdatedNotification,
+          );
+        },
+      ),
       client.on(ClientNotificationType.TRADE_OFFER, (n: NotificationData) => {
         LOGGER.info('[useWebSocket] received trade-offer', n);
         onTradeOfferRef.current?.(n as TradeOfferNotification);
@@ -490,6 +506,7 @@ export function useWebSocket({
     onPlayerStatsUpdatedRef,
     onMatchupStatsCompleteRef,
     onRosterUpdateRef,
+    onSubscriptionUpdatedRef,
     onTradeOfferRef,
     onLeagueChatMessageRef,
     onNotificationReceivedRef,

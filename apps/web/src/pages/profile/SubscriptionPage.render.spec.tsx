@@ -154,6 +154,27 @@ jest.mock('../../context/LeagueWebSocketContext', () => ({
   useLeagueWebSocketClient: () => mockUseLeagueWebSocketClient(),
 }));
 
+type UseWebSocketOptions = {
+  viewContext?: string;
+  autoConnect?: boolean;
+  onSubscriptionUpdated?: () => void;
+};
+
+const mockUseWebSocket = jest.fn<undefined, [UseWebSocketOptions]>();
+jest.mock('@legacy-sports/shared-components', () => ({
+  useWebSocket: (opts: UseWebSocketOptions) => mockUseWebSocket(opts),
+}));
+
+jest.mock('@legacy-sports/shared-components/auth', () => {
+  const actual = jest.requireActual<Record<string, unknown>>(
+    '@legacy-sports/shared-components/auth',
+  );
+  return {
+    ...actual,
+    useAuth: jest.fn(() => ({ user: { id: 1 }, token: 'test-token' })),
+  };
+});
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -272,6 +293,66 @@ describe('SubscriptionPage — realtime subscription refresh (LS-7380)', () => {
     window.dispatchEvent(new Event('focus'));
 
     expect(refetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('SubscriptionPage — live update on SUBSCRIPTION_UPDATED push (LS-7384)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLeagueWebSocket.mockReturnValue({ connected: false });
+    mockUseLeagueWebSocketClient.mockReturnValue({
+      client: null,
+      connected: false,
+    });
+  });
+
+  it('refetches mySubscription when the WebSocket reports onSubscriptionUpdated', () => {
+    const refetch = jest.fn().mockResolvedValue({});
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: {
+        mySubscription: {
+          status: 'past_due',
+          tier: 'premium',
+          currentPeriodEnd: '2026-07-01T00:00:00.000Z',
+          cancelAtPeriodEnd: false,
+        },
+      },
+      loading: false,
+      refetch,
+    });
+
+    renderPage();
+
+    expect(mockUseWebSocket).toHaveBeenCalledWith(
+      expect.objectContaining({
+        viewContext: 'general',
+        onSubscriptionUpdated: expect.any(Function),
+      }),
+    );
+
+    const opts = mockUseWebSocket.mock.calls[0]?.[0];
+    expect(opts?.onSubscriptionUpdated).toBeDefined();
+    opts?.onSubscriptionUpdated?.();
+
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('does not attempt a WebSocket connection when no auth token is available', () => {
+    jest
+      .requireMock('@legacy-sports/shared-components/auth')
+      .useAuth.mockReturnValueOnce({ user: { id: 1 }, token: null });
+
+    mockUseGetMySubscriptionQuery.mockReturnValue({
+      data: { mySubscription: null },
+      loading: false,
+      refetch: jest.fn(),
+    });
+
+    renderPage();
+
+    expect(mockUseWebSocket).toHaveBeenCalledWith(
+      expect.objectContaining({ autoConnect: false }),
+    );
   });
 });
 

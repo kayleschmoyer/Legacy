@@ -16,7 +16,8 @@ import {
 } from '@tamagui/lucide-icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
-import { useStepUpGate } from '@legacy-sports/shared-components/auth';
+import { useWebSocket } from '@legacy-sports/shared-components';
+import { useAuth, useStepUpGate } from '@legacy-sports/shared-components/auth';
 import {
   useCreateBillingPortalSessionMutation,
   useCreateCheckoutSessionMutation,
@@ -27,6 +28,7 @@ import { PriceSkeleton } from '../../components/PriceSkeleton';
 import { StepUpModal } from '../../components/StepUpModal';
 import { useLeagueWebSocket } from '../../hooks/useLeagueWebSocket';
 import { useLeagueWebSocketClient } from '../../context/LeagueWebSocketContext';
+import { env } from '../../config/environment';
 import {
   AMBER,
   BG_DARK,
@@ -587,6 +589,8 @@ const SubscriptionPage: React.FC = () => {
   const { data, loading, refetch } = useGetMySubscriptionQuery();
   const subscription = data?.mySubscription ?? null;
 
+  const { user, token } = useAuth();
+
   const isPremium = deriveIsPremium(subscription);
   const isPastDue = subscription?.status === 'past_due';
   const isCanceled = subscription?.status === 'canceled';
@@ -612,6 +616,20 @@ const SubscriptionPage: React.FC = () => {
 
   useLeagueWebSocket({
     onSubscriptionUpdated: () => refetchSafely('SUBSCRIPTION_UPDATED'),
+  });
+
+  // LS-7384: the grace-period-expiry sweep pushes SUBSCRIPTION_UPDATED, but
+  // outside a league page there is no LeagueWebSocketContext connection to
+  // receive it (useLeagueWebSocket above no-ops without the provider).
+  // Establish a general-purpose connection so a second device sitting on this
+  // page reflects the downgrade live, without waiting for a window-focus
+  // refetch.
+  useWebSocket({
+    url: env.websocketUrl,
+    token: token ?? undefined,
+    viewContext: 'general',
+    autoConnect: !!user?.id && !!token,
+    onSubscriptionUpdated: () => refetchSafely('SUBSCRIPTION_UPDATED push'),
   });
 
   // Fallback for when this page is not mounted inside a league page (the only

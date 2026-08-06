@@ -296,6 +296,31 @@ describe('useWebSocket', () => {
     expect(onRosterUpdate).toHaveBeenCalledWith(update);
   });
 
+  it('calls onSubscriptionUpdated handler', () => {
+    const onSubscriptionUpdated = jest.fn();
+    renderHook(() =>
+      useWebSocket({
+        url: 'wss://example.com',
+        token: 'jwt-token',
+        onSubscriptionUpdated,
+      }),
+    );
+
+    const notification = {
+      type: ClientNotificationType.SUBSCRIPTION_UPDATED,
+      tier: 'free',
+      status: 'past_due',
+    };
+    act(() =>
+      mockInstance._emit(
+        ClientNotificationType.SUBSCRIPTION_UPDATED,
+        notification,
+      ),
+    );
+
+    expect(onSubscriptionUpdated).toHaveBeenCalledWith(notification);
+  });
+
   it('calls onTradeOffer handler', () => {
     const onTradeOffer = jest.fn();
     renderHook(() =>
