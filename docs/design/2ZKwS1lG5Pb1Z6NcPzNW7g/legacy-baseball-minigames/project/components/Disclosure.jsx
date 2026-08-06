@@ -51,7 +51,58 @@ const SEARCH_POOL = [
   'Roger Bresnahan',
 ];
 
+const BackBtn = ({ onBack, label = 'Back to Games' }) => (
+  <button className="back-btn" onClick={onBack}>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M15 18l-6-6 6-6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+    {label}
+  </button>
+);
+
+// SKELETON: mirrors .dz-idle-card — mark, eyebrow, h1, lede, 3-up rules grid, dual CTAs
+const DisclosureLoading = ({ onBack, switcher }) => (
+  <div className="dz dz-idle">
+    <BackBtn onBack={onBack} />
+    {switcher}
+    <div className="dz-idle-card" aria-hidden="true">
+      <Skel w={104} h={104} r="50%" style={{ margin: '0 auto 24px' }} />
+      <Skel w={140} h={12} r={9999} style={{ margin: '0 auto 14px' }} />
+      <Skel w={280} h={48} r={8} style={{ margin: '0 auto 18px' }} />
+      <Skel w="80%" h={16} r={6} style={{ margin: '0 auto 8px' }} />
+      <Skel w="58%" h={16} r={6} style={{ margin: '0 auto 32px' }} />
+      <div className="dz-idle-rules">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            style={{
+              padding: '16px 14px',
+              background: 'rgba(255,255,255,.03)',
+              border: '1px solid var(--outline-subtle)',
+              borderRadius: 'var(--radius-4)',
+            }}
+          >
+            <Skel w={30} h={24} r={4} style={{ marginBottom: 10 }} />
+            <Skel w="88%" h={12} r={4} />
+          </div>
+        ))}
+      </div>
+      <div className="dz-idle-ctas">
+        <Skel w={148} h={52} r={9999} />
+        <Skel w={112} h={52} r={9999} />
+      </div>
+    </div>
+  </div>
+);
+
 const Disclosure = ({ onBack }) => {
+  const [viewState, setViewState] = React.useState('populated');
   const [phase, setPhase] = React.useState('idle'); // idle | playing | result
   const [revealed, setRevealed] = React.useState(0);
   const [guess, setGuess] = React.useState('');
@@ -143,8 +194,56 @@ const Disclosure = ({ onBack }) => {
         ).slice(0, 6)
       : [];
 
+  const switcher = (
+    <StateSwitcher
+      value={viewState}
+      onChange={setViewState}
+      states={[
+        { value: 'populated', label: 'Populated' },
+        { value: 'loading', label: 'Loading' },
+        { value: 'error', label: 'Error' },
+        { value: 'empty', label: 'Empty' },
+      ]}
+    />
+  );
+
+  if (viewState === 'loading') return <DisclosureLoading onBack={onBack} switcher={switcher} />;
+
+  if (viewState === 'error')
+    return (
+      <div className="dz dz-idle">
+        <BackBtn onBack={onBack} />
+        {switcher}
+        <ErrorCard
+          title="Can't load today's mystery player"
+          message="The trivia service didn't respond in time. Nothing was lost — your best score is still saved."
+          onRetry={() => setViewState('populated')}
+        />
+      </div>
+    );
+
+  if (viewState === 'empty')
+    return (
+      <div className="dz dz-idle">
+        <BackBtn onBack={onBack} />
+        {switcher}
+        <EmptyCard
+          icon={
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M9.5 9a2.5 2.5 0 0 1 4.6-1.4c.5.8.2 1.5-.6 2.1-.7.5-1.5 1-1.5 2.3M12 16h.01" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          }
+          title="No mystery player today"
+          message="Every deep cut in the archive has already been guessed for today's rotation. Check back tomorrow for a fresh case."
+          cta="Back to Games"
+          onCta={onBack}
+        />
+      </div>
+    );
+
   if (phase === 'idle')
-    return <DisclosureIdle onBack={onBack} onStart={start} />;
+    return <DisclosureIdle onBack={onBack} onStart={start} switcher={switcher} />;
   if (phase === 'result')
     return (
       <DisclosureResult
@@ -152,22 +251,13 @@ const Disclosure = ({ onBack }) => {
         result={result}
         total={total}
         onPlayAgain={start}
+        switcher={switcher}
       />
     );
   return (
     <div className="dz">
-      <button className="back-btn" onClick={onBack}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M15 18l-6-6 6-6"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        Back to Games
-      </button>
+      <BackBtn onBack={onBack} />
+      {switcher}
       <div className="dz-shell">
         <header className="dz-header">
           <div>
@@ -353,20 +443,10 @@ const Disclosure = ({ onBack }) => {
   );
 };
 
-const DisclosureIdle = ({ onBack, onStart }) => (
+const DisclosureIdle = ({ onBack, onStart, switcher }) => (
   <div className="dz dz-idle">
-    <button className="back-btn" onClick={onBack}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M15 18l-6-6 6-6"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      Back to Games
-    </button>
+    <BackBtn onBack={onBack} />
+    {switcher}
     <div className="dz-idle-card">
       <div className="dz-idle-mark">?</div>
       <div className="eyebrow" style={{ color: 'var(--brand-seam-red-light)' }}>
@@ -400,7 +480,7 @@ const DisclosureIdle = ({ onBack, onStart }) => (
   </div>
 );
 
-const DisclosureResult = ({ onBack, result, total, onPlayAgain }) => {
+const DisclosureResult = ({ onBack, result, total, onPlayAgain, switcher }) => {
   const titleMap = {
     won: {
       icon: <TrophySvg />,
@@ -423,18 +503,8 @@ const DisclosureResult = ({ onBack, result, total, onPlayAgain }) => {
   }[result.outcome];
   return (
     <div className="dz">
-      <button className="back-btn" onClick={onBack}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M15 18l-6-6 6-6"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-        Back to Games
-      </button>
+      <BackBtn onBack={onBack} />
+      {switcher}
       <div className={`dz-result dz-result-${titleMap.accent}`}>
         <div className="dz-result-mark">{titleMap.icon}</div>
         <div className="eyebrow">{titleMap.sub}</div>

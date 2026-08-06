@@ -13,14 +13,27 @@
   rule in styles.css plus per-control overrides where hover already painted
   over the default outline).
 
-  OPEN QUESTION for the implementer / next design pass: this file has no
-  visible state switcher and no loading-skeleton state for any of the five
-  screens (hub, disclosure, draft lobby/create/join/game only show
-  populated + a couple of incidental empty/error states). Per PROMPT.md
-  "Conditional States" that is a required deliverable, not a nice-to-have —
-  it needs a deliberate design pass (what does a Season Draft skeleton look
-  like mid-shuffle?) rather than a mechanical fix, so it is tracked as a
-  follow-up rather than invented here.
+  State switcher + skeletons pass (LS-9018, follow-up to LS-8959): every
+  screen (Hub, Disclosure, Season Draft Lobby/Create/Join/Game) now carries
+  a visible "Preview" state switcher (button tabs, styled after the
+  pre-existing .sdg-phase-toggle) toggling Loading/Error/Empty/Populated.
+  Loading renders a dedicated skeleton per screen — built from the shared
+  Skel primitive in components/StateSwitcher.jsx — that traces each
+  screen's real geometry (hero + card grid on Hub, ticket layout on Join,
+  draft header + rosters/scoreboard/history grid on Game, etc.) with the
+  shimmer animation defined in styles.css (respects prefers-reduced-motion).
+  Error and Empty use the new shared .state-error-card / .state-empty-card
+  components. SeasonDraftJoin's old generic spinner (.sdj-loading /
+  .sdj-spinner) was replaced by its skeleton — a spinner doesn't mirror
+  layout geometry per PROMPT.md "Conditional States". SeasonDraftLobby's
+  pre-existing data-driven empty state (.sdl-empty) is now also reachable
+  from the switcher instead of only via an empty LOBBY_GAMES array. Page-
+  specific states already covered by existing interaction (Disclosure's
+  idle/playing/result, SeasonDraftGame's setup/drafting/completed) are left
+  as reachable via their normal flows rather than duplicated in the
+  switcher, since PROMPT.md's requirement is that every condition the
+  reference doc defines is shown somewhere in the mockup, not that every
+  control lives in one bar.
 -->
 <html lang="en">
 <head>
@@ -42,6 +55,7 @@
 <body>
 <div id="root"></div>
 
+<script type="text/babel" src="components/StateSwitcher.jsx"></script>
 <script type="text/babel" src="components/Hub.jsx"></script>
 <script type="text/babel" src="components/Disclosure.jsx"></script>
 <script type="text/babel" src="components/SeasonDraftLobby.jsx"></script>

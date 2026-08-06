@@ -18,7 +18,68 @@ const PITCHER_STATS = [
   { k: 'cg', label: 'CG', name: 'Complete Games' },
 ];
 
+// SKELETON: mirrors .sdc-shell — sticky preview card (left) + settings form (right)
+const SdcSkeleton = () => (
+  <div className="sdc-shell" aria-hidden="true">
+    <aside className="sdc-preview">
+      <Skel w={110} h={11} r={4} />
+      <div className="sdc-prev-card">
+        <Skel w="66%" h={28} r={6} style={{ margin: '12px 0 16px' }} />
+        <div className="sdc-prev-stat-row">
+          <Skel w={48} h={40} r={6} />
+        </div>
+        <div className="sdc-prev-meta">
+          {[0, 1, 2].map((i) => (
+            <div key={i}>
+              <Skel w={34} h={10} r={4} style={{ marginBottom: 6 }} />
+              <Skel w={54} h={14} r={4} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <Skel w="90%" h={13} r={4} />
+    </aside>
+
+    <section className="sdc-form card">
+      <Skel w={150} h={11} r={4} />
+      <Skel w="46%" h={36} r={6} style={{ marginTop: 6 }} />
+      <Skel w="78%" h={14} r={4} />
+
+      <div className="sdc-field">
+        <Skel w={110} h={11} r={4} />
+        <Skel w="100%" h={44} r={8} />
+      </div>
+
+      <div className="sdc-row">
+        <div className="sdc-field">
+          <Skel w={90} h={11} r={4} />
+          <Skel w="100%" h={40} r={8} />
+        </div>
+        <div className="sdc-field">
+          <Skel w={90} h={11} r={4} />
+          <Skel w="100%" h={40} r={8} />
+        </div>
+      </div>
+
+      <div className="sdc-field">
+        <Skel w={150} h={11} r={4} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skel key={i} w={52} h={40} r={6} />
+          ))}
+        </div>
+      </div>
+
+      <div className="sdc-actions">
+        <Skel w={90} h={44} r={6} />
+        <Skel w={168} h={52} r={6} />
+      </div>
+    </section>
+  </div>
+);
+
 const SeasonDraftCreate = ({ onBack, onCreated }) => {
+  const [viewState, setViewState] = React.useState('populated');
   const [name, setName] = React.useState('');
   const [playerType, setPlayerType] = React.useState('Hitter');
   const [gameMode, setGameMode] = React.useState('Season');
@@ -56,6 +117,43 @@ const SeasonDraftCreate = ({ onBack, onCreated }) => {
         Back to Lobby
       </button>
 
+      <StateSwitcher
+        value={viewState}
+        onChange={setViewState}
+        states={[
+          { value: 'populated', label: 'Populated' },
+          { value: 'loading', label: 'Loading' },
+          { value: 'error', label: 'Error' },
+          { value: 'empty', label: 'Empty' },
+        ]}
+      />
+
+      {viewState === 'loading' && <SdcSkeleton />}
+
+      {viewState === 'error' && (
+        <ErrorCard
+          title="Can't load game settings"
+          message="The stat-category catalog didn't respond in time. Nothing has been created yet — try again in a moment."
+          onRetry={() => setViewState('populated')}
+        />
+      )}
+
+      {viewState === 'empty' && (
+        <EmptyCard
+          icon={
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+              <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M8 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          }
+          title="No stat categories available"
+          message="We couldn't find any draftable stat categories right now. Game creation needs at least one to continue — try again shortly."
+          cta="Back to Lobby"
+          onCta={onBack}
+        />
+      )}
+
+      {viewState === 'populated' && (
       <div className="sdc-shell">
         <aside className="sdc-preview">
           <div className="eyebrow" style={{ color: 'var(--brand-gold-light)' }}>
@@ -195,6 +293,7 @@ const SeasonDraftCreate = ({ onBack, onCreated }) => {
           </div>
         </section>
       </div>
+      )}
     </div>
   );
 };

@@ -24,10 +24,121 @@ const GAMES_LIST = [
   },
 ];
 
+const HubSkeleton = () => (
+  <>
+    {/* SKELETON: mirrors .hub-hero's two-column grid (copy + hero-mark) and the stats row */}
+    <section className="hub-hero" aria-hidden="true">
+      <div className="hub-hero-copy">
+        <Skel w={190} h={13} r={9999} style={{ marginBottom: 18 }} />
+        <Skel w="72%" h={44} r={8} style={{ marginBottom: 10 }} />
+        <Skel w="52%" h={44} r={8} style={{ marginBottom: 20 }} />
+        <Skel w="88%" h={16} r={6} style={{ marginBottom: 8 }} />
+        <Skel w="58%" h={16} r={6} style={{ marginBottom: 26 }} />
+        <div
+          style={{
+            display: 'flex',
+            gap: 22,
+            paddingTop: 20,
+            borderTop: '1px solid rgba(255,255,255,.08)',
+          }}
+        >
+          {[0, 1, 2].map((i) => (
+            <div key={i}>
+              <Skel w={50} h={22} r={4} style={{ marginBottom: 6 }} />
+              <Skel w={72} h={10} r={4} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <Skel
+        w="100%"
+        h={220}
+        r="50%"
+        style={{ maxWidth: 220, justifySelf: 'end', aspectRatio: '1 / 1' }}
+      />
+    </section>
+
+    {/* SKELETON: mirrors the two .hub-card tiles — icon, tag, title, desc, meta, footer stat+cta */}
+    <div className="hub-games" aria-hidden="true">
+      {[0, 1].map((i) => (
+        <div key={i} className="hub-card" style={{ cursor: 'default' }}>
+          <div className="hub-card-top">
+            <Skel w={52} h={52} r={12} />
+            <Skel w={92} h={24} r={9999} />
+          </div>
+          <Skel w="64%" h={38} r={6} style={{ marginTop: 4 }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skel w="100%" h={13} r={4} />
+            <Skel w="94%" h={13} r={4} />
+            <Skel w="55%" h={13} r={4} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Skel w="48%" h={12} r={4} />
+            <Skel w="38%" h={12} r={4} />
+          </div>
+          <div className="hub-card-foot">
+            <div>
+              <Skel w={38} h={22} r={4} style={{ marginBottom: 5 }} />
+              <Skel w={68} h={10} r={4} />
+            </div>
+            <Skel w={104} h={36} r={9999} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
+);
+
+const HubEmptyGlyph = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+    <path
+      d="M8 13.5q4 3 8 0M9 9.5h.01M15 9.5h.01"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 const Hub = ({ onNavigate }) => {
+  const [viewState, setViewState] = React.useState('populated');
   return (
     <div className="hub">
-      <section className="hub-hero">
+      <StateSwitcher
+        value={viewState}
+        onChange={setViewState}
+        states={[
+          { value: 'populated', label: 'Populated' },
+          { value: 'loading', label: 'Loading' },
+          { value: 'error', label: 'Error' },
+          { value: 'empty', label: 'Empty' },
+        ]}
+      />
+
+      {viewState === 'loading' && <HubSkeleton />}
+
+      {viewState === 'error' && (
+        <ErrorCard
+          title="Can't load the minigames catalog"
+          message="The game-selection service didn't respond in time. Your saved progress is safe — try again in a moment."
+          onRetry={() => setViewState('populated')}
+        />
+      )}
+
+      {viewState === 'empty' && (
+        <EmptyCard
+          icon={<HubEmptyGlyph />}
+          title="Rain delay."
+          message="Both minigames are between seasons for scheduled maintenance. Check back before first pitch — or browse the archive while you wait."
+          cta="Browse Player Stats"
+          onCta={() => {}}
+        />
+      )}
+
+      {viewState === 'populated' && (
+        <>
+          <section className="hub-hero">
         <div className="hub-hero-copy">
           <div className="eyebrow hub-eyebrow">
             <span className="hub-eyebrow-dot" />
@@ -259,6 +370,8 @@ const Hub = ({ onNavigate }) => {
           Three more modes in the dugout. Winter is long.
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 };

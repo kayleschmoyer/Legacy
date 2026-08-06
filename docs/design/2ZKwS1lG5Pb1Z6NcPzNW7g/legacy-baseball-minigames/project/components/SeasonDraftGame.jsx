@@ -180,7 +180,93 @@ const PLAYER_POOL = [
   },
 ];
 
+// SKELETON: mirrors .sdg-header + .sdg-grid — turn card, draft-step card, rosters, scoreboard, history
+const SdgSkeleton = () => (
+  <>
+    <header className="sdg-header" aria-hidden="true">
+      <div className="sdg-header-l">
+        <Skel w={90} h={11} r={4} style={{ marginBottom: 10 }} />
+        <Skel w="52%" h={34} r={6} style={{ marginBottom: 12 }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Skel w={40} h={20} r={6} />
+          <Skel w={58} h={14} r={4} />
+          <Skel w={72} h={14} r={4} />
+        </div>
+      </div>
+      <div className="sdg-turn-card">
+        <Skel w={68} h={11} r={4} style={{ marginLeft: 'auto', marginBottom: 8 }} />
+        <Skel w={116} h={26} r={6} style={{ marginLeft: 'auto', marginBottom: 8 }} />
+        <Skel w={92} h={12} r={4} style={{ marginLeft: 'auto' }} />
+      </div>
+    </header>
+
+    <div className="sdg-grid">
+      <div className="sdg-col-main">
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+            <Skel w={80} h={22} r={9999} />
+            <Skel w={170} h={22} r={4} />
+          </div>
+          <Skel w="100%" h={44} r={8} />
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {[0, 1, 2].map((i) => (
+              <Skel key={i} w={96} h={54} r={6} />
+            ))}
+          </div>
+          <Skel w="100%" h={52} r={6} />
+        </div>
+
+        <div className="card">
+          <div className="sdg-card-head">
+            <Skel w={84} h={16} r={4} />
+            <Skel w={54} h={11} r={4} />
+          </div>
+          <div className="sdg-rosters">
+            {[0, 1].map((i) => (
+              <div
+                key={i}
+                style={{
+                  padding: '12px 14px',
+                  border: '1px solid var(--outline-subtle)',
+                  borderRadius: 'var(--radius-4)',
+                }}
+              >
+                <Skel w="45%" h={16} r={4} style={{ marginBottom: 10 }} />
+                {[0, 1, 2].map((j) => (
+                  <Skel key={j} w="100%" h={30} r={4} style={{ marginBottom: 4 }} />
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <aside className="sdg-col-side">
+        <div className="card">
+          <div className="sdg-card-head">
+            <Skel w={100} h={16} r={4} />
+            <Skel w={36} h={11} r={4} />
+          </div>
+          {[0, 1, 2, 3].map((i) => (
+            <Skel key={i} w="100%" h={26} r={4} style={{ marginBottom: 6 }} />
+          ))}
+        </div>
+        <div className="card">
+          <div className="sdg-card-head">
+            <Skel w={58} h={16} r={4} />
+            <Skel w={56} h={11} r={4} />
+          </div>
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skel key={i} w="100%" h={30} r={4} style={{ marginBottom: 6 }} />
+          ))}
+        </div>
+      </aside>
+    </div>
+  </>
+);
+
 const SeasonDraftGame = ({ onBack }) => {
+  const [viewState, setViewState] = React.useState('populated');
   const [state, setState] = React.useState(INITIAL_STATE);
   const [phase, setPhase] = React.useState(state.phase); // local toggle via tweak
   const [search, setSearch] = React.useState('');
@@ -255,29 +341,88 @@ const SeasonDraftGame = ({ onBack }) => {
     setTimeout(() => setInviteCopied(false), 1500);
   };
 
+  const viewSwitcher = (
+    <StateSwitcher
+      value={viewState}
+      onChange={setViewState}
+      states={[
+        { value: 'populated', label: 'Populated' },
+        { value: 'loading', label: 'Loading' },
+        { value: 'error', label: 'Error' },
+        { value: 'empty', label: 'Empty' },
+      ]}
+    />
+  );
+
+  const topbar = (
+    <div className="sdg-topbar">
+      <button
+        className="back-btn"
+        style={{ marginBottom: 0 }}
+        onClick={onBack}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M15 18l-6-6 6-6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        Back to Lobby
+      </button>
+      <div className="sdg-topbar-right">
+        {viewState === 'populated' && (
+          <PhaseToggle phase={phase} onPhase={setPhase} />
+        )}
+        {viewSwitcher}
+      </div>
+    </div>
+  );
+
+  if (viewState === 'loading')
+    return (
+      <div className="sdg">
+        {topbar}
+        <SdgSkeleton />
+      </div>
+    );
+
+  if (viewState === 'error')
+    return (
+      <div className="sdg">
+        {topbar}
+        <ErrorCard
+          title="Can't load this draft"
+          message="The draft service didn't respond in time. No picks were lost — try again in a moment."
+          onRetry={() => setViewState('populated')}
+        />
+      </div>
+    );
+
+  if (viewState === 'empty')
+    return (
+      <div className="sdg">
+        {topbar}
+        <EmptyCard
+          icon={
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+              <path d="M8 12h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+          }
+          title="No players left to draft"
+          message="Every player for this stat category has already been picked. Once the pool runs dry, the draft wraps up automatically."
+          cta="Back to Lobby"
+          onCta={onBack}
+        />
+      </div>
+    );
+
   return (
     <div className="sdg">
-      <div className="sdg-topbar">
-        <button
-          className="back-btn"
-          style={{ marginBottom: 0 }}
-          onClick={onBack}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M15 18l-6-6 6-6"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          Back to Lobby
-        </button>
-        <div className="sdg-topbar-right">
-          <PhaseToggle phase={phase} onPhase={setPhase} />
-        </div>
-      </div>
+      {topbar}
 
       <header className="sdg-header">
         <div className="sdg-header-l">

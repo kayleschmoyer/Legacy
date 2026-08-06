@@ -216,3 +216,77 @@ a { color: inherit; }
   .appbar-wordmark small { display: none; }
   .appbar-crumbs { display: none; }
 }
+
+/* ─────────────── STATE SWITCHER (conditional-state preview control) ─────────────── */
+/* COMPONENT: state-switcher — reused on every screen to preview Loading/Error/Empty/Populated
+   (+ page-specific phases); visual language matches .sdg-phase-toggle in styles-game.css. */
+.state-switcher {
+  display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 6px 12px; margin-bottom: 18px;
+  background: var(--surface-card); border: 1px dashed var(--outline-default);
+  border-radius: 9999px;
+}
+.state-switcher-label {
+  font-family: var(--font-display); font-weight: 700; font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--fg4);
+}
+.state-switcher .toggle-group { padding: 2px; }
+.state-switcher .toggle-group button { padding: 5px 10px; font-size: 10px; min-height: 26px; text-transform: uppercase; }
+
+/* ─────────────── LOADING SKELETONS ─────────────── */
+/* MOTION: skeleton shimmer, 1.4s linear infinite; pauses under prefers-reduced-motion */
+@keyframes skel-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skel {
+  background:
+    linear-gradient(90deg,
+      rgba(255,255,255,.03) 0%,
+      rgba(255,255,255,.09) 40%,
+      rgba(255,255,255,.03) 80%);
+  background-size: 800px 100%;
+  animation: skel-shimmer 1.4s linear infinite;
+  border-radius: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; }
+}
+
+/* ─────────────── ERROR / EMPTY STATES (shared) ─────────────── */
+/* COMPONENT: state-error-card — reused whenever a screen's data fetch fails */
+.state-error-card {
+  display: flex; gap: 16px; align-items: flex-start;
+  padding: 24px; background: rgba(196,30,58,.06);
+  border: 1px solid rgba(196,30,58,.35); border-radius: var(--radius-6);
+}
+.state-error-icon {
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(196,30,58,.14); color: var(--brand-seam-red-light);
+  border: 1px solid rgba(196,30,58,.4);
+}
+.state-error-body h2 { font-family: var(--font-display); font-weight: 800; font-size: 20px; margin: 0 0 6px; color: var(--fg1-strong); }
+.state-error-body p { color: var(--fg2); font-size: 14px; line-height: 1.55; margin: 0 0 16px; max-width: 52ch; }
+
+/* COMPONENT: state-empty-card — reused whenever a screen has zero data to show */
+.state-empty-card {
+  text-align: center; padding: 64px 24px;
+  background: var(--surface-card); border: 1px dashed var(--outline-default);
+  border-radius: var(--radius-6);
+}
+.state-empty-icon {
+  width: 72px; height: 72px; margin: 0 auto 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(197,165,90,.08); border: 1px dashed rgba(197,165,90,.4);
+  color: var(--brand-gold-light);
+}
+.state-empty-card h3 { font-family: var(--font-display); font-weight: 800; font-size: 24px; margin: 0 0 8px; color: var(--fg1); }
+.state-empty-card p { color: var(--fg3); max-width: 42ch; margin: 0 auto 20px; font-size: 14px; line-height: 1.55; }
+
+/* BREAKPOINTS: state switcher + error/empty cards reflow at the canonical xs (660) threshold */
+@media (max-width: 660px) {
+  .state-switcher { width: 100%; }
+  .state-error-card { flex-direction: column; align-items: flex-start; }
+  .state-empty-card { padding: 40px 20px; }
+}

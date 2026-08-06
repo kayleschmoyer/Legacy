@@ -2,23 +2,24 @@
 
 **Design ID**: `2ZKwS1lG5Pb1Z6NcPzNW7g`
 **Source**: `designsync-local` (projectId `f1c2ee9f-859c-4136-bb9f-7d6fe6a2c832`)
-**Synced at**: 2026-08-04T15:23:01.000Z
-**Bundle hash**: `178a15e9c541dc9f1f4f7c6139836e485ef531d37d1cf7291ce9349f67fdd258`
-**Files**: 66
-**Total size**: 2418249 bytes
-**Sync ticket**: LS-8959 (re-run of the mockup against the updated `docs/agents/pages/PROMPT.md` brief)
+**Synced at**: 2026-08-06T18:38:59.295Z
+**Bundle hash**: `c1341835cd8eedaa43731ae7d7fd81e3edab70c42abdffd4e1418e62b1e0e3e6`
+**Files**: 67
+**Sync ticket**: LS-9018 (state switcher + loading skeletons, follow-up to LS-8959)
 
-## What changed vs. previous hash (`6edadff6...`)
+## What changed vs. previous hash (`178a15e9c541...`)
 
-Mechanical fixes applied at the source via the DesignSync write flow (LS-8954 audit / LS-8959), then pulled back:
+Design additions made at the source via the DesignSync write flow, then pulled back — the deliberate design pass LS-8959 intentionally deferred:
 
-- **`styles-game.css`**: `.sdg-hist.me` gold accent stripe narrowed from a banned 2px `border-left` to 1px.
-- **All 7 `styles*.css` files**: every `@media (max-width: …)` query snapped to the canonical breakpoint bands (660/800/860/980/1120/1280) — no more invented 480/560/640/720/900/1100 thresholds. `styles-create.css`'s existing 860px query was already canonical and is unchanged.
-- **`styles.css`, `styles-disclosure.css`, `styles-lobby.css`**: raw hex repeats (`#E63950`, `#C5A55A`) replaced with the existing `--brand-seam-red-light` / `--brand-gold` / `--brand-gold-dark` custom properties; added a global `:focus-visible` rule (2px `--fg1` outline) plus a few per-control overrides where `:hover` was already painting over the default outline.
-- **`styles-create.css`, `styles-disclosure.css`, `styles-hub.css`, `styles-join.css`, `styles-game.css`**: raw `font-family: 'Literata', serif` declarations replaced with `var(--font-body)`.
-- **`Legacy Minigames.html`**: added a `<!-- HANDOFF -->` block at the top; `styles*.css` files gained `MOTION`, `COMPONENT`, and `BREAKPOINTS` annotation comments (previously zero across the bundle).
-
-**Not fixed here (flagged for a human-led design pass, per LS-8959 scope)**: the bundle still has no visible state switcher and no loading-skeleton state for any screen — those are design additions, not mechanical fixes, so they were intentionally left for a follow-up design session rather than invented in this pass.
+- **New `components/StateSwitcher.jsx`**: shared `StateSwitcher` (button-tab preview control), `Skel` (shimmer primitive), `ErrorCard`, and `EmptyCard` components, reused by every screen.
+- **`styles.css`**: added the shimmer `@keyframes`, `.skel`, `.state-switcher`, `.state-error-card`, and `.state-empty-card` rules (respects `prefers-reduced-motion`).
+- **`Hub.jsx` / `styles-hub.css`**: state switcher + a skeleton mirroring the hero (copy + hero-mark) and the two game-card tiles; error and empty (maintenance) states.
+- **`Disclosure.jsx`**: state switcher + a skeleton mirroring the idle card; error (mystery-player fetch failed) and empty (no player queued today) states, gating ahead of the existing idle/playing/result phases.
+- **`SeasonDraftLobby.jsx`**: state switcher + a skeleton mirroring the section head and card grid; error state. The pre-existing data-driven empty state (`.sdl-empty`) is now also reachable from the switcher.
+- **`SeasonDraftCreate.jsx`**: state switcher + a skeleton mirroring the preview card and settings form; error and empty (no stat categories) states.
+- **`SeasonDraftJoin.jsx` / `styles-join.css`**: replaced the old generic `.sdj-loading`/`.sdj-spinner` with a skeleton mirroring the invite ticket (name, detail grid, 6-seat row, code, actions) — a spinner doesn't mirror layout geometry per PROMPT.md; added error (expired invite) and empty (game full) states.
+- **`SeasonDraftGame.jsx`**: state switcher + a skeleton mirroring the header, draft-step card, rosters, scoreboard, and history; error and empty (player pool exhausted) states, alongside the pre-existing setup/drafting/completed phase toggle.
+- **`Legacy Minigames.html`**: `<script>` tag for the new `StateSwitcher.jsx`; `<!-- HANDOFF -->` block rewritten to describe the switcher/skeleton pass and remove the stale "no state switcher" open question.
 
 ## Pages
 
@@ -38,6 +39,7 @@ legacy-baseball-minigames/project/components/SeasonDraftCreate.jsx
 legacy-baseball-minigames/project/components/SeasonDraftGame.jsx
 legacy-baseball-minigames/project/components/SeasonDraftJoin.jsx
 legacy-baseball-minigames/project/components/SeasonDraftLobby.jsx
+legacy-baseball-minigames/project/components/StateSwitcher.jsx
 legacy-baseball-minigames/project/fonts/Big-Shoulders-Display-normal-600-latin-ext.woff2
 legacy-baseball-minigames/project/fonts/Big-Shoulders-Display-normal-600-latin.woff2
 legacy-baseball-minigames/project/fonts/Big-Shoulders-Display-normal-600-vietnamese.woff2

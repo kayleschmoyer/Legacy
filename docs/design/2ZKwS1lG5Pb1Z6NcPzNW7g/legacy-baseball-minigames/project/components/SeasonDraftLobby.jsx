@@ -59,7 +59,49 @@ const LOBBY_GAMES = [
   },
 ];
 
+// SKELETON: mirrors the "Active" section head + a row of .sdl-card tiles
+const SdlSkeleton = () => (
+  <>
+    <div className="sdl-section-head" aria-hidden="true">
+      <Skel w={90} h={20} r={4} />
+      <Skel w={48} h={11} r={4} />
+    </div>
+    <div className="sdl-grid" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="sdl-card" style={{ cursor: 'default' }}>
+          <div className="sdl-card-head" style={{ marginTop: 0 }}>
+            <Skel w="62%" h={22} r={4} />
+            <Skel w={74} h={20} r={9999} style={{ flexShrink: 0 }} />
+          </div>
+          <div className="sdl-card-stat-row">
+            <Skel w={42} h={22} r={6} />
+            <Skel w={56} h={12} r={4} />
+            <Skel w={70} h={12} r={4} />
+          </div>
+          <div className="sdl-card-progress">
+            <Skel w="100%" h={6} r={3} />
+            <Skel w={96} h={11} r={4} />
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              gap: 6,
+              paddingTop: 10,
+              borderTop: '1px dashed var(--outline-subtle)',
+            }}
+          >
+            {[0, 1, 2, 3].map((j) => (
+              <Skel key={j} w={30} h={30} r="50%" />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  </>
+);
+
 const SeasonDraftLobby = ({ onBack, onCreate, onOpenGame, onJoin }) => {
+  const [viewState, setViewState] = React.useState('populated');
   const active = LOBBY_GAMES.filter(
     (g) => g.status === 'drafting' || g.status === 'setup',
   );
@@ -80,6 +122,17 @@ const SeasonDraftLobby = ({ onBack, onCreate, onOpenGame, onJoin }) => {
         </svg>
         Back to Games
       </button>
+
+      <StateSwitcher
+        value={viewState}
+        onChange={setViewState}
+        states={[
+          { value: 'populated', label: 'Populated' },
+          { value: 'loading', label: 'Loading' },
+          { value: 'error', label: 'Error' },
+          { value: 'empty', label: 'Empty' },
+        ]}
+      />
 
       <header className="sdl-head">
         <div>
@@ -111,7 +164,17 @@ const SeasonDraftLobby = ({ onBack, onCreate, onOpenGame, onJoin }) => {
         </div>
       </header>
 
-      {LOBBY_GAMES.length === 0 ? (
+      {viewState === 'loading' && <SdlSkeleton />}
+
+      {viewState === 'error' && (
+        <ErrorCard
+          title="Can't load your Season Draft games"
+          message="The games service didn't respond in time. Anything already in progress is unaffected — try again in a moment."
+          onRetry={() => setViewState('populated')}
+        />
+      )}
+
+      {viewState === 'empty' && (
         <div className="sdl-empty">
           <img src="../icons/trophy.svg" width="56" height="56" alt="" />
           <h3>No games yet</h3>
@@ -120,7 +183,9 @@ const SeasonDraftLobby = ({ onBack, onCreate, onOpenGame, onJoin }) => {
             Create First Game
           </button>
         </div>
-      ) : (
+      )}
+
+      {viewState === 'populated' && (
         <>
           <div className="sdl-section-head">
             <h2>Active</h2>

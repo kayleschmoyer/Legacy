@@ -58,11 +58,6 @@
 
 .sdj-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 
-.sdj-loading { padding: 60px 32px; display: flex; flex-direction: column; align-items: center; gap: 14px; color: var(--fg3); }
-.sdj-spinner { width: 36px; height: 36px; border-radius: 50%; border: 3px solid var(--outline-subtle); border-top-color: var(--brand-gold); animation: sdj-spin 900ms linear infinite; }
-/* MOTION: loading spinner, 900ms linear, infinite while the join code resolves */
-@keyframes sdj-spin { to { transform: rotate(360deg); } }
-
 /* BREAKPOINTS: reflow at the canonical xs (660) threshold — see docs/design brief */
 @media (max-width: 660px) {
   .sdj { padding: 20px 14px 60px; }
