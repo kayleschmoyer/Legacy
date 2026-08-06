@@ -192,6 +192,92 @@ describe('wizardReducer', () => {
       });
       expect(next.rosterCustomized).toBe(false);
     });
+
+    it('restores the prior customization when switching back to a previously-customized format (LS-6154)', () => {
+      const customizedDst = { ...DST_ROSTER_DEFAULTS, QB: 2, RB: 4 };
+      const customizedState: WizardState = {
+        ...INITIAL_STATE,
+        rosterSlots: customizedDst,
+        rosterCustomized: true,
+      };
+
+      // Switch to IDP — customization is discarded in favor of IDP defaults
+      // (with a confirm warning shown upstream), but the D/ST customization
+      // is now cached.
+      const toIdp = wizardReducer(customizedState, {
+        type: 'SET_DEFENSIVE_FORMAT',
+        format: 'idp',
+      });
+      expect(toIdp.rosterSlots).toEqual(IDP_ROSTER_DEFAULTS);
+      expect(toIdp.rosterCustomized).toBe(false);
+
+      // Switch back to D/ST — must restore the earlier customization, not
+      // silently reset to D/ST defaults a second time.
+      const backToDst = wizardReducer(toIdp, {
+        type: 'SET_DEFENSIVE_FORMAT',
+        format: 'dst',
+      });
+      expect(backToDst.rosterSlots).toEqual(customizedDst);
+      expect(backToDst.rosterCustomized).toBe(true);
+    });
+
+    it('caches and restores customization for both formats independently', () => {
+      const customizedDst = { ...DST_ROSTER_DEFAULTS, QB: 2 };
+      const start: WizardState = {
+        ...INITIAL_STATE,
+        rosterSlots: customizedDst,
+        rosterCustomized: true,
+      };
+
+      const toIdp = wizardReducer(start, {
+        type: 'SET_DEFENSIVE_FORMAT',
+        format: 'idp',
+      });
+      const customizedIdp = { ...IDP_ROSTER_DEFAULTS, LB: 3 };
+      const idpCustomized = wizardReducer(toIdp, {
+        type: 'SET_ROSTER_SLOTS',
+        slots: customizedIdp,
+      });
+
+      const backToDst = wizardReducer(idpCustomized, {
+        type: 'SET_DEFENSIVE_FORMAT',
+        format: 'dst',
+      });
+      expect(backToDst.rosterSlots).toEqual(customizedDst);
+
+      const backToIdp = wizardReducer(backToDst, {
+        type: 'SET_DEFENSIVE_FORMAT',
+        format: 'idp',
+      });
+      expect(backToIdp.rosterSlots).toEqual(customizedIdp);
+      expect(backToIdp.rosterCustomized).toBe(true);
+    });
+
+    it('does not restore stale roster customization after a sport change', () => {
+      const customizedDst = { ...DST_ROSTER_DEFAULTS, QB: 2 };
+      const customizedState: WizardState = {
+        ...INITIAL_STATE,
+        rosterSlots: customizedDst,
+        rosterCustomized: true,
+      };
+
+      const toIdp = wizardReducer(customizedState, {
+        type: 'SET_DEFENSIVE_FORMAT',
+        format: 'idp',
+      });
+      const awayAndBack = wizardReducer(
+        wizardReducer(toIdp, { type: 'SET_SPORT', sport: 'BASEBALL' }),
+        { type: 'SET_SPORT', sport: 'FOOTBALL' },
+      );
+      expect(awayAndBack.rosterSlotsByFormat).toEqual({});
+
+      const backToDst = wizardReducer(awayAndBack, {
+        type: 'SET_DEFENSIVE_FORMAT',
+        format: 'dst',
+      });
+      expect(backToDst.rosterSlots).toEqual(DST_ROSTER_DEFAULTS);
+      expect(backToDst.rosterCustomized).toBe(false);
+    });
   });
 
   describe('SET_ROSTER_SLOTS', () => {

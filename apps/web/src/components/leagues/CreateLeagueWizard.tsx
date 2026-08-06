@@ -57,6 +57,8 @@ export interface WizardState extends PremiumOptions {
   rosterSlots: Record<string, number>;
   /** Tracks whether the user has manually adjusted roster slots */
   rosterCustomized: boolean;
+  /** Customized roster slots saved per defensive format, restored on switch-back */
+  rosterSlotsByFormat: Partial<Record<DefensiveFormat, Record<string, number>>>;
 }
 
 type Step =
@@ -111,6 +113,7 @@ export const INITIAL_STATE: WizardState = {
   auctionMinBid: DEFAULT_AUCTION_MIN_BID,
   rosterSlots: { ...DST_ROSTER_DEFAULTS },
   rosterCustomized: false,
+  rosterSlotsByFormat: {},
 };
 
 export function wizardReducer(
@@ -131,6 +134,7 @@ export function wizardReducer(
         ...state,
         sport: action.sport,
         rosterCustomized: false,
+        rosterSlotsByFormat: {},
         ...defaults,
       };
     }
@@ -143,17 +147,29 @@ export function wizardReducer(
       };
     case 'SET_PREMIUM_OPTIONS':
       return { ...state, ...action.options };
-    case 'SET_DEFENSIVE_FORMAT':
+    case 'SET_DEFENSIVE_FORMAT': {
       if (action.format === state.defensiveFormat) return state;
+      // Preserve the outgoing format's customization so switching back restores it,
+      // instead of discarding it a second time.
+      const rosterSlotsByFormat = state.rosterCustomized
+        ? {
+            ...state.rosterSlotsByFormat,
+            [state.defensiveFormat]: state.rosterSlots,
+          }
+        : state.rosterSlotsByFormat;
+      const savedSlots = rosterSlotsByFormat[action.format];
       return {
         ...state,
         defensiveFormat: action.format,
-        rosterCustomized: false,
-        rosterSlots:
-          action.format === 'idp'
+        rosterSlotsByFormat,
+        rosterCustomized: savedSlots !== undefined,
+        rosterSlots: savedSlots
+          ? { ...savedSlots }
+          : action.format === 'idp'
             ? { ...IDP_ROSTER_DEFAULTS }
             : { ...DST_ROSTER_DEFAULTS },
       };
+    }
     case 'SET_SCORING_FORMAT':
       return { ...state, scoringFormat: action.format };
     case 'SET_ROSTER_SLOTS':
