@@ -52,6 +52,7 @@ export const ENTITLEMENTS = {
   logo_upload: 'logo_upload',
   advanced_scheduling: 'advanced_scheduling',
   draft_slot_trading: 'draft_slot_trading',
+  custom_scoring_multipliers: 'custom_scoring_multipliers',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -95,4 +96,6 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   logo_upload: 'Team logo upload (direct file upload)',
   advanced_scheduling: 'Advanced scheduling (custom in-division game ratio)',
   draft_slot_trading: 'Draft slot trading',
+  custom_scoring_multipliers:
+    'Custom scoring multipliers (TE-premium PPR, IDP point values)',
 };
