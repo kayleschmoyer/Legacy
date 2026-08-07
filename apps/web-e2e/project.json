@@ -6,6 +6,7 @@
   "tags": ["platform:web", "scope:e2e", "scope:web", "type:e2e", "type:test"],
   "implicitDependencies": ["web"],
   "// targets": "to see all targets run: nx show project web-e2e --web",
+  "// e2e dependsOn": "LS-9069: the Playwright webServer only serves the prebuilt dist/apps/web, so the e2e targets depend on web:build to avoid silently validating a stale bundle (cached — unchanged sources are a cache hit). test:full delegates to e2e to inherit the guard. CI is unaffected: it invokes playwright directly, not these targets.",
   "targets": {
     "typecheck": {
       "options": {
@@ -14,6 +15,7 @@
     },
     "e2e": {
       "executor": "nx:run-commands",
+      "dependsOn": [{ "projects": ["web"], "target": "build" }],
       "options": {
         "command": "playwright test",
         "cwd": "{projectRoot}"
@@ -26,6 +28,7 @@
     },
     "e2e:ui": {
       "executor": "nx:run-commands",
+      "dependsOn": [{ "projects": ["web"], "target": "build" }],
       "options": {
         "command": "playwright test --ui",
         "cwd": "."
@@ -33,6 +36,7 @@
     },
     "e2e:headed": {
       "executor": "nx:run-commands",
+      "dependsOn": [{ "projects": ["web"], "target": "build" }],
       "options": {
         "command": "playwright test --headed",
         "cwd": "{projectRoot}"
@@ -40,6 +44,7 @@
     },
     "e2e:debug": {
       "executor": "nx:run-commands",
+      "dependsOn": [{ "projects": ["web"], "target": "build" }],
       "options": {
         "command": "playwright test --debug",
         "cwd": "{projectRoot}"
@@ -52,7 +57,7 @@
       },
       "configurations": {
         "full": {
-          "command": "playwright test"
+          "command": "pnpm exec nx run web-e2e:e2e"
         }
       }
     },

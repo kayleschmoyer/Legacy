@@ -166,7 +166,9 @@ export default defineConfig({
   ],
 
   /* Serve the static production build — mirrors CI exactly.
-   * Run `pnpm exec nx build web` first if dist/apps/web is stale / missing.
+   * The nx e2e targets build web first (dependsOn in apps/web-e2e/project.json,
+   * LS-9069); only direct `playwright test` invocations need a manual
+   * `pnpm exec nx build web` when dist/apps/web is stale / missing.
    * Uses a dedicated port so the Vite dev-server (4200) can stay running.
    *
    * Best-practice notes (https://playwright.dev/docs/test-webserver):
@@ -174,8 +176,11 @@ export default defineConfig({
    *     where `playwright test` is invoked from.
    *   • 127.0.0.1 for the health-check avoids DNS resolution delays.
    *   • stdout/stderr piped so Playwright captures server logs on failure.
-   *   • reuseExistingServer only locally — CI always starts a fresh server
-   *     so startup failures are caught immediately. */
+   *   • reuseExistingServer is hard-off (LS-9069): a lingering preview server
+   *     serves the bundle it started with, so reusing one silently defeats
+   *     the freshness guarantee even after a rebuild (LS-7861, LS-9068).
+   *     An occupied port now fails loudly — kill the stale server (or set
+   *     E2E_PORT) instead of letting the run reuse it. */
   webServer: {
     // Use vite preview instead of a plain static server so that Vite's
     // production CSS preloading and chunk-splitting work correctly.  Plain
@@ -188,7 +193,7 @@ export default defineConfig({
     command: `pnpm --filter web exec vite preview --port ${E2E_PORT} --host 127.0.0.1 --outDir ../../dist/apps/web`,
     cwd: path.resolve(__dirname, '../..'),
     url: `http://127.0.0.1:${E2E_PORT}`,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 30_000,
     stdout: 'pipe',
     stderr: 'pipe',
