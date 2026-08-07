@@ -1,37 +1,47 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Marcus Whitfield · Legacy Sports</title>
-    <link rel="icon" href="design-system/assets/logo.png" />
-    <link rel="stylesheet" href="design-system/colors_and_type.css" />
-    <link rel="stylesheet" href="styles.css" />
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Marcus Whitfield · Legacy Sports</title>
+<link rel="icon" href="design-system/assets/logo.png" />
+<link rel="stylesheet" href="design-system/colors_and_type.css" />
+<link rel="stylesheet" href="styles.css" />
 
-    <script
-      src="https://unpkg.com/react@18.3.1/umd/react.development.js"
-      integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
-      integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm"
-      crossorigin="anonymous"
-    ></script>
-    <script
-      src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
-      integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y"
-      crossorigin="anonymous"
-    ></script>
-  </head>
-  <body>
-    <div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<!-- HANDOFF
+  Final file: index.html (loads app.jsx as the entry point via profile.jsx / settings.jsx / helpers.jsx / data.jsx).
+  This design covers the public manager profile (profile.jsx) and the owner-only profile settings
+  page (settings.jsx) — see LS-4922 for the original scope. Re-run for LS-8977 against the LS-8954
+  audit: fixed off-palette greens, >1px accent stripes, the banned light-theme token block, replaced
+  live CSS animations with static states + MOTION comments (skeleton shimmer kept per the Conditional
+  States spec), added a Loading/Error/Empty/Populated state switcher to the profile view, extended
+  responsive coverage to the seven canonical breakpoint bands, and tokenized repeated raw gold rgba()
+  values into --brand-gold-a* custom properties.
+  Deliberate deviations:
+    - design-system/colors_and_type.css self-hosts Big Shoulders Display + Literata (woff2) and pulls
+      JetBrains Mono via a Google Fonts @import rather than a <link> tag in <head>. This file mirrors
+      the shared design-system stylesheet used by every synced project (see its own header comment);
+      changing the font-loading strategy site-wide is out of scope for a single-page ticket and was
+      left as-is — flag for a design-system-level ticket if this needs to change everywhere.
+    - Settings is a form-driven owner page with no async data fetch in the real app, so it keeps a
+      single populated state; the Loading/Error/Empty matrix is implemented on the Profile view, which
+      is the page that actually renders remote profile data.
+  Open questions for the implementer:
+    - Confirm against the shipped /profile/settings route (LS-4922) which section-visibility toggles
+      are still accurate before wiring this 1:1.
+-->
+  <div id="root"></div>
 
-    <script type="text/babel" src="tweaks-panel.jsx"></script>
-    <script type="text/babel" src="data.jsx"></script>
-    <script type="text/babel" src="helpers.jsx"></script>
-    <script type="text/babel" src="profile.jsx"></script>
-    <script type="text/babel" src="settings.jsx"></script>
-    <script type="text/babel" src="app.jsx"></script>
-  </body>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="data.jsx"></script>
+  <script type="text/babel" src="helpers.jsx"></script>
+  <script type="text/babel" src="profile.jsx"></script>
+  <script type="text/babel" src="settings.jsx"></script>
+  <script type="text/babel" src="app.jsx"></script>
+</body>
 </html>

@@ -252,10 +252,10 @@
       "title": "User Page",
       "slug": "legacy-sports-user-page",
       "status": "active",
-      "lastSyncedHash": "231d89bd13de59fc8d739c540a6f7085dbf2fde413297962eb2832abef7cbbe2",
-      "lastSyncedAt": "2026-05-26T00:00:00.000Z",
-      "jiraKey": "LS-4922",
-      "source": "manual-zip-upload"
+      "lastSyncedHash": "sha256-30415b62fafe37f7de5b9ea853e81bd2b88b027f3b9b57d3b110cb6e08d07c70",
+      "lastSyncedAt": "2026-08-07T00:00:00.000Z",
+      "jiraKey": "LS-8977",
+      "source": "designsync-local"
     },
     {
       "id": "d208847d-c9ca-47fd-8dc1-fe1fe8b7f3a4",

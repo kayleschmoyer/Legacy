@@ -4,7 +4,7 @@ This is a **handoff bundle** from Claude Design (claude.ai/design).
 
 A user mocked up designs in HTML/CSS/JS using an AI design tool, then exported this bundle so a coding agent can implement the designs for real.
 
-> **Manual import note**: this bundle was uploaded by the user as a zip (not produced by `/sync-designs`). There are no chat transcripts under `chats/` — the prototype source files are the authoritative spec. Tracking ticket: **LS-4922** (child of design-sync bucket epic LS-4568).
+> **Re-synced 2026-08-06** (LS-8977) directly from the live Claude Design project via the `DesignSync` MCP tool — the earlier 2026-05-26 manual zip import was missing `tweaks-panel.jsx` and could not render; this pull is complete and current. `DesignSync`'s local pull path has no chat-transcript API, so there are still no transcripts under `chats/` — the prototype source files remain the authoritative spec. Tracking: **LS-8977** (design-source-fix, child of design-sync bucket epic LS-4568; original design ticket LS-4922).
 
 ## What you should do — IMPORTANT
 
@@ -21,7 +21,7 @@ The design medium is **HTML/CSS/JS** — these are prototypes, not production co
 ## Bundle contents
 
 - `legacy-sports-user-page/README.md` — this file
-- `legacy-sports-user-page/chats/` — empty (no transcripts in this manual import)
+- `legacy-sports-user-page/chats/` — empty (`DesignSync` local pulls have no chat-transcript API)
 - `legacy-sports-user-page/project/` — HTML prototype + supporting JSX/CSS + `design-system/` (tokens, fonts, brand icons)
 
 ## Target pages in this repo
