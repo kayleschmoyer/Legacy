@@ -1,3 +1,11 @@
+// NOTE (shared-components-first, LS-9057): EliteDraftBoardScreen.native.tsx
+// is a justified temporary fork, not undocumented debt — this screen's root
+// layout is still a raw CSS-Grid `<div>` (`.d-layout` in styles.ts) and
+// several children (DraftGrid, PlayerCard, DraftQueuePanel,
+// CurrentPickPanel, DraftIntelligence, DraftCompleteView) are raw-DOM/
+// web-only-DnD and not native-portable yet. Porting them to Tamagui and
+// collapsing both screens into one useMedia-driven component is tracked in
+// LS-9152.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { CSS } from './styles';

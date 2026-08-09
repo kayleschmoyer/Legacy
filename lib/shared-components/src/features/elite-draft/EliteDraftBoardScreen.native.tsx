@@ -1,3 +1,12 @@
+// Justified fork exception (shared-components-first, LS-9057): this screen
+// cannot yet be folded into EliteDraftBoardScreen.tsx behind useMedia because
+// most of that screen's dependency tree is not native-portable — a raw
+// CSS-Grid root (`.d-layout` in styles.ts), position:'fixed' overlays
+// (DraftStateScreens.tsx / PreDraftLobby.tsx), and several fully-DOM
+// components (DraftGrid, PlayerCard w/ HTML5 drag, DraftQueuePanel w/
+// @dnd-kit, CurrentPickPanel, DraftIntelligence, DraftCompleteView). Porting
+// that tree to Tamagui/RN-safe primitives is tracked in LS-9152 — re-merge
+// this file into EliteDraftBoardScreen.tsx once LS-9152 lands.
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet } from 'react-native';
 import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
