@@ -81,6 +81,19 @@ describe('WebRollbarImplementation', () => {
       expect(checkIgnore(false, [leagueLimitError])).toBe(true);
     });
 
+    it('drops the gtag.js "_.DumpException" cross-origin noise (LS-9170)', () => {
+      const checkIgnore = getCheckIgnore();
+
+      // Rollbar's automatic captureUncaught hands checkIgnore whatever
+      // window.onerror received. For a cross-origin script exception with no
+      // `error` object attached, that's a plain object shaped like an
+      // ErrorEvent — not an `Error` instance.
+      const malformedErrorEvent = {
+        message: '_._DumpException is not a function',
+      };
+      expect(checkIgnore(true, [malformedErrorEvent])).toBe(true);
+    });
+
     it('drops AbortError, WebSocket noise, and Failed to fetch (existing filters)', () => {
       const checkIgnore = getCheckIgnore();
 

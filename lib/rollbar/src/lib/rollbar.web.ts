@@ -18,6 +18,28 @@ import { sanitizeContext } from './sanitize-context';
 /** Maximum number of breadcrumbs retained in memory. Oldest entries are dropped when the buffer is full. */
 const MAX_BREADCRUMBS = 100;
 
+/**
+ * Extract a message string from a `checkIgnore` argument for noise matching.
+ * Rollbar's automatic captureUncaught handler doesn't always hand us an
+ * `Error` — a cross-origin script exception surfaces as a bare ErrorEvent-like
+ * object (LS-9170), and plain strings are passed through as-is. Without this,
+ * message-based filters below only matched `Error` instances and silently let
+ * malformed reports (and their "(unknown)" Rollbar titles) through.
+ */
+function getIgnoredErrorMessage(err: unknown): string | undefined {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  if (
+    err &&
+    typeof err === 'object' &&
+    'message' in err &&
+    typeof err.message === 'string'
+  ) {
+    return err.message;
+  }
+  return undefined;
+}
+
 class WebRollbarImplementation implements RollbarInterface {
   private rollbar: Rollbar | null = null;
   private breadcrumbs: RollbarBreadcrumb[] = [];
@@ -82,6 +104,17 @@ class WebRollbarImplementation implements RollbarInterface {
         //   blocks log every mutation failure via LOGGER.error (for support
         //   correlation on genuine failures), which otherwise forwards this
         //   expected error to Rollbar too.
+        // - "_.DumpException is not a function": thrown from inside Google's
+        //   own gtag.js/Google Tag Manager bundle (LS-9170), not our code.
+        //   Google's tag loads via a plain <script src> with no `crossorigin`
+        //   attribute (apps/web/src/utils/analytics.ts), so the browser
+        //   surfaces the *cross-origin* exception to window.onerror as a bare
+        //   ErrorEvent instead of the normal (message, source, lineno, colno,
+        //   error) tuple — `error` arrives undefined, so Rollbar's automatic
+        //   captureUncaught handler has no Error/stack to build a trace from
+        //   and reports the item with an "(unknown)" title. Matched via
+        //   getIgnoredErrorMessage below since args[0] here is a plain object
+        //   (the ErrorEvent), not an `Error` instance.
         checkIgnore: (_isUncaught: boolean, args: unknown[]) => {
           // Client-side sampling: drop (1 - captureRate) of items before they
           // reach Rollbar. Rollbar.js has no built-in sample-rate option, so
@@ -92,6 +125,9 @@ class WebRollbarImplementation implements RollbarInterface {
             return true;
           }
           const err = args[0];
+          if (getIgnoredErrorMessage(err)?.includes('DumpException')) {
+            return true;
+          }
           if (err instanceof Error && err.name === 'AbortError') {
             return true;
           }

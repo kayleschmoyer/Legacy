@@ -43,9 +43,15 @@ export function initializeAnalytics(): void {
     return;
   }
 
-  // Load gtag.js script
+  // Load gtag.js script. `crossorigin` lets the browser report full
+  // exception details (message/filename/lineno) for errors thrown inside
+  // this cross-origin script instead of masking them as an opaque
+  // "Script error." with no `error` object — which is what led Rollbar's
+  // automatic uncaught-exception capture to log an untitled "(unknown)"
+  // item for a gtag.js-internal error (LS-9170).
   const script = document.createElement('script');
   script.async = true;
+  script.crossOrigin = 'anonymous';
   script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
   document.head.appendChild(script);
 
