@@ -20,6 +20,14 @@ Source-level fix for LS-8965 (LS-8954 audit, HIGH/MED findings) applied directly
 - **Desktop layout (design ADDITION)**: added a 4th frame, **Desktop · 1280px ($xxl)**, with its own template (`tpl-app-desktop`) — persistent top nav + sticky sub-nav rail + single content column (not a scaled-up phone clone); sections stay open (no collapse affordance) since there's room to show everything. Matches the `$xxl` "Top + sidebar" nav pattern and 1280 content-max from the design system's `breakpoints.html`. This closes the previously-missing desktop layout AC.
 - **Preserved** (per audit note): the full 4-state switcher with geometry-mirroring skeletons, `role="switch"` toggles with `aria-label`s, and `tabular-nums` on stat values — untouched.
 
+## Post-sync fix: LS-9086 (2026-08-09)
+
+`legacy-sports-preferences/project/uploads/PROMPT.md` was found stale — it still carried the pre-Breakpoints-era "Mobile & Desktop Layouts" section instead of the seven-band `## Breakpoints` section from the canonical `docs/agents/pages/PROMPT.md`. This is the root cause LS-9024 traced for the bundle's missing xs(660)/sm(800)/md(860)/lg(980)/xl(1120) coverage: the design session worked from a checklist that never asked for those bands.
+
+**Deviation from the usual write-then-pull flow**: this fix was applied directly to the repo copy (`legacy-sports-preferences/project/uploads/PROMPT.md`) rather than via `DesignSync.write_files` against the Claude Design project — the `DesignSync` MCP tool requires an interactive `/design-login` that this cloud session cannot run (`get_project` returned a design-system-authorization error). The bundle hash above is therefore **not** re-derived from a fresh pull; it still reflects the LS-8965 sync. A follow-up local session should push this same `PROMPT.md` fix up to the Claude Design project (`projectId 019de99b-c7df-7e9d-9f09-20f8b65fcf1d`) via `/push-design UUCswUjg_28Xzcqii7Rt2Q` (or the DesignSync write flow directly) so the source stays in step, then `/pull-design` to re-derive the hash. Until then, the *next* full re-pull of this project will overwrite this repo-side fix unless the source has also been updated.
+
+Redesigning `project/scratch/mockups/preferences.html` itself to add the missing xs/sm/md/lg/xl frames or `BREAKPOINTS` annotations is out of scope for this ticket — LS-9086's closure AC is the `PROMPT.md` fix; a follow-up design pass against the corrected checklist covers the mockup itself.
+
 ## Pages
 
 - `legacy-sports-preferences/project/scratch/mockups/preferences.html`
