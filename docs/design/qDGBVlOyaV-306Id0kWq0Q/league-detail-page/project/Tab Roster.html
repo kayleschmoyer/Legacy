@@ -8,6 +8,14 @@
     <link rel="stylesheet" href="ds/colors_and_type.css" />
     <link rel="stylesheet" href="league-styles.css?v=4" />
 
+    <!-- BREAKPOINTS: shared league-styles.css maps its reflow tiers onto the
+         seven canonical bands (lib/design-tokens/src/lib/breakpoints.ts):
+         xxs (0-659px, fully designed 375px frame) < xs (660-799px) < sm
+         (800-859px) < md (860-979px) < lg/xl/xxl (980px+, fully designed
+         desktop frame at 1280px, shared across all three — no reflow above
+         980px). See league-styles.css's header comment for the full tier
+         breakdown and which CSS rules serve each band. -->
+
     <script
       src="https://unpkg.com/react@18.3.1/umd/react.development.js"
       integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
@@ -395,8 +403,10 @@
         ),
       };
 
-      // Named design-system breakpoints. `tier` matches the CSS breakpoint tier the
-      // current width falls into (see league-styles.css header).
+      // BREAKPOINTS: the seven canonical bands (lib/design-tokens/src/lib/breakpoints.ts).
+      // `tier` matches the CSS breakpoint tier the current width falls into
+      // (see league-styles.css header). Widths are each band's min-width
+      // start, except xxs which previews at the 375px reference device.
       // `full` means "don't constrain, use the browser viewport."
       const VIEWPORTS = {
         full: {
@@ -407,43 +417,59 @@
           device: 'desktop',
           icon: Glyph.Desktop,
         },
+        xxs: {
+          label: 'XXS 375',
+          w: 375,
+          h: 812,
+          tier: 'XXS',
+          device: 'phone',
+          icon: Glyph.Mobile,
+        },
         xs: {
-          label: 'XS 390',
-          w: 390,
-          h: 844,
+          label: 'XS 660',
+          w: 660,
+          h: 900,
           tier: 'XS',
           device: 'phone',
           icon: Glyph.Mobile,
         },
         sm: {
-          label: 'SM 600',
-          w: 600,
-          h: 900,
+          label: 'SM 800',
+          w: 800,
+          h: 1024,
           tier: 'SM',
-          device: 'phone',
-          icon: Glyph.Mobile,
+          device: 'tablet',
+          icon: Glyph.Tablet,
         },
         md: {
-          label: 'MD 834',
-          w: 834,
-          h: 1180,
+          label: 'MD 860',
+          w: 860,
+          h: 1024,
           tier: 'MD',
           device: 'tablet',
           icon: Glyph.Tablet,
         },
         lg: {
-          label: 'LG 1100',
-          w: 1100,
+          label: 'LG 980',
+          w: 980,
           h: 820,
           tier: 'LG',
           device: 'laptop',
           icon: Glyph.Desktop,
         },
         xl: {
-          label: 'XL 1280',
+          label: 'XL 1120',
+          w: 1120,
+          h: 840,
+          tier: 'XL',
+          device: 'desktop',
+          icon: Glyph.Desktop,
+        },
+        xxl: {
+          label: 'XXL 1280',
           w: 1280,
           h: 860,
-          tier: 'XL',
+          tier: 'XXL',
           device: 'desktop',
           icon: Glyph.Desktop,
         },
@@ -452,18 +478,22 @@
       // Maps an actual width back to which breakpoint tier the CSS applies.
       const tierFor = (w) => {
         if (w == null) return null;
-        if (w >= 1280) return 'XL';
-        if (w >= 1100) return 'LG';
-        if (w >= 780) return 'MD';
-        if (w >= 600) return 'SM';
-        return 'XS';
+        if (w >= 1280) return 'XXL';
+        if (w >= 1120) return 'XL';
+        if (w >= 980) return 'LG';
+        if (w >= 860) return 'MD';
+        if (w >= 800) return 'SM';
+        if (w >= 660) return 'XS';
+        return 'XXS';
       };
       const TIER_NOTES = {
-        XS: 'Compact phone · tabs hidden, hero shrunk, single column',
-        SM: 'Phablet · still inside the mobile media query (<780)',
-        MD: 'Tablet · tabs visible, 2-col grids enabled',
-        LG: 'Desktop · full multi-column grids',
-        XL: 'Wide desktop · max content width (1280)',
+        XXS: 'Small phone · fully designed 375px frame, tightest padding, crest/actions hidden',
+        XS: 'Compact phone · stacked layout, hero compressed (< sm)',
+        SM: 'Phablet · nav tabs hidden, mobile padding (< md)',
+        MD: 'Tablet · overview grid 1-col, snapshot 3-col (< lg)',
+        LG: 'Small laptop · shares the full desktop grid with xl/xxl',
+        XL: 'Laptop · shares the full desktop grid with lg/xxl',
+        XXL: 'Desktop · fully designed frame, max content width (1280)',
       };
 
       const DevToolbar = ({ sport, setSport, viewport, setViewport }) => (

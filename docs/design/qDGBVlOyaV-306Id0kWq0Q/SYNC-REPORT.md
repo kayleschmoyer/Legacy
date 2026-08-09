@@ -7,6 +7,38 @@
 **Files**: 90
 **Source**: `designsync-local` (LS-8974)
 
+## LS-9091: Breakpoints coverage fix (2026-08-09)
+
+LS-9024 audited all synced design bundles against `docs/agents/pages/PROMPT.md`'s Breakpoints
+checklist item and found this bundle non-compliant across all 9 files: `league-styles.css` used
+invented reflow thresholds (1100/780/600/380px) with no canonical bands and no `BREAKPOINTS`
+annotations anywhere in the bundle.
+
+**Fix applied directly to this repo bundle**, not via the `DesignSync` write flow the skill
+prefers for source-of-truth fixes: this session is a cloud session, and per the LS-9000 decision
+`DesignSync` requires an interactive `/design-login` that cloud sessions cannot run (confirmed
+here — `get_project` returned "DesignSync needs design-system authorization ... not available in
+this environment"). Patching the bundle directly was the only way to close this ticket's ACs from
+a cloud session. **A follow-up local session should `/push-design 2e2f8052-6cc9-4fb0-9c5f-a353a7fa57ff`
+this fix up to Claude Design and then `/pull-design` to reconcile the source and the manifest hash**
+— until then, Claude Design's copy still has the old invented breakpoints.
+
+- **`league-styles.css`** — reflow thresholds remapped from `1100/780/600/380px` to the canonical
+  bands `979/859/799/659px` (each "one pixel below the next band's start," per
+  `lib/design-tokens/src/lib/breakpoints.ts`: xs=660, sm=800, md=860, lg=980, xl=1120, xxl=1280).
+  Header comment rewritten with the full band → tier → frame table; each `@media` block gets a
+  `BREAKPOINTS:` comment stating which bands it serves. lg/xl/xxl (980px+) share the undecorated
+  base layout — annotated as the fully designed desktop frame (xxl, 1280px). xxs (0–659px) is the
+  fully designed 375px frame (all four override tiers combined).
+- **All 9 `Tab *.html` / `League Detail.html` files** — added a consistent head-level
+  `<!-- BREAKPOINTS: ... -->` comment summarizing the band → tier mapping and pointing to
+  `league-styles.css`'s header for the full breakdown.
+- **`Tab Roster.html`** — the only file with an interactive breakpoint-preview toolbar
+  (`VIEWPORTS`/`tierFor`/`TIER_NOTES`). Previously covered 5 invented tiers (xs=390, sm=600,
+  md=834, lg=1100, xl=1280) missing 2 of the 7 canonical bands entirely. Rebuilt to preview all
+  seven canonical bands at their min-width thresholds (xxs=375 reference device, xs=660, sm=800,
+  md=860, lg=980, xl=1120, xxl=1280), with `tierFor`/`TIER_NOTES` matching the CSS coverage table.
+
 ## What changed vs. previous sync (2026-05-20)
 
 This is a **mechanical-fix-only** partial re-sync, not the full "re-run" the parent ticket

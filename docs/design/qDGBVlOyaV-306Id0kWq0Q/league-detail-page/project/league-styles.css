@@ -1,17 +1,25 @@
 /* League Detail Page styles — extends Legacy Sports design system
 
    ─── Viewport breakpoints ───────────────────────────────────────
-   These are the breakpoints the layout actually responds to.
-   Tiers are *min*-width: "you're at or above this tier."
+   BREAKPOINTS: reflow thresholds are snapped to the seven canonical bands
+   (lib/design-tokens/src/lib/breakpoints.ts — that file is canonical if
+   this table drifts). Each `@media (max-width: …)` tier below fires at
+   "one pixel below the next band's start," so every band is claimed by
+   exactly one designed layout — nothing is left to invented thresholds.
 
-     XXS · <  380px   Small phone          condensed hero, stacked crest, minimal chrome
-     XS  · <  600px   Compact phone        single column, hero shrunk, tabs hidden
-     SM  · ≥  600px   Phablet              still <780 mobile rules
-     MD  · ≥  780px   Tablet               tabs reappear, 2-col grids start
-     LG  · ≥ 1100px   Desktop              full multi-column grids
-     XL  · ≥ 1280px   Wide desktop         max content width (1280) reached
+     Band   Range           Layout tier                              Frame
+     xxs    0–659px         @659 + @799 + @859 + @979 (most compact)  fully designed
+     xs     660–799px       @799 + @859 + @979 (stacked, no @659)     shares xxs's mobile chrome, hero less compressed
+     sm     800–859px       @859 + @979 (no @799/@659)                nav tabs hidden, mobile padding
+     md     860–979px       @979 only                                 overview grid → 1-col, snapshot → 3-col
+     lg     980–1119px      base (no override)                        shares desktop grid with xl/xxl
+     xl     1120–1279px     base (no override)                        shares desktop grid with lg/xxl
+     xxl    ≥ 1280px        base (no override)                        fully designed — primary desktop frame, capped at 1280 max-width
 
-   The active media-query edges are 380px, 780px and 1100px (see § Responsive).
+   Reflow: overview grid + snapshot bar collapse at md (§ 979px tier);
+   nav tabs + mobile padding kick in at sm (§ 859px tier); hero further
+   compresses at xs (§ 799px tier); crest/actions/era hide entirely at
+   xxs (§ 659px tier). lg/xl/xxl share one layout — no reflow above 980px.
 */
 
 * { box-sizing: border-box; }
@@ -565,7 +573,10 @@ input, textarea, select { font-family: inherit; }
 .ls-empty p { font-family: var(--font-body); font-size: 14px; color: var(--fg3); max-width: 380px; margin: 0; }
 
 /* ─── Responsive ───────────────────────────────────── */
-@media (max-width: 1100px) {
+/* BREAKPOINTS: serves md and narrower (860px and below) — below the lg
+   band (980px). Overview grid drops to 1 column, snapshot bar to 3
+   columns. lg/xl/xxl (980px+) keep the full multi-column grid above. */
+@media (max-width: 979px) {
   .ls-overview-grid { grid-template-columns: 1fr; }
   .ls-snapshot { grid-template-columns: repeat(3, 1fr); }
   .ls-snapshot .ls-snap-stat:nth-child(3) { border-right: 0; }
@@ -576,7 +587,10 @@ input, textarea, select { font-family: inherit; }
   .ls-bracket { grid-template-columns: 1fr; gap: 16px; }
   .ls-award-grid { grid-template-columns: 1fr; }
 }
-@media (max-width: 780px) {
+/* BREAKPOINTS: serves sm and narrower (800px and below) — below the md
+   band (860px). Adds mobile chrome: nav tabs hidden, page padding and
+   hero shrunk, matchup/scoreboard/roster panes stack to 1 column. */
+@media (max-width: 859px) {
   .ls-nav-tabs { display: none; }
   .ls-page { padding: 16px 14px 60px; }
   .ls-hero { padding: 14px 16px; }
@@ -608,7 +622,10 @@ input, textarea, select { font-family: inherit; }
   .ls-player-row .ls-player-actions { grid-column: 2 / -1; justify-content: flex-end; }
   .ls-wordmark { display: none; }
 }
-@media (max-width: 600px) {
+/* BREAKPOINTS: serves xs and narrower (660px and below) — below the sm
+   band (800px). Further compresses the hero (2-col meta grid, era and
+   actions hidden) so it stops eating the fold on phones. */
+@media (max-width: 799px) {
   /* Condense the hero so it stops eating the fold on phones, without cramping it. */
   .ls-hero { padding: 14px 16px; }
   .ls-hero-top { margin-bottom: 8px; gap: 4px 6px; font-size: 10.5px; line-height: 1.35; }
@@ -623,7 +640,10 @@ input, textarea, select { font-family: inherit; }
   .ls-hero-actions { display: none; }
   .ls-hero-crest { display: none; }
 }
-@media (max-width: 380px) {
+/* BREAKPOINTS: serves xxs only (0–659px, strictly below xs's 660px
+   start) — the fully designed 375px frame: tightest padding, smallest
+   crest, and the smallest hero heading size. */
+@media (max-width: 659px) {
   .ls-page { padding: 12px 10px 48px; }
   .ls-hero { padding: 14px 14px; }
   .ls-hero h1 { font-size: 21px; }

@@ -8,6 +8,14 @@
     <link rel="stylesheet" href="ds/colors_and_type.css" />
     <link rel="stylesheet" href="league-styles.css?v=3" />
 
+    <!-- BREAKPOINTS: shared league-styles.css maps its reflow tiers onto the
+         seven canonical bands (lib/design-tokens/src/lib/breakpoints.ts):
+         xxs (0-659px, fully designed 375px frame) < xs (660-799px) < sm
+         (800-859px) < md (860-979px) < lg/xl/xxl (980px+, fully designed
+         desktop frame at 1280px, shared across all three — no reflow above
+         980px). See league-styles.css's header comment for the full tier
+         breakdown and which CSS rules serve each band. -->
+
     <script
       src="https://unpkg.com/react@18.3.1/umd/react.development.js"
       integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
