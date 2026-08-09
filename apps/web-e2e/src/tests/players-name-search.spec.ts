@@ -70,6 +70,79 @@ async function mockAllPlayers(
     // its own EmptyState card — client-side grid filtering drives empty state.
     getallplayers: (route) =>
       fulfillJson(route, { data: { players: [...ALL_PLAYERS] } }),
+    // LS-9073: the cards view (PlayersGrid's default view, which this spec
+    // exercises) now sources from GetCareerBattingStats instead of
+    // GetAllPlayers, and sends `searchTerm` as a server-side query variable
+    // rather than filtering client-side. Mirror that by filtering the
+    // fixture on `variables.searchTerm` the same way the real resolver does.
+    getcareerbattingstats: (route, request) => {
+      const searchTerm = (
+        (request.variables.searchTerm as string | undefined) ?? ''
+      )
+        .trim()
+        .toLowerCase();
+      const matching = searchTerm
+        ? ALL_PLAYERS.filter((player) =>
+            `${player.firstName} ${player.lastName}`
+              .toLowerCase()
+              .includes(searchTerm),
+          )
+        : ALL_PLAYERS;
+
+      return fulfillJson(route, {
+        data: {
+          careerBattingStats: {
+            __typename: 'CareerBattingConnection',
+            totalCount: matching.length,
+            edges: matching.map((player) => ({
+              __typename: 'CareerBattingEdge',
+              node: {
+                __typename: 'CareerBatting',
+                playerId: player.id,
+                primaryPosition: 'UT',
+                positionsPlayed: JSON.stringify({ UT: { games: 0 } }),
+                games: 0,
+                plateAppearances: 0,
+                atBats: 0,
+                runs: 0,
+                hits: 0,
+                doubles: 0,
+                triples: 0,
+                homeRuns: 0,
+                rbi: 0,
+                stolenBases: 0,
+                caughtStealing: 0,
+                baseOnBalls: 0,
+                strikeouts: 0,
+                totalBases: 0,
+                groundedIntoDoublePlays: 0,
+                hitByPitch: 0,
+                sacrificeHits: 0,
+                intentionalBaseOnBalls: 0,
+                battingAverage: 0,
+                onBasePercentage: 0,
+                sluggingPercentage: 0,
+                offensiveWAR: 0,
+                player: {
+                  __typename: 'Player',
+                  id: player.id,
+                  firstName: player.firstName,
+                  lastName: player.lastName,
+                  brefId: player.brefId,
+                },
+              },
+            })),
+            pageInfo: {
+              __typename: 'PageInfo',
+              hasNextPage: false,
+              hasPreviousPage: false,
+              startCursor: null,
+              endCursor: null,
+            },
+          },
+        },
+      });
+    },
   });
 }
 

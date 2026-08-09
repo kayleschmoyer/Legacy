@@ -13,12 +13,20 @@ import {
   YStack,
 } from 'tamagui';
 import { ChevronDown, RefreshCw, Search } from '@tamagui/lucide-icons';
-import { formatBaseballCardSubStats, PlayerFeedCard } from './cardFeed';
+import {
+  formatBaseballCardSubStats,
+  PlayerFeedCard,
+  useAccumulatedPages,
+  useResettableCursor,
+} from './cardFeed';
 import { PlayerListRow } from './PlayerListRow';
 import { PlayersStatsTable } from './PlayersStatsTable';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
-import { fullName } from './playerNameUtils';
 import { formatProjection } from './usePlayerProjections';
+import {
+  PlayerCareerStats,
+  useCareerStatsWithNames,
+} from './services/CareerStatsService';
 // `PlayersViewMode` lives in PlayersScreen (LS-4656). Type-only import keeps
 // this leaf component free of the runtime cycle PlayersScreen → PlayersGrid.
 import type { PlayersViewMode } from './PlayersScreen';
@@ -111,10 +119,15 @@ function PlayersGrid({
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const isCardsView = viewMode === 'cards';
 
   const orderBy = sortBy.split('_')[0].toLowerCase();
   const orderDirection = sortBy.split('_')[1].toLowerCase();
 
+  // List/Stats views: unchanged `GetAllPlayers`-backed offset pagination.
+  // Skipped while the cards view is active, since nothing on screen reads
+  // it then — LS-9073 re-points the cards view at the richer career-stats
+  // query below instead.
   const { data, loading, error, fetchMore, refetch } = useGetAllPlayersQuery({
     variables: {
       limit: pageSize,
@@ -123,6 +136,7 @@ function PlayersGrid({
       orderDirection,
     },
     errorPolicy: 'all',
+    skip: isCardsView,
   });
 
   // Sync accumulated state when the base query result changes (initial load or sort change).
@@ -154,11 +168,6 @@ function PlayersGrid({
     }
   }, [fetchMore, offset, pageSize]);
 
-  const handleRefresh = useCallback(() => {
-    void refetch({ offset: 0 });
-    // useEffect resets allPlayers when refreshed data arrives
-  }, [refetch]);
-
   const filteredPlayers = useMemo(() => {
     if (!searchTerm) return allPlayers;
 
@@ -169,19 +178,127 @@ function PlayersGrid({
     );
   }, [allPlayers, searchTerm]);
 
+  // Cards view: the same career-batting-stats query/hook the desktop stats
+  // table uses (`useCareerStatsWithNames` / `GetCareerBattingStats`), instead
+  // of the baseball-only `GetAllPlayers` query — LS-9073. Cursor-continuation
+  // pagination (`useResettableCursor`/`useAccumulatedPages`, shared with the
+  // native card feed) keeps the infinite-scroll model underneath while
+  // `searchTerm`/sort are sent server-side like the stats table does.
+  // `viewMode` is folded into the query key so entering/leaving the cards
+  // view always forces a fresh reset page, even though `skip` toggles the
+  // query on and off with the same filter/sort values.
+  const careerOrderBy = orderBy === 'name' ? 'lastName' : orderBy;
+  const cardsQueryKey = `${viewMode}|${searchTerm}|${careerOrderBy}|${orderDirection}`;
+  const {
+    cursor: cardsCursor,
+    setCursor: setCardsCursor,
+    isResetRef: cardsIsResetRef,
+  } = useResettableCursor(cardsQueryKey);
+
+  const {
+    data: cardsPage,
+    loading: cardsLoading,
+    error: cardsError,
+    totalCount: cardsTotalCount,
+    hasNextPage: cardsHasNextPage,
+    endCursor: cardsEndCursor,
+    refetch: cardsRefetch,
+  } = useCareerStatsWithNames(
+    {
+      first: pageSize,
+      after: cardsCursor,
+      orderBy: careerOrderBy,
+      orderDirection,
+      searchTerm: searchTerm || undefined,
+    },
+    { skip: !isCardsView },
+  );
+
+  const cardsAccumulated = useAccumulatedPages(
+    cardsPage,
+    cardsLoading,
+    cardsCursor,
+    cardsIsResetRef,
+  );
+
+  const cardsIsLoadingMore = cardsLoading && cardsCursor !== undefined;
+
+  const handleCardsLoadMore = useCallback(() => {
+    if (cardsHasNextPage && cardsEndCursor && !cardsLoading) {
+      setCardsCursor(cardsEndCursor);
+    }
+  }, [cardsHasNextPage, cardsEndCursor, cardsLoading, setCardsCursor]);
+
+  const handleCardPlayerSelect = useCallback(
+    (player: PlayerCareerStats) => {
+      onPlayerSelect?.({
+        id: player.playerId,
+        firstName: player.firstName,
+        lastName: player.lastName,
+        brefId: player.brefId,
+        statsLastFetchedAt: null,
+        careerBatting: {
+          battingAverage: player.battingAverage,
+          homeRuns: player.homeRuns,
+          runs: player.runs,
+          rbi: player.rbi,
+          stolenBases: player.stolenBases,
+        },
+      });
+    },
+    [onPlayerSelect],
+  );
+
+  const handleRefresh = useCallback(() => {
+    if (isCardsView) {
+      setCardsCursor(undefined);
+      cardsIsResetRef.current = true;
+      void cardsRefetch();
+      return;
+    }
+    void refetch({ offset: 0 });
+    // useEffect resets allPlayers when refreshed data arrives
+  }, [isCardsView, refetch, cardsRefetch, setCardsCursor, cardsIsResetRef]);
+
+  // Unify the two data sources' matched/total/hasMore into one shape so the
+  // header, empty state, and `onResultStats` callback don't need to branch
+  // on `viewMode` more than once.
+  const resultStats = useMemo<PlayersGridResultStats>(() => {
+    if (isCardsView) {
+      return {
+        matched: cardsAccumulated.length,
+        total: cardsTotalCount,
+        hasMore: cardsHasNextPage,
+      };
+    }
+    return {
+      matched: filteredPlayers.length,
+      total: allPlayers.length,
+      hasMore,
+    };
+  }, [
+    isCardsView,
+    cardsAccumulated.length,
+    cardsTotalCount,
+    cardsHasNextPage,
+    filteredPlayers.length,
+    allPlayers.length,
+    hasMore,
+  ]);
+
   // Surface matched/total/hasMore so a parent (PlayersScreen, LS-4649)
   // can drive its own count chip and active-summary meta without
   // re-issuing the same query.
   useEffect(() => {
-    if (!onResultStats) return;
-    onResultStats({
-      matched: filteredPlayers.length,
-      total: allPlayers.length,
-      hasMore,
-    });
-  }, [filteredPlayers.length, allPlayers.length, hasMore, onResultStats]);
+    onResultStats?.(resultStats);
+  }, [resultStats, onResultStats]);
 
-  if (loading && !data) {
+  const isInitialLoading = isCardsView
+    ? cardsLoading && cardsAccumulated.length === 0
+    : loading && !data;
+  const activeError = isCardsView ? cardsError : error;
+
+  if (isInitialLoading) {
     return (
       <YStack
         flex={1}
@@ -193,14 +310,14 @@ function PlayersGrid({
     );
   }
 
-  if (error) {
+  if (activeError) {
     return (
       <YStack
         flex={1}
         style={{ justifyContent: 'center', alignItems: 'center', padding: 16 }}
       >
         <Text color="$red10" style={{ textAlign: 'center', marginBottom: 12 }}>
-          Error loading players: {error.message}
+          Error loading players: {activeError.message}
         </Text>
         <Button onPress={handleRefresh}>
           <RefreshCw size={16} />
@@ -246,9 +363,11 @@ function PlayersGrid({
           </H2>
           <XStack gap="$2" ai="center">
             <Text color="$gray10">
-              {filteredPlayers.length} player
-              {filteredPlayers.length !== 1 ? 's' : ''}
-              {!searchTerm && hasMore ? ' (more available)' : ''}
+              {resultStats.matched} player
+              {resultStats.matched !== 1 ? 's' : ''}
+              {(isCardsView || !searchTerm) && resultStats.hasMore
+                ? ' (more available)'
+                : ''}
             </Text>
             <Button
               size="$3"
@@ -326,7 +445,7 @@ function PlayersGrid({
       <Separator mb="$4" />
 
       {/* Players Grid */}
-      {filteredPlayers.length === 0 ? (
+      {resultStats.matched === 0 ? (
         <YStack flex={1} jc="center" ai="center">
           <Text color="$gray10" ta="center">
             {searchTerm
@@ -354,32 +473,22 @@ function PlayersGrid({
             </YStack>
           ) : (
             <YStack flexDirection="column" gap="$2">
-              {filteredPlayers.map((player) => {
-                const projection = player.id
-                  ? projectedPoints?.get(player.id)
-                  : undefined;
-                const careerBatting = player.careerBatting;
+              {cardsAccumulated.map((player) => {
+                const projection = projectedPoints?.get(player.playerId);
 
                 return (
                   <PlayerFeedCard
                     key={player.id}
                     sport="baseball"
-                    // The base Player fragment carries no position field
-                    // (LS-9073 re-points this view at the stats-page data
-                    // source, which does) — 'UT' matches the same fallback
-                    // the native card feed screen uses for baseball players
-                    // with no primaryPosition.
-                    position="UT"
-                    name={fullName(player)}
+                    position={player.primaryPosition ?? 'UT'}
+                    name={player.displayName}
                     subStats={formatBaseballCardSubStats({
-                      homeRuns: careerBatting?.homeRuns ?? 0,
-                      rbi: careerBatting?.rbi ?? 0,
-                      battingAverage: careerBatting?.battingAverage ?? 0,
+                      homeRuns: player.homeRuns,
+                      rbi: player.rbi,
+                      battingAverage: player.battingAverage,
                     })}
-                    // No career-FPTS field on this fragment yet — LS-9073
-                    // owns wiring the richer data source that has one.
-                    fpts="—"
-                    onPress={() => onPlayerSelect?.(player)}
+                    fpts={Math.round(player.fantasyPoints).toLocaleString()}
+                    onPress={() => handleCardPlayerSelect(player)}
                     projection={
                       showProjections && projection !== undefined
                         ? `${formatProjection(projection)} pts/g`
@@ -392,17 +501,21 @@ function PlayersGrid({
             </YStack>
           )}
 
-          {!searchTerm && hasMore && (
+          {(isCardsView ? resultStats.hasMore : !searchTerm && hasMore) && (
             <YStack ai="center" marginTop="$4" marginBottom="$2">
               <Button
                 onPress={() => {
-                  void handleLoadMore();
+                  if (isCardsView) {
+                    handleCardsLoadMore();
+                  } else {
+                    void handleLoadMore();
+                  }
                 }}
-                disabled={loadingMore}
+                disabled={isCardsView ? cardsIsLoadingMore : loadingMore}
                 variant="outlined"
                 size="$4"
               >
-                {loadingMore ? (
+                {(isCardsView ? cardsIsLoadingMore : loadingMore) ? (
                   <XStack gap="$2" ai="center">
                     <Spinner size="small" color="$brandNavyLight" />
                     <Text>Loading...</Text>

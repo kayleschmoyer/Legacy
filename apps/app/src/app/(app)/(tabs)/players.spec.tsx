@@ -156,6 +156,60 @@ jest.mock('@legacy-sports/shared-components', () => {
     useDebouncedValue: (value: unknown) => value,
     useCareerStatsWithNames: (...args: unknown[]) =>
       mockUseCareerStatsWithNames(...args) as MockCareerStatsReturn,
+    // Hand-written stubs mirroring cardFeed/useCursorPagination.ts's real
+    // reset-on-key-change / accumulate-on-cursor-change semantics (LS-9073
+    // extracted these out of this screen so the web card presentation could
+    // share them too). A `require` of the real module by relative path was
+    // tried instead (avoiding duplication) but reaches across this app
+    // project's boundary into shared-components' internals, which trips
+    // @nx/enforce-module-boundaries' lazy-vs-static-import consistency check
+    // for every other static `@legacy-sports/shared-components` import in
+    // this project — a worse problem than the duplication it was meant to
+    // avoid. Kept faithful to the real implementation rather than a
+    // passthrough per this file's no-`requireActual` convention above,
+    // since this screen's own pagination-handling tests depend on it
+    // behaving exactly like the real hooks.
+    useResettableCursor: (queryKey: string) => {
+      const [cursor, setCursor] = ReactActual.useState<string | undefined>(
+        undefined,
+      );
+      const prevKeyRef = ReactActual.useRef(queryKey);
+      const isResetRef = ReactActual.useRef(true);
+
+      ReactActual.useEffect(() => {
+        if (prevKeyRef.current !== queryKey) {
+          prevKeyRef.current = queryKey;
+          isResetRef.current = true;
+          setCursor(undefined);
+        }
+      }, [queryKey]);
+
+      return { cursor, setCursor, isResetRef };
+    },
+    useAccumulatedPages: <T,>(
+      data: readonly T[],
+      loading: boolean,
+      cursor: string | undefined,
+      isResetRef: { current: boolean },
+    ): readonly T[] => {
+      const [accumulated, setAccumulated] = ReactActual.useState<readonly T[]>(
+        [],
+      );
+      const prevCursorRef = ReactActual.useRef<string | undefined>(undefined);
+
+      ReactActual.useEffect(() => {
+        if (loading) return;
+        if (isResetRef.current) {
+          setAccumulated(data);
+          isResetRef.current = false;
+        } else if (prevCursorRef.current !== cursor) {
+          setAccumulated((prev) => [...prev, ...data]);
+        }
+        prevCursorRef.current = cursor;
+      }, [data, loading, cursor, isResetRef]);
+
+      return accumulated;
+    },
     PlayersCardFeed: (props: MockPlayersCardFeedProps) => {
       mockPlayersCardFeed(props);
       const rows = props.rows ?? [];

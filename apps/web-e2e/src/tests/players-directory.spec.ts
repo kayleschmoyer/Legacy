@@ -46,6 +46,56 @@ const MOCK_PLAYERS = [
   makeMockPlayer(5, 'Ronald', 'Acuna', 'RF'),
 ];
 
+/**
+ * LS-9073: the cards view (PlayersGrid's default view) now sources from
+ * `GetCareerBattingStats` instead of `GetAllPlayers`. Mirror the same
+ * `players` fixture into a `CareerBattingConnection` so cards-view specs
+ * keep seeing the names/positions they assert on instead of falling through
+ * to the global baseline GraphQL fixture.
+ */
+function toCareerBattingEdges(players: ReturnType<typeof makeMockPlayer>[]) {
+  return players.map((player) => ({
+    __typename: 'CareerBattingEdge',
+    node: {
+      __typename: 'CareerBatting',
+      playerId: player.id,
+      primaryPosition: player.position,
+      positionsPlayed: JSON.stringify({
+        [player.position]: { games: player.careerGames },
+      }),
+      games: player.careerGames,
+      plateAppearances: 0,
+      atBats: 0,
+      runs: 0,
+      hits: 0,
+      doubles: 0,
+      triples: 0,
+      homeRuns: 0,
+      rbi: 0,
+      stolenBases: 0,
+      caughtStealing: 0,
+      baseOnBalls: 0,
+      strikeouts: 0,
+      totalBases: 0,
+      groundedIntoDoublePlays: 0,
+      hitByPitch: 0,
+      sacrificeHits: 0,
+      intentionalBaseOnBalls: 0,
+      battingAverage: 0,
+      onBasePercentage: 0,
+      sluggingPercentage: 0,
+      offensiveWAR: 0,
+      player: {
+        __typename: 'Player',
+        id: player.id,
+        firstName: player.firstName,
+        lastName: player.lastName,
+        brefId: null,
+      },
+    },
+  }));
+}
+
 async function mockPlayersGraphQL(
   page: import('@playwright/test').Page,
   players = MOCK_PLAYERS,
@@ -63,6 +113,27 @@ async function mockPlayersGraphQL(
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { players } }),
+        });
+      } else if (postData.includes('getcareerbattingstats')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              careerBattingStats: {
+                __typename: 'CareerBattingConnection',
+                totalCount: players.length,
+                edges: toCareerBattingEdges(players),
+                pageInfo: {
+                  __typename: 'PageInfo',
+                  hasNextPage: false,
+                  hasPreviousPage: false,
+                  startCursor: null,
+                  endCursor: null,
+                },
+              },
+            },
+          }),
         });
       } else {
         await route.fallback();

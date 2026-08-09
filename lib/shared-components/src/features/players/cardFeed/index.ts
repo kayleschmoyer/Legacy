@@ -29,6 +29,11 @@ export { PlayerFeedSkeleton } from './PlayerFeedSkeleton';
 export { useDebouncedValue } from './useDebouncedValue';
 
 export {
+  useAccumulatedPages,
+  useResettableCursor,
+} from './useCursorPagination';
+
+export {
   BASEBALL_CARD_POSITIONS,
   cardPositionsForSport,
   formatBaseballCardSubStats,

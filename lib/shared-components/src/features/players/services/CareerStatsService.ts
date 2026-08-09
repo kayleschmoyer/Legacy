@@ -75,6 +75,8 @@ export interface PlayerCareerStats {
   readonly displayName: string;
   readonly firstName: string;
   readonly lastName: string;
+  /** Baseball Reference player ID, e.g. "ruthba01" — null when unavailable. */
+  readonly brefId: string | null;
   readonly primaryPosition?: string;
   // Batting statistics
   readonly games: number;
@@ -284,6 +286,7 @@ export function transformCareerStats(
   const firstName = playerData?.firstName ?? '';
   const lastName = playerData?.lastName ?? '';
   const displayName = `${firstName} ${lastName}`.trim() || `Player ${playerId}`;
+  const brefId = playerData?.brefId ?? null;
 
   return {
     id: `player-${playerId}`,
@@ -291,6 +294,7 @@ export function transformCareerStats(
     displayName,
     firstName,
     lastName,
+    brefId,
     primaryPosition: rawStats.primaryPosition ?? undefined,
     games,
     plateAppearances,
@@ -450,9 +454,14 @@ export function useCareerStatsService(
  * instead of just player IDs.
  *
  * @param params - Query parameters for filtering and pagination
+ * @param options - Optional hook behavior, e.g. `{ skip: true }` to skip the
+ *   underlying query without unmounting (LS-9073, view-mode gating)
  * @returns Career statistics with player names included
  */
-export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
+export function useCareerStatsWithNames(
+  params: CareerStatsQueryParams = {},
+  options: { skip?: boolean } = {},
+) {
   // Use generated hook directly
   const {
     data: statsData,
@@ -464,6 +473,7 @@ export function useCareerStatsWithNames(params: CareerStatsQueryParams = {}) {
     errorPolicy: 'all',
     notifyOnNetworkStatusChange: true,
     fetchPolicy: 'network-only', // Always fetch fresh data when sorting/filtering changes
+    skip: options.skip,
   });
 
   // Transform data (simplified - just batting stats for now)
