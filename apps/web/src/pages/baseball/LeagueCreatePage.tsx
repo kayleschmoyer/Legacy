@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Copy,
   Lock,
+  Zap,
 } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import {
@@ -1310,16 +1311,19 @@ function SummarySidePanel({
         padding="$5"
         gap="$3"
       >
-        <Text
-          fontFamily="$display"
-          fontWeight="700"
-          fontSize={12}
-          letterSpacing={1.4}
-          textTransform="uppercase"
-          color="$brandGoldLight"
-        >
-          What happens next?
-        </Text>
+        <XStack gap="$2" alignItems="center">
+          <Zap size={14} color="$brandGoldLight" />
+          <Text
+            fontFamily="$display"
+            fontWeight="700"
+            fontSize={12}
+            letterSpacing={1.4}
+            textTransform="uppercase"
+            color="$brandGoldLight"
+          >
+            What happens next
+          </Text>
+        </XStack>
         <YStack gap="$2.5">
           {[
             "Your league is created and you're set as Commissioner.",

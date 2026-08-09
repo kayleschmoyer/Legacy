@@ -234,6 +234,8 @@ jest.mock('@tamagui/lucide-icons', () => ({
   // Used by StepRosterSettings' slot +/- steppers (LS-6147).
   Minus: () => <span data-testid="icon-minus" />,
   Plus: () => <span data-testid="icon-plus" />,
+  // Used by the "What happens next" sidebar card header (LS-9129).
+  Zap: () => <span data-testid="icon-zap" />,
 }));
 
 jest.mock('tamagui', () => {
@@ -1455,7 +1457,7 @@ describe('LeagueCreatePage — draft date sidebar fallback (LS-6077)', () => {
     mockIsPremium = false;
   });
 
-  it('shows friendly fallback text in the "What happens next?" sidebar when no draft date is set', () => {
+  it('shows friendly fallback text in the "What happens next" sidebar when no draft date is set', () => {
     renderPage('/baseball/league/create');
     expect(
       screen.getByText('Draft opens whenever you schedule it.'),

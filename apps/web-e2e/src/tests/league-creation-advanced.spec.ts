@@ -890,7 +890,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await expect(page).toHaveURL('/baseball');
   });
 
-  // ─── "What happens next?" Info Card ──────────────────────────────────────
+  // ─── "What happens next" Info Card ───────────────────────────────────────
 
   test('should display league creation info card with all bullet points', async ({
     leaguePage,
@@ -898,7 +898,7 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     await leaguePage.gotoCreate();
     await leaguePage.leagueNameInput.expectVisible();
 
-    await leaguePage.text('What happens next?').expectVisible();
+    await leaguePage.text('What happens next').expectVisible();
     await leaguePage
       .text("Your league is created and you're set as Commissioner")
       .expectVisible();
