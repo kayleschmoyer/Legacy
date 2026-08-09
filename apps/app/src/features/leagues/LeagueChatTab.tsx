@@ -1,4 +1,8 @@
 import React, { useCallback, useRef, useState } from 'react';
+import type {
+  NativeSyntheticEvent,
+  TextInputSelectionChangeEventData,
+} from 'react-native';
 import {
   Image,
   KeyboardAvoidingView,
@@ -12,6 +16,8 @@ import { config } from '@legacy-sports/app-config/native';
 import { colors } from '@legacy-sports/design-tokens';
 import { useLeagueChat } from './hooks/useLeagueChat';
 import { formatTime } from './formatTime';
+import { applyMention, getMentionQuery, splitMentions } from './mentions';
+import type { MentionCandidate } from './mentions';
 import { useThemeContext } from '../../context/ThemeContext';
 import type { LegacySportsJwt } from '../../common/auth/AuthHooks';
 
@@ -24,6 +30,19 @@ interface LeagueChatTabProps {
   userInfo: LegacySportsJwt;
 }
 
+/**
+ * `messageType` values that render as a centered system notice instead of a
+ * chat bubble. `'text'`/`'gif'` are user-authored; the rest are structured
+ * league-event cards (trades/waivers/draft updates) — see
+ * `lib/db-client/migrations/20260226_120000_add_league_message_type.ts`.
+ */
+const SYSTEM_MESSAGE_TYPES = new Set([
+  'system',
+  'trade',
+  'waiver',
+  'draft_settings',
+]);
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -31,18 +50,52 @@ export function LeagueChatTab({
   leagueId,
   userInfo,
 }: LeagueChatTabProps): React.JSX.Element {
-  const { messages, loading, sending, wsError, sendMessage } =
-    useLeagueChat(leagueId);
+  const {
+    messages,
+    loading,
+    sending,
+    wsError,
+    sendMessage,
+    mentionCandidates = [],
+  } = useLeagueChat(leagueId);
   // Raw RN <TextInput> styling can't consume Tamagui `$token` props, so pull
   // resolved values from the design-token package — the same source of
   // truth the Tamagui themes mirror — keyed by the active light/dark theme.
   const { resolvedTheme } = useThemeContext();
   const palette = colors[resolvedTheme];
   const [inputText, setInputText] = useState('');
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [showGifPicker, setShowGifPicker] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const giphyApiKey = config.giphyApiKey ?? '';
+  const mentionLabels = mentionCandidates.map((c) => c.label);
+
+  const handleSelectionChange = useCallback(
+    (event: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+      setSelection(event.nativeEvent.selection);
+    },
+    [],
+  );
+
+  const mentionQuery = getMentionQuery(inputText, selection.start);
+  const mentionSuggestions: MentionCandidate[] =
+    mentionQuery === null
+      ? []
+      : mentionCandidates
+          .filter((c) =>
+            c.label.toLowerCase().startsWith(mentionQuery.toLowerCase()),
+          )
+          .slice(0, 5);
+
+  const handleSelectMention = useCallback(
+    (candidate: MentionCandidate) => {
+      const applied = applyMention(inputText, selection.start, candidate.label);
+      setInputText(applied.text);
+      setSelection({ start: applied.cursor, end: applied.cursor });
+    },
+    [inputText, selection],
+  );
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
@@ -117,7 +170,44 @@ export function LeagueChatTab({
             </YStack>
           ) : (
             messages.map((msg) => {
-              const isMe = msg.userId === userInfo.id;
+              const isSystemMessage =
+                !!msg.messageType && SYSTEM_MESSAGE_TYPES.has(msg.messageType);
+
+              // System-event cards (trades/waivers/draft updates) render as
+              // a centered notice, not a directional chat bubble.
+              if (isSystemMessage) {
+                return (
+                  <YStack
+                    key={msg.id}
+                    testID="system-message"
+                    alignItems="center"
+                    marginBottom="$2"
+                    paddingHorizontal="$3"
+                  >
+                    <YStack
+                      backgroundColor="$gray3"
+                      borderRadius="$10"
+                      paddingHorizontal="$3"
+                      paddingVertical="$1"
+                      maxWidth="90%"
+                    >
+                      <Text
+                        color="$gray10"
+                        fontSize="$2"
+                        textAlign="center"
+                        fontStyle="italic"
+                      >
+                        {msg.messageText}
+                      </Text>
+                    </YStack>
+                    <Text fontSize="$1" color="$gray9" marginTop="$1">
+                      {formatTime(msg.createdAt)}
+                    </Text>
+                  </YStack>
+                );
+              }
+
+              const isMe = !!msg.pending || msg.userId === userInfo.id;
               const isGif = msg.messageType === 'gif' && !!msg.gifUrl;
               return (
                 <YStack
@@ -148,13 +238,23 @@ export function LeagueChatTab({
                       paddingHorizontal="$3"
                       paddingVertical="$2"
                       maxWidth="80%"
+                      opacity={msg.pending ? 0.6 : 1}
                     >
                       <Text
                         color={isMe ? 'white' : '$gray12'}
                         fontSize="$4"
                         flexShrink={1}
                       >
-                        {msg.messageText}
+                        {splitMentions(msg.messageText, mentionLabels).map(
+                          (segment, index) => (
+                            <Text
+                              key={index}
+                              fontWeight={segment.isMention ? '700' : undefined}
+                            >
+                              {segment.text}
+                            </Text>
+                          ),
+                        )}
                       </Text>
                     </YStack>
                   )}
@@ -162,6 +262,7 @@ export function LeagueChatTab({
                   {/* Timestamp */}
                   <Text fontSize="$1" color="$gray9" marginTop="$1">
                     {formatTime(msg.createdAt)}
+                    {msg.pending ? ' · Sending…' : ''}
                   </Text>
                 </YStack>
               );
@@ -176,6 +277,30 @@ export function LeagueChatTab({
             onSelect={(url) => void handleSendGif(url)}
             onClose={() => setShowGifPicker(false)}
           />
+        )}
+
+        {/* @mention suggestions */}
+        {mentionSuggestions.length > 0 && (
+          <YStack
+            testID="mention-suggestions"
+            borderTopWidth={1}
+            borderTopColor="$gray4"
+            backgroundColor="$surfacePanel"
+            maxHeight={160}
+          >
+            {mentionSuggestions.map((candidate) => (
+              <Text
+                key={candidate.userId}
+                testID={`mention-suggestion-${candidate.userId}`}
+                fontSize="$4"
+                paddingHorizontal="$3"
+                paddingVertical="$2"
+                onPress={() => handleSelectMention(candidate)}
+              >
+                @{candidate.label}
+              </Text>
+            ))}
+          </YStack>
         )}
 
         {/* Input row */}
@@ -210,6 +335,7 @@ export function LeagueChatTab({
             ]}
             value={inputText}
             onChangeText={setInputText}
+            onSelectionChange={handleSelectionChange}
             placeholder="Message the league…"
             placeholderTextColor={palette.text.fg3}
             multiline

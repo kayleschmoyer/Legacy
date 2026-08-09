@@ -26,6 +26,7 @@ const mockUseLeagueChat = jest.fn(() => ({
   sending: false,
   wsError: null,
   sendMessage: mockSendMessage,
+  mentionCandidates: [],
 }));
 
 jest.mock('./hooks/useLeagueChat', () => ({
@@ -193,6 +194,7 @@ describe('LeagueChatTab', () => {
       sending: false,
       wsError: null,
       sendMessage: mockSendMessage,
+      mentionCandidates: [],
     });
   });
 
@@ -366,6 +368,165 @@ describe('LeagueChatTab', () => {
     it('does not show connection-failed banner when wsError is null', () => {
       render(<LeagueChatTab {...defaultProps} />);
       expect(screen.queryByTestId('ws-error-banner')).toBeNull();
+    });
+  });
+
+  describe('system messages (LS-9097)', () => {
+    it('renders a trade/waiver/draft event as a centered system notice', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [
+          {
+            id: 10,
+            userId: 0,
+            username: '',
+            messageText: 'Team A traded with Team B',
+            messageType: 'trade',
+            createdAt: '2026-03-31T10:00:00Z',
+          },
+        ],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.getByTestId('system-message')).toBeTruthy();
+      expect(screen.getByText('Team A traded with Team B')).toBeTruthy();
+    });
+
+    it('renders a plain text message as a normal bubble, not a system notice', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: mockMessages,
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.queryByTestId('system-message')).toBeNull();
+    });
+  });
+
+  describe('@mentions (LS-9097)', () => {
+    const mentionCandidates = [{ userId: 2, label: 'Wolfpack' }];
+
+    it('bolds a message segment that matches a roster mention', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [
+          {
+            id: 11,
+            userId: 2,
+            username: 'otheruser',
+            messageText: 'hi @Wolfpack, good luck this week',
+            messageType: 'text',
+            createdAt: '2026-03-31T10:00:00Z',
+          },
+        ],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.getByText('@Wolfpack')).toBeTruthy();
+    });
+
+    it('shows autocomplete suggestions while typing an @mention', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      const input = screen.getByPlaceholderText('Message the league…');
+
+      fireEvent.changeText(input, 'hi @Wolf');
+      fireEvent(input, 'selectionChange', {
+        nativeEvent: { selection: { start: 8, end: 8 } },
+      });
+
+      expect(screen.getByTestId('mention-suggestions')).toBeTruthy();
+      expect(screen.getByTestId('mention-suggestion-2')).toBeTruthy();
+    });
+
+    it('inserts the selected mention into the input on tap', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      const input = screen.getByPlaceholderText('Message the league…');
+
+      fireEvent.changeText(input, 'hi @Wolf');
+      fireEvent(input, 'selectionChange', {
+        nativeEvent: { selection: { start: 8, end: 8 } },
+      });
+      fireEvent.press(screen.getByTestId('mention-suggestion-2'));
+
+      expect(screen.getByDisplayValue('hi @Wolfpack ')).toBeTruthy();
+    });
+
+    it('does not show suggestions once the mention token is closed by a space', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      const input = screen.getByPlaceholderText('Message the league…');
+
+      fireEvent.changeText(input, 'hi @Wolfpack ');
+      fireEvent(input, 'selectionChange', {
+        nativeEvent: { selection: { start: 13, end: 13 } },
+      });
+
+      expect(screen.queryByTestId('mention-suggestions')).toBeNull();
+    });
+  });
+
+  describe('offline queueing (LS-9097)', () => {
+    it('renders a pending message with a sending indicator', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [
+          {
+            id: -1,
+            userId: 0,
+            username: '',
+            messageText: 'sent while offline',
+            messageType: 'text',
+            createdAt: '2026-03-31T10:00:00Z',
+            pending: true,
+          },
+        ],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.getByText('sent while offline')).toBeTruthy();
+      expect(screen.getByText(/Sending…/)).toBeTruthy();
     });
   });
 });

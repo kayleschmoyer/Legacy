@@ -1,4 +1,5 @@
-import { act, renderHook } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { useLeagueChat } from './useLeagueChat';
 
@@ -20,10 +21,13 @@ jest.mock('@apollo/client/react', () => ({
 }));
 
 const mockUseSendLeagueMessageMutation = jest.fn();
+const mockUseGetLeagueTeamsQuery = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   GetLeagueMessages: 'GET_LEAGUE_MESSAGES',
   useSendLeagueMessageMutation: (...args: unknown[]): unknown =>
     mockUseSendLeagueMessageMutation(...args),
+  useGetLeagueTeamsQuery: (...args: unknown[]): unknown =>
+    mockUseGetLeagueTeamsQuery(...args),
 }));
 
 jest.mock('@legacy-sports/rollbar/native', () => ({
@@ -40,15 +44,23 @@ const fakeClient = {
   },
 };
 
+let mockConnected = true;
 jest.mock('../../../context/LeagueWebSocketContext', () => ({
-  useLeagueWebSocketClient: () => ({ client: fakeClient, connected: true }),
+  useLeagueWebSocketClient: () => ({
+    client: fakeClient,
+    get connected() {
+      return mockConnected;
+    },
+  }),
 }));
 
 describe('useLeagueChat — WS notifications are scoped to the viewed league (LS-6301)', () => {
   beforeEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
     mockRegisteredHandlers.clear();
+    mockConnected = true;
     mockUseQuery.mockReturnValue({ loading: false, data: undefined });
+    mockUseGetLeagueTeamsQuery.mockReturnValue({ data: undefined });
     mockUseSendLeagueMessageMutation.mockReturnValue([
       jest.fn(),
       { loading: false },
@@ -104,5 +116,131 @@ describe('useLeagueChat — WS notifications are scoped to the viewed league (LS
     expect(result.current.messages.map((m) => m.messageText)).toEqual([
       'message from this league',
     ]);
+  });
+});
+
+describe('useLeagueChat — @mention roster (LS-9097)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRegisteredHandlers.clear();
+    mockConnected = true;
+    mockUseQuery.mockReturnValue({ loading: false, data: undefined });
+    mockUseSendLeagueMessageMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
+  });
+
+  it('derives mention candidates from the league team roster', () => {
+    mockUseGetLeagueTeamsQuery.mockReturnValue({
+      data: {
+        leagueTeams: [
+          { id: 1, name: 'Wolfpack', managerId: 10 },
+          { id: 2, name: 'Bears', managerId: 11 },
+          { id: 3, name: null, managerId: 12 },
+          { id: 4, name: 'No Manager', managerId: null },
+        ],
+      },
+    });
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    expect(result.current.mentionCandidates).toEqual([
+      { userId: 10, label: 'Wolfpack' },
+      { userId: 11, label: 'Bears' },
+    ]);
+  });
+
+  it('returns no mention candidates when the roster has not loaded', () => {
+    mockUseGetLeagueTeamsQuery.mockReturnValue({ data: undefined });
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    expect(result.current.mentionCandidates).toEqual([]);
+  });
+});
+
+describe('useLeagueChat — offline queueing (LS-9097)', () => {
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockRegisteredHandlers.clear();
+    mockConnected = true;
+    mockUseQuery.mockReturnValue({ loading: false, data: undefined });
+    mockUseGetLeagueTeamsQuery.mockReturnValue({ data: undefined });
+    await AsyncStorage.clear();
+  });
+
+  it('queues a message instead of sending it while disconnected', async () => {
+    mockConnected = false;
+    const sendMutation = jest.fn();
+    mockUseSendLeagueMessageMutation.mockReturnValue([
+      sendMutation,
+      { loading: false },
+    ]);
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    await act(async () => {
+      await result.current.sendMessage('queued while offline');
+    });
+
+    expect(sendMutation).not.toHaveBeenCalled();
+    expect(
+      result.current.messages.find(
+        (m) => m.messageText === 'queued while offline',
+      ),
+    ).toMatchObject({ pending: true });
+  });
+
+  it('flushes the queue once the socket reconnects', async () => {
+    mockConnected = false;
+    const sendMutation = jest.fn(
+      (options: {
+        variables: { leagueId: number; messageText: string; gifUrl?: string };
+        onCompleted?: (data: unknown) => void;
+      }) => {
+        options.onCompleted?.({
+          sendLeagueMessage: {
+            id: 55,
+            userId: 1,
+            username: 'me',
+            messageText: 'queued while offline',
+            messageType: 'text',
+            timestamp: '2026-01-01T00:00:00Z',
+          },
+        });
+        return Promise.resolve();
+      },
+    );
+    mockUseSendLeagueMessageMutation.mockReturnValue([
+      sendMutation,
+      { loading: false },
+    ]);
+
+    const { result, rerender } = renderHook(() => useLeagueChat(1));
+
+    await act(async () => {
+      await result.current.sendMessage('queued while offline');
+    });
+    expect(result.current.messages.some((m) => m.pending)).toBe(true);
+
+    mockConnected = true;
+    await act(() => {
+      rerender(undefined);
+    });
+
+    await waitFor(() => {
+      expect(sendMutation).toHaveBeenCalledTimes(1);
+    });
+    expect(sendMutation.mock.calls[0][0].variables.messageText).toBe(
+      'queued while offline',
+    );
+
+    await waitFor(() => {
+      expect(result.current.messages.some((m) => m.pending)).toBe(false);
+    });
+    expect(result.current.messages.map((m) => m.messageText)).toContain(
+      'queued while offline',
+    );
   });
 });
