@@ -38,6 +38,7 @@ describe('football resolvers', () => {
     from: jest.Mock;
     $dynamic: jest.Mock;
     innerJoin: jest.Mock;
+    leftJoin: jest.Mock;
     where: jest.Mock;
     orderBy: jest.Mock;
     limit: jest.Mock;
@@ -70,6 +71,7 @@ describe('football resolvers', () => {
       from: jest.fn().mockReturnThis(),
       $dynamic: jest.fn().mockReturnThis(),
       innerJoin: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       orderBy: jest.fn().mockReturnThis(),
       limit: jest.fn().mockReturnThis(),
@@ -167,6 +169,7 @@ describe('football resolvers', () => {
           yds: 'careerPassing.yds',
           td: 'careerPassing.td',
           int: 'careerPassing.int',
+          sacked: 'careerPassing.sacked',
           rating: 'careerPassing.rating',
         },
         careerFootballRushing: {
@@ -186,12 +189,14 @@ describe('football resolvers', () => {
           yds: 'careerReceiving.yds',
           td: 'careerReceiving.td',
           lng: 'careerReceiving.lng',
+          fumbles: 'careerReceiving.fumbles',
         },
         careerFootballKicking: {
           playerId: 'careerKicking.playerId',
           g: 'careerKicking.g',
           fgm: 'careerKicking.fgm',
           fga: 'careerKicking.fga',
+          fg50m: 'careerKicking.fg50m',
           xpm: 'careerKicking.xpm',
           xpa: 'careerKicking.xpa',
           lng: 'careerKicking.lng',
@@ -566,7 +571,7 @@ describe('football resolvers', () => {
       await expect(
         getResolver()(
           {},
-          { position: null, search: null, after: null, sortBy: 'fpts' },
+          { position: null, search: null, after: null, sortBy: 'nonsense' },
           mockContext,
           undefined as never,
         ),
@@ -1391,6 +1396,119 @@ describe('football resolvers', () => {
             expect.anything(),
           );
         });
+      });
+    });
+
+    describe('fantasy points pool sort (LS-9071)', () => {
+      function compileSql(arg: unknown): { sql: string; params: unknown[] } {
+        return new PgDialect().sqlToQuery(arg as never);
+      }
+
+      it('sorts by fpts across the full pool without requiring a category', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await expect(
+          getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              sortBy: 'fpts',
+              sortDir: 'desc',
+            },
+            mockContext,
+            undefined as never,
+          ),
+        ).resolves.toBeDefined();
+
+        const { sql: orderSql } = compileSql(mockDb.orderBy.mock.calls[0][0]);
+        expect(orderSql).toContain('CASE');
+        expect(orderSql).toContain('DESC NULLS LAST');
+        expect(mockDb.orderBy.mock.calls[0][1]).toBe('asc:id');
+      });
+
+      it('applies ascending direction with NULLS LAST for fpts', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            sortBy: 'fpts',
+            sortDir: 'asc',
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        const { sql: orderSql } = compileSql(mockDb.orderBy.mock.calls[0][0]);
+        expect(orderSql).toContain('ASC NULLS LAST');
+      });
+
+      it('sorts by fpg (fantasy points per game) alongside fpts', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await expect(
+          getResolver()(
+            {},
+            {
+              position: null,
+              search: null,
+              after: null,
+              sortBy: 'fpg',
+              sortDir: 'desc',
+            },
+            mockContext,
+            undefined as never,
+          ),
+        ).resolves.toBeDefined();
+
+        const { sql: orderSql } = compileSql(mockDb.orderBy.mock.calls[0][0]);
+        expect(orderSql).toContain('NULLIF');
+        expect(orderSql).toContain('DESC NULLS LAST');
+      });
+
+      it('left-joins every career category table for a pool sort with no category filter', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          { position: null, search: null, after: null, sortBy: 'fpts' },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.innerJoin).not.toHaveBeenCalled();
+        expect(mockDb.leftJoin).toHaveBeenCalledTimes(6);
+      });
+
+      it('combines a category filter with the fpts sort via one inner join and left joins for the rest', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            sortBy: 'fpts',
+            category: 'passing',
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        expect(mockDb.innerJoin).toHaveBeenCalledTimes(1);
+        expect(mockDb.innerJoin).toHaveBeenCalledWith(
+          expect.objectContaining({ yds: 'careerPassing.yds' }),
+          expect.anything(),
+        );
+        // Every other category table is left-joined so fpts still reflects
+        // the player's full stat line, not just the filtered category.
+        expect(mockDb.leftJoin).toHaveBeenCalledTimes(5);
       });
     });
 

@@ -409,6 +409,31 @@ describe('PlayersTab', () => {
     expect(mockPush).toHaveBeenCalledWith('/football/players/1');
   });
 
+  function lastFootballQueryVariables(): { sortBy: string; sortDir: string } {
+    const calls = mockUseFootballPlayersQuery.mock.calls as Array<
+      [{ variables: { sortBy: string; sortDir: string } }]
+    >;
+    return calls[calls.length - 1][0].variables;
+  }
+
+  it('queries football players sorted server-side by fpts, and re-queries on sort toggle (LS-9071)', () => {
+    mockUseFeatureIsOn.mockReturnValue(true);
+    render(<PlayersTab />);
+    fireEvent.press(screen.getByTestId('mock-sport-toggle'));
+
+    expect(lastFootballQueryVariables()).toMatchObject({
+      sortBy: 'fpts',
+      sortDir: 'desc',
+    });
+
+    fireEvent.press(screen.getByTestId('mock-toggle-sort'));
+
+    expect(lastFootballQueryVariables()).toMatchObject({
+      sortBy: 'fpts',
+      sortDir: 'asc',
+    });
+  });
+
   it('toggles sort direction and re-queries baseball stats with the new direction', () => {
     render(<PlayersTab />);
 

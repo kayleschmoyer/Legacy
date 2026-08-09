@@ -232,13 +232,10 @@ function FootballCardFeed({
 }: SportFeedProps) {
   const router = useRouter();
 
-  // The `footballPlayers` resolver has no global "sort by fantasy points"
-  // option (its sortBy allow-list is players-table columns + namespaced
-  // per-category stat keys — see FOOTBALL_STAT_SORT_FIELDS — with nothing
-  // equivalent to baseball's `orderBy: 'totalScore'`). Pages are fetched in
-  // the server's default order and accumulated for infinite scroll; the FPTS
-  // sort toggle re-sorts what's already loaded, client-side, with no refetch.
-  const queryKey = `${position}|${appliedSearch}`;
+  // The server sorts (footballPlayers(sortBy: 'fpts') — LS-9071), so a
+  // sortDir change requires a fresh query from page 1, same as a
+  // position/search change (mirrors the baseball feed above).
+  const queryKey = `${position}|${appliedSearch}|${sortDir}`;
   const { cursor, setCursor, isResetRef } = useResettableCursor(queryKey);
 
   const { data, loading, error, refetch } = useFootballPlayersQuery({
@@ -247,6 +244,8 @@ function FootballCardFeed({
       search: appliedSearch || undefined,
       after: cursor,
       first: PAGE_SIZE,
+      sortBy: 'fpts',
+      sortDir,
     },
     notifyOnNetworkStatusChange: true,
   });
@@ -256,20 +255,20 @@ function FootballCardFeed({
 
   const { refreshing, onRefresh } = usePullToRefresh([() => refetch()]);
 
-  const rows: PlayerFeedRow[] = useMemo(() => {
-    const sorted = [...accumulated].sort((a, b) => {
-      const aPts = a.careerStats?.fantasyPoints ?? 0;
-      const bPts = b.careerStats?.fantasyPoints ?? 0;
-      return sortDir === 'desc' ? bPts - aPts : aPts - bPts;
-    });
-    return sorted.map((player) => ({
-      id: String(player.id),
-      position: player.isDst ? 'DST' : (player.position ?? 'FLEX'),
-      name: [player.firstName, player.lastName].filter(Boolean).join(' '),
-      subStats: formatFootballCardSubStats(player),
-      fpts: Math.round(player.careerStats?.fantasyPoints ?? 0).toLocaleString(),
-    }));
-  }, [accumulated, sortDir]);
+  const rows: PlayerFeedRow[] = useMemo(
+    () =>
+      accumulated.map((player) => ({
+        id: String(player.id),
+        position: player.isDst ? 'DST' : (player.position ?? 'FLEX'),
+        name: [player.firstName, player.lastName].filter(Boolean).join(' '),
+        subStats: formatFootballCardSubStats(player),
+        fpts: Math.round(
+          player.careerStats?.fantasyPoints ?? 0,
+        ).toLocaleString(),
+        trend: 'flat',
+      })),
+    [accumulated],
+  );
 
   const pageInfo = data?.footballPlayers?.pageInfo;
   const hasMore = pageInfo?.hasNextPage ?? false;

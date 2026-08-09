@@ -1864,6 +1864,18 @@ function isPlayerColumnSort(s: string): s is FootballPlayerColumnSort {
   return (PLAYER_COLUMN_SORTS as readonly string[]).includes(s);
 }
 
+// Career fantasy-points sorts (LS-9071). Unlike the namespaced `category.field`
+// stat sorts below, FPTS/FP-G are pool-wide — a player's fantasy total spans
+// whichever categories they have data in (a QB's rushing stats count too), so
+// these never require a matching `category` arg, mirroring PLAYER_COLUMN_SORTS.
+const FOOTBALL_POOL_SORTS = ['fpts', 'fpg'] as const;
+
+type FootballPoolSort = (typeof FOOTBALL_POOL_SORTS)[number];
+
+function isFootballPoolSort(s: string): s is FootballPoolSort {
+  return (FOOTBALL_POOL_SORTS as readonly string[]).includes(s);
+}
+
 // Career-stat categories the stats grid can view and sort (LS-8566). Category
 // names map 1:1 to their backing storage — `idp` is the individual-defender
 // aggregate view, `defense` the DST career table — mirroring the
@@ -2099,6 +2111,56 @@ function getFootballStatSorts() {
   return footballStatSortsCache;
 }
 
+// Career fantasy points as a SQL expression, for server-side FPTS/FP-G sorting
+// (LS-9071). Mirrors FootballCareerStatsRef.fantasyPoints's JS branches above
+// (same getDefaultFootballScoringSettings() weights, so sort order agrees
+// with the value shown on the card) — DST uses only the flat per-play
+// multipliers (no points-allowed band, since that needs a season average
+// rather than a per-game total), IDP sums its per-play multipliers, and
+// offense/kicking sums whichever of passing/rushing/receiving/kicking the
+// player has a career row for. NULL when the player has no career row
+// anywhere, so NULLS LAST pushes unranked players to the end regardless of
+// sort direction.
+function footballFantasyPointsExpr(): SQL {
+  const passing = PublicSchema.careerFootballPassing;
+  const rushing = PublicSchema.careerFootballRushing;
+  const receiving = PublicSchema.careerFootballReceiving;
+  const kicking = PublicSchema.careerFootballKicking;
+  const defense = PublicSchema.careerFootballDefense;
+  const idp = PublicSchema.careerFootballDefenseIdp;
+  const settings = getDefaultFootballScoringSettings();
+
+  const defenseScore = sql`(COALESCE(${defense.sacks}, 0) * ${settings.defense.sacks ?? 0} + COALESCE(${defense.int}, 0) * ${settings.defense.int ?? 0} + COALESCE(${defense.fumRec}, 0) * ${settings.defense.fumbles_rec ?? 0} + COALESCE(${defense.defTd}, 0) * ${settings.defense.def_td ?? 0} + COALESCE(${defense.safeties}, 0) * ${settings.defense.safeties ?? 0})`;
+
+  const idpScore = sql`(COALESCE(${idp.soloTkl}, 0) * ${settings.idp.solo_tkl ?? 0} + COALESCE(${idp.astTkl}, 0) * ${settings.idp.ast_tkl ?? 0} + COALESCE(${idp.sacks}, 0) * ${settings.idp.sacks ?? 0} + COALESCE(${idp.int}, 0) * ${settings.idp.int ?? 0} + COALESCE(${idp.pd}, 0) * ${settings.idp.pd ?? 0} + COALESCE(${idp.ff}, 0) * ${settings.idp.ff ?? 0} + COALESCE(${idp.fr}, 0) * ${settings.idp.fr ?? 0} + COALESCE(${idp.defTd}, 0) * ${settings.idp.def_td ?? 0} + COALESCE(${idp.safeties}, 0) * ${settings.idp.safeties ?? 0})`;
+
+  const offenseScore = sql`(COALESCE(${passing.yds}, 0) * ${settings.passing.yds ?? 0} + COALESCE(${passing.td}, 0) * ${settings.passing.td ?? 0} + COALESCE(${passing.int}, 0) * ${settings.passing.int ?? 0} + COALESCE(${passing.sacked}, 0) * ${settings.passing.sacked ?? 0} + COALESCE(${rushing.yds}, 0) * ${settings.rushing.yds ?? 0} + COALESCE(${rushing.td}, 0) * ${settings.rushing.td ?? 0} + COALESCE(${rushing.fumbles}, 0) * ${settings.rushing.fumbles ?? 0} + COALESCE(${receiving.rec}, 0) * ${settings.receiving.rec ?? 0} + COALESCE(${receiving.yds}, 0) * ${settings.receiving.yds ?? 0} + COALESCE(${receiving.td}, 0) * ${settings.receiving.td ?? 0} + COALESCE(${receiving.fumbles}, 0) * ${settings.receiving.fumbles ?? 0} + COALESCE(${kicking.fgm}, 0) * ${settings.kicking.fgm ?? 0} + COALESCE(${kicking.fg50m}, 0) * ${settings.kicking.fg_50m ?? 0} + COALESCE(${kicking.xpm}, 0) * ${settings.kicking.xpm ?? 0})`;
+
+  return sql`(CASE
+    WHEN ${defense.playerId} IS NOT NULL THEN ${defenseScore}
+    WHEN ${idp.playerId} IS NOT NULL THEN ${idpScore}
+    WHEN ${passing.playerId} IS NOT NULL OR ${rushing.playerId} IS NOT NULL OR ${receiving.playerId} IS NOT NULL OR ${kicking.playerId} IS NOT NULL THEN ${offenseScore}
+    ELSE NULL
+  END)`;
+}
+
+// Fantasy points per game (LS-9071): the same total, divided by the most
+// games recorded across whichever category tables back that total (a passer
+// who also rushed a few times shouldn't have their FP/G diluted by a lower
+// rushing-only game count). NULLIF guards the 0-games case.
+function footballFantasyPointsPerGameExpr(): SQL {
+  const passing = PublicSchema.careerFootballPassing;
+  const rushing = PublicSchema.careerFootballRushing;
+  const receiving = PublicSchema.careerFootballReceiving;
+  const kicking = PublicSchema.careerFootballKicking;
+  const defense = PublicSchema.careerFootballDefense;
+  const idp = PublicSchema.careerFootballDefenseIdp;
+
+  const games = sql`GREATEST(COALESCE(${defense.g}, 0), COALESCE(${idp.g}, 0), COALESCE(${passing.g}, 0), COALESCE(${rushing.g}, 0), COALESCE(${receiving.g}, 0), COALESCE(${kicking.g}, 0))`;
+
+  return sql`(${footballFantasyPointsExpr()} / NULLIF(${games}, 0)::numeric)`;
+}
+
 builder.queryField('footballPlayers', (t) =>
   t.field({
     type: FootballPlayersConnectionRef,
@@ -2124,9 +2186,11 @@ builder.queryField('footballPlayers', (t) =>
       minProjectedPoints: t.arg.float({ required: false }),
       maxAdpRank: t.arg.int({ required: false }),
       // Sort over players-table columns ('name' = lastName/firstName,
-      // 'position', 'team' = nflTeam) or, with a matching `category`, a
-      // namespaced career-stat key like 'passing.yds' (LS-8566). Unset
-      // preserves the historical default of ordering by id (LS-6473).
+      // 'position', 'team' = nflTeam), pool-wide fantasy totals ('fpts',
+      // 'fpg' — LS-9071, no category required), or, with a matching
+      // `category`, a namespaced career-stat key like 'passing.yds'
+      // (LS-8566). Unset preserves the historical default of ordering by id
+      // (LS-6473).
       sortBy: t.arg.string({ required: false }),
       sortDir: t.arg.string({ required: false }),
       // Career-stat category (LS-8566). INNER JOINs the matching career table,
@@ -2170,30 +2234,39 @@ builder.queryField('footballPlayers', (t) =>
         throw UserInputError(`Invalid category: ${category}`);
       }
 
-      // A sortBy is either a players-table column or a namespaced stat key
-      // whose prefix must equal the supplied category (the key's table is only
-      // joined when its category is requested).
+      // A sortBy is a players-table column, a pool-wide fantasy-points total
+      // (no category needed — LS-9071), or a namespaced stat key whose prefix
+      // must equal the supplied category (the key's table is only joined when
+      // its category is requested).
       let statSort: {
         category: FootballStatCategory;
         expr: SQL | AnyPgColumn;
       } | null = null;
+      let poolSort: SQL | null = null;
       if (args.sortBy != null) {
         if (!isPlayerColumnSort(args.sortBy)) {
-          const candidate = getFootballStatSorts()[args.sortBy];
-          if (!candidate) {
-            throw UserInputError(`Invalid sortBy: ${args.sortBy}`);
+          if (isFootballPoolSort(args.sortBy)) {
+            poolSort =
+              args.sortBy === 'fpts'
+                ? footballFantasyPointsExpr()
+                : footballFantasyPointsPerGameExpr();
+          } else {
+            const candidate = getFootballStatSorts()[args.sortBy];
+            if (!candidate) {
+              throw UserInputError(`Invalid sortBy: ${args.sortBy}`);
+            }
+            if (category == null) {
+              throw UserInputError(
+                `Stat sortBy '${args.sortBy}' requires category: '${candidate.category}'`,
+              );
+            }
+            if (candidate.category !== category) {
+              throw UserInputError(
+                `Stat sortBy '${args.sortBy}' does not match category: '${category}'`,
+              );
+            }
+            statSort = candidate;
           }
-          if (category == null) {
-            throw UserInputError(
-              `Stat sortBy '${args.sortBy}' requires category: '${candidate.category}'`,
-            );
-          }
-          if (candidate.category !== category) {
-            throw UserInputError(
-              `Stat sortBy '${args.sortBy}' does not match category: '${category}'`,
-            );
-          }
-          statSort = candidate;
         }
       }
       const sortDir = args.sortDir ?? 'asc';
@@ -2323,6 +2396,15 @@ builder.queryField('footballPlayers', (t) =>
             : sql`${statSort.expr} ASC NULLS LAST`,
           asc(PublicSchema.players.id),
         );
+      } else if (poolSort) {
+        // Same NULLS LAST + id-tiebreaker treatment as statSort above — a
+        // player with no career row anywhere sorts to the end either way.
+        orderBy.push(
+          sortDir === 'desc'
+            ? sql`${poolSort} DESC NULLS LAST`
+            : sql`${poolSort} ASC NULLS LAST`,
+          asc(PublicSchema.players.id),
+        );
       } else {
         switch (args.sortBy) {
           case 'name':
@@ -2376,6 +2458,20 @@ builder.queryField('footballPlayers', (t) =>
           categoryTable,
           eq(categoryTable.playerId, PublicSchema.players.id),
         );
+      }
+      if (poolSort) {
+        // FPTS/FP-G need every category table to compute the total, not just
+        // the one the `category` filter (if any) already joined — LEFT JOIN
+        // so players without a row in a given category aren't dropped from
+        // the pool. Skip categoryTable itself: it's the same table object
+        // already INNER-joined above, and joining it twice would error.
+        for (const table of Object.values(getCategoryTables())) {
+          if (table === categoryTable) continue;
+          query = query.leftJoin(
+            table,
+            eq(table.playerId, PublicSchema.players.id),
+          );
+        }
       }
       const rows = await query
         .where(and(...conditions))
