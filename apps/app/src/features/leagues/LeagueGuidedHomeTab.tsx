@@ -26,6 +26,7 @@ import type { AppMatchupFragment } from '@legacy-sports/graphql';
 import { MatchupStatus } from '@legacy-sports/graphql';
 import { LeagueDuesPaymentStatus } from '../commissioner/LeagueDuesPaymentStatus';
 import type { ScoringSettings } from '../../common/scoring';
+import { useKeyboardActivation } from '../../common/hooks/useKeyboardActivation';
 
 export interface RankedStanding {
   rank: number;
@@ -316,6 +317,32 @@ function CompactHeader({
 
 // ─── Up next card ─────────────────────────────────────────────────────────────
 
+/**
+ * The secondary action's own component so `useKeyboardActivation` (a hook)
+ * can be called unconditionally — `UpNextCard` renders this only when
+ * `secondaryLabel`/`onSecondaryPress` are both set.
+ */
+function SecondaryLink({ action }: { action: NextAction }): React.JSX.Element {
+  const keyboardProps = useKeyboardActivation(() => {
+    action.onSecondaryPress?.();
+  });
+  return (
+    <Text
+      role="button"
+      tabIndex={0}
+      accessibilityRole="button"
+      accessibilityLabel={action.secondaryLabel}
+      fontSize={12}
+      fontWeight="600"
+      color="$brandGoldLight"
+      onPress={action.onSecondaryPress}
+      {...keyboardProps}
+    >
+      {action.secondaryLabel}
+    </Text>
+  );
+}
+
 function UpNextCard({ action }: { action: NextAction }): React.JSX.Element {
   return (
     <YStack
@@ -385,18 +412,7 @@ function UpNextCard({ action }: { action: NextAction }): React.JSX.Element {
           </Text>
         ) : null}
         {action.secondaryLabel && action.onSecondaryPress ? (
-          <Text
-            role="button"
-            tabIndex={0}
-            accessibilityRole="button"
-            accessibilityLabel={action.secondaryLabel}
-            fontSize={12}
-            fontWeight="600"
-            color="$brandGoldLight"
-            onPress={action.onSecondaryPress}
-          >
-            {action.secondaryLabel}
-          </Text>
+          <SecondaryLink action={action} />
         ) : null}
       </XStack>
     </YStack>
