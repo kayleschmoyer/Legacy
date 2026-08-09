@@ -1954,6 +1954,8 @@ export type Mutation = {
   forceDropPlayer?: Maybe<CommissionerActionResult>;
   /** Give up the current session. Reveals the correct player without awarding points. */
   giveUpDisclosureGame?: Maybe<GiveUpDisclosureGameResult>;
+  /** Admin only: grant a user time-boxed premium access by creating a Stripe trial subscription that auto-cancels if no payment method is attached by the expiry date — no charge is ever made. Entitlements are read live from Stripe, so the grant (and its expiry) take effect the same way a real subscription would. */
+  grantTemporaryPremium?: Maybe<TemporaryPremiumGrantResult>;
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
@@ -2325,6 +2327,11 @@ export type MutationForceDropPlayerArgs = {
 
 export type MutationGiveUpDisclosureGameArgs = {
   sessionId: Scalars['Int']['input'];
+};
+
+export type MutationGrantTemporaryPremiumArgs = {
+  days: Scalars['Int']['input'];
+  userId: Scalars['Int']['input'];
 };
 
 export type MutationImpersonateUserArgs = {
@@ -4551,6 +4558,13 @@ export type TeamStatistics = {
   totalPoints?: Maybe<Scalars['Float']['output']>;
   winPercentage?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
+};
+
+export type TemporaryPremiumGrantResult = {
+  __typename?: 'TemporaryPremiumGrantResult';
+  days?: Maybe<Scalars['Int']['output']>;
+  expiresAt?: Maybe<Scalars['String']['output']>;
+  stripeSubscriptionId?: Maybe<Scalars['String']['output']>;
 };
 
 /** Historical record of tiebreaker resolution */
@@ -8106,6 +8120,21 @@ export type RestoreGooglePurchasesMutationVariables = Exact<{
 export type RestoreGooglePurchasesMutation = {
   __typename?: 'Mutation';
   restoreGooglePurchases?: boolean | null;
+};
+
+export type GrantTemporaryPremiumMutationVariables = Exact<{
+  userId: Scalars['Int']['input'];
+  days: Scalars['Int']['input'];
+}>;
+
+export type GrantTemporaryPremiumMutation = {
+  __typename?: 'Mutation';
+  grantTemporaryPremium?: {
+    __typename?: 'TemporaryPremiumGrantResult';
+    stripeSubscriptionId?: string | null;
+    expiresAt?: string | null;
+    days?: number | null;
+  } | null;
 };
 
 export type TeamFragment = {
@@ -21016,6 +21045,59 @@ export type RestoreGooglePurchasesMutationResult =
 export type RestoreGooglePurchasesMutationOptions = BaseMutationOptions<
   RestoreGooglePurchasesMutation,
   RestoreGooglePurchasesMutationVariables
+>;
+export const GrantTemporaryPremium = gql`
+  mutation GrantTemporaryPremium($userId: Int!, $days: Int!) {
+    grantTemporaryPremium(userId: $userId, days: $days) {
+      stripeSubscriptionId
+      expiresAt
+      days
+    }
+  }
+`;
+export type GrantTemporaryPremiumMutationFn = MutationFunction<
+  GrantTemporaryPremiumMutation,
+  GrantTemporaryPremiumMutationVariables
+>;
+
+/**
+ * __useGrantTemporaryPremiumMutation__
+ *
+ * To run a mutation, you first call `useGrantTemporaryPremiumMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useGrantTemporaryPremiumMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [grantTemporaryPremiumMutation, { data, loading, error }] = useGrantTemporaryPremiumMutation({
+ *   variables: {
+ *      userId: // value for 'userId'
+ *      days: // value for 'days'
+ *   },
+ * });
+ */
+export function useGrantTemporaryPremiumMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    GrantTemporaryPremiumMutation,
+    GrantTemporaryPremiumMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    GrantTemporaryPremiumMutation,
+    GrantTemporaryPremiumMutationVariables
+  >(GrantTemporaryPremium, options);
+}
+export type GrantTemporaryPremiumMutationHookResult = ReturnType<
+  typeof useGrantTemporaryPremiumMutation
+>;
+export type GrantTemporaryPremiumMutationResult =
+  Apollo.MutationResult<GrantTemporaryPremiumMutation>;
+export type GrantTemporaryPremiumMutationOptions = BaseMutationOptions<
+  GrantTemporaryPremiumMutation,
+  GrantTemporaryPremiumMutationVariables
 >;
 export const GetTeamById = gql`
   query GetTeamById($teamId: Int!) {

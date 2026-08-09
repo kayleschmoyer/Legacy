@@ -9,6 +9,7 @@ import {
   useGetAllUsersQuery,
   useGetUserByIdQuery,
   useGetUsersCountQuery,
+  useGrantTemporaryPremiumMutation,
   useUpdateUserRoleMutation,
 } from '@legacy-sports/graphql';
 import {
@@ -19,6 +20,19 @@ import {
 } from '../../constants/colors';
 
 const PAGE_SIZE = 25;
+
+// Mirrors MAX_TEMPORARY_PREMIUM_GRANT_DAYS in
+// lambdas/db/src/schema/subscriptions.ts — the server is the source of truth
+// and re-validates; this only avoids a round-trip for an out-of-range value.
+const MIN_GRANT_DAYS = 1;
+const MAX_GRANT_DAYS = 90;
+
+function isValidGrantDays(value: string): boolean {
+  const days = Number(value);
+  return (
+    Number.isInteger(days) && days >= MIN_GRANT_DAYS && days <= MAX_GRANT_DAYS
+  );
+}
 
 type SortField = 'email' | 'username' | 'id';
 type SortDirection = 'asc' | 'desc';
@@ -64,6 +78,12 @@ export default function AdminUsersPage() {
     id: number;
     label: string;
   } | null>(null);
+  const [pendingGrant, setPendingGrant] = useState<{
+    id: number;
+    label: string;
+  } | null>(null);
+  const [grantDaysInput, setGrantDaysInput] = useState('7');
+  const [grantingId, setGrantingId] = useState<number | null>(null);
 
   const currentUserId = user?.id ?? 0;
   const { data: serverUserData, loading: serverUserLoading } =
@@ -114,6 +134,7 @@ export default function AdminUsersPage() {
   });
 
   const [updateUserRole, { loading: updating }] = useUpdateUserRoleMutation();
+  const [grantTemporaryPremium] = useGrantTemporaryPremiumMutation();
 
   if (isLoading || serverUserLoading) {
     return null;
@@ -187,6 +208,44 @@ export default function AdminUsersPage() {
       );
     } finally {
       setImpersonatingId(null);
+    }
+  };
+
+  const handleGrantConfirm = async () => {
+    if (!pendingGrant) return;
+    const { id: userId } = pendingGrant;
+    const days = parseInt(grantDaysInput, 10);
+    setPendingGrant(null);
+    setGrantingId(userId);
+    try {
+      const result = await grantTemporaryPremium({
+        variables: { userId, days },
+      });
+      const expiresAt = result.data?.grantTemporaryPremium?.expiresAt;
+      setFeedbackMap((prev) => ({
+        ...prev,
+        [userId]: expiresAt
+          ? `Granted premium until ${new Date(expiresAt).toLocaleDateString()}`
+          : 'Granted temporary premium',
+      }));
+      setTimeout(() => {
+        setFeedbackMap((prev) => {
+          const next = { ...prev };
+          delete next[userId];
+          return next;
+        });
+      }, 5000);
+    } catch (err) {
+      LOGGER.error(
+        'Failed to grant temporary premium:',
+        err instanceof Error ? err : String(err),
+      );
+      setFeedbackMap((prev) => ({
+        ...prev,
+        [userId]: `Error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      }));
+    } finally {
+      setGrantingId(null);
     }
   };
 
@@ -513,6 +572,29 @@ export default function AdminUsersPage() {
                         )}
                       </Button>
                     )}
+                    <Button
+                      size="$3"
+                      onPress={() =>
+                        setPendingGrant({
+                          id: displayId,
+                          label: u.username ?? u.email ?? `User #${displayId}`,
+                        })
+                      }
+                      disabled={grantingId !== null || isImpersonating}
+                      opacity={
+                        grantingId !== null || isImpersonating ? 0.55 : 1
+                      }
+                      backgroundColor={withAlpha(BRAND_GOLD, 0.12)}
+                      borderColor="$brandGold"
+                      borderWidth={1}
+                      color="$brandGold"
+                    >
+                      {grantingId === displayId ? (
+                        <Spinner size="small" />
+                      ) : (
+                        'Grant Temp Premium'
+                      )}
+                    </Button>
                   </XStack>
                 </XStack>
               </Card>
@@ -639,6 +721,79 @@ export default function AdminUsersPage() {
                 icon={impersonatingId !== null ? <Spinner /> : undefined}
               >
                 Impersonate
+              </Button>
+            </XStack>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog>
+
+      {/* Confirmation dialog for temporary premium grant */}
+      <Dialog
+        modal
+        open={pendingGrant !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingGrant(null);
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Overlay
+            key="overlay"
+            animation={dialogAnimation}
+            opacity={0.5}
+            enterStyle={{ opacity: 0 }}
+            exitStyle={{ opacity: 0 }}
+          />
+          <Dialog.Content
+            bordered
+            elevate
+            key="content"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="grant-premium-title"
+            aria-describedby="grant-premium-description"
+            animateOnly={['transform', 'opacity']}
+            animation={[
+              dialogAnimation,
+              { opacity: { overshootClamping: true } },
+            ]}
+            enterStyle={{ x: 0, y: -20, opacity: 0, scale: 0.9 }}
+            exitStyle={{ x: 0, y: 10, opacity: 0, scale: 0.95 }}
+            gap="$4"
+            padding="$4"
+            width={500}
+          >
+            <Dialog.Title id="grant-premium-title">
+              Grant temporary premium to {pendingGrant?.label}?
+            </Dialog.Title>
+            <Dialog.Description id="grant-premium-description">
+              Creates a Stripe trial subscription (sandbox — no charge is ever
+              made) that expires automatically after the chosen number of days.
+            </Dialog.Description>
+            <XStack gap="$3" alignItems="center">
+              <Text color="$colorPress" fontSize={13}>
+                Days ({MIN_GRANT_DAYS}-{MAX_GRANT_DAYS}):
+              </Text>
+              <Input
+                width={80}
+                keyboardType="numeric"
+                value={grantDaysInput}
+                onChangeText={setGrantDaysInput}
+              />
+            </XStack>
+            <XStack gap="$3" justifyContent="flex-end">
+              <Button onPress={() => setPendingGrant(null)}>Cancel</Button>
+              <Button
+                backgroundColor="$brandGold"
+                color="$textOnAccent"
+                onPress={() => {
+                  void handleGrantConfirm();
+                }}
+                disabled={
+                  grantingId !== null || !isValidGrantDays(grantDaysInput)
+                }
+                icon={grantingId !== null ? <Spinner /> : undefined}
+              >
+                Grant
               </Button>
             </XStack>
           </Dialog.Content>

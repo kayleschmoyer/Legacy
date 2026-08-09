@@ -130,6 +130,11 @@ const mockUseUpdateUserRoleMutation = jest.fn<
   [jest.Mock, { loading: boolean }],
   []
 >();
+const mockGrantTemporaryPremium = jest.fn();
+const mockUseGrantTemporaryPremiumMutation = jest.fn<
+  [jest.Mock, { loading: boolean }],
+  []
+>();
 const mockUseGetUserByIdQuery = jest.fn<
   { data: { user: { accessLevel: string } } | undefined; loading: boolean },
   [unknown?]
@@ -139,6 +144,8 @@ jest.mock('@legacy-sports/graphql', () => ({
   useGetUsersCountQuery: (opts?: unknown) => mockUseGetUsersCountQuery(opts),
   useUpdateUserRoleMutation: () => mockUseUpdateUserRoleMutation(),
   useGetUserByIdQuery: (opts?: unknown) => mockUseGetUserByIdQuery(opts),
+  useGrantTemporaryPremiumMutation: () =>
+    mockUseGrantTemporaryPremiumMutation(),
 }));
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -187,6 +194,19 @@ function setupMocks(overrides?: {
   });
   mockUseUpdateUserRoleMutation.mockReturnValue([
     jest.fn(),
+    { loading: false },
+  ]);
+  mockGrantTemporaryPremium.mockReset().mockResolvedValue({
+    data: {
+      grantTemporaryPremium: {
+        stripeSubscriptionId: 'sub_test',
+        expiresAt: '2026-08-16T00:00:00.000Z',
+        days: 7,
+      },
+    },
+  });
+  mockUseGrantTemporaryPremiumMutation.mockReturnValue([
+    mockGrantTemporaryPremium,
     { loading: false },
   ]);
 }
@@ -346,5 +366,146 @@ describe('AdminUsersPage — impersonation', () => {
     });
 
     expect(confirmButton).toBeDisabled();
+  });
+});
+
+describe('AdminUsersPage — grant temporary premium', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupMocks();
+  });
+
+  it('shows a Grant Temp Premium button for every user row', () => {
+    renderPage();
+    const buttons = screen.getAllByRole('button', {
+      name: /grant temp premium/i,
+    });
+    expect(buttons).toHaveLength(USERS.length);
+  });
+
+  it('opens the confirmation dialog with a days input when clicked', async () => {
+    renderPage();
+
+    const [firstButton] = screen.getAllByRole('button', {
+      name: /grant temp premium/i,
+    });
+    await userEvent.click(firstButton);
+
+    expect(screen.getByTestId('dialog')).toBeInTheDocument();
+    expect(screen.getByTestId('dialog-title')).toHaveTextContent(
+      /grant temporary premium/i,
+    );
+  });
+
+  it('calls grantTemporaryPremium with the selected userId and days on confirm', async () => {
+    renderPage();
+
+    const buttons = screen.getAllByRole('button', {
+      name: /grant temp premium/i,
+    });
+    // alice is USERS[1], id 2
+    await userEvent.click(buttons[1]);
+
+    const dialog = screen.getByTestId('dialog');
+    const daysInput = within(dialog).getByDisplayValue('7');
+    await userEvent.clear(daysInput);
+    await userEvent.type(daysInput, '14');
+
+    const confirmButton = within(dialog).getByRole('button', {
+      name: /^grant$/i,
+    });
+    await act(async () => {
+      await userEvent.click(confirmButton);
+    });
+
+    await waitFor(() => {
+      expect(mockGrantTemporaryPremium).toHaveBeenCalledWith({
+        variables: { userId: 2, days: 14 },
+      });
+    });
+  });
+
+  it('disables the confirm button when days is out of range', async () => {
+    renderPage();
+
+    const [firstButton] = screen.getAllByRole('button', {
+      name: /grant temp premium/i,
+    });
+    await userEvent.click(firstButton);
+
+    const dialog = screen.getByTestId('dialog');
+    const daysInput = within(dialog).getByDisplayValue('7');
+    await userEvent.clear(daysInput);
+    await userEvent.type(daysInput, '91');
+
+    const confirmButton = within(dialog).getByRole('button', {
+      name: /^grant$/i,
+    });
+    expect(confirmButton).toBeDisabled();
+  });
+
+  it('shows success feedback with the expiry date after a grant', async () => {
+    renderPage();
+
+    const [firstButton] = screen.getAllByRole('button', {
+      name: /grant temp premium/i,
+    });
+    await userEvent.click(firstButton);
+
+    const confirmButton = within(screen.getByTestId('dialog')).getByRole(
+      'button',
+      { name: /^grant$/i },
+    );
+    await act(async () => {
+      await userEvent.click(confirmButton);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/granted premium until/i)).toBeInTheDocument();
+    });
+  });
+
+  it('shows an error message when the mutation fails', async () => {
+    mockGrantTemporaryPremium.mockRejectedValueOnce(
+      new Error('User already has an active subscription'),
+    );
+    renderPage();
+
+    const [firstButton] = screen.getAllByRole('button', {
+      name: /grant temp premium/i,
+    });
+    await userEvent.click(firstButton);
+
+    const confirmButton = within(screen.getByTestId('dialog')).getByRole(
+      'button',
+      { name: /^grant$/i },
+    );
+    await act(async () => {
+      await userEvent.click(confirmButton);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/error: user already has an active subscription/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('closes the dialog without calling the mutation on cancel', async () => {
+    renderPage();
+
+    const [firstButton] = screen.getAllByRole('button', {
+      name: /grant temp premium/i,
+    });
+    await userEvent.click(firstButton);
+
+    await userEvent.click(
+      within(screen.getByTestId('dialog')).getByRole('button', {
+        name: /cancel/i,
+      }),
+    );
+
+    expect(mockGrantTemporaryPremium).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('dialog')).not.toBeInTheDocument();
   });
 });

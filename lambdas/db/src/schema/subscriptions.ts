@@ -2,6 +2,7 @@ import {
   clearLeagueTierFreezes,
   handleSubscriptionDowngrade,
   InternalSchema,
+  PublicSchema,
   reapplyLeagueRestrictions,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
@@ -19,6 +20,7 @@ import {
 } from './graphql-errors';
 import {
   getSubscriptionTier,
+  requireAdmin,
   requireAuth,
   requireNotImpersonating,
 } from './authorization';
@@ -152,6 +154,20 @@ const BillingPortalSessionResultRef = builder.objectRef<{ url: string }>(
 BillingPortalSessionResultRef.implement({
   fields: (t) => ({
     url: t.exposeString('url'),
+  }),
+});
+
+const TemporaryPremiumGrantResultRef = builder.objectRef<{
+  stripeSubscriptionId: string;
+  expiresAt: string;
+  days: number;
+}>('TemporaryPremiumGrantResult');
+
+TemporaryPremiumGrantResultRef.implement({
+  fields: (t) => ({
+    stripeSubscriptionId: t.exposeString('stripeSubscriptionId'),
+    expiresAt: t.exposeString('expiresAt'),
+    days: t.exposeInt('days'),
   }),
 });
 
@@ -749,6 +765,132 @@ builder.mutationField('createBillingPortalSession', (t) =>
       });
 
       return { url: portal.url };
+    },
+  }),
+);
+
+// Sandbox-safe upper bound on a single admin comp grant — long enough to cover
+// support/goodwill cases, short enough that a mistaken grant self-heals.
+const MAX_TEMPORARY_PREMIUM_GRANT_DAYS = 90;
+
+builder.mutationField('grantTemporaryPremium', (t) =>
+  t.field({
+    type: TemporaryPremiumGrantResultRef,
+    description:
+      'Admin only: grant a user time-boxed premium access by creating a Stripe ' +
+      'trial subscription that auto-cancels if no payment method is attached by ' +
+      'the expiry date — no charge is ever made. Entitlements are read live from ' +
+      'Stripe, so the grant (and its expiry) take effect the same way a real ' +
+      'subscription would.',
+    args: {
+      userId: t.arg.int({ required: true }),
+      days: t.arg.int({
+        required: true,
+        description: `Grant length in days (1-${MAX_TEMPORARY_PREMIUM_GRANT_DAYS}).`,
+      }),
+    },
+    resolve: async (_parent, { userId, days }, context) => {
+      const adminUser = await requireAdmin(context);
+
+      if (
+        !Number.isInteger(days) ||
+        days < 1 ||
+        days > MAX_TEMPORARY_PREMIUM_GRANT_DAYS
+      ) {
+        throw UserInputError(
+          `days must be an integer between 1 and ${MAX_TEMPORARY_PREMIUM_GRANT_DAYS}`,
+        );
+      }
+
+      const [targetUser] = await context.db
+        .select({
+          id: PublicSchema.users.id,
+          email: PublicSchema.users.canonicalEmail,
+        })
+        .from(PublicSchema.users)
+        .where(eq(PublicSchema.users.id, userId))
+        .limit(1);
+
+      if (!targetUser) {
+        throw UserInputError('User not found');
+      }
+
+      const existing = await getSubscriptionForUser(userId);
+      if (existing?.status === 'active') {
+        throw UserInputError(
+          'User already has an active subscription — no grant needed.',
+        );
+      }
+
+      const monthlyPriceId = process.env['STRIPE_MONTHLY_PRICE_ID'];
+      if (!monthlyPriceId) {
+        throw new Error(
+          'Stripe price ID is not configured (STRIPE_MONTHLY_PRICE_ID)',
+        );
+      }
+
+      const stripe = await getStripeClient();
+      const customer = await getOrCreateStripeCustomer(
+        stripe,
+        userId,
+        targetUser.email ?? '',
+        existing?.stripeCustomerId,
+      );
+
+      // trial_settings.end_behavior forces Stripe to cancel — rather than
+      // attempt to charge — the subscription when the trial ends without a
+      // payment method on file, so a comp grant can never turn into a real
+      // charge. The existing customer.subscription.created/updated/deleted
+      // webhook handlers (lambdas/stripe-webhook) already upsert the
+      // subscriptions row and bump entitlements_updated_at from the
+      // metadata.userId set below — no new webhook handling is needed.
+      const subscription = await stripe.subscriptions.create({
+        customer: customer.id,
+        items: [{ price: monthlyPriceId }],
+        trial_period_days: days,
+        trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
+        metadata: {
+          userId: String(userId),
+          grantedByAdminId: String(adminUser.id),
+          grantType: 'admin_temporary_premium',
+        },
+      });
+
+      // Force-expire the target's already-issued JWTs immediately instead of
+      // waiting on the async customer.subscription.created webhook to round
+      // trip (it bumps the same marker — this write is a redundant,
+      // idempotent belt-and-suspenders for instant effect, matching the
+      // pattern documented on entitlements_updated_at).
+      const now = new Date();
+      await runWithInternalClient(getDbOptions(), async (db) => {
+        await db
+          .update(InternalSchema.usersInAppInternal)
+          .set({
+            subscriptionTier: 'premium',
+            entitlementsUpdatedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(InternalSchema.usersInAppInternal.id, userId));
+      });
+
+      // Audit log: actor + target ids and grant metadata only — no PII.
+      LOGGER.info('Admin granted temporary premium access', {
+        audit: true,
+        actor: { id: Number(adminUser.id) },
+        targetUserId: userId,
+        days,
+        stripeSubscriptionId: subscription.id,
+      });
+
+      const expiresAt = subscription.trial_end
+        ? new Date(subscription.trial_end * 1000).toISOString()
+        : now.toISOString();
+
+      return {
+        stripeSubscriptionId: subscription.id,
+        expiresAt,
+        days,
+      };
     },
   }),
 );

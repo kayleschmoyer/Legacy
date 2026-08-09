@@ -21,3 +21,11 @@ mutation VerifyGooglePurchase($purchaseToken: String!, $productId: String!) {
 mutation RestoreGooglePurchases($purchaseToken: String!, $productId: String!) {
   restoreGooglePurchases(purchaseToken: $purchaseToken, productId: $productId)
 }
+
+mutation GrantTemporaryPremium($userId: Int!, $days: Int!) {
+  grantTemporaryPremium(userId: $userId, days: $days) {
+    stripeSubscriptionId
+    expiresAt
+    days
+  }
+}

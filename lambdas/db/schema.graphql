@@ -2436,6 +2436,17 @@ type Mutation {
   giveUpDisclosureGame(sessionId: Int!): GiveUpDisclosureGameResult
 
   """
+  Admin only: grant a user time-boxed premium access by creating a Stripe trial subscription that auto-cancels if no payment method is attached by the expiry date — no charge is ever made. Entitlements are read live from Stripe, so the grant (and its expiry) take effect the same way a real subscription would.
+  """
+  grantTemporaryPremium(
+    """
+    Grant length in days (1-90).
+    """
+    days: Int!
+    userId: Int!
+  ): TemporaryPremiumGrantResult
+
+  """
   Admin only: generate a JWT that authenticates as the specified user for debugging purposes.
   """
   impersonateUser(userId: Int!): ImpersonateUserResult
@@ -4638,6 +4649,12 @@ type TeamStatistics {
   totalPoints: Float
   winPercentage: Float
   wins: Int
+}
+
+type TemporaryPremiumGrantResult {
+  days: Int
+  expiresAt: String
+  stripeSubscriptionId: String
 }
 
 """
