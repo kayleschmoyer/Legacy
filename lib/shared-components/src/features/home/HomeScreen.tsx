@@ -1602,15 +1602,24 @@ function PlayboardHeroCard({
 
 /* ─── League list row ─── */
 
-function LeagueListRow({
-  summary,
-  onPress,
-  onMockDraft,
-}: {
+export interface LeagueListRowProps {
   summary: HomeLeagueSummary;
   onPress: () => void;
   onMockDraft?: () => void;
-}) {
+}
+
+/**
+ * Exported (LS-8791) so it can be render-tested directly under the mobile
+ * jest project — the row that threw "undefined is not a function" on
+ * Android when `formatDraftDate` (imported from `@legacy-sports/utils`)
+ * resolved to `undefined` on the native barrel. Testing it only indirectly
+ * through `HomeScreen` left this exact call path uncovered.
+ */
+export function LeagueListRow({
+  summary,
+  onPress,
+  onMockDraft,
+}: LeagueListRowProps) {
   const isDraftLive = summary.draftStatus === 'in-progress';
   const hasMatchup =
     summary.matchupId != null && summary.matchupStatus === 'in_progress';
