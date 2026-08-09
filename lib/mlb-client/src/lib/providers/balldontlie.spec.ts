@@ -264,6 +264,43 @@ describe('BallDontLieProvider.getScoreboard', () => {
     expect(mockedAxiosGet).toHaveBeenCalledTimes(1);
   });
 
+  it('coalesces concurrent requests for the same date into a single fetch', async () => {
+    const provider = makeProvider();
+    let resolveResponse: (value: typeof BDL_RESPONSE) => void = () => {
+      throw new Error('resolveResponse called before axios.get');
+    };
+    mockedAxiosGet.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveResponse = resolve;
+      }),
+    );
+
+    const [first, second] = [
+      provider.getScoreboard('2024-07-15'),
+      provider.getScoreboard('2024-07-15'),
+    ];
+    resolveResponse(BDL_RESPONSE);
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+
+    expect(mockedAxiosGet).toHaveBeenCalledTimes(1);
+    expect(firstResult).toEqual(secondResult);
+  });
+
+  it('coalesces concurrent requests that fail with a shared rejection', async () => {
+    const provider = makeProvider();
+    mockedAxiosGet.mockRejectedValue(makeAxiosError(429));
+
+    const [first, second] = [
+      provider.getScoreboard('2024-07-16'),
+      provider.getScoreboard('2024-07-16'),
+    ];
+
+    await expect(first).rejects.toThrow('HTTP 429');
+    await expect(second).rejects.toThrow('HTTP 429');
+    // 1 initial + MAX_RETRIES retries, shared across both callers
+    expect(mockedAxiosGet).toHaveBeenCalledTimes(3);
+  });
+
   it('returns stale cache when all retries fail with 429', async () => {
     const provider = makeProvider();
 

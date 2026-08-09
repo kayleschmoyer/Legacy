@@ -164,6 +164,13 @@ const BDL_MLB_BASE = 'https://api.balldontlie.io/mlb/v1';
 export class BallDontLieProvider implements MlbDataProvider {
   private readonly cache = new Map<string, CacheEntry>();
 
+  // Coalesces concurrent getScoreboard() calls for the same date into a
+  // single upstream fetch. Without this, a burst of simultaneous GraphQL
+  // requests (e.g. several browser tabs polling at once) each miss the
+  // cache and fire their own axios.get, multiplying the load that trips
+  // BallDontLie's rate limit (LS-9147).
+  private readonly inflight = new Map<string, Promise<Scoreboard>>();
+
   constructor(private readonly apiKey: string) {
     if (!apiKey) {
       throw new Error('[balldontlie] MLB_DATA_API_KEY is required');
@@ -194,6 +201,23 @@ export class BallDontLieProvider implements MlbDataProvider {
       return cached;
     }
 
+    const existing = this.inflight.get(cacheKey);
+    if (existing) {
+      LOGGER.debug('[balldontlie] joining in-flight request', { cacheKey });
+      return existing;
+    }
+
+    const fetchPromise = this.fetchScoreboard(date, cacheKey).finally(() => {
+      this.inflight.delete(cacheKey);
+    });
+    this.inflight.set(cacheKey, fetchPromise);
+    return fetchPromise;
+  }
+
+  private async fetchScoreboard(
+    date: string,
+    cacheKey: string,
+  ): Promise<Scoreboard> {
     LOGGER.debug('[balldontlie] fetching scoreboard', { date });
 
     let lastErr: unknown;
