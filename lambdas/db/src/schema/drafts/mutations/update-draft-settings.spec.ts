@@ -13,6 +13,8 @@
  * free-tier-safe era value doesn't spuriously trip requireEntitlement.
  */
 
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
@@ -22,13 +24,30 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+interface MakeCtxOptions {
+  userId?: number;
+  tier?: 'free' | 'premium';
+  leagueOwner?: number;
+  leagueSport?: string;
+  entitlements?: string[];
+}
+
 /** Build a minimal context that simulates a free-tier commissioner. */
 function makeCtx({
   userId = 1,
   tier = 'free',
   leagueOwner = 1,
   leagueSport = 'baseball',
-} = {}) {
+  // requirePremium() (the blanket LS-5014 gate) reads the DB subscription_tier
+  // column mocked below via tierSelectMock and doesn't need this. The granular
+  // auction_draft / historical_era_filters gates (LS-5017) go through
+  // requireEntitlement/hasEntitlement, which read the JWT-claim-derived
+  // context.user.entitlements (LS-8643) — default premium callers to holding
+  // both entitlements exercised by this file's test cases.
+  entitlements = tier === 'premium'
+    ? [ENTITLEMENTS.auction_draft, ENTITLEMENTS.historical_era_filters]
+    : [],
+}: MakeCtxOptions = {}) {
   const league = {
     id: 10,
     owner: leagueOwner,
@@ -98,7 +117,7 @@ function makeCtx({
   };
 
   return {
-    user: { id: userId, username: 'testuser' },
+    user: { id: userId, username: 'testuser', entitlements },
     db,
     notificationService: null,
   };

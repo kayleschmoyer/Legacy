@@ -1,4 +1,5 @@
 import type { GraphQLObjectType, GraphQLSchema } from 'graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 process.setMaxListeners(20);
 
@@ -121,7 +122,21 @@ describe('Statistics Resolver', () => {
 
   function makePremiumCtx() {
     return {
-      user: { id: 1, email: 'premium@test.com', isAdmin: false },
+      user: {
+        id: 1,
+        email: 'premium@test.com',
+        isAdmin: false,
+        // requirePremium() gates on the DB tier column mocked by makeMockDb.
+        // The granular per-field gates (LS-8643) read the JWT-claim-derived
+        // entitlements array instead — grant every entitlement this file's
+        // premium-path tests exercise.
+        entitlements: [
+          ENTITLEMENTS.large_player_stats_page_size,
+          ENTITLEMENTS.player_comparison,
+          ENTITLEMENTS.advanced_batting_stats,
+          ENTITLEMENTS.defensive_sabermetrics,
+        ],
+      },
       db: makeMockDb('premium'),
     } as never;
   }

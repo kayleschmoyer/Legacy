@@ -11,6 +11,7 @@
  * every existing member id (excluding the joiner) and the expected payload.
  */
 import type { GraphQLSchema } from 'graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 describe('join mutations — push notifications on join (LS-7971)', () => {
   let schema: GraphQLSchema;
@@ -182,7 +183,12 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
         },
       );
       const context = {
-        user: { id: 1, username: 'alice', isAdmin: false },
+        user: {
+          id: 1,
+          username: 'alice',
+          isAdmin: false,
+          entitlements: [ENTITLEMENTS.unlimited_leagues],
+        },
         db,
         notificationPublisher: { publishToMany },
       };
@@ -233,7 +239,12 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
         },
       );
       const context = {
-        user: { id: 1, username: 'alice', isAdmin: false },
+        user: {
+          id: 1,
+          username: 'alice',
+          isAdmin: false,
+          entitlements: [ENTITLEMENTS.unlimited_leagues],
+        },
         db,
       };
 
@@ -278,7 +289,12 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
         },
       );
       const context = {
-        user: { id: 1, username: 'bob', isAdmin: false },
+        user: {
+          id: 1,
+          username: 'bob',
+          isAdmin: false,
+          entitlements: [ENTITLEMENTS.unlimited_leagues],
+        },
         db,
         notificationPublisher: { publishToMany },
       };
@@ -328,7 +344,12 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
         },
       );
       const context = {
-        user: { id: 1, username: 'bob', isAdmin: false },
+        user: {
+          id: 1,
+          username: 'bob',
+          isAdmin: false,
+          entitlements: [ENTITLEMENTS.unlimited_leagues],
+        },
         db,
       };
 
@@ -352,7 +373,12 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
         { id: 42, leagueId: 7 },
       );
       const context = {
-        user: { id: 1, username: 'carol', isAdmin: false },
+        user: {
+          id: 1,
+          username: 'carol',
+          isAdmin: false,
+          entitlements: [ENTITLEMENTS.unlimited_leagues],
+        },
         db,
         notificationPublisher: { publishToMany },
       };
@@ -382,7 +408,12 @@ describe('join mutations — push notifications on join (LS-7971)', () => {
         { id: 42, leagueId: 7 },
       );
       const context = {
-        user: { id: 1, username: 'carol', isAdmin: false },
+        user: {
+          id: 1,
+          username: 'carol',
+          isAdmin: false,
+          entitlements: [ENTITLEMENTS.unlimited_leagues],
+        },
         db,
       };
 

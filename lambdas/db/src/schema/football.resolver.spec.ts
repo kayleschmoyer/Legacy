@@ -4,6 +4,7 @@ import {
   type GraphQLSchema,
   isNonNullType,
 } from 'graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 type FootballPlayersResult = {
   nodes: Array<{
@@ -52,7 +53,11 @@ describe('football resolvers', () => {
     careerFootballDefenseIdp: { load: jest.Mock };
   };
   let mockContext: {
-    user: { id: number; isAdmin: boolean } | null;
+    user: {
+      id: number;
+      isAdmin: boolean;
+      entitlements?: string[];
+    } | null;
     db: typeof mockDb;
     loaders: typeof mockCareerFootballLoaders;
   };
@@ -1056,6 +1061,13 @@ describe('football resolvers', () => {
         mockDb.then
           .mockImplementationOnce((resolve) => resolve([{ tier: 'premium' }]))
           .mockImplementationOnce((resolve) => resolve([]));
+        // requireEntitlement(advanced_search_filters) reads the JWT-claim
+        // entitlements array (LS-8643), not the DB tier row mocked above.
+        mockContext.user = {
+          id: 1,
+          isAdmin: false,
+          entitlements: [ENTITLEMENTS.advanced_search_filters],
+        };
 
         const result = (await getResolver()(
           {},
@@ -2432,6 +2444,13 @@ describe('football resolvers', () => {
       mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
         resolve([{ tier: 'premium' }]),
       );
+      // requireEntitlement(advanced_search_filters) reads the JWT-claim
+      // entitlements array (LS-8643), not the DB tier row mocked above.
+      mockContext.user = {
+        id: 1,
+        isAdmin: false,
+        entitlements: [ENTITLEMENTS.advanced_search_filters],
+      };
 
       const result = await getResolver()(
         {},
@@ -2448,6 +2467,11 @@ describe('football resolvers', () => {
       mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
         resolve([{ tier: 'premium' }]),
       );
+      mockContext.user = {
+        id: 1,
+        isAdmin: false,
+        entitlements: [ENTITLEMENTS.advanced_search_filters],
+      };
 
       const result = await getResolver()(
         {},
@@ -2472,6 +2496,11 @@ describe('football resolvers', () => {
       mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
         resolve([]),
       );
+      mockContext.user = {
+        id: 1,
+        isAdmin: false,
+        entitlements: [ENTITLEMENTS.advanced_search_filters],
+      };
 
       const result = await getResolver()(
         {},
@@ -2502,6 +2531,11 @@ describe('football resolvers', () => {
       mockDb.then.mockImplementationOnce((resolve: (v: unknown[]) => void) =>
         resolve([{ playerId: 10, leagueId: 5 }]),
       );
+      mockContext.user = {
+        id: 1,
+        isAdmin: false,
+        entitlements: [ENTITLEMENTS.advanced_search_filters],
+      };
 
       const result = (await getResolver()(
         {},
