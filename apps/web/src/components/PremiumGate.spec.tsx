@@ -44,6 +44,7 @@ jest.mock('tamagui', () => {
     </button>
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     YStack: PassThrough,
     Text: ({ children }: Children) => <span>{children}</span>,
     Button,

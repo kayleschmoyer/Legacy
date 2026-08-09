@@ -40,6 +40,7 @@ jest.mock('tamagui', () => {
 jest.mock('@legacy-sports/shared-components/commissioner', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
+    createTokens: (tokens: unknown) => tokens,
     AchievementRestrictionsControl: () => (
       <View testID="achievement-restrictions-control" />
     ),

@@ -16,6 +16,7 @@ jest.mock('tamagui', () => {
     jest.requireActual<typeof import('react-native')>('react-native');
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
+    createTokens: (tokens: unknown) => tokens,
     // Forward testID + flex so tests can assert the fill-mode layout fix
     // (LS-8636) — a flex-sized child collapses the gate without flex: 1 here.
     YStack: ({

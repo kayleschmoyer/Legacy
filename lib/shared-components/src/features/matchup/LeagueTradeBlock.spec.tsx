@@ -21,6 +21,7 @@ jest.mock('tamagui', () => {
     onPress?: () => void;
   }) => <div onClick={onPress}>{children as React.ReactNode | undefined}</div>;
   return {
+    createTokens: (tokens: unknown) => tokens,
     Card: Box,
     Separator: () => <hr />,
     Spinner: () => <div data-spinner />,

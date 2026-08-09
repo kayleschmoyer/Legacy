@@ -80,6 +80,7 @@ jest.mock('tamagui', () => {
     TextInput: React.ComponentType<{ value?: string; testID?: string }>;
   };
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button: ({
       children,
       onPress,

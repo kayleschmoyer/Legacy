@@ -87,6 +87,7 @@ jest.mock('tamagui', () => {
   } = jest.requireActual<typeof import('react-native')>('react-native');
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
+    createTokens: (tokens: unknown) => tokens,
     Theme: ({ children }: { children: React.ReactNode }) =>
       ReactActual.createElement(View, null, children),
     YStack: ({ children }: { children: React.ReactNode }) =>

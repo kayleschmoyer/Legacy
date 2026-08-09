@@ -58,6 +58,7 @@ jest.mock('tamagui', () => {
       [key: string]: unknown;
     }) => <Tag {...rest}>{children}</Tag>;
   return {
+    createTokens: (tokens: unknown) => tokens,
     H1: passthrough(RNText),
     H3: passthrough(RNText),
     Text: passthrough(RNText),

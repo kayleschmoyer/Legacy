@@ -192,6 +192,7 @@ jest.mock('tamagui', () => {
   );
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     Dialog,
     // Forwards ref so app code that restores focus to a trigger button
     // (LS-6049) can be exercised in tests.

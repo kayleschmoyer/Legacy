@@ -61,6 +61,7 @@ jest.mock('../../components/PriceSkeleton', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   styled: <T,>(Component: T) => Component,
   ScrollView: ({ children }: ChildrenProps) => <div>{children}</div>,
   Separator: () => <hr />,

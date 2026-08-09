@@ -16,6 +16,7 @@ const passthrough =
   };
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   Button: ({ children, onPress, disabled }: AnyProps) => (
     <button
       onClick={onPress as React.MouseEventHandler}

@@ -180,6 +180,7 @@ jest.mock('tamagui', () => {
   });
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button,
     Dialog,
     H3: PassThrough,

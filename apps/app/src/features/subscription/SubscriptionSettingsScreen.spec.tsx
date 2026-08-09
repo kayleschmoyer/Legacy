@@ -74,6 +74,7 @@ jest.mock('tamagui', () => {
       <View testID={testID}>{children}</View>
     );
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button: ({
       children,
       onPress,

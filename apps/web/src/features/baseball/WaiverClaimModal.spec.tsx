@@ -56,6 +56,7 @@ jest.mock('tamagui', () => {
   );
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     Dialog,
     Button: ({ children, onPress, disabled }: ButtonProps) => (
       <button onClick={onPress} disabled={disabled}>

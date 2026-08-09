@@ -79,7 +79,7 @@ jest.mock('tamagui', () => {
   const Spinner = () => <span />;
   const styled = (_Component: unknown) => Passthrough;
   return new Proxy(
-    { Button, Spinner, styled },
+    { Button, Spinner, styled, createTokens: (tokens: unknown) => tokens },
     {
       get: (target, prop) =>
         (target as Record<string | symbol, unknown>)[prop] ?? Passthrough,

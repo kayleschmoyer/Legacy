@@ -108,6 +108,7 @@ jest.mock('../../constants/colors', () => ({
 
 jest.mock('tamagui', () => {
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button: ({
       children,
       onPress,

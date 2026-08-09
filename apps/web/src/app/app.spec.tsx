@@ -137,6 +137,7 @@ jest.mock('../context/GrowthBookProvider', () => ({
 
 // Mock the styled function to avoid Tamagui issues
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   styled: (component: React.ComponentType<unknown>) => component,
 }));
 

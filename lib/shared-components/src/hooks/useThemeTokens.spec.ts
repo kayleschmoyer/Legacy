@@ -8,6 +8,7 @@ import { useThemeTokens } from './useThemeTokens';
 
 const mockUseThemeName = jest.fn();
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   useThemeName: (): unknown => mockUseThemeName(),
 }));
 

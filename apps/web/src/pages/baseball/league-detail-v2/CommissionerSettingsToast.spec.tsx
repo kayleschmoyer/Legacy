@@ -136,7 +136,13 @@ jest.mock('tamagui', () => {
   const passThrough = ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   );
-  return new Proxy({}, { get: () => passThrough });
+  return new Proxy(
+    { createTokens: (tokens: unknown) => tokens },
+    {
+      get: (target, prop) =>
+        (target as Record<string | symbol, unknown>)[prop] ?? passThrough,
+    },
+  );
 });
 
 /**

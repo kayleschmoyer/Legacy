@@ -25,7 +25,11 @@ import {
   typeScale,
   withAlpha,
 } from '@legacy-sports/design-tokens';
-import { createTamagui, type TamaguiInternalConfig } from 'tamagui';
+import {
+  createTamagui,
+  createTokens,
+  type TamaguiInternalConfig,
+} from 'tamagui';
 
 // Legacy Sports — Heritage-meets-modern brand themes
 // Identity: "Night stadium" dark with vintage sport character
@@ -435,8 +439,30 @@ const animations = createAnimations({
   },
 });
 
+// Layer the brand spacing/radii scale into Tamagui's internal `$`-token
+// scale (LS-9014). Bare `$N` props (padding="$4", borderRadius="$3", etc.)
+// resolve against `tokens.space`/`tokens.radius`, not `foundationTokens`
+// above — merging (rather than replacing) preserves every key the brand
+// scale doesn't define (fractional/negative/11-20/`true` for space; 0,
+// 8-12/`true` for radius) via `@tamagui/config`'s defaults. Values already
+// created as Tamagui `Variable`s (the untouched keys) are reused as-is by
+// `createTokens`/`createVariables`, so only the overridden 1-10/1-7 keys
+// get new CSS variable names.
+const tokens = createTokens({
+  ...config.tokens,
+  space: {
+    ...config.tokens.space,
+    ...spacing,
+  },
+  radius: {
+    ...config.tokens.radius,
+    ...radii,
+  },
+});
+
 const customConfig = {
   ...config,
+  tokens,
   animations,
   fonts: {
     ...config.fonts,
@@ -477,15 +503,13 @@ export const tamaguiConfig: TamaguiInternalConfig = createTamagui(
 // breakpoints are inherited unchanged from `config.media` (mirrors
 // @legacy-sports/design-tokens' `breakpoints`/`mediaQueries`).
 //
-// Space/radii/font-size are intentionally NOT layered into Tamagui's
-// internal `$`-token scale here: `tokens.space`/`tokens.radius`/font
-// `size` are consumed via bare `$N` props at ~2,000+ call sites across
-// apps/web, apps/app, and lib/shared-components, and this repo's Jest
-// mocks for `tamagui` (lib/shared-components/jest-setup-{web,mobile}.js,
-// apps/app/src/__test-utils__/tamagui-mocks.ts, 100+ per-spec mocks) stub
-// only the primitives currently in use — none stub `createTokens`.
-// Silently reflowing every `$N` value app-wide belongs in its own ticket
-// with dedicated visual QA, not folded into this foundations slice.
+// `spacing`/`radii` are ALSO layered into Tamagui's internal `tokens.space`/
+// `tokens.radius` scale above (LS-9014), so bare `$N` props resolve to the
+// same brand pixel values these raw exports carry. Font `size` is left
+// un-layered: `typeScale`'s named steps (xs/sm/md/.../6xl) don't map
+// 1:1 onto Tamagui's numeric `$1`-`$20` font-size scale the way the
+// spacing/radii numeric keys do, so wiring it in would require an
+// additional mapping decision outside this ticket's scope.
 export const foundationTokens = {
   spacing,
   radii,

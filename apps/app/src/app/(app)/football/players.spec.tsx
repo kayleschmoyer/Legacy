@@ -209,6 +209,7 @@ jest.mock('tamagui', () => {
   // Must be prefixed with 'mock' so jest-hoist permits this closure variable.
   let mockSelectOnChange: ((val: string) => void) | null = null;
   return {
+    createTokens: (tokens: unknown) => tokens,
     ...mocks.tamaguiMocks,
     XStack: ({
       children,

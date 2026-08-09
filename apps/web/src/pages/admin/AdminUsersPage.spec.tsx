@@ -53,6 +53,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   Card: ({ children }: ChildrenProps) => <div>{children}</div>,
   Dialog: Object.assign(
     ({ children, open }: { children?: React.ReactNode; open?: boolean }) =>

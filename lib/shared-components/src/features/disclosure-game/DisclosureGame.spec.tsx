@@ -65,6 +65,7 @@ jest.mock('tamagui', () => {
     />
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button,
     H1: Text,
     Input,

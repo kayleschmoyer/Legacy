@@ -152,6 +152,7 @@ jest.mock('tamagui', () => {
         children,
       );
   return {
+    createTokens: (tokens: unknown) => tokens,
     YStack: passthrough(View),
     Text: passthrough(Text),
     ScrollView: passthrough(View),

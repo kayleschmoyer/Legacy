@@ -86,6 +86,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   H1: ({ children }: any) => <h1>{children}</h1>,
   H2: ({ children }: any) => <h2>{children}</h2>,
   Input: ({ value, onChangeText, placeholder, disabled, id }: any) => (

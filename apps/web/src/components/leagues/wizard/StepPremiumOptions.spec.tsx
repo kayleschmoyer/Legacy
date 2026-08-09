@@ -4,6 +4,7 @@ import { StepPremiumOptions } from './StepPremiumOptions';
 import type { PremiumOptions } from './StepPremiumOptions';
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   Text: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),

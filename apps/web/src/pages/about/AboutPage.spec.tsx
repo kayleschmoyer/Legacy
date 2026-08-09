@@ -50,6 +50,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   styled:
     (Base: React.ComponentType<React.HTMLAttributes<HTMLElement>>) =>
     ({ children, ...rest }: React.HTMLAttributes<HTMLElement>) => (

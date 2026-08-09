@@ -45,6 +45,7 @@ jest.mock('../../hooks/useIsPremium', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   ScrollView: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),

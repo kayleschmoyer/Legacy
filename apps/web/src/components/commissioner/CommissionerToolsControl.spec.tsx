@@ -84,7 +84,7 @@ jest.mock('tamagui', () => {
   );
   const Spinner = () => <span data-testid="spinner" />;
   return new Proxy(
-    { Input, Button, Spinner },
+    { Input, Button, Spinner, createTokens: (tokens: unknown) => tokens },
     {
       get: (target, prop) =>
         (target as Record<string | symbol, unknown>)[prop] ?? Passthrough,

@@ -28,6 +28,7 @@ type Children = { children?: React.ReactNode; [key: string]: unknown };
 jest.mock('tamagui', () => {
   const PassThrough = ({ children }: Children) => <div>{children}</div>;
   return {
+    createTokens: (tokens: unknown) => tokens,
     Card: PassThrough,
     YStack: PassThrough,
     XStack: PassThrough,

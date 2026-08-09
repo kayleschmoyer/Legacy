@@ -119,6 +119,7 @@ jest.mock('tamagui', () => {
     (rest.accessible as boolean | undefined) ??
     (rest.role != null || rest.accessibilityRole != null ? true : undefined);
   return {
+    createTokens: (tokens: unknown) => tokens,
     Text: ({ children, ...rest }: PassthroughProps) => (
       <Text {...rest} accessible={withAccessibleDefault(rest)}>
         {children}

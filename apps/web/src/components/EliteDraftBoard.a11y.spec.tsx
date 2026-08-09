@@ -67,6 +67,7 @@ jest.mock('tamagui', () => {
   });
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     YStack: passthrough('div'),
     XStack: passthrough('div'),
     Text: passthrough('span'),

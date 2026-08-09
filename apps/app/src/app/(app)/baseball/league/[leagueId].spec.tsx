@@ -118,6 +118,7 @@ jest.mock('@tamagui/tabs', () => {
   Object.assign(TabsRoot, { Tab, Content, List });
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     Tabs: TabsRoot,
     Text: ({
       children,

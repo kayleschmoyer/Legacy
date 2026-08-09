@@ -18,6 +18,7 @@ jest.mock('tamagui', () => {
     ({ children }: { children?: React.ReactNode; [key: string]: unknown }) =>
       ReactActual.createElement(Host, null, children);
   return {
+    createTokens: (tokens: unknown) => tokens,
     Card: passthrough(View),
     YStack: passthrough(View),
     XStack: passthrough(View),

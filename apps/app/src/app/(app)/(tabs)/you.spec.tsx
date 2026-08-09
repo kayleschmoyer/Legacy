@@ -79,6 +79,7 @@ jest.mock('tamagui', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     Paragraph: ({
       children,
       testID,

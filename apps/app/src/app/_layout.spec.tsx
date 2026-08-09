@@ -66,6 +66,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   TamaguiProvider: ({ children }: { children: React.ReactNode }) => children,
   Theme: ({ children }: { children: React.ReactNode }) => children,
 }));

@@ -82,6 +82,7 @@ jest.mock('tamagui', () => {
   const { View, Text, TextInput, Pressable } =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button: ({
       children,
       onPress,

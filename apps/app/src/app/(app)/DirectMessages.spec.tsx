@@ -89,6 +89,7 @@ jest.mock('tamagui', () => {
     'react-native',
   ) as RNComponents;
   return {
+    createTokens: (tokens: unknown) => tokens,
     Card: ({ children }: { children?: React.ReactNode }) => (
       <View>{children}</View>
     ),

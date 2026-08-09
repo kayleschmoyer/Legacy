@@ -24,6 +24,7 @@ jest.mock('tamagui', () => {
     [k: string]: unknown;
   }) => React.createElement('button', { ...rest, onClick: onPress }, children);
   return {
+    createTokens: (tokens: unknown) => tokens,
     Card: makeDiv('div'),
     YStack: makeDiv('div'),
     XStack: makeDiv('div'),

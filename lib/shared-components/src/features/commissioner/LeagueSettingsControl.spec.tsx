@@ -55,6 +55,7 @@ jest.mock('tamagui', () => {
     />
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button,
     Card: PassThrough,
     H4: PassThrough,

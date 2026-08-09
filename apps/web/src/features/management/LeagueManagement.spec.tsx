@@ -27,6 +27,7 @@ jest.mock('@legacy-sports/graphql', () => ({
 
 // ── Tamagui YStack -> div passthrough ─────────────────────────────────────────
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   YStack: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
 }));
 

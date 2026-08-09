@@ -114,6 +114,7 @@ jest.mock('tamagui', () => {
     }>;
   };
   return {
+    createTokens: (tokens: unknown) => tokens,
     AnimatePresence: ({ children }: { children: React.ReactNode }) => (
       <View>{children}</View>
     ),

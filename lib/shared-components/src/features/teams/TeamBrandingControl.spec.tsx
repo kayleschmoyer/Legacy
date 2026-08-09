@@ -91,6 +91,7 @@ jest.mock('tamagui', () => {
   const Separator = () => <hr />;
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button,
     Card: PassThrough,
     H4: PassThrough,

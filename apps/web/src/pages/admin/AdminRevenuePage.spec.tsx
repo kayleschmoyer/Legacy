@@ -66,6 +66,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   styled: <T,>(Component: T) => Component,
   Card: ({ children }: ChildrenProps) => <div>{children}</div>,
   Spinner: () => <span data-testid="spinner" />,

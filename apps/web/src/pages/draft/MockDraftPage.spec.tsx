@@ -122,6 +122,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   Text: ({ children }: MockProps) => <span>{children}</span>,
 }));
 

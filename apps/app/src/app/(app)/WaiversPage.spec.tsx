@@ -26,6 +26,7 @@ jest.mock('@legacy-sports/shared-components', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
+    createTokens: (tokens: unknown) => tokens,
     PendingWaiverClaims: () => <View testID="pending-waiver-claims" />,
   };
 });

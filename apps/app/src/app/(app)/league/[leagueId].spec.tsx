@@ -66,6 +66,7 @@ jest.mock('tamagui', () => {
   const RN = require('react-native') as RNComponents;
   const { View, Text: RNText, ActivityIndicator } = RN;
   return {
+    createTokens: (tokens: unknown) => tokens,
     Card: ({
       children,
       testID,

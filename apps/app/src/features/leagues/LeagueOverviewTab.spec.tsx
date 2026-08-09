@@ -41,6 +41,7 @@ jest.mock('tamagui', () => {
     'react-native',
   ) as RNComponents;
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button: ({
       children,
       onPress,

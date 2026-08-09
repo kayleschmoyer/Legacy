@@ -104,6 +104,7 @@ jest.mock('tamagui', () => {
     <div {...rest}>{children}</div>
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     H4: ({ children }: Children) => <h4>{children}</h4>,
     styled: (_Comp: any, _config?: any) => Pass,
     Text: ({

@@ -8,6 +8,7 @@ jest.mock('tamagui', () => {
     <div>{children}</div>
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     Select: Object.assign(
       ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
       {

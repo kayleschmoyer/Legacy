@@ -73,6 +73,7 @@ jest.mock('tamagui', () => {
     />
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     Theme: PassThrough,
     Card: View,
     YStack: View,

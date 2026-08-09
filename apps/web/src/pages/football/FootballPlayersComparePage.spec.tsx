@@ -61,6 +61,7 @@ jest.mock('tamagui', () => {
     onPress?: () => void;
   }) => <div onClick={onPress}>{children}</div>;
   return {
+    createTokens: (tokens: unknown) => tokens,
     Text: Box,
     XStack: Box,
     YStack: Box,

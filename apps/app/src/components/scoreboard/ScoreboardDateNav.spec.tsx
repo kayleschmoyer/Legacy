@@ -40,6 +40,7 @@ jest.mock('tamagui', () => {
     return createElement(View, { testID }, children);
   }
   return {
+    createTokens: (tokens: unknown) => tokens,
     Text: ({
       children,
       ...rest

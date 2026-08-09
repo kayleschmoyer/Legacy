@@ -19,6 +19,7 @@ jest.mock('tamagui', () => ({
   createTamagui: jest.fn(
     (config: unknown) => config as Record<string, unknown>,
   ),
+  createTokens: jest.fn((tokens: unknown) => tokens as Record<string, unknown>),
 }));
 
 import { foundationTokens, tamaguiConfig } from './tamagui-config';

@@ -29,6 +29,7 @@ jest.mock('tamagui', () => {
     </div>
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     YStack: Pass,
     XStack: Pass,
     Paragraph: ({ children, ...rest }: Props) => (

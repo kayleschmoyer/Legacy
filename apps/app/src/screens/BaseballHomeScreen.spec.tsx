@@ -69,6 +69,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
   const { View, Text, Pressable } =
     jest.requireActual<RNComponents>('react-native');
   return {
+    createTokens: (tokens: unknown) => tokens,
     MLBHome: (props: {
       leagues: { name?: string | null }[];
       loading?: boolean;

@@ -45,6 +45,7 @@ jest.mock('tamagui', () => {
     <span data-testid={testID}>{children}</span>
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     ScrollView: Box,
     YStack: Box,
     XStack: Box,

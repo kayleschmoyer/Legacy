@@ -11,6 +11,7 @@ jest.mock('tamagui', () => {
     jest.requireActual<typeof import('react-native')>('react-native');
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
+    createTokens: (tokens: unknown) => tokens,
     // Forward testID + flex so tests can assert the screen gate fills the
     // viewport (LS-8636) — without flex: 1 the overlay collapses to zero
     // height for flex-sized screens and free users see a blank screen.

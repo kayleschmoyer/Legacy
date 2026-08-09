@@ -47,6 +47,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     jest.requireActual<typeof import('react-native')>('react-native');
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   return {
+    createTokens: (tokens: unknown) => tokens,
     PLAYER_COMPARISON_FEATURE_DESCRIPTION: 'feature description',
     PlayerComparison: ({
       isPremium,

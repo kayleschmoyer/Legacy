@@ -26,6 +26,7 @@ let mockActivity: unknown[] = [];
 /* ── Module mocks ─────────────────────────────────────────────────────────── */
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   Card: ({ children }: WithChildren) => <div>{children}</div>,
   Button: ({ children, onPress, disabled }: ButtonProps) => (
     <button onClick={onPress} disabled={disabled}>

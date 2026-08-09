@@ -274,6 +274,7 @@ jest.mock('tamagui', () => {
       ),
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     Card: passthrough,
     H1: ({ children }: any) => ReactLocal.createElement('h1', null, children),
     H2: ({ children }: any) => ReactLocal.createElement('h2', null, children),

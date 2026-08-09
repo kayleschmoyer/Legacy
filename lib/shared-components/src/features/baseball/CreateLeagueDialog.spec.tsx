@@ -74,6 +74,7 @@ jest.mock('tamagui', () => {
     Close: PassThrough,
   });
   return {
+    createTokens: (tokens: unknown) => tokens,
     Button,
     Dialog,
     H2: ({ children }: Children) => <h2>{children}</h2>,

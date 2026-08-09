@@ -36,6 +36,9 @@ function styled<T>(Component: T): T {
 }
 
 export const tamaguiMocks = {
+  // Safe passthrough stub for LS-9014's tamagui-config.ts createTokens()
+  // override — specs mocking 'tamagui' don't need real token merging.
+  createTokens: (tokens: unknown) => tokens,
   styled,
   Button: ({
     children,

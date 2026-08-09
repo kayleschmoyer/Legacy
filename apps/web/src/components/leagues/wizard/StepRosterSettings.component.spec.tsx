@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { DST_ROSTER_DEFAULTS, StepRosterSettings } from './StepRosterSettings';
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   Text: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),

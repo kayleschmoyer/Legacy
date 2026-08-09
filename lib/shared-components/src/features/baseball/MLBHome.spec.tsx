@@ -76,6 +76,7 @@ jest.mock('tamagui', () => {
     />
   );
   return {
+    createTokens: (tokens: unknown) => tokens,
     ScrollView: Box,
     YStack: Box,
     XStack: Box,

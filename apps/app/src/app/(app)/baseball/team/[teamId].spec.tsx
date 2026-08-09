@@ -153,6 +153,7 @@ jest.mock('tamagui', () => {
   );
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     ...mocks.tamaguiMocks,
     Label: ({ children }: { children: React.ReactNode }) => (
       <Text>{children}</Text>

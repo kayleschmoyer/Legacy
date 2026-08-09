@@ -80,6 +80,7 @@ jest.mock('@tamagui/tabs', () => {
   Object.assign(TabsRoot, { Tab, Content, List });
 
   return {
+    createTokens: (tokens: unknown) => tokens,
     Tabs: TabsRoot,
     // re-export Text so Tabs.Content children that use it don't break
     Text: ({

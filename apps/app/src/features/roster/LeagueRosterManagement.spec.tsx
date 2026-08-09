@@ -19,6 +19,7 @@ jest.mock('tamagui', () => {
   const { View, Text: RNText } =
     jest.requireActual<RNComponents>('react-native');
   return {
+    createTokens: (tokens: unknown) => tokens,
     ScrollView: ({ children }: { children: React.ReactNode }) => (
       <View>{children}</View>
     ),

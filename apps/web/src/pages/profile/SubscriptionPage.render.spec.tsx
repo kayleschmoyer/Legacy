@@ -55,6 +55,7 @@ jest.mock('../../components/PriceSkeleton', () => ({
 }));
 
 jest.mock('tamagui', () => ({
+  createTokens: (tokens: unknown) => tokens,
   styled: <T,>(Component: T) => Component,
   Button: ({ children, onPress }: ChildrenProps & { onPress?: () => void }) => (
     <button type="button" onClick={onPress}>

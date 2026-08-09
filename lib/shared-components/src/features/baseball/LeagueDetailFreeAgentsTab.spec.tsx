@@ -69,7 +69,14 @@ jest.mock('tamagui', () => {
       onChange={(e) => onChangeText?.(e.target.value)}
     />
   );
-  return { ScrollView: Box, YStack: Box, XStack: Box, Text: Txt, Input };
+  return {
+    createTokens: (tokens: unknown) => tokens,
+    ScrollView: Box,
+    YStack: Box,
+    XStack: Box,
+    Text: Txt,
+    Input,
+  };
 });
 
 const league: FreeAgentsTabLeague = {
