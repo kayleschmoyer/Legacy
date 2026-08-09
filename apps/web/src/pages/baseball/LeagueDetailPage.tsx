@@ -72,6 +72,7 @@ import {
   LeagueFragment,
   LeaguePositionFragment,
   MatchupPlayerFragment,
+  Sport,
   TeamMemberFragment,
   useGetLeagueByIdQuery,
   useGetLeagueTeamsLazyQuery,
@@ -133,6 +134,7 @@ import { LeagueBrandingControl } from '../../components/commissioner/LeagueBrand
 import { AchievementRestrictionsControl } from '../../components/commissioner/AchievementRestrictionsControl';
 import { TiebreakerConfig } from '../../components/league/TiebreakerConfig';
 import { LeagueDuesControl } from '../../components/commissioner/LeagueDuesControl';
+import { ExportLeagueSettingsControl } from '../../components/commissioner/ExportLeagueSettingsControl';
 import { LeagueDuesStatusDashboard } from '../../components/commissioner/LeagueDuesStatusDashboard';
 import {
   SeasonRenewalControl,
@@ -3536,6 +3538,47 @@ export function LeagueDetailPage(): React.JSX.Element {
             onError={(err) => {
               setMatchupErrorMessage(err.message);
             }}
+          />
+        ),
+      },
+      {
+        id: 'export-settings',
+        title: 'Export Settings',
+        content: (
+          <ExportLeagueSettingsControl
+            leagueId={leagueId}
+            sport={
+              data?.league?.sport === Sport.Football ? 'football' : 'baseball'
+            }
+            leagueName={data?.league?.name ?? league.name ?? 'League'}
+            playerPool={data?.league?.playerPool}
+            maxRosterSize={data?.league?.maxRosterSize}
+            waiverType={data?.league?.waiverType}
+            faabBudgetDefault={data?.league?.faabBudgetDefault}
+            isPublic={data?.league?.isPublic}
+            gamesPerMatchup={data?.league?.gamesPerMatchup}
+            eraFilter={data?.league?.eraFilter}
+            baseballHofOnly={data?.league?.baseballHofOnly}
+            customEraStartYear={data?.league?.customEraStartYear}
+            customEraEndYear={data?.league?.customEraEndYear}
+            salaryCapEnabled={data?.league?.salaryCapEnabled}
+            salaryCap={data?.league?.salaryCap}
+            salaryFloor={data?.league?.salaryFloor}
+            luxuryTaxThreshold={data?.league?.luxuryTaxThreshold}
+            minSalary={data?.league?.minSalary}
+            salaryEscalationPct={data?.league?.salaryEscalationPct}
+            salaryDecayPct={data?.league?.salaryDecayPct}
+            auctionBudget={data?.league?.auctionBudget}
+            auctionMinBid={data?.league?.auctionMinBid}
+            allowDraftSlotTrading={data?.league?.allowDraftSlotTrading}
+            rosterContinuity={data?.league?.rosterContinuity}
+            keeperCount={data?.league?.keeperSettings?.keeperCount}
+            keeperCostModel={data?.league?.keeperSettings?.costModel}
+            maxConsecutiveKeeps={
+              data?.league?.keeperSettings?.maxConsecutiveKeeps
+            }
+            rookieExempt={data?.league?.keeperSettings?.rookieExempt}
+            defensiveFormat={data?.league?.defensiveFormat}
           />
         ),
       },

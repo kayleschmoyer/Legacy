@@ -15,6 +15,7 @@ import {
   ScrollView,
   styled,
   Text,
+  TextArea,
   XStack,
   YStack,
 } from 'tamagui';
@@ -24,6 +25,7 @@ import {
   ChevronRight,
   Copy,
   Lock,
+  Upload,
   Zap,
 } from '@tamagui/lucide-icons';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
@@ -67,6 +69,10 @@ import {
   useGetUserLeaguesQuery,
   usePreviewEligiblePlayerCountQuery,
 } from '@legacy-sports/graphql';
+import {
+  LeagueSettingsExportEnvelope,
+  parseLeagueSettingsExport,
+} from '../../utils/leagueSettingsExport';
 import {
   formatDateAsUTC,
   formatDraftDate,
@@ -362,6 +368,234 @@ function applySportSwitch(
     defensiveFormat: 'dst',
     rosterSlots: freshRosterSlots,
   };
+}
+
+// ── Import settings (LS-9146) ───────────────────────────────────────────────
+// Merges a parsed export envelope into the current form, validating every
+// value against the same option sets/ranges the form controls themselves
+// use (mirrors the ?teams=/?eraFilter= deep-link allowlisting above) so a
+// hand-edited or stale export file can't push an out-of-range or
+// unrecognized value into form state. Fields that don't apply to the
+// league's *current* sport (e.g. defensiveFormat for a baseball league, or
+// maxRosterSize for football, which is derived from rosterSlots rather than
+// set directly) are skipped rather than coerced.
+
+export function applyImportedSettings(
+  prev: CreateLeagueFormData,
+  envelope: LeagueSettingsExportEnvelope,
+): {
+  next: CreateLeagueFormData;
+  appliedCount: number;
+  skippedFields: string[];
+} {
+  const s = envelope.settings;
+  const sport = prev.sport;
+  const sameSport = envelope.sport === sport;
+  const next = { ...prev };
+  let appliedCount = 0;
+  const skippedFields: string[] = [];
+
+  function apply<K extends keyof CreateLeagueFormData>(
+    field: K,
+    value: CreateLeagueFormData[K] | undefined,
+    isValid: boolean,
+  ): void {
+    if (value === undefined) return;
+    if (!isValid) {
+      skippedFields.push(field);
+      return;
+    }
+    next[field] = value;
+    appliedCount++;
+  }
+
+  apply(
+    'playerPool',
+    s.playerPool,
+    typeof s.playerPool === 'string' &&
+      PLAYER_POOL_OPTIONS_BY_SPORT[sport].some((p) => p.value === s.playerPool),
+  );
+
+  if (
+    sameSport &&
+    sport === 'baseball' &&
+    typeof s.maxRosterSize === 'number'
+  ) {
+    const range = ROSTER_RANGE_BY_SPORT[sport];
+    apply(
+      'maxRosterSize',
+      s.maxRosterSize,
+      s.maxRosterSize >= range.min && s.maxRosterSize <= range.max,
+    );
+  }
+
+  if (typeof s.numberOfTeams === 'number') {
+    apply(
+      'numberOfTeams',
+      s.numberOfTeams,
+      (TEAM_COUNT_OPTIONS as readonly number[]).includes(s.numberOfTeams),
+    );
+  }
+
+  apply(
+    'waiverType',
+    s.waiverType as CreateLeagueFormData['waiverType'],
+    s.waiverType === 'standard' || s.waiverType === 'faab',
+  );
+
+  if (typeof s.faabBudgetDefault === 'number') {
+    apply(
+      'faabBudgetDefault',
+      s.faabBudgetDefault,
+      s.faabBudgetDefault >= FAAB_BUDGET_MIN &&
+        s.faabBudgetDefault <= FAAB_BUDGET_MAX,
+    );
+  }
+
+  if (typeof s.isPublic === 'boolean') apply('isPublic', s.isPublic, true);
+
+  if (typeof s.gamesPerMatchup === 'number') {
+    const range = GAMES_PER_MATCHUP_BY_SPORT[sport];
+    apply(
+      'gamesPerMatchup',
+      s.gamesPerMatchup,
+      s.gamesPerMatchup >= range.min && s.gamesPerMatchup <= range.max,
+    );
+  }
+
+  if (typeof s.baseballEraFilter === 'string') {
+    apply(
+      'baseballEraFilter',
+      s.baseballEraFilter,
+      s.baseballEraFilter === 'custom' ||
+        ERAS_BY_SPORT[sport].some((e) => e.id === s.baseballEraFilter),
+    );
+  }
+
+  if (typeof s.baseballHofOnly === 'boolean') {
+    apply('baseballHofOnly', s.baseballHofOnly, true);
+  }
+
+  if (typeof s.customEraStartYear === 'number') {
+    apply(
+      'customEraStartYear',
+      s.customEraStartYear,
+      isFourDigitYear(s.customEraStartYear),
+    );
+  }
+  if (typeof s.customEraEndYear === 'number') {
+    apply(
+      'customEraEndYear',
+      s.customEraEndYear,
+      isFourDigitYear(s.customEraEndYear),
+    );
+  }
+
+  if (typeof s.salaryCapEnabled === 'boolean') {
+    apply('salaryCapEnabled', s.salaryCapEnabled, true);
+  }
+  if (typeof s.salaryCap === 'number') {
+    apply(
+      'salaryCap',
+      s.salaryCap,
+      s.salaryCap >= MIN_SALARY_CAP && s.salaryCap <= MAX_SALARY_CAP,
+    );
+  }
+  if (typeof s.salaryFloor === 'number') {
+    apply('salaryFloor', s.salaryFloor, s.salaryFloor >= 0);
+  }
+  if (typeof s.luxuryTaxThreshold === 'number') {
+    apply(
+      'luxuryTaxThreshold',
+      s.luxuryTaxThreshold,
+      s.luxuryTaxThreshold >= 0,
+    );
+  }
+  if (typeof s.minSalary === 'number') {
+    apply('minSalary', s.minSalary, s.minSalary >= 1);
+  }
+  if (typeof s.salaryEscalationPct === 'number') {
+    apply(
+      'salaryEscalationPct',
+      s.salaryEscalationPct,
+      s.salaryEscalationPct >= 0 && s.salaryEscalationPct <= 100,
+    );
+  }
+  if (typeof s.salaryDecayPct === 'number') {
+    apply(
+      'salaryDecayPct',
+      s.salaryDecayPct,
+      s.salaryDecayPct >= 0 && s.salaryDecayPct <= 100,
+    );
+  }
+
+  if (typeof s.auctionBudget === 'number') {
+    apply(
+      'auctionBudget',
+      s.auctionBudget,
+      s.auctionBudget >= AUCTION_BUDGET_RANGE.min &&
+        s.auctionBudget <= AUCTION_BUDGET_RANGE.max,
+    );
+  }
+  if (typeof s.auctionMinBid === 'number') {
+    apply(
+      'auctionMinBid',
+      s.auctionMinBid,
+      s.auctionMinBid >= AUCTION_MIN_BID_RANGE.min &&
+        s.auctionMinBid <= AUCTION_MIN_BID_RANGE.max,
+    );
+  }
+
+  if (typeof s.allowDraftSlotTrading === 'boolean') {
+    apply('allowDraftSlotTrading', s.allowDraftSlotTrading, true);
+  }
+
+  if (typeof s.rosterContinuity === 'string') {
+    apply(
+      'rosterContinuity',
+      s.rosterContinuity as CreateLeagueFormData['rosterContinuity'],
+      s.rosterContinuity === 'redraft' || s.rosterContinuity === 'keeper',
+    );
+  }
+  if (typeof s.keeperCount === 'number') {
+    apply(
+      'keeperCount',
+      s.keeperCount,
+      s.keeperCount >= KEEPER_COUNT_MIN && s.keeperCount <= KEEPER_COUNT_MAX,
+    );
+  }
+  if (typeof s.keeperCostModel === 'string') {
+    apply(
+      'keeperCostModel',
+      s.keeperCostModel as KeeperCostModel,
+      s.keeperCostModel === 'round-penalty' ||
+        s.keeperCostModel === 'auction-budget',
+    );
+  }
+  if (typeof s.maxConsecutiveKeeps === 'number') {
+    apply(
+      'maxConsecutiveKeeps',
+      s.maxConsecutiveKeeps,
+      s.maxConsecutiveKeeps >= 1,
+    );
+  }
+  if (typeof s.rookieExempt === 'boolean') {
+    apply('rookieExempt', s.rookieExempt, true);
+  }
+
+  if (
+    sameSport &&
+    sport === 'football' &&
+    typeof s.defensiveFormat === 'string'
+  ) {
+    apply(
+      'defensiveFormat',
+      s.defensiveFormat as CreateLeagueFormData['defensiveFormat'],
+      s.defensiveFormat === 'dst' || s.defensiveFormat === 'idp',
+    );
+  }
+
+  return { next, appliedCount, skippedFields };
 }
 
 // ── Roster-slot helpers (LS-6147) ───────────────────────────────────────────
@@ -1571,6 +1805,36 @@ export function LeagueCreatePage(): React.JSX.Element {
   // semantics — not re-synced on the sport-switch effect below.
   const initialFormDataRef = useRef(formData);
 
+  // Import settings dialog (LS-9146) — lets a commissioner paste or upload a
+  // JSON file exported from an existing league to prefill this form.
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importFeedback, setImportFeedback] = useState<{
+    type: 'error' | 'success';
+    message: string;
+  } | null>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportFileChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImportText(typeof reader.result === 'string' ? reader.result : '');
+      };
+      reader.onerror = () => {
+        setImportFeedback({
+          type: 'error',
+          message: 'Could not read that file.',
+        });
+      };
+      reader.readAsText(file);
+    },
+    [],
+  );
+
   // In-flight submit guard (LS-6063). `loading` from useCreateLeagueAndTeamsMutation
   // only flips to true on the *next* render, so a rapid double-click (or two
   // events firing within the same tick) can call handleSubmit twice before
@@ -2252,6 +2516,42 @@ export function LeagueCreatePage(): React.JSX.Element {
     );
   }, [createdLeague]);
 
+  const handleApplyImport = useCallback(() => {
+    const result = parseLeagueSettingsExport(importText);
+    if (!result.ok) {
+      setImportFeedback({ type: 'error', message: result.error });
+      return;
+    }
+
+    const { next, appliedCount, skippedFields } = applyImportedSettings(
+      formData,
+      result.envelope,
+    );
+    if (appliedCount === 0) {
+      setImportFeedback({
+        type: 'error',
+        message: 'No recognizable settings found in that file.',
+      });
+      return;
+    }
+
+    setFormData(next);
+    setHasUnsavedChanges(true);
+    revealValidationErrors(validateFormFull(next));
+
+    const sportNote =
+      result.envelope.sport !== formData.sport
+        ? ` ${result.envelope.sport}-only settings were skipped since this is a ${formData.sport} league.`
+        : '';
+    const skippedNote = skippedFields.length
+      ? ` ${skippedFields.length} value(s) were unrecognized and ignored.`
+      : '';
+    setImportFeedback({
+      type: 'success',
+      message: `Applied ${appliedCount} setting${appliedCount === 1 ? '' : 's'}.${sportNote}${skippedNote}`,
+    });
+  }, [importText, formData, revealValidationErrors]);
+
   const isFormDisabled = loading;
 
   const isFormDirty =
@@ -2367,6 +2667,19 @@ export function LeagueCreatePage(): React.JSX.Element {
               />
             </XStack>
             <XStack gap="$2">
+              <Button
+                size="$2"
+                variant="outlined"
+                icon={<Upload size={14} />}
+                onPress={() => {
+                  setImportFeedback(null);
+                  setShowImportDialog(true);
+                }}
+                disabled={isFormDisabled}
+                data-testid="import-league-settings-button"
+              >
+                Import settings
+              </Button>
               <Button
                 size="$2"
                 variant="outlined"
@@ -3990,6 +4303,62 @@ export function LeagueCreatePage(): React.JSX.Element {
           </YStack>
         </XStack>
       </YStack>
+
+      <Dialog
+        open={showImportDialog}
+        onOpenChange={(open) => {
+          setShowImportDialog(open);
+          if (!open) {
+            setImportText('');
+            setImportFeedback(null);
+          }
+        }}
+        title="Import League Settings"
+        description="Paste the JSON exported from an existing league, or upload the file, to prefill this form. One-time draft-setup fields (draft mode, order, and scheduling strategy) aren't included in exports and must still be set manually."
+        confirmLabel="Apply Settings"
+        cancelLabel="Close"
+        onConfirm={handleApplyImport}
+        onCancel={() => setShowImportDialog(false)}
+      >
+        <YStack gap="$3">
+          <input
+            ref={importFileInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: 'none' }}
+            onChange={handleImportFileChange}
+          />
+          <Button
+            size="$2"
+            variant="outlined"
+            alignSelf="flex-start"
+            onPress={() => importFileInputRef.current?.click()}
+          >
+            Upload JSON file
+          </Button>
+          <TextArea
+            value={importText}
+            onChangeText={(text: string) => {
+              setImportText(text);
+              setImportFeedback(null);
+            }}
+            placeholder="Or paste exported settings JSON here"
+            minHeight={140}
+            data-testid="import-settings-textarea"
+          />
+          {importFeedback ? (
+            <Text
+              fontSize="$2"
+              color={
+                importFeedback.type === 'error' ? '$red11' : '$brandGoldLight'
+              }
+              data-testid="import-settings-feedback"
+            >
+              {importFeedback.message}
+            </Text>
+          ) : null}
+        </YStack>
+      </Dialog>
 
       <Dialog
         open={showDiscardConfirm}

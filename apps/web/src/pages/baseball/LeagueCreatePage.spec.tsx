@@ -31,10 +31,13 @@ import {
 } from 'react-router-dom';
 import type { CreateLeagueFormData } from './LeagueCreatePage';
 import {
+  applyImportedSettings,
   isPoolTooSmall,
   validateFormFull,
   VALIDATION_ERROR_SECTION,
 } from './LeagueCreatePage';
+import type { LeagueSettingsExportEnvelope } from '../../utils/leagueSettingsExport';
+import { parseLeagueSettingsExport } from '../../utils/leagueSettingsExport';
 import { trackPremiumFeatureClick } from '../../utils/analytics';
 import { MAX_LEAGUE_NAME_LENGTH } from '../../constants/league';
 
@@ -2875,6 +2878,165 @@ describe('validateFormFull — salaryCap validation (LS-6115)', () => {
       salaryCap: 0,
     });
     expect(errs.salaryCap).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Export/import league settings (LS-9146)
+// ---------------------------------------------------------------------------
+
+describe('parseLeagueSettingsExport', () => {
+  it('rejects malformed JSON', () => {
+    const result = parseLeagueSettingsExport('{not valid json');
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects JSON missing a recognized sport', () => {
+    const result = parseLeagueSettingsExport(JSON.stringify({ settings: {} }));
+    expect(result.ok).toBe(false);
+  });
+
+  it('rejects JSON missing settings', () => {
+    const result = parseLeagueSettingsExport(
+      JSON.stringify({ sport: 'baseball' }),
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it('accepts a well-formed export envelope', () => {
+    const result = parseLeagueSettingsExport(
+      JSON.stringify({
+        version: 1,
+        exportedAt: '2026-01-01T00:00:00.000Z',
+        sourceLeagueName: 'The Sluggers',
+        sport: 'baseball',
+        settings: { waiverType: 'faab', faabBudgetDefault: 150 },
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.sport).toBe('baseball');
+      expect(result.envelope.settings).toEqual({
+        waiverType: 'faab',
+        faabBudgetDefault: 150,
+      });
+    }
+  });
+});
+
+describe('applyImportedSettings', () => {
+  const baseFormData: CreateLeagueFormData = {
+    sport: 'baseball',
+    leagueName: 'Test League',
+    numberOfTeams: 8,
+    numberOfDivisions: 2,
+    schedulingStrategy: 'divisional',
+    playerPool: 'all',
+    draftMode: 'live',
+    selectionMethod: 'standard',
+    draftOrder: 'snake',
+    maxRosterSize: 26,
+    waiverType: 'standard',
+    faabBudgetDefault: 100,
+    isPublic: false,
+    gamesPerMatchup: 5,
+    baseballEraFilter: 'all',
+    baseballHofOnly: false,
+    salaryCapEnabled: false,
+    auctionBudget: 200,
+    auctionMinBid: 1,
+    pickTimeLimitSeconds: 120,
+    scoringFormat: 'ppr',
+    defensiveFormat: 'dst',
+  };
+
+  function envelope(
+    overrides: Partial<LeagueSettingsExportEnvelope>,
+  ): LeagueSettingsExportEnvelope {
+    return {
+      version: 1,
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      sourceLeagueName: 'Source League',
+      sport: 'baseball',
+      settings: {},
+      ...overrides,
+    };
+  }
+
+  it('applies valid settings onto the form', () => {
+    const { next, appliedCount, skippedFields } = applyImportedSettings(
+      baseFormData,
+      envelope({
+        settings: {
+          waiverType: 'faab',
+          faabBudgetDefault: 250,
+          isPublic: true,
+        },
+      }),
+    );
+    expect(next.waiverType).toBe('faab');
+    expect(next.faabBudgetDefault).toBe(250);
+    expect(next.isPublic).toBe(true);
+    expect(appliedCount).toBe(3);
+    expect(skippedFields).toEqual([]);
+  });
+
+  it('skips out-of-range values and reports them, leaving the form unchanged', () => {
+    const { next, appliedCount, skippedFields } = applyImportedSettings(
+      baseFormData,
+      envelope({
+        settings: {
+          faabBudgetDefault: -50,
+          keeperCount: 0,
+        },
+      }),
+    );
+    expect(next.faabBudgetDefault).toBe(baseFormData.faabBudgetDefault);
+    expect(appliedCount).toBe(0);
+    expect(skippedFields).toEqual(
+      expect.arrayContaining(['faabBudgetDefault', 'keeperCount']),
+    );
+  });
+
+  it('skips an unrecognized enum-like value (e.g. a stale waiverType)', () => {
+    const { next, skippedFields } = applyImportedSettings(
+      baseFormData,
+      envelope({ settings: { waiverType: 'auction-blind' } }),
+    );
+    expect(next.waiverType).toBe(baseFormData.waiverType);
+    expect(skippedFields).toContain('waiverType');
+  });
+
+  it('skips sport-specific fields when importing across sports (football -> baseball)', () => {
+    const { next, skippedFields, appliedCount } = applyImportedSettings(
+      baseFormData,
+      envelope({
+        sport: 'football',
+        settings: {
+          defensiveFormat: 'idp',
+          waiverType: 'faab',
+        },
+      }),
+    );
+    // defensiveFormat only applies when importing into the same sport.
+    expect(next.defensiveFormat).toBe(baseFormData.defensiveFormat);
+    expect(skippedFields).not.toContain('defensiveFormat');
+    // Sport-agnostic fields still apply.
+    expect(next.waiverType).toBe('faab');
+    expect(appliedCount).toBe(1);
+  });
+
+  it('applies a football-only field when importing into a football league', () => {
+    const footballForm: CreateLeagueFormData = {
+      ...baseFormData,
+      sport: 'football',
+    };
+    const { next, appliedCount } = applyImportedSettings(
+      footballForm,
+      envelope({ sport: 'football', settings: { defensiveFormat: 'idp' } }),
+    );
+    expect(next.defensiveFormat).toBe('idp');
+    expect(appliedCount).toBe(1);
   });
 });
 
