@@ -20,6 +20,7 @@
  * (`.agents/skills/ui/SKILL.md`).
  */
 import React, { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
   SeasonDraftGameStatus,
@@ -39,6 +40,25 @@ import { GameRoomGlyph } from './GameRoomGlyphs';
 import { MinigamesHubBaseballMark } from './MinigamesHubBaseballMark';
 import { useThemeTokens } from '../../hooks/useThemeTokens';
 import { FONT_BODY, FONT_DISPLAY, TABULAR_NUMS } from '../../utils/typography';
+import { BRAND_GOLD, BRAND_NAVY, withAlpha } from '../../utils/colors';
+
+// Layered radial/linear wash matching the hero background in the
+// legacy-baseball-minigames mockup (docs/design/.../styles-hub.css
+// `.hub-hero`). Web-only — React Native has no `backgroundImage` — painted
+// over the `$surfaceCard` backgroundColor set on the hero stack (LS-9131).
+const HERO_BACKGROUND_IMAGE = [
+  `radial-gradient(ellipse at 85% 30%, ${withAlpha(BRAND_GOLD, 0.12)} 0%, transparent 55%)`,
+  `linear-gradient(135deg, ${withAlpha(BRAND_NAVY, 0.45)} 0%, ${withAlpha(BRAND_NAVY, 0.3)} 50%, transparent 100%)`,
+].join(', ');
+// Matches design-tokens' `shadowsDark.lg` / `shadowsLight.lg` recipe, applied
+// via RN-style shadow props (SearchBar.tsx's `$shadowColor`-token pattern)
+// rather than a raw rgba string, since this component renders on native too.
+const SHADOW_LG = {
+  shadowColor: '$shadowColor',
+  shadowOpacity: 1,
+  shadowOffset: { width: 0, height: 12 },
+  shadowRadius: 32,
+} as const;
 
 export type { MinigameId, MinigamesHubProps } from './MinigamesHub.shared';
 
@@ -122,7 +142,11 @@ const GameCard: React.FC<{
       borderRadius={16}
       padding={isNarrow ? 20 : 24}
       gap={14}
-      hoverStyle={{ borderColor: '$brandGold' }}
+      hoverStyle={{
+        borderColor: '$brandGold',
+        y: -4,
+        ...SHADOW_LG,
+      }}
       pressStyle={{ opacity: 0.9 }}
     >
       <XStack alignItems="center" justifyContent="space-between" gap={12}>
@@ -202,7 +226,8 @@ const GameCard: React.FC<{
         gap={12}
         paddingTop={16}
         borderTopWidth={1}
-        borderColor="$glassBorder"
+        borderStyle="dashed"
+        borderColor="$outlineSubtle"
       >
         <YStack>
           <Text
@@ -358,6 +383,13 @@ export function MinigamesHub({
           borderWidth={1}
           borderColor="$statusAccentBorder"
           borderRadius={24}
+          overflow="hidden"
+          style={
+            Platform.OS === 'web'
+              ? { backgroundImage: HERO_BACKGROUND_IMAGE }
+              : undefined
+          }
+          {...SHADOW_LG}
         >
           <YStack flex={1} minWidth={240}>
             <XStack alignItems="center" gap={8}>
@@ -487,7 +519,8 @@ export function MinigamesHub({
           gap={16}
           backgroundColor="$surfaceSubtle"
           borderWidth={1}
-          borderColor="$glassBorder"
+          borderStyle="dashed"
+          borderColor="$outlineSubtle"
           borderRadius={12}
           padding={20}
         >
