@@ -389,7 +389,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
                 aria-selected={isCurrent}
                 onClick={() => {
                   if (league.id) {
-                    navigate(`/baseball/league/${league.id}`);
+                    navigate(`/${sport}/league/${league.id}`);
                     setIsOpen(false);
                   }
                 }}
@@ -525,19 +525,19 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
               icon: <Compass size={14} />,
               label: 'Browse public leagues',
               hint: 'Open lobby',
-              to: '/baseball/leagues',
+              to: '/leagues',
             },
             {
               icon: <Ticket size={14} />,
               label: 'Join with invite code',
               hint: undefined,
-              to: '/baseball/league/join',
+              to: '/league/join',
             },
           ].map((item) => (
             <button
               key={item.label}
               onClick={() => {
-                navigate(item.to);
+                navigate(`/${sport}${item.to}`);
                 setIsOpen(false);
               }}
               style={{
@@ -593,7 +593,7 @@ export const LeagueSwitcherChip: React.FC<Props> = ({ draftLive = false }) => {
 
           <button
             onClick={() => {
-              navigate('/baseball/league/create');
+              navigate(`/${sport}/league/create`);
               setIsOpen(false);
             }}
             style={{

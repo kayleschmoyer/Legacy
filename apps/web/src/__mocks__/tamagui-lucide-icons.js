@@ -66,6 +66,10 @@ export const User = () => 'User';
 // Icons added for pricing page (LS-830)
 export const Tag = () => 'Tag';
 
+// Icons used by LeagueSwitcherChip (LS-9127)
+export const Compass = () => 'Compass';
+export const Ticket = () => 'Ticket';
+
 // Default export for any other icons
 const mockIcon = () => 'MockIcon';
 export default mockIcon;
