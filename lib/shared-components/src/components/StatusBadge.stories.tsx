@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { semantic } from '@legacy-sports/design-tokens';
 import { XStack, YStack } from 'tamagui';
 import { StatusBadge } from './StatusBadge';
 
@@ -41,6 +42,8 @@ const meta: Meta<typeof StatusBadge> = {
     fontSize: { control: { type: 'number', min: 8, max: 20 } },
     backgroundColor: { control: 'color' },
     color: { control: 'color' },
+    dotColor: { control: 'color' },
+    pulseDot: { control: 'boolean' },
   },
 };
 
@@ -115,6 +118,11 @@ export const WithDotIndicators: Story = {
     <XStack gap="$2" flexWrap="wrap">
       <StatusBadge label="Draft Live" variant="draftLive" />
       <StatusBadge label="Pre-Draft" variant="preDraft" />
+      <StatusBadge
+        label="On Time"
+        variant="success"
+        dotColor={semantic.success}
+      />
     </XStack>
   ),
 };

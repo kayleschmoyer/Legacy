@@ -43,6 +43,15 @@ export interface StatusBadgeProps {
   color?: string;
   /** Override font size only; use `size` prop to control both font size and padding together. */
   fontSize?: number;
+  /**
+   * Show a leading dot in this colour, overriding the variant's default dot
+   * (if any). Pass any variant + `dotColor` to add a dot indicator that
+   * isn't built into that variant — e.g. `variant="success" dotColor="$success"`
+   * for an "On Time" state.
+   */
+  dotColor?: string;
+  /** Whether the dot pulses. Only applies when a dot is shown. Defaults to the variant's own pulse behavior (`false` unless overridden). */
+  pulseDot?: boolean;
 }
 
 const SIZE_STYLES: Record<
@@ -184,11 +193,15 @@ export function StatusBadge({
   backgroundColor,
   color,
   fontSize,
+  dotColor,
+  pulseDot,
 }: StatusBadgeProps): React.JSX.Element {
   const styles = VARIANT_STYLES[variant];
   const sizeStyles = SIZE_STYLES[size];
   const resolvedFontSize = fontSize ?? sizeStyles.fontSize;
   const letterSpacing = resolvedFontSize * 0.1;
+  const resolvedDotColor = dotColor ?? styles.dotColor;
+  const resolvedPulse = pulseDot ?? styles.pulse ?? false;
 
   return (
     <XStack
@@ -202,15 +215,15 @@ export function StatusBadge({
       alignItems="center"
       gap={6}
     >
-      {styles.dotColor != null &&
-        (styles.pulse === true ? (
-          <PulseDot color={styles.dotColor} />
+      {resolvedDotColor != null &&
+        (resolvedPulse ? (
+          <PulseDot color={resolvedDotColor} />
         ) : (
           <XStack
             width={6}
             height={6}
             borderRadius={3}
-            backgroundColor={styles.dotColor}
+            backgroundColor={resolvedDotColor}
           />
         ))}
       <Text
