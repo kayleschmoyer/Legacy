@@ -19,6 +19,7 @@ import {
   scoringStatDefinitions,
   leagueScoringProfiles,
   leagueScoringProfileEntries,
+  leagueScoringPositionBonuses,
   leagueScoringChangeLog,
   directMessages,
 } from './schema';
@@ -89,6 +90,7 @@ export const leagueScoringProfilesRelations = relations(
       references: [leagues.id],
     }),
     entries: many(leagueScoringProfileEntries),
+    positionBonuses: many(leagueScoringPositionBonuses),
     changeLogs: many(leagueScoringChangeLog),
   }),
 );
@@ -97,6 +99,7 @@ export const scoringStatDefinitionsRelations = relations(
   scoringStatDefinitions,
   ({ many }) => ({
     entries: many(leagueScoringProfileEntries),
+    positionBonuses: many(leagueScoringPositionBonuses),
     changeLogs: many(leagueScoringChangeLog),
   }),
 );
@@ -113,6 +116,20 @@ export const leagueScoringProfileEntriesRelations = relations(
       references: [scoringStatDefinitions.id],
     }),
     changeLogs: many(leagueScoringChangeLog),
+  }),
+);
+
+export const leagueScoringPositionBonusesRelations = relations(
+  leagueScoringPositionBonuses,
+  ({ one }) => ({
+    profile: one(leagueScoringProfiles, {
+      fields: [leagueScoringPositionBonuses.profileId],
+      references: [leagueScoringProfiles.id],
+    }),
+    statDefinition: one(scoringStatDefinitions, {
+      fields: [leagueScoringPositionBonuses.statDefinitionId],
+      references: [scoringStatDefinitions.id],
+    }),
   }),
 );
 

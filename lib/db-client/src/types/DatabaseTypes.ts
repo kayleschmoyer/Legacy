@@ -27,6 +27,7 @@ import {
   leaguePosition,
   leagues,
   leagueScoringChangeLog,
+  leagueScoringPositionBonuses,
   leagueScoringProfileEntries,
   leagueScoringProfiles,
   matchupPlayerGames,
@@ -117,6 +118,8 @@ export type ScoringStatDefinition = typeof scoringStatDefinitions.$inferSelect;
 export type LeagueScoringProfile = typeof leagueScoringProfiles.$inferSelect;
 export type LeagueScoringProfileEntry =
   typeof leagueScoringProfileEntries.$inferSelect;
+export type LeagueScoringPositionBonus =
+  typeof leagueScoringPositionBonuses.$inferSelect;
 export type LeagueScoringChangeLog = typeof leagueScoringChangeLog.$inferSelect;
 export type CommissionerAuditLog = typeof commissionerAuditLog.$inferSelect;
 
@@ -131,6 +134,8 @@ export type CreateLeagueScoringProfileInput =
   typeof leagueScoringProfiles.$inferInsert;
 export type CreateLeagueScoringProfileEntryInput =
   typeof leagueScoringProfileEntries.$inferInsert;
+export type CreateLeagueScoringPositionBonusInput =
+  typeof leagueScoringPositionBonuses.$inferInsert;
 
 export type PlayerEligiblePosition = InferModelFromView<
   typeof playerEligiblePositions

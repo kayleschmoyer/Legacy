@@ -174,6 +174,50 @@ export const leagueScoringProfileEntries = pgTable(
   },
 );
 
+export const leagueScoringPositionBonuses = pgTable(
+  'league_scoring_position_bonuses',
+  {
+    id: serial('id').primaryKey().notNull(),
+    profileId: integer('profile_id').notNull(),
+    statDefinitionId: integer('stat_definition_id').notNull(),
+    position: varchar('position', { length: 10 }).notNull(),
+    bonusMultiplier: numeric('bonus_multiplier', {
+      precision: 6,
+      scale: 3,
+    }).notNull(),
+    isEnabled: boolean('is_enabled').notNull().default(true),
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+      mode: 'string',
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+      mode: 'string',
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => {
+    return {
+      profileForeignKey: foreignKey({
+        columns: [table.profileId],
+        foreignColumns: [leagueScoringProfiles.id],
+        name: 'league_scoring_position_bonuses_profile_fk',
+      }).onDelete('cascade'),
+      statDefinitionForeignKey: foreignKey({
+        columns: [table.statDefinitionId],
+        foreignColumns: [scoringStatDefinitions.id],
+        name: 'league_scoring_position_bonuses_stat_fk',
+      }),
+      profileStatPositionUnique: uniqueIndex(
+        'league_scoring_position_bonuses_unique',
+      ).on(table.profileId, table.statDefinitionId, table.position),
+    };
+  },
+);
+
 export const leagueScoringChangeLog = pgTable(
   'league_scoring_change_log',
   {
