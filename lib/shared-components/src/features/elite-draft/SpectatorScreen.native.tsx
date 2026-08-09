@@ -589,6 +589,9 @@ export function SpectatorScreen({
         announcement={announcement}
         celebrate={false}
         onDismiss={splash.dismiss}
+        notablePlay={
+          splash.active ? data.notablePlayFor(splash.active.player.id) : null
+        }
       />
     </YStack>
   );

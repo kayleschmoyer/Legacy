@@ -13,7 +13,12 @@ import { SpectatorScreen } from './SpectatorScreen.native';
 import { useDraftTimer } from './hooks/useDraftTimer';
 import { useDraftWebSocket } from './hooks/useDraftWebSocket';
 import { useSpectatorDraftData } from './hooks/useSpectatorDraftData';
-import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
+import type {
+  DraftPickRecord,
+  DraftPlayer,
+  LeagueTeam,
+  NotablePlaySummary,
+} from './types';
 import type { AnnouncementData } from './hooks/useDraftUIState';
 import { useAuth } from '../../features/auth';
 import { render } from '../../test-utils';
@@ -46,11 +51,16 @@ jest.mock('./DraftMiniBoard.native', () => ({
 jest.mock('./DraftPickAnnouncement.native', () => ({
   DraftPickAnnouncement: ({
     announcement,
+    notablePlay,
   }: {
     announcement: AnnouncementData | null;
+    notablePlay?: NotablePlaySummary | null;
   }) =>
     announcement ? (
-      <div data-testid="native-pick-announcement">
+      <div
+        data-testid="native-pick-announcement"
+        data-notable-play={notablePlay?.eventType ?? 'none'}
+      >
         {'name' in announcement.player ? announcement.player.name : 'pick'}
       </div>
     ) : null,
@@ -129,6 +139,7 @@ function makeData(
     pickHistory,
     refetchPickHistory: jest.fn(),
     mlbPlayerIdFor: jest.fn(() => null),
+    notablePlayFor: jest.fn(() => null),
     statsLookup: new Map<number, DraftPlayer>(),
     boardOrderedTeams: teams,
     onClockTeamPlayers: [],
@@ -219,6 +230,49 @@ describe('SpectatorScreen (native) — pick splash queue', () => {
     expect(getByTestId('native-pick-announcement').textContent).toBe(
       'Hank Aaron',
     );
+  });
+
+  it("feeds the active splash player's notable play into the announcement (LS-9112)", () => {
+    const notablePlay: NotablePlaySummary = {
+      mlbPlayerId: 660271,
+      playerRole: 'batter',
+      gameDate: '2026-08-05',
+      eventType: 'home_run',
+      description: 'Homers on a fly ball to center.',
+      exitVelocity: 110.2,
+      launchAngle: 27,
+      hitDistance: 430,
+      pitchSpeed: null,
+      pitchType: null,
+      filmRoomUrl: null,
+    };
+    const notablePlayFor = jest.fn((playerId: number) =>
+      playerId === 501 ? notablePlay : null,
+    );
+    mockUseSpectatorDraftData.mockReturnValue(makeData({ notablePlayFor }));
+    const { getByTestId } = render(<SpectatorScreen {...defaultProps} />);
+    const wsParams = mockUseDraftWebSocket.mock.calls[0][0];
+    const player: DraftPlayer = {
+      id: 501,
+      name: 'Hank Aaron',
+      position: 'OF',
+      avg: 0.305,
+      hr: 755,
+      rbi: 2297,
+      runs: 2174,
+      sb: 240,
+      games: 3298,
+      hits: 3771,
+      obp: 0.374,
+      slg: 0.555,
+    };
+    act(() => {
+      wsParams.showAnnouncement(player, 2, 1, 2, false, false, 'Sluggers');
+    });
+    expect(notablePlayFor).toHaveBeenCalledWith(501);
+    expect(
+      getByTestId('native-pick-announcement').getAttribute('data-notable-play'),
+    ).toBe('home_run');
   });
 });
 

@@ -7,6 +7,8 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable } from 'react-native';
 import { Text, XStack, YStack } from 'tamagui';
 import type { AnnouncementData } from './hooks/useDraftUIState';
+import type { NotablePlaySummary } from './types';
+import { PickSplashStatGraphic } from './PickSplashStatGraphic.native';
 import { initialsOf, statLineFor } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
 import { getPositionColor } from './utils';
@@ -123,12 +125,19 @@ export interface DraftPickAnnouncementProps {
   /** Play a confetti burst (viewer's own pick, unless the user muted it). */
   celebrate: boolean;
   onDismiss: () => void;
+  /**
+   * Cached notable play for the drafted player, rendered as the stat graphic
+   * under the pick card (LS-9112). Spectator splash only — the member draft
+   * room omits it.
+   */
+  notablePlay?: NotablePlaySummary | null;
 }
 
 export function DraftPickAnnouncement({
   announcement,
   celebrate,
   onDismiss,
+  notablePlay,
 }: DraftPickAnnouncementProps): React.JSX.Element | null {
   const palette = useDraftPalette();
 
@@ -231,6 +240,7 @@ export function DraftPickAnnouncement({
                 {subtitle}
               </Text>
             </XStack>
+            <PickSplashStatGraphic play={notablePlay ?? null} />
           </YStack>
         </YStack>
       </Pressable>
