@@ -345,10 +345,15 @@ export function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_add_comment',
-    'Post a comment to a Jira ticket. Use this instead of jira_edit_ticket when appending Implementation Notes or other additive content — comments do not overwrite the description.',
+    'Post a comment to a Jira ticket. Use this instead of jira_edit_ticket when appending Implementation Notes or other additive content — comments do not overwrite the description. Params: key, body (NOT "comment") — e.g. jira_add_comment({ key: "LS-1234", body: "..." }).',
     {
       key: z.string().describe('Ticket key (e.g. LS-1234)'),
-      body: z.string().min(1).describe('Comment body as plain text'),
+      body: z
+        .string()
+        .min(1)
+        .describe(
+          'Comment body as plain text. Param name is "body", not "comment".',
+        ),
     },
     async (p) => addComment(p),
   );
