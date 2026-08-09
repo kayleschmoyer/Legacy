@@ -296,15 +296,28 @@ button { font-family: inherit; }
 /* ── Container query breakpoints ────────────────
    These fire off the viewport frame width (because of
    container-type: inline-size). Resize the frame in the
-   design-tools bar to see them snap. */
-@container (max-width: 960px) {
+   design-tools bar to see them snap.
+
+   BREAKPOINTS: reflows happen only at the canonical thresholds from
+   lib/design-tokens/src/lib/breakpoints.ts — sm (800px) and xl (1120px).
+   @container max-width is inclusive, so the queries below fire below
+   799px and below 1119px (i.e. "narrower than sm" / "narrower than xl").
+   - xxl (1280px+) and xl (1120–1279px) share the default (no-query) layout:
+     desktop two-column grid, full nav/modal chrome. The Desktop (1280)
+     designed frame covers both bands.
+   - lg (980–1119px), md (860–979px), and sm (800–859px) share the layout
+     in the first block below: single-column grid, condensed page/modal
+     chrome, 2-col era picker. The Tablet (900) designed frame covers all
+     three bands.
+   - xs (660–799px) and xxs (0–659px) share the layout added in the second
+     block below: tightest paddings, 1-col era picker, stacked modal footer.
+     The Mobile (375) designed frame covers both bands. */
+@container (max-width: 1119px) {
   .ls-create-grid { grid-template-columns: 1fr; }
   .ls-create-side { position: static; order: -1; }
   .ls-section.two-col .ls-section-body { grid-template-columns: 1fr; }
   .ls-era-grid { grid-template-columns: repeat(2, 1fr); }
   .ls-section-summary { display: none; }
-}
-@container (max-width: 720px) {
   .ls-page { padding: 28px 18px 60px; }
   .ls-page-head { flex-direction: column; align-items: flex-start; gap: 12px; }
   .ls-modal-grid { grid-template-columns: 1fr; }
@@ -315,7 +328,7 @@ button { font-family: inherit; }
   .ls-action-bar { flex-direction: column; align-items: stretch; }
   .ls-action-btns { justify-content: flex-end; }
 }
-@container (max-width: 480px) {
+@container (max-width: 799px) {
   .ls-page { padding: 22px 14px 60px; }
   .ls-era-grid { grid-template-columns: 1fr; }
   .ls-modal-head { gap: 12px; padding: 16px 16px; }

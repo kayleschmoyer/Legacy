@@ -16,7 +16,8 @@
   .ls-mock-dash { max-width: 1280px; margin: 0 auto; padding: 32px 24px; filter: blur(1px) saturate(.7); pointer-events: none; }
   .ls-mock-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-top: 16px; }
   .ls-mock-card { background: var(--surface-card); border: 1px solid var(--outline-subtle); border-radius: var(--radius-5); padding: 20px; height: 180px; }
-  @container (max-width: 720px) { .ls-mock-row { grid-template-columns: 1fr; } .ls-mock-card { height: 100px; } .ls-mock-dash { padding: 20px 14px; } }
+  /* BREAKPOINTS: matches shared.css's mobile bucket — xs/xxs (below sm, 800px) */
+  @container (max-width: 799px) { .ls-mock-row { grid-template-columns: 1fr; } .ls-mock-card { height: 100px; } .ls-mock-dash { padding: 20px 14px; } }
 </style>
 </head>
 <body>
@@ -36,8 +37,19 @@ const { useState, useEffect, useMemo } = React;
 //   - step-pane crossfade 140ms (prefers-reduced-motion safe)
 //   - viewport frame width transition 280ms
 
+// BREAKPOINTS: all seven canonical bands (xxs/xs/sm/md/lg/xl/xxl, see
+// lib/design-tokens/src/lib/breakpoints.ts) are covered by these three
+// designed frames — reflows only happen at the canonical sm (800px) and
+// xl (1120px) thresholds (see shared.css), never at invented values.
+//   - Mobile (375px)  — designed frame for xxs (0–659px); shares this
+//     layout with xs (660–799px), annotated rather than framed separately.
+//   - Tablet (900px)  — designed frame for the sm/md/lg bucket
+//     (800–1119px); sm, md, and lg all share this single-column layout.
+//   - Desktop (1280px) — designed frame for xxl (1280px+); shares this
+//     layout with xl (1120–1279px), annotated rather than framed separately.
 const VIEWPORTS = [
   { id:'mobile',  label:'Mobile',  w:375  },
+  { id:'tablet',  label:'Tablet',  w:900  },
   { id:'desktop', label:'Desktop', w:1280 },
   { id:'full',    label:'Full',    w:null },
 ];

@@ -27,8 +27,19 @@ const { useState, useEffect, useMemo } = React;
 //   - sport switch — page header crossfade + theme tokens animate via transition
 //   - viewport resize — frame width transitions 280ms
 
+// BREAKPOINTS: all seven canonical bands (xxs/xs/sm/md/lg/xl/xxl, see
+// lib/design-tokens/src/lib/breakpoints.ts) are covered by these three
+// designed frames — reflows only happen at the canonical sm (800px) and
+// xl (1120px) thresholds (see shared.css), never at invented values.
+//   - Mobile (375px)  — designed frame for xxs (0–659px); shares this
+//     layout with xs (660–799px), annotated rather than framed separately.
+//   - Tablet (900px)  — designed frame for the sm/md/lg bucket
+//     (800–1119px); sm, md, and lg all share this single-column layout.
+//   - Desktop (1280px) — designed frame for xxl (1280px+); shares this
+//     layout with xl (1120–1279px), annotated rather than framed separately.
 const VIEWPORTS = [
   { id:'mobile',  label:'Mobile',  w:375  },
+  { id:'tablet',  label:'Tablet',  w:900  },
   { id:'desktop', label:'Desktop', w:1280 },
   { id:'full',    label:'Full',    w:null },
 ];

@@ -5,7 +5,43 @@
 **Synced at**: 2026-08-04T15:22:50.000Z
 **Bundle hash**: `66ac81d9b458d6db315bce119d8753b7395f137983dd74c6a3ce5a8ab2d71e88`
 **Files**: 87
-**Ticket**: LS-8963 (mechanical fixes only — see below)
+**Ticket**: LS-8963, LS-9084 (mechanical fixes only — see below)
+
+## LS-9084 mechanical-fix pass
+
+LS-9024 audited every synced bundle against PROMPT.md's Breakpoints checklist item (all seven
+canonical bands — `xxs`/`xs`/`sm`/`md`/`lg`/`xl`/`xxl` per `lib/design-tokens/src/lib/breakpoints.ts` —
+must be covered by a designed frame or an explicit `BREAKPOINTS:` annotation) and found this bundle
+non-compliant: only two `VIEWPORTS` were defined (mobile 375, desktop 1280), and `shared.css`'s
+`@container` rules reflowed at invented thresholds (`960px`/`720px`/`480px`) never mapped to the
+canonical bands, leaving `xs`–`lg` (660–1119px) entirely unclaimed.
+
+**Environment note**: this pass ran from a cloud session, where the `DesignSync` MCP tool is
+unauthorized (it needs an interactive `/design-login` only available locally — see
+`.agents/skills/design-sync/references/designsync-tool.md`). The design-source-fix pattern (fix in
+Claude Design, then pull) could not be used. Per that doc's documented fallback ("provide the project
+files directly"), the fix below was applied directly to this repo bundle instead. **Follow-up needed**:
+a local session should push these same changes to the Claude Design project
+(`projectId 3b56ca5b-71bb-4a97-a3c6-d91c453a73d1`) via `/push-design HI6N3yPYUzeh981B5SkXmw` so the
+source of truth doesn't drift from the repo copy.
+
+Fixed:
+
+- Consolidated `shared.css`'s three invented `@container` thresholds (`960px`/`720px`/`480px`) into two
+  canonical ones derived from `breakpoints.ts`: `1119px` (= xl/1120px minus 1, since `max-width` is
+  inclusive) and `799px` (= sm/800px minus 1). Reflows now happen only at canonical thresholds.
+- Added a `Tablet` (900px) designed viewport to the `VIEWPORTS` array in both HTML files, alongside the
+  existing `Mobile` (375px) and `Desktop` (1280px) frames, so every distinct layout has a viewable frame.
+- Added `BREAKPOINTS:` annotation comments (next to `VIEWPORTS` in both HTML files, and next to the
+  `@container` rules in `shared.css`) documenting which bands share which designed frame: `xxs`+`xs`
+  share Mobile (0–799px), `sm`+`md`+`lg` share Tablet (800–1119px), `xl`+`xxl` share Desktop
+  (1120px+). All seven bands are now claimed; `xxs` (375px) and `xxl` (1280px) remain fully designed
+  frames.
+- Aligned the `Create League - Modal.html` inline `.ls-mock-dash` container query (previously
+  `max-width: 720px`) to the same canonical `799px` threshold.
+
+Not addressed by this pass (out of scope — see the LS-8963 section below for the full list of
+deferred items; this bundle still needs a human-led Claude Design re-run for the wizard restructure).
 
 ## LS-8963 mechanical-fix pass
 
