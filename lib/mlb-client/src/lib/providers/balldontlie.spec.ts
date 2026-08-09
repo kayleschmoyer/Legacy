@@ -109,7 +109,7 @@ describe('isRetryableError', () => {
   });
 
   it('returns false for a timeout error (ECONNABORTED)', () => {
-    // Retrying immediately after a 10 s timeout will also timeout; three
+    // Retrying immediately after a 15 s timeout will also timeout; multiple
     // attempts back-to-back exceed Lambda's 30 s limit → 502 (LS-4856).
     expect(isRetryableError(makeTimeoutError())).toBe(false);
   });

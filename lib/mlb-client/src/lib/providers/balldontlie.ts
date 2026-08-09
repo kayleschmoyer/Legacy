@@ -103,14 +103,20 @@ function mapBdlGame(game: BdlGame): MlbGame {
 const MAX_RETRIES = 2;
 const RETRY_BASE_DELAY_MS = 500;
 
+// BDL's /games endpoint can be slow on a cold Lambda's first request of the
+// day; 15s leaves comfortable headroom under the GraphQL Lambda's 30s
+// function timeout for a single attempt (LS-9171) while still being well
+// short of a full retry cycle if it does time out.
+const REQUEST_TIMEOUT_MS = 15_000;
+
 /**
  * Returns true for errors that are worth retrying: rate limits (429), server
  * errors (5xx), and transient network-level failures (ECONNRESET, etc.).
  *
  * Timeout errors (ECONNABORTED) are excluded: an immediate retry after a
- * 10 s timeout will almost certainly also timeout, and three 10 s attempts
- * chained back-to-back exceed the Lambda's 30 s limit, causing API Gateway
- * to return 502 to the client (LS-4856).
+ * 15 s timeout will almost certainly also timeout, and multiple such
+ * attempts chained back-to-back exceed the Lambda's 30 s limit, causing API
+ * Gateway to return 502 to the client (LS-4856).
  * Exported for unit testing.
  */
 export function isRetryableError(err: unknown): boolean {
@@ -229,7 +235,7 @@ export class BallDontLieProvider implements MlbDataProvider {
             headers: { Authorization: this.apiKey },
             // BDL uses dates[] array filter; URLSearchParams encodes brackets correctly
             params: new URLSearchParams({ 'dates[]': date, per_page: '100' }),
-            timeout: 10_000,
+            timeout: REQUEST_TIMEOUT_MS,
           },
         );
 
