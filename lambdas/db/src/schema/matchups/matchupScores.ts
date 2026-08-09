@@ -17,20 +17,16 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   aggregatePlayerStats,
   calculatePlayerScore,
-  computeDefenseScore,
-  computeIDPScore,
-  computeScoring,
-  DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS,
-  DEFAULT_DEFENSE_SCORING,
-  DEFAULT_IDP_SCORING,
-  DEFAULT_KICKING_SCORING,
-  DEFAULT_PASSING_SCORING,
-  DEFAULT_RECEIVING_SCORING,
-  DEFAULT_RUSHING_SCORING,
+  computeFootballDefenseFantasyPoints,
+  computeFootballIdpFantasyPoints,
+  computeFootballOffenseFantasyPoints,
+  type FootballScoringSettings,
+  getDefaultFootballScoringSettings,
   getDefaultScoringSettings,
   type PlayerGameStats,
 } from '@legacy-sports/scoring';
 
+import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
 import { builder } from '../builder';
 import { FootballMatchupStatsRef } from '../football';
 import { AuthenticationError } from '../graphql-errors';
@@ -224,19 +220,22 @@ function adaptKickingFromOffense(row: OffenseRow): GameKickingShape {
  *  - All other players (offense + kicking): sums `computeScoring` across whichever
  *    stat groups are present.
  *
- * @param stats  Raw Drizzle stat row(s) for one player game from `getMatchupFootballPlayerGameStats`.
- * @param isDst  True when `players.is_dst` is true (DST team defense slot).
- * @param isIdp  True when the player's position type is DL, LB, DB, or DP.
- * @returns      Fantasy point total for this single game using default scoring settings.
+ * @param stats    Raw Drizzle stat row(s) for one player game from `getMatchupFootballPlayerGameStats`.
+ * @param isDst    True when `players.is_dst` is true (DST team defense slot).
+ * @param isIdp    True when the player's position type is DL, LB, DB, or DP.
+ * @param settings League scoring settings (LS-9041); defaults to the hardcoded
+ *                 constants when the league has no custom scoring profile.
+ * @returns        Fantasy point total for this single game.
  */
 export function computeFootballGamePoints(
   stats: FootballMatchupPlayerGameStats,
   isDst: boolean,
   isIdp: boolean,
+  settings: FootballScoringSettings = getDefaultFootballScoringSettings(),
 ): number {
   if (isDst && stats.defense) {
     const adapted = adaptDefenseRow(stats.defense);
-    return computeDefenseScore(
+    return computeFootballDefenseFantasyPoints(
       {
         sacks: adapted.sacks,
         int: adapted.int,
@@ -246,14 +245,13 @@ export function computeFootballGamePoints(
         pts_allowed: adapted.ptsAllowed,
         yds_allowed: adapted.ydsAllowed,
       },
-      DEFAULT_DEFENSE_SCORING,
-      DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS,
+      settings,
     );
   }
 
   if (isIdp && stats.idpDefense) {
     const adapted = adaptIdpRow(stats.idpDefense);
-    return computeIDPScore(
+    return computeFootballIdpFantasyPoints(
       {
         solo_tkl: adapted.soloTkl,
         ast_tkl: adapted.astTkl,
@@ -265,49 +263,40 @@ export function computeFootballGamePoints(
         def_td: adapted.defTd,
         safeties: adapted.safeties,
       },
-      DEFAULT_IDP_SCORING,
+      settings,
     );
   }
 
   // Offense / kicking — all offensive stats are in the unified offense row
-  let pts = 0;
-  if (stats.offense) {
-    pts += computeScoring(
-      {
+  if (!stats.offense) return 0;
+
+  return computeFootballOffenseFantasyPoints(
+    {
+      passing: {
         yds: stats.offense.passYds,
         td: stats.offense.passTd,
         int: stats.offense.interceptions,
         sacked: stats.offense.sacked,
       },
-      DEFAULT_PASSING_SCORING,
-    );
-    pts += computeScoring(
-      {
+      rushing: {
         yds: stats.offense.rushYds,
         td: stats.offense.rushTd,
         fumbles: stats.offense.rushFumbles,
       },
-      DEFAULT_RUSHING_SCORING,
-    );
-    pts += computeScoring(
-      {
+      receiving: {
         rec: stats.offense.rec,
         yds: stats.offense.recYds,
         td: stats.offense.recTd,
         fumbles: stats.offense.recFumbles,
       },
-      DEFAULT_RECEIVING_SCORING,
-    );
-    pts += computeScoring(
-      {
+      kicking: {
         fgm: stats.offense.fgm,
         fg_50m: stats.offense.fg50m,
         xpm: stats.offense.xpm,
       },
-      DEFAULT_KICKING_SCORING,
-    );
-  }
-  return pts;
+    },
+    settings,
+  );
 }
 
 // ─── Football resolver ───────────────────────────────────────────────────────
@@ -364,6 +353,14 @@ export async function resolveFootballMatchupScores(
       : [];
 
   const teamNameMap = new Map(teamRows.map((t) => [t.id, t.name]));
+
+  // League scoring settings (LS-9041) — falls back to defaults when the
+  // league has no custom profile, so unconfigured leagues score identically
+  // to before this change.
+  const scoringSettings = await getFootballScoringSettingsForLeague(
+    db,
+    leagueId,
+  );
 
   // Prefetch all per-matchup football stats concurrently to avoid sequential N+1.
   const playerGameStatsMap = new Map(
@@ -480,7 +477,12 @@ export async function resolveFootballMatchupScores(
         posType === 'DB' ||
         posType === 'DP';
 
-      const fantasyPoints = computeFootballGamePoints(gameStats, isDst, isIdp);
+      const fantasyPoints = computeFootballGamePoints(
+        gameStats,
+        isDst,
+        isIdp,
+        scoringSettings,
+      );
 
       const gameShape: FootballMatchupPlayerGameShape = {
         gameNum: gameStats.gameNum,

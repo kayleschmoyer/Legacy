@@ -93,7 +93,13 @@ jest.mock('@legacy-sports/db-client', () => ({
   getMatchupFootballPlayerGameStats: jest.fn(),
 }));
 
+jest.mock('./football-scoring-settings', () => ({
+  getFootballScoringSettingsForLeague: jest.fn(),
+}));
+
 import { getMatchupFootballPlayerGameStats } from '@legacy-sports/db-client';
+import { getDefaultFootballScoringSettings } from '@legacy-sports/scoring';
+import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
 import {
   resolveBaseballMatchupScores,
   resolveFootballMatchupScores,
@@ -104,6 +110,8 @@ import { verifyLeagueMembership } from '../authorization';
 const mockVerifyLeagueMembership = verifyLeagueMembership as jest.Mock;
 
 const mockGetFootballStats = getMatchupFootballPlayerGameStats as jest.Mock;
+const mockGetFootballScoringSettings =
+  getFootballScoringSettingsForLeague as jest.Mock;
 
 // ---------------------------------------------------------------------------
 // Capture builder side-effects at module load time (before any clearAllMocks)
@@ -180,6 +188,11 @@ function buildMockDb(resultQueue: unknown[][]) {
 describe('resolveFootballMatchupScores', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Leagues with no custom scoring profile fall back to the defaults
+    // (LS-9041) — this is the baseline every existing test below assumes.
+    mockGetFootballScoringSettings.mockResolvedValue(
+      getDefaultFootballScoringSettings(),
+    );
   });
 
   it('returns empty array when no matchups exist', async () => {
@@ -271,6 +284,73 @@ describe('resolveFootballMatchupScores', () => {
     expect(player.games).toHaveLength(1);
     expect(player.games[0].passing?.yds).toBe(300);
     expect(player.games[0].fantasyPoints).toBeCloseTo(20);
+  });
+
+  it('uses the league scoring profile when one is configured (LS-9041)', async () => {
+    // Custom profile: passing TD = 6 instead of the default 4.
+    // 300 passing yds × 0.04 = 12, 2 TDs × 6 = 12 → total = 24 (vs. 20 default)
+    const customSettings = getDefaultFootballScoringSettings();
+    customSettings.passing = { ...customSettings.passing, td: 6 };
+    mockGetFootballScoringSettings.mockResolvedValueOnce(customSettings);
+
+    const db = buildMockDb([
+      [{ id: 100, team1Id: 10, team2Id: 20 }],
+      [
+        { id: 10, name: 'Eagles' },
+        { id: 20, name: 'Bears' },
+      ],
+      [
+        {
+          matchupPlayerId: 1,
+          matchupId: 100,
+          teamId: 10,
+          playerId: 5,
+          positionType: 'QB',
+        },
+      ],
+      [
+        {
+          id: 5,
+          firstName: 'Patrick',
+          lastName: 'Mahomes',
+          isDst: false,
+          nflTeam: 'KC',
+        },
+      ],
+    ]);
+
+    mockGetFootballStats.mockResolvedValueOnce([
+      {
+        playerId: 5,
+        matchupPlayerId: 1,
+        gameNum: 1,
+        gameIdentifier: '20240901_KC_BAL',
+        offense: {
+          passYds: 300,
+          passTd: 2,
+          interceptions: 0,
+          sacked: 0,
+          rushYds: 0,
+          rushTd: 0,
+          rushFumbles: 0,
+          rec: 0,
+          recYds: 0,
+          recTd: 0,
+          recFumbles: 0,
+          fgm: 0,
+          fg50m: 0,
+          xpm: 0,
+        },
+        defense: null,
+        idpDefense: null,
+      },
+    ]);
+
+    const result = await resolveFootballMatchupScores(db as never, 1, 1);
+
+    const eaglesResult = result.find((r) => r.teamId === 10);
+    expect(eaglesResult!.players[0].totalPoints).toBeCloseTo(24);
+    expect(mockGetFootballScoringSettings).toHaveBeenCalledWith(db, 1);
   });
 
   it('scores DST player using computeDefenseScore (sack + shutout = 11 pts)', async () => {

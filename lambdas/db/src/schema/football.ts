@@ -13,14 +13,10 @@
  */
 import { PublicSchema } from '@legacy-sports/db-client';
 import {
-  computeIDPScore,
-  computeScoring,
-  DEFAULT_DEFENSE_SCORING,
-  DEFAULT_IDP_SCORING,
-  DEFAULT_KICKING_SCORING,
-  DEFAULT_PASSING_SCORING,
-  DEFAULT_RECEIVING_SCORING,
-  DEFAULT_RUSHING_SCORING,
+  computeFootballDefenseFantasyPoints,
+  computeFootballIdpFantasyPoints,
+  computeFootballOffenseFantasyPoints,
+  getDefaultFootballScoringSettings,
 } from '@legacy-sports/scoring';
 import {
   and,
@@ -760,11 +756,17 @@ FootballCareerStatsRef.implement({
         'Career fantasy point total computed from career stats using default PPR scoring (LS-6469). ' +
         'DST excludes per-game points-allowed band scoring since only season averages are stored.',
       resolve: (stats) => {
+        // Career stats have no league context to scope a scoring profile to
+        // (LS-9041) — this uses the same profile-aware scoring functions as
+        // matchupScores.ts, just with the default settings every league
+        // falls back to when it has no custom profile.
+        const settings = getDefaultFootballScoringSettings();
+
         // DST: flat multipliers only — ptsAllowedPerG is a season average, not
         // per-game total, so the points-allowed band cannot be applied accurately.
         if (stats.defense) {
           const d = stats.defense;
-          const score = computeScoring(
+          const score = computeFootballDefenseFantasyPoints(
             {
               sacks: d.sacks,
               int: d.int,
@@ -772,7 +774,7 @@ FootballCareerStatsRef.implement({
               def_td: d.defTd,
               safeties: d.safeties,
             },
-            DEFAULT_DEFENSE_SCORING,
+            settings,
           );
           // A present defense row means a valid total — preserve a 0 score
           // (do not collapse it to null, which would hide the card value).
@@ -782,7 +784,7 @@ FootballCareerStatsRef.implement({
         // IDP: career totals map cleanly to per-play multipliers.
         if (stats.idp) {
           const idp = stats.idp;
-          const score = computeIDPScore(
+          const score = computeFootballIdpFantasyPoints(
             {
               solo_tkl: idp.soloTkl,
               ast_tkl: idp.astTkl,
@@ -794,7 +796,7 @@ FootballCareerStatsRef.implement({
               def_td: idp.defTd,
               safeties: idp.safeties,
             },
-            DEFAULT_IDP_SCORING,
+            settings,
           );
           // A present IDP row means a valid total — preserve a 0 score
           // (do not collapse it to null, which would hide the card value).
@@ -802,58 +804,43 @@ FootballCareerStatsRef.implement({
         }
 
         // Offense / kicking — sum across all available stat categories.
-        let total = 0;
-        let hasData = false;
+        if (
+          !stats.passing &&
+          !stats.rushing &&
+          !stats.receiving &&
+          !stats.kicking
+        ) {
+          return null;
+        }
 
-        if (stats.passing) {
-          total += computeScoring(
-            {
+        // fg_50m is the 50+ yard bonus (additional pts on top of base fgm×3).
+        return computeFootballOffenseFantasyPoints(
+          {
+            passing: stats.passing && {
               yds: stats.passing.yds,
               td: stats.passing.td,
               int: stats.passing.int,
               sacked: stats.passing.sacked,
             },
-            DEFAULT_PASSING_SCORING,
-          );
-          hasData = true;
-        }
-        if (stats.rushing) {
-          total += computeScoring(
-            {
+            rushing: stats.rushing && {
               yds: stats.rushing.yds,
               td: stats.rushing.td,
               fumbles: stats.rushing.fumbles,
             },
-            DEFAULT_RUSHING_SCORING,
-          );
-          hasData = true;
-        }
-        if (stats.receiving) {
-          total += computeScoring(
-            {
+            receiving: stats.receiving && {
               rec: stats.receiving.rec,
               yds: stats.receiving.yds,
               td: stats.receiving.td,
               fumbles: stats.receiving.fumbles,
             },
-            DEFAULT_RECEIVING_SCORING,
-          );
-          hasData = true;
-        }
-        if (stats.kicking) {
-          // fg_50m is the 50+ yard bonus (additional pts on top of base fgm×3).
-          total += computeScoring(
-            {
+            kicking: stats.kicking && {
               fgm: stats.kicking.fgm,
               fg_50m: stats.kicking.fg50m,
               xpm: stats.kicking.xpm,
             },
-            DEFAULT_KICKING_SCORING,
-          );
-          hasData = true;
-        }
-
-        return hasData ? total : null;
+          },
+          settings,
+        );
       },
     }),
   }),

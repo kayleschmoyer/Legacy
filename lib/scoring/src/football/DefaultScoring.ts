@@ -1,4 +1,7 @@
-import type { DefensePointsAllowedBands } from './ScoringSettings';
+import type {
+  DefensePointsAllowedBands,
+  FootballScoringSettings,
+} from './ScoringSettings';
 import type { IDPScoringSettings } from './IDPScoring';
 
 export const DEFAULT_PASSING_SCORING = Object.freeze({
@@ -57,3 +60,21 @@ export const DEFAULT_IDP_SCORING = Object.freeze<IDPScoringSettings>({
   def_td: 6,
   safeties: 2,
 });
+
+/**
+ * The hardcoded scoring weights every football league used before league
+ * scoring profiles were wired in (LS-9041). Used as the fallback settings for
+ * leagues with no custom profile, and as the base a profile's overrides are
+ * merged on top of.
+ */
+export function getDefaultFootballScoringSettings(): FootballScoringSettings {
+  return {
+    passing: { ...DEFAULT_PASSING_SCORING },
+    rushing: { ...DEFAULT_RUSHING_SCORING },
+    receiving: { ...DEFAULT_RECEIVING_SCORING },
+    kicking: { ...DEFAULT_KICKING_SCORING },
+    defense: { ...DEFAULT_DEFENSE_SCORING },
+    defenseBands: { ...DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS },
+    idp: { ...DEFAULT_IDP_SCORING },
+  };
+}

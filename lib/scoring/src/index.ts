@@ -5,6 +5,7 @@ export * from './football/DefaultScoring';
 export * from './football/DefenseScoring';
 export * from './football/IDPScoring';
 export * from './football/ScoringSettings';
+export * from './football/FootballFantasyScoring';
 export * from './ComputeScoring';
 export * from './matchup-scoring';
 export * from './matchup-projections';

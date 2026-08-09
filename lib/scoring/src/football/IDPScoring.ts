@@ -24,14 +24,19 @@ export interface GameFootballDefenseIdp {
 
 export function computeIDPScore(
   stats: GameFootballDefenseIdp,
-  multipliers: IDPScoringSettings,
+  multipliers: Partial<IDPScoringSettings>,
 ): number {
   let sum = 0;
 
   for (const key of Object.keys(multipliers) as (keyof IDPScoringSettings)[]) {
     const multiplier = multipliers[key];
     const value = stats[key];
-    if (isNaN(multiplier) || value == null || isNaN(value)) {
+    if (
+      typeof multiplier !== 'number' ||
+      isNaN(multiplier) ||
+      value == null ||
+      isNaN(value)
+    ) {
       continue;
     }
     sum += multiplier * value;

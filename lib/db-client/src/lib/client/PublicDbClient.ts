@@ -1076,7 +1076,7 @@ export {
   getPlayersOrderedByLastFetch,
 } from './PlayerStatsUtils';
 
-function normalizeNumeric(value: unknown): number | null {
+export function normalizeNumeric(value: unknown): number | null {
   if (value === null || value === undefined) {
     return null;
   }
