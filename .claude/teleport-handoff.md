@@ -2,85 +2,69 @@
 
 ## Session Info
 
-- **Branch**: `claude/exciting-sagan-bkakZ`
-- **PR**: [#4133](https://github.com/bkrupa/legacy-sports/pull/4133) — `LS-2549 fix(oauth-proxy): close account-enumeration leak on /oauth/register`
-- **Ticket**: [LS-2549](https://bkrupa.atlassian.net/browse/LS-2549) — In Review
-- **Date**: 2026-05-22
+- **Branch**: `claude/elegant-keller-bmal9p`
+- **Ticket**: [LS-9085](https://bkrupa.atlassian.net/browse/LS-9085) — In Progress
+- **Date**: 2026-08-09
 
 > No secrets in this file.
 
 ## Completed Steps
 
-- [x] Jira LS-2549 transitioned: To Do → In Progress → In Review
-- [x] Code implementation complete on `claude/exciting-sagan-bkakZ`
-- [x] Unit tests written and passing (58/58 oauth-proxy)
-- [x] `make pc` passes (lint, typecheck, test, build)
-- [x] Branch rebased onto latest `origin/main` (7ed0d00)
-- [x] Pushed to remote
-- [x] PR #4133 created and marked ready
-- [x] Labels applied: `agent-in-progress`, `bot:ready-for-review`
-- [x] Copilot review requested
-- [x] Implementation notes appended to Jira description
-- [x] Follow-up tickets filed: **LS-4739** (verification email flow), **LS-4740** (per-IP rate limiting)
+- [x] Jira LS-9085 read in full (description + comments) via `getJiraIssue`
+- [x] Jira LS-9085 transitioned: To Do → In Progress
+- [x] Root cause located: `docs/design/QjHjpBJxAbmU7Xcc8HWarw/legacy-sports-account-management/project/scratch/mockups/management.html:1118-1124`, the `<!-- BREAKPOINTS: ... -->` HTML comment on the account-management mockup (**not** the bundle's `uploads/PROMPT.md`, despite the ticket-summary shorthand — that file is the generic per-page design brief, unmodified per bundle)
+- [x] Confirmed the exact gap: mobile canvas claims coverage of `xxs–lg (0–979px)`; desktop canvas claims `xl–xxl (1120px+)`. The `lg` band is `980–1119px` per `lib/design-tokens/src/lib/breakpoints.ts` — neither stated range actually reaches into it, so `lg` is unclaimed
+- [ ] Fix applied at the source (Claude Design project) via `DesignSync`
+- [ ] Fixed bundle re-pulled into `docs/design/QjHjpBJxAbmU7Xcc8HWarw/`
+- [ ] PR opened with the fix
+- [ ] PR marked ready, validated, merged
 
 ## Blocked Step
 
-**Operation**: Drive PR #4133 to merge — handle Copilot review feedback, CI failures, and final merge.
-**Reason**: User requested teleport to local session for review-cycle handling.
-**Category**: User-initiated handoff (not a capability boundary).
+**Operation**: Fix the `BREAKPOINTS` annotation at the source (Claude Design project `019de999-00d9-72cf-bb9a-3110eab0e366`) via the `DesignSync` MCP tool (`get_project` → `finalize_plan` → `write_files`), then re-pull the corrected bundle into `docs/design/QjHjpBJxAbmU7Xcc8HWarw/`.
+**Reason**: `DesignSync` calls fail in this session with: _"DesignSync needs design-system authorization, but `/design-login` requires an interactive terminal and is not available in this environment."_ This confirmed the documented constraint in `.agents/skills/design-sync/references/designsync-tool.md` — `DesignSync` is a **local-session-only** pathway; cloud sessions (including this one) cannot authenticate it.
+**Category**: Local tooling (design-source-fix requires `DesignSync`, which needs an interactive `/design-login`).
+
+Per `.agents/skills/design-sync/SKILL.md` ("Fixing designs at the source"): _"never hand-patch `docs/design/` bundle bytes and stop there: the next pull overwrites them."_ Both sanctioned remedies (fix in Claude Design directly, or fix in the repo bundle + `/push-design`) require `DesignSync`, so neither is reachable from this cloud session. Hand-patching `docs/design/` here and stopping would also fail the ticket's own closure AC #3 ("re-pulled into `docs/design/QjHjpBJxAbmU7Xcc8HWarw/` in this PR") since there would be nothing to re-pull from.
 
 ## Remaining Steps
 
-1. Watch PR #4133 for events:
-   - **Copilot review** (in progress at handoff): triage threads using the Author Agent Contract (`FIX: <sha>` / `JUSTIFY: <rationale>` per AGENTS.md). Cap at 2 review rounds.
-   - **CI**: respond to failures per `.agents/skills/pr-lifecycle/SKILL.md`.
-2. After CI green + bot APPROVED, merge.
-3. Verify Jira LS-2549 auto-transitions to Done (Jira Branch Sync); fall back to manual transition if it lags.
-4. Run MCP gap audit (`Skill: mcp-gap-audit`) if session exceeded threshold.
-5. (Optional) Decide whether to chip-dispatch LS-4739 and LS-4740 follow-ups now or defer to backlog.
+1. `git fetch origin claude/elegant-keller-bmal9p && git checkout claude/elegant-keller-bmal9p` (or a worktree via `make worktree TICKET=9085 DESC=account-management-breakpoints`).
+2. Via `DesignSync` against project `019de999-00d9-72cf-bb9a-3110eab0e366` (title "Account Management", slug `legacy-sports-account-management`):
+   - `get_file({ projectId, path: "project/scratch/mockups/management.html" })` to confirm current content matches the excerpt below.
+   - Correct the `BREAKPOINTS` comment so all seven bands (`xxs`–`xxl`) are unambiguously claimed — the minimal fix is widening the mobile canvas's stated range from `xxs–lg (0–979px)` to `xxs–lg (0–1119px)` so it actually reaches the end of the `lg` band before the desktop canvas's `xl–xxl (1120px+)` picks up. Do not change which canvas is "primary" or add new frames — the ticket's dispatch note calls this an annotation-range correction only.
+   - `finalize_plan({ projectId, writes: ["project/scratch/mockups/management.html"], deletes: [], localDir: <bundle-relative-dir> })` → `write_files`.
+3. Run `/pull-design https://claude.ai/design/p/019de999-00d9-72cf-bb9a-3110eab0e366` (or the equivalent `DesignSync` read + manual bundle write) to re-sync `docs/design/QjHjpBJxAbmU7Xcc8HWarw/` and regenerate its `SYNC-REPORT.md` / `manifest.json` hash entry.
+4. Verify: grep the re-pulled `management.html` for `BREAKPOINTS` and confirm the stated pixel ranges jointly cover `0px` through open-ended `1280px+` with no gap at `980–1119px`.
+5. Commit (`git add docs/design/QjHjpBJxAbmU7Xcc8HWarw/ docs/design/manifest.json`), push to `claude/elegant-keller-bmal9p`.
+6. Remove this handoff file (`git rm .claude/teleport-handoff.md`) in the same or a follow-up commit.
+7. Open the PR (title e.g. `LS-9085 fix(designs): correct account-management BREAKPOINTS annotation gap`), include the `jira-link` marker (`primary: LS-9085`), apply `agent-in-progress`, mark ready, drive to merge per the Author Agent Contract.
+8. Confirm Jira LS-9085 auto-transitions to Done on merge (Jira Branch Sync); fall back to manual transition if it lags.
 
 ## Context for the Local Agent
 
-### What was built
+### Current (broken) annotation
 
-**LS-2549** is a security bug — `/oauth/register` returned `409 'An account with this email already exists'` when the email was already registered, enabling account enumeration. Same problem on `/oauth/discord/link`.
+`docs/design/QjHjpBJxAbmU7Xcc8HWarw/legacy-sports-account-management/project/scratch/mockups/management.html:1118-1124`:
 
-User explicitly chose **option 1 (uniform-response + email follow-up)** over options 2 (generic-error only) or 3 (full per-IP rate limiting) when asked via `AskUserQuestion`. The fix:
+```html
+<!-- BREAKPOINTS: the mobile canvas (xxs, 375px) design serves
+ xxs–lg (0–979px) as a full-width single column; the desktop canvas
+ (xxl, 1280px) design serves xl–xxl (1120px+) as a centered 880px
+ settings column. No distinct frame exists for xs/sm/md/lg
+ (660–979px) — the page's layout shape doesn't change across them,
+ only the mobile canvas's own internal padding/font-size rules
+ (see .canvas-frame.mobile overrides) apply throughout that range. -->
+```
 
-- **`lambdas/oauth-proxy/src/handlers/Local.ts`**: `/oauth/register` now returns identical `200 {status:'pending'}` body for new and existing emails. No JWT or auth cookies issued. Always hashes the password for timing parity.
-- **`lambdas/oauth-proxy/src/handlers/Discord.ts`**: `/oauth/discord/link` returns generic `409 'Could not link Discord account'` instead of confirming "already linked to another user". Detail kept in server warn log.
-- **`apps/web-e2e/src/utils/test-user-auth.ts`**: e2e bootstrap performs a second `POST /oauth/login` after a successful register (since register no longer returns a JWT).
-- **`lambdas/oauth-proxy/src/handlers/Local.spec.ts`**: rewrote with proper module mocks (previous file failed locally because it imported `@legacy-sports/db-client` without mocking, which throws on missing `DB_PASSWORD` at module-init). 8 new tests cover uniform response, no-JWT body, user-creation behavior, and timing-parity hash.
-- **`lambdas/oauth-proxy/src/handlers/Discord.spec.ts`**: added `handleDiscordLink` test block covering the generic-error path and the successful-link path.
+Breakpoint bands (`lib/design-tokens/src/lib/breakpoints.ts`): `xxs`=0, `xs`=660, `sm`=800, `md`=860, `lg`=980, `xl`=1120, `xxl`=1280 (min-width thresholds; each band runs to the next one's start).
 
-### Accepted tradeoffs (anticipate these in review)
+The mobile canvas's own coverage claim covers `xxs` through the _end_ of `lg` conceptually, but its stated pixel range stops at `979px` — one pixel short of where `lg` (980px) even starts, so the entire `980–1119px` span (all of `lg`) is unclaimed by either canvas. The desktop canvas's `1120px+` claim is correct for `xl`–`xxl` and does not need to change.
 
-- **Squatting risk**: the uniform response still creates a user record on a new unverified email. An attacker can register `victim@example.com` with a password they choose, locking out the real owner. This is **out of scope for LS-2549** (which targets enumeration, not squatting) and is closed by **LS-4739** (verification email flow). Documented in the PR body and the ticket's Implementation Notes — reviewers may flag this; the response is "covered by LS-4739, not in this ticket's scope".
-- **Timing parity is best-effort**: bcrypt dominates the new-user path but the existing-user path also hashes; the DB read is non-uniform between the two. Sufficient to make timing a poor oracle in practice but not constant-time.
-- **`handleDiscordLink` second 409** (`'A different Discord account is already linked — unlink it first'`) is intentionally left as-is: it describes the _calling user's own_ state, not other users', so it's not an enumeration vector.
+### Why this isn't a repo-only fix
 
-### Pre-existing failing tests (out of scope)
-
-The previous `Local.spec.ts` had 8 of 9 tests failing locally because they exercised handlers without mocking DB modules (module-init throws on missing `DB_PASSWORD`). The new spec file replaces it with mocked tests that pass. The old tests for "password too short" hinted at a `min(8)` schema that never existed — that mismatch was pre-existing and not in scope here.
+This bundle (`docs/design/QjHjpBJxAbmU7Xcc8HWarw/`) is a synced mirror of a live Claude Design project (`019de999-00d9-72cf-bb9a-3110eab0e366`). Editing the mirror without also fixing the source means the next `/pull-design` or `/sync-designs` run silently reintroduces the exact gap this ticket exists to close. The ticket's own `METHOD` and `CLOSURE AC #3` require the source fix + re-pull, not a standalone repo edit.
 
 ## Files Changed
 
-```
-apps/web-e2e/src/utils/test-user-auth.ts         |  42 +++-
-lambdas/oauth-proxy/src/handlers/Discord.spec.ts |  65 ++++-
-lambdas/oauth-proxy/src/handlers/Discord.ts      |  15 +-
-lambdas/oauth-proxy/src/handlers/Local.spec.ts   | 229 ++++++++++++------
-lambdas/oauth-proxy/src/handlers/Local.ts        |  58 ++--
-```
-
-## To Resume Locally
-
-```bash
-git fetch origin claude/exciting-sagan-bkakZ
-git checkout claude/exciting-sagan-bkakZ
-
-# PR:        https://github.com/bkrupa/legacy-sports/pull/4133
-# Ticket:    https://bkrupa.atlassian.net/browse/LS-2549
-# Follow-up: https://bkrupa.atlassian.net/browse/LS-4739 (verification email)
-# Follow-up: https://bkrupa.atlassian.net/browse/LS-4740 (per-IP rate limiting)
-```
+None yet — this session made no code changes; it diagnosed the gap and confirmed the `DesignSync` capability boundary, then produced this handoff.
