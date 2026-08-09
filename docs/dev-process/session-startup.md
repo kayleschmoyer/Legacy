@@ -61,11 +61,12 @@ The `mcp-bootstrap.mjs` audit performed alongside LS-4505 confirmed it touches o
 
 Real warnings (post-LS-4505) mean what they say. Walk the checklist:
 
-| Warning                            | Cause                                                 | First fix to try                                                            |
-| ---------------------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------- |
-| `node_modules/.bin/tsx is missing` | Symlink absent, broken, or the pool slot is unhealthy | `node scripts/modules-pool/link.mjs` from worktree root (or `make install`) |
-| `.mcp.json not found`              | `CLAUDE_PROJECT_DIR` not set to the worktree path     | Restart Claude Code from inside the worktree                                |
-| `mcp-bootstrap.mjs missing`        | File deleted from working tree                        | `git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs`              |
+| Warning                                                         | Cause                                                                                | First fix to try                                                                                                                                                                                                           |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `node_modules/.bin/tsx is missing` (worktree session)           | Symlink absent, broken, or the pool slot is unhealthy                                | `node scripts/modules-pool/link.mjs` from worktree root (or `make install`)                                                                                                                                                |
+| `node_modules/.bin/tsx is missing` (non-worktree/cloud session) | Often transient (LS-9154) — `pnpm install` can still be running when this hook fires | Retry `ToolSearch` for a stdio tool after a few minutes; `mcp-bootstrap.mjs` (LS-8539) self-repairs on each server launch attempt, no restart needed. Only run `make install` if it's still missing after several minutes. |
+| `.mcp.json not found`                                           | `CLAUDE_PROJECT_DIR` not set to the worktree path                                    | Restart Claude Code from inside the worktree                                                                                                                                                                               |
+| `mcp-bootstrap.mjs missing`                                     | File deleted from working tree                                                       | `git checkout main -- .github/copilot/hooks/mcp-bootstrap.mjs`                                                                                                                                                             |
 
 The full diagnostic checklist (including pre-flight `auth_check_all` and the report-don't-fall-back protocol) is [`.agents/skills/mcp-first/references/diagnostics.md`](../../.agents/skills/mcp-first/references/diagnostics.md).
 

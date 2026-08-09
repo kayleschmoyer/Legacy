@@ -29,6 +29,8 @@ test -f node_modules/.bin/tsx && echo "tsx: OK" || echo "MISSING: node_modules/.
 - **OK** → proceed to Check 2
 - **MISSING** → see [Recovery: Missing node_modules](#recovery-missing-node_modules)
 
+**Non-worktree sessions (cloud agents, Claude Code Remote): a `tsx` miss reported by `check-mcp-servers.sh` near session start is often transient, not broken (LS-9154).** `pnpm install` runs in parallel with SessionStart hooks during session boot, so this hook can observe `tsx` as absent moments before it's written. `mcp-bootstrap.mjs`'s own health check (LS-8539, see [Recovery: Missing node_modules](#recovery-missing-node_modules)) re-verifies `tsx` on every stdio server launch attempt and self-repairs, so the servers typically connect on their own within a few minutes with **no session restart required** — retry `ToolSearch` for a stdio tool before concluding the servers are down. Do not add a retry/poll loop to `check-mcp-servers.sh` itself to "fix" this — LS-4505 already tried and rejected bounded polling for this exact file, because the install can take minutes on a cold lockfile miss, not seconds (see `docs/dev-process/session-startup.md` § Why not just add retries?). If `tsx` is still missing after several minutes, treat it as a genuine failure and follow the recovery steps below.
+
 ### Check 2 — `.mcp.json` exists in session root
 
 ```bash

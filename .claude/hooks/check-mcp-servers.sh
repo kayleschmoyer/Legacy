@@ -50,10 +50,31 @@ if [ ! -f "$TSX" ]; then
     WARNINGS+=("  Cause:  node_modules symlink is absent or broken in worktree.")
     WARNINGS+=("  Fix A:  from your terminal → cd \"$WIN_WT\" && node scripts/modules-pool/link.mjs  (links a content-addressable pool slot)")
     WARNINGS+=("  Fix B:  from your terminal → cd \"$WIN_WT\" && make modules-link WT=\"$WIN_WT\"  (directory symlinks require Windows Developer Mode)")
+    WARNINGS+=("  After:  restart the Claude Code session — MCP servers only connect at session start.")
   else
-    WARNINGS+=("  Fix:    run 'make install' in the project root, then restart the session.")
+    # Non-worktree sessions (cloud agents, Claude Code Remote, or a local
+    # checkout run without the worktree checkbox) can hit this at the exact
+    # moment this hook fires because `pnpm install` runs in parallel with
+    # SessionStart hooks during container/session boot (LS-9154) — tsx may
+    # not exist yet even though it is about to. Do not add a retry/poll loop
+    # here to paper over that: LS-4505 already tried bounded polling for this
+    # same file and rejected it, because the race window is unbounded (a
+    # cold-lockfile pnpm install can take minutes, not seconds) — see
+    # docs/dev-process/session-startup.md § Why not just add retries?.
+    #
+    # mcp-bootstrap.mjs (LS-8539) independently re-checks tsx on every stdio
+    # MCP server launch attempt and runs `corepack pnpm install
+    # --frozen-lockfile` itself when it's still missing, so a transient miss
+    # here usually self-heals within a few minutes with no action and no
+    # session restart — telling the agent/user to restart is misleading in
+    # that case, since the servers connect on their own once install
+    # finishes. Only recommend `make install` as a fallback for when that
+    # auto-repair has had time to run and tsx is still absent.
+    WARNINGS+=("  Note:   this can be transient at session start — node_modules install may still be finishing.")
+    WARNINGS+=("  Self-heal: mcp-bootstrap.mjs re-checks tsx on every stdio MCP server launch attempt and installs it automatically; no restart needed.")
+    WARNINGS+=("  Next:   retry ToolSearch for a stdio server (e.g. 'select:worktree_ping') after a few minutes before concluding servers are broken.")
+    WARNINGS+=("  If still missing after several minutes: run 'make install' in the project root.")
   fi
-  WARNINGS+=("  After:  restart the Claude Code session — MCP servers only connect at session start.")
 fi
 
 # --- 2. .mcp.json present ---------------------------------------------------
