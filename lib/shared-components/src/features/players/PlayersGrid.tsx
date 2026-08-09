@@ -379,7 +379,6 @@ function PlayersGrid({
                     // No career-FPTS field on this fragment yet — LS-9073
                     // owns wiring the richer data source that has one.
                     fpts="—"
-                    trend="flat"
                     onPress={() => onPlayerSelect?.(player)}
                     projection={
                       showProjections && projection !== undefined
