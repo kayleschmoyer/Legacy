@@ -1108,9 +1108,6 @@ export function PlayerStatsRoute() {
   // auth-gated queries for anonymous visitors.
   const { isAuthenticated, isLoading: authLoading } = useAuth();
 
-  // Check if the user is in at least one baseball league — availability filter
-  // is only surfaced when this is true.
-  //
   // PST-070 (LS-7130): `userLeagues` is auth-gated and throws
   // AuthenticationError for signed-out users. On a public shared link this
   // surfaced an opaque global auth-error toast to the recipient. Skip the query
@@ -1122,23 +1119,34 @@ export function PlayerStatsRoute() {
     fetchPolicy: 'cache-first',
     skip: !isAuthenticated || authLoading,
   });
-  const hasBaseballLeagues = (leaguesData?.userLeagues ?? []).some(
+
+  // Availability filter needs a single, unambiguous league to scope "Free
+  // Agents"/"Rostered" against. `/players/stats` is a global, cross-league
+  // grid — the underlying data (useLeagueRosteredPlayerIds) can only report
+  // "rostered on one of my own teams", which conflates every league the
+  // viewer belongs to. With zero leagues that data is empty (correctly
+  // hidden below); with two-plus it's ambiguous (a player may be a free
+  // agent in one league and rostered in another, so neither label is true
+  // league-wide). Only the exactly-one-league case has a real, single league
+  // context, so that's the only case the filter is shown (LS-9141). The
+  // `/players` page instead lets multi-league viewers pick a league
+  // (LS-7044); porting that picker here is a larger follow-up, not this fix.
+  const baseballLeagueCount = (leaguesData?.userLeagues ?? []).filter(
     (l) => l.sport === Sport.Baseball,
-  );
+  ).length;
+  const showBaseballAvailabilityFilter = baseballLeagueCount === 1;
   const { playerIds: baseballRosteredIds } = useLeagueRosteredPlayerIds(
     Sport.Baseball,
-    !hasBaseballLeagues,
+    !showBaseballAvailabilityFilter,
   );
 
-  // Football availability filter (LS-8442): surfaced only when the viewer is in
-  // at least one football league, mirroring the baseball wiring above. Both
-  // queries are already auth-skipped via the shared `userLeagues` gate.
-  const hasFootballLeagues = (leaguesData?.userLeagues ?? []).some(
+  const footballLeagueCount = (leaguesData?.userLeagues ?? []).filter(
     (l) => l.sport === Sport.Football,
-  );
+  ).length;
+  const showFootballAvailabilityFilter = footballLeagueCount === 1;
   const { playerIds: footballRosteredIds } = useLeagueRosteredPlayerIds(
     Sport.Football,
-    !hasFootballLeagues,
+    !showFootballAvailabilityFilter,
   );
 
   // Derive the active sport from the URL param, falling back to the user's
@@ -1681,7 +1689,7 @@ export function PlayerStatsRoute() {
           onShare={handleShare}
           onFiltersChange={handleNflFiltersChange}
           onPlayerDetails={handleNflPlayerDetails}
-          showAvailabilityFilter={hasFootballLeagues}
+          showAvailabilityFilter={showFootballAvailabilityFilter}
           rosteredPlayerIds={footballRosteredIds}
         />
         {selectedPlayerId !== null && (
@@ -1870,7 +1878,7 @@ export function PlayerStatsRoute() {
           onVisibleRowsChange={handleVisibleRowsChange}
           onShare={handleShare}
           onFiltersChange={handleFiltersChange}
-          showAvailabilityFilter={hasBaseballLeagues}
+          showAvailabilityFilter={showBaseballAvailabilityFilter}
           rosteredPlayerIds={baseballRosteredIds}
         />
       </PremiumGate>

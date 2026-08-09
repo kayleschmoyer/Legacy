@@ -698,6 +698,74 @@ describe('PlayerStatsRoute public-link auth gating (PST-070)', () => {
   });
 });
 
+// LS-9141: the availability filter's "Free Agents"/"Rostered" labels only map
+// onto a single, unambiguous league — `useLeagueRosteredPlayerIds` reports
+// player IDs rostered on the viewer's own teams across every league of the
+// sport, which is empty with zero leagues and conflates multiple leagues with
+// two-plus. The filter is only shown when the viewer has exactly one league
+// of the active sport.
+describe('PlayerStatsRoute availability filter league-count gating (LS-9141)', () => {
+  function setUserLeagues(
+    leagues: ReadonlyArray<{ sport: 'Baseball' | 'Football' }>,
+  ) {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leagues },
+      loading: false,
+    } as never);
+  }
+
+  beforeEach(() => {
+    mockIsAuthenticated = true;
+    mockAuthLoading = false;
+  });
+
+  afterEach(() => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({ data: null, loading: false });
+  });
+
+  it('hides the baseball availability filter with zero baseball leagues', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    setUserLeagues([]);
+    render(<PlayerStatsRoute />);
+    expect(mockStatsPageProps.showAvailabilityFilter).toBe(false);
+  });
+
+  it('shows the baseball availability filter with exactly one baseball league', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    setUserLeagues([{ sport: 'Baseball' }]);
+    render(<PlayerStatsRoute />);
+    expect(mockStatsPageProps.showAvailabilityFilter).toBe(true);
+  });
+
+  it('hides the baseball availability filter with two-plus baseball leagues', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    setUserLeagues([{ sport: 'Baseball' }, { sport: 'Baseball' }]);
+    render(<PlayerStatsRoute />);
+    expect(mockStatsPageProps.showAvailabilityFilter).toBe(false);
+  });
+
+  it('hides the football availability filter with zero football leagues', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    setUserLeagues([]);
+    render(<PlayerStatsRoute />);
+    expect(mockFootballStatsPageProps.showAvailabilityFilter).toBe(false);
+  });
+
+  it('shows the football availability filter with exactly one football league', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    setUserLeagues([{ sport: 'Football' }]);
+    render(<PlayerStatsRoute />);
+    expect(mockFootballStatsPageProps.showAvailabilityFilter).toBe(true);
+  });
+
+  it('hides the football availability filter with two-plus football leagues', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    setUserLeagues([{ sport: 'Football' }, { sport: 'Football' }]);
+    render(<PlayerStatsRoute />);
+    expect(mockFootballStatsPageProps.showAvailabilityFilter).toBe(false);
+  });
+});
+
 // PST-050 / LS-7123: a player click used to coerce the id with
 // `parseInt(player.id, 10)`, so a brefId-style string id (e.g. 'troutmi01')
 // silently became NaN and opened the detail view for player NaN. A non-numeric
