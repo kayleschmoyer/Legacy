@@ -67,8 +67,10 @@ describe('DiscordCallbackPage — actionable link errors (LS-6659)', () => {
   });
 
   it('shows friendly guidance and a contact-support link for the already-linked 409', async () => {
+    // Matches the real oauth-proxy message (lowercase "discord") — see
+    // lambdas/oauth-proxy/src/handlers/IdentityLink.ts.
     mockLinkDiscordAccount.mockRejectedValue(
-      new Error('Could not link Discord account'),
+      new Error('Could not link discord account'),
     );
     setSearch('?code=abc&state=xyz');
 
@@ -124,6 +126,19 @@ describe('DiscordCallbackPage — actionable link errors (LS-6659)', () => {
         { replace: true },
       );
     });
+  });
+
+  it('matches the already-linked 409 regardless of message casing (LS-9132, LS-9133)', async () => {
+    mockLinkDiscordAccount.mockRejectedValue(
+      new Error('Could Not Link Discord Account'),
+    );
+    setSearch('?code=abc&state=xyz');
+
+    renderPage();
+
+    expect(
+      await screen.findByText(/this discord account can’t be linked/i),
+    ).toBeInTheDocument();
   });
 
   it('shows an error with contact support when the security check fails (missing code/state)', async () => {

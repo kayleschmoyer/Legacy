@@ -33,7 +33,7 @@ const SUPPORT_EMAIL = 'support@legacysports.com';
  * (LS-2549), so we cannot make the server message more specific. Instead we
  * detect it here and surface an actionable next step (LS-6659).
  */
-const DISCORD_ALREADY_LINKED_MESSAGE = 'Could not link Discord account';
+const DISCORD_ALREADY_LINKED_MESSAGE = 'could not link discord account';
 
 export function DiscordCallbackPage(): React.JSX.Element {
   const { config } = useAuth();
@@ -85,7 +85,7 @@ export function DiscordCallbackPage(): React.JSX.Element {
 
   if (errorMessage) {
     const isAlreadyLinkedConflict =
-      errorMessage === DISCORD_ALREADY_LINKED_MESSAGE;
+      errorMessage.toLowerCase() === DISCORD_ALREADY_LINKED_MESSAGE;
     const displayMessage = isAlreadyLinkedConflict
       ? 'This Discord account can’t be linked to your profile.'
       : errorMessage;

@@ -129,9 +129,11 @@ test.describe('Discord OAuth callback — error states @regression', () => {
   }) => {
     // The oauth-proxy returns this intentionally-vague 409 when the Discord
     // account is linked to a different Legacy Sports user (LS-2549/LS-6659).
+    // Message casing matches lambdas/oauth-proxy/src/handlers/IdentityLink.ts
+    // exactly (lowercase "discord") — see LS-9132/LS-9133.
     await mockDiscordLink(page, {
       status: 409,
-      body: { message: 'Could not link Discord account' },
+      body: { message: 'Could not link discord account' },
     });
 
     await discordCallbackScreen.goto('?code=taken-code&state=nonce-123');
