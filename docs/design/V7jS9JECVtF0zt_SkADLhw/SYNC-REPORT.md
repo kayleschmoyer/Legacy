@@ -7,6 +7,29 @@
 **Files**: 18
 **Total size**: 470322 bytes
 
+## LS-9087 addendum (2026-08-09)
+
+LS-9024's Breakpoints audit found `lg` (980px) and `xl` (1120px) unclaimed by
+any frame or annotation — the `lg`/`xl` desktop layout was implicit (no
+reflow between the 979px mobile edge and the 1280px `xxl` frame) rather than
+explicitly claimed per PROMPT.md's checklist. Added a `BREAKPOINTS` comment
+in `scratch/mockups/help.html` stating that the unqualified desktop rules
+serve `lg`/`xl` as the same layout that anchors at the `xxl` frame, so all
+seven bands are now explicitly covered.
+
+**Deviation from the normal design-source-fix pattern**: this session is
+Claude Code Remote (CCR); the `DesignSync` tool requires an interactive
+`/design-login` that CCR cannot run (`get_project` on `019de997-dc7e-7592-a71f-df4e0ea9f180`
+returned "needs design-system authorization... not available in this
+environment"). Unlike LS-8966 (fixed at the Claude Design source, then
+re-pulled), this fix was applied **directly to the repo bundle** — the only
+reachable surface from this session. The Claude Design project itself still
+lacks the annotation; a future local session with working `DesignSync` auth
+should apply the same comment at the source (project
+`019de997-dc7e-7592-a71f-df4e0ea9f180`, `scratch/mockups/help.html`) via
+`/push-design` (or the DesignSync write flow) so a subsequent `/pull-design`
+doesn't silently revert this fix.
+
 ## What changed (vs previous hash `564894d973bbc0a9e76e10d9821dba433f441d87e5b6a1e1f6994cbf8bef9335`)
 
 LS-8966 — re-ran the mechanical fixes from the LS-8954 audit at the DesignSync source (`scratch/mockups/help.html` only; all other bundle files unchanged):

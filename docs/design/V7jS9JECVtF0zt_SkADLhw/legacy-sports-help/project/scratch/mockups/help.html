@@ -1339,6 +1339,16 @@
         }
       }
 
+      /* BREAKPOINTS: lg and xl (980–1279px) are served by the unqualified
+   desktop rules above (.ls-nav, .tutorial, .contact-grid, .urgent, etc.) —
+   the same layout that carries through to the xxl (1280px) designed frame
+   below. No reflow occurs between the 980px lower edge and 1280px, so lg
+   and xl are claimed by that single layout rather than needing separate
+   frames; the xxl "Desktop · 1280" stage is that layout's fully-designed
+   anchor per PROMPT.md's "xxs and xxl always get fully designed frames"
+   rule. Combined with the xxs–md annotation above and the mobile-stage
+   reflow below, all seven bands (xxs/xs/sm/md/lg/xl/xxl) are now claimed. */
+
       /* ── Mobile-stage breakpoint reflow ──────────────────────────
    At ≥768 the page-mobile rendering switches to a tablet/desktop
    shape: split tutorial, 2-col contact grid, larger headings.
