@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { useState } from 'react';
 import { YStack } from 'tamagui';
-import { Select } from './Select';
+import { MultiSelect, Select } from './Select';
 
 const meta: Meta<typeof Select> = {
   title: 'Components/Select',
@@ -55,6 +55,50 @@ export const Disabled: Story = {
         disabled
         placeholder="Locked by commissioner"
         options={ERAS}
+      />
+    </YStack>
+  ),
+};
+
+const POSITIONS = [
+  { value: 'P', label: 'P', tone: 'P' as const },
+  { value: 'C', label: 'C', tone: 'C' as const },
+  { value: 'IF', label: 'IF', tone: 'IF' as const },
+  { value: 'OF', label: 'OF', tone: 'OF' as const },
+  { value: 'U', label: 'U', tone: 'U' as const },
+];
+
+const noopMultiSelect = (_value: string[]): void => {
+  // story-only no-op handler
+};
+
+function MultiSelectDemo(): React.JSX.Element {
+  const [v, set] = useState<string[]>(['P', 'OF']);
+  return (
+    <YStack width={320}>
+      <MultiSelect
+        label="Positions"
+        value={v}
+        onValueChange={set}
+        options={POSITIONS}
+      />
+    </YStack>
+  );
+}
+
+export const MultiSelectChips: Story = {
+  render: () => <MultiSelectDemo />,
+};
+
+export const MultiSelectDisabled: Story = {
+  render: () => (
+    <YStack width={320}>
+      <MultiSelect
+        label="Positions (locked)"
+        value={['P']}
+        onValueChange={noopMultiSelect}
+        options={POSITIONS}
+        disabled
       />
     </YStack>
   ),

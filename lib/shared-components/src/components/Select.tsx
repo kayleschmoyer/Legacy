@@ -8,6 +8,8 @@ import {
   YStack,
 } from 'tamagui';
 import { Check, ChevronDown } from '@tamagui/lucide-icons';
+import { Chip, type ChipTone } from './Chip';
+import { Popover } from './Popover';
 
 export interface SelectOption {
   value: string;
@@ -150,6 +152,183 @@ export function Select({
           </TamaguiSelect.Viewport>
         </TamaguiSelect.Content>
       </TamaguiSelect>
+    </YStack>
+  );
+}
+
+export interface MultiSelectOption extends SelectOption {
+  /** Chip tone for the selected pill (e.g. a position color). Defaults to `navy`. */
+  tone?: ChipTone;
+}
+
+export interface MultiSelectProps {
+  value: string[];
+  onValueChange: (value: string[]) => void;
+  options: MultiSelectOption[];
+  /** Optional label rendered above the chip row. */
+  label?: string;
+  /** Text on the dashed "add" affordance. Defaults to `+ Add`. */
+  addLabel?: string;
+  disabled?: boolean;
+}
+
+/**
+ * Multi-select chip picker — selected options render as removable chips;
+ * a dashed "+ Add" chip opens a popover checklist of the remaining options.
+ */
+export function MultiSelect({
+  value,
+  onValueChange,
+  options,
+  label,
+  addLabel = '+ Add',
+  disabled = false,
+}: MultiSelectProps): React.JSX.Element {
+  const [open, setOpen] = React.useState(false);
+  const selected = options.filter((opt) => value.includes(opt.value));
+
+  const toggle = (optValue: string): void => {
+    if (value.includes(optValue)) {
+      onValueChange(value.filter((v) => v !== optValue));
+    } else {
+      onValueChange([...value, optValue]);
+    }
+  };
+
+  return (
+    <YStack gap="$1">
+      {label ? (
+        <Text
+          fontFamily="$heading"
+          fontSize={11}
+          color="$textMuted"
+          fontWeight="700"
+          letterSpacing={1.2}
+          textTransform="uppercase"
+        >
+          {label}
+        </Text>
+      ) : null}
+      <XStack gap={6} flexWrap="wrap" alignItems="center">
+        {selected.map((opt) => (
+          <Chip
+            key={opt.value}
+            label={opt.label}
+            tone={opt.tone ?? 'navy'}
+            trailing={
+              disabled ? undefined : (
+                <Text
+                  fontSize={11}
+                  fontWeight="700"
+                  color="$color12"
+                  onPress={() => toggle(opt.value)}
+                  cursor="pointer"
+                  role="button"
+                  aria-label={`Remove ${opt.label}`}
+                  tabIndex={0}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggle(opt.value);
+                    }
+                  }}
+                >
+                  ×
+                </Text>
+              )
+            }
+          />
+        ))}
+        {!disabled && (
+          <Popover
+            open={open}
+            onOpenChange={setOpen}
+            trigger={
+              <XStack
+                borderWidth={1}
+                borderStyle="dashed"
+                borderColor="$outlineStrong"
+                borderRadius={9999}
+                paddingHorizontal={10}
+                paddingVertical={5}
+                cursor="pointer"
+                role="button"
+                tabIndex={0}
+                aria-label={addLabel}
+                onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setOpen(true);
+                  }
+                }}
+              >
+                <Text
+                  fontFamily="$heading"
+                  fontSize={11}
+                  fontWeight="700"
+                  letterSpacing={0.8}
+                  textTransform="uppercase"
+                  color="$textMuted"
+                >
+                  {addLabel}
+                </Text>
+              </XStack>
+            }
+          >
+            <YStack gap={2} minWidth={180}>
+              {options.map((opt) => {
+                const isSelected = value.includes(opt.value);
+                return (
+                  <XStack
+                    key={opt.value}
+                    onPress={() => !opt.disabled && toggle(opt.value)}
+                    paddingVertical={9}
+                    paddingHorizontal={12}
+                    borderRadius={6}
+                    justifyContent="space-between"
+                    alignItems="center"
+                    backgroundColor={isSelected ? '$brandNavy' : 'transparent'}
+                    hoverStyle={
+                      opt.disabled
+                        ? undefined
+                        : {
+                            backgroundColor: isSelected
+                              ? '$brandNavy'
+                              : '$backgroundHover',
+                          }
+                    }
+                    opacity={opt.disabled ? 0.5 : 1}
+                    cursor={opt.disabled ? 'not-allowed' : 'pointer'}
+                    role="option"
+                    aria-selected={isSelected}
+                    aria-disabled={opt.disabled}
+                    tabIndex={opt.disabled ? undefined : 0}
+                    onKeyDown={
+                      opt.disabled
+                        ? undefined
+                        : (e: React.KeyboardEvent<HTMLElement>) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              toggle(opt.value);
+                            }
+                          }
+                    }
+                  >
+                    <Text
+                      fontFamily="$body"
+                      fontSize={14}
+                      color={isSelected ? '$textOnAccent' : '$color11'}
+                    >
+                      {opt.label}
+                    </Text>
+                    {isSelected && <Check size={14} color="$textOnAccent" />}
+                  </XStack>
+                );
+              })}
+            </YStack>
+          </Popover>
+        )}
+      </XStack>
     </YStack>
   );
 }
