@@ -22,7 +22,7 @@ export const Card = tamaguiStyled(TamaguiCard, {
   backgroundColor: '$surfaceCard',
   borderColor: '$glassBorder',
   borderWidth: 1,
-  borderRadius: '$6',
+  borderRadius: '$5',
   padding: '$5',
   gap: '$2',
   overflow: 'hidden',

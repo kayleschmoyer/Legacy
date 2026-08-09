@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, Dialog as TamaguiDialog, Text, XStack, YStack } from 'tamagui';
 import type { GetProps } from 'tamagui';
 import { X } from '@tamagui/lucide-icons';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 export interface DialogProps extends Omit<
   GetProps<typeof TamaguiDialog>,
@@ -37,16 +38,23 @@ export function Dialog({
   onCancel,
   destructive = false,
 }: DialogProps): React.JSX.Element {
+  // Springs settle at browser-dependent real-world durations; collapse to a
+  // near-instant timing animation under prefers-reduced-motion so enter/exit
+  // is deterministic for users who request it (and for E2E, which forces
+  // this media feature — LS-8995), matching Sheet/BaseModal precedent.
+  const animation = useReducedMotion() ? '100ms' : 'medium';
+
   return (
     <TamaguiDialog modal open={open} onOpenChange={onOpenChange}>
       <TamaguiDialog.Portal>
         <TamaguiDialog.Overlay
           key="overlay"
-          animation="quick"
+          animation={animation}
           opacity={1}
           enterStyle={{ opacity: 0 }}
           exitStyle={{ opacity: 0 }}
           backgroundColor="rgba(8, 12, 20, 0.7)"
+          style={{ backdropFilter: 'blur(6px)' } as never}
         />
         <TamaguiDialog.Content
           key="content"
@@ -60,7 +68,7 @@ export function Dialog({
           shadowColor="rgba(8, 12, 20, 0.75)"
           shadowOffset={{ width: 0, height: 20 }}
           shadowRadius={48}
-          animation="medium"
+          animation={animation}
           enterStyle={{ opacity: 0, scale: 0.96, y: 8 }}
           exitStyle={{ opacity: 0, scale: 0.96, y: 8 }}
         >
