@@ -427,6 +427,9 @@ export function LeagueDetailPageV2(): React.JSX.Element {
                 onJoinDraft={() =>
                   navigate(`/baseball/league/${leagueId}/draft`)
                 }
+                onWatchDraft={() =>
+                  navigate(`/baseball/league/${leagueId}/draft/watch`)
+                }
                 currentUserId={user?.id ?? null}
                 myRoster={myRoster}
               />

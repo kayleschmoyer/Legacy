@@ -140,6 +140,11 @@ const EliteDraftBoardScreen = lazyWithRetry(() =>
     default: m.EliteDraftBoardScreen,
   })),
 );
+const EliteDraftSpectatorScreen = lazyWithRetry(() =>
+  import('../components/EliteDraftSpectator').then((m) => ({
+    default: m.EliteDraftSpectatorScreen,
+  })),
+);
 const FootballHubPage = lazyWithRetry(() =>
   import('../pages/football/FootballHubPage').then((m) => ({
     default: m.FootballHubPage,
@@ -492,6 +497,13 @@ function App() {
 
   const { pathname } = useLocation();
 
+  // Big-screen / TV draft-watch routes suppress the standard app chrome
+  // (nav, scoreboard ticker, mobile bottom bar) so the page is a clean
+  // broadcast canvas (LS-8943). No pre-existing immersive/fullscreen
+  // mechanism exists in this file to hook into, so this is a plain
+  // route-prefix check.
+  const isImmersiveRoute = pathname.endsWith('/draft/watch');
+
   // Restore saved scroll position when returning to a previously-visited route
   // (both back/forward POP and sport-switch PUSH navigations). Scroll to top
   // only on first visit, when no saved position exists.
@@ -559,10 +571,10 @@ function App() {
       <PostLoginBillingBanner />
       {/* Global toast for uncaught Apollo/GraphQL errors */}
       <ApolloErrorToast />
-      <Navigation />
+      {!isImmersiveRoute && <Navigation />}
       {/* Live scores ticker — renders only when today's MLB games are available.
           The spacer inside ScoreboardTicker ensures no blank strip on empty days. */}
-      <ScoreboardTicker />
+      {!isImmersiveRoute && <ScoreboardTicker />}
       <YStack
         tag="main"
         role="main"
@@ -690,6 +702,14 @@ function App() {
             <Route
               path="/baseball/league/:id/draft"
               element={<EliteDraftBoardScreen />}
+            />
+            {/* Read-only big-screen / public draft watch (LS-8943). Signed-in
+                only — deliberately not in PUBLIC_PATHS (main.tsx); access to
+                private leagues is enforced server-side and surfaced by
+                SpectatorScreen itself as a "This draft is private" state. */}
+            <Route
+              path="/baseball/league/:id/draft/watch"
+              element={<EliteDraftSpectatorScreen />}
             />
             <Route path="/baseball/mock-draft" element={<MockDraftPage />} />
             <Route
@@ -830,9 +850,11 @@ function App() {
         </Suspense>
       </YStack>
       {/* Mobile bottom bar — fixed, hidden on desktop */}
-      <YStack display="flex" $gtMd={{ display: 'none' }}>
-        <MobileBottomBar />
-      </YStack>
+      {!isImmersiveRoute && (
+        <YStack display="flex" $gtMd={{ display: 'none' }}>
+          <MobileBottomBar />
+        </YStack>
+      )}
     </MainLayout>
   );
 }

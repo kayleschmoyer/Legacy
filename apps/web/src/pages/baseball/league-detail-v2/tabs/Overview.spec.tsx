@@ -186,6 +186,7 @@ describe('OverviewTab — Invite section anchor (LS-7968)', () => {
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
         currentUserId={1}
         myRoster={[]}
       />,
@@ -204,6 +205,7 @@ describe('OverviewTab — Invite section anchor (LS-7968)', () => {
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
         currentUserId={1}
         myRoster={[]}
       />,
@@ -238,6 +240,7 @@ describe('OverviewTab — Join Draft Room (LS-4916)', () => {
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={onJoinDraft}
+        onWatchDraft={jest.fn()}
         currentUserId={1}
         myRoster={[]}
       />,
@@ -261,6 +264,7 @@ describe('OverviewTab — Join Draft Room (LS-4916)', () => {
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
         currentUserId={1}
         myRoster={[]}
       />,
@@ -281,6 +285,7 @@ describe('OverviewTab — Join Draft Room (LS-4916)', () => {
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
         currentUserId={1}
         myRoster={[]}
       />,
@@ -316,6 +321,7 @@ describe('OverviewTab — paused draft banner (LS-8843)', () => {
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
         currentUserId={1}
         myRoster={[]}
       />,
@@ -339,6 +345,7 @@ describe('OverviewTab — paused draft banner (LS-8843)', () => {
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={onJoinDraft}
+        onWatchDraft={jest.fn()}
         currentUserId={1}
         myRoster={[]}
       />,
@@ -360,6 +367,7 @@ describe('OverviewTab — paused draft banner (LS-8843)', () => {
         onTab={jest.fn()}
         onTeam={jest.fn()}
         onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
         currentUserId={1}
         myRoster={[]}
       />,
@@ -380,6 +388,7 @@ describe('OverviewTab — paused draft banner (LS-8843)', () => {
           onTab={jest.fn()}
           onTeam={jest.fn()}
           onJoinDraft={jest.fn()}
+          onWatchDraft={jest.fn()}
           currentUserId={1}
           myRoster={[]}
         />,
@@ -388,6 +397,106 @@ describe('OverviewTab — paused draft banner (LS-8843)', () => {
       expect(screen.queryByText('Draft Is Live')).not.toBeInTheDocument();
     },
   );
+});
+
+describe('OverviewTab — Watch Draft banner (LS-8943)', () => {
+  const baseLeague = {
+    __typename: 'League',
+    id: 3924,
+    sport: Sport.Baseball,
+    draftStatus: 'in-progress',
+    maxRosterSize: 25,
+    gamesPerMatchup: 7,
+    inviteCode: 'ABC123',
+    lmNotes: null,
+    currentWeekNumber: null,
+    currentMatchup: null,
+    isPublic: false,
+  } as unknown as LeagueFragment;
+
+  it('shows the Watch Draft banner for members', () => {
+    render(
+      <OverviewTab
+        league={baseLeague}
+        teams={[]}
+        myTeamId={1}
+        isCommissioner={false}
+        isMember={true}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: /watch draft/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('shows the Watch Draft banner for non-members when the league is public', () => {
+    render(
+      <OverviewTab
+        league={{ ...baseLeague, isPublic: true }}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={false}
+        isMember={false}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: /watch draft/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('hides the Watch Draft banner for non-members when the league is private', () => {
+    render(
+      <OverviewTab
+        league={baseLeague}
+        teams={[]}
+        myTeamId={null}
+        isCommissioner={false}
+        isMember={false}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        onWatchDraft={jest.fn()}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: /watch draft/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('calls onWatchDraft when the Watch Draft button is clicked', () => {
+    const onWatchDraft = jest.fn();
+    render(
+      <OverviewTab
+        league={baseLeague}
+        teams={[]}
+        myTeamId={1}
+        isCommissioner={false}
+        isMember={true}
+        onTab={jest.fn()}
+        onTeam={jest.fn()}
+        onJoinDraft={jest.fn()}
+        onWatchDraft={onWatchDraft}
+        currentUserId={1}
+        myRoster={[]}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /watch draft/i }));
+    expect(onWatchDraft).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Snapshot', () => {

@@ -413,6 +413,7 @@ export interface OverviewTabProps {
   onTab: (t: TabId) => void;
   onTeam: (teamId: number) => void;
   onJoinDraft: () => void;
+  onWatchDraft: () => void;
   currentUserId: number | null;
   myRoster: readonly TeamMemberFragment[];
 }
@@ -426,6 +427,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
   onTab,
   onTeam,
   onJoinDraft,
+  onWatchDraft,
   currentUserId,
   myRoster,
 }) => {
@@ -521,6 +523,26 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             >
               <I.PlayCircle size={12} />{' '}
               {isPausedDraft ? 'Return to Draft Room' : 'Join Draft Room'}
+            </button>
+          }
+        />
+      ) : null}
+      {/* Big-screen / public spectator entry point (LS-8943): members always,
+          non-members only when the commissioner has set the league public. */}
+      {isMember || league.isPublic ? (
+        <Banner
+          kind="spectator"
+          icon={<I.Eye size={20} />}
+          title="Watch Draft"
+          sub="Open the read-only, big-screen draft view — great for casting to a TV."
+          actions={
+            <button
+              className="ls-btn sm"
+              type="button"
+              aria-label="Watch draft"
+              onClick={onWatchDraft}
+            >
+              <I.Eye size={12} /> Watch Draft
             </button>
           }
         />
