@@ -99,11 +99,15 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
             '',
             '$ pnpm install --no-frozen-lockfile (no frozen lockfile requested)',
           );
+          // shell: true — this function is Windows-only (guarded above); `pnpm`
+          // is resolved via a corepack .cmd shim there that execFile cannot
+          // launch without a shell (LS-9153).
           const installOut = await runCommand(
             'pnpm',
             ['install', '--no-frozen-lockfile'],
             worktreePath,
             300_000,
+            true,
           );
           log.push(installOut);
           log.push('', '$ make install (Poetry sync + hooks)');
@@ -135,11 +139,15 @@ export async function wtSetup(params: WtSetupParams): Promise<ToolResult> {
             '',
             '$ pnpm install --no-frozen-lockfile (no frozen lockfile requested)',
           );
+          // shell: true — this function is Windows-only (guarded above); `pnpm`
+          // is resolved via a corepack .cmd shim there that execFile cannot
+          // launch without a shell (LS-9153).
           const installOut = await runCommand(
             'pnpm',
             ['install', '--no-frozen-lockfile'],
             worktreePath,
             300_000,
+            true,
           );
           log.push(installOut);
           log.push('', '$ make install (Poetry sync + hooks)');

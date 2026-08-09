@@ -71,6 +71,8 @@ async function checkMigrationStatus(
 ): Promise<MigrationStatusResult> {
   const migrationNames = collectMigrationNames(repoRoot);
   try {
+    // shell: true — bare `pnpm` on Windows is resolved via a corepack .cmd
+    // shim that execFile cannot launch without a shell (LS-9153).
     const output = await runCommand(
       'pnpm',
       [
@@ -126,6 +128,8 @@ async function applyMigrations(
   repoRoot: string,
   workDir: string,
 ): Promise<string> {
+  // shell: true — bare `pnpm` on Windows is resolved via a corepack .cmd
+  // shim that execFile cannot launch without a shell (LS-9153).
   return runCommand(
     'pnpm',
     ['--prefix', join(repoRoot, 'lib', 'db-client'), 'run', 'db:up'],

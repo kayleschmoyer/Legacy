@@ -128,7 +128,15 @@ export async function runCustomChecks(
     const scriptPath = join(CHECKS_DIR, script);
     const start = Date.now();
     try {
-      const output = await runCommand('bash', [scriptPath], workDir, timeoutMs);
+      // shell: true — on Windows, `bash` (Git Bash) requires shell interpretation
+      // to resolve via PATH the same way `make` does (LS-9021, LS-9153).
+      const output = await runCommand(
+        'bash',
+        [scriptPath],
+        workDir,
+        timeoutMs,
+        true,
+      );
       results.push({
         script,
         passed: true,

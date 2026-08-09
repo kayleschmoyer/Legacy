@@ -680,7 +680,15 @@ server.tool(
     let makeVersion: string | undefined;
     let makeError: string | undefined;
     try {
-      const out = await runCommand('make', ['--version'], repoRoot, 10_000);
+      // shell: true — bare `make` on Windows is commonly resolved via a
+      // .cmd/.bat shim that execFile cannot launch without a shell (LS-9153).
+      const out = await runCommand(
+        'make',
+        ['--version'],
+        repoRoot,
+        10_000,
+        true,
+      );
       makeVersion = out.split('\n')[0]?.trim();
     } catch (err) {
       makeError = err instanceof Error ? err.message : String(err);

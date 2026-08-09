@@ -19,13 +19,21 @@ export function getRepoRoot(): string {
   return resolve(thisDir, '..', '..', '..', '..');
 }
 
-/** Run a command in a given directory and return stdout. Throws on non-zero exit. */
+/**
+ * Run a command in a given directory and return stdout. Throws on non-zero exit.
+ *
+ * `shell` defaults to `false` (execFile's own default) so callers get
+ * shell-injection-free argument passing unless a call site is verified to need
+ * shell interpretation (e.g. Windows PATH resolution for bare `make`/`pnpm`/`bash`,
+ * which are resolved via .cmd/.bat shims that execFile cannot launch directly) —
+ * see LS-9153.
+ */
 export function runCommand(
   command: string,
   args: string[],
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
-  shell = true,
+  shell = false,
   maxBuffer = 10 * 1024 * 1024,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -72,5 +80,7 @@ export function runMake(
   cwd: string,
   timeoutMs = COMMAND_TIMEOUT,
 ): Promise<string> {
-  return runCommand('make', args, cwd, timeoutMs);
+  // shell: true — on Windows, `make` is commonly resolved via a .cmd/.bat shim
+  // (e.g. choco/scoop installs) that execFile cannot launch without a shell.
+  return runCommand('make', args, cwd, timeoutMs, true);
 }
