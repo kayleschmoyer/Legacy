@@ -19,6 +19,7 @@
 import {
   createLocalJWKSet,
   createRemoteJWKSet,
+  decodeJwt,
   errors as joseErrors,
   type JSONWebKeySet,
   type JWTPayload,
@@ -276,6 +277,79 @@ function readConfigFromEnv(requiredScope: string): AuthConfig | AuthFailure {
 }
 
 /**
+ * Non-secret claims extracted (unverified) from the presented token, for the
+ * structured auth-event log line only. Never includes the token itself or any
+ * signature material.
+ */
+interface TokenLogClaims {
+  iat?: number;
+  exp?: number;
+  auth_time?: unknown;
+  client_id?: unknown;
+  token_use?: unknown;
+  scope?: unknown;
+  jti?: unknown;
+  origin_jti?: unknown;
+}
+
+/** Exported for tests only — production callers go through `authenticateMcpRequest`. */
+export function tokenLogClaims(
+  headers: Record<string, string | undefined> | undefined,
+): TokenLogClaims | null {
+  const parsed = readBearer(headers);
+  if ('code' in parsed) return null;
+  try {
+    // Unverified decode — acceptable here because the claims feed a diagnostic
+    // log line only, never an authorization decision.
+    const payload = decodeJwt(parsed.token);
+    return {
+      iat: payload.iat,
+      exp: payload.exp,
+      auth_time: payload['auth_time'],
+      client_id: payload['client_id'],
+      token_use: payload['token_use'],
+      scope: payload['scope'],
+      jti: payload.jti,
+      origin_jti: payload['origin_jti'],
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One structured line per authenticated request, written to stderr so it lands
+ * in the Lambda's CloudWatch log group. This is the only server-side evidence
+ * of connector token lifecycle: Cognito's /oauth2/token endpoint is not
+ * CloudTrail-logged, the user pool has no log delivery configured, and the MCP
+ * API Gateways have no access logs — without this line a mid-session 401 is
+ * forensically invisible (LS-8696). `tokenAgeSeconds` distinguishes a stale
+ * never-refreshed token from a freshly-minted-but-rejected one, and `iat`
+ * advancing across a session proves claude.ai's refresh flow is working.
+ */
+function logAuthEvent(
+  outcome: 'accepted' | 'rejected',
+  requiredScope: string,
+  reason: string | null,
+  claims: TokenLogClaims | null,
+): void {
+  const now = Math.floor(Date.now() / 1000);
+  process.stderr.write(
+    `[mcp-bearer-auth] ${JSON.stringify({
+      event: 'mcp-auth',
+      outcome,
+      requiredScope,
+      ...(reason === null ? {} : { reason }),
+      claims,
+      tokenAgeSeconds:
+        typeof claims?.iat === 'number' ? now - claims.iat : null,
+      expiresInSeconds:
+        typeof claims?.exp === 'number' ? claims.exp - now : null,
+    })}\n`,
+  );
+}
+
+/**
  * Authenticate an incoming Lambda request. Returns `null` when the request
  * carries a valid Cognito bearer for this server; otherwise returns a
  * well-formed JSON-RPC error response the handler should return immediately
@@ -299,10 +373,17 @@ export async function authenticateMcpRequest(
     // JSON-RPC envelope so the client gets the same actionable error shape
     // as a bad token, rather than the Lambda runtime turning a thrown
     // Error into an opaque 5xx the MCP transport can't parse.
+    logAuthEvent('rejected', options.requiredScope, config.message, null);
     return buildAuthErrorResponse(config);
   }
   const jwks = getRemoteJwks(config.issuer);
   const result = await verifyBearerToken(event.headers, config, jwks);
+  logAuthEvent(
+    result ? 'rejected' : 'accepted',
+    options.requiredScope,
+    result?.message ?? null,
+    tokenLogClaims(event.headers),
+  );
   if (!result) return null;
   // Missing/invalid token → spec-compliant 401 challenge so an OAuth client
   // (Claude Code web) can discover the Cognito authorization server. The

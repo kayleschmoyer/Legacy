@@ -12,6 +12,7 @@ import {
   MCP_AUTH_ERROR_CODE,
   MCP_SCOPE,
   OAUTH_PROTECTED_RESOURCE_PATH,
+  tokenLogClaims,
   verifyBearerToken,
 } from './index';
 
@@ -464,6 +465,28 @@ describe('authenticateMcpRequest', () => {
     expect(parsed.error.message).toMatch(/MCP_AUTH_MODE/);
   });
 
+  it('writes a structured auth-event line to stderr on rejection (LS-8696)', async () => {
+    process.env['MCP_COGNITO_ISSUER'] = ISSUER;
+    process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
+    const writes: string[] = [];
+    const spy = jest
+      .spyOn(process.stderr, 'write')
+      .mockImplementation((chunk: string | Uint8Array) => {
+        writes.push(String(chunk));
+        return true;
+      });
+    try {
+      await authenticateMcpRequest(gatewayEvent() as never, OPTIONS);
+    } finally {
+      spy.mockRestore();
+    }
+    const line = writes.find((w) => w.includes('"event":"mcp-auth"'));
+    expect(line).toBeDefined();
+    expect(line).toContain('"outcome":"rejected"');
+    expect(line).toContain('"claims":null');
+    expect(line).toContain(`"requiredScope":"${SCOPE}"`);
+  });
+
   it('challenges gateway requests with no bearer token (401 + WWW-Authenticate)', async () => {
     process.env['MCP_COGNITO_ISSUER'] = ISSUER;
     process.env['MCP_COGNITO_AUDIENCE'] = AUDIENCE;
@@ -483,6 +506,33 @@ describe('authenticateMcpRequest', () => {
     const parsed = parseBody(result.body);
     expect(parsed.error.code).toBe(MCP_AUTH_ERROR_CODE);
     expect(parsed.error.message).toMatch(/Authorization header missing/);
+  });
+});
+
+describe('tokenLogClaims — unverified claim extraction for auth-event logging', () => {
+  it('extracts the non-secret lifecycle claims from a bearer token', async () => {
+    const { privateKey } = await buildKeySet();
+    const token = await signToken(privateKey, {
+      scope: SCOPE,
+      extraClaims: {
+        client_id: 'connector-client',
+        token_use: 'access',
+        origin_jti: 'origin-123',
+      },
+    });
+    const claims = tokenLogClaims({ authorization: `Bearer ${token}` });
+    expect(claims).not.toBeNull();
+    expect(typeof claims?.iat).toBe('number');
+    expect(typeof claims?.exp).toBe('number');
+    expect(claims?.scope).toBe(SCOPE);
+    expect(claims?.client_id).toBe('connector-client');
+    expect(claims?.token_use).toBe('access');
+    expect(claims?.origin_jti).toBe('origin-123');
+  });
+
+  it('returns null for a missing header or undecodable token', () => {
+    expect(tokenLogClaims(undefined)).toBeNull();
+    expect(tokenLogClaims({ authorization: 'Bearer not-a-jwt' })).toBeNull();
   });
 });
 
