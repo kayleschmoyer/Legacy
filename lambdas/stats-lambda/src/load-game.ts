@@ -229,16 +229,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
               'isRateLimit' in error &&
               error.isRateLimit === true;
 
-            LOGGER.error(
-              `Failed to load stats for player ${player.playerId} in matchup ${message.matchupId}`,
-              {
-                error: error instanceof Error ? error.message : String(error),
-                playerId: player.playerId,
-                brefId: player.brefId,
-                isRetryable,
-                isRateLimit,
-              },
-            );
+            // loadPlayerGameStats already logs the failure (with stack trace and
+            // season) before rethrowing — avoid double-reporting the same error.
 
             // If rate limited, abort remaining players — no point hitting a throttled service
             if (isRateLimit) {

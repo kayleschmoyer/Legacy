@@ -253,14 +253,19 @@ export async function loadPlayerGameStats(
   } catch (error) {
     const retryable = isRetryableError(error);
 
-    LOGGER.error(`Failed to load stats for player ${playerId}:`, {
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      playerId,
-      brefId,
-      season,
-      isRetryable: retryable,
-    });
+    LOGGER.error(
+      `Failed to load stats for player ${playerId} in matchup ${matchupId}`,
+      {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        playerId,
+        brefId,
+        season,
+        matchupId,
+        isRetryable: retryable,
+        isRateLimit: isRateLimitError(error),
+      },
+    );
 
     // For retryable errors (429, timeout), leave status as 'loading' so
     // the SQS retry can process the player again without false 'failed' state
