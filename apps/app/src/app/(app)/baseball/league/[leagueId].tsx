@@ -649,6 +649,8 @@ export default function LeagueId(): React.JSX.Element {
                 draftStatus: league.draftStatus ?? 'pre-draft',
                 currentWeekNumber: league.currentWeekNumber ?? null,
                 totalMatchups: league.totalMatchups ?? null,
+                maxRosterSize: league.maxRosterSize ?? null,
+                gamesPerMatchup: league.gamesPerMatchup ?? null,
               }}
               leagueId={numLeagueId}
               teamCount={rankedStandings.length}
@@ -674,6 +676,10 @@ export default function LeagueId(): React.JSX.Element {
                 })
               }
               refreshControl={overviewRefresh.refreshControl}
+              scoringLoading={scoring.loading}
+              scoringError={scoring.error ?? null}
+              scoringProfileName={scoring.profileName}
+              scoringSettings={scoring.settings}
             />
           </YStack>
         )}

@@ -59,6 +59,11 @@ jest.mock('@legacy-sports/shared-components', () => {
         accessibilityValue={{ text: String(limit) }}
       />
     ),
+    LeagueScoringSummary: ({ profileName }: { profileName: string }) => (
+      <View testID="league-scoring-summary">
+        <Text>{profileName}</Text>
+      </View>
+    ),
     PanelCard: ({ children }: { children?: React.ReactNode }) => (
       <View>{children}</View>
     ),
@@ -147,6 +152,10 @@ const BASE_PROPS: LeagueGuidedHomeTabProps = {
     draftStatus: 'active',
     currentWeekNumber: 14,
     totalMatchups: 21,
+    maxRosterSize: 25,
+    // 12, not 5 — avoids colliding with the "5" standings-window rank text
+    // (window shows ranks 1/4/5 for this fixture).
+    gamesPerMatchup: 12,
   },
   leagueId: 42,
   teamCount: 10,
@@ -312,6 +321,51 @@ describe('LeagueGuidedHomeTab', () => {
       );
       fireEvent.press(screen.getByRole('button', { name: 'Roster' }));
       expect(onNavigateTab).toHaveBeenCalledWith('roster');
+    });
+  });
+
+  describe('league info section', () => {
+    it('shows Roster Size and Games / Matchup for non-commissioners', () => {
+      render(<LeagueGuidedHomeTab {...BASE_PROPS} isCommissioner={false} />);
+      expect(screen.getByText('League Info')).toBeTruthy();
+      expect(screen.getByText('Roster Size')).toBeTruthy();
+      expect(screen.getByText('25')).toBeTruthy();
+      expect(screen.getByText('Games / Matchup')).toBeTruthy();
+      expect(screen.getByText('12')).toBeTruthy();
+    });
+
+    it('falls back to "—" when roster size or games per matchup is missing', () => {
+      render(
+        <LeagueGuidedHomeTab
+          {...BASE_PROPS}
+          league={{
+            ...BASE_PROPS.league,
+            maxRosterSize: null,
+            gamesPerMatchup: null,
+          }}
+        />,
+      );
+      expect(screen.getAllByText('—')).toHaveLength(2);
+    });
+
+    it('does not render the scoring summary when scoringSettings is not provided', () => {
+      render(<LeagueGuidedHomeTab {...BASE_PROPS} />);
+      expect(screen.queryByTestId('league-scoring-summary')).toBeNull();
+    });
+
+    it('renders the read-only scoring summary for non-commissioners when scoringSettings is provided', () => {
+      render(
+        <LeagueGuidedHomeTab
+          {...BASE_PROPS}
+          isCommissioner={false}
+          scoringLoading={false}
+          scoringError={null}
+          scoringProfileName="Sandlot Standard"
+          scoringSettings={{ batting: {}, fielding: {}, pitching: {} }}
+        />,
+      );
+      expect(screen.getByTestId('league-scoring-summary')).toBeTruthy();
+      expect(screen.getByText('Sandlot Standard')).toBeTruthy();
     });
   });
 

@@ -9,6 +9,7 @@ import {
   Chip,
   getDraftStatusChipDef,
   LeagueActivityFeed,
+  LeagueScoringSummary,
   PanelCard,
 } from '@legacy-sports/shared-components';
 // Design-system MatchupCard (LS-4719) is intentionally not re-exported from
@@ -24,6 +25,7 @@ import {
 import type { AppMatchupFragment } from '@legacy-sports/graphql';
 import { MatchupStatus } from '@legacy-sports/graphql';
 import { LeagueDuesPaymentStatus } from '../commissioner/LeagueDuesPaymentStatus';
+import type { ScoringSettings } from '../../common/scoring';
 
 export interface RankedStanding {
   rank: number;
@@ -47,6 +49,8 @@ interface GuidedHomeLeague {
   draftStatus?: string | null;
   currentWeekNumber?: number | null;
   totalMatchups?: number | null;
+  maxRosterSize?: number | null;
+  gamesPerMatchup?: number | null;
 }
 
 interface NavTileDef {
@@ -88,6 +92,16 @@ export interface LeagueGuidedHomeTabProps {
   onMatchupPress: (matchupId: number) => void;
   /** Pull-to-refresh control for the tab's `ScrollView` (LS-8847). */
   refreshControl?: React.ReactElement<RefreshControlProps>;
+  /**
+   * Scoring profile state from `useLeagueScoringSettings`, threaded through so
+   * every league member — not just the commissioner — can see the active
+   * scoring rules from League Home (LS-8989). Mirrors the equivalent props on
+   * `LeagueOverviewTab`.
+   */
+  scoringLoading?: boolean;
+  scoringError?: Error | null;
+  scoringProfileName?: string;
+  scoringSettings?: ScoringSettings;
 }
 
 // ─── Matchup mapping ──────────────────────────────────────────────────────────
@@ -470,6 +484,103 @@ function NavTileGrid({
   );
 }
 
+// ─── League info (Scoring Rules + Roster Size / Games per Matchup) ───────────
+// Member-visible, read-only — no `isCommissioner` gate. Ports the read-only
+// stat strip + `LeagueScoringSummary` that the pre-LS-8988 Overview tab showed
+// every viewer, since Guided Home dropped both (LS-8989).
+
+function LeagueInfoSection({
+  maxRosterSize,
+  gamesPerMatchup,
+  scoringLoading,
+  scoringError,
+  scoringProfileName,
+  scoringSettings,
+}: {
+  maxRosterSize?: number | null;
+  gamesPerMatchup?: number | null;
+  scoringLoading?: boolean;
+  scoringError?: Error | null;
+  scoringProfileName?: string;
+  scoringSettings?: ScoringSettings;
+}): React.JSX.Element {
+  const stats = [
+    { label: 'Roster Size', value: String(maxRosterSize ?? '—') },
+    { label: 'Games / Matchup', value: String(gamesPerMatchup ?? '—') },
+  ];
+
+  return (
+    <PanelCard borderRadius={16} padding={16}>
+      <YStack gap={14}>
+        <Text
+          fontFamily="$heading"
+          fontWeight="800"
+          fontSize={16}
+          color="$color"
+        >
+          League Info
+        </Text>
+        <XStack gap={10}>
+          {stats.map((stat) => (
+            <YStack
+              key={stat.label}
+              flex={1}
+              backgroundColor="$surfaceCard"
+              borderWidth={1}
+              borderColor="$surfacePanelBorder"
+              borderRadius={12}
+              paddingVertical={12}
+              alignItems="center"
+              gap={4}
+            >
+              <Text
+                fontFamily="$heading"
+                fontWeight="800"
+                fontSize={20}
+                color="$color"
+                fontVariant={['tabular-nums']}
+              >
+                {stat.value}
+              </Text>
+              <Text
+                fontFamily="$heading"
+                fontWeight="700"
+                fontSize={10}
+                letterSpacing={1.1}
+                textTransform="uppercase"
+                color="$textMuted"
+                textAlign="center"
+              >
+                {stat.label}
+              </Text>
+            </YStack>
+          ))}
+        </XStack>
+        {scoringSettings ? (
+          <YStack gap={8}>
+            <Text
+              fontFamily="$heading"
+              fontWeight="700"
+              fontSize={11}
+              letterSpacing={1.1}
+              textTransform="uppercase"
+              color="$textMuted"
+            >
+              Scoring Rules
+            </Text>
+            <LeagueScoringSummary
+              loading={scoringLoading ?? false}
+              error={scoringError ?? null}
+              profileName={scoringProfileName ?? 'Default'}
+              settings={scoringSettings}
+            />
+          </YStack>
+        ) : null}
+      </YStack>
+    </PanelCard>
+  );
+}
+
 // ─── Standings peek ───────────────────────────────────────────────────────────
 
 function StandingsPeek({
@@ -705,6 +816,10 @@ export function LeagueGuidedHomeTab({
   onNavigateTab,
   onMatchupPress,
   refreshControl,
+  scoringLoading,
+  scoringError,
+  scoringProfileName,
+  scoringSettings,
 }: LeagueGuidedHomeTabProps): React.JSX.Element {
   const { bottom: bottomInset } = useSafeAreaInsets();
   const matchupData = useMemo(
@@ -780,6 +895,15 @@ export function LeagueGuidedHomeTab({
         ) : null}
 
         <NavTileGrid tiles={tiles} onNavigateTab={onNavigateTab} />
+
+        <LeagueInfoSection
+          maxRosterSize={league.maxRosterSize}
+          gamesPerMatchup={league.gamesPerMatchup}
+          scoringLoading={scoringLoading}
+          scoringError={scoringError}
+          scoringProfileName={scoringProfileName}
+          scoringSettings={scoringSettings}
+        />
 
         <StandingsPeek
           rankedStandings={rankedStandings}
