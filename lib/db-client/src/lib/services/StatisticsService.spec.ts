@@ -1,5 +1,7 @@
 import { PgDialect } from 'drizzle-orm/pg-core';
 import {
+  getCareerBattingFantasyScoreSql,
+  getCareerPitchingFantasyScoreSql,
   getCareerPitchingOrderByClause,
   getGameBattingFantasyScoreSql,
   getGamePitchingFantasyScoreSql,
@@ -149,6 +151,64 @@ describe('getGamePitchingFantasyScoreSql — LS-8670', () => {
     expect(sql).toMatch(/"game_pitching"\."h"/);
     expect(sql).toMatch(/"game_pitching"\."er"/);
     expect(sql).toMatch(/"game_pitching"\."l"/);
+  });
+
+  it('applies the DEFAULT_PITCHING_SCORING weights', () => {
+    const sql = render();
+
+    expect(sql).toMatch(/\* 5/); // w & sv
+    expect(sql).toMatch(/\* -2/); // er & l
+    expect(sql).toMatch(/\* -1/); // bb & h
+  });
+});
+
+describe('getCareerBattingFantasyScoreSql — LS-9145', () => {
+  function render(): string {
+    return dialect.sqlToQuery(getCareerBattingFantasyScoreSql()).sql;
+  }
+
+  it('combines every DEFAULT_BATTING_SCORING column against career_batting', () => {
+    const sql = render();
+
+    expect(sql).toMatch(/"career_batting"\."hr"/);
+    expect(sql).toMatch(/"career_batting"\."triples"/);
+    expect(sql).toMatch(/"career_batting"\."doubles"/);
+    expect(sql).toMatch(/"career_batting"\."h"/);
+    expect(sql).toMatch(/"career_batting"\."rbi"/);
+    expect(sql).toMatch(/"career_batting"\."r"/);
+    expect(sql).toMatch(/"career_batting"\."hbp"/);
+    expect(sql).toMatch(/"career_batting"\."sb"/);
+    expect(sql).toMatch(/"career_batting"\."cs"/);
+    expect(sql).toMatch(/"career_batting"\."so"/);
+  });
+
+  it('applies the DEFAULT_BATTING_SCORING weights', () => {
+    const sql = render();
+
+    expect(sql).toMatch(/\* 4/); // hr
+    expect(sql).toMatch(/\* 3/); // triples
+    expect(sql).toMatch(/\* 2/); // doubles & sb
+    expect(sql).toMatch(/\* -1/); // cs
+    expect(sql).toMatch(/\* -0\.5/); // so
+  });
+});
+
+describe('getCareerPitchingFantasyScoreSql — LS-9145', () => {
+  function render(): string {
+    return dialect.sqlToQuery(getCareerPitchingFantasyScoreSql()).sql;
+  }
+
+  it('combines every DEFAULT_PITCHING_SCORING column against career_pitching', () => {
+    const sql = render();
+
+    expect(sql).toMatch(/"career_pitching"\."w"/);
+    expect(sql).toMatch(/"career_pitching"\."sv"/);
+    expect(sql).toMatch(/"career_pitching"\."so"/);
+    expect(sql).toMatch(/"career_pitching"\."outs_recorded"/);
+    expect(sql).toMatch(/"career_pitching"\."bb"/);
+    expect(sql).toMatch(/"career_pitching"\."h"/);
+    expect(sql).toMatch(/"career_pitching"\."er"/);
+    expect(sql).toMatch(/"career_pitching"\."l"/);
   });
 
   it('applies the DEFAULT_PITCHING_SCORING weights', () => {

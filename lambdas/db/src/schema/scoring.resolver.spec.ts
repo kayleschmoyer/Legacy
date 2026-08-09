@@ -88,7 +88,6 @@ describe('League scoring GraphQL resolvers', () => {
     });
 
     jest.isolateModules(() => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.isolateModules requires runtime require
       const schemaModule = require('../schema') as { schema: GraphQLSchema };
       schemaUnderTest = schemaModule.schema;
     });

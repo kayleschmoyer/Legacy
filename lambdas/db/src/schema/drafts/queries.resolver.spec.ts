@@ -82,7 +82,6 @@ describe('getMyDraftQueue resolver — LS-2501 authorization', () => {
       })),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -287,7 +286,6 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
       })),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -529,7 +527,6 @@ describe('getDraftPicks resolver — LS-8397 resilience', () => {
       })),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -844,7 +841,6 @@ describe('spectator read access — LS-8939 access matrix', () => {
         .mockResolvedValue(CURRENT_PICK_SENTINEL),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 

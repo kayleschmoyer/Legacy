@@ -251,7 +251,6 @@ describe('computeFootballGamePoints — IDP branch', () => {
     // sacks: '1.5' stored as numeric → 1.5×2 = 3, plus solo_tkl: 1×1 = 1 → total = 4
     const pts = computeFootballGamePoints(
       makeGameStats({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         idpDefense: makeIdpRow({ sacks: '1.5', soloTkl: 1 }),
       }),
       false,

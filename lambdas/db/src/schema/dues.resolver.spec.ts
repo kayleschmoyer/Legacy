@@ -170,7 +170,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       isPlayerOnRoster: jest.fn().mockResolvedValue(false),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -250,7 +249,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
         undefined as never,
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyCommissionerAccess } = require('./authorization') as {
         verifyCommissionerAccess: jest.Mock;
       };
@@ -262,7 +260,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
     });
 
     it('rejects non-commissioner users', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyCommissionerAccess } = require('./authorization') as {
         verifyCommissionerAccess: jest.Mock;
       };
@@ -371,7 +368,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
         undefined as never,
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyCommissionerAccess } = require('./authorization') as {
         verifyCommissionerAccess: jest.Mock;
       };
@@ -394,7 +390,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
         undefined as never,
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyLeagueMembership } = require('./authorization') as {
         verifyLeagueMembership: jest.Mock;
       };
@@ -402,7 +397,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
     });
 
     it('rejects non-commissioner users', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyCommissionerAccess } = require('./authorization') as {
         verifyCommissionerAccess: jest.Mock;
       };
@@ -486,7 +480,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
         undefined as never,
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyCommissionerAccess } = require('./authorization') as {
         verifyCommissionerAccess: jest.Mock;
       };
@@ -509,7 +502,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
         undefined as never,
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyLeagueMembership } = require('./authorization') as {
         verifyLeagueMembership: jest.Mock;
       };
@@ -517,7 +509,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
     });
 
     it('rejects non-commissioner users', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyCommissionerAccess } = require('./authorization') as {
         verifyCommissionerAccess: jest.Mock;
       };
@@ -590,7 +581,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       const resolver = getQuery('leagueDuesSettings');
       await resolver({}, { leagueId: 10 }, mockContext, undefined as never);
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const auth = require('./authorization') as {
         verifyLeagueMembership: jest.Mock;
         verifyCommissionerAccess: jest.Mock;
@@ -628,7 +618,6 @@ describe('Dues Resolver — Commissioner/GM Permission Guards', () => {
       const resolver = getQuery('leagueDuesStatus');
       await resolver({}, { leagueId: 10 }, mockContext, undefined as never);
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const auth = require('./authorization') as {
         verifyLeagueMembership: jest.Mock;
         verifyCommissionerAccess: jest.Mock;

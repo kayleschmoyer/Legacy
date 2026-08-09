@@ -186,7 +186,6 @@ describe('impersonateUser mutation', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -561,7 +560,6 @@ describe('cleanupLeakedTestUsers mutation', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -892,7 +890,6 @@ describe('users / usersCount queries (LS-8653)', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -1195,7 +1192,6 @@ describe('updateUserTheme mutation', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -1431,7 +1427,6 @@ describe('myIdentities query', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -1666,7 +1661,6 @@ describe('setCanonicalEmail mutation', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 

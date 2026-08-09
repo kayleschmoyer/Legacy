@@ -169,7 +169,6 @@ function captureResolver() {
     getDbOptions: jest.fn(() => ({})),
   }));
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
   require('./update-draft-settings');
 
   if (!capturedFn) throw new Error('resolver not captured');

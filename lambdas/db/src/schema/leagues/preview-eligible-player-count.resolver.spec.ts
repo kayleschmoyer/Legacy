@@ -145,7 +145,6 @@ describe('previewEligiblePlayerCount (LS-6089)', () => {
       return { ...actual };
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 

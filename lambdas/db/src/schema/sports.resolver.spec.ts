@@ -37,7 +37,6 @@ describe('sports reference resolvers', () => {
     };
 
     jest.doMock('@legacy-sports/utils/node', () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const actual = jest.requireActual<
         typeof import('@legacy-sports/utils/node')
       >('@legacy-sports/utils/node');
@@ -87,7 +86,6 @@ describe('sports reference resolvers', () => {
     }));
 
     jest.doMock('drizzle-orm', () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const actual =
         jest.requireActual<typeof import('drizzle-orm')>('drizzle-orm');
       return {
@@ -97,7 +95,6 @@ describe('sports reference resolvers', () => {
       };
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 

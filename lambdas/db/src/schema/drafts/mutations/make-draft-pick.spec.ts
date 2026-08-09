@@ -273,7 +273,6 @@ function setupResolver(options: {
   // the real describeDbError so the LS-8476 retry test exercises the actual
   // SQLSTATE-matching logic isLockWaitTimeout relies on in production.
   jest.doMock('../scheduled-mutations', () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- lazy require inside a jest.doMock factory keeps the real (unmocked) delete-resilience helpers out of the hoisting path
     const { describeDbError } =
       require('../../leagues/delete-resilience') as typeof import('../../leagues/delete-resilience');
     return {
@@ -425,7 +424,6 @@ function setupResolver(options: {
     },
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- the module under test must be required AFTER jest.doMock() registers the mocks above; a static import would hoist and bypass them
   require('./make-draft-pick');
 
   if (!capturedFn) throw new Error('makeDraftPick resolver was not captured');

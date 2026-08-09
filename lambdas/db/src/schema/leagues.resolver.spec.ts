@@ -115,7 +115,7 @@ describe('League Mutations', () => {
     // Load the schema after mocks are set up
     // Note: Do NOT use jest.isolateModules() as it creates a separate module realm
     // which causes "Cannot use GraphQLSchema from another module or realm" errors
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
+
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -1224,9 +1224,9 @@ describe('League Mutations', () => {
       // schema load so the GraphQLError instance shares the same module realm
       // as the resolver's `instanceof GraphQLError` check, and so the mock
       // reference matches the one the resolver imported.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require in the resolver's module realm
+
       const { GraphQLError } = require('graphql');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require in the resolver's module realm
+
       const { createDraftForLeague } = require('@legacy-sports/db-client');
       (createDraftForLeague as jest.Mock).mockRejectedValueOnce(
         new GraphQLError('Premium subscription required', {
@@ -1269,7 +1269,7 @@ describe('League Mutations', () => {
       // failures are separately classified as BAD_USER_INPUT by LS-8098.) A
       // plain Error is never an `instanceof GraphQLError`, so it flows into the
       // catch's rewrap path regardless of the jest module realm.
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- match the resolver's module realm
+
       const { createDraftForLeague } = require('@legacy-sports/db-client');
       (createDraftForLeague as jest.Mock).mockRejectedValueOnce(
         new Error('Draft queue URL not configured'),

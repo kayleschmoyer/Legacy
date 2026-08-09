@@ -129,7 +129,6 @@ describe('addDefaultPositionsToLeague authorization (LS-5137)', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../index') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 

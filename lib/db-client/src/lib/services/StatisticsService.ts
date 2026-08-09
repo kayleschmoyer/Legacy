@@ -224,6 +224,26 @@ export function getGamePitchingFantasyScoreSql(): SQL<number> {
 }
 
 /**
+ * SQL expression computing a player's career batting fantasy score using
+ * our standard scoring weights. Mirrors the `totalScore` case in
+ * `getCareerBattingOrderByClause` (../query-builders/TypeSafeQueryBuilder.ts)
+ * — duplicated here for the same dependency-cycle reason documented on
+ * `getGameBattingFantasyScoreSql` above.
+ */
+export function getCareerBattingFantasyScoreSql(): SQL<number> {
+  return sql<number>`(COALESCE(${PublicSchema.careerBatting.h}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.doubles}, 0) * 2 + COALESCE(${PublicSchema.careerBatting.triples}, 0) * 3 + COALESCE(${PublicSchema.careerBatting.hr}, 0) * 4 + COALESCE(${PublicSchema.careerBatting.r}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.rbi}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.sb}, 0) * 2 + COALESCE(${PublicSchema.careerBatting.cs}, 0) * -1 + COALESCE(${PublicSchema.careerBatting.hbp}, 0) * 1 + COALESCE(${PublicSchema.careerBatting.so}, 0) * -0.5)`;
+}
+
+/**
+ * SQL expression computing a player's career pitching fantasy score using
+ * our standard scoring weights. Mirrors the `fantasyPoints` case in
+ * `getCareerPitchingOrderByClause` above — duplicated for the same reason.
+ */
+export function getCareerPitchingFantasyScoreSql(): SQL<number> {
+  return sql<number>`(COALESCE(${PublicSchema.careerPitching.w}, 0) * 5 + COALESCE(${PublicSchema.careerPitching.sv}, 0) * 5 + COALESCE(${PublicSchema.careerPitching.so}, 0) * 1 + COALESCE(${PublicSchema.careerPitching.outsRecorded}, 0) * 1 + COALESCE(${PublicSchema.careerPitching.bb}, 0) * -1 + COALESCE(${PublicSchema.careerPitching.h}, 0) * -1 + COALESCE(${PublicSchema.careerPitching.er}, 0) * -2 + COALESCE(${PublicSchema.careerPitching.l}, 0) * -2)`;
+}
+
+/**
  * Statistics service functions for database operations on career statistics
  */
 export class StatisticsService {
@@ -1023,6 +1043,11 @@ export class StatisticsService {
     limit = 20,
   ): Promise<OnThisDayEventEntry[]> {
     return runWithPublicClient(this.options, async (db) => {
+      // Rank events by the involved player's career fantasy points (standard
+      // scoring) so the most notable transactions/signings surface first.
+      // Events with no matching player (or no career stats) sort last.
+      const careerFantasyScore = sql<number>`(COALESCE(${getCareerBattingFantasyScoreSql()}, 0) + COALESCE(${getCareerPitchingFantasyScoreSql()}, 0))`;
+
       const rows = await db
         .select({
           id: PublicSchema.onThisDayEvents.id,
@@ -1037,13 +1062,30 @@ export class StatisticsService {
           toTeam: PublicSchema.onThisDayEvents.toTeam,
         })
         .from(PublicSchema.onThisDayEvents)
+        .leftJoin(
+          PublicSchema.careerBatting,
+          eq(
+            PublicSchema.onThisDayEvents.playerId,
+            PublicSchema.careerBatting.playerId,
+          ),
+        )
+        .leftJoin(
+          PublicSchema.careerPitching,
+          eq(
+            PublicSchema.onThisDayEvents.playerId,
+            PublicSchema.careerPitching.playerId,
+          ),
+        )
         .where(
           and(
             eq(PublicSchema.onThisDayEvents.month, month),
             eq(PublicSchema.onThisDayEvents.day, day),
           ),
         )
-        .orderBy(desc(PublicSchema.onThisDayEvents.year))
+        .orderBy(
+          desc(careerFantasyScore),
+          desc(PublicSchema.onThisDayEvents.year),
+        )
         // Over-fetch to compensate for duplicates that will be removed during
         // in-memory dedupe, so we still return up to `limit` unique events.
         .limit(limit * 3)

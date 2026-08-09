@@ -201,7 +201,6 @@ describe('players resolver', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -653,7 +652,7 @@ describe('players resolver', () => {
   describe('Player.mlbTeam / Player.jerseyNumber', () => {
     function getPlayerFieldResolver(name: 'mlbTeam' | 'jerseyNumber') {
       const playerType = schema.getType('Player');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- narrow to object type for field access in tests
+
       const field = (playerType as any)?.getFields?.()[name];
       if (!field?.resolve) throw new Error(`Player.${name} resolver not found`);
       return field.resolve.bind(field);

@@ -167,7 +167,6 @@ describe('Commissioner Tools Resolver', () => {
       isPlayerOnRoster: jest.fn().mockResolvedValue(false),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -712,7 +711,6 @@ describe('Commissioner Tools Resolver', () => {
         undefined as never,
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { verifyCommissionerAccess } = require('./authorization') as {
         verifyCommissionerAccess: jest.Mock;
       };

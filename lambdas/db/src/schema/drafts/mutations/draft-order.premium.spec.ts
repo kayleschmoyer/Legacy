@@ -54,7 +54,6 @@ function captureResolvers(): {
   // call chain that fails in a mocked builder environment.
   jest.doMock('../types', () => ({ Draft: {} }));
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
   require('./draft-order');
 
   if (!captured['setDraftOrder']) throw new Error('setDraftOrder not captured');

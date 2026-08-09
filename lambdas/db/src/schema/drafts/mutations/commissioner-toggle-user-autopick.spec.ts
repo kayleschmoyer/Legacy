@@ -115,7 +115,6 @@ function captureResolver(): Resolver {
     },
   }));
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('./commissioner-toggle-user-autopick');
 
   if (!capturedFn) throw new Error('resolver not captured');

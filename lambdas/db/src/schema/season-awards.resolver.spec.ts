@@ -53,7 +53,7 @@ describe('season-awards resolver', () => {
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       // Default: transaction calls the callback with mockDb itself as tx
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       transaction: jest.fn((fn: (tx: any) => Promise<unknown>) => fn(mockDb)),
       // Make the mock thenable - used when no explicit terminal call (e.g. orderBy is last)
       then: jest.fn((resolve) => resolve([])),
@@ -189,13 +189,11 @@ describe('season-awards resolver', () => {
     }));
 
     jest.doMock('drizzle-orm', () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const actual =
         jest.requireActual<typeof import('drizzle-orm')>('drizzle-orm');
       return { ...actual, eq: jest.fn(actual.eq), and: jest.fn(actual.and) };
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -294,7 +292,6 @@ describe('season-awards resolver', () => {
         undefined as never,
       );
 
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const { eq, and } = require('drizzle-orm') as {
         eq: jest.Mock;
         and: jest.Mock;
@@ -961,9 +958,8 @@ describe('season-awards resolver', () => {
           { id: 1, status: 'open', awardTypes: ['mvp'] },
         ]);
 
-      mockDb.transaction = jest.fn(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (fn: (tx: any) => Promise<unknown>) => fn(tx),
+      mockDb.transaction = jest.fn((fn: (tx: any) => Promise<unknown>) =>
+        fn(tx),
       );
 
       const result = (await getResolver()(
@@ -1027,9 +1023,8 @@ describe('season-awards resolver', () => {
           { id: 1, status: 'open', awardTypes: ['mvp'] },
         ]);
 
-      mockDb.transaction = jest.fn(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (fn: (tx: any) => Promise<unknown>) => fn(tx),
+      mockDb.transaction = jest.fn((fn: (tx: any) => Promise<unknown>) =>
+        fn(tx),
       );
 
       const result = (await getResolver()(

@@ -141,7 +141,6 @@ describe('leagueActivity resolver', () => {
     }));
 
     jest.doMock('drizzle-orm', () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
       const actual =
         jest.requireActual<typeof import('drizzle-orm')>('drizzle-orm');
       return {
@@ -152,7 +151,6 @@ describe('leagueActivity resolver', () => {
       };
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const schemaModule = require('../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 
@@ -372,7 +370,6 @@ describe('leagueActivity resolver', () => {
       undefined as never,
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const { inArray } = require('drizzle-orm') as { inArray: jest.Mock };
     expect(inArray).toHaveBeenCalledWith('eventType', [
       'trade_accepted',
@@ -390,7 +387,6 @@ describe('leagueActivity resolver', () => {
       undefined as never,
     );
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     const { inArray } = require('drizzle-orm') as { inArray: jest.Mock };
     expect(inArray).not.toHaveBeenCalled();
   });

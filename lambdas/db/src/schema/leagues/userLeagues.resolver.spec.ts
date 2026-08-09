@@ -146,7 +146,6 @@ describe('userLeagues query (LS-5798)', () => {
       getDbOptions: jest.fn(() => ({})),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
     schema = schemaModule.schema;
 

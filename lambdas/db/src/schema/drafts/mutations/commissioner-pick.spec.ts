@@ -99,7 +99,6 @@ function captureCommissionerPickResolver(overrides?: {
     formatDbError: jest.fn(() => 'mock db error'),
   }));
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('./commissioner-pick');
   if (!capturedFn)
     throw new Error('commissionerPick resolver was not captured');
@@ -228,7 +227,6 @@ describe('commissionerPick resolver', () => {
       formatDbError: jest.fn(() => 'mock db error'),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('./commissioner-pick');
 
     if (!capturedFn)
@@ -527,7 +525,6 @@ describe('commissionerPick — draft row lock-wait retry (LS-8480)', () => {
       formatDbError: jest.fn(() => 'mock db error'),
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('./commissioner-pick');
     if (!capturedFn)
       throw new Error('commissionerPick resolver was not captured');

@@ -58,7 +58,6 @@ function capturePauseResumeResolvers(): Record<string, Resolver> {
 
   jest.doMock('../types', () => ({ Draft: {} }));
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   require('./pause-resume-draft');
 
   if (!captured.pauseDraft || !captured.resumeDraft) {

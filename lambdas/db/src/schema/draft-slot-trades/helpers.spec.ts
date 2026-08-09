@@ -75,7 +75,6 @@ describe('draft-slot-trades helpers', () => {
       },
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.doMock requires runtime require
     helpers = require('./helpers') as typeof import('./helpers');
   });
 
