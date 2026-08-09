@@ -20,6 +20,12 @@ Fixed at the source via the DesignSync MCP tool (`finalize_plan` → `write_file
 
 Not changed (out of scope for this pass / deliberately left, matching the LS-8957 master Design System precedent): self-hosted `@font-face` vs. Google Fonts CDN (an open ruling that applies fleet-wide, not per-bundle); the `@media (max-width: 1700px)` reviewer-harness breakpoint and the JS-driven phone-width toggle (mockup harness chrome, not the seven canonical PROMPT.md bands — not part of this ticket's mechanical-violations scope); `ios-frame.jsx` (unused by this project's `Admin Console.html`, still references `'SF Pro'` — shared harness file, not consumed here).
 
+## LS-9093 addendum (2026-08-09)
+
+`legacy-sports-admin/project/uploads/PROMPT.md` — the design brief snapshot uploaded into this Claude Design project — predates the canonical `docs/agents/pages/PROMPT.md` "Breakpoints" section and its checklist items, so it was missing them entirely (the LS-9024 audit finding). Replaced its `## Mobile & Desktop Layouts` section with the canonical `## Breakpoints` section (seven-band table, per-band coverage rule, state × breakpoint matrix rule) and updated the matching Deliverable Checklist bullets to mirror `docs/agents/pages/PROMPT.md` verbatim.
+
+**Scope note / follow-up**: this is a docs-only mechanical fix to the bundle's brief snapshot — it does not change `Admin Console.html` itself. The underlying finding (`xs`/`sm`/`md`/`lg`/`xl` bands, 660–1279px, have no designed frame or `<!-- BREAKPOINTS: ... -->` annotation anywhere in the Admin Console prototype) still needs a design-source fix: add frames or annotations in the Claude Design project via the `DesignSync` MCP tool (`finalize_plan` → `write_files`), then re-pull. `DesignSync` requires `/design-login`, which is only available in an interactive local session — this session (cloud) confirmed `get_project` fails with "needs design-system authorization... not available in this environment". Filing/dispatching the design-source portion is left to a local session; `lastSyncedHash` is intentionally left unchanged above since the actual Claude Design project content has not changed.
+
 ## Pages
 
 - `legacy-sports-admin/project/Admin Console.html`
