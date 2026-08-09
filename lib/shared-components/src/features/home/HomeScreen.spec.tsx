@@ -218,6 +218,32 @@ describe('HomeScreen', () => {
       ).not.toThrow();
     });
 
+    it('renders a formatted draft date for a secondary pre-draft league without throwing (LS-8755 / LS-9161)', () => {
+      // `LeagueListRow` calls `formatDraftDate` (from `@legacy-sports/utils`)
+      // for any secondary league that is pre-draft with a scheduled time.
+      // `formatDraftDate` was previously defined only in that package's web
+      // barrel (`index.ts`) and missing from the mobile barrel
+      // (`mobile.ts`/`index.native.ts`), so it resolved to `undefined` on
+      // device and crashed the Home dashboard with "TypeError: undefined is
+      // not a function" (LS-8755, Rollbar item #201 / LS-9161) — no prior
+      // test rendered this branch, so the regression shipped undetected.
+      const preDraftScheduledLeague: HomeLeagueSummary = {
+        leagueId: 45,
+        leagueName: 'Scheduled Draft League',
+        sport: 'baseball',
+        leaguePhase: 'pre-draft',
+        draftScheduledAt: '2026-09-01T20:00:00.000Z',
+      };
+      const { getByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league, preDraftScheduledLeague]}
+        />,
+      );
+      expect(getByText('Scheduled Draft League')).toBeTruthy();
+      expect(getByText('Draft scheduled')).toBeTruthy();
+    });
+
     it('shows a "Live Season" badge on both sport cards in the compact "Pick your sport" section (LS-9035: football is live)', () => {
       const { getByText, getAllByText } = render(
         <HomeScreen {...baseProps} leagues={[league]} />,
