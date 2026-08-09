@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import type { AvailableDraftPlayer, DraftPlayer } from './types';
+import type {
+  AvailableDraftPlayer,
+  DraftPlayer,
+  NotablePlaySummary,
+} from './types';
 import { PickAnnouncement } from './PickAnnouncement';
+import { PickSplashStatGraphic } from './PickSplashStatGraphic';
 import { getMlbHeadshotUrl } from './draftUtils';
 
 // ---------------------------------------------------------------------------
@@ -204,6 +209,8 @@ export interface SplashQueueProps {
   commentaryFor?: (pick: SplashPick) => string | undefined;
   /** playerId → MLB Stats API id for the headshot URL; null hides the photo. */
   mlbPlayerIdFor?: (playerId: number) => number | null;
+  /** playerId → cached notable play for the stat graphic (LS-9095); null hides it. */
+  notablePlayFor?: (playerId: number) => NotablePlaySummary | null;
 }
 
 /**
@@ -219,6 +226,7 @@ export function SplashQueue({
   onDismiss,
   commentaryFor,
   mlbPlayerIdFor,
+  notablePlayFor,
 }: SplashQueueProps): React.JSX.Element | null {
   const [headshotFailed, setHeadshotFailed] = useState(false);
   const activePickNumber = active?.overallPick;
@@ -263,6 +271,10 @@ export function SplashQueue({
           </div>
         )}
         <div className="d-splash-team">{active.teamName}</div>
+        <PickSplashStatGraphic
+          key={active.overallPick}
+          play={notablePlayFor?.(player.id) ?? null}
+        />
         {pendingCount > 0 && (
           <div
             className="d-splash-queue-badge"

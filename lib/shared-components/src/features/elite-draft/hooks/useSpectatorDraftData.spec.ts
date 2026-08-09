@@ -21,6 +21,7 @@ import {
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
   GetMyDraftQueue as GET_MY_DRAFT_QUEUE,
+  GetNotablePlays as GET_NOTABLE_PLAYS,
   GetPositionsForLeague as GET_POSITIONS_FOR_LEAGUE,
 } from '@legacy-sports/graphql';
 import {
@@ -73,6 +74,7 @@ describe('useSpectatorDraftData', () => {
       GET_DRAFT_PLAYER_STATS,
       GET_DRAFT_PITCHING_STATS,
       GET_DRAFT_TEAM_ORDER,
+      GET_NOTABLE_PLAYS,
     ]);
     for (const call of recordedCalls) {
       expect(allowed.has(call.document)).toBe(true);

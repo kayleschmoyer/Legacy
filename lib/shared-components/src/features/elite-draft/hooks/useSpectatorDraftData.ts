@@ -9,6 +9,7 @@ import {
   GetLeagueById as GET_LEAGUE_BY_ID,
   GetLiveDraftLeagueDraft as GET_LEAGUE_DRAFT,
   GetLeagueTeams as GET_LEAGUE_TEAMS,
+  GetNotablePlays as GET_NOTABLE_PLAYS,
   GetPositionsForLeague as GET_POSITIONS_FOR_LEAGUE,
   type GetCurrentDraftPickQuery,
   type GetCurrentDraftPickQueryVariables,
@@ -21,6 +22,8 @@ import {
   type GetLeagueByIdQuery,
   type GetLeagueTeamsQuery,
   type GetLiveDraftLeagueDraftQuery,
+  type GetNotablePlaysQuery,
+  type GetNotablePlaysQueryVariables,
   type GetPositionsForLeagueQuery,
   type GetPositionsForLeagueQueryVariables,
 } from '@legacy-sports/graphql';
@@ -30,6 +33,7 @@ import type {
   DraftPickRecord,
   DraftPlayer,
   LeagueTeam,
+  NotablePlaySummary,
   PlayerStatsEntry,
 } from '../types';
 import { normalizeTeamId } from '../utils';
@@ -238,6 +242,56 @@ export function useSpectatorDraftData({
     [pickHistory],
   );
 
+  // ---- Notable plays (pick-splash stat graphic, LS-9095) ----
+  // Cache-table read only — the refresh schedule keeps it warm, so the splash
+  // path never waits on a live statsapi lookup.
+  const notableMlbIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const p of pickHistory) {
+      if (p.player?.mlbPlayerId != null) ids.add(p.player.mlbPlayerId);
+    }
+    return [...ids].sort((a, b) => a - b);
+  }, [pickHistory]);
+
+  const { data: notablePlaysData } = useQuery<
+    GetNotablePlaysQuery,
+    GetNotablePlaysQueryVariables
+  >(GET_NOTABLE_PLAYS, {
+    variables: { mlbPlayerIds: notableMlbIds },
+    skip: notableMlbIds.length === 0,
+    errorPolicy: 'all',
+  });
+
+  const notablePlayByMlbId = useMemo(() => {
+    const map = new Map<number, NotablePlaySummary>();
+    for (const row of notablePlaysData?.notablePlaysByMlbPlayerIds ?? []) {
+      if (row?.mlbPlayerId == null) continue;
+      map.set(row.mlbPlayerId, {
+        mlbPlayerId: row.mlbPlayerId,
+        playerRole: row.playerRole === 'pitcher' ? 'pitcher' : 'batter',
+        gameDate: row.gameDate ?? '',
+        eventType: row.eventType ?? '',
+        description: row.description ?? '',
+        exitVelocity: row.exitVelocity ?? null,
+        launchAngle: row.launchAngle ?? null,
+        hitDistance: row.hitDistance ?? null,
+        pitchSpeed: row.pitchSpeed ?? null,
+        pitchType: row.pitchType ?? null,
+        filmRoomUrl: row.filmRoomUrl ?? null,
+      });
+    }
+    return map;
+  }, [notablePlaysData]);
+
+  /** playerId → cached notable play for the splash stat graphic (LS-9095). */
+  const notablePlayFor = useCallback(
+    (playerId: number): NotablePlaySummary | null => {
+      const mlbId = mlbPlayerIdFor(playerId);
+      return mlbId != null ? (notablePlayByMlbId.get(mlbId) ?? null) : null;
+    },
+    [mlbPlayerIdFor, notablePlayByMlbId],
+  );
+
   // ---- Career stats (names, positions, and the splash stat line) ----
   const { data: statsData } = useQuery<GetDraftPlayerStatsQuery>(
     GET_DRAFT_PLAYER_STATS,
@@ -414,6 +468,7 @@ export function useSpectatorDraftData({
     pickHistory,
     refetchPickHistory,
     mlbPlayerIdFor,
+    notablePlayFor,
     // Stats / lookups
     statsLookup,
     // Board

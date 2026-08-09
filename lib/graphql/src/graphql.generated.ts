@@ -2003,6 +2003,8 @@ export type Mutation = {
   refreshFootballCareerStats?: Maybe<FootballStatsRefreshResult>;
   /** Refresh PFR season-totals for players on active football leagues. No-ops outside the NFL season window (Sept 1 – Feb 15). Triggered weekly by EventBridge; system-only. */
   refreshFootballWeeklySeasonStats?: Maybe<FootballStatsRefreshResult>;
+  /** Refresh the per-player notable-play cache from recent final games' feed data. Triggered daily by EventBridge; system-only. No-ops when the configured MLB data provider has no play-level feed support. */
+  refreshNotablePlays?: Maybe<NotablePlayRefreshResult>;
   registerDeviceToken?: Maybe<DeviceToken>;
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;
@@ -2476,6 +2478,10 @@ export type MutationRecordConsentArgs = {
   input: RecordConsentInput;
 };
 
+export type MutationRefreshNotablePlaysArgs = {
+  lookbackDays?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
 };
@@ -2803,6 +2809,20 @@ export type NflTeamSeasonMetadata = {
   teamAbbreviation: Scalars['String']['output'];
 };
 
+/** Result of the scheduled notable-play cache refresh triggered by EventBridge */
+export type NotablePlayRefreshResult = {
+  __typename?: 'NotablePlayRefreshResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  /** Number of final games whose feeds were scanned */
+  gamesScanned?: Maybe<Scalars['Int']['output']>;
+  /** Number of player cache rows inserted or updated */
+  playersUpdated?: Maybe<Scalars['Int']['output']>;
+  /** Human-readable explanation of the outcome */
+  reason?: Maybe<Scalars['String']['output']>;
+  /** Whether the refresh ran (false when the configured provider has no play-level feed support) */
+  triggered?: Maybe<Scalars['Boolean']['output']>;
+};
+
 export type NotificationHistoryItem = {
   __typename?: 'NotificationHistoryItem';
   body?: Maybe<Scalars['String']['output']>;
@@ -2935,6 +2955,35 @@ export type Player = {
   /** Number of distinct MLB seasons the player has batting stats for (AL/NL only) */
   seasonsPlayed?: Maybe<Scalars['Int']['output']>;
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A player's cached most-notable Statcast play, shown as the pick-splash stat graphic on the draft spectator page (LS-9095) */
+export type PlayerNotablePlay = {
+  __typename?: 'PlayerNotablePlay';
+  /** Human-readable play description from the game feed */
+  description?: Maybe<Scalars['String']['output']>;
+  /** MLB event type code, e.g. 'home_run', 'strikeout' */
+  eventType?: Maybe<Scalars['String']['output']>;
+  /** Exit velocity in mph (batter plays only) */
+  exitVelocity?: Maybe<Scalars['Float']['output']>;
+  /** MLB Film Room search link for this play — a user-initiated outbound link to MLB's own property (never an embedded video). Null when the game feed carried no Statcast play id. */
+  filmRoomUrl?: Maybe<Scalars['String']['output']>;
+  /** Official game date (YYYY-MM-DD) */
+  gameDate?: Maybe<Scalars['String']['output']>;
+  /** MLB primary key of the game the play occurred in */
+  gamePk?: Maybe<Scalars['Int']['output']>;
+  /** Hit distance in feet (batter plays only) */
+  hitDistance?: Maybe<Scalars['Float']['output']>;
+  /** Launch angle in degrees (batter plays only) */
+  launchAngle?: Maybe<Scalars['Float']['output']>;
+  /** MLB Stats API player id the play belongs to */
+  mlbPlayerId?: Maybe<Scalars['Int']['output']>;
+  /** Pitch speed in mph (pitcher plays only) */
+  pitchSpeed?: Maybe<Scalars['Float']['output']>;
+  /** Pitch type, e.g. 'Four-Seam Fastball' (pitcher plays only) */
+  pitchType?: Maybe<Scalars['String']['output']>;
+  /** Role the play is notable for: 'batter' or 'pitcher' */
+  playerRole?: Maybe<Scalars['String']['output']>;
 };
 
 export type PlayerScoring = {
@@ -3210,6 +3259,8 @@ export type Query = {
   mySubscription?: Maybe<SubscriptionInfo>;
   /** Bye week and SoS tier for every NFL team in the given season (LS-8044). When season is omitted, returns the current season (highest seeded season in the table). */
   nflTeamSeasonMetadata: Array<NflTeamSeasonMetadata>;
+  /** Cached notable plays for a set of MLB Stats API player ids. Players without a cached play are simply absent from the result. */
+  notablePlaysByMlbPlayerIds?: Maybe<Array<PlayerNotablePlay>>;
   /** Notable historical game-log performances from today's calendar date across all seasons */
   onThisDay?: Maybe<Array<OnThisDayEntry>>;
   /** Baseball events (signings, trades) that occurred on the given calendar date */
@@ -3676,6 +3727,10 @@ export type QueryMyLeaguesArgs = {
 
 export type QueryNflTeamSeasonMetadataArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryNotablePlaysByMlbPlayerIdsArgs = {
+  mlbPlayerIds: Array<Scalars['Int']['input']>;
 };
 
 export type QueryOnThisDayArgs = {
@@ -11856,6 +11911,28 @@ export type GetDraftPicksQuery = {
       eligiblePositions?: Array<string> | null;
       mlbPlayerId?: number | null;
     } | null;
+  }> | null;
+};
+
+export type GetNotablePlaysQueryVariables = Exact<{
+  mlbPlayerIds: Array<Scalars['Int']['input']> | Scalars['Int']['input'];
+}>;
+
+export type GetNotablePlaysQuery = {
+  __typename?: 'Query';
+  notablePlaysByMlbPlayerIds?: Array<{
+    __typename?: 'PlayerNotablePlay';
+    mlbPlayerId?: number | null;
+    playerRole?: string | null;
+    gameDate?: string | null;
+    eventType?: string | null;
+    description?: string | null;
+    exitVelocity?: number | null;
+    launchAngle?: number | null;
+    hitDistance?: number | null;
+    pitchSpeed?: number | null;
+    pitchType?: string | null;
+    filmRoomUrl?: string | null;
   }> | null;
 };
 
@@ -30090,6 +30167,106 @@ export type GetDraftPicksSuspenseQueryHookResult = ReturnType<
 export type GetDraftPicksQueryResult = Apollo.QueryResult<
   GetDraftPicksQuery,
   GetDraftPicksQueryVariables
+>;
+export const GetNotablePlays = gql`
+  query GetNotablePlays($mlbPlayerIds: [Int!]!) {
+    notablePlaysByMlbPlayerIds(mlbPlayerIds: $mlbPlayerIds) {
+      mlbPlayerId
+      playerRole
+      gameDate
+      eventType
+      description
+      exitVelocity
+      launchAngle
+      hitDistance
+      pitchSpeed
+      pitchType
+      filmRoomUrl
+    }
+  }
+`;
+
+/**
+ * __useGetNotablePlaysQuery__
+ *
+ * To run a query within a React component, call `useGetNotablePlaysQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetNotablePlaysQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetNotablePlaysQuery({
+ *   variables: {
+ *      mlbPlayerIds: // value for 'mlbPlayerIds'
+ *   },
+ * });
+ */
+export function useGetNotablePlaysQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetNotablePlaysQuery,
+    GetNotablePlaysQueryVariables
+  > &
+    (
+      | { variables: GetNotablePlaysQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<GetNotablePlaysQuery, GetNotablePlaysQueryVariables>(
+    GetNotablePlays,
+    options,
+  );
+}
+export function useGetNotablePlaysLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetNotablePlaysQuery,
+    GetNotablePlaysQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetNotablePlaysQuery,
+    GetNotablePlaysQueryVariables
+  >(GetNotablePlays, options);
+}
+export function useGetNotablePlaysSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetNotablePlaysQuery,
+        GetNotablePlaysQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetNotablePlaysQuery,
+    GetNotablePlaysQueryVariables
+  >(
+    GetNotablePlays,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetNotablePlaysQuery,
+          GetNotablePlaysQueryVariables
+        >,
+  );
+}
+export type GetNotablePlaysQueryHookResult = ReturnType<
+  typeof useGetNotablePlaysQuery
+>;
+export type GetNotablePlaysLazyQueryHookResult = ReturnType<
+  typeof useGetNotablePlaysLazyQuery
+>;
+export type GetNotablePlaysSuspenseQueryHookResult = ReturnType<
+  typeof useGetNotablePlaysSuspenseQuery
+>;
+export type GetNotablePlaysQueryResult = Apollo.QueryResult<
+  GetNotablePlaysQuery,
+  GetNotablePlaysQueryVariables
 >;
 export const GetAvailableDraftPlayers = gql`
   query GetAvailableDraftPlayers(

@@ -47,9 +47,57 @@ export interface MlbApiScheduleResponse {
   }>;
 }
 
+/** Statcast hit metrics attached to an in-play pitch event (LS-9095). */
+export interface MlbApiHitData {
+  launchSpeed?: number;
+  launchAngle?: number;
+  totalDistance?: number;
+}
+
+/** Pitch metrics attached to a pitch event (LS-9095). */
+export interface MlbApiPitchData {
+  startSpeed?: number;
+}
+
+/** One event within a play (pitch, pickoff, action) from feed/live (LS-9095). */
+export interface MlbApiPlayEvent {
+  /** Statcast play UUID — the same id Baseball Savant / Film Room key on. */
+  playId?: string;
+  isPitch?: boolean;
+  hitData?: MlbApiHitData;
+  pitchData?: MlbApiPitchData;
+  details?: {
+    type?: { code?: string; description?: string };
+    isInPlay?: boolean;
+  };
+}
+
+/** One plate appearance from liveData.plays.allPlays (LS-9095). */
+export interface MlbApiPlay {
+  result?: {
+    type?: string;
+    event?: string;
+    eventType?: string;
+    description?: string;
+  };
+  about?: {
+    isComplete?: boolean;
+    inning?: number;
+    halfInning?: string;
+  };
+  matchup?: {
+    batter?: { id?: number; fullName?: string };
+    pitcher?: { id?: number; fullName?: string };
+  };
+  playEvents?: MlbApiPlayEvent[];
+}
+
 export interface MlbApiGameFeedResponse {
   liveData?: {
     linescore?: MlbApiLinescore;
+    plays?: {
+      allPlays?: MlbApiPlay[];
+    };
   };
   gameData?: {
     status?: { detailedState?: string };
@@ -58,6 +106,7 @@ export interface MlbApiGameFeedResponse {
       away?: MlbApiTeamRef;
     };
     venue?: { name?: string };
+    datetime?: { officialDate?: string };
   };
 }
 

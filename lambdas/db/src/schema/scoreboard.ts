@@ -24,7 +24,8 @@ const MLB_DATA_API_KEY_SECRET_NAME =
 // occurs once regardless of how many concurrent requests arrive at cold start.
 let mlbDataProviderPromise: Promise<MlbDataProvider> | null = null;
 
-function getMlbDataProvider(): Promise<MlbDataProvider> {
+/** Shared lazy provider singleton — also used by notable-plays.ts (LS-9095). */
+export function getMlbDataProvider(): Promise<MlbDataProvider> {
   if (!mlbDataProviderPromise) {
     mlbDataProviderPromise = initMlbDataProvider().catch((error) => {
       // Reset so the next request retries initialisation (e.g. transient SM outage).

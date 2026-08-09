@@ -2608,6 +2608,16 @@ type Mutation {
   Refresh PFR season-totals for players on active football leagues. No-ops outside the NFL season window (Sept 1 – Feb 15). Triggered weekly by EventBridge; system-only.
   """
   refreshFootballWeeklySeasonStats: FootballStatsRefreshResult
+
+  """
+  Refresh the per-player notable-play cache from recent final games' feed data. Triggered daily by EventBridge; system-only. No-ops when the configured MLB data provider has no play-level feed support.
+  """
+  refreshNotablePlays(
+    """
+    Days of schedule history to scan (default 2, max 14)
+    """
+    lookbackDays: Int
+  ): NotablePlayRefreshResult
   registerDeviceToken(input: DeviceTokenInput!): DeviceToken
 
   """
@@ -2972,6 +2982,33 @@ type NflTeamSeasonMetadata {
   teamAbbreviation: String!
 }
 
+"""
+Result of the scheduled notable-play cache refresh triggered by EventBridge
+"""
+type NotablePlayRefreshResult {
+  errors: [String!]
+
+  """
+  Number of final games whose feeds were scanned
+  """
+  gamesScanned: Int
+
+  """
+  Number of player cache rows inserted or updated
+  """
+  playersUpdated: Int
+
+  """
+  Human-readable explanation of the outcome
+  """
+  reason: String
+
+  """
+  Whether the refresh ran (false when the configured provider has no play-level feed support)
+  """
+  triggered: Boolean
+}
+
 type NotificationHistoryItem {
   body: String
   channel: String
@@ -3153,6 +3190,71 @@ type Player {
   """
   seasonsPlayed: Int
   statsLastFetchedAt: String
+}
+
+"""
+A player's cached most-notable Statcast play, shown as the pick-splash stat graphic on the draft spectator page (LS-9095)
+"""
+type PlayerNotablePlay {
+  """
+  Human-readable play description from the game feed
+  """
+  description: String
+
+  """
+  MLB event type code, e.g. 'home_run', 'strikeout'
+  """
+  eventType: String
+
+  """
+  Exit velocity in mph (batter plays only)
+  """
+  exitVelocity: Float
+
+  """
+  MLB Film Room search link for this play — a user-initiated outbound link to MLB's own property (never an embedded video). Null when the game feed carried no Statcast play id.
+  """
+  filmRoomUrl: String
+
+  """
+  Official game date (YYYY-MM-DD)
+  """
+  gameDate: String
+
+  """
+  MLB primary key of the game the play occurred in
+  """
+  gamePk: Int
+
+  """
+  Hit distance in feet (batter plays only)
+  """
+  hitDistance: Float
+
+  """
+  Launch angle in degrees (batter plays only)
+  """
+  launchAngle: Float
+
+  """
+  MLB Stats API player id the play belongs to
+  """
+  mlbPlayerId: Int
+
+  """
+  Pitch speed in mph (pitcher plays only)
+  """
+  pitchSpeed: Float
+
+  """
+  Pitch type, e.g. 'Four-Seam Fastball' (pitcher plays only)
+  """
+  pitchType: String
+
+  """
+  Role the play is notable for: 'batter' or 'pitcher'
+  """
+  playerRole: String
 }
 
 type PlayerScoring {
@@ -3650,6 +3752,11 @@ type Query {
   Bye week and SoS tier for every NFL team in the given season (LS-8044). When season is omitted, returns the current season (highest seeded season in the table).
   """
   nflTeamSeasonMetadata(season: Int): [NflTeamSeasonMetadata!]!
+
+  """
+  Cached notable plays for a set of MLB Stats API player ids. Players without a cached play are simply absent from the result.
+  """
+  notablePlaysByMlbPlayerIds(mlbPlayerIds: [Int!]!): [PlayerNotablePlay!]
 
   """
   Notable historical game-log performances from today's calendar date across all seasons

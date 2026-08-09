@@ -184,6 +184,47 @@ export interface Team {
   leagueId: number | null;
 }
 
+// ─── Notable plays (Statcast) ─────────────────────────────────────────────────
+
+/**
+ * A single notable Statcast-style play for one player in one game (LS-9095).
+ *
+ * Extracted from the game feed's play-by-play data and scored by a
+ * deterministic notability heuristic so callers can keep only each player's
+ * best moment. Metric fields are null when the feed omits them (e.g. no
+ * Statcast tracking for the event).
+ */
+export interface NotablePlay {
+  mlbPlayerId: number;
+  /** Whether the play is notable for the player as batter or as pitcher. */
+  playerRole: 'batter' | 'pitcher';
+  gamePk: number;
+  /** Official game date (YYYY-MM-DD). */
+  gameDate: string;
+  /**
+   * Statcast play UUID — the same id Baseball Savant / MLB Film Room key on.
+   * Used to build a user-initiated Film Room link-out; never used to fetch or
+   * embed video. Null when the feed omits it.
+   */
+  playId: string | null;
+  /** MLB eventType code, e.g. 'home_run', 'triple', 'strikeout'. */
+  eventType: string;
+  /** Human-readable play description from the feed. */
+  description: string;
+  /** Exit velocity in mph (batter plays only). */
+  exitVelocity: number | null;
+  /** Launch angle in degrees (batter plays only). */
+  launchAngle: number | null;
+  /** Hit distance in feet (batter plays only). */
+  hitDistance: number | null;
+  /** Pitch speed in mph (pitcher plays only). */
+  pitchSpeed: number | null;
+  /** Pitch type description, e.g. 'Four-Seam Fastball' (pitcher plays only). */
+  pitchType: string | null;
+  /** Deterministic notability score — higher is more notable. */
+  notabilityScore: number;
+}
+
 /** Current team affiliation + jersey number for a player (LS-8597). */
 export interface PlayerInfo {
   playerId: number;

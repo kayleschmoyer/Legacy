@@ -1,5 +1,6 @@
 import type {
   GameFeed,
+  NotablePlay,
   PlayerGameStats,
   PlayerInfo,
   PlayerSeasonStats,
@@ -24,6 +25,16 @@ export interface MlbDataProvider {
 
   /** Returns the detailed live feed for a single game by MLB primary key. */
   getGameFeed(gamePk: number): Promise<GameFeed>;
+
+  /**
+   * Returns each player's single most notable Statcast-style play from one
+   * game's play-by-play data, scored by a deterministic heuristic (LS-9095).
+   *
+   * Optional — providers without play-level feed data (e.g. balldontlie)
+   * simply do not implement it. Callers must feature-detect
+   * (`provider.getNotablePlays === undefined`) and degrade gracefully.
+   */
+  getNotablePlays?(gamePk: number): Promise<NotablePlay[]>;
 
   // ── Player Stats ──────────────────────────────────────────────────────────
   /** Returns season aggregates for a player. */

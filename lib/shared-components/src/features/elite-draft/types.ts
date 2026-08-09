@@ -106,6 +106,29 @@ export interface LeagueTeam {
   managerId?: number | null;
 }
 
+/**
+ * A player's cached most-notable Statcast play, rendered as the animated
+ * stat graphic during the spectator pick splash (LS-9095). Metric fields are
+ * null when the source feed carried no Statcast tracking for the play.
+ */
+export interface NotablePlaySummary {
+  mlbPlayerId: number;
+  playerRole: 'batter' | 'pitcher';
+  /** Official game date (YYYY-MM-DD). */
+  gameDate: string;
+  /** MLB event type code, e.g. 'home_run', 'strikeout'. */
+  eventType: string;
+  /** Human-readable play description from the game feed. */
+  description: string;
+  exitVelocity: number | null;
+  launchAngle: number | null;
+  hitDistance: number | null;
+  pitchSpeed: number | null;
+  pitchType: string | null;
+  /** User-initiated MLB Film Room link-out — never an embedded video. */
+  filmRoomUrl: string | null;
+}
+
 export interface IntelligenceRecommendation {
   player: DraftPlayer;
   score: number;

@@ -550,3 +550,50 @@ resource "aws_lambda_permission" "football_career_refresh_eventbridge" {
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.football_career_refresh.arn
 }
+
+# ── Baseball: Daily Notable-Play Cache Refresh (LS-9095) ───────────────
+# Refreshes the player_notable_plays cache (each player's most notable
+# Statcast play) that powers the draft-spectator pick-splash stat graphic.
+# Fires daily at 09:00 UTC (4/5am ET) — after the last West Coast games go
+# final. UTC-fixed year-round like every other rule (DST shift accepted).
+# The resolver no-ops (triggered:false) when the configured MLB data
+# provider has no play-level feed support, so the rule stays enabled
+# year-round and skips are observable in CloudWatch.
+
+resource "aws_cloudwatch_event_rule" "notable_plays_refresh" {
+  name                = "${local.name_prefix}-notable-plays-refresh"
+  description         = "Refresh the per-player notable-play cache (pick-splash stat graphic) daily at 09:00 UTC"
+  schedule_expression = "cron(0 9 * * ? *)"
+
+  tags = local.common_tags
+}
+
+resource "aws_cloudwatch_event_target" "notable_plays_refresh" {
+  rule      = aws_cloudwatch_event_rule.notable_plays_refresh.name
+  target_id = "notable-plays-refresh"
+  arn       = aws_lambda_function.graphql.arn
+
+  input = jsonencode({
+    httpMethod = "POST"
+    body = jsonencode({
+      query = "mutation { refreshNotablePlays { triggered reason gamesScanned playersUpdated errors } }"
+    })
+    headers = {
+      "content-type"     = "application/json"
+      "x-system-api-key" = random_password.system_api_key.result
+    }
+    requestContext = {
+      http = {
+        method = "POST"
+      }
+    }
+  })
+}
+
+resource "aws_lambda_permission" "notable_plays_refresh_eventbridge" {
+  statement_id  = "AllowEventBridgeNotablePlaysRefresh"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.graphql.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.notable_plays_refresh.arn
+}

@@ -334,6 +334,7 @@ export function SpectatorScreen({
         onDismiss={splash.dismiss}
         commentaryFor={commentaryFor}
         mlbPlayerIdFor={data.mlbPlayerIdFor}
+        notablePlayFor={data.notablePlayFor}
       />
 
       <div className="sr-only" aria-live="polite">

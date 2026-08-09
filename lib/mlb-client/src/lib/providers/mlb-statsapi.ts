@@ -22,11 +22,13 @@ import type {
   MlbApiTeamsResponse,
 } from './mlb-statsapi.api-types';
 import type { MlbDataProvider } from '../provider';
+import { extractNotablePlays } from '../notable-plays';
 import type {
   GameFeed,
   MlbGame,
   MlbGameStatus,
   MlbTeamScore,
+  NotablePlay,
   PlayerGameStats,
   PlayerInfo,
   PlayerSeasonStats,
@@ -218,6 +220,19 @@ export class MlbStatsApiProvider implements MlbDataProvider {
       awayTeam: this.mapTeamScore(gameData?.teams?.away, ls?.teams?.away),
       venue: gameData?.venue?.name ?? null,
     };
+  }
+
+  /**
+   * Each player's most notable Statcast play from one game (LS-9095).
+   * Completed games only change once, so the feed is cached at the static TTL.
+   */
+  async getNotablePlays(gamePk: number): Promise<NotablePlay[]> {
+    const data = await this.get<MlbApiGameFeedResponse>(
+      `/v1.1/game/${gamePk}/feed/live`,
+      undefined,
+      STATIC_TTL_MS,
+    );
+    return extractNotablePlays(data, gamePk);
   }
 
   // ── Player Stats ──────────────────────────────────────────────────────────

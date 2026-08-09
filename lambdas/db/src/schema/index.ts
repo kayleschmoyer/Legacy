@@ -32,6 +32,7 @@ import './analytics';
 import './subscriptions';
 import './account-merge';
 import './scoreboard';
+import './notable-plays';
 import './disclosure-game';
 import './twenty-questions';
 import './sports';

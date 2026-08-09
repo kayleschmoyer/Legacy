@@ -165,6 +165,16 @@ export interface PlayerWithScoring extends Player {
   scoring: PlayerCareerScore;
 }
 
+/** Row shape of the player_notable_plays cache table (LS-9095). */
+export type PlayerNotablePlayRow =
+  typeof PublicSchema.playerNotablePlays.$inferSelect;
+
+/** Insertable notable-play summary (LS-9095) — timestamps are DB-managed. */
+export type PlayerNotablePlayUpsert = Omit<
+  typeof PublicSchema.playerNotablePlays.$inferInsert,
+  'createdAt' | 'updatedAt'
+>;
+
 /**
  * Player service functions for database operations
  */
@@ -222,6 +232,78 @@ export class PlayerService {
         .limit(1);
 
       return results[0] || null;
+    });
+  }
+
+  /**
+   * Get cached notable plays for a set of MLB Stats API player ids (LS-9095).
+   * Splash-path read — a single indexed lookup, no external calls.
+   */
+  async getNotablePlaysByMlbIds(
+    mlbPlayerIds: number[],
+  ): Promise<PlayerNotablePlayRow[]> {
+    if (mlbPlayerIds.length === 0) return [];
+    return runWithPublicClient(this.options, async (db) => {
+      return db
+        .select()
+        .from(PublicSchema.playerNotablePlays)
+        .where(
+          inArray(PublicSchema.playerNotablePlays.mlbPlayerId, mlbPlayerIds),
+        );
+    });
+  }
+
+  /**
+   * Narrow a set of MLB Stats API player ids to the ones mapped to a player
+   * row (LS-9095). Keeps the notable-play cache bounded to our own players.
+   */
+  async filterKnownMlbPlayerIds(mlbPlayerIds: number[]): Promise<number[]> {
+    if (mlbPlayerIds.length === 0) return [];
+    return runWithPublicClient(this.options, async (db) => {
+      const rows = await db
+        .select({ mlbPlayerId: PublicSchema.players.mlbPlayerId })
+        .from(PublicSchema.players)
+        .where(inArray(PublicSchema.players.mlbPlayerId, mlbPlayerIds));
+      return rows
+        .map((r) => r.mlbPlayerId)
+        .filter((id): id is number => id !== null);
+    });
+  }
+
+  /**
+   * Upsert notable-play cache rows (LS-9095). An existing row is only
+   * replaced when the incoming play scores at least as high, or when the
+   * stored play has gone stale (older than 60 days) — "best recent moment"
+   * semantics for the pick-splash graphic.
+   */
+  async upsertNotablePlays(plays: PlayerNotablePlayUpsert[]): Promise<number> {
+    if (plays.length === 0) return 0;
+    return runWithPublicClient(this.options, async (db) => {
+      const t = PublicSchema.playerNotablePlays;
+      const updated = await db
+        .insert(t)
+        .values(plays)
+        .onConflictDoUpdate({
+          target: t.mlbPlayerId,
+          set: {
+            playerRole: sql`excluded.player_role`,
+            gamePk: sql`excluded.game_pk`,
+            gameDate: sql`excluded.game_date`,
+            playId: sql`excluded.play_id`,
+            eventType: sql`excluded.event_type`,
+            description: sql`excluded.description`,
+            exitVelocity: sql`excluded.exit_velocity`,
+            launchAngle: sql`excluded.launch_angle`,
+            hitDistance: sql`excluded.hit_distance`,
+            pitchSpeed: sql`excluded.pitch_speed`,
+            pitchType: sql`excluded.pitch_type`,
+            notabilityScore: sql`excluded.notability_score`,
+            updatedAt: sql`now()`,
+          },
+          setWhere: sql`excluded.notability_score >= ${t.notabilityScore} OR ${t.gameDate} < (now() - interval '60 days')::date`,
+        })
+        .returning({ mlbPlayerId: t.mlbPlayerId });
+      return updated.length;
     });
   }
 

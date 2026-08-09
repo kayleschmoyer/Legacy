@@ -148,6 +148,10 @@ export function createDatabaseService(options: DbOptions): DatabaseService {
 // Re-export individual services for direct usage
 export { UserService, createUserService } from './UserService';
 export { PlayerService, createPlayerService } from './PlayerService';
+export type {
+  PlayerNotablePlayRow,
+  PlayerNotablePlayUpsert,
+} from './PlayerService';
 export {
   StatisticsService,
   createStatisticsService,

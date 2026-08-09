@@ -1997,6 +1997,8 @@ export type Mutation = {
   refreshFootballCareerStats?: Maybe<FootballStatsRefreshResult>;
   /** Refresh PFR season-totals for players on active football leagues. No-ops outside the NFL season window (Sept 1 – Feb 15). Triggered weekly by EventBridge; system-only. */
   refreshFootballWeeklySeasonStats?: Maybe<FootballStatsRefreshResult>;
+  /** Refresh the per-player notable-play cache from recent final games' feed data. Triggered daily by EventBridge; system-only. No-ops when the configured MLB data provider has no play-level feed support. */
+  refreshNotablePlays?: Maybe<NotablePlayRefreshResult>;
   registerDeviceToken?: Maybe<DeviceToken>;
   /** Reject a pending trade offer as the receiving team manager. */
   rejectTrade?: Maybe<TradeOffer>;
@@ -2470,6 +2472,10 @@ export type MutationRecordConsentArgs = {
   input: RecordConsentInput;
 };
 
+export type MutationRefreshNotablePlaysArgs = {
+  lookbackDays?: InputMaybe<Scalars['Int']['input']>;
+};
+
 export type MutationRegisterDeviceTokenArgs = {
   input: DeviceTokenInput;
 };
@@ -2797,6 +2803,20 @@ export type NflTeamSeasonMetadata = {
   teamAbbreviation: Scalars['String']['output'];
 };
 
+/** Result of the scheduled notable-play cache refresh triggered by EventBridge */
+export type NotablePlayRefreshResult = {
+  __typename?: 'NotablePlayRefreshResult';
+  errors?: Maybe<Array<Scalars['String']['output']>>;
+  /** Number of final games whose feeds were scanned */
+  gamesScanned?: Maybe<Scalars['Int']['output']>;
+  /** Number of player cache rows inserted or updated */
+  playersUpdated?: Maybe<Scalars['Int']['output']>;
+  /** Human-readable explanation of the outcome */
+  reason?: Maybe<Scalars['String']['output']>;
+  /** Whether the refresh ran (false when the configured provider has no play-level feed support) */
+  triggered?: Maybe<Scalars['Boolean']['output']>;
+};
+
 export type NotificationHistoryItem = {
   __typename?: 'NotificationHistoryItem';
   body?: Maybe<Scalars['String']['output']>;
@@ -2929,6 +2949,35 @@ export type Player = {
   /** Number of distinct MLB seasons the player has batting stats for (AL/NL only) */
   seasonsPlayed?: Maybe<Scalars['Int']['output']>;
   statsLastFetchedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** A player's cached most-notable Statcast play, shown as the pick-splash stat graphic on the draft spectator page (LS-9095) */
+export type PlayerNotablePlay = {
+  __typename?: 'PlayerNotablePlay';
+  /** Human-readable play description from the game feed */
+  description?: Maybe<Scalars['String']['output']>;
+  /** MLB event type code, e.g. 'home_run', 'strikeout' */
+  eventType?: Maybe<Scalars['String']['output']>;
+  /** Exit velocity in mph (batter plays only) */
+  exitVelocity?: Maybe<Scalars['Float']['output']>;
+  /** MLB Film Room search link for this play — a user-initiated outbound link to MLB's own property (never an embedded video). Null when the game feed carried no Statcast play id. */
+  filmRoomUrl?: Maybe<Scalars['String']['output']>;
+  /** Official game date (YYYY-MM-DD) */
+  gameDate?: Maybe<Scalars['String']['output']>;
+  /** MLB primary key of the game the play occurred in */
+  gamePk?: Maybe<Scalars['Int']['output']>;
+  /** Hit distance in feet (batter plays only) */
+  hitDistance?: Maybe<Scalars['Float']['output']>;
+  /** Launch angle in degrees (batter plays only) */
+  launchAngle?: Maybe<Scalars['Float']['output']>;
+  /** MLB Stats API player id the play belongs to */
+  mlbPlayerId?: Maybe<Scalars['Int']['output']>;
+  /** Pitch speed in mph (pitcher plays only) */
+  pitchSpeed?: Maybe<Scalars['Float']['output']>;
+  /** Pitch type, e.g. 'Four-Seam Fastball' (pitcher plays only) */
+  pitchType?: Maybe<Scalars['String']['output']>;
+  /** Role the play is notable for: 'batter' or 'pitcher' */
+  playerRole?: Maybe<Scalars['String']['output']>;
 };
 
 export type PlayerScoring = {
@@ -3204,6 +3253,8 @@ export type Query = {
   mySubscription?: Maybe<SubscriptionInfo>;
   /** Bye week and SoS tier for every NFL team in the given season (LS-8044). When season is omitted, returns the current season (highest seeded season in the table). */
   nflTeamSeasonMetadata: Array<NflTeamSeasonMetadata>;
+  /** Cached notable plays for a set of MLB Stats API player ids. Players without a cached play are simply absent from the result. */
+  notablePlaysByMlbPlayerIds?: Maybe<Array<PlayerNotablePlay>>;
   /** Notable historical game-log performances from today's calendar date across all seasons */
   onThisDay?: Maybe<Array<OnThisDayEntry>>;
   /** Baseball events (signings, trades) that occurred on the given calendar date */
@@ -3670,6 +3721,10 @@ export type QueryMyLeaguesArgs = {
 
 export type QueryNflTeamSeasonMetadataArgs = {
   season?: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type QueryNotablePlaysByMlbPlayerIdsArgs = {
+  mlbPlayerIds: Array<Scalars['Int']['input']>;
 };
 
 export type QueryOnThisDayArgs = {

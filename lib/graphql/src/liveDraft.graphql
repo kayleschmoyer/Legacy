@@ -294,6 +294,22 @@ query GetDraftPicks($draftId: Int!) {
   }
 }
 
+query GetNotablePlays($mlbPlayerIds: [Int!]!) {
+  notablePlaysByMlbPlayerIds(mlbPlayerIds: $mlbPlayerIds) {
+    mlbPlayerId
+    playerRole
+    gameDate
+    eventType
+    description
+    exitVelocity
+    launchAngle
+    hitDistance
+    pitchSpeed
+    pitchType
+    filmRoomUrl
+  }
+}
+
 query GetAvailableDraftPlayers(
   $draftId: Int!
   $search: String

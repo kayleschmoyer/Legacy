@@ -2117,4 +2117,118 @@ export const CSS = `
   border-radius: var(--d-radius-pill);
   padding: 3px 10px;
 }
+/* Pick-splash notable-play stat graphic (LS-9095). All intro animation
+   completes within ~2s so it reads fully even in the 4s catch-up window. */
+.d-splash-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 300px;
+  padding: 8px 10px 10px;
+  background: var(--d-panel);
+  border: 1px solid var(--d-panel-border);
+  border-radius: var(--d-radius);
+  animation: fadeSlideUp 0.3s ease-out;
+}
+.d-stat-event {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  color: var(--d-accent-light);
+}
+.d-stat-svg {
+  width: 280px;
+  height: 120px;
+}
+.d-stat-ground {
+  stroke: var(--d-panel-border);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.d-stat-traj {
+  fill: none;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 320;
+  stroke-dashoffset: 320;
+  animation: statTrajDraw 1.1s ease-out 0.2s forwards;
+}
+.d-stat-ball {
+  fill: var(--d-accent-light);
+  opacity: 0;
+  animation: statBallPop 0.4s ease-out 1.2s forwards;
+}
+.d-stat-chips {
+  display: flex;
+  gap: 8px;
+}
+.d-stat-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  animation: fadeSlideUp 0.35s ease-out forwards;
+}
+.d-stat-chip-value {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--d-text);
+}
+.d-stat-chip-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--d-text-secondary);
+}
+.d-stat-pitch {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 0 2px;
+}
+.d-stat-pitch-k {
+  font-family: var(--f-display);
+  font-weight: 800;
+  font-size: 44px;
+  line-height: 1;
+  color: var(--d-danger);
+  animation: statBallPopIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.d-stat-desc {
+  font-size: 12px;
+  color: var(--d-text-secondary);
+  text-align: center;
+}
+.d-stat-filmroom {
+  pointer-events: auto;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--d-accent-light);
+  text-decoration: none;
+  border: 1px solid var(--d-panel-border);
+  border-radius: var(--d-radius-pill);
+  padding: 3px 10px;
+  opacity: 0;
+  animation: fadeSlideUp 0.35s ease-out 1.8s forwards;
+}
+.d-stat-filmroom:hover {
+  border-color: var(--d-accent);
+  color: var(--d-accent);
+}
+@keyframes statTrajDraw {
+  to { stroke-dashoffset: 0; }
+}
+@keyframes statBallPop {
+  from { opacity: 0; transform: scale(0.4); transform-origin: center; transform-box: fill-box; }
+  to { opacity: 1; transform: scale(1); transform-origin: center; transform-box: fill-box; }
+}
+@keyframes statBallPopIn {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; transform: scale(1); }
+}
 `;

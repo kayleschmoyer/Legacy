@@ -11,6 +11,7 @@ export * from './models/Leagues';
 export * from './models/Matchups';
 export * from './models/MlbTeams';
 export * from './models/Notifications';
+export * from './models/PlayerNotablePlays';
 export * from './models/Players';
 export * from './models/Playoffs';
 export * from './models/RateLimits';
