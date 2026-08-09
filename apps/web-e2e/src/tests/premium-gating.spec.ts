@@ -84,8 +84,9 @@ test.describe('Premium gating — premium user @critical', () => {
     await useTier(page, 'premium');
     await page.goto('/players/stats');
 
-    // No lock overlay, and the Export action is rendered (LS-5591 — export is
-    // available to all entitlements, not premium-only).
+    // No lock overlay, and the Export action is rendered. Export (all
+    // formats, including JSON) is premium-only (LS-9140, superseding the
+    // LS-5591 "available to all entitlements" exemption).
     await expect(page.getByTestId(GATE)).toHaveCount(0);
     await expect(
       page.getByRole('button', { name: EXPORT_BUTTON }),

@@ -938,10 +938,10 @@ describe('PlayerStatsRoute export object-URL cleanup', () => {
   });
 });
 
-// LS-5591: Export JSON is available to all viewers (entitlement `all`). The
-// host passes canExport={true} unconditionally so every signed-in or anonymous
-// user can download the filtered stats.
-describe('PlayerStatsRoute export entitlement (LS-5591)', () => {
+// LS-9140: Export (all formats, including JSON) is a premium-only feature.
+// The host passes canExport={isPremium} so free/anonymous viewers never get
+// the export capability.
+describe('PlayerStatsRoute export entitlement (LS-9140)', () => {
   let createObjectURL: jest.Mock;
 
   beforeEach(() => {
@@ -958,16 +958,16 @@ describe('PlayerStatsRoute export entitlement (LS-5591)', () => {
     URL.revokeObjectURL = jest.fn();
   });
 
-  it('grants the export capability (canExport=true) to all viewers', () => {
+  it('grants the export capability (canExport=true) to premium viewers', () => {
     mockHasEntitlement = true;
     render(<PlayerStatsRoute />);
     expect(screen.getByTestId('can-export')).toHaveTextContent('true');
   });
 
-  it('grants the export capability (canExport=true) to non-premium viewers', () => {
+  it('withholds the export capability (canExport=false) from non-premium viewers (LS-9140)', () => {
     mockHasEntitlement = false;
     render(<PlayerStatsRoute />);
-    expect(screen.getByTestId('can-export')).toHaveTextContent('true');
+    expect(screen.getByTestId('can-export')).toHaveTextContent('false');
   });
 
   it('grants the column-customization capability (canCustomizeColumns=true) to premium viewers (PST-003 / LS-7107)', () => {
@@ -993,16 +993,17 @@ describe('PlayerStatsRoute export entitlement (LS-5591)', () => {
     expect(createObjectURL).toHaveBeenCalledTimes(1);
   });
 
-  it('runs the client-side export for non-premium viewers', () => {
+  it('does not run the client-side export for non-premium viewers (LS-9140)', () => {
     mockHasEntitlement = false;
     render(<PlayerStatsRoute />);
     fireEvent.click(screen.getByTestId('export-button'));
-    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(createObjectURL).not.toHaveBeenCalled();
   });
 });
 
-// PST-014 / LS-7112: Premium viewers get CSV and XLSX export format options.
-describe('PlayerStatsRoute export formats (PST-014 / LS-7112)', () => {
+// PST-014 / LS-7112 (superseded by LS-9140): Premium viewers get CSV and XLSX
+// export format options in addition to JSON; non-premium viewers get none.
+describe('PlayerStatsRoute export formats (PST-014 / LS-7112, LS-9140)', () => {
   let createObjectURL: jest.Mock;
 
   beforeEach(() => {
@@ -1026,10 +1027,10 @@ describe('PlayerStatsRoute export formats (PST-014 / LS-7112)', () => {
     );
   });
 
-  it('passes exportFormats ["json"] to non-premium viewers', () => {
+  it('passes exportFormats [] to non-premium viewers (LS-9140)', () => {
     mockHasEntitlement = false;
     render(<PlayerStatsRoute />);
-    expect(screen.getByTestId('export-formats')).toHaveTextContent('json');
+    expect(screen.getByTestId('export-formats')).toHaveTextContent('');
   });
 
   it('triggers a CSV download when format is csv', () => {
@@ -1063,6 +1064,13 @@ describe('PlayerStatsRoute export formats (PST-014 / LS-7112)', () => {
     mockHasEntitlement = false;
     render(<PlayerStatsRoute />);
     fireEvent.click(screen.getByTestId('export-xlsx-button'));
+    expect(createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('does not run JSON export for non-premium viewers (LS-9140)', () => {
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    fireEvent.click(screen.getByTestId('export-button'));
     expect(createObjectURL).not.toHaveBeenCalled();
   });
 });

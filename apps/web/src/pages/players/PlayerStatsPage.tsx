@@ -1339,17 +1339,18 @@ export function PlayerStatsRoute() {
     exportDataRef.current = data;
   }, []);
 
-  // Handle export functionality (PST-014 / LS-7112: CSV and XLSX added for premium)
+  // Handle export functionality (LS-9140: all export formats, including JSON,
+  // are premium-only)
   const handleExport = useCallback(
     (
       filters: PlayerStatsFilters,
       viewMode: PlayerStatsViewMode,
       format: ExportFormat = 'json',
     ) => {
-      // CSV and XLSX are premium-only (PST-014 / LS-7112). JSON export remains
-      // available to all users. Guard the handler so the premium formats can
-      // never run for a free user even if triggered programmatically.
-      if (format !== 'json' && !isPremium) return;
+      // Export (any format) is premium-only (LS-9140). Guard the handler so
+      // export can never run for a free user even if triggered
+      // programmatically.
+      if (!isPremium) return;
 
       let dataBlob: Blob;
       let filename: string;
@@ -1433,7 +1434,7 @@ export function PlayerStatsRoute() {
       }
       setLiveMsg('Player statistics exported. Download started.');
     },
-    [],
+    [isPremium],
   );
 
   // Mirror committed filter state into URL params so reload restores the view.
@@ -1857,8 +1858,8 @@ export function PlayerStatsRoute() {
           }
           showHeader={true}
           showActions={true}
-          canExport={true}
-          exportFormats={isPremium ? ['json', 'csv', 'xlsx'] : ['json']}
+          canExport={isPremium}
+          exportFormats={isPremium ? ['json', 'csv', 'xlsx'] : []}
           canCustomizeColumns={isPremium}
           isPremiumPageSize={isPremiumLargePageSize}
           statsFormat={statsFormat}
