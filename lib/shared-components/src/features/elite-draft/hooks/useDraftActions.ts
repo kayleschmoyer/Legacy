@@ -167,7 +167,24 @@ export function useDraftActions({
       } catch (err) {
         const msg =
           err instanceof Error ? err.message : 'Failed to initialize draft';
-        setInitError(msg);
+        // LS-9168: the draft can already be 'paused' (or 'in-progress') by
+        // the time this click lands — e.g. another commissioner started it,
+        // or this client's cached league data is stale. The raw backend
+        // message is technically accurate but not actionable, so translate
+        // it and resync the league so the UI leaves this stale lobby view.
+        if (msg.includes("current status is 'paused'")) {
+          setInitError(
+            'This draft is already paused. Resume it from the draft board instead of starting a new one.',
+          );
+          void refetchLeague();
+        } else if (msg.includes('Cannot initialize draft: current status')) {
+          setInitError(
+            'This draft has already been started. Refresh to see its current state.',
+          );
+          void refetchLeague();
+        } else {
+          setInitError(msg);
+        }
       }
     },
     [

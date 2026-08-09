@@ -10,6 +10,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { shuffleArray } from '@legacy-sports/utils';
 import { and, asc, desc, eq } from 'drizzle-orm';
+import { GraphQLError } from 'graphql';
 
 import { Draft } from '../types';
 import { enableAutoPickForUnmanagedTeams } from '../helpers';
@@ -382,11 +383,24 @@ builder.mutationField('initializeDraft', (t) =>
 
         return draft;
       } catch (error) {
-        LOGGER.error(
-          'Error initializing draft',
-          error instanceof Error ? error : new Error(String(error)),
-          { leagueId, userId },
-        );
+        // Skip error-level logging for expected user-facing errors (e.g. a
+        // commissioner re-initializing a draft that is already 'paused' or
+        // 'in-progress' — a normal state-machine rejection, not a system
+        // failure). Mirrors the pattern in make-draft-pick.ts so these don't
+        // pollute Rollbar (LS-9168).
+        const isExpected =
+          error instanceof GraphQLError &&
+          typeof error.extensions?.code === 'string' &&
+          ['BAD_USER_INPUT', 'FORBIDDEN', 'UNAUTHENTICATED'].includes(
+            error.extensions.code,
+          );
+        if (!isExpected) {
+          LOGGER.error(
+            'Error initializing draft',
+            error instanceof Error ? error : new Error(String(error)),
+            { leagueId, userId },
+          );
+        }
         throw error;
       }
     },

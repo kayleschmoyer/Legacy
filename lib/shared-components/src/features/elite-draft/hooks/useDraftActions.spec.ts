@@ -11,6 +11,7 @@ import { act, renderHook } from '@testing-library/react';
 
 // Jest hoists jest.mock above imports; references inside the factory must
 // be allow-listed (prefixed with `mock`) so they can be safely captured.
+const mockInitializeLiveDraft = jest.fn();
 const mockMakeDraftPick = jest.fn();
 const mockPauseDraft = jest.fn();
 const mockResumeDraft = jest.fn();
@@ -33,6 +34,7 @@ jest.mock('@apollo/client/react', () => ({
     //   8: ADD_TO_DRAFT_QUEUE
     //   9: REMOVE_FROM_DRAFT_QUEUE
     //  10: TOGGLE_DRAFT_AUTO_PICK
+    if (idx === 0) return [mockInitializeLiveDraft, { loading: false }];
     if (idx === 1) return [mockMakeDraftPick, { loading: false }];
     if (idx === 2) return [mockPauseDraft, { loading: false }];
     if (idx === 3) return [mockResumeDraft, { loading: false }];
@@ -476,5 +478,71 @@ describe('useDraftActions pause/resume optimistic update (LS-4834)', () => {
     expect(setDraftPaused).toHaveBeenNthCalledWith(1, false);
     expect(setDraftPaused).toHaveBeenNthCalledWith(2, true);
     expect(showToast).toHaveBeenCalledWith('boom', 'error');
+  });
+});
+
+describe('useDraftActions handleInitializeDraft state-machine error handling (LS-9168)', () => {
+  beforeEach(() => {
+    mockCallCounter.current = 0;
+    mockInitializeLiveDraft.mockReset();
+  });
+
+  it('surfaces a clear, actionable message and resyncs league state when the draft is already paused', async () => {
+    mockInitializeLiveDraft.mockRejectedValueOnce(
+      new Error("Cannot initialize draft: current status is 'paused'"),
+    );
+    const setInitError = jest.fn();
+    const refetchLeague = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ setInitError, refetchLeague })),
+    );
+
+    await act(async () => {
+      await result.current.handleInitializeDraft();
+    });
+
+    expect(setInitError).toHaveBeenLastCalledWith(
+      'This draft is already paused. Resume it from the draft board instead of starting a new one.',
+    );
+    expect(refetchLeague).toHaveBeenCalled();
+  });
+
+  it('surfaces a clear message and resyncs league state for any other current-status rejection', async () => {
+    mockInitializeLiveDraft.mockRejectedValueOnce(
+      new Error("Cannot initialize draft: current status is 'in-progress'"),
+    );
+    const setInitError = jest.fn();
+    const refetchLeague = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ setInitError, refetchLeague })),
+    );
+
+    await act(async () => {
+      await result.current.handleInitializeDraft();
+    });
+
+    expect(setInitError).toHaveBeenLastCalledWith(
+      'This draft has already been started. Refresh to see its current state.',
+    );
+    expect(refetchLeague).toHaveBeenCalled();
+  });
+
+  it('falls back to the raw error message for unrelated failures', async () => {
+    mockInitializeLiveDraft.mockRejectedValueOnce(new Error('network error'));
+    const setInitError = jest.fn();
+    const refetchLeague = jest.fn();
+
+    const { result } = renderHook(() =>
+      useDraftActions(makeParams({ setInitError, refetchLeague })),
+    );
+
+    await act(async () => {
+      await result.current.handleInitializeDraft();
+    });
+
+    expect(setInitError).toHaveBeenLastCalledWith('network error');
+    expect(refetchLeague).not.toHaveBeenCalled();
   });
 });
