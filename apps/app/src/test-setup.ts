@@ -2,6 +2,14 @@
 // No longer need @testing-library/jest-native as it's deprecated
 // Built-in matchers are available in @testing-library/react-native v12.4+
 
+// Set global test timeout to 30 seconds, matching apps/web/src/test-setup.ts
+// (LS-8987). Jest's 5000ms default leaves no margin for genuinely async
+// effects (e.g. ConversationThread's WebSocket connect, which awaits a
+// keychain read before constructing the client) when nx's parallel:5
+// fan-out — each project running its own maxWorkers:2 Jest workers
+// (jest.preset.js) — oversubscribes CPU during a full-suite run.
+jest.setTimeout(30000);
+
 // AsyncStorage is backed by a native module that throws under Jest (no native
 // runtime). Provide a self-contained in-memory mock so any module that imports
 // it — e.g. the last-visited-league persistence used by the league screens
