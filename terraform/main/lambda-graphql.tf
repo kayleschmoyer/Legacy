@@ -257,12 +257,21 @@ resource "aws_lambda_function" "graphql" {
       # other GraphQL) requests from the browser are not blocked by the Lambda's
       # origin-reflection guard in handler.ts.
       # Falls back to the handler's built-in default when domain_name is empty.
-      # In dev, also allow localhost dev-server origins (web app on :4200,
-      # storybook on :4280) so developers can hit the dev backend from a
-      # local frontend without tripping the origin-reflection guard (LS-4546).
+      # In dev, also allow localhost dev-server origins: web app on :4200,
+      # storybook on :4280 (plus its 127.0.0.1 form — Playwright's webServer
+      # health check hits the E2E static server via 127.0.0.1:4280, not
+      # localhost:4280), and :4300 (the `vite preview` port used by both
+      # apps/web and apps/graphql-explorer) so developers can hit the dev
+      # backend from a local frontend without tripping the origin-reflection
+      # guard (LS-4546, LS-9160).
       CORS_ALLOWED_ORIGINS = join(",", concat(
         [var.domain_name != "" ? "https://${var.domain_name}" : "https://legacy-fantasy.com"],
-        var.environment == "dev" ? ["http://localhost:4200", "http://localhost:4280"] : []
+        var.environment == "dev" ? [
+          "http://localhost:4200",
+          "http://localhost:4280",
+          "http://127.0.0.1:4280",
+          "http://localhost:4300",
+        ] : []
       ))
 
       # MLB data provider configuration
