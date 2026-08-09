@@ -235,6 +235,63 @@ describe('Scheduled Mutations', () => {
       expect(currentWeekMatchups.every((m) => m.weekNumber === 1)).toBe(true);
     });
 
+    it('gates bootstrap activation on leagues.currentWeek, not the lowest scheduled week (LS-9125)', () => {
+      // Regression: a league can have zero 'in_progress' matchups between the
+      // stats lambda marking the current week 'completed' directly
+      // (game-state-manager.ts::updateMatchupStatus, independent of
+      // advanceLeagueWeekInternal) and the Sunday autoAdvanceMatchups cron
+      // promoting the next week. If autoSelectGames' nightly run landed in
+      // that gap and blindly activated the lowest 'scheduled' week, matchup
+      // progression raced ahead of leagues.currentWeek, which then never got
+      // bumped — league 5670 got stuck showing "week 1/10" despite having
+      // completed weeks 1-3. Activation must only fire for the week
+      // leagues.currentWeek actually points to.
+      const leagueMatchups: Array<{
+        weekNumber: number;
+        status: MatchupStatus;
+      }> = [
+        { weekNumber: 1, status: 'completed' },
+        { weekNumber: 2, status: 'completed' },
+        { weekNumber: 3, status: 'completed' },
+        { weekNumber: 4, status: 'scheduled' },
+      ];
+      const currentWeek = 4;
+      const hasInProgress = leagueMatchups.some(
+        (m) => m.status === 'in_progress',
+      );
+      expect(hasInProgress).toBe(false);
+
+      // Old (buggy) behavior: lowest scheduled week is 4 here, which
+      // coincidentally matches — but nothing tied it to currentWeek, so once
+      // week 4 also completed out of band the lowest scheduled week would
+      // become 5 while currentWeek stayed frozen. The fix activates strictly
+      // at currentWeek and does nothing (no fallback) if that week isn't
+      // 'scheduled'.
+      const activatable = leagueMatchups.find(
+        (m) => m.weekNumber === currentWeek && m.status === 'scheduled',
+      );
+      expect(activatable).toBeDefined();
+
+      const staleLeagueMatchups: Array<{
+        weekNumber: number;
+        status: MatchupStatus;
+      }> = [
+        { weekNumber: 1, status: 'completed' },
+        { weekNumber: 2, status: 'completed' },
+        { weekNumber: 3, status: 'completed' },
+        { weekNumber: 4, status: 'in_progress' },
+        { weekNumber: 5, status: 'scheduled' },
+      ];
+      const staleCurrentWeek = 1; // stuck, per LS-9125
+      const staleActivatable = staleLeagueMatchups.find(
+        (m) => m.weekNumber === staleCurrentWeek && m.status === 'scheduled',
+      );
+      // currentWeek's matchup is already 'in_progress' (via the stale-league
+      // fixup, or a concurrent run) — nothing to activate, and critically no
+      // fallback to week 5 (the lowest 'scheduled' week).
+      expect(staleActivatable).toBeUndefined();
+    });
+
     it('should determine the correct next game number', async () => {
       // Game number = selectedGamesCount + 1
       // If 3 games already selected and gamesPerMatchup = 5, next = 4

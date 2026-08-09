@@ -125,6 +125,7 @@ builder.mutationField('autoSelectGames', (t) =>
             id: PublicSchema.leagues.id,
             name: PublicSchema.leagues.name,
             gamesPerMatchup: PublicSchema.leagues.gamesPerMatchup,
+            currentWeek: PublicSchema.leagues.currentWeek,
           })
           .from(PublicSchema.leagues)
           .where(and(...leagueConditions));
@@ -140,7 +141,21 @@ builder.mutationField('autoSelectGames', (t) =>
         //    first time autoSelectGames runs for them), promote the lowest-week
         //    'scheduled' matchups to 'in_progress'. Subsequent weeks are activated
         //    by advanceLeagueWeekInternal.
+        //
+        //    A league can also have zero 'in_progress' matchups transiently
+        //    between the stats lambda marking the current week 'completed'
+        //    (game-state-manager.ts::updateMatchupStatus) and
+        //    autoAdvanceMatchups running its Sunday cron to promote the next
+        //    week — that promotion is the only place leagues.currentWeek gets
+        //    bumped. Without the currentWeek gate below, this bootstrap step
+        //    would race ahead and activate that next week itself, leaving
+        //    currentWeek permanently stale (LS-9125) even though matchups keep
+        //    progressing. Only activate the week that leagues.currentWeek
+        //    actually points to.
         const activeLeagueIds = activeLeagues.map((l) => l.id);
+        const currentWeekByLeague = new Map(
+          activeLeagues.map((l) => [l.id, l.currentWeek]),
+        );
         if (activeLeagueIds.length > 0) {
           const leaguesWithInProgress = await context.db
             .selectDistinct({ leagueId: PublicSchema.matchups.leagueId })
@@ -159,19 +174,8 @@ builder.mutationField('autoSelectGames', (t) =>
           );
 
           for (const lid of leaguesNeedingActivation) {
-            const firstScheduled = await context.db
-              .select({ weekNumber: PublicSchema.matchups.weekNumber })
-              .from(PublicSchema.matchups)
-              .where(
-                and(
-                  eq(PublicSchema.matchups.leagueId, lid),
-                  eq(PublicSchema.matchups.status, 'scheduled'),
-                ),
-              )
-              .orderBy(PublicSchema.matchups.weekNumber)
-              .limit(1);
-            const firstWeek = firstScheduled[0]?.weekNumber;
-            if (firstWeek === undefined) continue;
+            const currentWeek = currentWeekByLeague.get(lid);
+            if (currentWeek == null) continue;
 
             const activated = await context.db
               .update(PublicSchema.matchups)
@@ -179,13 +183,23 @@ builder.mutationField('autoSelectGames', (t) =>
               .where(
                 and(
                   eq(PublicSchema.matchups.leagueId, lid),
-                  eq(PublicSchema.matchups.weekNumber, firstWeek),
+                  eq(PublicSchema.matchups.weekNumber, currentWeek),
                   eq(PublicSchema.matchups.status, 'scheduled'),
                 ),
               )
               .returning({ id: PublicSchema.matchups.id });
+
+            if (activated.length === 0) {
+              // Nothing scheduled at leagues.currentWeek — either the season is
+              // between weeks waiting on autoAdvanceMatchups, or the week was
+              // already activated by a concurrent run. Do NOT fall back to the
+              // lowest scheduled week; that would silently race ahead of
+              // currentWeek again.
+              continue;
+            }
+
             LOGGER.info(
-              `[autoSelectGames] Locked lineups for league ${lid} week ${firstWeek}: ${activated.length} matchups activated`,
+              `[autoSelectGames] Locked lineups for league ${lid} week ${currentWeek}: ${activated.length} matchups activated`,
             );
           }
         }
