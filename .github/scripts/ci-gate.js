@@ -112,15 +112,40 @@ function computeGateConclusion(results) {
  * skipping avoids racing a newer run and avoids spending an API write on a SHA
  * nobody will merge.
  *
+ * @param {object} params
+ * @param {number} [params.prNumber] PR number to post against when the run
+ *   has no `pull_request` in its event payload (LS-9148: workflow_dispatch
+ *   runs the orchestrator resolved a PR for). Ignored when a payload PR is
+ *   present — the payload is always the authoritative source when it exists.
+ * @param {string} [params.headSha] Head SHA to target alongside `prNumber`.
+ *   Required together with `prNumber` for the no-payload path; without it
+ *   there is no SHA to post the status to.
  * @returns {Promise<{posted: boolean, reason?: string, state?: string, sha?: string, currentSha?: string, failing?: string[]}>}
  */
-async function postCiGate({ github, context, core, results }) {
+async function postCiGate({
+  github,
+  context,
+  core,
+  results,
+  prNumber,
+  headSha,
+}) {
   const { owner, repo } = context.repo;
-  const pr = context.payload && context.payload.pull_request;
+  const payloadPr = context.payload && context.payload.pull_request;
+
+  // LS-9148: workflow_dispatch (manual re-runs, and the ci:run label handler,
+  // which routes through workflow_dispatch to avoid displacing the
+  // orchestrator's concurrency group) carries no `pull_request` in the event
+  // payload. When the orchestrator resolved a PR for such a run, the caller
+  // passes prNumber/headSha explicitly — fall back to those before giving up.
+  const pr =
+    payloadPr ||
+    (prNumber && headSha ? { number: prNumber, head: { sha: headSha } } : null);
 
   if (!pr) {
     core.info(
-      'CI Gate: no pull_request in the event payload — skipping (not a PR-scoped run).',
+      'CI Gate: no pull_request in the event payload and no prNumber/headSha ' +
+        'provided — skipping (not a PR-scoped run).',
     );
     return { posted: false, reason: 'no-pr' };
   }

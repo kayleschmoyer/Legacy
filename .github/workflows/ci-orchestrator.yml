@@ -24,6 +24,17 @@ on:
   # security scans for every queued PR.
   workflow_dispatch:
     inputs:
+      pr_number:
+        description: >-
+          PR number this run should be scoped to (LS-9148). When set, the
+          determine-scope job resolves the PR's base/head SHAs via the API and
+          threads them into CI Pipeline so lint/format diff against the PR's
+          merge-base (like the native pull_request trigger) instead of the
+          whole repo, and so CI Gate can post to the PR. Leave empty for a
+          repo-wide run with no PR context (e.g. debugging main).
+        required: false
+        default: ""
+        type: string
       debug_mode:
         description: "Enable debug mode for detailed logging"
         required: false
@@ -113,6 +124,9 @@ jobs:
       security-scan-type: ${{ steps.scope.outputs.security-scan-type }}
       runner-label: ${{ steps.runner-access.outputs.runner-label }}
       ci-already-passed: ${{ steps.check-prior-success.outputs.ci-already-passed }}
+      pr-number: ${{ steps.resolve-pr-context.outputs.pr-number }}
+      base-sha: ${{ steps.resolve-pr-context.outputs.base-sha }}
+      head-sha: ${{ steps.resolve-pr-context.outputs.head-sha }}
 
     steps:
       - name: "🔐 Verify head SHA still matches event SHA"
@@ -146,6 +160,56 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
+
+      # LS-9148: workflow_dispatch (manual re-runs, and the ci:run label
+      # handler which routes through workflow_dispatch to avoid displacing the
+      # orchestrator's concurrency group — see ci-run-label.yml) carries no
+      # `pull_request` event context, so `github.event.pull_request.base.sha`
+      # is empty downstream. That made the lint/format job fall back to a
+      # whole-repo Prettier check (failing on pre-existing unrelated
+      # formatting elsewhere) and made "Post CI Gate aggregate status" skip
+      # entirely (its `github.event.pull_request.number` guard). When the
+      # dispatch carries `pr_number`, resolve that PR's base/head SHAs here —
+      # mirroring what the native pull_request trigger gets for free — and
+      # thread them through ci-pipeline.yml as inputs. Without pr_number,
+      # surface a clear warning instead of silently producing a false failure.
+      - name: "🔗 Resolve PR Context (workflow_dispatch)"
+        id: resolve-pr-context
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -eo pipefail
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "::warning::workflow_dispatch was triggered without pr_number — lint/format will run a whole-repo check (not scoped to any PR diff) and CI Gate will not post to a PR. Pass pr_number to scope this run to a PR, mirroring the native pull_request trigger."
+            exit 0
+          fi
+
+          if ! [[ "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "::warning::pr_number '$PR_NUMBER' is not a valid PR number — ignoring it. Lint/format will run a whole-repo check and CI Gate will not post."
+            exit 0
+          fi
+
+          if ! PR_JSON=$(gh pr view "$PR_NUMBER" --json number,baseRefOid,headRefOid 2>&1); then
+            echo "::warning::Could not resolve PR #$PR_NUMBER via the API ($PR_JSON) — lint/format will run a whole-repo check and CI Gate will not post."
+            exit 0
+          fi
+
+          BASE_SHA=$(echo "$PR_JSON" | jq -r '.baseRefOid')
+          HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
+
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "null" ] || [ -z "$HEAD_SHA" ] || [ "$HEAD_SHA" = "null" ]; then
+            echo "::warning::PR #$PR_NUMBER resolved but base/head SHA was empty — lint/format will run a whole-repo check and CI Gate will not post."
+            exit 0
+          fi
+
+          echo "Resolved PR #$PR_NUMBER — base=$BASE_SHA head=$HEAD_SHA"
+          echo "pr-number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "base-sha=$BASE_SHA" >> "$GITHUB_OUTPUT"
+          echo "head-sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
 
       - name: "🧹 Clear CI: Runner Flake label"
         if: github.event.pull_request.number
@@ -477,6 +541,9 @@ jobs:
       e2e-exclude-patterns: "@slow"
       e2e-shard-total: 1
       runner-label: ${{ needs.determine-scope.outputs.runner-label }}
+      pr-number: ${{ needs.determine-scope.outputs.pr-number }}
+      base-sha: ${{ needs.determine-scope.outputs.base-sha }}
+      head-sha: ${{ needs.determine-scope.outputs.head-sha }}
     secrets: inherit
 
   security-scanning:

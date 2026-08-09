@@ -42,6 +42,26 @@ on:
         required: false
         type: string
         default: ""
+      pr-number:
+        description: >-
+          PR number this run is scoped to. Populated by the orchestrator for
+          the native pull_request/pull_request_review triggers (from the
+          event payload) and, per LS-9148, for workflow_dispatch runs that
+          were dispatched with a pr_number input. Empty for PR-less runs
+          (e.g. workflow_dispatch with no pr_number).
+        required: false
+        type: string
+        default: ""
+      base-sha:
+        description: "PR base SHA to diff format-check against (LS-9148 — resolved by the orchestrator for workflow_dispatch runs; falls back to github.event.pull_request.base.sha on native PR triggers)"
+        required: false
+        type: string
+        default: ""
+      head-sha:
+        description: "PR head SHA to diff format-check against (LS-9148 — resolved by the orchestrator for workflow_dispatch runs; falls back to github.event.pull_request.head.sha on native PR triggers)"
+        required: false
+        type: string
+        default: ""
     outputs:
       overall-status:
         value: ${{ jobs.summarize.outputs.overall-status }}
@@ -278,11 +298,14 @@ jobs:
         run: |
           set -o pipefail
           run_format() {
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
+            # LS-9148: prefer the orchestrator-resolved PR SHAs (populated for
+            # workflow_dispatch runs dispatched with pr_number) before falling
+            # back to the native pull_request event payload.
+            BASE_SHA="${{ inputs.base-sha || github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ inputs.head-sha || github.event.pull_request.head.sha || github.sha }}"
 
             if [ -z "$BASE_SHA" ]; then
-              echo "No pull request base SHA; running Prettier check on the repository."
+              echo "::warning::No PR base SHA available (not a pull_request-triggered run, and no pr_number was resolved for this workflow_dispatch) — running Prettier check on the whole repository instead of the PR diff."
               pnpm exec prettier --check --ignore-unknown .
               return
             fi
@@ -1013,8 +1036,14 @@ jobs:
       # (additive, alongside the granular names) and only becomes enforced when
       # the owner runs scripts/apply-ruleset.sh. Until then it is informational.
       # See docs/ci-cd/ci-gate-aggregator.md.
+      # LS-9148: workflow_dispatch runs (manual re-runs, and the ci:run label
+      # handler) have no `pull_request` in the event payload, so this step
+      # used to skip outright even when the orchestrator had resolved a
+      # pr-number for the run — leaving the PR with no CI Gate status at all.
+      # Fall back to the orchestrator-resolved pr-number/head-sha inputs so a
+      # PR-scoped dispatch still posts.
       - name: "Post CI Gate aggregate status"
-        if: always() && github.event.pull_request.number
+        if: always() && (github.event.pull_request.number || inputs.pr-number)
         # Never let a transient status-post failure (or a fork PR's read-only
         # GITHUB_TOKEN) fail the summarize job — CI Gate is informational during
         # bake, and once required a missing status blocks merge on its own.
@@ -1030,12 +1059,23 @@ jobs:
               "lockfile-check": "${{ needs.lockfile-check.result }}",
               "e2e":            "${{ needs.e2e.result }}"
             }
+          DISPATCH_PR_NUMBER: ${{ inputs.pr-number }}
+          DISPATCH_HEAD_SHA: ${{ inputs.head-sha }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { postCiGate } = require('./.github/scripts/ci-gate.js');
             const results = JSON.parse(process.env.GATE_RESULTS);
-            await postCiGate({ github, context, core, results });
+            const dispatchPrNumber = process.env.DISPATCH_PR_NUMBER;
+            const dispatchHeadSha = process.env.DISPATCH_HEAD_SHA;
+            await postCiGate({
+              github,
+              context,
+              core,
+              results,
+              prNumber: dispatchPrNumber ? Number(dispatchPrNumber) : undefined,
+              headSha: dispatchHeadSha || undefined,
+            });
 
       - name: "Deployment Gate"
         id: deployment-gate

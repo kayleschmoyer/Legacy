@@ -232,6 +232,77 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
     assert.strictEqual(calls.get, 0, 'should not re-fetch the PR when no PR');
   });
 
+  // ── LS-9148: workflow_dispatch / ci:run-label dispatch fallback ──────────
+
+  it('posts using explicit prNumber/headSha when there is no payload PR (workflow_dispatch, LS-9148)', async () => {
+    const { github, calls } = makeGithub({ currentSha: HEAD_SHA });
+    const res = await postCiGate({
+      github,
+      context: makeContext(null),
+      core,
+      results: allPass(),
+      prNumber: 7,
+      headSha: HEAD_SHA,
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].sha, HEAD_SHA);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+    assert.strictEqual(
+      calls.get,
+      1,
+      'should still re-fetch the PR to apply the SHA-currency guard',
+    );
+  });
+
+  it('the payload PR takes precedence over explicit prNumber/headSha when both are present', async () => {
+    const OTHER_SHA = '1111111111111111111111111111111111111111';
+    const { github, calls } = makeGithub({ currentSha: HEAD_SHA });
+    const res = await postCiGate({
+      github,
+      context: makeContext({ number: 7, head: { sha: HEAD_SHA } }),
+      core,
+      results: allPass(),
+      prNumber: 99,
+      headSha: OTHER_SHA,
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].sha, HEAD_SHA);
+  });
+
+  it('no-ops when prNumber is given without headSha', async () => {
+    const { github, calls } = makeGithub();
+    const res = await postCiGate({
+      github,
+      context: makeContext(null),
+      core,
+      results: allPass(),
+      prNumber: 7,
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'no-pr');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('applies the SHA-currency guard to the explicit-prNumber path too', async () => {
+    const { github, calls } = makeGithub({ currentSha: ADVANCED_SHA });
+    const res = await postCiGate({
+      github,
+      context: makeContext(null),
+      core,
+      results: allPass(),
+      prNumber: 7,
+      headSha: HEAD_SHA,
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'stale');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
   it('truncates the failure description to the 140-char status limit', async () => {
     const { github, calls } = makeGithub({ currentSha: HEAD_SHA });
     // Force every job to fail so the joined description is long.
