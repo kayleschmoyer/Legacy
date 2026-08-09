@@ -84,7 +84,8 @@ async function refreshConnectionTtl(connectionId: string): Promise<void> {
     new UpdateItemCommand({
       TableName: connectionsTable,
       Key: { connectionId: { S: connectionId } },
-      UpdateExpression: 'SET ttl = :ttl',
+      UpdateExpression: 'SET #ttl = :ttl',
+      ExpressionAttributeNames: { '#ttl': 'ttl' },
       ExpressionAttributeValues: { ':ttl': { N: ttl.toString() } },
     }),
   );
@@ -903,9 +904,11 @@ async function handleUpdateContext(
     }
 
     if (setExpressions.length > 0 || removeExpressions.length > 0) {
-      // Refresh TTL
+      // Refresh TTL. `ttl` is a DynamoDB reserved keyword, so it must be
+      // referenced via an ExpressionAttributeNames alias rather than
+      // literally in the UpdateExpression (LS-9011).
       const ttl = computeConnectionTtl();
-      setExpressions.push('ttl = :ttl');
+      setExpressions.push('#ttl = :ttl');
       attributeValues[':ttl'] = { N: ttl.toString() };
 
       // Build complete update expression
@@ -922,6 +925,7 @@ async function handleUpdateContext(
           TableName: connectionsTable,
           Key: { connectionId: { S: connectionId } },
           UpdateExpression: updateParts.join(' '),
+          ExpressionAttributeNames: { '#ttl': 'ttl' },
           ExpressionAttributeValues:
             Object.keys(attributeValues).length > 0
               ? attributeValues

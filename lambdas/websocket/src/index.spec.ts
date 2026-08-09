@@ -656,6 +656,24 @@ describe('WebSocket Lambda Handler', () => {
       expect(result.body).toBe('Pong sent');
     });
 
+    it('aliases the reserved `ttl` attribute name when refreshing TTL on ping (LS-9011)', async () => {
+      const event = makeEvent({
+        routeKey: '$default',
+        body: JSON.stringify({ type: 'ping' }),
+      });
+
+      await handler(event);
+
+      expect(mockDynamoSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: expect.objectContaining({
+            UpdateExpression: 'SET #ttl = :ttl',
+            ExpressionAttributeNames: { '#ttl': 'ttl' },
+          }),
+        }),
+      );
+    });
+
     it('handles malformed JSON body gracefully', async () => {
       const event = makeEvent({
         routeKey: '$default',
@@ -686,6 +704,33 @@ describe('WebSocket Lambda Handler', () => {
 
       const result = asResult(await handler(event));
       expect(result.statusCode).toBe(200);
+    });
+
+    it('aliases the reserved `ttl` attribute name in the updateContext UpdateExpression (LS-9011)', async () => {
+      mockDynamoSend.mockResolvedValueOnce({
+        Item: {
+          connectionId: { S: 'test-conn-id' },
+          userId: { N: '42' },
+        },
+      });
+
+      const event = makeEvent({
+        routeKey: '$default',
+        body: JSON.stringify({
+          type: 'updateContext',
+          data: { viewContext: 'draft' },
+        }),
+      });
+
+      await handler(event);
+
+      expect(mockDynamoSend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          input: expect.objectContaining({
+            ExpressionAttributeNames: { '#ttl': 'ttl' },
+          }),
+        }),
+      );
     });
 
     it('returns 200 for unknown message types', async () => {
