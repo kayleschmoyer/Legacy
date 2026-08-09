@@ -56,6 +56,18 @@ legacy-sports-nav-bar/project/frames/ios-frame.jsx
 legacy-sports-nav-bar/project/styles.css
 ```
 
+## Addendum — LS-9088 (2026-08-09)
+
+**This addendum was applied directly to the repo bundle, not via a DesignSync pull.** The `DesignSync` MCP tool requires an interactive `/design-login` that is unavailable in this cloud session (`get_project` on `20f12546-37e6-4441-b8b2-a3cb113c5004` returned "DesignSync needs design-system authorization... /design-login requires an interactive terminal and is not available in this environment"). Per the design-sync skill, the source-of-truth fix belongs in Claude Design itself; since that pathway is blocked here, the fix below was made in the repo bundle as a stopgap and **`manifest.designs[].lastSyncedHash` was deliberately left unchanged** rather than falsified.
+
+**Follow-up required**: from a local session, either (a) apply the same fix in Claude Design (project `20f12546-37e6-4441-b8b2-a3cb113c5004`) via the DesignSync write flow and re-pull, or (b) run `/push-design dNpCFgIxoT5OnLy71wHjrg` to upload this repo fix to Claude Design so the source and the bundle stay in step. Until then, a future `/pull-design` against this project will overwrite this fix with Claude Design's current (non-compliant) state.
+
+Fixed the LS-9088 audit finding — `Nav Bar System.html` §03 ("Tablet") was captioned "900–1100px", an invented range matching none of the 7 canonical breakpoint bands in `lib/design-tokens/src/lib/breakpoints.ts`, and bands `xs`(660), `sm`(800), `md`(860), and `xl`(1120) had no designed frame or `BREAKPOINTS` annotation anywhere in the file:
+
+- **§03 "Tablet · Collapsed"** — caption changed from the invented "900–1100px" to "Canonical bands xs–lg (660–1119px)"; added a `BREAKPOINTS` annotation explaining the collapsed nav (icon-only search, folded wordmark) serves `xs`/`sm`/`md`/`lg` as one continuum, and the two 1024px frames are labeled as landing in the `lg` band (980–1119px).
+- **§01 "Desktop · Anatomy"** — added a `BREAKPOINTS` annotation and caption update noting the full-search layout is unchanged between `xl` (1120–1279px) and `xxl` (1280px+), so the existing 1280px frame also covers `xl`.
+- **No frame changes** — `xxs` (390px phone mocks, §04/§05) and `xxl` (1280px desktop anatomy, §01) remain the only fully designed frames, per the Deliverable Checklist's minimum. All seven bands are now claimed by exactly one designed layout or annotation.
+
 ## Removed since previous sync
 
 ```

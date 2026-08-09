@@ -164,9 +164,12 @@
                 </p>
               </div>
 
+              {/* BREAKPOINTS: this full-search layout serves xl–xxl (1120–1280px+) as one
+              continuum — nothing in the anatomy changes between xl and xxl, only the
+              viewport grows. The frame below is designed at 1280px (xxl). */}
               <p className="caption">
                 <span className="dot" />
-                Logged-in default · 1280px
+                Logged-in default · 1280px (xxl, 1280px+; shared unchanged with xl, 1120–1279px)
                 <span className="hint">
                   The everyday state — one league selected, ticker on
                 </span>
@@ -414,11 +417,18 @@
                   <h2>Tablet · Collapsed</h2>
                 </div>
                 <p>
-                  900–1100px. Search retracts to an icon; wordmark folds to just
-                  the shield. Pills stay.
+                  Canonical bands xs–lg (660–1119px). Search retracts to an
+                  icon; wordmark folds to just the shield. Pills stay.
                 </p>
               </div>
 
+              {/* BREAKPOINTS: this collapsed layout serves xs, sm, md, and lg
+              (660–1119px) as a single continuum — the icon-only search and folded
+              wordmark don't change again until xl (1120px), where §01's full
+              anatomy takes over. Replaces the previously invented "900–1100px"
+              tablet range, which didn't align to any of the seven canonical
+              bands in lib/design-tokens/src/lib/breakpoints.ts. The frames below
+              are designed at 1024px, which falls in the lg band (980–1119px). */}
               <div
                 className="slab"
                 style={{ maxWidth: 960, margin: '0 auto 24px' }}
@@ -426,7 +436,7 @@
                 <div className="frame-label">
                   <div className="fl-left">
                     <span>iPad · Landscape</span>
-                    <span className="sz">1024 × 768</span>
+                    <span className="sz">1024 × 768 (lg, 980–1119px)</span>
                     <span className="tag">Logged in</span>
                   </div>
                 </div>
@@ -443,7 +453,7 @@
                 <div className="frame-label">
                   <div className="fl-left">
                     <span>iPad · Draft Room</span>
-                    <span className="sz">1024 × 768</span>
+                    <span className="sz">1024 × 768 (lg, 980–1119px)</span>
                     <span className="tag live">Draft Live</span>
                   </div>
                 </div>
