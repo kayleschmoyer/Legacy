@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Button,
   H1,
@@ -12,6 +12,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import { FlatList } from 'react-native';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { Platform } from '../../platform-components';
 import {
   formatDraftStatusForCard,
   getDraftStatusColors,
@@ -23,6 +26,21 @@ export interface NFLHomeLeague {
   draftStatus?: string | null;
   currentWeekNumber?: number | null;
   weekAdvanceStatus?: string | null;
+}
+
+// LS-6257 (FBH-003) — the leagues list previously rendered every league
+// eagerly inside the page ScrollView: no windowing on web, no FlatList on
+// native. Heavy users (commissioners across 10+ leagues) paid the full
+// render cost of every heavy-styled row (gradient/shadow/badges) up front.
+// Now the row list windows via @tanstack/react-virtual on web and FlatList
+// on native — same established pattern as GameLogsTable (LS-7470) — inside a
+// bounded-height panel so small league counts render exactly as before.
+const LEAGUE_ROW_HEIGHT_PX = 92;
+const LEAGUES_PANEL_MAX_HEIGHT_PX = 480;
+
+interface LeaguesListProps {
+  leagues: NFLHomeLeague[];
+  onViewLeague: (leagueId: string | number) => void;
 }
 
 export interface NFLHomeProps {
@@ -48,6 +66,178 @@ function getLeagueStatusLabel(league: NFLHomeLeague): string {
     return `Week ${league.currentWeekNumber}`;
   }
   return formatDraftStatusForCard(league.draftStatus);
+}
+
+interface LeagueRowProps {
+  league: NFLHomeLeague;
+  onViewLeague: (leagueId: string | number) => void;
+}
+
+function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
+  const statusColors = getDraftStatusColors(league.draftStatus);
+  const statusLabel = getLeagueStatusLabel(league);
+  return (
+    <XStack
+      backgroundColor="$glassSurface"
+      borderRadius="$3"
+      padding="$3"
+      borderWidth={1}
+      borderColor="$glassBorder"
+      marginBottom="$2"
+      flexDirection="column"
+      alignItems="flex-start"
+      gap="$2"
+      cursor="pointer"
+      onPress={() => onViewLeague(league.id)}
+      accessibilityLabel={`View ${league.name ?? 'league'}`}
+      role="link"
+      testID={`football-league-row-${league.id}`}
+      pressStyle={{ opacity: 0.8, scale: 0.99 }}
+      // League rows stack name over badges on phones and lay out in
+      // a single centered row on wider viewports (LS-7819).
+      $gtSm={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}
+    >
+      <Text
+        color="$color"
+        fontSize="$6"
+        fontWeight="600"
+        flex={1}
+        minWidth={160}
+      >
+        {league.name ?? 'Unnamed League'}
+      </Text>
+      <XStack gap="$2" flexWrap="wrap">
+        <YStack
+          backgroundColor="$glassSurface"
+          borderRadius="$3"
+          paddingHorizontal="$2"
+          paddingVertical="$1"
+          borderWidth={1}
+          borderColor="$glassBorder"
+        >
+          <Text
+            color="$orange9"
+            fontSize="$2"
+            fontWeight="700"
+            textTransform="uppercase"
+            letterSpacing={0.5}
+          >
+            Football
+          </Text>
+        </YStack>
+        {statusLabel ? (
+          <YStack
+            backgroundColor={statusColors.bg}
+            borderRadius="$3"
+            paddingHorizontal="$2"
+            paddingVertical="$1"
+            borderWidth={1}
+            borderColor={statusColors.border}
+          >
+            <Text
+              color={statusColors.text}
+              fontSize="$2"
+              fontWeight="700"
+              textTransform="uppercase"
+              letterSpacing={0.5}
+            >
+              {statusLabel}
+            </Text>
+          </YStack>
+        ) : null}
+        {(league.weekAdvanceStatus === 'processing' ||
+          league.weekAdvanceStatus === 'queued') && (
+          <YStack
+            backgroundColor="$yellow3"
+            borderRadius="$3"
+            paddingHorizontal="$2"
+            paddingVertical="$1"
+            borderWidth={1}
+            borderColor="$yellow7"
+            accessibilityLabel="League week advancing"
+          >
+            <Text color="$yellow11" fontSize="$2" fontWeight="600">
+              Advancing
+            </Text>
+          </YStack>
+        )}
+      </XStack>
+    </XStack>
+  );
+}
+
+// Web: window the rows with @tanstack/react-virtual inside a bounded-height
+// scroll container. Lists shorter than the panel height render with no
+// scrollbar at all — visually identical to the previous unvirtualized output.
+function LeaguesListWeb({ leagues, onViewLeague }: LeaguesListProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: leagues.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => LEAGUE_ROW_HEIGHT_PX,
+    overscan: 6,
+  });
+
+  return (
+    <div
+      ref={parentRef}
+      data-testid="football-leagues-virtual-scroller"
+      style={{ maxHeight: LEAGUES_PANEL_MAX_HEIGHT_PX, overflow: 'auto' }}
+    >
+      <div style={{ position: 'relative', height: virtualizer.getTotalSize() }}>
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const league = leagues[virtualRow.index];
+          return (
+            <div
+              key={league.id}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              <LeagueRow league={league} onViewLeague={onViewLeague} />
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// Native: FlatList windows rows natively. Bounding its height keeps it a
+// self-contained scroller inside the page's outer ScrollView instead of a
+// full-bleed nested list, so small league counts render at their natural
+// height exactly as before.
+function LeaguesListNative({ leagues, onViewLeague }: LeaguesListProps) {
+  return (
+    <FlatList
+      data={leagues}
+      keyExtractor={(item: NFLHomeLeague) => String(item.id)}
+      style={{ maxHeight: LEAGUES_PANEL_MAX_HEIGHT_PX }}
+      renderItem={({ item }: { item: NFLHomeLeague }) => (
+        <LeagueRow league={item} onViewLeague={onViewLeague} />
+      )}
+      initialNumToRender={8}
+      maxToRenderPerBatch={8}
+      windowSize={5}
+      removeClippedSubviews
+    />
+  );
+}
+
+function LeaguesList(props: LeaguesListProps) {
+  return Platform.OS === 'web' ? (
+    <LeaguesListWeb {...props} />
+  ) : (
+    <LeaguesListNative {...props} />
+  );
 }
 
 function NFLHome({
@@ -302,106 +492,7 @@ function NFLHome({
                 </Button>
               </YStack>
             ) : (
-              leagues.map((league) => {
-                const statusColors = getDraftStatusColors(league.draftStatus);
-                const statusLabel = getLeagueStatusLabel(league);
-                return (
-                  <XStack
-                    key={league.id}
-                    backgroundColor="$glassSurface"
-                    borderRadius="$3"
-                    padding="$3"
-                    borderWidth={1}
-                    borderColor="$glassBorder"
-                    marginBottom="$2"
-                    flexDirection="column"
-                    alignItems="flex-start"
-                    gap="$2"
-                    cursor="pointer"
-                    onPress={() => onViewLeague(league.id)}
-                    accessibilityLabel={`View ${league.name ?? 'league'}`}
-                    role="link"
-                    pressStyle={{ opacity: 0.8, scale: 0.99 }}
-                    // League rows stack name over badges on phones and lay out in
-                    // a single centered row on wider viewports (LS-7819).
-                    $gtSm={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <Text
-                      color="$color"
-                      fontSize="$6"
-                      fontWeight="600"
-                      flex={1}
-                      minWidth={160}
-                    >
-                      {league.name ?? 'Unnamed League'}
-                    </Text>
-                    <XStack gap="$2" flexWrap="wrap">
-                      <YStack
-                        backgroundColor="$glassSurface"
-                        borderRadius="$3"
-                        paddingHorizontal="$2"
-                        paddingVertical="$1"
-                        borderWidth={1}
-                        borderColor="$glassBorder"
-                      >
-                        <Text
-                          color="$orange9"
-                          fontSize="$2"
-                          fontWeight="700"
-                          textTransform="uppercase"
-                          letterSpacing={0.5}
-                        >
-                          Football
-                        </Text>
-                      </YStack>
-                      {statusLabel ? (
-                        <YStack
-                          backgroundColor={statusColors.bg}
-                          borderRadius="$3"
-                          paddingHorizontal="$2"
-                          paddingVertical="$1"
-                          borderWidth={1}
-                          borderColor={statusColors.border}
-                        >
-                          <Text
-                            color={statusColors.text}
-                            fontSize="$2"
-                            fontWeight="700"
-                            textTransform="uppercase"
-                            letterSpacing={0.5}
-                          >
-                            {statusLabel}
-                          </Text>
-                        </YStack>
-                      ) : null}
-                      {(league.weekAdvanceStatus === 'processing' ||
-                        league.weekAdvanceStatus === 'queued') && (
-                        <YStack
-                          backgroundColor="$yellow3"
-                          borderRadius="$3"
-                          paddingHorizontal="$2"
-                          paddingVertical="$1"
-                          borderWidth={1}
-                          borderColor="$yellow7"
-                          accessibilityLabel="League week advancing"
-                        >
-                          <Text
-                            color="$yellow11"
-                            fontSize="$2"
-                            fontWeight="600"
-                          >
-                            Advancing
-                          </Text>
-                        </YStack>
-                      )}
-                    </XStack>
-                  </XStack>
-                );
-              })
+              <LeaguesList leagues={leagues} onViewLeague={onViewLeague} />
             )}
           </YStack>
         </YStack>
