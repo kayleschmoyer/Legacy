@@ -8,6 +8,38 @@
 **Files**: 118
 **Total size**: 2375117 bytes
 
+## LS-9094 — Breakpoints coverage fix (repo-bundle-only, not re-pulled)
+
+Audited by LS-9024: `ui_kits/web/index.html` had zero `@media` queries, zero
+`BREAKPOINTS` annotations, and zero canonical-width references — the page
+composite was non-responsive despite `docs/agents/pages/PROMPT.md`'s
+Breakpoints checklist item requiring all seven bands to be covered.
+
+**Method actually used**: this ticket was worked from a Claude Code Remote
+(cloud) session, where the `DesignSync` MCP tool is unauthorized by design
+(it needs an interactive `/design-login` only a local session can run —
+confirmed here with a live `get_project` call against this project's id,
+which returned the expected authorization error). The documented
+design-source-fix pattern (fix in Claude Design → `finalize_plan` →
+`write_files` → re-pull) was therefore not reachable from this session.
+Per `.agents/skills/design-sync/references/designsync-tool.md`'s "fix in
+the repo bundle and `/push-design` it up" fallback, the fix below was made
+**directly in this repo bundle**. Claude Design's own copy of
+`ui_kits/web/index.html` and `styles.css` is now stale relative to this
+bundle — a follow-up local `/push-design 670f7892-5193-4b8a-a54c-20b112ad11bb`
+is needed to true it up (filed as a note on LS-9094; do not let the next
+`/pull-design` or `/sync-designs` run silently overwrite this fix with the
+stale Claude Design copy before that push happens).
+
+Changed: `legacy-sports-design-system/project/ui_kits/web/index.html`,
+`legacy-sports-design-system/project/ui_kits/web/styles.css` — added a
+top-of-file `BREAKPOINTS` annotation claiming all seven canonical bands
+(xxs–xxl), and extended the existing partial `@media` coverage (which only
+split `lg` from `sm`/`xs`) with a fully-designed `xxs` frame (condensed
+nav, single-column grids, tighter padding) and a fully-designed `xxl`
+frame (four-column feature grid, wider card grids), per the PROMPT.md
+closure AC.
+
 ## What changed (vs 2026-05-20 sync, hash `5af5d7f8…`)
 
 Targeted pull after agent-driven source fixes for **LS-8957** (PROMPT.md brief

@@ -175,18 +175,58 @@ body { margin: 0; background: var(--bg); color: var(--fg1); font-family: var(--f
 .ls-empty { padding: 48px; text-align: center; color: var(--fg3); }
 
 /* ── Responsive — canonical Tamagui bands (see preview/breakpoints.html;
-      mirrors lib/design-tokens breakpoints: xs 660 / sm 800 / md 860 /
-      lg 980 / xl 1120 / xxl 1280) ─────────────────────────────────── */
+      mirrors lib/design-tokens breakpoints: xxs 0 / xs 660 / sm 800 /
+      md 860 / lg 980 / xl 1120 / xxl 1280). Base rules above (no query)
+      are the lg/xl frame — the unmodified desktop layout shared by both
+      bands. Every band below is claimed by one of these blocks. ────── */
 
-/* Below $lg (980): draft board collapses to timeline; top-nav tabs
-   yield to drawer pattern */
+/* BREAKPOINTS: lg (980–1119) and xl (1120–1279) share the base layout
+   above unmodified — top nav tabs visible, two-column draft board,
+   two-column feature/sport grids, page capped at 1280px. */
+
+/* ≤ md (860–979): draft board collapses to a single-column timeline;
+   top-nav tabs yield (no replacement affordance needed — brand + avatar
+   remain reachable). Shared by sm and md — see the ≤ xs block below for
+   where their grid layouts actually diverge. */
 @media (max-width: 979px) {
   .ls-draft-grid { grid-template-columns: 1fr; }
   .ls-tabs { display: none; }
 }
 
-/* Below $sm (800): two-column grids stack to a single column */
+/* BREAKPOINTS: sm (800–859) and md (860–979) share this file's base
+   two-column feature/sport grids (only the ≤ md nav/draft rule above
+   applies to them) — no distinct layout of their own. */
+
+/* ≤ xs (660–799): two-column grids stack to a single column; matchup
+   header stacks. Shares this treatment with xxs below; xxs additionally
+   condenses the nav and tightens page padding. */
 @media (max-width: 799px) {
   .ls-feature-grid, .ls-sport-grid { grid-template-columns: 1fr; }
   .ls-matchup-head { grid-template-columns: 1fr; }
+}
+
+/* xxs (0–659), fully designed frame: condensed nav (wordmark subtitle and
+   secondary marketing links drop to fit small phones), tighter page
+   padding/gutters, a lower hero-heading ceiling, and full-bleed cards
+   instead of a multi-column grid. */
+@media (max-width: 659px) {
+  .ls-nav-inner { padding: 10px 16px; gap: 12px; }
+  .ls-wordmark span { display: none; }
+  .ls-nav-right .ls-link { display: none; }
+  .ls-landing, .ls-page { padding-left: 16px; padding-right: 16px; }
+  .ls-h1 { font-size: clamp(32px, 9vw, 40px); }
+  .ls-hero-ctas { flex-direction: column; align-items: stretch; }
+  .ls-cta { padding: 40px 20px; margin-top: 48px; }
+  .ls-sport-card { padding: 28px 20px; }
+  .ls-league-grid, .ls-game-grid { grid-template-columns: 1fr; }
+  .ls-matchup-head { padding: 20px 16px; gap: 16px; }
+}
+
+/* xxl (1280px+), fully designed frame: wider desktop canvas — the feature
+   grid opens to four columns instead of two, and league/game cards get
+   more breathing room in their auto-fill grid. */
+@media (min-width: 1280px) {
+  .ls-feature-grid { grid-template-columns: repeat(4, 1fr); }
+  .ls-league-grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 20px; }
+  .ls-game-grid { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
 }

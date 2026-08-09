@@ -24,6 +24,35 @@
     ></script>
   </head>
   <body>
+    <!-- BREAKPOINTS: canonical Tamagui bands (lib/design-tokens/src/lib/breakpoints.ts),
+         mirrored in preview/breakpoints.html. Every band is claimed below by a
+         designed frame or an explicit annotation — none left to chance.
+           xxs (0–659px)    — fully designed frame: condensed nav (wordmark
+                              subtitle + marketing links drop), single-column
+                              grids, tighter page padding. See styles.css
+                              "xxs" block (max-width: 659px).
+           xs (660–799px)   — shares xxs's single-column feature/sport grid
+                              and stacked matchup header; nav/page padding
+                              return to the desktop treatment. See styles.css
+                              "≤ xs" block (max-width: 799px).
+           sm (800–859px)   — two-column feature/sport grids resume; nav
+                              tabs and draft board still follow the shared
+                              ≤ md treatment below.
+           md (860–979px)   — shares sm's two-column grids; no layout change
+                              of its own at this threshold. See styles.css
+                              "≤ md" block (max-width: 979px) for the
+                              nav/draft rule shared by sm through md.
+           lg (980–1119px)  — top nav tabs return, draft board splits into
+                              its two-column grid; this is the file's base
+                              (unmodified) desktop layout.
+           xl (1120–1279px) — shares lg's base desktop layout; content still
+                              caps at the shared max-widths.
+           xxl (1280px+)    — fully designed frame: four-column feature
+                              grid, wider league/game card grid, full-bleed
+                              page padding. See styles.css "xxl" block
+                              (min-width: 1280px).
+         Reflow thresholds: 660 / 800 / 860 / 980 / 1120 / 1280 — no invented
+         breakpoints. -->
     <div id="app"></div>
     <script type="text/babel" src="Nav.jsx"></script>
     <script type="text/babel" src="Landing.jsx"></script>
