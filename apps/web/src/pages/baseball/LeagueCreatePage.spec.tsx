@@ -61,9 +61,12 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-// Default football_enabled = true so both sport tabs are visible in tests.
+// Default football_enabled = true so both sport tabs are enabled in tests.
+let mockFootballEnabled = true;
 jest.mock('../../context/GrowthBookProvider', () => ({
-  useFeatureIsOn: jest.fn(() => true),
+  useFeatureIsOn: jest.fn((flag: string) =>
+    flag === 'football_enabled' ? mockFootballEnabled : true,
+  ),
   useFeatureValue: jest.fn(() => null),
   GrowthBookProvider: ({ children }: any) => <>{children}</>,
   growthbook: {},
@@ -206,6 +209,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
       type={type ?? 'button'}
       data-testid={rest['data-testid']}
       aria-selected={rest['aria-selected']}
+      aria-disabled={rest['aria-disabled']}
       aria-label={rest['aria-label']}
       role={rest.role}
       onClick={onPress}
@@ -250,6 +254,11 @@ jest.mock('tamagui', () => {
           role: rest.role ?? rest.accessibilityRole,
           'aria-label': rest['aria-label'] ?? rest.accessibilityLabel,
           'aria-live': rest['aria-live'],
+          'aria-expanded': rest['aria-expanded'],
+          'aria-disabled': rest['aria-disabled'],
+          'aria-controls': rest['aria-controls'],
+          tabIndex: rest.tabIndex,
+          onKeyDown: rest.onKeyDown,
           onClick: rest.onPress,
         },
         children,
@@ -2841,5 +2850,140 @@ describe('validateFormFull — salaryCap validation (LS-6115)', () => {
       salaryCap: 0,
     });
     expect(errs.salaryCap).toBeUndefined();
+  });
+});
+
+describe('LeagueCreatePage — Fast Lane (LS-9128)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+    mockFootballEnabled = true;
+  });
+
+  it('is off by default, leaving every section independently expandable', () => {
+    renderPage('/baseball/league/create');
+    expect(screen.getByTestId('fast-lane-toggle')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('section-toggle-roster-schedule'),
+    ).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('collapses and locks every section but Basic Settings when turned on', () => {
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    expect(screen.getByTestId('section-toggle-era-history')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+
+    fireEvent.click(
+      within(screen.getByTestId('fast-lane-toggle')).getByRole('button', {
+        name: '⚡ On',
+      }),
+    );
+
+    // Locked, not removed — the section header is still in the document.
+    const eraToggle = screen.getByTestId('section-toggle-era-history');
+    expect(eraToggle).toBeInTheDocument();
+    expect(eraToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(eraToggle).toHaveAttribute('aria-disabled', 'true');
+
+    // Locked sections ignore clicks — content stays collapsed.
+    fireEvent.click(eraToggle);
+    expect(eraToggle).toHaveAttribute('aria-expanded', 'false');
+
+    // Basic Settings stays interactive.
+    expect(screen.getByTestId('section-toggle-basic')).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
+  });
+
+  it('still submits successfully using the defaults while Fast Lane is on', async () => {
+    renderPage('/baseball/league/create');
+    fireEvent.click(
+      within(screen.getByTestId('fast-lane-toggle')).getByRole('button', {
+        name: '⚡ On',
+      }),
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Fast Lane League' },
+    });
+    fireEvent.click(screen.getByTestId('create-league-submit'));
+
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalled());
+  });
+
+  it('turns itself off to reveal a validation error hiding in a locked section', async () => {
+    mockIsPremium = true;
+    renderPage('/baseball/league/create');
+    expandAllSections();
+    fireEvent.click(screen.getByText('Custom Era'));
+    fireEvent.click(
+      within(screen.getByTestId('fast-lane-toggle')).getByRole('button', {
+        name: '⚡ On',
+      }),
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Fast Lane League' },
+    });
+    fireEvent.click(screen.getByTestId('create-league-submit'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('section-toggle-era-history')).toHaveAttribute(
+        'aria-disabled',
+        'false',
+      );
+    });
+    expect(mockCreateLeague).not.toHaveBeenCalled();
+  });
+});
+
+describe('LeagueCreatePage — sport tab access (LS-9128)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+  });
+
+  afterEach(() => {
+    mockFootballEnabled = true;
+  });
+
+  it('disables (rather than hiding) the Football tab when football_enabled is off', () => {
+    mockFootballEnabled = false;
+    renderPage('/baseball/league/create');
+
+    const footballTab = screen.getByTestId('sport-tab-football');
+    // Still visible/present, per LS-9128 — a disabled panel is not a hidden one.
+    expect(footballTab).toBeInTheDocument();
+    expect(footballTab).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText('Coming Soon')).toBeInTheDocument();
+
+    fireEvent.click(footballTab);
+    expect(
+      screen.getByRole('heading', { name: /Create Baseball League/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the Football tab fully enabled when football_enabled is on', () => {
+    mockFootballEnabled = true;
+    renderPage('/baseball/league/create');
+
+    const footballTab = screen.getByTestId('sport-tab-football');
+    expect(footballTab).toHaveAttribute('aria-disabled', 'false');
+    expect(screen.queryByText('Coming Soon')).not.toBeInTheDocument();
+
+    fireEvent.click(footballTab);
+    expect(
+      screen.getByRole('heading', { name: /Create Football League/i }),
+    ).toBeInTheDocument();
   });
 });

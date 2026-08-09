@@ -654,6 +654,11 @@ interface SportSwitcherProps {
   onSelect: (sport: SportId) => void;
   disabled?: boolean;
   sports?: ReadonlyArray<(typeof SPORTS)[number]>;
+  /** Sports the user can't currently create a league for (e.g. a beta sport
+   * behind a feature flag). Rendered visibly but non-interactive with a Lock
+   * icon, rather than removed from the tab list, so the user can see what
+   * exists without being able to select it (LS-9128). */
+  unavailableSports?: ReadonlySet<SportId>;
 }
 
 function SportSwitcher({
@@ -661,6 +666,7 @@ function SportSwitcher({
   onSelect,
   disabled,
   sports = SPORTS,
+  unavailableSports,
 }: SportSwitcherProps): React.JSX.Element {
   const themePrimary = THEME_PRIMARY_BY_SPORT[value];
   return (
@@ -675,6 +681,8 @@ function SportSwitcher({
     >
       {sports.map((s) => {
         const selected = value === s.id;
+        const unavailable = unavailableSports?.has(s.id) ?? false;
+        const itemDisabled = disabled || unavailable;
         return (
           <Button
             key={s.id}
@@ -684,7 +692,8 @@ function SportSwitcher({
             data-testid={`sport-tab-${s.id}`}
             role="tab"
             aria-selected={selected}
-            aria-label={`${s.name} — ${s.league}${s.beta ? ' (Beta)' : ''}`}
+            aria-disabled={unavailable}
+            aria-label={`${s.name} — ${s.league}${s.beta ? ' (Beta)' : ''}${unavailable ? ' (not available yet)' : ''}`}
             backgroundColor={
               selected ? withAlpha(themePrimary, 0.32) : 'transparent'
             }
@@ -694,13 +703,16 @@ function SportSwitcher({
             paddingHorizontal="$4"
             paddingVertical="$3.5"
             justifyContent="flex-start"
-            onPress={() => !disabled && onSelect(s.id)}
-            disabled={disabled}
+            opacity={unavailable ? 0.5 : 1}
+            onPress={() => !itemDisabled && onSelect(s.id)}
+            disabled={itemDisabled}
             hoverStyle={
-              selected ? undefined : { backgroundColor: withAlpha(WHITE, 0.03) }
+              selected || unavailable
+                ? undefined
+                : { backgroundColor: withAlpha(WHITE, 0.03) }
             }
-            pressStyle={{ scale: 0.99 }}
-            cursor="pointer"
+            pressStyle={unavailable ? undefined : { scale: 0.99 }}
+            cursor={unavailable ? 'not-allowed' : 'pointer'}
             position="relative"
           >
             <XStack gap="$3" alignItems="center" flex={1}>
@@ -730,8 +742,9 @@ function SportSwitcher({
                   {s.beta ? ' · Beta' : ''}
                 </Text>
               </YStack>
+              {unavailable && <Lock size={14} color="$gray9" />}
             </XStack>
-            {s.beta && (
+            {s.beta && !unavailable && (
               <Text
                 position="absolute"
                 top={8}
@@ -750,6 +763,27 @@ function SportSwitcher({
                 borderRadius={4}
               >
                 Beta
+              </Text>
+            )}
+            {unavailable && (
+              <Text
+                position="absolute"
+                top={8}
+                right={10}
+                fontFamily="$display"
+                fontWeight="700"
+                fontSize={9}
+                letterSpacing={1.4}
+                textTransform="uppercase"
+                color="$gray9"
+                backgroundColor={withAlpha(WHITE, 0.04)}
+                borderWidth={1}
+                borderColor="$borderColor"
+                paddingHorizontal={6}
+                paddingVertical={2}
+                borderRadius={4}
+              >
+                Coming Soon
               </Text>
             )}
           </Button>
@@ -782,6 +816,13 @@ interface CollapsibleSectionProps {
   open: boolean;
   onToggle: () => void;
   children: React.ReactNode;
+  /** When set, the header renders visibly but can't be toggled — used to
+   * lock every section but the active one behind Fast Lane (LS-9128), or a
+   * panel the user otherwise lacks access to. Disabled panels are never
+   * removed from the layout; only their interactivity is gated. */
+  disabled?: boolean;
+  /** Short reason shown in place of the collapsed summary while disabled. */
+  disabledReason?: string;
 }
 
 function CollapsibleSection({
@@ -793,30 +834,38 @@ function CollapsibleSection({
   open,
   onToggle,
   children,
+  disabled = false,
+  disabledReason,
 }: CollapsibleSectionProps): React.JSX.Element {
   const regionId = `create-league-section-${id}`;
+  const isOpen = open && !disabled;
   return (
     <YStack
       borderWidth={1}
-      borderColor={open ? withAlpha(BRAND_NAVY_LIGHT, 0.45) : '$borderColor'}
+      borderColor={isOpen ? withAlpha(BRAND_NAVY_LIGHT, 0.45) : '$borderColor'}
       borderRadius="$5"
       overflow="hidden"
+      opacity={disabled ? 0.6 : 1}
     >
       <SectionHeader
         data-testid={`section-toggle-${id}`}
-        onPress={onToggle}
+        onPress={disabled ? undefined : onToggle}
         role="button"
-        tabIndex={0}
+        tabIndex={disabled ? -1 : 0}
         onKeyDown={(e: React.KeyboardEvent) => {
+          if (disabled) return;
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             onToggle();
           }
         }}
-        aria-expanded={open}
+        aria-expanded={isOpen}
+        aria-disabled={disabled}
         aria-controls={regionId}
-        borderBottomWidth={open ? 1 : 0}
+        borderBottomWidth={isOpen ? 1 : 0}
         borderBottomColor="$borderColor"
+        cursor={disabled ? 'not-allowed' : ('pointer' as never)}
+        hoverStyle={disabled ? { backgroundColor: '$color2' } : undefined}
       >
         {/* Section number */}
         <Text
@@ -824,7 +873,7 @@ function CollapsibleSection({
           fontWeight="800"
           fontSize={13}
           letterSpacing={1}
-          color="$brandGoldLight"
+          color={disabled ? '$gray9' : '$brandGoldLight'}
           width={28}
           flexShrink={0}
           style={{ fontVariantNumeric: 'tabular-nums' }}
@@ -838,18 +887,18 @@ function CollapsibleSection({
             fontFamily="$display"
             fontWeight="700"
             fontSize={19}
-            color="$color"
+            color={disabled ? '$gray10' : '$color'}
             letterSpacing={-0.1}
           >
             {title}
           </Text>
           <Text fontFamily="$body" fontSize={13} color="$gray10" marginTop={2}>
-            {sub}
+            {disabled && disabledReason ? disabledReason : sub}
           </Text>
         </YStack>
 
         {/* Collapsed summary */}
-        {!open && summary && (
+        {!isOpen && !disabled && summary && (
           <Text
             data-testid={`section-summary-${id}`}
             fontFamily="$body"
@@ -865,24 +914,28 @@ function CollapsibleSection({
           </Text>
         )}
 
-        {/* Chevron */}
-        <span
-          aria-hidden="true"
-          style={{
-            display: 'inline-flex',
-            flexShrink: 0,
-            transform: open ? 'rotate(90deg)' : 'rotate(0deg)',
-            transition: 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
-          }}
-        >
-          <ChevronRight
-            size={18}
-            color={open ? withAlpha(BRAND_NAVY_LIGHT, 0.9) : '#9CAAC5'}
-          />
-        </span>
+        {/* Chevron / lock */}
+        {disabled ? (
+          <Lock size={16} color="$gray9" aria-hidden="true" />
+        ) : (
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-flex',
+              flexShrink: 0,
+              transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+              transition: 'transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+            }}
+          >
+            <ChevronRight
+              size={18}
+              color={isOpen ? withAlpha(BRAND_NAVY_LIGHT, 0.9) : '#9CAAC5'}
+            />
+          </span>
+        )}
       </SectionHeader>
 
-      {open && (
+      {isOpen && (
         <YStack
           id={regionId}
           role="region"
@@ -1367,9 +1420,13 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [searchParams] = useSearchParams();
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const footballEnabled = useFeatureIsOn('football_enabled');
-  const visibleSports: ReadonlyArray<(typeof SPORTS)[number]> = footballEnabled
-    ? SPORTS
-    : SPORTS.filter((s) => s.id !== 'football');
+  // Sports the flag hasn't unlocked yet stay in the tab list but render
+  // disabled (LS-9128) — filtering them out entirely hid the option instead
+  // of showing the user it exists but isn't available.
+  const unavailableSports = useMemo(
+    () => new Set<SportId>(footballEnabled ? [] : ['football']),
+    [footballEnabled],
+  );
   const [showWaiverUpgradeModal, setShowWaiverUpgradeModal] = useState(false);
   const [showSalaryCapUpgradeModal, setShowSalaryCapUpgradeModal] =
     useState(false);
@@ -1571,6 +1628,21 @@ export function LeagueCreatePage(): React.JSX.Element {
     setOpenSections(new Set(['basic']));
   }, []);
 
+  // ── Fast Lane (LS-9128) ──────────────────────────────────────────────────
+  // For users who don't want to micro-manage every setting: collapses every
+  // section but Basic Settings and locks the rest closed (still visible,
+  // just disabled) so the league is created from the sport's recommended
+  // defaults. Turning it back off just unlocks the accordion again — no
+  // form data is reset, since the defaults were already the form's state.
+  const [fastLane, setFastLane] = useState(false);
+  const toggleFastLane = useCallback(() => {
+    setFastLane((prev) => {
+      const next = !prev;
+      if (next) setOpenSections(new Set(['basic']));
+      return next;
+    });
+  }, []);
+
   // Auto-expands every section that has an invalid field and scrolls to the
   // first one, so a failed submit shows the user where all N errors live
   // instead of leaving them to guess from a single truncated message
@@ -1582,6 +1654,10 @@ export function LeagueCreatePage(): React.JSX.Element {
         .filter((id): id is string => Boolean(id));
       if (errorSectionIds.length === 0) return;
 
+      // A validation error can live in a section Fast Lane just locked —
+      // turn it off so the user can actually reach and fix the field
+      // instead of seeing an expand attempt silently no-op (LS-9128).
+      setFastLane(false);
       setOpenSections((prev) => new Set([...prev, ...errorSectionIds]));
 
       const firstSectionId = errorSectionIds[0];
@@ -2258,24 +2334,54 @@ export function LeagueCreatePage(): React.JSX.Element {
             </Text>
           </YStack>
 
-          <XStack gap="$2" alignSelf="flex-end">
-            <Button
-              size="$2"
-              variant="outlined"
-              onPress={expandAll}
-              disabled={isFormDisabled}
+          <YStack gap="$2" alignItems="flex-end">
+            <XStack
+              gap="$2.5"
+              alignItems="center"
+              data-testid="fast-lane-toggle"
             >
-              Expand all
-            </Button>
-            <Button
-              size="$2"
-              variant="outlined"
-              onPress={collapseAll}
-              disabled={isFormDisabled}
-            >
-              Collapse
-            </Button>
-          </XStack>
+              <YStack alignItems="flex-end">
+                <Text
+                  fontFamily="$display"
+                  fontWeight="700"
+                  fontSize={11}
+                  letterSpacing={1}
+                  textTransform="uppercase"
+                  color={fastLane ? '$brandGoldLight' : '$gray9'}
+                >
+                  Fast Lane
+                </Text>
+                <Text fontFamily="$body" fontSize={11} color="$gray9">
+                  Skip the details, use our defaults
+                </Text>
+              </YStack>
+              <PillToggle
+                value={fastLane}
+                offLabel="⚡ Off"
+                onLabel="⚡ On"
+                onChange={toggleFastLane}
+                disabled={isFormDisabled}
+              />
+            </XStack>
+            <XStack gap="$2">
+              <Button
+                size="$2"
+                variant="outlined"
+                onPress={expandAll}
+                disabled={isFormDisabled || fastLane}
+              >
+                Expand all
+              </Button>
+              <Button
+                size="$2"
+                variant="outlined"
+                onPress={collapseAll}
+                disabled={isFormDisabled || fastLane}
+              >
+                Collapse
+              </Button>
+            </XStack>
+          </YStack>
         </XStack>
 
         {/* ── Sport switcher ── */}
@@ -2294,7 +2400,7 @@ export function LeagueCreatePage(): React.JSX.Element {
             value={selectedSport}
             onSelect={handleSportSelect}
             disabled={isFormDisabled}
-            sports={visibleSports}
+            unavailableSports={unavailableSports}
           />
           {selectedSport === 'football' && (
             <XStack
@@ -2663,6 +2769,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                 }
                 open={openSections.has('roster-schedule')}
                 onToggle={() => toggleSection('roster-schedule')}
+                disabled={fastLane}
+                disabledReason="Using recommended defaults — turn off Fast Lane to customize."
               >
                 <div
                   style={{
@@ -2864,6 +2972,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                 }
                 open={openSections.has('era-history')}
                 onToggle={() => toggleSection('era-history')}
+                disabled={fastLane}
+                disabledReason="Using recommended defaults — turn off Fast Lane to customize."
               >
                 {/* Premium upsell banner — suppressed while entitlements are
                     still loading so a premium user never sees a flash of the
@@ -3109,6 +3219,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                 }
                 open={openSections.has('draft')}
                 onToggle={() => toggleSection('draft')}
+                disabled={fastLane}
+                disabledReason="Using recommended defaults — turn off Fast Lane to customize."
               >
                 <div
                   style={{
@@ -3506,6 +3618,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                 }
                 open={openSections.has('waiver-budget')}
                 onToggle={() => toggleSection('waiver-budget')}
+                disabled={fastLane}
+                disabledReason="Using recommended defaults — turn off Fast Lane to customize."
               >
                 <div
                   style={{
@@ -3626,6 +3740,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                   }
                   open={openSections.has('football-scoring')}
                   onToggle={() => toggleSection('football-scoring')}
+                  disabled={fastLane}
+                  disabledReason="Using recommended defaults — turn off Fast Lane to customize."
                 >
                   {/* Offensive format */}
                   <FieldRow
