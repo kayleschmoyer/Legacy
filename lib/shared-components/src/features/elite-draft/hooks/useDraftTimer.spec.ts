@@ -82,4 +82,14 @@ describe('useDraftTimer', () => {
     });
     expect(result.current.timeRemaining).toBe(0);
   });
+
+  it('never nudges or ticks the countdown in untimed (offline) mode (LS-9144)', () => {
+    const params = makeParams({ untimed: true });
+    const { result } = renderHook(() => useDraftTimer(params));
+    act(() => {
+      jest.advanceTimersByTime(30_000);
+    });
+    expect(params.nudgeExpiredDraftPick).not.toHaveBeenCalled();
+    expect(result.current.timeRemaining).toBe(0);
+  });
 });

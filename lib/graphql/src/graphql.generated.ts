@@ -1436,6 +1436,7 @@ export type League = {
   /** League invite code. Null for non-members — only league members and the owner receive this value. */
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;
+  isOfflineDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   /** Keeper-mode configuration. Null unless rosterContinuity is keeper. (LS-8671) */
   keeperSettings?: Maybe<KeeperSettings>;
@@ -2347,6 +2348,7 @@ export type MutationInitializeDraftArgs = {
 
 export type MutationInitializeMockDraftArgs = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
+  isOffline?: InputMaybe<Scalars['Boolean']['input']>;
   numTeams: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
@@ -6165,6 +6167,7 @@ export type CreateLeagueAndTeamsMutation = {
       playoffMultiWeek?: boolean | null;
       lmNotes?: string | null;
       isMockDraft?: boolean | null;
+      isOfflineDraft?: boolean | null;
       isPublic?: boolean | null;
       logoUrl?: string | null;
       bannerUrl?: string | null;
@@ -6240,6 +6243,7 @@ export type GetUserLeaguesQuery = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
+    isOfflineDraft?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -6317,6 +6321,7 @@ export type GetMyLeaguesQuery = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
+    isOfflineDraft?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -6404,6 +6409,7 @@ export type StartDraftMutation = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
+    isOfflineDraft?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -6555,6 +6561,7 @@ export type StartSeasonMutation = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
+    isOfflineDraft?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -9246,6 +9253,7 @@ export type UpdateLeagueSettingsMutation = {
     faabBudgetDefault?: number | null;
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
+    isOfflineDraft?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -10425,6 +10433,7 @@ export type GetLeagueByIdQuery = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
+    isOfflineDraft?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -11354,6 +11363,7 @@ export type LeagueFragment = {
   playoffMultiWeek?: boolean | null;
   lmNotes?: string | null;
   isMockDraft?: boolean | null;
+  isOfflineDraft?: boolean | null;
   isPublic?: boolean | null;
   logoUrl?: string | null;
   bannerUrl?: string | null;
@@ -11987,6 +11997,7 @@ export type InitializeMockDraftMutationVariables = Exact<{
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Scalars['String']['input']>;
+  isOffline?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type InitializeMockDraftMutation = {
@@ -12696,6 +12707,7 @@ export type RenewLeagueMutation = {
     playoffMultiWeek?: boolean | null;
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
+    isOfflineDraft?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -15084,6 +15096,7 @@ export const LeagueFragmentDoc = gql`
     playoffMultiWeek
     lmNotes
     isMockDraft
+    isOfflineDraft
     isPublic
     logoUrl
     bannerUrl
@@ -30609,6 +30622,7 @@ export const InitializeMockDraft = gql`
     $draftOrder: String
     $playerPool: String
     $sport: String
+    $isOffline: Boolean
   ) {
     initializeMockDraft(
       numTeams: $numTeams
@@ -30618,6 +30632,7 @@ export const InitializeMockDraft = gql`
       draftOrder: $draftOrder
       playerPool: $playerPool
       sport: $sport
+      isOffline: $isOffline
     ) {
       leagueId
       draftId
@@ -30649,6 +30664,7 @@ export type InitializeMockDraftMutationFn = MutationFunction<
  *      draftOrder: // value for 'draftOrder'
  *      playerPool: // value for 'playerPool'
  *      sport: // value for 'sport'
+ *      isOffline: // value for 'isOffline'
  *   },
  * });
  */

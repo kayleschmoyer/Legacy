@@ -201,3 +201,31 @@ describe('DraftTopBand global Disable Auto-Pick control (LS-8783)', () => {
     expect(getByRole('button', { name: /auto-pick off/i })).toBeTruthy();
   });
 });
+
+describe('DraftTopBand untimed (offline) mode (LS-9144)', () => {
+  it('shows an infinity glyph and "No limit" instead of a countdown', () => {
+    const { getByText } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={true}
+        isOwner={true}
+        untimed
+      />,
+    );
+    expect(getByText('∞')).toBeTruthy();
+    expect(getByText('No limit')).toBeTruthy();
+    expect(getByText('Take your time')).toBeTruthy();
+  });
+
+  it('still shows commissioner Pause controls in untimed mode', () => {
+    const { getByRole } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={true}
+        isOwner={true}
+        untimed
+      />,
+    );
+    expect(getByRole('button', { name: /pause/i })).toBeTruthy();
+  });
+});

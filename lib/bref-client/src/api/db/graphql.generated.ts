@@ -1430,6 +1430,7 @@ export type League = {
   /** League invite code. Null for non-members — only league members and the owner receive this value. */
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMockDraft?: Maybe<Scalars['Boolean']['output']>;
+  isOfflineDraft?: Maybe<Scalars['Boolean']['output']>;
   isPublic?: Maybe<Scalars['Boolean']['output']>;
   /** Keeper-mode configuration. Null unless rosterContinuity is keeper. (LS-8671) */
   keeperSettings?: Maybe<KeeperSettings>;
@@ -2341,6 +2342,7 @@ export type MutationInitializeDraftArgs = {
 
 export type MutationInitializeMockDraftArgs = {
   draftOrder?: InputMaybe<Scalars['String']['input']>;
+  isOffline?: InputMaybe<Scalars['Boolean']['input']>;
   numTeams: Scalars['Int']['input'];
   pickTimeLimitSeconds?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;

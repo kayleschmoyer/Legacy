@@ -15,6 +15,13 @@ interface UseDraftTimerParams {
   setPickTimeLimitSeconds: (v: number) => void;
   setAutoPickDisabled: (v: boolean) => void;
   /**
+   * Offline mock draft mode (LS-9144): the pick clock never counts down and
+   * the expiry nudge never fires, so the drafter can take as long as they
+   * want on their own turn. Defaults to false, preserving existing timed
+   * behavior for shared drafts and real leagues.
+   */
+  untimed?: boolean;
+  /**
    * Read-only mode for spectator surfaces (LS-8942): the countdown still
    * runs, but the clock never calls `nudgeExpiredDraftPick` — at 0:00 it
    * simply waits for the server to advance the pick. Defaults to false,
@@ -43,6 +50,7 @@ export function useDraftTimer({
   setPickDeadline,
   setPickTimeLimitSeconds,
   setAutoPickDisabled,
+  untimed = false,
   readOnly = false,
   nudgeExpiredDraftPick,
   refetchDraft,
@@ -75,6 +83,7 @@ export function useDraftTimer({
   // Client-side countdown
   useEffect(() => {
     if (
+      untimed ||
       !draftId ||
       draftComplete ||
       draftOrderMissing ||
@@ -97,6 +106,7 @@ export function useDraftTimer({
     const timer = setInterval(tick, 500);
     return () => clearInterval(timer);
   }, [
+    untimed,
     draftId,
     draftComplete,
     draftOrderMissing,
@@ -126,7 +136,7 @@ export function useDraftTimer({
   }, [currentPickInfo?.overallPick]);
 
   useEffect(() => {
-    if (readOnly || !nudgeExpiredDraftPick) return;
+    if (untimed || readOnly || !nudgeExpiredDraftPick) return;
     if (!leagueId || !draftId || draftComplete || draftPaused) return;
     if (timeRemaining > 0) return;
 
@@ -151,6 +161,7 @@ export function useDraftTimer({
 
     return () => clearTimeout(timer);
   }, [
+    untimed,
     leagueId,
     draftId,
     draftComplete,

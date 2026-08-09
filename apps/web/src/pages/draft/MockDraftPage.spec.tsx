@@ -287,3 +287,59 @@ describe('MockDraftPage — sport threading & navigation (LS-9040)', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/football/league/42/draft');
   });
 });
+
+describe('MockDraftPage — offline mode threading (LS-9144)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  it('forwards isOffline=true and omits pickTimeLimitSeconds when mode is offline', async () => {
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    mockStartSettings = {
+      numTeams: 8,
+      rosterSize: 15,
+      userPickPosition: 1,
+      draftOrder: 'snake',
+      playerPool: 'all',
+      sport: 'baseball',
+      mode: 'offline',
+    };
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
+
+    await screen.findByRole('button', { name: /Start Mock Draft/i });
+    expect(mockInitializeMockDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          isOffline: true,
+          pickTimeLimitSeconds: undefined,
+        }),
+      }),
+    );
+  });
+
+  it('forwards isOffline=false and a 90s time limit when mode is shared', async () => {
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    mockStartSettings = {
+      numTeams: 8,
+      rosterSize: 15,
+      userPickPosition: 1,
+      draftOrder: 'snake',
+      playerPool: 'all',
+      sport: 'baseball',
+      mode: 'shared',
+    };
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
+
+    await screen.findByRole('button', { name: /Start Mock Draft/i });
+    expect(mockInitializeMockDraft).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({
+          isOffline: false,
+          pickTimeLimitSeconds: 90,
+        }),
+      }),
+    );
+  });
+});

@@ -138,6 +138,11 @@ export const leagues = pgTable(
     /** True for ephemeral mock drafts created via initializeMockDraft (LS-470).
      *  Rosters are NOT persisted and matchups are NOT created when isMockDraft=true. */
     isMockDraft: boolean('is_mock_draft').notNull().default(false),
+    /** True for mock drafts started in "Offline" mode (LS-9144): a single
+     *  person practicing solo with no pick-clock pressure — the drafter's own
+     *  turns never expire, but AI opponent teams still auto-pick immediately.
+     *  Only meaningful when isMockDraft=true. */
+    isOfflineDraft: boolean('is_offline_draft').notNull().default(false),
     /** Client-generated key from a single create-league form submission attempt
      *  (LS-6063). Lets createLeague dedupe a resubmission (double-click, retry,
      *  parallel tab) against an already-created league instead of inserting a

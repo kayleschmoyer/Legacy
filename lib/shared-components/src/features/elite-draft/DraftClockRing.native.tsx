@@ -27,6 +27,8 @@ export interface DraftClockRingProps {
   emphasize?: boolean;
   /** Commissioner has paused the draft — show `PAUSE` instead of a countdown. */
   paused?: boolean;
+  /** Offline mock draft mode (LS-9144) — show `∞` instead of a countdown. */
+  untimed?: boolean;
   /** Outer diameter in px. Default 52. */
   size?: number;
 }
@@ -36,13 +38,14 @@ export function DraftClockRing({
   totalSeconds,
   emphasize = false,
   paused = false,
+  untimed = false,
   size = 52,
 }: DraftClockRingProps): React.JSX.Element {
   const palette = useDraftPalette();
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (!emphasize || paused) {
+    if (untimed || !emphasize || paused) {
       pulse.setValue(0);
       return undefined;
     }
@@ -64,26 +67,37 @@ export function DraftClockRing({
     );
     loop.start();
     return () => loop.stop();
-  }, [emphasize, paused, pulse]);
+  }, [emphasize, paused, untimed, pulse]);
 
-  const tone = paused ? 'warning' : clockToneFor(secondsRemaining);
+  const tone = paused
+    ? 'warning'
+    : untimed
+      ? 'calm'
+      : clockToneFor(secondsRemaining);
   const strokeColor = palette.clock[tone];
 
   // Guard against a zero/absent limit so the arc never renders NaN.
-  const fraction =
-    totalSeconds > 0
+  const fraction = untimed
+    ? 1
+    : totalSeconds > 0
       ? Math.min(1, Math.max(0, secondsRemaining / totalSeconds))
       : 0;
   const dashOffset = CIRCUMFERENCE * (1 - fraction);
-  const label = paused ? 'PAUSE' : formatClock(secondsRemaining);
+  const label = untimed
+    ? '∞'
+    : paused
+      ? 'PAUSE'
+      : formatClock(secondsRemaining);
 
   return (
     <Animated.View
       accessibilityRole="timer"
       accessibilityLabel={
-        paused
-          ? 'Draft paused'
-          : `${formatClock(secondsRemaining)} left on the clock`
+        untimed
+          ? 'No pick time limit'
+          : paused
+            ? 'Draft paused'
+            : `${formatClock(secondsRemaining)} left on the clock`
       }
       style={{
         width: size,

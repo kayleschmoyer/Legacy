@@ -113,6 +113,8 @@ export const League = builder.objectRef<{
   lmNotes?: string | null;
   /** True for ephemeral mock-draft leagues (LS-470) */
   isMockDraft?: boolean;
+  /** True for mock drafts started in "Offline" (untimed solo practice) mode (LS-9144) */
+  isOfflineDraft?: boolean;
   isPublic?: boolean;
   logoUrl?: string | null;
   bannerUrl?: string | null;
@@ -220,6 +222,7 @@ League.implement({
     playoffMultiWeek: t.exposeBoolean('playoffMultiWeek', { nullable: true }),
     lmNotes: t.exposeString('lmNotes', { nullable: true }),
     isMockDraft: t.exposeBoolean('isMockDraft', { nullable: true }),
+    isOfflineDraft: t.exposeBoolean('isOfflineDraft', { nullable: true }),
     isPublic: t.exposeBoolean('isPublic', { nullable: true }),
     logoUrl: t.exposeString('logoUrl', { nullable: true }),
     bannerUrl: t.exposeString('bannerUrl', { nullable: true }),

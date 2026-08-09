@@ -41,6 +41,7 @@ async function captureInitializeMockDraftResolver(): Promise<
           arg: {
             int: () => ({}),
             string: () => ({}),
+            boolean: () => ({}),
           },
         });
       }),
@@ -342,6 +343,73 @@ describe('initializeMockDraft transaction behavior', () => {
     expect(chain.values.mock.calls[0][0]).toMatchObject({
       sport: 'football',
       playerPool: 'afc',
+    });
+  });
+
+  it('sets isOfflineDraft on the league insert and ignores an out-of-range pickTimeLimitSeconds when isOffline=true (LS-9144)', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }]) // league
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }]) // teams
+      .mockResolvedValueOnce([{ id: 100 }]); // draft
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    // pickTimeLimitSeconds=301 would normally fail the 10-300 range check —
+    // offline mode ignores the caller's time limit entirely.
+    const result = await resolve(
+      {},
+      { ...VALID_ARGS, pickTimeLimitSeconds: 301, isOffline: true },
+      { user: { id: 1 }, db },
+      undefined,
+    );
+
+    expect(result).toMatchObject({ leagueId: 1, draftId: 100 });
+    // First insert().values() call is the league insert (leagueValues).
+    expect(chain.values.mock.calls[0][0]).toMatchObject({
+      isOfflineDraft: true,
+    });
+  });
+
+  it('leaves isOfflineDraft=false when isOffline is not passed', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }])
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }])
+      .mockResolvedValueOnce([{ id: 100 }]);
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    await resolve({}, VALID_ARGS, { user: { id: 1 }, db }, undefined);
+
+    expect(chain.values.mock.calls[0][0]).toMatchObject({
+      isOfflineDraft: false,
     });
   });
 

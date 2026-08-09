@@ -169,6 +169,7 @@ describe('MockDraftPage', () => {
             draftOrder: 'snake',
             playerPool: 'all',
             sport: 'baseball',
+            isOffline: false,
           },
         });
       });

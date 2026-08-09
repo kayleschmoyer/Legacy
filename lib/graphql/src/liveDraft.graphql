@@ -417,6 +417,7 @@ mutation InitializeMockDraft(
   $draftOrder: String
   $playerPool: String
   $sport: String
+  $isOffline: Boolean
 ) {
   initializeMockDraft(
     numTeams: $numTeams
@@ -426,6 +427,7 @@ mutation InitializeMockDraft(
     draftOrder: $draftOrder
     playerPool: $playerPool
     sport: $sport
+    isOffline: $isOffline
   ) {
     leagueId
     draftId

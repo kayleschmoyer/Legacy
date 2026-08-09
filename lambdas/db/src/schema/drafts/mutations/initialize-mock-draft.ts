@@ -44,6 +44,16 @@ type DraftOrder = (typeof VALID_DRAFT_ORDERS)[number];
 type PlayerPool = (typeof VALID_PLAYER_POOLS)[number];
 type MockDraftSport = (typeof VALID_SPORTS)[number];
 
+// "Offline" mock drafts (LS-9144) never put the human drafter's own turn on
+// a real clock — no countdown UI, no auto-pick-on-timeout. Rather than making
+// drafts.pick_time_limit_seconds nullable (a schema change touching every
+// real draft), offline drafts get a generous sentinel deadline instead. The
+// commitDraftPick/autoProcessDraftPicks machinery still relies on a non-null
+// deadline to chain immediate CPU auto-picks (that override always sets an
+// explicitly-expired deadline regardless of this value), so a long sentinel
+// is sufficient: in practice the human is never kept waiting by it.
+const OFFLINE_PICK_TIME_LIMIT_SECONDS = 60 * 60 * 24; // 24 hours
+
 function isValidDraftOrder(v: string): v is DraftOrder {
   return (VALID_DRAFT_ORDERS as readonly string[]).includes(v);
 }
@@ -134,6 +144,13 @@ builder.mutationField('initializeMockDraft', (t) =>
         description:
           'Sport for the mock draft league: "baseball" (default) or "football" (LS-9040).',
       }),
+      isOffline: t.arg.boolean({
+        required: false,
+        description:
+          'When true, starts an "Offline" mock draft (LS-9144): a single-person ' +
+          "practice session with no pick-clock pressure on the human's own turns. " +
+          'AI opponents still auto-pick immediately. Ignores pickTimeLimitSeconds. Default: false.',
+      }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -150,11 +167,17 @@ builder.mutationField('initializeMockDraft', (t) =>
         draftOrder: rawDraftOrder,
         playerPool: rawPlayerPool,
         sport: rawSport,
+        isOffline: rawIsOffline,
       } = args;
       const userId = context.user.id;
+      const isOffline = rawIsOffline ?? false;
       // Mock drafts use a shorter default timer (30 s) so practice sessions
-      // complete quickly.  The caller can override via pickTimeLimitSeconds.
-      const pickTimeLimit = rawTimeLimit ?? 30;
+      // complete quickly. The caller can override via pickTimeLimitSeconds.
+      // Offline drafts ignore the caller's time limit entirely — see
+      // OFFLINE_PICK_TIME_LIMIT_SECONDS above.
+      const pickTimeLimit = isOffline
+        ? OFFLINE_PICK_TIME_LIMIT_SECONDS
+        : (rawTimeLimit ?? 30);
       const draftOrder = rawDraftOrder ?? 'snake';
       const playerPool = rawPlayerPool ?? 'all';
       const sport = rawSport ?? 'baseball';
@@ -198,7 +221,7 @@ builder.mutationField('initializeMockDraft', (t) =>
           `playerPool "${playerPool}" is not valid for a football mock draft`,
         );
       }
-      if (rawTimeLimit !== null && rawTimeLimit !== undefined) {
+      if (!isOffline && rawTimeLimit !== null && rawTimeLimit !== undefined) {
         if (rawTimeLimit < 10 || rawTimeLimit > 300) {
           throw UserInputError(
             'pickTimeLimitSeconds must be between 10 and 300',
@@ -229,6 +252,7 @@ builder.mutationField('initializeMockDraft', (t) =>
         draftOrder,
         playerPool,
         sport,
+        isOffline,
       });
 
       try {
@@ -258,6 +282,7 @@ builder.mutationField('initializeMockDraft', (t) =>
           minCareerGames: 0,
           minCareerSeasons: 0,
           isMockDraft: true,
+          isOfflineDraft: isOffline,
         };
 
         // ── Steps 1-6: single atomic transaction ─────────────────────────────

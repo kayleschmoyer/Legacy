@@ -396,15 +396,18 @@ export function MockDraftPage(): React.JSX.Element {
 
   const handleStart = async (s: MockDraftSettings) => {
     setMissingLeagueIdError(null);
+    const isOffline = s.mode === 'offline';
     const result = await initializeMockDraft({
       variables: {
         numTeams: s.numTeams,
         rosterSize: s.rosterSize,
         userPickPosition: s.userPickPosition,
-        pickTimeLimitSeconds: 90,
+        // Offline mode ignores this and uses its own untimed sentinel server-side.
+        pickTimeLimitSeconds: isOffline ? undefined : 90,
         draftOrder: s.draftOrder,
         playerPool: s.playerPool,
         sport: s.sport,
+        isOffline,
       },
     });
     const leagueId = result.data?.initializeMockDraft?.leagueId;

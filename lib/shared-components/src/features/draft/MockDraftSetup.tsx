@@ -30,6 +30,12 @@ import {
 export type MockDraftOrder = 'snake' | 'linear';
 export type MockDraftPlayerPool = 'all' | 'nl' | 'al';
 export type MockDraftSport = 'baseball' | 'football';
+/**
+ * Draft Mode (LS-9144):
+ * - 'shared': today's default — timed picks against AI opponents.
+ * - 'offline': solo practice — no pick clock, pause/resume at your own pace.
+ */
+export type MockDraftMode = 'shared' | 'offline';
 
 export interface MockDraftSettings {
   numTeams: number;
@@ -38,6 +44,7 @@ export interface MockDraftSettings {
   draftOrder: MockDraftOrder;
   playerPool: MockDraftPlayerPool;
   sport: MockDraftSport;
+  mode: MockDraftMode;
 }
 
 export interface MockDraftSetupProps {
@@ -69,6 +76,23 @@ const ROSTER_OPTIONS = [5, 8, 10, 15] as const;
 const DRAFT_ORDER_OPTIONS: { label: string; value: MockDraftOrder }[] = [
   { label: 'Snake', value: 'snake' },
   { label: 'Linear', value: 'linear' },
+];
+
+const DRAFT_MODE_OPTIONS: {
+  label: string;
+  value: MockDraftMode;
+  helper: string;
+}[] = [
+  {
+    label: 'Shared',
+    value: 'shared',
+    helper: 'Timed picks against AI opponents.',
+  },
+  {
+    label: 'Offline',
+    value: 'offline',
+    helper: 'No clock — pause and pick at your own pace.',
+  },
 ];
 
 const PLAYER_POOL_OPTIONS: { label: string; value: MockDraftPlayerPool }[] = [
@@ -192,6 +216,7 @@ export function MockDraftSetup({
   const [playerPool, setPlayerPool] =
     React.useState<MockDraftPlayerPool>('all');
   const [sport, setSport] = React.useState<MockDraftSport>('baseball');
+  const [mode, setMode] = React.useState<MockDraftMode>('shared');
 
   const handleStart = () => {
     onStart({
@@ -201,6 +226,7 @@ export function MockDraftSetup({
       draftOrder,
       playerPool,
       sport,
+      mode,
     });
   };
 
@@ -257,6 +283,36 @@ export function MockDraftSetup({
           </Paragraph>
         </YStack>
       )}
+
+      {/* Draft Mode — offline (no clock) vs shared (timed) (LS-9144) */}
+      <FieldSection
+        label="Draft Mode"
+        labelId="mode-label"
+        helper={
+          <Paragraph
+            fontFamily="$body"
+            fontSize={12}
+            color="$gray10"
+            textAlign="center"
+            margin={0}
+          >
+            {DRAFT_MODE_OPTIONS.find((opt) => opt.value === mode)?.helper}
+          </Paragraph>
+        }
+      >
+        <XStack gap="$2" flexWrap="wrap" justifyContent="center">
+          {DRAFT_MODE_OPTIONS.map((opt) => (
+            <OptionButton
+              key={opt.value}
+              label={opt.label}
+              selected={mode === opt.value}
+              accent={EMERALD}
+              onPress={() => setMode(opt.value)}
+              width={140}
+            />
+          ))}
+        </XStack>
+      </FieldSection>
 
       {/* Number of Teams */}
       <FieldSection label="Number of Teams" labelId="teams-label">

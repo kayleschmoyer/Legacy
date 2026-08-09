@@ -1651,6 +1651,7 @@ type League {
   """
   inviteCode: String
   isMockDraft: Boolean
+  isOfflineDraft: Boolean
   isPublic: Boolean
 
   """
@@ -2465,6 +2466,11 @@ type Mutation {
     Draft order style: "snake" (default) or "linear"
     """
     draftOrder: String
+
+    """
+    When true, starts an "Offline" mock draft (LS-9144): a single-person practice session with no pick-clock pressure on the human's own turns. AI opponents still auto-pick immediately. Ignores pickTimeLimitSeconds. Default: false.
+    """
+    isOffline: Boolean
 
     """
     Total number of teams in the mock draft (2–12)

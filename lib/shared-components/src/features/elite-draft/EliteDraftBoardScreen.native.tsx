@@ -737,6 +737,10 @@ export function EliteDraftBoardScreen({
     token: websocketToken ?? authToken ?? undefined,
   });
 
+  // Offline mock draft mode (LS-9144): no pick-clock pressure on the human's
+  // own turn. Only meaningful for mock drafts — undefined/false for real leagues.
+  const untimed = queries.league?.isOfflineDraft === true;
+
   const { timeRemaining } = useDraftTimer({
     draftId: queries.draftId,
     leagueId,
@@ -749,6 +753,7 @@ export function EliteDraftBoardScreen({
     setPickDeadline: ui.setPickDeadline,
     setPickTimeLimitSeconds: ui.setPickTimeLimitSeconds,
     setAutoPickDisabled: ui.setAutoPickDisabled,
+    untimed,
     nudgeExpiredDraftPick: actions.nudgeExpiredDraftPick,
     refetchDraft: queries.refetchDraft,
     refetchCurrentPick: queries.refetchCurrentPick,
@@ -998,9 +1003,11 @@ export function EliteDraftBoardScreen({
             <Eyebrow color={isMyPick ? '$brandGoldLight' : '$fg4'}>
               {ui.draftPaused
                 ? 'Draft paused'
-                : isMyPick
-                  ? 'You’re on the clock'
-                  : 'On the clock'}
+                : untimed && isMyPick
+                  ? 'Your pick — take your time'
+                  : isMyPick
+                    ? 'You’re on the clock'
+                    : 'On the clock'}
             </Eyebrow>
             <Text
               fontFamily="$heading"
@@ -1022,6 +1029,7 @@ export function EliteDraftBoardScreen({
             totalSeconds={ui.pickTimeLimitSeconds}
             emphasize={isMyPick}
             paused={ui.draftPaused}
+            untimed={untimed}
           />
         </XStack>
 

@@ -20,6 +20,8 @@ interface DraftTopBandProps {
   round: number;
   timeRemaining: number;
   pickTimeLimitSeconds: number;
+  /** Offline mock draft mode (LS-9144): no clock, no pressure. */
+  untimed?: boolean;
   isMyPick: boolean;
   currentPickInfo: CurrentDraftPickInfo | null;
   leagueTeamsLength: number;
@@ -338,6 +340,7 @@ export function DraftTopBand({
   round,
   timeRemaining,
   pickTimeLimitSeconds,
+  untimed = false,
   isMyPick,
   currentPickInfo,
   leagueTeamsLength,
@@ -364,11 +367,16 @@ export function DraftTopBand({
   onCommissionerToggleUserAutoPick,
 }: DraftTopBandProps): React.JSX.Element {
   const [userApExpanded, setUserApExpanded] = useState(false);
-  const zone = timerZone(timeRemaining, pickTimeLimitSeconds, draftPaused);
+  const zone = untimed
+    ? 'safe'
+    : timerZone(timeRemaining, pickTimeLimitSeconds, draftPaused);
   const livePulseDim = useLivePulse(!draftPaused);
 
-  const pct =
-    pickTimeLimitSeconds > 0 ? timeRemaining / pickTimeLimitSeconds : 1;
+  const pct = untimed
+    ? 1
+    : pickTimeLimitSeconds > 0
+      ? timeRemaining / pickTimeLimitSeconds
+      : 1;
   const clampedPct = Math.max(0, Math.min(1, pct));
   const strokeColor = draftPaused
     ? withAlpha(WHITE, 0.2)
@@ -462,20 +470,26 @@ export function DraftTopBand({
             color={ringTimeColor}
             zIndex={1}
             aria-label={
-              draftPaused
-                ? 'Draft paused'
-                : `${formatPickClock(timeRemaining, pickTimeLimitSeconds)} remaining`
+              untimed
+                ? 'No pick time limit'
+                : draftPaused
+                  ? 'Draft paused'
+                  : `${formatPickClock(timeRemaining, pickTimeLimitSeconds)} remaining`
             }
           >
-            {draftPaused
-              ? '⏸'
-              : formatPickClock(timeRemaining, pickTimeLimitSeconds)}
+            {untimed
+              ? '∞'
+              : draftPaused
+                ? '⏸'
+                : formatPickClock(timeRemaining, pickTimeLimitSeconds)}
           </Text>
         </RingWrap>
         <TimerInfo>
-          <TimerCap>Time left</TimerCap>
+          <TimerCap>{untimed ? 'No limit' : 'Time left'}</TimerCap>
           <TimerOf>
-            of {formatPickClock(pickTimeLimitSeconds, pickTimeLimitSeconds)}
+            {untimed
+              ? 'Take your time'
+              : `of ${formatPickClock(pickTimeLimitSeconds, pickTimeLimitSeconds)}`}
           </TimerOf>
         </TimerInfo>
       </TimerBlock>

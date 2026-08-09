@@ -217,6 +217,10 @@ export function EliteDraftBoardScreen({
     onPlayerDrafted,
   });
 
+  // Offline mock draft mode (LS-9144): no pick-clock pressure on the human's
+  // own turn. Only meaningful for mock drafts — undefined/false for real leagues.
+  const untimed = queries.league?.isOfflineDraft === true;
+
   const { timeRemaining } = useDraftTimer({
     draftId: queries.draftId,
     leagueId,
@@ -229,6 +233,7 @@ export function EliteDraftBoardScreen({
     setPickDeadline: ui.setPickDeadline,
     setPickTimeLimitSeconds: ui.setPickTimeLimitSeconds,
     setAutoPickDisabled: ui.setAutoPickDisabled,
+    untimed,
     nudgeExpiredDraftPick: actions.nudgeExpiredDraftPick,
     refetchDraft: queries.refetchDraft,
     refetchCurrentPick: queries.refetchCurrentPick,
@@ -522,6 +527,7 @@ export function EliteDraftBoardScreen({
           round={round}
           timeRemaining={timeRemaining}
           pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
+          untimed={untimed}
           isMyPick={isMyPick}
           currentPickInfo={queries.currentPickInfo}
           leagueTeamsLength={queries.leagueTeams.length}

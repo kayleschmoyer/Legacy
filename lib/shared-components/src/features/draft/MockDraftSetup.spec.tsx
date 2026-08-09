@@ -16,6 +16,9 @@ describe('MockDraftSetup', () => {
       <MockDraftSetup onStart={noop} onCancel={noop} />,
     );
 
+    expect(getByText('Draft Mode')).toBeTruthy();
+    expect(getByText('Shared')).toBeTruthy();
+    expect(getByText('Offline')).toBeTruthy();
     expect(getByText('Number of Teams')).toBeTruthy();
     expect(getByText('Rounds (Roster Size)')).toBeTruthy();
     expect(getByText('Draft Order')).toBeTruthy();
@@ -42,7 +45,22 @@ describe('MockDraftSetup', () => {
       draftOrder: 'snake',
       playerPool: 'all',
       sport: 'baseball',
+      mode: 'shared',
     });
+  });
+
+  it('reflects Offline mode selection in the onStart payload (LS-9144)', () => {
+    const onStart = jest.fn();
+    const { getByText } = render(
+      <MockDraftSetup onStart={onStart} onCancel={noop} />,
+    );
+
+    fireEvent.click(getByText('Offline'));
+    fireEvent.click(getByText('Start Mock Draft'));
+
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'offline' }),
+    );
   });
 
   it('reflects setting changes in the onStart payload', () => {
