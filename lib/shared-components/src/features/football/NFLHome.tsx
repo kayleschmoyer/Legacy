@@ -26,6 +26,7 @@ export interface NFLHomeLeague {
   draftStatus?: string | null;
   currentWeekNumber?: number | null;
   weekAdvanceStatus?: string | null;
+  maxRosterSize?: number | null;
 }
 
 // LS-6257 (FBH-003) — the leagues list previously rendered every league
@@ -101,15 +102,16 @@ function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
         justifyContent: 'space-between',
       }}
     >
-      <Text
-        color="$color"
-        fontSize="$6"
-        fontWeight="600"
-        flex={1}
-        minWidth={160}
-      >
-        {league.name ?? 'Unnamed League'}
-      </Text>
+      <YStack gap="$1" flex={1} minWidth={160}>
+        <Text color="$color" fontSize="$6" fontWeight="600">
+          {league.name ?? 'Unnamed League'}
+        </Text>
+        {league.maxRosterSize ? (
+          <Text color="$gray10" fontSize="$2">
+            {league.maxRosterSize}-slot roster
+          </Text>
+        ) : null}
+      </YStack>
       <XStack gap="$2" flexWrap="wrap">
         <YStack
           backgroundColor="$glassSurface"
@@ -162,6 +164,21 @@ function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
           >
             <Text color="$yellow11" fontSize="$2" fontWeight="600">
               Advancing
+            </Text>
+          </YStack>
+        )}
+        {league.weekAdvanceStatus === 'failed' && (
+          <YStack
+            backgroundColor="$red3"
+            borderRadius="$3"
+            paddingHorizontal="$2"
+            paddingVertical="$1"
+            borderWidth={1}
+            borderColor="$red7"
+            accessibilityLabel="League week advance failed"
+          >
+            <Text color="$red11" fontSize="$2" fontWeight="600">
+              Advance failed
             </Text>
           </YStack>
         )}

@@ -54,6 +54,7 @@ export function FootballHubPage() {
           draftStatus: l.draftStatus,
           currentWeekNumber: l.currentWeekNumber,
           weekAdvanceStatus: l.weekAdvanceStatus,
+          maxRosterSize: l.maxRosterSize,
         })),
     [data?.userLeagues],
   );

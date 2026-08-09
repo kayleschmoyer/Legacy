@@ -56,6 +56,7 @@ export default function FootballHomeScreen() {
           draftStatus: l.draftStatus,
           currentWeekNumber: l.currentWeekNumber,
           weekAdvanceStatus: l.weekAdvanceStatus,
+          maxRosterSize: l.maxRosterSize,
         })),
     [data?.userLeagues],
   );

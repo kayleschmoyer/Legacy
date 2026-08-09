@@ -112,3 +112,61 @@ describe('NFLHome — leagues list virtualization (LS-6257)', () => {
     expect(screen.getByText('No football leagues yet')).toBeInTheDocument();
   });
 });
+
+describe('NFLHome — league row metadata (LS-6256)', () => {
+  it('renders the roster size under the league name when maxRosterSize is present', () => {
+    const league: NFLHomeLeague = {
+      id: 1,
+      name: 'Grid Iron Legends',
+      draftStatus: 'completed',
+      currentWeekNumber: 4,
+      maxRosterSize: 16,
+    };
+    render(
+      <NFLHome leagues={[league]} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    expect(screen.getByText('Grid Iron Legends')).toBeInTheDocument();
+    expect(screen.getByText('16-slot roster')).toBeInTheDocument();
+  });
+
+  it('omits the roster-size line when maxRosterSize is absent', () => {
+    const league: NFLHomeLeague = {
+      id: 2,
+      name: 'No Roster Info League',
+      draftStatus: 'completed',
+      currentWeekNumber: 4,
+    };
+    render(
+      <NFLHome leagues={[league]} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    expect(screen.queryByText(/-slot roster/)).not.toBeInTheDocument();
+  });
+
+  it('renders "Advancing" badge when weekAdvanceStatus is processing', () => {
+    const league: NFLHomeLeague = {
+      id: 3,
+      name: 'Advancing League',
+      draftStatus: 'completed',
+      currentWeekNumber: 6,
+      weekAdvanceStatus: 'processing',
+    };
+    render(
+      <NFLHome leagues={[league]} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    expect(screen.getByText('Advancing')).toBeInTheDocument();
+  });
+
+  it('renders "Advance failed" badge when weekAdvanceStatus is failed', () => {
+    const league: NFLHomeLeague = {
+      id: 4,
+      name: 'Failed League',
+      draftStatus: 'completed',
+      currentWeekNumber: 3,
+      weekAdvanceStatus: 'failed',
+    };
+    render(
+      <NFLHome leagues={[league]} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    expect(screen.getByText('Advance failed')).toBeInTheDocument();
+  });
+});
