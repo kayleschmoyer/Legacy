@@ -216,6 +216,19 @@ describe('LeagueDetailShell', () => {
     expect(onAnalytics).toHaveBeenCalledTimes(1);
   });
 
+  // LS-9126: Analytics navigates to a separate premium-gated route, not a
+  // same-page tab — it must not be marked up (or discoverable) as a tab, or
+  // it silently misleads users and assistive tech into expecting in-page
+  // content when activated.
+  it('renders the Analytics action outside the tab list, not as a tab', () => {
+    const onAnalytics = jest.fn();
+    const { getByText, getByRole } = renderShell({ onAnalytics });
+    const analyticsAction = getByText('Analytics');
+    expect(within(getByRole('tablist')).queryByText('Analytics')).toBeNull();
+    expect(analyticsAction.closest('[role="tab"]')).toBeNull();
+    expect(analyticsAction.closest('[role="link"]')).not.toBeNull();
+  });
+
   // LS-8988: the League Home "Guided Home" redesign replaces the hero + tab
   // bar with its own compact header while on the Overview tab; every other
   // consumer (web, football, baseball's non-Overview tabs) must render

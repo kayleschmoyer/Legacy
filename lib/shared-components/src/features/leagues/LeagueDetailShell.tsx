@@ -873,26 +873,64 @@ export function LeagueTabBar({
       borderBottomWidth={1}
       borderBottomColor="$outlineSubtle"
     >
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ minWidth: '100%' }}
-      >
-        <XStack gap={2} role="tablist" aria-label="League sections">
-          {ordered.map((t) => (
-            <TabButton
-              key={t.id}
-              label={t.label}
-              active={activeTab === t.id}
-              badge={t.id === 'trades' ? pendingTradeCount : undefined}
-              onPress={() => onTabChange(t.id)}
+      <XStack alignItems="center">
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ minWidth: '100%' }}
+        >
+          <XStack gap={2} role="tablist" aria-label="League sections">
+            {ordered.map((t) => (
+              <TabButton
+                key={t.id}
+                label={t.label}
+                active={activeTab === t.id}
+                badge={t.id === 'trades' ? pendingTradeCount : undefined}
+                onPress={() => onTabChange(t.id)}
+              />
+            ))}
+          </XStack>
+        </ScrollView>
+        {/* Analytics is a distinct premium-gated route (/leagues/:id/analytics),
+            not a same-page tab — it must live outside role="tablist" so it
+            isn't announced or styled as a tab that silently navigates away
+            (LS-9126). Rendered as a link-styled affordance instead. */}
+        {onAnalytics ? (
+          <XStack
+            tag="button"
+            role="link"
+            tabIndex={0}
+            alignItems="center"
+            gap={6}
+            paddingVertical={10}
+            paddingHorizontal={14}
+            marginLeft={12}
+            flexShrink={0}
+            cursor="pointer"
+            animation="quick"
+            hoverStyle={{ opacity: 0.8 }}
+            onPress={onAnalytics}
+          >
+            <BrandIcon
+              name="bar-chart"
+              size={13}
+              color={FG3}
+              accentColor={FG3}
             />
-          ))}
-          {onAnalytics ? (
-            <TabButton label="Analytics" active={false} onPress={onAnalytics} />
-          ) : null}
-        </XStack>
-      </ScrollView>
+            <Text
+              fontFamily="$heading"
+              fontWeight="700"
+              fontSize={13}
+              letterSpacing={1.04}
+              textTransform="uppercase"
+              color="$textMuted"
+              hoverStyle={{ color: '$color' }}
+            >
+              Analytics
+            </Text>
+          </XStack>
+        ) : null}
+      </XStack>
     </YStack>
   );
 }
