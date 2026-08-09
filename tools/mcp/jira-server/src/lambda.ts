@@ -360,13 +360,16 @@ export function createMcpServer(): McpServer {
   server.tool(
     'jira_get_bucket_epic',
     'Get the current bucket epic key.',
-    { bucket: z.enum(['client-bugs', 'mcp-gaps']) },
+    { bucket: z.enum(['client-bugs', 'mcp-gaps', 'design-sync']) },
     async (p) => getBucketEpic(p),
   );
   server.tool(
     'jira_set_bucket_epic',
     'Set the current bucket epic key.',
-    { bucket: z.enum(['client-bugs', 'mcp-gaps']), epicKey: z.string() },
+    {
+      bucket: z.enum(['client-bugs', 'mcp-gaps', 'design-sync']),
+      epicKey: z.string(),
+    },
     async (p) => setBucketEpic(p),
   );
 

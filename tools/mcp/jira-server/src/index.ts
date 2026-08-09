@@ -789,10 +789,10 @@ server.tool(
 // --- jira_get_bucket_epic ---
 server.tool(
   'jira_get_bucket_epic',
-  'Get the current bucket epic for "client-bugs" or "mcp-gaps" from Jira project property. Returns a JSON object with success, bucket, key, cached (boolean), and updatedAt (ISO string or null). Cached 5 minutes.',
+  'Get the current bucket epic for "client-bugs", "mcp-gaps", or "design-sync" from Jira project property. Returns a JSON object with success, bucket, key, cached (boolean), and updatedAt (ISO string or null). Cached 5 minutes.',
   {
     bucket: z
-      .enum(['client-bugs', 'mcp-gaps'])
+      .enum(['client-bugs', 'mcp-gaps', 'design-sync'])
       .describe('Which bucket epic to look up'),
   },
   async (params) => getBucketEpic(params),
@@ -801,9 +801,9 @@ server.tool(
 // --- jira_set_bucket_epic ---
 server.tool(
   'jira_set_bucket_epic',
-  'Set the current bucket epic key for "client-bugs" or "mcp-gaps". Writes to Jira project property. Requires project admin credentials.',
+  'Set the current bucket epic key for "client-bugs", "mcp-gaps", or "design-sync". Writes to Jira project property. Requires project admin credentials.',
   {
-    bucket: z.enum(['client-bugs', 'mcp-gaps']),
+    bucket: z.enum(['client-bugs', 'mcp-gaps', 'design-sync']),
     epicKey: z.string().describe('Jira issue key, e.g. "LS-2501"'),
   },
   async (params) => setBucketEpic(params),
