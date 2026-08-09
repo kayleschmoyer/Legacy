@@ -147,54 +147,62 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   // `iat`) and retry the operation, up to ENTITLEMENTS_STALE_MAX_ATTEMPTS
   // times with backoff. A replay that comes back stale again re-enters this
   // same branch and reads the incremented attempt count from context (a
-  // bounded counter, not the old single-shot boolean). On refresh failure
-  // (silentlyRefreshJwt resolves null — the /refresh-jwt call itself failed)
-  // we exit immediately to the terminal fallback without waiting out the
-  // remaining budget: retrying against a broken refresh endpoint won't
-  // un-stale anything. Once the budget is exhausted we fail safe: clear the
-  // session (the user drops to free) and prompt re-login, matching the epic
-  // LS-8638 SHARED CONTRACTS #1 client contract. This code is an expected
-  // control signal, so it is never surfaced as a toast or to Rollbar.
+  // bounded counter, not the old single-shot boolean). Once the budget is
+  // exhausted we fail safe: clear the session (the user drops to free) and
+  // prompt re-login, matching the epic LS-8638 SHARED CONTRACTS #1 client
+  // contract. This code is an expected control signal, so it is never
+  // surfaced as a toast or to Rollbar.
   if (isEntitlementsStale) {
-    const attempt = Number(
+    const initialAttempt = Number(
       operation.getContext()['entitlementsStaleAttempt'] ?? 0,
     );
     return new Observable<ApolloLink.Result>((observer) => {
-      if (attempt >= ENTITLEMENTS_STALE_MAX_ATTEMPTS) {
-        // Budget exhausted → fail safe: fall back to free + prompt re-login.
-        window.dispatchEvent(new CustomEvent('auth:session-expired'));
-        observer.error(error);
-        return;
-      }
-      operation.setContext({ entitlementsStaleAttempt: attempt + 1 });
+      // A hard refresh failure (silentlyRefreshJwt resolves null — the
+      // /refresh-jwt call itself failed, e.g. a transient network blip) used
+      // to skip straight to the terminal fallback with zero retries. That's
+      // too harsh: a momentary network hiccup isn't evidence the user's
+      // entitlements are stuck, so it now consumes a retry slot within the
+      // same bounded budget instead (LS-9067 follow-up). This can't rely on
+      // the usual "replay via forward() re-enters errorLink" mechanism the
+      // stale-again case uses above, since there's no new operation response
+      // to intercept — so it loops locally via recursion, driven by the same
+      // attempt counter.
+      const tryRefresh = (attempt: number) => {
+        if (attempt >= ENTITLEMENTS_STALE_MAX_ATTEMPTS) {
+          // Budget exhausted → fail safe: fall back to free + prompt re-login.
+          window.dispatchEvent(new CustomEvent('auth:session-expired'));
+          observer.error(error);
+          return;
+        }
 
-      const attemptRefreshAndRetry = () => {
-        silentlyRefreshJwt()
-          .then((newToken) => {
-            if (!newToken) {
-              // Hard refresh failure → fail safe immediately, do not consume
-              // the remaining retry budget waiting on a broken endpoint.
-              window.dispatchEvent(new CustomEvent('auth:session-expired'));
-              observer.error(error);
-              return;
-            }
-            forward(operation).subscribe({
-              next: (value) => observer.next(value),
-              error: (err: unknown) => observer.error(err),
-              complete: () => observer.complete(),
+        const runAttempt = () => {
+          silentlyRefreshJwt()
+            .then((newToken) => {
+              if (!newToken) {
+                tryRefresh(attempt + 1);
+                return;
+              }
+              operation.setContext({ entitlementsStaleAttempt: attempt + 1 });
+              forward(operation).subscribe({
+                next: (value) => observer.next(value),
+                error: (err: unknown) => observer.error(err),
+                complete: () => observer.complete(),
+              });
+            })
+            .catch(() => {
+              tryRefresh(attempt + 1);
             });
-          })
-          .catch((err: unknown) => {
-            observer.error(err);
-          });
+        };
+
+        const delayMs = ENTITLEMENTS_STALE_RETRY_DELAYS_MS[attempt] ?? 0;
+        if (delayMs > 0) {
+          setTimeout(runAttempt, delayMs);
+        } else {
+          runAttempt();
+        }
       };
 
-      const delayMs = ENTITLEMENTS_STALE_RETRY_DELAYS_MS[attempt] ?? 0;
-      if (delayMs > 0) {
-        setTimeout(attemptRefreshAndRetry, delayMs);
-      } else {
-        attemptRefreshAndRetry();
-      }
+      tryRefresh(initialAttempt);
     });
   }
 

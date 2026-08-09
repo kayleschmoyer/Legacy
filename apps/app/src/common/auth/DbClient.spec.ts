@@ -106,7 +106,17 @@ describe('errorLink ENTITLEMENTS_STALE bounded retry', () => {
   ])(
     'uses the [0, 800, 2000]ms backoff schedule: attempt index %i waits %dms before refreshing',
     async (attempt, expectedDelay) => {
-      mockSilentlyRefreshJwt.mockResolvedValue(null);
+      // A successful refresh (rather than a hard failure) isolates exactly
+      // one refresh call per entry into the branch — a hard failure now
+      // recurses into further budgeted attempts (see the hard-refresh-failure
+      // tests below), which would make this delay-per-entry assertion
+      // ambiguous. `forward` must still error on its first (outer) call —
+      // ErrorLink's own request() wrapper subscribes to the outer `forward`
+      // before this handler ever runs, and a `next` there reads
+      // `operation.client.queryManager`, which the test's minimal fake
+      // operation doesn't provide. Only the second (inner, retried) call is
+      // this test's own concern.
+      mockSilentlyRefreshJwt.mockResolvedValue('fresh-jwt');
       const setTimeoutSpy = jest
         .spyOn(global, 'setTimeout')
         .mockImplementation((cb: () => void) => {
@@ -116,8 +126,19 @@ describe('errorLink ENTITLEMENTS_STALE bounded retry', () => {
 
       const op = makeOperation({ entitlementsStaleAttempt: attempt });
       const staleError = makeStaleError();
-      const forward = () =>
-        new Observable<never>((observer) => observer.error(staleError));
+      let forwardCalls = 0;
+      const forward = () => {
+        forwardCalls += 1;
+        if (forwardCalls === 1) {
+          return new Observable<never>((observer) =>
+            observer.error(staleError),
+          );
+        }
+        return new Observable<ApolloLink.Result>((observer) => {
+          observer.next({ data: { ok: true } });
+          observer.complete();
+        });
+      };
 
       await new Promise<void>((resolve) => {
         const result = errorLink.request(op as never, forward as never);
@@ -167,13 +188,67 @@ describe('errorLink ENTITLEMENTS_STALE bounded retry', () => {
     expect(mockEmitSessionExpired).toHaveBeenCalledTimes(1);
   });
 
-  it('hard-refresh-failure-short-circuits: a null refresh result fails safe immediately without consuming remaining budget', async () => {
-    // silentlyRefreshJwt resolves null (the /refresh-jwt call itself failed —
-    // e.g. a network/5xx error, distinct from a still-stale replay).
-    mockSilentlyRefreshJwt.mockResolvedValue(null);
+  it('hard-refresh-failure-retries-within-budget: a null refresh result retries instead of failing immediately, and succeeds on a later attempt', async () => {
+    // silentlyRefreshJwt resolves null on the first call (e.g. a transient
+    // network blip hitting /refresh-jwt), then succeeds on the second. A
+    // momentary network hiccup isn't evidence the user's entitlements are
+    // stuck, so this must consume a retry slot within the same bounded
+    // budget rather than failing safe immediately.
+    mockSilentlyRefreshJwt
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('fresh-jwt');
+    const setTimeoutSpy = jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation((cb: () => void) => {
+        cb();
+        return 0 as unknown as NodeJS.Timeout;
+      });
 
-    // Early attempt (0 of 3) — even though budget remains, a hard refresh
-    // failure must exit immediately rather than schedule further retries.
+    const op = makeOperation({});
+    const staleError = makeStaleError();
+    // The outer (first) forward call must error to enter this handler at
+    // all — see the backoff-schedule test above for why. Only the second
+    // (inner, retried-after-successful-refresh) call represents this test's
+    // actual replay.
+    let forwardCalls = 0;
+    const forward = () => {
+      forwardCalls += 1;
+      if (forwardCalls === 1) {
+        return new Observable<never>((observer) => observer.error(staleError));
+      }
+      return new Observable<ApolloLink.Result>((observer) => {
+        observer.next({ data: { ok: true } });
+        observer.complete();
+      });
+    };
+
+    const value = await new Promise<unknown>((resolve) => {
+      const result = errorLink.request(op as never, forward as never);
+      result?.subscribe({
+        next: (v) => resolve(v),
+        error: (e) => resolve(e),
+        complete: () => {
+          /* ignore */
+        },
+      });
+    });
+
+    expect(mockSilentlyRefreshJwt).toHaveBeenCalledTimes(2);
+    expect(value).toEqual({ data: { ok: true } });
+    expect(mockEmitSessionExpired).not.toHaveBeenCalled();
+
+    setTimeoutSpy.mockRestore();
+  });
+
+  it('hard-refresh-failure-exhausts-budget-then-terminal-fallback: repeated refresh failures still fail safe once the 3-attempt budget is spent', async () => {
+    mockSilentlyRefreshJwt.mockResolvedValue(null);
+    const setTimeoutSpy = jest
+      .spyOn(global, 'setTimeout')
+      .mockImplementation((cb: () => void) => {
+        cb();
+        return 0 as unknown as NodeJS.Timeout;
+      });
+
     const op = makeOperation({});
     const staleError = makeStaleError();
     const forward = () =>
@@ -190,9 +265,12 @@ describe('errorLink ENTITLEMENTS_STALE bounded retry', () => {
       });
     });
 
-    // Only the one (failed) refresh attempt was made — no retry loop against
-    // a broken refresh endpoint.
-    expect(mockSilentlyRefreshJwt).toHaveBeenCalledTimes(1);
+    // All 3 budgeted attempts were spent retrying the refresh call itself
+    // before failing safe — `forward` is never consulted since the refresh
+    // never produced a token to replay with.
+    expect(mockSilentlyRefreshJwt).toHaveBeenCalledTimes(3);
     expect(mockEmitSessionExpired).toHaveBeenCalledTimes(1);
+
+    setTimeoutSpy.mockRestore();
   });
 });

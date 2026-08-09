@@ -44,12 +44,10 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   // but its Stripe-minted entitlement claim predates the user's
   // `entitlements_updated_at` marker. Silently re-mint the JWT and retry
   // the operation, up to ENTITLEMENTS_STALE_MAX_ATTEMPTS times with
-  // backoff (LS-9067; a bounded counter on operation context, not a
-  // single-shot flag). A hard refresh failure (silentlyRefreshJwt
-  // resolves null) exits immediately to the terminal fallback without
-  // waiting out the remaining budget. Once the budget is exhausted, fail
-  // safe — clear the session so the user drops to free and is prompted
-  // to re-login (epic LS-8638 SHARED CONTRACTS #1).
+  // backoff (LS-9067; a bounded counter, driven recursively rather than via
+  // operation context re-entry — see below). Once the budget is exhausted,
+  // fail safe — clear the session so the user drops to free and is
+  // prompted to re-login (epic LS-8638 SHARED CONTRACTS #1).
   const isEntitlementsStale =
     CombinedGraphQLErrors.is(error) &&
     error.errors.some(
@@ -58,42 +56,55 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
     );
 
   if (isEntitlementsStale) {
-    const attempt = Number(
+    const initialAttempt = Number(
       operation.getContext()['entitlementsStaleAttempt'] ?? 0,
     );
     return new Observable<ApolloLink.Result>((observer) => {
-      if (attempt >= ENTITLEMENTS_STALE_MAX_ATTEMPTS) {
-        emitSessionExpired();
-        observer.error(error);
-        return;
-      }
-      operation.setContext({ entitlementsStaleAttempt: attempt + 1 });
+      // A hard refresh failure (silentlyRefreshJwt resolves null — the
+      // /refresh-jwt call itself failed, e.g. a transient network blip)
+      // used to skip straight to the terminal fallback with zero retries.
+      // That's too harsh: a momentary network hiccup isn't evidence the
+      // user's entitlements are stuck, so it now consumes a retry slot
+      // within the same bounded budget instead (LS-9067 follow-up). This
+      // can't rely on the usual "replay via forward() re-enters errorLink"
+      // mechanism the stale-again case uses, since there's no new operation
+      // response to intercept — so it loops locally via recursion, driven
+      // by the same attempt counter.
+      const tryRefresh = (attempt: number) => {
+        if (attempt >= ENTITLEMENTS_STALE_MAX_ATTEMPTS) {
+          emitSessionExpired();
+          observer.error(error);
+          return;
+        }
 
-      const attemptRefreshAndRetry = () => {
-        silentlyRefreshJwt()
-          .then((newToken) => {
-            if (!newToken) {
-              emitSessionExpired();
-              observer.error(error);
-              return;
-            }
-            forward(operation).subscribe({
-              next: (value) => observer.next(value),
-              error: (err: unknown) => observer.error(err),
-              complete: () => observer.complete(),
+        const runAttempt = () => {
+          silentlyRefreshJwt()
+            .then((newToken) => {
+              if (!newToken) {
+                tryRefresh(attempt + 1);
+                return;
+              }
+              operation.setContext({ entitlementsStaleAttempt: attempt + 1 });
+              forward(operation).subscribe({
+                next: (value) => observer.next(value),
+                error: (err: unknown) => observer.error(err),
+                complete: () => observer.complete(),
+              });
+            })
+            .catch(() => {
+              tryRefresh(attempt + 1);
             });
-          })
-          .catch((err: unknown) => {
-            observer.error(err);
-          });
+        };
+
+        const delayMs = ENTITLEMENTS_STALE_RETRY_DELAYS_MS[attempt] ?? 0;
+        if (delayMs > 0) {
+          setTimeout(runAttempt, delayMs);
+        } else {
+          runAttempt();
+        }
       };
 
-      const delayMs = ENTITLEMENTS_STALE_RETRY_DELAYS_MS[attempt] ?? 0;
-      if (delayMs > 0) {
-        setTimeout(attemptRefreshAndRetry, delayMs);
-      } else {
-        attemptRefreshAndRetry();
-      }
+      tryRefresh(initialAttempt);
     });
   }
 
