@@ -317,6 +317,83 @@ function AdminSection({
   );
 }
 
+// ─── Shared card-link building blocks ──────────────────────────────────────────
+
+function cardLinkStyle(hovered: boolean): React.CSSProperties {
+  return {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 10,
+    padding: '18px 20px',
+    borderRadius: 12,
+    background: hovered ? 'var(--color4)' : 'var(--surfaceCard)',
+    border: `1px solid ${hovered ? 'var(--outlineStrong)' : 'var(--outlineSubtle)'}`,
+    textDecoration: 'none',
+    transition: 'background 150ms ease, border-color 150ms ease',
+    flex: '1 1 160px',
+    minWidth: 0,
+  };
+}
+
+function CardIcon({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        width: 36,
+        height: 36,
+        borderRadius: 8,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: withAlpha(BRAND_NAVY, 0.6),
+        border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`,
+        color: 'var(--brandGoldLight)',
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function CardLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        fontFamily: FONT_DISPLAY,
+        fontWeight: 800,
+        fontSize: 15,
+        color: 'var(--color)',
+        letterSpacing: '-0.01em',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function CardDescription({
+  id,
+  children,
+}: {
+  id: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      id={id}
+      style={{
+        fontFamily: FONT_BODY,
+        fontSize: 13,
+        color: 'var(--textMuted)',
+        lineHeight: 1.45,
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
 // ─── Admin nav hub ────────────────────────────────────────────────────────────
 
 interface NavCardProps {
@@ -336,58 +413,11 @@ function NavCard({ to, icon, label, description }: NavCardProps) {
       aria-describedby={descriptionId}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        padding: '18px 20px',
-        borderRadius: 12,
-        background: hovered ? 'var(--color4)' : 'var(--surfaceCard)',
-        border: `1px solid ${hovered ? 'var(--outlineStrong)' : 'var(--outlineSubtle)'}`,
-        textDecoration: 'none',
-        transition: 'background 150ms ease, border-color 150ms ease',
-        flex: '1 1 160px',
-        minWidth: 0,
-      }}
+      style={cardLinkStyle(hovered)}
     >
-      <span
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 8,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: withAlpha(BRAND_NAVY, 0.6),
-          border: `1px solid ${withAlpha(BRAND_NAVY_LIGHT, 0.4)}`,
-          color: 'var(--brandGoldLight)',
-          flexShrink: 0,
-        }}
-      >
-        {icon}
-      </span>
-      <span
-        style={{
-          fontFamily: FONT_DISPLAY,
-          fontWeight: 800,
-          fontSize: 15,
-          color: 'var(--color)',
-          letterSpacing: '-0.01em',
-        }}
-      >
-        {label}
-      </span>
-      <span
-        id={descriptionId}
-        style={{
-          fontFamily: FONT_BODY,
-          fontSize: 13,
-          color: 'var(--textMuted)',
-          lineHeight: 1.45,
-        }}
-      >
-        {description}
-      </span>
+      <CardIcon>{icon}</CardIcon>
+      <CardLabel>{label}</CardLabel>
+      <CardDescription id={descriptionId}>{description}</CardDescription>
     </Link>
   );
 }
@@ -454,6 +484,142 @@ function AdminNavHub() {
           </svg>
         }
       />
+    </div>
+  );
+}
+
+// ─── External tool links ───────────────────────────────────────────────────────
+
+interface ExternalLinkCardProps {
+  href: string;
+  icon: React.ReactNode;
+  label: string;
+  description: string;
+}
+
+function ExternalLinkCard({
+  href,
+  icon,
+  label,
+  description,
+}: ExternalLinkCardProps) {
+  const [hovered, setHovered] = React.useState(false);
+  const descriptionId = `external-link-desc-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={`${label} (opens in a new tab)`}
+      aria-describedby={descriptionId}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={cardLinkStyle(hovered)}
+    >
+      <CardIcon>{icon}</CardIcon>
+      <CardLabel>{label} ↗</CardLabel>
+      <CardDescription id={descriptionId}>{description}</CardDescription>
+    </a>
+  );
+}
+
+interface ExternalToolLink {
+  href: string;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}
+
+const EXTERNAL_TOOL_LINKS: ExternalToolLink[] = [
+  {
+    href: 'https://github.com/bkrupa/legacy-sports',
+    label: 'GitHub',
+    description: 'Source repository, pull requests, and CI workflow runs.',
+    icon: (
+      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M12 2C6.48 2 2 6.58 2 12.19c0 4.49 2.87 8.3 6.84 9.65.5.1.68-.22.68-.49 0-.24-.01-1.03-.01-1.87-2.78.62-3.37-1.19-3.37-1.19-.45-1.18-1.11-1.49-1.11-1.49-.9-.63.07-.62.07-.62 1 .07 1.53 1.05 1.53 1.05.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.31.1-2.73 0 0 .84-.28 2.75 1.05a9.32 9.32 0 015 0c1.91-1.33 2.75-1.05 2.75-1.05.55 1.42.2 2.47.1 2.73.64.72 1.03 1.63 1.03 2.75 0 3.94-2.35 4.8-4.58 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.82 0 .27.18.6.69.49A10.02 10.02 0 0022 12.19C22 6.58 17.52 2 12 2z"
+          fill="currentColor"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: 'https://bkrupa.atlassian.net/browse/LS',
+    label: 'Jira',
+    description: 'Track and triage the LS project backlog and sprints.',
+    icon: (
+      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path
+          d="M22.4 11.27L12.7 1.56a.68.68 0 00-.96 0l-9.7 9.71a.68.68 0 000 .96l9.7 9.71a.68.68 0 00.96 0l9.7-9.71a.68.68 0 000-.96zM12.22 15.6l-3.6-3.6 3.6-3.6 3.6 3.6-3.6 3.6z"
+          fill="currentColor"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: 'https://app.rollbar.com',
+    label: 'Rollbar',
+    description: 'Live error tracking and occurrence details for production.',
+    icon: (
+      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <circle
+          cx="12"
+          cy="12"
+          r="9"
+          stroke="currentColor"
+          strokeWidth={1.75}
+        />
+        <path
+          d="M12 7v6m0 4h.01"
+          stroke="currentColor"
+          strokeWidth={1.75}
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    href: 'https://dashboard.stripe.com',
+    label: 'Stripe',
+    description: 'Payments, subscriptions, and billing dashboard.',
+    icon: (
+      <svg width={18} height={18} viewBox="0 0 24 24" fill="none" aria-hidden>
+        <rect
+          x="3"
+          y="5"
+          width="18"
+          height="14"
+          rx="2.5"
+          stroke="currentColor"
+          strokeWidth={1.75}
+        />
+        <path d="M3 10h18" stroke="currentColor" strokeWidth={1.75} />
+      </svg>
+    ),
+  },
+];
+
+function ExternalToolsSection() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 12,
+      }}
+      aria-label="Third-party tools"
+      role="navigation"
+    >
+      {EXTERNAL_TOOL_LINKS.map((link) => (
+        <ExternalLinkCard
+          key={link.label}
+          href={link.href}
+          icon={link.icon}
+          label={link.label}
+          description={link.description}
+        />
+      ))}
     </div>
   );
 }
@@ -1161,6 +1327,22 @@ export function AdminPage(): React.JSX.Element | null {
               </JsonBlock>
             </YStack>
           )}
+        </AdminSection>
+
+        {/* External tools section */}
+        <AdminSection number="03" title="External Tools" defaultOpen={true}>
+          <p
+            style={{
+              margin: '0 0 4px',
+              fontFamily: FONT_BODY,
+              fontSize: 14,
+              color: 'var(--textMuted)',
+            }}
+          >
+            Quick links to the third-party services we use to build, ship, and
+            operate Legacy Sports.
+          </p>
+          <ExternalToolsSection />
         </AdminSection>
       </YStack>
 

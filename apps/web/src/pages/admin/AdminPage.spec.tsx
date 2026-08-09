@@ -2,7 +2,7 @@
  * Unit tests for AdminPage auth loading and unauthorized redirect states (LS-5313).
  */
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import AdminPage from './AdminPage';
 
@@ -168,5 +168,44 @@ describe('AdminPage — unauthorized redirect', () => {
 
     expect(screen.getByText('Admin Console')).toBeInTheDocument();
     expect(mockNavigate).not.toHaveBeenCalledWith('/', expect.anything());
+  });
+});
+
+describe('AdminPage — external tools section', () => {
+  beforeEach(() => {
+    mockUseAuth.mockReturnValue({
+      isAuthenticated: true,
+      isLoading: false,
+      user: { accessLevel: 'admin', id: 1 },
+      impersonateUser: jest.fn(),
+    });
+    mockUseGetUserByIdQuery.mockReturnValue({
+      data: { user: { accessLevel: 'admin', id: 1 } },
+      loading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    });
+  });
+
+  it('renders a link to each third-party tool that opens in a new tab', () => {
+    renderPage();
+
+    const nav = screen.getByRole('navigation', { name: 'Third-party tools' });
+    const expected: Record<string, string> = {
+      GitHub: 'https://github.com/bkrupa/legacy-sports',
+      Jira: 'https://bkrupa.atlassian.net/browse/LS',
+      Rollbar: 'https://app.rollbar.com',
+      Stripe: 'https://dashboard.stripe.com',
+    };
+
+    for (const [label, href] of Object.entries(expected)) {
+      const link = within(nav).getByRole('link', {
+        name: `${label} (opens in a new tab)`,
+      });
+      expect(link).toHaveAttribute('href', href);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(within(link).getByText(`${label} ↗`)).toBeInTheDocument();
+    }
   });
 });
