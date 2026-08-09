@@ -90,6 +90,12 @@ variable "ga_measurement_id" {
   default     = ""
 }
 
+variable "apple_bundle_id" {
+  description = "iOS app bundle identifier (e.g. com.legacysports.app), used by the Apple IAP Lambda to validate App Store Server Notifications. Not sensitive — it's embedded in the shipped mobile app."
+  type        = string
+  default     = ""
+}
+
 variable "discord_client_id" {
   description = "Discord OAuth application client ID"
   type        = string

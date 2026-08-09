@@ -63,9 +63,15 @@ case $FUNCTION_NAME in
         DIST_DIR="dist"
         SSM_PARAM="/legacy-sports/${ENVIRONMENT}/lambda/game-selection/version"
         ;;
+    "apple-iap")
+        LAMBDA_DIR="lambdas/apple-iap"
+        BUILD_COMMAND="pnpm exec nx run apple-iap:build"
+        DIST_DIR="dist"
+        SSM_PARAM="/legacy-sports/${ENVIRONMENT}/lambda/apple-iap/version"
+        ;;
     *)
         echo "Error: Unknown function name '$FUNCTION_NAME'"
-        echo "Available functions: graphql, stats, oauth-proxy, game-selection"
+        echo "Available functions: graphql, stats, oauth-proxy, game-selection, apple-iap"
         exit 1
         ;;
 esac

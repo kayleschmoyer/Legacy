@@ -92,6 +92,10 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_method.github_webhook_any.id,
       aws_api_gateway_integration.github_webhook_root_any.id,
       aws_api_gateway_integration.github_webhook_any.id,
+      # Apple IAP resources (LS-9012)
+      aws_api_gateway_resource.apple_iap.id,
+      aws_api_gateway_method.apple_iap_post.id,
+      aws_api_gateway_integration.apple_iap_post.id,
     ]))
   }
 
@@ -130,6 +134,8 @@ resource "aws_api_gateway_deployment" "main" {
     aws_api_gateway_method.github_webhook_any,
     aws_api_gateway_integration.github_webhook_root_any,
     aws_api_gateway_integration.github_webhook_any,
+    aws_api_gateway_method.apple_iap_post,
+    aws_api_gateway_integration.apple_iap_post,
   ]
 }
 

@@ -49,7 +49,7 @@
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "command": "../../scripts/deploy-lambda.ps1 -FunctionName apple-iap",
+        "command": "../../scripts/deploy-lambda.sh apple-iap",
         "cwd": "lambdas/apple-iap"
       }
     },

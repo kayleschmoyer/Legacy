@@ -394,6 +394,12 @@ jobs:
               "s3Prefix":"mcp-rollbar", "ssmName":"mcp-rollbar",
               "badgeName":"Upload MCP Rollbar Lambda",
               "distPath":"tools/mcp/rollbar-server/dist", "rollbar":true
+            },
+            {
+              "project":"apple-iap", "dir":"apple-iap",
+              "s3Prefix":"apple-iap", "ssmName":"apple-iap",
+              "badgeName":"Upload Apple IAP Lambda",
+              "distPath":"lambdas/apple-iap/dist", "rollbar":true
             }
           ]'
 

@@ -71,8 +71,13 @@ switch ($FunctionName) {
         $ProjectName = 'notifications'
         $SsmParam = "/legacy-sports/${Environment}/lambda/notifications/version"
     }
+    'apple-iap' {
+        $LambdaDir = 'lambdas/apple-iap'
+        $ProjectName = 'apple-iap'
+        $SsmParam = "/legacy-sports/${Environment}/lambda/apple-iap/version"
+    }
     default {
-        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor, websocket, stripe-webhook, rollbar-discord, github-webhook, notifications"
+        Write-Error "Unknown function name '$FunctionName'. Available: graphql, stats, oauth-proxy, game-selection, draft-processor, websocket, stripe-webhook, rollbar-discord, github-webhook, notifications, apple-iap"
     }
 }
 
