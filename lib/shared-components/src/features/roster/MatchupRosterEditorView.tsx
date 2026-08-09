@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
 import {
   Button,
   Card,
@@ -93,7 +94,9 @@ export interface MatchupRosterEditorViewProps {
  *
  * Manages local selection state and delegates data mutations to the caller via
  * `onSwapPositions` and `onMoveToPosition` callbacks. Intentionally contains no
- * GraphQL or platform-specific imports so it can be used on both web and mobile.
+ * GraphQL imports so it can be used on both web and mobile — the one
+ * `Platform.OS` check below exists solely to keep the Playwright-testid `<div>`
+ * wrapper (LS-4133, LS-4215) out of the native render tree (LS-9163).
  */
 export function MatchupRosterEditorView({
   players,
@@ -398,136 +401,144 @@ export function MatchupRosterEditorView({
     const rowTestId = `matchup-player-row-${player.id}`;
     // Tamagui drops `data-testid` on animated XStack with onPress in Chromium
     // (LS-4133, LS-4215). A plain div wrapper guarantees the attribute reaches
-    // the real DOM and gives Playwright a clickable bounding box.
-    // `testID` stays on XStack for native mobile.
-    return (
-      <div key={player.id} data-testid={rowTestId}>
-        <XStack
-          testID={rowTestId}
-          paddingVertical="$2.5"
-          paddingHorizontal="$3"
-          backgroundColor={
-            !locked && isSelected
+    // the real DOM and gives Playwright a clickable bounding box. RN has no
+    // view config for a lowercase `div` host tag, so the wrapper must stay
+    // web-only — native gets the bare XStack with `testID` (LS-9163).
+    const row = (
+      <XStack
+        key={Platform.OS === 'web' ? undefined : player.id}
+        testID={rowTestId}
+        paddingVertical="$2.5"
+        paddingHorizontal="$3"
+        backgroundColor={
+          !locked && isSelected
+            ? '$surfaceInteractive'
+            : !locked && isSwapTarget && !isIneligibleSwapTarget
               ? '$surfaceInteractive'
-              : !locked && isSwapTarget && !isIneligibleSwapTarget
-                ? '$surfaceInteractive'
-                : undefined
-          }
-          borderWidth={!locked && isSelected ? 2 : 0}
-          borderColor={!locked && isSelected ? '$brandNavyLight' : undefined}
-          borderRadius="$3"
-          opacity={isIneligibleSwapTarget ? 0.45 : undefined}
-          hoverStyle={
-            locked || isIneligibleSwapTarget
-              ? undefined
-              : {
-                  backgroundColor: isSwapTarget
-                    ? '$surfaceInteractive'
-                    : '$gray3',
-                  cursor: 'pointer',
-                }
-          }
-          pressStyle={
-            locked || isIneligibleSwapTarget ? undefined : { scale: 0.99 }
-          }
-          animation="quick"
-          onPress={locked ? undefined : () => handlePlayerClick(player)}
-          alignItems="center"
-          gap="$2"
-        >
-          {/* Position badge */}
-          <PositionBadge
-            position={posType ?? 'BN'}
-            shape="circle"
-            backgroundColor={badge.bg}
-            textColor={badge.text}
-            fontSize="$2"
-            fontWeight="800"
-          />
+              : undefined
+        }
+        borderWidth={!locked && isSelected ? 2 : 0}
+        borderColor={!locked && isSelected ? '$brandNavyLight' : undefined}
+        borderRadius="$3"
+        opacity={isIneligibleSwapTarget ? 0.45 : undefined}
+        hoverStyle={
+          locked || isIneligibleSwapTarget
+            ? undefined
+            : {
+                backgroundColor: isSwapTarget
+                  ? '$surfaceInteractive'
+                  : '$gray3',
+                cursor: 'pointer',
+              }
+        }
+        pressStyle={
+          locked || isIneligibleSwapTarget ? undefined : { scale: 0.99 }
+        }
+        animation="quick"
+        onPress={locked ? undefined : () => handlePlayerClick(player)}
+        alignItems="center"
+        gap="$2"
+      >
+        {/* Position badge */}
+        <PositionBadge
+          position={posType ?? 'BN'}
+          shape="circle"
+          backgroundColor={badge.bg}
+          textColor={badge.text}
+          fontSize="$2"
+          fontWeight="800"
+        />
 
-          {/* Player info */}
-          <YStack flex={1} minWidth={0}>
-            <Text
-              fontSize="$3"
-              fontWeight="600"
-              color={isSelected ? '$yellow10' : '$gray12'}
-              numberOfLines={1}
-            >
-              {playerName || '—'}
-            </Text>
-            <Text fontSize="$1" color="$gray10" numberOfLines={1}>
-              {player.player?.eligiblePositions?.join(', ') ?? ''}
-              {player.season ? ` • Season ${player.season}` : ''}
-            </Text>
-          </YStack>
+        {/* Player info */}
+        <YStack flex={1} minWidth={0}>
+          <Text
+            fontSize="$3"
+            fontWeight="600"
+            color={isSelected ? '$yellow10' : '$gray12'}
+            numberOfLines={1}
+          >
+            {playerName || '—'}
+          </Text>
+          <Text fontSize="$1" color="$gray10" numberOfLines={1}>
+            {player.player?.eligiblePositions?.join(', ') ?? ''}
+            {player.season ? ` • Season ${player.season}` : ''}
+          </Text>
+        </YStack>
 
-          {/* Actions — shown only when this card is selected */}
-          {!locked && isSelected && section === 'starter' && (
-            <Button
-              size="$2"
-              theme="red"
-              data-testid={`roster-bench-${player.id}`}
-              onPress={(e: { stopPropagation: () => void }) => {
-                e.stopPropagation();
-                handleMoveToBench(player);
-              }}
-              disabled={mutating}
-            >
-              Bench
-            </Button>
+        {/* Actions — shown only when this card is selected */}
+        {!locked && isSelected && section === 'starter' && (
+          <Button
+            size="$2"
+            theme="red"
+            data-testid={`roster-bench-${player.id}`}
+            onPress={(e: { stopPropagation: () => void }) => {
+              e.stopPropagation();
+              handleMoveToBench(player);
+            }}
+            disabled={mutating}
+          >
+            Bench
+          </Button>
+        )}
+
+        {!locked &&
+          isSelected &&
+          section === 'bench' &&
+          positionOptions.length > 0 && (
+            <XStack gap="$1" flexWrap="wrap" maxWidth={200}>
+              {positionOptions.map((opt) => {
+                const eligible = isEligibleForSlot(
+                  player.player?.eligiblePositions ?? null,
+                  opt.type,
+                );
+                return (
+                  <Button
+                    key={opt.id}
+                    size="$2"
+                    backgroundColor={eligible ? '$brandNavyLight' : '$gray5'}
+                    color="white"
+                    data-testid={`roster-assign-${player.id}-${opt.id}`}
+                    opacity={eligible ? 1 : 0.5}
+                    pressStyle={
+                      eligible
+                        ? { backgroundColor: '$brandNavyDark' }
+                        : undefined
+                    }
+                    hoverStyle={
+                      eligible ? { backgroundColor: '$brandNavy' } : undefined
+                    }
+                    onPress={(e: { stopPropagation: () => void }) => {
+                      e.stopPropagation();
+                      handleAssignPosition(player, opt.id, opt.type);
+                    }}
+                    disabled={mutating || !eligible}
+                  >
+                    {opt.type}
+                  </Button>
+                );
+              })}
+            </XStack>
           )}
 
-          {!locked &&
-            isSelected &&
-            section === 'bench' &&
-            positionOptions.length > 0 && (
-              <XStack gap="$1" flexWrap="wrap" maxWidth={200}>
-                {positionOptions.map((opt) => {
-                  const eligible = isEligibleForSlot(
-                    player.player?.eligiblePositions ?? null,
-                    opt.type,
-                  );
-                  return (
-                    <Button
-                      key={opt.id}
-                      size="$2"
-                      backgroundColor={eligible ? '$brandNavyLight' : '$gray5'}
-                      color="white"
-                      data-testid={`roster-assign-${player.id}-${opt.id}`}
-                      opacity={eligible ? 1 : 0.5}
-                      pressStyle={
-                        eligible
-                          ? { backgroundColor: '$brandNavyDark' }
-                          : undefined
-                      }
-                      hoverStyle={
-                        eligible ? { backgroundColor: '$brandNavy' } : undefined
-                      }
-                      onPress={(e: { stopPropagation: () => void }) => {
-                        e.stopPropagation();
-                        handleAssignPosition(player, opt.id, opt.type);
-                      }}
-                      disabled={mutating || !eligible}
-                    >
-                      {opt.type}
-                    </Button>
-                  );
-                })}
-              </XStack>
-            )}
+        {!locked && isSwapTarget && !isIneligibleSwapTarget && (
+          <Text fontSize="$1" color="$yellow10" fontWeight="600">
+            Tap to swap
+          </Text>
+        )}
+        {!locked && isIneligibleSwapTarget && (
+          <Text fontSize="$1" color="$red10" fontWeight="600">
+            Not eligible
+          </Text>
+        )}
+      </XStack>
+    );
 
-          {!locked && isSwapTarget && !isIneligibleSwapTarget && (
-            <Text fontSize="$1" color="$yellow10" fontWeight="600">
-              Tap to swap
-            </Text>
-          )}
-          {!locked && isIneligibleSwapTarget && (
-            <Text fontSize="$1" color="$red10" fontWeight="600">
-              Not eligible
-            </Text>
-          )}
-        </XStack>
+    return Platform.OS === 'web' ? (
+      <div key={player.id} data-testid={rowTestId}>
+        {row}
       </div>
+    ) : (
+      row
     );
   };
 

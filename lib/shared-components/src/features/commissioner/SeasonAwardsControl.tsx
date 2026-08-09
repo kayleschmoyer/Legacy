@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   H4,
+  Input,
   Separator,
   Spinner,
   Text,
@@ -28,6 +29,7 @@ import {
   useOpenAwardVotingMutation,
   useUpsertLeagueSeasonAwardMutation,
 } from '@legacy-sports/graphql';
+import { Checkbox } from '../../components/ToggleControls';
 import { Select } from '../../components/Select';
 import {
   BRAND_GOLD,
@@ -134,29 +136,26 @@ function PlayerSearchInput({
         paddingHorizontal="$2"
         opacity={disabled ? 0.5 : 1}
       >
-        <input
+        <Input
+          unstyled
+          flex={1}
           disabled={disabled}
           value={value && !open ? value : query}
-          onChange={(e) => {
-            setQuery(e.target.value);
+          onChangeText={(text: string) => {
+            setQuery(text);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
           onBlur={handleBlur}
           placeholder="Search for a player…"
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: 'none',
-            outline: 'none',
-            color: 'inherit',
-            fontSize: 13,
-            padding: '8px 6px',
-            fontFamily: 'inherit',
-            width: '100%',
-          }}
-          aria-label="Search for award recipient"
           aria-autocomplete="list"
+          backgroundColor="transparent"
+          borderWidth={0}
+          color="$color"
+          fontSize={13}
+          paddingVertical={8}
+          paddingHorizontal={6}
+          aria-label="Search for award recipient"
         />
         {loading && <Spinner size="small" color={BRAND_NAVY_LIGHT} />}
       </XStack>
@@ -659,12 +658,12 @@ export function SeasonAwardsControl({
                         cursor="pointer"
                         onPress={() => toggleAwardType(meta.key)}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={selectedAwardTypes.has(meta.key)}
-                          onChange={() => toggleAwardType(meta.key)}
-                          onClick={(event) => event.stopPropagation()}
-                          style={{ cursor: 'pointer' }}
+                          onCheckedChange={() => toggleAwardType(meta.key)}
+                          onPress={(event: { stopPropagation: () => void }) =>
+                            event.stopPropagation()
+                          }
                           aria-label={`Include ${meta.label} in vote`}
                         />
                         <Text fontSize="$2" color="$color">
