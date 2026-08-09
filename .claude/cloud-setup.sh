@@ -85,6 +85,20 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Skip puppeteer's Chrome download (sandboxed/offline cloud environment)
+# ---------------------------------------------------------------------------
+# Mirrors the PLAYWRIGHT_BROWSERS_PATH / PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+# vars already set for the pre-installed browser (see AGENTS.md "Pre-installed
+# browser"). Without this, puppeteer's postinstall tries to download Chrome
+# and fails in this sandboxed/offline environment, breaking `pnpm install`
+# (and anything that shells out to it, e.g. scripts/modules-pool/link.mjs's
+# repair path) with "Set PUPPETEER_SKIP_DOWNLOAD env variable to skip
+# download" (LS-8982). Exported (this script is sourced) so it's in effect
+# for the rest of the session, not just this script's own pnpm install calls.
+export PUPPETEER_SKIP_DOWNLOAD=1
+export PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1
+
+# ---------------------------------------------------------------------------
 # Install Node.js dependencies
 # ---------------------------------------------------------------------------
 # Required for `make pc` (lint, typecheck, test, build) on code changes.
