@@ -13,10 +13,12 @@ import {
   YStack,
 } from 'tamagui';
 import { ChevronDown, RefreshCw, Search } from '@tamagui/lucide-icons';
-import { PlayerCard } from './PlayerCard';
+import { formatBaseballCardSubStats, PlayerFeedCard } from './cardFeed';
 import { PlayerListRow } from './PlayerListRow';
 import { PlayersStatsTable } from './PlayersStatsTable';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
+import { fullName } from './playerNameUtils';
+import { formatProjection } from './usePlayerProjections';
 // `PlayersViewMode` lives in PlayersScreen (LS-4656). Type-only import keeps
 // this leaf component free of the runtime cycle PlayersScreen → PlayersGrid.
 import type { PlayersViewMode } from './PlayersScreen';
@@ -214,7 +216,6 @@ function PlayersGrid({
           header and controls, smaller refresh control. Matches the inline
           <style> responsive pattern used elsewhere in this feature. */}
       <style>{`
-        .pg-card-cell { width: 280px; min-width: 280px; max-width: 400px; }
         /* List view rounded ends + collapsed inner borders (LS-4650).
            Mirrors the design's .pp-list-row first/last-child rules so
            consecutive rows share a single hair-line edge. */
@@ -225,7 +226,6 @@ function PlayersGrid({
           .pg-root { padding: 12px !important; }
           .pg-head { flex-wrap: wrap; gap: 8px; }
           .pg-head-title { font-size: 24px !important; }
-          .pg-card-cell { width: 100% !important; min-width: 0 !important; max-width: 100% !important; }
           .pg-controls > * { flex: 1 1 100% !important; min-width: 0 !important; }
           /* Drop the trailing stat cells on phone widths — matches the
              design's hide-sm rule at the small-tablet breakpoint. */
@@ -353,26 +353,41 @@ function PlayersGrid({
               ))}
             </YStack>
           ) : (
-            <YStack
-              flexDirection="row"
-              flexWrap="wrap"
-              gap="$3"
-              jc="flex-start"
-            >
+            <YStack flexDirection="column" gap="$2">
               {filteredPlayers.map((player) => {
                 const projection = player.id
                   ? projectedPoints?.get(player.id)
                   : undefined;
+                const careerBatting = player.careerBatting;
 
                 return (
-                  <YStack key={player.id} className="pg-card-cell">
-                    <PlayerCard
-                      player={player}
-                      onPlayerClick={onPlayerSelect}
-                      projectedPoints={projection}
-                      showProjection={showProjections}
-                    />
-                  </YStack>
+                  <PlayerFeedCard
+                    key={player.id}
+                    sport="baseball"
+                    // The base Player fragment carries no position field
+                    // (LS-9073 re-points this view at the stats-page data
+                    // source, which does) — 'UT' matches the same fallback
+                    // the native card feed screen uses for baseball players
+                    // with no primaryPosition.
+                    position="UT"
+                    name={fullName(player)}
+                    subStats={formatBaseballCardSubStats({
+                      homeRuns: careerBatting?.homeRuns ?? 0,
+                      rbi: careerBatting?.rbi ?? 0,
+                      battingAverage: careerBatting?.battingAverage ?? 0,
+                    })}
+                    // No career-FPTS field on this fragment yet — LS-9073
+                    // owns wiring the richer data source that has one.
+                    fpts="—"
+                    trend="flat"
+                    onPress={() => onPlayerSelect?.(player)}
+                    projection={
+                      showProjections && projection !== undefined
+                        ? `${formatProjection(projection)} pts/g`
+                        : undefined
+                    }
+                    testID={`player-feed-card-${player.id}`}
+                  />
                 );
               })}
             </YStack>

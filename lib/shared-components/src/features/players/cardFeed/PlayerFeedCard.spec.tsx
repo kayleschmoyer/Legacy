@@ -38,6 +38,18 @@ describe('PlayerFeedCard', () => {
     expect(props.onPress).toHaveBeenCalledTimes(1);
   });
 
+  test('does not render a projection line when omitted', () => {
+    render(<PlayerFeedCard {...makeProps()} />);
+
+    expect(screen.queryByText(/pts\/g/)).not.toBeInTheDocument();
+  });
+
+  test('renders the projection line when provided (LS-9072)', () => {
+    render(<PlayerFeedCard {...makeProps()} projection="24.3 pts/g" />);
+
+    expect(screen.getByText('24.3 pts/g')).toBeInTheDocument();
+  });
+
   test('renders a football card sub-stat line', () => {
     render(
       <PlayerFeedCard

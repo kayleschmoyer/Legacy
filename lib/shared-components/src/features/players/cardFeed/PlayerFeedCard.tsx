@@ -3,6 +3,7 @@ import { Text, XStack, YStack } from 'tamagui';
 import { PositionBadge } from '../../../components/PositionBadge';
 import {
   BG_DARK,
+  BRAND_GOLD_LIGHT,
   getPositionColor,
   lightenForContrast,
   STATS_BORDER,
@@ -27,6 +28,13 @@ export interface PlayerFeedCardProps {
   fpts: string;
   onPress: () => void;
   testID?: string;
+  /**
+   * Pre-formatted projected fantasy points (e.g. "24.3 pts/g") — folded in
+   * from the legacy `PlayerCard`'s projection footer (LS-9072). Optional and
+   * omitted by every current caller of this card; renders nothing when unset
+   * so the design handoff's card geometry is unaffected.
+   */
+  projection?: string;
 }
 
 /**
@@ -44,6 +52,7 @@ export function PlayerFeedCard({
   fpts,
   onPress,
   testID = 'player-feed-card',
+  projection,
 }: PlayerFeedCardProps) {
   const positionColor = getPositionColor(sport, position);
   const labelColor = lightenForContrast(positionColor, BG_DARK);
@@ -115,6 +124,16 @@ export function PlayerFeedCard({
         <Text fontFamily={FONT_MONO} fontSize={11} color={TEXT_TERTIARY}>
           FPTS
         </Text>
+        {projection && (
+          <Text
+            fontFamily={FONT_MONO}
+            fontSize={10}
+            color={BRAND_GOLD_LIGHT}
+            marginTop={2}
+          >
+            {projection}
+          </Text>
+        )}
       </YStack>
     </XStack>
   );

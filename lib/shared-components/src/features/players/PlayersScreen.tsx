@@ -5,6 +5,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { PlayersGrid, type PlayersGridResultStats } from './PlayersGrid';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 import { fullName, initialsOf } from './playerNameUtils';
+import { PlayerFeedSkeleton } from './cardFeed';
 import { Platform } from '../../platform-components';
 import {
   BG_DARK,
@@ -13,7 +14,6 @@ import {
   BRAND_NAVY,
   BRAND_SEAM_RED,
   OUTLINE_SUBTLE,
-  OVERLAY_WHITE_05,
   POS_CATCHER,
   POS_INFIELD,
   POS_OUTFIELD,
@@ -513,11 +513,6 @@ function PlayersScreen({
           }
           @media (prefers-reduced-motion: reduce) {
             .pp-sk-bar { animation: none; background: rgba(255,255,255,0.08); }
-          }
-          .pp-sk-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 16px;
           }
           .pp-filters { display: flex; flex-direction: column; gap: 14px; }
           .pp-search-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -1529,36 +1524,6 @@ function SkeletonBar({ width, height = 12, radius = 4 }: SkeletonBarProps) {
   );
 }
 
-/** Card-shaped skeleton matching the populated PlayerCard footprint. */
-function CardSkeleton() {
-  return (
-    <YStack
-      style={{
-        padding: 18,
-        background: SURFACE_CARD,
-        border: `1px solid ${OVERLAY_WHITE_05}`,
-        borderRadius: 14,
-        gap: 12,
-        minHeight: 198,
-      }}
-    >
-      <XStack alignItems="center" style={{ gap: 12 }}>
-        <SkeletonBar width={48} height={48} radius="50%" />
-        <YStack style={{ flex: 1, gap: 6 }}>
-          <SkeletonBar width="70%" height={18} />
-          <SkeletonBar width="45%" height={12} />
-        </YStack>
-        <SkeletonBar width={30} height={18} />
-      </XStack>
-      <SkeletonBar width="100%" height={54} radius={6} />
-      <XStack justifyContent="space-between" alignItems="center">
-        <SkeletonBar width="40%" height={12} />
-        <SkeletonBar width={80} height={18} radius={9999} />
-      </XStack>
-    </YStack>
-  );
-}
-
 interface LoadingSkeletonProps {
   viewMode: PlayersViewMode;
 }
@@ -1633,22 +1598,9 @@ function LoadingSkeleton({ viewMode }: LoadingSkeletonProps) {
     );
   }
 
-  // cards (default)
-  return (
-    <YStack
-      testID="players-loading-skeleton"
-      role="presentation"
-      aria-hidden={true}
-      className={Platform.OS === 'web' ? 'pp-sk-grid' : undefined}
-      style={
-        Platform.OS === 'web' ? undefined : { gap: 16, flexDirection: 'column' }
-      }
-    >
-      {Array.from({ length: 8 }).map((_, i) => (
-        <CardSkeleton key={i} />
-      ))}
-    </YStack>
-  );
+  // cards (default) — reuses the card feed's own skeleton (LS-9072) so the
+  // loading geometry matches the now-shared PlayerFeedCard row shape.
+  return <PlayerFeedSkeleton testID="players-loading-skeleton" />;
 }
 
 interface ErrorStateProps {

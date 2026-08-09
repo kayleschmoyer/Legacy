@@ -1,6 +1,5 @@
 // Players feature exports
 export { FreeAgents } from './FreeAgents';
-export { PlayerCard } from './PlayerCard';
 export { PlayerDetail, PlayerDetailById } from './PlayerDetail';
 export { PlayerRow } from './PlayerRow';
 export { PlayersGrid } from './PlayersGrid';
@@ -90,7 +89,6 @@ export * from './PlayersApi';
 export type { PlayerRowData, PlayerRowProps } from './PlayerRow';
 export type { PlayersGridProps } from './PlayersGrid';
 export type { PlayersTableProps } from './PlayersTable';
-export type { PlayerCardProps } from './PlayerCard';
 export type {
   PlayersScreenProps,
   PlayersShellState,

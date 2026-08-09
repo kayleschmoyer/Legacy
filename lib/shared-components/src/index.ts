@@ -113,7 +113,6 @@ export * from './features/home/HomeScreen';
 export * from './features/players/PlayerRow';
 export * from './features/players/PlayerDetail';
 export * from './features/players/PlayersApi';
-export * from './features/players/PlayerCard';
 export * from './features/players/PlayersGrid';
 export * from './features/players/PlayersScreen';
 
@@ -262,7 +261,8 @@ export type {
 } from './components/NotificationBell';
 export { NavBar } from './components/NavBar';
 export type { NavBarProps, NavLink } from './components/NavBar';
-// Aliased to avoid collision with the legacy PlayerCard in features/players.
+// Aliased for historical reasons (formerly collided with the now-deleted
+// features/players/PlayerCard — LS-9072 converged that one onto PlayerFeedCard).
 export { PlayerCard as DSPlayerCard } from './components/PlayerCard';
 export type { PlayerCardProps as DSPlayerCardProps } from './components/PlayerCard';
 export { PositionBadge } from './components/PositionBadge';
