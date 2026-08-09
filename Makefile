@@ -950,6 +950,10 @@ _PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
 # "Fatal process out of memory: Zone" + "spawn UNKNOWN" in jest-worker — that
 # signature means retry with `make pc-test MAXWORKERS=2` (or `make test
 # MAXWORKERS=2`), not that the changes under test regressed (LS-8666).
+# apps/web-e2e's test target isn't Jest (a `tsx --test` wrapper via
+# run-unit-tests.mjs) but receives the same `--maxWorkers=N` passthrough
+# uniformly; the wrapper translates it to Node's `--test-concurrency=N`
+# instead of rejecting it, so it stays compatible with this flag (LS-9115).
 _PC_TEST_CMD = pnpm exec nx affected -t test --base=$(NX_BASE) $(if $(MAXWORKERS),-- --maxWorkers=$(MAXWORKERS),)
 _PC_BUILD_CMD = pnpm exec nx affected -t build --base=$(NX_BASE)
 

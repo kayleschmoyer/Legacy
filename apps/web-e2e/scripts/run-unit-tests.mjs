@@ -22,8 +22,14 @@
  * a node test runner flag, so it is consumed here: it only controls the
  * empty-match exit code. All other CLI args are forwarded to tsx untouched.
  *
+ * `make pc-test`/`make test` also accept a `MAXWORKERS=N` OOM workaround
+ * (LS-8666) that the Makefile forwards uniformly to every affected project
+ * as a Jest `--maxWorkers=N` flag. web-e2e isn't Jest — Node's `--test`
+ * runner has no `--maxWorkers` flag and rejects it outright — so it's
+ * translated here to the equivalent `--test-concurrency=N` (LS-9115).
+ *
  * Usage:
- *   node apps/web-e2e/scripts/run-unit-tests.mjs [--passWithNoTests[=true|false]] [tsx args...]
+ *   node apps/web-e2e/scripts/run-unit-tests.mjs [--passWithNoTests[=true|false]] [--maxWorkers=N] [tsx args...]
  *
  * Exit code: the tsx --test exit code; 1 if no test files matched (0 when
  * --passWithNoTests=true).
@@ -42,7 +48,26 @@ const rawArgs = process.argv.slice(2);
 const passWithNoTests = rawArgs.some(
   (a) => a === '--passWithNoTests' || a === '--passWithNoTests=true',
 );
-const forwardedArgs = rawArgs.filter((a) => !a.startsWith('--passWithNoTests'));
+
+let maxWorkers;
+const forwardedArgs = [];
+for (let i = 0; i < rawArgs.length; i += 1) {
+  const arg = rawArgs[i];
+  if (arg.startsWith('--passWithNoTests')) continue;
+  if (arg.startsWith('--maxWorkers=')) {
+    maxWorkers = arg.slice('--maxWorkers='.length);
+    continue;
+  }
+  if (arg === '--maxWorkers') {
+    maxWorkers = rawArgs[i + 1];
+    i += 1;
+    continue;
+  }
+  forwardedArgs.push(arg);
+}
+if (maxWorkers) {
+  forwardedArgs.push(`--test-concurrency=${maxWorkers}`);
+}
 
 const testFiles = readdirSync(srcRoot, { recursive: true })
   .map((entry) => String(entry))
