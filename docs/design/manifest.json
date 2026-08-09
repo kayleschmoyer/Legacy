@@ -28,9 +28,10 @@
       "title": "Legacy Baseball Minigames",
       "slug": "legacy-baseball-minigames",
       "status": "active",
-      "lastSyncedHash": "c1341835cd8eedaa43731ae7d7fd81e3edab70c42abdffd4e1418e62b1e0e3e6",
-      "lastSyncedAt": "2026-08-06T18:38:59.295Z",
-      "jiraKey": "LS-9018"
+      "lastSyncedHash": "sha256-61c6636f87cb8204d296c083825469f69ed47afd0a2cf555c083b21d602550f9",
+      "lastSyncedAt": "2026-08-09T05:50:35.000Z",
+      "jiraKey": "LS-9082",
+      "source": "repo-direct-pending-push"
     },
     {
       "id": "4k4RdTqqAbEop0ZqmEDuOg",

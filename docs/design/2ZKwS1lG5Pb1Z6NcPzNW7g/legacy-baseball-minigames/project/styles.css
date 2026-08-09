@@ -180,6 +180,10 @@ a { color: inherit; }
 .card-panel { background: var(--surface-panel); }
 
 /* ─────────────── PAGE SHELL ─────────────── */
+/* BREAKPOINTS: xl (1120) and xxl (1280) share this layout — .page/.appbar-inner cap
+   at max-width:1280px, so xl (1120–1279px) keeps growing edge-to-edge while xxl
+   (1280px+) is fully designed at the cap: content centers with growing side margins
+   and no further reflow. Preview both explicitly via the breakpoint toggle below. */
 .page { max-width: 1280px; margin: 0 auto; padding: 32px 20px 80px; }
 .page-head {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -289,4 +293,46 @@ a { color: inherit; }
   .state-switcher { width: 100%; }
   .state-error-card { flex-direction: column; align-items: flex-start; }
   .state-empty-card { padding: 40px 20px; }
+}
+
+/* ─────────────── BREAKPOINT PREVIEW TOGGLE (design-review aid, not production UI) ─────────────── */
+/* COMPONENT: breakpoint-toggle — pins every screen to one of the seven canonical band
+   widths (or "Fluid") so a reviewer can inspect each band individually, including the
+   two that always need a fully designed frame: xxs (375px) and xxl (1280px). Mirrors
+   the visual language of .state-switcher above; not part of the shipped app. */
+.bp-toggle {
+  position: fixed; right: 16px; bottom: 16px; z-index: 40;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  max-width: calc(100vw - 32px);
+  padding: 8px 14px; background: var(--surface-card);
+  border: 1px dashed var(--outline-default); border-radius: 9999px;
+  box-shadow: var(--shadow-lg);
+}
+.bp-toggle-label {
+  font-family: var(--font-display); font-weight: 700; font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--fg4);
+}
+.bp-toggle .toggle-group { flex-wrap: wrap; padding: 2px; }
+.bp-toggle .toggle-group button { padding: 5px 10px; font-size: 10px; min-height: 26px; }
+
+/* BREAKPOINTS: below xs (660), the toggle drops to full width and wraps under the app
+   bar so it never overlaps content on the xxs (375px) frame. */
+@media (max-width: 660px) {
+  .bp-toggle { left: 16px; right: 16px; justify-content: center; }
+}
+
+.viewport-frame-outer {
+  overflow-x: auto; padding: 24px 0 96px;
+  display: flex; justify-content: center;
+}
+.viewport-frame-outer .app-root {
+  border: 1px solid var(--outline-strong);
+  border-radius: var(--radius-4);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+.viewport-frame-label {
+  font-family: var(--font-display); font-weight: 700; font-size: 11px;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--fg4);
+  text-align: center; padding: 8px 0 0;
 }

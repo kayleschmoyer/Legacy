@@ -144,7 +144,8 @@
 .sdg-hist-meta { font-family: var(--font-body); font-size: 11px; color: var(--fg3); }
 .sdg-hist-val { font-family: var(--font-display); font-weight: 800; font-size: 13px; color: var(--brand-gold-light); font-variant-numeric: tabular-nums; }
 
-/* BREAKPOINTS: reflow at the canonical lg (980) / sm (800) / xs (660) thresholds — see docs/design brief */
+/* BREAKPOINTS: reflow at the canonical xl (1120) / sm (800) / xs (660) thresholds — see docs/design brief.
+   lg (980) shares the xl (1120) layout below — no reflow occurs between the two. */
 @media (max-width: 1120px) {
   .sdg-grid { grid-template-columns: 1fr; }
   .sdg-rosters { grid-template-columns: 1fr; }

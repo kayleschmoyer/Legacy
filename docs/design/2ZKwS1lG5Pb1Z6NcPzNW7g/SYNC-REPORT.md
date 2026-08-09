@@ -1,11 +1,57 @@
 # Sync report: Legacy Baseball Minigames
 
 **Design ID**: `2ZKwS1lG5Pb1Z6NcPzNW7g`
-**Source**: `designsync-local` (projectId `f1c2ee9f-859c-4136-bb9f-7d6fe6a2c832`)
-**Synced at**: 2026-08-06T18:38:59.295Z
-**Bundle hash**: `c1341835cd8eedaa43731ae7d7fd81e3edab70c42abdffd4e1418e62b1e0e3e6`
+**Source**: `repo-direct-pending-push` (projectId `f1c2ee9f-859c-4136-bb9f-7d6fe6a2c832`)
+**Synced at**: 2026-08-09T05:50:35.000Z
+**Bundle hash**: `sha256-61c6636f87cb8204d296c083825469f69ed47afd0a2cf555c083b21d602550f9`
 **Files**: 67
-**Sync ticket**: LS-9018 (state switcher + loading skeletons, follow-up to LS-8959)
+**Sync ticket**: LS-9082 (breakpoint coverage fix, follow-up to LS-9024's bundle audit)
+
+## ⚠️ Deviation from the standard design-source-fix flow
+
+Per `.agents/skills/design-sync/references/designsync-tool.md`, a design defect is
+normally fixed **at the source** in Claude Design (`DesignSync` write flow) and then
+pulled back so the repo and the source stay in step. This session is a Claude Code
+Remote (cloud) session; `DesignSync.get_project` returned:
+
+> "DesignSync needs design-system authorization, but /design-login requires an
+> interactive terminal and is not available in this environment."
+
+`DesignSync` is documented as local-only (needs an interactive `/design-login`), so
+neither a source fix+pull nor a repo fix+`/push-design` was possible here. Per the
+skill's second fix path ("fix in the repo bundle and `/push-design` it up so Claude
+Design stays in step"), this pass applied the fix **directly to the repo bundle**
+and stops short of the push half — `source: "repo-direct-pending-push"` in
+`manifest.json` flags that the Claude Design project at
+`f1c2ee9f-859c-4136-bb9f-7d6fe6a2c832` is now **stale relative to this bundle**.
+
+**Follow-up required**: from a local session, run `/push-design 2ZKwS1lG5Pb1Z6NcPzNW7g`
+(or `/push-design f1c2ee9f-859c-4136-bb9f-7d6fe6a2c832`) to push this bundle's
+`project/` files up to Claude Design, then `/pull-design` to close the loop and clear
+the `repo-direct-pending-push` marker. Until then, do not run `/pull-design` against
+this project — it would overwrite this fix with the still-stale source.
+
+## What changed in this pass (LS-9082)
+
+- **`Legacy Minigames.html`**: added a `BreakpointToggle` component (button-tab
+  control, same visual language as the state switcher) that pins the whole app
+  shell — every screen — to one of the seven canonical breakpoint widths, or back
+  to "Fluid". Selecting a width wraps the shell in a bordered `.viewport-frame-outer`
+  frame so a reviewer can inspect any band, including the two PROMPT.md always
+  requires a fully designed frame for: xxs (375px) and xxl (1280px). Rewrote the
+  `<!-- HANDOFF -->` block with a full seven-band coverage map (which stylesheet or
+  annotation claims each band).
+- **`styles.css`**: added `.bp-toggle` / `.viewport-frame-outer` / `.viewport-frame-label`
+  rules for the new toggle; added an explicit `BREAKPOINTS` annotation on `.page`
+  documenting that xl (1120) and xxl (1280) share the max-width:1280 cap — xxl was
+  previously unclaimed by any annotation.
+- **`styles-game.css`**: fixed a mislabeled `BREAKPOINTS` comment — a `max-width:
+  1120px` query was annotated "lg (980)" instead of "xl (1120)" (the threshold was
+  already correct; only the band name was wrong). Added a note that lg (980) shares
+  the xl (1120) layout there.
+
+No other files changed — LS-9018's state-switcher/skeleton pass and LS-8959's
+mechanical breakpoint-snap pass are untouched.
 
 ## What changed vs. previous hash (`178a15e9c541...`)
 

@@ -34,6 +34,31 @@
   switcher, since PROMPT.md's requirement is that every condition the
   reference doc defines is shown somewhere in the mockup, not that every
   control lives in one bar.
+
+  Breakpoint coverage pass (LS-9082, follow-up to LS-9024's bundle audit):
+  the mockup was a single fluid page with no dedicated xxs/xxl frames and no
+  way to inspect a specific band without resizing the real browser window.
+  Added a "Preview" breakpoint toggle (bottom-right on every screen, see
+  BreakpointToggle below) that pins the whole app shell to one of the seven
+  canonical band widths — including the two PROMPT.md always requires a
+  fully designed frame for, xxs (375px) and xxl (1280px) — or back to
+  Fluid. All seven bands are now each claimed by exactly one designed
+  layout or an explicit BREAKPOINTS annotation:
+    xxs (0-659)   -> default mobile layout, styles.css general tweak
+    xs  (660)     -> shared xs media queries: styles.css, styles-hub.css,
+                     styles-disclosure.css, styles-game.css,
+                     styles-create.css, styles-join.css, styles-lobby.css
+    sm  (800)     -> styles-game.css
+    md  (860)     -> styles-create.css
+    lg  (980)     -> styles-hub.css, styles-disclosure.css; shares the
+                     xl (1120) layout in styles-game.css (no reflow between
+                     the two there)
+    xl  (1120)    -> styles-game.css
+    xxl (1280)    -> styles.css .page/.appbar-inner max-width cap; shares
+                     the xl layout, content centers with growing margins
+  Also fixed a mislabeled BREAKPOINTS comment in styles-game.css (a 1120px
+  query was annotated "lg (980)" instead of "xl (1120)" — the threshold
+  was already correct, only the band name was wrong).
 -->
 <html lang="en">
 <head>
@@ -79,6 +104,44 @@ const ROUTES = {
   'draft-game': { label: 'Live Draft', crumbs: ['Minigames', 'Season Draft'] },
 };
 
+/* BREAKPOINTS: the seven canonical bands (lib/design-tokens/src/lib/breakpoints.ts) as
+   selectable preview widths — every screen renders inside the chosen frame so a reviewer
+   can inspect any band on demand. xxs (375) and xxl (1280) are the two bands PROMPT.md
+   requires a fully designed frame for; the rest are covered by @media reflow (see the
+   BREAKPOINTS comments in styles*.css) but are just as inspectable here. */
+const BREAKPOINT_FRAMES = [
+  { key: 'xxs', width: 375, label: 'XXS · 375' },
+  { key: 'xs', width: 660, label: 'XS · 660' },
+  { key: 'sm', width: 800, label: 'SM · 800' },
+  { key: 'md', width: 860, label: 'MD · 860' },
+  { key: 'lg', width: 980, label: 'LG · 980' },
+  { key: 'xl', width: 1120, label: 'XL · 1120' },
+  { key: 'xxl', width: 1280, label: 'XXL · 1280' },
+];
+
+const BreakpointToggle = ({ frameWidth, onChange }) => (
+  <div className="bp-toggle" role="group" aria-label="Breakpoint preview width">
+    <span className="bp-toggle-label">Preview</span>
+    <div className="toggle-group">
+      <button
+        type="button"
+        className={frameWidth === null ? 'on' : ''}
+        aria-pressed={frameWidth === null}
+        onClick={() => onChange(null)}
+      >Fluid</button>
+      {BREAKPOINT_FRAMES.map((f) => (
+        <button
+          key={f.key}
+          type="button"
+          className={frameWidth === f.width ? 'on' : ''}
+          aria-pressed={frameWidth === f.width}
+          onClick={() => onChange(f.width)}
+        >{f.label}</button>
+      ))}
+    </div>
+  </div>
+);
+
 const AppBar = ({ route, onHome, onCrumb }) => {
   const meta = ROUTES[route] || ROUTES.hub;
   return (
@@ -112,6 +175,7 @@ const App = () => {
     const hash = window.location.hash.replace('#', '');
     return ROUTES[hash] ? hash : 'hub';
   });
+  const [frameWidth, setFrameWidth] = React.useState(null);
 
   React.useEffect(() => {
     window.location.hash = route;
@@ -148,11 +212,27 @@ const App = () => {
       }}/>;
   }
 
-  return (
+  const shell = (
     <div className="app-root">
       <AppBar route={route} onHome={home} onCrumb={() => home()}/>
       {page}
     </div>
+  );
+
+  const frame = BREAKPOINT_FRAMES.find((f) => f.width === frameWidth);
+
+  return (
+    <React.Fragment>
+      <BreakpointToggle frameWidth={frameWidth} onChange={setFrameWidth}/>
+      {frameWidth === null ? shell : (
+        <div className="viewport-frame-outer">
+          <div>
+            <div style={{ width: frameWidth }}>{shell}</div>
+            <div className="viewport-frame-label">{frame.label}px frame</div>
+          </div>
+        </div>
+      )}
+    </React.Fragment>
   );
 };
 
