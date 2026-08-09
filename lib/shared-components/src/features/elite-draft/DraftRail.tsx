@@ -53,6 +53,11 @@ const HOVER_BORDER = withAlpha(WHITE, 0.1);
 // isolated component tests (e.g. EliteDraftBoard.a11y.spec.tsx) don't set
 // up, while declarative $md style props resolve without it.
 const RailRoot = tamaguiStyled(YStack, {
+  // `gridArea` docks this component into the still-CSS-Grid `.d-layout`
+  // container in EliteDraftBoardScreen.tsx (raw HTML/CSS, out of scope for
+  // this ticket — see LS-9057). Tamagui forwards unrecognized style keys
+  // straight through to the underlying web element's style object.
+  gridArea: 'rail',
   backgroundColor: SURFACE_SUBTLE,
   borderLeftWidth: 1,
   borderLeftColor: BORDER_HAIRLINE,

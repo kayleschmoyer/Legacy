@@ -40,6 +40,11 @@ const positions = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
 type StyledComponent = React.ComponentType<Record<string, unknown>>;
 
 const MainContainer = tamaguiStyled(YStack, {
+  // `gridArea` docks this component into the still-CSS-Grid `.d-layout`
+  // container in EliteDraftBoardScreen.tsx (raw HTML/CSS, out of scope for
+  // this ticket — see LS-9057). Tamagui forwards unrecognized style keys
+  // straight through to the underlying web element's style object.
+  gridArea: 'main',
   flex: 1,
   paddingVertical: 16,
   paddingHorizontal: 22,
