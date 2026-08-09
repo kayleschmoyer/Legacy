@@ -6,6 +6,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { BrandLogo } from '@legacy-sports/shared-components';
 import { ScrollView, Spinner, styled, Text } from 'tamagui';
 import {
   BRAND_ICON_ACCENT,
@@ -553,40 +554,12 @@ export function PublicLandingPage(): React.JSX.Element {
           justifyContent="space-between"
           $sm={{ paddingHorizontal: '$3' }}
         >
-          {/* Logo */}
-          <XStack alignItems="center" gap="$2">
-            <img
-              src={`${env.baseUrl}logo.png`}
-              alt="Legacy Sports"
-              style={{ height: 38, width: 'auto', display: 'block' }}
-            />
-            <YStack lineHeight={1} gap={0}>
-              <Text
-                style={{
-                  fontFamily: '"Big Shoulders Display", system-ui, sans-serif',
-                  fontWeight: '800',
-                  fontSize: 14,
-                  letterSpacing: '0.04em',
-                  lineHeight: '1' as unknown as number,
-                  color: 'var(--brandGoldLight)',
-                }}
-              >
-                LEGACY
-              </Text>
-              <Text
-                style={{
-                  fontFamily: '"Big Shoulders Display", system-ui, sans-serif',
-                  fontWeight: '700',
-                  fontSize: 11,
-                  letterSpacing: '0.16em',
-                  lineHeight: '1' as unknown as number,
-                  color: 'var(--color12)',
-                }}
-              >
-                SPORTS
-              </Text>
-            </YStack>
-          </XStack>
+          {/* Logo — mirrors docs/design/.../preview/brand-logo.html */}
+          <BrandLogo
+            src={`${env.baseUrl}logo.png`}
+            tagline={null}
+            alt="Legacy Sports"
+          />
 
           {/* Nav sign-in button */}
           <OutlineSignInButton
