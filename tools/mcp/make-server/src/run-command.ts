@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 
 const COMMAND_TIMEOUT = 300_000; // 5 minutes default for make targets
 
+export { resolveBashExecutable } from './resolve-bash.js';
+
 export class TimeoutError extends Error {
   readonly partialOutput: string;
   constructor(message: string, partialOutput: string) {

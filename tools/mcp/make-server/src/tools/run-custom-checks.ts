@@ -2,6 +2,7 @@ import { readdirSync, existsSync } from 'node:fs';
 import { join, isAbsolute, resolve, relative } from 'node:path';
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { runCommand, getRepoRoot } from '../run-command.js';
+import { resolveBashExecutable } from '../resolve-bash.js';
 import { truncateOutput } from './run-target-utils.js';
 import type { ToolResult } from '../types.js';
 
@@ -128,14 +129,11 @@ export async function runCustomChecks(
     const scriptPath = join(CHECKS_DIR, script);
     const start = Date.now();
     try {
-      // shell: true — on Windows, `bash` (Git Bash) requires shell interpretation
-      // to resolve via PATH the same way `make` does (LS-9021, LS-9153).
       const output = await runCommand(
-        'bash',
+        resolveBashExecutable(),
         [scriptPath],
         workDir,
         timeoutMs,
-        true,
       );
       results.push({
         script,
