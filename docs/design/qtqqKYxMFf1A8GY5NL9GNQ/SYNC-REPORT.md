@@ -26,6 +26,29 @@ Fixed the mechanical violations flagged by the LS-8954 audit, at the source in t
 - Real historical MLB/NFL players in `sports-data.jsx` — ruled acceptable for player-data surfaces per LS-9004.
 - No annotations (LOW finding) — out of scope for this mechanical-fix pass.
 
+## LS-9092 follow-up (2026-08-09)
+
+The LS-9024 repo-wide Breakpoints audit found `sm` (800) and `xl` (1120) unclaimed by
+any `BREAKPOINTS` annotation or toggle frame in `project/stats.css` / `project/stats.jsx`,
+despite this bundle otherwise being a `docs/agents/pages/PROMPT.md`-compliant example.
+Both bands share a layout with an adjacent band (no reflow of their own), so per the
+brief's "bands that share a layout don't need separate frames — annotate the coverage
+instead" rule, the fix is annotation-only:
+
+- `stats.css` — the existing `below md (860)` container-query comment now explicitly
+  states it also claims the `sm` band (800–859px); a new comment claims `md`–`xl`
+  (860–1279px) as sharing the un-media-queried base layout.
+- `stats.jsx` — the `BREAKPOINTS` catalogue's header comment now explains why `sm`
+  and `xl` have no dedicated viewport chip, cross-referencing the `stats.css` claims.
+
+**Note**: this was applied directly to the repo bundle rather than via the DesignSync
+write flow (`finalize_plan` → `write_files` against the source Claude Design project),
+because `DesignSync` requires an interactive `/design-login` this cloud session cannot
+run. The Claude Design source project (`projectId 26a15a22-caeb-49e6-b5c3-1604c76ea778`)
+is therefore stale relative to this bundle for these two comments — a follow-up local
+`/push-design qtqqKYxMFf1A8GY5NL9GNQ` should push this annotation fix up so the source
+and the repo stay in step.
+
 ## Skipped / truncated files
 
 None — all fetches succeeded, nothing truncated.

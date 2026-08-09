@@ -98,6 +98,14 @@ const SPORTS = {
    Widths are the canonical bands from docs/agents/pages/PROMPT.md —
    xxs (375, always fully designed) through xxl (1280, always fully
    designed) — never invented pixel values like 768/1024/1536.
+
+   BREAKPOINTS: sm (800) and xl (1120) have no dedicated chip because
+   they share a layout with an adjacent band rather than reflowing on
+   their own — sm renders identically to the md-and-below toolbar
+   layout (see stats.css, "below md (860)"), and xl renders identically
+   to md/lg's base desktop layout (see stats.css, "md–xl share the base
+   layout"). All seven bands are still covered; see stats.css for the
+   band-by-band claims.
    ────────────────────────────────────────── */
 const BREAKPOINTS = [
   { id: 'xxs', label: 'Phone', width: 375, device: 'iPhone (xxs band, 0px+)' },

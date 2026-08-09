@@ -1654,7 +1654,9 @@ body {
    invented pixel values.
    ──────────────────────────────────────────────────────────── */
 
-/* BREAKPOINTS: below md (860) — hide top-nav inline tabs, collapse to 2-col toolbar */
+/* BREAKPOINTS: below md (860) — hide top-nav inline tabs, collapse to 2-col toolbar.
+   Claims the sm band (800–859px) as well as xs/xxs: sm gets this layout only
+   (no further override below fires until xs at 799px). */
 @container shell (max-width: 859px) {
   .sp-tabs {
     display: none;
@@ -1775,6 +1777,10 @@ body {
     padding-left: 14px !important;
   }
 }
+
+/* BREAKPOINTS: md–xl (860–1279px) share the base layout defined above (outside
+   any container query) — no reflow between md, lg, and xl; toolbar, tabs, and
+   table stay in their default desktop arrangement across all three bands. */
 
 /* BREAKPOINTS: xxl (1280) and up — comfier table spacing */
 @container shell (min-width: 1280px) {
