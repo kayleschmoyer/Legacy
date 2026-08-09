@@ -174,3 +174,24 @@ describe('FootballHubPage — free-tier league cap gating (LS-5184)', () => {
     expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument();
   });
 });
+
+describe('FootballHubPage — null-sport league handling (FBH-001)', () => {
+  it('includes null-sport (legacy/un-migrated) leagues alongside football leagues', () => {
+    setLeagues([
+      ...leaguesOfCount(1, 'football'),
+      ...leaguesOfCount(1, 'baseball'),
+      { ...leaguesOfCount(1)[0], id: 99, name: 'Legacy League', sport: null },
+    ] as unknown as StubLeague[]);
+
+    render(<FootballHubPage />);
+
+    const leaguesProp = mockNFLHome.mock.calls[0][0].leagues as Array<{
+      id: string | number;
+      name: string;
+    }>;
+    expect(leaguesProp.map((l) => l.name)).toEqual([
+      'League 1',
+      'Legacy League',
+    ]);
+  });
+});

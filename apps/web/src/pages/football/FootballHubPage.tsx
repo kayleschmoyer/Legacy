@@ -43,7 +43,10 @@ export function FootballHubPage() {
     () =>
       (data?.userLeagues ?? [])
         .filter(Boolean)
-        .filter((l) => l.sport === Sport.Football)
+        // Legacy/un-migrated leagues can have a null sport (FBH-001) — treat
+        // them as football rather than silently dropping them, since the
+        // alternative is the user losing access to the league entirely.
+        .filter((l) => l.sport === Sport.Football || l.sport == null)
         .filter((l): l is typeof l & { id: string | number } => l.id != null)
         .map((l) => ({
           id: l.id,

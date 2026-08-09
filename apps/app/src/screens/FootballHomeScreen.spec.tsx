@@ -136,6 +136,15 @@ const BASEBALL_LEAGUE = {
   weekAdvanceStatus: null,
 };
 
+const NULL_SPORT_LEAGUE = {
+  id: 20,
+  name: 'Legacy League',
+  sport: null,
+  draftStatus: null,
+  currentWeekNumber: null,
+  weekAdvanceStatus: null,
+};
+
 describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -157,6 +166,34 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
   it('passes skip based on authentication', () => {
     render(<FootballHomeScreen />);
     expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: false });
+  });
+
+  it('includes null-sport (legacy/un-migrated) leagues (FBH-001)', () => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: [...FOOTBALL_LEAGUES, NULL_SPORT_LEAGUE] },
+      loading: false,
+    });
+    render(<FootballHomeScreen />);
+    expect(
+      screen.getByText(
+        'leagues:Grid Iron Legends,Touchdown Club,Legacy League',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('excludes baseball leagues while including null-sport leagues (FBH-001)', () => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [...FOOTBALL_LEAGUES, BASEBALL_LEAGUE, NULL_SPORT_LEAGUE],
+      },
+      loading: false,
+    });
+    render(<FootballHomeScreen />);
+    expect(
+      screen.getByText(
+        'leagues:Grid Iron Legends,Touchdown Club,Legacy League',
+      ),
+    ).toBeTruthy();
   });
 
   describe('create league — free-tier cap enforcement (LS-5025)', () => {
