@@ -124,9 +124,25 @@ Timing conventions (for annotation only):
 
 ---
 
-## Mobile & Desktop Layouts
+## Breakpoints
 
-The reference doc specifies the route and primary breakpoints. The mockup should show **both** in a single file — a side-by-side or toggle layout. Default to showing the mobile view (375px) as primary; include a desktop preview (1280px) as a secondary panel or via a toggle button.
+The app uses seven breakpoint bands (min-width thresholds, mirroring the Tamagui media defaults in `lib/design-tokens/src/lib/breakpoints.ts` — that file is canonical if this table drifts):
+
+| Band  | Starts at | Typical device               |
+| ----- | --------- | ----------------------------- |
+| `xxs` | 0px       | Phones (design at 375px)     |
+| `xs`  | 660px     | Large phones / small tablets |
+| `sm`  | 800px     | Tablets portrait             |
+| `md`  | 860px     | Tablets landscape            |
+| `lg`  | 980px     | Small laptops                |
+| `xl`  | 1120px    | Laptops                      |
+| `xxl` | 1280px    | Desktops (design at 1280px)  |
+
+The mockup must account for **all seven bands**, not just phone and desktop:
+
+- Design a distinct layout for every band where the page's layout actually changes, and make each one viewable in the file (toggle or side-by-side). Reflow only at these thresholds — never invent breakpoints like 720px or 768px.
+- Bands that share a layout don't need separate frames — annotate the coverage instead (e.g. `<!-- BREAKPOINTS: this layout serves xs–md (660–979px); columns drop from 4 to 2 at lg -->`). Every band must be claimed by exactly one designed layout; none may be left to chance.
+- At minimum, `xxs` (375px) and `xxl` (1280px) always get fully designed frames; the reference doc may require more or override the defaults.
 
 Touch targets: annotate any interactive element that must be ≥ 44×44px with a comment.
 
@@ -148,6 +164,7 @@ Before marking the design complete, verify:
 - [ ] Body copy does not exceed 70ch width
 - [ ] Skeleton screens match the actual layout geometry
 - [ ] Motion intent annotated via HTML comments
-- [ ] Mobile (375px) and desktop (1280px) layouts both shown
+- [ ] All seven breakpoint bands (`xxs`–`xxl`) are covered — each band is either a designed frame or explicitly annotated as sharing one; `xxs` (375px) and `xxl` (1280px) are always fully designed
+- [ ] Reflow behavior annotated at the canonical thresholds (660/800/860/980/1120/1280) — no invented breakpoints
 - [ ] Representative fictional data used throughout — no "Lorem ipsum"
 - [ ] Design intent comments explain _why_ choices were made, not _what_ they are
