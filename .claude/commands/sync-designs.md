@@ -43,7 +43,7 @@ Load the authoritative playbook via `Skill(skill: "design-sync")` before doing a
        - **zip**: `yauzl` — streaming, gives you per-entry metadata before extraction so the caps and path checks can run before any bytes hit disk.
        - **tar / tar.gz**: the `tar` npm package (the maintained Node port) with `onentry` validation that enforces every invariant above before writing.
      - Extract into `scratch/design-sync/<id>/` and confirm the final file tree is inside it (`find scratch/design-sync/<id>/ -path '*/..*' -print` should return no output before you proceed).
-     - Compute `lastSyncedHash` per [manifest-schema.md](../../.agents/skills/design-sync/references/manifest-schema.md) "Hashing".
+     - Compute `lastSyncedHash` with `node scripts/hash-design-bundle.mjs scratch/design-sync/<id>` — implements [manifest-schema.md](../../.agents/skills/design-sync/references/manifest-schema.md) "Hashing" exactly; do not hand-roll the sha256 loop.
      - Compare to `manifest.designs[id].lastSyncedHash`:
        - **No prior entry** → status `new`.
        - **Different hash** → status `changed`.

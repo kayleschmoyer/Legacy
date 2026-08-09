@@ -61,7 +61,9 @@ Before the first `/sync-designs` run you may want to seed URLs so the cloud agen
 
 ## Hashing
 
-`lastSyncedHash` is a deterministic content hash, format `sha256-<hex>`:
+`lastSyncedHash` is a deterministic content hash, format `sha256-<hex>`. Compute it with `node scripts/hash-design-bundle.mjs <bundleDir>` (or `make hash-design-bundle DIR=<bundleDir>`) rather than hand-rolling the algorithm below — the script is the canonical implementation (LS-9020).
+
+Algorithm implemented by the script:
 
 1. After extracting the bundle, enumerate every file under `docs/design/<id>/` **excluding** `SYNC-REPORT.md` (which the sync agent itself writes).
 2. Sort the file list by relative path, lexicographically, case-sensitive.
