@@ -1037,7 +1037,14 @@ export function FootballPlayerDetail({
       )}
 
       {player && (
-        <YStack padding={24} gap={20} maxWidth={640} width="100%">
+        <YStack
+          padding={24}
+          gap={20}
+          maxWidth={640}
+          $gtMd={{ maxWidth: 960 }}
+          width="100%"
+          alignSelf="center"
+        >
           <FootballPlayerHeader player={player} />
 
           {/* Player news */}
