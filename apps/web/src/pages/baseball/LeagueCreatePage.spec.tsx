@@ -62,12 +62,18 @@ jest.mock('@legacy-sports/logging', () => ({
 }));
 
 // Default football_enabled = true so both sport tabs are enabled in tests.
+// useFeatureValue (what LeagueCreatePage actually reads, LS-9130) mirrors the
+// real hook's contract of falling back to the caller-supplied default when a
+// flag isn't configured, except for football_enabled itself — driven by
+// mockFootballEnabled so LS-9128's disabled-tab tests can toggle it.
 let mockFootballEnabled = true;
 jest.mock('../../context/GrowthBookProvider', () => ({
   useFeatureIsOn: jest.fn((flag: string) =>
     flag === 'football_enabled' ? mockFootballEnabled : true,
   ),
-  useFeatureValue: jest.fn(() => null),
+  useFeatureValue: jest.fn((key: string, defaultValue: unknown) =>
+    key === 'football_enabled' ? mockFootballEnabled : defaultValue,
+  ),
   GrowthBookProvider: ({ children }: any) => <>{children}</>,
   growthbook: {},
 }));
@@ -506,6 +512,25 @@ describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
     renderPage('/baseball/league/create');
     expect(screen.getByTestId('sport-tab-baseball')).toBeInTheDocument();
     expect(screen.getByTestId('sport-tab-football')).toBeInTheDocument();
+  });
+
+  it('keeps the Football tab enabled when football_enabled is unresolved, not just when explicitly true (LS-9130)', () => {
+    // Regression guard for the flag-default mismatch: LeagueCreatePage reads
+    // `useFeatureValue('football_enabled', true)`, defaulting to enabled
+    // while GrowthBook is still loading/unconfigured — mirroring the
+    // `FootballGate` route guard's default. The old `useFeatureIsOn` call
+    // had no default and resolved to `false` (locked) in that same window.
+    const growthBookModule = jest.requireMock(
+      '../../context/GrowthBookProvider',
+    );
+    growthBookModule.useFeatureValue.mockImplementationOnce(
+      (_key: string, defaultValue: unknown) => defaultValue,
+    );
+    renderPage('/baseball/league/create');
+    expect(screen.getByTestId('sport-tab-football')).toHaveAttribute(
+      'aria-disabled',
+      'false',
+    );
   });
 
   it('selects Baseball at /baseball/league/create with a baseball heading', () => {

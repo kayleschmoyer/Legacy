@@ -232,7 +232,9 @@ export default function HomeTab() {
           onSeeAllLeagues={() => router.navigate('/leagues')}
           onOpenProfile={() => router.navigate('/you')}
           onMockDraft={() => router.push('/baseball/mock-draft')}
-          onCreateLeague={() => router.navigate('/baseball/league/create')}
+          onCreateLeague={(sportKey) =>
+            router.navigate(`/${sportKey}/league/create`)
+          }
           onJoinLeague={() => router.navigate('/baseball/league/join')}
           onBrowseStats={() => router.navigate('/players')}
           onViewSport={handleViewSport}

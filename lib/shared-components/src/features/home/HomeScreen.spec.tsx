@@ -251,6 +251,22 @@ describe('HomeScreen', () => {
       expect(getByText('Pick your sport')).toBeTruthy();
       expect(getAllByText('Live Season').length).toBe(2);
     });
+
+    it("passes the clicked card's sport to onCreateLeague (LS-9127)", () => {
+      const onCreateLeague = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onCreateLeague={onCreateLeague}
+        />,
+      );
+      fireEvent.click(getByTestId('sport-card-create-football'));
+      expect(onCreateLeague).toHaveBeenCalledWith('football');
+
+      fireEvent.click(getByTestId('sport-card-create-baseball'));
+      expect(onCreateLeague).toHaveBeenCalledWith('baseball');
+    });
   });
 
   describe('quick actions (LS-9048)', () => {

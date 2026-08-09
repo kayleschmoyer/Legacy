@@ -115,7 +115,7 @@ export interface HomeScreenProps {
   onViewLeague: (summary: HomeLeagueSummary) => void;
   onSetLineup?: (summary: HomeLeagueSummary) => void;
   onMockDraft?: (summary: HomeLeagueSummary) => void;
-  onCreateLeague: () => void;
+  onCreateLeague: (sportKey: 'baseball' | 'football') => void;
   onJoinLeague: () => void;
   onBrowseStats: () => void;
   onViewSport: (sportKey: 'baseball' | 'football') => void;
@@ -1952,6 +1952,7 @@ function SportCard({
         {sport.available ? (
           <>
             <ActionButton
+              testID={`sport-card-create-${sport.key}`}
               label="Create League"
               variant="gold"
               onPress={onCreate}
@@ -2858,7 +2859,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                   icon={<Plus size={15} color={BRAND_GOLD_LIGHT} />}
                   label="Create League"
                   gold
-                  onPress={onCreateLeague}
+                  onPress={() => onCreateLeague(defaultSport)}
                 />
                 <QuickActionPill
                   testID="home-quick-join-league"
@@ -3110,7 +3111,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                     icon={<Plus size={15} color={BRAND_GOLD_LIGHT} />}
                     label="Create League"
                     gold
-                    onPress={onCreateLeague}
+                    onPress={() => onCreateLeague(defaultSport)}
                   />
                   <QuickActionPill
                     testID="home-quick-join-league"
@@ -3153,7 +3154,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                       isLight={isLight}
                       showBadge
                       onView={() => onViewSport(sport.key)}
-                      onCreate={onCreateLeague}
+                      onCreate={() => onCreateLeague(sport.key)}
                     />
                   ))}
                 </YStack>
@@ -3242,7 +3243,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
             <ActionButton
               label="Create League"
               variant="gold"
-              onPress={onCreateLeague}
+              onPress={() => onCreateLeague(defaultSport)}
               testID="home-empty-create"
             />
             <ActionButton
@@ -3277,7 +3278,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                 isLight={isLight}
                 full
                 onView={() => onViewSport(sport.key)}
-                onCreate={onCreateLeague}
+                onCreate={() => onCreateLeague(sport.key)}
               />
             ))}
           </YStack>

@@ -88,7 +88,7 @@ import {
   StepRosterSettings,
 } from '../../components/leagues/wizard/StepRosterSettings';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
-import { useFeatureIsOn } from '../../context/GrowthBookProvider';
+import { useFeatureValue } from '../../context/GrowthBookProvider';
 import {
   AMBER,
   BG_DARK,
@@ -1419,7 +1419,10 @@ export function LeagueCreatePage(): React.JSX.Element {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
-  const footballEnabled = useFeatureIsOn('football_enabled');
+  // Falls back to `true` (rather than `useFeatureIsOn`'s implicit `false`)
+  // so the tab doesn't lock while GrowthBook is still loading or the flag is
+  // unconfigured (LS-9130) — same default as the route guard in app.tsx.
+  const footballEnabled = useFeatureValue('football_enabled', true);
   // Sports the flag hasn't unlocked yet stay in the tab list but render
   // disabled (LS-9128) — filtering them out entirely hid the option instead
   // of showing the user it exists but isn't available.
