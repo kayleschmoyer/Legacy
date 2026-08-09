@@ -42,3 +42,14 @@ describe('foundationTokens', () => {
     expect(foundationTokens.shadowsLight.sm).toContain('rgba(2, 6, 23');
   });
 });
+
+describe('cardGradientEnd (LS-9134)', () => {
+  it('stays opaque navy in dark theme but softens to a tint in light theme', () => {
+    const { themes } = tamaguiConfig as unknown as {
+      themes: Record<string, { cardGradientEnd: string; brandNavy: string }>;
+    };
+    expect(themes.dark.cardGradientEnd).toBe(themes.dark.brandNavy);
+    expect(themes.light.cardGradientEnd).not.toBe(themes.light.brandNavy);
+    expect(themes.light.cardGradientEnd).toContain('rgba(');
+  });
+});

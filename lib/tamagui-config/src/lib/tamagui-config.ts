@@ -111,6 +111,11 @@ const brandDark = {
   brandNavy: brand.navy, // deep baseball navy
   brandNavyLight: brand.navyLight, // lighter navy for gradients
   brandNavyDark: brand.navyDark, // darker navy for press states
+  // Gradient end-stop for surfaceCard -> navy panel gradients (LS-9134).
+  // Opaque navy in dark theme (unchanged); in light theme a full-strength
+  // navy stop turns the same recipe into a jarring white-to-black-navy
+  // block, so this end stops at a soft tint instead.
+  cardGradientEnd: brand.navy,
   brandSeamRed: brand.seamRed, // baseball seam red
   brandSeamRedLight: brand.seamRedLight, // lighter seam red for hover/glow
   brandSeamRedDark: brand.seamRedDark, // darker seam red for press states
@@ -245,6 +250,9 @@ const brandLight = {
   brandNavy: brand.navy,
   brandNavyLight: brand.navyLight,
   brandNavyDark: brand.navyDark,
+  // See brandDark.cardGradientEnd — soft tint keeps surfaceCard -> navy
+  // panel gradients readable instead of resolving to solid dark navy.
+  cardGradientEnd: withAlpha(brand.navy, 0.14),
   brandSeamRed: brand.seamRed,
   brandSeamRedLight: brand.seamRedLight,
   brandSeamRedDark: brand.seamRedDark,

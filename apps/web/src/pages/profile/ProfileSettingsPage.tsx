@@ -221,7 +221,11 @@ const pageBackgroundStyle: React.CSSProperties = {
 };
 
 const sectionCardGradientStyle: React.CSSProperties = {
-  background: `linear-gradient(135deg, var(--surfaceCard) 0%, var(--brandNavy) 100%)`,
+  // --cardGradientEnd resolves to opaque navy in dark theme (unchanged) and
+  // a soft navy tint in light theme, so the card never spans a full
+  // white-to-black-navy range that fixed-color text can't stay readable
+  // across (LS-9134).
+  background: `linear-gradient(135deg, var(--surfaceCard) 0%, var(--cardGradientEnd) 100%)`,
 };
 
 /* ─── Helpers ─── */
