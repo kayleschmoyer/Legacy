@@ -41,6 +41,9 @@ export interface NextAction {
   ctaLabel: string;
   trailingNote?: string;
   onPress: () => void;
+  /** Optional secondary link rendered next to the primary CTA (e.g. "Watch draft" alongside "Join draft"). */
+  secondaryLabel?: string;
+  onSecondaryPress?: () => void;
 }
 
 interface GuidedHomeLeague {
@@ -379,6 +382,20 @@ function UpNextCard({ action }: { action: NextAction }): React.JSX.Element {
         {action.trailingNote ? (
           <Text fontSize={12} color="$fg4">
             {action.trailingNote}
+          </Text>
+        ) : null}
+        {action.secondaryLabel && action.onSecondaryPress ? (
+          <Text
+            role="button"
+            tabIndex={0}
+            accessibilityRole="button"
+            accessibilityLabel={action.secondaryLabel}
+            fontSize={12}
+            fontWeight="600"
+            color="$brandGoldLight"
+            onPress={action.onSecondaryPress}
+          >
+            {action.secondaryLabel}
           </Text>
         ) : null}
       </XStack>

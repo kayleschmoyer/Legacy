@@ -21,6 +21,8 @@ type NextActionLike = {
   body: string;
   ctaLabel: string;
   onPress: () => void;
+  secondaryLabel?: string;
+  onSecondaryPress?: () => void;
 };
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -709,6 +711,19 @@ describe('BaseballLeagueId', () => {
       lastGuidedHomeNextAction?.onPress();
       expect(mockNavigate).toHaveBeenCalledWith(
         expect.objectContaining({ pathname: '/DraftBoardPage' }),
+      );
+    });
+
+    it('derives a "Watch draft" secondary action alongside the draft nextAction', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, draftStatus: 'in-progress' } },
+        loading: false,
+      });
+      render(<BaseballLeagueId />);
+      expect(lastGuidedHomeNextAction?.secondaryLabel).toBe('Watch draft');
+      lastGuidedHomeNextAction?.onSecondaryPress?.();
+      expect(mockNavigate).toHaveBeenCalledWith(
+        expect.objectContaining({ pathname: '/DraftWatchPage' }),
       );
     });
 

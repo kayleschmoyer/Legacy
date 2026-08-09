@@ -872,6 +872,9 @@ importers:
       expo-intent-launcher:
         specifier: ~56.0.4
         version: 56.0.4(expo@56.0.16)
+      expo-keep-awake:
+        specifier: ~56.0.3
+        version: 56.0.3(expo@56.0.16)(react@19.2.3)
       expo-local-authentication:
         specifier: ~14.0.1
         version: 14.0.1(expo@56.0.16)

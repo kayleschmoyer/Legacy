@@ -513,6 +513,14 @@ export default function LeagueId(): React.JSX.Element {
             pathname: '/DraftBoardPage',
             params: { leagueId: String(numLeagueId) },
           }),
+        // Mirrors the web spectator page's "Watch draft" link (LS-8938) —
+        // read-only big-screen view, distinct from the interactive draft room.
+        secondaryLabel: 'Watch draft',
+        onSecondaryPress: () =>
+          router.navigate({
+            pathname: '/DraftWatchPage',
+            params: { leagueId: String(numLeagueId) },
+          }),
       };
     }
     if (userTeamId != null && emptyStarterSlots > 0) {

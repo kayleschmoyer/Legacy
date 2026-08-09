@@ -215,6 +215,42 @@ describe('LeagueGuidedHomeTab', () => {
       fireEvent.press(screen.getByRole('button', { name: 'Set my lineup' }));
       expect(onPress).toHaveBeenCalledTimes(1);
     });
+
+    it('renders a secondary link and fires onSecondaryPress', () => {
+      const onPress = jest.fn();
+      const onSecondaryPress = jest.fn();
+      render(
+        <LeagueGuidedHomeTab
+          {...BASE_PROPS}
+          nextAction={{
+            headline: 'The draft is live — make your picks.',
+            body: 'Join the draft room to make your picks.',
+            ctaLabel: 'Join draft',
+            onPress,
+            secondaryLabel: 'Watch draft',
+            onSecondaryPress,
+          }}
+        />,
+      );
+      fireEvent.press(screen.getByRole('button', { name: 'Watch draft' }));
+      expect(onSecondaryPress).toHaveBeenCalledTimes(1);
+      expect(onPress).not.toHaveBeenCalled();
+    });
+
+    it('omits the secondary link when not provided', () => {
+      render(
+        <LeagueGuidedHomeTab
+          {...BASE_PROPS}
+          nextAction={{
+            headline: '2 starter slots are empty for Week 14.',
+            body: 'Fill your lineup before first pitch.',
+            ctaLabel: 'Set my lineup',
+            onPress: jest.fn(),
+          }}
+        />,
+      );
+      expect(screen.queryByRole('button', { name: 'Watch draft' })).toBeNull();
+    });
   });
 
   describe('matchup card', () => {
