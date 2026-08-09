@@ -629,6 +629,77 @@ describe('WebSocketClient', () => {
       client.dispose();
     });
 
+    it('reconnectNow gives up-and-recover a fresh attempt budget after the budget is exhausted (LS-8985)', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        reconnect: true,
+        reconnectDelay: 100,
+        maxReconnectAttempts: 2,
+        autoConnect: false,
+      });
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      // Exhaust the reconnect budget the same way as the LS-8881 test above.
+      client.connect();
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(200);
+
+      expect(errorHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Max reconnection attempts reached',
+        }),
+      );
+
+      // Simulate connectivity returning (e.g. app foregrounded) — a fresh
+      // reconnectNow() call should try again rather than staying dead.
+      mockServer = new Server(mockUrl);
+      client.reconnectNow();
+      jest.advanceTimersByTime(100);
+
+      expect(client.getState()).toBe('connected');
+      client.dispose();
+    });
+
+    it('reconnectNow is a no-op when already connected', () => {
+      mockServer = new Server(mockUrl);
+
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        autoConnect: true,
+      });
+
+      jest.advanceTimersByTime(100);
+      expect(client.getState()).toBe('connected');
+
+      // Should not tear down and recreate the live connection.
+      client.reconnectNow();
+      jest.advanceTimersByTime(100);
+
+      expect(client.getState()).toBe('connected');
+      client.dispose();
+    });
+
+    it('reconnectNow is a no-op after disposal', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        autoConnect: false,
+      });
+
+      client.dispose();
+
+      expect(() => client.reconnectNow()).not.toThrow();
+      expect(client.getState()).toBe('disconnected');
+    });
+
     it('should not reconnect when reconnect option is false', () => {
       mockServer = new Server(mockUrl);
 

@@ -618,6 +618,32 @@ export class WebSocketClient {
   }
 
   /**
+   * Force a reconnection attempt with a fresh attempt budget, bypassing any
+   * pending backoff timer.
+   *
+   * Use after the client has already given up (see `scheduleReconnect`) when
+   * an external signal suggests connectivity may have returned — e.g. the
+   * app coming back to the foreground after a spell of flaky mobile network
+   * that burned through the full reconnect budget (LS-8985). Giving up is
+   * still correct behaviour for a permanently-rejected connection (LS-8881),
+   * but nothing should keep it giving up forever once the world around it
+   * has changed. No-op if disposed or already connected.
+   */
+  public reconnectNow(): void {
+    if (
+      this.disposed ||
+      this.ws?.readyState === WebSocket.OPEN ||
+      this.ws?.readyState === WebSocket.CONNECTING
+    ) {
+      return;
+    }
+
+    this.cancelReconnect();
+    this.reconnectAttempts = 0;
+    this.connect();
+  }
+
+  /**
    * Cancel any pending reconnection attempt
    */
   private cancelReconnect(): void {

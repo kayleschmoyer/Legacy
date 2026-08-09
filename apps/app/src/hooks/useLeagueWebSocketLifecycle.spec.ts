@@ -19,6 +19,28 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+type AppStateChangeHandler = (state: string) => void;
+let appStateListeners: AppStateChangeHandler[] = [];
+const mockAppStateAddEventListener = jest.fn<
+  { remove: () => void },
+  [string, AppStateChangeHandler]
+>();
+
+jest.mock('react-native', () => {
+  const RN = jest.requireActual<typeof import('react-native')>('react-native');
+  return new Proxy(RN, {
+    get(target, prop: string) {
+      if (prop === 'AppState') {
+        return {
+          addEventListener: (...args: [string, AppStateChangeHandler]) =>
+            mockAppStateAddEventListener(...args),
+        };
+      }
+      return Reflect.get(target, prop) as unknown;
+    },
+  });
+});
+
 const { WebSocketClient } = jest.requireMock(
   '@legacy-sports/websocket-client',
 ) as unknown as { WebSocketClient: jest.Mock };
@@ -36,6 +58,7 @@ function makeMockClient() {
     }),
     connect: jest.fn(),
     dispose: jest.fn(),
+    reconnectNow: jest.fn(),
     _emit(event: string, ...args: unknown[]) {
       (handlers[event] ?? []).forEach((h) => h(...args));
     },
@@ -47,6 +70,17 @@ describe('useLeagueWebSocketLifecycle', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
+    appStateListeners = [];
+    mockAppStateAddEventListener.mockImplementation(
+      (_event: string, handler: AppStateChangeHandler) => {
+        appStateListeners.push(handler);
+        return {
+          remove: () => {
+            appStateListeners = appStateListeners.filter((h) => h !== handler);
+          },
+        };
+      },
+    );
     mockUseIsFocused.mockReturnValue(true);
     mockClient = makeMockClient();
     WebSocketClient.mockImplementation(() => mockClient);
@@ -122,6 +156,40 @@ describe('useLeagueWebSocketLifecycle', () => {
 
     expect(WebSocketClient).toHaveBeenCalledTimes(1);
     expect(secondClient.connect).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls reconnectNow when the app returns to the foreground (LS-8985)', () => {
+    renderHook(() => useLeagueWebSocketLifecycle(defaultOptions));
+
+    expect(appStateListeners).toHaveLength(1);
+
+    void act(() => {
+      appStateListeners[0]('active');
+    });
+
+    expect(mockClient.reconnectNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call reconnectNow for a background transition', () => {
+    renderHook(() => useLeagueWebSocketLifecycle(defaultOptions));
+
+    void act(() => {
+      appStateListeners[0]('background');
+    });
+
+    expect(mockClient.reconnectNow).not.toHaveBeenCalled();
+  });
+
+  it('removes the AppState subscription on unmount', () => {
+    const { unmount } = renderHook(() =>
+      useLeagueWebSocketLifecycle(defaultOptions),
+    );
+
+    expect(appStateListeners).toHaveLength(1);
+
+    unmount();
+
+    expect(appStateListeners).toHaveLength(0);
   });
 
   it('disposes the client on unmount', () => {

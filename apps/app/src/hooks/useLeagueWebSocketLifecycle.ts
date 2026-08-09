@@ -11,6 +11,7 @@
  * async keychain-sourced token.
  */
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
 import { WebSocketClient } from '@legacy-sports/websocket-client';
@@ -85,6 +86,25 @@ export function useLeagueWebSocketLifecycle({
       setConnected(false);
     };
   }, [leagueId, url, token, isFocused]);
+
+  // A stretch of flaky mobile network (subway, elevator, wifi/cellular
+  // handoff) can burn through the client's bounded reconnect budget and it
+  // gives up for good (LS-8881) — silently, since the error above is only
+  // logged at debug level. Without this, realtime stays dead for the rest of
+  // the screen's lifetime even after connectivity returns, because nothing
+  // else re-triggers the leagueId/url/token/isFocused effect above. Treat the
+  // app returning to the foreground as a signal worth a fresh attempt,
+  // mirroring the resume-refetch pattern in FootballMatchupScreen (LS-6388).
+  useEffect(() => {
+    if (!client) return;
+
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        client.reconnectNow();
+      }
+    });
+    return () => subscription.remove();
+  }, [client]);
 
   return { client, connected };
 }
