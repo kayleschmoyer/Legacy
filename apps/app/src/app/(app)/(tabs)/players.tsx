@@ -192,9 +192,6 @@ function BaseballCardFeed({
           battingAverage: player.battingAverage,
         }),
         fpts: Math.round(player.fantasyPoints).toLocaleString(),
-        // No backing data source for career-leaderboard trend — see
-        // cardFeedHelpers.CardTrendDirection.
-        trend: 'flat',
       })),
     [accumulated],
   );
@@ -319,7 +316,6 @@ function FootballCardFeed({
       name: [player.firstName, player.lastName].filter(Boolean).join(' '),
       subStats: formatFootballCardSubStats(player),
       fpts: Math.round(player.careerStats?.fantasyPoints ?? 0).toLocaleString(),
-      trend: 'flat',
     }));
   }, [accumulated, sortDir]);
 

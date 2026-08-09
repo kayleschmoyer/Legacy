@@ -10,7 +10,6 @@ function makeRow(overrides: Partial<PlayerFeedRow> = {}): PlayerFeedRow {
     name: 'Barry Bonds',
     subStats: 'HR 762 · RBI 1,996 · AVG .298',
     fpts: '14,208',
-    trend: 'flat',
     ...overrides,
   };
 }

@@ -7,10 +7,7 @@ import { SortControl } from './SortControl';
 import { PlayerFeedCard } from './PlayerFeedCard';
 import { PremiumTeaserCard } from './PremiumTeaserCard';
 import { PlayerFeedSkeleton } from './PlayerFeedSkeleton';
-import {
-  type CardTrendDirection,
-  playersCardFeedTopPadding,
-} from './cardFeedHelpers';
+import { playersCardFeedTopPadding } from './cardFeedHelpers';
 import { EmptyCard, ErrorCard } from '../shell/StateCards';
 import { FONT_DISPLAY } from '../shell/tokens';
 import type { Sport } from '../../../utils/colors';
@@ -25,7 +22,6 @@ export interface PlayerFeedRow {
   subStats: string;
   /** Pre-formatted career fantasy points, e.g. "14,208". */
   fpts: string;
-  trend: CardTrendDirection;
 }
 
 type ListItem =
@@ -219,7 +215,6 @@ export function PlayersCardFeed({
                     name={item.row.name}
                     subStats={item.row.subStats}
                     fpts={item.row.fpts}
-                    trend={item.row.trend}
                     onPress={() => onPlayerPress(item.row.id)}
                     testID={`${testID}-card-${item.row.id}`}
                   />

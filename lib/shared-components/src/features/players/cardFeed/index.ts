@@ -39,6 +39,5 @@ export {
 } from './cardFeedHelpers';
 export type {
   BaseballCardStatsInput,
-  CardTrendDirection,
   FootballCardStatsInput,
 } from './cardFeedHelpers';

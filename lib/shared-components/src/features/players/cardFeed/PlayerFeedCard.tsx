@@ -1,13 +1,10 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import type { CardTrendDirection } from './cardFeedHelpers';
 import { PositionBadge } from '../../../components/PositionBadge';
 import {
   BG_DARK,
   getPositionColor,
   lightenForContrast,
-  SCORE_LOSS,
-  SCORE_WIN,
   STATS_BORDER,
   SURFACE_PANEL,
   TEXT_HIGH_CONTRAST,
@@ -19,18 +16,6 @@ import {
 import type { Sport } from '../../../utils/colors';
 import { FONT_BODY, FONT_DISPLAY, FONT_MONO } from '../shell/tokens';
 
-const TREND_GLYPH: Record<CardTrendDirection, string> = {
-  up: '▲',
-  down: '▼',
-  flat: '—',
-};
-
-const TREND_COLOR: Record<CardTrendDirection, string> = {
-  up: SCORE_WIN,
-  down: SCORE_LOSS,
-  flat: TEXT_TERTIARY,
-};
-
 export interface PlayerFeedCardProps {
   sport: Sport;
   /** Position abbreviation for the tile + sub-stat category selection (e.g. "OF", "QB"). */
@@ -40,7 +25,6 @@ export interface PlayerFeedCardProps {
   subStats: string;
   /** Pre-formatted career fantasy points, e.g. "14,208". */
   fpts: string;
-  trend: CardTrendDirection;
   onPress: () => void;
   testID?: string;
 }
@@ -58,7 +42,6 @@ export function PlayerFeedCard({
   name,
   subStats,
   fpts,
-  trend,
   onPress,
   testID = 'player-feed-card',
 }: PlayerFeedCardProps) {
@@ -129,8 +112,8 @@ export function PlayerFeedCard({
         >
           {fpts}
         </Text>
-        <Text fontFamily={FONT_MONO} fontSize={11} color={TREND_COLOR[trend]}>
-          {TREND_GLYPH[trend]} FPTS
+        <Text fontFamily={FONT_MONO} fontSize={11} color={TEXT_TERTIARY}>
+          FPTS
         </Text>
       </YStack>
     </XStack>

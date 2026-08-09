@@ -181,16 +181,3 @@ export function formatFootballCardSubStats(
 
   return [team, ...parts].filter(Boolean).join(' · ');
 }
-
-// ── Trend ────────────────────────────────────────────────────────────────
-
-/**
- * Card feed trend indicator direction. The design handoff's mockup shows a
- * per-player trend arrow, but its backing data (week-over-week or
- * season-over-season movement) has no equivalent in the all-time career
- * leaderboard this screen renders — the ticket's own State section omits a
- * trend field entirely. Screens wiring this feed should pass `'flat'` unless
- * a real trend signal becomes available; the type stays 3-valued so the
- * presentational component doesn't need to change when one does.
- */
-export type CardTrendDirection = 'up' | 'down' | 'flat';

@@ -8,7 +8,6 @@ const makeProps = () => ({
   name: 'Barry Bonds',
   subStats: 'HR 762 · RBI 1,996 · AVG .298',
   fpts: '14,208',
-  trend: 'up' as const,
   onPress: jest.fn(),
 });
 
@@ -24,22 +23,10 @@ describe('PlayerFeedCard', () => {
     expect(screen.getByText('14,208')).toBeInTheDocument();
   });
 
-  test('renders the up-trend glyph and label', () => {
+  test('renders the FPTS label', () => {
     render(<PlayerFeedCard {...makeProps()} />);
 
-    expect(screen.getByText('▲ FPTS')).toBeInTheDocument();
-  });
-
-  test('renders the down-trend glyph', () => {
-    render(<PlayerFeedCard {...makeProps()} trend="down" />);
-
-    expect(screen.getByText('▼ FPTS')).toBeInTheDocument();
-  });
-
-  test('renders the flat-trend glyph', () => {
-    render(<PlayerFeedCard {...makeProps()} trend="flat" />);
-
-    expect(screen.getByText('— FPTS')).toBeInTheDocument();
+    expect(screen.getByText('FPTS')).toBeInTheDocument();
   });
 
   test('calls onPress when tapped', () => {
