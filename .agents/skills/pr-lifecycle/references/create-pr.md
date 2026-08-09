@@ -67,6 +67,42 @@ primary: LS-####
 
 `github_create_pr` injects the marker automatically when the body lacks one: it uses the `jiraPrimary` param if passed, else the first `LS-####` in the title, else `none`. Pass `jiraRelated` for related keys. Bodies that already contain a marker are left untouched, and a body that already has a visible `**Jira:**` line gets only the HTML comment (no duplicate link).
 
+#### CCR fallback — hand-authoring the marker (no `jiraPrimary` convenience)
+
+The generic `mcp__github__create_pull_request` tool (routing table row 3 — used when the hosted `legacy-sports-github`/`legacy-sports-jira` connectors are unauthenticated in a CCR session, or on Claude Code on the web without the connector) takes a plain `body` string only. It has **no `jiraPrimary` param** and does **not** auto-prepend the marker — you must hand-author the exact three-line block yourself, in the body you pass to the initial `create_pull_request` call.
+
+The marker key is **newline-separated**, not inline. Both of these look plausible but only the first is valid:
+
+```markdown
+<!-- jira-link
+primary: LS-####
+-->
+```
+
+✅ Valid — `primary:` is its own line inside the comment.
+
+```markdown
+<!-- jira-link primary=LS-#### -->
+```
+
+❌ Invalid — inline `key=value` syntax. This fails the "Jira Link Check" required CI check with `jira-link marker has no \`primary:\` line`, and is only caught after the fact by fetching CI job logs, forcing a follow-up `update_pull_request` body edit (per LS-8932/LS-6141).
+
+Copy-pasteable example for a `mcp__github__create_pull_request` body (substitute the real ticket key):
+
+```markdown
+<!-- jira-link
+primary: LS-1234
+-->
+
+**Jira:** [LS-1234](https://bkrupa.atlassian.net/browse/LS-1234)
+
+## Context
+
+...
+```
+
+If `legacy-sports-github` re-authenticates mid-session, prefer switching back to `github_create_pr({ jiraPrimary: "LS-####" })` for its auto-prepend convenience rather than continuing to hand-author the marker on the generic tool.
+
 ### PR Body Template
 
 > **This description is read by Copilot as a prompt — not just by humans.** When reviewers use "Fix with Copilot" or `@copilot` on a review comment, Copilot's entire context is the PR title, this description, and the diff. A thin description produces repeated, incomplete, or misaligned fixes. Write it as if you are briefing an engineer who has never seen the ticket.
