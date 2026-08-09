@@ -578,10 +578,13 @@
   }
 
   /* ── Mobile tweaks ──────────────────────────────
-     BREAKPOINTS: applies below `sm` (800px, canonical band start) —
-     the review-scaffold header/card/footer reflow to a single column
-     ahead of the `.m-scroll`-scoped rules that govern the fixed-width
-     mobile device frame itself. */
+     BREAKPOINTS: this layout serves `xxs`–`xs` (0–799px) — combined
+     with the `.m-scroll`-scoped rules below (which govern the
+     fixed-width mobile device frame), `.hdr`/`.card-top`/`.stat-line`/
+     `.footer-cta` stack to a single column below the `sm` band start
+     (800px). `xxs` (375px) is always the fully designed mobile frame;
+     this rule extends that same single-column treatment up through
+     `xs` (660–799px) for the fluid `.page` layout. */
   @media (max-width: 799px) {
     .hdr { flex-direction: column; align-items: flex-start; }
     .card-top { flex-direction: column; }
@@ -589,6 +592,16 @@
     .stat-line .spots { grid-column: 1 / -1; border-top: 1px solid var(--outline-subtle); padding-top: 10px; }
     .footer-cta { flex-direction: column; align-items: flex-start; }
   }
+
+  /* ── Tablet/laptop fluid reflow ──────────────────
+     BREAKPOINTS: this layout (the base, non-media-queried `.page`,
+     `.hdr`, `.controls`, `.filter-row` rules — the same rules the
+     `xxl` desktop frame uses) serves `sm`–`xl` (800–1279px). No
+     dedicated frame is needed: nothing restructures between `sm` and
+     `xl`, the two-column `.hdr` and wrapping `.filter-row`/
+     `.footer-cta` (flexbox `flex-wrap`) reflow continuously across
+     that whole range, and it's the identical component layout `xxl`
+     ships — `xxl` just adds the side-by-side review-panel stage. */
 
   /* Mobile frame scoped rules */
   .m-scroll .hdr { flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
@@ -603,10 +616,15 @@
   .m-scroll .filter-row { flex-direction: column; align-items: stretch; gap: 12px; }
   .m-scroll .footer-cta { flex-direction: column; align-items: flex-start; padding: 24px 20px; }
 
-  /* Stage-label placement on narrow screens
-     BREAKPOINTS: applies below `xxl` (1280px, canonical band start) —
-     narrower than a full desktop viewport can't fit the mobile+desktop
-     review panels side by side, so they stack. */
+  /* Stage-label placement on narrow screens — REVIEW SCAFFOLD ONLY
+     BREAKPOINTS: this rule repositions only the `.stage`/`.prod-mobile`
+     review scaffolding (stacking the mobile+desktop review panels
+     vertically below `xxl` so both fit on screen); it is not a product
+     breakpoint. The product's `xxl` (1280px) band is the `.page`
+     desktop frame inside `.prod-desktop`, which is fully designed and
+     unaffected by this rule — it just goes from being displayed
+     alongside the mobile frame (>=1280px) to being displayed below it
+     (<1280px). */
   @media (max-width: 1279px) {
     .stage { grid-template-columns: 1fr; gap: 40px; }
     .prod-mobile { position: static; margin: 0 auto; }
