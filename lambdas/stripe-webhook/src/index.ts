@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import Stripe from 'stripe';
-import { and, eq, isNull, lt, or } from 'drizzle-orm';
+import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   createNotificationPublisher,
@@ -177,9 +177,18 @@ async function upsertSubscription(
     return rows[0] ?? null;
   });
 
+  // Stripe's `event.created` has whole-second resolution, and a single
+  // checkout routinely fires `customer.subscription.created`,
+  // `customer.subscription.updated`, and `checkout.session.completed`
+  // concurrently within the same second — so a same-timestamp event is a
+  // concurrent delivery, not a stale/out-of-order one. Only reject an event
+  // strictly OLDER than what's stored; a tie must be allowed through, or the
+  // checkout-completed write (which always re-fetches live status from
+  // Stripe) can be silently dropped by a same-second sibling event, leaving
+  // the user stuck on their pre-checkout tier (LS-9136).
   if (
     existing?.lastEventTimestamp != null &&
-    existing.lastEventTimestamp >= eventTimestamp
+    existing.lastEventTimestamp > eventTimestamp
   ) {
     LOGGER.info('ignored stale event', {
       stripeSubscriptionId,
@@ -217,11 +226,13 @@ async function upsertSubscription(
           updatedAt: new Date(),
         },
         // Defense against a concurrent newer write landing between our
-        // select above and this upsert: only overwrite when our event is
-        // strictly newer than the row's last_event_timestamp.
+        // select above and this upsert: only overwrite when our event is not
+        // older than the row's last_event_timestamp. Same-timestamp events
+        // are concurrent deliveries (see the in-app check above) and must be
+        // allowed through, not just strictly-newer ones.
         setWhere: or(
           isNull(InternalSchema.subscriptions.lastEventTimestamp),
-          lt(InternalSchema.subscriptions.lastEventTimestamp, eventTimestamp),
+          lte(InternalSchema.subscriptions.lastEventTimestamp, eventTimestamp),
         ),
       });
 
@@ -277,10 +288,13 @@ async function updateSubscriptionStatus(
 
     const { userId, tier: previousTier, lastEventTimestamp } = existing[0];
 
-    // Conditional update — only apply when the incoming event is strictly
-    // newer than the row's last_event_timestamp. If zero rows come back,
-    // the event is stale (out-of-order delivery / retry) and must be
-    // ignored to avoid overwriting newer state.
+    // Conditional update — only apply when the incoming event is not older
+    // than the row's last_event_timestamp. Stripe's `event.created` has
+    // whole-second resolution, so same-timestamp events are concurrent
+    // deliveries, not stale/out-of-order ones — rejecting ties silently
+    // dropped correct writes (LS-9136). If zero rows come back, the event is
+    // genuinely stale (out-of-order delivery / retry) and must be ignored to
+    // avoid overwriting newer state.
     const updated = await db
       .update(InternalSchema.subscriptions)
       .set({
@@ -297,7 +311,10 @@ async function updateSubscriptionStatus(
           ),
           or(
             isNull(InternalSchema.subscriptions.lastEventTimestamp),
-            lt(InternalSchema.subscriptions.lastEventTimestamp, eventTimestamp),
+            lte(
+              InternalSchema.subscriptions.lastEventTimestamp,
+              eventTimestamp,
+            ),
           ),
         ),
       )

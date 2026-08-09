@@ -317,6 +317,62 @@ describe('stripe-webhook event handlers', () => {
       );
     });
 
+    it('applies the checkout upgrade even when a sibling event already wrote the same-second lastEventTimestamp (LS-9136)', async () => {
+      // A single checkout fires customer.subscription.created/updated and
+      // checkout.session.completed concurrently; Stripe's whole-second
+      // `event.created` means they frequently share a timestamp. The row
+      // already carries that exact timestamp (written by the sibling event
+      // first) — this must still be treated as concurrent, not stale, so the
+      // checkout-completed write (built from a live Stripe re-fetch) is not
+      // silently dropped, leaving the buyer stuck on 'free'.
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'checkout.session.completed',
+          created: 200,
+          data: {
+            object: {
+              id: 'cs_123',
+              customer: 'cus_123',
+              subscription: 'sub_123',
+              metadata: { userId: '42' },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // verifyCheckoutOwnership: no existing row for this customer
+      setupOwnershipDbCheck();
+      // upsertSubscription: previous tier lookup — a sibling event already
+      // wrote lastEventTimestamp=200 (same second as this event).
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', lastEventTimestamp: 200 }])),
+      );
+      // upsertSubscription: insert + update users — must still run, not skip.
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeInsertUpdateDb()),
+      );
+      setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      const result = await handler(makeEvent());
+
+      expect(result.statusCode).toBe(200);
+      // The GA4 side effect only fires when upsertSubscription actually
+      // applied the write (returns true) — proving the tie was not dropped.
+      expect(mockSendGa4ServerEvent).toHaveBeenCalledWith(
+        42,
+        'subscription_started',
+        { tier: 'premium', source: 'stripe' },
+      );
+    });
+
     it('returns 200 without processing when userId is missing from metadata', async () => {
       mockConstructEvent.mockReturnValue(
         fakeStripeEvent({
@@ -1543,6 +1599,57 @@ describe('stripe-webhook event handlers', () => {
       // Tier-change side effects must NOT fire for a stale cancel.
       expect(mockHandleSubscriptionDowngrade).not.toHaveBeenCalled();
       expect(mockPushPublish).not.toHaveBeenCalled();
+    });
+
+    it('processes a subscription.updated event with a same-second last_event_timestamp instead of dropping it as stale (LS-9136)', async () => {
+      // Two events from the same checkout (e.g. customer.subscription.updated
+      // and checkout.session.completed) routinely share the same whole-second
+      // `event.created` — a concurrent delivery, not an out-of-order one, so
+      // it must NOT be rejected by the staleness guard.
+      mockConstructEvent.mockReturnValue(
+        fakeStripeEvent({
+          type: 'customer.subscription.updated',
+          created: 200,
+          data: {
+            object: {
+              id: 'sub_123',
+              customer: 'cus_123',
+              status: 'active',
+              cancel_at_period_end: false,
+              trial_end: null,
+              metadata: { userId: '42' },
+              items: { data: [{ current_period_end: 1700000000 }] },
+            },
+          },
+        }),
+      );
+
+      setupNotProcessed();
+      // upsertSubscription: previous tier lookup — a sibling event already
+      // wrote lastEventTimestamp=200 (same second as this event).
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'free', lastEventTimestamp: 200 }])),
+      );
+      // upsertSubscription: insert + update users — must still run, not skip.
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeInsertUpdateDb()),
+      );
+      setupRecordEvent();
+      // pushSubscriptionUpdated DB lookup
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb(makeSelectDb([{ tier: 'premium', status: 'active' }])),
+      );
+
+      await handler(makeEvent());
+
+      // free → premium at a tied timestamp must still apply the upgrade.
+      expect(mockClearLeagueTierFreezes).toHaveBeenCalledWith(
+        42,
+        expect.any(Object),
+      );
     });
 
     it('processes a fresh event when last_event_timestamp is older', async () => {
