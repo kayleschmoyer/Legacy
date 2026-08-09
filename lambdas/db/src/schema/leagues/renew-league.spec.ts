@@ -19,6 +19,17 @@
  * contract independently of that infra.
  */
 import type { GraphQLSchema } from 'graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+
+// Stubs the live-Stripe-lookup path `requireFreshEntitlement` takes
+// (fresh-entitlements.ts `getStripeCustomerId` → `InternalSchema.subscriptions`,
+// then `fetchActiveEntitlements` → Stripe). Grants every catalog entitlement
+// whenever a Stripe customer id is present; a null customer id (the default —
+// matches a free user who has never been billed) short-circuits before this
+// is ever called, so its yield set never matters for free-tier assertions.
+const mockStripeEntitlementsList = jest.fn(function* () {
+  for (const key of Object.values(ENTITLEMENTS)) yield { lookup_key: key };
+});
 
 describe('renewLeague — transaction atomicity (LS-2498)', () => {
   let schema: GraphQLSchema;
@@ -36,7 +47,7 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
    */
   function makeChainableDb(
     readQueue: unknown[],
-    opts: { failOnInsert?: string } = {},
+    opts: { failOnInsert?: string; stripeCustomerId?: string | null } = {},
   ): {
     db: Record<string, unknown>;
     insertCalls: Array<{ table: unknown; values?: unknown[] }>;
@@ -49,14 +60,37 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
       set?: Record<string, unknown>;
     }> = [];
     let transactionInvocations = 0;
+    // Tracks the table passed to the most recent `.from(...)` so the
+    // `getStripeCustomerId` read (`.select(...).from(InternalSchema.subscriptions)...`)
+    // can be resolved out-of-band from `readQueue` below — its position in the
+    // resolver's read sequence varies per test (0-2 `requireFreshEntitlement`
+    // calls depending on which premium features the league carries), so it
+    // must not consume a slot meant for a positional business-data read.
+    let pendingFromTable: unknown;
 
     // Build the proxy lazily so `this` references stay consistent.
     const handler: ProxyHandler<object> = {
       get(_target, prop) {
+        if (prop === 'from') {
+          return (table: unknown) => {
+            pendingFromTable = table;
+            return proxy;
+          };
+        }
         if (prop === 'then') {
           // Awaiting the chain resolves to the next queued value.
-          return (resolve: (v: unknown) => void) =>
+          return (resolve: (v: unknown) => void) => {
+            if (pendingFromTable === 'subscriptions') {
+              pendingFromTable = undefined;
+              resolve(
+                opts.stripeCustomerId != null
+                  ? [{ stripeCustomerId: opts.stripeCustomerId }]
+                  : [],
+              );
+              return;
+            }
             resolve(readQueue.shift() ?? []);
+          };
         }
         if (prop === 'transaction') {
           return async (cb: (tx: unknown) => unknown) => {
@@ -227,7 +261,21 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
       },
       InternalSchema: {
         usersInAppInternal: sentinelTable('usersInAppInternal'),
+        subscriptions: sentinelTable('subscriptions'),
       },
+    }));
+
+    // The requireFreshEntitlement advanced-gate path (fresh-entitlements.ts)
+    // resolves a live Stripe client to read active entitlements. Tests never
+    // exercise real Stripe — `makeChainableDb`'s stripeCustomerId option
+    // decides whether getStripeCustomerId sees a customer at all, and this
+    // stub only matters when it does.
+    jest.doMock('../../server/stripe', () => ({
+      getStripeClient: jest.fn(async () => ({
+        entitlements: {
+          activeEntitlements: { list: mockStripeEntitlementsList },
+        },
+      })),
     }));
 
     const schemaModule = require('../../schema') as { schema: GraphQLSchema };
@@ -319,9 +367,22 @@ describe('renewLeague — transaction atomicity (LS-2498)', () => {
 
     const helpers = makeChainableDb(readQueue, {
       failOnInsert: opts.failOnInsert,
+      // Premium fixture: gives requireFreshEntitlement's live-Stripe path a
+      // customer to look up, so the FAAB (waiverType is always 'faab' here)
+      // and salary-cap re-checks resolve instead of throwing.
+      stripeCustomerId: 'cus_test_premium',
     });
     const context = {
-      user: { id: 42, isAdmin: false, username: 'commish' },
+      user: {
+        id: 42,
+        isAdmin: false,
+        username: 'commish',
+        // Fast-path claim consumed by hasEntitlement's unlimited_leagues gate
+        // (mutations.ts:3106) — without it the free-tier league-cap count
+        // query runs and consumes a readQueue slot this fixture doesn't plan
+        // for.
+        entitlements: [ENTITLEMENTS.unlimited_leagues],
+      },
       db: helpers.db,
     };
 
