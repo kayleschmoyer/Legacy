@@ -1,9 +1,10 @@
 /**
- * Tests for the shared LeagueDetailFreeAgentsTab (LS-7818).
+ * Tests for the shared LeagueDetailFreeAgentsTab (LS-7818, LS-9098).
  *
  * Mirrors the behavioral coverage the web v2 tab used to own before the
  * extraction: hitter/pitcher column sets, nullable-name handling, the
- * spectator banner, the claim-action gating, and the football placeholder.
+ * spectator banner, the claim-action gating, and the sport-conditional
+ * football position-group filters + sort-by-projection control.
  */
 
 import React from 'react';
@@ -14,10 +15,21 @@ import {
 import { fireEvent, render, screen } from '../../test-utils';
 
 let mockPlayers: ReadonlyArray<Record<string, unknown>> = [];
+let mockFootballPlayers: ReadonlyArray<Record<string, unknown>> = [];
+let mockFootballHasNextPage = false;
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetPlayersWithStatsQuery: jest.fn(() => ({
     data: { players: mockPlayers },
+    loading: false,
+  })),
+  useFootballPlayersQuery: jest.fn(() => ({
+    data: {
+      footballPlayers: {
+        nodes: mockFootballPlayers,
+        pageInfo: { hasNextPage: mockFootballHasNextPage, endCursor: null },
+      },
+    },
     loading: false,
   })),
   useGetLeagueTeamsQuery: jest.fn(() => ({
@@ -32,6 +44,8 @@ jest.mock('@apollo/client/react', () => ({
 }));
 
 jest.mock('@tamagui/lucide-icons', () => ({
+  ArrowDown: () => null,
+  ArrowUp: () => null,
   ChevronLeft: () => null,
   ChevronRight: () => null,
   Eye: () => null,
@@ -120,8 +134,21 @@ const claimAction = (player: { id: number }) => (
   </button>
 );
 
+const makeFootballPlayer = (overrides: Record<string, unknown> = {}) => ({
+  id: 20,
+  firstName: 'Patrick',
+  lastName: 'Mahomes',
+  position: 'QB',
+  isDst: false,
+  nflTeam: 'KC',
+  projectedFantasyPoints: 24.5,
+  ...overrides,
+});
+
 beforeEach(() => {
   mockPlayers = [];
+  mockFootballPlayers = [];
+  mockFootballHasNextPage = false;
 });
 
 describe('LeagueDetailFreeAgentsTab', () => {
@@ -213,17 +240,6 @@ describe('LeagueDetailFreeAgentsTab', () => {
     expect(screen.getByText('No players found')).toBeInTheDocument();
   });
 
-  it('renders the football player pool placeholder for football leagues', () => {
-    render(
-      <LeagueDetailFreeAgentsTab
-        league={{ ...league, sport: 'football' }}
-        isMember
-        myTeamId={42}
-      />,
-    );
-    expect(screen.getByText('Football Player Pool')).toBeInTheDocument();
-  });
-
   it('does not render hitter/pitcher toggles for football leagues', () => {
     render(
       <LeagueDetailFreeAgentsTab
@@ -234,5 +250,73 @@ describe('LeagueDetailFreeAgentsTab', () => {
     );
     expect(screen.queryByText('Pitchers')).not.toBeInTheDocument();
     expect(screen.queryByText('Hitters')).not.toBeInTheDocument();
+  });
+
+  it('renders QB/RB/WR/TE/K/DST position filters for a non-IDP football league', () => {
+    render(
+      <LeagueDetailFreeAgentsTab
+        league={{ ...league, sport: 'football', defensiveFormat: 'dst' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    for (const pos of ['QB', 'RB', 'WR', 'TE', 'K', 'DST']) {
+      expect(screen.getByTestId(`position-filter-${pos}`)).toBeInTheDocument();
+    }
+    expect(screen.queryByTestId('position-filter-DL')).not.toBeInTheDocument();
+  });
+
+  it('adds IDP DL/LB/DB position filters when the league defensiveFormat is idp', () => {
+    render(
+      <LeagueDetailFreeAgentsTab
+        league={{ ...league, sport: 'football', defensiveFormat: 'idp' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    for (const pos of ['DL', 'LB', 'DB']) {
+      expect(screen.getByTestId(`position-filter-${pos}`)).toBeInTheDocument();
+    }
+  });
+
+  it('renders football players with a Proj column and a sort-by-projection control', () => {
+    mockFootballPlayers = [makeFootballPlayer()];
+    render(
+      <LeagueDetailFreeAgentsTab
+        league={{ ...league, sport: 'football' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    expect(screen.getByTestId('fa-col-PROJ')).toBeInTheDocument();
+    expect(screen.getByText('Patrick Mahomes')).toBeInTheDocument();
+    expect(screen.getByTestId('sort-by-projection')).toBeInTheDocument();
+  });
+
+  it('reorders football players when the projection sort control is pressed', () => {
+    mockFootballPlayers = [
+      makeFootballPlayer({
+        id: 1,
+        lastName: 'LowProj',
+        projectedFantasyPoints: 5,
+      }),
+      makeFootballPlayer({
+        id: 2,
+        lastName: 'HighProj',
+        projectedFantasyPoints: 30,
+      }),
+    ];
+    render(
+      <LeagueDetailFreeAgentsTab
+        league={{ ...league, sport: 'football' }}
+        isMember
+        myTeamId={42}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('sort-by-projection'));
+    const names = screen
+      .getAllByText(/Patrick (HighProj|LowProj)/)
+      .map((el) => el.textContent);
+    expect(names).toEqual(['Patrick HighProj', 'Patrick LowProj']);
   });
 });

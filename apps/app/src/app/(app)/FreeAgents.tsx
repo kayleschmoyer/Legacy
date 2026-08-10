@@ -226,6 +226,7 @@ export function LeagueFreeAgents({ leagueId }: { leagueId: number }) {
           waiverEnabled,
           waiverType,
           gamesPerMatchup: league?.gamesPerMatchup,
+          defensiveFormat: league?.defensiveFormat,
         }}
         isMember
         myTeamId={userTeamId}
