@@ -2082,6 +2082,7 @@ export type Mutation = {
   /** Create or update dues settings for a league. Commissioner/GM access required. */
   updateDuesSettings?: Maybe<LeagueDuesSettings>;
   updateLeagueAnnouncement?: Maybe<LeagueChatMessage>;
+  updateLeagueScoringPositionBonuses?: Maybe<ScoringConfig>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
   updateMatchupPlayerPosition?: Maybe<MatchupPlayer>;
@@ -2694,6 +2695,11 @@ export type MutationUpdateLeagueAnnouncementArgs = {
   id: Scalars['Int']['input'];
   leagueId: Scalars['Int']['input'];
   messageText: Scalars['String']['input'];
+};
+
+export type MutationUpdateLeagueScoringPositionBonusesArgs = {
+  leagueId: Scalars['Int']['input'];
+  updates: Array<UpdateLeagueScoringPositionBonusInput>;
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {
@@ -4086,6 +4092,7 @@ export type ScoringConfig = {
   entries?: Maybe<Array<ScoringConfigEntry>>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   multiplierGroups?: Maybe<Array<ScoringRuleGroup>>;
+  positionBonuses?: Maybe<Array<ScoringPositionBonus>>;
   profileId?: Maybe<Scalars['Int']['output']>;
   profileName?: Maybe<Scalars['String']['output']>;
   stats?: Maybe<Array<ScoringRule>>;
@@ -4108,6 +4115,19 @@ export type ScoringMultiplierEntry = {
   multiplier?: Maybe<Scalars['Float']['output']>;
   sourceColumn?: Maybe<Scalars['String']['output']>;
   statKey?: Maybe<Scalars['String']['output']>;
+};
+
+export type ScoringPositionBonus = {
+  __typename?: 'ScoringPositionBonus';
+  bonusMultiplier?: Maybe<Scalars['Float']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  definition?: Maybe<ScoringStatDefinition>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  profileId?: Maybe<Scalars['Int']['output']>;
+  statDefinitionId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
 export type ScoringRule = {
@@ -4811,6 +4831,13 @@ export type UpdateDuesSettingsInput = {
 export type UpdateLeagueScoringMultiplierInput = {
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   multiplier?: InputMaybe<Scalars['Float']['input']>;
+  statDefinitionId: Scalars['Int']['input'];
+};
+
+export type UpdateLeagueScoringPositionBonusInput = {
+  bonusMultiplier?: InputMaybe<Scalars['Float']['input']>;
+  isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  position: Scalars['String']['input'];
   statDefinitionId: Scalars['Int']['input'];
 };
 
