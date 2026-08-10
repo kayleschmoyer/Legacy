@@ -40,6 +40,31 @@ describe('buildFetchArgs', () => {
       'develop',
     ]);
   });
+
+  it('inserts --deepen=<n> before the remote when deepen is positive', () => {
+    expect(buildFetchArgs('origin', 'main', 200)).toEqual([
+      'fetch',
+      '--deepen=200',
+      'origin',
+      'main',
+    ]);
+  });
+
+  it('omits --deepen when deepen is absent, zero, negative, or non-integer', () => {
+    expect(buildFetchArgs('origin', undefined, undefined)).toEqual([
+      'fetch',
+      'origin',
+    ]);
+    expect(buildFetchArgs('origin', undefined, 0)).toEqual(['fetch', 'origin']);
+    expect(buildFetchArgs('origin', undefined, -5)).toEqual([
+      'fetch',
+      'origin',
+    ]);
+    expect(buildFetchArgs('origin', undefined, 1.5)).toEqual([
+      'fetch',
+      'origin',
+    ]);
+  });
 });
 
 describe('buildFetchResult', () => {
@@ -105,6 +130,20 @@ describe('executeWorktreeFetch', () => {
       output:
         'From github.com:org/repo\n   abc123..def456  main -> origin/main',
     });
+  });
+
+  it('passes deepen through to buildFetchArgs', () => {
+    const runGit = jest.fn<FetchDeps['runGit']>().mockReturnValue('');
+
+    executeWorktreeFetch(
+      { remote: 'origin', branch: 'main', deepen: 200 },
+      { resolveTargetDir: okResolver, runGit },
+    );
+
+    expect(runGit).toHaveBeenCalledWith(
+      ['fetch', '--deepen=200', 'origin', 'main'],
+      '/wt',
+    );
   });
 
   it('defaults the remote to origin and reports upToDate on empty output', () => {

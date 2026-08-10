@@ -32,6 +32,8 @@ export interface FetchArgs {
   remote?: string;
   branch?: string;
   worktree?: string;
+  /** Deepen a shallow clone by this many commits (`git fetch --deepen=<n>`). */
+  deepen?: number;
 }
 
 /**
@@ -52,9 +54,21 @@ export interface FetchDeps {
  * Appends the branch only when it is a non-empty (after trimming) string, so
  * `git fetch <remote>` (fetch all) and `git fetch <remote> <branch>` are both
  * expressible. The branch is trimmed to avoid passing stray whitespace to git.
+ * `--deepen=<n>` is inserted before the remote (matching `git fetch --deepen=N
+ * <remote> <branch>`) when `deepen` is a positive integer, so callers can
+ * recover a shallow clone (e.g. after a stale merge-base) without a raw
+ * `git fetch --deepen` via Bash (LS-9232).
  */
-export function buildFetchArgs(remote: string, branch?: string): string[] {
-  const args = ['fetch', remote];
+export function buildFetchArgs(
+  remote: string,
+  branch?: string,
+  deepen?: number,
+): string[] {
+  const args = ['fetch'];
+  if (Number.isInteger(deepen) && (deepen as number) > 0) {
+    args.push(`--deepen=${deepen}`);
+  }
+  args.push(remote);
   if (branch && branch.trim()) {
     args.push(branch.trim());
   }
@@ -95,7 +109,7 @@ export function executeWorktreeFetch(
   args: FetchArgs,
   deps: FetchDeps,
 ): ToolResponse {
-  const { remote = 'origin', branch, worktree: wtKey } = args;
+  const { remote = 'origin', branch, worktree: wtKey, deepen } = args;
 
   const target = deps.resolveTargetDir(wtKey);
   if ('error' in target) {
@@ -106,7 +120,10 @@ export function executeWorktreeFetch(
   }
 
   try {
-    const output = deps.runGit(buildFetchArgs(remote, branch), target.path);
+    const output = deps.runGit(
+      buildFetchArgs(remote, branch, deepen),
+      target.path,
+    );
     return {
       content: [
         {

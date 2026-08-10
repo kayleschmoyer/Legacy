@@ -34,6 +34,7 @@ import { homedir, tmpdir } from 'node:os';
 import { checkJiraAuth } from './auth-checks';
 import { scanStagedForConflictMarkers } from './conflict-markers';
 import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
+import { ensureSufficientDepth } from './shallow-utils';
 import {
   executeWorktreeFileMode,
   executeWorktreeSetExecutable,
@@ -2834,7 +2835,10 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         'Use this instead of worktree_run(command: "git fetch origin") when you need up-to-date ' +
         'remote refs before a merge-base check, ancestor comparison, or any operation that reads ' +
         'origin/* refs. Typical use: fetch before worktree_status() to get accurate ahead/behind counts, ' +
-        'or before worktree_run(command: "git merge-base --is-ancestor origin/main HEAD").',
+        'or before worktree_run(command: "git merge-base --is-ancestor origin/main HEAD"). ' +
+        'If a merge-base check fails with "unrelated histories" or comes back empty, the worktree is ' +
+        'likely a shallow clone — pass `deepen` (e.g. 200) instead of falling back to a raw ' +
+        '`git fetch --deepen`/`git rev-parse --is-shallow-repository` via Bash.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -2847,6 +2851,13 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Specific branch or refspec to fetch (e.g. "main" or "refs/heads/main"). ' +
               'Omit to fetch all branches from the remote.',
+          },
+          deepen: {
+            type: 'number',
+            description:
+              'Deepen a shallow clone by this many additional commits ' +
+              '(`git fetch --deepen=<n>`). Use when a merge-base check against origin/main ' +
+              'fails or returns nothing. 200 covers typical PR depths.',
           },
           worktree: {
             type: 'string',
@@ -10214,6 +10225,11 @@ const handleCallTool = async (
             `Fetch warning (continuing): ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)}`,
           );
         }
+
+        // A shallow MAIN_REPO doesn't self-heal on a plain fetch — deepen it
+        // now so the new worktree doesn't inherit stale/insufficient history
+        // (LS-9232). Non-fatal: failures only produce warning log lines.
+        log.push(...ensureSufficientDepth({ runGit }, MAIN_REPO));
 
         // Run git worktree add — if the branch exists locally use it directly;
         // otherwise create a local tracking branch from origin/<branch>.
