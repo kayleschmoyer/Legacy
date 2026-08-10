@@ -13,7 +13,6 @@ import {
   SLATE_400,
   SURFACE_CARD,
   SURFACE_SUBTLE,
-  WHITE,
   withAlpha,
 } from '../utils/colors';
 
@@ -95,11 +94,11 @@ export function LeagueCard({
         cursor="pointer"
         backgroundColor={SURFACE_CARD}
         borderWidth={1}
-        borderColor={withAlpha(WHITE, 0.08)}
+        borderColor="$glassBorder"
         borderRadius={16}
         overflow="hidden"
         animation="quick"
-        hoverStyle={{ borderColor: withAlpha(WHITE, 0.16) }}
+        hoverStyle={{ borderColor: '$glassBorderHover' }}
         pressStyle={{ scale: 0.99 }}
         style={{ animationDelay: `${animationDelay}ms` } as never}
       >
