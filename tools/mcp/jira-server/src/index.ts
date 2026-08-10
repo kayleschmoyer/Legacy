@@ -478,7 +478,7 @@ server.tool(
 // --- jira_search ---
 server.tool(
   'jira_search',
-  'Search Jira issues using JQL. Returns compact results (key, summary, status, type, assignee, priority) — no metadata blobs. Prefer this over Atlassian plugin search tools to avoid context overflow. Default maxResults is 15; raise only when you know the result set is small. Use compact=true for large result sets (e.g. listing all children of an epic) to get a minimal flat array of {key, summary, status} — typically under 2 KB for 50 issues. When more pages exist, the response includes nextPageToken — pass it as pageToken to fetch the next page.',
+  "Search Jira issues using JQL. Returns compact results (key, summary, status, type, assignee, priority) — no metadata blobs. Prefer this over Atlassian plugin search tools to avoid context overflow. Default maxResults is 15; raise only when you know the result set is small. Use compact=true for large result sets (e.g. listing all children of an epic) to get a minimal flat array of {key, summary, status} — typically under 2 KB for 50 issues. Pass fields to restrict the response to exactly those Jira fields (plus key) instead of the default/compact column set — unlike the Atlassian plugin's searchJiraIssuesUsingJql, this fields param is actually honored. When more pages exist, the response includes nextPageToken — pass it as pageToken to fetch the next page.",
   {
     jql: z.string().describe('JQL query string'),
     maxResults: z.coerce
@@ -492,7 +492,7 @@ server.tool(
       .boolean()
       .default(false)
       .describe(
-        'When true, returns { issues: [{key, summary, status}], nextPageToken? } — no extra fields, envelope format. Use for large result sets like epic children to avoid context overflow.',
+        'When true, returns { issues: [{key, summary, status}], nextPageToken? } — no extra fields, envelope format. Use for large result sets like epic children to avoid context overflow. Ignored when fields is set.',
       ),
     pageToken: z
       .string()
@@ -500,6 +500,13 @@ server.tool(
       .optional()
       .describe(
         'Cursor token from a previous response nextPageToken to fetch the next page of results.',
+      ),
+    fields: z
+      .array(z.string())
+      .min(1)
+      .optional()
+      .describe(
+        'Restrict the response to exactly these Jira field names (plus key), overriding the default/compact column set. Each row renders one column per requested field.',
       ),
   },
   async (params) => search(params),

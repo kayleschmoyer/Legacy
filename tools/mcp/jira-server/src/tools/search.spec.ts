@@ -90,4 +90,62 @@ describe('search', () => {
     expect(result.isError).toBe(true);
     expect(text(result)).toContain('Jira search failed: boom');
   });
+
+  it('honors a custom fields list, restricting both the request and the rendered columns', async () => {
+    mockSearchJql.mockResolvedValueOnce({
+      issues: [
+        { key: 'LS-9000', fields: { summary: 'First issue' } },
+        { key: 'LS-9001', fields: { summary: 'Second issue' } },
+      ],
+    });
+
+    const out = text(
+      await search({ jql: 'project = LS', fields: ['summary'] }),
+    );
+
+    expect(mockSearchJql).toHaveBeenCalledWith(
+      expect.objectContaining({ fields: ['summary'] }),
+    );
+    expect(out).toContain('key|summary');
+    expect(out).not.toContain('status');
+    expect(out).toContain('LS-9000|First issue');
+    expect(out).toContain('LS-9001|Second issue');
+  });
+
+  it('flattens nested { name } / { displayName } shapes for custom fields', async () => {
+    mockSearchJql.mockResolvedValueOnce({
+      issues: [
+        {
+          key: 'LS-9000',
+          fields: {
+            status: { name: 'In Progress' },
+            assignee: { displayName: 'Brad Krupa' },
+          },
+        },
+      ],
+    });
+
+    const out = text(
+      await search({
+        jql: 'project = LS',
+        fields: ['status', 'assignee'],
+      }),
+    );
+
+    expect(out).toContain('key|status|assignee');
+    expect(out).toContain('LS-9000|In Progress|Brad Krupa');
+  });
+
+  it('an empty custom fields array falls back to the default column set', async () => {
+    mockSearchJql.mockResolvedValueOnce({ issues });
+
+    const out = text(await search({ jql: 'project = LS', fields: [] }));
+
+    expect(mockSearchJql).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fields: ['summary', 'status', 'issuetype', 'assignee', 'priority'],
+      }),
+    );
+    expect(out).toContain('key|summary|status|type|assignee|priority');
+  });
 });

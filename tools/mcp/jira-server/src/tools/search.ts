@@ -12,6 +12,7 @@ interface SearchParams {
   maxResults?: number;
   compact?: boolean;
   pageToken?: string;
+  fields?: string[];
 }
 
 interface SearchFields {
@@ -31,12 +32,56 @@ const DEFAULT_FIELDS = [
 ];
 const COMPACT_FIELDS = ['summary', 'status'];
 
+/** Best-effort scalar rendering of a raw Jira field value for the custom-fields table. */
+function renderFieldValue(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    if (typeof obj.name === 'string') return obj.name;
+    if (typeof obj.displayName === 'string') return obj.displayName;
+    if (typeof obj.value === 'string') return obj.value;
+  }
+  return value;
+}
+
 /** Search Jira issues using JQL via the v3 search/jql endpoint. */
 export async function search(params: SearchParams): Promise<CallToolResult> {
-  const { jql, maxResults: rawMax = 15, compact = false, pageToken } = params;
+  const {
+    jql,
+    maxResults: rawMax = 15,
+    compact = false,
+    pageToken,
+    fields: customFields,
+  } = params;
   const maxResults = Math.max(1, Math.min(50, Math.floor(rawMax)));
 
   try {
+    if (customFields && customFields.length > 0) {
+      const result = await searchJql<Record<string, unknown>>({
+        jql,
+        fields: customFields,
+        maxResults,
+        pageToken,
+      });
+
+      const issues = result.issues.map((issue) => {
+        const row: Record<string, unknown> = { key: issue.key };
+        for (const field of customFields) {
+          row[field] = renderFieldValue(issue.fields[field]);
+        }
+        return row;
+      });
+      const columns = ['key', ...customFields];
+      const text =
+        issues.length === 0
+          ? 'No issues match this query.'
+          : withNextPageHint(
+              markdownTable(issues, { columns }),
+              result.nextPageToken,
+            );
+      return { content: [{ type: 'text', text }] };
+    }
+
     const result = await searchJql<SearchFields>({
       jql,
       fields: compact ? COMPACT_FIELDS : DEFAULT_FIELDS,
