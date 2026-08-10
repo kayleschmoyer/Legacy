@@ -142,6 +142,14 @@ export class LeaguePage extends BaseScreen {
   }
 
   /**
+   * The "League limit reached" alert banner shown on the create form when a
+   * free-tier user is already at `FREE_LEAGUE_LIMIT` (LS-5376).
+   */
+  get leagueLimitBanner(): UIElement {
+    return this.driver.byTestId('league-limit-banner');
+  }
+
+  /**
    * The `UpgradeModal` dialog (`apps/web/src/components/UpgradeModal.tsx`) —
    * opened by any premium-gated control's upgrade CTA, including create-form
    * fields (FAAB waivers, historical eras, salary cap) and the {@link premiumGate}
