@@ -2,6 +2,7 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import {
   battingPlayerTypeFilter,
   getCareerBattingOrderByClause,
+  positionEligibilityFilter,
   type QueryOptions,
 } from './TypeSafeQueryBuilder';
 
@@ -109,4 +110,30 @@ describe('battingPlayerTypeFilter (LS-7145)', () => {
     expect(battingPlayerTypeFilter('combined')).toBeUndefined();
     expect(battingPlayerTypeFilter('')).toBeUndefined();
   });
+});
+
+// Players tab position chips (LS-8835 regression): the filter must go against
+// player_eligible_positions, not career_fielding_by_position — the latter is
+// fielding-only and has no SP/RP rows (pitching roles, not fielding
+// positions), so those two chips previously inner-joined to zero rows.
+describe('positionEligibilityFilter (LS-8835)', () => {
+  function render(position: string): string {
+    return dialect.sqlToQuery(positionEligibilityFilter(position)).sql;
+  }
+
+  it('filters career_batting.player_id via player_eligible_positions', () => {
+    const sql = render('2B');
+    expect(sql).toMatch(/"career_batting"\."player_id" IN \(/);
+    expect(sql).toMatch(/player_eligible_positions/);
+    expect(sql).toMatch(/position ILIKE/);
+  });
+
+  it.each(['SP', 'RP', 'DH'])(
+    "renders a filter for the pitching-role/DH chip '%s' (no career_fielding_by_position join, which lacks these values)",
+    (position) => {
+      const sql = render(position);
+      expect(sql).not.toMatch(/career_fielding_by_position/);
+      expect(sql).toMatch(/player_eligible_positions/);
+    },
+  );
 });

@@ -64,6 +64,20 @@ export function battingPlayerTypeFilter(
 }
 
 /**
+ * Position-chip filter (LS-8835) against `player_eligible_positions`, not
+ * `career_fielding_by_position` — the latter is fielding-only (populated from
+ * defensive appearances), so it has no `SP`/`RP` rows at all (pitching roles,
+ * not fielding positions) and selecting either chip previously inner-joined
+ * to zero rows. `player_eligible_positions` (the same view
+ * `battingPlayerTypeFilter` above already trusts for its 'pitcher' bucket)
+ * carries `SP`/`RP`/`DH` correctly, so every chip — including the two
+ * pitching-role ones — resolves off one canonical source.
+ */
+export function positionEligibilityFilter(position: string): SQL<unknown> {
+  return sql`${PublicSchema.careerBatting.playerId} IN (SELECT player_id FROM public.player_eligible_positions WHERE position ILIKE ${position})`;
+}
+
+/**
  * Type-safe query builder using Drizzle's recommended conditional patterns
  * This approach avoids .$dynamic() by building complete queries conditionally
  * following Drizzle best practices for complex queries
@@ -364,8 +378,9 @@ export class CareerBattingQueryBuilder {
   }
 
   /**
-   * Execute query with position join for filtering by primary position
-   * Joins career_batting with career_fielding_by_position
+   * Execute query filtered by eligible position (LS-8835: filters against
+   * `player_eligible_positions` via `positionEligibilityFilter`, not a join
+   * to the fielding-only `career_fielding_by_position` table).
    */
   private async executeWithPositionJoin(
     battingConditions: SQL<unknown>[],
@@ -373,23 +388,10 @@ export class CareerBattingQueryBuilder {
     orderByClause: SQL<unknown>,
     options: QueryOptions,
   ) {
-    const positionCondition = ilike(
-      PublicSchema.careerFieldingByPosition.pos,
-      position,
-    );
+    const positionCondition = positionEligibilityFilter(position);
     const allConditions = [...battingConditions, positionCondition];
 
-    const baseQuery = () =>
-      this.db
-        .select()
-        .from(PublicSchema.careerBatting)
-        .innerJoin(
-          PublicSchema.careerFieldingByPosition,
-          eq(
-            PublicSchema.careerBatting.playerId,
-            PublicSchema.careerFieldingByPosition.playerId,
-          ),
-        );
+    const baseQuery = () => this.db.select().from(PublicSchema.careerBatting);
 
     const withConditions = () => {
       const query = baseQuery();
@@ -419,7 +421,8 @@ export class CareerBattingQueryBuilder {
   }
 
   /**
-   * Execute query with both player join (search) and position join
+   * Execute query with player join (search) plus an eligible-position filter
+   * (LS-8835: `positionEligibilityFilter`, not a `career_fielding_by_position` join).
    */
   private async executeWithBothJoins(
     battingConditions: SQL<unknown>[],
@@ -429,10 +432,7 @@ export class CareerBattingQueryBuilder {
     options: QueryOptions,
   ) {
     const searchCondition = buildPlayerNameSearch(searchTerm);
-    const positionCondition = ilike(
-      PublicSchema.careerFieldingByPosition.pos,
-      position,
-    );
+    const positionCondition = positionEligibilityFilter(position);
 
     const allConditions = [...battingConditions, positionCondition];
     if (searchCondition) {
@@ -446,13 +446,6 @@ export class CareerBattingQueryBuilder {
         .innerJoin(
           PublicSchema.players,
           eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id),
-        )
-        .innerJoin(
-          PublicSchema.careerFieldingByPosition,
-          eq(
-            PublicSchema.careerBatting.playerId,
-            PublicSchema.careerFieldingByPosition.playerId,
-          ),
         );
 
     const withConditions = () => {
@@ -665,7 +658,8 @@ export class CareerBattingQueryBuilder {
   }
 
   /**
-   * Get count with position join (career_fielding_by_position) using function-based approach
+   * Get count filtered by eligible position (LS-8835: `positionEligibilityFilter`,
+   * not a `career_fielding_by_position` join) using function-based approach
    */
   async countWithPositionJoin(options: {
     filters?: StatisticsQueryFilters;
@@ -702,22 +696,11 @@ export class CareerBattingQueryBuilder {
       }
     }
     if (filters.position) {
-      conditions.push(
-        ilike(PublicSchema.careerFieldingByPosition.pos, filters.position),
-      );
+      conditions.push(positionEligibilityFilter(filters.position));
     }
 
     const baseQuery = () =>
-      this.db
-        .select({ count: count() })
-        .from(PublicSchema.careerBatting)
-        .innerJoin(
-          PublicSchema.careerFieldingByPosition,
-          eq(
-            PublicSchema.careerBatting.playerId,
-            PublicSchema.careerFieldingByPosition.playerId,
-          ),
-        );
+      this.db.select({ count: count() }).from(PublicSchema.careerBatting);
 
     const finalQuery = () => {
       const query = baseQuery();
@@ -732,7 +715,8 @@ export class CareerBattingQueryBuilder {
   }
 
   /**
-   * Get count with both player join (search) and position join
+   * Get count with player join (search) plus an eligible-position filter
+   * (LS-8835: `positionEligibilityFilter`, not a `career_fielding_by_position` join).
    */
   async countWithBothJoins(options: {
     filters?: StatisticsQueryFilters;
@@ -769,9 +753,7 @@ export class CareerBattingQueryBuilder {
       }
     }
     if (filters.position) {
-      conditions.push(
-        ilike(PublicSchema.careerFieldingByPosition.pos, filters.position),
-      );
+      conditions.push(positionEligibilityFilter(filters.position));
     }
     if (filters.searchTerm) {
       const searchCondition = buildPlayerNameSearch(filters.searchTerm);
@@ -787,13 +769,6 @@ export class CareerBattingQueryBuilder {
         .innerJoin(
           PublicSchema.players,
           eq(PublicSchema.careerBatting.playerId, PublicSchema.players.id),
-        )
-        .innerJoin(
-          PublicSchema.careerFieldingByPosition,
-          eq(
-            PublicSchema.careerBatting.playerId,
-            PublicSchema.careerFieldingByPosition.playerId,
-          ),
         );
 
     const finalQuery = () => {
