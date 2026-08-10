@@ -761,6 +761,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
       position: queryPosition,
       leagueId,
       search: debouncedSearch || undefined,
+      excludeRostered: true,
     },
     skip: !league.id || isFootball,
     fetchPolicy: 'cache-and-network',

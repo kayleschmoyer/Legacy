@@ -115,6 +115,13 @@ export interface PlayerFilters {
   baseballHofOnly?: boolean;
   /** Filter by sport ('baseball' | 'football'). Omit for no restriction. */
   sport?: 'baseball' | 'football';
+  /**
+   * When true, exclude players already rostered on any team in the query's
+   * `leagueId` (LS-9118). Requires `leagueId` to be set — a no-op otherwise.
+   * Applied server-side, before LIMIT/OFFSET, so paginated free-agent results
+   * are not thinned out by post-fetch client-side filtering.
+   */
+  excludeRostered?: boolean;
 }
 
 /** Sort options that require a join to career_batting */
@@ -638,6 +645,14 @@ export class PlayerService {
         const eraCondition = this.buildRawEraFilter(queryOptions.filters);
         if (eraCondition) {
           rawConditions.push(eraCondition);
+        }
+
+        // Rostered-player exclusion (LS-9118) — applied before LIMIT/OFFSET so
+        // a page of results is never thinned out after the fact.
+        if (queryOptions.filters?.excludeRostered && leagueIdParam != null) {
+          rawConditions.push(
+            sql`NOT EXISTS (SELECT 1 FROM public.team_members tm WHERE tm.player_id = p.id AND tm.league_id = ${leagueIdParam})`,
+          );
         }
 
         const whereClause =

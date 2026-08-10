@@ -3794,6 +3794,7 @@ export type QueryPlayerSeasonPitchingArgs = {
 
 export type QueryPlayersArgs = {
   excludeEmptyNames?: InputMaybe<Scalars['Boolean']['input']>;
+  excludeRostered?: InputMaybe<Scalars['Boolean']['input']>;
   leagueId?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;

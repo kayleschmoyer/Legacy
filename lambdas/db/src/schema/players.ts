@@ -364,6 +364,12 @@ builder.queryField('players', (t) =>
         description:
           'Filter by sport. When leagueId is provided, the league sport takes precedence.',
       }),
+      excludeRostered: t.arg.boolean({
+        required: false,
+        defaultValue: false,
+        description:
+          'When true, exclude players already rostered on any team in leagueId (free-agent pools). Requires leagueId.',
+      }),
     },
     resolve: async (root, args, context) => {
       // Player-name search drives the Player Comparison feature. The comparison
@@ -436,6 +442,7 @@ builder.queryField('players', (t) =>
           customEraStartYear: leagueCustomEraStartYear,
           customEraEndYear: leagueCustomEraEndYear,
           sport: sportFilter,
+          excludeRostered: args.excludeRostered ?? false,
         },
       });
     },

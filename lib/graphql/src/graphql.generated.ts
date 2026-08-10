@@ -3806,6 +3806,7 @@ export type QueryPlayerSeasonPitchingArgs = {
 
 export type QueryPlayersArgs = {
   excludeEmptyNames?: InputMaybe<Scalars['Boolean']['input']>;
+  excludeRostered?: InputMaybe<Scalars['Boolean']['input']>;
   leagueId?: InputMaybe<Scalars['Int']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
@@ -11065,6 +11066,7 @@ export type GetPlayersWithStatsQueryVariables = Exact<{
   position?: InputMaybe<Scalars['String']['input']>;
   leagueId?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  excludeRostered?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type GetPlayersWithStatsQuery = {
@@ -27340,6 +27342,7 @@ export const GetPlayersWithStats = gql`
     $position: String
     $leagueId: Int
     $search: String
+    $excludeRostered: Boolean
   ) {
     players(
       limit: $limit
@@ -27349,6 +27352,7 @@ export const GetPlayersWithStats = gql`
       position: $position
       leagueId: $leagueId
       search: $search
+      excludeRostered: $excludeRostered
     ) {
       id
       firstName
@@ -27446,6 +27450,7 @@ export const GetPlayersWithStats = gql`
  *      position: // value for 'position'
  *      leagueId: // value for 'leagueId'
  *      search: // value for 'search'
+ *      excludeRostered: // value for 'excludeRostered'
  *   },
  * });
  */

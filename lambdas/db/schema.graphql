@@ -3835,6 +3835,11 @@ type Query {
     excludeEmptyNames: Boolean = false
 
     """
+    When true, exclude players already rostered on any team in leagueId (free-agent pools). Requires leagueId.
+    """
+    excludeRostered: Boolean = false
+
+    """
     League ID for scoring-based sorting and player pool filtering (career minimums, sport). Uses league-specific scoring multipliers when provided, system defaults otherwise.
     """
     leagueId: Int

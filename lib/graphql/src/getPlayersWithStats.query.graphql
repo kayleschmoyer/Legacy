@@ -6,6 +6,7 @@ query GetPlayersWithStats(
   $position: String
   $leagueId: Int
   $search: String
+  $excludeRostered: Boolean
 ) {
   players(
     limit: $limit
@@ -15,6 +16,7 @@ query GetPlayersWithStats(
     position: $position
     leagueId: $leagueId
     search: $search
+    excludeRostered: $excludeRostered
   ) {
     id
     firstName

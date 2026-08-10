@@ -213,6 +213,42 @@ describe('PlayerService — scoring sort', () => {
     expect(sqlText).toContain('cs_default');
   });
 
+  it('excludes rostered players when excludeRostered + leagueId are set (LS-9118)', async () => {
+    await service.getPlayersWithScoring({
+      orderBy: 'avgPointsPerGame',
+      leagueId: 5670,
+      filters: { excludeRostered: true },
+    });
+
+    const executeCalls = mockDb.execute.mock.calls as unknown[][];
+    const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+    expect(sqlText).toContain('team_members');
+    expect(sqlText).toContain('tm.league_id');
+  });
+
+  it('does not filter by roster when excludeRostered is set without a leagueId (LS-9118)', async () => {
+    await service.getPlayersWithScoring({
+      orderBy: 'avgPointsPerGame',
+      filters: { excludeRostered: true },
+    });
+
+    const executeCalls = mockDb.execute.mock.calls as unknown[][];
+    const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+    expect(sqlText).not.toContain('team_members');
+  });
+
+  it('does not filter by roster when excludeRostered is false (LS-9118)', async () => {
+    await service.getPlayersWithScoring({
+      orderBy: 'avgPointsPerGame',
+      leagueId: 5670,
+      filters: { excludeRostered: false },
+    });
+
+    const executeCalls = mockDb.execute.mock.calls as unknown[][];
+    const sqlText = JSON.stringify(executeCalls[0]?.[0]);
+    expect(sqlText).not.toContain('team_members');
+  });
+
   it('reads pre-computed hitter_avg_ppg / pitching_avg_ppg from the cache (LS-4688)', async () => {
     mockDb.execute.mockResolvedValueOnce({
       rows: [
