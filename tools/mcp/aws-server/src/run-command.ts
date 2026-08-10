@@ -17,6 +17,17 @@ export function getRepoRoot(): string {
  * encode errors on emoji/non-ASCII log output (Windows-specific issue). PYTHONUTF8=1
  * enables Python 3.7+ UTF-8 mode as a belt-and-suspenders fallback.
  * Throws on non-zero exit.
+ *
+ * Runs with `shell: false`: `aws` and `terraform` (the only commands this
+ * server invokes) are real executables on every platform, not npm-style
+ * `.cmd` wrappers, so no shell is needed. `shell: true` previously forced
+ * Node to join `command` and `args` into a single string handed to the
+ * platform shell for re-parsing — which strips unescaped quotes/braces from
+ * args like the SSM `--parameters` JSON payload (`{"commands":[...]}`
+ * became `{commands:[...]}` once the shell removed the quoting), breaking
+ * `aws ssm send-command`. `execFile` with `shell: false` passes `args` to
+ * the OS as an argv array with no re-parsing, so arguments reach the
+ * process byte-for-byte.
  */
 export function runCommand(
   command: string,
@@ -40,7 +51,7 @@ export function runCommand(
       {
         cwd,
         timeout,
-        shell: true,
+        shell: false,
         env,
         // CREATE_NO_WINDOW: suppress the console window that cmd.exe/powershell.exe
         // would otherwise flash when spawned from a hidden stdio MCP child on Windows.
