@@ -22,6 +22,11 @@ const mockSetParams = jest.fn();
 // `/baseball` and `/football` redirect into this tab carrying `?sport=` (LS-8823).
 let mockSearchParams: { sport?: string } = {};
 
+// Focus callbacks are recorded so tests can re-fire focus after mount — the
+// screen stays mounted across tab switches, so "return to this tab" is a
+// second focus, not a re-render (LS-9248).
+const focusCallbacks: Array<() => (() => void) | void> = [];
+
 // useFocusEffect runs its callback synchronously in tests
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -31,6 +36,7 @@ jest.mock('expo-router', () => ({
   }),
   useLocalSearchParams: () => mockSearchParams,
   useFocusEffect: (cb: () => (() => void) | void) => {
+    focusCallbacks.push(cb);
     cb();
   },
 }));
@@ -91,8 +97,12 @@ let capturedOnBrowseStats: (() => void) | null = null;
 let capturedOnSetLineup: ((summary: Record<string, unknown>) => void) | null =
   null;
 
+/** Minimal stand-in for the ScrollView handle `scrollRef` receives (LS-9248). */
+type ScrollHandleStub = { scrollTo: jest.Mock };
+
 type HomeScreenMockProps = {
   onViewSport: (sport: 'baseball' | 'football') => void;
+  scrollRef?: React.RefObject<ScrollHandleStub | null>;
   testID?: string;
   topInset?: number;
   onThisDay?: React.ReactNode;
@@ -110,10 +120,13 @@ type HomeScreenMockProps = {
 // Capture the refreshControl element so pull-to-refresh tests can assert it's
 // wired to the screen's refetch (LS-8847).
 let capturedRefreshControl: HomeScreenMockProps['refreshControl'] | null = null;
+// Capture the scroll handle the tab passes down (LS-9248).
+let capturedScrollRef: HomeScreenMockProps['scrollRef'] | null = null;
 
 jest.mock('@legacy-sports/shared-components', () => ({
   HomeScreen: ({
     onViewSport,
+    scrollRef,
     testID,
     topInset,
     onThisDay,
@@ -138,6 +151,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     capturedOnBrowseStats = onBrowseStats ?? null;
     capturedOnSetLineup = onSetLineup ?? null;
     capturedRefreshControl = refreshControl ?? null;
+    capturedScrollRef = scrollRef ?? null;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
     return <View testID={testID ?? 'home-screen'}>{onThisDay}</View>;
@@ -654,5 +668,63 @@ describe('HomeTab pull-to-refresh (LS-8847)', () => {
     });
 
     expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// LS-9248 — the tab navigator keeps this screen mounted, so scrolling down on
+// Home, switching to another tab and coming back used to land the user
+// wherever they had left off instead of at the top of the dashboard.
+describe('HomeTab scroll reset on tab focus (LS-9248)', () => {
+  /** Stands in for the mounted ScrollView the shared HomeScreen attaches. */
+  const attachScrollHandle = (): ScrollHandleStub => {
+    const handle: ScrollHandleStub = { scrollTo: jest.fn() };
+    if (capturedScrollRef) capturedScrollRef.current = handle;
+    return handle;
+  };
+
+  /** Re-fires focus the way returning to an already-mounted tab does. */
+  const refocusTab = () => {
+    void act(() => {
+      focusCallbacks.forEach((cb) => cb());
+    });
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = {};
+    capturedScrollRef = null;
+    focusCallbacks.length = 0;
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: [] },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+    mockGetArchivedLazy.mockReturnValue([
+      jest.fn(),
+      { data: null, loading: false },
+    ]);
+    mockGetArchivedCached.mockReturnValue({ data: null });
+  });
+
+  it('gives HomeScreen a scroll ref to reset', () => {
+    render(<HomeTab />);
+    expect(capturedScrollRef).toBeTruthy();
+  });
+
+  it('scrolls the dashboard back to the top when the tab regains focus', () => {
+    render(<HomeTab />);
+    const handle = attachScrollHandle();
+
+    refocusTab();
+
+    expect(handle.scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
+  });
+
+  it('does not throw when focus fires before the scroll view has mounted', () => {
+    expect(() => {
+      render(<HomeTab />);
+      refocusTab();
+    }).not.toThrow();
   });
 });

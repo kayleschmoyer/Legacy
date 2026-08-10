@@ -13,6 +13,7 @@ import type {
   GestureResponderEvent,
   LayoutChangeEvent,
   RefreshControlProps,
+  ScrollView as ScrollViewHandle,
 } from 'react-native';
 import {
   ArrowRight,
@@ -148,6 +149,15 @@ export interface HomeScreenProps {
   onThisDayCondensed?: React.ReactNode;
   /** Pull-to-refresh control for the narrow layout's `ScrollView` (LS-8847). */
   refreshControl?: React.ReactElement<RefreshControlProps>;
+  /**
+   * Handle on the screen's scroll container, attached to whichever state
+   * (loading / error / dashboard / new-user) is currently rendered.
+   *
+   * Mobile keeps this tab mounted across tab switches, so the offset survives
+   * one; the Home tab uses this ref to scroll back to the top on focus
+   * (LS-9248). Callers that don't need imperative scrolling omit it.
+   */
+  scrollRef?: React.Ref<ScrollViewHandle>;
 }
 
 /* ─── Sport config ─── */
@@ -2657,6 +2667,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     onViewMatchup,
     onThisDayCondensed,
     refreshControl,
+    scrollRef,
   } = props;
 
   const sortedSummaries = useMemo(() => sortByUrgency(leagues), [leagues]);
@@ -2693,6 +2704,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   if (loading) {
     return (
       <ScrollView
+        ref={scrollRef}
         testID="home-screen"
         backgroundColor="$background"
         paddingTop={topInset}
@@ -2718,6 +2730,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   if (error) {
     return (
       <ScrollView
+        ref={scrollRef}
         testID="home-screen"
         backgroundColor="$background"
         paddingTop={topInset}
@@ -2793,6 +2806,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
 
       return (
         <ScrollView
+          ref={scrollRef}
           testID="home-screen"
           backgroundColor="$background"
           refreshControl={refreshControl}
@@ -2913,6 +2927,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
 
     return (
       <ScrollView
+        ref={scrollRef}
         testID="home-screen"
         backgroundColor="$background"
         paddingTop={topInset}
@@ -3192,6 +3207,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
   /* ── New-user getting-started view ── */
   return (
     <ScrollView
+      ref={scrollRef}
       testID="home-screen"
       backgroundColor="$background"
       paddingTop={topInset}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, within } from '@testing-library/react';
+import type { ScrollView as ScrollViewHandle } from 'react-native';
 import { useMedia } from 'tamagui';
 import {
   homeContentTopPadding,
@@ -835,6 +836,38 @@ describe('HomeScreen', () => {
       expect(() =>
         render(<HomeScreen {...baseProps} leagues={[league]} topInset={44} />),
       ).not.toThrow();
+    });
+  });
+
+  // LS-9248 — mobile's Home tab scrolls this screen back to the top when the
+  // tab regains focus, which only works if every render branch attaches the
+  // ref. A branch that forgets it silently keeps the user's old offset.
+  describe('scrollRef (LS-9248)', () => {
+    const renderWithRef = (props: Partial<HomeScreenProps>) => {
+      const ref = React.createRef<ScrollViewHandle>();
+      render(<HomeScreen {...baseProps} {...props} scrollRef={ref} />);
+      return ref;
+    };
+
+    it('attaches the ref on the new-user branch', () => {
+      expect(renderWithRef({}).current).not.toBeNull();
+    });
+
+    it('attaches the ref on the returning-user branch', () => {
+      expect(renderWithRef({ leagues: [league] }).current).not.toBeNull();
+    });
+
+    it('attaches the ref on the narrow returning-user branch', () => {
+      (useMedia as jest.Mock).mockReturnValue({ sm: true });
+      expect(renderWithRef({ leagues: [league] }).current).not.toBeNull();
+    });
+
+    it('attaches the ref on the loading branch', () => {
+      expect(renderWithRef({ loading: true }).current).not.toBeNull();
+    });
+
+    it('attaches the ref on the error branch', () => {
+      expect(renderWithRef({ error: true }).current).not.toBeNull();
     });
   });
 });

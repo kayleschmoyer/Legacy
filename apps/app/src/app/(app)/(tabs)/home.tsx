@@ -1,6 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import type { ScrollView } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   formatDisplayName,
@@ -44,6 +51,11 @@ function parseActiveSport(value: string | undefined): ActiveSport | null {
  * `/baseball` and `/football` redirect here with `?sport=` rather than
  * rendering their own copy, which used to read as a second home page
  * (LS-8823).
+ *
+ * That preservation is scoped to sport switching *within* the tab. Leaving for
+ * another bottom tab and coming back resets the sports dashboard to the top
+ * (LS-9248) — the inline sport views keep their own scroll position, since
+ * they are a drill-down the user is still inside of.
  */
 export default function HomeTab() {
   const router = useRouter();
@@ -59,6 +71,18 @@ export default function HomeTab() {
   // Once a sport screen is mounted we keep it alive to preserve scroll position.
   const [mountedSports, setMountedSports] = useState<Set<ActiveSport>>(
     new Set(),
+  );
+
+  // The tab navigator keeps this screen mounted once visited, so the
+  // dashboard's scroll offset survives a switch to another tab and back —
+  // the user returned to Home mid-page instead of at the top (LS-9248).
+  // Reset it on focus rather than on blur: on blur the screen is still on
+  // screen during the transition, so the jump would be visible.
+  const dashboardScrollRef = useRef<ScrollView>(null);
+  useFocusEffect(
+    useCallback(() => {
+      dashboardScrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, []),
   );
 
   const { data, loading, error, refetch } = useGetUserLeagueSummariesQuery({
@@ -211,6 +235,7 @@ export default function HomeTab() {
         style={{ display: activeSport !== null ? 'none' : 'flex', flex: 1 }}
       >
         <HomeScreen
+          scrollRef={dashboardScrollRef}
           userName={userName}
           isLight={resolvedTheme === 'light'}
           topInset={topInset}
