@@ -89,6 +89,13 @@ batch, and polls the job to its terminal state so callers still see one
 logical operation. The pure transpile/payload/poll logic lives in
 `src/client/migrate-client.ts`.
 
+**Agent callers** (MCP session, no `MCP_DB_ADMIN_BEARER` in the shell): don't
+hand-run `esbuild` and hand-paste the output into `jsSource` — run
+`node scripts/db/transpile-migration.mjs [<migration-file>...]` (LS-9203) and
+pass its stdout straight through as the `migrations` argument to the
+`db_migrate` MCP tool call. No arguments transpiles every migration file in
+`lib/db-client/migrations/` (the server skips already-applied ones).
+
 ## Environment (set by Terraform — see `terraform/main/lambda-mcp-db.tf`)
 
 - `MCP_COGNITO_ISSUER`, `MCP_COGNITO_AUDIENCE`, `MCP_OAUTH_SCOPES="openid mcp/db"`

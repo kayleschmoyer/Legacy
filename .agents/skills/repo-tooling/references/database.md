@@ -6,20 +6,20 @@
 
 ## Operations
 
-| Operation                      | Command                                                                |
-| ------------------------------ | ---------------------------------------------------------------------- |
-| Ad-hoc SQL (read-only)         | `db_query` (hosted MCP)                                                |
-| Check pending migrations       | `pnpm --prefix lib/db-client run db:status`                            |
-| Apply pending migrations       | `pnpm --prefix lib/db-client run db:up`                                |
-| Apply migrations to dev RDS    | `db_migrate` (hosted MCP, transpiles local `.ts` and POSTs over HTTPS) |
-| Migration diff vs applied      | `db_migration_status` (hosted MCP; pass local migration filenames)     |
-| Regenerate `schema.graphql`    | `pnpm exec nx run db:print-schema`                                     |
-| GraphQL codegen after schema   | `make codegen`                                                         |
-| Restore dev seed (DESTRUCTIVE) | `make db-restore-dev`                                                  |
-| Restore from S3 prod dump      | `make db-restore` (AWS required)                                       |
-| Dump to S3                     | `make db-dump`                                                         |
-| Scrub-and-dump dev seed        | `make db-dump-dev`                                                     |
-| Interactive psql               | `pnpm --prefix lib/db-client run db:psql`                              |
+| Operation                      | Command                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Ad-hoc SQL (read-only)         | `db_query` (hosted MCP)                                                                          |
+| Check pending migrations       | `pnpm --prefix lib/db-client run db:status`                                                      |
+| Apply pending migrations       | `pnpm --prefix lib/db-client run db:up`                                                          |
+| Apply migrations to dev RDS    | `node scripts/db/transpile-migration.mjs` piped into `db_migrate` (hosted MCP, POSTs over HTTPS) |
+| Migration diff vs applied      | `db_migration_status` (hosted MCP; pass local migration filenames)                               |
+| Regenerate `schema.graphql`    | `pnpm exec nx run db:print-schema`                                                               |
+| GraphQL codegen after schema   | `make codegen`                                                                                   |
+| Restore dev seed (DESTRUCTIVE) | `make db-restore-dev`                                                                            |
+| Restore from S3 prod dump      | `make db-restore` (AWS required)                                                                 |
+| Dump to S3                     | `make db-dump`                                                                                   |
+| Scrub-and-dump dev seed        | `make db-dump-dev`                                                                               |
+| Interactive psql               | `pnpm --prefix lib/db-client run db:psql`                                                        |
 
 ## Common Workflows
 

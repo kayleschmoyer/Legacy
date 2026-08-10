@@ -29,7 +29,13 @@ pnpm --prefix lib/db-client run db:up
 
 Confirm the output reports `Applied N new migrations` or `No new migrations to apply`. Any other result is a failure — do not proceed to `make pc`.
 
-To apply against the dev RDS without an SSM tunnel, use the hosted `db_migrate` MCP tool (`mcp__legacy-sports-db-admin__db_migrate`) — it transpiles local migrations and POSTs them to the in-VPC server. The call is async (LS-8563): it returns `{ jobId, status: "running" }`; poll `db_migration_status({ jobId })` every ~5s until `terminal: true` for the applied/skipped result.
+To apply against the dev RDS without an SSM tunnel, use the hosted `db_migrate` MCP tool (`mcp__legacy-sports-db-admin__db_migrate`). The hosted Lambda cannot see your local migrations directory, so **you** must supply transpiled source — never hand-run `esbuild` and hand-paste the output. Instead:
+
+```
+node scripts/db/transpile-migration.mjs [<migration-file>...]
+```
+
+prints `{ "migrations": [{ name, hash, jsSource }, ...] }` on stdout — pass it straight through as the `migrations` argument. No arguments transpiles every migration file in `lib/db-client/migrations/` (the server skips already-applied ones, so this is safe); pass filenames to limit the batch. The call is async (LS-8563): it returns `{ jobId, status: "running" }`; poll `db_migration_status({ jobId })` every ~5s until `terminal: true` for the applied/skipped result.
 
 ### 3. Verify (spot-check)
 
