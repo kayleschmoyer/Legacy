@@ -1,8 +1,13 @@
 import { execFile } from 'node:child_process';
-import { resolve } from 'node:path';
+import { rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { escapeCmdShellArg } from './cmd-escape.js';
+import {
+  isStaleProjectGraphError,
+  PROJECT_GRAPH_CACHE_DIRS,
+} from './stale-project-graph.js';
 
 const COMMAND_TIMEOUT = 120_000;
 
@@ -134,7 +139,19 @@ function isDaemonRaceError(err: unknown): boolean {
 const DAEMON_RETRY_DELAY_MS = 2_000;
 const DAEMON_MAX_RETRIES = 3;
 
-/** Run an Nx command via pnpm exec. Retries on daemon race errors. */
+/** Remove Nx's project graph cache so the next invocation rebuilds it from scratch. */
+async function clearProjectGraphCache(workspaceRoot: string): Promise<void> {
+  await Promise.all(
+    PROJECT_GRAPH_CACHE_DIRS.map((dir) =>
+      rm(join(workspaceRoot, dir), { recursive: true, force: true }),
+    ),
+  );
+}
+
+/**
+ * Run an Nx command via pnpm exec. Retries on daemon race errors, and once
+ * on a stale project-graph cache (clearing the cache first).
+ */
 export async function runNx(
   args: string[],
   cwd: string,
@@ -144,6 +161,7 @@ export async function runNx(
     includeStderr?: boolean;
   },
 ): Promise<string> {
+  let clearedStaleCache = false;
   for (let attempt = 0; attempt <= DAEMON_MAX_RETRIES; attempt++) {
     if (attempt > 0) {
       await new Promise((r) => setTimeout(r, DAEMON_RETRY_DELAY_MS));
@@ -158,6 +176,12 @@ export async function runNx(
       );
     } catch (err) {
       if (isDaemonRaceError(err) && attempt < DAEMON_MAX_RETRIES) {
+        continue;
+      }
+      if (!clearedStaleCache && isStaleProjectGraphError(err)) {
+        clearedStaleCache = true;
+        await clearProjectGraphCache(cwd);
+        attempt--;
         continue;
       }
       throw err;
