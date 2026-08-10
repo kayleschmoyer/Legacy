@@ -29,7 +29,7 @@ function setupJob(): void {
       exitCode: 0,
       error: null,
       meta: jobOpts.meta,
-      log: '',
+      log: ' NX   Successfully ran target test\n',
     };
     return snapshot;
   });
@@ -212,7 +212,7 @@ describe('runTarget', () => {
       elapsedSec: 3,
       exitCode: 0,
       error: null,
-      log: 'PASS shared-components/LoginPage.spec.ts',
+      log: 'PASS shared-components/LoginPage.spec.ts\n\n NX   Successfully ran target test for project shared-components\n',
     } satisfies JobSnapshot);
 
     const result = await runTarget({
@@ -225,8 +225,59 @@ describe('runTarget', () => {
       project: 'shared-components',
       target: 'test',
       passed: true,
-      output: 'PASS shared-components/LoginPage.spec.ts',
+      output:
+        'PASS shared-components/LoginPage.spec.ts\n\n NX   Successfully ran target test for project shared-components\n',
     });
+  });
+
+  it('reports daemonError and isError when the Nx Daemon fails to compute the project graph (LS-8819)', async () => {
+    const daemonOutput =
+      'Calculating the project graph on the Nx Daemon\n\n NX   Nx Daemon was not able to compute the project graph.\n\nLog file with the error: <worktree>/.nx/workspace-data/d/daemon-error.log\nPlease file an issue at https://github.com/nrwl/nx\nNx Daemon is going to be disabled until you run "nx reset".\n';
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-daemon-fail',
+      status: 'done',
+      label: 'nx run mcp-github-server:test',
+      cwd: '/repo',
+      elapsedSec: 131,
+      exitCode: 0,
+      error: null,
+      log: daemonOutput,
+    } satisfies JobSnapshot);
+
+    const result = await runTarget({
+      project: 'mcp-github-server',
+      target: 'test',
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse(result.content[0].text as string);
+    expect(parsed.passed).toBe(false);
+    expect(parsed.daemonError).toBe(true);
+    expect(parsed.hint).toMatch(/make clean-cache/);
+    expect(parsed.hint).not.toMatch(/nx reset/);
+  });
+
+  it('reports daemonError when the job exits 0 with no task-completion line at all', async () => {
+    mockRunJob.mockResolvedValue({
+      jobId: 'nx-no-completion',
+      status: 'done',
+      label: 'nx run shared-components:test',
+      cwd: '/repo',
+      elapsedSec: 1,
+      exitCode: 0,
+      error: null,
+      log: 'some unexpected truncated output with no nx trailer',
+    } satisfies JobSnapshot);
+
+    const result = await runTarget({
+      project: 'shared-components',
+      target: 'test',
+    });
+
+    expect(result.isError).toBe(true);
+    const parsed = JSON.parse(result.content[0].text as string);
+    expect(parsed.passed).toBe(false);
+    expect(parsed.daemonError).toBe(true);
   });
 
   it('returns a running snapshot with jobId instead of blocking past the sync budget', async () => {

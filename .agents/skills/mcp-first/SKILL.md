@@ -245,6 +245,8 @@ These are the specific built-in tool substitutions agents should reach for autom
 
 Prefer the `nx_run` MCP tool over `pnpm exec nx run <project>:<target>`. For affected targets, prefer `nx_run_affected` over `pnpm exec nx affected -t <target>`. Fall back to shell commands only when the MCP server is unavailable.
 
+> **`passed: true` does not always mean tasks ran.** If the Nx Daemon fails to compute the project graph, the underlying process can still exit 0 with zero tasks executed. `nx_run`, `nx_run_affected`, and `nx_job_wait`/`nx_job_status` detect this and report `passed: false`, `isError: true`, `daemonError: true`, plus a `hint`. On `daemonError: true`, run `make clean-cache` (never `nx reset` — blocked repo-wide by `.claude/hooks/guard-risky-tools.mjs`, it corrupts the shared cache for other worktrees) and retry. (LS-8819)
+
 > **Never invoke `node_modules/.bin/nx run …` or `jest` directly via Bash for test runs — including the `pnpm exec` prefixed forms (`pnpm exec jest …`, `pnpm exec prettier …`).** These bypass the MCP layer and fail when `node_modules/.bin/tsx` is missing (MCP server health-check warning at session start). Always use `nx_run` / `nx_run_affected` instead. Use `nx_show_projects` instead of `node_modules/.bin/nx show projects`. (LS-8078)
 
 | Shell command                                                                                                                            | MCP tool (use this)                                                                                                                                                                          |

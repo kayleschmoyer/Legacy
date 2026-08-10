@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { DAEMON_FAILURE_HINT, isDaemonFailure } from '../daemon-failure.js';
 import { formatTerminalSnapshot } from '../job-formatters.js';
 import { MAX_WAIT_MS, listJobs, snapshotJob, waitForJob } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
@@ -43,8 +44,22 @@ async function snapshotResult(snapshot: JobSnapshot): Promise<ToolResult> {
     label: snapshot.label,
     elapsedSec: snapshot.elapsedSec,
   };
+  let daemonFailed = false;
   if (snapshot.status === 'done' || snapshot.status === 'failed') {
-    body.passed = snapshot.status === 'done';
+    // Only nx_run/nx_run_affected jobs (label prefix "nx ") go through this
+    // generic fallback un-kinded — e2e-specs and install jobs are caught by
+    // formatTerminalSnapshot above and never reach here. A daemon that fails
+    // to compute the project graph still exits 0 (LS-8819), so status alone
+    // would report a false green on zero tasks run.
+    daemonFailed =
+      snapshot.status === 'done' &&
+      (snapshot.label?.startsWith('nx ') ?? false) &&
+      isDaemonFailure(snapshot.log ?? '');
+    body.passed = snapshot.status === 'done' && !daemonFailed;
+    if (daemonFailed) {
+      body.daemonError = true;
+      body.hint = DAEMON_FAILURE_HINT;
+    }
     if (snapshot.recoveredFromTimeout) body.recoveredFromTimeout = true;
     if (snapshot.error) body.error = snapshot.error;
     body.output = truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS);
@@ -54,7 +69,7 @@ async function snapshotResult(snapshot: JobSnapshot): Promise<ToolResult> {
   }
   return {
     content: [{ type: 'text', text: minifiedJson(body) }],
-    ...(snapshot.status === 'failed' ? { isError: true } : {}),
+    ...(snapshot.status === 'failed' || daemonFailed ? { isError: true } : {}),
   };
 }
 

@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { DAEMON_FAILURE_HINT, isDaemonFailure } from '../daemon-failure.js';
 import { runJobWithBudget } from '../jobs.js';
 import { SYNC_BUDGET_MS, nxJobSpec } from '../nx-job.js';
 import { getRepoRoot } from '../run-command.js';
@@ -84,7 +85,12 @@ export async function runAffected(
       };
     }
 
-    const passed = snapshot.status === 'done';
+    const rawOutput = snapshot.log ?? '';
+    // Same daemon-graph-failure override as run-target.ts (LS-8819): a failed
+    // daemon still exits 0, so status alone would report a false green.
+    const daemonFailed =
+      snapshot.status === 'done' && isDaemonFailure(rawOutput);
+    const passed = snapshot.status === 'done' && !daemonFailed;
     return {
       content: [
         {
@@ -93,8 +99,11 @@ export async function runAffected(
             target: params.target,
             base,
             passed,
+            ...(daemonFailed
+              ? { daemonError: true, hint: DAEMON_FAILURE_HINT }
+              : {}),
             ...(snapshot.error ? { error: snapshot.error } : {}),
-            output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
+            output: truncateOutput(rawOutput, MAX_OUTPUT_CHARS),
           }),
         },
       ],

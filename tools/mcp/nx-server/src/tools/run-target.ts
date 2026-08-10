@@ -1,4 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { DAEMON_FAILURE_HINT, isDaemonFailure } from '../daemon-failure.js';
 import { runJobWithBudget } from '../jobs.js';
 import { SYNC_BUDGET_MS, nxJobSpec } from '../nx-job.js';
 import { getRepoRoot } from '../run-command.js';
@@ -285,7 +286,14 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
       };
     }
 
-    const passed = snapshot.status === 'done';
+    const rawOutput = snapshot.log ?? '';
+    // A daemon that fails to compute the project graph still exits 0 (LS-8819)
+    // — deriving `passed` from status alone reports a false green on zero
+    // tasks run. Only checked on an otherwise-"done" status; an exit-code
+    // failure is already correctly reported without this override.
+    const daemonFailed =
+      snapshot.status === 'done' && isDaemonFailure(rawOutput);
+    const passed = snapshot.status === 'done' && !daemonFailed;
     return {
       content: [
         {
@@ -294,8 +302,11 @@ export async function runTarget(params: RunTargetParams): Promise<ToolResult> {
             project: params.project,
             target: params.target,
             passed,
+            ...(daemonFailed
+              ? { daemonError: true, hint: DAEMON_FAILURE_HINT }
+              : {}),
             ...(snapshot.error ? { error: snapshot.error } : {}),
-            output: truncateOutput(snapshot.log ?? '', MAX_OUTPUT_CHARS),
+            output: truncateOutput(rawOutput, MAX_OUTPUT_CHARS),
           }),
         },
       ],
