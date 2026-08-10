@@ -18,6 +18,22 @@ export const MAX_OUTPUT_CHARS = 30_000;
 export const STRUCTURED_TARGETS = new Set(['pc', 'pre-commit', 'full-check']);
 
 /**
+ * Unambiguous failure signals shared by parseSteps (status verdict) and
+ * truncateStepErrors (tail-bias decision) so the two never disagree about
+ * which step section actually failed.
+ */
+function isFailedSection(section: string): boolean {
+  return (
+    /NX\s+Failed tasks/i.test(section) ||
+    /^FAIL\s+\S/m.test(section) ||
+    /error TS\d/i.test(section) ||
+    /exit code [1-9]/.test(section) ||
+    /✗/.test(section) ||
+    /^make.*Error/im.test(section)
+  );
+}
+
+/**
  * Parse the output of multi-step targets like `make pc` into structured step results.
  * Matches the actual Makefile format: "1/9 Migration immutability check..."
  */
@@ -49,15 +65,7 @@ export function parseSteps(output: string): StepResult[] {
       continue;
     }
 
-    // Use unambiguous failure signals only.
-    const failed =
-      /NX\s+Failed tasks/i.test(section) ||
-      /^FAIL\s+\S/m.test(section) ||
-      /error TS\d/i.test(section) ||
-      /exit code [1-9]/.test(section) ||
-      /✗/.test(section) ||
-      /^make.*Error/im.test(section);
-
+    const failed = isFailedSection(section);
     const passed = /(?:✓|passed|succeeded|SUCCESS)/im.test(section);
 
     steps.push({
@@ -70,25 +78,38 @@ export function parseSteps(output: string): StepResult[] {
 }
 
 /**
+ * Matches prettier per-file output lines: `apps/web/Foo.tsx 123ms (unchanged)` or `lib/Bar.ts 45ms`
+ * Requires at least one path separator so plain single-word lines don't match.
+ */
+const PRETTIER_FILE_LINE_RE = /^(\S+\/\S+)\s+\d+ms(?:\s+\(unchanged\))?$/;
+
+/**
  * Extract error lines from output — lines containing error indicators.
+ *
+ * Prettier per-file progress lines (e.g. `components/ErrorBoundary.tsx 12ms
+ * (unchanged)`) can contain the substring "error" in a filename and would
+ * otherwise false-positive match as an anchor; they're excluded both as
+ * anchors and as trailing context so a run of thousands of them never
+ * populates this array (see LS-8822).
  */
 export function extractErrors(output: string): string[] {
   const errorLines: string[] = [];
   const lines = output.split('\n');
+  const isNoise = (line: string) => PRETTIER_FILE_LINE_RE.test(line.trim());
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (
       /(?:ERROR|FAIL|error\b|failed\b|✗)/i.test(line) &&
       !/node_modules/.test(line) &&
-      !/^[\s]*at\s/.test(line)
+      !/^[\s]*at\s/.test(line) &&
+      !isNoise(line)
     ) {
       errorLines.push(line.trim());
-      if (i + 1 < lines.length && lines[i + 1].trim()) {
-        errorLines.push(lines[i + 1].trim());
-      }
-      if (i + 2 < lines.length && lines[i + 2].trim()) {
-        errorLines.push(lines[i + 2].trim());
+      for (const next of [lines[i + 1], lines[i + 2]]) {
+        if (next && next.trim() && !isNoise(next)) {
+          errorLines.push(next.trim());
+        }
       }
     }
   }
@@ -146,12 +167,6 @@ export function truncateOutput(output: string, maxChars: number): string {
 }
 
 /**
- * Matches prettier per-file output lines: `apps/web/Foo.tsx 123ms (unchanged)` or `lib/Bar.ts 45ms`
- * Requires at least one path separator so plain single-word lines don't match.
- */
-const PRETTIER_FILE_LINE_RE = /^(\S+\/\S+)\s+\d+ms(?:\s+\(unchanged\))?$/;
-
-/**
  * Collapse prettier per-file listings in output.
  * Consecutive prettier file lines are replaced with a single summary:
  *   [Formatting: 1180 files checked, 2 changed — lib/foo.ts, lib/bar.ts]
@@ -199,6 +214,12 @@ const MAX_STEP_BODY_LINES = 20;
 /**
  * For each make-pc step section, truncate the body to MAX_STEP_BODY_LINES lines.
  * Appends "[N more lines — run step directly for full output]" when truncated.
+ *
+ * Passing/unknown steps keep the head — that's where nx prints the target
+ * being run, useful context. Failed steps keep the tail instead: non-zero-exit
+ * tooling (prettier, eslint, tsc) prints its actionable reason as the LAST
+ * thing before returning, so head-first truncation reliably discarded it
+ * behind thousands of earlier progress lines (LS-8822).
  */
 export function truncateStepErrors(output: string): string {
   const headers: Array<{ index: number; length: number }> = [];
@@ -228,10 +249,18 @@ export function truncateStepErrors(output: string): string {
     const contentLineCount = trimmed.length - 1; // subtract leading ''
     if (contentLineCount > MAX_STEP_BODY_LINES) {
       const remaining = contentLineCount - MAX_STEP_BODY_LINES;
-      parts.push(trimmed.slice(0, MAX_STEP_BODY_LINES + 1).join('\n'));
-      parts.push(
-        `\n[${remaining} more lines — run step directly for full output]`,
-      );
+      if (isFailedSection(body)) {
+        const tailLines = trimmed.slice(-MAX_STEP_BODY_LINES);
+        parts.push(
+          `\n[${remaining} earlier lines omitted — run step directly for full output]`,
+        );
+        parts.push('\n' + tailLines.join('\n'));
+      } else {
+        parts.push(trimmed.slice(0, MAX_STEP_BODY_LINES + 1).join('\n'));
+        parts.push(
+          `\n[${remaining} more lines — run step directly for full output]`,
+        );
+      }
     } else {
       parts.push(body);
     }

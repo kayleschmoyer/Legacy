@@ -8,6 +8,7 @@ import {
   compressFormatterOutput,
   truncateStepErrors,
   buildCompactOutput,
+  MAX_OUTPUT_CHARS,
 } from './run-target-utils.js';
 
 describe('parseSteps', () => {
@@ -97,6 +98,33 @@ describe('extractErrors', () => {
     const lines = Array.from({ length: 200 }, (_, i) => `error number ${i}`);
     const errors = extractErrors(lines.join('\n'));
     expect(errors.length).toBeLessThanOrEqual(50);
+  });
+
+  it('does not anchor on a prettier "(unchanged)" line whose filename contains "error"', () => {
+    const output = [
+      'components/ErrorBoundary.tsx 12ms (unchanged)',
+      'apps/web/src/Foo.tsx 5ms (unchanged)',
+      'lib/shared/Bar.tsx 3ms (unchanged)',
+    ].join('\n');
+
+    // "ErrorBoundary.tsx" would substring-match /error/i, but it's a prettier
+    // progress line, not an actual error — must not populate errors[].
+    expect(extractErrors(output)).toEqual([]);
+  });
+
+  it('does not pull a following prettier "(unchanged)" line in as trailing context', () => {
+    const output = [
+      'ERROR: something broke',
+      'components/ErrorBoundary.tsx 12ms (unchanged)',
+      'a real detail line',
+    ].join('\n');
+
+    const errors = extractErrors(output);
+    expect(errors).toContain('ERROR: something broke');
+    expect(errors).toContain('a real detail line');
+    expect(errors).not.toContain(
+      'components/ErrorBoundary.tsx 12ms (unchanged)',
+    );
   });
 });
 
@@ -208,6 +236,31 @@ describe('truncateStepErrors', () => {
     const output = 'just some output\nno step headers';
     expect(truncateStepErrors(output)).toBe(output);
   });
+
+  it('keeps the tail — not the head — of a failed step body so the trailing error survives', () => {
+    const noise = Array.from({ length: 30 }, (_, i) => `noise line ${i}`);
+    const body = [...noise, 'ERROR: the actionable reason lives here'].join(
+      '\n',
+    );
+    const output = `1/1 Formatting...\n${body}\nmake: *** [pc-format] Error 1`;
+    const result = truncateStepErrors(output);
+
+    expect(result).toContain('ERROR: the actionable reason lives here');
+    expect(result).not.toContain('noise line 0');
+    expect(result).toContain(
+      'earlier lines omitted — run step directly for full output',
+    );
+  });
+
+  it('keeps the head of a passing/unknown step body (unaffected by the tail-bias change)', () => {
+    const body = Array.from({ length: 30 }, (_, i) => `line ${i}`).join('\n');
+    const output = `1/1 Lint...\n${body}`;
+    const result = truncateStepErrors(output);
+
+    expect(result).toContain('line 0');
+    expect(result).not.toContain('line 25');
+    expect(result).toContain('more lines — run step directly for full output');
+  });
 });
 
 describe('buildCompactOutput', () => {
@@ -220,6 +273,49 @@ describe('buildCompactOutput', () => {
     const result = buildCompactOutput(output, 30_000);
     expect(result).toContain('[Formatting: 500 files checked, 0 changed]');
     expect(result.length).toBeLessThan(output.length);
+  });
+
+  it('LS-8822: surfaces the trailing "other uncommitted changes" error from a recorded pc-format failure without a second call', () => {
+    // Recorded shape of a real `make pc` failure (LS-8822): thousands of
+    // "(unchanged)" prettier lines — some for files whose names contain
+    // "error" — followed by the actionable ERROR block at the very end.
+    const unchangedLines = [
+      'components/ErrorBoundary.tsx 12ms (unchanged)',
+      ...Array.from(
+        { length: 60 },
+        (_, i) => `apps/web/src/file${i}.tsx ${i + 1}ms (unchanged)`,
+      ),
+    ];
+    const changedLine = '.agents/skills/mcp-first/SKILL.md 8ms';
+    const errorBlock = [
+      'ERROR: Formatting rewrote the following files:',
+      '    .agents/skills/mcp-first/SKILL.md',
+      '',
+      'You have other uncommitted changes alongside the format fixes.',
+      'Commit or stash them first, then re-run make pc.',
+      'make: *** [pc-format] Error 1',
+    ];
+    const output = [
+      '2/9 Formatting...',
+      ...unchangedLines,
+      changedLine,
+      ...errorBlock,
+      '3/9 Lint...',
+      'skipped',
+    ].join('\n');
+
+    const result = buildCompactOutput(output, MAX_OUTPUT_CHARS);
+
+    // The prettier per-file flood is collapsed (LS-7944 / LS-8423 behavior preserved)...
+    expect(result).toContain('[Formatting:');
+    expect(result).not.toContain('(unchanged)');
+    // ...and the actionable error tail survives, without a second verbose call.
+    expect(result).toContain(
+      'You have other uncommitted changes alongside the format fixes.',
+    );
+    expect(result).toContain(
+      'Commit or stash them first, then re-run make pc.',
+    );
   });
 });
 
