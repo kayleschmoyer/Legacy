@@ -163,18 +163,28 @@ jobs:
         id: base-schema
         shell: bash
         env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          # The exact base commit GitHub resolved for *this* event, not the
+          # moving branch name — pins the diff to the PR's real merge-base
+          # even when a force-push rebase and this job race against main.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
-          if [ -z "${BASE_REF:-}" ]; then
+          if [ -z "${BASE_SHA:-}" ]; then
             echo "no-base=true" >> "$GITHUB_OUTPUT"
             echo "::notice::No base ref (manual run) — validating operations only, skipping breaking-change diff."
             exit 0
           fi
-          # Fetch only the base tip; FETCH_HEAD then points at it regardless of
-          # whether the shallow checkout populated refs/remotes/origin/<base>.
-          git fetch --depth=1 origin "$BASE_REF" >/dev/null 2>&1 || true
-          if git show "FETCH_HEAD:lambdas/db/schema.graphql" > /tmp/base-schema.graphql 2>/dev/null; then
+          # Fetch the exact base commit into a dedicated, always-overwritten ref
+          # rather than relying on FETCH_HEAD. Self-hosted runners reuse the
+          # workspace (and its .git dir) across unrelated jobs, so a prior job's
+          # FETCH_HEAD can still be sitting there; a failed fetch that only
+          # logged-and-continued (`|| true`) let that leftover ref pass for the
+          # base schema, producing breaking-change false positives (LS-9199).
+          # Fetching into a named ref means we only ever read content this run
+          # itself fetched — a fetch failure now fails the step instead of
+          # silently falling through to stale data.
+          git fetch --depth=1 origin "$BASE_SHA":refs/schema-contract-base
+          if git show "refs/schema-contract-base:lambdas/db/schema.graphql" > /tmp/base-schema.graphql 2>/dev/null; then
             echo "no-base=false" >> "$GITHUB_OUTPUT"
           else
             echo "no-base=true" >> "$GITHUB_OUTPUT"
