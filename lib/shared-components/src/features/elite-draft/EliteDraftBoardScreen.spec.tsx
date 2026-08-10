@@ -10,10 +10,82 @@ import {
   useDraftTimer,
   useDraftUIState,
   useDraftWebSocket,
+  useIsCompactDraftViewport,
   usePlayerData,
 } from './hooks';
+import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
 import { useAuth } from '../../features/auth';
-import { fireEvent, render } from '../../test-utils';
+import { fireEvent, render, screen } from '../../test-utils';
+
+// The compact/narrow-viewport branch's local chrome (PlayerRow, GoldButton,
+// GhostButton, Eyebrow) uses these react-native primitives directly — the
+// shared mobile jest setup mocks most of react-native but omits Pressable
+// and StyleSheet (LS-9207, ported from the former .native.spec.tsx).
+jest.mock('react-native', () => {
+  /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- jest.mock factory needs runtime require */
+  const ReactLocal = require('react') as typeof import('react');
+  /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires */
+  return {
+    StyleSheet: { create: (s: unknown) => s, flatten: (s: unknown) => s },
+    // `accessibilityLabel` is remapped to `aria-label` so RTL's a11y queries
+    // reach the same labels a screen reader would announce on device.
+    Pressable: ({
+      children,
+      onPress,
+      accessibilityLabel,
+      ...props
+    }: {
+      children?: React.ReactNode;
+      onPress?: () => void;
+      accessibilityLabel?: string;
+    } & Record<string, unknown>) =>
+      ReactLocal.createElement(
+        'button',
+        { onClick: onPress, 'aria-label': accessibilityLabel, ...props },
+        children,
+      ),
+    FlatList: ({
+      data,
+      renderItem,
+      keyExtractor,
+      ListEmptyComponent,
+      ListFooterComponent,
+    }: {
+      data?: ReadonlyArray<unknown>;
+      renderItem?: (info: {
+        item: unknown;
+        index: number;
+        separators: Record<string, unknown>;
+      }) => React.ReactElement | null;
+      keyExtractor?: (item: unknown, index: number) => string;
+      ListEmptyComponent?: React.ReactNode;
+      ListFooterComponent?: React.ReactNode;
+    }) => {
+      const items =
+        data && data.length > 0
+          ? data.map((item, index) => {
+              const key = keyExtractor
+                ? keyExtractor(item, index)
+                : String(index);
+              const element = renderItem
+                ? renderItem({ item, index, separators: {} })
+                : null;
+              return element && ReactLocal.isValidElement(element)
+                ? ReactLocal.cloneElement(element, { key })
+                : null;
+            })
+          : ListEmptyComponent
+            ? [ListEmptyComponent]
+            : null;
+      return ReactLocal.createElement(
+        'div',
+        { 'data-testid': 'flatlist' },
+        items,
+        ListFooterComponent,
+      );
+    },
+  };
+});
 
 jest.mock('./hooks', () => ({
   useDraftActions: jest.fn(),
@@ -22,6 +94,7 @@ jest.mock('./hooks', () => ({
   useDraftTimer: jest.fn(),
   useDraftUIState: jest.fn(),
   useDraftWebSocket: jest.fn(),
+  useIsCompactDraftViewport: jest.fn(),
   usePlayerData: jest.fn(),
 }));
 
@@ -63,6 +136,65 @@ jest.mock('./DraftChatOverlay', () => ({
 jest.mock('./PickAnnouncement', () => ({
   PickAnnouncement: () => null,
 }));
+// Compact-branch widgets (LS-9206) — each already has its own component-level
+// spec (DraftClockRing.spec.tsx etc.), so these are shallow wiring mocks
+// rather than a re-verification of their internals.
+jest.mock('./DraftClockRing', () => ({
+  DraftClockRing: ({
+    secondsRemaining,
+    paused,
+  }: {
+    secondsRemaining: number;
+    paused?: boolean;
+  }) => (
+    <div
+      data-testid="draft-clock-ring"
+      data-seconds={secondsRemaining}
+      data-paused={String(!!paused)}
+    />
+  ),
+}));
+jest.mock('./DraftMiniBoard', () => ({
+  DraftMiniBoard: ({ rounds }: { rounds: number }) => (
+    <div data-testid="draft-mini-board" data-rounds={rounds} />
+  ),
+}));
+jest.mock('./DraftPickAnnouncement', () => ({
+  DraftPickAnnouncement: ({
+    announcement,
+  }: {
+    announcement: { pickNumber: number } | null;
+  }) =>
+    announcement ? (
+      <div
+        data-testid="draft-pick-announcement"
+        data-pick={announcement.pickNumber}
+      />
+    ) : null,
+}));
+jest.mock('./DraftSquadStrip', () => ({
+  DraftSquadStrip: ({
+    myTeam,
+    rounds,
+    open,
+    onOpen,
+    onClose,
+  }: {
+    myTeam: unknown[];
+    rounds: number;
+    open: boolean;
+    onOpen: () => void;
+    onClose: () => void;
+  }) => (
+    <button
+      data-testid="draft-squad-strip"
+      data-open={String(open)}
+      onClick={open ? onClose : onOpen}
+    >
+      {`My Squad · ${myTeam.length}/${rounds}`}
+    </button>
+  ),
+}));
 jest.mock('./styles', () => ({ CSS: '' }));
 
 const mockUseAuth = jest.mocked(useAuth);
@@ -71,6 +203,7 @@ const mockUseDraftUIState = jest.mocked(useDraftUIState);
 const mockUseDraftQueries = jest.mocked(useDraftQueries);
 const mockUsePlayerData = jest.mocked(usePlayerData);
 const mockUseDraftActions = jest.mocked(useDraftActions);
+const mockUseIsCompactDraftViewport = jest.mocked(useIsCompactDraftViewport);
 
 function makeBaseUI(
   overrides: Partial<ReturnType<typeof useDraftUIState>> = {},
@@ -218,6 +351,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({
     user: { id: 1, accessLevel: 'member' },
   } as unknown as ReturnType<typeof useAuth>);
+  mockUseIsCompactDraftViewport.mockReturnValue(false);
   mockUseDraftUIState.mockReturnValue(makeBaseUI());
   mockUseDraftQueries.mockReturnValue(makeBaseQueries());
   mockUseDraftActions.mockReturnValue(makeBaseActions());
@@ -941,5 +1075,358 @@ describe('EliteDraftBoardScreen — lost league access (LS-8863)', () => {
     const { getByTestId } = render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(getByTestId('draft-player-board')).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Compact/narrow-viewport branch (LS-9207) — folded in from the former
+// EliteDraftBoardScreen.native.tsx fork. Early-return states (loading,
+// errors, pre-draft lobby, draft complete) are shared across viewports and
+// already covered above; these tests exercise the compact live-board JSX
+// that only renders when useIsCompactDraftViewport() is true.
+// ---------------------------------------------------------------------------
+const TEAMS: LeagueTeam[] = [
+  { id: '1', name: 'Dinger Dynasty', leagueId: 1 },
+  { id: '2', name: 'Bronx Bombers', leagueId: 1 },
+];
+
+function makeDraftPlayer(overrides: Partial<DraftPlayer> = {}): DraftPlayer {
+  return {
+    id: 1,
+    name: 'Bobby Witt Jr.',
+    position: 'SS',
+    avg: 0.332,
+    hr: 32,
+    rbi: 96,
+    runs: 100,
+    sb: 30,
+    games: 160,
+    hits: 200,
+    obp: 0.389,
+    slg: 0.588,
+    ppg: 11.4,
+    ...overrides,
+  };
+}
+
+function makePickRecord(
+  overrides: Partial<DraftPickRecord> = {},
+): DraftPickRecord {
+  return {
+    id: 'pick-1',
+    draftId: 42,
+    round: 1,
+    pickNumber: 1,
+    overallPick: 1,
+    pickedAt: '2026-07-28T00:00:00Z',
+    teamId: 1,
+    playerId: 1,
+    ...overrides,
+  };
+}
+
+function setupCompactLiveDraft({
+  isMyPick = false,
+  players = [] as DraftPlayer[],
+  picks = [] as DraftPickRecord[],
+  ui,
+  queries,
+}: {
+  isMyPick?: boolean;
+  players?: DraftPlayer[];
+  picks?: DraftPickRecord[];
+  ui?: Partial<ReturnType<typeof useDraftUIState>>;
+  queries?: Record<string, unknown>;
+} = {}) {
+  mockUseIsCompactDraftViewport.mockReturnValue(true);
+  mockUseDraftUIState.mockReturnValue({ ...makeBaseUI(), ...ui });
+  mockUseDraftQueries.mockReturnValue({
+    ...makeBaseQueries(),
+    leagueTeams: TEAMS,
+    boardOrderedTeams: TEAMS,
+    myTeamId: 1,
+    currentPickTeamId: isMyPick ? 1 : 2,
+    currentPickInfo: {
+      draftId: 42,
+      teamId: isMyPick ? 1 : 2,
+      round: 1,
+      pickNumber: isMyPick ? 1 : 2,
+      overallPick: isMyPick ? 1 : 2,
+      isComplete: false,
+    },
+    pickHistory: picks,
+    teamNameById: jest.fn((teamId: number | null) =>
+      String(teamId) === '1' ? 'Dinger Dynasty' : 'Bronx Bombers',
+    ),
+    ...queries,
+  } as unknown as ReturnType<typeof useDraftQueries>);
+  mockUsePlayerData.mockReturnValue({
+    enrichedPlayers: players,
+    myTeam: [],
+    myTeamPicks: [],
+    statsLookup: new Map(players.map((p) => [p.id, p])),
+  } as unknown as ReturnType<typeof usePlayerData>);
+}
+
+describe('EliteDraftBoardScreen — compact viewport branch selection', () => {
+  it('renders the compact live board instead of DraftPlayerBoard/DraftTopBand/DraftRail', () => {
+    setupCompactLiveDraft();
+
+    const { queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(queryByTestId('draft-player-board')).toBeNull();
+    expect(queryByTestId('draft-top-band')).toBeNull();
+    expect(queryByTestId('draft-rail')).toBeNull();
+    expect(queryByTestId('flatlist')).toBeTruthy();
+  });
+
+  it('renders the wide board when useIsCompactDraftViewport is false (default)', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
+    );
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('draft-player-board')).toBeTruthy();
+    expect(queryByTestId('flatlist')).toBeNull();
+  });
+});
+
+describe('EliteDraftBoardScreen — compact viewport, live board', () => {
+  it('headlines the team on the clock with its round and pick', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('On the clock')).toBeTruthy();
+    expect(screen.getByText('Bronx Bombers')).toBeTruthy();
+    expect(screen.getByText('Round 1 · Pick #2')).toBeTruthy();
+  });
+
+  it('switches the eyebrow to second person when the viewer is on the clock', () => {
+    setupCompactLiveDraft({ isMyPick: true });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('You’re on the clock')).toBeTruthy();
+  });
+
+  it('passes the draft timer and paused state to DraftClockRing', () => {
+    setupCompactLiveDraft({ ui: { draftPaused: true } });
+    jest.mocked(useDraftTimer).mockReturnValue({ timeRemaining: 42 });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    const ring = screen.getByTestId('draft-clock-ring');
+    expect(ring.getAttribute('data-seconds')).toBe('42');
+    expect(ring.getAttribute('data-paused')).toBe('true');
+    expect(screen.getByText('Draft paused')).toBeTruthy();
+  });
+
+  it('passes the resolved board rounds to DraftMiniBoard', () => {
+    setupCompactLiveDraft({ picks: [makePickRecord()] });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByTestId('draft-mini-board')).toBeTruthy();
+  });
+
+  it('shows a loading footer while more players are being fetched', () => {
+    setupCompactLiveDraft({
+      players: [makeDraftPlayer()],
+      queries: { hasMorePlayers: true, loadingMore: true },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByTestId('draft-loading-more')).toBeTruthy();
+  });
+
+  it('shows no loading footer when there are no more players to fetch', () => {
+    setupCompactLiveDraft({
+      players: [makeDraftPlayer()],
+      queries: { hasMorePlayers: false, loadingMore: false },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.queryByTestId('draft-loading-more')).toBeNull();
+  });
+
+  it('shows each available player with a stat line, points and ADP', () => {
+    setupCompactLiveDraft({ players: [makeDraftPlayer()] });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('Bobby Witt Jr.')).toBeTruthy();
+    expect(screen.getByText('AVG .332 · HR 32 · RBI 96')).toBeTruthy();
+    expect(screen.getByText('11.4')).toBeTruthy();
+    expect(screen.getByText('ADP 1')).toBeTruthy();
+  });
+
+  it('hides the DRAFT action until the viewer is on the clock', () => {
+    setupCompactLiveDraft({ players: [makeDraftPlayer()] });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.queryByText('DRAFT')).toBeNull();
+  });
+
+  it('drafts the tapped player when the viewer is on the clock', () => {
+    const handleMakePick = jest.fn();
+    setupCompactLiveDraft({ isMyPick: true, players: [makeDraftPlayer()] });
+    mockUseDraftActions.mockReturnValue(makeBaseActions({ handleMakePick }));
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+    fireEvent.click(screen.getByText('DRAFT'));
+
+    expect(handleMakePick).toHaveBeenCalledWith(1);
+  });
+
+  it('re-sorts the list by projected points without renumbering ADP', () => {
+    setupCompactLiveDraft({
+      players: [
+        makeDraftPlayer({ id: 1, name: 'Ace Adams', ppg: 6 }),
+        makeDraftPlayer({ id: 2, name: 'Bo Baker', ppg: 12 }),
+      ],
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+    fireEvent.click(screen.getByText('PTS'));
+
+    // Bo Baker leads on points but keeps his server-ranked ADP of 2.
+    expect(
+      screen.getAllByText(/Adams|Baker/).map((node) => node.textContent),
+    ).toEqual(['Bo Baker', 'Ace Adams']);
+    expect(screen.getByText('ADP 2')).toBeTruthy();
+  });
+
+  it('summarises the squad strip and toggles the roster sheet', () => {
+    const player = makeDraftPlayer();
+    setupCompactLiveDraft({ players: [player], picks: [makePickRecord()] });
+    mockUsePlayerData.mockReturnValue({
+      enrichedPlayers: [],
+      myTeam: [player],
+      myTeamPicks: [makePickRecord()],
+      statsLookup: new Map([[player.id, player]]),
+    } as unknown as ReturnType<typeof usePlayerData>);
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    const strip = screen.getByTestId('draft-squad-strip');
+    expect(strip.textContent).toBe('My Squad · 1/5');
+    expect(strip.getAttribute('data-open')).toBe('false');
+
+    fireEvent.click(strip);
+
+    expect(strip.getAttribute('data-open')).toBe('true');
+  });
+
+  it('exposes commissioner pause and comm-pick controls to the commissioner', () => {
+    setupCompactLiveDraft({ queries: { isCommissioner: true } });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('PAUSE')).toBeTruthy();
+    expect(screen.getByText('COMM PICK')).toBeTruthy();
+  });
+
+  // LS-8841: showCommissionerBar gates strictly on isCommissioner (mirroring
+  // the wide-branch DraftTopBand gate), not on the broader isOwner check.
+  describe('commissioner control bar visibility by permission level (LS-8841)', () => {
+    it.each([
+      ['general_manager', false],
+      ['assistant_manager', false],
+      ['commissioner', true],
+    ] as const)(
+      'permissionLevel=%s → commissioner bar visible=%s',
+      (permissionLevel, expectVisible) => {
+        setupCompactLiveDraft({
+          queries: {
+            isCommissioner: permissionLevel === 'commissioner',
+            league: {
+              id: 1,
+              name: 'Test League',
+              draftStatus: 'in-progress',
+              isMockDraft: false,
+              userMembership: { permissionLevel, teamId: 1 },
+            },
+          },
+        });
+
+        render(<EliteDraftBoardScreen {...defaultProps} />);
+
+        if (expectVisible) {
+          expect(screen.getByText('PAUSE')).toBeTruthy();
+          expect(screen.getByText('COMM PICK')).toBeTruthy();
+        } else {
+          expect(screen.queryByText('PAUSE')).toBeNull();
+          expect(screen.queryByText('COMM PICK')).toBeNull();
+        }
+      },
+    );
+  });
+});
+
+describe('EliteDraftBoardScreen — compact viewport, pick announcement', () => {
+  it('wires the current announcement through to DraftPickAnnouncement', () => {
+    setupCompactLiveDraft({
+      ui: {
+        announcement: {
+          player: makeDraftPlayer(),
+          pickNumber: 7,
+          round: 1,
+          roundPickNumber: 7,
+          isMyPick: true,
+          isAuto: false,
+          teamName: 'Dinger Dynasty',
+        },
+      },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('draft-pick-announcement').getAttribute('data-pick'),
+    ).toBe('7');
+  });
+
+  it('renders nothing for DraftPickAnnouncement when there is no announcement', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.queryByTestId('draft-pick-announcement')).toBeNull();
+  });
+});
+
+// AC4/Technical-approach: auction drafts have no compact layout yet (a
+// deferred product decision, not a capability gap) — gated on viewport, not
+// platform, so it reuses the same AuctionNotSupportedScreen at any width.
+describe('EliteDraftBoardScreen — compact viewport, auction draft', () => {
+  it('shows the auction-not-supported state instead of AuctionDraftRoom', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(true);
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        leagueDraft: {
+          selectionMethod: 'auction',
+          draftCompletedAt: null,
+          id: '42',
+        },
+        isAuctionDraft: true,
+      }),
+    );
+
+    const { getByText, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByText('Auction Draft')).toBeTruthy();
+    expect(queryByTestId('auction-draft-room')).toBeNull();
   });
 });

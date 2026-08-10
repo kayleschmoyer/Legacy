@@ -382,3 +382,31 @@ export function AutomatedDraftScreen(): React.JSX.Element {
     />
   );
 }
+
+/**
+ * Shown in the compact/narrow-viewport branch when the draft is an auction —
+ * AuctionDraftRoom is wide-layout-only for now (LS-9207). Whether to build a
+ * compact auction UI is a deferred product decision (tracked as AC6 on the
+ * original LS-9066), not a capability gap, so this is a viewport-gated state
+ * screen rather than a platform check.
+ */
+export function AuctionNotSupportedScreen({
+  leagueId,
+  onNavigate,
+}: {
+  leagueId: number | null;
+  onNavigate: (path: string) => void;
+}): React.JSX.Element {
+  return (
+    <StateScreen
+      icon="🏷️"
+      iconLabel="auction tag"
+      title="Auction Draft"
+      description="Auction drafts aren't available on this screen size yet. Widen your browser window or use a larger device to participate."
+      buttonText="Back to League"
+      onButtonClick={() =>
+        onNavigate(leagueId ? `/baseball/league/${leagueId}` : '/baseball')
+      }
+    />
+  );
+}

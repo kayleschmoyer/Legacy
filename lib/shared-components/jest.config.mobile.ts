@@ -49,15 +49,16 @@ module.exports = {
     // resolvable under the RN mobile jest environment. Belongs to
     // shared-components:web only.
     '/src/components/DateTimePicker\\.navigateMonth\\.spec\\.tsx$',
-    // Web-only specs for components with a dedicated `.native.tsx` fork
-    // (LS-9180): now that this project's moduleFileExtensions actually
+    // Web-only specs for components that still have a dedicated `.native.tsx`
+    // fork (LS-9180): now that this project's moduleFileExtensions actually
     // prefers the native barrel, these generic specs resolve to the native
     // component and assert web-only behavior (DOM `role="img"`/`role="link"`,
     // `StyleSheet`/`Easing` shapes the web mock doesn't provide). Each has a
     // purpose-built `.native.spec.tsx` sibling that already covers the
-    // native component correctly.
+    // native component correctly. EliteDraftBoardScreen was a third entry
+    // here until LS-9207 unified it into a single file/spec, so it no longer
+    // needs (or has) this exclusion.
     '/src/features/elite-draft/PickSplashStatGraphic\\.spec\\.tsx$',
-    '/src/features/elite-draft/EliteDraftBoardScreen\\.spec\\.tsx$',
     '/src/features/elite-draft/SpectatorScreen\\.spec\\.tsx$',
     // Same LS-9180 problem, introduced later by #6862 (LS-9206) without the
     // exclusion: these generic specs assert web DOM roles/attributes

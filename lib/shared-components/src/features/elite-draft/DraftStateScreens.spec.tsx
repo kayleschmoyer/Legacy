@@ -10,6 +10,7 @@
  */
 import React from 'react';
 import {
+  AuctionNotSupportedScreen,
   AutomatedDraftScreen,
   LeagueErrorScreen,
   LoadingScreen,
@@ -120,5 +121,28 @@ describe('AutomatedDraftScreen', () => {
 
     expect(getByText('Draft in Progress')).toBeTruthy();
     expect(queryByRole('button')).toBeNull();
+  });
+});
+
+describe('AuctionNotSupportedScreen (LS-9207)', () => {
+  it('navigates to the league when a leagueId is present', () => {
+    const onNavigate = jest.fn();
+    const { getByText } = render(
+      <AuctionNotSupportedScreen leagueId={42} onNavigate={onNavigate} />,
+    );
+
+    expect(getByText('Auction Draft')).toBeTruthy();
+    getByText('Back to League').click();
+    expect(onNavigate).toHaveBeenCalledWith('/baseball/league/42');
+  });
+
+  it('falls back to the leagues list when leagueId is null', () => {
+    const onNavigate = jest.fn();
+    const { getByText } = render(
+      <AuctionNotSupportedScreen leagueId={null} onNavigate={onNavigate} />,
+    );
+
+    getByText('Back to League').click();
+    expect(onNavigate).toHaveBeenCalledWith('/baseball');
   });
 });

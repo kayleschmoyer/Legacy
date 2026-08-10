@@ -1,12 +1,6 @@
-// NOTE (shared-components-first, LS-9057): EliteDraftBoardScreen.native.tsx
-// is a justified temporary fork, not undocumented debt — this screen's root
-// layout is still a raw CSS-Grid `<div>` (`.d-layout` in styles.ts) and
-// several children (DraftGrid, PlayerCard, DraftQueuePanel,
-// CurrentPickPanel, DraftIntelligence, DraftCompleteView) are raw-DOM/
-// web-only-DnD and not native-portable yet. Porting them to Tamagui and
-// collapsing both screens into one useMedia-driven component is tracked in
-// LS-9152.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet } from 'react-native';
+import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { CSS } from './styles';
 import { DraftCompleteView } from './DraftCompleteView';
@@ -17,7 +11,19 @@ import { AuctionDraftRoom } from './auction/AuctionDraftRoom';
 import { PreDraftLobby } from './PreDraftLobby';
 import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
+import { DraftClockRing } from './DraftClockRing';
+import { DraftMiniBoard } from './DraftMiniBoard';
+import { DraftPickAnnouncement } from './DraftPickAnnouncement';
+import { DraftSquadStrip } from './DraftSquadStrip';
+import { useDraftPalette } from './nativeDraftPalette';
 import {
+  MIN_BOARD_ROUNDS,
+  resolveBoardRounds,
+  statLineFor,
+} from './nativeDraftBoard';
+import { getPositionColor } from './utils';
+import {
+  AuctionNotSupportedScreen,
   AutomatedDraftScreen,
   LeagueErrorScreen,
   LoadingScreen,
@@ -31,12 +37,14 @@ import {
   useDraftTimer,
   useDraftUIState,
   useDraftWebSocket,
+  useIsCompactDraftViewport,
   usePlayerData,
 } from './hooks';
 import { DraftChatOverlay } from './DraftChatOverlay';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import type { DraftPlayer } from './types';
+import { PositionBadge } from '../../components/PositionBadge';
 import { useAuth } from '../../features/auth';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
@@ -50,7 +58,7 @@ export interface EliteDraftBoardScreenProps {
   websocketUrl: string;
   /** Optional auth token for the draft WebSocket. When omitted the socket defers until a token becomes available. */
   token?: string;
-  /** Optional render prop for the chat overlay. If omitted, chat is disabled. */
+  /** Optional render prop for the chat overlay. If omitted, chat is disabled (compact/narrow viewports never render it — the mobile UX uses a separate chat screen accessible from the league tab). */
   renderChat?: DraftChatRenderer;
   /** Optional callback fired when a player is drafted (for analytics). */
   onPlayerDrafted?: (playerId: number, position: string) => void;
@@ -68,6 +76,606 @@ export interface EliteDraftBoardScreenProps {
   onActiveDraftChange?: (active: boolean) => void;
 }
 
+const POSITION_FILTERS = [
+  'ALL',
+  'C',
+  '1B',
+  '2B',
+  '3B',
+  'SS',
+  'OF',
+  'SP',
+  'RP',
+  'DH',
+] as const;
+
+type SortKey = 'adp' | 'pts';
+
+// ---------------------------------------------------------------------------
+// Compact-branch chrome (narrow-viewport only — folded in from the former
+// EliteDraftBoardScreen.native.tsx fork, LS-9207)
+// ---------------------------------------------------------------------------
+
+/** Uppercase, wide-tracked label used above every headline on the compact board. */
+function Eyebrow({
+  children,
+  color = '$fg4',
+}: {
+  children: React.ReactNode;
+  color?: string;
+}) {
+  return (
+    <Text
+      fontSize={9.5}
+      fontWeight="700"
+      letterSpacing={2}
+      textTransform="uppercase"
+      color={color}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/** The gold lozenge used for every primary action on the compact draft board. */
+function GoldButton({
+  label,
+  onPress,
+  disabled,
+  size = 'lg',
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  size?: 'lg' | 'sm';
+}) {
+  const large = size === 'lg';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+    >
+      <YStack
+        backgroundColor="$brandGold"
+        borderRadius={999}
+        paddingVertical={large ? 15 : 8}
+        paddingHorizontal={large ? 34 : 12}
+        opacity={disabled ? 0.55 : 1}
+      >
+        <Text
+          fontFamily="$heading"
+          fontSize={large ? 19 : 11.5}
+          fontWeight="800"
+          letterSpacing={large ? 1.5 : 0.5}
+          color="$textOnAccent"
+        >
+          {label}
+        </Text>
+      </YStack>
+    </Pressable>
+  );
+}
+
+/** Outlined, low-emphasis action (commissioner toggles) on the compact board. */
+function GhostButton({
+  label,
+  onPress,
+  tone = 'neutral',
+  disabled,
+}: {
+  label: string;
+  onPress: () => void;
+  tone?: 'neutral' | 'active';
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+    >
+      <YStack
+        borderWidth={1}
+        borderRadius={999}
+        paddingVertical={7}
+        paddingHorizontal={13}
+        opacity={disabled ? 0.55 : 1}
+        borderColor={tone === 'active' ? '$brandGold' : '$outlineDefault'}
+        backgroundColor={tone === 'active' ? '$accentMuted' : 'transparent'}
+      >
+        <Text
+          fontSize={11}
+          fontWeight="700"
+          letterSpacing={0.5}
+          color={tone === 'active' ? '$brandGoldLight' : '$textMuted'}
+        >
+          {label}
+        </Text>
+      </YStack>
+    </Pressable>
+  );
+}
+
+/** A single row in the compact board's available-players list. */
+function PlayerRow({
+  player,
+  adp,
+  canDraft,
+  commPickMode,
+  onDraft,
+  onCommissionerPick,
+}: {
+  player: DraftPlayer;
+  adp: number;
+  canDraft: boolean;
+  commPickMode: boolean;
+  onDraft: (id: number) => void;
+  onCommissionerPick: (id: number) => void;
+}) {
+  const posColor = getPositionColor('baseball', player.position);
+
+  return (
+    <XStack
+      alignItems="center"
+      gap={10}
+      backgroundColor="$surfaceCard"
+      borderWidth={1}
+      borderColor="$surfacePanelBorder"
+      borderRadius={12}
+      paddingVertical={10}
+      paddingHorizontal={13}
+      marginBottom={7}
+    >
+      <PositionBadge
+        position={player.position}
+        color={posColor}
+        alpha={0.14}
+        paddingHorizontal={8}
+        paddingVertical={3}
+        borderRadius={6}
+      />
+      <YStack flex={1} minWidth={0}>
+        <Text fontWeight="600" fontSize={15} color="$color" numberOfLines={1}>
+          {player.name}
+        </Text>
+        <Text
+          fontSize={11.5}
+          color="$textMuted"
+          marginTop={2}
+          numberOfLines={1}
+        >
+          {statLineFor(player)}
+        </Text>
+      </YStack>
+      <YStack alignItems="flex-end" flexShrink={0}>
+        <Text
+          fontFamily="$heading"
+          fontSize={16}
+          fontWeight="700"
+          color="$brandGoldLight"
+        >
+          {player.ppg != null ? player.ppg.toFixed(1) : '—'}
+        </Text>
+        <Text fontSize={9} color="$fg4" letterSpacing={0.5}>
+          ADP {adp}
+        </Text>
+      </YStack>
+      {canDraft && (
+        <GoldButton
+          size="sm"
+          label={commPickMode ? 'ASSIGN' : 'DRAFT'}
+          onPress={() =>
+            commPickMode ? onCommissionerPick(player.id) : onDraft(player.id)
+          }
+        />
+      )}
+    </XStack>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Compact (narrow-viewport) live-board — a separate component so its
+// compact-only hooks (useDraftPalette et al) only run when this subtree
+// actually mounts. `EliteDraftBoardScreen` calling useDraftPalette()
+// unconditionally at its own top level previously crashed apps/web's test
+// environment (no useThemeName mock there) even though the wide branch never
+// used it — this render path is only reachable when useIsCompactDraftViewport()
+// is true (LS-9207 review fix).
+// ---------------------------------------------------------------------------
+interface CompactLiveDraftBoardProps {
+  ui: ReturnType<typeof useDraftUIState>;
+  queries: ReturnType<typeof useDraftQueries>;
+  actions: ReturnType<typeof useDraftActions>;
+  playerData: ReturnType<typeof usePlayerData>;
+  isMyPick: boolean;
+  untimed: boolean;
+  timeRemaining: number;
+  round: number;
+  currentPick: number;
+  onDraftPlayer: (id: number) => void;
+  onCommissionerPick: (id: number) => void;
+  onLoadMore: () => void;
+}
+
+function CompactLiveDraftBoard({
+  ui,
+  queries,
+  actions,
+  playerData,
+  isMyPick,
+  untimed,
+  timeRemaining,
+  round,
+  currentPick,
+  onDraftPlayer,
+  onCommissionerPick,
+  onLoadMore,
+}: CompactLiveDraftBoardProps): React.JSX.Element {
+  const palette = useDraftPalette();
+  const [sortKey, setSortKey] = useState<SortKey>('adp');
+  const [rosterOpen, setRosterOpen] = useState(false);
+
+  const boardTeams =
+    queries.boardOrderedTeams.length > 0
+      ? queries.boardOrderedTeams
+      : queries.leagueTeams;
+
+  const boardRounds = resolveBoardRounds({
+    teamCount: boardTeams.length,
+    pickCount: queries.pickHistory.length,
+    currentRound: queries.currentPickInfo?.round ?? null,
+    maxPickRound: queries.pickHistory.reduce(
+      (max, p) => Math.max(max, p.round),
+      0,
+    ),
+  });
+
+  // ADP is the server's own ordering of the available pool, so capture it
+  // before any client-side re-sort — otherwise the PTS sort renumbers it.
+  const rankedPlayers = useMemo(
+    () =>
+      playerData.enrichedPlayers.map((player, index) => ({
+        player,
+        adp: index + 1,
+      })),
+    [playerData.enrichedPlayers],
+  );
+  const listedPlayers = useMemo(() => {
+    if (sortKey === 'adp') return rankedPlayers;
+    return [...rankedPlayers].sort(
+      (a, b) => (b.player.ppg ?? 0) - (a.player.ppg ?? 0),
+    );
+  }, [rankedPlayers, sortKey]);
+
+  const canCommissionerPick = ui.commPickMode && queries.isCommissioner;
+  const canDraft = isMyPick || canCommissionerPick;
+  const showCommissionerBar = queries.isCommissioner;
+
+  return (
+    <YStack flex={1} backgroundColor="$background">
+      {/* ---- On the clock: team, countdown ring, and the board itself ---- */}
+      <YStack
+        paddingHorizontal="$3"
+        paddingTop={10}
+        paddingBottom={11}
+        borderBottomWidth={1}
+        backgroundColor={isMyPick ? '$surfaceRaised' : '$surfacePanel'}
+        borderBottomColor={isMyPick ? '$brandGold' : '$outlineSubtle'}
+      >
+        <XStack
+          justifyContent="space-between"
+          alignItems="center"
+          gap="$3"
+          marginBottom={8}
+        >
+          <YStack flex={1} minWidth={0}>
+            <Eyebrow color={isMyPick ? '$brandGoldLight' : '$fg4'}>
+              {ui.draftPaused
+                ? 'Draft paused'
+                : untimed && isMyPick
+                  ? 'Your pick — take your time'
+                  : isMyPick
+                    ? 'You’re on the clock'
+                    : 'On the clock'}
+            </Eyebrow>
+            <Text
+              fontFamily="$heading"
+              fontSize={19}
+              fontWeight="800"
+              letterSpacing={0.5}
+              lineHeight={21}
+              color="$color"
+              numberOfLines={1}
+            >
+              {queries.teamNameById(queries.currentPickTeamId)}
+            </Text>
+            <Text fontSize={11} color="$fg4" marginTop={1}>
+              Round {round} · Pick #{currentPick}
+            </Text>
+          </YStack>
+          <DraftClockRing
+            secondsRemaining={timeRemaining}
+            totalSeconds={ui.pickTimeLimitSeconds}
+            emphasize={isMyPick}
+            paused={ui.draftPaused}
+            untimed={untimed}
+          />
+        </XStack>
+
+        <DraftMiniBoard
+          teams={boardTeams}
+          picks={queries.pickHistory}
+          currentPickInfo={queries.currentPickInfo}
+          myTeamId={queries.myTeamId}
+          statsLookup={playerData.statsLookup}
+          rounds={boardRounds}
+        />
+      </YStack>
+
+      {/* ---- Commissioner controls ---- */}
+      {showCommissionerBar && (
+        <XStack
+          gap="$2"
+          paddingHorizontal="$3"
+          paddingTop={8}
+          alignItems="center"
+        >
+          {!ui.draftPaused ? (
+            <GhostButton
+              label="PAUSE"
+              disabled={actions.pauseLoading}
+              onPress={() => void actions.handlePauseDraft()}
+            />
+          ) : (
+            <GhostButton
+              label="RESUME"
+              tone="active"
+              disabled={actions.resumeLoading}
+              onPress={() => void actions.handleResumeDraft()}
+            />
+          )}
+          <GhostButton
+            label={ui.commPickMode ? 'COMM PICK ON' : 'COMM PICK'}
+            tone={ui.commPickMode ? 'active' : 'neutral'}
+            onPress={() => ui.setCommPickMode(!ui.commPickMode)}
+          />
+        </XStack>
+      )}
+
+      {/* ---- Search + sort ---- */}
+      <XStack
+        gap="$2"
+        paddingHorizontal="$3"
+        paddingTop={9}
+        alignItems="center"
+      >
+        <Input
+          flex={1}
+          minWidth={0}
+          size="$3"
+          borderRadius={10}
+          backgroundColor="$surfacePanel"
+          borderColor="$surfacePanelBorder"
+          color="$color"
+          placeholder="Search…"
+          placeholderTextColor={palette.text.fg4}
+          value={ui.searchTerm}
+          onChangeText={ui.setSearchTerm}
+        />
+        <XStack
+          borderWidth={1}
+          borderColor="$surfacePanelBorder"
+          borderRadius={9}
+          overflow="hidden"
+        >
+          {(['adp', 'pts'] as const).map((key) => {
+            const active = sortKey === key;
+            return (
+              <Pressable
+                key={key}
+                accessibilityRole="button"
+                accessibilityLabel={`Sort by ${key.toUpperCase()}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => setSortKey(key)}
+              >
+                <YStack
+                  paddingVertical={8}
+                  paddingHorizontal={11}
+                  backgroundColor={active ? '$surfaceRaised' : 'transparent'}
+                >
+                  <Text
+                    fontSize={11}
+                    fontWeight="800"
+                    color={active ? '$color' : '$fg4'}
+                  >
+                    {key.toUpperCase()}
+                  </Text>
+                </YStack>
+              </Pressable>
+            );
+          })}
+        </XStack>
+      </XStack>
+
+      {/* ---- Position filter chips ---- */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        flexGrow={0}
+        flexShrink={0}
+      >
+        <XStack gap={4} paddingHorizontal="$3" paddingVertical={8}>
+          {POSITION_FILTERS.map((pos) => {
+            const active = ui.selectedPosition === pos;
+            const tint =
+              pos === 'ALL'
+                ? palette.gold.gold
+                : getPositionColor('baseball', pos);
+            return (
+              <Pressable
+                key={pos}
+                accessibilityRole="button"
+                accessibilityLabel={`Filter by ${pos}`}
+                accessibilityState={{ selected: active }}
+                onPress={() => ui.setSelectedPosition(pos)}
+              >
+                <YStack
+                  paddingVertical={4}
+                  paddingHorizontal={10}
+                  borderRadius={999}
+                  borderWidth={1}
+                  borderColor={active ? tint : '$outlineDefault'}
+                  backgroundColor={active ? tint : 'transparent'}
+                >
+                  <Text
+                    fontSize={11.5}
+                    fontWeight="700"
+                    color={active ? '$textOnAccent' : '$textMuted'}
+                  >
+                    {pos}
+                  </Text>
+                </YStack>
+              </Pressable>
+            );
+          })}
+        </XStack>
+      </ScrollView>
+
+      {/* ---- Available players ---- */}
+      <FlatList
+        data={listedPlayers}
+        keyExtractor={(item) => String(item.player.id)}
+        contentContainerStyle={styles.playerList}
+        renderItem={({ item }) => (
+          <PlayerRow
+            player={item.player}
+            adp={item.adp}
+            canDraft={canDraft}
+            commPickMode={canCommissionerPick}
+            onDraft={onDraftPlayer}
+            onCommissionerPick={onCommissionerPick}
+          />
+        )}
+        onEndReached={() => {
+          if (queries.hasMorePlayers && !queries.loadingMore) {
+            onLoadMore();
+          }
+        }}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={
+          queries.loadingMore ? (
+            <YStack
+              testID="draft-loading-more"
+              padding="$3"
+              alignItems="center"
+            >
+              <Spinner color="$brandGold" />
+            </YStack>
+          ) : null
+        }
+        ListEmptyComponent={
+          <YStack padding="$6" alignItems="center">
+            <Text color="$textMuted">No players match that filter</Text>
+          </YStack>
+        }
+      />
+
+      {/* ---- My squad strip + roster sheet ---- */}
+      <DraftSquadStrip
+        myPicks={playerData.myTeamPicks}
+        myTeam={playerData.myTeam}
+        statsLookup={playerData.statsLookup}
+        rounds={Math.max(boardRounds, MIN_BOARD_ROUNDS)}
+        teamName={queries.teamNameById(queries.myTeamId)}
+        isMyPick={isMyPick}
+        open={rosterOpen}
+        onOpen={() => setRosterOpen(true)}
+        onClose={() => setRosterOpen(false)}
+      />
+
+      {/* ---- Pick announcement ---- */}
+      <DraftPickAnnouncement
+        announcement={ui.announcement}
+        celebrate
+        onDismiss={ui.dismissAnnouncement}
+      />
+
+      {/* Toast overlay */}
+      {ui.toastMessage && (
+        <YStack
+          position="absolute"
+          bottom={20}
+          left={16}
+          right={16}
+          zIndex={100}
+          borderRadius={12}
+          borderWidth={1}
+          padding="$3"
+          backgroundColor={
+            ui.toastMessage.type === 'error'
+              ? '$statusDangerBg'
+              : ui.toastMessage.type === 'success'
+                ? '$statusSuccessBg'
+                : '$surfaceRaised'
+          }
+          borderColor={
+            ui.toastMessage.type === 'error'
+              ? '$statusDangerBorder'
+              : ui.toastMessage.type === 'success'
+                ? '$statusSuccessBorder'
+                : '$outlineDefault'
+          }
+        >
+          <Pressable onPress={() => ui.setToastMessage(null)}>
+            <Text color="$color" fontWeight="600" textAlign="center">
+              {ui.toastMessage.text}
+            </Text>
+          </Pressable>
+        </YStack>
+      )}
+
+      {/* Urgent-error overlay (LS-8066) — mirrors the wide-viewport toast
+          below so pick failures are visible on every screen size. */}
+      {ui.urgentMessage && !ui.toastMessage && (
+        <YStack
+          position="absolute"
+          bottom={20}
+          left={16}
+          right={16}
+          zIndex={100}
+          borderRadius={12}
+          borderWidth={1}
+          padding="$3"
+          backgroundColor="$statusDangerBg"
+          borderColor="$statusDangerBorder"
+        >
+          <Pressable onPress={() => ui.setUrgentMessage('')}>
+            <Text color="$statusDangerFg" fontWeight="600" textAlign="center">
+              {ui.urgentMessage}
+            </Text>
+          </Pressable>
+        </YStack>
+      )}
+      <Text
+        position="absolute"
+        width={1}
+        height={1}
+        padding={0}
+        margin={-1}
+        overflow="hidden"
+        borderWidth={0}
+      >
+        {ui.liveMessage}
+      </Text>
+    </YStack>
+  );
+}
+
 export function EliteDraftBoardScreen({
   leagueId,
   onNavigate,
@@ -81,6 +689,7 @@ export function EliteDraftBoardScreen({
   const { user, token: authToken } = useAuth();
   const userId = user?.id ?? 0;
   const isAuthenticated = !!user;
+  const isCompact = useIsCompactDraftViewport();
 
   const { data: userSubscriptionData } = useGetUserByIdQuery({
     variables: { id: userId },
@@ -208,9 +817,9 @@ export function EliteDraftBoardScreen({
     refetchQueue: queries.refetchQueue,
     refetchAutoPickStatuses: queries.refetchAutoPickStatuses,
     websocketUrl,
-    // LS-8067: fall back to the in-memory JWT from useAuth when no explicit
-    // token prop is supplied. Web (and native) consumers never pass `token`,
-    // so without this the draft socket defers forever and other open clients
+    // LS-8067 / LS-8108: fall back to the in-memory JWT from useAuth when no
+    // explicit token prop is supplied. Most consumers never pass `token`, so
+    // without this the draft socket defers forever and other open clients
     // (e.g. a laptop while you pick on mobile) never receive live pick pushes
     // until a manual refetch. The prop still wins when provided.
     token: token ?? authToken ?? undefined,
@@ -369,7 +978,8 @@ export function EliteDraftBoardScreen({
 
   // LS-8068: drag-to-draft. The player card being dragged is held here so the
   // DraftRail can highlight eligible roster slots during the drag and validate
-  // eligibility on drop. Cleared when the drag ends (drop or cancel).
+  // eligibility on drop. Cleared when the drag ends (drop or cancel). Wide
+  // viewport only — the compact branch has no drag-and-drop interaction.
   const [draggedPlayer, setDraggedPlayer] = useState<DraftPlayer | null>(null);
   const handlePlayerDragStart = useCallback(
     (player: DraftPlayer) => setDraggedPlayer(player),
@@ -377,7 +987,9 @@ export function EliteDraftBoardScreen({
   );
   const handlePlayerDragEnd = useCallback(() => setDraggedPlayer(null), []);
 
-  // ---- Early returns for special states ----
+  // ---- Early returns for special states (identical at every viewport width
+  // — DraftStateScreens/PreDraftLobby/DraftCompleteView are already
+  // responsive, LS-9060/LS-9061/LS-9205) ----
   if (!leagueId) return <NoLeagueScreen onNavigate={onNavigate} />;
 
   if (
@@ -503,7 +1115,12 @@ export function EliteDraftBoardScreen({
     queries.leagueDraft?.selectionMethod === 'auction' &&
     queries.draftId != null
   ) {
-    return (
+    // Auction drafts have no compact layout yet — a deferred product
+    // decision (AC6 on the original LS-9066), not a capability gap, so this
+    // is gated on viewport rather than platform (LS-9207).
+    return isCompact ? (
+      <AuctionNotSupportedScreen leagueId={leagueId} onNavigate={onNavigate} />
+    ) : (
       <AuctionDraftRoom
         draftId={queries.draftId}
         myTeamId={queries.myTeamId ?? undefined}
@@ -515,7 +1132,27 @@ export function EliteDraftBoardScreen({
     return <AutomatedDraftScreen />;
   }
 
-  // ---- Main Live Draft UI ----
+  // ---- Main Live Draft UI: compact (narrow-viewport) branch ----
+  if (isCompact) {
+    return (
+      <CompactLiveDraftBoard
+        ui={ui}
+        queries={queries}
+        actions={actions}
+        playerData={playerData}
+        isMyPick={isMyPick}
+        untimed={untimed}
+        timeRemaining={timeRemaining}
+        round={round}
+        currentPick={currentPick}
+        onDraftPlayer={handleDraftPlayer}
+        onCommissionerPick={handleCommissionerPick}
+        onLoadMore={handleLoadMore}
+      />
+    );
+  }
+
+  // ---- Main Live Draft UI: wide-viewport branch ----
   return (
     <div className="d-root" data-sport={sport}>
       <style>{CSS}</style>
@@ -716,3 +1353,15 @@ export function EliteDraftBoardScreen({
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Styles (compact-branch FlatList only — the wide branch uses the raw-CSS
+// `.d-*` classes injected via <style>{CSS}</style> above)
+// ---------------------------------------------------------------------------
+const styles = StyleSheet.create({
+  playerList: {
+    paddingHorizontal: 12,
+    paddingTop: 2,
+    paddingBottom: 16,
+  },
+});
