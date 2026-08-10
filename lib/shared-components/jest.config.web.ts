@@ -49,6 +49,13 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/src/features/leagues/ProposeTradeDialogNativeModal.spec.tsx',
+    // Mobile-only regression test (LS-9180) — asserts that a bare
+    // `@legacy-sports/utils` import resolves through `index.native.ts`
+    // (`getDbOptions`, which the web barrel doesn't export at all). This web
+    // project's `moduleFileExtensions` has no native.ts entry, so the
+    // assertion is correctly false here. Belongs to
+    // shared-components:mobile only.
+    '/src/nativeModuleResolution.native.spec.ts',
   ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],

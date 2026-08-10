@@ -1,7 +1,16 @@
 module.exports = {
   coverageDirectory: '../../coverage/lib/shared-components/mobile',
   displayName: 'shared-components:mobile',
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
+  moduleFileExtensions: [
+    'native.ts',
+    'native.tsx',
+    'ts',
+    'tsx',
+    'native.js',
+    'native.jsx',
+    'js',
+    'jsx',
+  ],
   moduleNameMapper: {
     '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$':
       'identity-obj-proxy',
@@ -40,6 +49,20 @@ module.exports = {
     // resolvable under the RN mobile jest environment. Belongs to
     // shared-components:web only.
     '/src/components/DateTimePicker\\.navigateMonth\\.spec\\.tsx$',
+    // Web-only specs for components with a dedicated `.native.tsx` fork
+    // (LS-9180): now that this project's moduleFileExtensions actually
+    // prefers the native barrel, these generic specs resolve to the native
+    // component and assert web-only behavior (DOM `role="img"`/`role="link"`,
+    // `StyleSheet`/`Easing` shapes the web mock doesn't provide). Each has a
+    // purpose-built `.native.spec.tsx` sibling that already covers the
+    // native component correctly.
+    '/src/features/elite-draft/PickSplashStatGraphic\\.spec\\.tsx$',
+    '/src/features/elite-draft/EliteDraftBoardScreen\\.spec\\.tsx$',
+    '/src/features/elite-draft/SpectatorScreen\\.spec\\.tsx$',
+    // useVoiceCommands.native.ts is a static stub (no RN speech-recognition
+    // equivalent) with no branches to test; its generic spec drives the web
+    // `window.SpeechRecognition` implementation exclusively (LS-9180).
+    '/src/hooks/useVoiceCommands\\.spec\\.ts$',
   ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
