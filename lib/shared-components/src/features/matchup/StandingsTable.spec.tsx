@@ -330,4 +330,43 @@ describe('StandingsTable', () => {
     expect(getByText('11')).toBeTruthy();
     expect(getByText('13')).toBeTruthy();
   });
+
+  it('sorts by waiver priority and toggles direction — LS-9119', () => {
+    const { getByText, getAllByRole } = render(
+      <StandingsTable
+        standings={mockStandings}
+        showWaiverOrder
+        waiverOrders={{ '1': 15, '2': 11, '3': 13 }}
+      />,
+    );
+
+    // Re-query between clicks: the header label gains a sort-direction arrow
+    // after the first click, so the exact text 'Waiver' no longer matches.
+    fireEvent.click(getByText(/^Waiver/));
+
+    // Ascending: lowest waiver number (11, Lightning) sorts first.
+    const rows = getAllByRole('row');
+    expect(rows[1].textContent).toContain('Lightning');
+
+    fireEvent.click(getByText(/^Waiver/));
+
+    // Descending: highest waiver number (15, Thunder) sorts first.
+    const rowsDesc = getAllByRole('row');
+    expect(rowsDesc[1].textContent).toContain('Thunder');
+  });
+
+  it('sorts by the # (rank) column — LS-9120', () => {
+    const { getByText, getAllByRole } = render(
+      <StandingsTable standings={mockStandings} />,
+    );
+
+    // First click selects the rank sort key (defaults to desc, matching the
+    // table's initial winPct-desc order).
+    fireEvent.click(getByText('#'));
+    // Second click toggles to ascending — lowest win% (Avalanche) sorts first.
+    fireEvent.click(getByText(/^#/));
+
+    const rows = getAllByRole('row');
+    expect(rows[1].textContent).toContain('Avalanche');
+  });
 });

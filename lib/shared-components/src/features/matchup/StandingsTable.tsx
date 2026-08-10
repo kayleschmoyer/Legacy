@@ -49,6 +49,7 @@ export interface StandingsTableProps {
 }
 
 type SortKey =
+  | 'rank'
   | 'team'
   | 'wins'
   | 'losses'
@@ -56,7 +57,8 @@ type SortKey =
   | 'winPct'
   | 'pointsFor'
   | 'pointsAgainst'
-  | 'diff';
+  | 'diff'
+  | 'waiverOrder';
 type SortDirection = 'asc' | 'desc';
 
 const diffOf = (s: StandingRecord): number | null =>
@@ -68,12 +70,18 @@ function sortStandings(
   list: StandingRecord[],
   sortKey: SortKey,
   sortDirection: SortDirection,
+  waiverOrders?: Record<string, number>,
 ): StandingRecord[] {
   return [...list].sort((a, b) => {
     let aValue: number | string;
     let bValue: number | string;
 
     switch (sortKey) {
+      case 'rank':
+      case 'winPct':
+        aValue = a.winPercentage ?? 0;
+        bValue = b.winPercentage ?? 0;
+        break;
       case 'team':
         aValue = a.teamName ?? '';
         bValue = b.teamName ?? '';
@@ -90,10 +98,6 @@ function sortStandings(
         aValue = a.ties ?? 0;
         bValue = b.ties ?? 0;
         break;
-      case 'winPct':
-        aValue = a.winPercentage ?? 0;
-        bValue = b.winPercentage ?? 0;
-        break;
       case 'pointsFor':
         aValue = a.pointsFor ?? 0;
         bValue = b.pointsFor ?? 0;
@@ -105,6 +109,14 @@ function sortStandings(
       case 'diff':
         aValue = diffOf(a) ?? 0;
         bValue = diffOf(b) ?? 0;
+        break;
+      case 'waiverOrder':
+        aValue =
+          (a.teamId != null ? waiverOrders?.[a.teamId] : undefined) ??
+          Number.MAX_SAFE_INTEGER;
+        bValue =
+          (b.teamId != null ? waiverOrders?.[b.teamId] : undefined) ??
+          Number.MAX_SAFE_INTEGER;
         break;
       default:
         return 0;
@@ -354,10 +366,12 @@ function StandingsRow({
 /**
  * StandingsTable - Sortable league standings table.
  *
- * Full column set: Rank, Team, W, L, T, Win%, PF, PA, Diff (PF−PA). Supports
- * division grouping (rank resets per division), current-user row highlight,
- * row press navigation, and responsive column hiding (T/Win% hide below `$sm`,
- * PF/PA/Diff hide below `$md`).
+ * Full column set: Rank, Team, W, L, T, Win%, PF, PA, Diff (PF−PA), and an
+ * optional Waiver column. All columns are sortable, including Rank (sorts by
+ * win%, the ranking criterion) and Waiver. Supports division grouping (rank
+ * resets per division), current-user row highlight, row press navigation,
+ * and responsive column hiding (T/Win% hide below `$sm`, PF/PA/Diff/Waiver
+ * hide below `$md`).
  */
 export function StandingsTable({
   standings,
@@ -379,7 +393,9 @@ export function StandingsTable({
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
-      setSortDirection(key === 'team' ? 'asc' : 'desc');
+      setSortDirection(
+        key === 'team' || key === 'waiverOrder' ? 'asc' : 'desc',
+      );
     }
   };
 
@@ -401,15 +417,17 @@ export function StandingsTable({
       return {
         divisionId: divId,
         divisionName: name,
-        teams: sortStandings(divTeams, sortKey, sortDirection),
+        teams: sortStandings(divTeams, sortKey, sortDirection, waiverOrders),
       };
     });
-  }, [hasDivisions, standings, sortKey, sortDirection]);
+  }, [hasDivisions, standings, sortKey, sortDirection, waiverOrders]);
 
   const sortedStandings = useMemo(
     () =>
-      hasDivisions ? [] : sortStandings(standings, sortKey, sortDirection),
-    [hasDivisions, standings, sortKey, sortDirection],
+      hasDivisions
+        ? []
+        : sortStandings(standings, sortKey, sortDirection, waiverOrders),
+    [hasDivisions, standings, sortKey, sortDirection, waiverOrders],
   );
 
   if (loading) {
@@ -482,9 +500,7 @@ export function StandingsTable({
           width={44}
           alignItems="center"
         >
-          <Text fontSize="$3" fontWeight="bold" color="$gray11">
-            #
-          </Text>
+          <SortButton label="#" sortKeyValue="rank" />
         </YStack>
         <YStack
           tag="th"
@@ -578,9 +594,7 @@ export function StandingsTable({
             display="none"
             $gtMd={{ display: 'flex' }}
           >
-            <Text fontSize="$3" fontWeight="bold" color="$gray11">
-              Waiver
-            </Text>
+            <SortButton label="Waiver" sortKeyValue="waiverOrder" />
           </YStack>
         ) : null}
       </XStack>
