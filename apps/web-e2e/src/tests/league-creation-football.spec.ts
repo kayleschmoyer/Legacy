@@ -202,6 +202,38 @@ test.describe('League Creation — Sport-aware @regression', () => {
     expect(captured.current?.sport).toBe('football');
   });
 
+  // ─── Basic League Settings journey (LS-5374) ────────────────────────────
+  // Feature Story under the QA epic (LS-5263): a commissioner sets the
+  // league name and team count for a football league and those exact
+  // values are submitted and reflected on the created league.
+
+  test('football basic settings: league name and team count are submitted and reflected on the created league (LS-5374)', async ({
+    page,
+    leaguePage,
+  }) => {
+    const captured: { current: Record<string, unknown> | null } = {
+      current: null,
+    };
+    await mockCreateLeague(page, captured);
+
+    await leaguePage.gotoCreate('football');
+    await leaguePage.leagueNameInput.expectVisible();
+
+    await leaguePage.fillLeagueName('Basic Settings Football League');
+    await leaguePage.selectTeamCount(8);
+    await leaguePage.submitCreate();
+    await leaguePage.continueToLeague();
+
+    // Navigation confirms the league was created from this submission.
+    await expect(page).toHaveURL(/\/football\/league\/\d+/);
+
+    // The exact name and team count entered are what the app actually
+    // submitted, not just whatever the mock echoes back.
+    expect(captured.current?.leagueName).toBe('Basic Settings Football League');
+    expect(captured.current?.numberOfTeams).toBe(8);
+    expect(captured.current?.sport).toBe('football');
+  });
+
   // ─── Premium gates still fire in football mode ──────────────────────────
   // The Create League premium gating is sport-agnostic, but the gates render
   // inside sport-aware sections (eras swap per FREE_ERA_IDS_BY_SPORT; FAAB +
