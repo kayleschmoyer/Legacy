@@ -45,6 +45,8 @@ Never file a duplicate — several held PRs must converge on **one** blocker tic
 
 3. **Link it as a blocker to your own ticket**: `jira_link_issues(inwardKey: "<your LS-####>", outwardKey: "<blocker LS-####>")` — inward is the blocked ticket, outward is the blocker.
 
+4. **Optionally dispatch a fix chip** (`mcp__ccd_session__spawn_task`, one chip = the blocker ticket) so the blocker gets fixed without waiting for a human to pick it up. The chip's job is **fix and merge the blocker ticket only** — its prompt must NOT tell it to rebase, update, label, or otherwise poke the held PR. Resume is owned by the auto-resume backstop and this session's Phase D monitor; a chip that also pokes the held PR races the holder's local rebase (`push --force-with-lease` collisions).
+
 ## Phase C: Hold the PR (visible, machine-readable)
 
 A hold that isn't surfaced is just abandonment. All four steps are required before the hold is legitimate:
@@ -101,14 +103,24 @@ done
 
 With the monitor armed, the marker posted, the label applied, and the user notified, **the turn may end** — this is the "Held on external E2E blocker (armed)" state in [drive.md's terminal states](drive.md#terminal-states-the-only-places-this-loop-may-stop). The session is parked, not stuck: the monitor wakes it, and if the session dies anyway, the sweep net (below) resumes the PR.
 
+## Auto-resume backstop (tokenless)
+
+`.github/workflows/e2e-hold-resume.yml` (LS-9218) resumes held PRs with **zero agent tokens**: on every merge to `main` it matches the merged PR's LS-#### title keys against each held PR's `<!-- e2e-hold -->` marker `blocker:` key. On a match it runs `update-branch` (merging fresh main → a `synchronize` event that re-fires CI + review while this session sleeps), appends ▶️ auto-resumed to the hold comment, removes `blocked:e2e-on-main`, and ensures `bot:ready-for-review`. If `update-branch` hits conflicts it leaves the hold **fully intact** and appends a ⚠️ failure note — the rebase path is then this session's (or a resume chip's) job.
+
+Because the workflow fires within seconds of the fix merging and the Phase D monitor polls at 10 minutes, **expect the backstop to have already acted by the time this session wakes**. Phase E reconciles the two.
+
+The backstop only matches fixes whose PR title carries the blocker key. Fixes without a PR (infra, Jira-only closure) or with a mistitled PR still rely on the Phase D monitor and the sweep net — the backstop is a layer, not a replacement for arming the monitor.
+
 ## Phase E: Resume on blocker resolution
 
 When the monitor fires (or a sweep resume-chip picks up a held PR whose blocker is Done):
 
 1. **Confirm one-shot**: `jira_view(key: <blocker>)` shows Done, or `github_view_pr` on the fix PR shows `state: "MERGED"`. If neither confirms (monitor false positive), re-arm and stay held.
 2. **Disarm the monitor**: `TaskStop` it if still running.
-3. **Rebase onto main** to pick up the fix: `/rebase` (worktree_rebase_onto_main → stabilize → validate). Push.
-4. **Un-hold**: `github_manage_labels(prs: [<PR#>], remove: ["blocked:e2e-on-main"])`, update the hold comment (▶️ resumed: blocker LS-#### resolved by PR #<n>), and re-apply `bot:ready-for-review` (**last** label op) to re-fire review + CI.
+3. **Check whether the backstop already resumed**: `github_view_pr` on your PR — if `blocked:e2e-on-main` is gone and the remote head has advanced past your local head, the backstop's `update-branch` already re-fired CI. **Do not rebase over it**: `git fetch` and fast-forward/reset your local branch to `origin/<branch>` (the remote merge commit is canonical; a local rebase + `push --force-with-lease` here would fail or erase the revalidation in flight), then skip to step 5.
+4. **Backstop didn't act or failed on conflicts** (hold label still present, or the hold comment carries the ⚠️ auto-resume-failed note): resume manually —
+   - **Rebase onto main** to pick up the fix: `/rebase` (worktree_rebase_onto_main → stabilize → validate). Push.
+   - **Un-hold**: `github_manage_labels(prs: [<PR#>], remove: ["blocked:e2e-on-main"])`, update the hold comment (▶️ resumed: blocker LS-#### resolved by PR #<n>), and re-apply `bot:ready-for-review` (**last** label op) to re-fire review + CI.
 5. **Re-enter the drive loop** ([drive.md Step 6](drive.md#step-6-event-handling-loop)) and drive to merge.
 6. **If the same specs fail again** on the new run: the blocker fix was incomplete. Re-run Phase A (the failure may be yours now). If it is still pre-existing, comment the evidence on the blocker ticket (or its successor), re-hold **once**. On a second recurrence, stop and escalate to the user with the full history — do not loop hold/resume silently.
 

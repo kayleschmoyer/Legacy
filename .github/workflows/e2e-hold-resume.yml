@@ -1,0 +1,207 @@
+name: "E2E Hold Auto-Resume"
+
+# Resumes PRs held under the e2e-hold protocol when their blocker's fix merges.
+# (.agents/skills/pr-lifecycle/references/e2e-hold.md — LS-9218)
+#
+# A PR held on `blocked:e2e-on-main` is parked waiting for a fix that lands on
+# a DIFFERENT PR. Nothing in the held PR's own event stream ever fires when
+# that fix merges: the holding session's watch-pr.sh monitor only polls its own
+# PR, the Phase D long-poll monitor dies with the session, and the sweep-net
+# recovery only runs when a sweep is invoked. This workflow is the tokenless
+# backstop: it fires on every merge to main, matches held PRs to the merged fix
+# by blocker ticket key, and resumes them with zero agent involvement.
+#
+# Matching contract: the merged PR's title carries its LS-#### key (commit
+# format rule), and every legitimate hold carries a machine-readable
+#   <!-- e2e-hold
+#   blocker: LS-####
+#   ... -->
+# marker comment (e2e-hold.md Phase C). Ticket-key matching is deliberate —
+# the fix PR's number does not exist yet when the hold is placed, and it also
+# catches human-authored fixes. Holds are NOT matched by label name: label-sync
+# prunes labels not in labels.yml, so dynamic `blocked-by:<n>` labels cannot
+# exist.
+#
+# Resume = PUT update-branch (merge fresh main into the held branch). The
+# resulting `synchronize` event re-fires the CI orchestrator and — when
+# `bot:ready-for-review` is already present — review.yml, revalidating the PR
+# against the fixed main while the holding session sleeps. A re-run of the old
+# failed job would NOT work: re-runs reuse the original refs/pull/N/merge
+# commit and would test against the still-broken main. The merge commit this
+# pushes into the branch is harmless — the merge queue squashes, and the
+# commit is revalidated as the new head by the synchronize-triggered CI.
+#
+# TOKEN CASCADE (do not "simplify" to GITHUB_TOKEN): events created with the
+# workflow's own GITHUB_TOKEN do not trigger other workflows, so a
+# GITHUB_TOKEN update-branch would un-hold the PR without ever re-firing CI —
+# a silent, worse-than-nothing no-op. Every write below goes through the Agent
+# Author app token, and the job fails loudly if the token cannot be minted.
+#
+# On update-branch conflict the hold is left fully intact (label + marker) and
+# the hold comment gains a conflict note: the holding session's own monitor or
+# a sweep resume chip owns the rebase path (e2e-hold.md Phase E). This
+# workflow never force-pushes and never touches PRs without a parseable
+# marker (malformed holds belong to the sweep net).
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+concurrency:
+  group: e2e-hold-resume-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  resume:
+    name: "Resume held PRs"
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # No fallback to GITHUB_TOKEN here (unlike check-conflicts-sweep, which
+      # only reads): resume REQUIRES an event-cascading identity — see header.
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
+      - name: Resume held PRs whose blocker just merged
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          MERGED_PR: ${{ github.event.pull_request.number }}
+          MERGED_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -eo pipefail
+
+          # LS keys named by the merged PR (title carries the ticket key by
+          # commit-format rule; there may be more than one, e.g. revert PRs).
+          KEYS=$(printf '%s' "$MERGED_TITLE" | grep -oE 'LS-[0-9]+' | sort -u || true)
+          if [ -z "$KEYS" ]; then
+            echo "Merged PR #${MERGED_PR} has no LS-#### key in its title; nothing to match."
+            exit 0
+          fi
+          echo "Merged PR #${MERGED_PR} keys: $(echo "$KEYS" | tr '\n' ' ')"
+
+          # Open PRs currently held. The issues endpoint supports label
+          # filtering directly; .pull_request presence filters out plain issues.
+          if ! HELD=$(gh api --paginate \
+              "repos/${GH_REPO}/issues?state=open&labels=blocked%3Ae2e-on-main&per_page=100" \
+              --jq '.[] | select(.pull_request) | .number'); then
+            echo "::error::Failed to list held PRs — check app token permissions/rate limits"
+            exit 1
+          fi
+          if [ -z "$HELD" ]; then
+            echo "No open PRs hold the blocked:e2e-on-main label; nothing to resume."
+            exit 0
+          fi
+
+          FAILED_WRITES=0
+
+          while IFS= read -r PR_NUM; do
+            [ -z "$PR_NUM" ] && continue
+            echo "--- held PR #${PR_NUM} ---"
+
+            # Newest e2e-hold marker comment wins (a re-hold supersedes).
+            # --paginate runs the jq filter per page, so `last` can emit one
+            # candidate per page on comment-heavy PRs — tail keeps the newest.
+            MARKER_JSON=$(gh api --paginate \
+              "repos/${GH_REPO}/issues/${PR_NUM}/comments" \
+              --jq '[.[] | select(.body | contains("<!-- e2e-hold"))] | last // empty' \
+              2>/dev/null | tail -n 1 || true)
+            if [ -z "$MARKER_JSON" ]; then
+              echo "::warning::PR #${PR_NUM} is labeled held but has no <!-- e2e-hold --> marker comment — malformed hold, leaving it to the sweep net"
+              continue
+            fi
+            COMMENT_ID=$(printf '%s' "$MARKER_JSON" | jq -r '.id')
+            BLOCKER=$(printf '%s' "$MARKER_JSON" | jq -r '.body' \
+              | sed -n 's/^[[:space:]]*blocker:[[:space:]]*\(LS-[0-9][0-9]*\).*/\1/p' | head -1)
+            if [ -z "$BLOCKER" ]; then
+              echo "::warning::PR #${PR_NUM} marker has no parseable 'blocker: LS-####' line — leaving it to the sweep net"
+              continue
+            fi
+            if ! echo "$KEYS" | grep -qx "$BLOCKER"; then
+              echo "PR #${PR_NUM} is held on ${BLOCKER}, not resolved by this merge; skipping."
+              continue
+            fi
+            echo "PR #${PR_NUM} blocker ${BLOCKER} was resolved by merged PR #${MERGED_PR}; resuming."
+
+            NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            UPDATE_ERR=$(gh api "repos/${GH_REPO}/pulls/${PR_NUM}/update-branch" -X PUT 2>&1 >/dev/null) \
+              && UPDATE_RC=0 || UPDATE_RC=$?
+
+            if [ "$UPDATE_RC" -ne 0 ]; then
+              case "$UPDATE_ERR" in
+                *"no new commits"*|*"No new commits"*)
+                  # Branch already contains main's tip — no synchronize event
+                  # will fire, so force a fresh review/CI cycle via a label
+                  # EVENT: remove + re-add bot:ready-for-review below.
+                  echo "PR #${PR_NUM} branch already up to date with main; will re-fire via label event."
+                  FORCE_LABEL_CYCLE=1
+                  ;;
+                *)
+                  # Merge conflict (or transient API failure): leave the hold
+                  # fully intact and note it on the hold comment — the holding
+                  # session's monitor / a sweep resume chip owns the rebase.
+                  echo "::warning::update-branch failed for PR #${PR_NUM}: ${UPDATE_ERR}"
+                  NEW_BODY=$(printf '%s' "$MARKER_JSON" | jq -r '.body')"
+
+          ---
+          ⚠️ **Auto-resume attempted ${NOW} and failed** — blocker ${BLOCKER} was fixed by PR #${MERGED_PR}, but \`update-branch\` did not succeed (likely merge conflicts with \`main\`).
+          The hold remains; resume manually via e2e-hold Phase E (rebase → un-hold → \`bot:ready-for-review\`)."
+                  printf '%s' "$NEW_BODY" | jq -R -s '{"body": .}' \
+                    | gh api "repos/${GH_REPO}/issues/comments/${COMMENT_ID}" -X PATCH --input - > /dev/null \
+                    || { echo "::error::Failed to update hold comment on PR #${PR_NUM}"; FAILED_WRITES=$((FAILED_WRITES + 1)); }
+                  continue
+                  ;;
+              esac
+            else
+              echo "PR #${PR_NUM}: update-branch accepted — synchronize event will revalidate against fixed main."
+              FORCE_LABEL_CYCLE=0
+            fi
+
+            # Un-hold: update the hold comment in place (keep the marker for
+            # audit; Phase E and sweeps key off the label, which goes away).
+            NEW_BODY=$(printf '%s' "$MARKER_JSON" | jq -r '.body')"
+
+          ---
+          ▶️ **Auto-resumed ${NOW}** — blocker ${BLOCKER} fixed by PR #${MERGED_PR}. Branch updated from \`main\`; CI + review re-fired. (e2e-hold-resume workflow)"
+            printf '%s' "$NEW_BODY" | jq -R -s '{"body": .}' \
+              | gh api "repos/${GH_REPO}/issues/comments/${COMMENT_ID}" -X PATCH --input - > /dev/null \
+              || { echo "::error::Failed to update hold comment on PR #${PR_NUM}"; FAILED_WRITES=$((FAILED_WRITES + 1)); }
+
+            gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels/blocked%3Ae2e-on-main" \
+              -X DELETE > /dev/null 2>&1 \
+              || { echo "::error::Failed to remove hold label from PR #${PR_NUM}"; FAILED_WRITES=$((FAILED_WRITES + 1)); }
+
+            # bot:ready-for-review — ALWAYS the last label op (protocol rule).
+            # If absent, add it. If present: the synchronize event already
+            # re-fires review.yml, so a toggle would just double-run the
+            # reviewer — only cycle it when there was no synchronize event.
+            HAS_RFR=$(gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels" \
+              --jq 'any(.[]; .name == "bot:ready-for-review")' 2>/dev/null || echo "false")
+            if [ "$HAS_RFR" != "true" ]; then
+              printf '{"labels":["bot:ready-for-review"]}' \
+                | gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels" -X POST --input - > /dev/null \
+                || { echo "::error::Failed to add bot:ready-for-review to PR #${PR_NUM}"; FAILED_WRITES=$((FAILED_WRITES + 1)); }
+            elif [ "${FORCE_LABEL_CYCLE:-0}" = "1" ]; then
+              gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels/bot%3Aready-for-review" \
+                -X DELETE > /dev/null 2>&1 || true
+              printf '{"labels":["bot:ready-for-review"]}' \
+                | gh api "repos/${GH_REPO}/issues/${PR_NUM}/labels" -X POST --input - > /dev/null \
+                || { echo "::error::Failed to re-add bot:ready-for-review to PR #${PR_NUM}"; FAILED_WRITES=$((FAILED_WRITES + 1)); }
+            fi
+
+            echo "PR #${PR_NUM} resumed."
+          done <<< "$HELD"
+
+          if [ "$FAILED_WRITES" -gt 0 ]; then
+            echo "::error::${FAILED_WRITES} write(s) failed while resuming held PRs"
+            exit 1
+          fi
