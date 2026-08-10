@@ -49,6 +49,12 @@
   --pos-outfield: #2d6a4f;
   --pos-utility: #c5a55a;
 
+  /* Football — mirrors footballPositionBadges in @legacy-sports/design-tokens */
+  --pos-qb: #c41e3a;
+  --pos-skill: #8b6f47;
+  --pos-kicker: #c5a55a;
+  --pos-defense: #c25a2a;
+
   --radius-2: 6px;
   --radius-3: 8px;
   --radius-4: 12px;
@@ -424,6 +430,19 @@
 .mrc-g-utility .mrc-pos-badge {
   background: var(--pos-utility);
   color: var(--brand-navy-dark);
+}
+.mrc-g-qb .mrc-pos-badge {
+  background: var(--pos-qb);
+}
+.mrc-g-skill .mrc-pos-badge {
+  background: var(--pos-skill);
+}
+.mrc-g-kicker .mrc-pos-badge {
+  background: var(--pos-kicker);
+  color: var(--brand-navy-dark);
+}
+.mrc-g-defense .mrc-pos-badge {
+  background: var(--pos-defense);
 }
 
 /* team cell */

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AppState, RefreshControl } from 'react-native';
 import { NetworkStatus } from '@apollo/client';
+import { useRouter } from 'expo-router';
 import {
   Card,
   ScrollView,
@@ -175,6 +176,7 @@ interface RosterSectionProps {
   readonly players: MatchupPlayer[];
   readonly positionOrder: readonly string[];
   readonly label: string;
+  readonly onPlayerPress: (player: MatchupPlayer) => void;
 }
 
 function RosterSection({
@@ -182,6 +184,7 @@ function RosterSection({
   players,
   positionOrder,
   label,
+  onPlayerPress,
 }: RosterSectionProps) {
   const teamPlayers = players.filter((p) => p.teamId === teamId);
 
@@ -237,6 +240,12 @@ function RosterSection({
             paddingVertical="$2"
             alignItems="center"
             gap="$2"
+            {...(player
+              ? {
+                  onPress: () => onPlayerPress(player),
+                  pressStyle: { opacity: 0.6 },
+                }
+              : {})}
           >
             <YStack width={36} alignItems="flex-end">
               <Text fontSize="$2" fontWeight="700" color="$gray9">
@@ -274,6 +283,8 @@ function RosterSection({
               paddingVertical="$2"
               alignItems="center"
               gap="$2"
+              onPress={() => onPlayerPress(player)}
+              pressStyle={{ opacity: 0.6 }}
             >
               <YStack width={36} alignItems="flex-end">
                 <Text fontSize="$2" fontWeight="700" color="$gray7">
@@ -298,6 +309,13 @@ export function FootballMatchupScreen(
   props: FootballMatchupScreenProps,
 ): React.JSX.Element {
   const { matchupId, defensiveFormat } = props;
+  const router = useRouter();
+
+  const onPlayerPress = (player: MatchupPlayer) => {
+    if (player.playerId) {
+      router.push(`/football/players/${player.playerId}`);
+    }
+  };
 
   const {
     data: matchupData,
@@ -450,12 +468,14 @@ export function FootballMatchupScreen(
               players={players}
               positionOrder={positionOrder}
               label={`Team ${matchup.team1Id ?? '1'}`}
+              onPlayerPress={onPlayerPress}
             />
             <RosterSection
               teamId={matchup.team2Id}
               players={players}
               positionOrder={positionOrder}
               label={`Team ${matchup.team2Id ?? '2'}`}
+              onPlayerPress={onPlayerPress}
             />
           </>
         )}

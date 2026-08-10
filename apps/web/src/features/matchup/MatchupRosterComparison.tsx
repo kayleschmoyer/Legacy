@@ -13,12 +13,14 @@ import {
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
+  Sport,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
 } from '@legacy-sports/graphql';
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
+import { FootballPlayerDetailModal } from '../../components/FootballPlayerDetailModal';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
   mapBattingStats,
@@ -49,11 +51,46 @@ function hasNoStats(game: GameSlot): boolean {
 
 // ── Position grouping (drives .mrc-g-* badge color classes) ────────────────
 
-type PositionGroup = 'catcher' | 'infield' | 'outfield' | 'pitcher' | 'utility';
+/**
+ * Badge color group for a roster slot. Baseball uses `catcher` / `infield` /
+ * `outfield` / `pitcher`; football uses `qb` / `skill` / `kicker` / `defense`.
+ * `utility` is the fallback for both sports.
+ */
+type PositionGroup =
+  | 'catcher'
+  | 'infield'
+  | 'outfield'
+  | 'pitcher'
+  | 'utility'
+  | 'qb'
+  | 'skill'
+  | 'kicker'
+  | 'defense';
 
-function getPositionGroup(position: string | null | undefined): PositionGroup {
+const FOOTBALL_SKILL_POSITIONS = new Set(['RB', 'WR', 'TE', 'FLEX']);
+const FOOTBALL_DEFENSE_POSITIONS = new Set(['DST', 'DL', 'LB', 'DB']);
+
+/**
+ * Maps a position/slot label to its badge color group.
+ *
+ * @param position - Position or slot label (e.g. `'QB'`, `'SP'`), matched
+ * case-insensitively.
+ * @param isFootball - When true, matches against the football position
+ * groups (qb/skill/kicker/defense) instead of the baseball ones.
+ */
+function getPositionGroup(
+  position: string | null | undefined,
+  isFootball: boolean,
+): PositionGroup {
   if (!position) return 'utility';
   const pos = position.toUpperCase();
+  if (isFootball) {
+    if (pos === 'QB') return 'qb';
+    if (FOOTBALL_SKILL_POSITIONS.has(pos)) return 'skill';
+    if (pos === 'K') return 'kicker';
+    if (FOOTBALL_DEFENSE_POSITIONS.has(pos)) return 'defense';
+    return 'utility';
+  }
   if (pos === 'C') return 'catcher';
   if (['1B', '2B', '3B', 'SS', 'IF'].includes(pos)) return 'infield';
   if (['LF', 'CF', 'RF', 'OF'].includes(pos)) return 'outfield';
@@ -133,6 +170,10 @@ export interface MatchupRosterComparisonProps {
   matchup: MatchupFragment;
   /** The current user's team ID — if provided, their team is always shown on the left. */
   userTeamId?: number | null;
+  /** The league's sport — drives football-specific position grouping/ordering
+   *  and routes player clicks to the football player detail modal instead of
+   *  the baseball season/matchup-breakdown modals. */
+  sport?: Sport | null;
 }
 
 /**
@@ -142,7 +183,10 @@ export interface MatchupRosterComparisonProps {
 export function MatchupRosterComparison({
   matchup,
   userTeamId,
+  sport,
 }: MatchupRosterComparisonProps) {
+  const isFootball = sport === Sport.Football;
+
   // Bench toggle state
   const [showBench, setShowBench] = useState(false);
 
@@ -159,6 +203,11 @@ export function MatchupRosterComparison({
     useState<MatchupPlayerFragment | null>(null);
   const [selectedMatchupPlayerName, setSelectedMatchupPlayerName] =
     useState<string>('');
+
+  // Modal state for the football player detail modal (name/score clicks
+  // route here instead of the baseball modals above when isFootball).
+  const [footballModalOpen, setFootballModalOpen] = useState(false);
+  const [footballPlayerId, setFootballPlayerId] = useState<number | null>(null);
 
   // Always show the current user's team on the left column. If the user is
   // team2 in this matchup, swap so their slots line up with the roster editor.
@@ -802,6 +851,13 @@ export function MatchupRosterComparison({
     return actual >= expected;
   };
 
+  const openFootballPlayerDetail = (player: MatchupPlayerFragment) => {
+    if (player.playerId) {
+      setFootballPlayerId(player.playerId);
+      setFootballModalOpen(true);
+    }
+  };
+
   const openSeasonModal = (player: MatchupPlayerFragment) => {
     if (player.playerId && player.player) {
       setSelectedPlayer({
@@ -871,7 +927,7 @@ export function MatchupRosterComparison({
       : player.positionId
         ? positionMap.get(player.positionId)
         : (player.player?.eligiblePositions?.[0] ?? null);
-    const group = getPositionGroup(slotType ?? posLabel);
+    const group = getPositionGroup(slotType ?? posLabel, isFootball);
     const statLine = formatAccumulatedStats(player);
     const lead = isLead ? ' mrc-lead' : '';
 
@@ -887,7 +943,11 @@ export function MatchupRosterComparison({
             <button
               type="button"
               className="mrc-pname"
-              onClick={() => openSeasonModal(player)}
+              onClick={() =>
+                isFootball
+                  ? openFootballPlayerDetail(player)
+                  : openSeasonModal(player)
+              }
             >
               {player.player?.firstName} {player.player?.lastName}
             </button>
@@ -912,7 +972,11 @@ export function MatchupRosterComparison({
           <button
             type="button"
             className="mrc-sc mrc-actual"
-            onClick={() => openBreakdownModal(player)}
+            onClick={() =>
+              isFootball
+                ? openFootballPlayerDetail(player)
+                : openBreakdownModal(player)
+            }
           >
             <span className="mrc-lab">Actual</span>
             <span className={`mrc-num ${actualCls}`}>
@@ -933,7 +997,7 @@ export function MatchupRosterComparison({
     // Only starter rows share a single league slot (and therefore a single
     // position) across both teams — bench/bullpen rows pair arbitrary
     // players by index and rely on each cell's own inline badge instead.
-    const group = getPositionGroup(slotType);
+    const group = getPositionGroup(slotType, isFootball);
     const team1Actual =
       team1Player?.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ??
       0;
@@ -1076,7 +1140,9 @@ export function MatchupRosterComparison({
         {batterSlotRows.length > 0 && (
           <div className="mrc-section">
             <div className="mrc-section-bar">
-              <h3>Starting Lineup — Batters</h3>
+              <h3>
+                {isFootball ? 'Starting Lineup' : 'Starting Lineup — Batters'}
+              </h3>
               <div className="mrc-rule" />
             </div>
             {batterSlotRows.map((row) =>
@@ -1087,7 +1153,11 @@ export function MatchupRosterComparison({
                 row.team2Player,
               ),
             )}
-            {totalsRow('Hitters Total', team1BatterTotals, team2BatterTotals)}
+            {totalsRow(
+              isFootball ? 'Team Total' : 'Hitters Total',
+              team1BatterTotals,
+              team2BatterTotals,
+            )}
           </div>
         )}
 
@@ -1186,6 +1256,13 @@ export function MatchupRosterComparison({
         player={selectedMatchupPlayer}
         playerName={selectedMatchupPlayerName}
         scoringSettings={scoringSettings}
+      />
+
+      {/* Football Player Detail Modal (name/score clicks, football leagues only) */}
+      <FootballPlayerDetailModal
+        playerId={footballPlayerId}
+        open={footballModalOpen}
+        onOpenChange={setFootballModalOpen}
       />
     </div>
   );

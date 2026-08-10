@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import * as graphqlLib from '@legacy-sports/graphql';
@@ -7,6 +7,11 @@ import * as sharedComponentsLib from '@legacy-sports/shared-components';
 import { FootballMatchupScreen } from './FootballMatchupScreen';
 
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
+
+const mockRouterPush = jest.fn();
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockRouterPush }),
+}));
 
 type AppStateChangeHandler = (state: string) => void;
 let appStateListeners: AppStateChangeHandler[] = [];
@@ -127,11 +132,17 @@ jest.mock('tamagui', () => {
     XStack: ({
       children,
       testID,
+      onPress,
     }: {
       children?: React.ReactNode;
       testID?: string;
+      onPress?: () => void;
       [key: string]: unknown;
-    }) => <View testID={testID}>{children}</View>,
+    }) => (
+      <View testID={testID} onPress={onPress}>
+        {children}
+      </View>
+    ),
     YStack: ({
       children,
       testID,
@@ -205,6 +216,14 @@ describe('FootballMatchupScreen', () => {
   it('renders player name for team 1', () => {
     render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
     expect(screen.getByText('Patrick Mahomes')).toBeTruthy();
+  });
+
+  it('navigates to the football player detail route when a player row is pressed', () => {
+    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+
+    fireEvent.press(screen.getByText('Patrick Mahomes'));
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/football/players/5');
   });
 
   it('renders DST position slot in DST format', () => {

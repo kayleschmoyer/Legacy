@@ -552,6 +552,7 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
           <MatchupRosterComparison
             matchup={matchup}
             userTeamId={myTeamId ?? null}
+            sport={league.sport}
           />
         ) : (
           <div

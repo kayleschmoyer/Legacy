@@ -9,8 +9,11 @@
 /**
  * Canonical display order for position slot types.
  *
- * Non-overlapping between batters (0–19) and pitchers (20+) so that all slots
- * can be sorted together and pitchers always follow batters.
+ * Non-overlapping between baseball batters (0–19) and pitchers (20+) so that
+ * all slots can be sorted together and pitchers always follow batters.
+ * Football slots (30+) are a separate non-overlapping range — no baseball
+ * league ever mixes slot types with football ones, but this keeps `sort`
+ * stable if the two are ever combined.
  */
 export const POSITION_SLOT_ORDER: Record<string, number> = {
   // Batters
@@ -29,6 +32,17 @@ export const POSITION_SLOT_ORDER: Record<string, number> = {
   // Pitchers
   SP: 20,
   RP: 21,
+  // Football
+  QB: 30,
+  RB: 31,
+  WR: 32,
+  TE: 33,
+  FLEX: 34,
+  K: 35,
+  DST: 36,
+  DL: 37,
+  LB: 38,
+  DB: 39,
 };
 
 export const PITCHER_POSITION_TYPES = new Set<string>(['SP', 'RP']);

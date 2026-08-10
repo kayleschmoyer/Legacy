@@ -413,11 +413,18 @@ export class LeaguePage extends BaseScreen {
    * Navigate to a league detail tab. The driver's `open` resolves once the
    * document has loaded (`networkidle` is defeated by the league activity/chat
    * long-poll — ADR-0015 Context); specs gate on the element they need next.
+   *
+   * @param sport - Which sport's league-detail route to build the URL for.
+   * Defaults to `'baseball'`; pass `'football'` for football league specs.
    */
-  async gotoDetail(leagueId: number, tab?: string): Promise<void> {
+  async gotoDetail(
+    leagueId: number,
+    tab?: string,
+    sport: Sport = 'baseball',
+  ): Promise<void> {
     const path = tab
-      ? `/baseball/league/${leagueId}/${tab}`
-      : `/baseball/league/${leagueId}`;
+      ? `/${sport}/league/${leagueId}/${tab}`
+      : `/${sport}/league/${leagueId}`;
     await this.driver.open(path);
   }
 

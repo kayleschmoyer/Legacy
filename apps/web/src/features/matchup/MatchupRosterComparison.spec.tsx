@@ -11,6 +11,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
+  Sport,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
@@ -49,6 +50,17 @@ jest.mock('./PlayerSeasonStatsModal', () => ({
 
 jest.mock('./PlayerMatchupStatsModal', () => ({
   PlayerMatchupStatsModal: () => null,
+}));
+
+const mockOpenFootballPlayerDetailModal = jest.fn();
+jest.mock('../../components/FootballPlayerDetailModal', () => ({
+  FootballPlayerDetailModal: (props: {
+    open: boolean;
+    playerId: number | null;
+  }) => {
+    mockOpenFootballPlayerDetailModal(props);
+    return props.open ? <div data-testid="football-player-modal" /> : null;
+  },
 }));
 
 function makeMatchup(
@@ -331,5 +343,116 @@ describe('MatchupRosterComparison — off-day vs no-data labeling (LS-9122)', ()
     fireEvent.click(screen.getByText('Show Bench'));
 
     expect(screen.getAllByText(/2 off days/).length).toBeGreaterThan(0);
+  });
+});
+
+describe('MatchupRosterComparison — football (LS-5418)', () => {
+  function makeFootballStarter(
+    id: string,
+    teamId: number,
+    playerId: number,
+    positionId: number,
+    firstName: string,
+  ): MatchupPlayerFragment {
+    return {
+      __typename: 'MatchupPlayer',
+      id,
+      matchupId: 1234,
+      playerId,
+      teamId,
+      positionId,
+      season: 2026,
+      numberOfGames: 1,
+      player: {
+        __typename: 'Player',
+        firstName,
+        lastName: 'Player',
+        eligiblePositions: ['QB'],
+      },
+      seasonBatting: null,
+      seasonPitching: null,
+      seasonFielding: null,
+      games: [],
+    } as unknown as MatchupPlayerFragment;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue({
+      data: {
+        leaguePositions: [
+          { id: 1, positionType: 'QB' },
+          { id: 2, positionType: 'RB' },
+        ],
+      },
+      loading: false,
+    });
+    (useGetLeagueTeamsQuery as jest.Mock).mockReturnValue({
+      data: {
+        leagueTeams: [
+          { id: 10, name: 'Team A' },
+          { id: 20, name: 'Team B' },
+        ],
+      },
+    });
+    (useLeagueScoringSettings as jest.Mock).mockReturnValue({
+      settings: { batting: {}, pitching: {}, fielding: {} },
+      loading: false,
+    });
+  });
+
+  it('renders football position slot labels (QB, RB) instead of baseball ones', () => {
+    const players: MatchupPlayerFragment[] = [
+      makeFootballStarter('s1', 10, 901, 1, 'Pat'),
+      makeFootballStarter('s2', 20, 902, 1, 'Chris'),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+
+    render(
+      <MatchupRosterComparison
+        matchup={makeMatchup()}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(screen.getByText('QB')).toBeInTheDocument();
+    expect(screen.getByText('Starting Lineup')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Starting Lineup — Batters'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Starting Lineup — Pitchers'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the football player detail modal (not the baseball season modal) when a player name is clicked', () => {
+    const players: MatchupPlayerFragment[] = [
+      makeFootballStarter('s1', 10, 901, 1, 'Pat'),
+      makeFootballStarter('s2', 20, 902, 1, 'Chris'),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+
+    render(
+      <MatchupRosterComparison
+        matchup={makeMatchup()}
+        sport={Sport.Football}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Pat Player'));
+
+    expect(screen.getByTestId('football-player-modal')).toBeInTheDocument();
+    expect(mockOpenFootballPlayerDetailModal).toHaveBeenLastCalledWith(
+      expect.objectContaining({ open: true, playerId: 901 }),
+    );
   });
 });

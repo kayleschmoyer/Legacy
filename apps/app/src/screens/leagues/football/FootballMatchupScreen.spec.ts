@@ -4,6 +4,10 @@ import {
   getPositionOrder,
 } from './FootballMatchupScreen';
 
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}));
+
 jest.mock('@legacy-sports/shared-components', () => ({
   useWebSocket: jest.fn(() => ({ connected: false })),
 }));
