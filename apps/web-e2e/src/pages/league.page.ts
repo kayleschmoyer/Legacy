@@ -118,6 +118,19 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId(`sport-tab-${sport}`);
   }
 
+  /**
+   * The post-create "League created!" confirmation dialog (LS-6067), which
+   * gates navigation to the new league and shows its invite code — assert
+   * the code against this element rather than the page.
+   *
+   * Matched by content, not by accessible name: the shared `Dialog` puts its
+   * `aria-labelledby` target on an inner content wrapper, so the outer
+   * `role="dialog"` node itself has no accessible name to match on.
+   */
+  get leagueCreatedDialog(): UIElement {
+    return this.driver.byRole('dialog').filterByText(/League created!/i);
+  }
+
   /** The football "beta" status banner (only rendered in football mode). */
   get footballBetaBanner(): UIElement {
     return this.driver.byTestId('football-beta-banner');
@@ -185,6 +198,43 @@ export class LeaguePage extends BaseScreen {
   /** The league name rendered as the detail page `<h1>`. */
   leagueNameHeading(name: string): UIElement {
     return this.driver.byRole('heading', { name, level: 1 });
+  }
+
+  /**
+   * The detail page's league-name `<h1>` addressed by test id rather than by
+   * the name it renders — for asserting *which* league the page loaded when
+   * the expected name is the thing under test.
+   */
+  get leagueTitle(): UIElement {
+    return this.driver.byTestId('league-title');
+  }
+
+  /**
+   * A team's row in the detail page's Standings card, by team name. The row
+   * is a button labelled "Open <team name>" (`LeagueDetailShell`) — the
+   * enclosing card carries no test id, so the row itself is the anchor.
+   */
+  teamStandingsRow(teamName: string): UIElement {
+    return this.driver.byRole('button', { name: `Open ${teamName}` });
+  }
+
+  /**
+   * The commissioner-only "Commissioner" tab. `LeagueDetailShell` filters
+   * `commishOnly` tabs out for everyone else, so its presence is the
+   * commissioner-permission signal. (The hero also renders a "Commissioner"
+   * chip, but it carries no test id and its label collides with this tab.)
+   */
+  get commissionerTab(): UIElement {
+    return this.driver.byRole('tab', { name: 'Commissioner' });
+  }
+
+  /**
+   * The hero draft-status chip ("Pre-Draft", "Drafting · Live", …). The test
+   * id sits on the chip's inner label `<Text>`, not the wrapper — Tamagui
+   * drops `data-*` on a styled `XStack` (LS-7845).
+   */
+  get draftStatusChip(): UIElement {
+    return this.driver.byTestId('draft-status-chip');
   }
 
   /**

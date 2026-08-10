@@ -105,6 +105,7 @@ const ls4461IntegrationRules = [
 // flat config requires the explicit `**/` prefix to preserve that behavior.
 const ls8096MigratedSpecFiles = [
   'create-league-form-validation.spec.ts',
+  'create-league-post-creation-redirect.spec.ts',
   'draft-selection-workflow.spec.ts',
   'free-agents-pickup.spec.ts',
   'join-league.spec.ts',
