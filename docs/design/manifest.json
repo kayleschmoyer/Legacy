@@ -76,9 +76,9 @@
       "title": "Players Page",
       "slug": "legacy-sports-players-page",
       "status": "active",
-      "lastSyncedHash": "sha256-afeb263bfe15375cb2feb15dc59e1f613a3a76c9e775e8faf7d8885c8bab756b",
-      "lastSyncedAt": "2026-08-04T00:00:00.000Z",
-      "jiraKey": "LS-8962",
+      "lastSyncedHash": "sha256-f69d00a11bfbc79bcca342e07c3e70c927dc32944f2a33c983387dbe6b6e6d92",
+      "lastSyncedAt": "2026-08-10T00:00:00.000Z",
+      "jiraKey": "LS-9090",
       "source": "designsync-local"
     },
     {

@@ -178,10 +178,13 @@ const SPORTS = {
 
 // ── Viewport breakpoints (design-tool config) ────────────
 // Canonical bands from the DS breakpoints guide (docs/design "Breakpoints"
-// preview, mirrors @tamagui/config): $xs/$sm/$md/$lg/$xl/$xxl at
-// 660/800/860/980/1120/1280 — no invented widths. Fluid remains for the
+// preview, mirrors @tamagui/config): $xxs/$xs/$sm/$md/$lg/$xl/$xxl at
+// 375(band starts 0)/660/800/860/980/1120/1280 — no invented widths. $xxs
+// previews at 375px per the Breakpoints checklist's "design at 375px"
+// guidance for the band that starts at 0. Fluid remains for the
 // unconstrained default.
 const VIEWPORTS = [
+  { id: '375',  label: '$xxs', width: 375,  device: 'Phone · compact' },
   { id: '660',  label: '$xs',  width: 660,  device: 'Phone · standard / large' },
   { id: '800',  label: '$sm',  width: 800,  device: 'Phone landscape · small tablet' },
   { id: '860',  label: '$md',  width: 860,  device: 'Tablet · portrait' },

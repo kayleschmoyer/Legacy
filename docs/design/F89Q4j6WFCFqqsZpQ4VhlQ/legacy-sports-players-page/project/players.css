@@ -473,16 +473,31 @@
    The .pp-viewport-frame defines container `vp`. All
    responsive rules key off its inline-size, so the
    viewport switcher accurately previews each breakpoint.
+
+   BREAKPOINTS: reflow points below are pinned to the seven
+   canonical bands (lib/design-tokens/src/lib/breakpoints.ts:
+   xxs 0 / xs 660 / sm 800 / md 860 / lg 980 / xl 1120 / xxl 1280),
+   never invented widths. Coverage, base tier first:
+     - xxl (1280px+) and xl (1120–1279px) share this file's base
+       (unoverridden) desktop layout — no reflow between them.
+     - lg (980–1119px) gets its own delta below ("nav goes tight").
+     - md (860–979px) and sm (800–859px) share the tablet delta
+       below ("hide nav tabs, 2-col featured") — no reflow between them.
+     - xs (660–799px) gets its own delta below ("1-col grid, compact
+       list/featured").
+     - xxs (0–659px, designed at 375px) gets the deepest delta below
+       ("phone: stacked filters, compact nav") — its own fully
+       designed frame, previewable via VIEWPORTS' `$xxs` (375px) entry.
    ═══════════════════════════════════════════════════ */
 
-/* Laptop and below (1024px) — nav goes tight */
-@container vp (max-width: 1100px) {
+/* BREAKPOINTS: lg (980–1119px) — nav goes tight */
+@container vp (max-width: 1119px) {
   .ls-nav-inner { padding: 12px 18px; gap: 16px; }
   .ls-tabs a { padding: 7px 11px; font-size: 11px; }
 }
 
-/* Tablet (900px) — hide nav tabs (mobile-style), tighten featured */
-@container vp (max-width: 900px) {
+/* BREAKPOINTS: sm–md (800–979px) — hide nav tabs (mobile-style), tighten featured */
+@container vp (max-width: 979px) {
   .ls-tabs { display: none; }
   .ls-sportswitch-btn span { display: none; }
   .ls-sportswitch-btn { padding: 6px 8px; }
@@ -493,8 +508,8 @@
   .pp-featured-name { font-size: 30px; }
 }
 
-/* Small tablet / large phone (700px) */
-@container vp (max-width: 700px) {
+/* BREAKPOINTS: xs (660–799px) — 1-col card grid, compact list/featured */
+@container vp (max-width: 799px) {
   .pp-page { padding: 20px 14px 60px; }
   .pp-head h1 { font-size: 38px; }
   .pp-grid { grid-template-columns: 1fr; }
@@ -509,8 +524,10 @@
   .pp-sort { flex: 1 1 auto; }
 }
 
-/* Phone (520px) */
-@container vp (max-width: 520px) {
+/* BREAKPOINTS: xxs (0–659px, designed at 375px) — fully designed phone frame:
+   compact nav/brand, stacked filter rail with horizontal-scroll pill groups,
+   stacked search, single-column list rows, full-width footer actions */
+@container vp (max-width: 659px) {
   .ls-brand img { height: 32px; }
   .ls-wordmark { font-size: 12px; }
   .ls-wordmark span { font-size: 10px; }
@@ -561,8 +578,10 @@
   .pp-loadmore { width: 100%; padding: 14px; }
 }
 
-/* ── Viewport bar responsive (responds to actual browser width) ── */
-@media (max-width: 720px) {
+/* ── Viewport bar responsive (design-tool chrome, not page content —
+   responds to actual browser width; pinned to the xxs boundary (659px)
+   for consistency, not an invented width) ── */
+@media (max-width: 659px) {
   .pp-vpbar-inner { padding: 8px 14px; gap: 10px; }
   .pp-vpbar-titleblock { display: none; }
   .pp-vpbar-pills { width: 100%; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none; }
