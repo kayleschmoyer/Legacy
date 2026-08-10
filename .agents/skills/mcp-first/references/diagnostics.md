@@ -157,6 +157,8 @@ HTTP 401 ... ZodError: expected string, received undefined
 
 3. **Wait for the user.** Do not proceed with implementation. A session with these servers down is not a valid environment for any workflow that touches GitHub, Jira, CI, or the dev database. Re-consent via `/mcp` is the **only** recovery — running `node scripts/mcp-auth.mjs` is the retired pre-OAuth answer and does nothing for connector sessions (see [SKILL.md — Auth Model](../SKILL.md#auth-model)).
 
+> **CCR exception (LS-8924)**: this "stop and wait for the user" protocol assumes a human is attending the session. In a Claude Code Remote (CCR) watch-to-merge loop, the session is deliberately unattended for the multi-hour-to-multi-day spans that make this expiry likely, so waiting is not actionable. Do not stop — switch to the generic `mcp__github__*`/`mcp__Atlassian__*` fallback and keep driving the PR to merge instead. Full fallback mapping (mark-ready, re-trigger review, Jira transitions): [cloud-agent-mode — hosted github/jira OAuth expires mid-session](../../cloud-agent-mode/SKILL.md#known-failure-mode-hosted-legacy-sports-githublegacy-sports-jira-oauth-expires-mid-session-on-long-running-watch-to-merge-loops-ls-8924).
+
 ## Pre-flight Auth Check (Separate from Load Failures)
 
 Call `auth_check_all()` (worktree MCP server) at the start of any workflow requiring GitHub,
