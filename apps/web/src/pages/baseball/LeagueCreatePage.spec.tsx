@@ -1546,6 +1546,10 @@ describe('validateFormFull — gamesPerMatchup (LS-6102)', () => {
     pickTimeLimitSeconds: 120,
     scoringFormat: 'ppr',
     defensiveFormat: 'dst',
+    allowDraftSlotTrading: false,
+    rosterContinuity: 'redraft',
+    rookieExempt: false,
+    rosterSlots: {},
   };
 
   it('accepts a valid gamesPerMatchup value', () => {
@@ -1593,6 +1597,10 @@ describe('validateFormFull — league name length (LS-6055)', () => {
     pickTimeLimitSeconds: 120,
     scoringFormat: 'ppr',
     defensiveFormat: 'dst',
+    allowDraftSlotTrading: false,
+    rosterContinuity: 'redraft',
+    rookieExempt: false,
+    rosterSlots: {},
   };
 
   // The rendered Input hard-caps at maxLength={MAX_LEAGUE_NAME_LENGTH}, so a
@@ -1643,6 +1651,10 @@ describe('validateFormFull — auction budget/min bid (LS-6092, upper bound LS-6
     pickTimeLimitSeconds: 120,
     scoringFormat: 'ppr',
     defensiveFormat: 'dst',
+    allowDraftSlotTrading: false,
+    rosterContinuity: 'redraft',
+    rookieExempt: false,
+    rosterSlots: {},
   };
 
   it('accepts a valid, correctly-ordered auction budget/min bid', () => {
@@ -1727,6 +1739,10 @@ describe('validateFormFull — custom era year bounds (LS-6082, LS-6093)', () =>
     pickTimeLimitSeconds: 120,
     scoringFormat: 'ppr',
     defensiveFormat: 'dst',
+    allowDraftSlotTrading: false,
+    rosterContinuity: 'redraft',
+    rookieExempt: false,
+    rosterSlots: {},
   };
 
   it('accepts a custom era range within MLB history (e.g. 1920-1960)', () => {
@@ -1848,6 +1864,10 @@ describe('VALIDATION_ERROR_SECTION coverage (LS-6090)', () => {
     pickTimeLimitSeconds: 120,
     scoringFormat: 'ppr',
     defensiveFormat: 'dst',
+    allowDraftSlotTrading: false,
+    rosterContinuity: 'redraft',
+    rookieExempt: false,
+    rosterSlots: {},
   };
 
   // Every field validateFormFull() can flag pushed invalid at once, so the
@@ -2249,7 +2269,9 @@ describe('LeagueCreatePage — playerPool/sport validation (LS-6103)', () => {
   });
 
   /** Baseline valid baseball form data — every field satisfies validateFormFull. */
-  function baseballFormData(overrides: Record<string, any> = {}) {
+  function baseballFormData(
+    overrides: Partial<CreateLeagueFormData> = {},
+  ): CreateLeagueFormData {
     return {
       sport: 'baseball',
       leagueName: 'Test League',
@@ -2277,11 +2299,17 @@ describe('LeagueCreatePage — playerPool/sport validation (LS-6103)', () => {
       pickTimeLimitSeconds: 120,
       scoringFormat: 'ppr',
       defensiveFormat: 'dst',
+      allowDraftSlotTrading: false,
+      rosterContinuity: 'redraft',
+      rookieExempt: false,
+      rosterSlots: {},
       ...overrides,
     };
   }
 
-  function footballFormData(overrides: Record<string, any> = {}) {
+  function footballFormData(
+    overrides: Partial<CreateLeagueFormData> = {},
+  ): CreateLeagueFormData {
     return baseballFormData({
       sport: 'football',
       numberOfTeams: 10,
@@ -2667,7 +2695,9 @@ describe('LeagueCreatePage — ?name= sanitization (LS-6107 / CLB-051)', () => {
     renderPage(
       '/baseball/league/create?name=%3Cscript%3Ealert(1)%3C%2Fscript%3E',
     );
-    const input = screen.getByPlaceholderText('Enter your league name');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
     expect(input.value).not.toContain('<script>');
     expect(input.value).not.toContain('</script>');
   });
@@ -2676,14 +2706,18 @@ describe('LeagueCreatePage — ?name= sanitization (LS-6107 / CLB-051)', () => {
     renderPage(
       `/baseball/league/create?name=${encodeURIComponent('evil\u202Ename')}`,
     );
-    const input = screen.getByPlaceholderText('Enter your league name');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
     expect(input.value).not.toContain('\u202E');
     expect(input.value).toBe('evilname');
   });
 
   it('AC3: strips control/RTL-override characters typed or pasted into the field', () => {
     renderPage('/baseball/league/create');
-    const input = screen.getByPlaceholderText('Enter your league name');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
     fireEvent.change(input, {
       target: { value: 'Evil\u202ELeague' },
     });
@@ -2694,14 +2728,18 @@ describe('LeagueCreatePage — ?name= sanitization (LS-6107 / CLB-051)', () => {
   it('AC4: preserves trim + max-length truncation after sanitization', () => {
     const longName = `  ${'a'.repeat(60)}  `;
     renderPage(`/baseball/league/create?name=${encodeURIComponent(longName)}`);
-    const input = screen.getByPlaceholderText('Enter your league name');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
     expect(input.value).toHaveLength(50);
     expect(input.value).toBe('a'.repeat(50));
   });
 
   it('AC5: prefills normally for a plain alphanumeric ?name= param (no regression)', () => {
     renderPage('/baseball/league/create?name=My%20Great%20League');
-    const input = screen.getByPlaceholderText('Enter your league name');
+    const input = screen.getByPlaceholderText<HTMLInputElement>(
+      'Enter your league name',
+    );
     expect(input.value).toBe('My Great League');
   });
 });
@@ -2845,6 +2883,10 @@ describe('validateFormFull — salaryCap validation (LS-6115)', () => {
     pickTimeLimitSeconds: 120,
     scoringFormat: 'ppr',
     defensiveFormat: 'dst',
+    allowDraftSlotTrading: false,
+    rosterContinuity: 'redraft',
+    rookieExempt: false,
+    rosterSlots: {},
   };
 
   it('requires a salaryCap when the cap is enabled', () => {
@@ -2949,6 +2991,10 @@ describe('applyImportedSettings', () => {
     pickTimeLimitSeconds: 120,
     scoringFormat: 'ppr',
     defensiveFormat: 'dst',
+    allowDraftSlotTrading: false,
+    rosterContinuity: 'redraft',
+    rookieExempt: false,
+    rosterSlots: {},
   };
 
   function envelope(
