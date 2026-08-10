@@ -20,10 +20,13 @@ import {
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
   and,
+  asc,
   count,
   countDistinct,
   desc,
   eq,
+  inArray,
+  isNotNull,
   isNull,
   ne,
   sql,
@@ -53,6 +56,7 @@ import {
   ROSTER_RANGE_BY_SPORT,
 } from './sport-validation';
 import { generateSecureInviteCode } from './helpers';
+import { planRosterPositionUpdate } from './roster-position-planner';
 import {
   describeDbError,
   formatDbError,
@@ -1110,6 +1114,208 @@ builder.mutationField('addDefaultPositionsToLeague', (t) =>
           userId,
           error: error instanceof Error ? error.message : String(error),
         });
+        throw error;
+      }
+    },
+  }),
+);
+
+// ── Update Roster Positions (LS-9099) ───────────────────────────────────────
+
+const UpdateRosterPositionsInput = builder.inputType(
+  'UpdateRosterPositionsInput',
+  {
+    fields: (t) => ({
+      leagueId: t.int({ required: true }),
+      rosterSlots: t.field({ type: [RosterSlotInput], required: true }),
+    }),
+  },
+);
+
+/**
+ * Mutation: updateRosterPositions — commissioner-only reconfiguration of a
+ * league's roster position slots after creation (LS-9099). This is the
+ * post-creation counterpart to the wizard's rosterSlots input (LS-6145);
+ * out of scope for LS-6151's premium SFLEX/K-P slot types, which are not
+ * yet in the position_slot enum.
+ *
+ * Shrinking a slot below the number of players any single team already has
+ * rostered in that position is rejected — the caller must drop players from
+ * that position first. Displaced (but still-valid) roster assignments are
+ * transparently reassigned onto the retained slot rows of the same type so
+ * no in-progress roster is corrupted by the resize.
+ */
+builder.mutationField('updateRosterPositions', (t) =>
+  t.field({
+    type: League,
+    args: {
+      input: t.arg({ type: UpdateRosterPositionsInput, required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to update roster positions',
+        );
+      }
+
+      const { leagueId, rosterSlots: inputRosterSlots } = args.input;
+      const userId = context.user.id;
+
+      const [league] = await context.db
+        .select({
+          id: PublicSchema.leagues.id,
+          sport: PublicSchema.leagues.sport,
+        })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, leagueId))
+        .limit(1);
+
+      if (!league) {
+        throw UserInputError('League not found');
+      }
+
+      // Verify user is commissioner (same gate as updateLeagueSettings)
+      const membership = await context.db
+        .select({
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw ForbiddenError('You are not a member of this league');
+      }
+      if (membership[0].permissionLevel !== 'commissioner') {
+        throw ForbiddenError('Only a commissioner can update roster positions');
+      }
+
+      const resolvedSport = normalizeSport(league.sport);
+      const validatedRosterSlots =
+        validateRosterSlots(
+          inputRosterSlots,
+          ROSTER_RANGE_BY_SPORT[resolvedSport].max,
+        ) ?? [];
+
+      if (validatedRosterSlots.length === 0) {
+        throw UserInputError(
+          'At least one roster slot with a non-zero count is required.',
+        );
+      }
+
+      const newCountByType = new Map<string, number>(
+        validatedRosterSlots.map((s) => [s.positionType, s.count]),
+      );
+      const newMaxRosterSize = validatedRosterSlots.reduce(
+        (sum, s) => sum + s.count,
+        0,
+      );
+      if (!isRosterSizeValidForSport(resolvedSport, newMaxRosterSize)) {
+        const range = ROSTER_RANGE_BY_SPORT[resolvedSport];
+        throw UserInputError(
+          `Total roster size (${newMaxRosterSize}) must be between ${range.min} and ${range.max} for ${resolvedSport} leagues.`,
+        );
+      }
+
+      try {
+        const updatedLeague = await context.db.transaction(async (tx) => {
+          // Current slot rows, oldest-first — a stable order for the planner
+          // to pick "keep" vs. "drop" rows from when shrinking a type.
+          const currentPositions = await tx
+            .select({
+              id: PublicSchema.leaguePosition.id,
+              positionType: PublicSchema.leaguePosition.positionType,
+            })
+            .from(PublicSchema.leaguePosition)
+            .where(eq(PublicSchema.leaguePosition.leagueId, leagueId))
+            .orderBy(asc(PublicSchema.leaguePosition.id));
+
+          // Rostered players currently occupying a slot, per team, per type —
+          // the in-flight state a shrink must never silently orphan.
+          const occupiedRows = await tx
+            .select({
+              teamMemberId: PublicSchema.teamMembers.id,
+              teamId: PublicSchema.teamMembers.teamId,
+              positionId: PublicSchema.teamMembers.positionId,
+              positionType: PublicSchema.leaguePosition.positionType,
+            })
+            .from(PublicSchema.teamMembers)
+            .innerJoin(
+              PublicSchema.leaguePosition,
+              eq(
+                PublicSchema.teamMembers.positionId,
+                PublicSchema.leaguePosition.id,
+              ),
+            )
+            .where(
+              and(
+                eq(PublicSchema.teamMembers.leagueId, leagueId),
+                isNotNull(PublicSchema.teamMembers.positionId),
+              ),
+            );
+
+          // Throws UserInputError if any type would shrink below a team's
+          // already-rostered count in that position.
+          const plan = planRosterPositionUpdate({
+            currentPositions,
+            occupiedRows,
+            newCountByType,
+          });
+
+          for (const { positionType, count } of plan.inserts) {
+            await tx.insert(PublicSchema.leaguePosition).values(
+              Array.from({ length: count }, () => ({
+                leagueId,
+                positionType:
+                  positionType as (typeof PublicSchema.positionSlot.enumValues)[number],
+              })),
+            );
+          }
+
+          for (const { teamMemberId, positionId } of plan.reassignments) {
+            await tx
+              .update(PublicSchema.teamMembers)
+              .set({ positionId })
+              .where(eq(PublicSchema.teamMembers.id, teamMemberId));
+          }
+
+          if (plan.deletes.length > 0) {
+            await tx
+              .delete(PublicSchema.leaguePosition)
+              .where(inArray(PublicSchema.leaguePosition.id, plan.deletes));
+          }
+
+          const [updated] = await tx
+            .update(PublicSchema.leagues)
+            .set({ maxRosterSize: newMaxRosterSize, updatedAt: new Date() })
+            .where(eq(PublicSchema.leagues.id, leagueId))
+            .returning();
+
+          return updated;
+        });
+
+        LOGGER.info('Roster positions updated', {
+          leagueId,
+          userId,
+          rosterSlots: validatedRosterSlots,
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Pothos resolver return type mismatch
+        return updatedLeague as any;
+      } catch (error) {
+        if (error instanceof GraphQLError) {
+          throw error;
+        }
+        LOGGER.error(
+          'Error updating roster positions',
+          error instanceof Error ? error : new Error(String(error)),
+          { leagueId, userId },
+        );
         throw error;
       }
     },

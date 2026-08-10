@@ -2086,6 +2086,7 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updatePlayoffMatchup?: Maybe<PlayoffMatchup>;
+  updateRosterPositions?: Maybe<League>;
   updateTeamBranding?: Maybe<Team>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
   /** Update the avatar URL for the currently authenticated user. */
@@ -2726,6 +2727,10 @@ export type MutationUpdatePlayoffMatchupArgs = {
   lowSeedScore?: InputMaybe<Scalars['Float']['input']>;
   matchupId: Scalars['Int']['input'];
   status?: InputMaybe<PlayoffMatchupStatus>;
+};
+
+export type MutationUpdateRosterPositionsArgs = {
+  input: UpdateRosterPositionsInput;
 };
 
 export type MutationUpdateTeamBrandingArgs = {
@@ -4824,6 +4829,11 @@ export type UpdateLeagueSettingsInput = {
   secondaryColor?: InputMaybe<Scalars['String']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
   waiverType?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateRosterPositionsInput = {
+  leagueId: Scalars['Int']['input'];
+  rosterSlots: Array<RosterSlotInput>;
 };
 
 export type UpsertAchievementRestrictionInput = {

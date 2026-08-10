@@ -114,6 +114,21 @@ mutation DeleteAchievementRestriction(
   )
 }
 
+query GetLeaguePositions($leagueId: Int!) {
+  leaguePositions(leagueId: $leagueId) {
+    id
+    leagueId
+    positionType
+  }
+}
+
+mutation UpdateRosterPositions($input: UpdateRosterPositionsInput!) {
+  updateRosterPositions(input: $input) {
+    id
+    maxRosterSize
+  }
+}
+
 query GetLeagueDraft($leagueId: Int!) {
   getLeagueDraft(leagueId: $leagueId) {
     id

@@ -2885,6 +2885,7 @@ type Mutation {
     matchupId: Int!
     status: PlayoffMatchupStatus
   ): PlayoffMatchup
+  updateRosterPositions(input: UpdateRosterPositionsInput!): League
   updateTeamBranding(
     avatarUrl: String
     bannerUrl: String
@@ -5000,6 +5001,11 @@ input UpdateLeagueSettingsInput {
   secondaryColor: String
   totalMatchups: Int
   waiverType: String
+}
+
+input UpdateRosterPositionsInput {
+  leagueId: Int!
+  rosterSlots: [RosterSlotInput!]!
 }
 
 input UpsertAchievementRestrictionInput {

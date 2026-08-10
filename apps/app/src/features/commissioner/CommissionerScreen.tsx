@@ -13,6 +13,7 @@ import {
   LeagueBrandingControl,
   LeagueSettingsControl,
   NextStepControl,
+  RosterRequirementsControl,
   SeasonAwardsControl,
   WaiverProcessControl,
 } from '@legacy-sports/shared-components/commissioner';
@@ -124,6 +125,15 @@ export function CommissionerScreen({
             customEraStartYear={league.customEraStartYear ?? undefined}
             customEraEndYear={league.customEraEndYear ?? undefined}
             isPremium={isPremium}
+            onSuccess={handleAlert('Success')}
+            onError={handleError}
+          />
+        )}
+
+        {isFootball && (
+          <RosterRequirementsControl
+            leagueId={leagueId}
+            defensiveFormat={league.defensiveFormat}
             onSuccess={handleAlert('Success')}
             onError={handleError}
           />

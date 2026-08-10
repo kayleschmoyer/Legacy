@@ -2092,6 +2092,7 @@ export type Mutation = {
   updateMatchupStatus?: Maybe<Matchup>;
   updateNotificationPreferences?: Maybe<NotificationPreference>;
   updatePlayoffMatchup?: Maybe<PlayoffMatchup>;
+  updateRosterPositions?: Maybe<League>;
   updateTeamBranding?: Maybe<Team>;
   updateTeamMemberPosition?: Maybe<TeamMember>;
   /** Update the avatar URL for the currently authenticated user. */
@@ -2732,6 +2733,10 @@ export type MutationUpdatePlayoffMatchupArgs = {
   lowSeedScore?: InputMaybe<Scalars['Float']['input']>;
   matchupId: Scalars['Int']['input'];
   status?: InputMaybe<PlayoffMatchupStatus>;
+};
+
+export type MutationUpdateRosterPositionsArgs = {
+  input: UpdateRosterPositionsInput;
 };
 
 export type MutationUpdateTeamBrandingArgs = {
@@ -4830,6 +4835,11 @@ export type UpdateLeagueSettingsInput = {
   secondaryColor?: InputMaybe<Scalars['String']['input']>;
   totalMatchups?: InputMaybe<Scalars['Int']['input']>;
   waiverType?: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateRosterPositionsInput = {
+  leagueId: Scalars['Int']['input'];
+  rosterSlots: Array<RosterSlotInput>;
 };
 
 export type UpsertAchievementRestrictionInput = {
@@ -9203,6 +9213,33 @@ export type DeleteAchievementRestrictionMutationVariables = Exact<{
 export type DeleteAchievementRestrictionMutation = {
   __typename?: 'Mutation';
   deleteAchievementRestriction?: boolean | null;
+};
+
+export type GetLeaguePositionsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetLeaguePositionsQuery = {
+  __typename?: 'Query';
+  leaguePositions?: Array<{
+    __typename?: 'LeaguePosition';
+    id?: number | null;
+    leagueId?: number | null;
+    positionType?: string | null;
+  }> | null;
+};
+
+export type UpdateRosterPositionsMutationVariables = Exact<{
+  input: UpdateRosterPositionsInput;
+}>;
+
+export type UpdateRosterPositionsMutation = {
+  __typename?: 'Mutation';
+  updateRosterPositions?: {
+    __typename?: 'League';
+    id?: number | null;
+    maxRosterSize?: number | null;
+  } | null;
 };
 
 export type GetLeagueDraftQueryVariables = Exact<{
@@ -24156,6 +24193,149 @@ export type DeleteAchievementRestrictionMutationResult =
 export type DeleteAchievementRestrictionMutationOptions = BaseMutationOptions<
   DeleteAchievementRestrictionMutation,
   DeleteAchievementRestrictionMutationVariables
+>;
+export const GetLeaguePositions = gql`
+  query GetLeaguePositions($leagueId: Int!) {
+    leaguePositions(leagueId: $leagueId) {
+      id
+      leagueId
+      positionType
+    }
+  }
+`;
+
+/**
+ * __useGetLeaguePositionsQuery__
+ *
+ * To run a query within a React component, call `useGetLeaguePositionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetLeaguePositionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetLeaguePositionsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetLeaguePositionsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetLeaguePositionsQuery,
+    GetLeaguePositionsQueryVariables
+  > &
+    (
+      | { variables: GetLeaguePositionsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetLeaguePositionsQuery,
+    GetLeaguePositionsQueryVariables
+  >(GetLeaguePositions, options);
+}
+export function useGetLeaguePositionsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetLeaguePositionsQuery,
+    GetLeaguePositionsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetLeaguePositionsQuery,
+    GetLeaguePositionsQueryVariables
+  >(GetLeaguePositions, options);
+}
+export function useGetLeaguePositionsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetLeaguePositionsQuery,
+        GetLeaguePositionsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetLeaguePositionsQuery,
+    GetLeaguePositionsQueryVariables
+  >(
+    GetLeaguePositions,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetLeaguePositionsQuery,
+          GetLeaguePositionsQueryVariables
+        >,
+  );
+}
+export type GetLeaguePositionsQueryHookResult = ReturnType<
+  typeof useGetLeaguePositionsQuery
+>;
+export type GetLeaguePositionsLazyQueryHookResult = ReturnType<
+  typeof useGetLeaguePositionsLazyQuery
+>;
+export type GetLeaguePositionsSuspenseQueryHookResult = ReturnType<
+  typeof useGetLeaguePositionsSuspenseQuery
+>;
+export type GetLeaguePositionsQueryResult = Apollo.QueryResult<
+  GetLeaguePositionsQuery,
+  GetLeaguePositionsQueryVariables
+>;
+export const UpdateRosterPositions = gql`
+  mutation UpdateRosterPositions($input: UpdateRosterPositionsInput!) {
+    updateRosterPositions(input: $input) {
+      id
+      maxRosterSize
+    }
+  }
+`;
+export type UpdateRosterPositionsMutationFn = MutationFunction<
+  UpdateRosterPositionsMutation,
+  UpdateRosterPositionsMutationVariables
+>;
+
+/**
+ * __useUpdateRosterPositionsMutation__
+ *
+ * To run a mutation, you first call `useUpdateRosterPositionsMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateRosterPositionsMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateRosterPositionsMutation, { data, loading, error }] = useUpdateRosterPositionsMutation({
+ *   variables: {
+ *      input: // value for 'input'
+ *   },
+ * });
+ */
+export function useUpdateRosterPositionsMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateRosterPositionsMutation,
+    UpdateRosterPositionsMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateRosterPositionsMutation,
+    UpdateRosterPositionsMutationVariables
+  >(UpdateRosterPositions, options);
+}
+export type UpdateRosterPositionsMutationHookResult = ReturnType<
+  typeof useUpdateRosterPositionsMutation
+>;
+export type UpdateRosterPositionsMutationResult =
+  Apollo.MutationResult<UpdateRosterPositionsMutation>;
+export type UpdateRosterPositionsMutationOptions = BaseMutationOptions<
+  UpdateRosterPositionsMutation,
+  UpdateRosterPositionsMutationVariables
 >;
 export const GetLeagueDraft = gql`
   query GetLeagueDraft($leagueId: Int!) {

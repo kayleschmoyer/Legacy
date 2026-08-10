@@ -19,6 +19,8 @@ export { LeagueBrandingControl } from './LeagueBrandingControl';
 export type { LeagueBrandingControlProps } from './LeagueBrandingControl';
 export { LeagueSettingsControl } from './LeagueSettingsControl';
 export type { LeagueSettingsControlProps } from './LeagueSettingsControl';
+export { RosterRequirementsControl } from './RosterRequirementsControl';
+export type { RosterRequirementsControlProps } from './RosterRequirementsControl';
 export { GameSelectionControl } from './GameSelectionControl';
 export type { GameSelectionControlProps } from './GameSelectionControl';
 export { MatchupControl } from './MatchupControl';

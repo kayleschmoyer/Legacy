@@ -52,6 +52,9 @@ jest.mock('@legacy-sports/shared-components/commissioner', () => {
     LeagueBrandingControl: () => <View testID="league-branding-control" />,
     LeagueSettingsControl: () => <View testID="league-settings-control" />,
     NextStepControl: () => <View testID="next-step-control" />,
+    RosterRequirementsControl: () => (
+      <View testID="roster-requirements-control" />
+    ),
     SeasonAwardsControl: () => <View testID="season-awards-control" />,
     WaiverProcessControl: () => <View testID="waiver-process-control" />,
   };
@@ -196,6 +199,28 @@ describe('CommissionerScreen', () => {
         />,
       );
       expect(screen.queryByTestId('draft-settings-control')).toBeNull();
+    });
+
+    it('renders RosterRequirementsControl for football (LS-9099)', () => {
+      render(
+        <CommissionerScreen
+          leagueId={1}
+          league={mockFootballLeague as unknown as AppLeagueFragment}
+          onLeagueDeleted={mockOnLeagueDeleted}
+        />,
+      );
+      expect(screen.getByTestId('roster-requirements-control')).toBeTruthy();
+    });
+
+    it('does not render RosterRequirementsControl for baseball', () => {
+      render(
+        <CommissionerScreen
+          leagueId={1}
+          league={mockBaseballLeague as unknown as AppLeagueFragment}
+          onLeagueDeleted={mockOnLeagueDeleted}
+        />,
+      );
+      expect(screen.queryByTestId('roster-requirements-control')).toBeNull();
     });
 
     it('renders core commissioner controls for football', () => {
