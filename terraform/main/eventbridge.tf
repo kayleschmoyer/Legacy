@@ -124,15 +124,21 @@ resource "aws_lambda_permission" "auto_select_games_eventbridge" {
   source_arn    = aws_cloudwatch_event_rule.auto_select_games.arn
 }
 
-# ── Weekly Matchup Advancement ──────────────────────────────────────
+# ── Matchup Advancement ──────────────────────────────────────────────
 # Advances matchups for leagues where all games are complete.
-# Runs every Sunday at 3am EST = 08:00 UTC (standard) / 07:00 UTC (DST).
+# Runs nightly at 3am EST = 08:00 UTC (standard) / 07:00 UTC (DST), a few
+# hours after auto-select-games (05:00 UTC), so leagues whose games all
+# complete on any given day roll over the next morning instead of waiting
+# for a fixed weekly day. Matchups still only advance once gamesPerMatchup
+# selections exist (LS-9121: a Sunday-only cron left baseball leagues —
+# whose weeks can finish on any weekday, unlike football's Sunday-aligned
+# schedule — stalled for up to several days after all games completed).
 # Using 08:00 UTC (EST year-round).
 
 resource "aws_cloudwatch_event_rule" "auto_advance_matchups" {
   name                = "${local.name_prefix}-auto-advance-matchups"
-  description         = "Advance matchups on Sundays at 3am EST for leagues with all games complete"
-  schedule_expression = "cron(0 8 ? * SUN *)"
+  description         = "Advance matchups nightly at 3am EST for leagues with all games complete"
+  schedule_expression = "cron(0 8 * * ? *)"
 
   tags = local.common_tags
 }

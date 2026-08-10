@@ -2221,7 +2221,7 @@ type Mutation {
   approveDraftSlotTrade(tradeId: Int!): DraftSlotTrade
 
   """
-  Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge.
+  Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at 3am EST by EventBridge.
   """
   autoAdvanceMatchups(
     """

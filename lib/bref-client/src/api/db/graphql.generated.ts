@@ -1882,7 +1882,7 @@ export type Mutation = {
   advancePlayoffBracket?: Maybe<PlayoffBracket>;
   /** Commissioner-only: approve an accepted draft slot trade and atomically swap the two teams’ draft slots. */
   approveDraftSlotTrade?: Maybe<DraftSlotTrade>;
-  /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge. */
+  /** Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at 3am EST by EventBridge. */
   autoAdvanceMatchups?: Maybe<AutoAdvanceMatchupsResult>;
   /** Process expired draft pick deadlines. Idempotent — safe to call from any client as a nudge. EventBridge also calls this every minute as a fallback. */
   autoProcessDraftPicks?: Maybe<AutoProcessDraftPicksResult>;

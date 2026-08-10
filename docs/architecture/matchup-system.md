@@ -146,7 +146,10 @@ league can remain `scheduled` is if `draftStatus !== 'completed'` (the
 cron skips such leagues on purpose), or if the nightly cron is not
 running — both are observability concerns, not lifecycle gaps.
 
-`autoAdvanceMatchups` (`scheduled-mutations.ts:303`) is the weekly job that:
+`autoAdvanceMatchups` (`scheduled-mutations.ts:303`) is the nightly job
+(LS-9121: previously Sunday-only, which left baseball leagues — whose
+weeks can finish completing games on any weekday — stalled for up to
+several days after becoming ready) that:
 
 1. Marks the prior week's matchups `completed`.
 2. Updates each league's `current_week`.

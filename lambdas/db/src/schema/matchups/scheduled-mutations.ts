@@ -364,7 +364,9 @@ builder.mutationField('autoSelectGames', (t) =>
 );
 
 // ── Mutation: autoAdvanceMatchups ────────────────────────────────────────────
-// Triggered Sunday at 3am EST by EventBridge.
+// Triggered nightly at 3am EST by EventBridge (LS-9121: was Sunday-only,
+// which stalled baseball leagues — whose games can finish any weekday —
+// for up to several days after all games completed).
 // For every active league where all games in the current matchup have been
 // completed, advances to the next week (same logic as the UI advanceLeagueWeek).
 
@@ -379,12 +381,12 @@ builder.mutationField('autoAdvanceMatchups', (t) =>
       }),
     },
     description:
-      'Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered Sundays at 3am EST by EventBridge.',
+      'Automatically advance matchups for leagues where all games are complete. When leagueId is provided, processes only that league (commissioner access). Without leagueId, processes all leagues (admin / system only). Triggered nightly at 3am EST by EventBridge.',
     resolve: async (_parent, args, context) => {
       const leagueId = args.leagueId ?? null;
       await assertAuthorized(context, leagueId);
 
-      LOGGER.info('[autoAdvanceMatchups] Starting weekly matchup advancement');
+      LOGGER.info('[autoAdvanceMatchups] Starting matchup advancement check');
 
       const result: AutoAdvanceMatchupsResultShape = {
         leaguesProcessed: 0,
