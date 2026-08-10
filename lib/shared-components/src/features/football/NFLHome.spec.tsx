@@ -1,6 +1,6 @@
 import React from 'react';
 import { NFLHome, type NFLHomeLeague } from './NFLHome';
-import { fireEvent, render, screen } from '../../test-utils';
+import { fireEvent, render, screen, within } from '../../test-utils';
 
 // LS-6257 (FBH-003) — the leagues list previously rendered every league
 // eagerly (plain ScrollView + .map() on web, ScrollView + .map() on native).
@@ -168,5 +168,58 @@ describe('NFLHome — league row metadata (LS-6256)', () => {
       <NFLHome leagues={[league]} onCreateLeague={noop} onViewLeague={noop} />,
     );
     expect(screen.getByText('Advance failed')).toBeInTheDocument();
+  });
+});
+
+describe('NFLHome — matchup highlight card (LS-5407)', () => {
+  it('renders the highlight card with both team names and the week when a matchup is scheduled', () => {
+    const league: NFLHomeLeague = {
+      id: 1,
+      name: 'Test Football League',
+      draftStatus: 'completed',
+      currentWeekNumber: 3,
+    };
+    render(
+      <NFLHome
+        leagues={[league]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        matchupHighlight={{
+          leagueId: 1,
+          leagueName: 'Test Football League',
+          weekNumber: 3,
+          awayTeamName: 'Alpha Offense',
+          homeTeamName: 'Beta Defense',
+          status: 'pre',
+        }}
+      />,
+    );
+
+    const card = screen.getByTestId('matchup-highlight-card');
+    expect(card).toBeInTheDocument();
+    expect(within(card).getByText('Alpha Offense')).toBeInTheDocument();
+    expect(within(card).getByText('Beta Defense')).toBeInTheDocument();
+    expect(within(card).getByText(/Week 3/)).toBeInTheDocument();
+  });
+
+  it('omits the highlight card when no matchup is scheduled', () => {
+    const league: NFLHomeLeague = {
+      id: 1,
+      name: 'Test Football League',
+      draftStatus: 'not-started',
+      currentWeekNumber: null,
+    };
+    render(
+      <NFLHome
+        leagues={[league]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        matchupHighlight={null}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId('matchup-highlight-card'),
+    ).not.toBeInTheDocument();
   });
 });

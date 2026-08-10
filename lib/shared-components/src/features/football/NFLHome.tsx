@@ -19,6 +19,7 @@ import {
   formatDraftStatusForCard,
   getDraftStatusColors,
 } from '../../utils/draftStatus';
+import { MatchupCard } from '../../components/MatchupCard';
 
 export interface NFLHomeLeague {
   id: string | number;
@@ -44,6 +45,22 @@ interface LeaguesListProps {
   onViewLeague: (leagueId: string | number) => void;
 }
 
+/**
+ * This week's highlighted matchup for a football league (LS-5407). Surfaced
+ * on Football Home so a manager mid-season can see who they're playing
+ * without opening the league. Omitted/undefined when no league has an
+ * active or upcoming matchup scheduled.
+ */
+export interface NFLHomeMatchupHighlight {
+  leagueId: string | number;
+  leagueName?: string | null;
+  weekNumber: number;
+  awayTeamName: string;
+  homeTeamName: string;
+  status?: 'live' | 'pre' | 'final' | 'bye';
+  onPress?: () => void;
+}
+
 export interface NFLHomeProps {
   leagues?: NFLHomeLeague[];
   loading?: boolean;
@@ -56,6 +73,8 @@ export interface NFLHomeProps {
   onViewLeague: (leagueId: string | number) => void;
   /** Navigate to sign-in from the unauthenticated notice. */
   onSignIn?: () => void;
+  /** This week's matchup to highlight (LS-5407). Hidden when absent. */
+  matchupHighlight?: NFLHomeMatchupHighlight | null;
 }
 
 function getLeagueStatusLabel(league: NFLHomeLeague): string {
@@ -267,6 +286,7 @@ function NFLHome({
   onBrowseLeagues,
   onViewLeague,
   onSignIn,
+  matchupHighlight,
 }: NFLHomeProps) {
   const hasLeagues = leagues.length > 0;
 
@@ -441,6 +461,23 @@ function NFLHome({
             </YStack>
           </YStack>
         </XStack>
+
+        {/* This week's matchup highlight (LS-5407) — shown only when a
+            league has an active/upcoming matchup scheduled. */}
+        {matchupHighlight ? (
+          <YStack gap="$3" testID="matchup-highlight-card">
+            <H2 color="$color" fontSize="$7" fontWeight="700">
+              This Week's Matchup
+            </H2>
+            <MatchupCard
+              away={{ name: matchupHighlight.awayTeamName }}
+              home={{ name: matchupHighlight.homeTeamName }}
+              status={matchupHighlight.status ?? 'pre'}
+              week={`Week ${matchupHighlight.weekNumber}`}
+              onPress={matchupHighlight.onPress}
+            />
+          </YStack>
+        ) : null}
 
         {/* Your Football Leagues */}
         <YStack gap="$4">

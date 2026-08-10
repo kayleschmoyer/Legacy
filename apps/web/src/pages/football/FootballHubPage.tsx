@@ -1,8 +1,15 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { NFLHome } from '@legacy-sports/shared-components/football';
+import type { NFLHomeMatchupHighlight } from '@legacy-sports/shared-components/football';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { Sport, useGetUserLeaguesQuery } from '@legacy-sports/graphql';
+import {
+  MatchupStatus,
+  Sport,
+  useGetLeagueTeamsQuery,
+  useGetMatchupByIdQuery,
+  useGetUserLeaguesQuery,
+} from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
@@ -56,9 +63,71 @@ export function FootballHubPage() {
           currentWeekNumber: l.currentWeekNumber,
           weekAdvanceStatus: l.weekAdvanceStatus,
           maxRosterSize: l.maxRosterSize,
+          currentMatchup: l.currentMatchup,
         })),
     [data?.userLeagues],
   );
+
+  // Matchup highlight (LS-5407, FBH feature): the first football league with
+  // an active/upcoming matchup drives the "This Week's Matchup" card. Only
+  // one card is shown on the hub, so the first match is sufficient — there is
+  // no ordering requirement in the AC beyond "a league with a matchup".
+  const highlightLeague = React.useMemo(
+    () => leagues.find((l) => l.currentMatchup != null) ?? null,
+    [leagues],
+  );
+
+  const { data: matchupData } = useGetMatchupByIdQuery({
+    variables: { id: highlightLeague?.currentMatchup as number },
+    skip: !highlightLeague?.currentMatchup,
+  });
+  const matchup = matchupData?.getMatchupById;
+
+  // League ids are numeric GraphQL Ints, but NFLHomeLeague.id is typed
+  // string | number for platform flexibility. Coerce defensively and skip the
+  // query rather than sending a NaN variable if a caller ever passes a
+  // non-numeric id (LS-5407 review).
+  const highlightLeagueNumericId = React.useMemo(() => {
+    if (highlightLeague == null) return null;
+    const n = Number(highlightLeague.id);
+    return Number.isFinite(n) ? n : null;
+  }, [highlightLeague]);
+
+  const { data: teamsData } = useGetLeagueTeamsQuery({
+    variables: { leagueId: highlightLeagueNumericId as number },
+    skip: highlightLeagueNumericId == null,
+  });
+  const teams = React.useMemo(() => teamsData?.leagueTeams ?? [], [teamsData]);
+
+  const matchupHighlight: NFLHomeMatchupHighlight | null = React.useMemo(() => {
+    if (
+      !highlightLeague ||
+      !matchup ||
+      matchup.status === MatchupStatus.Cancelled
+    ) {
+      return null;
+    }
+    const homeTeam = teams.find((t) => t?.id === matchup.team1Id);
+    const awayTeam = teams.find((t) => t?.id === matchup.team2Id);
+    if (!homeTeam || !awayTeam || matchup.weekNumber == null) {
+      return null;
+    }
+    const status =
+      matchup.status === MatchupStatus.InProgress
+        ? 'live'
+        : matchup.status === MatchupStatus.Completed
+          ? 'final'
+          : 'pre';
+    return {
+      leagueId: highlightLeague.id,
+      leagueName: highlightLeague.name,
+      weekNumber: matchup.weekNumber,
+      awayTeamName: awayTeam.name ?? 'Away',
+      homeTeamName: homeTeam.name ?? 'Home',
+      status,
+      onPress: () => navigate(`/football/league/${highlightLeague.id}/matchup`),
+    };
+  }, [highlightLeague, matchup, teams, navigate]);
 
   const handleCreateLeague = () => {
     // Proactively gate free users who are already at the league cap so they see
@@ -93,6 +162,7 @@ export function FootballHubPage() {
           onViewLeague={(id: string | number) =>
             navigate(`/football/league/${id}`)
           }
+          matchupHighlight={matchupHighlight}
         />
       </div>
       <UpgradeModal

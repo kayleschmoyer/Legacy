@@ -14,7 +14,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useNavigate } from 'react-router-dom';
 import { NFLHome } from '@legacy-sports/shared-components/football';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
+import {
+  useGetLeagueTeamsQuery,
+  useGetMatchupByIdQuery,
+  useGetUserLeaguesQuery,
+} from '@legacy-sports/graphql';
 import { FootballHubPage } from './FootballHubPage';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
@@ -37,7 +41,15 @@ jest.mock('../../hooks/useIsPremium', () => ({
 }));
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
+  MatchupStatus: {
+    Cancelled: 'cancelled',
+    Completed: 'completed',
+    InProgress: 'in_progress',
+    Scheduled: 'scheduled',
+  },
   useGetUserLeaguesQuery: jest.fn(),
+  useGetMatchupByIdQuery: jest.fn(),
+  useGetLeagueTeamsQuery: jest.fn(),
 }));
 
 const mockNavigate = useNavigate as jest.MockedFunction<typeof useNavigate>;
@@ -51,6 +63,10 @@ const mockUseIsPremiumStatus = useIsPremiumStatus as jest.MockedFunction<
 >;
 const mockUseGetUserLeaguesQuery =
   useGetUserLeaguesQuery as jest.MockedFunction<typeof useGetUserLeaguesQuery>;
+const mockUseGetMatchupByIdQuery =
+  useGetMatchupByIdQuery as jest.MockedFunction<typeof useGetMatchupByIdQuery>;
+const mockUseGetLeagueTeamsQuery =
+  useGetLeagueTeamsQuery as jest.MockedFunction<typeof useGetLeagueTeamsQuery>;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -63,6 +79,7 @@ interface StubLeague {
   draftStatus: string;
   currentWeekNumber: number;
   weekAdvanceStatus: string | null;
+  currentMatchup?: number | null;
 }
 
 function leaguesOfCount(n: number, sport = 'football'): StubLeague[] {
@@ -114,6 +131,16 @@ beforeEach(() => {
     isPremium: false,
     isLoading: false,
   });
+  mockUseGetMatchupByIdQuery.mockReturnValue({
+    data: undefined,
+    loading: false,
+    error: undefined,
+  } as ReturnType<typeof useGetMatchupByIdQuery>);
+  mockUseGetLeagueTeamsQuery.mockReturnValue({
+    data: undefined,
+    loading: false,
+    error: undefined,
+  } as ReturnType<typeof useGetLeagueTeamsQuery>);
   setLeagues([]);
 });
 
@@ -216,5 +243,54 @@ describe('FootballHubPage — null-sport league handling (FBH-001)', () => {
       'League 1',
       'Legacy League',
     ]);
+  });
+});
+
+describe('FootballHubPage — matchup highlight wiring (LS-5407)', () => {
+  it('passes a matchupHighlight with both team names and the week when the league has a scheduled matchup', () => {
+    setLeagues([{ ...leaguesOfCount(1)[0], id: 1, currentMatchup: 10 }]);
+    mockUseGetMatchupByIdQuery.mockReturnValue({
+      data: {
+        getMatchupById: {
+          id: 10,
+          leagueId: 1,
+          weekNumber: 3,
+          team1Id: 1,
+          team2Id: 2,
+          status: 'scheduled',
+        },
+      },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof useGetMatchupByIdQuery>);
+    mockUseGetLeagueTeamsQuery.mockReturnValue({
+      data: {
+        leagueTeams: [
+          { id: 1, name: 'Alpha Offense' },
+          { id: 2, name: 'Beta Defense' },
+        ],
+      },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof useGetLeagueTeamsQuery>);
+
+    render(<FootballHubPage />);
+
+    const highlight = mockNFLHome.mock.calls[0][0].matchupHighlight;
+    expect(highlight).toMatchObject({
+      weekNumber: 3,
+      awayTeamName: 'Beta Defense',
+      homeTeamName: 'Alpha Offense',
+      status: 'pre',
+    });
+  });
+
+  it('passes null matchupHighlight when no league has a current matchup', () => {
+    setLeagues([{ ...leaguesOfCount(1)[0], id: 1, currentMatchup: null }]);
+
+    render(<FootballHubPage />);
+
+    const highlight = mockNFLHome.mock.calls[0][0].matchupHighlight;
+    expect(highlight).toBeNull();
   });
 });

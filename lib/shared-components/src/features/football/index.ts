@@ -1,4 +1,9 @@
-export { NFLHome, type NFLHomeProps, type NFLHomeLeague } from './NFLHome';
+export {
+  NFLHome,
+  type NFLHomeProps,
+  type NFLHomeLeague,
+  type NFLHomeMatchupHighlight,
+} from './NFLHome';
 export {
   FootballPlayerCard,
   type FootballPlayerCardProps,

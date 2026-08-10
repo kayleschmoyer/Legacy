@@ -1734,6 +1734,12 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/football-matchup-highlight.spec.ts": [
+      "apps/web/src/pages/football/**",
+      "apps/web/src/components/football/**",
+      "lib/shared-components/src/features/football/**",
+      "lib/graphql/src/**"
+    ],
     "apps/web-e2e/src/tests/football-no-leagues-empty-state.spec.ts": [
       "apps/web/src/pages/football/**",
       "apps/web/src/components/football/**",
