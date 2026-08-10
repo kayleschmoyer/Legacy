@@ -336,4 +336,41 @@ describe('updateDraftSettings — draft-status guard', () => {
   });
 });
 
+describe('updateDraftSettings — league chat system message (LS-9217, AC3)', () => {
+  it('posts a draft_settings system message to league chat on successful update', async () => {
+    const resolve = captureResolver();
+    const notifyLeagueChatMessage = jest.fn().mockResolvedValue(undefined);
+    const ctx = makeCtx({ tier: 'premium' });
+    (ctx as { notificationService: unknown }).notificationService = {
+      notifyLeagueChatMessage,
+    };
+
+    await resolve(null, { input: { leagueId: 10, draftOrder: 'linear' } }, ctx);
+
+    // makeCtx's db.insert() always returns the same fixed mock object, so
+    // re-invoking it here yields the identical `values` jest.fn used
+    // internally by the resolver — safe to inspect its recorded calls.
+    const valuesMock = (ctx.db as any).insert().values;
+    const draftSettingsCall = valuesMock.mock.calls.find(
+      (call: unknown[]) =>
+        (call[0] as Record<string, unknown>)?.messageType === 'draft_settings',
+    );
+
+    expect(draftSettingsCall).toBeDefined();
+    expect(draftSettingsCall[0]).toMatchObject({
+      leagueId: 10,
+      userId: null,
+      messageType: 'draft_settings',
+    });
+
+    expect(notifyLeagueChatMessage).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({
+        leagueId: 10,
+        messageType: 'draft_settings',
+      }),
+    );
+  });
+});
+
 export {};

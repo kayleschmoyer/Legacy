@@ -6,7 +6,12 @@
  * deterministic tiebreakers.
  */
 
-import { sortClaimsByPriority } from './waiver-processor';
+import { sortClaimsByPriority, WaiverClaimProcessor } from './waiver-processor';
+
+jest.mock('./discord-league', () => ({
+  getDiscordWebhookUrls: jest.fn().mockResolvedValue(new Map()),
+  notifyDiscordWaiverClaim: jest.fn().mockResolvedValue(undefined),
+}));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -264,6 +269,73 @@ describe('WaiverClaimProcessor — sortByPriority', () => {
 
       expect(claims[0].teamId).toBe(20);
       expect(claims[1].teamId).toBe(10);
+    });
+  });
+
+  // ── System chat message on successful waiver claim (LS-9217, AC2) ────────
+
+  describe('WaiverClaimProcessor — sendNotifications', () => {
+    it('posts a waiver system message to league chat for a succeeded claim (LS-9217)', async () => {
+      const notifyLeagueChatMessage = jest.fn().mockResolvedValue(undefined);
+      const notificationService: any = {
+        notifyRosterUpdate: jest.fn().mockResolvedValue(undefined),
+        notifyLeagueChatMessage,
+      };
+
+      const chatMsg = { id: 55, timestamp: '2026-01-01 00:00:00+00' };
+      const valuesMock = jest.fn().mockReturnValue({
+        returning: jest.fn().mockResolvedValue([chatMsg]),
+      });
+
+      const db: any = {
+        select: jest
+          .fn()
+          .mockReturnValueOnce({
+            from: jest.fn().mockReturnValue({
+              where: jest
+                .fn()
+                .mockResolvedValue([
+                  { id: 100, firstName: 'Joe', lastName: 'Player' },
+                ]),
+            }),
+          })
+          .mockReturnValueOnce({
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue([{ id: 10, name: 'Team A' }]),
+            }),
+          }),
+        insert: jest.fn().mockReturnValue({ values: valuesMock }),
+      };
+
+      const processor = new WaiverClaimProcessor(db, notificationService);
+
+      await (processor as any).sendNotifications(new Set([1]), [
+        {
+          leagueId: 1,
+          teamId: 10,
+          userId: 999,
+          playerId: 100,
+          dropPlayerId: null,
+          faabBid: null,
+          waiverType: 'standard',
+        },
+      ]);
+
+      expect(valuesMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leagueId: 1,
+          userId: null,
+          messageType: 'waiver',
+        }),
+      );
+      expect(notifyLeagueChatMessage).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          leagueId: 1,
+          messageId: 55,
+          messageType: 'waiver',
+        }),
+      );
     });
   });
 });

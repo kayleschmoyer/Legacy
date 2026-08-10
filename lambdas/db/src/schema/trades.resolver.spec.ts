@@ -1364,6 +1364,56 @@ describe('Trades Resolver', () => {
         resolver({}, { tradeId: 5 }, mockContext, undefined as never),
       ).rejects.toThrow('already been accepted');
     });
+
+    // LS-9217: a rejected trade must post a system message into league chat
+    // (AC1 — verified here via rejectTrade since it exercises the same shared
+    // postTradeSystemMessage helper that acceptTrade/cancelTrade/vetoTrade call).
+    it('posts a trade system message to league chat on successful rejection (LS-9217)', async () => {
+      const trade = {
+        id: 5,
+        status: 'pending',
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+      };
+
+      // rejectTrade: trade fetch
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      // rejectTrade: membership fetch — caller is the receiving team manager
+      mockDb.limit.mockResolvedValueOnce([{ teamId: 2 }]);
+      // postTradeSystemMessage: proposing/receiving team name lookups
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Proposing Team' }]);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Receiving Team' }]);
+      // postTradeSystemMessage: leagueMessages insert
+      mockDb.returning.mockResolvedValueOnce([
+        { id: 55, timestamp: '2026-01-01 00:00:00+00' },
+      ]);
+      // enrichTrade: re-fetch trade + team names for the mutation's return value
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Proposing Team' }]);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Receiving Team' }]);
+
+      const resolver = getResolver('mutation', 'rejectTrade');
+      await resolver({}, { tradeId: 5 }, mockContext, undefined as never);
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leagueId: 1,
+          userId: null,
+          messageType: 'trade',
+        }),
+      );
+      expect(
+        mockContext.notificationService.notifyLeagueChatMessage,
+      ).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          leagueId: 1,
+          messageId: 55,
+          messageType: 'trade',
+        }),
+      );
+    });
   });
 
   // ── cancelTrade ────────────────────────────────────────────────────────────
