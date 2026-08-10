@@ -1,3 +1,4 @@
+import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 
 jest.mock('./github-api.js', () => ({
@@ -26,6 +27,59 @@ function textToArrayBuffer(text: string): ArrayBuffer {
     buf.byteOffset,
     buf.byteOffset + buf.byteLength,
   ) as ArrayBuffer;
+}
+
+function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
+  return buf.buffer.slice(
+    buf.byteOffset,
+    buf.byteOffset + buf.byteLength,
+  ) as ArrayBuffer;
+}
+
+/** Build a STORED (uncompressed) ZIP local file entry with real header sizes. */
+function buildStoredZipEntry(name: string, text: string): Buffer {
+  const nameBuf = Buffer.from(name, 'utf-8');
+  const data = Buffer.from(text, 'utf-8');
+  const header = Buffer.alloc(30);
+  header.writeUInt32LE(0x04034b50, 0); // local file header signature
+  header.writeUInt16LE(20, 4); // version needed to extract
+  header.writeUInt16LE(0, 6); // general purpose bit flag (no data descriptor)
+  header.writeUInt16LE(0, 8); // compression method: stored
+  header.writeUInt32LE(0, 14); // crc-32 (unchecked by extractTextFromZip)
+  header.writeUInt32LE(data.length, 18); // compressed size
+  header.writeUInt32LE(data.length, 22); // uncompressed size
+  header.writeUInt16LE(nameBuf.length, 26); // file name length
+  header.writeUInt16LE(0, 28); // extra field length
+  return Buffer.concat([header, nameBuf, data]);
+}
+
+/**
+ * Build a DEFLATE ZIP local file entry with general-purpose bit 3 set — i.e.
+ * a "streamed" entry whose local header reports zeroed sizes, with the real
+ * sizes/CRC only available in a trailing data descriptor. This is the shape
+ * GitHub Actions' log archiver produces for larger job logs (LS-9229).
+ */
+function buildStreamedDeflateZipEntry(name: string, text: string): Buffer {
+  const nameBuf = Buffer.from(name, 'utf-8');
+  const compressed = deflateRawSync(Buffer.from(text, 'utf-8'));
+  const header = Buffer.alloc(30);
+  header.writeUInt32LE(0x04034b50, 0); // local file header signature
+  header.writeUInt16LE(20, 4); // version needed to extract
+  header.writeUInt16LE(0x0008, 6); // general purpose bit flag: data descriptor follows
+  header.writeUInt16LE(8, 8); // compression method: deflate
+  header.writeUInt32LE(0, 14); // crc-32: zeroed (real value is in the data descriptor)
+  header.writeUInt32LE(0, 18); // compressed size: zeroed
+  header.writeUInt32LE(0, 22); // uncompressed size: zeroed
+  header.writeUInt16LE(nameBuf.length, 26); // file name length
+  header.writeUInt16LE(0, 28); // extra field length
+
+  const dataDescriptor = Buffer.alloc(16);
+  dataDescriptor.writeUInt32LE(0x08074b50, 0); // optional data descriptor signature
+  dataDescriptor.writeUInt32LE(0, 4); // crc-32
+  dataDescriptor.writeUInt32LE(compressed.length, 8); // compressed size
+  dataDescriptor.writeUInt32LE(text.length, 12); // uncompressed size
+
+  return Buffer.concat([header, nameBuf, compressed, dataDescriptor]);
 }
 
 describe('fetchRunLogsRing', () => {
@@ -367,5 +421,88 @@ describe('fetchRunLogs scope metadata (LS-8301)', () => {
     expect(result.jobsSearched).toBe(1);
     expect(result.jobsTotal).toBe(2);
     expect(result.skippedByFailedOnly).toBe(false);
+  });
+});
+
+describe('extractTextFromZip streamed (data-descriptor) entries (LS-9229)', () => {
+  beforeEach(() => {
+    mockGithubGet.mockReset();
+    mockGithubGetArrayBuffer.mockReset();
+  });
+
+  it('reads content from a streamed DEFLATE entry after a normal STORED entry', async () => {
+    // Reproduces LS-9229: GitHub Actions' log archiver streams larger job
+    // logs, producing a ZIP entry with general-purpose bit 3 set (sizes
+    // zeroed in the local header, real sizes in a trailing data descriptor).
+    // The old parser trusted the zeroed compressedSize, landed on the middle
+    // of the entry's compressed bytes for its next "signature" check, found
+    // no match, and silently `break`-ed — dropping this entry and everything
+    // after it while still reporting the search as untruncated.
+    const zip = Buffer.concat([
+      buildStoredZipEntry('1_setup.txt', 'Setting up job\n'),
+      buildStreamedDeflateZipEntry(
+        '2_run-e2e-tests.txt',
+        'Running 42 tests using 3 workers\n42 passed (18s)\n',
+      ),
+    ]);
+
+    mockGithubGetArrayBuffer.mockResolvedValue(bufferToArrayBuffer(zip));
+
+    const result = await fetchRunLogs({ jobId: 93328804888 });
+
+    expect(result.text).toContain('Setting up job');
+    expect(result.text).toContain('42 passed (18s)');
+  });
+
+  it('reads a streamed entry that is the only entry in the archive', async () => {
+    const zip = buildStreamedDeflateZipEntry(
+      '0_run-e2e-tests.txt',
+      'passed: 10\nfailed: 0\n',
+    );
+
+    mockGithubGetArrayBuffer.mockResolvedValue(bufferToArrayBuffer(zip));
+
+    const result = await fetchRunLogs({ jobId: 1 });
+
+    expect(result.text).toContain('passed: 10');
+  });
+
+  it('reads multiple consecutive streamed entries', async () => {
+    const zip = Buffer.concat([
+      buildStreamedDeflateZipEntry('0_step-one.txt', 'step one output\n'),
+      buildStreamedDeflateZipEntry('1_step-two.txt', 'step two output\n'),
+    ]);
+
+    mockGithubGetArrayBuffer.mockResolvedValue(bufferToArrayBuffer(zip));
+
+    const result = await fetchRunLogs({ jobId: 1 });
+
+    expect(result.text).toContain('step one output');
+    expect(result.text).toContain('step two output');
+  });
+
+  it('stops parsing rather than reading out of bounds when fileNameLength overruns the buffer', async () => {
+    // legacy-sports-review-bot flagged this on the PR: a malicious/corrupt
+    // header could claim a fileNameLength/extraFieldLength that pushes
+    // dataOffset past the end of the buffer.
+    const good = buildStoredZipEntry('0_setup.txt', 'setup output\n');
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);
+    header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(0, 6);
+    header.writeUInt16LE(0, 8);
+    header.writeUInt32LE(0, 14);
+    header.writeUInt32LE(0, 18);
+    header.writeUInt32LE(0, 22);
+    header.writeUInt16LE(60_000, 26); // fileNameLength claims far more than remains
+    header.writeUInt16LE(0, 28);
+    const malformed = Buffer.concat([header, Buffer.from('short')]);
+
+    const zip = Buffer.concat([good, malformed]);
+    mockGithubGetArrayBuffer.mockResolvedValue(bufferToArrayBuffer(zip));
+
+    const result = await fetchRunLogs({ jobId: 1 });
+
+    expect(result.text).toContain('setup output');
   });
 });

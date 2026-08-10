@@ -2,6 +2,22 @@ import { inflateRawSync } from 'node:zlib';
 
 import { githubGet, githubGetArrayBuffer } from './github-api.js';
 
+/** ZIP local file header signature (`PK\x03\x04`). */
+const LOCAL_FILE_HEADER_SIG = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+/** ZIP central directory file header signature (`PK\x01\x02`) — marks the end of entries. */
+const CENTRAL_DIR_SIG = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
+/**
+ * General-purpose bit flag 3: CRC-32/compressed/uncompressed sizes are zeroed
+ * in the local file header and instead stored in a trailing data descriptor
+ * written after the entry's data — used when a writer streams an entry
+ * without knowing its final size up front (GitHub Actions' log archiver does
+ * this for larger job logs). Trusting a zeroed `compressedSize` for such an
+ * entry made the parser land on garbage bytes for the next "signature" check
+ * and silently `break` out of the loop, dropping every entry from that point
+ * on (and everything read so far reported as `truncated: false`) — LS-9229.
+ */
+const FLAG_DATA_DESCRIPTOR = 0x0008;
+
 export interface FetchRunLogsParams {
   runId?: number;
   jobId?: number;
@@ -99,6 +115,18 @@ const LOG_FETCH_CONCURRENCY = 5;
 const MAX_UNCOMPRESSED_ENTRY_BYTES = 50 * 1024 * 1024;
 
 /**
+ * Find the end of a streamed entry's data: the offset of the next local file
+ * header or the start of the central directory, whichever comes first, or
+ * the end of the buffer if neither appears (last entry, archive truncated).
+ */
+function findStreamedEntryEnd(data: Buffer, from: number): number {
+  const nextLocal = data.indexOf(LOCAL_FILE_HEADER_SIG, from);
+  const nextCentral = data.indexOf(CENTRAL_DIR_SIG, from);
+  const candidates = [nextLocal, nextCentral].filter((i) => i !== -1);
+  return candidates.length > 0 ? Math.min(...candidates) : data.length;
+}
+
+/**
  * Extract text content from a ZIP archive buffer.
  * Uses Node built-in zlib (inflateRawSync) to decompress individual ZIP entries.
  * Concatenates all text files found in the archive.
@@ -114,30 +142,53 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
     // Check for local file header signature
     if (data.readUInt32LE(offset) !== 0x04034b50) break;
 
+    const generalPurposeBitFlag = data.readUInt16LE(offset + 6);
     const compressionMethod = data.readUInt16LE(offset + 8);
-    const compressedSize = data.readUInt32LE(offset + 18);
+    const headerCompressedSize = data.readUInt32LE(offset + 18);
     const uncompressedSize = data.readUInt32LE(offset + 22);
     const fileNameLength = data.readUInt16LE(offset + 26);
     const extraFieldLength = data.readUInt16LE(offset + 28);
 
     const dataOffset = offset + 30 + fileNameLength + extraFieldLength;
+    if (dataOffset > data.length) {
+      // Malformed header: fileNameLength/extraFieldLength claim more bytes
+      // than remain in the buffer. Nothing past this point in the archive
+      // can be trusted, so stop parsing instead of reading with an
+      // out-of-range offset (legacy-sports-review-bot, LS-9229).
+      break;
+    }
+    // Streamed entries (bit 3) have zeroed sizes in the local header — the
+    // header field can't be trusted, so locate the boundary by scanning
+    // forward for the next entry instead.
+    const streamed = (generalPurposeBitFlag & FLAG_DATA_DESCRIPTOR) !== 0;
+    const entryEnd = streamed
+      ? findStreamedEntryEnd(data, dataOffset)
+      : dataOffset + headerCompressedSize;
+    const compressedSize = streamed
+      ? entryEnd - dataOffset
+      : headerCompressedSize;
 
-    if (compressedSize > 0 && dataOffset + compressedSize <= data.length) {
-      if (uncompressedSize > MAX_UNCOMPRESSED_ENTRY_BYTES) {
+    if (compressedSize > 0 && entryEnd <= data.length) {
+      if (!streamed && uncompressedSize > MAX_UNCOMPRESSED_ENTRY_BYTES) {
         process.stderr.write(
           `[ci-server] skipping ZIP entry: uncompressed size ${uncompressedSize} exceeds ${MAX_UNCOMPRESSED_ENTRY_BYTES} byte limit\n`,
         );
       } else {
-        const compressedData = data.subarray(
-          dataOffset,
-          dataOffset + compressedSize,
-        );
+        const compressedData = data.subarray(dataOffset, entryEnd);
         try {
           if (compressionMethod === 8) {
-            // Deflated — use inflateRaw
-            texts.push(inflateRawSync(compressedData).toString('utf-8'));
-          } else if (compressionMethod === 0) {
-            // Stored (no compression)
+            // Deflated — use inflateRaw. Raw deflate streams are
+            // self-terminating, so a streamed entry's trailing data
+            // descriptor bytes (included in `compressedData` since its real
+            // length is unknown) are harmlessly ignored past the stream end.
+            texts.push(
+              inflateRawSync(compressedData, {
+                maxOutputLength: MAX_UNCOMPRESSED_ENTRY_BYTES,
+              }).toString('utf-8'),
+            );
+          } else if (compressionMethod === 0 && !streamed) {
+            // Stored (no compression) — only trustworthy when the header's
+            // size fields are real, i.e. not a streamed entry.
             texts.push(compressedData.toString('utf-8'));
           }
         } catch {
@@ -146,7 +197,7 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
       }
     }
 
-    offset = dataOffset + compressedSize;
+    offset = entryEnd;
   }
 
   return texts.join('');
