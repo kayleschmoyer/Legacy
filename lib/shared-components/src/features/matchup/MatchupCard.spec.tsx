@@ -147,7 +147,11 @@ describe('MatchupCard', () => {
   it('calls onPress when card is clicked', () => {
     const onPress = jest.fn();
     render(<MatchupCard matchup={createMatchup()} onPress={onPress} />);
-    fireEvent.click(screen.getByTestId('matchup-card'));
+    // The wrapper div only carries data-testid (LS-4133 workaround, see
+    // MatchupCard.tsx); the click must dispatch on its first child, the
+    // actual Tamagui-rendered onPress carrier.
+    const wrapper = screen.getByTestId('matchup-card');
+    fireEvent.click(wrapper.firstElementChild as HTMLElement);
     expect(onPress).toHaveBeenCalled();
   });
 

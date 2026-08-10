@@ -20,6 +20,7 @@ import {
 import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
 import { useLeagueWebSocketClient } from '../../../../context/LeagueWebSocketContext';
 import { MatchupRosterComparison } from '../../../../features/matchup/MatchupRosterComparison';
+import { MatchupGrid } from '../../../../features/matchup/MatchupGrid';
 import { computeMatchupScores } from '../../../../features/matchup/MatchupScoreboard';
 import { useLeagueScoringSettings } from '../../../../lib/scoring';
 import { mapMatchupPlayerToSeasonStats } from '../../../../lib/scoring/mapGraphQLToScoringFormat';
@@ -75,6 +76,23 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
     league.id ?? null,
     week,
   );
+
+  // Football's Matchups List (LS-5419) surfaces every matchup for the week
+  // with the viewer's own matchup pinned to the top; baseball keeps its
+  // existing single-matchup-only flow, so this ordering is only computed
+  // (and rendered) for football leagues.
+  const pinnedMatchups = useMemo(() => {
+    const nonNull = matchups.filter(
+      (m): m is NonNullable<typeof m> => m != null,
+    );
+    if (!isFootball || nonNull.length === 0) return nonNull;
+    const mine = nonNull.filter(
+      (m) =>
+        myTeamId != null && (m.team1Id === myTeamId || m.team2Id === myTeamId),
+    );
+    const rest = nonNull.filter((m) => !mine.includes(m));
+    return [...mine, ...rest];
+  }, [isFootball, matchups, myTeamId]);
 
   // Used only as a fallback cap for the week stepper when league.totalMatchups
   // is null (e.g. mid-rollover state) — see the disabled condition below.
@@ -432,6 +450,16 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
               : 'No games scheduled'}
         </span>
       </div>
+
+      {isFootball && matchups.length > 0 ? (
+        <div data-testid="matchups-list">
+          <MatchupGrid
+            matchups={pinnedMatchups}
+            weekNumber={week}
+            onMatchupPress={(m) => setBrowseMatchupId(Number(m.id))}
+          />
+        </div>
+      ) : null}
 
       <MatchupScoreboardHero
         weekNumber={week}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { Card, Text, XStack, YStack } from 'tamagui';
 import { Activity, CheckCircle, Clock, XCircle } from '@tamagui/lucide-icons';
 import { type MatchupFragment, MatchupStatus } from '@legacy-sports/graphql';
@@ -175,8 +176,16 @@ export function MatchupCard({
 
   const statusConfig = getStatusPresentation(status);
 
-  return (
-    <CardContainer onPress={onPress} testID="matchup-card">
+  // Tamagui drops `data-testid` on an animated Card with onPress in Chromium
+  // (LS-4133, LS-4215) — same issue worked around in
+  // MatchupRosterEditorView. A plain div wrapper guarantees the attribute
+  // reaches the real DOM; RN has no host tag for a lowercase `div`, so the
+  // wrapper must stay web-only (LS-9163).
+  const card = (
+    <CardContainer
+      onPress={onPress}
+      testID={Platform.OS === 'web' ? undefined : 'matchup-card'}
+    >
       {/* Accent bar */}
       <AccentBar backgroundColor={statusConfig.accent} />
 
@@ -234,5 +243,11 @@ export function MatchupCard({
         />
       </YStack>
     </CardContainer>
+  );
+
+  return Platform.OS === 'web' ? (
+    <div data-testid="matchup-card">{card}</div>
+  ) : (
+    card
   );
 }

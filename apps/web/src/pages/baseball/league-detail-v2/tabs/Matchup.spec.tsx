@@ -12,6 +12,9 @@
  *   8. Schedule card: NOT rendered when matchup has no startTime / endTime.
  *   9. Bye/no-team empty state (LS-5902): shown instead of a stranger's
  *      matchup when the user's team isn't in this week's matchups.
+ *  10. Matchups List tab (LS-5419): football renders every matchup for the
+ *      week with the viewer's matchup pinned to the top; baseball does not
+ *      render the list; tapping a card browses to that matchup's detail.
  */
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -111,6 +114,29 @@ jest.mock('../../../../features/matchup/MatchupScoreboard', () => ({
 jest.mock('@legacy-sports/shared-components/matchup', () => ({
   MatchupScoreboardHero: () => <div data-testid="scoreboard-hero" />,
 }));
+const mockMatchupGrid = jest.fn();
+jest.mock('../../../../features/matchup/MatchupGrid', () => ({
+  MatchupGrid: (props: {
+    matchups: Array<{ id: number }>;
+    onMatchupPress?: (matchup: { id: number }) => void;
+  }) => {
+    mockMatchupGrid(props);
+    return (
+      <div data-testid="matchup-grid">
+        {props.matchups.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            data-testid={`matchup-grid-card-${m.id}`}
+            onClick={() => props.onMatchupPress?.(m)}
+          >
+            {m.id}
+          </button>
+        ))}
+      </div>
+    );
+  },
+}));
 
 // ---------------------------------------------------------------------------
 
@@ -175,6 +201,7 @@ beforeEach(() => {
     client: { updateContext: mockUpdateContext },
     connected: true,
   });
+  mockMatchupGrid.mockClear();
 });
 
 describe('MatchupTab — football-awareness', () => {
@@ -555,5 +582,66 @@ describe('MatchupTab — matchup-scoped WebSocket context (LS-6355)', () => {
     });
     expect(() => renderTab({}, { initialMatchupId: '1' })).not.toThrow();
     expect(mockUpdateContext).not.toHaveBeenCalled();
+  });
+});
+
+describe('MatchupTab — Matchups List (LS-5419)', () => {
+  const myMatchup = {
+    ...baseMatchup,
+    id: 1,
+    team1Id: 10,
+    team2Id: 20,
+  };
+  const otherMatchup = {
+    ...baseMatchup,
+    id: 2,
+    team1Id: 30,
+    team2Id: 40,
+    team1: { id: 30, name: 'Charlie' },
+    team2: { id: 40, name: 'Delta' },
+  };
+
+  beforeEach(() => {
+    mockUseMatchupsByWeek.mockReturnValue({
+      matchups: [otherMatchup, myMatchup],
+      refetch: jest.fn(),
+    });
+  });
+
+  it('renders the matchups list for a football league', () => {
+    renderTab({ sport: 'football' }, { myTeamId: 10 });
+    expect(screen.getByTestId('matchups-list')).toBeInTheDocument();
+    expect(mockMatchupGrid).toHaveBeenCalled();
+  });
+
+  it('does not render the matchups list for a baseball league', () => {
+    renderTab({ sport: 'baseball' }, { myTeamId: 10 });
+    expect(screen.queryByTestId('matchups-list')).not.toBeInTheDocument();
+  });
+
+  it('does not render the matchups list when there are no matchups this week', () => {
+    mockUseMatchupsByWeek.mockReturnValue({ matchups: [], refetch: jest.fn() });
+    renderTab({ sport: 'football' }, { myTeamId: 10 });
+    expect(screen.queryByTestId('matchups-list')).not.toBeInTheDocument();
+  });
+
+  it("pins the viewer's matchup to the top of the list", () => {
+    renderTab({ sport: 'football' }, { myTeamId: 10 });
+    const { matchups } = mockMatchupGrid.mock.calls[0][0];
+    expect(matchups[0].id).toBe(1);
+    expect(matchups[1].id).toBe(2);
+  });
+
+  it('leaves ordering unchanged for an observer with no team in the league', () => {
+    renderTab({ sport: 'football' }, { myTeamId: null });
+    const { matchups } = mockMatchupGrid.mock.calls[0][0];
+    expect(matchups[0].id).toBe(2);
+    expect(matchups[1].id).toBe(1);
+  });
+
+  it("browses to a matchup's detail view when its card is tapped", () => {
+    renderTab({ sport: 'football' }, { myTeamId: 10, initialMatchupId: null });
+    fireEvent.click(screen.getByTestId('matchup-grid-card-2'));
+    expect(mockUseMatchupById).toHaveBeenLastCalledWith(2);
   });
 });
