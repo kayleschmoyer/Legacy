@@ -75,6 +75,12 @@ export interface NFLHomeProps {
   onSignIn?: () => void;
   /** This week's matchup to highlight (LS-5407). Hidden when absent. */
   matchupHighlight?: NFLHomeMatchupHighlight | null;
+  /**
+   * When provided, renders a compact in-page sport switcher (LS-5412),
+   * mirroring the Baseball -> Football switcher (LS-5815). Called with the
+   * sport key the user selected.
+   */
+  onSwitchSport?: (sport: 'baseball') => void;
 }
 
 function getLeagueStatusLabel(league: NFLHomeLeague): string {
@@ -287,6 +293,7 @@ function NFLHome({
   onViewLeague,
   onSignIn,
   matchupHighlight,
+  onSwitchSport,
 }: NFLHomeProps) {
   const hasLeagues = leagues.length > 0;
 
@@ -477,6 +484,30 @@ function NFLHome({
               onPress={matchupHighlight.onPress}
             />
           </YStack>
+        ) : null}
+
+        {/* In-page sport switcher (LS-5412) */}
+        {onSwitchSport ? (
+          <XStack alignItems="center" gap="$3" flexWrap="wrap">
+            <Text fontSize="$3" color="$gray10" fontWeight="600">
+              Also play:
+            </Text>
+            <Button
+              size="$2"
+              backgroundColor="$gray3"
+              borderColor="$gray7"
+              borderWidth={1}
+              borderRadius="$5"
+              onPress={() => onSwitchSport('baseball')}
+              accessibilityLabel="Switch to Baseball"
+              aria-label="Switch to Baseball"
+              testID="sport-switcher-baseball"
+            >
+              <Text fontSize={12} fontWeight="600" color="$gray11">
+                Baseball
+              </Text>
+            </Button>
+          </XStack>
         ) : null}
 
         {/* Your Football Leagues */}

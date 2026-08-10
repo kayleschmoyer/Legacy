@@ -10,6 +10,16 @@ import { trackPremiumFeatureClick } from '../utils/analytics';
 // Analytics label for the upgrade prompt fired from the league-cap gate (LS-5025).
 const LEAGUE_CAP_FEATURE_NAME = 'Unlimited Leagues';
 
+type FootballHomeScreenProps = {
+  /**
+   * Switches to the baseball home. Owned by the host (`(tabs)/home.tsx`), which
+   * flips its inline sport view rather than navigating — the screen must never
+   * push `/baseball` itself, or the user ends up on a second home surface
+   * outside the tab shell (LS-8823). Omitted → `NFLHome` hides the switcher.
+   */
+  onSwitchSport?: (sport: 'baseball') => void;
+};
+
 /**
  * Mobile data wrapper for the shared `NFLHome`.
  *
@@ -17,7 +27,9 @@ const LEAGUE_CAP_FEATURE_NAME = 'Unlimited Leagues';
  * (LS-5814). `/football` is a redirect into that tab, not a second mount point
  * — see `(app)/football/index.tsx` (LS-8823).
  */
-export default function FootballHomeScreen() {
+export default function FootballHomeScreen({
+  onSwitchSport,
+}: FootballHomeScreenProps) {
   const userInfo = useAuthorizedUserInfo();
   const router = useRouter();
 
@@ -93,6 +105,7 @@ export default function FootballHomeScreen() {
           params: { leagueId: id },
         })
       }
+      onSwitchSport={onSwitchSport}
     />
   );
 }

@@ -627,6 +627,25 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
     });
   });
 
+  test('sport switcher on the football hub switches to Baseball (LS-5412)', async ({
+    page,
+  }) => {
+    await page.goto('/football');
+    await expect(page.getByTestId('football-screen')).toBeVisible({
+      timeout: 10000,
+    });
+
+    const switcher = page.getByTestId('sport-switcher-baseball');
+    await expect(switcher).toBeVisible();
+
+    await switcher.click();
+
+    await expect(page).toHaveURL('/baseball');
+    await expect(page.getByTestId('baseball-screen')).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
   test('primary navigation is visible on the football hub', async ({
     page,
   }) => {

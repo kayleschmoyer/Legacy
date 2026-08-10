@@ -268,7 +268,9 @@ export default function HomeTab() {
             paddingTop: topInset,
           }}
         >
-          <FootballHomeScreen />
+          {/* The switcher flips the inline view instead of pushing
+              `/baseball`, which would leave the tab shell (LS-8823). */}
+          <FootballHomeScreen onSwitchSport={handleViewSport} />
         </View>
       )}
     </>

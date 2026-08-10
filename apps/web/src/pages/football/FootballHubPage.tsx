@@ -163,6 +163,7 @@ export function FootballHubPage() {
             navigate(`/football/league/${id}`)
           }
           matchupHighlight={matchupHighlight}
+          onSwitchSport={(sport) => navigate(`/${sport}`)}
         />
       </div>
       <UpgradeModal
