@@ -370,14 +370,21 @@ async function loadFootballPlayerGameStats(
     const retryable = isRetryableError(error);
     const err = error instanceof Error ? error : new Error(String(error));
 
-    LOGGER.error(`Failed to load football stats for player ${playerId}`, err, {
-      playerId,
-      pfrId,
-      season,
-      isRetryable: retryable,
-    });
-
+    // Retryable errors (429, timeout, 5xx) are expected transient failures that
+    // SQS will retry — log at 'warn' so they don't trip the RollbarOutputDestination
+    // (which only forwards 'error'/'fatal') and page on noise that self-heals.
     if (retryable) {
+      LOGGER.warn(
+        `Failed to load football stats for player ${playerId} (retryable)`,
+        err,
+        {
+          playerId,
+          pfrId,
+          season,
+          isRetryable: retryable,
+        },
+      );
+
       const retryableError = new Error(
         `RETRYABLE: ${error instanceof Error ? error.message : String(error)}`,
       ) as RetryableError;
@@ -386,6 +393,13 @@ async function loadFootballPlayerGameStats(
       retryableError.isRateLimit = isRateLimitError(error);
       throw retryableError;
     }
+
+    LOGGER.error(`Failed to load football stats for player ${playerId}`, err, {
+      playerId,
+      pfrId,
+      season,
+      isRetryable: retryable,
+    });
 
     await db
       .update(PublicSchema.matchupPlayerGames)

@@ -253,23 +253,28 @@ export async function loadPlayerGameStats(
   } catch (error) {
     const retryable = isRetryableError(error);
 
-    LOGGER.error(
-      `Failed to load stats for player ${playerId} in matchup ${matchupId}`,
-      {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        playerId,
-        brefId,
-        season,
-        matchupId,
-        isRetryable: retryable,
-        isRateLimit: isRateLimitError(error),
-      },
-    );
+    const logContext = {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      playerId,
+      brefId,
+      season,
+      matchupId,
+      isRetryable: retryable,
+      isRateLimit: isRateLimitError(error),
+    };
 
-    // For retryable errors (429, timeout), leave status as 'loading' so
-    // the SQS retry can process the player again without false 'failed' state
+    // Retryable errors (429, timeout, 5xx) are expected transient failures that
+    // SQS will retry — log at 'warn' so they don't trip the RollbarOutputDestination
+    // (which only forwards 'error'/'fatal') and page on noise that self-heals.
     if (retryable) {
+      LOGGER.warn(
+        `Failed to load stats for player ${playerId} in matchup ${matchupId} (retryable)`,
+        logContext,
+      );
+
+      // For retryable errors (429, timeout), leave status as 'loading' so
+      // the SQS retry can process the player again without false 'failed' state
       const retryableError = new Error(
         `RETRYABLE: ${error instanceof Error ? error.message : String(error)}`,
       ) as RetryableError;
@@ -278,6 +283,12 @@ export async function loadPlayerGameStats(
       retryableError.isRateLimit = isRateLimitError(error);
       throw retryableError;
     }
+
+    LOGGER.error(
+      `Failed to load stats for player ${playerId} in matchup ${matchupId}`,
+      error instanceof Error ? error : new Error(String(error)),
+      logContext,
+    );
 
     // Non-retryable error — mark this player's game as failed
     if (player.matchupPlayerId) {
