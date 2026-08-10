@@ -1359,7 +1359,16 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           paths: {
             type: 'array' as const,
             items: { type: 'string' },
-            description: 'Path filter',
+            description:
+              'Path filter — string or string[]. Alias: "files" (either name works; providing both is an error).',
+          },
+          files: {
+            anyOf: [
+              { type: 'string' },
+              { type: 'array' as const, items: { type: 'string' } },
+            ],
+            description:
+              'Alias for "paths" — string or string[]. Providing both "paths" and "files" is an error.',
           },
           stat: { type: 'boolean', description: 'Diffstat only' },
           nameOnly: { type: 'boolean', description: 'File names only' },
@@ -3736,18 +3745,45 @@ const handleCallTool = async (
       const {
         worktree: wtKey,
         base = 'origin/main',
-        paths,
+        paths: rawPaths,
+        files: rawFiles,
         stat,
         nameOnly,
         staged,
       } = args as {
         worktree?: string;
         base?: string;
-        paths?: string[];
+        paths?: unknown;
+        files?: unknown;
         stat?: boolean;
         nameOnly?: boolean;
         staged?: boolean;
       };
+
+      if (rawPaths !== undefined && rawFiles !== undefined) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Provide either "paths" or "files", not both — they are aliases for the same path filter.',
+            },
+          ],
+          isError: true,
+        };
+      }
+      const pathsResult = normalizeFilesParam(rawPaths ?? rawFiles);
+      if (
+        pathsResult &&
+        typeof pathsResult === 'object' &&
+        !Array.isArray(pathsResult) &&
+        'error' in pathsResult
+      ) {
+        return {
+          content: [{ type: 'text', text: pathsResult.error }],
+          isError: true,
+        };
+      }
+      const paths = pathsResult;
 
       const target = resolveTargetDir(wtKey);
       if ('error' in target) {
