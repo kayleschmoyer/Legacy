@@ -261,10 +261,15 @@ async function resolveToken(): Promise<{ token: string; expiresAt?: Date }> {
                 '(GH_TOKEN/GITHUB_TOKEN not set, AGENT_AUTHOR_APP_PRIVATE_KEY not configured, gh CLI auth failed). ' +
                 'Fix: set AGENT_AUTHOR_APP_PRIVATE_KEY or GH_TOKEN in cloud env settings ' +
                 '(see .agents/skills/cloud-agent-mode/SKILL.md). ' +
-                'Fallback: use the built-in mcp__github__actions_list tool to inspect workflow runs. ' +
+                'Fallback for read-only inspection: use the built-in mcp__github__actions_list tool to inspect workflow runs. ' +
                 'WARNING: actions_list returns enormous payloads (~400 KB at per_page=15, ~65 KB at per_page=3); ' +
                 'always save to a temp file and extract only the fields you need ' +
-                '(id, status, conclusion, head_sha, name, created_at) with python3 or jq rather than reading the full JSON inline.',
+                '(id, status, conclusion, head_sha, name, created_at) with python3 or jq rather than reading the full JSON inline. ' +
+                'Fallback for write actions (rerun/cancel/dispatch): use the built-in mcp__github__actions_run_trigger tool instead — ' +
+                'e.g. mcp__github__actions_run_trigger({ method: "rerun_failed_jobs", owner, repo, run_id }) covers ' +
+                'ci_rerun_failed_jobs/ci_rerun, method: "cancel_workflow_run" covers ci_cancel_run, and ' +
+                'method: "run_workflow" covers ci_dispatch_workflow. It authenticates via the platform\'s own ' +
+                "GitHub token, independent of this server's credential resolution.",
             ),
           );
           return;
