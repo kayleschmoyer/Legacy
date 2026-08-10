@@ -51,6 +51,9 @@ interface UseDraftQueriesParams {
   playerSearch: string;
   selectedPosition: string;
   viewMode: 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
+  /** True on the compact/native draft board, which always renders DraftMiniBoard
+   * regardless of `viewMode` and therefore always needs the real slot order (LS-9245). */
+  isCompact?: boolean;
 }
 
 export function useDraftQueries({
@@ -58,6 +61,7 @@ export function useDraftQueries({
   playerSearch,
   selectedPosition,
   viewMode,
+  isCompact = false,
 }: UseDraftQueriesParams) {
   // ---- League Data ----
   const {
@@ -456,11 +460,14 @@ export function useDraftQueries({
   });
 
   // ---- Draft team order ----
-  // Fetched for the 'board' view (existing) and also for the pre-draft lobby
-  // (LS-8677), so an executed draft slot trade's swap is reflected in the
-  // lobby's order display immediately. Still skipped for other views
-  // (grid/list/compact/table) once the draft is live, to avoid firing an
-  // unused query throughout an active draft.
+  // Fetched for the 'board' view (existing), the pre-draft lobby (LS-8677, so
+  // an executed draft slot trade's swap is reflected in the lobby's order
+  // display immediately), and the compact/native board (LS-9245, which always
+  // renders DraftMiniBoard off `boardOrderedTeams` regardless of `viewMode`
+  // and silently fell back to unsorted `leagueTeams` once the draft went
+  // live). Still skipped for other desktop views (grid/list/compact/table)
+  // once the draft is live, to avoid firing an unused query throughout an
+  // active draft.
   const isPreDraft =
     league?.draftStatus !== 'in-progress' && league?.draftStatus !== 'paused';
   const { data: draftTeamOrderData, refetch: refetchDraftTeamOrder } = useQuery<
@@ -468,7 +475,7 @@ export function useDraftQueries({
     GetDraftTeamOrderQueryVariables
   >(GET_DRAFT_TEAM_ORDER, {
     variables: { draftId: draftId ?? 0 },
-    skip: !draftId || (viewMode !== 'board' && !isPreDraft),
+    skip: !draftId || (viewMode !== 'board' && !isPreDraft && !isCompact),
   });
 
   const boardOrderedTeams = useMemo<LeagueTeam[]>(() => {

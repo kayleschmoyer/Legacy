@@ -715,6 +715,7 @@ export function EliteDraftBoardScreen({
     playerSearch: ui.playerSearch,
     selectedPosition: ui.selectedPosition,
     viewMode: ui.viewMode,
+    isCompact,
   });
 
   const isMyPick = Boolean(
