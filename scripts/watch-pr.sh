@@ -130,16 +130,29 @@ while true; do
     sleep "$INTERVAL"
     continue
   fi
-  consec_failures=0
   rate_limited_notified=0
 
   # Heartbeat: prove the watch is alive to the stop guard.
   mkdir -p "${PROJECT_DIR}/.claude" 2>/dev/null || true
   touch "$FLAG_FILE" 2>/dev/null || true
 
+  # Write the JSON to a file rather than piping it: `python -` reads its own
+  # program from stdin via the heredoc below, and a pipe into the same
+  # command's stdin is clobbered by that heredoc redirect (both target fd 0;
+  # the heredoc wins) — python then hits EOF on json.load(sys.stdin) and
+  # raises JSONDecodeError("Expecting value: line 1 column 1 (char 0)") on
+  # every single poll (LS-8805). Passing a file path leaves stdin free for
+  # the heredoc program and sidesteps the conflict entirely.
+  CUR_JSON_FILE="${STATE_DIR}/cur.json"
+  printf '%s' "$CUR_JSON" >"$CUR_JSON_FILE"
+
   # Diff current state against previous; print event lines; persist new state.
   # Exit code 10 = terminal PR state reached (watch ends cleanly).
-  printf '%s' "$CUR_JSON" | python - "$STATE_FILE" "$PR_NUMBER" "$now_ts" "$REBASELINE" "$STALL_SECONDS" <<'PYEOF'
+  # Exit code 2 = the JSON payload was empty/malformed — a diagnostic line
+  # was already printed to stdout; the bash side counts this toward
+  # consec_failures so a persistent parse regression trips the DEAD exit
+  # instead of spinning forever silently touching the heartbeat.
+  python - "$STATE_FILE" "$CUR_JSON_FILE" "$PR_NUMBER" "$now_ts" "$REBASELINE" "$STALL_SECONDS" <<'PYEOF'
 import json, os, sys
 
 # Windows Git Bash: python stdout defaults to cp1252, which cannot encode
@@ -147,9 +160,15 @@ import json, os, sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-state_file, pr, now_ts, rebaseline, stall_secs = (
-    sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4] == "1", int(sys.argv[5]))
-cur = json.load(sys.stdin)
+state_file, cur_json_file, pr, now_ts, rebaseline, stall_secs = (
+    sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5] == "1", int(sys.argv[6]))
+
+try:
+    with open(cur_json_file, encoding="utf-8") as f:
+        cur = json.load(f)
+except (OSError, json.JSONDecodeError) as e:
+    print(f"watch #{pr}: malformed gh payload this poll ({e}) — skipping, will retry next interval.")
+    sys.exit(2)
 
 prev = {}
 if os.path.exists(state_file):
@@ -325,6 +344,16 @@ PYEOF
   if [ $py_rc -eq 10 ]; then
     exit 0
   fi
+  if [ $py_rc -ne 0 ]; then
+    consec_failures=$((consec_failures + 1))
+    if [ "$consec_failures" -ge "$MAX_CONSEC_FAILURES" ]; then
+      echo "watch #${PR_NUMBER} degraded: ${consec_failures} consecutive parse failures — watch is DEAD; investigate, then re-arm"
+      exit 1
+    fi
+    sleep "$INTERVAL"
+    continue
+  fi
+  consec_failures=0
 
   # Jitter (0-15s) de-synchronizes concurrent session watches sharing a token.
   sleep $((INTERVAL + RANDOM % 16))
