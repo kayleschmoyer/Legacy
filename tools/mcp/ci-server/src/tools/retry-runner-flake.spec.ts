@@ -92,11 +92,14 @@ describe('retryRunnerFlake', () => {
     });
   });
 
-  describe('label absent', () => {
-    it('returns a clear no-signal result and makes no write calls', async () => {
+  describe('label absent, comment absent', () => {
+    it('returns a clear no-signal result naming both signals and makes no write calls', async () => {
       mockGet.mockImplementation(async (path: string) => {
         if (path === '/issues/99') {
           return { labels: [{ name: 'some-other-label' }] };
+        }
+        if (path === '/issues/99/comments') {
+          return [comment('unrelated comment')];
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -107,8 +110,36 @@ describe('retryRunnerFlake', () => {
       expect(result.content[0].text).toContain(
         'No runner-shutdown flake signal',
       );
-      expect(mockGet).toHaveBeenCalledTimes(1);
+      expect(result.content[0].text).toContain('CI: Runner Flake');
+      expect(result.content[0].text).toContain('bot comment');
       expect(mockRetryFailed).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('label absent, comment present', () => {
+    it('treats the bot comment as a sufficient signal on its own and retries', async () => {
+      mockGet.mockImplementation(async (path: string) => {
+        if (path === '/issues/101') {
+          return { labels: [{ name: 'some-other-label' }] };
+        }
+        if (path === '/issues/101/comments') {
+          return [
+            comment(
+              [
+                '⚡ **CI cancelled due to a runner restart** — this is not caused by your code.',
+                '',
+                '[Re-run the failed jobs →](https://github.com/acme/repo/actions/runs/999)',
+              ].join('\n'),
+            ),
+          ];
+        }
+        throw new Error(`unexpected path ${path}`);
+      });
+
+      const result = await retryRunnerFlake({ prNumber: 101 });
+
+      expect(mockRetryFailed).toHaveBeenCalledWith({ runId: 999 });
+      expect(result.isError).toBeUndefined();
     });
   });
 

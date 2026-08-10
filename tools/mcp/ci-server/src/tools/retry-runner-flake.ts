@@ -70,12 +70,6 @@ export async function retryRunnerFlake(
     const hasFlakeLabel = issue.labels.some(
       (label) => label.name === RUNNER_FLAKE_LABEL,
     );
-    if (!hasFlakeLabel) {
-      return noSignalResult(
-        params.prNumber,
-        `the "${RUNNER_FLAKE_LABEL}" label is not present on the PR.`,
-      );
-    }
 
     const comments = await githubGet<GitHubComment[]>(
       `/issues/${params.prNumber}/comments`,
@@ -83,7 +77,9 @@ export async function retryRunnerFlake(
 
     // GitHub returns comments in ascending creation order, and a PR can
     // accumulate more than one flake+retry cycle — take the most recent
-    // matching comment, not the first.
+    // matching comment, not the first. The comment is preferred as the
+    // source of truth for the run ID: the tool already parses it, and
+    // unlike the label it cannot be edited away by label housekeeping.
     let runId: number | undefined;
     for (let i = comments.length - 1; i >= 0; i -= 1) {
       const body = comments[i]?.body ?? '';
@@ -93,6 +89,16 @@ export async function retryRunnerFlake(
         runId = Number(match[1]);
         break;
       }
+    }
+
+    // Label and bot comment are independent sufficient signals, not a
+    // conjunction — either one alone is enough to proceed with the retry.
+    if (runId === undefined && !hasFlakeLabel) {
+      return noSignalResult(
+        params.prNumber,
+        `neither the "${RUNNER_FLAKE_LABEL}" label nor a runner-shutdown bot ` +
+          'comment with a parseable run ID was found on the PR.',
+      );
     }
 
     if (runId === undefined) {
