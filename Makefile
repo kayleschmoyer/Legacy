@@ -266,9 +266,9 @@ lint: ## Run linting on affected projects
 	@$(call echo_blue,Running linters...)
 	pnpm exec nx affected -t lint
 
-lint-fix: ## Run linting with auto-fix on affected projects
+lint-fix: ## Run linting with auto-fix on affected projects. Pass PARALLEL=N to cap nx project parallelism (e.g. PARALLEL=2) on memory-constrained machines
 	@$(call echo_blue,Running linters with auto-fix...)
-	pnpm exec nx affected -t lint --fix --fix-type=problem,suggestion,layout
+	pnpm exec nx affected -t lint --fix --fix-type=problem,suggestion,layout $(if $(PARALLEL),--parallel=$(PARALLEL),)
 
 lint-workflows: ## Lint GitHub Actions workflow files
 	@$(call echo_blue,Linting GitHub Actions workflows...)
@@ -941,7 +941,16 @@ endif
 _PC_MIGRATION_CMD = node scripts/check-migration-immutability.js --branch
 _PC_SCHEMA_CMD = pnpm exec nx run db:print-schema
 _PC_TYPECHECK_CMD = pnpm exec nx affected -t typecheck --base=$(NX_BASE)
-_PC_LINT_CMD = pnpm exec nx affected -t lint --fix --fix-type=problem,suggestion,layout --base=$(NX_BASE)
+# PARALLEL caps how many affected projects nx runs lint concurrently (nx's own
+# --parallel flag, default 5 per nx.json). Unset by default (full parallelism).
+# On memory-constrained machines, nx's parallel batching can run several large
+# `eslint . --fix` processes at once (each ballooning to 2-5GB RSS for projects
+# like lambdas/db and cli), OOM-killing individual projects mid-run even though
+# overall memory has headroom at other points — nx then mislabels the OOM-killed
+# task "flaky" on retry, masking the real cause. That signature means retry with
+# `make pc-lint PARALLEL=2` (or `make lint-fix PARALLEL=2`), not that the killed
+# project's lint actually failed (LS-9114).
+_PC_LINT_CMD = pnpm exec nx affected -t lint --fix --fix-type=problem,suggestion,layout --base=$(NX_BASE) $(if $(PARALLEL),--parallel=$(PARALLEL),)
 _PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
 # MAXWORKERS caps Jest worker parallelism (--maxWorkers) across every affected
 # project's test run, forwarded to nx via the trailing `-- --maxWorkers=N`
@@ -1042,7 +1051,7 @@ pc-format: ## pc step 5: prettier + auto-commit formatter rewrites (new commit, 
 	$(_PC_FORMAT_RECIPE)
 
 pc-lint: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
-pc-lint: ## pc step 6: lint affected projects
+pc-lint: ## pc step 6: lint affected projects. Pass PARALLEL=N to cap nx project parallelism (avoids OOM on memory-constrained machines)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
 
 pc-workflows: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))

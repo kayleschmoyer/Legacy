@@ -64,6 +64,7 @@ interface RunPcChunkParams {
   worktreePath?: string;
   verbose?: boolean;
   maxWorkers?: number;
+  parallel?: number;
 }
 
 export async function runPcChunk(
@@ -91,6 +92,25 @@ export async function runPcChunk(
     args.push(`MAXWORKERS=${params.maxWorkers}`);
   }
 
+  // Caps nx's own project-level parallelism (--parallel) for the pc-lint
+  // chunk — forwarded as a PARALLEL make variable, which the Makefile's
+  // pc-lint recipe appends to `nx affected -t lint --fix` as `--parallel=<n>`.
+  // Ignored by every other chunk (LS-9114).
+  if (params.parallel !== undefined) {
+    if (!Number.isInteger(params.parallel) || params.parallel < 1) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Invalid parallel: "${params.parallel}". Must be a positive integer.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+    args.push(`PARALLEL=${params.parallel}`);
+  }
+
   const snapshot = await runJobWithBudget(
     {
       command: 'make',
@@ -101,7 +121,7 @@ export async function runPcChunk(
       successMarker: getSuccessMarkerForChunk(params.chunk),
       // Blind retries (e.g. after a lost transport) join the in-flight run
       // instead of spawning a duplicate make process.
-      idempotencyKey: `pc-chunk:${cwd}:${params.chunk}${params.maxWorkers !== undefined ? `:mw${params.maxWorkers}` : ''}`,
+      idempotencyKey: `pc-chunk:${cwd}:${params.chunk}${params.maxWorkers !== undefined ? `:mw${params.maxWorkers}` : ''}${params.parallel !== undefined ? `:par${params.parallel}` : ''}`,
     },
     SYNC_BUDGET_MS,
   );

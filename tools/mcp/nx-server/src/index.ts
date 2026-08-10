@@ -309,6 +309,19 @@ server.tool(
           'signature means retry pc-test with a lower maxWorkers, not that the code under test regressed. ' +
           'E.g. maxWorkers: 2. Ignored by chunks other than pc-test.',
       ),
+    parallel: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        'Cap nx project-level parallelism for the pc-lint chunk by passing PARALLEL=<n>, which the pc-lint ' +
+          'recipe forwards to `nx affected -t lint --fix` as `--parallel=<n>` (nx.json default: 5). Use on ' +
+          'memory-constrained machines to avoid individual large projects (e.g. lambdas/db, cli) getting ' +
+          '"Killed" (OOM) when several `eslint . --fix` processes run concurrently, each ballooning to ' +
+          '2-5GB RSS — nx may then mislabel the OOM-killed project "flaky" on retry, masking the real cause. ' +
+          'E.g. parallel: 2. Ignored by chunks other than pc-lint.',
+      ),
   },
   async (params) => runPcChunk(params),
 );

@@ -78,6 +78,18 @@ Cap Jest worker parallelism with `MAXWORKERS`/`maxWorkers` (forwarded as `-- --m
 
 No effect on non-test targets/chunks.
 
+### pc-lint OOM on individual large projects (LS-9114)
+
+`pc-lint` / `make lint-fix` run `nx affected -t lint --fix` across every affected project at nx's default project-level parallelism (`nx.json`: 5 concurrent projects). On a memory-constrained machine, several large `eslint . --fix` processes running concurrently (each ballooning to 2-5GB RSS) can OOM-kill individual large projects — notably `lambdas/db` and `cli` — even though overall memory has headroom at other points in the run. The failure surfaces as `Killed` in the eslint subprocess output and a non-zero `make pc-lint` exit; a bare retry of the same project in isolation succeeds immediately, and nx may mislabel the retried task "flaky" — masking that the root cause was memory pressure, not flakiness. **That signature means retry with lower nx parallelism, not that the project's lint actually failed.**
+
+Cap nx's project-level parallelism with `PARALLEL`/`parallel` (forwarded as `--parallel=<n>` to the underlying `nx affected -t lint --fix`):
+
+- `make pc-lint PARALLEL=2` / `make lint-fix PARALLEL=2`
+- `nx_run_pc_chunk({ chunk: "pc-lint", parallel: 2 })`
+- `make_run({ target: "pc-lint", variables: "PARALLEL=2" })`
+
+No effect on non-lint targets/chunks.
+
 ## Codegen
 
 ```bash

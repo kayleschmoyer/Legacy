@@ -86,3 +86,17 @@ describe('runPcChunk — maxWorkers validation (LS-8666)', () => {
     expect(result.content[0].text).toContain('Invalid maxWorkers');
   });
 });
+
+describe('runPcChunk — parallel validation (LS-9114)', () => {
+  it('rejects a non-positive parallel before starting a job', async () => {
+    const result = await runPcChunk({ chunk: 'pc-lint', parallel: 0 });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid parallel');
+  });
+
+  it('rejects a non-integer parallel before starting a job', async () => {
+    const result = await runPcChunk({ chunk: 'pc-lint', parallel: 1.5 });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid parallel');
+  });
+});
