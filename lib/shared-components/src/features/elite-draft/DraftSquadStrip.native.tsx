@@ -9,7 +9,7 @@
  * Stays native-only: react-native's Pressable has no web build in this
  * codebase; see ./DraftSquadStrip.tsx for the DOM/Tamagui capability shim.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable } from 'react-native';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import type { DraftPickRecord, DraftPlayer } from './types';
@@ -47,7 +47,11 @@ export function DraftSquadStrip({
   onClose,
 }: DraftSquadStripProps): React.JSX.Element {
   const palette = useDraftPalette();
+  const [activeTab, setActiveTab] = useState<'roster' | 'picks'>('roster');
   const slots = buildSquadSlots({ myPicks, statsLookup, rounds });
+  const sortedPicks = [...myPicks].sort(
+    (a, b) => a.overallPick - b.overallPick,
+  );
   const needText = describeSquadNeed(myTeam);
   // The strip only has room for a handful of slots side by side, so it shows
   // the first six rounds — the filled end of the roster. The sheet below has
@@ -208,50 +212,201 @@ export function DraftSquadStrip({
               {needText}
             </Text>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <YStack gap={7} paddingBottom="$2">
-                {slots.map((slot) => {
-                  const player = slot.player;
-                  const positionColor = player
-                    ? getPositionColor('baseball', player.position)
-                    : null;
-                  const pick = myPicks.find((p) => p.round === slot.round);
-                  return (
-                    <XStack
-                      key={slot.round}
-                      alignItems="center"
-                      gap={11}
-                      borderWidth={1}
-                      borderRadius={12}
-                      paddingVertical={11}
-                      paddingHorizontal={13}
-                      borderColor={
-                        positionColor
-                          ? '$surfacePanelBorder'
-                          : '$outlineDefault'
-                      }
-                      backgroundColor={
-                        positionColor
-                          ? withAlpha(positionColor, 0.14)
-                          : 'transparent'
-                      }
+            <XStack
+              role="tablist"
+              accessibilityRole="tablist"
+              aria-label="My squad view"
+              gap={4}
+              marginBottom={10}
+              borderBottomWidth={1}
+              borderBottomColor="$outlineDefault"
+            >
+              {(
+                [
+                  { key: 'roster', label: 'Roster' },
+                  { key: 'picks', label: 'Draft Picks' },
+                ] as const
+              ).map((tab) => {
+                const active = activeTab === tab.key;
+                return (
+                  <XStack
+                    key={tab.key}
+                    role="tab"
+                    accessibilityRole="tab"
+                    aria-selected={active}
+                    accessibilityState={{ selected: active }}
+                    aria-label={tab.label}
+                    onPress={() => setActiveTab(tab.key)}
+                    cursor="pointer"
+                    paddingVertical={8}
+                    paddingHorizontal={12}
+                    borderBottomWidth={2}
+                    borderBottomColor={
+                      active ? palette.gold.gold : 'transparent'
+                    }
+                    marginBottom={-1}
+                  >
+                    <Text
+                      fontFamily="$heading"
+                      fontSize={11}
+                      fontWeight="800"
+                      letterSpacing={1}
+                      textTransform="uppercase"
+                      color={active ? palette.gold.goldLight : '$fg4'}
                     >
-                      <YStack width={46} flexShrink={0} alignItems="center">
-                        <Text
-                          fontFamily="$heading"
-                          fontSize={15}
-                          fontWeight="800"
-                          color={positionColor ?? palette.text.fg4}
-                        >
-                          {player ? player.position : `R${slot.round}`}
-                        </Text>
-                        <Text fontSize={8.5} color="$fg4" letterSpacing={0.3}>
-                          Rd {slot.round}
-                        </Text>
-                      </YStack>
+                      {tab.label}
+                    </Text>
+                  </XStack>
+                );
+              })}
+            </XStack>
 
-                      {player ? (
-                        <>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {activeTab === 'roster' ? (
+                <YStack gap={7} paddingBottom="$2">
+                  {slots.map((slot) => {
+                    const player = slot.player;
+                    const positionColor = player
+                      ? getPositionColor('baseball', player.position)
+                      : null;
+                    return (
+                      <XStack
+                        key={slot.round}
+                        alignItems="center"
+                        gap={11}
+                        borderWidth={1}
+                        borderRadius={12}
+                        paddingVertical={11}
+                        paddingHorizontal={13}
+                        borderColor={
+                          positionColor
+                            ? '$surfacePanelBorder'
+                            : '$outlineDefault'
+                        }
+                        backgroundColor={
+                          positionColor
+                            ? withAlpha(positionColor, 0.14)
+                            : 'transparent'
+                        }
+                      >
+                        <YStack width={46} flexShrink={0} alignItems="center">
+                          <Text
+                            fontFamily="$heading"
+                            fontSize={15}
+                            fontWeight="800"
+                            color={positionColor ?? palette.text.fg4}
+                          >
+                            {player ? player.position : `R${slot.round}`}
+                          </Text>
+                          <Text fontSize={8.5} color="$fg4" letterSpacing={0.3}>
+                            Rd {slot.round}
+                          </Text>
+                        </YStack>
+
+                        {player ? (
+                          <>
+                            <YStack flex={1}>
+                              <Text
+                                fontWeight="600"
+                                fontSize={15}
+                                color="$color"
+                                numberOfLines={1}
+                              >
+                                {player.name}
+                              </Text>
+                              <Text fontSize={11} color="$textMuted">
+                                {player.position}
+                              </Text>
+                            </YStack>
+                            {player.ppg != null && (
+                              <Text
+                                fontFamily="$heading"
+                                fontSize={17}
+                                fontWeight="700"
+                                color="$brandGoldLight"
+                              >
+                                {player.ppg.toFixed(1)}
+                              </Text>
+                            )}
+                          </>
+                        ) : (
+                          <YStack
+                            flex={1}
+                            borderWidth={1}
+                            borderColor="$outlineDefault"
+                            borderStyle="dashed"
+                            borderRadius={9}
+                            paddingVertical={9}
+                            paddingHorizontal={12}
+                          >
+                            <Text
+                              fontSize={12.5}
+                              fontStyle="italic"
+                              color="$fg4"
+                            >
+                              Round {slot.round} — not drafted yet
+                            </Text>
+                          </YStack>
+                        )}
+                      </XStack>
+                    );
+                  })}
+                </YStack>
+              ) : (
+                <YStack gap={7} paddingBottom="$2">
+                  {sortedPicks.length === 0 ? (
+                    <Text
+                      fontSize={12.5}
+                      fontStyle="italic"
+                      color="$fg4"
+                      paddingVertical={9}
+                    >
+                      No picks made yet.
+                    </Text>
+                  ) : (
+                    sortedPicks.map((pick) => {
+                      const player = statsLookup.get(pick.playerId) ?? null;
+                      const positionColor = player
+                        ? getPositionColor('baseball', player.position)
+                        : null;
+                      return (
+                        <XStack
+                          key={pick.id}
+                          alignItems="center"
+                          gap={11}
+                          borderWidth={1}
+                          borderRadius={12}
+                          paddingVertical={11}
+                          paddingHorizontal={13}
+                          borderColor={
+                            positionColor
+                              ? '$surfacePanelBorder'
+                              : '$outlineDefault'
+                          }
+                          backgroundColor={
+                            positionColor
+                              ? withAlpha(positionColor, 0.14)
+                              : 'transparent'
+                          }
+                        >
+                          <YStack width={46} flexShrink={0} alignItems="center">
+                            <Text
+                              fontFamily="$heading"
+                              fontSize={15}
+                              fontWeight="800"
+                              color={positionColor ?? palette.text.fg4}
+                            >
+                              #{pick.overallPick}
+                            </Text>
+                            <Text
+                              fontSize={8.5}
+                              color="$fg4"
+                              letterSpacing={0.3}
+                            >
+                              Rd {pick.round}
+                            </Text>
+                          </YStack>
+
                           <YStack flex={1}>
                             <Text
                               fontWeight="600"
@@ -259,43 +414,20 @@ export function DraftSquadStrip({
                               color="$color"
                               numberOfLines={1}
                             >
-                              {player.name}
+                              {player ? player.name : 'Unknown player'}
                             </Text>
-                            <Text fontSize={11} color="$textMuted">
-                              {player.position}
-                              {pick ? ` · Pick #${pick.overallPick}` : ''}
-                            </Text>
+                            {player && (
+                              <Text fontSize={11} color="$textMuted">
+                                {player.position}
+                              </Text>
+                            )}
                           </YStack>
-                          {player.ppg != null && (
-                            <Text
-                              fontFamily="$heading"
-                              fontSize={17}
-                              fontWeight="700"
-                              color="$brandGoldLight"
-                            >
-                              {player.ppg.toFixed(1)}
-                            </Text>
-                          )}
-                        </>
-                      ) : (
-                        <YStack
-                          flex={1}
-                          borderWidth={1}
-                          borderColor="$outlineDefault"
-                          borderStyle="dashed"
-                          borderRadius={9}
-                          paddingVertical={9}
-                          paddingHorizontal={12}
-                        >
-                          <Text fontSize={12.5} fontStyle="italic" color="$fg4">
-                            Round {slot.round} — not drafted yet
-                          </Text>
-                        </YStack>
-                      )}
-                    </XStack>
-                  );
-                })}
-              </YStack>
+                        </XStack>
+                      );
+                    })
+                  )}
+                </YStack>
+              )}
             </ScrollView>
           </YStack>
         </>
