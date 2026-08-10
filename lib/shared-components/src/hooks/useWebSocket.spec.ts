@@ -13,6 +13,7 @@ interface MockWSClient {
   send: jest.Mock;
   updateContext: jest.Mock;
   setHeartbeatInterval: jest.Mock;
+  reconnectNow: jest.Mock;
   dispose: jest.Mock;
   _handlers: Map<string, EventHandler[]>;
   _emit: (event: string, ...args: unknown[]) => void;
@@ -40,6 +41,7 @@ function mockCreateInstance(): MockWSClient {
     send: jest.fn(),
     updateContext: jest.fn(),
     setHeartbeatInterval: jest.fn(),
+    reconnectNow: jest.fn(),
     dispose: jest.fn(),
     _handlers: handlers,
     _emit(event: string, ...args: unknown[]) {
@@ -475,5 +477,32 @@ describe('useWebSocket', () => {
     act(() => result.current.updateContext(ctx));
 
     expect(mockInstance.updateContext).toHaveBeenCalledWith(ctx);
+  });
+
+  // ── Recovery after exhausted reconnect budget (LS-9192) ─────────────────
+
+  it('calls client.reconnectNow() when the browser regains network connectivity', () => {
+    renderHook(() =>
+      useWebSocket({ url: 'wss://example.com', token: 'jwt-token' }),
+    );
+
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    expect(mockInstance.reconnectNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes the online listener on unmount', () => {
+    const { unmount } = renderHook(() =>
+      useWebSocket({ url: 'wss://example.com', token: 'jwt-token' }),
+    );
+
+    unmount();
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    expect(mockInstance.reconnectNow).not.toHaveBeenCalled();
   });
 });

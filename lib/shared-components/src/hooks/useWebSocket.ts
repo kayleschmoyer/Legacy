@@ -311,6 +311,28 @@ export function useWebSocket({
       });
     }
 
+    // A stretch of flaky network can burn through the client's bounded
+    // reconnect budget, after which it gives up for good (LS-8881) and stays
+    // dead until something re-triggers this effect (e.g. leagueId changing).
+    // The native app already treats the app returning to the foreground as a
+    // signal worth a fresh attempt (useLeagueWebSocketLifecycle, LS-8985);
+    // the browser equivalent is the `online` event, which fires when
+    // connectivity returns after being lost — exactly the "world around it
+    // has changed" case `reconnectNow` exists for (LS-9192).
+    const handleOnline = () => {
+      LOGGER.info('[useWebSocket] network online — attempting reconnect', {
+        viewContext,
+        leagueId,
+      });
+      client.reconnectNow();
+    };
+    const hasWindowEvents =
+      typeof window !== 'undefined' &&
+      typeof window.addEventListener === 'function';
+    if (hasWindowEvents) {
+      window.addEventListener('online', handleOnline);
+    }
+
     // Set up event handlers
     let wasConnected = false;
 
@@ -476,6 +498,9 @@ export function useWebSocket({
     // Cleanup on unmount
     return () => {
       cancelled = true;
+      if (hasWindowEvents) {
+        window.removeEventListener('online', handleOnline);
+      }
       unsubscribeConnected();
       unsubscribeDisconnected();
       unsubscribeError();
