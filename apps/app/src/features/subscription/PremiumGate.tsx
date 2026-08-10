@@ -3,6 +3,7 @@ import { Button, Text, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
 import { brand } from '@legacy-sports/design-tokens';
 import { useStripePrices } from './useStripePrices';
+import { PriceSkeleton } from './PriceSkeleton';
 import {
   trackPremiumFeatureBlocked,
   trackPremiumFeatureClick,
@@ -102,7 +103,7 @@ function PremiumGateOverlay({
   const [pressed, setPressed] = useState(false);
   // Live monthly-equivalent price (annual total / 12). Falls back to display
   // values from FALLBACK_ANNUAL_TOTAL_CENTS when Stripe prices are unavailable.
-  const { annualMonthlyEquivalent } = useStripePrices();
+  const { annualMonthlyEquivalent, loading: pricesLoading } = useStripePrices();
 
   const handleUpgradePress = () => {
     trackPremiumFeatureClick(featureName);
@@ -186,9 +187,13 @@ function PremiumGateOverlay({
               Upgrade to Premium
             </Text>
           </Button>
-          <Text fontSize="$2" color={brand.goldLight} textAlign="center">
-            From {annualMonthlyEquivalent}/mo
-          </Text>
+          {pricesLoading ? (
+            <PriceSkeleton />
+          ) : (
+            <Text fontSize="$2" color={brand.goldLight} textAlign="center">
+              From {annualMonthlyEquivalent}/mo
+            </Text>
+          )}
         </YStack>
       </YStack>
     </YStack>

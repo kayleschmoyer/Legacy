@@ -72,7 +72,10 @@ describe('PremiumGate', () => {
     jest.clearAllMocks();
     // Default: live prices yielding a monthly-equivalent distinct from the old
     // hardcoded "$3.33" so we can prove the value is dynamic.
-    mockUseStripePrices.mockReturnValue({ annualMonthlyEquivalent: '$6.67' });
+    mockUseStripePrices.mockReturnValue({
+      annualMonthlyEquivalent: '$6.67',
+      loading: false,
+    });
   });
 
   it('renders the monthly-equivalent price from useStripePrices for free users', () => {
@@ -90,7 +93,10 @@ describe('PremiumGate', () => {
   it('renders the hook fallback value when live prices are unavailable', () => {
     // useStripePrices serves fallback display values (3999¢ / 12 = $3.33) when
     // Stripe prices cannot be fetched.
-    mockUseStripePrices.mockReturnValue({ annualMonthlyEquivalent: '$3.33' });
+    mockUseStripePrices.mockReturnValue({
+      annualMonthlyEquivalent: '$3.33',
+      loading: false,
+    });
 
     render(
       <PremiumGate isPremium={false} featureName="Player Comparison">
@@ -99,6 +105,24 @@ describe('PremiumGate', () => {
     );
 
     expect(screen.getByText('From $3.33/mo')).toBeTruthy();
+  });
+
+  it('renders a placeholder instead of the fallback price while prices are loading', () => {
+    // LS-8859: while useStripePrices is still loading, the hook returns the
+    // fallback figure immediately (cache-and-network) — the overlay must not
+    // flash that hardcoded value before the live price resolves.
+    mockUseStripePrices.mockReturnValue({
+      annualMonthlyEquivalent: '$3.33',
+      loading: true,
+    });
+
+    render(
+      <PremiumGate isPremium={false} featureName="Player Comparison">
+        <RNText>locked content</RNText>
+      </PremiumGate>,
+    );
+
+    expect(screen.queryByText(/\/mo$/)).toBeNull();
   });
 
   it('does not render the upgrade overlay (or price) for premium users', () => {
