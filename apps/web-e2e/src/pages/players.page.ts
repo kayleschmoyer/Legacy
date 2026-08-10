@@ -353,6 +353,27 @@ class PlayerStatsSurface {
       .expectVisible({ timeout });
   }
 
+  /**
+   * Assert the phone-width card-feed presentation is rendered (LS-9075) —
+   * `PlayersCardFeed` (`testID="players-stats-card-feed-<sport>"`), not the
+   * desktop table.
+   */
+  async expectCardFeedVisible(
+    sport: 'mlb' | 'nfl' = 'mlb',
+    timeout = 15_000,
+  ): Promise<void> {
+    await this.#driver
+      .byTestId(`players-stats-card-feed-${sport}`)
+      .expectVisible({ timeout });
+  }
+
+  /** Assert the phone-width card feed is NOT rendered (desktop table active). */
+  async expectCardFeedHidden(sport: 'mlb' | 'nfl' = 'mlb'): Promise<void> {
+    await this.#driver
+      .byTestId(`players-stats-card-feed-${sport}`)
+      .expectHidden();
+  }
+
   /** Assert a data-grid column header is visible. */
   async expectColumnHeader(label: string): Promise<void> {
     await this.#driver.byText(label, { exact: true }).first().expectVisible();

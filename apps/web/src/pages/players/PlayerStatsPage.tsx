@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMedia } from 'tamagui';
 import {
   useLocation,
   useNavigate,
@@ -36,6 +37,10 @@ import {
   useGetUserLeaguesQuery,
   useGetUserPreferencesQuery,
 } from '@legacy-sports/graphql';
+import {
+  WebBaseballCardFeed,
+  WebFootballCardFeed,
+} from './PlayerStatsCardFeed';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
@@ -123,6 +128,30 @@ export function parsePageSize(raw: string | null): number {
  * resolving to the equivalent new filters instead of breaking silently (PST-101).
  */
 export const URL_SCHEMA_VERSION = 1;
+
+/**
+ * Search-engine / link-preview crawler user agents. `/players/stats` is a
+ * public, prerendering-free SPA route (LS-9075 investigation: this repo has
+ * no server-side render or build-time prerender step for it at all — the
+ * static HTML GitHub Pages serves is an empty `<div id="root">` shell per
+ * `tools/vite-configs/spa-route-fallback-plugin.ts`; every crawler that
+ * indexes this page must fully execute the client React app itself). Google's
+ * indexing crawler renders with a narrow mobile viewport by default
+ * (mobile-first indexing), so a pure `useMedia()` viewport branch would hand
+ * crawlers the paginated card feed instead of the full, filterable table —
+ * exactly the "crawled HTML changes shape" risk the ticket flags. Forcing the
+ * desktop table for known crawler UAs keeps the indexed content unchanged
+ * regardless of which viewport the crawler's renderer uses.
+ */
+const CRAWLER_USER_AGENT_PATTERN =
+  /bot|crawler|spider|slurp|facebookexternalhit|embedly|quora link preview|showyoubot|outbrain|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot/i;
+
+/** Exported for unit testing. */
+export function isCrawlerUserAgent(
+  userAgent: string | undefined | null,
+): boolean {
+  return userAgent != null && CRAWLER_USER_AGENT_PATTERN.test(userAgent);
+}
 
 type ParamRenames = Record<string, string>;
 
@@ -1209,6 +1238,20 @@ export function PlayerStatsRoute() {
   const footballEnabled = useFeatureValue('football_enabled', true);
   const showFootball = sport === 'nfl' && footballEnabled !== false;
 
+  // Viewport-adaptive presentation (LS-9075): phone-width browsers get the
+  // card feed (PlayersCardFeed, already shipped on native — LS-8832/LS-9072/
+  // LS-9073), desktop keeps the existing stats table. `media.sm` (maxWidth
+  // 800) is the same breakpoint predicate FootballPlayersPage.tsx already
+  // uses to choose between its own cards/table default, so this stays
+  // consistent with the one other place in the codebase making this call.
+  // Read directly on every render (not seeded once) so resizing the window
+  // mid-session — or the phone-width MobileBottomBar's Stats tab landing here
+  // — switches presentation immediately, matching the ticket's framing of the
+  // bug ("phone-width web nav... renders desktop shells").
+  const media = useMedia();
+  const isNarrowViewport =
+    media.sm && !isCrawlerUserAgent(window.navigator.userAgent);
+
   // Switch the viewed sport with a FRESH param set containing only `sport`.
   // Sport-specific filters (NFL `position=QB`/`view=passing`/stat `sortBy`,
   // MLB `view=hitters`/stat ranges, an open `playerId` modal) are invalid in
@@ -1348,6 +1391,23 @@ export function PlayerStatsRoute() {
         setSearchParams(params);
       } else {
         navigate(`/players/${rawId}`);
+      }
+    },
+    [searchParams, setSearchParams, navigate],
+  );
+
+  // Card-feed player press (LS-9075): PlayersCardFeed rows carry a bare
+  // numeric id string (career-stats `playerId`), not a full PlayerWithStats —
+  // mirrors handlePlayerDetails' numeric branch above so both presentations
+  // open the identical in-place modal via the same `?playerId` URL contract.
+  const handleCardPlayerPress = useCallback(
+    (rawId: string) => {
+      if (/^\d+$/.test(rawId)) {
+        const params = new URLSearchParams(searchParams);
+        params.set('playerId', rawId);
+        setSearchParams(params);
+      } else {
+        navigate(`/players/${encodeURIComponent(rawId)}`);
       }
     },
     [searchParams, setSearchParams, navigate],
@@ -1718,22 +1778,32 @@ export function PlayerStatsRoute() {
           onSelectMlb={() => handleSelectSport('mlb')}
           onSelectNfl={() => handleSelectSport('nfl')}
         />
-        <FootballStatsPage
-          title="NFL Player Statistics"
-          isPremium={isPremium}
-          initialFilters={nflInitialFilters}
-          initialPageSize={nflInitialPageSize}
-          showHeader={true}
-          showActions={true}
-          onShare={handleShare}
-          onFiltersChange={handleNflFiltersChange}
-          onPlayerDetails={handleNflPlayerDetails}
-          showAvailabilityFilter={showFootballAvailabilityFilter}
-          rosteredPlayerIds={footballRosteredIds}
-          leagues={footballLeagues.length > 1 ? footballLeagues : undefined}
-          leagueId={effectiveFootballLeagueId}
-          onLeagueChange={setFootballLeagueId}
-        />
+        {isNarrowViewport ? (
+          <WebFootballCardFeed
+            isPremium={isPremium}
+            showSportToggle={false}
+            onSportChange={handleSelectSport}
+            onPlayerPress={handleCardPlayerPress}
+            onCompare={() => navigate('/players/compare')}
+          />
+        ) : (
+          <FootballStatsPage
+            title="NFL Player Statistics"
+            isPremium={isPremium}
+            initialFilters={nflInitialFilters}
+            initialPageSize={nflInitialPageSize}
+            showHeader={true}
+            showActions={true}
+            onShare={handleShare}
+            onFiltersChange={handleNflFiltersChange}
+            onPlayerDetails={handleNflPlayerDetails}
+            showAvailabilityFilter={showFootballAvailabilityFilter}
+            rosteredPlayerIds={footballRosteredIds}
+            leagues={footballLeagues.length > 1 ? footballLeagues : undefined}
+            leagueId={effectiveFootballLeagueId}
+            onLeagueChange={setFootballLeagueId}
+          />
+        )}
         {selectedPlayerId !== null && (
           <FootballPlayerDetailModal
             open={true}
@@ -1897,35 +1967,49 @@ export function PlayerStatsRoute() {
         featureName="Player Statistics & Projections"
         featureDescription="Unlock advanced player statistics, projected fantasy points, and ADP rankings with Premium."
       >
-        <PlayerStatsPage
-          title="MLB Player Statistics"
-          initialViewMode={initialState.viewMode}
-          initialFilters={initialState.filters}
-          initialPageSize={
-            isPremiumLargePageSize
-              ? initialState.pageSize
-              : Math.min(initialState.pageSize, 100)
-          }
-          showHeader={true}
-          showActions={true}
-          canExport={isPremium}
-          exportFormats={isPremium ? ['json', 'csv', 'xlsx'] : []}
-          canCustomizeColumns={isPremium}
-          isPremiumPageSize={isPremiumLargePageSize}
-          statsFormat={statsFormat}
-          initialVisibleColumns={visibleColumns}
-          onVisibleColumnsChange={handleVisibleColumnsChange}
-          onPlayerDetails={handlePlayerDetails}
-          onExport={handleExport}
-          onVisibleRowsChange={handleVisibleRowsChange}
-          onShare={handleShare}
-          onFiltersChange={handleFiltersChange}
-          showAvailabilityFilter={showBaseballAvailabilityFilter}
-          rosteredPlayerIds={baseballRosteredIds}
-          leagues={baseballLeagues.length > 1 ? baseballLeagues : undefined}
-          leagueId={effectiveBaseballLeagueId}
-          onLeagueChange={setBaseballLeagueId}
-        />
+        {isNarrowViewport ? (
+          // Card presentation has no Export/Share controls (see
+          // PlayerStatsCardFeed.tsx scope note) — the whole branch, like the
+          // table, sits behind this same PremiumGate, so the entitlement gate
+          // is unaffected by which presentation renders (LS-9075 AC).
+          <WebBaseballCardFeed
+            isPremium={isPremium}
+            showSportToggle={false}
+            onSportChange={handleSelectSport}
+            onPlayerPress={handleCardPlayerPress}
+            onCompare={() => navigate('/players/compare')}
+          />
+        ) : (
+          <PlayerStatsPage
+            title="MLB Player Statistics"
+            initialViewMode={initialState.viewMode}
+            initialFilters={initialState.filters}
+            initialPageSize={
+              isPremiumLargePageSize
+                ? initialState.pageSize
+                : Math.min(initialState.pageSize, 100)
+            }
+            showHeader={true}
+            showActions={true}
+            canExport={isPremium}
+            exportFormats={isPremium ? ['json', 'csv', 'xlsx'] : []}
+            canCustomizeColumns={isPremium}
+            isPremiumPageSize={isPremiumLargePageSize}
+            statsFormat={statsFormat}
+            initialVisibleColumns={visibleColumns}
+            onVisibleColumnsChange={handleVisibleColumnsChange}
+            onPlayerDetails={handlePlayerDetails}
+            onExport={handleExport}
+            onVisibleRowsChange={handleVisibleRowsChange}
+            onShare={handleShare}
+            onFiltersChange={handleFiltersChange}
+            showAvailabilityFilter={showBaseballAvailabilityFilter}
+            rosteredPlayerIds={baseballRosteredIds}
+            leagues={baseballLeagues.length > 1 ? baseballLeagues : undefined}
+            leagueId={effectiveBaseballLeagueId}
+            onLeagueChange={setBaseballLeagueId}
+          />
+        )}
       </PremiumGate>
       {/* Routable player detail modal (PST-051 / LS-7124). Rendered in place over
           the filtered list when ?playerId=X is present — opened by a row click or

@@ -239,20 +239,30 @@ test.describe('Player Statistics Page @regression', () => {
     page,
     playersPage,
   }) => {
-    // Test mobile viewport
+    // Phone/tablet width (<=800, Tamagui's "sm" breakpoint) now renders the
+    // card feed instead of the desktop table (LS-9075) — "responsive" means
+    // the page still renders functional content, not that the table's own
+    // heading text survives the narrower width unchanged.
     await page.setViewportSize({ width: 375, height: 667 });
     await page.reload();
     await page.waitForLoadState('load');
 
-    // Check that the page is still functional
-    await playersPage.stats.expectText(/MLB Player Statistics/i);
+    await playersPage.stats.expectCardFeedVisible('mlb');
+    await playersPage.expectNoApplicationError();
 
-    // Test tablet viewport
+    // Test tablet viewport — still <=800, so still the card feed.
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.reload();
     await page.waitForLoadState('load');
 
-    // Verify still renders at tablet width
+    await playersPage.stats.expectCardFeedVisible('mlb');
+    await playersPage.expectNoApplicationError();
+
+    // Desktop width restores the original table.
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.reload();
+    await page.waitForLoadState('load');
+
     await playersPage.stats.expectText(/MLB Player Statistics/i);
   });
 

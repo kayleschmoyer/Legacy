@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { PlayerStatsRoute } from './PlayerStatsPage';
+import { isCrawlerUserAgent, PlayerStatsRoute } from './PlayerStatsPage';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,15 @@ const mockOnPlayerDetailsRef: {
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
   useSearchParams: () => [mockSearchParams, mockSetSearchParams],
+}));
+
+// Viewport detection (LS-9075). Defaults to desktop (`sm: false`) so every
+// pre-existing test in this file keeps exercising the table/FootballStatsPage
+// branch unchanged; the narrow-viewport describe block below opts into
+// `sm: true` per test.
+let mockMediaSm = false;
+jest.mock('tamagui', () => ({
+  useMedia: () => ({ sm: mockMediaSm }),
 }));
 
 jest.mock('../../context/GrowthBookProvider', () => ({
@@ -177,6 +186,28 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
   },
 }));
 
+// Narrow-viewport card feed (LS-9075). Mocked wholesale (rather than mocking
+// every cardFeed export it pulls from shared-components) with lightweight
+// markers that capture the props the route passes, so player-press/premium/
+// compare wiring can be asserted without pulling in the real GraphQL-backed
+// card components.
+let mockBaseballCardFeedProps: Record<string, unknown> = {};
+let mockFootballCardFeedProps: Record<string, unknown> = {};
+jest.mock('./PlayerStatsCardFeed', () => ({
+  WebBaseballCardFeed: (props: Record<string, unknown>) => {
+    mockBaseballCardFeedProps = props;
+    return (
+      <div data-testid="mlb-card-feed" data-premium={String(props.isPremium)} />
+    );
+  },
+  WebFootballCardFeed: (props: Record<string, unknown>) => {
+    mockFootballCardFeedProps = props;
+    return (
+      <div data-testid="nfl-card-feed" data-premium={String(props.isPremium)} />
+    );
+  },
+}));
+
 // The football detail modal (LS-8442) is graphql/Tamagui-heavy; mock it with a
 // lightweight marker so the NFL deep-link path can be asserted without pulling
 // the real component into the unit test.
@@ -276,10 +307,16 @@ jest.mock('@legacy-sports/logging', () => ({
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-// Default every test to a premium viewer; suites that need a free viewer opt in
-// by setting mockHasEntitlement = false in their own (inner) beforeEach/test.
+// Default every test to a premium viewer and a desktop viewport; suites that
+// need a free viewer or narrow viewport opt in within their own (inner)
+// beforeEach/test. Resetting `mockMediaSm` globally (not only in the LS-9075
+// describe block) matters — without it, a narrow-viewport test earlier in the
+// file would leak into every later test, silently switching them from the
+// table/FootballStatsPage branch onto the (here, unmocked-per-suite) card
+// feed branch.
 beforeEach(() => {
   mockHasEntitlement = true;
+  mockMediaSm = false;
 });
 
 describe('PlayerStatsRoute inline NFL view', () => {
@@ -791,6 +828,185 @@ describe('PlayerStatsRoute availability filter league gating (LS-9141 / LS-9158)
       { id: 4, name: 'Gridiron B' },
     ]);
     expect(mockFootballStatsPageProps.leagueId).toBe(3);
+  });
+});
+
+describe('isCrawlerUserAgent (LS-9075)', () => {
+  it.each([
+    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+    'facebookexternalhit/1.1',
+    'Twitterbot/1.0',
+    'Slackbot-LinkExpanding 1.0',
+  ])('flags known crawler UA: %s', (ua) => {
+    expect(isCrawlerUserAgent(ua)).toBe(true);
+  });
+
+  it.each([
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0',
+  ])('does not flag an ordinary browser UA: %s', (ua) => {
+    expect(isCrawlerUserAgent(ua)).toBe(false);
+  });
+
+  it('does not flag a null/undefined user agent', () => {
+    expect(isCrawlerUserAgent(undefined)).toBe(false);
+    expect(isCrawlerUserAgent(null)).toBe(false);
+    expect(isCrawlerUserAgent('')).toBe(false);
+  });
+});
+
+// LS-9075: /players/stats renders the card feed at phone width and the
+// existing table/FootballStatsPage at desktop width, for both sports. The
+// entitlement gate must be unaffected by which presentation renders.
+describe('PlayerStatsRoute narrow-viewport card feed (LS-9075)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockFootballEnabled = true;
+    mockHasEntitlement = true;
+    mockBaseballCardFeedProps = {};
+    mockFootballCardFeedProps = {};
+    mockMediaSm = false;
+  });
+
+  it('renders the MLB table (not the card feed) at desktop width', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockMediaSm = false;
+    render(<PlayerStatsRoute />);
+    expect(screen.queryByTestId('mlb-card-feed')).not.toBeInTheDocument();
+  });
+
+  it('renders the MLB card feed (not the table) at phone width', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('mlb-card-feed')).toBeInTheDocument();
+  });
+
+  it('renders the NFL FootballStatsPage (not the card feed) at desktop width', async () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockMediaSm = false;
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    expect(screen.queryByTestId('nfl-card-feed')).not.toBeInTheDocument();
+  });
+
+  it('renders the NFL card feed (not FootballStatsPage) at phone width', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('nfl-card-feed')).toBeInTheDocument();
+    expect(screen.queryByTestId('football-stats-page')).not.toBeInTheDocument();
+  });
+
+  it('threads the real entitlement into the MLB card feed (gate unaffected by presentation)', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockMediaSm = true;
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('mlb-card-feed')).toHaveAttribute(
+      'data-premium',
+      'false',
+    );
+  });
+
+  it('threads the real entitlement into the NFL card feed', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockMediaSm = true;
+    mockHasEntitlement = true;
+    render(<PlayerStatsRoute />);
+    expect(screen.getByTestId('nfl-card-feed')).toHaveAttribute(
+      'data-premium',
+      'true',
+    );
+  });
+
+  it('opens the in-place modal when the MLB card feed presses a numeric player id', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    const onPlayerPress = mockBaseballCardFeedProps.onPlayerPress as (
+      id: string,
+    ) => void;
+    act(() => onPlayerPress('4242'));
+    const params = mockSetSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(params.get('playerId')).toBe('4242');
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('navigates to the raw NFL card-feed player id via the football handler', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    const onPlayerPress = mockFootballCardFeedProps.onPlayerPress as (
+      id: string,
+    ) => void;
+    act(() => onPlayerPress('99'));
+    const params = mockSetSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(params.get('playerId')).toBe('99');
+  });
+
+  it('navigates to /players/compare from the MLB card feed overflow action', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    (mockBaseballCardFeedProps.onCompare as () => void)?.();
+    expect(mockNavigate).toHaveBeenCalledWith('/players/compare');
+  });
+
+  it('preserves other filters in the URL when the card feed opens a player deep link', () => {
+    mockSearchParams = new URLSearchParams('sport=mlb&position=OF');
+    mockMediaSm = true;
+    render(<PlayerStatsRoute />);
+    const onPlayerPress = mockBaseballCardFeedProps.onPlayerPress as (
+      id: string,
+    ) => void;
+    act(() => onPlayerPress('7'));
+    const params = mockSetSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(params.get('position')).toBe('OF');
+    expect(params.get('sport')).toBe('mlb');
+  });
+
+  // LS-9075 risk note: /players/stats has no server-side prerender — every
+  // crawler must execute the client React app itself, and Google's indexing
+  // crawler renders at a narrow mobile viewport by default. Forcing the
+  // desktop table for a known crawler UA keeps the indexed content the same
+  // full, filterable table regardless of the crawler's actual viewport.
+  describe('crawler UA forces the desktop table even at phone width', () => {
+    const originalUserAgent = window.navigator.userAgent;
+
+    afterEach(() => {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        value: originalUserAgent,
+        configurable: true,
+      });
+    });
+
+    it('renders the MLB table (not the card feed) for Googlebot at phone width', () => {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        value:
+          'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        configurable: true,
+      });
+      mockSearchParams = new URLSearchParams('sport=mlb');
+      mockMediaSm = true;
+      render(<PlayerStatsRoute />);
+      expect(screen.queryByTestId('mlb-card-feed')).not.toBeInTheDocument();
+    });
+
+    it('renders the NFL FootballStatsPage (not the card feed) for Googlebot at phone width', async () => {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        value:
+          'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        configurable: true,
+      });
+      mockSearchParams = new URLSearchParams('sport=nfl');
+      mockMediaSm = true;
+      render(<PlayerStatsRoute />);
+      await screen.findByTestId('football-stats-page');
+      expect(screen.queryByTestId('nfl-card-feed')).not.toBeInTheDocument();
+    });
   });
 });
 
