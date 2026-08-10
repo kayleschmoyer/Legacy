@@ -1,5 +1,12 @@
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { expect, test } from '../fixtures/auth-enhanced';
-import { enableFootball, useTier } from '../fixtures/shared-mocks';
+import {
+  enableFootball,
+  extractOperationName,
+  unmockedGraphQLFallback,
+  useTier,
+} from '../fixtures/shared-mocks';
+import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /**
  * E2E coverage for the premium gating added in LS-5024.
@@ -62,6 +69,181 @@ test.describe('Premium gating — free user @critical', () => {
     await expect(
       page.getByRole('button', { name: UPGRADE_CTA }).first(),
     ).toBeVisible();
+  });
+});
+
+// ── Position-scoped scoring bonuses (LS-9105) ────────────────────────────────
+//
+// The position-bonus section of the football commissioner scoring editor is
+// wrapped in `PremiumGate` (lib/shared-components), gated on
+// `useHasEntitlement(ENTITLEMENTS.custom_scoring_multipliers)`. Unlike the
+// other gates on this page (sourced from `GetUserById.subscriptionTier`),
+// this reads `MyEntitlements` — `useTier` overrides both.
+//
+// The league detail page itself (LeagueDetailPageV2) is *also* wrapped in a
+// coarse `PremiumGate` keyed off `GetUserById.subscriptionTier` (the
+// account-level "Fantasy League" gate) — a `useTier(page, 'free')` commissioner
+// never reaches the Scoring Rules accordion at all, so the free-tier scenario
+// below stays on the `premium` subscription tier (passes the page-level gate)
+// and overrides only the `MyEntitlements` response to omit
+// `custom_scoring_multipliers`, isolating the granular entitlement gate under
+// test from the coarse account-tier gate.
+
+const POSITION_BONUS_FEATURE_NAME = 'Position-Scoped Scoring Bonuses';
+
+async function mockFootballCommissionerPage(
+  page: import('@playwright/test').Page,
+): Promise<void> {
+  await page.route(
+    (url) => isGraphQLEndpoint(url),
+    async (route, request) => {
+      const body = request.postDataJSON() as { operationName?: string };
+      const op = body.operationName ?? '';
+
+      if (op === 'GetLeagueById') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              league: {
+                __typename: 'League',
+                id: 1,
+                name: 'Test Football League',
+                owner: 1,
+                sport: 'football',
+                defensiveFormat: 'dst',
+                draftStatus: 'not-started',
+                numberOfTeams: 4,
+                isPublic: false,
+                inviteCode: 'TEST1234',
+                userMembership: { teamId: 1 },
+                frozenAt: null,
+              },
+            },
+          }),
+        });
+        return;
+      }
+      if (op === 'GetLeagueTeams') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { leagueTeams: [] } }),
+        });
+        return;
+      }
+      if (op === 'GetLeagueScoringProfile') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              leagueScoringProfile: {
+                __typename: 'ScoringConfig',
+                profileId: 1,
+                profileName: 'Standard',
+                stats: [
+                  {
+                    __typename: 'ScoringRule',
+                    multiplier: 0.04,
+                    defaultMultiplier: 0.04,
+                    isOverride: false,
+                    isEnabled: true,
+                    definition: {
+                      __typename: 'ScoringStatDefinition',
+                      id: 1,
+                      statKey: 'pass_yds',
+                      statGroup: 'passing',
+                      displayName: 'Passing Yards',
+                      description: null,
+                      sourceColumn: 'passingYards',
+                      defaultMultiplier: 0.04,
+                      minMultiplier: 0,
+                      maxMultiplier: 1,
+                      stepSize: 0.01,
+                      isRequired: false,
+                      enforcePositive: false,
+                      enforceNegative: false,
+                    },
+                  },
+                ],
+                multiplierGroups: [],
+              },
+            },
+          }),
+        });
+        return;
+      }
+
+      await unmockedGraphQLFallback(route);
+    },
+  );
+}
+
+/** Expand the "Scoring" accordion on the commissioner tab. */
+async function expandScoringSection(
+  page: import('@playwright/test').Page,
+): Promise<void> {
+  const toggle = page.getByRole('button', {
+    name: 'Scoring Rules',
+    exact: true,
+  });
+  await toggle.waitFor({ state: 'visible' });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+}
+
+test.describe('Premium gating — position-scoped scoring bonuses (LS-9105) @critical', () => {
+  test('position bonuses are gated for a commissioner without the entitlement', async ({
+    page,
+  }) => {
+    // Base tier is `premium` so the page-level "Fantasy League" gate
+    // (LeagueDetailPageV2, keyed off GetUserById.subscriptionTier) passes —
+    // only the MyEntitlements claim is overridden to omit
+    // custom_scoring_multipliers, isolating the position-bonus gate itself.
+    await useTier(page, 'premium');
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const op = extractOperationName(route).toLowerCase();
+      if (op === 'myentitlements') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              myEntitlements: Object.values(ENTITLEMENTS).filter(
+                (key) => key !== ENTITLEMENTS.custom_scoring_multipliers,
+              ),
+            },
+          }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+    await enableFootball(page);
+    await mockFootballCommissionerPage(page);
+    await page.goto('/football/league/1/commissioner');
+    await expandScoringSection(page);
+
+    // Locked state: the PremiumGate's feature name is visible, the real
+    // section content (position-bonus-section testid) is not.
+    await expect(
+      page.getByText(POSITION_BONUS_FEATURE_NAME, { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByTestId('position-bonus-section')).toHaveCount(0);
+  });
+
+  test('position bonuses are available to a premium football commissioner', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await enableFootball(page);
+    await mockFootballCommissionerPage(page);
+    await page.goto('/football/league/1/commissioner');
+    await expandScoringSection(page);
+
+    await expect(page.getByTestId('position-bonus-section')).toBeVisible();
   });
 });
 

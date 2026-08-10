@@ -3,6 +3,7 @@ import './types/tamagui.d.ts';
 export * from './Button';
 export * from './IconButton';
 export * from './Layout';
+export * from './components/PremiumGate';
 
 // New shared components
 export * from './ConditionalProviders';

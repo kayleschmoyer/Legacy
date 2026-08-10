@@ -406,6 +406,8 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       // LeagueScoringEditor hardcodes GROUP_ORDER to the three baseball groups
       // (batting/pitching/fielding), while ScoringSettingsEditor is sport-aware
       // (passing/rushing/receiving/kicking + DST or IDP) via getGroupOrder().
+      // LS-9105's premium-gated Position Bonuses section lives in
+      // ScoringSettingsEditor since that's the component football leagues render.
       content: leagueId ? (
         isFootball ? (
           <ScoringSettingsEditor
@@ -419,6 +421,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
             draftStatus={league.draftStatus}
             sport="football"
             defensiveFormat={league.defensiveFormat}
+            onUpgrade={() => navigate('/profile/subscription')}
           />
         ) : (
           <LeagueScoringEditor

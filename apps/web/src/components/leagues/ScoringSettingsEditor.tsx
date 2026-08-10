@@ -32,9 +32,12 @@ import {
   valuesToUpdates,
 } from '@legacy-sports/scoring';
 import {
+  DefensiveFormat,
   type GetLeagueScoringProfileQuery,
   useUpdateLeagueScoringProfileMutation,
 } from '@legacy-sports/graphql';
+import { PremiumGate } from '@legacy-sports/shared-components';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   BLACK,
   BRAND_GOLD,
@@ -47,6 +50,8 @@ import {
   SLATE_400,
   withAlpha,
 } from '../../constants/colors';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
+import { PositionBonusSection } from '../../features/baseball/PositionBonusSection';
 
 // Per-group accent color overrides for the web editor (hex overrides the
 // generic accent strings stored in scoring-profile-utils, which are shared
@@ -90,6 +95,8 @@ interface ScoringSettingsEditorProps {
   sport?: 'baseball' | 'football' | null;
   /** 'dst' or 'idp' — only meaningful for football leagues. */
   defensiveFormat?: string | null;
+  /** Optional upgrade callback forwarded to the position-bonus PremiumGate. */
+  onUpgrade?: () => void;
 }
 
 /**
@@ -131,7 +138,12 @@ export function ScoringSettingsEditor(
     draftStatus,
     sport,
     defensiveFormat,
+    onUpgrade,
   } = props;
+
+  const hasCustomScoringMultipliers = useHasEntitlement(
+    ENTITLEMENTS.custom_scoring_multipliers,
+  );
 
   const groupOrder = useMemo(
     () => getGroupOrder(sport, defensiveFormat),
@@ -743,6 +755,26 @@ export function ScoringSettingsEditor(
               );
             })
           : null}
+
+        {/* Position-scoped scoring bonuses (LS-9105) — football leagues only. */}
+        {!loading && sport === 'football' ? (
+          <PremiumGate
+            isPremium={hasCustomScoringMultipliers}
+            featureName="Position-Scoped Scoring Bonuses"
+            featureDescription="Give bonus points to specific positions (e.g. extra points per TE reception, or custom IDP point values) on top of the league's base scoring."
+            onUpgrade={onUpgrade}
+          >
+            <PositionBonusSection
+              isLocked={isLocked}
+              defensiveFormat={
+                defensiveFormat === 'idp'
+                  ? DefensiveFormat.Idp
+                  : DefensiveFormat.Dst
+              }
+              availableStats={stats}
+            />
+          </PremiumGate>
+        ) : null}
 
         {/* Action bar */}
         <YStack

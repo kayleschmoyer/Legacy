@@ -375,3 +375,83 @@ export function isStatDirty(stat: ProfileStat, formValue: string): boolean {
   const parsed = parseInput(formValue);
   return parsed !== null && Math.abs(parsed - stat.multiplier) > 0.0001;
 }
+
+// ── Position-scoped scoring bonuses (LS-9105) ───────────────────────────────
+//
+// Position bonuses are additive on top of a stat's base multiplier for a
+// given roster position (e.g. a TE gets +0.5 per reception on top of the
+// league's base receiving multiplier). Storage (`league_scoring_position_bonuses`,
+// LS-9103) and GraphQL exposure (LS-9104: `positionBonuses` field +
+// `updateLeagueScoringPositionBonuses` mutation) are tracked separately; the
+// shapes below intentionally mirror LS-9104's planned `ScoringPositionBonus`
+// GraphQL type so this module needs no changes once that API lands — only the
+// data source wiring in the consuming component changes.
+
+/** Roster positions eligible for a position-scoped bonus, by defensive format. */
+export const OFFENSE_BONUS_POSITIONS: readonly string[] = [
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+];
+
+export const IDP_BONUS_POSITIONS: readonly string[] = ['DL', 'LB', 'DB'];
+
+/**
+ * Normalized representation of a single position-scoped bonus row for form
+ * editing. Mirrors LS-9104's planned `ScoringPositionBonus` GraphQL type.
+ */
+export interface PositionBonus {
+  /** Present once persisted; `null` for a row not yet saved. */
+  id: number | null;
+  position: string;
+  statDefinitionId: number;
+  statDisplayName: string;
+  bonusMultiplier: number;
+  defaultBonusMultiplier: number;
+}
+
+/** Maps a client-local row key → the current form string value. */
+export type PositionBonusFormValueState = Record<string, string>;
+
+/** Maps a client-local row key → validation error message (null = valid). */
+export type PositionBonusFieldErrorState = Record<string, string | null>;
+
+/** A single position-bonus row identified by its (position, stat) pair. */
+export function positionBonusKey(
+  position: string,
+  statDefinitionId: number,
+): string {
+  return `${position}:${statDefinitionId}`;
+}
+
+/**
+ * Validate a position bonus's form value. Bonuses are additive adjustments,
+ * so unlike a base multiplier they may be positive, negative, or zero.
+ */
+export function validatePositionBonus(
+  value: string | undefined,
+): string | null {
+  const parsed = parseInput(value);
+
+  if (parsed === null) {
+    return 'Enter a number for the bonus value';
+  }
+
+  return null;
+}
+
+/**
+ * Build the initial form value map from an array of `PositionBonus` rows,
+ * keyed by `positionBonusKey`.
+ */
+export function createInitialPositionBonusValues(
+  bonuses: PositionBonus[],
+): PositionBonusFormValueState {
+  return bonuses.reduce<PositionBonusFormValueState>((acc, bonus) => {
+    acc[positionBonusKey(bonus.position, bonus.statDefinitionId)] =
+      formatMultiplier(bonus.bonusMultiplier);
+    return acc;
+  }, {});
+}

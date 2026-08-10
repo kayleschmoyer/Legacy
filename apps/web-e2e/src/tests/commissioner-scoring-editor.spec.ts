@@ -19,7 +19,11 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  enableFootball,
+  unmockedGraphQLFallback,
+  useTier,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -174,6 +178,164 @@ function makeScoringProfile(overrides: Record<string, unknown> = {}) {
           enforceNegative: true,
         },
       },
+    ],
+    multiplierGroups: [],
+    ...overrides,
+  };
+}
+
+/** A football scoring profile: one stat each from passing/rushing/receiving/kicking, plus a defense-format stat. */
+function makeFootballScoringProfile(
+  defensiveFormat: 'dst' | 'idp' = 'dst',
+  overrides: Record<string, unknown> = {},
+) {
+  const defenseStat =
+    defensiveFormat === 'idp'
+      ? {
+          __typename: 'ScoringRule',
+          multiplier: 1,
+          defaultMultiplier: 1,
+          isOverride: false,
+          isEnabled: true,
+          definition: {
+            __typename: 'ScoringStatDefinition',
+            id: 5,
+            statKey: 'solo_tackle',
+            statGroup: 'idp',
+            displayName: 'Solo Tackles',
+            description: 'IDP solo tackle bonus',
+            sourceColumn: 'soloTackles',
+            defaultMultiplier: 1,
+            minMultiplier: 0,
+            maxMultiplier: 5,
+            stepSize: 0.25,
+            isRequired: false,
+            enforcePositive: false,
+            enforceNegative: false,
+          },
+        }
+      : {
+          __typename: 'ScoringRule',
+          multiplier: 1,
+          defaultMultiplier: 1,
+          isOverride: false,
+          isEnabled: true,
+          definition: {
+            __typename: 'ScoringStatDefinition',
+            id: 5,
+            statKey: 'sack',
+            statGroup: 'defense',
+            displayName: 'Sacks',
+            description: 'D/ST sack bonus',
+            sourceColumn: 'sacks',
+            defaultMultiplier: 1,
+            minMultiplier: 0,
+            maxMultiplier: 5,
+            stepSize: 0.25,
+            isRequired: false,
+            enforcePositive: false,
+            enforceNegative: false,
+          },
+        };
+
+  return {
+    __typename: 'ScoringConfig',
+    profileId: 1,
+    profileName: 'Standard',
+    stats: [
+      {
+        __typename: 'ScoringRule',
+        multiplier: 0.04,
+        defaultMultiplier: 0.04,
+        isOverride: false,
+        isEnabled: true,
+        definition: {
+          __typename: 'ScoringStatDefinition',
+          id: 1,
+          statKey: 'pass_yds',
+          statGroup: 'passing',
+          displayName: 'Passing Yards',
+          description: 'Points per passing yard',
+          sourceColumn: 'passingYards',
+          defaultMultiplier: 0.04,
+          minMultiplier: 0,
+          maxMultiplier: 1,
+          stepSize: 0.01,
+          isRequired: false,
+          enforcePositive: false,
+          enforceNegative: false,
+        },
+      },
+      {
+        __typename: 'ScoringRule',
+        multiplier: 0.1,
+        defaultMultiplier: 0.1,
+        isOverride: false,
+        isEnabled: true,
+        definition: {
+          __typename: 'ScoringStatDefinition',
+          id: 2,
+          statKey: 'rush_yds',
+          statGroup: 'rushing',
+          displayName: 'Rushing Yards',
+          description: 'Points per rushing yard',
+          sourceColumn: 'rushingYards',
+          defaultMultiplier: 0.1,
+          minMultiplier: 0,
+          maxMultiplier: 1,
+          stepSize: 0.01,
+          isRequired: false,
+          enforcePositive: false,
+          enforceNegative: false,
+        },
+      },
+      {
+        __typename: 'ScoringRule',
+        multiplier: 1,
+        defaultMultiplier: 1,
+        isOverride: false,
+        isEnabled: true,
+        definition: {
+          __typename: 'ScoringStatDefinition',
+          id: 3,
+          statKey: 'reception',
+          statGroup: 'receiving',
+          displayName: 'Receptions',
+          description: 'Points per reception (PPR)',
+          sourceColumn: 'receptions',
+          defaultMultiplier: 1,
+          minMultiplier: 0,
+          maxMultiplier: 3,
+          stepSize: 0.5,
+          isRequired: false,
+          enforcePositive: false,
+          enforceNegative: false,
+        },
+      },
+      {
+        __typename: 'ScoringRule',
+        multiplier: 3,
+        defaultMultiplier: 3,
+        isOverride: false,
+        isEnabled: true,
+        definition: {
+          __typename: 'ScoringStatDefinition',
+          id: 4,
+          statKey: 'fg_made',
+          statGroup: 'kicking',
+          displayName: 'Field Goals Made',
+          description: 'Points per made field goal',
+          sourceColumn: 'fieldGoalsMade',
+          defaultMultiplier: 3,
+          minMultiplier: 0,
+          maxMultiplier: 6,
+          stepSize: 1,
+          isRequired: false,
+          enforcePositive: false,
+          enforceNegative: false,
+        },
+      },
+      defenseStat,
     ],
     multiplierGroups: [],
     ...overrides,
@@ -838,5 +1000,156 @@ test.describe('Commissioner Scoring Editor — Unsaved Changes Guard @critical',
     } finally {
       page.off('dialog', dialogListener);
     }
+  });
+});
+
+// ── Football (LS-9105) ───────────────────────────────────────────────────────
+//
+// Position-scoped scoring bonuses + IDP stat rows for football leagues.
+// Follows the tiered test-user model (.agents/skills/add-entitlement/SKILL.md
+// step 7): premium is the default tier for feature tests; `free` is used only
+// in the spec asserting the position-bonus gate fires (LS-5030).
+
+test.describe('Commissioner Scoring Editor — Football @critical', () => {
+  test('renders football stat groups (DST format) for a premium commissioner', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await enableFootball(page);
+    await setupGraphQL(page, {
+      league: makeLeague({ sport: 'football', defensiveFormat: 'dst' }),
+      scoringProfile: makeFootballScoringProfile('dst'),
+    });
+    await page.goto('/football/league/1/commissioner');
+    await expandScoringSection(page);
+
+    const scoringRegion = page.getByTestId('scoring-editor');
+    await expect(
+      scoringRegion.getByText('Passing', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      scoringRegion.getByText('Rushing', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      scoringRegion.getByText('Receiving', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      scoringRegion.getByText('Kicking', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      scoringRegion.getByText(/Defense \/ Special Teams/i),
+    ).toBeVisible();
+
+    // No IDP group for a DST-format league.
+    await expect(
+      scoringRegion.getByText('Individual Defensive Players', {
+        exact: false,
+      }),
+    ).not.toBeVisible();
+  });
+
+  test('renders IDP stat rows instead of DST when defensiveFormat is idp', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await enableFootball(page);
+    await setupGraphQL(page, {
+      league: makeLeague({ sport: 'football', defensiveFormat: 'idp' }),
+      scoringProfile: makeFootballScoringProfile('idp'),
+    });
+    await page.goto('/football/league/1/commissioner');
+    await expandScoringSection(page);
+
+    const scoringRegion = page.getByTestId('scoring-editor');
+    await expect(
+      scoringRegion.getByText('Individual Defensive Players', {
+        exact: false,
+      }),
+    ).toBeVisible();
+    await expect(
+      scoringRegion.getByText('Solo Tackles', { exact: true }),
+    ).toBeVisible();
+    await expect(
+      scoringRegion.getByText(/Defense \/ Special Teams/i),
+    ).not.toBeVisible();
+  });
+
+  test('existing flat-multiplier editing still works for a football stat', async ({
+    page,
+  }) => {
+    let mutationCalled = false;
+    await useTier(page, 'premium');
+    await enableFootball(page);
+    await setupGraphQL(page, {
+      league: makeLeague({ sport: 'football', defensiveFormat: 'dst' }),
+      scoringProfile: makeFootballScoringProfile('dst'),
+      onUpdateScoringProfile: () => {
+        mutationCalled = true;
+        return makeFootballScoringProfile('dst');
+      },
+    });
+    await page.goto('/football/league/1/commissioner');
+    await expandScoringSection(page);
+
+    const scoringRegion = page.getByTestId('scoring-editor');
+    const passingInput = scoringRegion
+      .locator('input[type="text"], input:not([type])')
+      .first();
+    await passingInput.fill('0.06');
+    await passingInput.blur();
+
+    await expect(scoringRegion.getByText(/unsaved/i)).toBeVisible();
+    const saveButton = scoringRegion.getByRole('button', { name: /^Save/ });
+    await saveButton.click();
+
+    await expect.poll(() => mutationCalled, { timeout: 5000 }).toBe(true);
+  });
+
+  test('position bonus section renders for a premium football commissioner', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await enableFootball(page);
+    await setupGraphQL(page, {
+      league: makeLeague({ sport: 'football', defensiveFormat: 'dst' }),
+      scoringProfile: makeFootballScoringProfile('dst'),
+    });
+    await page.goto('/football/league/1/commissioner');
+    await expandScoringSection(page);
+
+    await expect(page.getByTestId('position-bonus-section')).toBeVisible();
+  });
+
+  test('commissioner can add a position bonus row', async ({ page }) => {
+    await useTier(page, 'premium');
+    await enableFootball(page);
+    await setupGraphQL(page, {
+      league: makeLeague({ sport: 'football', defensiveFormat: 'dst' }),
+      scoringProfile: makeFootballScoringProfile('dst'),
+    });
+    await page.goto('/football/league/1/commissioner');
+    await expandScoringSection(page);
+
+    const section = page.getByTestId('position-bonus-section');
+    await expect(section).toBeVisible();
+    await expect(section.getByTestId('position-bonus-row')).toHaveCount(0);
+
+    await section.getByRole('button', { name: 'Add position bonus' }).click();
+    await section
+      .getByRole('button', { name: 'Confirm new position bonus' })
+      .click();
+
+    await expect(section.getByTestId('position-bonus-row')).toHaveCount(1);
+  });
+
+  test('position bonuses are not shown for baseball leagues', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await setupGraphQL(page);
+    await page.goto('/baseball/league/1/commissioner');
+    await expandScoringSection(page);
+
+    await expect(page.getByTestId('position-bonus-section')).toHaveCount(0);
   });
 });
