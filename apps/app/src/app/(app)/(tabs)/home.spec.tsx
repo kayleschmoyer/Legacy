@@ -727,4 +727,13 @@ describe('HomeTab scroll reset on tab focus (LS-9248)', () => {
       refocusTab();
     }).not.toThrow();
   });
+
+  it('does not throw when the attached ref has no scrollTo method (LS-9249)', () => {
+    render(<HomeTab />);
+    if (capturedScrollRef) {
+      capturedScrollRef.current = {} as ScrollHandleStub;
+    }
+
+    expect(() => refocusTab()).not.toThrow();
+  });
 });

@@ -81,7 +81,13 @@ export default function HomeTab() {
   const dashboardScrollRef = useRef<ScrollView>(null);
   useFocusEffect(
     useCallback(() => {
-      dashboardScrollRef.current?.scrollTo({ y: 0, animated: false });
+      // Tamagui's `ScrollView` doesn't always forward a ref exposing RN's
+      // imperative `scrollTo` (its shape varies by platform/wrapper), so a
+      // bare `?.scrollTo(...)` call can throw "undefined is not a function"
+      // when `current` is set but isn't that method (LS-9249).
+      if (typeof dashboardScrollRef.current?.scrollTo === 'function') {
+        dashboardScrollRef.current.scrollTo({ y: 0, animated: false });
+      }
     }, []),
   );
 
