@@ -54,6 +54,7 @@ describe('League scoring GraphQL resolvers', () => {
       getDefaultMultipliers: jest.Mock;
       getScoringDefinitions: jest.Mock;
       updateActiveProfile: jest.Mock;
+      getPositionBonusesForProfile: jest.Mock;
     };
   };
   let runWithPublicClientMock: jest.Mock;
@@ -69,6 +70,7 @@ describe('League scoring GraphQL resolvers', () => {
         getDefaultMultipliers: jest.fn(),
         getScoringDefinitions: jest.fn(),
         updateActiveProfile: updateActiveProfileMock,
+        getPositionBonusesForProfile: jest.fn().mockResolvedValue([]),
       },
     };
 

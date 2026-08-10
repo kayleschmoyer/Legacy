@@ -40,24 +40,34 @@ export interface FootballOffenseFantasyStats {
 /**
  * Sum fantasy points across whichever offense/kicking stat groups are
  * present, using the given (profile-aware or default) scoring settings.
+ *
+ * `position` (LS-9104), when supplied, looks up `settings.positionBonuses`
+ * for that roster position (e.g. 'TE') and applies any matching per-stat
+ * bonus additively on top of the base multiplier for that group.
  */
 export function computeFootballOffenseFantasyPoints(
   stats: FootballOffenseFantasyStats,
   settings: FootballScoringSettings,
+  position?: string,
 ): number {
   let total = 0;
+  const bonuses = position ? settings.positionBonuses[position] : undefined;
 
   if (stats.passing) {
-    total += computeScoring(stats.passing, settings.passing);
+    total += computeScoring(stats.passing, settings.passing, bonuses?.passing);
   }
   if (stats.rushing) {
-    total += computeScoring(stats.rushing, settings.rushing);
+    total += computeScoring(stats.rushing, settings.rushing, bonuses?.rushing);
   }
   if (stats.receiving) {
-    total += computeScoring(stats.receiving, settings.receiving);
+    total += computeScoring(
+      stats.receiving,
+      settings.receiving,
+      bonuses?.receiving,
+    );
   }
   if (stats.kicking) {
-    total += computeScoring(stats.kicking, settings.kicking);
+    total += computeScoring(stats.kicking, settings.kicking, bonuses?.kicking);
   }
 
   return total;
@@ -71,10 +81,18 @@ export function computeFootballDefenseFantasyPoints(
   return computeDefenseScore(stats, settings.defense, settings.defenseBands);
 }
 
-/** Individual defensive player fantasy points using the given scoring settings. */
+/**
+ * Individual defensive player fantasy points using the given scoring
+ * settings. `position` (LS-9104) applies any matching IDP position bonus
+ * (e.g. 'DL', 'LB', 'DB') additively on top of `settings.idp`.
+ */
 export function computeFootballIdpFantasyPoints(
   stats: GameFootballDefenseIdp,
   settings: FootballScoringSettings,
+  position?: string,
 ): number {
-  return computeIDPScore(stats, settings.idp);
+  const bonuses = position
+    ? settings.positionBonuses[position]?.idp
+    : undefined;
+  return computeIDPScore(stats, settings.idp, bonuses);
 }

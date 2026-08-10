@@ -225,6 +225,9 @@ function adaptKickingFromOffense(row: OffenseRow): GameKickingShape {
  * @param isIdp    True when the player's position type is DL, LB, DB, or DP.
  * @param settings League scoring settings (LS-9041); defaults to the hardcoded
  *                 constants when the league has no custom scoring profile.
+ * @param position Rostered position type (e.g. 'TE', 'DL') used to look up
+ *                 any matching position-scoped bonus (LS-9104), applied
+ *                 additively on top of the base multiplier. Ignored for DST.
  * @returns        Fantasy point total for this single game.
  */
 export function computeFootballGamePoints(
@@ -232,6 +235,7 @@ export function computeFootballGamePoints(
   isDst: boolean,
   isIdp: boolean,
   settings: FootballScoringSettings = getDefaultFootballScoringSettings(),
+  position?: string,
 ): number {
   if (isDst && stats.defense) {
     const adapted = adaptDefenseRow(stats.defense);
@@ -264,6 +268,7 @@ export function computeFootballGamePoints(
         safeties: adapted.safeties,
       },
       settings,
+      position,
     );
   }
 
@@ -296,6 +301,7 @@ export function computeFootballGamePoints(
       },
     },
     settings,
+    position,
   );
 }
 
@@ -482,6 +488,7 @@ export async function resolveFootballMatchupScores(
         isDst,
         isIdp,
         scoringSettings,
+        posType,
       );
 
       const gameShape: FootballMatchupPlayerGameShape = {

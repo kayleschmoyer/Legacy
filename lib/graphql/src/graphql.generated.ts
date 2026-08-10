@@ -2088,6 +2088,7 @@ export type Mutation = {
   /** Create or update dues settings for a league. Commissioner/GM access required. */
   updateDuesSettings?: Maybe<LeagueDuesSettings>;
   updateLeagueAnnouncement?: Maybe<LeagueChatMessage>;
+  updateLeagueScoringPositionBonuses?: Maybe<ScoringConfig>;
   updateLeagueScoringProfile?: Maybe<ScoringConfig>;
   updateLeagueSettings?: Maybe<League>;
   updateMatchupPlayerPosition?: Maybe<MatchupPlayer>;
@@ -2700,6 +2701,11 @@ export type MutationUpdateLeagueAnnouncementArgs = {
   id: Scalars['Int']['input'];
   leagueId: Scalars['Int']['input'];
   messageText: Scalars['String']['input'];
+};
+
+export type MutationUpdateLeagueScoringPositionBonusesArgs = {
+  leagueId: Scalars['Int']['input'];
+  updates: Array<UpdateLeagueScoringPositionBonusInput>;
 };
 
 export type MutationUpdateLeagueScoringProfileArgs = {
@@ -4091,6 +4097,7 @@ export type ScoringConfig = {
   entries?: Maybe<Array<ScoringConfigEntry>>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   multiplierGroups?: Maybe<Array<ScoringRuleGroup>>;
+  positionBonuses?: Maybe<Array<ScoringPositionBonus>>;
   profileId?: Maybe<Scalars['Int']['output']>;
   profileName?: Maybe<Scalars['String']['output']>;
   stats?: Maybe<Array<ScoringRule>>;
@@ -4113,6 +4120,19 @@ export type ScoringMultiplierEntry = {
   multiplier?: Maybe<Scalars['Float']['output']>;
   sourceColumn?: Maybe<Scalars['String']['output']>;
   statKey?: Maybe<Scalars['String']['output']>;
+};
+
+export type ScoringPositionBonus = {
+  __typename?: 'ScoringPositionBonus';
+  bonusMultiplier?: Maybe<Scalars['Float']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  definition?: Maybe<ScoringStatDefinition>;
+  id?: Maybe<Scalars['Int']['output']>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  position?: Maybe<Scalars['String']['output']>;
+  profileId?: Maybe<Scalars['Int']['output']>;
+  statDefinitionId?: Maybe<Scalars['Int']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
 export type ScoringRule = {
@@ -4816,6 +4836,13 @@ export type UpdateDuesSettingsInput = {
 export type UpdateLeagueScoringMultiplierInput = {
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   multiplier?: InputMaybe<Scalars['Float']['input']>;
+  statDefinitionId: Scalars['Int']['input'];
+};
+
+export type UpdateLeagueScoringPositionBonusInput = {
+  bonusMultiplier?: InputMaybe<Scalars['Float']['input']>;
+  isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  position: Scalars['String']['input'];
   statDefinitionId: Scalars['Int']['input'];
 };
 
@@ -12927,6 +12954,21 @@ export type GetLeagueScoringProfileQuery = {
         multiplier?: number | null;
       }> | null;
     }> | null;
+    positionBonuses?: Array<{
+      __typename?: 'ScoringPositionBonus';
+      id?: number | null;
+      position?: string | null;
+      bonusMultiplier?: number | null;
+      isEnabled?: boolean | null;
+      definition?: {
+        __typename?: 'ScoringStatDefinition';
+        id?: number | null;
+        statKey?: string | null;
+        statGroup?: ScoringStatGroup | null;
+        displayName?: string | null;
+        sourceColumn?: string | null;
+      } | null;
+    }> | null;
   } | null;
 };
 
@@ -12971,6 +13013,21 @@ export type GetDefaultScoringProfileQuery = {
         sourceColumn?: string | null;
         multiplier?: number | null;
       }> | null;
+    }> | null;
+    positionBonuses?: Array<{
+      __typename?: 'ScoringPositionBonus';
+      id?: number | null;
+      position?: string | null;
+      bonusMultiplier?: number | null;
+      isEnabled?: boolean | null;
+      definition?: {
+        __typename?: 'ScoringStatDefinition';
+        id?: number | null;
+        statKey?: string | null;
+        statGroup?: ScoringStatGroup | null;
+        displayName?: string | null;
+        sourceColumn?: string | null;
+      } | null;
     }> | null;
   } | null;
 };
@@ -13020,6 +13077,52 @@ export type UpdateLeagueScoringProfileMutation = {
         sourceColumn?: string | null;
         multiplier?: number | null;
       }> | null;
+    }> | null;
+    positionBonuses?: Array<{
+      __typename?: 'ScoringPositionBonus';
+      id?: number | null;
+      position?: string | null;
+      bonusMultiplier?: number | null;
+      isEnabled?: boolean | null;
+      definition?: {
+        __typename?: 'ScoringStatDefinition';
+        id?: number | null;
+        statKey?: string | null;
+        statGroup?: ScoringStatGroup | null;
+        displayName?: string | null;
+        sourceColumn?: string | null;
+      } | null;
+    }> | null;
+  } | null;
+};
+
+export type UpdateLeagueScoringPositionBonusesMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  updates:
+    | Array<UpdateLeagueScoringPositionBonusInput>
+    | UpdateLeagueScoringPositionBonusInput;
+}>;
+
+export type UpdateLeagueScoringPositionBonusesMutation = {
+  __typename?: 'Mutation';
+  updateLeagueScoringPositionBonuses?: {
+    __typename?: 'ScoringConfig';
+    profileId?: number | null;
+    profileName?: string | null;
+    positionBonuses?: Array<{
+      __typename?: 'ScoringPositionBonus';
+      id?: number | null;
+      position?: string | null;
+      bonusMultiplier?: number | null;
+      isEnabled?: boolean | null;
+      definition?: {
+        __typename?: 'ScoringStatDefinition';
+        id?: number | null;
+        statKey?: string | null;
+        statGroup?: ScoringStatGroup | null;
+        displayName?: string | null;
+        sourceColumn?: string | null;
+      } | null;
     }> | null;
   } | null;
 };
@@ -32347,6 +32450,19 @@ export const GetLeagueScoringProfile = gql`
           multiplier
         }
       }
+      positionBonuses {
+        id
+        position
+        bonusMultiplier
+        isEnabled
+        definition {
+          id
+          statKey
+          statGroup
+          displayName
+          sourceColumn
+        }
+      }
     }
   }
 `;
@@ -32464,6 +32580,19 @@ export const GetDefaultScoringProfile = gql`
           statKey
           sourceColumn
           multiplier
+        }
+      }
+      positionBonuses {
+        id
+        position
+        bonusMultiplier
+        isEnabled
+        definition {
+          id
+          statKey
+          statGroup
+          displayName
+          sourceColumn
         }
       }
     }
@@ -32584,6 +32713,19 @@ export const UpdateLeagueScoringProfile = gql`
           multiplier
         }
       }
+      positionBonuses {
+        id
+        position
+        bonusMultiplier
+        isEnabled
+        definition {
+          id
+          statKey
+          statGroup
+          displayName
+          sourceColumn
+        }
+      }
     }
   }
 `;
@@ -32631,6 +32773,75 @@ export type UpdateLeagueScoringProfileMutationOptions = BaseMutationOptions<
   UpdateLeagueScoringProfileMutation,
   UpdateLeagueScoringProfileMutationVariables
 >;
+export const UpdateLeagueScoringPositionBonuses = gql`
+  mutation UpdateLeagueScoringPositionBonuses(
+    $leagueId: Int!
+    $updates: [UpdateLeagueScoringPositionBonusInput!]!
+  ) {
+    updateLeagueScoringPositionBonuses(leagueId: $leagueId, updates: $updates) {
+      profileId
+      profileName
+      positionBonuses {
+        id
+        position
+        bonusMultiplier
+        isEnabled
+        definition {
+          id
+          statKey
+          statGroup
+          displayName
+          sourceColumn
+        }
+      }
+    }
+  }
+`;
+export type UpdateLeagueScoringPositionBonusesMutationFn = MutationFunction<
+  UpdateLeagueScoringPositionBonusesMutation,
+  UpdateLeagueScoringPositionBonusesMutationVariables
+>;
+
+/**
+ * __useUpdateLeagueScoringPositionBonusesMutation__
+ *
+ * To run a mutation, you first call `useUpdateLeagueScoringPositionBonusesMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useUpdateLeagueScoringPositionBonusesMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [updateLeagueScoringPositionBonusesMutation, { data, loading, error }] = useUpdateLeagueScoringPositionBonusesMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      updates: // value for 'updates'
+ *   },
+ * });
+ */
+export function useUpdateLeagueScoringPositionBonusesMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    UpdateLeagueScoringPositionBonusesMutation,
+    UpdateLeagueScoringPositionBonusesMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    UpdateLeagueScoringPositionBonusesMutation,
+    UpdateLeagueScoringPositionBonusesMutationVariables
+  >(UpdateLeagueScoringPositionBonuses, options);
+}
+export type UpdateLeagueScoringPositionBonusesMutationHookResult = ReturnType<
+  typeof useUpdateLeagueScoringPositionBonusesMutation
+>;
+export type UpdateLeagueScoringPositionBonusesMutationResult =
+  Apollo.MutationResult<UpdateLeagueScoringPositionBonusesMutation>;
+export type UpdateLeagueScoringPositionBonusesMutationOptions =
+  BaseMutationOptions<
+    UpdateLeagueScoringPositionBonusesMutation,
+    UpdateLeagueScoringPositionBonusesMutationVariables
+  >;
 export const SearchPlayersForDisclosure = gql`
   query SearchPlayersForDisclosure($searchTerm: String!, $limit: Int) {
     searchPlayers(searchTerm: $searchTerm, limit: $limit) {

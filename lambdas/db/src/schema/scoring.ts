@@ -8,6 +8,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import type {
+  LeagueScoringPositionBonus,
   LeagueScoringProfileEntry,
   ScoringMultiplierGroup,
   ScoringStatDefinition,
@@ -15,7 +16,13 @@ import type {
 } from '@legacy-sports/db-client';
 import { checkAdminInDb } from './authorization';
 import { builder } from './builder';
-import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import { ENTITLEMENTS } from './entitlements';
+import { requireFreshEntitlement } from './fresh-entitlements';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from './graphql-errors';
 
 const dbService = createDatabaseService(getDbOptions());
 
@@ -84,9 +91,26 @@ const UpdateLeagueScoringMultiplierInput = builder.inputType(
   },
 );
 
+const UpdateLeagueScoringPositionBonusInput = builder.inputType(
+  'UpdateLeagueScoringPositionBonusInput',
+  {
+    fields: (t) => ({
+      statDefinitionId: t.int({ required: true }),
+      position: t.string({ required: true }),
+      bonusMultiplier: t.float({ required: false }),
+      isEnabled: t.boolean({ required: false }),
+    }),
+  },
+);
+
 interface ScoringConfigEntryWithDefinition extends LeagueScoringProfileEntry {
   definition: ScoringStatDefinition | null;
   numericMultiplier: number | null;
+}
+
+interface ScoringPositionBonusWithDefinition extends LeagueScoringPositionBonus {
+  definition: ScoringStatDefinition | null;
+  numericBonusMultiplier: number | null;
 }
 
 interface ScoringRule {
@@ -116,6 +140,7 @@ interface ScoringConfigGraph {
   entries: ScoringConfigEntryWithDefinition[];
   stats: ScoringRule[];
   multiplierGroups: ScoringRuleGroup[];
+  positionBonuses: ScoringPositionBonusWithDefinition[];
 }
 
 function parseNumeric(value: unknown): number | null {
@@ -160,6 +185,22 @@ function attachDefinitionsToEntries(
       ...entry,
       definition,
       numericMultiplier: parseNumeric(entry.multiplier),
+    };
+  });
+}
+
+function attachDefinitionsToPositionBonuses(
+  definitions: ScoringStatDefinition[],
+  bonuses: LeagueScoringPositionBonus[],
+): ScoringPositionBonusWithDefinition[] {
+  const definitionById = new Map(definitions.map((def) => [def.id, def]));
+
+  return bonuses.map((bonus) => {
+    const definition = definitionById.get(bonus.statDefinitionId) ?? null;
+    return {
+      ...bonus,
+      definition,
+      numericBonusMultiplier: parseNumeric(bonus.bonusMultiplier),
     };
   });
 }
@@ -257,6 +298,10 @@ async function loadLeagueScoringConfig(
   );
   const stats = buildStatValues(details.definitions, entriesWithDefinitions);
 
+  const positionBonuses = await dbService.scoring.getPositionBonusesForProfile(
+    details.profileId,
+  );
+
   return {
     profileId: details.profileId,
     leagueId: details.leagueId,
@@ -265,6 +310,10 @@ async function loadLeagueScoringConfig(
     entries: entriesWithDefinitions,
     stats,
     multiplierGroups: buildMultiplierGroups(stats),
+    positionBonuses: attachDefinitionsToPositionBonuses(
+      details.definitions,
+      positionBonuses,
+    ),
   };
 }
 
@@ -300,6 +349,7 @@ async function loadDefaultScoringConfig(): Promise<ScoringConfigGraph> {
     entries: [],
     stats,
     multiplierGroups: buildMultiplierGroups(stats),
+    positionBonuses: [],
   };
 }
 
@@ -417,6 +467,29 @@ ScoringConfigEntryRef.implement({
   }),
 });
 
+const ScoringPositionBonusRef =
+  builder.objectRef<ScoringPositionBonusWithDefinition>('ScoringPositionBonus');
+
+ScoringPositionBonusRef.implement({
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    profileId: t.exposeInt('profileId'),
+    statDefinitionId: t.exposeInt('statDefinitionId'),
+    position: t.exposeString('position'),
+    bonusMultiplier: t.float({
+      resolve: (bonus) => bonus.numericBonusMultiplier ?? 0,
+    }),
+    isEnabled: t.exposeBoolean('isEnabled'),
+    definition: t.field({
+      type: ScoringStatDefinitionRef,
+      nullable: true,
+      resolve: (bonus) => bonus.definition,
+    }),
+    createdAt: t.exposeString('createdAt'),
+    updatedAt: t.exposeString('updatedAt'),
+  }),
+});
+
 const ScoringConfigRef = builder.objectRef<ScoringConfigGraph>('ScoringConfig');
 
 ScoringConfigRef.implement({
@@ -448,6 +521,10 @@ ScoringConfigRef.implement({
     multiplierGroups: t.field({
       type: [ScoringRuleGroupRef],
       resolve: (profile) => profile.multiplierGroups,
+    }),
+    positionBonuses: t.field({
+      type: [ScoringPositionBonusRef],
+      resolve: (profile) => profile.positionBonuses,
     }),
   }),
 });
@@ -632,11 +709,115 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
   }),
 );
 
+// ── Position-scoped scoring bonuses (LS-9104, premium) ──────────────────────
+//
+// Unlike updateLeagueScoringProfile (free — every league can tune base
+// multipliers), this mutation is hard-gated behind the custom_scoring_multipliers
+// entitlement in its entirety: any commissioner/GM on a free-tier league is
+// rejected outright, mirroring the advanced_scheduling hard-gate pattern at
+// leagues/mutations.ts:639-644.
+builder.mutationField('updateLeagueScoringPositionBonuses', (t) =>
+  t.field({
+    type: ScoringConfigRef,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      updates: t.arg({
+        type: [UpdateLeagueScoringPositionBonusInput],
+        required: true,
+      }),
+    },
+    resolve: async (_, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to update scoring position bonuses',
+        );
+      }
+
+      const updates = (args.updates ?? []).filter(
+        (update): update is NonNullable<typeof update> => update !== null,
+      );
+
+      if (updates.length === 0) {
+        throw UserInputError('At least one position bonus update is required');
+      }
+
+      if (!(await checkAdminInDb(context))) {
+        await ensureLeagueCommissionerAccess(
+          context.db,
+          args.leagueId,
+          context.user.id,
+        );
+      }
+
+      await requireFreshEntitlement(
+        context,
+        ENTITLEMENTS.custom_scoring_multipliers,
+        'Position-scoped scoring bonuses require a premium subscription. Upgrade to unlock custom scoring multipliers.',
+      );
+
+      for (const update of updates) {
+        if (!update.position || update.position.trim() === '') {
+          throw UserInputError(
+            'Each position bonus update must include a position',
+          );
+        }
+
+        const hasBonusMultiplier = typeof update.bonusMultiplier === 'number';
+        const hasEnabledFlag = typeof update.isEnabled === 'boolean';
+
+        if (!hasBonusMultiplier && !hasEnabledFlag) {
+          throw UserInputError(
+            'Each position bonus update must include a bonusMultiplier or an isEnabled flag',
+          );
+        }
+
+        if (hasBonusMultiplier && !Number.isFinite(update.bonusMultiplier)) {
+          throw UserInputError(
+            'Bonus multiplier values must be finite numbers',
+          );
+        }
+      }
+
+      await dbService.scoring.updatePositionBonuses(
+        args.leagueId,
+        updates.map((update) => ({
+          statDefinitionId: update.statDefinitionId,
+          position: update.position,
+          bonusMultiplier:
+            typeof update.bonusMultiplier === 'number'
+              ? update.bonusMultiplier
+              : undefined,
+          isEnabled:
+            typeof update.isEnabled === 'boolean'
+              ? update.isEnabled
+              : undefined,
+        })),
+      );
+
+      // Invalidate the player scoring cache for this league so the next
+      // player browse / draft pool request sees the updated bonuses,
+      // mirroring updateLeagueScoringProfile (LS-696).
+      await refreshPlayerScoringCache(
+        context.db as unknown as PublicDb,
+        args.leagueId,
+      ).catch((err: unknown) => {
+        LOGGER.warn(
+          'Failed to refresh player scoring cache after position bonus update',
+          { err },
+        );
+      });
+
+      return loadLeagueScoringConfig(args.leagueId);
+    },
+  }),
+);
+
 export {
   ScoringConfigRef,
   ScoringRuleRef,
   ScoringRuleGroupRef,
   ScoringConfigEntryRef,
+  ScoringPositionBonusRef,
   loadLeagueScoringConfig,
   ensureLeagueAccess,
 };

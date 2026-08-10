@@ -31,6 +31,19 @@ query GetLeagueScoringProfile($leagueId: Int!) {
         multiplier
       }
     }
+    positionBonuses {
+      id
+      position
+      bonusMultiplier
+      isEnabled
+      definition {
+        id
+        statKey
+        statGroup
+        displayName
+        sourceColumn
+      }
+    }
   }
 }
 
@@ -64,6 +77,19 @@ query GetDefaultScoringProfile {
         statKey
         sourceColumn
         multiplier
+      }
+    }
+    positionBonuses {
+      id
+      position
+      bonusMultiplier
+      isEnabled
+      definition {
+        id
+        statKey
+        statGroup
+        displayName
+        sourceColumn
       }
     }
   }
@@ -103,6 +129,42 @@ mutation UpdateLeagueScoringProfile(
         statKey
         sourceColumn
         multiplier
+      }
+    }
+    positionBonuses {
+      id
+      position
+      bonusMultiplier
+      isEnabled
+      definition {
+        id
+        statKey
+        statGroup
+        displayName
+        sourceColumn
+      }
+    }
+  }
+}
+
+mutation UpdateLeagueScoringPositionBonuses(
+  $leagueId: Int!
+  $updates: [UpdateLeagueScoringPositionBonusInput!]!
+) {
+  updateLeagueScoringPositionBonuses(leagueId: $leagueId, updates: $updates) {
+    profileId
+    profileName
+    positionBonuses {
+      id
+      position
+      bonusMultiplier
+      isEnabled
+      definition {
+        id
+        statKey
+        statGroup
+        displayName
+        sourceColumn
       }
     }
   }

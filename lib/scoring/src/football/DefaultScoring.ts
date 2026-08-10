@@ -76,5 +76,6 @@ export function getDefaultFootballScoringSettings(): FootballScoringSettings {
     defense: { ...DEFAULT_DEFENSE_SCORING },
     defenseBands: { ...DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS },
     idp: { ...DEFAULT_IDP_SCORING },
+    positionBonuses: {},
   };
 }

@@ -3,12 +3,16 @@ import { runWithPublicClient } from '../client/Helpers';
 import {
   getActiveScoringProfileForLeague,
   getScoringMultipliersForLeague,
+  getScoringPositionBonusesForProfile,
   getScoringProfileEntriesForProfile,
   getScoringStatDefinitions,
   type LeagueScoringMultiplierUpdateInput,
+  type LeagueScoringPositionBonusUpdateInput,
+  updateLeagueScoringPositionBonuses,
   updateLeagueScoringProfileEntries,
 } from '../client/PublicDbClient';
 import {
+  LeagueScoringPositionBonus,
   LeagueScoringProfileEntry,
   ScoringStatDefinition,
 } from '../../types/DatabaseTypes';
@@ -133,6 +137,38 @@ export class ScoringService {
         entries,
         definitions,
       } satisfies LeagueScoringProfileDetails;
+    });
+  }
+
+  async getPositionBonusesForProfile(
+    profileId: number | null,
+  ): Promise<LeagueScoringPositionBonus[]> {
+    if (profileId === null) {
+      return [];
+    }
+    return runWithPublicClient(this.options, (db) =>
+      getScoringPositionBonusesForProfile(db, profileId),
+    );
+  }
+
+  async updatePositionBonuses(
+    leagueId: number,
+    updates: LeagueScoringPositionBonusUpdateInput[],
+  ): Promise<LeagueScoringPositionBonus[]> {
+    if (!Number.isFinite(leagueId)) {
+      throw new Error('A valid leagueId is required');
+    }
+
+    return runWithPublicClient(this.options, async (db) => {
+      const profile = await getActiveScoringProfileForLeague(db, leagueId);
+
+      if (!profile) {
+        throw new Error(
+          `Active scoring profile not found for league ${leagueId}`,
+        );
+      }
+
+      return updateLeagueScoringPositionBonuses(db, profile.id, updates);
     });
   }
 }

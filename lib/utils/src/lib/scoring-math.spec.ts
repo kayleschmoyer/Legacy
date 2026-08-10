@@ -42,4 +42,35 @@ describe('applyScoring', () => {
     const stats = { hr: 3, extraStat: 99 };
     expect(applyScoring(stats, weights)).toBe(12); // only hr: 3*4
   });
+
+  describe('positionBonuses (LS-9104)', () => {
+    it('adds the bonus on top of the base multiplier, not in place of it', () => {
+      const stats = { hr: 2 };
+      // base hr=4, bonus hr=+1 => (4+1)*2 = 10, not 1*2
+      expect(applyScoring(stats, weights, { hr: 1 })).toBe(10);
+    });
+
+    it('applies a bonus for a stat with a zero/absent base weight', () => {
+      const stats = { rec: 5 };
+      expect(applyScoring(stats, {}, { rec: 0.5 })).toBe(2.5);
+    });
+
+    it('is a no-op when positionBonuses is undefined', () => {
+      const stats = { hr: 2, rbi: 5 };
+      expect(applyScoring(stats, weights)).toBe(
+        applyScoring(stats, weights, undefined),
+      );
+    });
+
+    it('ignores bonus keys with no matching stat value', () => {
+      const stats = { hr: 2 };
+      expect(applyScoring(stats, weights, { rbi: 10 })).toBe(8); // only hr: 2*4
+    });
+
+    it('ignores non-numeric bonus values', () => {
+      const stats = { hr: 2 };
+      const badBonuses = { hr: 'oops' } as unknown as Record<string, number>;
+      expect(applyScoring(stats, weights, badBonuses)).toBe(8); // base only
+    });
+  });
 });

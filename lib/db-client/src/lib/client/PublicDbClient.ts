@@ -11,6 +11,7 @@ import {
   CareerPitching,
   CreateMatchupPlayer,
   CreatePlayerInput,
+  LeagueScoringPositionBonus,
   LeagueScoringProfile,
   LeagueScoringProfileEntry,
   Matchup,
@@ -32,6 +33,13 @@ export type PublicDb = GenericDatabase<typeof Schema>;
 export interface LeagueScoringMultiplierUpdateInput {
   statDefinitionId: number;
   multiplier?: number | null;
+  isEnabled?: boolean | null;
+}
+
+export interface LeagueScoringPositionBonusUpdateInput {
+  statDefinitionId: number;
+  position: string;
+  bonusMultiplier?: number | null;
   isEnabled?: boolean | null;
 }
 
@@ -1319,6 +1327,129 @@ export async function updateLeagueScoringProfileEntries(
       .select()
       .from(Schema.leagueScoringProfileEntries)
       .where(eq(Schema.leagueScoringProfileEntries.profileId, profileId));
+  });
+}
+
+export async function getScoringPositionBonusesForProfile(
+  db: PublicDb,
+  profileId: number,
+): Promise<LeagueScoringPositionBonus[]> {
+  return db
+    .select()
+    .from(Schema.leagueScoringPositionBonuses)
+    .where(eq(Schema.leagueScoringPositionBonuses.profileId, profileId));
+}
+
+/**
+ * Upsert position-scoped scoring bonuses for a league's active profile
+ * (LS-9104). Mirrors `updateLeagueScoringProfileEntries`'s merge/upsert
+ * shape but keys on (profileId, statDefinitionId, position) — the unique
+ * index backing `league_scoring_position_bonuses` — and does not write to
+ * `league_scoring_change_log`, which has no position column.
+ */
+export async function updateLeagueScoringPositionBonuses(
+  db: PublicDb,
+  profileId: number,
+  updates: LeagueScoringPositionBonusUpdateInput[],
+): Promise<LeagueScoringPositionBonus[]> {
+  if (updates.length === 0) {
+    return getScoringPositionBonusesForProfile(db, profileId);
+  }
+
+  const mergedUpdates = new Map<
+    string,
+    LeagueScoringPositionBonusUpdateInput
+  >();
+  for (const update of updates) {
+    const key = `${update.statDefinitionId}:${update.position}`;
+    mergedUpdates.set(key, { ...mergedUpdates.get(key), ...update });
+  }
+
+  const statDefinitionIds = [
+    ...new Set(Array.from(mergedUpdates.values(), (u) => u.statDefinitionId)),
+  ];
+
+  return db.transaction(async (tx) => {
+    const definitions = await tx
+      .select()
+      .from(Schema.scoringStatDefinitions)
+      .where(inArray(Schema.scoringStatDefinitions.id, statDefinitionIds));
+
+    const definitionById = new Map(
+      definitions.map((definition) => [definition.id, definition]),
+    );
+
+    const missingDefinitions = statDefinitionIds.filter(
+      (id) => !definitionById.has(id),
+    );
+    if (missingDefinitions.length > 0) {
+      throw new Error(
+        `Unknown scoring stat definition ids: ${missingDefinitions.join(', ')}`,
+      );
+    }
+
+    const existingBonuses = await tx
+      .select()
+      .from(Schema.leagueScoringPositionBonuses)
+      .where(
+        and(
+          eq(Schema.leagueScoringPositionBonuses.profileId, profileId),
+          inArray(
+            Schema.leagueScoringPositionBonuses.statDefinitionId,
+            statDefinitionIds,
+          ),
+        ),
+      );
+
+    const existingByKey = new Map(
+      existingBonuses.map((bonus) => [
+        `${bonus.statDefinitionId}:${bonus.position}`,
+        bonus,
+      ]),
+    );
+
+    const values = Array.from(mergedUpdates.entries()).map(([key, update]) => {
+      const existing = existingByKey.get(key);
+
+      const resolvedBonusMultiplier =
+        update.bonusMultiplier ??
+        normalizeNumeric(existing?.bonusMultiplier) ??
+        0;
+
+      const resolvedIsEnabled =
+        update.isEnabled ?? (existing ? existing.isEnabled : true);
+
+      return {
+        profileId,
+        statDefinitionId: update.statDefinitionId,
+        position: update.position,
+        bonusMultiplier: resolvedBonusMultiplier.toString(),
+        isEnabled: resolvedIsEnabled,
+      };
+    });
+
+    await tx
+      .insert(Schema.leagueScoringPositionBonuses)
+      .values(values)
+      .onConflictDoUpdate({
+        target: [
+          Schema.leagueScoringPositionBonuses.profileId,
+          Schema.leagueScoringPositionBonuses.statDefinitionId,
+          Schema.leagueScoringPositionBonuses.position,
+        ],
+        set: conflictUpdateAllExcept(Schema.leagueScoringPositionBonuses, [
+          'id',
+          'profileId',
+          'statDefinitionId',
+          'position',
+          'createdAt',
+        ]),
+      });
+
+    return tx
+      .select()
+      .from(Schema.leagueScoringPositionBonuses)
+      .where(eq(Schema.leagueScoringPositionBonuses.profileId, profileId));
   });
 }
 
