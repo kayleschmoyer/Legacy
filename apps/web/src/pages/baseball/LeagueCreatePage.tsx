@@ -104,7 +104,11 @@ import {
   WHITE,
   withAlpha,
 } from '../../constants/colors';
-import { trackPremiumFeatureClick } from '../../utils/analytics';
+import {
+  trackFastLaneLeagueCreated,
+  trackFastLaneToggled,
+  trackPremiumFeatureClick,
+} from '../../utils/analytics';
 
 // ── Sport switcher ───────────────────────────────────────────────────────────
 // Sport is URL-driven (`/baseball/league/create` vs `/football/league/create`)
@@ -1908,9 +1912,10 @@ export function LeagueCreatePage(): React.JSX.Element {
     setFastLane((prev) => {
       const next = !prev;
       if (next) setOpenSections(new Set(['basic']));
+      trackFastLaneToggled(next, selectedSport);
       return next;
     });
-  }, []);
+  }, [selectedSport]);
 
   // Auto-expands every section that has an invalid field and scrolls to the
   // first one, so a failed submit shows the user where all N errors live
@@ -2460,6 +2465,9 @@ export function LeagueCreatePage(): React.JSX.Element {
       const newLeague = result.data?.createLeagueAndTeams?.league;
       if (newLeague?.id) {
         setHasUnsavedChanges(false);
+        if (fastLane) {
+          trackFastLaneLeagueCreated(formData.sport);
+        }
         setCreatedLeague({
           id: newLeague.id,
           inviteCode: newLeague.inviteCode ?? null,

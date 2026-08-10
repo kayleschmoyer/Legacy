@@ -186,6 +186,8 @@ jest.mock('../../hooks/useIsPremium', () => ({
 
 jest.mock('../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
+  trackFastLaneToggled: jest.fn(),
+  trackFastLaneLeagueCreated: jest.fn(),
 }));
 
 // Records navigate() calls for assertions (e.g. push-vs-replace options)

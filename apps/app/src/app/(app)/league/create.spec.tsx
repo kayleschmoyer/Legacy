@@ -91,6 +91,8 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
 
 jest.mock('../../../utils/analytics', () => ({
   trackPremiumFeatureClick: jest.fn(),
+  trackFastLaneToggled: jest.fn(),
+  trackFastLaneLeagueCreated: jest.fn(),
 }));
 
 // The "League created!" interstitial (LS-6136) is a presentational shared

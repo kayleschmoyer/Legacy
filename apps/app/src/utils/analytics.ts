@@ -141,3 +141,25 @@ export function trackGoogleSignInFailure(failureMode: string): void {
     category: 'auth',
   });
 }
+
+/** Fast Lane toggle usage on the league-create wizard (LS-9179). */
+export function trackFastLaneToggled(
+  enabled: boolean,
+  sport: 'baseball' | 'football',
+): void {
+  void trackEvent('fast_lane_toggled', {
+    enabled,
+    sport,
+    category: 'league_creation',
+  });
+}
+
+/** A league created with Fast Lane enabled (LS-9179). */
+export function trackFastLaneLeagueCreated(
+  sport: 'baseball' | 'football',
+): void {
+  void trackEvent('fast_lane_league_created', {
+    sport,
+    category: 'league_creation',
+  });
+}

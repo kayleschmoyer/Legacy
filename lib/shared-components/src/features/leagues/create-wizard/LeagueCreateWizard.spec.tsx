@@ -423,6 +423,56 @@ describe('LeagueCreateWizard — review step', () => {
   });
 });
 
+describe('LeagueCreateWizard — Fast Lane (LS-9179)', () => {
+  it('toggles on the Basics step and reports the change via onFastLaneToggle', () => {
+    const onFastLaneToggle = jest.fn();
+    const { getByTestId } = renderWizard({
+      initialLeagueName: VALID_NAME,
+      onFastLaneToggle,
+    });
+    const toggle = getByTestId('toggle-fastLane');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    expect(onFastLaneToggle).toHaveBeenCalledWith(true);
+  });
+
+  it('jumps NEXT straight from Basics to Review, skipping Roster/Draft/Rules', () => {
+    const { getByTestId, getByText } = renderWizard({
+      initialLeagueName: VALID_NAME,
+    });
+    fireEvent.click(getByTestId('toggle-fastLane'));
+    expect(getByText('NEXT — REVIEW')).toBeTruthy();
+    fireEvent.click(getByTestId('wizard-next'));
+    expect(getByTestId('wizard-submit')).toBeTruthy();
+    expect(getByTestId('review-league-name').textContent).toBe(VALID_NAME);
+  });
+
+  it('leaves the skipped steps tappable from the progress strip after the jump', () => {
+    const { getByTestId, getByText } = renderWizard({
+      initialLeagueName: VALID_NAME,
+    });
+    fireEvent.click(getByTestId('toggle-fastLane'));
+    fireEvent.click(getByTestId('wizard-next'));
+    fireEvent.click(getByTestId('wizard-step-tab-basics'));
+    expect(getByText('NEXT — REVIEW')).toBeTruthy();
+  });
+
+  it('submits sport defaults for the skipped steps', () => {
+    const onSubmit = jest.fn();
+    const { getByTestId } = renderWizard({
+      initialLeagueName: VALID_NAME,
+      onSubmit,
+    });
+    fireEvent.click(getByTestId('toggle-fastLane'));
+    fireEvent.click(getByTestId('wizard-next'));
+    fireEvent.click(getByTestId('wizard-submit'));
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ leagueName: VALID_NAME, numberOfTeams: 12 }),
+    );
+  });
+});
+
 describe('LeagueCreateWizard — state and close', () => {
   it('preserves edits across forward and back navigation', () => {
     const { getByTestId } = renderWizard({ initialLeagueName: VALID_NAME });

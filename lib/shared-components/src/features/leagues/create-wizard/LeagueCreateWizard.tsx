@@ -111,6 +111,12 @@ export interface LeagueCreateWizardProps {
   /** Close/cancel. The host decides whether to confirm — see `isDirty`. */
   onClose: (isDirty: boolean) => void;
   onUpgrade: (featureName: string) => void;
+  /**
+   * Fires when the Fast Lane toggle changes (LS-9179). This component stays
+   * dependency-free (no analytics import) — the host wires this to its own
+   * analytics module, same pattern as `onUpgrade`.
+   */
+  onFastLaneToggle?: (enabled: boolean) => void;
   /** Top safe-area inset, applied as padding so content clears the status bar. */
   topInset?: number;
 }
@@ -126,6 +132,7 @@ export function LeagueCreateWizard({
   onSubmit,
   onClose,
   onUpgrade,
+  onFastLaneToggle,
   topInset = 0,
 }: LeagueCreateWizardProps): React.JSX.Element {
   const [form, setForm] = useState<LeagueCreateWizardForm>(() =>
@@ -135,6 +142,12 @@ export function LeagueCreateWizard({
   const [stepIndex, setStepIndex] = useState(0);
   const [furthestIndex, setFurthestIndex] = useState(0);
   const [errors, setErrors] = useState<WizardErrors>({});
+  // Fast Lane (LS-9179): mirrors the web accordion page's "lock everything
+  // but Basic Settings" toggle (LS-9128), reinterpreted for a step wizard —
+  // "locked" becomes "skipped". Turning it on jumps straight from Basics to
+  // Review using the form's existing defaults for Roster/Draft/Rules; no
+  // form data is reset, since those steps were never visited.
+  const [fastLane, setFastLane] = useState(false);
 
   const step: WizardStepId = WIZARD_STEPS[stepIndex].id;
   const isReview = step === 'review';
@@ -172,17 +185,29 @@ export function LeagueCreateWizard({
     setErrors({});
   }, []);
 
+  const toggleFastLane = useCallback(() => {
+    setFastLane((prev) => {
+      const next = !prev;
+      onFastLaneToggle?.(next);
+      return next;
+    });
+  }, [onFastLaneToggle]);
+
   const handleNext = useCallback(() => {
     const stepErrors = validateWizardStep(step, form, sport);
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
       return;
     }
-    const next = Math.min(stepIndex + 1, WIZARD_STEPS.length - 1);
+    const lastIndex = WIZARD_STEPS.length - 1;
+    const next =
+      fastLane && step === 'basics'
+        ? lastIndex
+        : Math.min(stepIndex + 1, lastIndex);
     setStepIndex(next);
     setFurthestIndex((prev) => Math.max(prev, next));
     setErrors({});
-  }, [form, sport, step, stepIndex]);
+  }, [fastLane, form, sport, step, stepIndex]);
 
   const handleBack = useCallback(() => {
     if (stepIndex === 0) {
@@ -190,7 +215,7 @@ export function LeagueCreateWizard({
       return;
     }
     goToStep(stepIndex - 1);
-  }, [goToStep, isDirty, onClose, stepIndex]);
+  }, [goToStep, isDirty, stepIndex, onClose]);
 
   const handleSubmit = useCallback(() => {
     // Belt-and-suspenders: the CTA is already disabled while atLeagueLimit,
@@ -241,6 +266,8 @@ export function LeagueCreateWizard({
               errors={errors}
               disabled={disabled}
               setField={setField}
+              fastLane={fastLane}
+              onToggleFastLane={toggleFastLane}
             />
           )}
           {step === 'roster' && (
@@ -301,7 +328,11 @@ export function LeagueCreateWizard({
           <WizardBottomBar
             backLabel={stepIndex === 0 ? 'CANCEL' : 'BACK'}
             onBack={handleBack}
-            nextLabel={`NEXT — ${WIZARD_STEPS[stepIndex + 1].label}`}
+            nextLabel={`NEXT — ${
+              fastLane && step === 'basics'
+                ? WIZARD_STEPS[WIZARD_STEPS.length - 1].label
+                : WIZARD_STEPS[stepIndex + 1].label
+            }`}
             onNext={handleNext}
             nextDisabled={
               disabled || atLeagueLimit || (step === 'basics' && !nameValid)
@@ -333,16 +364,36 @@ function numberChips(values: readonly number[]): WizardChipOption<number>[] {
   return values.map((value) => ({ value, label: String(value) }));
 }
 
+interface BasicsStepProps extends SportStepProps {
+  fastLane: boolean;
+  onToggleFastLane: () => void;
+}
+
 function BasicsStep({
   form,
   sport,
   errors,
   disabled,
   setField,
-}: SportStepProps): React.JSX.Element {
+  fastLane,
+  onToggleFastLane,
+}: BasicsStepProps): React.JSX.Element {
   const allowedDivisions = validDivisionOptions(form.numberOfTeams);
   return (
     <>
+      <WizardToggleRow
+        testID="toggle-fastLane"
+        title="Fast Lane"
+        subtitle={
+          fastLane
+            ? 'Skipping to Review — using our recommended defaults for the rest.'
+            : 'Skip the details, use our defaults.'
+        }
+        value={fastLane}
+        onChange={onToggleFastLane}
+        disabled={disabled}
+      />
+
       <WizardFieldRow
         label="League Name"
         testID="field-leagueName"

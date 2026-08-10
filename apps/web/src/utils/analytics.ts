@@ -318,6 +318,41 @@ export function trackPremiumFeatureBlocked(featureName: string): void {
   });
 }
 
+// =============================================================================
+// League Creation
+// =============================================================================
+
+/**
+ * Track Fast Lane toggle usage on the league-create form (LS-9179).
+ * @param enabled - Whether Fast Lane was switched on or off
+ * @param sport - The sport of the league being created
+ */
+export function trackFastLaneToggled(
+  enabled: boolean,
+  sport: 'baseball' | 'football',
+): void {
+  trackEvent('fast_lane_toggled', {
+    enabled,
+    sport,
+    category: 'league_creation',
+  });
+}
+
+/**
+ * Track a league created with Fast Lane enabled (LS-9179) — the adoption
+ * signal that matters more than the toggle event, since a user can flip Fast
+ * Lane on and still back out before submitting.
+ * @param sport - The sport of the league being created
+ */
+export function trackFastLaneLeagueCreated(
+  sport: 'baseball' | 'football',
+): void {
+  trackEvent('fast_lane_league_created', {
+    sport,
+    category: 'league_creation',
+  });
+}
+
 /**
  * Track subscription started
  * @param tier - Subscription tier

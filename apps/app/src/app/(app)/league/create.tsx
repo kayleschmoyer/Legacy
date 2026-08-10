@@ -22,7 +22,11 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useSubscription } from '../../../features/subscription';
-import { trackPremiumFeatureClick } from '../../../utils/analytics';
+import {
+  trackFastLaneLeagueCreated,
+  trackFastLaneToggled,
+  trackPremiumFeatureClick,
+} from '../../../utils/analytics';
 import {
   closeToHomeTab,
   HOME_TAB_HREF,
@@ -122,6 +126,10 @@ export default function CreateLeagueScreen(): React.JSX.Element {
     inviteCode: string | null;
   } | null>(null);
 
+  // Tracks whether Fast Lane was on at submit time (LS-9179), so the
+  // adoption event fires only for leagues actually created via the skip.
+  const [fastLaneUsed, setFastLaneUsed] = useState(false);
+
   // Preflight league-count check (LS-6133): without this, a free user at the
   // cap only finds out on final submit, after typing through all five steps.
   // A failed query fails closed (treated as at-limit) rather than silently
@@ -140,6 +148,9 @@ export default function CreateLeagueScreen(): React.JSX.Element {
     onCompleted: (data: CreateLeagueMutation) => {
       const league = data.createLeagueAndTeams?.league;
       if (league?.id) {
+        if (fastLaneUsed) {
+          trackFastLaneLeagueCreated(sport);
+        }
         setCreatedLeague({
           id: league.id,
           name: league.name ?? '',
@@ -251,6 +262,14 @@ export default function CreateLeagueScreen(): React.JSX.Element {
     [router],
   );
 
+  const handleFastLaneToggle = useCallback(
+    (enabled: boolean) => {
+      setFastLaneUsed(enabled);
+      trackFastLaneToggled(enabled, sport);
+    },
+    [sport],
+  );
+
   return (
     <>
       <LeagueCreateWizard
@@ -266,6 +285,7 @@ export default function CreateLeagueScreen(): React.JSX.Element {
         onSubmit={handleSubmit}
         onClose={handleClose}
         onUpgrade={handleUpgrade}
+        onFastLaneToggle={handleFastLaneToggle}
       />
       <Dialog
         open={createdLeague !== null}
