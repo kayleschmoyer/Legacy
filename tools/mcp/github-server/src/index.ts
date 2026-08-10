@@ -2033,11 +2033,31 @@ export function createServer(): McpServer {
     'github_pr_diagnose',
     'Semantic one-shot for CI failure investigation: returns a compact markdown report with PR state, CI summary, failing job list with extracted error context, and a recommended next action. ' +
       'Replaces the 4-5 call chain: github_view_pr → github_get_check_runs → github_pr_why_blocked → ci_find_session → ci_get_logs. ' +
-      'For full CI log lines, fetch logs separately via ci_get_logs after using this tool to identify which jobs are failing.',
+      'For full CI log lines, fetch logs separately via ci_get_logs after using this tool to identify which jobs are failing. ' +
+      'Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      prNumber: z.number().int().positive().describe('PR number to diagnose'),
+      number: prNumberField('number')
+        .optional()
+        .describe('PR number to diagnose'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
     },
-    async (params) => diagnose(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return diagnose({ prNumber: resolved });
+    },
   );
 
   // Job polling tools — stdio only. Git-heavy tools (github_rebase_pr,
