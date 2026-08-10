@@ -6,6 +6,10 @@
  * out in gold, the pick on the clock pulses, and tapping any cell writes a
  * description of it into the caption underneath — that caption is how mobile
  * gets at pick history without a separate tab.
+ *
+ * Stays native-only: react-native's Pressable and Animated.loop (OnClockRing's
+ * pulse) have no web build in this codebase; see ./DraftMiniBoard.tsx for the
+ * DOM/Tamagui capability shim.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable } from 'react-native';

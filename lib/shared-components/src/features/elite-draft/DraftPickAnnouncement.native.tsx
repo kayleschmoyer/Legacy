@@ -2,6 +2,10 @@
  * DraftPickAnnouncement (native) — the full-bleed "with the Nth pick" card that
  * rises over the board whenever a pick lands, plus the confetti burst reserved
  * for the viewer's own picks.
+ *
+ * Stays native-only: the Confetti piece is built on react-native's Animated
+ * API, which has no web build in this codebase; see ./DraftPickAnnouncement.tsx
+ * for the capability shim (confetti omitted there).
  */
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable } from 'react-native';

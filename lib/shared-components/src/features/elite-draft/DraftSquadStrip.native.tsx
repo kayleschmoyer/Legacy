@@ -5,6 +5,9 @@
  * The strip shows one slot per draft round so the viewer can see their roster
  * filling in without leaving the board; tapping it raises a sheet with the full
  * picks, which is how mobile reaches "My Team" now that the tab bar is gone.
+ *
+ * Stays native-only: react-native's Pressable has no web build in this
+ * codebase; see ./DraftSquadStrip.tsx for the DOM/Tamagui capability shim.
  */
 import React from 'react';
 import { Pressable } from 'react-native';

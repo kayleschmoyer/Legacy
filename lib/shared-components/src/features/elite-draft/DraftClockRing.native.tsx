@@ -5,6 +5,9 @@
  * the pick clock runs down, with the remaining time centred inside it. When the
  * viewer is on the clock the whole ring breathes so it reads from across the
  * room.
+ *
+ * Stays native-only: react-native-svg and Animated.loop have no web build in
+ * this codebase; see ./DraftClockRing.tsx for the DOM/CSS capability shim.
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
