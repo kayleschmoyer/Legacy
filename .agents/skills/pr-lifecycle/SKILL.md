@@ -414,8 +414,14 @@ github_resolve_threads(threadIds: [...], prNumber: <PR#>)
 github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])  # MANDATORY and MUST be last label op — fires Reviewer (W1) → bot review → CI Orchestrator. Plain pushes do NOT trigger CI.
 
 # ⛔ Why bot:ready-for-review must be last: Reviewer (W1) uses concurrency.cancel-in-progress: true.
-# Any label applied after bot:ready-for-review queues a new W1 run that cancels the reviewer before
-# it posts, then skips itself (non-qualifying label). The PR silently stalls with no review posted.
+# Since PR #4738 irrelevant-label events land in a separate `noop` concurrency group and CANNOT
+# cancel the active reviewer run — only the review-trigger labels themselves (bot:ready-for-review,
+# review-bot-degraded, bot:reset-cycle-counter, review-bot-override) and pushes land in the `active`
+# group. Label-last ordering remains required hygiene: it guarantees the labeled event that fires W1
+# is the final state GitHub delivers. If a W1 run still dies before posting any bot-review status
+# (external cancellation, runner failure/starvation), the merge-queue processor's review-stall sweep
+# self-heals it on its next wake by cycling the label; after 2 dead re-triggers per SHA it escalates
+# to a terminal bot-review failure + needs-human-arbitration (LS-9209).
 # If agent-in-progress is missing when you reach this step, apply it first, then bot:ready-for-review.
 
 # Enable auto-merge (worktree-safe — use instead of `gh pr merge --auto`)

@@ -13,7 +13,9 @@ name: Reviewer (W1)
 # merge-queue processor's self-heal re-applies bot:ready-for-review, and
 # that label — the only review trigger — fires this workflow through its
 # normal path. Labels stay single-purpose: bot:ready-for-review = review,
-# merge-when-ready = merge.
+# merge-when-ready = merge. Since LS-9209 the same self-heal also sweeps
+# non-queued PRs carrying bot:ready-for-review, cycling (remove + re-add)
+# the label when it is already present so a fresh labeled event fires.
 #
 # Stacked PRs (LS-8489): on APPROVE the reviewer applies only
 # merge-when-ready, regardless of base branch. Stacked PRs merge base-first —
@@ -30,6 +32,21 @@ name: Reviewer (W1)
 # bot-review missing or pending, that step fails the job visibly. Known/handled
 # failure modes (e.g. the rate-limit path, which already sets bot-review to a
 # terminal failure) are unaffected and stay exactly as visible as before.
+#
+# Early pending footprint (LS-9209): the LS-8299 guard lives inside the review
+# job, so it cannot fire when the run dies BEFORE that job executes — runner
+# cancellation, a check-runner-access failure, or a review job queued forever
+# on a starved self-hosted label all left the head SHA with NO bot-review
+# status at all, permanently blocking the PR (four PRs stalled 2026-08-06..09).
+# The check-runner-access job therefore posts `bot-review: pending` as its
+# first act (ubuntu-latest, seconds after the run starts, before checkout or
+# runner resolution) whenever the review job would run. Every death mode then
+# leaves a detectable stale-pending footprint instead of nothing, and the
+# merge-queue processor's review-stall sweep (merge-queue-processor.js,
+# remediateStaleBotReview) heals it on its next wake. The gate condition is
+# computed ONCE in the check-runner-access "Evaluate review gate" step and
+# consumed by both the footprint steps and the review job's `if`, so the two
+# can never drift.
 
 on:
   pull_request:
@@ -57,7 +74,56 @@ jobs:
     timeout-minutes: 2
     outputs:
       runner-label: ${{ steps.resolve.outputs.runner-label }}
+      should-review: ${{ steps.gate.outputs.should-review }}
     steps:
+      # Single source of truth for "would the review job run for this event?".
+      # Skip drafts, fork PRs, labeled events for irrelevant labels, and
+      # synchronize events when bot:ready-for-review is not present.
+      # When review-bot-override is labeled, fire in auto-approve mode (no LLM
+      # review). For all other triggers, skip when review-bot-override is
+      # present. Consumed by the review job's `if` AND the pending-footprint
+      # steps below so the conditions can never drift (LS-9209).
+      - name: Evaluate review gate
+        id: gate
+        env:
+          SHOULD_REVIEW: >-
+            ${{ github.event.pull_request.draft == false &&
+                github.event.pull_request.head.repo.full_name == github.repository &&
+                (github.event.label.name == 'review-bot-override' ||
+                 (!contains(github.event.pull_request.labels.*.name, 'review-bot-override') &&
+                  (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
+                   github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
+                   github.event.label.name == 'bot:ready-for-review' ||
+                   github.event.label.name == 'review-bot-degraded' ||
+                   github.event.label.name == 'bot:reset-cycle-counter'))) }}
+        run: |
+          echo "should-review=${SHOULD_REVIEW}" >> "$GITHUB_OUTPUT"
+          echo "Review gate: should-review=${SHOULD_REVIEW}"
+      # Post `bot-review: pending` before checkout/runner resolution so any
+      # death of this run past this point leaves a stale-pending footprint the
+      # merge-queue processor's review-stall sweep can detect and heal, instead
+      # of no status at all (LS-9209). Best-effort: continue-on-error on both
+      # steps — a footprint failure must never block the review path itself.
+      - name: Generate reviewer app token for pending footprint
+        id: pending-token
+        if: steps.gate.outputs.should-review == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+      - name: Post bot-review pending footprint
+        if: steps.gate.outputs.should-review == 'true' && steps.pending-token.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.pending-token.outputs.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/statuses/${HEAD_SHA}" \
+            -f state=pending \
+            -f context=bot-review \
+            -f "description=Review cycle starting — awaiting Reviewer (W1)"
+          echo "Posted bot-review=pending footprint for ${HEAD_SHA}"
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -77,21 +143,11 @@ jobs:
           github-token: ${{ steps.app-token.outputs.token || github.token }}
 
   review:
-    # Skip drafts, fork PRs, labeled events for irrelevant labels, and
-    # synchronize events when bot:ready-for-review is not present.
-    # When review-bot-override is labeled, fire in auto-approve mode (no LLM
-    # review). For all other triggers, skip when review-bot-override is present.
+    # Gate condition lives in check-runner-access's "Evaluate review gate"
+    # step (single source of truth shared with the pending-footprint steps —
+    # LS-9209); see the comment there for the skip semantics.
     needs: [check-runner-access]
-    if: >-
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      (github.event.label.name == 'review-bot-override' ||
-       (!contains(github.event.pull_request.labels.*.name, 'review-bot-override') &&
-        (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
-         github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
-         github.event.label.name == 'bot:ready-for-review' ||
-         github.event.label.name == 'review-bot-degraded' ||
-         github.event.label.name == 'bot:reset-cycle-counter')))
+    if: needs.check-runner-access.outputs.should-review == 'true'
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 15
     steps:

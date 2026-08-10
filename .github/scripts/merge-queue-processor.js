@@ -96,6 +96,16 @@ const BOT_REVIEW_STATUS_CONTEXT = 'bot-review';
 // reviews at once; the next queue trigger (each remediated review's submission
 // wakes the queue via pull_request_review) picks up the remainder.
 const MAX_REVIEW_REMEDIATIONS_PER_RUN = 10;
+// LS-9209: each self-heal re-trigger stamps a bot-review pending status whose
+// description carries this marker. The SHA's status history is append-only, so
+// counting marker statuses gives a durable per-SHA attempt counter with no
+// extra storage. After MAX_SELF_HEAL_ATTEMPTS_PER_SHA dead Reviewer (W1) runs
+// the queue stops re-triggering and escalates: terminal bot-review failure +
+// needs-human-arbitration (paged by Label Pager W4). Never a silent stall,
+// never an unbounded retry.
+const SELF_HEAL_MARKER = 'self-heal re-trigger';
+const MAX_SELF_HEAL_ATTEMPTS_PER_SHA = 2;
+const ARBITRATION_LABEL = 'needs-human-arbitration';
 
 // The CI Gate commit status (and the granular 🚀 CI Pipeline / * check runs)
 // are only produced by a pull_request-triggered orchestrator run. If that run
@@ -186,8 +196,10 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   let hasPendingPRs = false;
   let reviewRemediationsThisRun = 0;
   let ciRerunsThisRun = 0;
+  const processedPRNumbers = new Set();
 
   for (const pr of mergeReadyPRs) {
+    processedPRNumbers.add(pr.number);
     console.log(`\n🔍 Processing PR #${pr.number}: ${pr.title}`);
 
     try {
@@ -225,6 +237,13 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       );
       await reportProcessingError(pr, error);
     }
+  }
+
+  // LS-9209: heal review stalls on PRs the queue never sees (no
+  // merge-when-ready label). Under forceCheck every open PR already went
+  // through the loop above, so the sweep would be redundant.
+  if (!forceCheck) {
+    await sweepReviewStalls(processedPRNumbers);
   }
 
   console.log(`\n🏁 Merge queue processing complete`);
@@ -695,31 +714,36 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   // Self-heal the "bot-review never registers" deadlock (see
   // REVIEW_TRIGGER_LABEL above). Fires in two blocked states:
   //   1. bot-review is a required check but has no run/status on the head SHA
-  //      ("not yet registered") — W1 skipped the last push.
+  //      ("not yet registered") — W1 skipped the last push, or the W1 run died
+  //      (cancelled / runner-label failure / queued forever) before its review
+  //      job could post a status (LS-9209).
   //   2. reviewDecision is CHANGES_REQUESTED but the head SHA carries no
   //      bot-review status — the agent pushed fixes, W1 never re-reviewed, so
   //      the stale REQUEST_CHANGES can never be superseded.
-  // Idempotency guards: skip when the label is already present (adding again
-  // fires no event) and when the head SHA already has ANY bot-review status
-  // (the reviewer has adjudicated — or is adjudicating — the current code).
-  async function remediateStaleBotReview(pr, validation) {
-    const waitingOnBotReview = (validation.pendingChecks ?? []).some((c) =>
-      c.startsWith(`${BOT_REVIEW_STATUS_CONTEXT} `),
-    );
-    const staleChangesRequested =
-      validation.reviewDecision === 'CHANGES_REQUESTED';
-    if (!waitingOnBotReview && !staleChangesRequested) return;
-
-    if (pr.labels.some((l) => l.name === REVIEW_TRIGGER_LABEL)) {
-      if (waitingOnBotReview) {
-        console.log(
-          `⚠️ PR #${pr.number}: ${BOT_REVIEW_STATUS_CONTEXT} not registered but ` +
-            `'${REVIEW_TRIGGER_LABEL}' is already present — re-adding fires no event. ` +
-            `Needs manual attention (re-apply the label or dispatch Reviewer W1).`,
-        );
-      }
-      return;
+  // The head SHA's status history is authoritative: a terminal status or a
+  // fresh pending means the reviewer adjudicated (or is adjudicating) the
+  // current code and nothing is healed. Remedy: apply the trigger label, or
+  // CYCLE it (remove + re-add) when already present — a bare re-add fires no
+  // labeled event (LS-9209; this branch previously no-op'd with "needs manual
+  // attention", which left non-queued PRs stalled indefinitely). Each remedy
+  // stamps a SELF_HEAL_MARKER pending status; after
+  // MAX_SELF_HEAL_ATTEMPTS_PER_SHA markers the queue escalates to a terminal
+  // bot-review failure + needs-human-arbitration instead of retrying forever.
+  // `validation` is present on the queued path (cheap pre-filter from
+  // validatePRForMerge) and null on the review-stall sweep path, which passes
+  // every open PR carrying the trigger label straight to the status check.
+  async function remediateStaleBotReview(pr, validation = null) {
+    if (validation) {
+      const waitingOnBotReview = (validation.pendingChecks ?? []).some((c) =>
+        c.startsWith(`${BOT_REVIEW_STATUS_CONTEXT} `),
+      );
+      const staleChangesRequested =
+        validation.reviewDecision === 'CHANGES_REQUESTED';
+      if (!waitingOnBotReview && !staleChangesRequested) return;
     }
+
+    // A human explicitly owns this PR — automation must not re-trigger.
+    if (pr.labels.some((l) => l.name === ARBITRATION_LABEL)) return;
 
     const headStatuses = await github.paginate(
       github.rest.repos.listCommitStatusesForRef,
@@ -737,11 +761,11 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     }
     if (latestBotReview) {
       // success/failure → the reviewer adjudicated this SHA; nothing to heal.
-      // pending → the reviewer set "in progress" and may still be running;
-      // W1's job timeout is 15 minutes, so a pending older than
-      // STALE_PENDING_MS means the reviewer died mid-run (its run step is
-      // continue-on-error) and the status will never resolve — fall through
-      // and re-trigger.
+      // pending → the reviewer (or the LS-9209 early footprint in W1's
+      // check-runner-access job) set "in progress" and W1 may still be
+      // running; W1's job timeout is 15 minutes, so a pending older than
+      // STALE_PENDING_MS means the run died and the status will never
+      // resolve — fall through and re-trigger.
       const STALE_PENDING_MS = 45 * 60 * 1000;
       const isStalePending =
         latestBotReview.state === 'pending' &&
@@ -762,20 +786,94 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       return;
     }
 
+    // Durable attempt counter: SELF_HEAL_MARKER statuses already stamped on
+    // this SHA (see the constant's comment). At the cap, escalate instead of
+    // re-triggering — repeated W1 deaths on one SHA mean something systemic
+    // (runner starvation, recurring cancellation) that another cycle will not
+    // fix.
+    const priorAttempts = headStatuses.filter(
+      (s) =>
+        s.context === BOT_REVIEW_STATUS_CONTEXT &&
+        s.description?.includes(SELF_HEAL_MARKER),
+    ).length;
+    if (priorAttempts >= MAX_SELF_HEAL_ATTEMPTS_PER_SHA) {
+      if (isDryRun) {
+        console.log(
+          `🏃 DRY RUN: Would escalate PR #${pr.number} to ${ARBITRATION_LABEL} — ` +
+            `${priorAttempts} self-heal attempts already failed on ${pr.head.sha}`,
+        );
+        return;
+      }
+      reviewRemediationsThisRun++;
+      console.log(
+        `🚨 PR #${pr.number}: ${priorAttempts} self-heal re-triggers already died on ` +
+          `${pr.head.sha} — posting terminal ${BOT_REVIEW_STATUS_CONTEXT} failure and ` +
+          `applying ${ARBITRATION_LABEL} (LS-9209)`,
+      );
+      try {
+        await github.rest.repos.createCommitStatus({
+          owner,
+          repo,
+          sha: pr.head.sha,
+          state: 'failure',
+          context: BOT_REVIEW_STATUS_CONTEXT,
+          description: `Reviewer (W1) died ${priorAttempts + 1}x on this SHA — needs human attention (LS-9209)`,
+        });
+      } catch (statusError) {
+        console.warn(
+          `⚠️ PR #${pr.number}: could not post escalation status: ${statusError.message} — ` +
+            `if this is a 403, grant the Merge Queue GitHub App "Commit statuses: Read and write".`,
+        );
+      }
+      try {
+        await github.rest.issues.addLabels({
+          owner,
+          repo,
+          issue_number: pr.number,
+          labels: [ARBITRATION_LABEL],
+        });
+      } catch (labelError) {
+        console.warn(
+          `⚠️ PR #${pr.number}: could not apply '${ARBITRATION_LABEL}': ${labelError.message}`,
+        );
+      }
+      return;
+    }
+
+    const labelPresent = pr.labels.some((l) => l.name === REVIEW_TRIGGER_LABEL);
+
     if (isDryRun) {
       console.log(
-        `🏃 DRY RUN: Would apply '${REVIEW_TRIGGER_LABEL}' to PR #${pr.number} ` +
-          `to re-trigger Reviewer (W1) — ${BOT_REVIEW_STATUS_CONTEXT} missing on head SHA`,
+        `🏃 DRY RUN: Would ${labelPresent ? 'cycle' : 'apply'} '${REVIEW_TRIGGER_LABEL}' ` +
+          `on PR #${pr.number} to re-trigger Reviewer (W1) — ` +
+          `${BOT_REVIEW_STATUS_CONTEXT} missing or stale on head SHA`,
       );
       return;
     }
 
     reviewRemediationsThisRun++;
     console.log(
-      `🩹 PR #${pr.number}: ${BOT_REVIEW_STATUS_CONTEXT} missing on head SHA ${pr.head.sha} — ` +
-        `applying '${REVIEW_TRIGGER_LABEL}' to re-trigger Reviewer (W1) ` +
-        `(${reviewRemediationsThisRun}/${MAX_REVIEW_REMEDIATIONS_PER_RUN} this run)`,
+      `🩹 PR #${pr.number}: ${BOT_REVIEW_STATUS_CONTEXT} missing or stale on head SHA ` +
+        `${pr.head.sha} — ${labelPresent ? 'cycling' : 'applying'} '${REVIEW_TRIGGER_LABEL}' ` +
+        `to re-trigger Reviewer (W1) ` +
+        `(${reviewRemediationsThisRun}/${MAX_REVIEW_REMEDIATIONS_PER_RUN} this run, ` +
+        `self-heal attempt ${priorAttempts + 1}/${MAX_SELF_HEAL_ATTEMPTS_PER_SHA} for this SHA)`,
     );
+    if (labelPresent) {
+      try {
+        await github.rest.issues.removeLabel({
+          owner,
+          repo,
+          issue_number: pr.number,
+          name: REVIEW_TRIGGER_LABEL,
+        });
+      } catch (removeError) {
+        console.warn(
+          `⚠️ PR #${pr.number}: could not remove '${REVIEW_TRIGGER_LABEL}' before ` +
+            `re-adding: ${removeError.message}`,
+        );
+      }
+    }
     try {
       await github.rest.issues.addLabels({
         owner,
@@ -787,6 +885,70 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       console.warn(
         `⚠️ PR #${pr.number}: could not apply '${REVIEW_TRIGGER_LABEL}': ${labelError.message}`,
       );
+      return;
+    }
+    // Stamp the attempt AFTER the label ops succeed so a failed cycle does not
+    // burn an attempt. Also serves as the visible in-progress footprint until
+    // the re-triggered W1 run overwrites it.
+    try {
+      await github.rest.repos.createCommitStatus({
+        owner,
+        repo,
+        sha: pr.head.sha,
+        state: 'pending',
+        context: BOT_REVIEW_STATUS_CONTEXT,
+        description: `${SELF_HEAL_MARKER} #${priorAttempts + 1}: re-firing Reviewer (W1) (LS-9209)`,
+      });
+    } catch (statusError) {
+      console.warn(
+        `⚠️ PR #${pr.number}: could not stamp self-heal attempt status: ${statusError.message} — ` +
+          `if this is a 403, grant the Merge Queue GitHub App "Commit statuses: Read and write".`,
+      );
+    }
+  }
+
+  // LS-9209: PRs OUTSIDE the merge queue stall identically when their W1 run
+  // dies — and the queued-path remediation above never sees them (it only
+  // iterates merge-when-ready PRs). Sweep every open non-draft PR carrying
+  // the trigger label through the same remediation. One paginated pulls.list
+  // call (~1 request for <100 open PRs) plus one status read per labeled PR —
+  // far below the per-PR full validation that motivated the LS-8289
+  // label-filtered listing. Skipped under forceCheck, which already routes
+  // every open PR through the queued path.
+  async function sweepReviewStalls(processedPRNumbers) {
+    let openPRs;
+    try {
+      openPRs = await github.paginate(github.rest.pulls.list, {
+        owner,
+        repo,
+        state: 'open',
+        per_page: 100,
+      });
+    } catch (listError) {
+      console.warn(
+        `⚠️ Review-stall sweep: could not list open PRs: ${listError.message}`,
+      );
+      return;
+    }
+    const candidates = openPRs.filter(
+      (pr) =>
+        !pr.draft &&
+        !processedPRNumbers.has(pr.number) &&
+        pr.labels.some((l) => l.name === REVIEW_TRIGGER_LABEL),
+    );
+    if (candidates.length === 0) return;
+    console.log(
+      `\n🧹 Review-stall sweep: checking ${candidates.length} non-queued PR(s) ` +
+        `carrying '${REVIEW_TRIGGER_LABEL}'`,
+    );
+    for (const pr of candidates) {
+      try {
+        await remediateStaleBotReview(pr);
+      } catch (sweepError) {
+        console.warn(
+          `⚠️ Review-stall sweep: error on PR #${pr.number}: ${sweepError.message}`,
+        );
+      }
     }
   }
 

@@ -103,11 +103,11 @@ After fixing, validate before pushing. In **cloud** sessions run the seven `pc-*
 
 This is **not** a passing state. The orchestrated suite (lint/typecheck/test/build/e2e) is gated on the Reviewer Bot's review event, so the pipeline does not run on a plain push. The usual causes:
 
-1. **`bot:ready-for-review` was not (re-)applied** after the last push — the single most common cause. Re-apply it; it must be the **last** label op (Reviewer W1 uses `concurrency.cancel-in-progress`, so any later label cancels the run).
-2. **A label op landed after `bot:ready-for-review`** and cancelled the reviewer run before it dispatched CI. Re-apply the label last.
+1. **`bot:ready-for-review` was not (re-)applied** after the last push — the single most common cause. Re-apply it; it must be the **last** label op (see the ⛔ note in [SKILL.md](../SKILL.md) — since PR #4738 only the review-trigger labels and pushes can cancel an active W1 run, but label-last ordering remains required hygiene).
+2. **The Reviewer (W1) run died before posting any `bot-review` status** (LS-9209) — external run cancellation, a `check-runner-access` failure, or the review job queued forever on a starved self-hosted runner. Symptom: `github_pr_why_blocked` reports `bot-review (not yet registered)` (or a `bot-review` pending stuck >45 min) while the PR carries `bot:ready-for-review`. Since LS-9209, W1 posts a `bot-review: pending` footprint seconds into every qualifying run, and the merge-queue processor's review-stall sweep self-heals stalled PRs (queued or not) on its next wake by **cycling** the label — a bare re-add fires no event. After 2 dead re-triggers on one SHA it stops retrying and posts a terminal `bot-review` failure + `needs-human-arbitration`. Manual recovery (idle repo, or you want it now): remove then re-add `bot:ready-for-review`.
 3. **A stale `CI: *` label** (e.g. `CI: Lint Failure`) reflects a real failure from an earlier SHA that was never re-validated. Do not clear the label by hand — fix the underlying check and push; the label clears when the check passes.
 
-**Response**: re-arm the pipeline (re-apply `bot:ready-for-review` as the last label op), confirm `🚀 CI Pipeline` transitions out of `SKIPPED`, then resume the event loop. A green review on top of a `SKIPPED` pipeline is **not** mergeable — never treat the review verdict as sufficient while the pipeline has not actually run.
+**Response**: re-arm the pipeline (re-apply `bot:ready-for-review` as the last label op — remove first if already present, so a fresh `labeled` event fires), confirm `🚀 CI Pipeline` transitions out of `SKIPPED`, then resume the event loop. A green review on top of a `SKIPPED` pipeline is **not** mergeable — never treat the review verdict as sufficient while the pipeline has not actually run.
 
 ---
 

@@ -83,12 +83,22 @@ function makeGithub({
   commitStatuses = [],
   branchRules = [],
   workflowRuns = [],
+  // merge-when-ready listing (the queued-path loop). Defaults to [pr] so
+  // existing tests exercise the queued path unchanged; pass [] to test the
+  // LS-9209 review-stall sweep in isolation.
+  mergeReadyItems = undefined,
+  // Open-PR listing served to the LS-9209 review-stall sweep
+  // (paginate(pulls.list)). Defaults to [] so the sweep is inert in tests
+  // that don't exercise it.
+  sweepPRs = [],
 } = {}) {
   const calls = {
     merges: [],
     comments: [],
     updateBranch: [],
     labels: [],
+    labelsRemoved: [],
+    statuses: [],
     dispatches: [],
     reruns: [],
   };
@@ -99,6 +109,7 @@ function makeGithub({
     // paginate dispatches on the endpoint function reference
     paginate: async (fn, args) => {
       if (fn === github.rest.pulls.listReviews) return reviews;
+      if (fn === github.rest.pulls.list) return sweepPRs;
       if (fn === github.rest.checks.listForRef) {
         const res = await github.rest.checks.listForRef(args);
         return res.data.check_runs;
@@ -107,8 +118,8 @@ function makeGithub({
         const res = await github.rest.repos.listCommitStatusesForRef(args);
         return res.data;
       }
-      // default: PR list
-      return [pr];
+      // default: merge-when-ready PR list
+      return mergeReadyItems ?? [pr];
     },
 
     graphql: async (query) => {
@@ -150,6 +161,10 @@ function makeGithub({
           throw Object.assign(new Error('Not Found'), { status: 404 });
         },
         listCommitStatusesForRef: async () => ({ data: commitStatuses }),
+        createCommitStatus: async (args) => {
+          calls.statuses.push(args);
+          return { data: {} };
+        },
       },
       checks: {
         listForRef: async () => ({ data: { check_runs: checkRuns } }),
@@ -164,7 +179,9 @@ function makeGithub({
         addLabels: async (args) => {
           calls.labels.push(args);
         },
-        removeLabel: async () => {},
+        removeLabel: async (args) => {
+          calls.labelsRemoved.push(args);
+        },
       },
       git: { deleteRef: async () => {} },
       actions: {
@@ -1544,7 +1561,10 @@ describe('merge-queue-processor — bot-review self-heal (LS-8289)', () => {
     assert.deepStrictEqual(calls.labels[0].labels, ['bot:ready-for-review']);
   });
 
-  it('does not re-apply the label when bot:ready-for-review is already present', async () => {
+  it('cycles (removes then re-adds) the label when bot:ready-for-review is already present (LS-9209)', async () => {
+    // Pre-LS-9209 this state no-op'd with "needs manual attention", leaving
+    // the PR stalled indefinitely — a bare re-add fires no labeled event, but
+    // remove + re-add does.
     const { github, calls } = makeGithub({
       reviews: APPROVED_BOT_REVIEW,
       branchRules: BOT_REVIEW_RULES,
@@ -1566,7 +1586,23 @@ describe('merge-queue-processor — bot-review self-heal (LS-8289)', () => {
       isRetry: false,
     });
 
-    assert.strictEqual(calls.labels.length, 0, 'must not add labels');
+    assert.strictEqual(
+      calls.labelsRemoved.length,
+      1,
+      'should remove the stale label first',
+    );
+    assert.strictEqual(calls.labelsRemoved[0].name, 'bot:ready-for-review');
+    assert.strictEqual(calls.labels.length, 1, 'should re-add the label');
+    assert.deepStrictEqual(calls.labels[0].labels, ['bot:ready-for-review']);
+    assert.ok(
+      calls.statuses.some(
+        (s) =>
+          s.context === 'bot-review' &&
+          s.state === 'pending' &&
+          s.description.includes('self-heal re-trigger #1'),
+      ),
+      'should stamp the self-heal attempt marker on the head SHA',
+    );
   });
 
   it('re-triggers the reviewer when CHANGES_REQUESTED is stale (no bot-review status on head SHA)', async () => {
@@ -1745,6 +1781,218 @@ describe('merge-queue-processor — bot-review self-heal (LS-8289)', () => {
       1,
       'event-triggered runs keep the single self-retry',
     );
+  });
+});
+
+// ── review-stall sweep + escalation (LS-9209) ────────────────────────────────
+
+describe('merge-queue-processor — review-stall sweep (LS-9209)', () => {
+  const STALE_PENDING_AT = new Date(
+    Date.now() - 2 * 60 * 60 * 1000,
+  ).toISOString();
+
+  // A non-queued PR (no merge-when-ready) carrying the review trigger label.
+  const sweepPR = (overrides = {}) => ({
+    number: 42,
+    draft: false,
+    labels: [{ name: 'bot:ready-for-review' }],
+    head: { sha: HEAD_SHA },
+    ...overrides,
+  });
+
+  it('cycles the label on a non-queued PR whose head SHA has no bot-review status', async () => {
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [], // queue empty — the common stall scenario
+      sweepPRs: [sweepPR()],
+      commitStatuses: [],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.labelsRemoved.length, 1, 'label removed first');
+    assert.strictEqual(calls.labels.length, 1, 'label re-added');
+    assert.deepStrictEqual(calls.labels[0].labels, ['bot:ready-for-review']);
+    assert.strictEqual(calls.labels[0].issue_number, 42);
+    assert.ok(
+      calls.statuses.some(
+        (s) => s.state === 'pending' && s.description.includes('#1'),
+      ),
+      'attempt marker stamped',
+    );
+  });
+
+  it('heals a stale-pending footprint (dead W1 run after the LS-9209 early footprint posted)', async () => {
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [],
+      sweepPRs: [sweepPR()],
+      commitStatuses: [
+        {
+          context: 'bot-review',
+          state: 'pending',
+          description: 'Review cycle starting — awaiting Reviewer (W1)',
+          created_at: STALE_PENDING_AT,
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.labels.length, 1, 'stale pending → re-trigger');
+  });
+
+  it('leaves fresh pendings, terminal statuses, drafts, and arbitration-owned PRs alone', async () => {
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [],
+      sweepPRs: [
+        sweepPR({ number: 50 }),
+        sweepPR({ number: 51, draft: true }),
+        sweepPR({
+          number: 52,
+          labels: [
+            { name: 'bot:ready-for-review' },
+            { name: 'needs-human-arbitration' },
+          ],
+        }),
+        { number: 53, draft: false, labels: [], head: { sha: HEAD_SHA } },
+      ],
+      // Fresh pending covers PR 50 (shared SHA fixture).
+      commitStatuses: [
+        {
+          context: 'bot-review',
+          state: 'pending',
+          created_at: new Date().toISOString(),
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.labels.length, 0, 'nothing to heal');
+    assert.strictEqual(calls.labelsRemoved.length, 0);
+  });
+
+  it('escalates to bot-review failure + needs-human-arbitration after the per-SHA attempt cap', async () => {
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [],
+      sweepPRs: [sweepPR()],
+      // Two prior self-heal attempts already stamped on this SHA, the latest
+      // itself stale — the re-triggered W1 runs died too.
+      commitStatuses: [
+        {
+          context: 'bot-review',
+          state: 'pending',
+          description:
+            'self-heal re-trigger #1: re-firing Reviewer (W1) (LS-9209)',
+          created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          context: 'bot-review',
+          state: 'pending',
+          description:
+            'self-heal re-trigger #2: re-firing Reviewer (W1) (LS-9209)',
+          created_at: STALE_PENDING_AT,
+        },
+      ],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.ok(
+      calls.statuses.some(
+        (s) => s.state === 'failure' && s.context === 'bot-review',
+      ),
+      'terminal failure posted instead of a third re-trigger',
+    );
+    assert.deepStrictEqual(
+      calls.labels.map((l) => l.labels).flat(),
+      ['needs-human-arbitration'],
+      'arbitration label applied, trigger label NOT cycled again',
+    );
+    assert.strictEqual(calls.labelsRemoved.length, 0);
+  });
+
+  it('does not double-process a PR already handled by the queued-path loop', async () => {
+    const queuedPR = makePR({
+      labels: [{ name: 'merge-when-ready' }, { name: 'bot:ready-for-review' }],
+    });
+    const { github, calls } = makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      pr: queuedPR,
+      branchRules: [
+        {
+          type: 'required_status_checks',
+          parameters: {
+            required_status_checks: [
+              { context: 'bot-review' },
+              { context: 'CI Pipeline' },
+            ],
+          },
+        },
+      ],
+      commitStatuses: [],
+      // The same PR also appears in the open-PR listing the sweep reads.
+      sweepPRs: [queuedPR],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.labels.length,
+      1,
+      'exactly one remediation — the sweep must skip the queued PR',
+    );
+  });
+
+  it('dry-run sweep logs but performs no mutations', async () => {
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [],
+      sweepPRs: [sweepPR()],
+      commitStatuses: [],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: true,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.labels.length, 0);
+    assert.strictEqual(calls.labelsRemoved.length, 0);
+    assert.strictEqual(calls.statuses.length, 0);
   });
 });
 
