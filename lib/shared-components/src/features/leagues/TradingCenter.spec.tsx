@@ -1789,6 +1789,36 @@ describe('TradingCenter — ProposeTradeDialog (LS-5678)', () => {
     expect(await findByText(/you will give/i)).toBeTruthy();
   });
 
+  it('offer step has a "Back" button that returns to the team step without losing selected players', async () => {
+    const { getByText, findByText, queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    act(() => {
+      fireEvent.click(
+        getByText('Propose Trade').closest('button') as HTMLButtonElement,
+      );
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    await act(async () => {
+      fireEvent.click(await findByText('Aaron Judge'));
+    });
+
+    await act(async () => {
+      const backBtn = await findByText('← Back');
+      fireEvent.click(backBtn.closest('button') ?? backBtn);
+    });
+    expect(
+      await findByText(/select the team you want to trade with/i),
+    ).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(await findByText('Sluggers'));
+    });
+    expect(queryByText(/next.*select their players/i)).toBeTruthy();
+  });
+
   it('shows user roster players in the offer step', async () => {
     const { getByText, findByText } = render(
       <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,

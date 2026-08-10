@@ -1157,21 +1157,36 @@ function ProposeTradeDialog({
                     </Button>
                   );
                 })}
-              {draft.offeringPlayerIds.length > 0 && (
+              <XStack gap="$2" marginTop="$2">
                 <Button
-                  marginTop="$2"
-                  data-testid="trade-dialog-next-to-request"
-                  onPress={() => setStep('request')}
-                  backgroundColor={BRAND_NAVY_LIGHT}
+                  flex={1}
+                  data-testid="trade-dialog-back-to-team"
+                  onPress={() => setStep('team')}
+                  backgroundColor="$gray4"
                   borderRadius="$4"
                   animation="quick"
                   pressStyle={{ scale: 0.98 }}
                 >
-                  <Text fontSize="$3" fontWeight="700" color="white">
-                    Next — Select Their Players →
+                  <Text fontSize="$3" fontWeight="600" color="$gray11">
+                    ← Back
                   </Text>
                 </Button>
-              )}
+                {draft.offeringPlayerIds.length > 0 && (
+                  <Button
+                    flex={2}
+                    data-testid="trade-dialog-next-to-request"
+                    onPress={() => setStep('request')}
+                    backgroundColor={BRAND_NAVY_LIGHT}
+                    borderRadius="$4"
+                    animation="quick"
+                    pressStyle={{ scale: 0.98 }}
+                  >
+                    <Text fontSize="$3" fontWeight="700" color="white">
+                      Next — Select Their Players →
+                    </Text>
+                  </Button>
+                )}
+              </XStack>
             </YStack>
           )}
 
