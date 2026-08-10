@@ -26,7 +26,7 @@ Scaffold a new project in the monorepo with standardized configuration. Pick the
 1. **`project.json`** — register with Nx. Include `$schema`, `sourceRoot`, `projectType`, and `tags`. Libraries need `"typecheck": {}`; apps/lambdas override the typecheck command to use `tsconfig.app.json`.
 2. **`tsconfig.json`** — extend `../../tsconfig.base.json` (or `../../../tsconfig.base.json` for MCP servers). Use project references to split lib/app and spec configs.
 3. **`.eslintrc.json`** — extend root config. Always add `jest.config.ts` to `ignorePatterns`. Add `dist` for apps/lambdas.
-4. **`jest.config.ts`** — use `createNodeJestConfig` from `../../jest.helpers.ts`.
+4. **`jest.config.ts`** — use `createNodeJestConfig` from `../../jest.helpers.cjs`.
 5. **`package.json`** — `@legacy-sports/<name>`, `"private": true`. Libraries point `main`/`types` at `./src/index.ts`; lambdas point `main` at `dist/index.js`.
 6. **Path alias** (libraries only) — add `@legacy-sports/<name>` to `tsconfig.base.json` paths (alphabetical order).
 7. **Validate** — all of these must pass before committing:

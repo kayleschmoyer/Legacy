@@ -39,7 +39,7 @@ Use `--testPathPatterns` (plural; the singular form is deprecated in Jest 30+). 
 
 - `jest.config.ts` (root) — `getJestProjectsAsync()`, aggregates every project config.
 - `jest.preset.js` — shared preset (`@nx/jest/preset` + `watchman`, `cache`, `clearMocks`, `collectCoverageFrom` globs).
-- `jest.helpers.ts` — `createNodeJestConfig({ displayName, projectPath, overrides })`, the factory most node projects (lambdas, `lib/*`, `apps/cli`) use in their `jest.config.ts`.
+- `jest.helpers.cjs` — `createNodeJestConfig({ displayName, projectPath, overrides })`, the factory most node projects (lambdas, `lib/*`, `apps/cli`) use in their `jest.config.ts`.
 - Per-project `jest.config.ts` under each project root; `nx.json` `targetDefaults.test` sets `passWithNoTests: true` (which is why an empty match set passes silently — see the gate-hole note in [What Gates Merge](../SKILL.md#what-gates-merge)).
 
 ## CI behavior
@@ -66,5 +66,5 @@ Rewritten 2026-07-02 from the skills audit (`scratch/skills-audit/synthesis.json
 
 - DB spec naming: `Glob('**/*.db.spec.ts')` and `grep -n testMatch lambdas/db/jest.db.config.ts`
 - `make test` recipe: `grep -n -A2 '^test:' Makefile`
-- Jest config factory: `head -12 jest.helpers.ts`
+- Jest config factory: `head -12 jest.helpers.cjs`
 - `passWithNoTests`: `grep -n -A6 '"test":' nx.json`

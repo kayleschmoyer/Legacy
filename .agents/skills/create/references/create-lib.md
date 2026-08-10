@@ -146,7 +146,7 @@ lib/<name>/
 #### `jest.config.ts`
 
 ```typescript
-const { createNodeJestConfig } = require('../../jest.helpers.ts');
+const { createNodeJestConfig } = require('../../jest.helpers.cjs');
 
 module.exports = createNodeJestConfig({
   displayName: '<name>',

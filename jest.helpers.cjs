@@ -2,7 +2,7 @@
  * Shared Jest configuration factory for Nx projects.
  *
  * Usage (node libs/lambdas):
- *   const { createNodeJestConfig } = require('../../jest.helpers');
+ *   const { createNodeJestConfig } = require('../../jest.helpers.cjs');
  *   module.exports = createNodeJestConfig({ displayName: 'utils', projectPath: 'lib/utils' });
  */
 

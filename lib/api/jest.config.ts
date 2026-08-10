@@ -1,6 +1,6 @@
 ﻿import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const { createNodeJestConfig } = require('../../jest.helpers.ts');
+const { createNodeJestConfig } = require('../../jest.helpers.cjs');
 
 export default createNodeJestConfig({
   displayName: 'api',

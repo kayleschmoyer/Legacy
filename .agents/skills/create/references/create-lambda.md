@@ -233,7 +233,7 @@ Or rely on the existing `build:lambda` extends pattern if the default `tsconfig.
 #### `jest.config.ts`
 
 ```typescript
-const { createNodeJestConfig } = require('../../jest.helpers.ts');
+const { createNodeJestConfig } = require('../../jest.helpers.cjs');
 
 module.exports = createNodeJestConfig({
   displayName: '<name>',
@@ -244,7 +244,7 @@ module.exports = createNodeJestConfig({
 If the lambda needs environment variables during tests, add a `setupFiles` override:
 
 ```typescript
-const { createNodeJestConfig } = require('../../jest.helpers.ts');
+const { createNodeJestConfig } = require('../../jest.helpers.cjs');
 
 module.exports = createNodeJestConfig({
   displayName: '<name>',

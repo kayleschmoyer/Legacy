@@ -139,10 +139,10 @@ tsconfig.base.json (root -- strict, skipLibCheck, paths, etc.)
 
 ### Factory pattern
 
-All Node/server jest configs use the shared factory at `jest.helpers.ts`:
+All Node/server jest configs use the shared factory at `jest.helpers.cjs`:
 
 ```typescript
-const { createNodeJestConfig } = require('../../jest.helpers.ts');
+const { createNodeJestConfig } = require('../../jest.helpers.cjs');
 
 module.exports = createNodeJestConfig({
   displayName: '<project-name>',
@@ -180,7 +180,7 @@ Use `createRequire` instead of `require`:
 ```typescript
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
-const { createNodeJestConfig } = require('../../jest.helpers.ts');
+const { createNodeJestConfig } = require('../../jest.helpers.cjs');
 
 export default createNodeJestConfig({
   displayName: '<name>',
