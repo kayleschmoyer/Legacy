@@ -505,4 +505,46 @@ describe('useWebSocket', () => {
 
     expect(mockInstance.reconnectNow).not.toHaveBeenCalled();
   });
+
+  // ── Recovery after exhausted reconnect budget (LS-9220) ─────────────────
+
+  it('calls client.reconnectNow() when the tab becomes visible again', () => {
+    renderHook(() =>
+      useWebSocket({ url: 'wss://example.com', token: 'jwt-token' }),
+    );
+
+    jest.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(mockInstance.reconnectNow).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call reconnectNow when the tab is backgrounded', () => {
+    renderHook(() =>
+      useWebSocket({ url: 'wss://example.com', token: 'jwt-token' }),
+    );
+
+    jest.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(mockInstance.reconnectNow).not.toHaveBeenCalled();
+  });
+
+  it('removes the visibilitychange listener on unmount', () => {
+    const { unmount } = renderHook(() =>
+      useWebSocket({ url: 'wss://example.com', token: 'jwt-token' }),
+    );
+
+    unmount();
+    jest.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(mockInstance.reconnectNow).not.toHaveBeenCalled();
+  });
 });

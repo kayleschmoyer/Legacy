@@ -333,6 +333,29 @@ export function useWebSocket({
       window.addEventListener('online', handleOnline);
     }
 
+    // `online` only fires on a local network transition — it never fires
+    // for a transient backend/gateway blip that exhausts the reconnect
+    // budget while the browser's own connectivity never dropped (LS-9220:
+    // reconnect budget exhausted mid-draft with every GraphQL call still
+    // succeeding). A backgrounded tab is throttled by the browser and won't
+    // reliably keep retrying anyway, so treat the tab becoming visible again
+    // as a second "world around it has changed" signal, same rationale as
+    // the `online` handler above.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+      LOGGER.info('[useWebSocket] tab visible — attempting reconnect', {
+        viewContext,
+        leagueId,
+      });
+      client.reconnectNow();
+    };
+    const hasDocumentEvents =
+      typeof document !== 'undefined' &&
+      typeof document.addEventListener === 'function';
+    if (hasDocumentEvents) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
     // Set up event handlers
     let wasConnected = false;
 
@@ -500,6 +523,12 @@ export function useWebSocket({
       cancelled = true;
       if (hasWindowEvents) {
         window.removeEventListener('online', handleOnline);
+      }
+      if (hasDocumentEvents) {
+        document.removeEventListener(
+          'visibilitychange',
+          handleVisibilityChange,
+        );
       }
       unsubscribeConnected();
       unsubscribeDisconnected();
