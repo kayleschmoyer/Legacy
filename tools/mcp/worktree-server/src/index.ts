@@ -32,7 +32,10 @@ import {
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { checkJiraAuth } from './auth-checks';
-import { scanStagedForConflictMarkers } from './conflict-markers';
+import {
+  getConflictInfo,
+  scanStagedForConflictMarkers,
+} from './conflict-markers';
 import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
 import { ensureSufficientDepth } from './shallow-utils';
 import {
@@ -48,6 +51,7 @@ import {
   startJob,
   waitForJob,
 } from './jobs';
+import { mergeFromMain } from './merge-from-main';
 import { rebaseOntoMain } from './rebase-onto-main';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitish } from './resolve-commitish';
@@ -2828,6 +2832,37 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
+      name: 'worktree_merge_main',
+      description:
+        'Semantic one-shot merge: fetch origin/main → merge it into the current branch → push. ' +
+        'Complements worktree_rebase_onto_main for the merge-resolution path AGENTS.md sanctions ' +
+        'for PR merge-conflict notices ("merge the base branch ... into your PR head — or rebase"). ' +
+        'On conflict, leaves the merge in progress (does not abort) and returns the same structured ' +
+        'conflict info worktree_conflict_info provides (conflicted file list + marker locations) — ' +
+        'resolve, then worktree_commit + worktree_push, or worktree_run(command: "git merge --abort") to back out. ' +
+        'Refuses to operate on the main branch.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree.',
+          },
+          from: {
+            type: 'string',
+            description: 'Branch to merge from (default: "main").',
+          },
+          pushTimeoutMs: {
+            type: 'number',
+            description:
+              'Timeout for git push in milliseconds (default: 120000).',
+          },
+        },
+        required: [],
+      },
+    },
+    {
       name: 'worktree_fetch',
       description:
         'Fetch from a remote (git fetch [remote] [branch]). ' +
@@ -3650,13 +3685,8 @@ const handleCallTool = async (
       }
       const cwd = target.path;
       try {
-        // Use NUL-delimited output for safe path handling
-        const rawConflicts = run(
-          'git diff --name-only --diff-filter=U -z',
-          cwd,
-        );
-        const conflictedPaths = rawConflicts.split('\0').filter(Boolean);
-        if (conflictedPaths.length === 0) {
+        const { files } = getConflictInfo(cwd, run);
+        if (files.length === 0) {
           return {
             content: [
               {
@@ -3669,67 +3699,6 @@ const handleCallTool = async (
               },
             ],
           };
-        }
-        const files: Array<{
-          path: string;
-          conflicts: Array<{
-            startLine: number;
-            separatorLine: number;
-            endLine: number;
-            oursPreview: string;
-            theirsPreview: string;
-          }>;
-        }> = [];
-        for (const filePath of conflictedPaths) {
-          const fullPath = join(cwd, filePath);
-          if (!existsSync(fullPath)) {
-            files.push({ path: filePath, conflicts: [] });
-            continue;
-          }
-          const content = readFileSync(fullPath, 'utf-8');
-          const lines = content.split('\n');
-          const conflicts: Array<{
-            startLine: number;
-            separatorLine: number;
-            endLine: number;
-            oursPreview: string;
-            theirsPreview: string;
-          }> = [];
-          let i = 0;
-          while (i < lines.length) {
-            if (lines[i].startsWith('<<<<<<<')) {
-              const startLine = i + 1;
-              const oursLines: string[] = [];
-              i++;
-              while (i < lines.length && !lines[i].startsWith('=======')) {
-                oursLines.push(lines[i]);
-                i++;
-              }
-              const separatorLine = i + 1;
-              i++;
-              const theirsLines: string[] = [];
-              while (i < lines.length && !lines[i].startsWith('>>>>>>>')) {
-                theirsLines.push(lines[i]);
-                i++;
-              }
-              const endLine = i + 1;
-              const preview = (arr: string[]) => {
-                const suffix =
-                  arr.length > 3 ? `\n... (${arr.length} lines total)` : '';
-                const maxContent = 200 - suffix.length;
-                return arr.slice(0, 3).join('\n').slice(0, maxContent) + suffix;
-              };
-              conflicts.push({
-                startLine,
-                separatorLine,
-                endLine,
-                oursPreview: preview(oursLines),
-                theirsPreview: preview(theirsLines),
-              });
-            }
-            i++;
-          }
-          files.push({ path: filePath, conflicts });
         }
         return {
           content: [{ type: 'text', text: JSON.stringify({ files }, null, 2) }],
@@ -6010,6 +5979,61 @@ const handleCallTool = async (
             {
               type: 'text',
               text: `worktree_rebase_onto_main failed: ${detail}`,
+            },
+          ],
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_merge_main
+    // -----------------------------------------------------------------------
+    case 'worktree_merge_main': {
+      const {
+        worktree: wtKey,
+        from: fromRaw,
+        pushTimeoutMs: pushTimeoutRaw,
+      } = args as {
+        worktree?: string;
+        from?: string;
+        pushTimeoutMs?: number;
+      };
+
+      const from = fromRaw ?? 'main';
+      const pushTimeoutMs =
+        typeof pushTimeoutRaw === 'number' && pushTimeoutRaw > 0
+          ? pushTimeoutRaw
+          : 120_000;
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      try {
+        return mergeFromMain(
+          cwd,
+          { from, pushTimeoutMs },
+          {
+            runGit,
+            runShell: run,
+            nonInteractiveEnv: NON_INTERACTIVE_GIT_ENV,
+          },
+        );
+      } catch (err: unknown) {
+        const e = err as { stderr?: string; stdout?: string; message?: string };
+        const detail =
+          e.stderr?.trim() || e.stdout?.trim() || e.message || String(err);
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: `worktree_merge_main failed: ${detail}`,
             },
           ],
         };
