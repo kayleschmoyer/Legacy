@@ -8,6 +8,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import './styles.css';
 import {
+  Sport,
   type TeamFragment,
   useGetLeagueByIdQuery,
   useGetLeagueTeamsLazyQuery,
@@ -372,7 +373,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
         featureDescription="Full league access — roster management, live draft, commissioner tools, and advanced stats — is available on the Premium plan."
       >
         <LeagueDetailShell
-          sport="baseball"
+          sport={league.sport === Sport.Football ? 'football' : 'baseball'}
           className="ls-root"
           pageClassName="ls-page"
           league={{
