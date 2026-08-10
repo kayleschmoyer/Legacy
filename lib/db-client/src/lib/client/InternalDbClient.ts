@@ -28,6 +28,14 @@ export interface NewIdentityInput {
   providerAvatar?: string | null;
 }
 
+/** E2E/seed accounts use emails on this domain by convention (LS-9222). */
+const TEST_USER_EMAIL_DOMAIN = '@test.legacysports.dev';
+
+/** Whether an email belongs to the test-user domain convention (LS-9222). */
+export function isTestUserEmail(email: string): boolean {
+  return email.toLowerCase().endsWith(TEST_USER_EMAIL_DOMAIN);
+}
+
 export async function createUser(
   db: InternalDb,
   email: string,
@@ -37,6 +45,7 @@ export async function createUser(
     canonicalEmail: email,
     passwordHash: password,
     username: email,
+    isTestUser: isTestUserEmail(email),
   };
 
   return await db

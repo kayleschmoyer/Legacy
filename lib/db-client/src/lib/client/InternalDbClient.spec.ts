@@ -4,13 +4,36 @@
  *     selects only the MFA columns.
  *   - setUserMfa: writes both fields (+ updatedAt), returns the updated row,
  *     clears the secret when passed null, throws when the user does not exist.
+ *
+ * Also covers createUser's isTestUser assignment (LS-9222): new users are
+ * flagged based on the @test.legacysports.dev email-domain convention.
  */
-import { getUserMfa, type InternalDb, setUserMfa } from './InternalDbClient';
+import {
+  createUser,
+  getUserMfa,
+  type InternalDb,
+  isTestUserEmail,
+  setUserMfa,
+} from './InternalDbClient';
 import * as Schema from '../../drizzle/internal/schema';
 
 interface Capture {
   selectColumns?: Record<string, unknown>;
   updateValues?: Record<string, unknown>;
+  insertValues?: Record<string, unknown>;
+}
+
+function makeInsertDb(rows: unknown[], capture: Capture): InternalDb {
+  return {
+    insert: () => ({
+      values: (values: Record<string, unknown>) => {
+        capture.insertValues = values;
+        return {
+          returning: () => Promise.resolve(rows),
+        };
+      },
+    }),
+  } as unknown as InternalDb;
 }
 
 function makeSelectDb(rows: unknown[], capture: Capture): InternalDb {
@@ -113,5 +136,47 @@ describe('setUserMfa', () => {
     await expect(
       setUserMfa(db, 12345, { mfaEnabled: true, totpSecret: 'x' }),
     ).rejects.toThrow('Found non unique or inexistent value');
+  });
+});
+
+describe('isTestUserEmail', () => {
+  it.each([
+    'seed@test.legacysports.dev',
+    'SEED@TEST.LEGACYSPORTS.DEV',
+    'e2e.bot+1@test.legacysports.dev',
+  ])('returns true for test-domain email %s', (email) => {
+    expect(isTestUserEmail(email)).toBe(true);
+  });
+
+  it.each([
+    'real.user@example.com',
+    'someone@nottest.legacysports.dev',
+    'someone@test.legacysports.dev.evil.com',
+  ])('returns false for non-test-domain email %s', (email) => {
+    expect(isTestUserEmail(email)).toBe(false);
+  });
+});
+
+describe('createUser', () => {
+  it('sets isTestUser true when the email is on the test domain', async () => {
+    const capture: Capture = {};
+    const insertedRow = { id: 1, canonicalEmail: 'seed@test.legacysports.dev' };
+    const db = makeInsertDb([insertedRow], capture);
+
+    const result = await createUser(db, 'seed@test.legacysports.dev');
+
+    expect(result).toBe(insertedRow);
+    expect(capture.insertValues?.isTestUser).toBe(true);
+  });
+
+  it('sets isTestUser false for a regular email', async () => {
+    const capture: Capture = {};
+    const insertedRow = { id: 2, canonicalEmail: 'real.user@example.com' };
+    const db = makeInsertDb([insertedRow], capture);
+
+    await createUser(db, 'real.user@example.com', 'hashed-password');
+
+    expect(capture.insertValues?.isTestUser).toBe(false);
+    expect(capture.insertValues?.passwordHash).toBe('hashed-password');
   });
 });

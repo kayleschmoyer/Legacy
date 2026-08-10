@@ -16,6 +16,7 @@ import {
   char,
   pgEnum,
   pgView,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { accessLevel } from './Enums';
@@ -29,6 +30,7 @@ export const users = pgView('users', {
   subscriptionTier: text('subscription_tier'),
   themePreference: varchar('theme_preference', { length: 10 }),
   canonicalEmailSource: text('canonical_email_source'),
+  isTestUser: boolean('is_test_user'),
 }).as(sql`SELECT id,
        canonical_email,
        username,
@@ -36,5 +38,6 @@ export const users = pgView('users', {
        avatar_url,
        subscription_tier::text AS subscription_tier,
        theme_preference,
-       canonical_email_source::text AS canonical_email_source
+       canonical_email_source::text AS canonical_email_source,
+       is_test_user
 FROM app_internal.users`);

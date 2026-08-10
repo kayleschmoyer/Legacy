@@ -90,6 +90,11 @@ export const usersInAppInternal = appInternal.table(
     passwordResetExpiresAt: timestamp('password_reset_expires_at', {
       withTimezone: true,
     }),
+    // Informational-only signal identifying E2E/seed accounts (LS-9222). Set at
+    // creation time from the canonical email domain; nothing in app behavior
+    // (entitlements, auth, matchmaking, analytics, etc.) may read or branch on
+    // it — see the ticket's "Goals" section.
+    isTestUser: boolean('is_test_user'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

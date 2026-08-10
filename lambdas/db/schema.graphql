@@ -5071,6 +5071,7 @@ type User {
   avatarUrl: String
   email: String
   id: Int
+  isTestUser: Boolean
   subscriptionTier: String
   themePreference: String
   username: String

@@ -4868,6 +4868,7 @@ export type User = {
   avatarUrl?: Maybe<Scalars['String']['output']>;
   email?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
+  isTestUser?: Maybe<Scalars['Boolean']['output']>;
   subscriptionTier?: Maybe<Scalars['String']['output']>;
   themePreference?: Maybe<Scalars['String']['output']>;
   username?: Maybe<Scalars['String']['output']>;

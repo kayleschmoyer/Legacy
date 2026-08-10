@@ -141,6 +141,7 @@ const mockUser = {
   canonicalEmailSource: 'discord' as const,
   passwordResetToken: null,
   passwordResetExpiresAt: null,
+  isTestUser: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };

@@ -24,6 +24,9 @@ export const UserRef = builder.objectRef<{
   avatarUrl?: string | null;
   subscriptionTier?: string | null;
   themePreference?: string | null;
+  // Informational-only signal identifying E2E/seed accounts (LS-9222). Never
+  // read or branch on this in app behavior — see AC4 on the ticket.
+  isTestUser?: boolean | null;
 }>('User');
 
 UserRef.implement({
@@ -35,6 +38,8 @@ UserRef.implement({
     avatarUrl: t.exposeString('avatarUrl', { nullable: true }),
     subscriptionTier: t.exposeString('subscriptionTier', { nullable: true }),
     themePreference: t.exposeString('themePreference', { nullable: true }),
+    // Read-only: intentionally not settable via any mutation/input type (AC3).
+    isTestUser: t.exposeBoolean('isTestUser', { nullable: true }),
   }),
 });
 
@@ -208,6 +213,7 @@ builder.queryField('users', (t) =>
         avatarUrl: u.avatarUrl ?? null,
         subscriptionTier: u.subscriptionTier ?? null,
         themePreference: u.themePreference ?? null,
+        isTestUser: u.isTestUser ?? null,
       }));
     },
   }),
@@ -280,6 +286,7 @@ builder.queryField('user', (t) =>
         // other resolver that builds the `User` shape (below).
         subscriptionTier: user.subscriptionTier ?? null,
         themePreference: user.themePreference ?? null,
+        isTestUser: user.isTestUser ?? null,
       };
     },
   }),
@@ -313,6 +320,7 @@ builder.queryField('userByEmail', (t) =>
         avatarUrl: foundUser.avatarUrl ?? null,
         subscriptionTier: foundUser.subscriptionTier ?? null,
         themePreference: foundUser.themePreference ?? null,
+        isTestUser: foundUser.isTestUser ?? null,
       };
     },
   }),
@@ -344,6 +352,7 @@ builder.queryField('searchUsers', (t) =>
         avatarUrl: user.avatarUrl ?? null,
         subscriptionTier: user.subscriptionTier ?? null,
         themePreference: user.themePreference ?? null,
+        isTestUser: user.isTestUser ?? null,
       }));
     },
   }),
@@ -380,6 +389,7 @@ builder.mutationField('updateUserRole', (t) =>
         avatarUrl: updated.avatarUrl ?? null,
         subscriptionTier: updated.subscriptionTier ?? null,
         themePreference: updated.themePreference ?? null,
+        isTestUser: updated.isTestUser ?? null,
       };
     },
   }),
@@ -424,6 +434,7 @@ builder.mutationField('updateUsername', (t) =>
           avatarUrl: updated.avatarUrl ?? null,
           subscriptionTier: updated.subscriptionTier ?? null,
           themePreference: updated.themePreference ?? null,
+          isTestUser: updated.isTestUser ?? null,
         };
       } catch (error: unknown) {
         // Check for Postgres unique constraint violation (code 23505)
@@ -473,6 +484,7 @@ builder.mutationField('updateUserAvatar', (t) =>
         avatarUrl: updated.avatarUrl ?? null,
         subscriptionTier: updated.subscriptionTier ?? null,
         themePreference: updated.themePreference ?? null,
+        isTestUser: updated.isTestUser ?? null,
       };
     },
   }),
@@ -519,6 +531,7 @@ builder.mutationField('updateUserTheme', (t) =>
         avatarUrl: updated.avatarUrl ?? null,
         subscriptionTier: updated.subscriptionTier ?? null,
         themePreference: updated.themePreference ?? null,
+        isTestUser: updated.isTestUser ?? null,
       };
     },
   }),
@@ -709,6 +722,7 @@ const SetCanonicalEmailResultRef = builder.objectRef<{
     avatarUrl?: string | null;
     subscriptionTier?: string | null;
     themePreference?: string | null;
+    isTestUser?: boolean | null;
   };
   changed: boolean;
 }>('SetCanonicalEmailResult');
@@ -777,6 +791,7 @@ builder.mutationField('setCanonicalEmail', (t) =>
           avatarUrl: result.user.avatarUrl ?? null,
           subscriptionTier: result.user.subscriptionTier ?? null,
           themePreference: result.user.themePreference ?? null,
+          isTestUser: result.user.isTestUser ?? null,
         },
         changed: result.changed,
       };
