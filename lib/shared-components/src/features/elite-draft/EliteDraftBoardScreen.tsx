@@ -354,7 +354,11 @@ function CompactLiveDraftBoard({
 
   const canCommissionerPick = ui.commPickMode && queries.isCommissioner;
   const canDraft = isMyPick || canCommissionerPick;
-  const showCommissionerBar = queries.isCommissioner;
+  // Mock drafts auto-register the human as "commissioner" (initialize-mock-draft.ts)
+  // so the queue/pick flow works, but there's no real commissioner role to manage
+  // in a solo practice draft — the controls should never surface there (LS-9242).
+  const showCommissionerBar =
+    queries.isCommissioner && !queries.league?.isMockDraft;
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -1170,6 +1174,7 @@ export function EliteDraftBoardScreen({
           leagueTeamsLength={queries.leagueTeams.length}
           isCommissioner={queries.isCommissioner}
           isOwner={queries.isOwner}
+          isMockDraft={queries.league?.isMockDraft ?? false}
           draftId={queries.draftId}
           commPickMode={ui.commPickMode}
           autoPickDisabled={ui.autoPickDisabled}

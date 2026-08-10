@@ -27,6 +27,10 @@ interface DraftTopBandProps {
   leagueTeamsLength: number;
   isCommissioner: boolean;
   isOwner: boolean;
+  /** Mock drafts auto-register the human as commissioner so the pick flow works,
+   * but there's no real commissioner role to manage in a solo practice draft — the
+   * commissioner controls should never render there (LS-9242). */
+  isMockDraft?: boolean;
   draftId: number | null;
   commPickMode: boolean;
   autoPickDisabled: boolean;
@@ -346,6 +350,7 @@ export function DraftTopBand({
   leagueTeamsLength,
   isCommissioner,
   isOwner: _isOwner,
+  isMockDraft = false,
   draftId,
   commPickMode,
   autoPickDisabled,
@@ -398,7 +403,7 @@ export function DraftTopBand({
     ? teamNameById(currentPickInfo.teamId)
     : null;
 
-  const showCommish = isCommissioner && !!draftId;
+  const showCommish = isCommissioner && !!draftId && !isMockDraft;
   const showAutopick = draftId !== null && myTeamId !== null;
 
   return (

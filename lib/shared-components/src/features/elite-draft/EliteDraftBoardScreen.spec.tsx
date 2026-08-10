@@ -1371,6 +1371,30 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
       },
     );
   });
+
+  // LS-9242: initialize-mock-draft.ts registers the human as
+  // permissionLevel="commissioner" so the pick/queue flow works, but a solo
+  // mock draft has no real commissioner role to manage — the commissioner
+  // controls must stay hidden even though isCommissioner is true.
+  it('hides commissioner controls in a mock draft even though the user is registered as commissioner', () => {
+    setupCompactLiveDraft({
+      queries: {
+        isCommissioner: true,
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'in-progress',
+          isMockDraft: true,
+          userMembership: { permissionLevel: 'commissioner', teamId: 1 },
+        },
+      },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.queryByText('PAUSE')).toBeNull();
+    expect(screen.queryByText('COMM PICK')).toBeNull();
+  });
 });
 
 describe('EliteDraftBoardScreen — compact viewport, pick announcement', () => {

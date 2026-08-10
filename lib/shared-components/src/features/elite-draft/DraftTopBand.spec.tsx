@@ -122,6 +122,19 @@ describe('DraftTopBand autopick visibility (LS-7980)', () => {
     expect(getByRole('button', { name: /pause/i })).toBeTruthy();
   });
 
+  it('hides commissioner controls in a mock draft even though the user is registered as commissioner (LS-9242)', () => {
+    const { queryByRole } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={true}
+        isOwner={true}
+        isMockDraft={true}
+      />,
+    );
+    expect(queryByRole('button', { name: /pause/i })).toBeNull();
+    expect(queryByRole('button', { name: /commish/i })).toBeNull();
+  });
+
   it('hides the autopick toggle when the user has no team (myTeamId null)', () => {
     const { queryByRole } = render(
       <DraftTopBand
