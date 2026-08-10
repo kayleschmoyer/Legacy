@@ -74,6 +74,15 @@ jest.mock('../scoring/LeagueScoringEditor', () => {
   };
 });
 
+jest.mock('../../screens/leagues/football/FootballLeagueScoringScreen', () => {
+  const { View } = jest.requireActual<RNComponents>('react-native');
+  return {
+    FootballLeagueScoringScreen: () => (
+      <View testID="football-league-scoring-screen" />
+    ),
+  };
+});
+
 jest.mock('../../common/scoring/LeagueScoringProvider', () => ({
   useLeagueScoringSettings: jest.fn(() => ({
     profile: null,
@@ -235,6 +244,18 @@ describe('CommissionerScreen', () => {
       expect(screen.getByTestId('league-settings-control')).toBeTruthy();
       expect(screen.getByTestId('delete-league-control')).toBeTruthy();
       expect(screen.getByTestId('commissioner-audit-log')).toBeTruthy();
+    });
+
+    it('renders FootballLeagueScoringScreen instead of the baseball LeagueScoringEditor (LS-9042)', () => {
+      render(
+        <CommissionerScreen
+          leagueId={1}
+          league={mockFootballLeague as unknown as AppLeagueFragment}
+          onLeagueDeleted={mockOnLeagueDeleted}
+        />,
+      );
+      expect(screen.getByTestId('football-league-scoring-screen')).toBeTruthy();
+      expect(screen.queryByTestId('league-scoring-editor')).toBeNull();
     });
   });
 });

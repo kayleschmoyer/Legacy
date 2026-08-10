@@ -81,6 +81,10 @@ jest.mock('../../../features/baseball/LeagueScoringEditor', () => ({
   LeagueScoringEditor: () => <div data-testid="scoring-editor" />,
 }));
 
+jest.mock('../../../components/leagues/ScoringSettingsEditor', () => ({
+  ScoringSettingsEditor: () => <div data-testid="football-scoring-editor" />,
+}));
+
 jest.mock('../../../features/commissioner/DeleteLeagueControl', () => ({
   DeleteLeagueControl: () => <div data-testid="delete-league" />,
 }));

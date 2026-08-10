@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
-  DefensiveFormat,
   type LeagueFragment,
   Sport,
   type TeamFragment,
@@ -22,6 +21,7 @@ import { LeagueDuesControl } from '../../../../components/commissioner/LeagueDue
 import { LeagueDuesStatusDashboard } from '../../../../components/commissioner/LeagueDuesStatusDashboard';
 import { SeasonAwardsControl } from '../../../../components/commissioner/SeasonAwardsControl';
 import { LeagueScoringEditor } from '../../../../features/baseball/LeagueScoringEditor';
+import { ScoringSettingsEditor } from '../../../../components/leagues/ScoringSettingsEditor';
 import { DeleteLeagueControl } from '../../../../features/commissioner/DeleteLeagueControl';
 import { LeagueSettingsControl } from '../../../../components/commissioner/LeagueSettingsControl';
 import { WaiverProcessControl } from '../../../../features/commissioner';
@@ -402,45 +402,24 @@ export const CommishTab: React.FC<CommishTabProps> = ({
       id: 'scoring',
       label: 'Scoring Rules',
       icon: <I.List size={16} />,
-      ...(isFootball
-        ? {
-            badge: (
-              <span
-                className="ls-chip"
-                style={{ marginLeft: 8, fontSize: 9, opacity: 0.6 }}
-              >
-                Coming Soon
-              </span>
-            ),
-            disabled: true,
-          }
-        : {}),
+      // LS-9042: two different editor components, not platform duplication —
+      // LeagueScoringEditor hardcodes GROUP_ORDER to the three baseball groups
+      // (batting/pitching/fielding), while ScoringSettingsEditor is sport-aware
+      // (passing/rushing/receiving/kicking + DST or IDP) via getGroupOrder().
       content: leagueId ? (
         isFootball ? (
-          <div
-            style={{
-              padding: '24px 16px',
-              textAlign: 'center',
-              color: 'var(--fg3)',
-              fontSize: 13,
+          <ScoringSettingsEditor
+            leagueId={leagueId}
+            profile={scoringProfile}
+            loading={scoringLoading}
+            error={scoringError ?? null}
+            onRefetch={async () => {
+              await refetchScoring();
             }}
-          >
-            <div
-              style={{
-                fontFamily: 'var(--font-display)',
-                fontWeight: 700,
-                fontSize: 14,
-                color: 'var(--fg2)',
-                marginBottom: 6,
-                letterSpacing: '.04em',
-              }}
-            >
-              Football Scoring Editor
-            </div>
-            Football scoring settings (passing, rushing, receiving, kicking
-            {league.defensiveFormat === DefensiveFormat.Idp ? ', IDP' : ', DST'}
-            ) will be configurable here once the football scoring editor ships.
-          </div>
+            draftStatus={league.draftStatus}
+            sport="football"
+            defensiveFormat={league.defensiveFormat}
+          />
         ) : (
           <LeagueScoringEditor
             leagueId={leagueId}

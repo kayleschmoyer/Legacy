@@ -21,6 +21,7 @@ import { Sport } from '@legacy-sports/graphql';
 import type { AppLeagueFragment } from '@legacy-sports/graphql';
 import { LeagueDuesSetup } from './LeagueDuesSetup';
 import { LeagueScoringEditor } from '../scoring/LeagueScoringEditor';
+import { FootballLeagueScoringScreen } from '../../screens/leagues/football/FootballLeagueScoringScreen';
 import { useLeagueScoringSettings } from '../../common/scoring/LeagueScoringProvider';
 import {
   useCurrentWeek,
@@ -170,15 +171,31 @@ export function CommissionerScreen({
           onError={handleError}
         />
 
-        <LeagueScoringEditor
-          leagueId={leagueId}
-          profile={scoringProfile}
-          loading={scoringLoading}
-          error={scoringError}
-          onRefetch={async () => {
-            await refetchScoringProfile();
-          }}
-        />
+        {/* LS-9042: LeagueScoringEditor hardcodes SCORING_GROUP_ORDER to the
+            three baseball groups, so football leagues need the group-aware
+            FootballLeagueScoringScreen instead — not platform duplication. */}
+        {isFootball ? (
+          <FootballLeagueScoringScreen
+            leagueId={leagueId}
+            profile={scoringProfile}
+            loading={scoringLoading}
+            error={scoringError ?? null}
+            onRefetch={async () => {
+              await refetchScoringProfile();
+            }}
+            defensiveFormat={league.defensiveFormat}
+          />
+        ) : (
+          <LeagueScoringEditor
+            leagueId={leagueId}
+            profile={scoringProfile}
+            loading={scoringLoading}
+            error={scoringError ?? null}
+            onRefetch={async () => {
+              await refetchScoringProfile();
+            }}
+          />
+        )}
 
         <AchievementRestrictionsControl
           leagueId={leagueId}

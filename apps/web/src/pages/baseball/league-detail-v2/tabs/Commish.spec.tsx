@@ -1,11 +1,11 @@
 /**
- * Tests for CommishTab football-awareness (LS-4152).
+ * Tests for CommishTab football-awareness (LS-4152, LS-9042).
  *
  * Covers:
  *   1. Baseball league: "Draft Settings" accordion button is present.
  *   2. Football league: "Draft Settings" accordion button is absent.
- *   3. Football league: opening "Scoring Rules" shows the football placeholder.
- *   4. Football league: IDP vs DST distinction is reflected in scoring placeholder.
+ *   3. Football league: opening "Scoring Rules" renders the football scoring editor.
+ *   4. Football league: IDP vs DST is passed through to the scoring editor.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 import React from 'react';
@@ -105,6 +105,15 @@ jest.mock('../../../../components/commissioner/SeasonAwardsControl', () => ({
 jest.mock('../../../../features/baseball/LeagueScoringEditor', () => ({
   LeagueScoringEditor: () => <div data-testid="league-scoring-editor" />,
 }));
+jest.mock('../../../../components/leagues/ScoringSettingsEditor', () => ({
+  ScoringSettingsEditor: (props: any) => (
+    <div
+      data-testid="football-scoring-editor"
+      data-sport={props.sport}
+      data-defensive-format={props.defensiveFormat}
+    />
+  ),
+}));
 jest.mock('../../../../features/commissioner/DeleteLeagueControl', () => ({
   DeleteLeagueControl: () => <div data-testid="delete-league-control" />,
 }));
@@ -157,20 +166,17 @@ describe('CommishTab — football-awareness', () => {
     expect(screen.queryByText('Draft Settings')).not.toBeInTheDocument();
   });
 
-  it('shows "Coming Soon" badge on "Scoring Rules" row for a football league (LS-5916)', () => {
+  it('"Scoring Rules" accordion has no "Coming Soon" badge for a football league (LS-9042)', () => {
     renderCommish({ sport: 'football', defensiveFormat: 'dst' });
-    expect(screen.getByText('Coming Soon')).toBeInTheDocument();
+    expect(screen.queryByText('Coming Soon')).not.toBeInTheDocument();
   });
 
-  it('"Scoring Rules" accordion is disabled for a football league — click does not expand it (LS-5916)', () => {
+  it('"Scoring Rules" accordion is not disabled for a football league — click expands it (LS-9042)', () => {
     renderCommish({ sport: 'football', defensiveFormat: 'dst' });
     const scoringButton = screen.getByText('Scoring Rules').closest('button');
-    expect(scoringButton).toHaveAttribute('aria-disabled', 'true');
-    // Click should not reveal the placeholder
+    expect(scoringButton).not.toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(screen.getByText('Scoring Rules'));
-    expect(
-      screen.queryByText('Football Scoring Editor'),
-    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('football-scoring-editor')).toBeInTheDocument();
   });
 
   it('"Scoring Rules" accordion has no "Coming Soon" badge for a baseball league (LS-5916)', () => {
@@ -178,21 +184,25 @@ describe('CommishTab — football-awareness', () => {
     expect(screen.queryByText('Coming Soon')).not.toBeInTheDocument();
   });
 
-  it('shows football scoring placeholder when "Scoring Rules" content is rendered for a football league', () => {
+  it('shows the football scoring editor wired to leagueId/profile/loading/error/draftStatus when "Scoring Rules" is opened for a DST football league (LS-9042)', () => {
     renderCommish({ sport: 'football', defensiveFormat: 'dst' });
-    // The placeholder is in the content but the accordion is disabled — it stays hidden
-    expect(
-      screen.queryByText('Football Scoring Editor'),
-    ).not.toBeInTheDocument();
-    // The baseball LeagueScoringEditor must NOT be rendered either
+    fireEvent.click(screen.getByText('Scoring Rules'));
+    const editor = screen.getByTestId('football-scoring-editor');
+    expect(editor).toBeInTheDocument();
+    expect(editor).toHaveAttribute('data-sport', 'football');
+    expect(editor).toHaveAttribute('data-defensive-format', 'dst');
+    // The baseball LeagueScoringEditor must NOT be rendered
     expect(
       screen.queryByTestId('league-scoring-editor'),
     ).not.toBeInTheDocument();
   });
 
-  it('shows "Coming Soon" badge on "Scoring Rules" for football IDP leagues too (LS-5916)', () => {
+  it('shows the football scoring editor for IDP leagues too (LS-9042)', () => {
     renderCommish({ sport: 'football', defensiveFormat: 'idp' });
-    expect(screen.getByText('Coming Soon')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Scoring Rules'));
+    const editor = screen.getByTestId('football-scoring-editor');
+    expect(editor).toBeInTheDocument();
+    expect(editor).toHaveAttribute('data-defensive-format', 'idp');
   });
 
   it('shows the baseball scoring editor when "Scoring Rules" is opened for a baseball league', () => {
@@ -200,7 +210,7 @@ describe('CommishTab — football-awareness', () => {
     fireEvent.click(screen.getByText('Scoring Rules'));
     expect(screen.getByTestId('league-scoring-editor')).toBeInTheDocument();
     expect(
-      screen.queryByText('Football Scoring Editor'),
+      screen.queryByTestId('football-scoring-editor'),
     ).not.toBeInTheDocument();
   });
 });
