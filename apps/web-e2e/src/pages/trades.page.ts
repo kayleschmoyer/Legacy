@@ -134,9 +134,17 @@ export class TradesPage extends BaseScreen {
    * render. Gate on the header "Propose Trade" button — it is present for every
    * member regardless of trade/offer/team state (`networkidle` is defeated by
    * the league chat long-poll and the trades WebSocket; ADR-0015 Context).
+   *
+   * `sport` selects the route prefix — the shared `LeagueDetailPageV2` /
+   * `TradingCenter` components serve both `/baseball/league/:id/trades` and
+   * `/football/league/:id/trades` (LS-5423), so a single page object covers
+   * both without duplicating locators.
    */
-  async gotoTrades(leagueId: number): Promise<void> {
-    await this.driver.open(`/baseball/league/${leagueId}/trades`);
+  async gotoTrades(
+    leagueId: number,
+    sport: 'baseball' | 'football' = 'baseball',
+  ): Promise<void> {
+    await this.driver.open(`/${sport}/league/${leagueId}/trades`);
     await this.proposeTradeButton.expectVisible({ timeout: 15000 });
   }
 
