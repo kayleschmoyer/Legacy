@@ -82,7 +82,7 @@ jest.mock('@legacy-sports/shared-components/players', () => ({
         <button
           type="button"
           data-testid="share-button"
-          onClick={() => props.onShare?.('/players/stats?view=combined')}
+          onClick={() => props.onShare?.('/players?view=combined')}
         >
           Share
         </button>
@@ -591,8 +591,8 @@ describe('PlayerStatsRoute share fallback', () => {
 
   // The host builds the absolute URL from origin + relative path + sport. jsdom
   // origin is http://localhost; the mocked share button passes
-  // /players/stats?view=combined and sport=mlb is appended.
-  const EXPECTED_URL = 'http://localhost/players/stats?view=combined&sport=mlb';
+  // /players?view=combined and sport=mlb is appended.
+  const EXPECTED_URL = 'http://localhost/players?view=combined&sport=mlb';
 
   beforeEach(() => {
     mockNavigate.mockClear();
@@ -1067,7 +1067,7 @@ describe('PlayerStatsRoute player deep link (PST-051)', () => {
     mockOnPlayerDetailsRef.current = undefined;
     // The close / filter-commit handlers read the LIVE URL (window.location)
     // rather than the React-state snapshot, so reset jsdom's history per test.
-    window.history.replaceState(null, '', '/players/stats');
+    window.history.replaceState(null, '', '/players');
   });
 
   it('auto-opens the detail modal for the player in ?playerId on mount (AC3)', () => {
@@ -1113,7 +1113,7 @@ describe('PlayerStatsRoute player deep link (PST-051)', () => {
     window.history.replaceState(
       null,
       '',
-      `/players/stats?${mockSearchParams.toString()}`,
+      `/players?${mockSearchParams.toString()}`,
     );
     render(<PlayerStatsRoute />);
     fireEvent.click(screen.getByTestId('close-modal'));
@@ -1134,7 +1134,7 @@ describe('PlayerStatsRoute player deep link (PST-051)', () => {
     window.history.replaceState(
       null,
       '',
-      `/players/stats?${mockSearchParams.toString()}`,
+      `/players?${mockSearchParams.toString()}`,
     );
     render(<PlayerStatsRoute />);
     act(() => {

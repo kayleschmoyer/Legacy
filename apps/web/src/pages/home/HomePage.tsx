@@ -233,7 +233,7 @@ export function HomePage(): React.JSX.Element {
           onMockDraft={(s) => navigate(leagueMockDraftRoute(s))}
           onCreateLeague={(sportKey) => navigate(`/${sportKey}/league/create`)}
           onJoinLeague={() => navigate(JOIN_BASEBALL_LEAGUE_ROUTE)}
-          onBrowseStats={() => navigate('/players/stats')}
+          onBrowseStats={() => navigate('/players')}
           onViewSport={(sport) =>
             navigate(sport === 'football' ? '/football' : '/baseball')
           }

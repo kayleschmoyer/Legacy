@@ -115,7 +115,7 @@ export const PITCHING_NAME_COLUMN_KEY = 'playerName';
 // Column Configuration
 // =============================================================================
 
-// Column order mirrors docs/agents/pages/players/stats.md (Pitcher Columns section):
+// Column order mirrors docs/agents/pages/players/index.md (Pitcher Columns section):
 // Name · Position · [Team omitted — not available on CareerPitching data model] ·
 // G · GS · W · L · IP · ERA · SO · BB · WHIP · SHO · SV · K/9
 // Additional non-spec columns (CG, H, ER, WAR) follow at the end. Fantasy points

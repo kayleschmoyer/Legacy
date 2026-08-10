@@ -101,7 +101,6 @@ const secret = await readSecret({ secretName: 'db-credentials' });
 ```typescript
 // Screen components work the same across platforms
 import {
-  PlayersScreen,
   HomeScreen,
   AppProvider
 } from '@legacy-sports/shared-components';
@@ -110,7 +109,6 @@ function App() {
   return (
     <AppProvider apolloClient={client} colorScheme="dark">
       <HomeScreen />
-      <PlayersScreen />
     </AppProvider>
   );
 }
@@ -138,7 +136,6 @@ lib/shared-components/
 Pre-built screens ready to use:
 
 - `HomeScreen`: Dashboard and navigation
-- `PlayersScreen`: Player data display
 - `BaseballScreen`: Baseball-specific views
 - `FootballScreen`: Football-specific views
 - `DemoScreen`: Component demonstrations
@@ -227,12 +224,12 @@ Components automatically adapt:
 ### In React Native App
 
 ```typescript
-import { PlayersScreen, AppProvider } from '@legacy-sports/shared-components';
+import { HomeScreen, AppProvider } from '@legacy-sports/shared-components';
 
 function App() {
   return (
     <AppProvider apolloClient={client} colorScheme="dark">
-      <PlayersScreen />
+      <HomeScreen />
     </AppProvider>
   );
 }
@@ -241,12 +238,12 @@ function App() {
 ### In Web App
 
 ```typescript
-import { PlayersScreen, AppProvider } from '@legacy-sports/shared-components';
+import { HomeScreen, AppProvider } from '@legacy-sports/shared-components';
 
 function App() {
   return (
     <AppProvider apolloClient={client} colorScheme="dark">
-      <PlayersScreen />
+      <HomeScreen />
     </AppProvider>
   );
 }

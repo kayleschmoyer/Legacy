@@ -335,7 +335,8 @@ export function buildShareUrl(
     params.set('sortBy', sortFilter.sortBy);
     params.set('sortDir', sortFilter.sortDir ?? DEFAULT_BATTING_SORT_DIR);
   }
-  return `/players/stats?${params.toString()}`;
+  // LS-9076: /players is the canonical stats route (formerly /players/stats).
+  return `/players?${params.toString()}`;
 }
 
 /**

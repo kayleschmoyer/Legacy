@@ -727,7 +727,7 @@ test.describe('Player Detail Deep Link — from Matchup @regression', () => {
 // ── Tests: back navigation from deep link ────────────────────────────────────
 
 test.describe('Player Detail Deep Link — back navigation @regression', () => {
-  test('back button from a direct /players/:id deep link returns to /players/stats', async ({
+  test('back button from a direct /players/:id deep link returns to /players', async ({
     page,
     playersPage,
   }) => {
@@ -739,7 +739,8 @@ test.describe('Player Detail Deep Link — back navigation @regression', () => {
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectBackButton();
 
-    // Back from a cold deep link falls back to /players/stats
+    // Back from a cold deep link falls back to /players (LS-9076 — the
+    // canonical stats route, formerly /players/stats)
     await playersPage.detail.back();
     await playersPage.detail.waitForStatsList();
   });

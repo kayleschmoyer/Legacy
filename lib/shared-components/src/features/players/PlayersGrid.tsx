@@ -27,9 +27,9 @@ import {
   PlayerCareerStats,
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
-// `PlayersViewMode` lives in PlayersScreen (LS-4656). Type-only import keeps
-// this leaf component free of the runtime cycle PlayersScreen → PlayersGrid.
-import type { PlayersViewMode } from './PlayersScreen';
+
+/** Card / list / stats display mode for the players browse surface. */
+export type PlayersViewMode = 'cards' | 'list' | 'stats';
 
 export interface PlayersGridResultStats {
   matched: number;

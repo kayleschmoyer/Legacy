@@ -268,7 +268,7 @@ export function sanitizeFilenameSegment(value: string): string {
  * testing — the host component wraps this with `setSearchParams(...)`.
  *
  * Numeric formatting matches the URL param contract documented in
- * `docs/agents/pages/players/stats.md` (3 decimals for AVG, 2 for ERA).
+ * `docs/agents/pages/players/index.md` (3 decimals for AVG, 2 for ERA).
  */
 export function buildStatsSearchParams(state: {
   viewMode: PlayerStatsViewMode;
@@ -2099,7 +2099,9 @@ export function PlayerDetailPage() {
     if (location.key !== 'default') {
       navigate(-1);
     } else {
-      navigate('/players/stats', { replace: true });
+      // LS-9076: /players is the canonical stats route (formerly
+      // /players/stats).
+      navigate('/players', { replace: true });
     }
   }, [navigate, location.key]);
 

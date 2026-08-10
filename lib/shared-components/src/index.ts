@@ -115,7 +115,6 @@ export * from './features/players/PlayerRow';
 export * from './features/players/PlayerDetail';
 export * from './features/players/PlayersApi';
 export * from './features/players/PlayersGrid';
-export * from './features/players/PlayersScreen';
 
 // Common UI components
 export * from './features/common/SearchBar';

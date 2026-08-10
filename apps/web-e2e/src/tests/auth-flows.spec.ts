@@ -571,13 +571,15 @@ unauthTest.describe('Public Routes @critical', () => {
   );
 
   unauthTest(
-    'shows Players directory content on /players when not authenticated (LS-3497)',
+    'shows Player Stats content on /players when not authenticated (LS-3497, LS-9076)',
     async ({ page }) => {
       await page.goto('/players');
       await page.waitForLoadState('load');
 
+      // LS-9076: /players is the canonical merged player browse + stats
+      // surface — it renders what /players/stats used to render.
       await expect(
-        page.getByRole('heading', { name: /all players/i }),
+        page.getByText(/MLB Player Statistics/i).first(),
       ).toBeVisible({ timeout: 15000 });
     },
   );
@@ -603,9 +605,10 @@ unauthTest.describe('Public Routes @critical', () => {
         'Fantasy Baseball · Season 2026',
       );
 
-      // Players directory content is visible — confirming the correct page loaded.
+      // Player stats content is visible — confirming the correct page loaded
+      // (LS-9076: /players now renders what /players/stats used to).
       await expect(
-        page.getByRole('heading', { name: /all players/i }),
+        page.getByText(/MLB Player Statistics/i).first(),
       ).toBeVisible({ timeout: 15000 });
     },
   );

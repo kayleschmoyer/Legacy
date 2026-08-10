@@ -240,14 +240,14 @@ async function mockPlayerStatsGraphQL(
 }
 
 test.describe('Player Stats Page (mocked) — navigation @smoke', () => {
-  test('navigates to /players/stats without errors', async ({
+  test('navigates to /players/stats without errors (redirects to /players, LS-9076)', async ({
     page,
     playersPage,
   }) => {
     await mockPlayerStatsGraphQL(page);
     await playersPage.gotoStats();
 
-    await expect(page).toHaveURL('/players/stats');
+    await expect(page).toHaveURL('/players');
     await playersPage.expectNoApplicationError();
   });
 });
@@ -586,10 +586,10 @@ unauthTest.describe(
 // received a functional 404 — EnhancedAuthGuard had not listed the route in
 // publicPaths, so it intercepted the request and rendered the "Build Your
 // Dynasty" marketing landing page while the URL showed /players/stats. Adding
-// the route to publicPaths (LS-3548) resolved the redirect. These tests lock
-// in the corrected URL behaviour: the browser must remain at /players/stats
-// (no auth-guard redirect to /) and the marketing landing page must never
-// appear for unauthenticated visitors to this public route.
+// the route to publicPaths (LS-3548) resolved the redirect. /players/stats is
+// now itself a permanent redirect to /players (LS-9076) — these tests lock in
+// that the redirect still resolves for unauthenticated users (no auth-guard
+// interception landing them on the marketing page instead).
 // ---------------------------------------------------------------------------
 
 unauthTest.describe(
@@ -601,9 +601,9 @@ unauthTest.describe(
     });
 
     unauthTest(
-      'URL stays at /players/stats for unauthenticated users — no auth-guard redirect',
+      'redirects to /players for unauthenticated users — no auth-guard interception',
       async ({ page }) => {
-        await expect(page).toHaveURL('/players/stats', { timeout: 15_000 });
+        await expect(page).toHaveURL('/players', { timeout: 15_000 });
       },
     );
 

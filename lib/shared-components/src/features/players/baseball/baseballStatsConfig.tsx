@@ -663,29 +663,31 @@ export function useBaseballController(
 
   // ── URL preview — matches the URL params that apps/web persists ─
   const urlPreview = useMemo(() => {
-    const params: string[] = [`view=${viewMode}`, `pageSize=${pageSize}`];
-    if (search) params.push(`search=${encodeURIComponent(search)}`);
-    if (position !== 'All Positions')
-      params.push(`position=${encodeURIComponent(position)}`);
-    if (team !== 'All Teams') params.push(`team=${encodeURIComponent(team)}`);
-    if (minHR > 0) params.push(`minHomeRuns=${minHR}`);
-    if (maxHR < HR_MAX) params.push(`maxHomeRuns=${maxHR}`);
-    if (minRBI > 0) params.push(`minRBI=${minRBI}`);
-    if (maxRBI < RBI_MAX) params.push(`maxRBI=${maxRBI}`);
-    if (minAVG > 0) params.push(`minBattingAvg=${minAVG.toFixed(3)}`);
-    if (maxAVG < AVG_MAX) params.push(`maxBattingAvg=${maxAVG.toFixed(3)}`);
-    if (minERA > 0) params.push(`minERA=${minERA.toFixed(2)}`);
-    if (maxERA < ERA_MAX_OFF) params.push(`maxERA=${maxERA.toFixed(2)}`);
-    if (minWins > 0) params.push(`minWins=${minWins}`);
-    if (maxWins < WINS_MAX) params.push(`maxWins=${maxWins}`);
-    if (minSO > 0) params.push(`minStrikeouts=${minSO}`);
-    if (maxSO < SO_MAX) params.push(`maxStrikeouts=${maxSO}`);
+    const params = new URLSearchParams();
+    params.set('view', viewMode);
+    params.set('pageSize', String(pageSize));
+    if (search) params.set('search', search);
+    if (position !== 'All Positions') params.set('position', position);
+    if (team !== 'All Teams') params.set('team', team);
+    if (minHR > 0) params.set('minHomeRuns', String(minHR));
+    if (maxHR < HR_MAX) params.set('maxHomeRuns', String(maxHR));
+    if (minRBI > 0) params.set('minRBI', String(minRBI));
+    if (maxRBI < RBI_MAX) params.set('maxRBI', String(maxRBI));
+    if (minAVG > 0) params.set('minBattingAvg', minAVG.toFixed(3));
+    if (maxAVG < AVG_MAX) params.set('maxBattingAvg', maxAVG.toFixed(3));
+    if (minERA > 0) params.set('minERA', minERA.toFixed(2));
+    if (maxERA < ERA_MAX_OFF) params.set('maxERA', maxERA.toFixed(2));
+    if (minWins > 0) params.set('minWins', String(minWins));
+    if (maxWins < WINS_MAX) params.set('maxWins', String(maxWins));
+    if (minSO > 0) params.set('minStrikeouts', String(minSO));
+    if (maxSO < SO_MAX) params.set('maxStrikeouts', String(maxSO));
     const sortFilter = battingSortFilter(sortBy, sortDir);
     if (sortFilter.sortBy) {
-      params.push(`sortBy=${sortFilter.sortBy}`);
-      params.push(`sortDir=${sortFilter.sortDir}`);
+      params.set('sortBy', sortFilter.sortBy);
+      params.set('sortDir', sortFilter.sortDir ?? DEFAULT_BATTING_SORT_DIR);
     }
-    return `/players/stats?${params.join('&')}`;
+    // LS-9076: /players is the canonical stats route (formerly /players/stats).
+    return `/players?${params.toString()}`;
   }, [
     viewMode,
     pageSize,
@@ -751,6 +753,7 @@ export function useBaseballController(
             onChangeText={setSearch}
             onSubmitEditing={applyFilters}
             placeholder={`Search player name · min ${MIN_SEARCH_LENGTH} chars`}
+            accessibilityLabel="Search player name"
             placeholderTextColor={FG4}
             style={csp({
               flex: 1,

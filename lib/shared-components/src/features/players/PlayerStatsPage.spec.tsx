@@ -499,7 +499,7 @@ describe('buildShareUrl (LS-7131)', () => {
 
   it('serializes only view + pageSize when no filters are applied', () => {
     expect(buildShareUrl('combined', APPLIED_DEFAULTS)).toBe(
-      '/players/stats?view=combined&pageSize=25',
+      '/players?view=combined&pageSize=25',
     );
   });
 
@@ -510,7 +510,7 @@ describe('buildShareUrl (LS-7131)', () => {
     // the shared URL must NOT include the un-committed "Ohtani" term.
     const applied = { ...APPLIED_DEFAULTS, search: '' };
     expect(buildShareUrl('combined', applied)).toBe(
-      '/players/stats?view=combined&pageSize=25',
+      '/players?view=combined&pageSize=25',
     );
     expect(buildShareUrl('combined', applied)).not.toContain('Ohtani');
   });
@@ -518,7 +518,7 @@ describe('buildShareUrl (LS-7131)', () => {
   it('serializes a committed search term', () => {
     const applied = { ...APPLIED_DEFAULTS, search: 'Ohtani' };
     expect(buildShareUrl('hitters', applied)).toBe(
-      '/players/stats?view=hitters&pageSize=25&search=Ohtani',
+      '/players?view=hitters&pageSize=25&search=Ohtani',
     );
   });
 

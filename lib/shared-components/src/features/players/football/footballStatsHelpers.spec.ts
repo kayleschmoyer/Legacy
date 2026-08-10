@@ -175,7 +175,7 @@ describe('buildFootballStatsQuery', () => {
       pageSize: 25,
       sortDir: 'asc',
     });
-    expect(url).toBe('/players/stats?sport=nfl&view=receiving&pageSize=25');
+    expect(url).toBe('/players?sport=nfl&view=receiving&pageSize=25');
   });
 
   it('serializes an explicit sort', () => {

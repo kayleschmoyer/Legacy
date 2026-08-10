@@ -183,13 +183,13 @@ test.describe('Player Stats — share: manual-copy fallback variant (LS-5597) @r
     await playersPage.stats.expectShareFallbackInput();
   });
 
-  test('fallback URL input value contains a /players/stats deep link', async ({
+  test('fallback URL input value contains a /players deep link', async ({
     page,
     playersPage,
   }) => {
     await playersPage.stats.clickShare();
     await expect(page.getByLabel('Shareable link to copy')).toHaveValue(
-      /\/players\/stats/,
+      /\/players\?/,
     );
   });
 });

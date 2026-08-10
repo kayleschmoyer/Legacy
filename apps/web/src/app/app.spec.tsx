@@ -48,7 +48,6 @@ jest.mock('@legacy-sports/shared-components', () => {
     Separator: () => <hr />,
     BaseballScreen: () => <div>Baseball Screen</div>,
     FootballScreen: () => <div>Football Screen</div>,
-    PlayersScreen: () => <div>Players Screen</div>,
     useAuth: () => ({
       isAuthenticated: true,
       isLoading: false,
@@ -98,10 +97,6 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
 
 jest.mock('@legacy-sports/shared-components/sports', () => ({
   FootballScreen: () => <div>Football Screen</div>,
-}));
-
-jest.mock('@legacy-sports/shared-components/players', () => ({
-  PlayersScreen: () => <div>Players Screen</div>,
 }));
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({

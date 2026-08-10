@@ -96,8 +96,9 @@ const PUBLIC_PATHS = [
   // /baseball/mock-draft (LS-3074). Adding it here so the
   // client-side <Navigate> fires for unauthenticated users.
   `${basePath}/draft/mock`,
-  // /players/stats shows public MLB player statistics — no
-  // auth required (LS-3548).
+  // /players/stats is now a permanent redirect to /players (LS-9076) — kept
+  // public so a signed-out visitor following an old shared link still gets
+  // redirected instead of hitting the login wall (LS-3548 origin).
   `${basePath}/players/stats`,
   `${basePath}/scoreboard`,
   // /help shows help documentation and FAQs — publicly accessible
@@ -134,10 +135,11 @@ const PUBLIC_PATHS = [
 // /baseball hub is publicly accessible (LS-3532). Using publicExactPaths
 // (not publicPaths) so only the landing page is public — sub-routes like
 // /baseball/league/create remain authenticated-only.
-// /players directory is publicly accessible so unauthenticated users can
-// browse the player roster (LS-3493, LS-3497). Using publicExactPaths so
-// only the listing page is public — sub-routes like /players/:id
-// remain authenticated-only (/players/compare is in publicPaths above).
+// /players is the canonical merged player browse + stats surface (LS-9076,
+// formerly /players/stats) and is publicly accessible so unauthenticated
+// users can browse it (LS-3493, LS-3497, LS-3548). Using publicExactPaths so
+// only this page is public — sub-routes like /players/:id remain
+// authenticated-only (/players/compare is in publicPaths above).
 const PUBLIC_EXACT_PATHS = [`${basePath}/baseball`, `${basePath}/players`];
 
 /**

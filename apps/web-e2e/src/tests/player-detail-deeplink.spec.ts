@@ -492,7 +492,8 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
 
   // ── 2. Player Stats / Search origin ───────────────────────────────────────
   // PlayerStatsPage rows call navigate('/players/:id') via React Router so
-  // location.key is set — the back button correctly returns to /players/stats.
+  // location.key is set — the back button correctly returns to /players
+  // (LS-9076 — the canonical stats route, formerly /players/stats).
 
   test.describe('Stats/Search origin @critical', () => {
     test('desktop: click player row opens /players/:id dialog', async ({
@@ -507,11 +508,11 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await playersPage.stats.row(1).tap();
 
       // Numeric player IDs open an in-place modal via ?playerId= (PST-051 / LS-7124)
-      await page.waitForURL(/\/players\/stats.*playerId=1/);
+      await page.waitForURL(/\/players\?.*playerId=1/);
       await playersPage.detail.expectOpen();
     });
 
-    test('desktop: back button returns to /players/stats', async ({
+    test('desktop: back button returns to /players', async ({
       page,
       playersPage,
     }) => {
@@ -520,7 +521,7 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
 
       await playersPage.stats.row(1).expectVisible({ timeout: 15_000 });
       await playersPage.stats.row(1).tap();
-      await page.waitForURL(/\/players\/stats.*playerId=1/);
+      await page.waitForURL(/\/players\?.*playerId=1/);
       await playersPage.detail.expectOpen();
 
       // PST-051: close the in-place modal via its X button; handleClosePlayerDetails
@@ -551,11 +552,11 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await playersPage.stats.openPlayerByName('Mike Trout');
 
       // Numeric player IDs open an in-place modal via ?playerId= (PST-051 / LS-7124)
-      await page.waitForURL(/\/players\/stats.*playerId=1/);
+      await page.waitForURL(/\/players\?.*playerId=1/);
       await playersPage.detail.expectOpen();
     });
 
-    test('mobile: back button returns to /players/stats', async ({
+    test('mobile: back button returns to /players', async ({
       page,
       playersPage,
     }) => {
@@ -565,7 +566,7 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
 
       await playersPage.stats.expectCardFeedVisible('mlb');
       await playersPage.stats.openPlayerByName('Mike Trout');
-      await page.waitForURL(/\/players\/stats.*playerId=1/);
+      await page.waitForURL(/\/players\?.*playerId=1/);
       await playersPage.detail.expectOpen();
 
       // PST-051: close the in-place modal via its X button; handleClosePlayerDetails

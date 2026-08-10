@@ -2,7 +2,7 @@
 
 This package provides reusable UI primitives and hooks for working with player data across web and mobile surfaces. Key exports include:
 
-- `PlayersTable`, `PlayersGrid`, and `PlayersScreen` – high-level React components for browsing and selecting players.
+- `PlayersTable` and `PlayersGrid` – high-level React components for browsing and selecting players.
 - `usePlayerProjections` – React hook that converts career statistics and scoring multipliers into projected fantasy points per game.
 - `formatProjection` – utility helper for displaying projection values in a consistent format.
 - `CareerStatsService` – server-side helpers for fetching and transforming career statistics.

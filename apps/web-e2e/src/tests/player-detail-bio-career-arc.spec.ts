@@ -740,7 +740,7 @@ test.describe('Player Detail Modal – duplicate season deduplication @regressio
 // ── Tests: Opening modal from stats page ────────────────────────────────────
 
 test.describe('Player Detail Modal – open from stats table @regression', () => {
-  test('clicking a player row on /players/stats opens the modal', async ({
+  test('clicking a player row on /players opens the modal', async ({
     page,
     playersPage,
   }) => {
@@ -763,7 +763,7 @@ test.describe('Player Detail Modal – open from stats table @regression', () =>
     // LS-7124). Wait for that URL transition — the single source of truth that
     // the modal is about to render — before asserting visibility, instead of
     // racing the dialog mount.
-    await page.waitForURL(/\/players\/stats.*playerId=1/);
+    await page.waitForURL(/\/players\?.*playerId=1/);
 
     // The modal dialog should appear.
     await playersPage.detail.expectOpen();

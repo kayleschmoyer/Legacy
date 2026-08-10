@@ -7,7 +7,6 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { PlayersScreen } from '@legacy-sports/shared-components/players';
 import { styled } from 'tamagui';
 import { Menu } from '@tamagui/lucide-icons';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
@@ -26,7 +25,6 @@ import { useAnalyticsIdentify } from '../hooks/useAnalyticsIdentify';
 import { useWebPushRegistration } from '../hooks/useWebPushRegistration';
 import { ImpersonationBanner } from '../components/ImpersonationBanner';
 import { PostLoginBillingBanner } from '../components/PostLoginBillingBanner';
-import { PageMeta } from '../components/PageMeta';
 import { ApolloErrorToast } from '../components/layout/ApolloErrorToast';
 import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
 import { NAV_Z_INDEX } from '../constants/dimensions';
@@ -51,6 +49,11 @@ const PlayerStatsPage = lazyWithRetry(() =>
 const PlayerDetailPage = lazyWithRetry(() =>
   import('../pages/players/PlayerStatsPage').then((m) => ({
     default: m.PlayerDetailPage,
+  })),
+);
+const PlayersStatsRedirectPage = lazyWithRetry(() =>
+  import('../pages/players/PlayersStatsRedirectPage').then((m) => ({
+    default: m.PlayersStatsRedirectPage,
   })),
 );
 const PlayerComparisonPage = lazyWithRetry(() =>
@@ -764,19 +767,14 @@ function App() {
               element={<MatchupRedirectPage />}
             />
             <Route path="/management" element={<ManagementPage />} />
+            {/* /players is the canonical merged player browse + stats surface
+                (LS-9076) — /players/stats redirects here, preserving the
+                query string. */}
+            <Route path="/players" element={<PlayerStatsPage />} />
             <Route
-              path="/players"
-              element={
-                <>
-                  <PageMeta
-                    title="All Players"
-                    description="Browse every player available across your Legacy Sports fantasy leagues."
-                  />
-                  <PlayersScreen />
-                </>
-              }
+              path="/players/stats"
+              element={<PlayersStatsRedirectPage />}
             />
-            <Route path="/players/stats" element={<PlayerStatsPage />} />
             <Route path="/players/compare" element={<PlayerComparisonPage />} />
             {/* Static segment must precede the /players/:id dynamic route
                 (react-router v6 ranks static over dynamic; ordered explicitly

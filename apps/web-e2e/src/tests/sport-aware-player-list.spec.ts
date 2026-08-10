@@ -1,11 +1,15 @@
 /**
  * Sport-Aware Player List — E2E tests (LS-5606)
  *
- * Verifies that the player list reflects the active league's sport context:
- *   Football context (/football/players): shows football positions (QB, RB, WR …)
- *     and NFL team options — not baseball positions or MLB teams.
- *   Baseball context (/players): shows baseball positions (P, C, IF, OF, DH)
- *     in the filter rail — not football positions, and no NFL team filter.
+ * Verifies that the football player list reflects the active league's sport
+ * context: /football/players shows football positions (QB, RB, WR …) and NFL
+ * team options — not baseball positions or MLB teams.
+ *
+ * The former baseball-context coverage (/players showing baseball positions
+ * in a filter rail) tested the retired `PlayersScreen` shell, which no
+ * longer renders at /players (LS-9076 — /players is now the canonical merged
+ * player stats page, formerly at /players/stats). Removed rather than
+ * adapted; there is no equivalent position-filter-rail UI on the stats page.
  *
  * All GraphQL responses are mocked with route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -18,7 +22,6 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const FOOTBALL_URL = '/football/players';
-const BASEBALL_URL = '/players';
 
 // ── Football mock ─────────────────────────────────────────────────────────────
 
@@ -41,26 +44,6 @@ async function mockFootballPlayers(page: import('@playwright/test').Page) {
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(EMPTY_FOOTBALL_RESPONSE),
-        });
-      } else {
-        await route.fallback();
-      }
-    },
-  );
-}
-
-// ── Baseball mock ─────────────────────────────────────────────────────────────
-
-async function mockBaseballPlayers(page: import('@playwright/test').Page) {
-  await page.route(
-    (url) => isGraphQLEndpoint(url),
-    async (route) => {
-      const op = extractOperationName(route).toLowerCase();
-      if (op === 'getallplayers' || op === 'getplayerswithstats') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: { players: [] } }),
         });
       } else {
         await route.fallback();
@@ -118,66 +101,5 @@ test.describe('Sport-aware player list — football context @regression', () => 
     const teamSelect = page.locator('select[name="team-filter"]');
     await expect(teamSelect.locator('option[value="NYY"]')).not.toBeAttached();
     await expect(teamSelect.locator('option[value="LAD"]')).not.toBeAttached();
-  });
-});
-
-// ── Baseball context ──────────────────────────────────────────────────────────
-
-test.describe('Sport-aware player list — baseball context @regression', () => {
-  test.beforeEach(async ({ page }) => {
-    await mockBaseballPlayers(page);
-    await page.goto(BASEBALL_URL);
-    await page.waitForLoadState('load');
-  });
-
-  test('shows All Players heading in baseball context', async ({ page }) => {
-    await expect(
-      page.getByRole('heading', { name: /all players/i }),
-    ).toBeVisible();
-  });
-
-  test('position filter shows baseball positions (P, C, IF, OF, DH)', async ({
-    page,
-  }) => {
-    const filterRail = page.getByRole('group', {
-      name: 'Filter players by era, position, or status',
-    });
-    await expect(
-      filterRail.getByRole('button', { name: 'P', exact: true }),
-    ).toBeVisible();
-    await expect(
-      filterRail.getByRole('button', { name: 'C', exact: true }),
-    ).toBeVisible();
-    await expect(
-      filterRail.getByRole('button', { name: 'IF', exact: true }),
-    ).toBeVisible();
-    await expect(
-      filterRail.getByRole('button', { name: 'OF', exact: true }),
-    ).toBeVisible();
-    await expect(
-      filterRail.getByRole('button', { name: 'DH', exact: true }),
-    ).toBeVisible();
-  });
-
-  test('position filter does not show football positions in baseball context', async ({
-    page,
-  }) => {
-    const filterRail = page.getByRole('group', {
-      name: 'Filter players by era, position, or status',
-    });
-    await expect(
-      filterRail.getByRole('button', { name: 'QB', exact: true }),
-    ).not.toBeVisible();
-    await expect(
-      filterRail.getByRole('button', { name: 'WR', exact: true }),
-    ).not.toBeVisible();
-    await expect(
-      filterRail.getByRole('button', { name: 'DST', exact: true }),
-    ).not.toBeVisible();
-  });
-
-  test('baseball page has no NFL team filter dropdown', async ({ page }) => {
-    // The football-specific Tamagui Select (name="team-filter") is absent on /players
-    await expect(page.locator('select[name="team-filter"]')).toHaveCount(0);
   });
 });

@@ -275,15 +275,15 @@ describe('PlayerStatsScreen', () => {
 
     // The handler invokes Share.share synchronously (before its internal await),
     // so the spy is populated by the time control returns.
-    capturedOnShare?.('/players/stats?view=combined&pageSize=25');
+    capturedOnShare?.('/players?view=combined&pageSize=25');
 
     expect(shareSpy).toHaveBeenCalledTimes(1);
     const arg = shareSpy.mock.calls[0][0] as { url?: string; message: string };
     expect(arg.url).toBe(
-      'https://legacysports.app/players/stats?view=combined&pageSize=25',
+      'https://legacysports.app/players?view=combined&pageSize=25',
     );
     expect(arg.message).toContain(
-      'https://legacysports.app/players/stats?view=combined&pageSize=25',
+      'https://legacysports.app/players?view=combined&pageSize=25',
     );
   });
 

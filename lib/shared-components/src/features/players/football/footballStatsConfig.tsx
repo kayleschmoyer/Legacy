@@ -66,7 +66,7 @@ export interface FootballStatsPageProps {
   isPremium?: boolean;
   initialFilters?: Partial<FootballStatsFilters>;
   initialPageSize?: number;
-  /** Called with the `/players/stats?…` share URL when the user taps Share. */
+  /** Called with the `/players?…` share URL when the user taps Share. */
   onShare?: (url: string) => void;
   /** Mirror committed filter state to the host (URL round-trip). */
   onFiltersChange?: (state: {

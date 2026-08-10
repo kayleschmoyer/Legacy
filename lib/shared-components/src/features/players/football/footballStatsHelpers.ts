@@ -392,8 +392,10 @@ export function buildFootballQueryVars(
 }
 
 /**
- * Build the `/players/stats?sport=nfl&…` preview / share query string from the
- * current football filter state. Mirrors the params the apps/web route persists.
+ * Build the `/players?sport=nfl&…` preview / share query string from the
+ * current football filter state. Mirrors the params the apps/web route
+ * persists. LS-9076: /players is the canonical stats route (formerly
+ * /players/stats).
  */
 export function buildFootballStatsQuery(state: {
   view: FootballStatsView;
@@ -406,30 +408,29 @@ export function buildFootballStatsQuery(state: {
   minProjectedPoints?: number;
   maxAdpRank?: number;
 }): string {
-  const params: string[] = [
-    `sport=nfl`,
-    `view=${state.view}`,
-    `pageSize=${state.pageSize}`,
-  ];
+  const params = new URLSearchParams();
+  params.set('sport', 'nfl');
+  params.set('view', state.view);
+  params.set('pageSize', String(state.pageSize));
   if (state.positions.length > 0) {
-    params.push(`position=${encodeURIComponent(state.positions.join(','))}`);
+    params.set('position', state.positions.join(','));
   }
   if (state.team && state.team !== TEAM_ALL) {
-    params.push(`team=${encodeURIComponent(state.team)}`);
+    params.set('team', state.team);
   }
   const search = state.search.trim();
   if (search.length >= FOOTBALL_SEARCH_MIN_LENGTH) {
-    params.push(`search=${encodeURIComponent(search)}`);
+    params.set('search', search);
   }
   if (state.sortField) {
-    params.push(`sortBy=${state.sortField}`);
-    params.push(`sortDir=${state.sortDir}`);
+    params.set('sortBy', state.sortField);
+    params.set('sortDir', state.sortDir);
   }
   if (state.minProjectedPoints != null) {
-    params.push(`minProjectedPoints=${state.minProjectedPoints}`);
+    params.set('minProjectedPoints', String(state.minProjectedPoints));
   }
   if (state.maxAdpRank != null) {
-    params.push(`maxAdpRank=${state.maxAdpRank}`);
+    params.set('maxAdpRank', String(state.maxAdpRank));
   }
-  return `/players/stats?${params.join('&')}`;
+  return `/players?${params.toString()}`;
 }

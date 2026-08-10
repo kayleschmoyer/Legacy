@@ -5,7 +5,8 @@ import { PremiumGate } from '../components/premium-gate.component';
 
 /**
  * Page object for the player-facing routes (ADR-0015 §1, §4):
- *   - `/players/stats`            — the MLB statistics page
+ *   - `/players`                  — the canonical MLB statistics page
+ *     (LS-9076; `/players/stats` is now a permanent redirect here)
  *   - `/players/:id` / `:brefId`  — the player-detail modal route
  *   - `/players/compare`          — the premium player-comparison tool
  *
@@ -56,7 +57,7 @@ import { PremiumGate } from '../components/premium-gate.component';
  *     platform-neutral `aria-label="Slot N"` check (LS-8352 stage 5).
  */
 export class PlayersPage {
-  /** `/players/stats` surface (driver-typed — platform neutral). */
+  /** `/players` surface (driver-typed — platform neutral). */
   readonly stats: PlayerStatsSurface;
   /** Player-detail modal surface (`/players/:id` and `/players/:brefId`). */
   readonly detail: PlayerDetailSurface;
@@ -113,7 +114,14 @@ export class PlayersPage {
 
   // ── Navigation ────────────────────────────────────────────────────
 
-  /** Navigate to `/players/stats`. */
+  /**
+   * Navigate to the stats page via `/players/stats`. LS-9076: this is now a
+   * redirect source — the driver follows it transparently and lands on the
+   * canonical `/players`, so specs that just need to reach the page are
+   * unaffected. Kept pointed at `/players/stats` (rather than `/players`
+   * directly) so specs that assert unauthenticated/legacy-URL behavior via
+   * this verb keep exercising the actual redirect.
+   */
   async gotoStats(): Promise<void> {
     await this.#driver.open('/players/stats');
   }
@@ -164,11 +172,11 @@ function nameRegExp(prefix: string, name: string): RegExp {
 }
 
 // ===========================================================================
-// /players/stats
+// /players (canonical stats page — LS-9076; formerly /players/stats)
 // ===========================================================================
 
 /**
- * Semantic surface for the `/players/stats` page. The page renders the title
+ * Semantic surface for the `/players` page. The page renders the title
  * as a styled `div` ("MLB Player Statistics"), a debounced search input, view
  * tabs (Combined / Hitters / Pitchers), and per-grid leader tables whose rows
  * carry `data-testid="player-row-<id>"`.
@@ -594,12 +602,13 @@ class PlayerDetailSurface {
 
   /**
    * Wait for navigation back to the stats list. WEB-ONLY: the regex covers
-   * /players/stats with or without query params, and `waitUntil: 'commit'` is
-   * required for bfcache restores (navigate(-1)) which don't fire the 'load'
-   * event the default condition waits for — a browser navigation semantic.
+   * /players with or without query params (LS-9076 — the canonical stats
+   * route, formerly /players/stats), and `waitUntil: 'commit'` is required
+   * for bfcache restores (navigate(-1)) which don't fire the 'load' event the
+   * default condition waits for — a browser navigation semantic.
    */
   async waitForStatsList(): Promise<void> {
-    await this.#requireWebPage().waitForURL(/\/players\/stats/, {
+    await this.#requireWebPage().waitForURL(/\/players(\?.*)?$/, {
       waitUntil: 'commit',
     });
   }

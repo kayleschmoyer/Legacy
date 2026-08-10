@@ -63,12 +63,12 @@ test.describe('Navigation – Nav pill tabs @smoke', () => {
     await expect(page).toHaveURL(/\/players/);
   });
 
-  test('clicking Stats navigates to /players/stats', async ({
+  test('clicking Stats navigates to /players (redirected from /players/stats, LS-9076)', async ({
     page,
     navHeader,
   }) => {
     await navHeader.clickNavItem(/^stats$/i);
-    await expect(page).toHaveURL(/\/players\/stats/);
+    await expect(page).toHaveURL(/\/players$/);
   });
 
   test('clicking Minigames navigates to /games', async ({
