@@ -249,6 +249,19 @@ describe('buildViewSearch (LS-4650)', () => {
     expect(buildViewSearch('?sort=name', 'list')).toBe('?sort=name&view=list');
     expect(buildViewSearch('?sort=name&view=list', 'cards')).toBe('?sort=name');
   });
+
+  // LS-9074 — the default is no longer always 'cards': it's the current
+  // viewport's derived default, passed explicitly as `defaultView`.
+  it('elides the param against an explicit non-"cards" defaultView', () => {
+    expect(buildViewSearch('', 'stats', 'stats')).toBe('');
+    expect(buildViewSearch('?view=cards', 'stats', 'stats')).toBe('');
+  });
+
+  it('persists a manual override that diverges from the current viewport default', () => {
+    // Desktop's viewport default is 'stats' — selecting 'cards' must persist
+    // explicitly so a refresh doesn't fall back to the (still-desktop) default.
+    expect(buildViewSearch('', 'cards', 'stats')).toBe('?view=cards');
+  });
 });
 
 describe('activeFilterChips — availability hidden when no active league (LS-7043)', () => {

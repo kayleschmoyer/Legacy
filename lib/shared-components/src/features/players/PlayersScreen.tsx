@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable } from 'react-native';
-import { Text, XStack, YStack } from 'tamagui';
+import { Text, useMedia, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import { PlayersGrid, type PlayersGridResultStats } from './PlayersGrid';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
@@ -163,8 +163,10 @@ export interface PlayersScreenProps {
    * peek Apollo query result.
    */
   state?: PlayersShellState;
-  /** Initial view mode when the URL does not carry a `?view=` parameter and
-   *  on non-web platforms (which don't read the URL). Default: 'cards'. */
+  /** Initial view mode override when the URL does not carry a `?view=`
+   *  parameter and on non-web platforms (which don't read the URL). When
+   *  omitted, the default is viewport-derived (LS-9074): cards at narrow
+   *  widths, the stats table at wide widths — never the platform. */
   viewMode?: PlayersViewMode;
   /** Retry handler invoked from the ErrorState card. Defaults to Apollo refetch. */
   onRetry?: () => void;
@@ -292,12 +294,16 @@ export function parseViewParam(
  * Pure builder for the URL search string after a view change (LS-4650).
  * Returns the new `?...` string (including leading `?`, or empty string if no
  * other params remain) so callers can pump it through `history.replaceState`
- * without depending on `window` at module scope. The default `'cards'` is
- * elided from the URL so a clean `/players` link stays clean.
+ * without depending on `window` at module scope. `defaultView` (the current
+ * viewport-derived default, LS-9074 — 'cards' when omitted, matching the
+ * pre-viewport-driven behaviour) is elided from the URL so a clean `/players`
+ * link stays clean; any other selection persists explicitly, so a manual
+ * override survives refresh even if the viewport default differs.
  */
 export function buildViewSearch(
   currentSearch: string | null | undefined,
   view: PlayersViewMode,
+  defaultView: PlayersViewMode = 'cards',
 ): string {
   const params = new URLSearchParams(
     currentSearch
@@ -306,7 +312,7 @@ export function buildViewSearch(
         : currentSearch
       : '',
   );
-  if (view === 'cards') {
+  if (view === defaultView) {
     params.delete('view');
   } else {
     params.set('view', view);
@@ -321,7 +327,7 @@ function PlayersScreen({
   title = 'All Players',
   showFeatured = true,
   state,
-  viewMode: viewModeProp = 'cards',
+  viewMode: viewModeProp,
   onRetry,
   hasActiveLeague = true,
   leagues,
@@ -334,40 +340,57 @@ function PlayersScreen({
     [onPlayerSelect],
   );
 
-  // View mode (Cards / List). Stats Table is reserved for the upcoming slice;
-  // the toggle exposes it as disabled with a "Coming soon" hint per AC1.
-  // Persistence: hydrate from `?view=` on mount, push view changes back via
-  // history.replaceState so refresh + back-navigation keep the choice (AC3).
-  // The `viewMode` prop seeds the initial value when no URL parameter is set
-  // (or on native, which doesn't read the URL).
+  // Viewport-driven default view mode (LS-9074) — never the platform. Reads
+  // the `$sm` (≤800px) breakpoint explicitly, rather than `!gtSm`, so the
+  // Tamagui jest mock's base tier (every breakpoint false/undefined)
+  // resolves to the wide/table branch by default, matching the "base =
+  // desktop" convention the rest of this codebase's tests rely on (same
+  // pattern as HomeScreen.tsx / LeagueDetailShell.tsx). Bind `useMedia`
+  // through an explicit signature so the call/result stay type-safe under
+  // this project's typed ESLint rules.
+  const readMedia = useMedia as () => { sm?: boolean };
+  const isNarrowViewport = Boolean(readMedia().sm);
+  const mediaDefaultView: PlayersViewMode = isNarrowViewport
+    ? 'cards'
+    : 'stats';
+
+  // View mode (Cards / List / Stats). Persistence: hydrate from `?view=` on
+  // mount, push view changes back via history.replaceState so refresh +
+  // back-navigation keep the choice (AC3). The `viewMode` prop, when passed,
+  // overrides the viewport-derived default; otherwise the default follows
+  // viewport width (or on native, which doesn't read the URL).
   const [view, setView] = useState<PlayersViewMode>(() => {
+    const fallback = viewModeProp ?? mediaDefaultView;
     if (Platform.OS !== 'web' || typeof window === 'undefined') {
-      return viewModeProp;
+      return fallback;
     }
-    return parseViewParam(window.location.search, viewModeProp);
+    return parseViewParam(window.location.search, fallback);
   });
 
-  const handleViewChange = useCallback((next: PlayersViewMode) => {
-    setView(next);
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    try {
-      const url = new URL(window.location.href);
-      url.search = buildViewSearch(url.search, next);
-      window.history.replaceState(
-        null,
-        '',
-        `${url.pathname}${url.search}${url.hash}`,
-      );
-    } catch (err) {
-      // history.replaceState can throw under sandbox/iframe policies; the
-      // in-memory state is the source of truth for the current session, so
-      // log and continue rather than blocking the toggle.
-      LOGGER.warn(
-        'PlayersScreen view URL sync failed',
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-  }, []);
+  const handleViewChange = useCallback(
+    (next: PlayersViewMode) => {
+      setView(next);
+      if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+      try {
+        const url = new URL(window.location.href);
+        url.search = buildViewSearch(url.search, next, mediaDefaultView);
+        window.history.replaceState(
+          null,
+          '',
+          `${url.pathname}${url.search}${url.hash}`,
+        );
+      } catch (err) {
+        // history.replaceState can throw under sandbox/iframe policies; the
+        // in-memory state is the source of truth for the current session, so
+        // log and continue rather than blocking the toggle.
+        LOGGER.warn(
+          'PlayersScreen view URL sync failed',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    },
+    [mediaDefaultView],
+  );
 
   // Filter / sort state owned by the screen so the grid, the count chip,
   // the active-summary row, and the derived empty state all read from one
@@ -886,8 +909,8 @@ function PlayersScreen({
               <FeaturedSpotlight player={featuredPlayer} />
             )}
 
-            {/* View toggle — Cards / List / Stats. Stats is locked until the
-                Stats Table slice lands (LS-4650 AC1). */}
+            {/* View toggle — Cards / List / Stats. Default selection is
+                viewport-derived (LS-9074); all three options are live. */}
             <ViewToggle view={view} onChange={handleViewChange} />
 
             {/* Grid (stats table delivered in Slice 4).
