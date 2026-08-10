@@ -286,6 +286,16 @@ Environment behaviors that look like bugs but are not. Recognize the symptom and
 
 **Do not loop-retry** the rerun/cancel MCP calls once a run has been stuck 15+ minutes with a persistent "already running" 403 — that is the wedge signature, not a transient race worth retrying through.
 
+### Quirk 9: Auto Mode's permission classifier can block a legitimate single-shot `ci_list_runs`/`send_later` call (LS-8931)
+
+**Symptom**: a single, non-looping `mcp__legacy-sports-ci__ci_list_runs(...)` or `mcp__Claude_Code_Remote__send_later(...)` call is denied outright with `"Blocked by classifier"` — even though the call is exactly the ONE-SHOT pattern this repo's own skills recommend (Rule 11 in [pr-lifecycle/SKILL.md](../pr-lifecycle/SKILL.md#quick-commands); the `send_later` check-in fallback in [drive.md](../pr-lifecycle/references/drive.md#askuserquestion-may-be-unavailable-in-autonomous-sessions)), not the `sleep N && gh pr checks` polling anti-pattern the classifier is presumably meant to catch.
+
+**Root cause**: Auto Mode's tool-call permission classifier lives in the core Claude Code harness (the product surface described by this session's own "## Auto Mode Active" system reminder), not in this repository — confirmed by an exhaustive repo search (`.claude/hooks/`, `.claude/settings.json`, `tools/mcp/`) turning up no classifier, heuristic, or blocklist referencing `ci_list_runs` or `send_later` anywhere in `bkrupa/legacy-sports`. Its heuristic appears to key on the tool name alone rather than call frequency, so it can flag the first and only invocation in a session the same way it would flag a tight retry loop.
+
+**Not fixable in this repo**: same class as [Quirk 6](#quirk-6-stop-hook-git-checksh-false-positives-unverified-on-genuinely-ssh-signed-commits-ls-8589)/[Quirk 7](#quirk-7-bkrupagithubio-connect-blocked-by-the-ccr-egress-proxy-cloudremote-sessions) — no PR against this codebase can change harness-side classifier logic.
+
+**Fix / workaround**: do not loop-retry an identical call that was blocked by the classifier — a retry with the same arguments will not change its verdict. Treat the denial as a capability gap for that call, not a task blocker: fall back to the next-best signal already documented for each tool (native push-event/webhook delivery in place of a `ci_list_runs` snapshot; pure webhook-driven PR watching in place of a `send_later` check-in, per the [PR-subscription guidance](../../../AGENTS.md)), and continue the ticket. If the block recurs often enough to be disruptive, report it to your session administrator so the classifier's allowlist/heuristic can be tuned — that tuning happens on the harness side, not via a change here.
+
 ## Cloud-to-Local Teleport
 
 When a task needs AWS credentials, real database access, Terraform, or thread resolution from degraded mode, do not skip the step or fail silently — follow [cloud-teleport](../cloud-teleport/SKILL.md): commit progress, write a structured handoff artifact, alert the user to continue locally.

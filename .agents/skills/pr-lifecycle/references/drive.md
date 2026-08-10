@@ -289,7 +289,7 @@ A `JUSTIFY:` reply does **not** clear `CHANGES_REQUESTED` — it leaves the thre
 1. Proceed with your best-judgment call and **document the reasoning explicitly** — in the PR body/comment and, if a Jira ticket is linked, a ticket comment.
 2. Post a PR comment naming the decision point, the option you chose, and why, so a human reviewer can override before merge.
 3. If the decision is genuinely blocking (unsafe to proceed either way), treat it as the [Genuine human-only blocker terminal state](#terminal-states-the-only-places-this-loop-may-stop): apply `requires-human-review`, post the explicit question as a comment, and stop — do not keep calling `AskUserQuestion`.
-4. Where available, `send_later` (claude-code-remote MCP) can schedule a check-in with the human instead of blocking indefinitely on a prompt that may never resolve.
+4. Where available, `send_later` (claude-code-remote MCP) can schedule a check-in with the human instead of blocking indefinitely on a prompt that may never resolve. A single `send_later` call is a legitimate one-shot scheduling call, not polling — but Auto Mode's permission classifier can still deny it outright (`"Blocked by classifier"`); don't retry the identical call, fall back to pure webhook-driven PR watching instead (see [cloud-agent-mode Quirk 9](../../cloud-agent-mode/SKILL.md#quirk-9-auto-modes-permission-classifier-can-block-a-legitimate-single-shot-ci_list_runssend_later-call-ls-8931)).
 
 #### The CI pipeline must actually have run (not SKIPPED)
 
