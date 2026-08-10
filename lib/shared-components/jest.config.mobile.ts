@@ -17,9 +17,29 @@ module.exports = {
     '^__PLATFORM_COMPONENTS__$': '<rootDir>/src/platform-components/mobile',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
+    // Apollo Client 4.x exports @apollo/client/react with nested export conditions
+    // that Jest's resolver does not recurse into, causing it to fall through to the
+    // ESM bundle which cannot load in Jest's CJS context. Map directly to the CJS build.
+    '^@apollo/client/react$':
+      '<rootDir>/../../node_modules/@apollo/client/__cjs/react/index.cjs',
+    '^@apollo/client/testing/react$':
+      '<rootDir>/../../node_modules/@apollo/client/__cjs/testing/react/index.cjs',
+    '^@apollo/client/testing$':
+      '<rootDir>/../../node_modules/@apollo/client/__cjs/testing/index.cjs',
+    // Apollo Client 4.x: root package resolves to core only in CJS; merge
+    // react hooks so generated files (`import * as Apollo from '@apollo/client'`)
+    // can find Apollo.useQuery, Apollo.useLazyQuery, etc.
+    '^@apollo/client$': '<rootDir>/jest-apollo-shim.cjs',
   },
   setupFilesAfterEnv: ['<rootDir>/jest-setup-mobile.js'],
   testEnvironment: 'jsdom',
+  testEnvironmentOptions: {
+    // Apollo Client 4.x ships as "type":"module". jest's jsdom defaults to the
+    // 'browser' export condition, which resolves @apollo/client subpath exports
+    // to ESM files that can't be required in jest's CJS context. Adding 'require'
+    // ensures jest selects the CJS bundles (e.g. __cjs/react/index.cjs).
+    customExportConditions: ['browser', 'require', 'default', 'node'],
+  },
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': [
       'babel-jest',
