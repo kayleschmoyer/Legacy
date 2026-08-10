@@ -56,6 +56,67 @@ jest.mock('../../../features/subscription/useSubscription', () => ({
   useSubscription: (...args: unknown[]) => mockUseSubscription(...args),
 }));
 
+// Defaults to the narrow/`sm` breakpoint so all of this file's existing
+// card-feed assertions keep passing unchanged — the wide-viewport (table)
+// tests below override this per-case (LS-9079). This is the opposite
+// default from the shared-components jest-setup-web.js base tier (which
+// resolves to the wide/table branch) because that convention exists to keep
+// *that* project's existing "table by default" specs passing; here the
+// established default across this file's existing specs is cards.
+const mockUseMedia = jest.fn(() => ({ sm: true }));
+jest.mock('tamagui', () => {
+  const mocks = jest.requireActual<
+    typeof import('../../../__test-utils__/tamagui-mocks')
+  >('../../../__test-utils__/tamagui-mocks');
+  return {
+    ...mocks.tamaguiMocks,
+    useMedia: () => mockUseMedia(),
+  };
+});
+
+// `PlayerStatsScreen` (the wide-viewport baseball table) is a full screen
+// with its own dedicated, thoroughly-mocked spec (`../PlayerStats.spec.tsx`)
+// — this file only needs to verify players.tsx renders it at wide viewport,
+// mirroring `../football/players.spec.tsx`'s identical stub for the same
+// module.
+jest.mock('../PlayerStats', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- ES import cannot appear inside a jest.mock() factory
+  const ReactActual = require('react') as typeof import('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- ES import cannot appear inside a jest.mock() factory
+  const { View } = require('react-native') as typeof import('react-native');
+  return {
+    __esModule: true,
+    default: () =>
+      ReactActual.createElement(View, { testID: 'player-stats-screen' }),
+  };
+});
+
+jest.mock('../../../components/SportSwitcherPill', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- ES import cannot appear inside a jest.mock() factory
+  const ReactActual = require('react') as typeof import('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- ES import cannot appear inside a jest.mock() factory
+  const ReactNative = require('react-native') as typeof import('react-native');
+  const { Pressable, Text } = ReactNative;
+  return {
+    SportSwitcherPill: ({
+      label,
+      active,
+      onPress,
+      testID,
+    }: {
+      label: string;
+      active: boolean;
+      onPress: () => void;
+      testID?: string;
+    }) =>
+      ReactActual.createElement(
+        Pressable,
+        { testID, onPress },
+        ReactActual.createElement(Text, null, `${label}:${String(active)}`),
+      ),
+  };
+});
+
 interface MockFootballQueryReturn {
   data?: {
     footballPlayers?: {
@@ -106,8 +167,14 @@ interface MockPlayersCardFeedProps {
   onClearFilters: () => void;
 }
 
+interface MockFootballStatsPageProps {
+  isPremium: boolean;
+  onPlayerDetails?: (playerId: number) => void;
+}
+
 const mockUseCareerStatsWithNames = jest.fn();
 const mockPlayersCardFeed = jest.fn<void, [MockPlayersCardFeedProps]>();
+const mockFootballStatsPage = jest.fn<void, [MockFootballStatsPageProps]>();
 
 jest.mock('@legacy-sports/shared-components', () => {
   // Real ES `import` cannot appear inside a jest.mock() factory (babel-plugin-
@@ -263,6 +330,17 @@ jest.mock('@legacy-sports/shared-components', () => {
         }),
       );
     },
+    FootballStatsPage: (props: MockFootballStatsPageProps) => {
+      mockFootballStatsPage(props);
+      return ReactActual.createElement(
+        View,
+        { testID: 'football-stats-page' },
+        ReactActual.createElement(Pressable, {
+          testID: 'football-stats-player-press',
+          onPress: () => props.onPlayerDetails?.(1),
+        }),
+      );
+    },
   };
 });
 
@@ -327,6 +405,7 @@ describe('PlayersTab', () => {
     jest.clearAllMocks();
     mockUseFeatureIsOn.mockReturnValue(false);
     mockUseSubscription.mockReturnValue({ isPremium: false });
+    mockUseMedia.mockReturnValue({ sm: true });
     mockSearchParams = {};
     mockCareerStats();
     mockFootballPlayers();
@@ -493,5 +572,70 @@ describe('PlayersTab', () => {
         sortDirection: 'asc',
       }),
     );
+  });
+
+  // ── Wide viewport (tablet) — LS-9079 ──────────────────────────────────────
+
+  describe('wide viewport (tablet)', () => {
+    beforeEach(() => {
+      mockUseMedia.mockReturnValue({});
+    });
+
+    it('renders the baseball stats table instead of the card feed', () => {
+      render(<PlayersTab />);
+      expect(screen.getByTestId('player-stats-screen')).toBeTruthy();
+      expect(screen.queryByTestId('players-card-feed')).toBeNull();
+    });
+
+    it('renders the football stats table when football is active', () => {
+      mockUseFeatureIsOn.mockReturnValue(true);
+      render(<PlayersTab />);
+
+      fireEvent.press(screen.getByTestId('players-tab-sport-switch-football'));
+
+      expect(screen.getByTestId('football-stats-page')).toBeTruthy();
+      expect(screen.queryByTestId('player-stats-screen')).toBeNull();
+      expect(mockFootballStatsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ isPremium: false }),
+      );
+    });
+
+    it('navigates to the football detail route on a stats-table row press', () => {
+      mockUseFeatureIsOn.mockReturnValue(true);
+      render(<PlayersTab />);
+      fireEvent.press(screen.getByTestId('players-tab-sport-switch-football'));
+
+      fireEvent.press(screen.getByTestId('football-stats-player-press'));
+
+      expect(mockPush).toHaveBeenCalledWith('/football/players/1');
+    });
+
+    it('hides the sport switcher when football is disabled', () => {
+      mockUseFeatureIsOn.mockReturnValue(false);
+      render(<PlayersTab />);
+      expect(
+        screen.queryByTestId('players-tab-sport-switch-baseball'),
+      ).toBeNull();
+    });
+
+    it('shows the sport switcher when football is enabled', () => {
+      mockUseFeatureIsOn.mockReturnValue(true);
+      render(<PlayersTab />);
+      expect(
+        screen.getByTestId('players-tab-sport-switch-baseball'),
+      ).toBeTruthy();
+    });
+
+    it('forwards isPremium from useSubscription to the football stats table', () => {
+      mockUseFeatureIsOn.mockReturnValue(true);
+      mockUseSubscription.mockReturnValue({ isPremium: true });
+      render(<PlayersTab />);
+
+      fireEvent.press(screen.getByTestId('players-tab-sport-switch-football'));
+
+      expect(mockFootballStatsPage).toHaveBeenCalledWith(
+        expect.objectContaining({ isPremium: true }),
+      );
+    });
   });
 });

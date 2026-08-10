@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useMedia, XStack, YStack } from 'tamagui';
 import {
   cardPositionsForSport,
+  FootballStatsPage,
   formatBaseballCardSubStats,
   formatFootballCardSubStats,
   type PlayerFeedRow,
@@ -21,6 +23,13 @@ import {
   toPlayerDetailIdParam,
 } from '../../../common/utilities/RouteUtils';
 import { useSubscription } from '../../../features/subscription/useSubscription';
+import { SportSwitcherPill } from '../../../components/SportSwitcherPill';
+// The stats-table presentation reuses `PlayerStatsScreen` wholesale — it
+// already wraps `PlayerStatsPage` in `PremiumGate` and wires expo-router
+// param hydration, share, and export (LS-9079: un-orphans this screen by
+// making it the wide-viewport rendering of this very tab, rather than a
+// standalone route only reachable via a deep link).
+import PlayerStatsScreen from '../PlayerStats';
 
 type Sport = 'baseball' | 'football';
 type SortDir = 'asc' | 'desc';
@@ -332,6 +341,38 @@ function FootballCardFeed({
   );
 }
 
+// ── Wide-viewport (tablet) stats table ──────────────────────────────────────
+// Football has no PlayerStats.tsx-style screen wrapper to reuse (that file is
+// baseball-only), so this is a thin binding of the shared `FootballStatsPage`
+// — same shape of adapter `PlayerStats.tsx` provides for baseball, scoped
+// down to what the tablet table needs (LS-9079).
+
+function FootballStatsTable({
+  isPremium,
+}: {
+  isPremium: boolean;
+}): React.JSX.Element {
+  const router = useRouter();
+
+  const handlePlayerDetails = useCallback(
+    (playerId: number) => {
+      // Mirrors FootballCardFeed's handlePlayerPress above — same detail
+      // route regardless of which presentation the row was tapped from.
+      router.push(`/football/players/${playerId}`);
+    },
+    [router],
+  );
+
+  return (
+    <FootballStatsPage
+      isPremium={isPremium}
+      onPlayerDetails={handlePlayerDetails}
+      showHeader
+      showActions
+    />
+  );
+}
+
 // ── Screen ────────────────────────────────────────────────────────────────
 
 export default function PlayersTab(): React.JSX.Element {
@@ -401,6 +442,17 @@ export default function PlayersTab(): React.JSX.Element {
   const showSportToggle = footballEnabled;
   const activeSport: Sport = footballEnabled ? sport : 'baseball';
 
+  // Tablet+ widths get the stats table instead of the card feed; phone
+  // widths keep the card feed (LS-9079 — the native mirror of LS-9074's
+  // web-side viewport branching). Reads the `$sm` (≤800px) breakpoint
+  // explicitly, matching the established convention (PlayersScreen.tsx,
+  // apps/web's PlayerStatsPage.tsx/FootballPlayersPage.tsx).
+  // Bind `useMedia` through an explicit signature (matches
+  // PlayersScreen.tsx's LS-9074 pattern) so the call/result stay type-safe
+  // under this project's typed ESLint rules.
+  const readMedia = useMedia as () => { sm?: boolean };
+  const isNarrowViewport = Boolean(readMedia().sm);
+
   const sharedProps: SportFeedProps = {
     position,
     appliedSearch,
@@ -417,6 +469,34 @@ export default function PlayersTab(): React.JSX.Element {
     sport: activeSport,
     onSportChange: handleSportChange,
   };
+
+  if (!isNarrowViewport) {
+    return (
+      <YStack flex={1} backgroundColor="$background">
+        {showSportToggle && (
+          <XStack paddingHorizontal={12} paddingVertical={10} gap={8}>
+            <SportSwitcherPill
+              label="Baseball"
+              active={activeSport === 'baseball'}
+              onPress={() => handleSportChange('baseball')}
+              testID="players-tab-sport-switch-baseball"
+            />
+            <SportSwitcherPill
+              label="Football"
+              active={activeSport === 'football'}
+              onPress={() => handleSportChange('football')}
+              testID="players-tab-sport-switch-football"
+            />
+          </XStack>
+        )}
+        {activeSport === 'football' ? (
+          <FootballStatsTable isPremium={isPremium} />
+        ) : (
+          <PlayerStatsScreen />
+        )}
+      </YStack>
+    );
+  }
 
   if (activeSport === 'football') {
     return <FootballCardFeed key={sportKey} {...sharedProps} />;

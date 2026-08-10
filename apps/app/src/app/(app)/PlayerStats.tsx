@@ -135,12 +135,20 @@ export function buildStatsParams(state: {
 }
 
 /**
- * Mobile Player Statistics Screen
+ * Mobile Player Statistics Screen (baseball)
  *
  * Wraps the shared {@link PlayerStatsPage} with mobile navigation and
  * native-appropriate export/share. Tapping a player navigates to the
  * PlayerDetail screen via Expo Router; the shared component owns the filter,
  * sort, and premium-column UI so native stays at parity with web (LS-7806).
+ *
+ * Consumers (LS-9079): the wide-viewport (tablet) branch of the Players tab
+ * (`(tabs)/players.tsx`) renders this screen directly as its stats-table
+ * presentation, and `football/players.tsx`'s baseball sub-tab embeds it
+ * inline. Both are deliberate — this file is not a standalone route reached
+ * by navigation anymore (the old "Browse Stats" home CTA was repointed at
+ * `/players` in LS-8984), but its default export is the canonical baseball
+ * stats screen, composed from elsewhere rather than orphaned.
  */
 export default function PlayerStatsScreen() {
   const router = useRouter();

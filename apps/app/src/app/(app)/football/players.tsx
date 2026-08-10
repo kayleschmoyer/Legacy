@@ -29,6 +29,7 @@ import {
 import { useMyRosterPlayerIds } from './hooks/useMyRosterPlayerIds';
 import { useThemeContext } from '../../../context/ThemeContext';
 import { SafeScreen } from '../../../components/SafeScreen';
+import { SportSwitcherPill } from '../../../components/SportSwitcherPill';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 import PlayerStatsScreen from '../PlayerStats';
 
@@ -566,42 +567,6 @@ function ProjectionsUpsellBanner() {
         </Text>
       </YStack>
     </XStack>
-  );
-}
-
-function SportSwitcherPill({
-  label,
-  active,
-  onPress,
-  testID,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  testID?: string;
-}): React.JSX.Element {
-  return (
-    <YStack
-      testID={testID}
-      paddingHorizontal={14}
-      paddingVertical={8}
-      borderRadius={20}
-      borderWidth={1}
-      onPress={onPress}
-      pressStyle={{ opacity: 0.7 }}
-      backgroundColor={active ? `${colors.brand.navy}33` : '$glassSurface'}
-      borderColor={active ? colors.brand.navy : '$glassBorder'}
-      justifyContent="center"
-      alignItems="center"
-    >
-      <Text
-        fontSize={14}
-        fontWeight="600"
-        color={active ? colors.brand.navy : '$gray10'}
-      >
-        {label}
-      </Text>
-    </YStack>
   );
 }
 
