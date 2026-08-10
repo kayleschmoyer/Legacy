@@ -51,8 +51,9 @@ function freshMainRepo() {
 
 /**
  * A fake but "healthy" node_modules: has nx/ (with a package.json — the deep
- * health check treats a package dir without one as corruption) and a
- * populated .bin/.
+ * health check treats a package dir without one as corruption), a populated
+ * .bin/, and .modules.yaml (pnpm's own install-completion marker — its
+ * absence is the LS-9210 corruption signature).
  */
 function makeHealthyNodeModules(nmPath) {
   mkdirSync(join(nmPath, 'nx'), { recursive: true });
@@ -60,6 +61,7 @@ function makeHealthyNodeModules(nmPath) {
   mkdirSync(join(nmPath, '.bin'), { recursive: true });
   writeFileSync(join(nmPath, '.bin', 'placeholder'), '');
   writeFileSync(join(nmPath, '.bin', 'nx'), '');
+  writeFileSync(join(nmPath, '.modules.yaml'), 'hoistedDependencies: {}\n');
 }
 
 function makeWorktree(root, name, lock = LOCK_A) {
@@ -753,6 +755,7 @@ function makeFakePnpm(binDir) {
         'mkdir node_modules\\.bin',
         'echo x > node_modules\\.bin\\placeholder',
         'echo x > node_modules\\.bin\\nx',
+        'echo hoistedDependencies: {} > node_modules\\.modules.yaml',
       ].join('\r\n') + '\r\n',
     );
   } else {
@@ -762,7 +765,8 @@ function makeFakePnpm(binDir) {
       '#!/bin/sh\nmkdir -p node_modules/nx node_modules/.bin\n' +
         'echo \'{"name":"nx"}\' > node_modules/nx/package.json\n' +
         'echo x > node_modules/.bin/placeholder\n' +
-        'echo x > node_modules/.bin/nx\n',
+        'echo x > node_modules/.bin/nx\n' +
+        'echo "hoistedDependencies: {}" > node_modules/.modules.yaml\n',
     );
     chmodSync(p, 0o755);
   }
@@ -860,6 +864,74 @@ test('--check exits 1 when nx package exists and .bin is non-empty but .bin/nx i
     assert.match(output, /\.bin\/nx missing/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--check exits 1 when .modules.yaml is missing (LS-9210)', () => {
+  // Reproduces the LS-9210 gap: a node_modules with tsx/nx present and .bin
+  // populated (the old checks all pass) but assembled by something other
+  // than a completed `pnpm install` — pnpm's own install-completion marker,
+  // .modules.yaml, was never written. nx's project-graph plugin refuses to
+  // run against such a tree even though every individual package resolves.
+  const root = freshMainRepo();
+  try {
+    const wt = makeWorktree(root, 'wt1');
+    const hash = runLink([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--print-hash',
+    ]).trim();
+    const slotNm = join(root, '.modules-pool', hash, 'node_modules');
+    mkdirSync(join(slotNm, 'nx'), { recursive: true });
+    writeFileSync(join(slotNm, 'nx', 'package.json'), '{"name":"nx"}');
+    mkdirSync(join(slotNm, '.bin'), { recursive: true });
+    writeFileSync(join(slotNm, '.bin', 'placeholder'), '');
+    writeFileSync(join(slotNm, '.bin', 'nx'), '');
+    // Deliberately no .modules.yaml written.
+
+    const { status, output } = runLinkExpectFail([
+      `--worktree=${wt}`,
+      `--main-repo=${root}`,
+      '--check',
+    ]);
+    assert.equal(
+      status,
+      1,
+      '--check must exit 1 when .modules.yaml is missing',
+    );
+    assert.match(output, /\.modules\.yaml missing/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('--assess-path exits 1 and names .modules.yaml missing on a plain (non-pool) node_modules', () => {
+  // This is the exact entry point cloud-setup.sh's node_modules_healthy()
+  // uses for cloud sessions, which have a plain node_modules with no
+  // .modules-pool involved.
+  const nmPath = mkdtempSync(join(tmpdir(), 'mp-assess-'));
+  try {
+    mkdirSync(join(nmPath, 'nx'), { recursive: true });
+    writeFileSync(join(nmPath, 'nx', 'package.json'), '{"name":"nx"}');
+    mkdirSync(join(nmPath, '.bin'), { recursive: true });
+    writeFileSync(join(nmPath, '.bin', 'nx'), '');
+
+    const { status, output } = runLinkExpectFail([`--assess-path=${nmPath}`]);
+    assert.equal(status, 1);
+    assert.match(output, /\.modules\.yaml missing/);
+  } finally {
+    rmSync(nmPath, { recursive: true, force: true });
+  }
+});
+
+test('--assess-path exits 0 on a healthy plain node_modules', () => {
+  const nmPath = mkdtempSync(join(tmpdir(), 'mp-assess-'));
+  try {
+    makeHealthyNodeModules(nmPath);
+    const out = runLink([`--assess-path=${nmPath}`]);
+    assert.match(out, /healthy/);
+  } finally {
+    rmSync(nmPath, { recursive: true, force: true });
   }
 });
 

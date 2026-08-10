@@ -414,6 +414,16 @@ function assessSlot(nm) {
     return { healthy: false, findings: ['slot not built'] };
   }
   if (!existsSync(join(nm, 'nx'))) findings.push('nx package missing');
+  // pnpm writes .modules.yaml as the last step of a successful install: its
+  // absence means node_modules was assembled by something other than a
+  // completed `pnpm install` (e.g. copied, or an install that was skipped
+  // entirely) even when individual packages/bins look present. nx's own
+  // project-graph plugin refuses to run against such a tree ("pnpm lockfile
+  // detected, but node_modules/.modules.yaml is missing"), so every
+  // nx-based `pc-*` chunk fails even though tsx/nx themselves resolve fine
+  // (LS-9210).
+  if (!existsSync(join(nm, '.modules.yaml')))
+    findings.push('.modules.yaml missing (node_modules not installed by pnpm)');
   try {
     if (readdirSync(join(nm, '.bin')).length === 0)
       findings.push('.bin is empty');
