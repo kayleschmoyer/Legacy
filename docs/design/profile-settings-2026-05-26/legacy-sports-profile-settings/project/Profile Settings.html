@@ -35,6 +35,7 @@
     <script type="text/babel" src="Icons.jsx"></script>
     <script type="text/babel" src="ProfileSettings.jsx"></script>
     <script type="text/babel" src="PublicProfileHero.jsx"></script>
+    <script type="text/babel" src="ProfileStates.jsx"></script>
     <script type="text/babel" src="BreakpointFrame.jsx"></script>
 
     <script type="text/babel" data-presets="react">
@@ -308,6 +309,62 @@
               height={750}
             >
               <VisitorLocked handle="marcus-j" />
+            </DCArtboard>
+          </DCSection>
+          {/* ── Section 5: Loading & empty states ───────────────────── */}
+          <DCSection
+            id="loading-empty"
+            title="Loading & empty states"
+            subtitle="The skeleton mirrors the populated page card-for-card — same order, same paddings, same row heights — with content blanked out. Shimmer is annotated in markup, not animated here."
+          >
+            <DCArtboard
+              id="state-skeleton"
+              label="Loading · skeleton"
+              sublabel="Renders the real page markup with paint blanked — geometry matches pub-mixed 1:1 · shimmer: 1.5s ease-in-out infinite (annotated)"
+              width={840}
+              height={1900}
+            >
+              <ProfileSettingsSkeleton initialPublic={MIXED} initialStickyBar="hidden" />
+            </DCArtboard>
+
+            <DCArtboard
+              id="state-skeleton-mobile"
+              label="Loading · skeleton · mobile"
+              sublabel="$xxs · fields stack, actions go full-width — matching the populated mobile layout"
+              width={420}
+              height={4100}
+            >
+              <ProfileSettingsSkeleton initialPublic={MIXED} initialStickyBar="hidden" />
+            </DCArtboard>
+
+            <DCArtboard
+              id="state-empty-owner"
+              label="Empty · owner · no sections enabled"
+              sublabel="Master ON, 0/6 sections · CTA enables a section"
+              width={1100}
+              height={860}
+            >
+              <PublicProfileEmpty viewer="owner" handle="marcus-j" />
+            </DCArtboard>
+
+            <DCArtboard
+              id="state-empty-visitor"
+              label="Empty · visitor · nothing shared"
+              sublabel="Same shell, visitor copy · no settings CTA"
+              width={1100}
+              height={780}
+            >
+              <PublicProfileEmpty viewer="visitor" handle="marcus-j" />
+            </DCArtboard>
+
+            <DCArtboard
+              id="state-empty-mobile"
+              label="Empty · owner · mobile"
+              sublabel="$xxs · buttons stack full-width"
+              width={420}
+              height={1140}
+            >
+              <PublicProfileEmpty viewer="owner" handle="marcus-j" />
             </DCArtboard>
           </DCSection>
         </DesignCanvas>

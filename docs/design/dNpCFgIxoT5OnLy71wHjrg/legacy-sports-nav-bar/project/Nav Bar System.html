@@ -7,6 +7,7 @@
     <link rel="icon" href="assets/logo.png" />
     <link rel="stylesheet" href="assets/colors_and_type.css?v=7" />
     <link rel="stylesheet" href="styles.css?v=7" />
+    <link rel="stylesheet" href="interaction-states.css?v=1" />
     <script
       src="https://unpkg.com/react@18.3.1/umd/react.development.js"
       integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L"
@@ -35,6 +36,7 @@
     <script type="text/babel" src="NavParts.jsx"></script>
     <script type="text/babel" src="NavPopovers.jsx"></script>
     <script type="text/babel" src="NavBars.jsx"></script>
+    <script type="text/babel" src="NavStates.jsx"></script>
     <script type="text/babel" data-presets="react">
       // Mini helper: place a popover into a nav with proper active state tracking
       const openPop = (pop) => {
@@ -105,6 +107,20 @@
         // Mobile drawer toggle per-frame
         const [drawerA, setDrawerA] = React.useState(false);
 
+        // §02 — data state driving every nav surface at once
+        const [navState, setNavState] = React.useState('populated');
+        const retryTimer = React.useRef(null);
+        const retry = () => {
+          setNavState('loading');
+          clearTimeout(retryTimer.current);
+          retryTimer.current = setTimeout(() => setNavState('populated'), 1100);
+        };
+        React.useEffect(() => () => clearTimeout(retryTimer.current), []);
+        const stateHint = (NAV_STATES.find((s) => s.id === navState) || {}).hint;
+
+        // §05 — which device chrome wraps the shared mobile mock
+        const [chrome, setChrome] = React.useState('native');
+
         return (
           <div className="canvas" data-screen-label="Nav System">
             <div className="canvas-head">
@@ -136,7 +152,7 @@
                     color: 'var(--fg3)',
                   }}
                 >
-                  4 surfaces · 9 states · 1 system
+                  3 surfaces · 4 data states · 1 system
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <span className="ls-chip ls-chip-live">
@@ -242,15 +258,77 @@
             </div>
 
             {/* ═══════════════════════════════════════════════════
-          §02 — DESKTOP STATES
+          §02 — DATA STATES (switchable)
+          ═══════════════════════════════════════════════════ */}
+            <div className="section" data-screen-label="Data states">
+              <div className="section-head">
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
+                  <span className="num">§ 02</span>
+                  <h2>Data States</h2>
+                </div>
+                <p>
+                  One switch drives every surface at once — top nav and ticker,
+                  the notification tray and league dropdown, and the mobile
+                  header + dugout rail.
+                </p>
+              </div>
+
+              <div className="state-switch-bar">
+                <StateSwitch value={navState} onChange={setNavState} />
+                <p className="sw-hint">{stateHint}</p>
+              </div>
+
+              <p className="caption">
+                <span
+                  className="dot"
+                  style={
+                    navState === 'error'
+                      ? { background: 'var(--brand-seam-red)' }
+                      : undefined
+                  }
+                />
+                Desktop · {navState}
+                <span className="hint">
+                  Retry anywhere returns the nav to loading, then populated
+                </span>
+              </p>
+              <div className="slab">
+                <NavDesktopState state={navState} onRetry={retry} />
+              </div>
+
+              <div className="state-grid">
+                <div className="state-panels">
+                  <div className="state-panel">
+                    <p className="caption">Notification tray</p>
+                    <NotifTrayState state={navState} onRetry={retry} />
+                  </div>
+                  <div className="state-panel">
+                    <p className="caption">League switcher menu</p>
+                    <LeagueDropdownState state={navState} onRetry={retry} />
+                  </div>
+                </div>
+                <div>
+                  <p
+                    className="caption"
+                    style={{ justifyContent: 'center', textAlign: 'center' }}
+                  >
+                    Mobile · header + dugout rail
+                  </p>
+                  <PhoneMockState state={navState} onRetry={retry} />
+                </div>
+              </div>
+            </div>
+
+            {/* ═══════════════════════════════════════════════════
+          §03 — DESKTOP STATES
           ═══════════════════════════════════════════════════ */}
             <div className="section">
               <div className="section-head">
                 <div
                   style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
                 >
-                  <span className="num">§ 02</span>
-                  <h2>Desktop · States</h2>
+                  <span className="num">§ 03</span>
+                  <h2>Desktop · Menus & Modes</h2>
                 </div>
                 <p>
                   Every open-menu, live-draft, scrolled, and search-focused
@@ -413,7 +491,7 @@
                 <div
                   style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
                 >
-                  <span className="num">§ 03</span>
+                  <span className="num">§ 04</span>
                   <h2>Tablet · Collapsed</h2>
                 </div>
                 <p>
@@ -457,7 +535,7 @@
                     <span className="tag live">Draft Live</span>
                   </div>
                 </div>
-                <NavTablet current="stats" draftLive={true} />
+                <NavTablet current="players" draftLive={true} />
                 <div className="slab-content">
                   <div className="placeholder">
                     Seam-red glow follows the user into smaller viewports.
@@ -467,98 +545,76 @@
             </div>
 
             {/* ═══════════════════════════════════════════════════
-          §04 — MOBILE WEB
+          §05 — MOBILE (one mock, two chromes)
           ═══════════════════════════════════════════════════ */}
-            <div className="section">
-              <div className="section-head">
-                <div
-                  style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
-                >
-                  <span className="num">§ 04</span>
-                  <h2>Mobile Web · Bottom Bar + Drawer</h2>
-                </div>
-                <p>
-                  5 tabs in the dugout rail. Menu drawer holds league context,
-                  deeper routes, and bug-report.
-                </p>
-              </div>
-
-              <div className="slab-grid-3" style={{ justifyItems: 'center' }}>
-                <div>
-                  <p
-                    className="caption"
-                    style={{ justifyContent: 'center', textAlign: 'center' }}
-                  >
-                    Players · default
-                  </p>
-                  <PhoneMock current="players" />
-                </div>
-                <div>
-                  <p
-                    className="caption"
-                    style={{ justifyContent: 'center', textAlign: 'center' }}
-                  >
-                    Draft live
-                  </p>
-                  <PhoneMock current="stats" draftLive={true} />
-                </div>
-                <div>
-                  <p
-                    className="caption"
-                    style={{ justifyContent: 'center', textAlign: 'center' }}
-                  >
-                    Drawer open
-                  </p>
-                  <PhoneMock current="players" drawer />
-                </div>
-              </div>
-            </div>
-
-            {/* ═══════════════════════════════════════════════════
-          §05 — NATIVE MOBILE (iOS)
-          ═══════════════════════════════════════════════════ */}
-            <div className="section">
+            <div className="section" data-screen-label="Mobile">
               <div className="section-head">
                 <div
                   style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
                 >
                   <span className="num">§ 05</span>
-                  <h2>Native · iOS</h2>
+                  <h2>Mobile · Web & Native</h2>
                 </div>
                 <p>
-                  Status bar + home indicator live on the device chrome. Our
-                  header lives inside the safe area.
+                  One mock, two chromes. Web and native render the same header,
+                  dugout rail, and drawer — only the device chrome differs, so
+                  the two platforms can't drift apart.
+                </p>
+              </div>
+
+              <div className="state-switch-bar">
+                <div
+                  className="state-switch"
+                  role="radiogroup"
+                  aria-label="Device chrome"
+                >
+                  {[
+                    { id: 'web', label: 'Mobile web' },
+                    { id: 'native', label: 'Native iOS' },
+                  ].map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={chrome === c.id}
+                      tabIndex={chrome === c.id ? 0 : -1}
+                      className="state-switch-btn"
+                      onClick={() => setChrome(c.id)}
+                    >
+                      <span className="sw-dot" aria-hidden="true" />
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="sw-hint">
+                  {chrome === 'web'
+                    ? 'Browser chrome: URL bar above our header, no home indicator — the rail sits on the browser toolbar.'
+                    : 'Device chrome: status bar and home indicator belong to iOS; our header sits inside the safe area.'}
                 </p>
               </div>
 
               <div className="slab-grid-3" style={{ justifyItems: 'center' }}>
-                <div>
-                  <p
-                    className="caption"
-                    style={{ justifyContent: 'center', textAlign: 'center' }}
-                  >
-                    Players
-                  </p>
-                  <NativePhoneMock current="players" />
-                </div>
-                <div>
-                  <p
-                    className="caption"
-                    style={{ justifyContent: 'center', textAlign: 'center' }}
-                  >
-                    Alerts
-                  </p>
-                  <NativePhoneMock current="alerts" />
-                </div>
-                <div>
-                  <p
-                    className="caption"
-                    style={{ justifyContent: 'center', textAlign: 'center' }}
-                  >
-                    Minigames · Live
-                  </p>
-                  <NativePhoneMock current="minigames" draftLive={true} />
-                </div>
+                {[
+                  { label: 'Home · default', props: { current: 'home' } },
+                  {
+                    label: 'Games · draft live',
+                    props: { current: 'games', draftLive: true },
+                  },
+                  {
+                    label: 'Drawer open',
+                    props: { current: 'home', drawer: true },
+                  },
+                ].map((m) => (
+                  <div key={m.label}>
+                    <p
+                      className="caption"
+                      style={{ justifyContent: 'center', textAlign: 'center' }}
+                    >
+                      {m.label}
+                    </p>
+                    <PhoneMock chrome={chrome} {...m.props} />
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -690,8 +746,42 @@
             </div>
 
             {/* ═══════════════════════════════════════════════════
-          TWEAKS
+          §07 — BREAKPOINTS
           ═══════════════════════════════════════════════════ */}
+            <div className="section" data-screen-label="Breakpoints">
+              <div className="section-head">
+                <div
+                  style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}
+                >
+                  <span className="num">§ 07</span>
+                  <h2>Breakpoints</h2>
+                </div>
+                <p>
+                  All seven canonical bands are implemented mobile-first in
+                  styles.css. Resize the frame — the nav above reflows through
+                  every row of this ledger.
+                </p>
+              </div>
+
+              <div className="bp-ledger">
+                {[
+                  { t: '$xxs', r: '0 – 659', d: 'Phone · portrait', n: 'Single column, 12px gutters. Wordmark and inline search hide; pill labels tighten. 44px touch targets.' },
+                  { t: '$xs', r: '660 – 799', d: 'Phone · standard', n: '16px gutters, 2-up spec cards and content cards. Nav stays icon-led.' },
+                  { t: '$sm', r: '800 – 859', d: 'Landscape · small tablet', n: '$gtSm content appears: wordmark returns, full tab labels, menu panels go 2-up, header row un-stacks.' },
+                  { t: '$md', r: '860 – 979', d: 'Tablet · portrait', n: 'Primary top nav at full pill width; 3-up content cards. Still 44px targets — touch is likely.' },
+                  { t: '$lg', r: '980 – 1119', d: 'Tablet · landscape', n: 'Inline search returns; 3-up phone grid and spec cards. Targets relax to 40px for pointer input.' },
+                  { t: '$xl', r: '1120 – 1279', d: 'Laptop', n: 'Paired slabs sit side by side, specs go 4-up, state phone moves alongside its panels. Full 24px radii.' },
+                  { t: '$xxl', r: '1280 +', d: 'Desktop & wide', n: 'Nav inner caps at 1280, page canvas at 1480. The primary design target.' },
+                ].map((b) => (
+                  <div className="bp-row" key={b.t}>
+                    <span className="bp-token">{b.t}</span>
+                    <span className="bp-range">{b.r}</span>
+                    <span className="bp-device">{b.d}</span>
+                    <span className="bp-note">{b.n}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
             {editMode && (
               <div className="tweaks-panel">
                 <div className="tweaks-head">
@@ -842,12 +932,21 @@
         </div>
       );
 
-      // ── Mobile web phone mock ──
-      const PhoneMock = ({ current, draftLive, drawer }) => (
-        <div className="phone-frame" style={{ height: 720 }}>
+      // ── One phone mock, two device chromes ──────────────────
+      // Web and native share every nav part; only the chrome differs.
+      const PhoneMock = ({ current = 'home', draftLive, drawer, chrome = 'native' }) => (
+        <div className={`phone-frame chrome-${chrome}`} style={{ height: 720 }}>
           <IosStatusBar />
+          {chrome === 'web' && (
+            <div className="mob-urlbar">
+              <span className="lock" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+              </span>
+              <span className="url">legacysports.app/{current}</span>
+            </div>
+          )}
+          <MobileHeader draftLive={draftLive} showLeague={true} />
           <div className="phone-content" style={{ flex: 1 }}>
-            <MobileHeader draftLive={draftLive} />
             <div className="phone-fake-content">
               <div className="card" />
               <div className="card" />
@@ -857,51 +956,13 @@
             {drawer && <MobileDrawer current={current} />}
           </div>
           <MobileBottomBar current={current} draftLive={draftLive} />
+          {chrome === 'native' && (
+            <div className="home-indicator" aria-hidden="true"><span /></div>
+          )}
         </div>
       );
 
-      // ── Native iOS mock (adds status bar / island) ──
-      const NativePhoneMock = ({ current, draftLive }) => (
-        <div className="phone-frame" style={{ height: 720 }}>
-          <IosStatusBar />
-          <MobileHeader draftLive={draftLive} showLeague={true} />
-          <div className="phone-content" style={{ flex: 1 }}>
-            <div className="phone-fake-content">
-              <div className="card" />
-              <div className="card" />
-              <div className="card" />
-              <div className="card" />
-            </div>
-          </div>
-          <MobileBottomBar current={current} draftLive={draftLive} />
-          {/* Home indicator */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: 24,
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'flex-end',
-              paddingBottom: 7,
-              pointerEvents: 'none',
-              zIndex: 70,
-            }}
-          >
-            <div
-              style={{
-                width: 120,
-                height: 4,
-                borderRadius: 9999,
-                background: 'rgba(255,255,255,0.6)',
-              }}
-            />
-          </div>
-        </div>
-      );
-
+      window.IosStatusBar = IosStatusBar;
       window.App = App;
       ReactDOM.createRoot(document.getElementById('app')).render(<App />);
     </script>

@@ -1515,6 +1515,185 @@ body {
   margin-top: -4px;
 }
 
+/* ── Loading skeleton ────────────────────────────────────── */
+/* The skeleton renders the REAL page markup inside .lg-skeleton, so every
+   card top, height, wrap point and container query matches the populated
+   state exactly. These rules only blank the paint.
+   Shimmer is documented, not implemented — see <ShimmerNote/>. */
+.lg-skeleton { --sk-fill: rgba(255,255,255,.055); --sk-fill-2: rgba(255,255,255,.085); --sk-last: 100%; pointer-events: none; user-select: none }
+.lg-skeleton *, .lg-skeleton *::before, .lg-skeleton *::after { animation: none !important; transition: none !important }
+
+/* Text runs → one bar per rendered line (1lh keeps bars locked to real line-height) */
+.lg-skeleton .lg-eyebrow, .lg-skeleton .lg-h1, .lg-skeleton .lg-sub,
+.lg-skeleton .lg-display-name, .lg-skeleton .lg-hero-email,
+.lg-skeleton .lg-field-label, .lg-skeleton .lg-field-value,
+.lg-skeleton .lg-info-banner p, .lg-skeleton .lg-err,
+.lg-skeleton .lg-card-title, .lg-skeleton .lg-card-sub,
+.lg-skeleton .lg-row-text .name, .lg-skeleton .lg-row-text .meta,
+.lg-skeleton .lg-master .lbl, .lg-skeleton .lg-master .hint,
+.lg-skeleton .lg-subsection-title, .lg-skeleton .lg-subsection-sub,
+.lg-skeleton .lg-toggle-row .lbl, .lg-skeleton .lg-toggle-row .hint,
+.lg-skeleton .lg-danger-row .name, .lg-skeleton .lg-danger-row .meta,
+.lg-skeleton .lg-wordmark, .lg-skeleton .lg-nav-tabs a {
+  color: transparent !important;
+  background-image: linear-gradient(to bottom, transparent 0 .16lh, var(--sk-fill) .16lh .82lh, transparent .82lh 1lh);
+  background-size: 100% 1lh; background-repeat: repeat-y; background-position: top left;
+  /* ragged final line: layer 1 covers all full lines, layer 2 trims the last */
+  -webkit-mask-image: linear-gradient(#000,#000), linear-gradient(#000,#000);
+  -webkit-mask-size: 100% calc(100% - 1lh), var(--sk-last) 1lh;
+  -webkit-mask-position: top left, bottom left; -webkit-mask-repeat: no-repeat, no-repeat;
+  mask-image: linear-gradient(#000,#000), linear-gradient(#000,#000);
+  mask-size: 100% calc(100% - 1lh), var(--sk-last) 1lh;
+  mask-position: top left, bottom left; mask-repeat: no-repeat, no-repeat;
+}
+/* inline children of blanked text (chips, inline svg) keep their box, lose their paint */
+.lg-skeleton .lg-field-value > *, .lg-skeleton .lg-master .lbl > *,
+.lg-skeleton .lg-toggle-row .lbl > *, .lg-skeleton .lg-info-banner p > span { visibility: hidden }
+
+/* per-run last-line widths — varied so the page doesn't read as a grid of ticks */
+.lg-skeleton .lg-eyebrow { --sk-last: 88px }
+.lg-skeleton .lg-h1 { --sk-last: 62% }
+.lg-skeleton .lg-sub { --sk-last: 47% }
+.lg-skeleton .lg-display-name { --sk-last: 58% }
+.lg-skeleton .lg-hero-email { --sk-last: 44% }
+.lg-skeleton .lg-field-label { --sk-last: 68px }
+.lg-skeleton .lg-field-value { --sk-last: 46% }
+.lg-skeleton .lg-mono.lg-field-value { --sk-last: 84% }
+.lg-skeleton .lg-info-banner p { --sk-last: 61% }
+.lg-skeleton .lg-card-title { --sk-last: 42% }
+.lg-skeleton .lg-card-sub { --sk-last: 66% }
+.lg-skeleton .lg-row-text .name { --sk-last: 128px }
+.lg-skeleton .lg-row-text .meta { --sk-last: 58% }
+.lg-skeleton .lg-master .lbl { --sk-last: 46% }
+.lg-skeleton .lg-master .hint { --sk-last: 72% }
+.lg-skeleton .lg-subsection-title { --sk-last: 132px }
+.lg-skeleton .lg-subsection-sub { --sk-last: 148px }
+.lg-skeleton .lg-toggle-row .lbl { --sk-last: 118px }
+.lg-skeleton .lg-toggle-row .hint { --sk-last: 64% }
+.lg-skeleton .lg-toggle-row:nth-child(even) .lbl { --sk-last: 94px }
+.lg-skeleton .lg-toggle-row:nth-child(even) .hint { --sk-last: 48% }
+.lg-skeleton .lg-toggle-row:nth-child(3n) .hint { --sk-last: 77% }
+.lg-skeleton .lg-danger-row .name { --sk-last: 96px }
+.lg-skeleton .lg-danger-row .meta { --sk-last: 69% }
+.lg-skeleton .lg-wordmark { --sk-last: 100% }
+.lg-skeleton .lg-nav-tabs a { --sk-last: 100% }
+
+/* Icon tiles, avatars, switches, buttons, chips → flat fills */
+.lg-skeleton .lg-card-icon, .lg-skeleton .lg-row-icon, .lg-skeleton .lg-icon-btn {
+  background: rgba(255,255,255,.03) !important; border: 1px solid var(--outline-subtle) !important; color: transparent !important;
+}
+.lg-skeleton .lg-card-icon > *, .lg-skeleton .lg-row-icon > *, .lg-skeleton .lg-icon-btn > *,
+.lg-skeleton .lg-info-banner > svg, .lg-skeleton .lg-brand img, .lg-skeleton .lg-nav-tabs a img { visibility: hidden }
+.lg-skeleton .lg-info-banner > svg { opacity: 0 }
+.lg-skeleton .lg-avatar-xl, .lg-skeleton .lg-nav-avatar, .lg-skeleton .lg-avatar-opt {
+  background: var(--sk-fill-2) !important; color: transparent !important; border-color: var(--outline-subtle) !important; box-shadow: none !important;
+}
+.lg-skeleton .lg-avatar-opt.sel { outline: none !important }
+.lg-skeleton .lg-avatar-opt > * { visibility: hidden }
+.lg-skeleton .lg-sw { background: rgba(255,255,255,.05) !important; border-color: var(--outline-subtle) !important; box-shadow: none !important }
+.lg-skeleton .lg-sw::after, .lg-skeleton .lg-sw::before { background: rgba(255,255,255,.12) !important; box-shadow: none !important }
+.lg-skeleton .lg-btn, .lg-skeleton .lg-chip, .lg-skeleton .lg-chip-soft {
+  background: var(--sk-fill-2) !important; border-color: var(--outline-subtle) !important;
+  color: transparent !important; box-shadow: none !important;
+}
+.lg-skeleton .lg-btn > *, .lg-skeleton .lg-chip > *, .lg-skeleton .lg-chip-soft > * { visibility: hidden }
+.lg-skeleton .lg-burger span { background: var(--sk-fill-2) !important }
+.lg-skeleton .lg-divider { opacity: .6 }
+.lg-skeleton .lg-info-banner { background: rgba(27,58,92,.12) !important; border-color: var(--outline-subtle) !important }
+.lg-skeleton .lg-master { background: rgba(27,58,92,.1) !important; border-color: var(--outline-subtle) !important }
+.lg-skeleton .lg-danger-row, .lg-skeleton .lg-card-danger { border-color: var(--panel-border) !important }
+.lg-skeleton .lg-card-danger { background: linear-gradient(135deg, var(--surface-subtle) 0%, var(--surface-card) 60%) !important }
+
+/* ── Empty state (public profile with zero sections) ─────── */
+.lg-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 56px 28px;
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 9px,
+      rgba(255, 255, 255, 0.015) 9px,
+      rgba(255, 255, 255, 0.015) 18px
+    ),
+    var(--surface-card);
+  border: 1px dashed var(--outline-default);
+  border-radius: var(--radius-5);
+}
+.lg-empty-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(197, 165, 90, 0.12);
+  border: 1px solid var(--brand-gold);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-gold-light);
+  box-shadow: var(--shadow-gold);
+}
+.lg-empty-icon svg {
+  width: 32px;
+  height: 32px;
+  stroke-width: 1.6;
+}
+.lg-empty h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 30px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: var(--fg1-strong);
+  margin: 0;
+}
+.lg-empty p {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--fg3);
+  margin: 0;
+  max-width: 52ch;
+  text-wrap: pretty;
+}
+.lg-empty-suggest {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.lg-empty-suggest-head {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg4);
+}
+.lg-empty-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.lg-empty-cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.lg-empty-foot {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--fg4);
+}
+
 /* ── Breakpoint frame (canvas-only chrome, not part of page) ─ */
 .bp-frame {
   display: flex;

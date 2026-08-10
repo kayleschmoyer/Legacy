@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-08-06T18:38:59.295Z",
+  "lastSyncedAt": "2026-08-09T23:24:42.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -147,9 +147,9 @@
       "title": "Nav Bar",
       "slug": "legacy-sports-nav-bar",
       "status": "active",
-      "lastSyncedHash": "03e6532014da7cca0f493ca6b9d72fae44755c3891887971f5c3b86f57ad97a1",
-      "lastSyncedAt": "2026-08-04T19:30:00.000Z",
-      "jiraKey": "LS-8968",
+      "lastSyncedHash": "sha256-7aca3a4ed75a288d66d0221569c9b0baf2f82dbd72cc4bf80fd2f6defc6892fa",
+      "lastSyncedAt": "2026-08-09T23:24:42.000Z",
+      "jiraKey": "LS-9224",
       "source": "designsync-local"
     },
     {
@@ -195,9 +195,9 @@
       "slug": "legacy-sports-profile-settings",
       "status": "active",
       "source": "designsync-local",
-      "lastSyncedHash": "sha256-f8f29079116f7e827980aa768b6e1db4635c107ed835e72a0e51e1e011281b71",
-      "lastSyncedAt": "2026-08-04T15:49:13.000Z",
-      "jiraKey": "LS-8972"
+      "lastSyncedHash": "sha256-181ef058f755d29ce73c43bcb07b956f4019012df7bcc09e07063020f535fc6d",
+      "lastSyncedAt": "2026-08-09T23:24:42.000Z",
+      "jiraKey": "LS-9219"
     },
     {
       "id": "nxFiEGqu3yPCDKpoNDmQWA",

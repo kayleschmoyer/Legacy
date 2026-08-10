@@ -216,8 +216,30 @@ body {
     0 6px 24px -8px rgba(196, 30, 58, 0.25);
 }
 .ls-nav--compact .ls-nav-inner {
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+.ls-nav--compact .ls-league-switcher {
+  padding: 3px 8px 3px 5px;
+}
+.ls-nav--compact .ls-league-switcher .crest {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+.ls-nav--compact .ls-icon-btn {
+  width: 32px;
+  height: 32px;
+}
+.ls-nav--compact .ls-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 10px;
+}
+.ls-nav--compact .ls-tabs button,
+.ls-nav--compact .ls-tabs a {
+  min-height: 26px;
+  padding: 5px 14px;
 }
 .ls-nav--compact .ls-brand img {
   height: 30px;
@@ -268,7 +290,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 10px 7px 8px;
+  padding: 5px 10px 5px 6px;
   border: 1px solid var(--outline-subtle);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.02);
@@ -1713,6 +1735,7 @@ body {
   min-height: 220px;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 16px;
 }
 .fake-pagetitle {
@@ -1790,32 +1813,113 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Responsive — canonical bands (docs/agents/pages/PROMPT.md #Breakpoints):
-   xxs 0 / xs 660 / sm 800 / md 860 / lg 980 / xl 1120 / xxl 1280 */
-@media (max-width: 1119px) {
-  /* below xl — lg and down */
-  .slab-grid-2 {
-    grid-template-columns: 1fr;
-  }
-  .slab-grid-3 {
-    grid-template-columns: 1fr;
-  }
-  .spec-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* ══════════════════════════════════════════════════════════
+   BREAKPOINTS — all seven canonical bands, mobile-first.
+   xxs 0–659 · xs 660–799 · sm 800–859 · md 860–979 ·
+   lg 980–1119 · xl 1120–1279 · xxl 1280+
+   Base rules below are the $xxs band.
+   ══════════════════════════════════════════════════════════ */
+
+/* ── $xxs · 0–659 — phone portrait. Single column, 12px gutters ── */
+.canvas { padding: 28px 12px 96px; }
+.canvas-head { flex-direction: column; align-items: flex-start; gap: 20px; }
+.canvas-head h1 { font-size: 34px; }
+.canvas-head p { font-size: 15px; }
+.section { margin-top: 44px; }
+.section-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+.section-head p { text-align: left; max-width: none; }
+.section-head h2 { font-size: 22px; }
+.slab-grid-2, .slab-grid-3, .spec-grid { grid-template-columns: 1fr; }
+.slab { border-radius: 16px; }
+.slab-content { padding: 18px 14px; }
+.fake-content-wrap { padding: 18px 14px; }
+.fake-pagetitle { font-size: 26px; }
+.fake-card-row { grid-template-columns: 1fr; }
+.tweaks-panel { left: 12px; right: 12px; width: auto; }
+.phone-frame { width: 100%; max-width: 390px; }
+/* Nav at phone widths: brand + switcher + one utility; pills go icon-only */
+  .ls-nav-inner { padding: 8px 12px; gap: 10px; }
+.ls-wordmark { display: none; }
+.ls-search { display: none; }
+.ls-tabs { padding: 3px; }
+.ls-tabs button span.tab-label, .ls-tabs button, .ls-tabs a { font-size: 11px; padding: 8px 10px; }
+.ls-nav-right { gap: 4px; }
+/* Touch targets: 44px minimum on the true touch surfaces. The desktop bar
+   keeps its 56px height and gets an invisible expanded hit area instead. */
+.ls-mob-header .icon-btn { width: 44px; height: 44px; }
+.ls-mob-tab { min-height: 44px; }
+.ls-drawer-item { min-height: 44px; }
+.ls-icon-btn::after,
+.ls-avatar-btn::after { content: ''; position: absolute; inset: -4px; border-radius: 9999px; }
+.ls-tabs button::before,
+.ls-tabs a::before { content: ''; position: absolute; inset: -7px -4px; border-radius: 9999px; }
+.ls-tabs button, .ls-tabs a { min-height: 30px; }
+
+/* ── $xs · 660–799 — standard phone. 16px gutters ── */
+@media (min-width: 660px) {
+  .canvas { padding: 36px 16px 110px; }
+  .canvas-head h1 { font-size: 40px; }
+  .section-head h2 { font-size: 24px; }
+  .slab-content { padding: 22px 20px; }
+  .fake-card-row { grid-template-columns: repeat(2, 1fr); }
+  .spec-grid { grid-template-columns: repeat(2, 1fr); }
+  .ls-nav-inner { padding: 8px 16px; gap: 14px; }
 }
-@media (max-width: 659px) {
-  /* below xs — xxs phones only */
-  .canvas {
-    padding: 32px 16px 120px;
-  }
-  .canvas-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .tweaks-panel {
-    left: 12px;
-    right: 12px;
-    width: auto;
-  }
+
+/* ── $sm · 800–859 — phone landscape / small tablet.
+      $gtSm content appears: wordmark, tab labels, 2-up panels ── */
+@media (min-width: 800px) {
+  .canvas { padding: 44px 24px 120px; }
+  .canvas-head { flex-direction: row; align-items: flex-end; }
+  .canvas-head h1 { font-size: 44px; }
+  .section-head { flex-direction: row; align-items: baseline; }
+  .section-head p { text-align: right; max-width: 440px; }
+  .ls-wordmark { display: block; }
+  .ls-tabs button, .ls-tabs a { font-size: 12px; padding: 8px 14px; }
+  .state-panels { grid-template-columns: 1fr 1fr; }
+  .slab-grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── $md · 860–979 — tablet portrait. Full pill group, no inline search ── */
+@media (min-width: 860px) {
+  .section { margin-top: 60px; }
+  .section-head h2 { font-size: 26px; }
+  .ls-nav-inner { padding: 8px 20px; gap: 16px; }
+  .ls-tabs button, .ls-tabs a { padding: 8px 16px; }
+  .fake-card-row { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* ── $lg · 980–1119 — tablet landscape. Inline search returns;
+      pointer-precise input, so touch targets relax to 40px ── */
+@media (min-width: 980px) {
+  .canvas { padding: 48px 32px 120px; }
+  .canvas-head h1 { font-size: 48px; }
+  .ls-search { display: flex; }
+  /* Pointer-precise input from $lg up — drop the expanded hit areas */
+  .ls-icon-btn::after, .ls-avatar-btn::after,
+  .ls-tabs button::before, .ls-tabs a::before { content: none; }
+  .spec-grid { grid-template-columns: repeat(3, 1fr); }
+  .slab-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .section { margin-top: 68px; }
+}
+
+/* ── $xl · 1120–1279 — laptop. Side-by-side slabs, 4-up specs ── */
+@media (min-width: 1120px) {
+  .canvas { padding: 56px 40px 120px; }
+  .canvas-head h1 { font-size: 52px; }
+  .section { margin-top: 72px; }
+  .section-head h2 { font-size: 28px; }
+  .slab-grid-2 { grid-template-columns: 1fr 1fr; }
+  .spec-grid { grid-template-columns: repeat(4, 1fr); }
+  .slab { border-radius: 24px; }
+  .slab-content { padding: 28px 32px; }
+  .fake-content-wrap { padding: 24px 32px; }
+  .fake-pagetitle { font-size: 36px; }
+}
+
+/* ── $xxl · 1280+ — desktop & wide. Content caps; nav hits 1280 ── */
+@media (min-width: 1280px) {
+  .canvas { max-width: 1480px; }
+  .ls-nav-inner { max-width: 1280px; padding: 8px 24px; gap: 20px; }
+  .ls-search { max-width: 380px; }
 }
