@@ -106,6 +106,13 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   // in-flight success state (e.g. the "saved successfully" toast) isn't lost.
   const league = leagueData?.league ?? leaguePreviousData?.league;
 
+  // LeagueDetailPageV2 is shared by both `/baseball/league/:id` and
+  // `/football/league/:id` (see app.tsx routing) — every in-page navigate()
+  // call below must stay on the league's own sport namespace rather than
+  // hardcoding `baseball` (LS-9271).
+  const sportBasePath =
+    league?.sport === Sport.Football ? 'football' : 'baseball';
+
   // Persist this league as the user's most recently opened one so the next
   // login can redirect them straight here instead of the generic `/` route
   // (LS-6694). Best-effort and storage-failure tolerant.
@@ -250,9 +257,11 @@ export function LeagueDetailPageV2(): React.JSX.Element {
       routeTab in TAB_ALIASES ||
       (TAB_IDS as readonly string[]).includes(routeTab);
     if (!isKnown && Number.isFinite(leagueId)) {
-      navigate(`/baseball/league/${leagueId}/overview`, { replace: true });
+      navigate(`/${sportBasePath}/league/${leagueId}/overview`, {
+        replace: true,
+      });
     }
-  }, [routeTab, leagueId, navigate]);
+  }, [routeTab, leagueId, navigate, sportBasePath]);
 
   const [tab, setTabState] = useState<TabId>(tabFromRoute);
   useEffect(() => setTabState(tabFromRoute), [tabFromRoute]);
@@ -260,9 +269,9 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   const setTab = useCallback(
     (t: TabId) => {
       setTabState(t);
-      navigate(`/baseball/league/${leagueId}/${t}`);
+      navigate(`/${sportBasePath}/league/${leagueId}/${t}`);
     },
-    [navigate, leagueId],
+    [navigate, leagueId, sportBasePath],
   );
 
   // Gate role-restricted tabs once both league and user have loaded.
@@ -426,10 +435,10 @@ export function LeagueDetailPageV2(): React.JSX.Element {
                 onTab={setTab}
                 onTeam={onTeamNav}
                 onJoinDraft={() =>
-                  navigate(`/baseball/league/${leagueId}/draft`)
+                  navigate(`/${sportBasePath}/league/${leagueId}/draft`)
                 }
                 onWatchDraft={() =>
-                  navigate(`/baseball/league/${leagueId}/draft/watch`)
+                  navigate(`/${sportBasePath}/league/${leagueId}/draft/watch`)
                 }
                 currentUserId={user?.id ?? null}
                 myRoster={myRoster}

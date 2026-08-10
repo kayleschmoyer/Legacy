@@ -205,7 +205,13 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       {isCurrent && league.id != null && (
         <PendingTradeOfferBanner
           teamId={myTeamId}
-          onReview={() => navigate(`/baseball/league/${league.id}/trades`)}
+          onReview={() =>
+            navigate(
+              league.sport === Sport.Football
+                ? `/football/league/${league.id}/trades`
+                : `/baseball/league/${league.id}/trades`,
+            )
+          }
         />
       )}
 
@@ -231,6 +237,7 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       )}
 
       <RosterBoard<TeamMemberFragment, LeaguePositionFragment>
+        sport={league.sport === Sport.Football ? 'football' : 'baseball'}
         positions={positions}
         teamPlayers={teamPlayers}
         onPlayerAssign={(player, position) => {

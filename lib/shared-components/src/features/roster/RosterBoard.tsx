@@ -77,6 +77,12 @@ export interface RosterBoardProps<
   readOnly?: boolean;
   /** Position IDs whose slots are blocked while a mutation is in-flight. */
   disabledPositionIds?: ReadonlySet<number>;
+  /**
+   * Baseball (default) splits starters/bench into Hitters/Pitchers sections
+   * via `isPitcherSlot`. Football has no such split — QB/RB/WR/TE/K/DST/DL/LB/DB
+   * all render under one "Starters" section and an ungrouped "Bench" (LS-5421).
+   */
+  sport?: 'baseball' | 'football';
 }
 
 // ── Row primitives ──────────────────────────────────────────────────────────
@@ -375,10 +381,13 @@ export function RosterBoard<
   error = null,
   readOnly = false,
   disabledPositionIds,
+  sport = 'baseball',
 }: RosterBoardProps<P, Pos>): React.JSX.Element {
   const [selected, setSelected] = useState<P | null>(null);
+  const isFootball = sport === 'football';
 
   const { hitterSlots, pitcherSlots } = useMemo(() => {
+    if (isFootball) return { hitterSlots: [...positions], pitcherSlots: [] };
     const hitters: Pos[] = [];
     const pitchers: Pos[] = [];
     for (const p of positions) {
@@ -386,7 +395,7 @@ export function RosterBoard<
       else hitters.push(p);
     }
     return { hitterSlots: hitters, pitcherSlots: pitchers };
-  }, [positions]);
+  }, [positions, isFootball]);
 
   const benchPlayers = useMemo(
     () => teamPlayers.filter((p) => p.positionId == null),
@@ -394,6 +403,8 @@ export function RosterBoard<
   );
 
   const { benchHitters, benchPitchers } = useMemo(() => {
+    if (isFootball)
+      return { benchHitters: [...benchPlayers], benchPitchers: [] };
     const hitters: P[] = [];
     const pitchers: P[] = [];
     for (const p of benchPlayers) {
@@ -402,7 +413,7 @@ export function RosterBoard<
       else hitters.push(p); // unclassified → hitters group (safety fallback)
     }
     return { benchHitters: hitters, benchPitchers: pitchers };
-  }, [benchPlayers]);
+  }, [benchPlayers, isFootball]);
 
   const filledHitters = hitterSlots.filter((s) =>
     teamPlayers.some((tp) => tp.positionId === s.id),
@@ -425,7 +436,11 @@ export function RosterBoard<
         setSelected(null);
         return;
       }
-      const canAccept = canPlayerPlayPosition(selected, position.positionType);
+      const canAccept = canPlayerPlayPosition(
+        selected,
+        position.positionType,
+        sport,
+      );
       if (assigned && canAccept) {
         if (assigned.isLocked) {
           // Can't swap into a locked player's slot; re-select them instead.
@@ -457,6 +472,7 @@ export function RosterBoard<
       onPlayerAssign,
       onPlayerSwap,
       disabledPositionIds,
+      sport,
     ],
   );
 
@@ -523,7 +539,11 @@ export function RosterBoard<
     const assigned = teamPlayers.find((p) => p.positionId === position.id);
     let state: SlotState = 'idle';
     if (selected) {
-      const canAccept = canPlayerPlayPosition(selected, position.positionType);
+      const canAccept = canPlayerPlayPosition(
+        selected,
+        position.positionType,
+        sport,
+      );
       if (assigned?.id === selected.id) state = 'selected';
       else if (assigned && canAccept) state = 'eligible-swap';
       else if (!assigned && canAccept) state = 'eligible-empty';
@@ -592,8 +612,10 @@ export function RosterBoard<
       )}
 
       <SectionCard
-        title="Starting Hitters"
-        testId="roster-section-hitters"
+        title={isFootball ? 'Starters' : 'Starting Hitters'}
+        testId={
+          isFootball ? 'roster-section-starters' : 'roster-section-hitters'
+        }
         right={
           <Text fontSize="$2" color="$gray10">
             {filledHitters}/{hitterSlots.length}
@@ -602,30 +624,34 @@ export function RosterBoard<
       >
         {hitterSlots.length === 0 ? (
           <Text color="$gray9" fontSize="$2" padding="$2">
-            No hitter slots configured.
+            {isFootball
+              ? 'No starting slots configured.'
+              : 'No hitter slots configured.'}
           </Text>
         ) : (
           <YStack gap="$2">{hitterSlots.map(renderSlot)}</YStack>
         )}
       </SectionCard>
 
-      <SectionCard
-        title="Starting Pitchers"
-        testId="roster-section-pitchers"
-        right={
-          <Text fontSize="$2" color="$gray10">
-            {filledPitchers}/{pitcherSlots.length}
-          </Text>
-        }
-      >
-        {pitcherSlots.length === 0 ? (
-          <Text color="$gray9" fontSize="$2" padding="$2">
-            No pitcher slots configured.
-          </Text>
-        ) : (
-          <YStack gap="$2">{pitcherSlots.map(renderSlot)}</YStack>
-        )}
-      </SectionCard>
+      {isFootball ? null : (
+        <SectionCard
+          title="Starting Pitchers"
+          testId="roster-section-pitchers"
+          right={
+            <Text fontSize="$2" color="$gray10">
+              {filledPitchers}/{pitcherSlots.length}
+            </Text>
+          }
+        >
+          {pitcherSlots.length === 0 ? (
+            <Text color="$gray9" fontSize="$2" padding="$2">
+              No pitcher slots configured.
+            </Text>
+          ) : (
+            <YStack gap="$2">{pitcherSlots.map(renderSlot)}</YStack>
+          )}
+        </SectionCard>
+      )}
 
       <SectionCard
         title="Bench"
@@ -642,16 +668,9 @@ export function RosterBoard<
           </Text>
         ) : (
           <YStack gap="$4">
-            <YStack gap="$2">
-              <Text fontSize="$2" color="$gray10">
-                Hitters · {benchHitters.length}
-              </Text>
-              {benchHitters.length === 0 ? (
-                <Text color="$gray9" fontSize="$1" padding="$2">
-                  No hitters on the bench.
-                </Text>
-              ) : (
-                benchHitters.map((p) => (
+            {isFootball ? (
+              <YStack gap="$2">
+                {benchHitters.map((p) => (
                   <BenchRow
                     key={p.id}
                     name={getPlayerName(p)}
@@ -667,37 +686,68 @@ export function RosterBoard<
                       onPlayerPress ? () => onPlayerPress(p) : undefined
                     }
                   />
-                ))
-              )}
-            </YStack>
-            <YStack gap="$2">
-              <Text fontSize="$2" color="$gray10">
-                Pitchers · {benchPitchers.length}
-              </Text>
-              {benchPitchers.length === 0 ? (
-                <Text color="$gray9" fontSize="$1" padding="$2">
-                  No pitchers on the bench.
-                </Text>
-              ) : (
-                benchPitchers.map((p) => (
-                  <BenchRow
-                    key={p.id}
-                    name={getPlayerName(p)}
-                    eligible={p.player?.eligiblePositions ?? []}
-                    primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
-                    mlbTeam={p.player?.mlbTeam}
-                    jerseyNumber={p.player?.jerseyNumber}
-                    selected={selected?.id === p.id}
-                    readOnly={readOnly}
-                    isLocked={p.isLocked ?? false}
-                    onPress={() => handleBenchSelect(p)}
-                    onPlayerPress={
-                      onPlayerPress ? () => onPlayerPress(p) : undefined
-                    }
-                  />
-                ))
-              )}
-            </YStack>
+                ))}
+              </YStack>
+            ) : (
+              <>
+                <YStack gap="$2">
+                  <Text fontSize="$2" color="$gray10">
+                    Hitters · {benchHitters.length}
+                  </Text>
+                  {benchHitters.length === 0 ? (
+                    <Text color="$gray9" fontSize="$1" padding="$2">
+                      No hitters on the bench.
+                    </Text>
+                  ) : (
+                    benchHitters.map((p) => (
+                      <BenchRow
+                        key={p.id}
+                        name={getPlayerName(p)}
+                        eligible={p.player?.eligiblePositions ?? []}
+                        primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
+                        mlbTeam={p.player?.mlbTeam}
+                        jerseyNumber={p.player?.jerseyNumber}
+                        selected={selected?.id === p.id}
+                        readOnly={readOnly}
+                        isLocked={p.isLocked ?? false}
+                        onPress={() => handleBenchSelect(p)}
+                        onPlayerPress={
+                          onPlayerPress ? () => onPlayerPress(p) : undefined
+                        }
+                      />
+                    ))
+                  )}
+                </YStack>
+                <YStack gap="$2">
+                  <Text fontSize="$2" color="$gray10">
+                    Pitchers · {benchPitchers.length}
+                  </Text>
+                  {benchPitchers.length === 0 ? (
+                    <Text color="$gray9" fontSize="$1" padding="$2">
+                      No pitchers on the bench.
+                    </Text>
+                  ) : (
+                    benchPitchers.map((p) => (
+                      <BenchRow
+                        key={p.id}
+                        name={getPlayerName(p)}
+                        eligible={p.player?.eligiblePositions ?? []}
+                        primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
+                        mlbTeam={p.player?.mlbTeam}
+                        jerseyNumber={p.player?.jerseyNumber}
+                        selected={selected?.id === p.id}
+                        readOnly={readOnly}
+                        isLocked={p.isLocked ?? false}
+                        onPress={() => handleBenchSelect(p)}
+                        onPlayerPress={
+                          onPlayerPress ? () => onPlayerPress(p) : undefined
+                        }
+                      />
+                    ))
+                  )}
+                </YStack>
+              </>
+            )}
             {moveToBenchEnabled && selected && (
               <Text
                 role="button"

@@ -7,7 +7,10 @@
  * labels (LS-7813, epic LS-7708). Operates on platform-agnostic minimal shapes
  * so it stays decoupled from each app's generated GraphQL fragments.
  */
-import { ALLOWED_POSITIONS, PITCHING_POSITIONS } from '@legacy-sports/utils';
+import {
+  ALLOWED_POSITIONS_BY_SPORT,
+  PITCHING_POSITIONS,
+} from '@legacy-sports/utils';
 
 /** Minimal player shape the roster helpers need (structurally satisfied by
  *  both web and native `TeamMemberFragment`). */
@@ -68,14 +71,18 @@ export function isDualEligible(player: RosterEligiblePlayer): boolean {
  * Mirrors the web canonical rule: an empty eligibility list is treated as
  * universally eligible (the server-side mutation is the final gate), otherwise
  * the player must be eligible for one of the positions the slot accepts.
+ *
+ * `sport` selects the eligibility crosswalk (defaults to baseball, this
+ * function's original behavior — LS-5421 added the football table).
  */
 export function canPlayerPlayPosition(
   player: RosterEligiblePlayer,
   positionType: string | null | undefined,
+  sport: 'baseball' | 'football' = 'baseball',
 ): boolean {
   const eligible = getEligiblePositions(player);
   if (eligible.length === 0) return true;
-  const allowed = ALLOWED_POSITIONS[positionType ?? ''];
+  const allowed = ALLOWED_POSITIONS_BY_SPORT[sport][positionType ?? ''];
   if (!allowed) return false;
   return eligible.some((p) => allowed.includes(p));
 }
@@ -98,6 +105,18 @@ export const POSITION_LABEL: Record<string, string> = {
   UTIL: 'Utility',
   DH: 'Designated Hitter',
   XDH: 'Extra Hitter',
+  // Football (NFL) position/slot codes — mirrors Android's SLOT_LABELS in
+  // FootballLeagueRosterScreen.tsx so slot labels match across platforms.
+  QB: 'Quarterback',
+  RB: 'Running Back',
+  WR: 'Wide Receiver',
+  TE: 'Tight End',
+  FLEX: 'Flex',
+  K: 'Kicker',
+  DST: 'Defense / Special Teams',
+  DL: 'Defensive Lineman',
+  LB: 'Linebacker',
+  DB: 'Defensive Back',
 };
 
 /** Returns the label for a slot type, falling back to the upper-cased code. */
