@@ -166,6 +166,7 @@ export function FootballHubPage() {
           leagues={leagues}
           loading={loading && !data}
           error={!!error}
+          isAuthenticated={!!auth?.user}
           onCreateLeague={handleCreateLeague}
           onJoinLeague={() => navigate('/football/league/join')}
           onBrowseLeagues={() => navigate('/football/leagues')}
@@ -177,6 +178,7 @@ export function FootballHubPage() {
           trendingPlayersLoading={trendingPlayersLoading}
           matchupHighlight={matchupHighlight}
           onSwitchSport={(sport) => navigate(`/${sport}`)}
+          onSignIn={() => navigate('/')}
         />
       </div>
       <UpgradeModal
