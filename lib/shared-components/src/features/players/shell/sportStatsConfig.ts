@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { AvailabilityValue } from './AvailabilityFilter';
+import type { LeagueOption } from './LeaguePicker';
 import type { PlayerStatsShellState } from './StateCards';
 import type { StatsTabDef } from './StatsViewTabs';
 import type { ToggleableColumn } from '../columnVisibility';
@@ -53,6 +54,16 @@ export interface SportStatsController {
   showAvailability: boolean;
   availabilityValue: AvailabilityValue;
   onAvailabilityChange: (v: AvailabilityValue) => void;
+  /**
+   * Leagues for the availability-filter league picker (LS-9158), ported from
+   * the standalone `/players` page (LS-7044). Omitted or empty hides the
+   * picker even when the availability filter isn't "All" — the shell then
+   * behaves as it did before the picker existed (single-league scoping only).
+   */
+  leagues?: ReadonlyArray<LeagueOption>;
+  /** Selected league id scoping the availability filter's rostered-players data. */
+  leagueId?: number | null;
+  onLeagueChange?: (id: number | null) => void;
 
   // ── Advanced filters panel ──────────────────────────────────────────
   /** The full advanced panel (sliders vs projected/ADP), or null. */
@@ -78,4 +89,9 @@ export interface SportStatsConfig<TProps = unknown> {
   useController: (props: TProps) => SportStatsController;
 }
 
-export type { AvailabilityValue, PlayerStatsShellState, StatsTabDef };
+export type {
+  AvailabilityValue,
+  LeagueOption,
+  PlayerStatsShellState,
+  StatsTabDef,
+};

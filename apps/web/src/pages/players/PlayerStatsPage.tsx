@@ -22,6 +22,7 @@ import type {
   ExportFormat,
   FootballStatsFilters,
   FootballStatsView,
+  LeagueOption,
   PlayerStatsExportData,
   PlayerStatsFilters,
   PlayerWithStats,
@@ -1121,32 +1122,70 @@ export function PlayerStatsRoute() {
   });
 
   // Availability filter needs a single, unambiguous league to scope "Free
-  // Agents"/"Rostered" against. `/players/stats` is a global, cross-league
-  // grid — the underlying data (useLeagueRosteredPlayerIds) can only report
-  // "rostered on one of my own teams", which conflates every league the
-  // viewer belongs to. With zero leagues that data is empty (correctly
-  // hidden below); with two-plus it's ambiguous (a player may be a free
-  // agent in one league and rostered in another, so neither label is true
-  // league-wide). Only the exactly-one-league case has a real, single league
-  // context, so that's the only case the filter is shown (LS-9141). The
-  // `/players` page instead lets multi-league viewers pick a league
-  // (LS-7044); porting that picker here is a larger follow-up, not this fix.
-  const baseballLeagueCount = (leaguesData?.userLeagues ?? []).filter(
-    (l) => l.sport === Sport.Baseball,
-  ).length;
-  const showBaseballAvailabilityFilter = baseballLeagueCount === 1;
+  // Agents"/"Rostered" against — the underlying data (useLeagueRosteredPlayerIds)
+  // can only report "rostered on one of my own teams", which conflates every
+  // league the viewer belongs to when aggregated across all of them. With zero
+  // leagues there's no data (filter hidden below). With exactly one league,
+  // that's the unambiguous scope. With two-plus, a league picker (ported from
+  // the `/players` page's LS-7044 picker) lets the viewer choose which league's
+  // roster to scope against, instead of hiding the filter entirely (LS-9141
+  // hid it as the interim fix; LS-9158 is this follow-up).
+  const baseballLeagues: LeagueOption[] = useMemo(
+    () =>
+      (leaguesData?.userLeagues ?? [])
+        .filter((l) => l.sport === Sport.Baseball)
+        .filter((l): l is typeof l & { id: number; name: string } =>
+          Boolean(l.id != null && l.name),
+        )
+        .map((l) => ({ id: l.id, name: l.name })),
+    [leaguesData],
+  );
+  const showBaseballAvailabilityFilter = baseballLeagues.length >= 1;
+  // Only offer the picker (and require an explicit selection) once the
+  // aggregate would actually be ambiguous — a single league needs no picker.
+  const [baseballLeagueId, setBaseballLeagueId] = useState<number | null>(null);
+  useEffect(() => {
+    if (
+      baseballLeagues.length > 1 &&
+      !baseballLeagues.some((l) => l.id === baseballLeagueId)
+    ) {
+      setBaseballLeagueId(baseballLeagues[0].id);
+    }
+  }, [baseballLeagues, baseballLeagueId]);
+  const effectiveBaseballLeagueId =
+    baseballLeagues.length === 1 ? baseballLeagues[0].id : baseballLeagueId;
   const { playerIds: baseballRosteredIds } = useLeagueRosteredPlayerIds(
     Sport.Baseball,
     !showBaseballAvailabilityFilter,
+    effectiveBaseballLeagueId,
   );
 
-  const footballLeagueCount = (leaguesData?.userLeagues ?? []).filter(
-    (l) => l.sport === Sport.Football,
-  ).length;
-  const showFootballAvailabilityFilter = footballLeagueCount === 1;
+  const footballLeagues: LeagueOption[] = useMemo(
+    () =>
+      (leaguesData?.userLeagues ?? [])
+        .filter((l) => l.sport === Sport.Football)
+        .filter((l): l is typeof l & { id: number; name: string } =>
+          Boolean(l.id != null && l.name),
+        )
+        .map((l) => ({ id: l.id, name: l.name })),
+    [leaguesData],
+  );
+  const showFootballAvailabilityFilter = footballLeagues.length >= 1;
+  const [footballLeagueId, setFootballLeagueId] = useState<number | null>(null);
+  useEffect(() => {
+    if (
+      footballLeagues.length > 1 &&
+      !footballLeagues.some((l) => l.id === footballLeagueId)
+    ) {
+      setFootballLeagueId(footballLeagues[0].id);
+    }
+  }, [footballLeagues, footballLeagueId]);
+  const effectiveFootballLeagueId =
+    footballLeagues.length === 1 ? footballLeagues[0].id : footballLeagueId;
   const { playerIds: footballRosteredIds } = useLeagueRosteredPlayerIds(
     Sport.Football,
     !showFootballAvailabilityFilter,
+    effectiveFootballLeagueId,
   );
 
   // Derive the active sport from the URL param, falling back to the user's
@@ -1691,6 +1730,9 @@ export function PlayerStatsRoute() {
           onPlayerDetails={handleNflPlayerDetails}
           showAvailabilityFilter={showFootballAvailabilityFilter}
           rosteredPlayerIds={footballRosteredIds}
+          leagues={footballLeagues.length > 1 ? footballLeagues : undefined}
+          leagueId={effectiveFootballLeagueId}
+          onLeagueChange={setFootballLeagueId}
         />
         {selectedPlayerId !== null && (
           <FootballPlayerDetailModal
@@ -1880,6 +1922,9 @@ export function PlayerStatsRoute() {
           onFiltersChange={handleFiltersChange}
           showAvailabilityFilter={showBaseballAvailabilityFilter}
           rosteredPlayerIds={baseballRosteredIds}
+          leagues={baseballLeagues.length > 1 ? baseballLeagues : undefined}
+          leagueId={effectiveBaseballLeagueId}
+          onLeagueChange={setBaseballLeagueId}
         />
       </PremiumGate>
       {/* Routable player detail modal (PST-051 / LS-7124). Rendered in place over

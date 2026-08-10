@@ -10,9 +10,15 @@ import {
 } from '@legacy-sports/graphql';
 
 /**
- * Returns the set of player IDs rostered on the current user's teams across
- * all their leagues of the given sport. Used by the availability filter on the
- * Players List pages to distinguish free agents from rostered players.
+ * Returns the set of player IDs rostered on the current user's team(s) of the
+ * given sport. Used by the availability filter on the Players List pages to
+ * distinguish free agents from rostered players.
+ *
+ * By default aggregates across all of the viewer's leagues of `sport` — only
+ * meaningful when the viewer belongs to exactly one, since a player can be a
+ * free agent in one league and rostered in another. Pass `leagueId` to scope
+ * the result to a single league instead (LS-9158) — required for a correct
+ * result when the viewer has 2+ leagues of the sport.
  *
  * Only fetches when `skip` is false. Uses cache-first so rapid filter toggles
  * don't re-hit the network.
@@ -20,6 +26,7 @@ import {
 export function useLeagueRosteredPlayerIds(
   sport: Sport,
   skip = false,
+  leagueId: number | null = null,
 ): { playerIds: Set<number>; loading: boolean } {
   const client = useApolloClient();
   const [playerIds, setPlayerIds] = useState<Set<number>>(() => new Set());
@@ -31,9 +38,10 @@ export function useLeagueRosteredPlayerIds(
     () =>
       (leaguesData?.userLeagues ?? [])
         .filter((l) => l.sport === sport)
+        .filter((l) => leagueId === null || l.id === leagueId)
         .map((l) => l.userMembership?.teamId)
         .filter((id): id is number => id != null),
-    [leaguesData, sport],
+    [leaguesData, sport, leagueId],
   );
 
   useEffect(() => {

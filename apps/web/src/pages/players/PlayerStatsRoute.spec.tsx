@@ -698,15 +698,20 @@ describe('PlayerStatsRoute public-link auth gating (PST-070)', () => {
   });
 });
 
-// LS-9141: the availability filter's "Free Agents"/"Rostered" labels only map
-// onto a single, unambiguous league — `useLeagueRosteredPlayerIds` reports
-// player IDs rostered on the viewer's own teams across every league of the
-// sport, which is empty with zero leagues and conflates multiple leagues with
-// two-plus. The filter is only shown when the viewer has exactly one league
-// of the active sport.
-describe('PlayerStatsRoute availability filter league-count gating (LS-9141)', () => {
+// LS-9141 hid the availability filter whenever the viewer's league count for
+// the active sport wasn't exactly one, since `useLeagueRosteredPlayerIds`
+// aggregated across every league of the sport with no way to scope to one.
+// LS-9158 replaces "hide when ambiguous" with a league picker: the filter now
+// shows whenever the viewer has at least one league, and a `leagues` list is
+// passed down (only when there's a real choice to make, i.e. 2+) so the
+// multi-league case can be scoped instead of staying ambiguous.
+describe('PlayerStatsRoute availability filter league gating (LS-9141 / LS-9158)', () => {
   function setUserLeagues(
-    leagues: ReadonlyArray<{ sport: 'Baseball' | 'Football' }>,
+    leagues: ReadonlyArray<{
+      id: number;
+      name: string;
+      sport: 'Baseball' | 'Football';
+    }>,
   ) {
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: { userLeagues: leagues },
@@ -728,20 +733,32 @@ describe('PlayerStatsRoute availability filter league-count gating (LS-9141)', (
     setUserLeagues([]);
     render(<PlayerStatsRoute />);
     expect(mockStatsPageProps.showAvailabilityFilter).toBe(false);
+    expect(mockStatsPageProps.leagues).toBeUndefined();
   });
 
-  it('shows the baseball availability filter with exactly one baseball league', () => {
+  it('shows the baseball availability filter with exactly one baseball league and no picker', () => {
     mockSearchParams = new URLSearchParams('sport=mlb');
-    setUserLeagues([{ sport: 'Baseball' }]);
+    setUserLeagues([{ id: 1, name: 'Dynasty A', sport: 'Baseball' }]);
     render(<PlayerStatsRoute />);
     expect(mockStatsPageProps.showAvailabilityFilter).toBe(true);
+    expect(mockStatsPageProps.leagueId).toBe(1);
+    expect(mockStatsPageProps.leagues).toBeUndefined();
   });
 
-  it('hides the baseball availability filter with two-plus baseball leagues', () => {
+  it('shows the baseball availability filter with a league picker for two-plus baseball leagues', () => {
     mockSearchParams = new URLSearchParams('sport=mlb');
-    setUserLeagues([{ sport: 'Baseball' }, { sport: 'Baseball' }]);
+    setUserLeagues([
+      { id: 1, name: 'Dynasty A', sport: 'Baseball' },
+      { id: 2, name: 'Dynasty B', sport: 'Baseball' },
+    ]);
     render(<PlayerStatsRoute />);
-    expect(mockStatsPageProps.showAvailabilityFilter).toBe(false);
+    expect(mockStatsPageProps.showAvailabilityFilter).toBe(true);
+    expect(mockStatsPageProps.leagues).toEqual([
+      { id: 1, name: 'Dynasty A' },
+      { id: 2, name: 'Dynasty B' },
+    ]);
+    // Defaults to the first league until the viewer picks one.
+    expect(mockStatsPageProps.leagueId).toBe(1);
   });
 
   it('hides the football availability filter with zero football leagues', () => {
@@ -749,20 +766,31 @@ describe('PlayerStatsRoute availability filter league-count gating (LS-9141)', (
     setUserLeagues([]);
     render(<PlayerStatsRoute />);
     expect(mockFootballStatsPageProps.showAvailabilityFilter).toBe(false);
+    expect(mockFootballStatsPageProps.leagues).toBeUndefined();
   });
 
-  it('shows the football availability filter with exactly one football league', () => {
+  it('shows the football availability filter with exactly one football league and no picker', () => {
     mockSearchParams = new URLSearchParams('sport=nfl');
-    setUserLeagues([{ sport: 'Football' }]);
+    setUserLeagues([{ id: 3, name: 'Gridiron A', sport: 'Football' }]);
     render(<PlayerStatsRoute />);
     expect(mockFootballStatsPageProps.showAvailabilityFilter).toBe(true);
+    expect(mockFootballStatsPageProps.leagueId).toBe(3);
+    expect(mockFootballStatsPageProps.leagues).toBeUndefined();
   });
 
-  it('hides the football availability filter with two-plus football leagues', () => {
+  it('shows the football availability filter with a league picker for two-plus football leagues', () => {
     mockSearchParams = new URLSearchParams('sport=nfl');
-    setUserLeagues([{ sport: 'Football' }, { sport: 'Football' }]);
+    setUserLeagues([
+      { id: 3, name: 'Gridiron A', sport: 'Football' },
+      { id: 4, name: 'Gridiron B', sport: 'Football' },
+    ]);
     render(<PlayerStatsRoute />);
-    expect(mockFootballStatsPageProps.showAvailabilityFilter).toBe(false);
+    expect(mockFootballStatsPageProps.showAvailabilityFilter).toBe(true);
+    expect(mockFootballStatsPageProps.leagues).toEqual([
+      { id: 3, name: 'Gridiron A' },
+      { id: 4, name: 'Gridiron B' },
+    ]);
+    expect(mockFootballStatsPageProps.leagueId).toBe(3);
   });
 });
 

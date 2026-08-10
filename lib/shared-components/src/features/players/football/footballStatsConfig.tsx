@@ -47,6 +47,7 @@ import {
 import { NativeSelect } from '../shell/NativeSelect';
 import { AdvancedFilterPanel } from '../shell/AdvancedFilterPanel';
 import type {
+  LeagueOption,
   SportStatsConfig,
   SportStatsController,
 } from '../shell/sportStatsConfig';
@@ -79,6 +80,10 @@ export interface FootballStatsPageProps {
   showAvailabilityFilter?: boolean;
   /** Player IDs rostered in the viewer's football leagues. */
   rosteredPlayerIds?: ReadonlySet<number>;
+  /** Leagues for the availability-filter league picker (LS-9158). */
+  leagues?: ReadonlyArray<LeagueOption>;
+  leagueId?: number | null;
+  onLeagueChange?: (id: number | null) => void;
   /** Optional shell-level state override (loading/error/empty). */
   state?: PlayerStatsShellState;
   onRetry?: () => void;
@@ -172,6 +177,9 @@ export function useFootballController(
     onPlayerDetails,
     showAvailabilityFilter = false,
     rosteredPlayerIds,
+    leagues,
+    leagueId,
+    onLeagueChange,
     state,
     onRetry,
     onClearFilters,
@@ -784,6 +792,9 @@ export function useFootballController(
     showAvailability: showAvailabilityFilter,
     availabilityValue: availabilityFilter,
     onAvailabilityChange: setAvailabilityFilter,
+    leagues,
+    leagueId,
+    onLeagueChange,
     renderAdvancedPanel,
     shellState: state,
     onRetry,

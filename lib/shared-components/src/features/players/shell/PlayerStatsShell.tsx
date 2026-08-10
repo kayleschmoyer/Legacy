@@ -9,6 +9,7 @@ import { StatsViewTabs } from './StatsViewTabs';
 import { StatsToolbarFrame } from './StatsToolbarFrame';
 import { ColumnPickerPanel } from './ColumnPickerPanel';
 import { AvailabilityFilter } from './AvailabilityFilter';
+import { LeaguePicker } from './LeaguePicker';
 import {
   EmptyCard,
   ErrorCard,
@@ -266,10 +267,25 @@ export function PlayerStatsShell({
         )}
 
         {c.showAvailability && (
-          <AvailabilityFilter
-            value={c.availabilityValue}
-            onChange={c.onAvailabilityChange}
-          />
+          <XStack alignItems="center" gap={16} flexWrap="wrap">
+            <AvailabilityFilter
+              value={c.availabilityValue}
+              onChange={c.onAvailabilityChange}
+            />
+            {/* Multi-league viewers scope Free Agents/Rostered to one league
+                instead of an ambiguous cross-league aggregate (LS-9158,
+                porting the /players page's picker from LS-7044). */}
+            {c.availabilityValue !== 'all' &&
+              c.leagues &&
+              c.leagues.length > 0 && (
+                <LeaguePicker
+                  leagues={c.leagues}
+                  leagueId={c.leagueId ?? null}
+                  onChange={c.onLeagueChange ?? (() => undefined)}
+                  allowAll={false}
+                />
+              )}
+          </XStack>
         )}
 
         {advancedOpen && c.renderAdvancedPanel()}

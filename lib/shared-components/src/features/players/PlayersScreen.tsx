@@ -6,6 +6,7 @@ import { PlayersGrid, type PlayersGridResultStats } from './PlayersGrid';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 import { fullName, initialsOf } from './playerNameUtils';
 import { PlayerFeedSkeleton } from './cardFeed';
+import { type LeagueOption, LeaguePicker } from './shell/LeaguePicker';
 import { Platform } from '../../platform-components';
 import {
   BG_DARK,
@@ -131,11 +132,10 @@ const SORT_OPTIONS = [
   { value: 'NAME_DESC', label: 'Sort: Name (Z → A)' },
 ] as const;
 
-/** A league entry shown in the availability-filter league picker (LS-7044). */
-export interface LeagueOption {
-  id: number;
-  name: string;
-}
+// `LeagueOption` now lives in `./shell/LeaguePicker` so both this page and
+// PlayerStatsShell (LS-9158) share one type + one picker implementation.
+// Re-exported here so existing `from './PlayersScreen'` imports keep working.
+export type { LeagueOption };
 
 /**
  * Shell-level conditional state for the Players Page. When omitted, the page
@@ -1068,36 +1068,13 @@ function FilterRail({
             <>
               <YStack className="pp-rail-divider" aria-hidden={true} />
               <XStack className="pp-rail-group" alignItems="center">
-                <Text
-                  className="pp-rail-label"
-                  style={{
-                    fontFamily: FONT_DISPLAY,
-                    fontWeight: '700',
-                    fontSize: 10,
-                    letterSpacing: 1.4,
-                    textTransform: 'uppercase',
-                    color: TEXT_MUTED,
-                    marginRight: 4,
-                  }}
-                >
-                  League
-                </Text>
-                <select
-                  className="pp-league-sel"
-                  aria-label="Select league for availability filter"
-                  value={leagueId ?? ''}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    onLeagueChange(raw === '' ? null : parseInt(raw, 10));
-                  }}
-                >
-                  <option value="">All Leagues</option>
-                  {(leagues ?? []).map((lg) => (
-                    <option key={lg.id} value={lg.id}>
-                      {lg.name}
-                    </option>
-                  ))}
-                </select>
+                <LeaguePicker
+                  leagues={leagues ?? []}
+                  leagueId={leagueId}
+                  onChange={onLeagueChange}
+                  webClassName="pp-league-sel"
+                  webLabelClassName="pp-rail-label"
+                />
               </XStack>
             </>
           )}

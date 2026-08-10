@@ -52,6 +52,7 @@ import { TabContentFade } from '../shell/TabContentFade';
 import { AdvancedFilterPanel } from '../shell/AdvancedFilterPanel';
 import type {
   AvailabilityValue,
+  LeagueOption,
   SportStatsConfig,
   SportStatsController,
 } from '../shell/sportStatsConfig';
@@ -126,6 +127,10 @@ export interface PlayerStatsPageProps {
   }) => void;
   showAvailabilityFilter?: boolean;
   rosteredPlayerIds?: ReadonlySet<number>;
+  /** Leagues for the availability-filter league picker (LS-9158). */
+  leagues?: ReadonlyArray<LeagueOption>;
+  leagueId?: number | null;
+  onLeagueChange?: (id: number | null) => void;
 }
 
 const SKELETON_COLS_BY_MODE: Record<
@@ -212,6 +217,9 @@ export function useBaseballController(
     onFiltersChange,
     showAvailabilityFilter = false,
     rosteredPlayerIds,
+    leagues,
+    leagueId,
+    onLeagueChange,
   } = props;
 
   // ── View mode ─────────────────────────────────────────────────
@@ -1148,6 +1156,9 @@ export function useBaseballController(
     showAvailability: showAvailabilityFilter,
     availabilityValue: availabilityFilter,
     onAvailabilityChange: setAvailabilityFilter,
+    leagues,
+    leagueId,
+    onLeagueChange,
     renderAdvancedPanel,
     shellState: state,
     onRetry,
