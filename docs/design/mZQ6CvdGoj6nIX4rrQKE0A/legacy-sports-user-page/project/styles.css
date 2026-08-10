@@ -815,7 +815,8 @@ body { background: var(--bg); color: var(--fg1); font-family: var(--font-body); 
    dedicated frame. */
 @media (max-width: 979px) {
   /* BREAKPOINTS: md (860–979) starts trimming the two-column shells down
-     to single columns; sm (800–859) shares this frame. */
+     to single columns; sm (800–859) and xs (660–799) share this frame
+     as-is — all three bands are claimed by this designed layout. */
   .stat-ribbon { grid-template-columns: 1fr 1fr; }
   .league-grid { grid-template-columns: 1fr; }
   .badge-grid { grid-template-columns: repeat(2, 1fr); }

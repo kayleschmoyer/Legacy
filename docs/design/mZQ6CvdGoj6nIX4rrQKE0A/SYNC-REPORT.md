@@ -3,10 +3,10 @@
 - **Design id**: `mZQ6CvdGoj6nIX4rrQKE0A`
 - **Slug**: `legacy-sports-user-page`
 - **Status**: active (re-synced)
-- **Synced**: 2026-08-06 via `DesignSync` (local pull, `/pull-design`); review-comment fix on 2026-08-07
+- **Synced**: 2026-08-06 via `DesignSync` (local pull, `/pull-design`); review-comment fix on 2026-08-07; BREAKPOINTS annotation fix on 2026-08-09
 - **Source**: Claude Design project `2b6eb2e3-82c4-4df8-9ed6-34f13edbe49b` (`PROJECT_TYPE_PROJECT`, "Legacy Sports User Page")
-- **Bundle hash (sha256, canonical scheme)**: `sha256-30415b62fafe37f7de5b9ea853e81bd2b88b027f3b9b57d3b110cb6e08d07c70`
-- **Jira ticket**: [LS-8977](https://bkrupa.atlassian.net/browse/LS-8977) (design-source-fix, child of design-sync bucket epic LS-4568; original design ticket LS-4922)
+- **Bundle hash (sha256, canonical scheme)**: `sha256-d1429fd1dcf9619dc0c948a4f55edd071e291c04184dc7df0b58fbd54bddbe7e`
+- **Jira ticket**: [LS-9089](https://bkrupa.atlassian.net/browse/LS-9089) (design-source-fix, child of design-sync bucket epic LS-4568; original design ticket LS-4922)
 
 ## What changed vs the previous (2026-05-26 manual-zip) sync
 
@@ -30,6 +30,10 @@ The previous repo bundle was an incomplete manual zip import: `index.html` refer
 ## Review follow-up (2026-08-07)
 
 The review bot flagged `ProfileErrorState` reusing `BrandIcon name="secure"` — the same icon `ProfileView`'s private-profile lock screen uses, making "couldn't load" and "this profile is private" visually identical. Fixed at the source (the brand icon set has no dedicated error mark): swapped to an inline alert-triangle SVG using `currentColor`, styled by the existing `.state-frame.is-error` danger-token color.
+
+## BREAKPOINTS annotation fix (2026-08-09, LS-9089)
+
+LS-9024's Breakpoints-coverage audit found one real gap left after the 2026-08-06/07 responsive work (LS-8977): the `xs` band (660–799px) is functionally covered — it falls inside the `@media (max-width: 979px)` block alongside `md`/`sm` — but the block's `BREAKPOINTS:` comment only named `md`/`sm` as sharing the frame, so `xs` wasn't explicitly claimed by any annotation per the `docs/agents/pages/PROMPT.md` checklist wording. Fixed at the source (`styles.css`, the shared frame's `BREAKPOINTS:` comment) to also name `xs`, then re-pulled here. No visual/layout change — comment-only fix. All seven bands (`xxs`/`xs`/`sm`/`md`/`lg`/`xl`/`xxl`) are now each covered by a designed frame or an explicit `BREAKPOINTS:` annotation, reflowing only at the canonical thresholds (660/800/860/980/1120/1280).
 
 ## Known gap
 
