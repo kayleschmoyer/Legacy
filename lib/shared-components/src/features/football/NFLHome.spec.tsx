@@ -219,6 +219,57 @@ describe('NFLHome — player discovery entry point (LS-5411)', () => {
   });
 });
 
+describe('NFLHome — league-cap indicator (LS-8928)', () => {
+  it('omits the indicator when leagueCap is not provided', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(screen.queryByText(/Your leagues:/)).not.toBeInTheDocument();
+  });
+
+  it('renders the persistent count/limit indicator with cross-sport copy', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        leagueCap={{ count: 2, limit: 3, atLimit: false, onUpgrade: noop }}
+      />,
+    );
+    expect(
+      screen.getByTestId('football-league-cap-indicator'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Your leagues: 2\/3.*counts across every sport/),
+    ).toBeInTheDocument();
+  });
+
+  it('shows "Upgrade to add more" copy and invokes onUpgrade when at cap', () => {
+    const onUpgrade = jest.fn();
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        leagueCap={{ count: 3, limit: 3, atLimit: true, onUpgrade }}
+      />,
+    );
+    const upgradeCta = screen.getByText('— Upgrade to add more');
+    fireEvent.click(upgradeCta);
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows "Upgrade to Premium" copy when under cap', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        leagueCap={{ count: 1, limit: 3, atLimit: false, onUpgrade: noop }}
+      />,
+    );
+    expect(screen.getByText('— Upgrade to Premium')).toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — matchup highlight card (LS-5407)', () => {
   it('renders the highlight card with both team names and the week when a matchup is scheduled', () => {
     const league: NFLHomeLeague = {

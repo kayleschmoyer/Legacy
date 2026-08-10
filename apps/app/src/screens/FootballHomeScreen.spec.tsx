@@ -53,6 +53,12 @@ jest.mock('@legacy-sports/shared-components/football', () => {
       onViewLeague: (id: string | number) => void;
       onSignIn?: () => void;
       refreshControl?: import('../common/hooks/usePullToRefresh').PullToRefreshControlElement;
+      leagueCap?: {
+        count: number;
+        limit: number;
+        atLimit: boolean;
+        onUpgrade: () => void;
+      };
     }) => {
       capturedRefreshControl = props.refreshControl ?? null;
       return (
@@ -61,6 +67,13 @@ jest.mock('@legacy-sports/shared-components/football', () => {
           <Text>{`loading:${String(props.loading)}`}</Text>
           <Text>{`error:${String(props.error)}`}</Text>
           <Text>{`isAuthenticated:${String(props.isAuthenticated)}`}</Text>
+          <Text>{`leagueCap:${props.leagueCap ? `${props.leagueCap.count}/${props.leagueCap.limit}:${props.leagueCap.atLimit}` : 'undefined'}`}</Text>
+          <Pressable
+            testID="league-cap-upgrade"
+            onPress={() => props.leagueCap?.onUpgrade()}
+          >
+            <Text>league-cap-upgrade</Text>
+          </Pressable>
           <Pressable testID="create" onPress={() => props.onCreateLeague()}>
             <Text>create</Text>
           </Pressable>
@@ -403,6 +416,50 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       });
       render(<FootballHomeScreen />);
       fireEvent.press(screen.getByTestId('create'));
+      expect(mockTrackPremiumFeatureClick).toHaveBeenCalledWith(
+        'Unlimited Leagues',
+      );
+    });
+  });
+
+  describe('league-cap indicator wiring (LS-8928)', () => {
+    it('passes leagueCap when the free user is below the cap', () => {
+      render(<FootballHomeScreen />);
+      expect(screen.getByText('leagueCap:2/3:false')).toBeTruthy();
+    });
+
+    it('passes leagueCap with atLimit true when the free user is at the cap', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            ...FOOTBALL_LEAGUES,
+            {
+              id: 3,
+              name: 'Third',
+              sport: 'football',
+              draftStatus: null,
+              currentWeekNumber: null,
+              weekAdvanceStatus: null,
+            },
+          ],
+          userLeagueCount: 3,
+        },
+        loading: false,
+      });
+      render(<FootballHomeScreen />);
+      expect(screen.getByText('leagueCap:3/3:true')).toBeTruthy();
+    });
+
+    it('omits leagueCap for premium users', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: true, loading: false });
+      render(<FootballHomeScreen />);
+      expect(screen.getByText('leagueCap:undefined')).toBeTruthy();
+    });
+
+    it('invokes the same upgrade handler (with analytics) as the direct-redirect path', () => {
+      render(<FootballHomeScreen />);
+      fireEvent.press(screen.getByTestId('league-cap-upgrade'));
+      expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
       expect(mockTrackPremiumFeatureClick).toHaveBeenCalledWith(
         'Unlimited Leagues',
       );

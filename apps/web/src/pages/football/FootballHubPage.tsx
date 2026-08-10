@@ -57,6 +57,19 @@ export function FootballHubPage() {
     !isPremium &&
     activeLeagueCount >= FREE_TIER_LEAGUE_LIMIT;
 
+  // Persistent league-cap indicator (LS-8928), wired the same way
+  // BaseballScreen wires `leagueCap` into MLBHome — visible before the user
+  // taps Create rather than only surfacing on click via UpgradeModal.
+  const leagueCap =
+    auth?.user && !premiumLoading && !isPremium
+      ? {
+          count: activeLeagueCount,
+          limit: FREE_TIER_LEAGUE_LIMIT,
+          atLimit: atLeagueCap,
+          onUpgrade: () => navigate('/pricing'),
+        }
+      : undefined;
+
   const leagues = React.useMemo(
     () =>
       (data?.userLeagues ?? [])
@@ -179,6 +192,7 @@ export function FootballHubPage() {
           matchupHighlight={matchupHighlight}
           onSwitchSport={(sport) => navigate(`/${sport}`)}
           onSignIn={() => navigate('/')}
+          leagueCap={leagueCap}
         />
       </div>
       <UpgradeModal

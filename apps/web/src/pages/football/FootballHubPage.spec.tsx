@@ -236,6 +236,65 @@ describe('FootballHubPage — free-tier league cap gating (LS-5184)', () => {
   });
 });
 
+describe('FootballHubPage — league-cap indicator wiring (LS-8928)', () => {
+  it('passes leagueCap for a free user below the cap', () => {
+    setLeagues(leaguesOfCount(2));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].leagueCap).toMatchObject({
+      count: 2,
+      limit: 3,
+      atLimit: false,
+    });
+  });
+
+  it('passes leagueCap with atLimit true for a free user at the cap', () => {
+    setLeagues(leaguesOfCount(3));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].leagueCap).toMatchObject({
+      count: 3,
+      limit: 3,
+      atLimit: true,
+    });
+  });
+
+  it('omits leagueCap for premium users', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
+    setLeagues(leaguesOfCount(5));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].leagueCap).toBeUndefined();
+  });
+
+  it('omits leagueCap while premium status is still resolving', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: false,
+      isLoading: true,
+    });
+    setLeagues(leaguesOfCount(4));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].leagueCap).toBeUndefined();
+  });
+
+  it("leagueCap's onUpgrade navigates to /pricing, mirroring BaseballScreen", () => {
+    setLeagues(leaguesOfCount(3));
+
+    render(<FootballHubPage />);
+
+    mockNFLHome.mock.calls[0][0].leagueCap?.onUpgrade();
+    expect(navigateSpy).toHaveBeenCalledWith('/pricing');
+  });
+});
+
 describe('FootballHubPage — null-sport league handling (FBH-001)', () => {
   it('includes null-sport (legacy/un-migrated) leagues alongside football leagues', () => {
     setLeagues([
