@@ -204,7 +204,13 @@ export default [
     ignores: ['dist', '**/node_modules/**'],
   },
   {
-    ignores: ['node_modules/', '.modules-pool/', 'dist/', 'webpack.config.*'],
+    ignores: [
+      'node_modules/',
+      '.modules-pool/',
+      'dist/',
+      'webpack.config.*',
+      '**/.tamagui/**',
+    ],
   },
   {
     // Pinned to the repo root — see the basePath comment on the VITE_*
