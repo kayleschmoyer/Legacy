@@ -155,6 +155,7 @@ fragment AppMatchupPlayer on MatchupPlayer {
     gamePosition
     statsLoadingStatus
     pitcherStartSkipped
+    noGameDataFound
     battingGame {
       playerId
       season

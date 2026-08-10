@@ -6,7 +6,7 @@
  * team's count separately ("5 vs 0") instead of the summed total.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import {
   type MatchupFragment,
@@ -201,5 +201,135 @@ describe('MatchupRosterComparison — bench toggle (LS-5904 / BMD-034)', () => {
     // With no bench players on either side, the bench toggle section isn't
     // rendered at all — no "Show Bench" text and no per-team split badge.
     expect(screen.queryByText(/Bench/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Regression coverage for LS-9122: a season with no scraped per-game box
+ * scores was flagged as `pitcherStartSkipped`, the same flag used for a
+ * real SP rotation skip. That made a hitter with a data gap read as having
+ * "N off days" — a misleading, inflated count. `noGameDataFound` now
+ * carries the data-gap case, and the UI must show "Stats unavailable"
+ * for it instead of counting it as an off day.
+ */
+describe('MatchupRosterComparison — off-day vs no-data labeling (LS-9122)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue({
+      data: { leaguePositions: [] },
+      loading: false,
+    });
+    (useGetLeagueTeamsQuery as jest.Mock).mockReturnValue({
+      data: {
+        leagueTeams: [
+          { id: 10, name: 'Team A' },
+          { id: 20, name: 'Team B' },
+        ],
+      },
+    });
+    (useLeagueScoringSettings as jest.Mock).mockReturnValue({
+      settings: { batting: {}, pitching: {}, fielding: {} },
+      loading: false,
+    });
+  });
+
+  function makeGame(
+    id: number,
+    overrides: Partial<{
+      pitcherStartSkipped: boolean;
+      noGameDataFound: boolean;
+    }> = {},
+  ) {
+    return {
+      __typename: 'MatchupPlayerGame',
+      id,
+      matchupPlayerId: id,
+      gameNum: 1,
+      gameIdentifier: null,
+      gamePosition: null,
+      statsLoadingStatus: 'completed',
+      pitcherStartSkipped: false,
+      noGameDataFound: false,
+      ...overrides,
+    };
+  }
+
+  function makeFielderBenchPlayer(
+    id: string,
+    teamId: number,
+    playerId: number,
+    games: ReturnType<typeof makeGame>[],
+  ): MatchupPlayerFragment {
+    return {
+      __typename: 'MatchupPlayer',
+      id,
+      matchupId: 1234,
+      playerId,
+      teamId,
+      positionId: null,
+      season: 2026,
+      numberOfGames: games.length,
+      player: {
+        __typename: 'Player',
+        firstName: `First${id}`,
+        lastName: `Last${id}`,
+        eligiblePositions: ['OF'],
+      },
+      seasonBatting: null,
+      seasonPitching: null,
+      seasonFielding: null,
+      games,
+    } as unknown as MatchupPlayerFragment;
+  }
+
+  it('shows "Stats unavailable" (not "off day") for a hitter with a data-availability gap', () => {
+    const players: MatchupPlayerFragment[] = [
+      makeFielderBenchPlayer('1', 10, 101, [
+        makeGame(1, { noGameDataFound: true }),
+        makeGame(2, { noGameDataFound: true }),
+      ]),
+      makeFielderBenchPlayer('2', 20, 102, [
+        makeGame(3, { noGameDataFound: true }),
+        makeGame(4, { noGameDataFound: true }),
+      ]),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+
+    render(<MatchupRosterComparison matchup={makeMatchup()} />);
+    fireEvent.click(screen.getByText('Show Bench'));
+
+    expect(screen.getAllByText(/Stats unavailable/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/off day/)).not.toBeInTheDocument();
+    // Games with no data should not count toward "games played" either —
+    // both benched players show 0/2, never games "played".
+    expect(screen.getAllByText(/0\/2 games/).length).toBeGreaterThan(0);
+  });
+
+  it('still shows "N off days" for a real SP rotation skip', () => {
+    const players: MatchupPlayerFragment[] = [
+      makeFielderBenchPlayer('1', 10, 101, [
+        makeGame(1, { pitcherStartSkipped: true }),
+        makeGame(2, { pitcherStartSkipped: true }),
+      ]),
+      makeFielderBenchPlayer('2', 20, 102, [
+        makeGame(3, { pitcherStartSkipped: true }),
+        makeGame(4, { pitcherStartSkipped: true }),
+      ]),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+
+    render(<MatchupRosterComparison matchup={makeMatchup()} />);
+    fireEvent.click(screen.getByText('Show Bench'));
+
+    expect(screen.getAllByText(/2 off days/).length).toBeGreaterThan(0);
   });
 });

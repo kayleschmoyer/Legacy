@@ -502,6 +502,7 @@ test.describe
                 gameIdentifier: string | null;
                 gameNum: number | null;
                 pitcherStartSkipped: boolean | null;
+                noGameDataFound: boolean | null;
               }> | null;
             }>;
           }>(
@@ -509,7 +510,7 @@ test.describe
             `query MatchupPlayers($matchupId: Int!) {
                    getMatchupPlayers(matchupId: $matchupId) {
                      id playerId
-                     games { id gameIdentifier gameNum pitcherStartSkipped }
+                     games { id gameIdentifier gameNum pitcherStartSkipped noGameDataFound }
                    }
                  }`,
             { matchupId: Number(matchup.id) },
@@ -521,11 +522,13 @@ test.describe
           );
           expect(playersWithGames.length).toBeGreaterThan(0);
 
-          // gameIdentifier === null iff pitcherStartSkipped === true (intentional SP-skip slots).
-          // Non-skipped games must always have a real identifier.
+          // gameIdentifier === null iff pitcherStartSkipped === true (intentional
+          // SP-skip slots) or noGameDataFound === true (no per-game box scores
+          // found for the player's assigned season — LS-9122). All other games
+          // must always have a real identifier.
           for (const mp of playersWithGames) {
             for (const g of mp.games ?? []) {
-              if (g.pitcherStartSkipped) {
+              if (g.pitcherStartSkipped || g.noGameDataFound) {
                 expect(g.gameIdentifier).toBeNull();
               } else {
                 expect(g.gameIdentifier).toBeTruthy();
@@ -535,7 +538,9 @@ test.describe
 
           // At least some games across all players should be real (non-skipped)
           const realGames = playersWithGames.flatMap((mp) =>
-            (mp.games ?? []).filter((g) => !g.pitcherStartSkipped),
+            (mp.games ?? []).filter(
+              (g) => !g.pitcherStartSkipped && !g.noGameDataFound,
+            ),
           );
           expect(realGames.length).toBeGreaterThan(0);
         }

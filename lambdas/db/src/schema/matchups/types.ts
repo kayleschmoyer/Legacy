@@ -796,6 +796,8 @@ export const MatchupPlayerGameRef = builder.objectRef<{
   statsLoadingStatus: string | null;
   /** True when an SP was probabilistically skipped for this game day */
   pitcherStartSkipped: boolean;
+  /** True when no per-game box score data could be found for the player's assigned season */
+  noGameDataFound: boolean;
 }>('MatchupPlayerGame');
 
 MatchupPlayerGameRef.implement({
@@ -810,6 +812,8 @@ MatchupPlayerGameRef.implement({
     }),
     /** True when an SP was probabilistically skipped for this game day (not starting). */
     pitcherStartSkipped: t.exposeBoolean('pitcherStartSkipped'),
+    /** True when no per-game box score data could be found for the player's assigned season (any position) — a data gap, not an off day. */
+    noGameDataFound: t.exposeBoolean('noGameDataFound'),
 
     // Resolve the actual game stats for this selected game
     battingGame: t.field({

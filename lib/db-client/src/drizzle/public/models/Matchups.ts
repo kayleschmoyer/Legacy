@@ -214,6 +214,8 @@ export const matchupPlayerGames = pgTable(
     pitcherStartSkipped: boolean('pitcher_start_skipped')
       .notNull()
       .default(false),
+    /** True when no per-game box score data could be found for the player's assigned season (any position) — a data gap, not an off day. */
+    noGameDataFound: boolean('no_game_data_found').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

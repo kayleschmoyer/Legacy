@@ -29,6 +29,24 @@ import {
 import { outsToBaseballIP } from '../../lib/scoring/ipUtils';
 import './MatchupRosterComparison.css';
 
+// ── Game-slot helpers ────────────────────────────────────────────────────
+//
+// A game slot with no real stats can mean two different things:
+//   - pitcherStartSkipped: a real off day — an SP was probabilistically
+//     held out of the rotation for this game day.
+//   - noGameDataFound: a data gap — the stats pipeline never found a
+//     per-game box score for the player's assigned season, for any
+//     position. This is not an off day; it should never be counted or
+//     labeled as one (LS-9122).
+type GameSlot = Pick<
+  NonNullable<MatchupPlayerFragment['games']>[number],
+  'pitcherStartSkipped' | 'noGameDataFound'
+>;
+
+function hasNoStats(game: GameSlot): boolean {
+  return Boolean(game.pitcherStartSkipped || game.noGameDataFound);
+}
+
 // ── Position grouping (drives .mrc-g-* badge color classes) ────────────────
 
 type PositionGroup = 'catcher' | 'infield' | 'outfield' | 'pitcher' | 'utility';
@@ -271,7 +289,7 @@ export function MatchupRosterComparison({
       player: MatchupPlayerFragment,
     ): number => {
       const gamesPlayed =
-        player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0;
+        player.games?.filter((g) => !hasNoStats(g)).length ?? 0;
       const actualScore =
         player.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ?? 0;
       // Use player-specific numberOfGames (SP gets pitcherStartsPerMatchup, others get gamesPerMatchup)
@@ -735,7 +753,7 @@ export function MatchupRosterComparison({
   };
 
   // Suffix shown after the "Season {year} • {gp}/{gs} games" meta line —
-  // priority: loading > failed > off days > yet to play.
+  // priority: loading > failed > no data > off days > yet to play.
   const metaSuffix = (
     player: MatchupPlayerFragment,
   ): { text: string; className: string } | null => {
@@ -743,15 +761,21 @@ export function MatchupRosterComparison({
     if (games.length === 0) return { text: ' • Yet to play', className: '' };
     const loadingCount = games.filter(
       (g) =>
-        !g.pitcherStartSkipped &&
+        !hasNoStats(g) &&
         (g.statsLoadingStatus === 'loading' ||
           g.statsLoadingStatus === 'pending'),
     ).length;
     if (loadingCount > 0) return { text: ' • Loading stats', className: '' };
     const failedCount = games.filter(
-      (g) => !g.pitcherStartSkipped && g.statsLoadingStatus === 'failed',
+      (g) => !hasNoStats(g) && g.statsLoadingStatus === 'failed',
     ).length;
     if (failedCount > 0)
+      return { text: ' • Stats unavailable', className: 'mrc-fail' };
+    // A data-availability gap (no per-game box scores for the player's
+    // assigned season) is not a real off day — never fold it into the
+    // off-day count (LS-9122).
+    const noDataCount = games.filter((g) => g.noGameDataFound).length;
+    if (noDataCount > 0)
       return { text: ' • Stats unavailable', className: 'mrc-fail' };
     const skippedCount = games.filter((g) => g.pitcherStartSkipped).length;
     if (skippedCount > 0) {
@@ -772,8 +796,7 @@ export function MatchupRosterComparison({
     actual: number,
     proj: number,
   ): boolean | null => {
-    const gamesPlayed =
-      player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0;
+    const gamesPlayed = player.games?.filter((g) => !hasNoStats(g)).length ?? 0;
     if (gamesPlayed === 0) return null;
     const expected = (proj / gamesPerMatchup) * gamesPlayed;
     return actual >= expected;
@@ -791,7 +814,7 @@ export function MatchupRosterComparison({
 
   const openBreakdownModal = (player: MatchupPlayerFragment) => {
     const hasPlayed =
-      (player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) > 0;
+      (player.games?.filter((g) => !hasNoStats(g)).length ?? 0) > 0;
     if (hasPlayed && player.player) {
       setSelectedMatchupPlayer(player);
       setSelectedMatchupPlayerName(
@@ -839,7 +862,7 @@ export function MatchupRosterComparison({
       0;
     const proj = calculatePlayerProjection(player);
     const hasPlayed =
-      (player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) > 0;
+      (player.games?.filter((g) => !hasNoStats(g)).length ?? 0) > 0;
     const beats = beatsProjection(player, actual, proj);
     const actualCls = beats === null ? '' : beats ? 'mrc-up' : 'mrc-down';
     const suffix = metaSuffix(player);
@@ -871,7 +894,7 @@ export function MatchupRosterComparison({
           </div>
           <div className="mrc-pmeta">
             Season {player.season} •{' '}
-            {player.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0}/
+            {player.games?.filter((g) => !hasNoStats(g)).length ?? 0}/
             {player.numberOfGames ?? gamesPerMatchup} games
             {suffix && (
               <span className={`mrc-suffix ${suffix.className}`}>
@@ -918,11 +941,9 @@ export function MatchupRosterComparison({
       team2Player?.games?.reduce((sum, g) => sum + calculateGameScore(g), 0) ??
       0;
     const team1Played =
-      (team1Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) >
-      0;
+      (team1Player?.games?.filter((g) => !hasNoStats(g)).length ?? 0) > 0;
     const team2Played =
-      (team2Player?.games?.filter((g) => !g.pitcherStartSkipped).length ?? 0) >
-      0;
+      (team2Player?.games?.filter((g) => !hasNoStats(g)).length ?? 0) > 0;
     const team1Lead =
       team1Player != null &&
       team2Player != null &&

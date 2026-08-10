@@ -1772,6 +1772,7 @@ export type MatchupPlayerGame = {
   gamePosition?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
+  noGameDataFound?: Maybe<Scalars['Boolean']['output']>;
   pitcherStartSkipped?: Maybe<Scalars['Boolean']['output']>;
   pitchingGame?: Maybe<GamePitching>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;

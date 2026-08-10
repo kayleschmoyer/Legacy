@@ -1778,6 +1778,7 @@ export type MatchupPlayerGame = {
   gamePosition?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   matchupPlayerId?: Maybe<Scalars['Int']['output']>;
+  noGameDataFound?: Maybe<Scalars['Boolean']['output']>;
   pitcherStartSkipped?: Maybe<Scalars['Boolean']['output']>;
   pitchingGame?: Maybe<GamePitching>;
   statsLoadingStatus?: Maybe<Scalars['String']['output']>;
@@ -6987,6 +6988,7 @@ export type GetMatchupRosterQuery = {
       gamePosition?: string | null;
       statsLoadingStatus?: string | null;
       pitcherStartSkipped?: boolean | null;
+      noGameDataFound?: boolean | null;
       battingGame?: {
         __typename?: 'GameBatting';
         playerId?: number | null;
@@ -7192,6 +7194,7 @@ export type UpdateMatchupPlayerPositionMutation = {
       gamePosition?: string | null;
       statsLoadingStatus?: string | null;
       pitcherStartSkipped?: boolean | null;
+      noGameDataFound?: boolean | null;
       battingGame?: {
         __typename?: 'GameBatting';
         playerId?: number | null;
@@ -7362,6 +7365,7 @@ export type SwapMatchupPlayerPositionsMutation = {
       gamePosition?: string | null;
       statsLoadingStatus?: string | null;
       pitcherStartSkipped?: boolean | null;
+      noGameDataFound?: boolean | null;
       battingGame?: {
         __typename?: 'GameBatting';
         playerId?: number | null;
@@ -7531,6 +7535,7 @@ export type AppMatchupPlayerFragment = {
     gamePosition?: string | null;
     statsLoadingStatus?: string | null;
     pitcherStartSkipped?: boolean | null;
+    noGameDataFound?: boolean | null;
     battingGame?: {
       __typename?: 'GameBatting';
       playerId?: number | null;
@@ -10745,6 +10750,7 @@ export type GetMatchupPlayersQuery = {
       gamePosition?: string | null;
       statsLoadingStatus?: string | null;
       pitcherStartSkipped?: boolean | null;
+      noGameDataFound?: boolean | null;
       battingGame?: {
         __typename?: 'GameBatting';
         playerId?: number | null;
@@ -12252,6 +12258,7 @@ export type MatchupPlayerFragment = {
     gamePosition?: string | null;
     statsLoadingStatus?: string | null;
     pitcherStartSkipped?: boolean | null;
+    noGameDataFound?: boolean | null;
     battingGame?: {
       __typename?: 'GameBatting';
       playerId?: number | null;
@@ -14540,6 +14547,7 @@ export const AppMatchupPlayerFragmentDoc = gql`
       gamePosition
       statsLoadingStatus
       pitcherStartSkipped
+      noGameDataFound
       battingGame {
         playerId
         season
@@ -15355,6 +15363,7 @@ export const MatchupPlayerFragmentDoc = gql`
       gamePosition
       statsLoadingStatus
       pitcherStartSkipped
+      noGameDataFound
       battingGame {
         playerId
         season

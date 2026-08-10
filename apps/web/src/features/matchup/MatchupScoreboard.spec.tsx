@@ -223,6 +223,7 @@ describe('computeMatchupScores', () => {
             gamePosition: null,
             statsLoadingStatus: null,
             pitcherStartSkipped: false,
+            noGameDataFound: false,
             battingGame: {
               __typename: 'GameBatting',
               playerId,
@@ -305,6 +306,7 @@ describe('computeMatchupScores', () => {
             gamePosition: null,
             statsLoadingStatus: null,
             pitcherStartSkipped: false,
+            noGameDataFound: false,
             battingGame: {
               __typename: 'GameBatting',
               playerId: Number(id),
@@ -388,6 +390,7 @@ describe('computeMatchupScores', () => {
           gamePosition: null,
           statsLoadingStatus: null,
           pitcherStartSkipped: false,
+          noGameDataFound: false,
           battingGame: {
             __typename: 'GameBatting',
             playerId,

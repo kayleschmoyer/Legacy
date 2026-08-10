@@ -2052,6 +2052,7 @@ type MatchupPlayerGame {
   gamePosition: String
   id: Int
   matchupPlayerId: Int
+  noGameDataFound: Boolean
   pitcherStartSkipped: Boolean
   pitchingGame: GamePitching
   statsLoadingStatus: String

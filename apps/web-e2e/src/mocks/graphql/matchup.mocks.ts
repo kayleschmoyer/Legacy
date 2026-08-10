@@ -53,6 +53,7 @@ export interface MockMatchupPlayerGame {
   gamePosition: string | null;
   statsLoadingStatus: MockStatsLoadingStatus;
   pitcherStartSkipped: boolean;
+  noGameDataFound: boolean;
 }
 
 /** Individual game selection record for a matchup player. */
@@ -68,6 +69,7 @@ export function mockMatchupPlayerGame(
     gamePosition: null,
     statsLoadingStatus: 'not_started',
     pitcherStartSkipped: false,
+    noGameDataFound: false,
     ...overrides,
   };
 }
