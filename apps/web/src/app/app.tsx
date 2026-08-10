@@ -674,6 +674,23 @@ function App() {
                 </FootballGate>
               }
             />
+            {/* Static segment must precede /football/league/:id dynamic route. */}
+            <Route
+              path="/football/league/join"
+              element={
+                <FootballGate>
+                  <JoinLeagueByCodePage />
+                </FootballGate>
+              }
+            />
+            <Route
+              path="/football/league/join/:inviteCode"
+              element={
+                <FootballGate>
+                  <JoinLeagueByCodePage />
+                </FootballGate>
+              }
+            />
             <Route
               path="/football/league/:id"
               element={

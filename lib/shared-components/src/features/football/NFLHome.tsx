@@ -352,6 +352,7 @@ function NFLHome({
                   paddingHorizontal="$5"
                   onPress={onJoinLeague}
                   accessibilityLabel="Join a football league"
+                  data-testid="join-league-button"
                 >
                   <Text color="white" fontSize="$4" fontWeight="700">
                     Join League

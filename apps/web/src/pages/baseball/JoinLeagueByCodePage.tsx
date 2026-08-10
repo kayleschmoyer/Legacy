@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import {
   Button,
@@ -21,8 +21,15 @@ import {
   withAlpha,
 } from '../../constants/colors';
 
+/** Read the sport from a pathname (`/football/...` → football, otherwise baseball). */
+function sportFromPathname(pathname: string): 'baseball' | 'football' {
+  return pathname.startsWith('/football') ? 'football' : 'baseball';
+}
+
 export function JoinLeagueByCodePage(): React.JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
+  const sport = sportFromPathname(location.pathname);
   const { inviteCode: urlInviteCode } = useParams<{ inviteCode?: string }>();
   // Initialise directly from the URL param so validation fires on the first
   // render rather than after a state-update round-trip (LS-2950 regression).
@@ -87,7 +94,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
     // Preserve the canonical join URL rather than the current address bar
     // value — the code may have been typed in rather than arrived via the
     // /:inviteCode route param, so window.location alone isn't reliable.
-    storeCameFrom(`/baseball/league/join/${trimmedCode}`);
+    storeCameFrom(`/${sport}/league/join/${trimmedCode}`);
     navigate('/login', { replace: true });
   };
 
@@ -130,7 +137,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
 
       const leagueId = result.data?.joinLeagueByCode?.leagueId;
       if (leagueId) {
-        navigate(`/baseball/league/${leagueId}`);
+        navigate(`/${sport}/league/${leagueId}`);
       } else {
         setError(
           'League joined but navigation failed — please visit My Leagues.',
@@ -171,7 +178,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
     >
       <PageMeta
         title="Join a League"
-        description="Enter your invitation code to join a fantasy baseball league on Legacy Sports and start competing."
+        description={`Enter your invitation code to join a fantasy ${sport} league on Legacy Sports and start competing.`}
       />
       <YStack space="$2">
         <H1 size="$9" color={BRAND_GOLD_LIGHT} id="join-league-title">
@@ -461,7 +468,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                     color="white"
                     borderRadius="$4"
                     onPress={() =>
-                      navigate(`/baseball/league/${leagueInfo.leagueId}`)
+                      navigate(`/${sport}/league/${leagueInfo.leagueId}`)
                     }
                   >
                     Go to League
@@ -531,7 +538,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 backgroundColor="$gray6"
                 color="$gray11"
                 animation="fast"
-                onPress={() => navigate('/baseball')}
+                onPress={() => navigate(`/${sport}`)}
                 disabled={loading}
               >
                 Cancel
