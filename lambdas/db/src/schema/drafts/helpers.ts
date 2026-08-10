@@ -169,28 +169,83 @@ export async function getUnfilledPositionTypes(
     playerSlotMap.set(row.playerId, existing);
   }
 
-  // 4. Greedily assign players to slots (most-specific slots first)
-  const slotsCovered = new Map<string, number>();
+  // 4-5. Maximum bipartite matching between drafted players and slot
+  // instances determines which slot types remain genuinely unfilled.
+  return computeUnfilledSlotTypes(slotsNeeded, playerSlotMap, teamPlayerIds);
+}
+
+/**
+ * Given per-type slot requirements and which slot types each drafted player
+ * can fill, return the slot types that cannot be covered by any valid
+ * assignment of players to slots (LS-9123).
+ *
+ * A one-pass greedy assignment — each player claims the first open slot type
+ * it's eligible for, in draft order — is NOT guaranteed to find a valid full
+ * assignment even when one exists: a dual-eligible player (e.g. 3B/SS)
+ * processed before a single-eligible player (3B only) can claim the shared
+ * slot first, permanently starving the single-eligible player and leaving a
+ * slot reported "unfilled" that a different, still-valid assignment would
+ * have covered — e.g. an auto-drafted team ending up with no player at 3B
+ * because auto-pick, driven by this function, never treated 3B as needed.
+ * Kuhn's augmenting-path algorithm finds the true maximum matching, so a slot
+ * type is only reported unfilled when no valid assignment can cover it.
+ */
+export function computeUnfilledSlotTypes(
+  slotsNeeded: Map<string, number>,
+  playerSlotMap: Map<number, Set<string>>,
+  teamPlayerIds: number[],
+): string[] {
   const orderedSlotTypes = [...slotsNeeded.keys()].sort(
     (a, b) =>
       (ALLOWED_POSITIONS[a]?.length ?? 1) - (ALLOWED_POSITIONS[b]?.length ?? 1),
   );
 
-  for (const playerId of teamPlayerIds) {
-    const coverableSlots = playerSlotMap.get(playerId);
-    if (!coverableSlots) continue;
+  const slotInstanceTypes: string[] = [];
+  for (const [slotType, needed] of slotsNeeded) {
+    for (let i = 0; i < needed; i++) slotInstanceTypes.push(slotType);
+  }
+  const slotInstancesByType = new Map<string, number[]>();
+  slotInstanceTypes.forEach((slotType, idx) => {
+    const list = slotInstancesByType.get(slotType) ?? [];
+    list.push(idx);
+    slotInstancesByType.set(slotType, list);
+  });
 
-    for (const slotType of orderedSlotTypes) {
-      const needed = slotsNeeded.get(slotType) ?? 0;
-      const covered = slotsCovered.get(slotType) ?? 0;
-      if (covered < needed && coverableSlots.has(slotType)) {
-        slotsCovered.set(slotType, covered + 1);
-        break; // Each player fills exactly one slot
+  // slotInstance index -> playerId currently matched to it (or null)
+  const matchedPlayerForSlot = new Array<number | null>(
+    slotInstanceTypes.length,
+  ).fill(null);
+
+  function tryMatch(playerId: number, visited: Set<number>): boolean {
+    const coverableSlots = playerSlotMap.get(playerId);
+    if (!coverableSlots) return false;
+
+    for (const slotType of coverableSlots) {
+      for (const slotIdx of slotInstancesByType.get(slotType) ?? []) {
+        if (visited.has(slotIdx)) continue;
+        visited.add(slotIdx);
+
+        const incumbent = matchedPlayerForSlot[slotIdx];
+        if (incumbent === null || tryMatch(incumbent, visited)) {
+          matchedPlayerForSlot[slotIdx] = playerId;
+          return true;
+        }
       }
     }
+    return false;
   }
 
-  // 5. Return slot types that still have open slots
+  for (const playerId of teamPlayerIds) {
+    tryMatch(playerId, new Set());
+  }
+
+  const slotsCovered = new Map<string, number>();
+  slotInstanceTypes.forEach((slotType, idx) => {
+    if (matchedPlayerForSlot[idx] !== null) {
+      slotsCovered.set(slotType, (slotsCovered.get(slotType) ?? 0) + 1);
+    }
+  });
+
   return orderedSlotTypes.filter(
     (slotType) =>
       (slotsCovered.get(slotType) ?? 0) < (slotsNeeded.get(slotType) ?? 0),
