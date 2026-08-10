@@ -6,6 +6,7 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   MatchupStatus,
   Sport,
+  useFootballPlayersQuery,
   useGetLeagueTeamsQuery,
   useGetMatchupByIdQuery,
   useGetUserLeaguesQuery,
@@ -31,6 +32,15 @@ export function FootballHubPage() {
     skip: !auth?.user,
     fetchPolicy: 'cache-and-network',
   });
+
+  // Top/trending players preview (LS-5411). Pool-wide fantasy points, top 5 —
+  // no dedicated "trending" backend metric exists, so this reuses the
+  // existing footballPlayers sort support (fpts desc) rather than adding one.
+  const { data: trendingPlayersData, loading: trendingPlayersLoading } =
+    useFootballPlayersQuery({
+      variables: { first: 5, sortBy: 'fpts', sortDir: 'desc' },
+    });
+  const trendingPlayers = trendingPlayersData?.footballPlayers?.nodes ?? [];
 
   // `userLeagues` is paginated (LS-9101), so its array length can under-count
   // once a user has more leagues than the page size. `userLeagueCount` is the
@@ -159,9 +169,12 @@ export function FootballHubPage() {
           onCreateLeague={handleCreateLeague}
           onJoinLeague={() => navigate('/football/league/join')}
           onBrowseLeagues={() => navigate('/football/leagues')}
+          onBrowsePlayers={() => navigate('/football/players')}
           onViewLeague={(id: string | number) =>
             navigate(`/football/league/${id}`)
           }
+          trendingPlayers={trendingPlayers}
+          trendingPlayersLoading={trendingPlayersLoading}
           matchupHighlight={matchupHighlight}
           onSwitchSport={(sport) => navigate(`/${sport}`)}
         />

@@ -156,6 +156,18 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   // GetUserLeagues also fetches userLeagueCount (LS-9101) — the authoritative
   // total the free-tier league-cap gate reads instead of userLeagues.length.
   getuserleagues: { data: { userLeagues: [], userLeagueCount: 0 } },
+  // Football Home's top/trending-players preview fires FootballPlayers on every
+  // /football load (LS-5411). An empty connection renders the preview section's
+  // loading-then-empty transition cleanly without asserting on player content —
+  // specs that need actual preview data register their own override.
+  footballplayers: {
+    data: {
+      footballPlayers: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+      },
+    },
+  },
   // GetMyLeagues fetches the same userLeagueCount field (LS-9101).
   getmyleagues: { data: { myLeagues: [], userLeagueCount: 0 } },
   getpublicleagues: { data: { publicLeagues: [] } },

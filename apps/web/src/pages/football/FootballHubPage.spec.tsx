@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { NFLHome } from '@legacy-sports/shared-components/football';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
+  useFootballPlayersQuery,
   useGetLeagueTeamsQuery,
   useGetMatchupByIdQuery,
   useGetUserLeaguesQuery,
@@ -48,6 +49,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     Scheduled: 'scheduled',
   },
   useGetUserLeaguesQuery: jest.fn(),
+  useFootballPlayersQuery: jest.fn(),
   useGetMatchupByIdQuery: jest.fn(),
   useGetLeagueTeamsQuery: jest.fn(),
 }));
@@ -63,6 +65,10 @@ const mockUseIsPremiumStatus = useIsPremiumStatus as jest.MockedFunction<
 >;
 const mockUseGetUserLeaguesQuery =
   useGetUserLeaguesQuery as jest.MockedFunction<typeof useGetUserLeaguesQuery>;
+const mockUseFootballPlayersQuery =
+  useFootballPlayersQuery as jest.MockedFunction<
+    typeof useFootballPlayersQuery
+  >;
 const mockUseGetMatchupByIdQuery =
   useGetMatchupByIdQuery as jest.MockedFunction<typeof useGetMatchupByIdQuery>;
 const mockUseGetLeagueTeamsQuery =
@@ -142,6 +148,11 @@ beforeEach(() => {
     error: undefined,
   } as ReturnType<typeof useGetLeagueTeamsQuery>);
   setLeagues([]);
+  mockUseFootballPlayersQuery.mockReturnValue({
+    data: { footballPlayers: { nodes: [], pageInfo: {} } },
+    loading: false,
+    error: undefined,
+  } as unknown as ReturnType<typeof useFootballPlayersQuery>);
 });
 
 // ---------------------------------------------------------------------------

@@ -24,6 +24,10 @@ export {
 } from './FootballPlayerDetail';
 export { StatCategory } from './StatCategory';
 export {
+  TrendingPlayersPreview,
+  type TrendingPlayersPreviewProps,
+} from './TrendingPlayersPreview';
+export {
   FootballPlayerHeader,
   type FootballPlayerHeaderProps,
   type FootballPlayerHeaderPlayer,

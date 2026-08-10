@@ -38,6 +38,7 @@ jest.mock('@legacy-sports/shared-components/football', () => {
       onCreateLeague: () => void;
       onJoinLeague?: () => void;
       onBrowseLeagues?: () => void;
+      onBrowsePlayers?: () => void;
       onViewLeague: (id: string | number) => void;
       onSignIn?: () => void;
     }) => (
@@ -57,6 +58,12 @@ jest.mock('@legacy-sports/shared-components/football', () => {
         </Pressable>
         <Pressable testID="sign-in" onPress={() => props.onSignIn?.()}>
           <Text>sign-in</Text>
+        </Pressable>
+        <Pressable
+          testID="browse-players"
+          onPress={() => props.onBrowsePlayers?.()}
+        >
+          <Text>browse-players</Text>
         </Pressable>
       </View>
     ),
@@ -78,10 +85,15 @@ const mockUseGetUserLeaguesQuery: jest.MockedFunction<
     error?: unknown;
   }
 > = jest.fn();
+const mockUseFootballPlayersQuery: jest.MockedFunction<
+  (options?: unknown) => { data: unknown; loading: boolean; error?: unknown }
+> = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Football: 'football', Baseball: 'baseball' },
   useGetUserLeaguesQuery: (options?: { skip?: boolean }) =>
     mockUseGetUserLeaguesQuery(options),
+  useFootballPlayersQuery: (options?: unknown) =>
+    mockUseFootballPlayersQuery(options),
 }));
 
 interface SubscriptionResult {
@@ -157,6 +169,10 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       loading: false,
     });
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
+    mockUseFootballPlayersQuery.mockReturnValue({
+      data: { footballPlayers: { nodes: [], pageInfo: {} } },
+      loading: false,
+    });
   });
 
   it('maps query leagues into NFLHome (football only)', () => {
@@ -381,6 +397,12 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
         pathname: '/football/league/[leagueId]',
         params: { leagueId: 7 },
       });
+    });
+
+    it('navigates to football players (LS-5411)', () => {
+      render(<FootballHomeScreen />);
+      fireEvent.press(screen.getByTestId('browse-players'));
+      expect(mockPush).toHaveBeenCalledWith('/football/players');
     });
   });
 

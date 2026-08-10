@@ -171,6 +171,53 @@ describe('NFLHome — league row metadata (LS-6256)', () => {
   });
 });
 
+describe('NFLHome — player discovery entry point (LS-5411)', () => {
+  it('does not render the Browse Players CTA when onBrowsePlayers is omitted', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(
+      screen.queryByTestId('browse-players-button'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the Browse Players CTA and invokes onBrowsePlayers when pressed', () => {
+    const onBrowsePlayers = jest.fn();
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onBrowsePlayers={onBrowsePlayers}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('browse-players-button'));
+    expect(onBrowsePlayers).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the trending players section when trendingPlayers is not passed', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(
+      screen.queryByTestId('trending-players-preview'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders a preview row for each trending player', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        trendingPlayers={[
+          { id: 1, firstName: 'Pat', lastName: 'Mahomes', position: 'QB' },
+          { id: 2, firstName: 'Josh', lastName: 'Allen', position: 'QB' },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId('trending-players-preview')).toBeInTheDocument();
+    expect(screen.getByTestId('trending-player-row-1')).toBeInTheDocument();
+    expect(screen.getByTestId('trending-player-row-2')).toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — matchup highlight card (LS-5407)', () => {
   it('renders the highlight card with both team names and the week when a matchup is scheduled', () => {
     const league: NFLHomeLeague = {

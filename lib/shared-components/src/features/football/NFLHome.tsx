@@ -14,6 +14,8 @@ import {
 } from 'tamagui';
 import { FlatList } from 'react-native';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { TrendingPlayersPreview } from './TrendingPlayersPreview';
+import type { FootballPlayerCardPlayer } from './FootballPlayerCard';
 import { Platform } from '../../platform-components';
 import {
   formatDraftStatusForCard,
@@ -70,9 +72,13 @@ export interface NFLHomeProps {
   onCreateLeague: () => void;
   onJoinLeague?: () => void;
   onBrowseLeagues?: () => void;
+  onBrowsePlayers?: () => void;
   onViewLeague: (leagueId: string | number) => void;
   /** Navigate to sign-in from the unauthenticated notice. */
   onSignIn?: () => void;
+  /** Top/trending players preview (LS-5411). Omit to hide the section entirely. */
+  trendingPlayers?: FootballPlayerCardPlayer[];
+  trendingPlayersLoading?: boolean;
   /** This week's matchup to highlight (LS-5407). Hidden when absent. */
   matchupHighlight?: NFLHomeMatchupHighlight | null;
   /**
@@ -290,8 +296,11 @@ function NFLHome({
   onCreateLeague,
   onJoinLeague,
   onBrowseLeagues,
+  onBrowsePlayers,
   onViewLeague,
   onSignIn,
+  trendingPlayers,
+  trendingPlayersLoading = false,
   matchupHighlight,
   onSwitchSport,
 }: NFLHomeProps) {
@@ -396,6 +405,20 @@ function NFLHome({
                 >
                   <Text color="white" fontSize="$4" fontWeight="700">
                     Browse Leagues
+                  </Text>
+                </Button>
+              )}
+              {onBrowsePlayers && (
+                <Button
+                  backgroundColor="$orange9"
+                  borderRadius="$3"
+                  paddingHorizontal="$5"
+                  onPress={onBrowsePlayers}
+                  accessibilityLabel="Browse football players"
+                  data-testid="browse-players-button"
+                >
+                  <Text color="white" fontSize="$4" fontWeight="700">
+                    Browse Players
                   </Text>
                 </Button>
               )}
@@ -582,6 +605,13 @@ function NFLHome({
             )}
           </YStack>
         </YStack>
+
+        {trendingPlayers != null && (
+          <TrendingPlayersPreview
+            players={trendingPlayers}
+            loading={trendingPlayersLoading}
+          />
+        )}
       </YStack>
     </ScrollView>
   );

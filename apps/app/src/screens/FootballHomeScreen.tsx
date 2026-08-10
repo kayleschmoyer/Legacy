@@ -1,7 +1,11 @@
 import React, { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { NFLHome } from '@legacy-sports/shared-components/football';
-import { Sport, useGetUserLeaguesQuery } from '@legacy-sports/graphql';
+import {
+  Sport,
+  useFootballPlayersQuery,
+  useGetUserLeaguesQuery,
+} from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../common/auth/AuthorizedUserContext';
 import { useSubscription } from '../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../features/subscription/constants';
@@ -36,6 +40,15 @@ export default function FootballHomeScreen({
   const { data, loading, error } = useGetUserLeaguesQuery({
     skip: !userInfo?.id,
   });
+
+  // Top/trending players preview (LS-5411). Pool-wide fantasy points, top 5 —
+  // no dedicated "trending" backend metric exists, so this reuses the
+  // existing footballPlayers sort support (fpts desc) rather than adding one.
+  const { data: trendingPlayersData, loading: trendingPlayersLoading } =
+    useFootballPlayersQuery({
+      variables: { first: 5, sortBy: 'fpts', sortDir: 'desc' },
+    });
+  const trendingPlayers = trendingPlayersData?.footballPlayers?.nodes ?? [];
 
   const { isPremium, loading: subscriptionLoading } = useSubscription();
 
@@ -99,12 +112,15 @@ export default function FootballHomeScreen({
       onCreateLeague={handleCreateLeague}
       onJoinLeague={() => router.push('/football/league/join')}
       onBrowseLeagues={() => router.push('/league-discovery')}
+      onBrowsePlayers={() => router.push('/football/players')}
       onViewLeague={(id) =>
         router.push({
           pathname: '/football/league/[leagueId]',
           params: { leagueId: id },
         })
       }
+      trendingPlayers={trendingPlayers}
+      trendingPlayersLoading={trendingPlayersLoading}
       onSwitchSport={onSwitchSport}
     />
   );

@@ -1589,6 +1589,13 @@
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
     ],
+    "apps/web-e2e/src/tests/football-home-player-discovery.spec.ts": [
+      "apps/web/src/pages/football/**",
+      "apps/app/src/screens/FootballHomeScreen.tsx",
+      "lib/shared-components/src/features/football/**",
+      "lambdas/db/src/schema/football.ts",
+      "lib/graphql/src/**"
+    ],
     "apps/web-e2e/src/tests/football-hub.spec.ts": [
       "apps/web/src/pages/football/**",
       "apps/web/src/components/football/**",
