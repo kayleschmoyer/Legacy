@@ -944,13 +944,22 @@ _PC_TYPECHECK_CMD = pnpm exec nx affected -t typecheck --base=$(NX_BASE)
 # PARALLEL caps how many affected projects nx runs lint concurrently (nx's own
 # --parallel flag, default 5 per nx.json). Unset by default (full parallelism).
 # On memory-constrained machines, nx's parallel batching can run several large
-# `eslint . --fix` processes at once (each ballooning to 2-5GB RSS for projects
-# like lambdas/db and cli), OOM-killing individual projects mid-run even though
+# `eslint .` processes at once (each ballooning to 2-5GB RSS for projects like
+# lambdas/db and cli), OOM-killing individual projects mid-run even though
 # overall memory has headroom at other points — nx then mislabels the OOM-killed
 # task "flaky" on retry, masking the real cause. That signature means retry with
 # `make pc-lint PARALLEL=2` (or `make lint-fix PARALLEL=2`), not that the killed
 # project's lint actually failed (LS-9114).
-_PC_LINT_CMD = pnpm exec nx affected -t lint --fix --fix-type=problem,suggestion,layout --base=$(NX_BASE) $(if $(PARALLEL),--parallel=$(PARALLEL),)
+#
+# Split into two passes deliberately (LS-8777): whole-project `eslint . --fix`
+# used to rewrite files the agent never touched — stripping BOMs and deleting
+# eslint-disable directives from unrelated specs/configs — silently widening
+# the PR's diff via the next `git add -A`. scripts/lint-fix-changed.js scopes
+# --fix to files changed vs the merge-base; the unscoped `nx affected -t lint`
+# check that follows (no --fix) still fails pc-lint on anything that pass
+# couldn't or didn't touch, so violations are still reported, just never
+# auto-rewritten outside the diff.
+_PC_LINT_CMD = node scripts/lint-fix-changed.js --base=$(NX_BASE) && pnpm exec nx affected -t lint --base=$(NX_BASE) $(if $(PARALLEL),--parallel=$(PARALLEL),)
 _PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
 # MAXWORKERS caps Jest worker parallelism (--maxWorkers) across every affected
 # project's test run, forwarded to nx via the trailing `-- --maxWorkers=N`

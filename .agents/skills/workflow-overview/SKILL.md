@@ -90,7 +90,7 @@ The full pre-commit validation pipeline backed by the `pre-commit` Makefile targ
 3. DB code generation for database changes (`nx affected -t codegen`)
 4. `nx affected -t typecheck` -- TypeScript type checking on affected projects
 5. `nx format:write` -- auto-formats code; if the working tree was clean, it formats and commits the rewrites as a new commit (never amends the tip — LS-8367), otherwise you must commit the formatted files and re-run
-6. `nx affected -t lint --fix` -- ESLint on affected projects with auto-fix where possible
+6. `scripts/lint-fix-changed.js` auto-fixes only files changed vs the merge-base, then `nx affected -t lint` (no `--fix`) checks every affected project -- scoping autofix to the diff prevents ESLint from rewriting files the agent never touched (LS-8777)
 7. Workflow validation (`scripts/validate-workflows.js`)
 8. `nx affected -t test` -- Jest unit/integration tests on affected projects
 9. `nx affected -t build` -- build validation on affected projects

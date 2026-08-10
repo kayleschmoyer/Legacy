@@ -17,17 +17,17 @@ The `_PC_*_CMD` variable block in the root `Makefile` (search for the `_PC_` pre
 
 `make pc` (alias for `make pre-commit`) runs nine steps. The seven standalone chunk targets exist because the monolith exceeds cloud-session transport timeouts (LS-7906); they are equivalent to `make pc` **only when all seven run in this order**:
 
-| #   | Step                            | Command (from `_PC_*_CMD`)                                              | Chunk target   | Runs when            |
-| --- | ------------------------------- | ----------------------------------------------------------------------- | -------------- | -------------------- |
-| 1   | Migration immutability          | `node scripts/check-migration-immutability.js --branch`                 | `pc-db-prep`   | `PC_HAS_DB=1`        |
-| 2   | Schema generation               | `pnpm exec nx run db:print-schema`                                      | `pc-db-prep`   | `PC_HAS_DB=1`        |
-| 3   | Codegen                         | `GRAPHQL_SCHEMA=<abs>/lambdas/db/schema.graphql nx run-many -t codegen` | `pc-db-prep`   | `PC_HAS_DB=1`        |
-| 4   | Typecheck                       | `pnpm exec nx affected -t typecheck --base=$(NX_BASE)`                  | `pc-typecheck` | `PC_DOCS_ONLY=0`     |
-| 5   | Format (prettier + auto-commit) | `_PC_FORMAT_RECIPE` (see below)                                         | `pc-format`    | always               |
-| 6   | Lint (auto-fix)                 | `pnpm exec nx affected -t lint --fix --base=$(NX_BASE)`                 | `pc-lint`      | `PC_DOCS_ONLY=0`     |
-| 7   | Workflow validation             | `node scripts/validate-workflows.js`                                    | `pc-workflows` | `PC_HAS_WORKFLOWS=1` |
-| 8   | Test                            | `pnpm exec nx affected -t test --base=$(NX_BASE)`                       | `pc-test`      | `PC_DOCS_ONLY=0`     |
-| 9   | Build                           | `pnpm exec nx affected -t build --base=$(NX_BASE)`                      | `pc-build`     | `PC_DOCS_ONLY=0`     |
+| #   | Step                            | Command (from `_PC_*_CMD`)                                                                              | Chunk target   | Runs when            |
+| --- | ------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------- | -------------------- |
+| 1   | Migration immutability          | `node scripts/check-migration-immutability.js --branch`                                                 | `pc-db-prep`   | `PC_HAS_DB=1`        |
+| 2   | Schema generation               | `pnpm exec nx run db:print-schema`                                                                      | `pc-db-prep`   | `PC_HAS_DB=1`        |
+| 3   | Codegen                         | `GRAPHQL_SCHEMA=<abs>/lambdas/db/schema.graphql nx run-many -t codegen`                                 | `pc-db-prep`   | `PC_HAS_DB=1`        |
+| 4   | Typecheck                       | `pnpm exec nx affected -t typecheck --base=$(NX_BASE)`                                                  | `pc-typecheck` | `PC_DOCS_ONLY=0`     |
+| 5   | Format (prettier + auto-commit) | `_PC_FORMAT_RECIPE` (see below)                                                                         | `pc-format`    | always               |
+| 6   | Lint (scoped fix + check)       | `node scripts/lint-fix-changed.js --base=$(NX_BASE) && pnpm exec nx affected -t lint --base=$(NX_BASE)` | `pc-lint`      | `PC_DOCS_ONLY=0`     |
+| 7   | Workflow validation             | `node scripts/validate-workflows.js`                                                                    | `pc-workflows` | `PC_HAS_WORKFLOWS=1` |
+| 8   | Test                            | `pnpm exec nx affected -t test --base=$(NX_BASE)`                                                       | `pc-test`      | `PC_DOCS_ONLY=0`     |
+| 9   | Build                           | `pnpm exec nx affected -t build --base=$(NX_BASE)`                                                      | `pc-build`     | `PC_DOCS_ONLY=0`     |
 
 Canonical chunk order: `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build`.
 
@@ -78,11 +78,15 @@ Cap Jest worker parallelism with `MAXWORKERS`/`maxWorkers` (forwarded as `-- --m
 
 No effect on non-test targets/chunks.
 
+### pc-lint scopes autofix to the diff, then checks the whole affected set (LS-8777)
+
+`pc-lint` runs two passes, not one: `node scripts/lint-fix-changed.js --base=$(NX_BASE)` autofixes only files changed vs the merge-base (grouped by nearest `eslint.config.*`, same resolution `nx_run_eslint` uses), then an unscoped `pnpm exec nx affected -t lint --base=$(NX_BASE)` (no `--fix`) checks every affected project and fails pc-lint on any violation the scoped pass didn't touch. Before this split, `nx affected -t lint --fix` ran `eslint . --fix` per affected _project_ — fixing every file in the project tree, not just the ones changed, which silently stripped BOMs and deleted `eslint-disable` directives from unrelated specs/configs that then rode along into the commit via `git add -A`. `make lint-fix` (the standalone developer target, not part of `make pc`) still runs the old whole-project `--fix` deliberately — that command's entire purpose is a full auto-fix pass, invoked explicitly by a human, not a silent side effect of validation.
+
 ### pc-lint OOM on individual large projects (LS-9114)
 
-`pc-lint` / `make lint-fix` run `nx affected -t lint --fix` across every affected project at nx's default project-level parallelism (`nx.json`: 5 concurrent projects). On a memory-constrained machine, several large `eslint . --fix` processes running concurrently (each ballooning to 2-5GB RSS) can OOM-kill individual large projects — notably `lambdas/db` and `cli` — even though overall memory has headroom at other points in the run. The failure surfaces as `Killed` in the eslint subprocess output and a non-zero `make pc-lint` exit; a bare retry of the same project in isolation succeeds immediately, and nx may mislabel the retried task "flaky" — masking that the root cause was memory pressure, not flakiness. **That signature means retry with lower nx parallelism, not that the project's lint actually failed.**
+The unscoped check pass (`nx affected -t lint`) runs `eslint .` across every affected project at nx's default project-level parallelism (`nx.json`: 5 concurrent projects). On a memory-constrained machine, several large `eslint .` processes running concurrently (each ballooning to 2-5GB RSS) can OOM-kill individual large projects — notably `lambdas/db` and `cli` — even though overall memory has headroom at other points in the run. The failure surfaces as `Killed` in the eslint subprocess output and a non-zero `make pc-lint` exit; a bare retry of the same project in isolation succeeds immediately, and nx may mislabel the retried task "flaky" — masking that the root cause was memory pressure, not flakiness. **That signature means retry with lower nx parallelism, not that the project's lint actually failed.**
 
-Cap nx's project-level parallelism with `PARALLEL`/`parallel` (forwarded as `--parallel=<n>` to the underlying `nx affected -t lint --fix`):
+Cap nx's project-level parallelism with `PARALLEL`/`parallel` (forwarded as `--parallel=<n>` to the check pass's `nx affected -t lint`; `make lint-fix`'s own `--fix` run takes the same flag directly):
 
 - `make pc-lint PARALLEL=2` / `make lint-fix PARALLEL=2`
 - `nx_run_pc_chunk({ chunk: "pc-lint", parallel: 2 })`
