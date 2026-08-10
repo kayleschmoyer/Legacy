@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-08-09T23:24:42.000Z",
+  "lastSyncedAt": "2026-08-10T00:00:00.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -206,9 +206,9 @@
       "title": "Homepage",
       "slug": "legacy-sports-homepage",
       "status": "active",
-      "lastSyncedHash": "sha256-800946e3e8e76a226f245eb0219a1d272ff0bcecef85e3b5b5aab25e3df0762d",
-      "lastSyncedAt": "2026-08-04T23:55:00.000Z",
-      "jiraKey": "LS-9046",
+      "lastSyncedHash": "sha256-4242ceaaf43f0ca50d370d380c2f669bdd79c8c8654e3a8d8c4c181e10ad914e",
+      "lastSyncedAt": "2026-08-10T00:00:00.000Z",
+      "jiraKey": "LS-9278",
       "source": "designsync-local"
     },
     {

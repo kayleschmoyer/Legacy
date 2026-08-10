@@ -699,9 +699,9 @@ describe('HomeScreen', () => {
   });
 
   describe('loading and error states', () => {
-    it('renders the loading view', () => {
-      const { getByText } = render(<HomeScreen {...baseProps} loading />);
-      expect(getByText('Loading your dashboard…')).toBeTruthy();
+    it('renders the loading skeleton', () => {
+      const { getByTestId } = render(<HomeScreen {...baseProps} loading />);
+      expect(getByTestId('home-skeleton')).toBeTruthy();
     });
 
     it('renders the error view and fires onRetry', () => {

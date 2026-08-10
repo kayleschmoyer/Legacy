@@ -1037,15 +1037,21 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
   .ticket-hero .tk-num { font-size: 46px; }
   .tk-title { font-size: 32px; }
 }
+/* Narrow ticket: compress vertically. The stub is a hero, not a page — every
+   band below 440px trims padding, gaps and stacked runs so it stops eating the
+   fold. Actions stay in ONE row (equal-flex) rather than stacking. */
 @container tkhero (max-width: 440px) {
-  .ticket-hero .tk-num { font-size: 36px; }
-  .tk-title { font-size: 26px; }
-  .tk-sub { font-size: 13.5px; }
-  .tk-head { flex-wrap: wrap; gap: 8px; }
+  .ticket-hero .tk-num { font-size: 34px; }
+  .tk-title { font-size: 25px; }
+  .tk-sub { font-size: 13px; margin-top: 6px; }
+  .tk-head { flex-wrap: wrap; gap: 6px; padding-bottom: 12px; }
   .tk-head .tk-deadline { margin-left: 0; flex-basis: 100%; }
-  .ticket-hero .tk-actions { flex-direction: column; }
-  .ticket-hero .tk-btn { width: 100%; }
-  .tk-meta { font-size: 10px; gap: 7px; }
+  .ticket-hero .tk-actions { flex-direction: row; gap: 8px; margin-top: 14px; }
+  .ticket-hero .tk-btn { flex: 1 1 0; min-width: 0; padding-left: 10px; padding-right: 10px; }
+  .tk-meta { font-size: 10px; gap: 6px; margin-top: 10px; }
+  .tk-hero-grid { gap: 14px; }
+  .tk-hero-score { padding-top: 14px; }
+  .tk-link { margin-top: 12px; }
 }
 
 .sport-card .ticket { align-self: stretch; flex: 1 1 auto; }
@@ -1069,20 +1075,22 @@ p { font-family: var(--font-body); color: var(--text-secondary); line-height: 1.
 .frame[data-viewport="mobile"] .tk-num { font-size: 36px; }
 .frame[data-viewport="mobile"] .tk-score { gap: 8px; }
 .frame[data-viewport="mobile"] .tk-vs { font-size: 10px; letter-spacing: .16em; padding-bottom: 11px; }
-.frame[data-viewport="mobile"] .tk-actions { flex-direction: column; }
-.frame[data-viewport="mobile"] .tk-btn { width: 100%; }
+.frame[data-viewport="mobile"] .tk-actions { flex-direction: row; gap: 8px; }
+.frame[data-viewport="mobile"] .tk-btn { flex: 1 1 0; min-width: 0; padding-left: 10px; padding-right: 10px; }
 .frame[data-viewport="mobile"] .tk-stub span { letter-spacing: .22em; font-size: 9px; }
 .frame[data-viewport="mobile"] .tk-deadline { font-size: 11.5px; }
 .frame[data-viewport="mobile"] .ticket-hero { grid-template-columns: minmax(0,1fr) 34px; }
-.frame[data-viewport="mobile"] .ticket-hero .tk-body { padding: 18px 16px 20px; gap: 16px; }
-.frame[data-viewport="mobile"] .ticket-hero .tk-num { font-size: 38px; }
-.frame[data-viewport="mobile"] .tk-hero-grid { grid-template-columns: 1fr; gap: 18px; }
-.frame[data-viewport="mobile"] .tk-hero-score { padding-left: 0; padding-top: 16px; border-left: 0; border-top: 1px dashed var(--tk-rule); }
-.frame[data-viewport="mobile"] .tk-title { font-size: 26px; }
-.frame[data-viewport="mobile"] .tk-sub { font-size: 13.5px; }
-.frame[data-viewport="mobile"] .tk-head { flex-wrap: wrap; gap: 8px; }
+.frame[data-viewport="mobile"] .ticket-hero .tk-body { padding: 16px 16px 18px; gap: 12px; }
+.frame[data-viewport="mobile"] .ticket-hero .tk-num { font-size: 34px; }
+.frame[data-viewport="mobile"] .tk-hero-grid { grid-template-columns: 1fr; gap: 14px; }
+.frame[data-viewport="mobile"] .tk-hero-score { padding-left: 0; padding-top: 14px; border-left: 0; border-top: 1px dashed var(--tk-rule); }
+.frame[data-viewport="mobile"] .tk-title { font-size: 25px; }
+.frame[data-viewport="mobile"] .tk-sub { font-size: 13px; margin-top: 6px; }
+.frame[data-viewport="mobile"] .tk-head { flex-wrap: wrap; gap: 6px; padding-bottom: 12px; }
 .frame[data-viewport="mobile"] .tk-head .tk-deadline { margin-left: 0; flex-basis: 100%; }
-.frame[data-viewport="mobile"] .tk-meta { font-size: 10px; gap: 7px; }
+.frame[data-viewport="mobile"] .tk-meta { font-size: 10px; gap: 6px; margin-top: 10px; }
+.frame[data-viewport="mobile"] .ticket-hero .tk-actions { margin-top: 14px; }
+.frame[data-viewport="mobile"] .tk-link { margin-top: 12px; }
 
 /* ── Football hero: chalk playbook board + mounted scorebug ────────
    COMPONENT: playboard — football's answer to baseball's ticket. The ticket is

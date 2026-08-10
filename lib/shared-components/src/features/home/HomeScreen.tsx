@@ -43,6 +43,7 @@ import {
 } from './leagueSummaryStats';
 import { BODY_FONT, DISPLAY_FONT } from './homeFonts';
 import { GradientSurface } from './GradientSurface';
+import { Skeleton } from '../../components/Skeleton';
 import { BrandIcon, type BrandIconName } from '../../components/icons';
 import { useThemeTokens } from '../../hooks/useThemeTokens';
 import {
@@ -324,6 +325,10 @@ function TicketButton({
       backgroundColor={isSolid ? BRAND_NAVY : 'transparent'}
       alignItems="center"
       justifyContent="center"
+      // Narrow ticket-hero (LS-9278): actions stay in ONE row, equal-flex,
+      // rather than stacking full-width — matches home.html's
+      // `@container tkhero (max-width: 440px)` / `[data-viewport="mobile"]`.
+      $sm={{ flex: 1, minWidth: 0, paddingHorizontal: 10 }}
       hoverStyle={{
         backgroundColor: isSolid
           ? BRAND_NAVY_LIGHT
@@ -867,7 +872,12 @@ function LeagueHeroCard({
                   </Text>
                 ) : null}
               </XStack>
-              <XStack gap="$2" marginTop={20} flexWrap="wrap">
+              <XStack
+                gap="$2"
+                marginTop={20}
+                flexWrap="wrap"
+                $sm={{ marginTop: 14 }}
+              >
                 <TicketButton
                   label="View League"
                   variant="solid"
@@ -2622,6 +2632,118 @@ function LiveMatchupTicker({
   );
 }
 
+/* ─── Loading skeleton (`tpl-returning-loading` in home.html) ───
+   Mirrors the returning-dashboard geometry (greeting, hero card, league
+   list, On This Day rail) so layout doesn't shift when real content
+   replaces it. The design also mocks up a separate new-user skeleton, but
+   `loading` fires before `hasLeagues` is known, so this single skeleton
+   — matching the more detailed returning-dashboard state — covers the
+   `loading` prop's one entry point. */
+
+const LEAGUE_ROW_SKELETON_COUNT = 2;
+
+function HomeScreenSkeleton(): React.JSX.Element {
+  return (
+    <YStack
+      testID="home-skeleton"
+      accessibilityLabel="Loading your dashboard"
+      maxWidth={1280}
+      width="100%"
+      alignSelf="center"
+      padding="$5"
+      gap="$6"
+    >
+      <YStack gap="$2" paddingBottom={24}>
+        <Skeleton width={90} height={11} />
+        <Skeleton width={320} height={44} radius={10} />
+        <Skeleton width={260} height={13} />
+        <XStack gap="$2" marginTop="$3">
+          <Skeleton width={140} height={42} radius={12} />
+          <Skeleton width={160} height={42} radius={12} />
+        </XStack>
+      </YStack>
+
+      <YStack
+        gap="$6"
+        $gtMd={{ flexDirection: 'row', alignItems: 'flex-start' }}
+      >
+        {/* Main column */}
+        <YStack flex={1} gap="$5" minWidth={0}>
+          <YStack
+            borderWidth={1}
+            borderColor="$surfacePanelBorder"
+            backgroundColor="$surfacePanel"
+            borderRadius={16}
+            padding={24}
+            gap="$5"
+            $gtMd={{ flexDirection: 'row', alignItems: 'center' }}
+          >
+            <YStack flex={1.3} minWidth={0} gap="$3">
+              <Skeleton width={120} height={22} radius={9999} />
+              <Skeleton width="80%" height={32} radius={8} />
+              <Skeleton width="70%" height={14} />
+              <Skeleton width="60%" height={14} />
+              <XStack gap="$2" marginTop="$2">
+                <Skeleton width={140} height={40} radius={12} />
+                <Skeleton width={120} height={40} radius={12} />
+              </XStack>
+            </YStack>
+            <YStack flex={1} minWidth={0}>
+              <Skeleton width="100%" height={180} radius={10} />
+            </YStack>
+          </YStack>
+
+          <YStack gap={10}>
+            {Array.from({ length: LEAGUE_ROW_SKELETON_COUNT }).map(
+              (_, index) => (
+                <XStack
+                  key={index}
+                  backgroundColor="$glassSurfaceLight"
+                  borderWidth={1}
+                  borderColor="$glassBorder"
+                  borderRadius={12}
+                  paddingVertical={18}
+                  paddingHorizontal={22}
+                  gap="$3"
+                  alignItems="center"
+                >
+                  <YStack flex={1.6} minWidth={0} gap="$2">
+                    <Skeleton width="65%" height={18} />
+                    <Skeleton width="45%" height={12} />
+                  </YStack>
+                  <Skeleton width={80} height={22} radius={9999} />
+                  <Skeleton width={100} height={18} />
+                </XStack>
+              ),
+            )}
+          </YStack>
+        </YStack>
+
+        {/* Right rail */}
+        <YStack
+          width="100%"
+          $gtMd={{ width: 360 }}
+          backgroundColor="$surfacePanel"
+          borderWidth={1}
+          borderColor="$surfacePanelBorder"
+          borderRadius={16}
+          padding={22}
+          gap="$4"
+        >
+          <Skeleton width="70%" height={18} />
+          {[0, 1, 2].map((index) => (
+            <YStack key={index} gap="$2">
+              <Skeleton width={56} height={12} />
+              <Skeleton width="92%" height={14} />
+              {index < 2 ? <Skeleton width="70%" height={14} /> : null}
+            </YStack>
+          ))}
+        </YStack>
+      </YStack>
+    </YStack>
+  );
+}
+
 /* ─── HomeScreen ─── */
 
 /**
@@ -2709,19 +2831,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
         backgroundColor="$background"
         paddingTop={topInset}
       >
-        <YStack
-          flex={1}
-          minHeight={400}
-          alignItems="center"
-          justifyContent="center"
-          padding="$8"
-          gap="$4"
-        >
-          <Spinner size="large" color={BRAND_GOLD_LIGHT} />
-          <Text fontFamily={BODY_FONT} color="$textMuted">
-            Loading your dashboard…
-          </Text>
-        </YStack>
+        <HomeScreenSkeleton />
       </ScrollView>
     );
   }
