@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { afterEach, describe, expect, it, jest } from '@jest/globals';
 
 // playwright-report.ts transitively imports github-api.ts, whose `import.meta`
 // does not compile under ts-jest's CommonJS target. Stub it so requireActual on
@@ -6,6 +6,13 @@ import { describe, expect, it, jest } from '@jest/globals';
 jest.mock('../github-api.js', () => ({
   buildHeaders: jest.fn(),
   getDeploysToken: jest.fn(),
+  deploysTokenWasFallback: jest.fn(() => false),
+  githubGet: jest.fn(),
+}));
+
+jest.mock('../s3-artifacts.js', () => ({
+  resolveRunSha: jest.fn(),
+  listPlaywrightS3Artifacts: jest.fn(),
 }));
 
 // Keep renderReportAsMarkdown / reportUrlFor real so we exercise the actual
@@ -24,6 +31,8 @@ jest.mock('../playwright-report.js', () => {
 
 import { getPlaywrightReport } from './get-playwright-report.js';
 import * as playwrightReport from '../playwright-report.js';
+import * as githubApi from '../github-api.js';
+import * as s3Artifacts from '../s3-artifacts.js';
 
 const mockSummary =
   playwrightReport.fetchPlaywrightSummary as jest.MockedFunction<
@@ -36,6 +45,24 @@ const mockJobStatus =
   playwrightReport.fetchDeployReportJobStatus as jest.MockedFunction<
     typeof playwrightReport.fetchDeployReportJobStatus
   >;
+const mockDeploysTokenWasFallback =
+  githubApi.deploysTokenWasFallback as jest.MockedFunction<
+    typeof githubApi.deploysTokenWasFallback
+  >;
+const mockGithubGet = githubApi.githubGet as jest.MockedFunction<
+  typeof githubApi.githubGet
+>;
+const mockResolveRunSha = s3Artifacts.resolveRunSha as jest.MockedFunction<
+  typeof s3Artifacts.resolveRunSha
+>;
+const mockListS3Artifacts =
+  s3Artifacts.listPlaywrightS3Artifacts as jest.MockedFunction<
+    typeof s3Artifacts.listPlaywrightS3Artifacts
+  >;
+
+afterEach(() => {
+  mockDeploysTokenWasFallback.mockReturnValue(false);
+});
 
 const BASE_STATS = {
   total: 3,
@@ -389,5 +416,90 @@ describe('getPlaywrightReport — job-status diagnosis on exhausted fallback (LS
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Report not found. Tried:');
+  });
+});
+
+describe('getPlaywrightReport — S3 fallback on credentials gap (LS-9236)', () => {
+  it('falls back to S3 artifacts for a runId when GH Pages fails due to a credentials gap', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'GitHub API 404: credentials gap' });
+    mockDeploysTokenWasFallback.mockReturnValue(true);
+    mockResolveRunSha.mockResolvedValue('abc123sha');
+    mockListS3Artifacts.mockResolvedValue({
+      sha: 'abc123sha',
+      s3Prefix: 's3://bucket/ci-artifacts/abc123sha/playwright-blobs/',
+      artifacts: [
+        {
+          key: 'ci-artifacts/abc123sha/playwright-blobs/0/report-x.zip',
+          presignedUrl: 'https://s3.example/presigned',
+          sizeBytes: 1024,
+          lastModified: '2026-08-10T00:00:00.000Z',
+        },
+      ],
+      empty: false,
+    });
+
+    const result = await getPlaywrightReport({ runId: 99999 });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockResolveRunSha).toHaveBeenCalledWith(99999);
+    expect(mockListS3Artifacts).toHaveBeenCalledWith('abc123sha');
+    const parsed = JSON.parse(result.content[0].text as string);
+    expect(parsed.source).toBe('s3');
+    expect(parsed.sha).toBe('abc123sha');
+    expect(parsed.runId).toBe(99999);
+    expect(parsed.artifactCount).toBe(1);
+  });
+
+  it('falls back to S3 artifacts for a prNumber lookup by resolving the PR head SHA', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'GitHub API 404: credentials gap' });
+    mockDeploysTokenWasFallback.mockReturnValue(true);
+    mockGithubGet.mockResolvedValue({ head: { sha: 'pr-head-sha' } });
+    mockListS3Artifacts.mockResolvedValue({
+      sha: 'pr-head-sha',
+      s3Prefix: 's3://bucket/ci-artifacts/pr-head-sha/playwright-blobs/',
+      artifacts: [],
+      empty: false,
+    });
+
+    const result = await getPlaywrightReport({ prNumber: 6855 });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockGithubGet).toHaveBeenCalledWith('/pulls/6855');
+    const parsed = JSON.parse(result.content[0].text as string);
+    expect(parsed.source).toBe('s3');
+    expect(parsed.sha).toBe('pr-head-sha');
+    expect(parsed.runId).toBeNull();
+  });
+
+  it('does not attempt S3 fallback when there is no credentials gap', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'not found' });
+    mockDeploysTokenWasFallback.mockReturnValue(false);
+
+    const result = await getPlaywrightReport({ prNumber: 42 });
+
+    expect(mockListS3Artifacts).not.toHaveBeenCalled();
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('not found');
+  });
+
+  it('falls through to the generic error when the S3 listing comes up empty', async () => {
+    mockSummary.mockResolvedValue(null);
+    mockFetch.mockResolvedValue({ error: 'GitHub API 404: credentials gap' });
+    mockDeploysTokenWasFallback.mockReturnValue(true);
+    mockGithubGet.mockResolvedValue({ head: { sha: 'pr-head-sha' } });
+    mockListS3Artifacts.mockResolvedValue({
+      sha: 'pr-head-sha',
+      s3Prefix: 's3://bucket/ci-artifacts/pr-head-sha/playwright-blobs/',
+      artifacts: [],
+      empty: true,
+    });
+
+    const result = await getPlaywrightReport({ prNumber: 42 });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('GitHub API 404: credentials gap');
   });
 });

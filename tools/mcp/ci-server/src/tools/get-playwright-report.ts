@@ -6,6 +6,8 @@ import {
   renderReportAsMarkdown,
   reportUrlFor,
 } from '../playwright-report.js';
+import { deploysTokenWasFallback, githubGet } from '../github-api.js';
+import { listPlaywrightS3Artifacts, resolveRunSha } from '../s3-artifacts.js';
 
 /**
  * Return a Playwright report as compact, agent-targeted Markdown.
@@ -23,6 +25,91 @@ import {
  */
 /** Numeric-only run IDs resolve to nightly-{id} or manual-{id} on GH Pages. */
 const NUMERIC_ID_RE = /^\d+$/;
+
+interface GitHubPullRequest {
+  head: { sha: string };
+}
+
+/**
+ * Resolve the commit SHA to use for an S3 blob-artifact lookup, from
+ * whichever resolution input the caller originally supplied.
+ * Returns null when no SHA can be resolved (e.g. the API call itself fails).
+ */
+async function resolveShaForS3Fallback(params: {
+  prNumber?: number;
+  runId?: number;
+  reportName: string;
+}): Promise<{ sha: string; runId: number | null } | null> {
+  try {
+    if (params.runId !== undefined) {
+      return { sha: await resolveRunSha(params.runId), runId: params.runId };
+    }
+    if (params.prNumber !== undefined) {
+      const pr = await githubGet<GitHubPullRequest>(
+        `/pulls/${params.prNumber}`,
+      );
+      return { sha: pr.head.sha, runId: null };
+    }
+    if (NUMERIC_ID_RE.test(params.reportName)) {
+      const runId = Number(params.reportName);
+      return { sha: await resolveRunSha(runId), runId };
+    }
+  } catch {
+    // Resolution failed — caller falls through to the generic GH-Pages error.
+  }
+  return null;
+}
+
+/**
+ * When the GH Pages fetch failed because this session lacks
+ * PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID (a credentials gap, not a missing
+ * report — LS-9236), automatically fall back to listing the raw S3 blob
+ * artifacts instead of erroring, mirroring the source="s3" fallback that
+ * ci_get_playwright_test_result already supports for the same artifact class.
+ * Returns null when the fallback isn't applicable or comes up empty, so the
+ * caller can fall through to its existing error handling unchanged.
+ */
+async function tryS3Fallback(params: {
+  prNumber?: number;
+  runId?: number;
+  reportName: string;
+}): Promise<ToolResult | null> {
+  if (!deploysTokenWasFallback()) return null;
+
+  const resolved = await resolveShaForS3Fallback(params);
+  if (!resolved) return null;
+
+  let s3Result;
+  try {
+    s3Result = await listPlaywrightS3Artifacts(resolved.sha);
+  } catch {
+    return null;
+  }
+  if (s3Result.empty) return null;
+
+  const response = {
+    source: 's3' as const,
+    reason:
+      'GH Pages report fetch failed with a credentials gap ' +
+      '(PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID are not configured in this ' +
+      'session) — falling back to raw S3 blob artifacts instead of erroring.',
+    sha: resolved.sha,
+    runId: resolved.runId,
+    s3Prefix: s3Result.s3Prefix,
+    artifactCount: s3Result.artifacts.length,
+    artifacts: s3Result.artifacts,
+    note:
+      'Presigned URLs expire in 1 hour. Each artifact is a Playwright blob ' +
+      'zip containing test results. Use `playwright merge-reports` or inspect ' +
+      'the zip to extract individual test error-context.md / trace.zip files. ' +
+      'For a rendered pass/fail summary instead of raw blobs, ask a human to ' +
+      'configure PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID for this session.',
+  };
+
+  return {
+    content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+  };
+}
 
 export async function getPlaywrightReport(params: {
   reportName?: string;
@@ -87,14 +174,22 @@ export async function getPlaywrightReport(params: {
       };
     }
 
-    // If this was the only name to try, surface the error.
+    // If this was the only name to try, surface the error — after first
+    // trying the S3 fallback for a credentials-gap failure (LS-9236).
     if (namesToTry.length === 1) {
+      const s3Fallback = await tryS3Fallback({ prNumber, runId, reportName });
+      if (s3Fallback) return s3Fallback;
       return {
         isError: true,
         content: [{ type: 'text', text: report.error }],
       };
     }
     lastError = report.error;
+  }
+
+  {
+    const s3Fallback = await tryS3Fallback({ prNumber, runId, reportName });
+    if (s3Fallback) return s3Fallback;
   }
 
   // No name variant resolved. When the failed name was numeric (a runId, or a
