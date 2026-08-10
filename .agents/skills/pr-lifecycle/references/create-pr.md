@@ -103,6 +103,20 @@ primary: LS-1234
 
 If `legacy-sports-github` re-authenticates mid-session, prefer switching back to `github_create_pr({ jiraPrimary: "LS-####" })` for its auto-prepend convenience rather than continuing to hand-author the marker on the generic tool.
 
+#### CCR fallback: jira-link marker read-back-and-retry
+
+When the only PR-body write path available is the built-in `mcp__github__update_pull_request` / `mcp__github__issue_write` (no `legacy-sports-github` connector — some Claude Code Remote / cloud sessions), these tools strip any `<!-- ... -->` HTML comment from the body, including the jira-link marker (LS-9202; full root-cause writeup at [mcp-first § Built-in GitHub Tools](../../mcp-first/SKILL.md#built-in-github-tools-claude-code-on-the-web)). LS-8934 found this stripping is **intermittent, not deterministic**: on PR #6630 (LS-6147) and PR #6744 (LS-6153) a first `update_pull_request` call echoed a 200 response with the marker apparently intact, but reading the body back showed it had been silently dropped — and retrying the exact same call a second time (no escaping or content changes) then persisted it correctly.
+
+Because a "successful" write can be a false positive, never trust a body write containing an HTML comment without confirming it landed:
+
+1. Write the body via `mcp__github__update_pull_request` (or the initial `create_pull_request`) as normal.
+2. **Read it back immediately**: `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber, fields: ["body"] })` (or `github_view_pr({ number, fields: ["body"] })` if that tool is present).
+3. If the `<!-- jira-link ... -->` block is present with a `primary:` line, done.
+4. If it's missing, retry the identical `update_pull_request` call once (do not alter the text) and read back again.
+5. If it's still missing after the retry, stop treating this as transient — fall back to the `legacy-sports-github` connector (`github_edit_pr`) if it becomes available, `gh pr edit --body-file` via Bash, or ask the user to add the marker through the GitHub UI. Do not loop retrying indefinitely; two failed read-backs is the signal to escalate to a different write path.
+
+This same read-back-and-retry loop is also the fastest way to confirm the Jira Link Check will pass before waiting on CI — a marker missing at read-back time will always fail that check.
+
 ### PR Body Template
 
 > **This description is read by Copilot as a prompt — not just by humans.** When reviewers use "Fix with Copilot" or `@copilot` on a review comment, Copilot's entire context is the PR title, this description, and the diff. A thin description produces repeated, incomplete, or misaligned fixes. Write it as if you are briefing an engineer who has never seen the ticket.
