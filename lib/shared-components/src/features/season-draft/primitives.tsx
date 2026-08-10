@@ -10,7 +10,36 @@ import { YStack } from 'tamagui';
  * in unit tests without extending the global mock.
  */
 
-type YStackProps = React.ComponentProps<typeof YStack>;
+/**
+ * Declared explicitly rather than derived from Tamagui's `YStack` props:
+ * `React.ComponentProps<typeof YStack>` resolves to `any` under this
+ * package's type-aware ESLint config, which silently collapses any
+ * intersection built on it (LS-8799). An explicit surface — covering only
+ * the props this file's callers actually pass — keeps the primitives
+ * honest; see `.agents/skills/ui/SKILL.md` for the repo-wide convention.
+ */
+interface YStackProps {
+  children?: React.ReactNode;
+  backgroundColor?: string;
+  borderWidth?: number;
+  borderColor?: string;
+  borderStyle?: 'solid' | 'dashed';
+  borderRadius?: number | string;
+  width?: number | string;
+  height?: number | string;
+  minWidth?: number | string;
+  padding?: number | string;
+  paddingHorizontal?: number | string;
+  paddingVertical?: number | string;
+  marginVertical?: number | string;
+  gap?: number | string;
+  alignItems?: 'center' | 'flex-start' | 'flex-end' | 'stretch';
+  justifyContent?: 'center' | 'flex-start' | 'flex-end' | 'space-between';
+  alignSelf?: 'center' | 'flex-start' | 'flex-end' | 'stretch';
+  overflow?: 'hidden' | 'visible';
+  testID?: string;
+  'data-testid'?: string;
+}
 
 /** A circular container — Tamagui's `Circle` equivalent. */
 export function Circle({

@@ -77,6 +77,21 @@ When a prop genuinely needs a CSS string a token can't fill:
 - **Responsiveness**: Use `$sm`, `$md` breakpoint keys. Test on small screens.
 - **Icons**: `@tamagui/lucide-icons` accepts theme tokens — `<Zap color="$brandNavyLight" />`. Never pass hex.
 - **Forced theme**: never wrap a page in `<Theme name="dark">` / `"legacy_dark"` to sidestep theming — that ships a dark island into light mode (being removed under LS-8530).
+- **Never derive a prop type from `React.ComponentProps<typeof YStack>`** (or `XStack`/`Text`/other Tamagui components) — it resolves to `any` under this package's type-aware ESLint config (though not under a plain `tsc` run), so `React.ComponentProps<typeof YStack> & { yourProp: T }` silently collapses to `any` and `yourProp` is never actually checked. `tsc --noEmit` stays green; only `eslint` surfaces it, as unrelated-looking errors on the intersected prop (`@typescript-eslint/no-redundant-type-constituents`, `@typescript-eslint/no-unsafe-member-access`) — easy to eslint-disable without realizing the type hole (LS-8799). Declare an explicit prop interface instead, covering only the props your callers actually pass:
+
+  ```tsx
+  // ❌ collapses to `any` under type-aware lint
+  type Props = React.ComponentProps<typeof YStack> & {
+    colors: readonly [string, string];
+  };
+
+  // ✅ explicit surface — see GradientSurface.types.ts
+  interface Props {
+    colors: readonly [string, string];
+    children?: React.ReactNode;
+    // ...only the YStack props this component actually forwards
+  }
+  ```
 
 ## Component Checklist
 
