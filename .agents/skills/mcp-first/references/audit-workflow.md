@@ -129,11 +129,11 @@ These are pre-classified by the script at high confidence:
 
 ## Known High-Frequency Overflow Patterns
 
-| Tool                       | Frequency | Root cause                     | Fix                           |
-| -------------------------- | --------- | ------------------------------ | ----------------------------- |
-| `ci_get_logs`              | Very high | Full logs without `maxLines`   | Enforce `maxLines` default    |
-| `searchJiraIssuesUsingJql` | High      | Broad JQL without `maxResults` | Add pagination                |
-| `worktree_run`             | Medium    | `git diff` on lockfiles        | Use `--stat` or `--name-only` |
+| Tool                       | Frequency | Root cause                            | Fix                                                                                                                                                              |
+| -------------------------- | --------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci_get_logs`              | Very high | Full logs without `maxLines`          | Enforce `maxLines` default                                                                                                                                       |
+| `searchJiraIssuesUsingJql` | High      | `maxResults` omitted or set too broad | Always pass explicit `maxResults` (e.g. `1` for single-issue lookups); for broader queries prefer `jira_search(compact: true)` or `jira_list_children` (LS-9233) |
+| `worktree_run`             | Medium    | `git diff` on lockfiles               | Use `--stat` or `--name-only`                                                                                                                                    |
 
 ## Known Resolved `worktree_run` Anti-Patterns
 
