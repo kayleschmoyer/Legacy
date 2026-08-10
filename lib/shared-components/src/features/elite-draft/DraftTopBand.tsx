@@ -372,16 +372,11 @@ export function DraftTopBand({
   onCommissionerToggleUserAutoPick,
 }: DraftTopBandProps): React.JSX.Element {
   const [userApExpanded, setUserApExpanded] = useState(false);
-  const zone = untimed
-    ? 'safe'
-    : timerZone(timeRemaining, pickTimeLimitSeconds, draftPaused);
+  const zone = timerZone(timeRemaining, pickTimeLimitSeconds, draftPaused);
   const livePulseDim = useLivePulse(!draftPaused);
 
-  const pct = untimed
-    ? 1
-    : pickTimeLimitSeconds > 0
-      ? timeRemaining / pickTimeLimitSeconds
-      : 1;
+  const pct =
+    pickTimeLimitSeconds > 0 ? timeRemaining / pickTimeLimitSeconds : 1;
   const clampedPct = Math.max(0, Math.min(1, pct));
   const strokeColor = draftPaused
     ? withAlpha(WHITE, 0.2)
@@ -429,75 +424,74 @@ export function DraftTopBand({
         </RoundMeta>
       </StatusBlock>
 
-      <Divider aria-hidden="true" />
-
-      {/* Inline ring timer */}
-      <TimerBlock role="timer" aria-label="Pick timer" aria-live="off">
-        <RingWrap aria-hidden="true">
-          <svg
-            width="58"
-            height="58"
-            viewBox="0 0 58 58"
-            style={{
-              transform: 'rotate(-90deg)',
-              position: 'absolute',
-              inset: 0,
-            }}
-          >
-            <circle
-              cx="29"
-              cy="29"
-              r={RING_RADIUS}
-              fill="none"
-              stroke={withAlpha(WHITE, 0.06)}
-              strokeWidth="4"
-            />
-            <circle
-              cx="29"
-              cy="29"
-              r={RING_RADIUS}
-              fill="none"
-              stroke={strokeColor}
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={`${RING_CIRCUMFERENCE}`}
-              strokeDashoffset={`${RING_CIRCUMFERENCE * (1 - clampedPct)}`}
-              style={{
-                transition: 'stroke-dashoffset 1s linear, stroke 0.5s ease',
-              }}
-            />
-          </svg>
-          <Text
-            fontFamily="$heading"
-            fontWeight="800"
-            fontSize={draftPaused ? 18 : 16}
-            fontVariant={['tabular-nums']}
-            color={ringTimeColor}
-            zIndex={1}
-            aria-label={
-              untimed
-                ? 'No pick time limit'
-                : draftPaused
-                  ? 'Draft paused'
-                  : `${formatPickClock(timeRemaining, pickTimeLimitSeconds)} remaining`
-            }
-          >
-            {untimed
-              ? '∞'
-              : draftPaused
-                ? '⏸'
-                : formatPickClock(timeRemaining, pickTimeLimitSeconds)}
-          </Text>
-        </RingWrap>
-        <TimerInfo>
-          <TimerCap>{untimed ? 'No limit' : 'Time left'}</TimerCap>
-          <TimerOf>
-            {untimed
-              ? 'Take your time'
-              : `of ${formatPickClock(pickTimeLimitSeconds, pickTimeLimitSeconds)}`}
-          </TimerOf>
-        </TimerInfo>
-      </TimerBlock>
+      {/* Inline ring timer — omitted entirely for untimed (offline mock draft)
+          mode; LS-9243 removed the placeholder "∞ / No limit" display since
+          the offline flow should show no pick timer at all. */}
+      {!untimed && (
+        <>
+          <Divider aria-hidden="true" />
+          <TimerBlock role="timer" aria-label="Pick timer" aria-live="off">
+            <RingWrap aria-hidden="true">
+              <svg
+                width="58"
+                height="58"
+                viewBox="0 0 58 58"
+                style={{
+                  transform: 'rotate(-90deg)',
+                  position: 'absolute',
+                  inset: 0,
+                }}
+              >
+                <circle
+                  cx="29"
+                  cy="29"
+                  r={RING_RADIUS}
+                  fill="none"
+                  stroke={withAlpha(WHITE, 0.06)}
+                  strokeWidth="4"
+                />
+                <circle
+                  cx="29"
+                  cy="29"
+                  r={RING_RADIUS}
+                  fill="none"
+                  stroke={strokeColor}
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={`${RING_CIRCUMFERENCE}`}
+                  strokeDashoffset={`${RING_CIRCUMFERENCE * (1 - clampedPct)}`}
+                  style={{
+                    transition: 'stroke-dashoffset 1s linear, stroke 0.5s ease',
+                  }}
+                />
+              </svg>
+              <Text
+                fontFamily="$heading"
+                fontWeight="800"
+                fontSize={draftPaused ? 18 : 16}
+                fontVariant={['tabular-nums']}
+                color={ringTimeColor}
+                zIndex={1}
+                aria-label={
+                  draftPaused
+                    ? 'Draft paused'
+                    : `${formatPickClock(timeRemaining, pickTimeLimitSeconds)} remaining`
+                }
+              >
+                {draftPaused
+                  ? '⏸'
+                  : formatPickClock(timeRemaining, pickTimeLimitSeconds)}
+              </Text>
+            </RingWrap>
+            <TimerInfo>
+              <TimerCap>Time left</TimerCap>
+              <TimerOf>
+                of {formatPickClock(pickTimeLimitSeconds, pickTimeLimitSeconds)}
+              </TimerOf>
+            </TimerInfo>
+          </TimerBlock>
+        </>
+      )}
 
       {/* On-the-clock slab (stretches to fill) */}
       <ClockSlab
