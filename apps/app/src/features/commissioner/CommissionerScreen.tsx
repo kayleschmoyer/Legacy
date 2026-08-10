@@ -19,15 +19,16 @@ import {
 } from '@legacy-sports/shared-components/commissioner';
 import { Sport } from '@legacy-sports/graphql';
 import type { AppLeagueFragment } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { LeagueDuesSetup } from './LeagueDuesSetup';
 import { LeagueScoringEditor } from '../scoring/LeagueScoringEditor';
-import { FootballLeagueScoringScreen } from '../../screens/leagues/football/FootballLeagueScoringScreen';
 import { useLeagueScoringSettings } from '../../common/scoring/LeagueScoringProvider';
 import {
   useCurrentWeek,
   useMatchupsForLeague,
 } from '../matchup/hooks/useMatchup';
 import { useSubscription } from '../subscription';
+import { useHasEntitlement } from '../subscription/useSubscription';
 
 export interface CommissionerScreenProps {
   leagueId: number;
@@ -42,6 +43,9 @@ export function CommissionerScreen({
 }: CommissionerScreenProps): React.JSX.Element {
   const router = useRouter();
   const { isPremium } = useSubscription();
+  const hasCustomScoringMultipliers = useHasEntitlement(
+    ENTITLEMENTS.custom_scoring_multipliers,
+  );
   const isFootball = league.sport === Sport.Football;
 
   const {
@@ -171,31 +175,19 @@ export function CommissionerScreen({
           onError={handleError}
         />
 
-        {/* LS-9042: LeagueScoringEditor hardcodes SCORING_GROUP_ORDER to the
-            three baseball groups, so football leagues need the group-aware
-            FootballLeagueScoringScreen instead — not platform duplication. */}
-        {isFootball ? (
-          <FootballLeagueScoringScreen
-            leagueId={leagueId}
-            profile={scoringProfile}
-            loading={scoringLoading}
-            error={scoringError ?? null}
-            onRefetch={async () => {
-              await refetchScoringProfile();
-            }}
-            defensiveFormat={league.defensiveFormat}
-          />
-        ) : (
-          <LeagueScoringEditor
-            leagueId={leagueId}
-            profile={scoringProfile}
-            loading={scoringLoading}
-            error={scoringError ?? null}
-            onRefetch={async () => {
-              await refetchScoringProfile();
-            }}
-          />
-        )}
+        <LeagueScoringEditor
+          leagueId={leagueId}
+          profile={scoringProfile}
+          loading={scoringLoading}
+          error={scoringError}
+          onRefetch={async () => {
+            await refetchScoringProfile();
+          }}
+          sport={league.sport ?? undefined}
+          defensiveFormat={league.defensiveFormat}
+          isPremium={hasCustomScoringMultipliers}
+          onUpgrade={() => router.navigate('/subscription-settings')}
+        />
 
         <AchievementRestrictionsControl
           leagueId={leagueId}

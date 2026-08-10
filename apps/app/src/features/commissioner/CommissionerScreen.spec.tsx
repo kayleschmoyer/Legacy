@@ -67,19 +67,14 @@ jest.mock('./LeagueDuesSetup', () => {
   };
 });
 
+const mockLeagueScoringEditor = jest.fn<void, [Record<string, unknown>]>();
 jest.mock('../scoring/LeagueScoringEditor', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
-    LeagueScoringEditor: () => <View testID="league-scoring-editor" />,
-  };
-});
-
-jest.mock('../../screens/leagues/football/FootballLeagueScoringScreen', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
-  return {
-    FootballLeagueScoringScreen: () => (
-      <View testID="football-league-scoring-screen" />
-    ),
+    LeagueScoringEditor: (props: Record<string, unknown>) => {
+      mockLeagueScoringEditor(props);
+      return <View testID="league-scoring-editor" />;
+    },
   };
 });
 
@@ -101,8 +96,17 @@ jest.mock('../subscription', () => ({
   useSubscription: jest.fn(() => ({ isPremium: false })),
 }));
 
+const mockUseHasEntitlement = jest.fn(() => false);
+jest.mock('../subscription/useSubscription', () => ({
+  useHasEntitlement: (key: string) => mockUseHasEntitlement(key),
+}));
+
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
+}));
+
+jest.mock('@legacy-sports/utils', () => ({
+  ENTITLEMENTS: { custom_scoring_multipliers: 'custom_scoring_multipliers' },
 }));
 
 // ── Test data ─────────────────────────────────────────────────────────────────
@@ -246,16 +250,34 @@ describe('CommissionerScreen', () => {
       expect(screen.getByTestId('commissioner-audit-log')).toBeTruthy();
     });
 
-    it('renders FootballLeagueScoringScreen instead of the baseball LeagueScoringEditor (LS-9042)', () => {
+    it('forwards sport, defensiveFormat, isPremium, and onUpgrade to LeagueScoringEditor', () => {
+      mockUseHasEntitlement.mockReturnValue(true);
+
       render(
         <CommissionerScreen
           leagueId={1}
-          league={mockFootballLeague as unknown as AppLeagueFragment}
+          league={
+            {
+              ...mockFootballLeague,
+              defensiveFormat: 'idp',
+            } as unknown as AppLeagueFragment
+          }
           onLeagueDeleted={mockOnLeagueDeleted}
         />,
       );
-      expect(screen.getByTestId('football-league-scoring-screen')).toBeTruthy();
-      expect(screen.queryByTestId('league-scoring-editor')).toBeNull();
+
+      expect(mockUseHasEntitlement).toHaveBeenCalledWith(
+        'custom_scoring_multipliers',
+      );
+      expect(mockLeagueScoringEditor).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sport: 'football',
+          defensiveFormat: 'idp',
+          isPremium: true,
+        }),
+      );
+      const forwardedProps = mockLeagueScoringEditor.mock.calls[0]?.[0];
+      expect(typeof forwardedProps?.onUpgrade).toBe('function');
     });
   });
 });

@@ -376,18 +376,16 @@ export function isStatDirty(stat: ProfileStat, formValue: string): boolean {
   return parsed !== null && Math.abs(parsed - stat.multiplier) > 0.0001;
 }
 
-// ── Position-scoped scoring bonuses (LS-9105) ───────────────────────────────
+// ── Position-scoped scoring bonuses (LS-9104/LS-9105/LS-9106) ───────────────
 //
 // Position bonuses are additive on top of a stat's base multiplier for a
 // given roster position (e.g. a TE gets +0.5 per reception on top of the
-// league's base receiving multiplier). Storage (`league_scoring_position_bonuses`,
-// LS-9103) and GraphQL exposure (LS-9104: `positionBonuses` field +
-// `updateLeagueScoringPositionBonuses` mutation) are tracked separately; the
-// shapes below intentionally mirror LS-9104's planned `ScoringPositionBonus`
-// GraphQL type so this module needs no changes once that API lands — only the
-// data source wiring in the consuming component changes.
+// league's base receiving multiplier). Backed by
+// `league_scoring_position_bonuses` (LS-9103) and exposed via the
+// `positionBonuses` GraphQL field + `updateLeagueScoringPositionBonuses`
+// mutation (LS-9104).
 
-/** Roster positions eligible for a position-scoped bonus, by defensive format. */
+/** Offensive roster positions eligible for a position-scoped bonus. */
 export const OFFENSE_BONUS_POSITIONS: readonly string[] = [
   'QB',
   'RB',
@@ -400,7 +398,7 @@ export const IDP_BONUS_POSITIONS: readonly string[] = ['DL', 'LB', 'DB'];
 
 /**
  * Normalized representation of a single position-scoped bonus row for form
- * editing. Mirrors LS-9104's planned `ScoringPositionBonus` GraphQL type.
+ * editing.
  */
 export interface PositionBonus {
   /** Present once persisted; `null` for a row not yet saved. */
@@ -410,6 +408,32 @@ export interface PositionBonus {
   statDisplayName: string;
   bonusMultiplier: number;
   defaultBonusMultiplier: number;
+}
+
+/**
+ * Minimal shape of a scoring profile's `positionBonuses` field; intentionally
+ * avoids importing generated GraphQL types so this module stays
+ * platform-agnostic.
+ */
+export interface PositionBonusProfileInput {
+  positionBonuses?: ReadonlyArray<{
+    id?: number | null;
+    position?: string | null;
+    bonusMultiplier?: number | null;
+    isEnabled?: boolean | null;
+    definition?: {
+      id?: number | null;
+      displayName?: string | null;
+    } | null;
+  } | null> | null;
+}
+
+/** A single position-bonus update to send to the API. */
+export interface PositionBonusUpdate {
+  position: string;
+  statDefinitionId: number;
+  bonusMultiplier?: number;
+  isEnabled?: boolean;
 }
 
 /** Maps a client-local row key → the current form string value. */
@@ -443,6 +467,44 @@ export function validatePositionBonus(
 }
 
 /**
+ * Normalize a raw scoring profile's `positionBonuses` field into a flat array
+ * of `PositionBonus` objects suitable for form editing.
+ */
+export function collectPositionBonuses(
+  profile: PositionBonusProfileInput | null | undefined,
+): PositionBonus[] {
+  if (!profile?.positionBonuses) {
+    return [];
+  }
+
+  const bonuses: PositionBonus[] = [];
+
+  for (const raw of profile.positionBonuses) {
+    if (!raw || !raw.definition || raw.isEnabled === false) {
+      continue;
+    }
+
+    const { definition } = raw;
+
+    if (definition.id == null || raw.position == null) {
+      continue;
+    }
+
+    bonuses.push({
+      id: raw.id ?? null,
+      position: raw.position,
+      statDefinitionId: definition.id,
+      statDisplayName: definition.displayName ?? `Stat ${definition.id}`,
+      bonusMultiplier:
+        typeof raw.bonusMultiplier === 'number' ? raw.bonusMultiplier : 0,
+      defaultBonusMultiplier: 0,
+    });
+  }
+
+  return bonuses;
+}
+
+/**
  * Build the initial form value map from an array of `PositionBonus` rows,
  * keyed by `positionBonusKey`.
  */
@@ -454,4 +516,46 @@ export function createInitialPositionBonusValues(
       formatMultiplier(bonus.bonusMultiplier);
     return acc;
   }, {});
+}
+
+/**
+ * Diff the form values against the original bonuses and produce an array of
+ * `PositionBonusUpdate` objects (edited value only) ready to submit to the
+ * `updateLeagueScoringPositionBonuses` mutation.
+ */
+export function positionBonusValuesToUpdates(
+  bonuses: PositionBonus[],
+  values: PositionBonusFormValueState,
+): PositionBonusUpdate[] {
+  return bonuses
+    .map((bonus) => {
+      const rowKey = positionBonusKey(bonus.position, bonus.statDefinitionId);
+      const value = values[rowKey];
+      const parsed = parseInput(value);
+
+      if (parsed === null) {
+        return null;
+      }
+
+      const isChanged = Math.abs(parsed - bonus.bonusMultiplier) > 0.0001;
+
+      if (!isChanged) {
+        return null;
+      }
+
+      return {
+        position: bonus.position,
+        statDefinitionId: bonus.statDefinitionId,
+        bonusMultiplier: Number(parsed.toFixed(4)),
+      };
+    })
+    .filter(
+      (
+        update,
+      ): update is {
+        position: string;
+        statDefinitionId: number;
+        bonusMultiplier: number;
+      } => Boolean(update),
+    );
 }

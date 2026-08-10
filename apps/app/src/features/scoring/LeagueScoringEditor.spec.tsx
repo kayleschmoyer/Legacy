@@ -71,6 +71,10 @@ jest.mock('@legacy-sports/scoring', () => ({
   createInitialValues: jest.fn(() => ({ 1: '1.00', 2: '5.00', 3: '2.00' })),
   createInitialErrors: jest.fn(() => ({ 1: null, 2: null, 3: null })),
   formatMultiplier: jest.fn((v: number) => v.toFixed(2)),
+  parseInput: jest.fn((v: string) => {
+    const parsed = Number.parseFloat(v);
+    return Number.isFinite(parsed) ? parsed : null;
+  }),
   validateStat: jest.fn(() => null),
   valuesToUpdates: jest.fn(() => []),
   isStatDirty: jest.fn(() => false),
@@ -79,6 +83,14 @@ jest.mock('@legacy-sports/scoring', () => ({
       stat.leagueMultiplier !== null,
   ),
   SCORING_GROUP_ORDER: ['batting', 'pitching'],
+  FOOTBALL_SCORING_GROUP_ORDER: [
+    'passing',
+    'rushing',
+    'receiving',
+    'kicking',
+    'defense',
+    'idp',
+  ],
   SCORING_GROUP_COPY: {
     batting: {
       title: 'Batting',
@@ -91,16 +103,57 @@ jest.mock('@legacy-sports/scoring', () => ({
       accent: '#EF4444',
     },
   },
+  OFFENSE_BONUS_POSITIONS: ['QB', 'RB', 'WR', 'TE', 'K'],
+  IDP_BONUS_POSITIONS: ['DL', 'LB', 'DB'],
+  collectPositionBonuses: jest.fn(() => []),
+  createInitialPositionBonusValues: jest.fn(() => ({})),
+  positionBonusKey: jest.fn(
+    (position: string, statDefinitionId: number) =>
+      `${position}:${statDefinitionId}`,
+  ),
+  positionBonusValuesToUpdates: jest.fn(() => []),
+  validatePositionBonus: jest.fn((v: string) => {
+    const parsed = Number.parseFloat(v);
+    return Number.isFinite(parsed)
+      ? null
+      : 'Enter a number for the bonus value';
+  }),
 }));
 
-// Mock the mutation
+// Mock the mutations
 const mockUpdateScoring = jest.fn().mockResolvedValue({});
+const mockUpdatePositionBonuses = jest.fn().mockResolvedValue({});
 jest.mock('@legacy-sports/graphql', () => ({
+  DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
+  Sport: { Baseball: 'baseball', Football: 'football' },
   useUpdateLeagueScoringProfileMutation: jest.fn(() => [
     mockUpdateScoring,
     { loading: false },
   ]),
+  useUpdateLeagueScoringPositionBonusesMutation: jest.fn(() => [
+    mockUpdatePositionBonuses,
+    { loading: false },
+  ]),
 }));
+
+// Mock PremiumGate — renders children when premium, a lock notice otherwise
+jest.mock('@legacy-sports/shared-components', () => {
+  const { Text: RNTextComponent } =
+    jest.requireActual<RNComponents>('react-native');
+  return {
+    PremiumGate: ({
+      isPremium,
+      featureName,
+      children,
+    }: {
+      isPremium: boolean;
+      featureName: string;
+      children: React.ReactNode;
+      onUpgrade?: () => void;
+    }) =>
+      isPremium ? children : <RNTextComponent>{featureName}</RNTextComponent>,
+  };
+});
 
 // Mock tamagui
 jest.mock('tamagui', () => {
@@ -229,6 +282,19 @@ describe('LeagueScoringEditor', () => {
     jest
       .mocked(scoringLib.createInitialErrors)
       .mockReturnValue({ 1: null, 2: null, 3: null });
+    jest
+      .mocked(graphqlLib.useUpdateLeagueScoringPositionBonusesMutation)
+      .mockReturnValue([
+        mockUpdatePositionBonuses,
+        { loading: false },
+      ] as ReturnType<
+        typeof graphqlLib.useUpdateLeagueScoringPositionBonusesMutation
+      >);
+    jest.mocked(scoringLib.collectPositionBonuses).mockReturnValue([]);
+    jest
+      .mocked(scoringLib.createInitialPositionBonusValues)
+      .mockReturnValue({});
+    jest.mocked(scoringLib.positionBonusValuesToUpdates).mockReturnValue([]);
   });
 
   describe('loading state', () => {
@@ -393,6 +459,175 @@ describe('LeagueScoringEditor', () => {
       expect(
         screen.getByText('Fix highlighted fields before saving.'),
       ).toBeTruthy();
+    });
+  });
+
+  describe('football position bonuses', () => {
+    it('does not render position bonuses for baseball leagues', () => {
+      render(<LeagueScoringEditor {...defaultProps} />);
+      expect(screen.queryByText('Position Bonuses')).toBeNull();
+      expect(screen.queryByText('Position-Scoped Scoring Bonuses')).toBeNull();
+    });
+
+    it('shows the upgrade gate for free-tier commissioners on football leagues', () => {
+      render(
+        <LeagueScoringEditor
+          {...defaultProps}
+          sport={graphqlLib.Sport.Football}
+          isPremium={false}
+        />,
+      );
+      expect(screen.getByText('Position-Scoped Scoring Bonuses')).toBeTruthy();
+      expect(screen.queryByText('Position Bonuses')).toBeNull();
+    });
+
+    it('renders configured position bonus rows for premium football commissioners', () => {
+      jest.mocked(scoringLib.collectPositionBonuses).mockReturnValue([
+        {
+          id: 1,
+          position: 'TE',
+          statDefinitionId: 10,
+          statDisplayName: 'Receptions',
+          bonusMultiplier: 0.5,
+          defaultBonusMultiplier: 0,
+        },
+      ]);
+
+      render(
+        <LeagueScoringEditor
+          {...defaultProps}
+          sport={graphqlLib.Sport.Football}
+          isPremium={true}
+        />,
+      );
+
+      expect(screen.getByText('Position Bonuses')).toBeTruthy();
+      expect(screen.getByText('TE')).toBeTruthy();
+      expect(screen.getByText('Receptions')).toBeTruthy();
+    });
+
+    it('calls the position bonus mutation with isEnabled: false on remove', async () => {
+      jest.mocked(scoringLib.collectPositionBonuses).mockReturnValue([
+        {
+          id: 1,
+          position: 'TE',
+          statDefinitionId: 10,
+          statDisplayName: 'Receptions',
+          bonusMultiplier: 0.5,
+          defaultBonusMultiplier: 0,
+        },
+      ]);
+
+      render(
+        <LeagueScoringEditor
+          {...defaultProps}
+          sport={graphqlLib.Sport.Football}
+          isPremium={true}
+        />,
+      );
+
+      fireEvent.press(screen.getByLabelText('Remove TE Receptions bonus'));
+
+      await waitFor(() => {
+        expect(mockUpdatePositionBonuses).toHaveBeenCalledWith({
+          variables: {
+            leagueId: 42,
+            updates: [
+              { position: 'TE', statDefinitionId: 10, isEnabled: false },
+            ],
+          },
+        });
+      });
+    });
+
+    it('shows a validation error and disables save when the draft bonus value is invalid', () => {
+      render(
+        <LeagueScoringEditor
+          {...defaultProps}
+          sport={graphqlLib.Sport.Football}
+          isPremium={true}
+        />,
+      );
+
+      fireEvent.press(screen.getByText('+ Add'));
+      fireEvent.changeText(screen.getByDisplayValue('0.00'), 'abc');
+
+      expect(
+        screen.getByText('Enter a number for the bonus value'),
+      ).toBeTruthy();
+      fireEvent.press(screen.getByText('Save Bonuses'));
+      expect(mockUpdatePositionBonuses).not.toHaveBeenCalled();
+    });
+
+    it('shows a validation error instead of silently failing when the draft bonus is a duplicate', () => {
+      // Default draft starts on positions[0] ('QB') and the first stat by
+      // displayName from mockStats ('Home Runs', id 2) — matching this row
+      // exactly so the duplicate check fires.
+      jest.mocked(scoringLib.collectPositionBonuses).mockReturnValue([
+        {
+          id: 1,
+          position: 'QB',
+          statDefinitionId: 2,
+          statDisplayName: 'Home Runs',
+          bonusMultiplier: 0.1,
+          defaultBonusMultiplier: 0,
+        },
+      ]);
+
+      render(
+        <LeagueScoringEditor
+          {...defaultProps}
+          sport={graphqlLib.Sport.Football}
+          isPremium={true}
+        />,
+      );
+
+      fireEvent.press(screen.getByText('+ Add'));
+      fireEvent.press(screen.getByText('Save Bonuses'));
+
+      expect(
+        screen.getByText('A bonus for this position and stat already exists.'),
+      ).toBeTruthy();
+      expect(mockUpdatePositionBonuses).not.toHaveBeenCalled();
+    });
+
+    it('calls the position bonus mutation when saving an edited bonus', async () => {
+      jest.mocked(scoringLib.collectPositionBonuses).mockReturnValue([
+        {
+          id: 1,
+          position: 'TE',
+          statDefinitionId: 10,
+          statDisplayName: 'Receptions',
+          bonusMultiplier: 0.5,
+          defaultBonusMultiplier: 0,
+        },
+      ]);
+      jest
+        .mocked(scoringLib.positionBonusValuesToUpdates)
+        .mockReturnValue([
+          { position: 'TE', statDefinitionId: 10, bonusMultiplier: 1.5 },
+        ]);
+
+      render(
+        <LeagueScoringEditor
+          {...defaultProps}
+          sport={graphqlLib.Sport.Football}
+          isPremium={true}
+        />,
+      );
+
+      fireEvent.press(screen.getByText('Save Bonuses'));
+
+      await waitFor(() => {
+        expect(mockUpdatePositionBonuses).toHaveBeenCalledWith({
+          variables: {
+            leagueId: 42,
+            updates: [
+              { position: 'TE', statDefinitionId: 10, bonusMultiplier: 1.5 },
+            ],
+          },
+        });
+      });
     });
   });
 });
