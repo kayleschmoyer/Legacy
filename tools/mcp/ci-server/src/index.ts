@@ -161,7 +161,8 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_rerun',
-    'Prefer this over `gh run rerun` or `gh run rerun --failed` via shell. Rerun failed jobs, a specific job, or an entire CI run. Defaults to failed-only (equivalent to `gh run rerun --failed`). Use ci_rerun_failed_jobs when you want a dedicated name that mirrors the shell command and makes the intent explicit.',
+    'Prefer this over `gh run rerun` or `gh run rerun --failed` via shell. Rerun failed jobs, a specific job, or an entire CI run. Defaults to failed-only (equivalent to `gh run rerun --failed`). Use ci_rerun_failed_jobs when you want a dedicated name that mirrors the shell command and makes the intent explicit. ' +
+      'The failed-only path auto-escalates to a full run rerun when the run has jobs left `cancelled` by an upstream dependency failure (GitHub\'s rerun-failed-jobs endpoint never reschedules those, LS-9212) — check the response `scope`/`message` for `"run (escalated from failed-jobs)"` to know when that happened.',
     {
       runId: z.coerce.number().int().positive().describe('Run ID'),
       failedOnly: coercedBoolean
@@ -182,7 +183,11 @@ export function createServer(): McpServer {
     'ci_rerun_failed_jobs',
     'Prefer this over `gh run rerun --failed` via shell. Re-run only the failed jobs of a GitHub Actions run. ' +
       'Equivalent to ci_rerun({ runId, failedOnly: true }) but with a dedicated name for discoverability. ' +
-      'Use when a transient CI failure (flaky test, runner timeout, network hiccup) needs a re-run without touching the full workflow.',
+      'Use when a transient CI failure (flaky test, runner timeout, network hiccup) needs a re-run without touching the full workflow. ' +
+      'Auto-escalates to a full run rerun when the run has downstream required jobs left `cancelled` by an upstream dependency failure — ' +
+      "GitHub's rerun-failed-jobs endpoint only reschedules jobs with conclusion `failure`, so cancelled dependents would otherwise sit stranded " +
+      'until the workflow times out, leaving `mergeable_state: blocked` with no visibly-failed check (LS-9212). Check the response `scope`/`message` ' +
+      'for `"run (escalated from failed-jobs)"` to know when that happened.',
     {
       runId: z.coerce
         .number()

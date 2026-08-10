@@ -2,6 +2,7 @@ import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 
 jest.mock('../github-api.js', () => ({
   postWithRetryOnAlreadyRunning: jest.fn(),
+  githubGet: jest.fn(),
 }));
 
 import { rerun } from './rerun.js';
@@ -11,11 +12,16 @@ const mockPostWithRetry =
   githubApi.postWithRetryOnAlreadyRunning as jest.MockedFunction<
     typeof githubApi.postWithRetryOnAlreadyRunning
   >;
+const mockGithubGet = githubApi.githubGet as jest.MockedFunction<
+  typeof githubApi.githubGet
+>;
 
 describe('rerun', () => {
   beforeEach(() => {
     mockPostWithRetry.mockReset();
     mockPostWithRetry.mockResolvedValue(undefined);
+    mockGithubGet.mockReset();
+    mockGithubGet.mockResolvedValue({ jobs: [] });
   });
 
   describe('ci_rerun_failed_jobs contract (failedOnly: true)', () => {
@@ -47,6 +53,78 @@ describe('rerun', () => {
       };
       expect(payload.scope).toBe('failed-jobs');
       expect(payload.runId).toBe(123);
+    });
+  });
+
+  describe('cancelled-dependency escalation (LS-9212)', () => {
+    it('escalates to a full rerun when the run has a cancelled job', async () => {
+      mockGithubGet.mockResolvedValue({
+        jobs: [
+          { id: 1, conclusion: 'success' },
+          { id: 2, conclusion: 'cancelled' },
+        ],
+      });
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(mockGithubGet).toHaveBeenCalledWith('/actions/runs/123/jobs', {
+        per_page: '100',
+        filter: 'latest',
+      });
+      expect(mockPostWithRetry).toHaveBeenCalledWith(
+        '/actions/runs/123/rerun',
+        undefined,
+      );
+      expect(mockPostWithRetry).not.toHaveBeenCalledWith(
+        '/actions/runs/123/rerun-failed-jobs',
+        expect.anything(),
+      );
+
+      const payload = JSON.parse(result.content[0].text) as {
+        scope: string;
+        message: string;
+      };
+      expect(payload.scope).toBe('run (escalated from failed-jobs)');
+      expect(payload.message).toMatch(/Escalated to a full run rerun/);
+    });
+
+    it('does not escalate when no jobs are cancelled', async () => {
+      mockGithubGet.mockResolvedValue({
+        jobs: [
+          { id: 1, conclusion: 'failure' },
+          { id: 2, conclusion: 'success' },
+        ],
+      });
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(mockPostWithRetry).toHaveBeenCalledWith(
+        '/actions/runs/123/rerun-failed-jobs',
+        undefined,
+      );
+      const payload = JSON.parse(result.content[0].text) as { scope: string };
+      expect(payload.scope).toBe('failed-jobs');
+    });
+
+    it('falls back to the normal failed-only rerun when the jobs lookup fails', async () => {
+      mockGithubGet.mockRejectedValue(new Error('network error'));
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(mockPostWithRetry).toHaveBeenCalledWith(
+        '/actions/runs/123/rerun-failed-jobs',
+        undefined,
+      );
+      expect(result.isError).toBeUndefined();
+      const payload = JSON.parse(result.content[0].text) as { scope: string };
+      expect(payload.scope).toBe('failed-jobs');
+    });
+
+    it('does not check for cancelled jobs on the full-run or job-scoped paths', async () => {
+      await rerun({ runId: 123, failedOnly: false });
+      await rerun({ runId: 123, jobId: 987 });
+
+      expect(mockGithubGet).not.toHaveBeenCalled();
     });
   });
 
