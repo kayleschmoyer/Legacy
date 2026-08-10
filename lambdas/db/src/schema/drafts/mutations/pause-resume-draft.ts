@@ -8,6 +8,7 @@ import { and, desc, eq } from 'drizzle-orm';
 
 import { Draft } from '../types';
 import { builder } from '../../builder';
+import { writeAuditLog } from '../../commissioner-tools';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -87,6 +88,15 @@ builder.mutationField('pauseDraft', (t) =>
         .where(eq(PublicSchema.drafts.leagueId, leagueId))
         .orderBy(desc(PublicSchema.drafts.createdAt))
         .limit(1);
+
+      await writeAuditLog(context.db, {
+        leagueId,
+        userId,
+        action: 'pause_draft',
+        targetType: 'draft',
+        targetId: draft?.id,
+        details: { previousStatus: league.draftStatus },
+      });
 
       LOGGER.info('Draft paused', { leagueId, userId });
 
@@ -173,6 +183,15 @@ builder.mutationField('resumeDraft', (t) =>
           .set({ currentPickDeadline: resumeDeadline })
           .where(eq(PublicSchema.drafts.id, draft.id));
 
+        await writeAuditLog(context.db, {
+          leagueId,
+          userId,
+          action: 'resume_draft',
+          targetType: 'draft',
+          targetId: draft.id,
+          details: { previousStatus: league.draftStatus },
+        });
+
         LOGGER.info('Draft resumed', { leagueId, userId });
 
         // Notify all league connections
@@ -183,6 +202,14 @@ builder.mutationField('resumeDraft', (t) =>
           );
         }
       } else {
+        await writeAuditLog(context.db, {
+          leagueId,
+          userId,
+          action: 'resume_draft',
+          targetType: 'draft',
+          details: { previousStatus: league.draftStatus },
+        });
+
         LOGGER.info('Draft resumed (no draft record found)', {
           leagueId,
           userId,

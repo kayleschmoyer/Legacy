@@ -25,10 +25,13 @@ jest.mock('@legacy-sports/logging', () => ({
 
 type Resolver = (...args: unknown[]) => Promise<unknown>;
 
+const writeAuditLog = jest.fn().mockResolvedValue(undefined);
+
 // Load the module with its builder + db-client dependencies mocked and return
 // the captured GraphQL resolver functions keyed by mutation name.
 function capturePauseResumeResolvers(): Record<string, Resolver> {
   jest.resetModules();
+  writeAuditLog.mockClear();
   const captured: Record<string, Resolver> = {};
 
   jest.doMock('../../builder', () => ({
@@ -43,6 +46,8 @@ function capturePauseResumeResolvers(): Record<string, Resolver> {
       }),
     },
   }));
+
+  jest.doMock('../../commissioner-tools', () => ({ writeAuditLog }));
 
   jest.doMock('@legacy-sports/db-client', () => ({
     PublicSchema: {
@@ -134,6 +139,26 @@ describe('resumeDraft resolver', () => {
       extensions: { code: 'BAD_USER_INPUT' },
     });
   });
+
+  it('writes a resume_draft row to commissioner_audit_log on success', async () => {
+    const { resumeDraft } = capturePauseResumeResolvers();
+    const { db } = makeDb([
+      [{ permissionLevel: 'commissioner' }], // membership lookup
+      [{ id: 1, draftStatus: 'paused' }], // league lookup
+      [{ id: 5, leagueId: 1, pickTimeLimitSeconds: 120 }], // draft lookup
+    ]);
+    const ctx = { user: { id: 99 }, db };
+    await resumeDraft({}, { leagueId: 1 }, ctx, undefined);
+
+    expect(writeAuditLog).toHaveBeenCalledWith(db, {
+      leagueId: 1,
+      userId: 99,
+      action: 'resume_draft',
+      targetType: 'draft',
+      targetId: 5,
+      details: { previousStatus: 'paused' },
+    });
+  });
 });
 
 describe('pauseDraft resolver', () => {
@@ -164,6 +189,26 @@ describe('pauseDraft resolver', () => {
     ).rejects.toMatchObject({
       message: 'League not found',
       extensions: { code: 'BAD_USER_INPUT' },
+    });
+  });
+
+  it('writes a pause_draft row to commissioner_audit_log on success', async () => {
+    const { pauseDraft } = capturePauseResumeResolvers();
+    const { db } = makeDb([
+      [{ permissionLevel: 'commissioner' }], // membership lookup
+      [{ id: 1, draftStatus: 'in-progress' }], // league lookup
+      [{ id: 5, leagueId: 1 }], // draft lookup
+    ]);
+    const ctx = { user: { id: 99 }, db };
+    await pauseDraft({}, { leagueId: 1 }, ctx, undefined);
+
+    expect(writeAuditLog).toHaveBeenCalledWith(db, {
+      leagueId: 1,
+      userId: 99,
+      action: 'pause_draft',
+      targetType: 'draft',
+      targetId: 5,
+      details: { previousStatus: 'in-progress' },
     });
   });
 });
