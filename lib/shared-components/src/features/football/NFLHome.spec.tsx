@@ -75,7 +75,7 @@ describe('NFLHome — leagues list virtualization (LS-6257)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders the loading state instead of the list', () => {
+  it('renders the loading skeleton instead of the list', () => {
     render(
       <NFLHome
         leagues={makeLeagues(5)}
@@ -85,6 +85,7 @@ describe('NFLHome — leagues list virtualization (LS-6257)', () => {
       />,
     );
 
+    expect(screen.getByTestId('football-leagues-skeleton')).toBeInTheDocument();
     expect(
       screen.queryByTestId('football-league-row-1'),
     ).not.toBeInTheDocument();

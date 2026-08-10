@@ -7,7 +7,6 @@ import {
   Paragraph,
   ScrollView,
   Separator,
-  Spinner,
   Text,
   XStack,
   YStack,
@@ -285,6 +284,58 @@ function LeaguesList(props: LeaguesListProps) {
     <LeaguesListWeb {...props} />
   ) : (
     <LeaguesListNative {...props} />
+  );
+}
+
+const SKELETON_ROW_COUNT = 3;
+
+/**
+ * Loading placeholder for the "Your Football Leagues" panel — shares
+ * {@link LeagueRow}'s geometry so the swap to real rows doesn't reflow the
+ * page once data resolves (LS-5410).
+ */
+function LeaguesListSkeleton() {
+  return (
+    <YStack
+      testID="football-leagues-skeleton"
+      gap="$2"
+      role="presentation"
+      aria-hidden={true}
+    >
+      {Array.from({ length: SKELETON_ROW_COUNT }).map((_, i) => (
+        <XStack
+          key={i}
+          backgroundColor="$glassSurface"
+          borderRadius="$3"
+          padding="$3"
+          borderWidth={1}
+          borderColor="$glassBorder"
+          alignItems="center"
+          gap="$3"
+        >
+          <YStack flex={1} gap="$2" minWidth={160}>
+            <YStack
+              height={16}
+              width={160}
+              borderRadius="$2"
+              backgroundColor="$gray5"
+            />
+            <YStack
+              height={10}
+              width={100}
+              borderRadius="$2"
+              backgroundColor="$gray5"
+            />
+          </YStack>
+          <YStack
+            height={20}
+            width={64}
+            borderRadius="$3"
+            backgroundColor="$gray5"
+          />
+        </XStack>
+      ))}
+    </YStack>
   );
 }
 
@@ -568,9 +619,7 @@ function NFLHome({
                 ) : null}
               </YStack>
             ) : loading ? (
-              <YStack alignItems="center" padding="$5">
-                <Spinner size="large" color="$orange9" />
-              </YStack>
+              <LeaguesListSkeleton />
             ) : error ? (
               <YStack alignItems="center" padding="$5" gap="$3">
                 <Text fontSize="$5" color="$red10" textAlign="center">
