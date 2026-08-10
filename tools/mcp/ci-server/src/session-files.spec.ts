@@ -28,9 +28,11 @@ describe('findClaudeProjectsDir', () => {
     savedEnv = {
       CLAUDE_PROJECTS_DIR: process.env['CLAUDE_PROJECTS_DIR'],
       APPDATA: process.env['APPDATA'],
+      HOME: process.env['HOME'],
     };
     delete process.env['CLAUDE_PROJECTS_DIR'];
     delete process.env['APPDATA'];
+    delete process.env['HOME'];
   });
 
   afterEach(() => {
@@ -46,6 +48,25 @@ describe('findClaudeProjectsDir', () => {
   it('returns the CLAUDE_PROJECTS_DIR override when it exists', () => {
     process.env['CLAUDE_PROJECTS_DIR'] = tmpDir;
     expect(findClaudeProjectsDir()).toBe(tmpDir);
+  });
+
+  it('returns the explicit param override, taking priority over everything', () => {
+    process.env['CLAUDE_PROJECTS_DIR'] = '/nonexistent-env-override-xyz';
+    expect(findClaudeProjectsDir(tmpDir)).toBe(tmpDir);
+  });
+
+  it('resolves ~/.claude/projects from $HOME when it differs from the OS user home (LS-8867)', () => {
+    // Simulates a CCR-style environment where the process's OS user-database
+    // home (what node:os homedir() falls back to) is stale/mismatched, but
+    // $HOME correctly points at the real session directory.
+    const homeProjects = join(tmpDir, '.claude', 'projects');
+    mkdirSync(homeProjects, { recursive: true });
+    try {
+      process.env['HOME'] = tmpDir;
+      expect(findClaudeProjectsDir()).toBe(homeProjects);
+    } finally {
+      rmSync(homeProjects, { recursive: true, force: true });
+    }
   });
 
   it('CLAUDE_PROJECTS_DIR override takes priority over APPDATA', () => {

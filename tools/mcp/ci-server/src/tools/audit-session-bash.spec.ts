@@ -122,6 +122,23 @@ describe('auditSessionBash (node-native)', () => {
     jest.clearAllMocks();
   });
 
+  it('honors an explicit projectsDir param, overriding CLAUDE_PROJECTS_DIR (LS-8867)', async () => {
+    // Simulates a CCR session where the server process's auto-detected home
+    // doesn't match the real session location: the caller passes the actual
+    // directory explicitly rather than relying on env-var/homedir detection.
+    delete process.env.CLAUDE_PROJECTS_DIR;
+
+    const result = await auditSessionBash({
+      projectsDir,
+      project: SLUG,
+      sessionId: SESSION_ID,
+      gapsOnly: true,
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(resultText(result)).toContain(`Session: ${SESSION_ID}`);
+  });
+
   it('returns a gaps report without any Python interpreter (gapsOnly)', async () => {
     // Simulate an environment with no python/python3 anywhere: an empty PATH.
     process.env.PATH = '';

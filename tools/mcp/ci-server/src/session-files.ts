@@ -19,18 +19,33 @@ import { basename, join, resolve, sep } from 'node:path';
  * environments.
  *
  * Search order:
- *   1. $CLAUDE_PROJECTS_DIR env-var override (useful for custom installs / tests)
- *   2. ~/.claude/projects  (Linux, macOS, Windows Git-Bash / WSL)
- *   3. %APPDATA%\Claude\projects  (native Windows Claude Code install)
+ *   1. `explicit` param (caller-supplied override, e.g. a tool-call `projectsDir` arg)
+ *   2. $CLAUDE_PROJECTS_DIR env-var override (useful for custom installs / tests)
+ *   3. ~/.claude/projects, resolved from $HOME directly (POSIX) — falls back to
+ *      the OS user-database home (via node:os homedir()) only if $HOME is unset.
+ *      Some hosted/CCR server processes run with a stale or sandbox-default
+ *      $HOME baked into their launch environment (e.g. /home/sbx_user1051) that
+ *      no longer matches the container's actual home (e.g. /root) — preferring
+ *      $HOME explicitly, plus the explicit/env-var overrides above, gives callers
+ *      a way around a mismatched value (LS-8867).
+ *   4. %APPDATA%\Claude\projects  (native Windows Claude Code install)
  */
-export function findClaudeProjectsDir(): string {
+export function findClaudeProjectsDir(explicit?: string): string {
   const candidates: string[] = [];
+
+  if (explicit) {
+    candidates.push(explicit);
+  }
 
   const envOverride = process.env['CLAUDE_PROJECTS_DIR'];
   if (envOverride) {
     candidates.push(envOverride);
   }
 
+  const homeEnv = process.env['HOME'];
+  if (homeEnv) {
+    candidates.push(join(homeEnv, '.claude', 'projects'));
+  }
   candidates.push(join(homedir(), '.claude', 'projects'));
 
   const appData = process.env['APPDATA'];

@@ -725,6 +725,15 @@ export function createServer(): McpServer {
             '"D--code-legacy-sports--claude-worktrees-<name>" for a launcher worktree session). ' +
             'Auto-detected from CWD if omitted — worktree sessions are detected automatically.',
         ),
+      projectsDir: z
+        .string()
+        .optional()
+        .describe(
+          'Explicit base directory containing project session folders (e.g. "/root/.claude/projects"). ' +
+            'Overrides auto-detection (env override, $HOME, then OS user home). Use this when the server ' +
+            "process's resolved home directory does not match the actual session location, which can happen " +
+            'in Claude Code Remote (CCR) sessions.',
+        ),
       includeMcp: coercedBoolean
         .default(false)
         .describe(

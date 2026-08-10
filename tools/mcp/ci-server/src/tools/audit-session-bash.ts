@@ -41,6 +41,7 @@ function validateProjectSlug(slug: string): string | null {
 export interface AuditSessionBashParams {
   sessionId?: string;
   project?: string;
+  projectsDir?: string;
   includeMcp?: boolean;
   pid?: number;
   gapsOnly?: boolean;
@@ -74,7 +75,7 @@ export async function auditSessionBash(
 ): Promise<ToolResult> {
   let projectsDir: string;
   try {
-    projectsDir = findClaudeProjectsDir();
+    projectsDir = findClaudeProjectsDir(params.projectsDir);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return textError(`audit-session-bash failed: ${message}`);
