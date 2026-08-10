@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   type GameRoomResumeGame,
   GameRoomScreen,
@@ -34,6 +35,7 @@ const ROUTES: Record<MinigameId, string> = {
 
 export default function GamesTab() {
   const router = useRouter();
+  const { top: topInset } = useSafeAreaInsets();
 
   const {
     data: sdGamesData,
@@ -146,6 +148,7 @@ export default function GamesTab() {
       personalStats={{ draftsWon: null, dayStreak: null, gamesPlayed: null }}
       onSelectGame={handleSelectGame}
       onResumeGame={handleResumeGame}
+      topInset={topInset}
     />
   );
 }

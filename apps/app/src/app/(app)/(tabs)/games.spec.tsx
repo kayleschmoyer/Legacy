@@ -25,6 +25,10 @@ jest.mock('../_screenErrorBoundary', () => ({
   ScreenErrorBoundary: () => null,
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 const mockLoggerError = jest.fn();
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {

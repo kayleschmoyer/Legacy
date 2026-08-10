@@ -64,6 +64,10 @@ jest.mock('../../../common/auth/AuthHooks', () => ({
   useAuthHandlers: () => ({ logout: mockLogout }),
 }));
 
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+}));
+
 let mockUnreadCount = 0;
 
 jest.mock('@legacy-sports/graphql', () => ({

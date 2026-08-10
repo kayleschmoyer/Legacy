@@ -65,6 +65,8 @@ export interface GameRoomScreenProps {
   personalStats: GameRoomPersonalStats;
   onSelectGame: (id: MinigameId) => void;
   onResumeGame: (game: GameRoomResumeGame) => void;
+  /** Status-bar clearance from `useSafeAreaInsets().top`. Defaults to 0. */
+  topInset?: number;
 }
 
 const PAGE_PADDING = 18;
@@ -372,12 +374,14 @@ export function GameRoomScreen({
   personalStats,
   onSelectGame,
   onResumeGame,
+  topInset = 0,
 }: GameRoomScreenProps): React.JSX.Element {
   return (
     <ScrollView
       backgroundColor="$background"
       contentContainerStyle={{
-        padding: PAGE_PADDING,
+        paddingHorizontal: PAGE_PADDING,
+        paddingTop: PAGE_PADDING + topInset,
         paddingBottom: 48,
         gap: SECTION_GAP,
       }}

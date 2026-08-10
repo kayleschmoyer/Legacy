@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 import { Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getExpoPushTokenAsync } from 'expo-notifications';
 import { LOGGER } from '@legacy-sports/logging';
 import {
@@ -84,6 +85,7 @@ function MenuRow({
 
 export default function YouTab(): React.JSX.Element {
   const router = useRouter();
+  const { top: topInset } = useSafeAreaInsets();
   const { logout } = useAuthHandlers();
   const [disableDeviceToken] = useDisableDeviceTokenMutation();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -124,7 +126,10 @@ export default function YouTab(): React.JSX.Element {
       <YStack backgroundColor="$background" minHeight="100%">
         <YStack
           paddingHorizontal="$5"
-          paddingTop="$6"
+          // Screens own their status-bar clearance since the back bar was
+          // removed in LS-8766; $6 (24px) plus the inset keeps the existing
+          // visual gap below the status bar instead of flush against it.
+          paddingTop={topInset + 24}
           paddingBottom="$4"
           gap="$1"
         >
