@@ -3,4 +3,5 @@
 export * from './chrome';
 export * from './constants';
 export * from './LeagueCreateWizard';
+export * from './RosterPositionsEditor';
 export * from './validation';

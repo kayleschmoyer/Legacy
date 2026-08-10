@@ -151,7 +151,26 @@ export const FOOTBALL_ROSTER_SLOT_LABELS: Record<string, string> = {
   LB: 'Linebacker',
   DB: 'Defensive Back',
   BN: 'Bench',
+  SFLEX: 'Superflex (QB/RB/WR/TE)',
+  KP: 'Kicker/Punter',
 };
+
+/**
+ * Premium-gated roster slot types (LS-9108, inherited from LS-6151): Superflex
+ * and a combined Kicker/Punter slot. Deliberately excluded from
+ * `FOOTBALL_ROSTER_SLOTS_BY_DEFENSIVE_FORMAT` / `..._DEFAULTS_BY_...` above —
+ * those two stay the ungated base slot set so non-premium behavior is
+ * unchanged (AC3) — `RosterPositionsEditor` renders these as an additional,
+ * separately-gated section.
+ *
+ * `SFLEX` already exists end-to-end on the server (`position_slot` enum);
+ * `KP` is a placeholder key for the DB enum value LS-9107 has not added yet —
+ * reconcile against the real value once LS-9107 merges.
+ */
+export const PREMIUM_FOOTBALL_ROSTER_SLOTS = ['SFLEX', 'KP'] as const;
+
+export type PremiumFootballRosterSlot =
+  (typeof PREMIUM_FOOTBALL_ROSTER_SLOTS)[number];
 
 export const FOOTBALL_ROSTER_SLOTS_BY_DEFENSIVE_FORMAT: Record<
   DefensiveFormatChoice,
