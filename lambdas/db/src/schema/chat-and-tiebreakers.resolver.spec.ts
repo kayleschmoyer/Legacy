@@ -138,6 +138,7 @@ describe('Chat and Tiebreakers Resolver', () => {
           messageType: 'messageType',
           gifUrl: 'gifUrl',
           metadata: 'metadata',
+          mentionedUserIds: 'mentionedUserIds',
         },
         directMessages: {
           id: 'id',
@@ -585,6 +586,170 @@ describe('Chat and Tiebreakers Resolver', () => {
       )) as Record<string, unknown>;
 
       expect(result).toMatchObject({ leagueId: 1, userId: 1 });
+    });
+
+    // ── @mentions (LS-9216) ──────────────────────────────────────────────
+
+    it('resolves an @TeamName mention to the managing user id and persists it', async () => {
+      const msg = makeLeagueMsg({ mentionedUserIds: [2] });
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([
+          { name: 'Wolfpack', managerId: 2 },
+          { name: 'Bears', managerId: 3 },
+        ]),
+      );
+      mockDb.returning.mockResolvedValueOnce([msg]);
+
+      const resolver = getMutation('sendLeagueMessage');
+      const result = (await resolver(
+        {},
+        { leagueId: 1, messageText: 'hi @Wolfpack, good luck this week' },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({ mentionedUserIds: [2] }),
+      );
+      expect(result).toMatchObject({ mentionedUserIds: [2] });
+    });
+
+    it('does not treat an unmatched @token as a mention', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([{ name: 'Wolfpack', managerId: 2 }]),
+      );
+      mockDb.returning.mockResolvedValueOnce([makeLeagueMsg()]);
+
+      const resolver = getMutation('sendLeagueMessage');
+      await resolver(
+        {},
+        { leagueId: 1, messageText: 'hi @randomguy' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({ mentionedUserIds: null }),
+      );
+    });
+
+    it('prefers the longer team name when one is a prefix of another', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([
+          { name: 'Bears', managerId: 2 },
+          { name: 'Bears United', managerId: 3 },
+        ]),
+      );
+      mockDb.returning.mockResolvedValueOnce([makeLeagueMsg()]);
+
+      const resolver = getMutation('sendLeagueMessage');
+      await resolver(
+        {},
+        { leagueId: 1, messageText: 'go @Bears United' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({ mentionedUserIds: [3] }),
+      );
+    });
+
+    it('push-notifies a mentioned user who is not viewing the league', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([{ name: 'Wolfpack', managerId: 2 }]),
+      );
+      mockDb.returning.mockResolvedValueOnce([
+        makeLeagueMsg({ mentionedUserIds: [2] }),
+      ]);
+
+      const publish = jest.fn().mockResolvedValue(undefined);
+      const isUserViewingLeague = jest.fn().mockResolvedValue(false);
+      mockContext.notificationPublisher = { publish };
+      mockContext.notificationService = {
+        notifyLeagueChatMessage: jest.fn().mockResolvedValue(undefined),
+        isUserViewingLeague,
+      };
+
+      const resolver = getMutation('sendLeagueMessage');
+      await resolver(
+        {},
+        { leagueId: 1, messageText: 'hi @Wolfpack' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(isUserViewingLeague).toHaveBeenCalledWith(2, 1);
+      expect(publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 2,
+          notificationType: 'LEAGUE_CHAT_MENTION',
+          data: { leagueId: 1, messageId: 1 },
+        }),
+      );
+
+      delete mockContext.notificationPublisher;
+      delete mockContext.notificationService;
+    });
+
+    it('does not push-notify a mentioned user who is actively viewing the league', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.then.mockImplementationOnce((resolve: (v: unknown) => void) =>
+        resolve([{ name: 'Wolfpack', managerId: 2 }]),
+      );
+      mockDb.returning.mockResolvedValueOnce([
+        makeLeagueMsg({ mentionedUserIds: [2] }),
+      ]);
+
+      const publish = jest.fn().mockResolvedValue(undefined);
+      mockContext.notificationPublisher = { publish };
+      mockContext.notificationService = {
+        notifyLeagueChatMessage: jest.fn().mockResolvedValue(undefined),
+        isUserViewingLeague: jest.fn().mockResolvedValue(true),
+      };
+
+      const resolver = getMutation('sendLeagueMessage');
+      await resolver(
+        {},
+        { leagueId: 1, messageText: 'hi @Wolfpack' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(publish).not.toHaveBeenCalled();
+
+      delete mockContext.notificationPublisher;
+      delete mockContext.notificationService;
+    });
+
+    it('does not push-notify the sender when they mention their own team', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.then.mockImplementationOnce(
+        (resolve: (v: unknown) => void) =>
+          resolve([{ name: 'MyTeam', managerId: 1 }]), // sender's own team
+      );
+      mockDb.returning.mockResolvedValueOnce([
+        makeLeagueMsg({ mentionedUserIds: [1] }),
+      ]);
+
+      const publish = jest.fn().mockResolvedValue(undefined);
+      mockContext.notificationPublisher = { publish };
+
+      const resolver = getMutation('sendLeagueMessage');
+      await resolver(
+        {},
+        { leagueId: 1, messageText: 'go @MyTeam' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(publish).not.toHaveBeenCalled();
+
+      delete mockContext.notificationPublisher;
     });
   });
 

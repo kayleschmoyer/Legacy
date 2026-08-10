@@ -326,6 +326,8 @@ export const leagueMessages = pgTable(
     metadata: jsonb('metadata').$type<Record<string, unknown>>(),
     /** URL of GIF attachment; null for text messages */
     gifUrl: text('gif_url'),
+    /** User ids @mentioned in this message, resolved server-side from `@TeamName` tokens (LS-9216). Null when no mentions. */
+    mentionedUserIds: jsonb('mentioned_user_ids').$type<number[]>(),
   },
   (table) => {
     return {

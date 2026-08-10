@@ -1762,6 +1762,11 @@ type LeagueChatMessage {
   gifUrl: String
   id: ID
   leagueId: Int
+
+  """
+  User ids @mentioned in this message (LS-9216)
+  """
+  mentionedUserIds: [Int!]
   messageText: String
   messageType: String
   metadata: String

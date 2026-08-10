@@ -44,6 +44,45 @@ function toUtcIso(pgTs: string): string {
   return new Date(normalized + 'Z').toISOString();
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Resolve `@TeamName` tokens in a league chat message to the mentioned
+ * team(s)' managing user id(s) (LS-9216). Mirrors the client's
+ * `splitMentions` highlighting algorithm (LS-9097, `apps/app/.../mentions.ts`)
+ * so a message renders/persists mentions consistently: longest team name
+ * first (so "Bears" can't shadow "Bears United"), matched literally with a
+ * trailing word boundary. Resolution happens here — at send time, against
+ * the roster as it exists right now — rather than trusting a client-supplied
+ * id list or re-parsing on every read, since team names are user-editable.
+ */
+function resolveMentionedManagerIds(
+  text: string,
+  teams: Array<{ name: string | null; managerId: number | null }>,
+): number[] {
+  const byName = new Map<string, number>();
+  for (const team of teams) {
+    if (team.name && team.managerId != null) {
+      byName.set(team.name, team.managerId);
+    }
+  }
+  if (byName.size === 0) return [];
+
+  const sortedNames = [...byName.keys()].sort((a, b) => b.length - a.length);
+  const pattern = sortedNames.map(escapeRegExp).join('|');
+  const regex = new RegExp(`@(${pattern})\\b`, 'g');
+
+  const managerIds = new Set<number>();
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    const managerId = byName.get(match[1]);
+    if (managerId != null) managerIds.add(managerId);
+  }
+  return [...managerIds];
+}
+
 // ============================================================================
 // ENUMS
 // ============================================================================
@@ -295,6 +334,7 @@ const LeagueChatMessage = builder.objectRef<{
   messageType: string;
   metadata: Record<string, unknown> | null;
   gifUrl: string | null;
+  mentionedUserIds: number[] | null;
 }>('LeagueChatMessage');
 
 builder.objectType(LeagueChatMessage, {
@@ -316,6 +356,10 @@ builder.objectType(LeagueChatMessage, {
       type: 'String',
       nullable: true,
       resolve: (msg) => (msg.metadata ? JSON.stringify(msg.metadata) : null),
+    }),
+    mentionedUserIds: t.exposeIntList('mentionedUserIds', {
+      nullable: true,
+      description: 'User ids @mentioned in this message (LS-9216)',
     }),
     sender: t.field({
       type: 'User',
@@ -651,6 +695,7 @@ builder.queryField('getLeagueMessages', (t) =>
         messageType: msg.messageType ?? 'text',
         gifUrl: msg.gifUrl ?? null,
         metadata: msg.metadata ?? null,
+        mentionedUserIds: msg.mentionedUserIds ?? null,
       }));
     },
   }),
@@ -849,6 +894,31 @@ builder.mutationField('sendLeagueMessage', (t) =>
         throw ForbiddenError('Not a member of this league');
       }
 
+      // Resolve @mentions (LS-9216): derive the mentioned team(s)' managing
+      // user id(s) server-side from `@TeamName` tokens against the current
+      // roster, rather than trusting a client-supplied id list — see
+      // resolveMentionedManagerIds doc comment. Skip the roster query
+      // entirely when the text has no `@` — the common case.
+      let mentionedManagerIds: number[] = [];
+      if (text.includes('@')) {
+        const teams = await context.db
+          .select({
+            name: PublicSchema.teams.name,
+            managerId: PublicSchema.leagueMembers.userId,
+          })
+          .from(PublicSchema.teams)
+          .leftJoin(
+            PublicSchema.leagueMembers,
+            and(
+              eq(PublicSchema.leagueMembers.teamId, PublicSchema.teams.id),
+              eq(PublicSchema.leagueMembers.leagueId, args.leagueId),
+            ),
+          )
+          .where(eq(PublicSchema.teams.leagueId, args.leagueId));
+
+        mentionedManagerIds = resolveMentionedManagerIds(text, teams);
+      }
+
       // Persist the message
       const rows = await context.db
         .insert(PublicSchema.leagueMessages)
@@ -858,6 +928,8 @@ builder.mutationField('sendLeagueMessage', (t) =>
           messageText: text,
           messageType: gifUrl ? 'gif' : 'text',
           gifUrl: gifUrl,
+          mentionedUserIds:
+            mentionedManagerIds.length > 0 ? mentionedManagerIds : null,
         })
         .returning();
 
@@ -887,6 +959,42 @@ builder.mutationField('sendLeagueMessage', (t) =>
         }
       }
 
+      // Push-notify mentioned users who aren't actively viewing the league
+      // chat (LS-9216, AC2). Skips the sender (mentioning your own team is
+      // a no-op notification target). Best-effort: a failure here never
+      // blocks the mutation response.
+      const senderId = context.user.id;
+      const senderUsername = context.user.username ?? `user_${senderId}`;
+      const mentionRecipientIds = mentionedManagerIds.filter(
+        (id) => id !== senderId,
+      );
+      if (mentionRecipientIds.length > 0 && context.notificationPublisher) {
+        for (const recipientId of mentionRecipientIds) {
+          try {
+            const isViewing = notificationService
+              ? await notificationService.isUserViewingLeague(
+                  recipientId,
+                  args.leagueId,
+                )
+              : false;
+            if (isViewing) continue;
+
+            await context.notificationPublisher.publish({
+              userId: recipientId,
+              notificationType: 'LEAGUE_CHAT_MENTION',
+              title: 'You were mentioned',
+              body: `${senderUsername} mentioned you in league chat`,
+              data: { leagueId: args.leagueId, messageId: msg.id },
+            });
+          } catch (err: unknown) {
+            LOGGER.warn(
+              'Failed to send league chat mention push notification (non-fatal)',
+              { err, recipientId, messageId: msg.id },
+            );
+          }
+        }
+      }
+
       return {
         id: msg.id,
         leagueId: msg.leagueId,
@@ -896,6 +1004,7 @@ builder.mutationField('sendLeagueMessage', (t) =>
         messageType: msg.messageType ?? 'text',
         gifUrl: msg.gifUrl ?? null,
         metadata: null,
+        mentionedUserIds: msg.mentionedUserIds ?? null,
       };
     },
   }),
@@ -954,6 +1063,7 @@ builder.queryField('getLeagueAnnouncements', (t) =>
         messageType: msg.messageType ?? 'announcement',
         gifUrl: msg.gifUrl ?? null,
         metadata: msg.metadata ?? null,
+        mentionedUserIds: msg.mentionedUserIds ?? null,
       }));
     },
   }),
@@ -1051,6 +1161,7 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
         messageType: 'announcement',
         gifUrl: null,
         metadata: null,
+        mentionedUserIds: null,
       };
     },
   }),
@@ -1133,6 +1244,7 @@ builder.mutationField('updateLeagueAnnouncement', (t) =>
         messageType: 'announcement',
         gifUrl: null,
         metadata: null,
+        mentionedUserIds: null,
       };
     },
   }),

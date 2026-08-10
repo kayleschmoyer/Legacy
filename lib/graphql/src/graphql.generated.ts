@@ -1527,6 +1527,8 @@ export type LeagueChatMessage = {
   gifUrl?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** User ids @mentioned in this message (LS-9216) */
+  mentionedUserIds?: Maybe<Array<Scalars['Int']['output']>>;
   messageText?: Maybe<Scalars['String']['output']>;
   messageType?: Maybe<Scalars['String']['output']>;
   metadata?: Maybe<Scalars['String']['output']>;

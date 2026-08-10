@@ -973,6 +973,46 @@ export class WebSocketNotificationService {
   }
 
   /**
+   * Check whether a user currently has an active WebSocket connection to a
+   * league's chat (i.e. is on the league page, not drilled into a specific
+   * matchup — there is no dedicated chat-tab `viewContext` today, so this
+   * mirrors the recipient set `notifyLeagueChatMessage` already broadcasts
+   * to). Used to skip a push notification for a mention when the mentioned
+   * user would already see the message arrive over the socket (LS-9216).
+   *
+   * Queries the same `UserIdIndex` GSI as `getUserConnections`.
+   */
+  async isUserViewingLeague(
+    userId: number,
+    leagueId: number,
+  ): Promise<boolean> {
+    try {
+      const items = await this.queryAllPages({
+        TableName: this.connectionsTableName,
+        IndexName: 'UserIdIndex',
+        KeyConditionExpression: 'userId = :userId',
+        FilterExpression:
+          'leagueId = :leagueId AND (attribute_not_exists(viewContext) OR viewContext <> :matchupContext)',
+        ExpressionAttributeValues: {
+          ':userId': { N: userId.toString() },
+          ':leagueId': { N: leagueId.toString() },
+          ':matchupContext': { S: 'matchup' },
+        },
+        ProjectionExpression: 'connectionId',
+      });
+
+      return items.length > 0;
+    } catch (error) {
+      LOGGER.error('Error checking user league presence', {
+        error,
+        userId,
+        leagueId,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Broadcast a new league chat message to all connected league members.
    *
    * @param leagueId - The league whose members should be notified.

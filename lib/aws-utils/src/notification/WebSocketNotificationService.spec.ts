@@ -193,6 +193,48 @@ describe('WebSocketNotificationService — DynamoDB pagination', () => {
     });
   });
 
+  describe('isUserViewingLeague (LS-9216)', () => {
+    it('queries the UserIdIndex filtered by leagueId and non-matchup viewContext', async () => {
+      mockDynamoSend.mockResolvedValueOnce({
+        Items: makeConnectionItems(['c1']),
+      });
+
+      const result = await service.isUserViewingLeague(123, 42);
+
+      expect(result).toBe(true);
+      const queryCalls = getDynamoCalls().filter((c) => c._type === 'Query');
+      expect(queryCalls).toHaveLength(1);
+      expect(queryCalls[0].input.IndexName).toBe('UserIdIndex');
+      expect(
+        (
+          queryCalls[0].input as unknown as {
+            FilterExpression: string;
+            ExpressionAttributeValues: Record<string, unknown>;
+          }
+        ).FilterExpression,
+      ).toContain('leagueId = :leagueId');
+      expect(
+        (
+          queryCalls[0].input as unknown as {
+            ExpressionAttributeValues: Record<string, unknown>;
+          }
+        ).ExpressionAttributeValues,
+      ).toEqual({
+        ':userId': { N: '123' },
+        ':leagueId': { N: '42' },
+        ':matchupContext': { S: 'matchup' },
+      });
+    });
+
+    it('returns false when the user has no matching connections', async () => {
+      mockDynamoSend.mockResolvedValueOnce({ Items: [] });
+
+      const result = await service.isUserViewingLeague(123, 42);
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe('notifyDraftCompleted — published envelope contract (LS-8883)', () => {
     it('broadcasts a DRAFT_COMPLETED envelope filtered to the league via LeagueIdIndex', async () => {
       mockDynamoSend.mockResolvedValueOnce({
