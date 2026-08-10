@@ -268,7 +268,7 @@ lint: ## Run linting on affected projects
 
 lint-fix: ## Run linting with auto-fix on affected projects
 	@$(call echo_blue,Running linters with auto-fix...)
-	pnpm exec nx affected -t lint --fix
+	pnpm exec nx affected -t lint --fix --fix-type=problem,suggestion,layout
 
 lint-workflows: ## Lint GitHub Actions workflow files
 	@$(call echo_blue,Linting GitHub Actions workflows...)
@@ -941,7 +941,7 @@ endif
 _PC_MIGRATION_CMD = node scripts/check-migration-immutability.js --branch
 _PC_SCHEMA_CMD = pnpm exec nx run db:print-schema
 _PC_TYPECHECK_CMD = pnpm exec nx affected -t typecheck --base=$(NX_BASE)
-_PC_LINT_CMD = pnpm exec nx affected -t lint --fix --base=$(NX_BASE)
+_PC_LINT_CMD = pnpm exec nx affected -t lint --fix --fix-type=problem,suggestion,layout --base=$(NX_BASE)
 _PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
 # MAXWORKERS caps Jest worker parallelism (--maxWorkers) across every affected
 # project's test run, forwarded to nx via the trailing `-- --maxWorkers=N`
@@ -1060,7 +1060,7 @@ pc-build: ## pc step 9: build affected projects
 quick-check: ## Quick validation (typecheck + lint only)
 	@$(call echo_blue,Running quick checks...)
 	@pnpm exec nx affected -t typecheck --base=$(NX_BASE)
-	@pnpm exec nx affected -t lint --fix --base=$(NX_BASE)
+	@pnpm exec nx affected -t lint --fix --fix-type=problem,suggestion,layout --base=$(NX_BASE)
 	@$(call echo_green,✓ Quick checks passed!)
 
 # Agent workflow automation scripts
