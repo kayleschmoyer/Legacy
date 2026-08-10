@@ -502,7 +502,7 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_dispatch_workflow',
-    'Trigger a GitHub Actions workflow_dispatch event. Accepts workflow file name (e.g. "deploy.yml") or numeric ID, plus optional ref and input parameters. ' +
+    'Trigger a GitHub Actions workflow_dispatch event. Accepts a workflow file name (e.g. "deploy.yml"), numeric ID, or display name (e.g. "Legacy Sports CI Orchestrator") — resolved the same way as ci_list_runs, plus optional ref and input parameters. ' +
       "Set waitForCompletion: true to wait for the run (bounded at ~20s per call to stay under this Lambda-hosted server's own 30s execution timeout): fast runs return the final conclusion in one call; " +
       'longer runs return { status: "in_progress", runId } — continue with ci_wait_run({ runId }), never by re-dispatching. ' +
       'This is the MCP-native alternative to `gh run watch` for non-PR dispatched runs — avoids the shell fallback and session-resume watcher-death problem. ' +

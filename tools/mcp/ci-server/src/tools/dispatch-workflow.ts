@@ -1,5 +1,6 @@
 import { githubGet, githubPost } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+import { resolveWorkflowId } from './list-runs.js';
 import { waitRunHint } from './wait-run.js';
 
 // Hard per-call ceiling. This server runs on a Lambda whose configured
@@ -172,7 +173,11 @@ export async function dispatchWorkflow(
       body.inputs = params.inputs;
     }
 
-    const workflow = String(params.workflow);
+    // Resolve display names (e.g. "Legacy Sports CI Orchestrator") to the
+    // filename/numeric ID the dispatch endpoint actually accepts, the same
+    // way ci_list_runs does — otherwise a display name that works for every
+    // sibling tool 404s here with no hint why (LS-9230).
+    const workflow = await resolveWorkflowId(String(params.workflow));
     const ref = String(body.ref);
 
     if (OIDC_PLAN_ROLE_MAIN_ONLY_WORKFLOWS.has(workflow) && isNonMainRef(ref)) {

@@ -73,6 +73,55 @@ describe('dispatchWorkflow', () => {
     expect(result.content[0].text).not.toContain('ci_rerun_failed_jobs');
   });
 
+  describe('display-name resolution (LS-9230)', () => {
+    it('resolves a display name to its filename before dispatching, the same way ci_list_runs does', async () => {
+      mockGithubGet.mockResolvedValue({
+        total_count: 1,
+        workflows: [
+          {
+            id: 123,
+            name: 'Legacy Sports CI Orchestrator',
+            path: '.github/workflows/ci-orchestrator.yml',
+          },
+        ],
+      });
+      mockGithubPost.mockResolvedValue(undefined);
+
+      const result = await dispatchWorkflow({
+        workflow: 'Legacy Sports CI Orchestrator',
+        ref: 'my-branch',
+      });
+
+      expect(mockGithubPost).toHaveBeenCalledWith(
+        '/actions/workflows/ci-orchestrator.yml/dispatches',
+        { ref: 'my-branch' },
+      );
+      expect(result.isError).toBeUndefined();
+    });
+
+    it('surfaces the resolver "no workflow found" error without ever calling dispatch', async () => {
+      mockGithubGet.mockResolvedValue({
+        total_count: 1,
+        workflows: [
+          {
+            id: 1,
+            name: 'Some Other Workflow',
+            path: '.github/workflows/other.yml',
+          },
+        ],
+      });
+
+      const result = await dispatchWorkflow({
+        workflow: 'Totally Unknown Workflow',
+        ref: 'my-branch',
+      });
+
+      expect(mockGithubPost).not.toHaveBeenCalled();
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('No workflow found with name');
+    });
+  });
+
   describe('OIDC plan-role main-only workflows (LS-9029)', () => {
     it('fails fast without dispatching when ref is a non-main branch', async () => {
       const result = await dispatchWorkflow({
