@@ -12,11 +12,14 @@ mutation CreateLeagueAndTeams($input: CreateLeagueAndTeamsInput!) {
   }
 }
 
-query GetUserLeagues {
-  userLeagues {
+query GetUserLeagues($limit: Int, $cursor: String) {
+  userLeagues(limit: $limit, cursor: $cursor) {
     ...League
     ...AppLeague
   }
+  # Authoritative, unpaginated total (LS-9101) — the free-tier league-cap gate
+  # must read this instead of userLeagues.length, which is bounded by $limit.
+  userLeagueCount
 }
 
 query GetMyLeagues($sport: Sport) {
@@ -24,6 +27,9 @@ query GetMyLeagues($sport: Sport) {
     ...League
     ...AppLeague
   }
+  # Same authoritative total as GetUserLeagues — the cap is global across
+  # sports, so the sport-filtered myLeagues list can't be used to derive it.
+  userLeagueCount
 }
 
 mutation DeleteAllLeagues($systemWide: Boolean) {

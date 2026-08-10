@@ -92,7 +92,10 @@ export function BaseballScreen() {
     auth.isLoading || (!!auth.user && (loading || (!data && !error)));
 
   // Count all leagues across sports — the backend cap is global (LS-5804).
-  const activeLeagueCount = (data?.userLeagues ?? []).filter(Boolean).length;
+  // `userLeagues` is now paginated (LS-9101), so the authoritative,
+  // unpaginated `userLeagueCount` must be used instead of array length once a
+  // user has more leagues than the page size.
+  const activeLeagueCount = data?.userLeagueCount ?? 0;
   // Only show the cap indicator (and upgrade CTA) for authenticated non-premium
   // users once we know their subscription status. Mirrors the native guard in
   // baseball/index.tsx (showLeagueCap).

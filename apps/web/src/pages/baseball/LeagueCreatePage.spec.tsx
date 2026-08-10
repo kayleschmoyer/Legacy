@@ -299,6 +299,10 @@ jest.mock('tamagui', () => {
 
 const mockCreateLeague = jest.fn();
 let mockLeagueCount = 0;
+// Authoritative total (LS-9101). Defaults to mockLeagueCount so existing
+// tests (small counts, well under the pagination page size) are unaffected;
+// tests exercising pagination override it independently of the array length.
+let mockUserLeagueCount: number | undefined;
 jest.mock('@legacy-sports/graphql', () => ({
   GetUserLeagues: 'GetUserLeagues',
   Sport: { Baseball: 'baseball', Football: 'football' },
@@ -312,6 +316,7 @@ jest.mock('@legacy-sports/graphql', () => ({
         id: i + 1,
         name: `League ${i + 1}`,
       })),
+      userLeagueCount: mockUserLeagueCount ?? mockLeagueCount,
     },
   })),
   usePreviewEligiblePlayerCountQuery: jest.fn(() => ({
@@ -374,8 +379,19 @@ describe('LeagueCreatePage — free league limit (LS-5012)', () => {
     jest.clearAllMocks();
     mockCreateLeague.mockResolvedValue({ data: undefined });
     mockLeagueCount = 0;
+    mockUserLeagueCount = undefined;
     mockIsPremium = false;
     mockIsPremiumLoading = false;
+  });
+
+  it('still shows the limit banner for a power user whose league count exceeds the userLeagues page size (LS-9101)', () => {
+    // userLeagues is server-paginated at 50; a user with 60 leagues gets back
+    // an array of only 50, but userLeagueCount — the authoritative,
+    // unpaginated total — is 60. The banner must key off that total.
+    mockLeagueCount = 50;
+    mockUserLeagueCount = 60;
+    renderPage('/baseball/league/create');
+    expect(screen.getByTestId('league-limit-banner')).toBeInTheDocument();
   });
 
   it('does not show the limit banner when a free user has fewer than 3 leagues', () => {

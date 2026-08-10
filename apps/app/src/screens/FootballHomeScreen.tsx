@@ -29,13 +29,16 @@ export default function FootballHomeScreen() {
 
   // Count all leagues (all sports) against the free-tier cap — mirrors the
   // backend's setActiveLeagues enforcement and the baseball home pattern.
+  // `userLeagues` is paginated (LS-9101); `userLeagueCount` is the
+  // authoritative, unpaginated total and must be used for the cap gate so it
+  // stays correct once a user has more leagues than the page size.
   const userLeagues = data?.userLeagues;
-  const rawLeagues = userLeagues ?? [];
   const leaguesLoadFailed = !loading && userLeagues == null;
   const leaguesLoaded = !loading && !leaguesLoadFailed;
   const showLeagueCap = !subscriptionLoading && !isPremium && leaguesLoaded;
+  const activeLeagueCount = data?.userLeagueCount ?? 0;
   const atFreeLeagueLimit =
-    showLeagueCap && rawLeagues.length >= FREE_TIER_LEAGUE_LIMIT;
+    showLeagueCap && activeLeagueCount >= FREE_TIER_LEAGUE_LIMIT;
 
   type LeagueWithId = NonNullable<
     NonNullable<typeof data>['userLeagues'][number]

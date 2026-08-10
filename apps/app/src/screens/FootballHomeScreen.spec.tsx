@@ -150,7 +150,10 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
     jest.clearAllMocks();
     mockUseAuthorizedUserInfo.mockReturnValue({ id: 1, username: 'testuser' });
     mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: FOOTBALL_LEAGUES },
+      data: {
+        userLeagues: FOOTBALL_LEAGUES,
+        userLeagueCount: FOOTBALL_LEAGUES.length,
+      },
       loading: false,
     });
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
@@ -170,7 +173,10 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
 
   it('includes null-sport (legacy/un-migrated) leagues (FBH-001)', () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: [...FOOTBALL_LEAGUES, NULL_SPORT_LEAGUE] },
+      data: {
+        userLeagues: [...FOOTBALL_LEAGUES, NULL_SPORT_LEAGUE],
+        userLeagueCount: FOOTBALL_LEAGUES.length + 1,
+      },
       loading: false,
     });
     render(<FootballHomeScreen />);
@@ -185,6 +191,7 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: {
         userLeagues: [...FOOTBALL_LEAGUES, BASEBALL_LEAGUE, NULL_SPORT_LEAGUE],
+        userLeagueCount: FOOTBALL_LEAGUES.length + 2,
       },
       loading: false,
     });
@@ -218,6 +225,7 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
               weekAdvanceStatus: null,
             },
           ],
+          userLeagueCount: 3,
         },
         loading: false,
       });
@@ -230,12 +238,38 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
     it('counts all leagues (all sports) against the cap', () => {
       // 2 football + 1 baseball = 3 total → at cap (LS-5025)
       mockUseGetUserLeaguesQuery.mockReturnValue({
-        data: { userLeagues: [...FOOTBALL_LEAGUES, BASEBALL_LEAGUE] },
+        data: {
+          userLeagues: [...FOOTBALL_LEAGUES, BASEBALL_LEAGUE],
+          userLeagueCount: 3,
+        },
         loading: false,
       });
       render(<FootballHomeScreen />);
       fireEvent.press(screen.getByTestId('create'));
       expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
+    });
+
+    it('still gates a power user whose league count exceeds the userLeagues page size (LS-9101)', () => {
+      // userLeagues is server-paginated at 50; a user with 60 leagues gets
+      // back an array of only 50, but userLeagueCount — the authoritative,
+      // unpaginated total — is 60. The gate must read that total, not the
+      // truncated array's length.
+      const fiftyLeagues = Array.from({ length: 50 }, (_, i) => ({
+        id: i + 1,
+        name: `League ${i + 1}`,
+        sport: 'football',
+        draftStatus: null,
+        currentWeekNumber: null,
+        weekAdvanceStatus: null,
+      }));
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: { userLeagues: fiftyLeagues, userLeagueCount: 60 },
+        loading: false,
+      });
+      render(<FootballHomeScreen />);
+      fireEvent.press(screen.getByTestId('create'));
+      expect(mockNavigate).toHaveBeenCalledWith('subscription-settings');
+      expect(mockPush).not.toHaveBeenCalledWith('/football/league/create');
     });
 
     it('allows create for premium users even at 3+ leagues', () => {
@@ -261,6 +295,7 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
               weekAdvanceStatus: null,
             },
           ],
+          userLeagueCount: 4,
         },
         loading: false,
       });
@@ -285,6 +320,7 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
               weekAdvanceStatus: null,
             },
           ],
+          userLeagueCount: 3,
         },
         loading: false,
       });
@@ -319,6 +355,7 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
               weekAdvanceStatus: null,
             },
           ],
+          userLeagueCount: 3,
         },
         loading: false,
       });

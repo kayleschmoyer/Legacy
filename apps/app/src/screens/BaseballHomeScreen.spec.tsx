@@ -230,7 +230,7 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
     jest.clearAllMocks();
     mockUseAuthorizedUserInfo.mockReturnValue({ id: 1, username: 'testuser' });
     mockUseGetMyLeaguesQuery.mockReturnValue({
-      data: { myLeagues: MOCK_LEAGUES },
+      data: { myLeagues: MOCK_LEAGUES, userLeagueCount: MOCK_LEAGUES.length },
       loading: false,
     });
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
@@ -299,6 +299,7 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
             ...MOCK_LEAGUES,
             { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
+          userLeagueCount: 3,
         },
         loading: false,
       });
@@ -335,6 +336,7 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
             ...MOCK_LEAGUES,
             { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
+          userLeagueCount: 3,
         },
         loading: false,
       });
@@ -353,11 +355,30 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
             ...MOCK_LEAGUES,
             { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
+          userLeagueCount: 3,
         },
         loading: false,
       });
       render(<BaseballHomeScreen />);
       expect(screen.getByText('cap:3/3:true')).toBeTruthy();
+    });
+
+    it('still gates a power user whose league count exceeds the myLeagues page size (LS-9101)', () => {
+      // myLeagues is server-paginated at 50; a user with 60 leagues gets back
+      // an array of only 50, but userLeagueCount — the authoritative,
+      // unpaginated, all-sport total — is 60. The gate must read that total.
+      const fiftyLeagues = Array.from({ length: 50 }, (_, i) => ({
+        id: i + 1,
+        name: `League ${i + 1}`,
+        inviteCode: `C${i + 1}`,
+        sport: 'baseball',
+      }));
+      mockUseGetMyLeaguesQuery.mockReturnValue({
+        data: { myLeagues: fiftyLeagues, userLeagueCount: 60 },
+        loading: false,
+      });
+      render(<BaseballHomeScreen />);
+      expect(screen.getByText('cap:60/3:true')).toBeTruthy();
     });
   });
 
@@ -369,6 +390,7 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
             ...MOCK_LEAGUES,
             { id: 3, name: 'Third', inviteCode: 'C3', sport: 'baseball' },
           ],
+          userLeagueCount: 3,
         },
         loading: false,
       });

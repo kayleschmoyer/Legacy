@@ -20,7 +20,7 @@ interface MLBHomeHarnessProps {
   onCreateLeague: (input: Record<string, unknown>) => Promise<void>;
 }
 interface LeaguesQueryResult {
-  data?: { userLeagues: HarnessLeague[] };
+  data?: { userLeagues: HarnessLeague[]; userLeagueCount?: number };
   loading: boolean;
   error?: Error;
   refetch: () => void;
@@ -328,7 +328,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5817)', () 
 
   it('does not set atLimit when user is below the cap', () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: leaguesOfCount(2) },
+      data: { userLeagues: leaguesOfCount(2), userLeagueCount: 2 },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -339,7 +339,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5817)', () 
 
   it('sets atLimit when free user reaches the cap and upgrade CTA navigates to /pricing (LS-5817)', () => {
     mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: leaguesOfCount(3) },
+      data: { userLeagues: leaguesOfCount(3), userLeagueCount: 3 },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -356,7 +356,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5817)', () 
       isLoading: false,
     });
     mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: leaguesOfCount(5) },
+      data: { userLeagues: leaguesOfCount(5), userLeagueCount: 5 },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -371,7 +371,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5817)', () 
       isLoading: true,
     });
     mockUseGetUserLeaguesQuery.mockReturnValue({
-      data: { userLeagues: leaguesOfCount(4) },
+      data: { userLeagues: leaguesOfCount(4), userLeagueCount: 4 },
       loading: false,
       error: undefined,
       refetch: mockRefetch,
@@ -388,6 +388,7 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5817)', () 
           { id: 2, name: 'Baseball B' },
           { id: 3, name: 'Baseball C' },
         ],
+        userLeagueCount: 3,
       },
       loading: false,
       error: undefined,
@@ -396,5 +397,19 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5817)', () 
     render(<BaseballScreen />);
     expect(screen.getByTestId('at-limit').textContent).toBe('true');
     expect(screen.getByText('upgrade')).toBeInTheDocument();
+  });
+
+  it('still sets atLimit for a power user whose league count exceeds the userLeagues page size (LS-9101)', () => {
+    // userLeagues is server-paginated at 50; a user with 60 leagues gets back
+    // an array of only 50, but userLeagueCount — the authoritative,
+    // unpaginated total — is 60. The gate must read that total.
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: { userLeagues: leaguesOfCount(50), userLeagueCount: 60 },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+    render(<BaseballScreen />);
+    expect(screen.getByTestId('at-limit').textContent).toBe('true');
   });
 });

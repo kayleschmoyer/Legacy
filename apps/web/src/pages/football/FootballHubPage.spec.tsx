@@ -76,9 +76,16 @@ function leaguesOfCount(n: number, sport = 'football'): StubLeague[] {
   }));
 }
 
-function setLeagues(userLeagues: StubLeague[]) {
+// `userLeagueCount` defaults to the array length so existing callers of this
+// helper (which pass fewer leagues than the page size) keep working
+// unchanged; tests exercising pagination pass an explicit `userLeagueCount`
+// that diverges from `userLeagues.length` (LS-9101).
+function setLeagues(userLeagues: StubLeague[], userLeagueCount?: number) {
   mockUseGetUserLeaguesQuery.mockReturnValue({
-    data: { userLeagues },
+    data: {
+      userLeagues,
+      userLeagueCount: userLeagueCount ?? userLeagues.length,
+    },
     loading: false,
     error: undefined,
   } as ReturnType<typeof useGetUserLeaguesQuery>);
@@ -166,6 +173,22 @@ describe('FootballHubPage — free-tier league cap gating (LS-5184)', () => {
   it('counts leagues across all sports toward the cap', () => {
     // 2 baseball + 1 football = 3 total → at cap even though only 1 is football.
     setLeagues([...leaguesOfCount(2, 'baseball'), ...leaguesOfCount(1)]);
+
+    render(<FootballHubPage />);
+    fireEvent.click(screen.getByTestId('create-league-button'));
+
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument();
+  });
+
+  it('still gates a power user whose league count exceeds the userLeagues page size (LS-9101)', () => {
+    // userLeagues is server-paginated at 50 (see userLeagues resolver); a user
+    // with 60 leagues gets back an array of only 50, but userLeagueCount — the
+    // authoritative, unpaginated total — is 60. The cap must be derived from
+    // that total, not from the truncated array's length (which is 50, itself
+    // >= the cap, but would mask the bug if the gate ever regressed to reading
+    // array length directly since 50 also happens to be >= 3).
+    setLeagues(leaguesOfCount(50), 60);
 
     render(<FootballHubPage />);
     fireEvent.click(screen.getByTestId('create-league-button'));

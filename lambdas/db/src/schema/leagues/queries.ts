@@ -41,6 +41,23 @@ import {
   UserInputError,
 } from '../graphql-errors';
 
+// Default/maximum page size for userLeagues cursor pagination (LS-9101).
+// 50 matches the pre-existing hard-coded LIMIT (LS-5798) so callers that pass
+// no arguments keep receiving exactly the same page they always have.
+const DEFAULT_USER_LEAGUES_LIMIT = 50;
+const MAX_USER_LEAGUES_LIMIT = 100;
+
+/**
+ * userLeagues paginates via an opaque cursor: a base64-encoded offset into the
+ * createdAt DESC, id DESC ordering. Mirrors the careerBattingStats cursor
+ * encoding in statistics.ts so pagination conventions stay consistent across
+ * resolvers.
+ */
+function decodeUserLeaguesCursor(cursor: string): number {
+  const offset = parseInt(Buffer.from(cursor, 'base64').toString(), 10);
+  return Number.isFinite(offset) && offset > 0 ? offset : 0;
+}
+
 const VALID_PLAYER_POOLS = ['all', 'nl', 'al', 'nfl', 'afc', 'nfc'] as const;
 type ValidPlayerPool = (typeof VALID_PLAYER_POOLS)[number];
 
@@ -258,6 +275,20 @@ builder.queryField('userLeagues', (t) =>
   t.field({
     type: [League],
     nullable: false,
+    args: {
+      // Both optional and additive (LS-9101): omitting them preserves the
+      // exact pre-pagination behaviour (50 most-recent leagues, no cursor),
+      // so every existing caller is unaffected by this change.
+      limit: t.arg.int({
+        required: false,
+        description: `Max leagues to return (default ${DEFAULT_USER_LEAGUES_LIMIT}, capped at ${MAX_USER_LEAGUES_LIMIT}).`,
+      }),
+      cursor: t.arg.string({
+        required: false,
+        description:
+          'Opaque pagination cursor from a previous page — omit for the first page.',
+      }),
+    },
     resolve: async (parent, args, context) => {
       // Check if user is authenticated
       if (!context.user) {
@@ -267,6 +298,12 @@ builder.queryField('userLeagues', (t) =>
       }
 
       const userId = context.user.id;
+      const requestedLimit = args.limit ?? DEFAULT_USER_LEAGUES_LIMIT;
+      const limit = Math.max(
+        1,
+        Math.min(requestedLimit, MAX_USER_LEAGUES_LIMIT),
+      );
+      const offset = args.cursor ? decodeUserLeaguesCursor(args.cursor) : 0;
 
       try {
         const results = await context.db
@@ -320,7 +357,8 @@ builder.queryField('userLeagues', (t) =>
             desc(PublicSchema.leagues.createdAt),
             desc(PublicSchema.leagues.id),
           )
-          .limit(50);
+          .limit(limit)
+          .offset(offset);
 
         return results.map((league) => ({
           id: league.id,
@@ -355,11 +393,60 @@ builder.queryField('userLeagues', (t) =>
           tierFrozenAt: league.tierFrozenAt?.toISOString() ?? null,
         }));
       } catch (error) {
-        LOGGER.error('Failed to fetch user leagues', {
-          userId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        LOGGER.error(
+          'Failed to fetch user leagues',
+          error instanceof Error ? error : new Error(String(error)),
+          { userId },
+        );
         throw new Error('Failed to fetch user leagues');
+      }
+    },
+  }),
+);
+
+// Query field for the authoritative total count of a user's non-mock leagues
+// across every sport (LS-9101). userLeagues is now paginated (default page
+// size 50), so `userLeagues.length` can no longer be trusted as the free-tier
+// league-cap gate's input for users at/above the page size — this field
+// exists specifically so FootballHubPage/FootballHomeScreen/BaseballScreen/
+// BaseballHomeScreen and any other cap-check site can read the true total
+// independent of how large a page they requested.
+builder.queryField('userLeagueCount', (t) =>
+  t.field({
+    type: 'Int',
+    nullable: false,
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to fetch user league count',
+        );
+      }
+
+      const userId = context.user.id;
+
+      try {
+        const result = await context.db
+          .select({ total: count() })
+          .from(PublicSchema.leagues)
+          .innerJoin(
+            PublicSchema.leagueMembers,
+            eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+          )
+          .where(
+            and(
+              eq(PublicSchema.leagueMembers.userId, userId),
+              eq(PublicSchema.leagues.isMockDraft, false),
+            ),
+          );
+
+        return Number(result[0]?.total ?? 0);
+      } catch (error) {
+        LOGGER.error(
+          'Failed to fetch user league count',
+          error instanceof Error ? error : new Error(String(error)),
+          { userId },
+        );
+        throw new Error('Failed to fetch user league count');
       }
     },
   }),

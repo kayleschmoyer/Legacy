@@ -3331,6 +3331,7 @@ export type Query = {
   /** Return earned badges for a user, optionally filtered to a specific league */
   userBadges?: Maybe<Array<UserBadge>>;
   userByEmail?: Maybe<User>;
+  userLeagueCount: Scalars['Int']['output'];
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
   users?: Maybe<Array<User>>;
@@ -3964,6 +3965,11 @@ export type QueryUserBadgesArgs = {
 
 export type QueryUserByEmailArgs = {
   email: Scalars['String']['input'];
+};
+
+export type QueryUserLeaguesArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryUserTeamIdArgs = {

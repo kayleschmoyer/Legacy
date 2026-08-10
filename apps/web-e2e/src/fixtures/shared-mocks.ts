@@ -153,8 +153,11 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
       },
     },
   },
-  getuserleagues: { data: { userLeagues: [] } },
-  getmyleagues: { data: { myLeagues: [] } },
+  // GetUserLeagues also fetches userLeagueCount (LS-9101) — the authoritative
+  // total the free-tier league-cap gate reads instead of userLeagues.length.
+  getuserleagues: { data: { userLeagues: [], userLeagueCount: 0 } },
+  // GetMyLeagues fetches the same userLeagueCount field (LS-9101).
+  getmyleagues: { data: { myLeagues: [], userLeagueCount: 0 } },
   getpublicleagues: { data: { publicLeagues: [] } },
   // ProfileSettingsPage fires MyIdentities on load (useMyIdentitiesQuery, LS-7825).
   // An empty array renders the "No linked providers found." branch cleanly; an

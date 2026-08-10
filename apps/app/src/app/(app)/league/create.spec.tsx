@@ -153,6 +153,10 @@ let mockCreatedLeague: {
 /** Captured so a test can drive the mutation's `onError` handler directly. */
 let mutationOptions: { onError?: (error: unknown) => void } | undefined;
 let mockUserLeagueCount = 0;
+/** Overridable per test — undefined by default, falls back to mockUserLeagueCount.
+ * Lets pagination tests diverge the authoritative total (LS-9101) from the
+ * returned `userLeagues` array length. */
+let mockAuthoritativeLeagueCount: number | undefined;
 /** Overridable per test — undefined by default (query succeeds). */
 let mockUserLeaguesQueryError: unknown;
 jest.mock('@legacy-sports/graphql', () => ({
@@ -163,6 +167,7 @@ jest.mock('@legacy-sports/graphql', () => ({
       userLeagues: Array.from({ length: mockUserLeagueCount }, (_, i) => ({
         id: i,
       })),
+      userLeagueCount: mockAuthoritativeLeagueCount ?? mockUserLeagueCount,
     },
     error: mockUserLeaguesQueryError,
   }),
@@ -241,6 +246,7 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
     mockCreateLeagueState.error = undefined;
     mockCreatedLeague = { id: 42, name: 'Test League', inviteCode: null };
     mockUserLeagueCount = 0;
+    mockAuthoritativeLeagueCount = undefined;
     mockUserLeaguesQueryError = undefined;
   });
 
@@ -298,6 +304,17 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
       mockPremiumLoading = false;
       mockUserLeaguesQueryError = new Error('network error');
       expect(renderScreen().atLeagueLimit).toBe(false);
+    });
+
+    it('still flags a power user whose league count exceeds the userLeagues page size (LS-9101)', () => {
+      // userLeagues is server-paginated at 50; a user with 60 leagues gets
+      // back an array of only 50, but userLeagueCount — the authoritative,
+      // unpaginated total — is 60. The preflight check must read that total.
+      mockIsPremium = false;
+      mockPremiumLoading = false;
+      mockUserLeagueCount = 50;
+      mockAuthoritativeLeagueCount = 60;
+      expect(renderScreen().atLeagueLimit).toBe(true);
     });
   });
 

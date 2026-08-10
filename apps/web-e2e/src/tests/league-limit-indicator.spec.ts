@@ -76,7 +76,14 @@ const THREE_LEAGUES = [
 async function mockThreeLeagues(page: import('@playwright/test').Page) {
   await createGraphQLRouter(page, {
     getuserleagues: (route) =>
-      fulfillJson(route, { data: { userLeagues: THREE_LEAGUES } }),
+      fulfillJson(route, {
+        data: {
+          userLeagues: THREE_LEAGUES,
+          // Authoritative total (LS-9101) — BaseballScreen's cap gate reads
+          // this instead of userLeagues.length.
+          userLeagueCount: THREE_LEAGUES.length,
+        },
+      }),
   });
 }
 

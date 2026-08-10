@@ -3337,6 +3337,7 @@ export type Query = {
   /** Return earned badges for a user, optionally filtered to a specific league */
   userBadges?: Maybe<Array<UserBadge>>;
   userByEmail?: Maybe<User>;
+  userLeagueCount: Scalars['Int']['output'];
   userLeagues: Array<League>;
   userTeamId?: Maybe<Scalars['Int']['output']>;
   users?: Maybe<Array<User>>;
@@ -3970,6 +3971,11 @@ export type QueryUserBadgesArgs = {
 
 export type QueryUserByEmailArgs = {
   email: Scalars['String']['input'];
+};
+
+export type QueryUserLeaguesArgs = {
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryUserTeamIdArgs = {
@@ -6279,10 +6285,14 @@ export type CreateLeagueAndTeamsMutation = {
   } | null;
 };
 
-export type GetUserLeaguesQueryVariables = Exact<{ [key: string]: never }>;
+export type GetUserLeaguesQueryVariables = Exact<{
+  limit?: InputMaybe<Scalars['Int']['input']>;
+  cursor?: InputMaybe<Scalars['String']['input']>;
+}>;
 
 export type GetUserLeaguesQuery = {
   __typename?: 'Query';
+  userLeagueCount: number;
   userLeagues: Array<{
     __typename?: 'League';
     id?: number | null;
@@ -6361,6 +6371,7 @@ export type GetMyLeaguesQueryVariables = Exact<{
 
 export type GetMyLeaguesQuery = {
   __typename?: 'Query';
+  userLeagueCount: number;
   myLeagues: Array<{
     __typename?: 'League';
     id?: number | null;
@@ -18297,11 +18308,12 @@ export type CreateLeagueAndTeamsMutationOptions = BaseMutationOptions<
   CreateLeagueAndTeamsMutationVariables
 >;
 export const GetUserLeagues = gql`
-  query GetUserLeagues {
-    userLeagues {
+  query GetUserLeagues($limit: Int, $cursor: String) {
+    userLeagues(limit: $limit, cursor: $cursor) {
       ...League
       ...AppLeague
     }
+    userLeagueCount
   }
   ${LeagueFragmentDoc}
   ${AppLeagueFragmentDoc}
@@ -18319,6 +18331,8 @@ export const GetUserLeagues = gql`
  * @example
  * const { data, loading, error } = useGetUserLeaguesQuery({
  *   variables: {
+ *      limit: // value for 'limit'
+ *      cursor: // value for 'cursor'
  *   },
  * });
  */
@@ -18390,6 +18404,7 @@ export const GetMyLeagues = gql`
       ...League
       ...AppLeague
     }
+    userLeagueCount
   }
   ${LeagueFragmentDoc}
   ${AppLeagueFragmentDoc}

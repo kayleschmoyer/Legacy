@@ -157,16 +157,17 @@ export default function BaseballHomeScreen({
     [userLeagues],
   );
 
-  // Free-tier league cap (LS-5182). `userLeagues` holds the user's baseball
-  // leagues (sport-filtered via myLeagues). Baseball leagues are the only sport
-  // counted here; the server counts all sports against FREE_TIER_LEAGUE_LIMIT,
-  // so the cap shown may be optimistic for multi-sport users — acceptable given
-  // the baseball-home context. Only meaningful for free users with a
+  // Free-tier league cap (LS-5182). `userLeagueCount` is the authoritative,
+  // unpaginated total across every sport (LS-9101) — using it here (rather
+  // than the baseball-only `rawLeagues.length`) both fixes the pagination
+  // under-count and the pre-existing multi-sport under-count this comment used
+  // to document as "acceptable". Only meaningful for free users with a
   // successfully loaded list; premium users have unlimited leagues.
   const leaguesLoaded = !loadingLeagues && !leaguesLoadFailed;
   const showLeagueCap = !subscriptionLoading && !isPremium && leaguesLoaded;
+  const activeLeagueCount = data?.userLeagueCount ?? 0;
   const atFreeLeagueLimit =
-    showLeagueCap && rawLeagues.length >= FREE_TIER_LEAGUE_LIMIT;
+    showLeagueCap && activeLeagueCount >= FREE_TIER_LEAGUE_LIMIT;
 
   const handleCreateLeague = async (input: QuickCreateLeagueInput) => {
     if (atFreeLeagueLimit) {
@@ -238,7 +239,7 @@ export default function BaseballHomeScreen({
         leagueCap={
           showLeagueCap
             ? {
-                count: rawLeagues.length,
+                count: activeLeagueCount,
                 limit: FREE_TIER_LEAGUE_LIMIT,
                 atLimit: atFreeLeagueLimit,
                 onUpgrade: goToUpgrade,

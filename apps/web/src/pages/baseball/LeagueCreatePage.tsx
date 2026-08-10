@@ -1703,7 +1703,9 @@ export function LeagueCreatePage(): React.JSX.Element {
   }, []);
 
   const { data: leaguesData } = useGetUserLeaguesQuery();
-  const leagueCount = leaguesData?.userLeagues?.length ?? 0;
+  // userLeagues is paginated (LS-9101) — use the authoritative unpaginated
+  // total instead of array length so this gate stays correct past the page size.
+  const leagueCount = leaguesData?.userLeagueCount ?? 0;
   const atLeagueLimit =
     !isPremium && !premiumLoading && leagueCount >= FREE_LEAGUE_LIMIT;
 

@@ -25,11 +25,12 @@ export function FootballHubPage() {
     fetchPolicy: 'cache-and-network',
   });
 
-  // `userLeagues` already excludes mock-draft leagues and spans every sport, so
-  // its length is exactly the count the backend enforces the free-tier cap on:
-  // distinct non-mock leagues the user is a member of (owned + joined). The cap
-  // is global across sports, so we count all of them — not just football.
-  const activeLeagueCount = (data?.userLeagues ?? []).filter(Boolean).length;
+  // `userLeagues` is paginated (LS-9101), so its array length can under-count
+  // once a user has more leagues than the page size. `userLeagueCount` is the
+  // authoritative, unpaginated total of non-mock leagues the user is a member
+  // of (owned + joined), across every sport — exactly what the backend
+  // enforces the free-tier cap on.
+  const activeLeagueCount = data?.userLeagueCount ?? 0;
 
   // Only gate once we are confident the user is on the free tier and at the cap.
   // While premium status is still resolving we allow the navigation, so a
