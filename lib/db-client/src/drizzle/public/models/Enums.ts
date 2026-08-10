@@ -124,6 +124,7 @@ export const positionSlot = pgEnum('position_slot', [
   'DST',
   'FLEX', // RB/WR/TE eligible
   'SFLEX', // QB/RB/WR/TE eligible (Superflex)
+  'KP', // Combined kicker/punter slot (LS-9107)
   // Football IDP (LS-245); DP is the defensive flex (any IDP position)
   'DL',
   'LB',

@@ -57,6 +57,14 @@ describe('validateRosterSlots (LS-6145)', () => {
     ).toEqual([{ positionType: 'QB', count: 1 }]);
   });
 
+  it('passes through the SFLEX and KP premium roster slots (LS-9107) — entitlement gating happens at the resolver, not here', () => {
+    const input = [
+      { positionType: 'SFLEX', count: 1 },
+      { positionType: 'KP', count: 1 },
+    ];
+    expect(validateRosterSlots(input, MAX_COUNT)).toEqual(input);
+  });
+
   it('passes through IDP position slots', () => {
     const input = [
       { positionType: 'DL', count: 2 },

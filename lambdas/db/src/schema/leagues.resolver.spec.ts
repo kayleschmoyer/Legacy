@@ -2002,6 +2002,167 @@ describe('League Mutations', () => {
     });
   });
 
+  describe('createLeagueAndTeams mutation — custom roster positions entitlement gate (LS-9107)', () => {
+    const baseInput = {
+      leagueName: 'Superflex League',
+      numberOfTeams: 10,
+      playerPool: 'all',
+      sport: 'football',
+    };
+
+    it('blocks a free user from submitting an SFLEX roster slot', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          {
+            input: {
+              ...baseInput,
+              rosterSlots: [{ positionType: 'SFLEX', count: 1 }],
+            },
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Custom roster positions');
+
+      // The gate must fire before any league is created.
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('blocks a free user from submitting a KP roster slot', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          {
+            input: {
+              ...baseInput,
+              rosterSlots: [{ positionType: 'KP', count: 1 }],
+            },
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Custom roster positions');
+
+      expect(mockCreateLeague).not.toHaveBeenCalled();
+    });
+
+    it('allows a premium (admin) user to submit SFLEX and KP roster slots', async () => {
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 4,
+          name: 'Superflex League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const adminContext = {
+        user: { id: 1, isAdmin: true },
+        db: mockDb,
+      };
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        {
+          input: {
+            ...baseInput,
+            rosterSlots: [
+              { positionType: 'SFLEX', count: 1 },
+              { positionType: 'KP', count: 1 },
+            ],
+          },
+        },
+        adminContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rosterSlots: [
+            { positionType: 'SFLEX', count: 1 },
+            { positionType: 'KP', count: 1 },
+          ],
+        }),
+      );
+    });
+
+    it('allows a free user to create a league without SFLEX/KP slots', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ tier: 'free' }]);
+      mockCreateLeague.mockResolvedValue({
+        league: {
+          id: 5,
+          name: 'Superflex League',
+          owner: 1,
+          maxRosterSize: 25,
+          currentMatchup: null,
+        },
+        teams: [],
+        leagueMembers: [],
+      });
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().createLeagueAndTeams;
+      if (!field?.resolve) {
+        throw new Error('createLeagueAndTeams resolver not found');
+      }
+
+      await field.resolve(
+        {},
+        {
+          input: {
+            ...baseInput,
+            rosterSlots: [{ positionType: 'QB', count: 1 }],
+          },
+        },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
+      expect(mockCreateLeague).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rosterSlots: [{ positionType: 'QB', count: 1 }],
+        }),
+      );
+    });
+  });
+
   describe('createLeagueAndTeams mutation — server-side name sanitization (LS-6056)', () => {
     const baseInput = {
       numberOfTeams: 10,

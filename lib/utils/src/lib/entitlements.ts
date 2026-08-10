@@ -53,6 +53,7 @@ export const ENTITLEMENTS = {
   advanced_scheduling: 'advanced_scheduling',
   draft_slot_trading: 'draft_slot_trading',
   custom_scoring_multipliers: 'custom_scoring_multipliers',
+  custom_roster_positions: 'custom_roster_positions',
 } as const;
 
 export type EntitlementKey = (typeof ENTITLEMENTS)[keyof typeof ENTITLEMENTS];
@@ -98,4 +99,5 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   draft_slot_trading: 'Draft slot trading',
   custom_scoring_multipliers:
     'Custom scoring multipliers (TE-premium PPR, IDP point values)',
+  custom_roster_positions: 'Custom roster positions (Superflex, K/P)',
 };

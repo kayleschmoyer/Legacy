@@ -93,6 +93,15 @@ export function validatePickTimeLimitSeconds(
 }
 
 /**
+ * Roster slot types gated behind the `custom_roster_positions` entitlement
+ * (LS-9107). Both slots already survive `validateRosterSlots` (SFLEX has
+ * since LS-245; KP since LS-9107) but must not be usable by a non-entitled
+ * account — see the `requireFreshEntitlement` call in
+ * `createLeagueAndTeams` below.
+ */
+const PREMIUM_ROSTER_SLOT_TYPES = new Set(['SFLEX', 'KP']);
+
+/**
  * Validates a wizard-supplied per-slot roster config (LS-6145) and returns
  * the subset with a non-zero count, ready to hand to
  * `LeagueService.createLeague`. Returns `undefined` when `rosterSlots` is
@@ -692,6 +701,22 @@ builder.mutationField('createLeagueAndTeams', (t) =>
         ROSTER_RANGE_BY_SPORT[resolvedSport].max,
       );
 
+      // Superflex (SFLEX) and the combined K/P slot (KP) are premium roster
+      // positions (LS-9107) — hard-reject rather than silently dropping the
+      // slot, matching the FAAB / salary cap / auction / era-filter pattern
+      // above.
+      if (
+        validatedRosterSlots?.some((slot) =>
+          PREMIUM_ROSTER_SLOT_TYPES.has(slot.positionType),
+        )
+      ) {
+        await requireFreshEntitlement(
+          context,
+          ENTITLEMENTS.custom_roster_positions,
+          'Custom roster positions (Superflex, K/P) require a premium subscription. Upgrade to unlock these roster slots.',
+        );
+      }
+
       if (
         inputGamesPerMatchup != null &&
         !isGamesPerMatchupValidForSport(resolvedSport, inputGamesPerMatchup)
@@ -1135,9 +1160,10 @@ const UpdateRosterPositionsInput = builder.inputType(
 /**
  * Mutation: updateRosterPositions — commissioner-only reconfiguration of a
  * league's roster position slots after creation (LS-9099). This is the
- * post-creation counterpart to the wizard's rosterSlots input (LS-6145);
- * out of scope for LS-6151's premium SFLEX/K-P slot types, which are not
- * yet in the position_slot enum.
+ * post-creation counterpart to the wizard's rosterSlots input (LS-6145).
+ * NOTE: unlike createLeagueAndTeams, this resolver does not gate SFLEX/KP
+ * behind `custom_roster_positions` (LS-9107 scoped the entitlement check to
+ * league creation only) — tracked as a follow-up gap, not fixed here.
  *
  * Shrinking a slot below the number of players any single team already has
  * rostered in that position is rejected — the caller must drop players from
