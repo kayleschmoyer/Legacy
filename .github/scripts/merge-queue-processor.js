@@ -1275,6 +1275,70 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     }
   }
 
+  // LS-8779: when a PR was stacked on another (soft-dependency) branch and
+  // that base branch has since squash- or rebase-merged into its own base,
+  // GitHub auto-retargets this PR to the grandparent branch and the plain
+  // "checkout main / merge main" advice below replays every one of the old
+  // base branch's commits on top of the (unrelated-SHA) squash commit —
+  // noisy conflicts or a redundant merge commit. `git rebase --onto` drops
+  // the now-squashed commits cleanly. Detect the pattern via the PR's own
+  // BaseRefChangedEvent history + the old base branch's (now-merged) PR;
+  // any failure/ambiguity here just falls back to the generic advice.
+  async function detectSquashedStackedBase(pr) {
+    const timeline = await github.graphql(
+      `query($owner: String!, $repo: String!, $number: Int!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequest(number: $number) {
+            timelineItems(last: 5, itemTypes: [BASE_REF_CHANGED_EVENT]) {
+              nodes {
+                ... on BaseRefChangedEvent {
+                  previousRefName
+                  currentRefName
+                }
+              }
+            }
+          }
+        }
+      }`,
+      { owner, repo, number: pr.number },
+    );
+    const events =
+      timeline?.repository?.pullRequest?.timelineItems?.nodes ?? [];
+    const lastChange = events[events.length - 1];
+    if (
+      !lastChange?.previousRefName ||
+      lastChange.previousRefName === pr.base.ref
+    ) {
+      return null;
+    }
+
+    const oldBase = await github.graphql(
+      `query($owner: String!, $repo: String!, $ref: String!) {
+        repository(owner: $owner, name: $repo) {
+          pullRequests(headRefName: $ref, states: [MERGED], first: 1) {
+            nodes {
+              headRefOid
+              mergeCommit { parents { totalCount } }
+            }
+          }
+        }
+      }`,
+      { owner, repo, ref: lastChange.previousRefName },
+    );
+    const node = oldBase?.repository?.pullRequests?.nodes?.[0];
+    // A 2-parent merge commit means the old base's commits are still
+    // reachable from the new base by their original SHAs — a plain rebase
+    // is fine. Only a 1-parent (squash/rebase-merge) commit flattens them.
+    if (!node?.headRefOid || node.mergeCommit?.parents?.totalCount !== 1) {
+      return null;
+    }
+
+    return {
+      previousRefName: lastChange.previousRefName,
+      oldTipSha: node.headRefOid,
+    };
+  }
+
   async function reportMergeBlocker(pr, validation) {
     if (validation.isPending) {
       console.log(
@@ -1296,19 +1360,47 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       '### 🛠️ How to Fix:';
 
     if (validation.reason.includes('merge conflicts')) {
-      comment +=
-        '\n1. Sync your branch with the latest main:\n' +
-        '   ```bash\n' +
-        '   git checkout main\n' +
-        '   git pull origin main\n' +
-        '   git checkout ' +
-        pr.head.ref +
-        '\n' +
-        '   git merge main  # Resolve any conflicts\n' +
-        '   git push origin ' +
-        pr.head.ref +
-        '\n' +
-        '   ```';
+      const squashedStack = await detectSquashedStackedBase(pr).catch(
+        () => null,
+      );
+      if (squashedStack) {
+        comment +=
+          '\n1. This PR was stacked on `' +
+          squashedStack.previousRefName +
+          '`, which has since been squash- or rebase-merged into `' +
+          pr.base.ref +
+          '` — its commits no longer exist under their original SHAs. A plain ' +
+          "rebase or merge would replay all of that branch's original commits on " +
+          'top of the squash commit, producing noisy conflicts or a redundant merge ' +
+          'commit. Drop the now-squashed commits cleanly instead:\n' +
+          '   ```bash\n' +
+          '   git fetch origin\n' +
+          '   git rebase --onto origin/' +
+          pr.base.ref +
+          ' ' +
+          squashedStack.oldTipSha +
+          ' ' +
+          pr.head.ref +
+          '\n' +
+          '   git push --force-with-lease origin ' +
+          pr.head.ref +
+          '\n' +
+          '   ```';
+      } else {
+        comment +=
+          '\n1. Sync your branch with the latest main:\n' +
+          '   ```bash\n' +
+          '   git checkout main\n' +
+          '   git pull origin main\n' +
+          '   git checkout ' +
+          pr.head.ref +
+          '\n' +
+          '   git merge main  # Resolve any conflicts\n' +
+          '   git push origin ' +
+          pr.head.ref +
+          '\n' +
+          '   ```';
+      }
     } else if (
       validation.reason.includes('CODEOWNER approval') ||
       validation.reason.includes('reviewDecision')

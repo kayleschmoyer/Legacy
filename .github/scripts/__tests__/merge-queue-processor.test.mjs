@@ -91,6 +91,15 @@ function makeGithub({
   // (paginate(pulls.list)). Defaults to [] so the sweep is inert in tests
   // that don't exercise it.
   sweepPRs = [],
+  // LS-8779: BaseRefChangedEvent timeline nodes served to
+  // detectSquashedStackedBase's first GraphQL query. Defaults to [] (no base
+  // retarget on record) so unrelated merge-conflict tests fall through to the
+  // generic advice.
+  baseRefChangedEvents = [],
+  // LS-8779: the old base branch's own (now-merged) PR, served to
+  // detectSquashedStackedBase's second GraphQL query. Defaults to null (no
+  // matching merged PR found for the retargeted-from ref).
+  oldBasePR = null,
 } = {}) {
   const calls = {
     merges: [],
@@ -130,6 +139,20 @@ function makeGithub({
         return {
           repository: {
             pullRequest: { reviewThreads: { nodes: unresolvedThreads } },
+          },
+        };
+      }
+      if (query.includes('BaseRefChangedEvent')) {
+        return {
+          repository: {
+            pullRequest: { timelineItems: { nodes: baseRefChangedEvents } },
+          },
+        };
+      }
+      if (query.includes('mergeCommit')) {
+        return {
+          repository: {
+            pullRequests: { nodes: oldBasePR ? [oldBasePR] : [] },
           },
         };
       }
@@ -1065,6 +1088,113 @@ describe('merge-queue-processor — Discord CODEOWNER ping dedup (LS-8603)', () 
           u.body?.includes(pingMarkerFor(HEAD_SHA)),
       ),
       'rewritten status comment should carry the ping marker forward',
+    );
+  });
+});
+
+// ── LS-8779 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — squash-merged stacked-base rebase advice (LS-8779)', () => {
+  const OLD_BASE_TIP_SHA = 'oldbase111tip222sha333abc444def555abc666';
+
+  it('emits --onto advice when the base branch was squash-merged (1-parent merge commit)', async () => {
+    const conflictPR = makePR({ mergeable: false, base: { ref: 'main' } });
+    const { github, calls } = makeGithub({
+      pr: conflictPR,
+      baseRefChangedEvents: [
+        { previousRefName: 'claude/old-base-branch', currentRefName: 'main' },
+      ],
+      oldBasePR: {
+        headRefOid: OLD_BASE_TIP_SHA,
+        mergeCommit: { parents: { totalCount: 1 } },
+      },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    const statusComment = calls.comments.find((c) =>
+      c.body?.includes('Merge Queue: Cannot Merge'),
+    );
+    assert.ok(statusComment, 'should post a blocked-merge status comment');
+    assert.ok(
+      statusComment.body.includes(
+        `git rebase --onto origin/main ${OLD_BASE_TIP_SHA} ${conflictPR.head.ref}`,
+      ),
+      'should advise the --onto rebase using the old base branch tip SHA',
+    );
+    assert.ok(
+      statusComment.body.includes('claude/old-base-branch'),
+      'should name the old base branch that was squash-merged',
+    );
+    assert.ok(
+      !statusComment.body.includes('git merge main'),
+      'should not also emit the generic merge-main advice',
+    );
+  });
+
+  it('falls back to generic advice when the old base was a real (2-parent) merge commit', async () => {
+    const conflictPR = makePR({ mergeable: false, base: { ref: 'main' } });
+    const { github, calls } = makeGithub({
+      pr: conflictPR,
+      baseRefChangedEvents: [
+        { previousRefName: 'claude/old-base-branch', currentRefName: 'main' },
+      ],
+      oldBasePR: {
+        headRefOid: OLD_BASE_TIP_SHA,
+        mergeCommit: { parents: { totalCount: 2 } },
+      },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    const statusComment = calls.comments.find((c) =>
+      c.body?.includes('Merge Queue: Cannot Merge'),
+    );
+    assert.ok(statusComment, 'should post a blocked-merge status comment');
+    assert.ok(
+      statusComment.body.includes('git merge main'),
+      'a 2-parent merge commit means the old commits are still reachable — plain advice applies',
+    );
+    assert.ok(
+      !statusComment.body.includes('rebase --onto'),
+      'should not emit --onto advice when a plain rebase is safe',
+    );
+  });
+
+  it('falls back to generic advice when there is no base-retarget history', async () => {
+    const conflictPR = makePR({ mergeable: false, base: { ref: 'main' } });
+    const { github, calls } = makeGithub({
+      pr: conflictPR,
+      baseRefChangedEvents: [],
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    const statusComment = calls.comments.find((c) =>
+      c.body?.includes('Merge Queue: Cannot Merge'),
+    );
+    assert.ok(statusComment, 'should post a blocked-merge status comment');
+    assert.ok(
+      statusComment.body.includes('git merge main'),
+      'no retarget history means the generic advice applies',
     );
   });
 });

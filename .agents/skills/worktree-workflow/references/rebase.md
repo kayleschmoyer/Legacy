@@ -44,7 +44,24 @@ git push --force-with-lease origin HEAD
 | Source/config files conflict                | Read both sides, synthesize. See [conflict-resolution-guide.md](rebase/conflict-resolution-guide.md)         |
 | Many files conflict across many commits     | See [rebase-conflict-strategies.md](rebase/rebase-conflict-strategies.md)                                    |
 | Stacked/dependent branches need rebasing    | `make rebase-tree` or `make rebase-tree-auto`                                                                |
+| Base PR (stacked-on branch) squash-merged   | See [Squash-merged stacked base](#squash-merged-stacked-base-ls-8779) below — do NOT plain-rebase/merge      |
 | Stuck mid-rebase or need recovery           | See [rebase-interactive-and-recovery.md](rebase/rebase-interactive-and-recovery.md)                          |
+
+## Squash-Merged Stacked Base (LS-8779)
+
+When a PR is intentionally stacked on another (soft-dependency) PR's branch — this repo's documented pattern of basing your branch on a related PR "if it has landed or is close, to avoid rework/conflicts" — and that base PR later merges, GitHub auto-retargets the stacked PR's base to the grandparent branch (usually `main`). If the base PR was **squash-merged** (or rebase-merged), its ~N commits collapse into a single new commit on the grandparent branch that shares none of their original SHAs.
+
+The merge-queue bot's generic conflict advice (`git checkout main && git merge main`, or a plain `git rebase origin/main`) does **not** know this happened — it replays every one of the base branch's original commits on top of the squash commit, producing a cascade of trivial-but-noisy conflicts (or, in the merge case, a redundant merge commit carrying duplicate history).
+
+**Before following the generic advice on a stacked PR whose base was just auto-retargeted**, check whether the old base branch's PR was squash/rebase-merged (a 1-parent merge commit) vs. truly merge-committed (2 parents — in which case the old commits are still reachable under their original SHAs and a plain rebase is fine):
+
+```bash
+git fetch origin
+git rebase --onto origin/main <last-commit-of-old-base-branch> HEAD
+git push --force-with-lease origin HEAD
+```
+
+`<last-commit-of-old-base-branch>` is the old base PR's `head.sha` (still available from the closed PR even after its branch is deleted) — find it via `github_view_pr` on the old base PR number, or `git log` if the branch ref is still local. This drops the now-squashed commits cleanly instead of replaying them. The merge-queue processor (`.github/scripts/merge-queue-processor.js`, `detectSquashedStackedBase`) auto-detects this case via the PR's `BaseRefChangedEvent` timeline and emits this exact advice when it can; fall back to the manual check above if the bot's comment still shows the generic advice.
 
 ## Check for Conflicts After Rebase
 
