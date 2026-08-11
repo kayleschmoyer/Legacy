@@ -5036,23 +5036,64 @@ const handleCallTool = async (
       // string, preventing flag injection or unexpected shell expansion.
       const wantsUpstream =
         setUpstream === true || normalizedRemoteBranch !== undefined;
-      const pushArgs = [
+      const targetBranchName =
+        resolvedRemoteBranch ?? run('git branch --show-current', cwd).trim();
+      // --force-with-lease compares against the local remote-tracking ref
+      // (refs/remotes/origin/<branch>). On a genuinely new branch that ref
+      // doesn't exist yet, and depending on git version/config that can
+      // manifest as a spurious "stale info" rejection instead of succeeding
+      // as a normal first push would (LS-8722). Omit --force-with-lease for
+      // this first push — there's nothing on the remote to clobber.
+      let hasRemoteTrackingRef = true;
+      try {
+        runGit(
+          [
+            'rev-parse',
+            '--verify',
+            '-q',
+            `refs/remotes/origin/${targetBranchName}`,
+          ],
+          cwd,
+        );
+      } catch {
+        hasRemoteTrackingRef = false;
+      }
+      const buildPushArgs = (forceWithLease: boolean) => [
         'push',
         ...(wantsUpstream ? ['-u'] : []),
-        '--force-with-lease',
+        ...(forceWithLease ? ['--force-with-lease'] : []),
         'origin',
         resolvedRemoteBranch
           ? `HEAD:refs/heads/${resolvedRemoteBranch}`
           : 'HEAD',
       ];
+      const pushArgs = buildPushArgs(hasRemoteTrackingRef);
       // cmdDisplay is only used in log output — never passed to a shell.
       const cmdDisplay = `git ${pushArgs.join(' ')}`;
 
       try {
-        const out = runGit(pushArgs, cwd, {
-          timeout: pushTimeoutMs,
-          env: pushEnv,
-        });
+        let out: string;
+        try {
+          out = runGit(pushArgs, cwd, {
+            timeout: pushTimeoutMs,
+            env: pushEnv,
+          });
+        } catch (pushErr: unknown) {
+          const pe = pushErr as { stdout?: string; stderr?: string };
+          const peOutput = [pe.stdout, pe.stderr].filter(Boolean).join('\n');
+          // Reactive fallback: if we thought there was a remote-tracking ref
+          // but git still rejected with "stale info" (e.g. a stale/unfetched
+          // local ref), retry once without --force-with-lease rather than
+          // requiring an agent to fall back to raw `git push` via Bash.
+          if (hasRemoteTrackingRef && /stale info/i.test(peOutput)) {
+            out = runGit(buildPushArgs(false), cwd, {
+              timeout: pushTimeoutMs,
+              env: pushEnv,
+            });
+          } else {
+            throw pushErr;
+          }
+        }
 
         // Append an explicit success summary so agents don't need a follow-up
         // worktree_status call to confirm the push landed. git push writes its
