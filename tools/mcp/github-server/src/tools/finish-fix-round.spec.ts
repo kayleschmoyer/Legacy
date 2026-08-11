@@ -206,7 +206,9 @@ describe('finishFixRound (integration)', () => {
         },
       });
     });
-    mockRest.mockResolvedValue({});
+    mockRest.mockImplementation(({ method }: { method: string }) =>
+      method === 'GET' ? Promise.resolve([]) : Promise.resolve({}),
+    );
 
     const result = await finishFixRound({
       prNumber: 42,
@@ -220,6 +222,7 @@ describe('finishFixRound (integration)', () => {
     expect(data.replied).toBe(2);
     expect(data.resolved).toBe(1);
     expect(data.labelApplied).toBe(true);
+    expect(data.labelReapplied).toBe(false);
 
     // FIX body is exactly `FIX: <sha>`
     const fixCall = mockGraphQL.mock.calls.find(
@@ -274,7 +277,9 @@ describe('finishFixRound (integration)', () => {
         data: { t0: { thread: { isResolved: true } } },
       });
     });
-    mockRest.mockResolvedValue({});
+    mockRest.mockImplementation(({ method }: { method: string }) =>
+      method === 'GET' ? Promise.resolve([]) : Promise.resolve({}),
+    );
 
     const result = await finishFixRound({
       prNumber: 42,
@@ -312,7 +317,9 @@ describe('finishFixRound (integration)', () => {
         },
       },
     });
-    mockRest.mockResolvedValue({});
+    mockRest.mockImplementation(({ method }: { method: string }) =>
+      method === 'GET' ? Promise.resolve([]) : Promise.resolve({}),
+    );
 
     await finishFixRound({
       prNumber: 99,
@@ -326,7 +333,9 @@ describe('finishFixRound (integration)', () => {
   });
 
   it('posts a PR-level (issueId) reply as a top-level issue comment, not a thread reply', async () => {
-    mockRest.mockResolvedValue({ id: 555 });
+    mockRest.mockImplementation(({ method }: { method: string }) =>
+      method === 'GET' ? Promise.resolve([]) : Promise.resolve({ id: 555 }),
+    );
 
     const result = await finishFixRound({
       prNumber: 42,
@@ -361,7 +370,9 @@ describe('finishFixRound (integration)', () => {
   });
 
   it('does not resolve anything for a PR-level FIX reply (no thread exists)', async () => {
-    mockRest.mockResolvedValue({ id: 555 });
+    mockRest.mockImplementation(({ method }: { method: string }) =>
+      method === 'GET' ? Promise.resolve([]) : Promise.resolve({ id: 555 }),
+    );
 
     const result = await finishFixRound({
       prNumber: 42,
@@ -371,5 +382,90 @@ describe('finishFixRound (integration)', () => {
     const data = parse(result);
     expect(data.resolved).toBe(0);
     expect(data.resolutions).toEqual([]);
+  });
+
+  it('forces a remove-then-add cycle when the ready label is already present (LS-8706)', async () => {
+    mockRest.mockImplementation(({ method }: { method: string }) =>
+      method === 'GET'
+        ? Promise.resolve([{ name: 'bot:ready-for-review' }])
+        : Promise.resolve({}),
+    );
+
+    const result = await finishFixRound({
+      prNumber: 42,
+      replies: [{ issueId: 'ISSUE01', kind: 'JUSTIFY', body: 'covered' }],
+    });
+
+    const data = parse(
+      result as { content: Array<{ type: string; text: string }> },
+    );
+    expect(data.labelApplied).toBe(false);
+    expect(data.labelReapplied).toBe(true);
+
+    const labelPath = '/repos/bkrupa/legacy-sports/issues/42/labels';
+    const deleteCall = mockRest.mock.calls.find(
+      ([args]) =>
+        args.method === 'DELETE' &&
+        args.path === `${labelPath}/bot%3Aready-for-review`,
+    );
+    const postCall = mockRest.mock.calls.find(
+      ([args]) => args.method === 'POST' && args.path === labelPath,
+    );
+    expect(deleteCall).toBeDefined();
+    expect(postCall).toBeDefined();
+    // Remove must happen before the re-add.
+    expect(mockRest.mock.calls.indexOf(deleteCall!)).toBeLessThan(
+      mockRest.mock.calls.indexOf(postCall!),
+    );
+  });
+
+  it('does a plain add (no delete) when the ready label is not yet present', async () => {
+    mockRest.mockImplementation(({ method }: { method: string }) =>
+      method === 'GET' ? Promise.resolve([]) : Promise.resolve({}),
+    );
+
+    const result = await finishFixRound({
+      prNumber: 42,
+      replies: [{ issueId: 'ISSUE01', kind: 'JUSTIFY', body: 'covered' }],
+    });
+
+    const data = parse(
+      result as { content: Array<{ type: string; text: string }> },
+    );
+    expect(data.labelApplied).toBe(true);
+    expect(data.labelReapplied).toBe(false);
+
+    const deleteCalls = mockRest.mock.calls.filter(
+      ([args]) => args.method === 'DELETE',
+    );
+    expect(deleteCalls).toHaveLength(0);
+  });
+
+  it('still adds the label when the remove-then-add DELETE 404s (label removed by a racing call)', async () => {
+    mockRest.mockImplementation(({ method }: { method: string }) => {
+      if (method === 'GET')
+        return Promise.resolve([{ name: 'bot:ready-for-review' }]);
+      if (method === 'DELETE')
+        return Promise.reject(new Error('Not Found (404)'));
+      return Promise.resolve({});
+    });
+
+    const result = await finishFixRound({
+      prNumber: 42,
+      replies: [{ issueId: 'ISSUE01', kind: 'JUSTIFY', body: 'covered' }],
+    });
+
+    const data = parse(
+      result as { content: Array<{ type: string; text: string }> },
+    );
+    expect(data.labelReapplied).toBe(true);
+    expect(data.errors).toEqual([]);
+
+    const postCall = mockRest.mock.calls.find(
+      ([args]) =>
+        args.method === 'POST' &&
+        args.path === '/repos/bkrupa/legacy-sports/issues/42/labels',
+    );
+    expect(postCall).toBeDefined();
   });
 });

@@ -186,6 +186,51 @@ describe('manageLabels — clearPattern composes with add and remove', () => {
   });
 });
 
+// ── standalone add: force remove-then-add when the label is already present (LS-8706) ──
+
+describe('manageLabels — add re-triggers label-gated workflows', () => {
+  it('removes then re-adds a label that is already present', async () => {
+    mockRest
+      .mockResolvedValueOnce([{ name: 'bot:ready-for-review' }] as never) // GET current labels
+      .mockResolvedValue(undefined as never); // DELETE + POST
+
+    const result = await manageLabels({
+      prs: [42],
+      add: ['bot:ready-for-review'],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const body = parse(result);
+    expect(body.labelsReapplied).toEqual(['bot:ready-for-review']);
+
+    const calls = mockRest.mock.calls;
+    const deleteIdx = calls.findIndex(([args]) => args.method === 'DELETE');
+    const postIdx = calls.findIndex(([args]) => args.method === 'POST');
+    expect(deleteIdx).toBeGreaterThanOrEqual(0);
+    expect(postIdx).toBeGreaterThan(deleteIdx);
+  });
+
+  it('does a plain add (no delete) when the label is not yet present', async () => {
+    mockRest
+      .mockResolvedValueOnce([{ name: 'agent-in-progress' }] as never) // GET current labels
+      .mockResolvedValue(undefined as never); // POST
+
+    const result = await manageLabels({
+      prs: [42],
+      add: ['bot:ready-for-review'],
+    });
+
+    expect(result.isError).toBeFalsy();
+    const body = parse(result);
+    expect(body.labelsReapplied).toBeUndefined(); // omitted when empty
+
+    const deleteCalls = mockRest.mock.calls.filter(
+      ([args]) => args.method === 'DELETE',
+    );
+    expect(deleteCalls).toHaveLength(0);
+  });
+});
+
 // ── migrated call site: clearPattern replaces the removed clear_ci_failure_labels tool ──
 
 describe('manageLabels — clearPattern as drop-in for ci-failure label clearing', () => {

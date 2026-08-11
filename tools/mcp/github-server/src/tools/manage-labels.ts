@@ -24,7 +24,7 @@ export function globToRegex(pattern: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
-async function fetchPrLabels(basePath: string): Promise<string[]> {
+export async function fetchPrLabels(basePath: string): Promise<string[]> {
   const allNames: string[] = [];
   let page = 1;
   while (true) {
@@ -66,6 +66,7 @@ export async function manageLabels(
     prNumber: number;
     success: boolean;
     clearedLabels: string[];
+    labelsReapplied: string[];
     error?: string;
   }> = [];
 
@@ -83,10 +84,15 @@ export async function manageLabels(
             // Build effective remove list: explicit removes + pattern-matched labels
             const effectiveRemove: string[] = [...(params.remove ?? [])];
             const clearedLabels: string[] = [];
+            const labelsReapplied: string[] = [];
+
+            let currentLabels: string[] | undefined;
+            if (clearRegex || params.add?.length) {
+              currentLabels = await fetchPrLabels(basePath);
+            }
 
             if (clearRegex) {
-              const currentLabels = await fetchPrLabels(basePath);
-              for (const name of currentLabels) {
+              for (const name of currentLabels!) {
                 if (clearRegex.test(name) && !effectiveRemove.includes(name)) {
                   effectiveRemove.push(name);
                   clearedLabels.push(name);
@@ -95,6 +101,30 @@ export async function manageLabels(
             }
 
             if (params.add?.length) {
+              // GitHub's Labels API returns 200 without firing a `labeled`
+              // webhook when the label is already present — a plain add
+              // cannot re-trigger label-gated workflows. Force a genuine
+              // add-transition via remove-then-add for labels that are
+              // already on the PR (LS-8706).
+              const alreadyPresent = params.add.filter((l) =>
+                currentLabels!.includes(l),
+              );
+              for (const label of alreadyPresent) {
+                try {
+                  await githubRest({
+                    method: 'DELETE',
+                    path: `${basePath}/${encodeURIComponent(label)}`,
+                  });
+                } catch (removeErr) {
+                  const msg =
+                    removeErr instanceof Error ? removeErr.message : '';
+                  if (!msg.includes('(404)') && !msg.includes('(422)')) {
+                    throw removeErr;
+                  }
+                }
+              }
+              labelsReapplied.push(...alreadyPresent);
+
               await githubRest({
                 method: 'POST',
                 path: basePath,
@@ -115,12 +145,13 @@ export async function manageLabels(
                 }
               }
             }
-            return { prNumber, success: true, clearedLabels };
+            return { prNumber, success: true, clearedLabels, labelsReapplied };
           } catch (error) {
             return {
               prNumber,
               success: false,
               clearedLabels: [],
+              labelsReapplied: [],
               error: error instanceof Error ? error.message : String(error),
             };
           }
@@ -159,6 +190,9 @@ export async function manageLabels(
             ...(r.clearedLabels.length
               ? { clearedLabels: r.clearedLabels }
               : {}),
+            ...(r.labelsReapplied.length
+              ? { labelsReapplied: r.labelsReapplied }
+              : {}),
             ...(r.error ? { error: r.error } : {}),
           }),
         },
@@ -177,10 +211,13 @@ export async function manageLabels(
           failed,
           requestedLabelsAdded: params.add ?? [],
           requestedLabelsRemoved: params.remove ?? [],
-          results: perPrResults.map(({ clearedLabels, ...r }) => ({
-            ...r,
-            ...(clearedLabels.length ? { clearedLabels } : {}),
-          })),
+          results: perPrResults.map(
+            ({ clearedLabels, labelsReapplied, ...r }) => ({
+              ...r,
+              ...(clearedLabels.length ? { clearedLabels } : {}),
+              ...(labelsReapplied.length ? { labelsReapplied } : {}),
+            }),
+          ),
         }),
       },
     ],

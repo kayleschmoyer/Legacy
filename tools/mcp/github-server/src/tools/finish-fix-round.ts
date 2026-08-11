@@ -2,6 +2,7 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+import { fetchPrLabels } from './manage-labels.js';
 
 export type ReplyKind = 'FIX' | 'JUSTIFY' | 'CANNOT-COMPLY';
 
@@ -355,17 +356,48 @@ export async function finishFixRound(
 
   const resolveOutcomes = await resolveBatch(threadIdsToResolve);
 
-  // Apply the ready-for-review label last. Idempotent on the GitHub side.
+  // Apply the ready-for-review label last. GitHub's Labels API returns 200
+  // without firing a `labeled` webhook when the label is already present —
+  // a plain add cannot re-trigger the Reviewer Bot workflow, which only
+  // listens for `opened`/`ready_for_review`/`labeled` events. Since the
+  // label is essentially always already present here (every fix round
+  // after the first mark-ready), force a genuine add-transition via a
+  // remove-then-add pair when it's already on the PR (LS-8706).
   let labelApplied = false;
+  let labelReapplied = false;
   let labelError: string | undefined;
   try {
     const repo = await getRepoOwnerName();
+    const basePath = `/repos/${repo.owner}/${repo.name}/issues/${params.prNumber}/labels`;
+    const currentLabels = await fetchPrLabels(basePath);
+    const alreadyPresent = currentLabels.includes(readyLabel);
+
+    if (alreadyPresent) {
+      try {
+        await githubRest({
+          method: 'DELETE',
+          path: `${basePath}/${encodeURIComponent(readyLabel)}`,
+        });
+      } catch (removeErr) {
+        // 404 = label already gone (race with an external removal) — safe to
+        // ignore and proceed to the add below, which still fires `labeled`.
+        const msg = removeErr instanceof Error ? removeErr.message : '';
+        if (!msg.includes('(404)')) {
+          throw removeErr;
+        }
+      }
+    }
     await githubRest({
       method: 'POST',
-      path: `/repos/${repo.owner}/${repo.name}/issues/${params.prNumber}/labels`,
+      path: basePath,
       body: { labels: [readyLabel] },
     });
-    labelApplied = true;
+
+    if (alreadyPresent) {
+      labelReapplied = true;
+    } else {
+      labelApplied = true;
+    }
   } catch (err) {
     labelError = err instanceof Error ? err.message : String(err);
   }
@@ -409,6 +441,7 @@ export async function finishFixRound(
           replied,
           resolved,
           labelApplied,
+          labelReapplied,
           readyLabel,
           replies: replyOutcomes.map((o) => ({
             ...(o.threadId ? { threadId: o.threadId } : {}),
