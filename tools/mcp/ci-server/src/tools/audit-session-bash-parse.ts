@@ -351,9 +351,33 @@ export function classifyCommand(cmd: string): readonly [string, string] {
   return ['gap', ''];
 }
 
+/**
+ * Line-range file reads (sed -n 'A,Bp' <file>, tail -N <file>, wc -l <file>)
+ * differ only in the range/count and file path they carry, so grouping by
+ * first-3-token pattern (below) fragments them into one gap row per
+ * invocation instead of one per command family. Detect these up front and
+ * collapse them to a single canonical pattern regardless of the specific
+ * range or path (LS-8778).
+ */
+const LINE_RANGE_READ_PATTERNS: ReadonlyArray<{ re: RegExp; pattern: string }> =
+  [
+    { re: /^sed\s+-n\s+/i, pattern: "sed -n '<range>' <file>" },
+    { re: /^tail\s+/i, pattern: 'tail <file>' },
+    { re: /^wc\s+-l\s+/i, pattern: 'wc -l <file>' },
+  ];
+
+function lineRangeReadPattern(actual: string): string | null {
+  for (const { re, pattern } of LINE_RANGE_READ_PATTERNS) {
+    if (re.test(actual)) return pattern;
+  }
+  return null;
+}
+
 /** Normalise a command to a short scannable pattern (first 3 tokens max). */
 export function commandPattern(cmd: string): string {
   const actual = stripCdPrefix(cmd);
+  const lineRangePattern = lineRangeReadPattern(actual);
+  if (lineRangePattern) return lineRangePattern;
   const parts = actual.split(/\s+/).filter((t) => t.length > 0);
   if (parts.length === 0) return '(empty)';
   // For pnpm exec nx keep 4 tokens (pnpm exec nx <target>)
@@ -399,6 +423,8 @@ interface RecurringInfo {
   gap_type: string;
   server: string;
   reason: string;
+  /** Tool name to cite in the missing-awareness draft summary (e.g. "Glob", "Read"). */
+  toolHint?: string;
 }
 
 /**
@@ -430,6 +456,7 @@ export const RECURRING_INVESTIGATIVE: ReadonlyArray<
       gap_type: 'missing-awareness',
       server: 'n/a',
       reason: 'Should use Glob tool instead of find',
+      toolHint: 'Glob',
     },
   ],
   [
@@ -438,6 +465,7 @@ export const RECURRING_INVESTIGATIVE: ReadonlyArray<
       gap_type: 'missing-awareness',
       server: 'n/a',
       reason: 'Should use Glob tool instead of find',
+      toolHint: 'Glob',
     },
   ],
   [
@@ -446,6 +474,7 @@ export const RECURRING_INVESTIGATIVE: ReadonlyArray<
       gap_type: 'missing-awareness',
       server: 'n/a',
       reason: 'Should use Grep tool instead of grep',
+      toolHint: 'Grep',
     },
   ],
   [
@@ -454,6 +483,37 @@ export const RECURRING_INVESTIGATIVE: ReadonlyArray<
       gap_type: 'missing-awareness',
       server: 'n/a',
       reason: 'Should use Grep tool instead of grep',
+      toolHint: 'Grep',
+    },
+  ],
+  [
+    "sed -n '<range>' <file>",
+    {
+      gap_type: 'missing-awareness',
+      server: 'n/a',
+      reason:
+        'Line-range file reads should use the Read tool with offset/limit instead of sed -n',
+      toolHint: 'Read (with offset/limit)',
+    },
+  ],
+  [
+    'tail <file>',
+    {
+      gap_type: 'missing-awareness',
+      server: 'n/a',
+      reason:
+        'Line-range file reads should use the Read tool with offset/limit instead of tail',
+      toolHint: 'Read (with offset/limit)',
+    },
+  ],
+  [
+    'wc -l <file>',
+    {
+      gap_type: 'missing-awareness',
+      server: 'n/a',
+      reason:
+        'Line-count checks should use the Read tool with offset/limit instead of wc -l',
+      toolHint: 'Read (with offset/limit)',
     },
   ],
 ];
@@ -502,7 +562,7 @@ export function classifyGapType(
       const prefix = SUMMARY_PREFIX[info.gap_type] ?? 'feat(mcp):';
       let draft: string;
       if (info.gap_type === 'missing-awareness') {
-        const toolName = recPat.includes('find') ? 'Glob' : 'Grep';
+        const toolName = info.toolHint ?? 'Grep';
         draft = `${prefix} guide agents to use ${toolName} instead of \`${pattern}\``;
       } else {
         draft = `${prefix} add \`${pattern.replace(/ /g, '_')}\` support to ${info.server}`;
@@ -848,6 +908,29 @@ export function formatAudit(
   let totalBashCommands = 0;
   for (const count of counts.values()) totalBashCommands += count;
 
+  // `gaps` is already frequency-descending (built from mostCommon(counts)).
+  // Soft-cap the medium/low-confidence review list so a session with many
+  // one-off gap patterns can't blow the report past the tool-result token
+  // cap (LS-8778) — the reviewer sees the highest-frequency patterns first
+  // and an overflow note for the rest.
+  const GAPS_TO_REVIEW_CAP = 30;
+  const gapsToReviewAll = gaps.filter((g) => g['confidence'] !== 'high');
+  const gapsToReview = gapsToReviewAll.slice(0, GAPS_TO_REVIEW_CAP);
+  const gapsToReviewOmitted = gapsToReviewAll.length - gapsToReview.length;
+
+  const actionRequired: Record<string, unknown> = {
+    gaps_to_review: gapsToReview,
+    gaps_auto_classified: gaps.filter((g) => g['confidence'] === 'high'),
+    overflows: overflowItems,
+    failures: failureItems,
+  };
+  if (gapsToReviewOmitted > 0) {
+    actionRequired['gaps_to_review_overflow'] = {
+      omitted: gapsToReviewOmitted,
+      note: `Showing the top ${GAPS_TO_REVIEW_CAP} gap_to_review patterns by frequency; ${gapsToReviewOmitted} lower-frequency pattern(s) omitted. Re-run with gapsOnly:true for the full frequency table.`,
+    };
+  }
+
   const report: Record<string, unknown> = {
     session_id: sessionId,
     summary: {
@@ -859,12 +942,7 @@ export function formatAudit(
       mcp_overflows: overflowItems.length,
       mcp_failures: failureItems.length,
     },
-    action_required: {
-      gaps_to_review: gaps.filter((g) => g['confidence'] !== 'high'),
-      gaps_auto_classified: gaps.filter((g) => g['confidence'] === 'high'),
-      overflows: overflowItems,
-      failures: failureItems,
-    },
+    action_required: actionRequired,
     informational: {
       noise_filtered: noise,
       covered_commands: covered,

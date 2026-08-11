@@ -344,6 +344,25 @@ describe('audit-session-bash-parse', () => {
         'terraform plan -out',
       );
     });
+
+    it('collapses line-range file reads to a canonical pattern regardless of range/path (LS-8778)', () => {
+      expect(commandPattern("sed -n '10,50p' foo.txt")).toBe(
+        "sed -n '<range>' <file>",
+      );
+      expect(commandPattern("sed -n '200,250p' bar/baz.ts")).toBe(
+        "sed -n '<range>' <file>",
+      );
+      expect(commandPattern('tail -50 /tmp/task-output-1.txt')).toBe(
+        'tail <file>',
+      );
+      expect(commandPattern('tail -n 20 other-file.log')).toBe('tail <file>');
+      expect(commandPattern('wc -l some/deep/path/file.ts')).toBe(
+        'wc -l <file>',
+      );
+      expect(commandPattern("cd /repo && sed -n '1,5p' README.md")).toBe(
+        "sed -n '<range>' <file>",
+      );
+    });
   });
 
   describe('noise filtering', () => {
@@ -399,6 +418,35 @@ describe('audit-session-bash-parse', () => {
         server: 'legacy-sports-github or legacy-sports-ci',
         draft_summary: 'feat(mcp): add support for `gh workflow list`',
       });
+    });
+
+    it('classifies line-range file reads as high-confidence missing-awareness pointing at Read (LS-8778)', () => {
+      const sedResult = classifyGapType(
+        "sed -n '10,50p' foo.txt",
+        "sed -n '<range>' <file>",
+      );
+      expect(sedResult).toMatchObject({
+        gap_type: 'missing-awareness',
+        confidence: 'high',
+        server: 'n/a',
+      });
+      expect(sedResult.draft_summary).toBe(
+        "docs(skills): guide agents to use Read (with offset/limit) instead of `sed -n '<range>' <file>`",
+      );
+
+      const tailResult = classifyGapType('tail -50 output.txt', 'tail <file>');
+      expect(tailResult).toMatchObject({
+        gap_type: 'missing-awareness',
+        confidence: 'high',
+      });
+      expect(tailResult.draft_summary).toContain('Read (with offset/limit)');
+
+      const wcResult = classifyGapType('wc -l foo.txt', 'wc -l <file>');
+      expect(wcResult).toMatchObject({
+        gap_type: 'missing-awareness',
+        confidence: 'high',
+      });
+      expect(wcResult.draft_summary).toContain('Read (with offset/limit)');
     });
 
     it('falls back to low-confidence missing-tool for uncategorized commands', () => {
@@ -557,6 +605,58 @@ describe('audit-session-bash-parse', () => {
       expect(report.action_required.failures).toHaveLength(1);
       expect(report.action_required.failures[0].params).toBe('(none)');
       expect(report.action_required.failures[0].error).toBe('401 unauthorized');
+    });
+
+    it('collapses repeated line-range reads into one auto-classified gap instead of one per invocation (LS-8778)', () => {
+      const calls = [
+        synthBashCall("sed -n '10,50p' foo.txt"),
+        synthBashCall("sed -n '60,90p' bar.txt"),
+        synthBashCall("sed -n '1,5p' baz/qux.ts"),
+        synthBashCall('tail -50 /tmp/task-1.txt'),
+        synthBashCall('tail -20 /tmp/task-2.txt'),
+        synthBashCall('wc -l foo.txt'),
+      ];
+
+      const report = JSON.parse(formatAudit(calls, [], 'session-1')) as {
+        summary: Record<string, number>;
+        action_required: {
+          gaps_to_review: Array<Record<string, unknown>>;
+          gaps_auto_classified: Array<Record<string, unknown>>;
+        };
+      };
+
+      // 6 invocations collapse to 3 unique patterns (sed / tail / wc), not 6.
+      expect(report.summary.unique_patterns).toBe(3);
+      expect(report.summary.gaps_found).toBe(3);
+      expect(report.action_required.gaps_to_review).toHaveLength(0);
+      expect(report.action_required.gaps_auto_classified).toHaveLength(3);
+      const sedGap = report.action_required.gaps_auto_classified.find(
+        (g) => g['pattern'] === "sed -n '<range>' <file>",
+      );
+      expect(sedGap).toMatchObject({ count: 3, confidence: 'high' });
+    });
+
+    it('soft-caps gaps_to_review at 30 patterns and notes the overflow (LS-8778)', () => {
+      const calls = Array.from({ length: 40 }, (_, i) =>
+        synthBashCall(`curl -s https://example.com/endpoint-${i}`),
+      );
+
+      const report = JSON.parse(formatAudit(calls, [], 'session-1')) as {
+        summary: Record<string, number>;
+        action_required: {
+          gaps_to_review: unknown[];
+          gaps_to_review_overflow?: { omitted: number; note: string };
+        };
+      };
+
+      expect(report.summary.gaps_found).toBe(40);
+      expect(report.action_required.gaps_to_review).toHaveLength(30);
+      expect(report.action_required.gaps_to_review_overflow).toMatchObject({
+        omitted: 10,
+      });
+      expect(report.action_required.gaps_to_review_overflow?.note).toContain(
+        'gapsOnly:true',
+      );
     });
   });
 });
