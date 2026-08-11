@@ -16,8 +16,8 @@
 // tool calls do not re-hit Secrets Manager.
 
 import {
-  SecretsManagerClient,
   GetSecretValueCommand,
+  SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 
 /** Environment variable holding the Rollbar read-scope project access token. */

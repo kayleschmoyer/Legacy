@@ -2,8 +2,8 @@ import { markdownTable, pickFields } from '@legacy-sports/mcp-format';
 import { rollbarGet } from '../rollbar-api.js';
 import {
   ITEM_LIST_COLUMNS,
-  withPageFullHint,
   type RollbarItem,
+  withPageFullHint,
 } from '../format.js';
 import type { ToolResult } from '../types.js';
 

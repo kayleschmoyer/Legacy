@@ -1,6 +1,6 @@
 import {
-  ROLLBAR_READ_TOKEN_ENV,
   _resetRollbarTokenCacheForTests,
+  ROLLBAR_READ_TOKEN_ENV,
 } from './auth';
 import { ROLLBAR_API_BASE, rollbarGet } from './rollbar-api';
 
@@ -24,9 +24,9 @@ describe('rollbarGet', () => {
 
   function mockFetch(
     impl: (url: string, init: RequestInit) => Response,
-  ): jest.Mock {
-    const fn = jest.fn(async (url: string, init: RequestInit) =>
-      impl(url, init),
+  ): jest.Mock<Promise<Response>, [string, RequestInit]> {
+    const fn = jest.fn((url: string, init: RequestInit) =>
+      Promise.resolve(impl(url, init)),
     );
     global.fetch = fn as unknown as typeof fetch;
     return fn;
@@ -49,7 +49,7 @@ describe('rollbarGet', () => {
         new Response(JSON.stringify({ err: 0, result: {} }), { status: 200 }),
     );
     await rollbarGet({ path: '/items' });
-    const init = fn.mock.calls[0][1] as RequestInit;
+    const init = fn.mock.calls[0][1];
     expect(
       (init.headers as Record<string, string>)['X-Rollbar-Access-Token'],
     ).toBe('read-token');
@@ -64,7 +64,7 @@ describe('rollbarGet', () => {
       path: '/items',
       query: { status: 'active', level: undefined, page: 2 },
     });
-    const calledUrl = fn.mock.calls[0][0] as string;
+    const calledUrl = fn.mock.calls[0][0];
     expect(calledUrl).toBe(`${ROLLBAR_API_BASE}/items?status=active&page=2`);
   });
 

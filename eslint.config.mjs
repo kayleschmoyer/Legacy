@@ -35,7 +35,12 @@ export default [
         'error',
         {
           enforceBuildableLibDependency: false,
-          allow: [],
+          // tools/vite-configs is a plain relative-import helper folder (no
+          // project.json), consumed by relative path from every consumer's
+          // vite.config.ts so Vite's own config loader — which runs before
+          // any Nx/tsconfig-paths resolution is available — can load it with
+          // bare Node ESM resolution. See tools/mcp/rollbar-server/vite.config.ts.
+          allow: ['../../vite-configs'],
           depConstraints: [
             {
               sourceTag: '*',
@@ -234,9 +239,7 @@ export default [
       'tools/mcp/github-server/**',
       'tools/mcp/jira-server/**',
       'tools/mcp/nx-server/**',
-      'tools/mcp/rollbar-server/**',
       'tools/jira-sync/**',
-      'tools/rollbar-jira-reconcile/**',
     ],
   },
 ];

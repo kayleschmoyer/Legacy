@@ -73,7 +73,10 @@ describe('cli decide-batch', () => {
     const lines = result.stdout
       .trim()
       .split('\n')
-      .map((l) => JSON.parse(l));
+      .map(
+        (l): Record<string, unknown> =>
+          JSON.parse(l) as Record<string, unknown>,
+      );
     expect(lines).toHaveLength(3);
     expect(lines[0]).toMatchObject({
       counter: '1',
@@ -98,7 +101,10 @@ describe('cli decide-batch', () => {
     const [decision] = result.stdout
       .trim()
       .split('\n')
-      .map((l) => JSON.parse(l));
+      .map(
+        (l): Record<string, unknown> =>
+          JSON.parse(l) as Record<string, unknown>,
+      );
     expect(decision).toMatchObject({ action: 'propose' });
   });
 

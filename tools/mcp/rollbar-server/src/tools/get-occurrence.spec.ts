@@ -25,12 +25,23 @@ describe('getOccurrence', () => {
 
   function mockFetch(
     impl: (url: string, init: RequestInit) => Response,
-  ): jest.Mock {
-    const fn = jest.fn(async (url: string, init: RequestInit) =>
-      impl(url, init),
+  ): jest.Mock<Promise<Response>, [string, RequestInit]> {
+    const fn = jest.fn((url: string, init: RequestInit) =>
+      Promise.resolve(impl(url, init)),
     );
     global.fetch = fn as unknown as typeof fetch;
     return fn;
+  }
+
+  interface ParsedOccurrence {
+    id?: number;
+    data: {
+      body: {
+        trace_chain?: { exception: { message: string } }[];
+        message?: { body: string };
+        custom?: Record<string, unknown>;
+      };
+    };
   }
 
   it('returns an error when neither itemId nor occurrenceId is provided', async () => {
@@ -69,18 +80,18 @@ describe('getOccurrence', () => {
 
     expect(result.isError).toBeUndefined();
     expect(fn).toHaveBeenCalledTimes(1);
-    const [calledUrl] = fn.mock.calls[0] as [string, RequestInit];
+    const [calledUrl] = fn.mock.calls[0];
     expect(calledUrl).toBe(`${ROLLBAR_API_BASE}/instance/999`);
 
     const text = (result.content[0] as { text: string }).text;
     // Regression guard: `text` must always be a plain string so it satisfies
     // the MCP text-content schema.
     expect(typeof text).toBe('string');
-    const parsed = JSON.parse(text);
-    expect(parsed.data.body.trace_chain[0].exception.message).toBe(
+    const parsed = JSON.parse(text) as ParsedOccurrence;
+    expect(parsed.data.body.trace_chain?.[0].exception.message).toBe(
       'something went wrong',
     );
-    expect(parsed.data.body.custom.userId).toBe(42);
+    expect(parsed.data.body.custom?.userId).toBe(42);
   });
 
   it('also unwraps the instance when nested under `result.instance`', async () => {
@@ -102,9 +113,9 @@ describe('getOccurrence', () => {
     expect(result.isError).toBeUndefined();
     const text = (result.content[0] as { text: string }).text;
     expect(typeof text).toBe('string');
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(text) as ParsedOccurrence;
     expect(parsed.id).toBe(1001);
-    expect(parsed.data.body.message.body).toBe('nested shape');
+    expect(parsed.data.body.message?.body).toBe('nested shape');
   });
 
   it('returns a string error result when the instance payload is missing', async () => {
@@ -144,14 +155,14 @@ describe('getOccurrence', () => {
 
     expect(result.isError).toBeUndefined();
     expect(fn).toHaveBeenCalledTimes(1);
-    const [calledUrl] = fn.mock.calls[0] as [string, RequestInit];
+    const [calledUrl] = fn.mock.calls[0];
     expect(calledUrl).toContain(`${ROLLBAR_API_BASE}/item/12345/instances`);
     expect(calledUrl).toContain('per_page=1');
 
     const text = (result.content[0] as { text: string }).text;
-    const parsed = JSON.parse(text);
-    expect(parsed.data.body.message.body).toBe('full log line here');
-    expect(parsed.data.body.custom.requestId).toBe('abc123');
+    const parsed = JSON.parse(text) as ParsedOccurrence;
+    expect(parsed.data.body.message?.body).toBe('full log line here');
+    expect(parsed.data.body.custom?.requestId).toBe('abc123');
   });
 
   it('returns a not-found message when item has no occurrences', async () => {

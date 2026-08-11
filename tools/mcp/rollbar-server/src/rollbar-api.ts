@@ -11,7 +11,7 @@ export const ROLLBAR_API_BASE = 'https://api.rollbar.com/api/1';
 function isConnectionError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message.toLowerCase();
-  const cause = err.cause;
+  const cause = (err as Error & { cause?: unknown }).cause;
   const causeCode =
     cause !== null &&
     typeof cause === 'object' &&

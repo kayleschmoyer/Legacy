@@ -3,10 +3,10 @@ import {
   SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 import {
-  ROLLBAR_READ_TOKEN_ENV,
-  ROLLBAR_READ_TOKEN_SECRET_NAME_ENV,
   _resetRollbarTokenCacheForTests,
   getRollbarToken,
+  ROLLBAR_READ_TOKEN_ENV,
+  ROLLBAR_READ_TOKEN_SECRET_NAME_ENV,
   tryGetRollbarToken,
 } from './auth';
 

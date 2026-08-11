@@ -1,8 +1,8 @@
 import {
   occurrenceSummary,
-  withPageFullHint,
   ROLLBAR_DEFAULT_PER_PAGE,
   type RollbarInstance,
+  withPageFullHint,
 } from './format';
 
 describe('occurrenceSummary', () => {
