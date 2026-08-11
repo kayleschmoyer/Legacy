@@ -20,7 +20,7 @@
  * "run everything" so nothing is accidentally skipped.
  */
 
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 function parseBaseRef(argv) {
   const idx = argv.indexOf('--base');
@@ -30,7 +30,30 @@ function parseBaseRef(argv) {
   return 'origin/main';
 }
 
+// LS-8718: a cached `origin/main` ref can be stale-but-still-an-ancestor of
+// HEAD, which lets `git merge-base` resolve successfully against the wrong
+// (older) commit instead of failing outright like the no-merge-base case
+// LS-3041 handled. Refresh the remote-tracking ref before diffing so the
+// classification reflects current origin/main. Best-effort: if the fetch
+// fails (offline, no network), fall back to whatever ref is already cached
+// rather than erroring out.
+function refreshBaseRef(baseRef) {
+  const match = /^origin\/(.+)$/.exec(baseRef);
+  if (!match) {
+    return;
+  }
+  try {
+    execFileSync('git', ['fetch', 'origin', match[1], '--quiet'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      timeout: 15000,
+    });
+  } catch {
+    // Offline or fetch failed — proceed with the existing cached ref.
+  }
+}
+
 function classify(baseRef) {
+  refreshBaseRef(baseRef);
   const FAIL_SAFE = {
     hasDb: true,
     hasWorkflows: true,
@@ -40,10 +63,14 @@ function classify(baseRef) {
 
   let files;
   try {
-    const output = execSync(`git diff --name-only ${baseRef}...HEAD`, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    }).trim();
+    const output = execFileSync(
+      'git',
+      ['diff', '--name-only', `${baseRef}...HEAD`],
+      {
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      },
+    ).trim();
 
     if (!output) {
       // No changes detected — run everything (fail-safe)
@@ -93,51 +120,63 @@ function classify(baseRef) {
   return { hasDb, hasWorkflows, docsOnly: allDocs, reason: null };
 }
 
-const baseRef = parseBaseRef(process.argv);
-const result = classify(baseRef);
-const flags = {
-  PC_HAS_DB: result.hasDb ? '1' : '0',
-  PC_HAS_WORKFLOWS: result.hasWorkflows ? '1' : '0',
-  PC_DOCS_ONLY: result.docsOnly ? '1' : '0',
-};
+function main() {
+  const baseRef = parseBaseRef(process.argv);
+  const result = classify(baseRef);
+  const flags = {
+    PC_HAS_DB: result.hasDb ? '1' : '0',
+    PC_HAS_WORKFLOWS: result.hasWorkflows ? '1' : '0',
+    PC_DOCS_ONLY: result.docsOnly ? '1' : '0',
+  };
 
-const printSummary = process.argv.includes('--print-summary');
+  const printSummary = process.argv.includes('--print-summary');
 
-if (printSummary) {
-  // Human-readable output for the recipe log
-  if (result.reason === 'no-changes') {
-    process.stdout.write(
-      '  No changes detected vs base — running all steps (fail-safe)\n',
-    );
-  } else if (result.reason === 'git-diff-failed') {
-    process.stdout.write('  git diff failed — running all steps (fail-safe)\n');
-  } else {
-    const skips = [];
-    if (flags.PC_DOCS_ONLY === '1') {
-      skips.push(
-        'docs-only changes detected — skipping typecheck, lint, test, build',
+  if (printSummary) {
+    // Human-readable output for the recipe log
+    if (result.reason === 'no-changes') {
+      process.stdout.write(
+        '  No changes detected vs base — running all steps (fail-safe)\n',
       );
-    }
-    if (flags.PC_HAS_DB === '0') {
-      skips.push(
-        'no db changes — skipping migration check, schema gen, codegen',
+    } else if (result.reason === 'git-diff-failed') {
+      process.stdout.write(
+        '  git diff failed — running all steps (fail-safe)\n',
       );
-    }
-    if (flags.PC_HAS_WORKFLOWS === '0') {
-      skips.push('no workflow changes — skipping workflow validation');
-    }
-    if (skips.length === 0) {
-      process.stdout.write('  All change types detected — running all steps\n');
     } else {
-      for (const skip of skips) {
-        process.stdout.write(`  ${skip}\n`);
+      const skips = [];
+      if (flags.PC_DOCS_ONLY === '1') {
+        skips.push(
+          'docs-only changes detected — skipping typecheck, lint, test, build',
+        );
+      }
+      if (flags.PC_HAS_DB === '0') {
+        skips.push(
+          'no db changes — skipping migration check, schema gen, codegen',
+        );
+      }
+      if (flags.PC_HAS_WORKFLOWS === '0') {
+        skips.push('no workflow changes — skipping workflow validation');
+      }
+      if (skips.length === 0) {
+        process.stdout.write(
+          '  All change types detected — running all steps\n',
+        );
+      } else {
+        for (const skip of skips) {
+          process.stdout.write(`  ${skip}\n`);
+        }
       }
     }
+  } else {
+    // Machine-readable output for Make $(shell) evaluation
+    const output = Object.entries(flags)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(' ');
+    process.stdout.write(output);
   }
-} else {
-  // Machine-readable output for Make $(shell) evaluation
-  const output = Object.entries(flags)
-    .map(([k, v]) => `${k}=${v}`)
-    .join(' ');
-  process.stdout.write(output);
 }
+
+if (require.main === module) {
+  main();
+}
+
+module.exports = { parseBaseRef, refreshBaseRef, classify };
