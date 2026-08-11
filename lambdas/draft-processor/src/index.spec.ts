@@ -16,6 +16,11 @@ jest.mock('drizzle-orm', () => ({
     vals,
   }),
   or: (...args: unknown[]) => ({ _type: 'or', args }),
+  sum: (col: unknown) => ({
+    _type: 'sum',
+    col,
+    mapWith: () => ({ _type: 'sum', col }),
+  }),
   sql: Object.assign(
     (strings: TemplateStringsArray, ...vals: unknown[]) => ({
       _type: 'sql',
@@ -573,6 +578,11 @@ describe('buildPlayerPool', () => {
                 .mockImplementation(() => Promise.resolve(fetch())),
             })),
             limit: jest.fn().mockImplementation(() => Promise.resolve(fetch())),
+            groupBy: jest.fn().mockImplementation(() => ({
+              having: jest
+                .fn()
+                .mockImplementation(() => Promise.resolve(fetch())),
+            })),
             then: (
               resolve: (v: unknown[]) => unknown,
               reject?: (e: unknown) => unknown,
@@ -713,6 +723,49 @@ describe('buildPlayerPool', () => {
     expect(mockFilterPlayerIdsByLeagueEligibility).toHaveBeenCalledWith(
       db,
       expect.any(Array),
+      expect.objectContaining({ sport: 'baseball' }),
+    );
+  });
+
+  it('for baseball: includes a player who qualifies only via aggregated fielding games', async () => {
+    // Player 2 has no batting/pitching rows but has fielding rows split across
+    // positions in one season that sum to >= minGames (LS-9317: the SQL now
+    // aggregates via GROUP BY/HAVING, so this arrives as a single pre-summed row).
+    const players = [makePlayer(1), makePlayer(2)];
+    const positions = [makePosition(1, 'OF'), makePosition(2, 'SS')];
+
+    // Sequence: candidatePlayers → battingStats → pitchingStats → fieldingStats → playerPositions
+    const db = makeSequentialDb([
+      players,
+      [{ playerId: 1, g: 50 }],
+      [],
+      [{ playerId: 2, totalG: 20 }],
+      positions,
+    ]);
+
+    mockFilterPlayerIdsByLeagueEligibility.mockResolvedValue({
+      eligibleIds: new Set([1, 2]),
+      excludedByPool: 0,
+      excludedByCareerGames: 0,
+      excludedByCareerSeasons: 0,
+      excludedByHofOnly: 0,
+      excludedByEraFilter: 0,
+    });
+
+    await buildPlayerPool(
+      db as unknown as PublicDb,
+      LEAGUE_ID,
+      NUM_TEAMS,
+      POSITIONS,
+      {
+        ...BASE_CONFIG,
+        sport: 'baseball',
+      },
+    );
+
+    expect(mockFilterPlayerIdsByLeagueEligibility).toHaveBeenCalledWith(
+      db,
+      expect.arrayContaining([1, 2]),
       expect.objectContaining({ sport: 'baseball' }),
     );
   });

@@ -48,6 +48,7 @@ import {
   notInArray,
   or,
   sql,
+  sum,
 } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -487,8 +488,7 @@ export async function buildPlayerPool(
       db
         .select({
           playerId: PublicSchema.seasonFielding.playerId,
-          season: PublicSchema.seasonFielding.season,
-          g: PublicSchema.seasonFielding.g,
+          totalG: sum(PublicSchema.seasonFielding.g).mapWith(Number),
         })
         .from(PublicSchema.seasonFielding)
         .where(
@@ -500,19 +500,22 @@ export async function buildPlayerPool(
             gte(PublicSchema.seasonFielding.season, MIN_SEASON_WITH_GAME_DATA),
             notNegroLeague(PublicSchema.seasonFielding.lgId),
           ),
-        ),
+        )
+        // Fielding requires per-season aggregation (multiple positions per
+        // season, e.g. a mid-season position change) — a player row is only
+        // "valid" once one season's total games crosses minGames. Pushed into
+        // SQL (LS-9317) so the ~17.5k rows/call this previously returned
+        // (every player/season/position row, unfiltered) collapses to one
+        // row per qualifying player/season.
+        .groupBy(
+          PublicSchema.seasonFielding.playerId,
+          PublicSchema.seasonFielding.season,
+        )
+        .having(gte(sum(PublicSchema.seasonFielding.g), minGames)),
     ]);
 
-    const fieldingByPlayerSeason = new Map<string, number>();
-    for (const stat of fieldingStats) {
-      const key = `${stat.playerId}-${stat.season}`;
-      fieldingByPlayerSeason.set(
-        key,
-        (fieldingByPlayerSeason.get(key) ?? 0) + (stat.g ?? 0),
-      );
-    }
-
-    // Batting and pitching rows already satisfy g >= minGames (filtered in SQL).
+    // Batting and pitching rows already satisfy g >= minGames (filtered in SQL);
+    // fielding rows are pre-aggregated per season and already satisfy it too.
     const playersWithValidSeasons = new Set<number>();
     for (const stat of battingStats) {
       playersWithValidSeasons.add(stat.playerId);
@@ -520,11 +523,8 @@ export async function buildPlayerPool(
     for (const stat of pitchingStats) {
       playersWithValidSeasons.add(stat.playerId);
     }
-    // Fielding requires per-season aggregation (multiple positions per season).
-    for (const [key, totalGames] of fieldingByPlayerSeason.entries()) {
-      if (totalGames >= minGames) {
-        playersWithValidSeasons.add(parseInt(key.split('-')[0]));
-      }
+    for (const stat of fieldingStats) {
+      playersWithValidSeasons.add(stat.playerId);
     }
 
     players = candidatePlayers.filter((p) => playersWithValidSeasons.has(p.id));
