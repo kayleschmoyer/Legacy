@@ -51,6 +51,7 @@ coverage/
 
 # Lock files (large, rarely useful for context)
 pnpm-lock.yaml
+poetry.lock
 
 # Internal tool state
 .twig/
