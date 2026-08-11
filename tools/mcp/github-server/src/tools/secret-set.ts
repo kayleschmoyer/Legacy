@@ -1,8 +1,8 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { readFileSync } from 'node:fs';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
-import { readFileSync } from 'node:fs';
 
 function isModuleNotFoundError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
@@ -42,7 +42,7 @@ async function encryptSecret(
   // These are optional deps without guaranteed type declarations, so we
   // import as unknown and cast to the minimal shape we need.
   try {
-    const tweetnacl = (await import('tweetnacl' as string)) as unknown as {
+    const tweetnacl = (await import('tweetnacl')) as unknown as {
       sealedbox?: {
         seal(msg: Uint8Array, pk: Uint8Array): Uint8Array;
       };
@@ -66,9 +66,7 @@ async function encryptSecret(
 
   // Fallback: use libsodium-wrappers if available
   try {
-    const sodium = (await import(
-      'libsodium-wrappers' as string
-    )) as unknown as {
+    const sodium = (await import('libsodium-wrappers')) as unknown as {
       ready: Promise<void>;
       crypto_box_seal(msg: Uint8Array, pk: Uint8Array): Uint8Array;
     };
@@ -141,8 +139,10 @@ export async function secretSet(params: SecretSetParams): Promise<ToolResult> {
           ],
         };
       }
+    } else if (params.value) {
+      secretValue = params.value;
     } else {
-      secretValue = params.value!;
+      throw new Error('Provide either "value" or "valueFile" parameter.');
     }
 
     const repo = await getRepoOwnerName();

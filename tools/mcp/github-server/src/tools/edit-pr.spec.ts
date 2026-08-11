@@ -1,9 +1,9 @@
 jest.mock('../github-api', () => ({ githubRest: jest.fn() }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
+import { editPR } from './edit-pr';
 import { githubRest } from '../github-api';
 import { getRepoOwnerName } from '../auth';
-import { editPR } from './edit-pr';
 
 const mockedRest = githubRest as jest.MockedFunction<typeof githubRest>;
 const mockedRepo = getRepoOwnerName as jest.MockedFunction<
@@ -18,6 +18,12 @@ afterEach(() => jest.resetAllMocks());
 
 const LARGE_BODY = 'B'.repeat(60_000);
 
+interface EditPrResultBody {
+  success?: boolean;
+  number?: number;
+  updatedFields?: Record<string, string>;
+}
+
 describe('editPR — compact response', () => {
   it('returns only updated fields, not full body, on title-only edit', async () => {
     mockedRest.mockResolvedValue({
@@ -28,7 +34,7 @@ describe('editPR — compact response', () => {
     });
     const result = await editPR({ number: 42, title: 'New title' });
     expect(result.isError).toBeFalsy();
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as EditPrResultBody;
     expect(parsed.success).toBe(true);
     expect(parsed.number).toBe(42);
     expect(parsed.updatedFields).toHaveProperty('title', 'New title');
@@ -47,7 +53,7 @@ describe('editPR — compact response', () => {
       html_url: 'https://github.com/o/r/pull/42',
     });
     const result = await editPR({ number: 42, body: 'short body' });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as EditPrResultBody;
     expect(parsed.updatedFields).toHaveProperty('body', 'short body');
     expect(parsed.updatedFields).not.toHaveProperty('title');
   });

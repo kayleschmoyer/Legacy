@@ -1,6 +1,6 @@
 import { LOGGER } from '@legacy-sports/logging/server';
-import type { ToolResult } from '../types.js';
 import { listPRComments } from './list-pr-comments.js';
+import type { ToolResult } from '../types.js';
 
 export interface ListPRInlineCommentsParams {
   number: number;

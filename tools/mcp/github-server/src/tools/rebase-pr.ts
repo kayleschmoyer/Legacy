@@ -1,6 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
-import { getRepoRoot, getRepoOwnerName, isLambda } from '../auth.js';
+import { getRepoOwnerName, getRepoRoot, isLambda } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import { runWithSyncBudget, withCheckoutLock } from '../jobs.js';
 import type { JobLogger } from '../jobs.js';
@@ -215,7 +215,9 @@ export async function rebasePRViaApi(
  */
 export async function rebasePRWorker(
   params: RebasePRParams,
-  jobLog: JobLogger = () => {},
+  jobLog: JobLogger = () => {
+    // no-op default logger
+  },
 ): Promise<ToolResult> {
   const { number } = params;
   const cwd = getRepoRoot();

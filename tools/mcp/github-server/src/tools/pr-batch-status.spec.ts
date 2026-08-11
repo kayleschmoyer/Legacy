@@ -1,9 +1,9 @@
 jest.mock('../github-api', () => ({ githubGraphQL: jest.fn() }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
+import { prBatchStatus } from './pr-batch-status';
 import { githubGraphQL } from '../github-api';
 import { getRepoOwnerName } from '../auth';
-import { prBatchStatus } from './pr-batch-status';
 
 const mockedGraphQL = githubGraphQL as jest.MockedFunction<
   typeof githubGraphQL
@@ -57,6 +57,13 @@ function makePR(
 
 function gqlResponse(prsByAlias: Record<string, unknown>) {
   return { data: { repository: prsByAlias }, errors: undefined };
+}
+
+interface ParsedBatchStatus {
+  prs: Array<{
+    ciSummary: string;
+    failedJobs?: string[];
+  }>;
 }
 
 beforeEach(() => {
@@ -117,7 +124,7 @@ describe('prBatchStatus — failedJobs dedup (LS-8829)', () => {
     );
 
     const result = await prBatchStatus({ numbers: [6520], compact: true });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedBatchStatus;
 
     expect(parsed.prs[0].ciSummary).toBe('pass');
     expect(parsed.prs[0]).not.toHaveProperty('failedJobs');
@@ -148,7 +155,7 @@ describe('prBatchStatus — failedJobs dedup (LS-8829)', () => {
     );
 
     const result = await prBatchStatus({ numbers: [1], compact: true });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedBatchStatus;
 
     expect(parsed.prs[0].ciSummary).toBe('fail');
     expect(parsed.prs[0].failedJobs).toEqual(['lint']);
@@ -197,12 +204,15 @@ describe('prBatchStatus — statusCheckRollup pagination (LS-8829 Cycle 2)', () 
       },
     );
 
-    mockedGraphQL.mockImplementation(async (query: string) => {
+    mockedGraphQL.mockImplementation((query: string) => {
       if (query.includes('pr_42')) {
-        return { data: { repository: { pr_42: pr } }, errors: undefined };
+        return Promise.resolve({
+          data: { repository: { pr_42: pr } },
+          errors: undefined,
+        });
       }
       // Pagination follow-up query, scoped to the commit oid.
-      return {
+      return Promise.resolve({
         data: {
           repository: {
             object: {
@@ -225,11 +235,11 @@ describe('prBatchStatus — statusCheckRollup pagination (LS-8829 Cycle 2)', () 
           },
         },
         errors: undefined,
-      };
+      });
     });
 
     const result = await prBatchStatus({ numbers: [42], compact: true });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedBatchStatus;
 
     // Without pagination, the second-page "lint" failure would be silently dropped.
     expect(parsed.prs[0].ciSummary).toBe('fail');

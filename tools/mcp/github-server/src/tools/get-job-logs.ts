@@ -146,7 +146,11 @@ const ERROR_PATTERN =
   /(?:error\b|FAIL|failed|✗|ERR!|error TS\d|Cannot find|Module not found|ENOENT|exit code [1-9]|Failed tasks)/i;
 
 const NX_FAILED_SECTION = /^[\s>]*Failed tasks/i;
-const ANSI_ESCAPE_PREFIX = /^\x1b\[/;
+
+/** True if `line` starts with an ANSI CSI escape sequence (ESC `[`). */
+function startsWithAnsiEscape(line: string): boolean {
+  return line.charCodeAt(0) === 0x1b && line[1] === '[';
+}
 
 /**
  * Extract lines that match error patterns, with 2 lines of surrounding context.
@@ -170,7 +174,7 @@ function extractErrorSummary(allLines: string[]): string[] {
 
     if (
       ERROR_PATTERN.test(line) &&
-      !ANSI_ESCAPE_PREFIX.test(line) &&
+      !startsWithAnsiEscape(line) &&
       !/node_modules/.test(line) &&
       !/^\s*at\s/.test(line)
     ) {
@@ -263,7 +267,10 @@ export async function getJobLogs(
       rawText = await fetchJobLog(owner, name, params.jobId);
       jobLabel = `job ${params.jobId}`;
     } else {
-      const jobs = await fetchJobs(owner, name, params.runId!, failedOnly);
+      if (!params.runId) {
+        throw new Error('runId is required when jobId is not provided');
+      }
+      const jobs = await fetchJobs(owner, name, params.runId, failedOnly);
       if (jobs.length === 0) {
         return {
           content: [

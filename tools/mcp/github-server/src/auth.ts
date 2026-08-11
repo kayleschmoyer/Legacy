@@ -1,11 +1,10 @@
+import { LOGGER } from '@legacy-sports/logging/server';
 import { execFile } from 'node:child_process';
 import { createSign } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { chmod, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-
-import { LOGGER } from '@legacy-sports/logging/server';
 
 import { readGitRemoteUrl } from './git-config.js';
 import { getRepoRoot } from './repo-root.js';

@@ -10,13 +10,13 @@ jest.mock('../auth', () => ({
 }));
 
 const { rebasePRWorker: mockRebasePR, rebasePRViaApi: mockRebasePRViaApi } =
-  jest.requireMock('./rebase-pr') as {
+  jest.requireMock<{
     rebasePRWorker: jest.Mock;
     rebasePRViaApi: jest.Mock;
-  };
-const { isLambda: mockIsLambda } = jest.requireMock('../auth') as {
-  isLambda: jest.Mock;
-};
+  }>('./rebase-pr');
+const { isLambda: mockIsLambda } = jest.requireMock<{ isLambda: jest.Mock }>(
+  '../auth',
+);
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -58,23 +58,31 @@ function conflictResult(number: number) {
   };
 }
 
+interface BulkRebaseResultBody {
+  total?: number;
+  succeeded?: Array<{ number: number }>;
+  failed?: Array<{ index: number; key?: string | number; error: string }>;
+}
+
+function parse(result: { content: Array<{ type: string; text: string }> }) {
+  return JSON.parse(result.content[0].text) as BulkRebaseResultBody;
+}
+
 describe('bulkRebase', () => {
   it('runs sequentially and aggregates success results', async () => {
     const callOrder: number[] = [];
-    mockRebasePR.mockImplementation(async ({ number }: { number: number }) => {
+    mockRebasePR.mockImplementation(({ number }: { number: number }) => {
       callOrder.push(number);
-      return successResult(number);
+      return Promise.resolve(successResult(number));
     });
 
     const result = await bulkRebase({ numbers: [10, 20, 30] });
 
     expect(callOrder).toEqual([10, 20, 30]);
     expect(result.isError).toBeUndefined();
-    const body = JSON.parse(result.content[0].text);
+    const body = parse(result);
     expect(body.total).toBe(3);
-    expect(body.succeeded.map((s: { number: number }) => s.number)).toEqual([
-      10, 20, 30,
-    ]);
+    expect(body.succeeded?.map((s) => s.number)).toEqual([10, 20, 30]);
   });
 
   it('continues past a failed rebase and surfaces the conflict error', async () => {
@@ -86,7 +94,7 @@ describe('bulkRebase', () => {
     const result = await bulkRebase({ numbers: [1, 2, 3] });
 
     expect(result.isError).toBe(true);
-    const body = JSON.parse(result.content[0].text);
+    const body = parse(result);
     expect(body.succeeded).toHaveLength(2);
     expect(body.failed).toEqual([
       { index: 1, key: 2, error: 'Rebase conflicts detected' },
@@ -95,8 +103,8 @@ describe('bulkRebase', () => {
 
   it('uses rebasePRViaApi (not the git worker) per PR when isLambda() is true (LS-7753)', async () => {
     mockIsLambda.mockReturnValue(true);
-    mockRebasePRViaApi.mockImplementation(
-      async ({ number }: { number: number }) => successResult(number),
+    mockRebasePRViaApi.mockImplementation(({ number }: { number: number }) =>
+      Promise.resolve(successResult(number)),
     );
 
     const result = await bulkRebase({ numbers: [10, 20] });

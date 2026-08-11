@@ -4,9 +4,9 @@ jest.mock('../github-api', () => ({
 }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
+import { __test, listReviews } from './list-reviews';
 import { githubGraphQL, githubRest } from '../github-api';
 import { getRepoOwnerName } from '../auth';
-import { listReviews, __test } from './list-reviews';
 
 const mockedGraphQL = githubGraphQL as jest.MockedFunction<
   typeof githubGraphQL
@@ -330,8 +330,8 @@ describe('listReviews (LS-8166)', () => {
             submitted_at: '2026-01-01T00:00:00Z',
             body: 'lgtm',
           },
-        ] as unknown as never)
-        .mockResolvedValueOnce([] as unknown as never);
+        ] as unknown)
+        .mockResolvedValueOnce([] as unknown);
 
       // Single-PR reviews render as a token-efficient Markdown table (LS-8021):
       // a header line plus one row per review.
@@ -359,8 +359,8 @@ describe('listReviews (LS-8166)', () => {
             submitted_at: '2026-01-01T00:00:00Z',
             body: 'a distinctive review body',
           },
-        ] as unknown as never)
-        .mockResolvedValueOnce([] as unknown as never);
+        ] as unknown)
+        .mockResolvedValueOnce([] as unknown);
 
       const text = (await listReviews({ number: 42, compact: false }))
         .content[0].text;
@@ -378,8 +378,8 @@ describe('listReviews (LS-8166)', () => {
             submitted_at: '2026-01-01T00:00:00Z',
             body: 'lgtm',
           },
-        ] as unknown as never)
-        .mockResolvedValueOnce([] as unknown as never);
+        ] as unknown)
+        .mockResolvedValueOnce([] as unknown);
 
       const text = (await listReviews({ number: 42 })).content[0].text;
 

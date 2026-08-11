@@ -141,11 +141,17 @@ export function buildReplyBody(reply: FinishFixRoundReply): string {
   const prefix = KIND_PREFIX[reply.kind];
 
   if (reply.kind === 'FIX') {
-    const sha = reply.sha!.trim();
+    if (!reply.sha) {
+      throw new Error('FIX reply requires a sha');
+    }
+    const sha = reply.sha.trim();
     return prLevel ? `${prefix} ${reply.issueId}\n${sha}` : `${prefix} ${sha}`;
   }
 
-  const body = reply.body!.trim();
+  if (!reply.body) {
+    throw new Error(`${reply.kind} reply requires a body`);
+  }
+  const body = reply.body.trim();
   if (prLevel) {
     // CANNOT-COMPLY already requires an issue-id on its own line regardless
     // of thread vs PR-level origin (see parseAuthorReply) — JUSTIFY adopts
@@ -341,8 +347,11 @@ export async function finishFixRound(
   //     bot (or a human reviewer) can adjudicate them in the next cycle.
   // PR-level (issueId-based) replies have no thread to resolve.
   const threadIdsToResolve = replyOutcomes
-    .filter((o) => o.success && o.kind === 'FIX' && o.threadId)
-    .map((o) => o.threadId!);
+    .filter(
+      (o): o is ReplyOutcome & { threadId: string } =>
+        o.success && o.kind === 'FIX' && !!o.threadId,
+    )
+    .map((o) => o.threadId);
 
   const resolveOutcomes = await resolveBatch(threadIdsToResolve);
 
@@ -367,7 +376,7 @@ export async function finishFixRound(
       threadId: o.threadId,
       issueId: o.issueId,
       kind: o.kind,
-      error: o.error!,
+      error: o.error ?? 'unknown error',
     }));
   const resolveErrors = resolveOutcomes
     .filter((r) => r.error || !r.isResolved)

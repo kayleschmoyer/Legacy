@@ -135,7 +135,7 @@ export async function resolveThreads(
   let allThreadIds: string[] = [...(params.threadIds ?? [])];
   let notFoundCommentIds: number[] = [];
 
-  if (hasCommentIds) {
+  if (hasCommentIds && params.commentDatabaseIds) {
     if (!params.prNumber) {
       return {
         isError: true,
@@ -151,7 +151,7 @@ export async function resolveThreads(
     try {
       const { resolved, notFound } = await fetchThreadIdsForComments(
         params.prNumber,
-        params.commentDatabaseIds!,
+        params.commentDatabaseIds,
       );
       allThreadIds = [...new Set([...allThreadIds, ...resolved])];
       notFoundCommentIds = notFound;

@@ -8,11 +8,11 @@ jest.mock('../pr-utils', () => ({
   resolvePullRequestNodeId: jest.fn(),
 }));
 
-const { githubGraphQL: mockGithubGraphQL } = jest.requireMock(
-  '../github-api',
-) as { githubGraphQL: jest.Mock };
+const { githubGraphQL: mockGithubGraphQL } = jest.requireMock<{
+  githubGraphQL: jest.Mock;
+}>('../github-api');
 const { resolvePullRequestNodeId: mockResolvePullRequestNodeId } =
-  jest.requireMock('../pr-utils') as { resolvePullRequestNodeId: jest.Mock };
+  jest.requireMock<{ resolvePullRequestNodeId: jest.Mock }>('../pr-utils');
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -38,7 +38,11 @@ describe('enableAutoMerge', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as {
+      success: boolean;
+      prNumber: number;
+      mergeMethod: string;
+    };
     expect(body).toMatchObject({
       success: true,
       prNumber: 5076,
@@ -80,7 +84,11 @@ describe('enableAutoMerge', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as {
+      success: boolean;
+      prNumber: number;
+      output: string;
+    };
     expect(body.success).toBe(true);
     expect(body.prNumber).toBe(5076);
     expect(body.output).toContain('already in the merge queue');

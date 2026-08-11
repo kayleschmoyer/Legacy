@@ -1,12 +1,12 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { getRepoOwnerName } from '../auth.js';
-import { githubRest } from '../github-api.js';
-import type { ToolResult } from '../types.js';
 import {
   extractJiraLinkBlock,
   stripJiraLinkBlocks,
   validateJiraLinkMarker,
 } from './jira-link.js';
+import { getRepoOwnerName } from '../auth.js';
+import { githubRest } from '../github-api.js';
+import type { ToolResult } from '../types.js';
 
 interface EditPRParams {
   number: number;

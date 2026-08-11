@@ -9,14 +9,19 @@ jest.mock('../auth', () => ({
   getRepoOwnerName: jest.fn(),
 }));
 
+interface BulkReplyPayload {
+  success: boolean;
+  succeeded: unknown[];
+  failed: Array<{ error: string }>;
+}
+
 const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
-  jest.requireMock('../github-api') as {
-    githubRest: jest.Mock;
-    githubGraphQL: jest.Mock;
-  };
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as { getRepoOwnerName: jest.Mock };
+  jest.requireMock<{ githubRest: jest.Mock; githubGraphQL: jest.Mock }>(
+    '../github-api',
+  );
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
+  getRepoOwnerName: jest.Mock;
+}>('../auth');
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -46,7 +51,7 @@ describe('bulkReplyToReview', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as BulkReplyPayload;
     expect(body.success).toBe(true);
     expect(body.succeeded).toHaveLength(2);
   });
@@ -68,7 +73,7 @@ describe('bulkReplyToReview', () => {
     });
 
     expect(result.isError).toBe(true);
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as BulkReplyPayload;
     expect(body.succeeded).toHaveLength(1);
     expect(body.failed).toHaveLength(1);
     expect(body.failed[0].error).toMatch(/threadId|commentId/);

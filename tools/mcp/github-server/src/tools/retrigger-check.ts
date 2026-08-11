@@ -53,7 +53,6 @@ export async function retriggerCheck(
   let totalCount = 0;
   let page = 1;
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const pageData = await githubRest<CheckRunsResponse>({
       method: 'GET',

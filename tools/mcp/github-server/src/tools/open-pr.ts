@@ -1,22 +1,22 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { isAbsolute, resolve, relative } from 'node:path';
-import {
-  getRepoOwnerName,
-  getRepoRoot,
-  getAuthorToken,
-  isLambda,
-} from '../auth.js';
-import { githubGraphQL, githubRest } from '../github-api.js';
-import { runWithSyncBudget } from '../jobs.js';
-import type { JobLogger } from '../jobs.js';
+import { isAbsolute, relative, resolve } from 'node:path';
 import {
   ensureJiraLinkMarker,
   ensureTitleHasPrimaryKey,
   extractPrimaryKey,
   isValidPrimary,
 } from './jira-link.js';
+import {
+  getAuthorToken,
+  getRepoOwnerName,
+  getRepoRoot,
+  isLambda,
+} from '../auth.js';
+import { githubGraphQL, githubRest } from '../github-api.js';
+import { runWithSyncBudget } from '../jobs.js';
+import type { JobLogger } from '../jobs.js';
 import type { ToolResult } from '../types.js';
 
 export interface OpenPRParams {
@@ -136,7 +136,7 @@ export async function openPR(params: OpenPRParams): Promise<ToolResult> {
 
 async function openPRWorker(
   params: OpenPRParams,
-  jobLog: JobLogger = () => {},
+  jobLog: JobLogger = () => undefined,
 ): Promise<ToolResult> {
   const lambda = isLambda();
   const shouldPush = params.push !== false;

@@ -8,12 +8,12 @@ jest.mock('../auth', () => ({
 
 import { getFileContent } from './get-file-content';
 
-const { githubRest: mockGithubRest } = jest.requireMock('../github-api') as {
+const { githubRest: mockGithubRest } = jest.requireMock<{
   githubRest: jest.Mock;
-};
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as { getRepoOwnerName: jest.Mock };
+}>('../github-api');
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
+  getRepoOwnerName: jest.Mock;
+}>('../auth');
 
 function parse(text: string) {
   return JSON.parse(text) as Record<string, unknown>;

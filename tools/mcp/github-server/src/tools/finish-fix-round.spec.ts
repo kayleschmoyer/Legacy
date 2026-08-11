@@ -13,18 +13,35 @@ jest.mock('../auth', () => ({
   getRepoOwnerName: jest.fn(),
 }));
 
-const { githubRest: mockRest, githubGraphQL: mockGraphQL } = jest.requireMock(
-  '../github-api',
-) as {
-  githubRest: jest.Mock;
-  githubGraphQL: jest.Mock;
-};
-const { getRepoOwnerName: mockRepo } = jest.requireMock('../auth') as {
+const { githubRest: mockRest, githubGraphQL: mockGraphQL } = jest.requireMock<{
+  githubRest: jest.Mock<Promise<unknown>, [Record<string, unknown>]>;
+  githubGraphQL: jest.Mock<Promise<unknown>, [string, Record<string, unknown>]>;
+}>('../github-api');
+const { getRepoOwnerName: mockRepo } = jest.requireMock<{
   getRepoOwnerName: jest.Mock;
-};
+}>('../auth');
 
-function parse(result: { content: Array<{ type: string; text: string }> }) {
-  return JSON.parse(result.content[0].text);
+interface ParsedResult {
+  error?: string;
+  replied?: number;
+  resolved?: number;
+  labelApplied?: boolean;
+  errors?: Array<{ stage: string; threadId?: string }>;
+  replies?: Array<{
+    threadId?: string;
+    issueId?: string;
+    kind: string;
+    body: string;
+    success: boolean;
+    commentId?: number;
+  }>;
+  resolutions?: Array<{ threadId: string; isResolved: boolean }>;
+}
+
+function parse(result: {
+  content: Array<{ type: string; text: string }>;
+}): ParsedResult {
+  return JSON.parse(result.content[0].text) as ParsedResult;
 }
 
 describe('validateReplies', () => {
@@ -167,9 +184,7 @@ describe('finishFixRound (integration)', () => {
     expect(result.isError).toBe(true);
     expect(mockGraphQL).not.toHaveBeenCalled();
     expect(mockRest).not.toHaveBeenCalled();
-    const data = parse(
-      result as { content: Array<{ type: string; text: string }> },
-    );
+    const data = parse(result);
     expect(data.error).toMatch(/validation failed/);
   });
 
@@ -201,9 +216,7 @@ describe('finishFixRound (integration)', () => {
       ],
     });
 
-    const data = parse(
-      result as { content: Array<{ type: string; text: string }> },
-    );
+    const data = parse(result);
     expect(data.replied).toBe(2);
     expect(data.resolved).toBe(1);
     expect(data.labelApplied).toBe(true);
@@ -212,13 +225,15 @@ describe('finishFixRound (integration)', () => {
     const fixCall = mockGraphQL.mock.calls.find(
       ([, vars]) => (vars as { threadId: string }).threadId === 'PRRT_1',
     );
-    expect((fixCall![1] as { body: string }).body).toBe('FIX: abc1234');
+    if (!fixCall) throw new Error('fixCall not found');
+    expect((fixCall[1] as { body: string }).body).toBe('FIX: abc1234');
 
     // JUSTIFY prefixed
     const justifyCall = mockGraphQL.mock.calls.find(
       ([, vars]) => (vars as { threadId: string }).threadId === 'PRRT_2',
     );
-    expect((justifyCall![1] as { body: string }).body).toBe(
+    if (!justifyCall) throw new Error('justifyCall not found');
+    expect((justifyCall[1] as { body: string }).body).toBe(
       'JUSTIFY: intentional',
     );
 
@@ -231,9 +246,10 @@ describe('finishFixRound (integration)', () => {
 
     // JUSTIFY threads must NOT be resolved
     const resolveCall = mockGraphQL.mock.calls.find(([q]) =>
-      (q as string).includes('resolveReviewThread'),
+      q.includes('resolveReviewThread'),
     );
-    const resolveVars = resolveCall![1] as Record<string, string>;
+    if (!resolveCall) throw new Error('resolveCall not found');
+    const resolveVars = resolveCall[1] as Record<string, string>;
     expect(Object.values(resolveVars)).toContain('PRRT_1');
     expect(Object.values(resolveVars)).not.toContain('PRRT_2');
   });
@@ -268,9 +284,7 @@ describe('finishFixRound (integration)', () => {
       ],
     });
 
-    const data = parse(
-      result as { content: Array<{ type: string; text: string }> },
-    );
+    const data = parse(result);
     expect(data.replied).toBe(1);
     expect(data.resolved).toBe(1);
     expect(data.labelApplied).toBe(true);
@@ -282,9 +296,10 @@ describe('finishFixRound (integration)', () => {
 
     // Failed thread is NOT resolved
     const resolveCall = mockGraphQL.mock.calls.find(([q]) =>
-      (q as string).includes('resolveReviewThread'),
+      q.includes('resolveReviewThread'),
     );
-    const resolveVars = resolveCall![1] as Record<string, string>;
+    if (!resolveCall) throw new Error('resolveCall not found');
+    const resolveVars = resolveCall[1] as Record<string, string>;
     expect(Object.values(resolveVars)).not.toContain('PRRT_FAIL');
     expect(Object.values(resolveVars)).toContain('PRRT_OK');
   });
@@ -305,7 +320,7 @@ describe('finishFixRound (integration)', () => {
     });
 
     const resolveCall = mockGraphQL.mock.calls.find(([q]) =>
-      (q as string).includes('resolveReviewThread'),
+      q.includes('resolveReviewThread'),
     );
     expect(resolveCall).toBeUndefined();
   });
@@ -318,9 +333,7 @@ describe('finishFixRound (integration)', () => {
       replies: [{ issueId: 'ISSUE01', kind: 'FIX', sha: 'abc1234' }],
     });
 
-    const data = parse(
-      result as { content: Array<{ type: string; text: string }> },
-    );
+    const data = parse(result);
     expect(data.replied).toBe(1);
     expect(data.replies[0]).toMatchObject({
       issueId: 'ISSUE01',
@@ -355,9 +368,7 @@ describe('finishFixRound (integration)', () => {
       replies: [{ issueId: 'ISSUE01', kind: 'FIX', sha: 'abc1234' }],
     });
 
-    const data = parse(
-      result as { content: Array<{ type: string; text: string }> },
-    );
+    const data = parse(result);
     expect(data.resolved).toBe(0);
     expect(data.resolutions).toEqual([]);
   });

@@ -14,15 +14,15 @@ jest.mock('@legacy-sports/logging/server', () => ({
   LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
 }));
 
-const { githubRest: mockGithubRest } = jest.requireMock('../github-api') as {
+const { githubRest: mockGithubRest } = jest.requireMock<{
   githubRest: jest.Mock;
-};
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as { getRepoOwnerName: jest.Mock };
-const { LOGGER: mockLogger } = jest.requireMock(
-  '@legacy-sports/logging/server',
-) as { LOGGER: { warn: jest.Mock } };
+}>('../github-api');
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
+  getRepoOwnerName: jest.Mock;
+}>('../auth');
+const { LOGGER: mockLogger } = jest.requireMock<{
+  LOGGER: { warn: jest.Mock; error: jest.Mock; info: jest.Mock };
+}>('@legacy-sports/logging/server');
 
 const ISSUE_COMMENTS_PATH = '/repos/owner/repo/issues/42/comments';
 const PULL_COMMENTS_PATH = '/repos/owner/repo/pulls/42/comments';
@@ -75,7 +75,7 @@ function setupRest(
     inline?: unknown[];
   } = {},
 ) {
-  mockGithubRest.mockImplementation(async ({ path }: { path: string }) => {
+  mockGithubRest.mockImplementation(({ path }: { path: string }) => {
     if (path === ISSUE_COMMENTS_PATH) return opts.topLevel ?? [];
     if (path === PULL_COMMENTS_PATH) return opts.inline ?? [];
     throw new Error(`unexpected path ${path}`);
@@ -92,7 +92,16 @@ function parseOutput(result: { content: { text: string }[] }): {
   filteredByReviewId?: number | null;
   number?: number;
 } {
-  return JSON.parse(result.content[0].text);
+  return JSON.parse(result.content[0].text) as {
+    type?: string;
+    total?: number;
+    comments?: unknown[];
+    topLevel?: { total: number; comments: unknown[] };
+    inline?: { total: number; comments: unknown[] };
+    filteredByPath?: string | null;
+    filteredByReviewId?: number | null;
+    number?: number;
+  };
 }
 
 describe('listPRComments', () => {
@@ -105,7 +114,7 @@ describe('listPRComments', () => {
     setupRest({ topLevel: topLevelFixture, inline: inlineFixture });
 
     const result = await listPRComments({ number: 42 });
-    const out = parseOutput(result as never);
+    const out = parseOutput(result);
 
     expect(out.type).toBe('all');
     expect(out.total).toBe(3);
@@ -118,7 +127,7 @@ describe('listPRComments', () => {
     setupRest({ topLevel: topLevelFixture });
 
     const result = await listPRComments({ number: 42, type: 'top-level' });
-    const out = parseOutput(result as never);
+    const out = parseOutput(result);
 
     expect(out.type).toBe('top-level');
     expect(out.total).toBe(1);
@@ -136,7 +145,7 @@ describe('listPRComments', () => {
       type: 'inline',
       path: 'src/foo.ts',
     });
-    const out = parseOutput(result as never);
+    const out = parseOutput(result);
 
     expect(out.type).toBe('inline');
     expect(out.total).toBe(1);
@@ -154,7 +163,7 @@ describe('listPRComments', () => {
       type: 'review',
       reviewId: 555,
     });
-    const out = parseOutput(result as never);
+    const out = parseOutput(result);
 
     expect(out.type).toBe('review');
     expect(out.total).toBe(1);
@@ -170,7 +179,7 @@ describe('listPRComments', () => {
       type: 'all',
       path: 'src/foo.ts',
     });
-    const out = parseOutput(result as never);
+    const out = parseOutput(result);
 
     expect(out.topLevel?.total).toBe(1);
     expect(out.inline?.total).toBe(1);
@@ -198,7 +207,7 @@ describe('deprecated aliases', () => {
       number: 42,
       path: 'src/bar.ts',
     });
-    const out = parseOutput(result as never);
+    const out = parseOutput(result);
 
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('github_list_pr_inline_comments is deprecated'),
@@ -214,7 +223,7 @@ describe('deprecated aliases', () => {
     setupRest({ inline: inlineFixture });
 
     const result = await listReviewComments({ number: 42, reviewId: 666 });
-    const out = parseOutput(result as never);
+    const out = parseOutput(result);
 
     expect(mockLogger.warn).toHaveBeenCalledWith(
       expect.stringContaining('github_list_review_comments is deprecated'),

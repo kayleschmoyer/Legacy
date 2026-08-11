@@ -10,13 +10,13 @@ jest.mock('../auth', () => ({
 import { getJobLogs } from './get-job-logs';
 
 const { githubGetArrayBuffer: mockGetArrayBuffer, githubRest: mockRest } =
-  jest.requireMock('../github-api') as {
+  jest.requireMock<{
     githubGetArrayBuffer: jest.Mock;
     githubRest: jest.Mock;
-  };
-const { getRepoOwnerName: mockGetRepo } = jest.requireMock('../auth') as {
+  }>('../github-api');
+const { getRepoOwnerName: mockGetRepo } = jest.requireMock<{
   getRepoOwnerName: jest.Mock;
-};
+}>('../auth');
 
 function makeLogBuffer(content: string): ArrayBuffer {
   const buf = Buffer.from(content);

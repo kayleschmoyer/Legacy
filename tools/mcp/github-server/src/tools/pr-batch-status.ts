@@ -4,8 +4,8 @@ import { githubGraphQL } from '../github-api.js';
 import { FAILED_CONCLUSIONS, summarizeCIStatus } from '../types.js';
 import type { ToolResult } from '../types.js';
 import {
-  normalizeChecks,
   dedupeLatestByName,
+  normalizeChecks,
   type StatusCheckNode,
 } from '../utils/github-checks.js';
 

@@ -1,9 +1,9 @@
+import { rebasePRViaApi, rebasePRWorker } from './rebase-pr.js';
 import { isLambda } from '../auth.js';
 import { assembleBatchResult, checkBatchSize } from '../batch.js';
 import type { BatchFailure } from '../batch.js';
 import { runWithSyncBudget, withCheckoutLock } from '../jobs.js';
 import type { JobLogger } from '../jobs.js';
-import { rebasePRViaApi, rebasePRWorker } from './rebase-pr.js';
 import type { ToolResult } from '../types.js';
 
 export interface BulkRebaseParams {
@@ -52,7 +52,7 @@ export async function bulkRebase(
 
 async function bulkRebaseWorker(
   params: BulkRebaseParams,
-  jobLog: JobLogger = () => {},
+  jobLog: JobLogger = () => undefined,
 ): Promise<ToolResult> {
   const total = params.numbers.length;
   const succeeded: BulkRebaseSuccess[] = [];

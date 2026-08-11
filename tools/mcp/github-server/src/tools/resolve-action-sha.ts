@@ -106,7 +106,7 @@ export async function resolveActionShas(
   );
 
   const resolved = results.map((result, i) => {
-    const a = params.actions[i]!;
+    const a = params.actions[i];
     if (result.status === 'fulfilled') return result.value;
     return {
       action: `${a.owner}/${a.repo}`,

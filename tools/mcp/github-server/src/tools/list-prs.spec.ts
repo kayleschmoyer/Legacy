@@ -1,9 +1,9 @@
 jest.mock('../github-api', () => ({ githubGraphQL: jest.fn() }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
-import { githubGraphQL } from '../github-api';
-import { getRepoOwnerName } from '../auth';
 import { listPRs } from './list-prs';
+import { getRepoOwnerName } from '../auth';
+import { githubGraphQL } from '../github-api';
 
 const mockedGraphQL = githubGraphQL as jest.MockedFunction<
   typeof githubGraphQL
@@ -51,7 +51,7 @@ describe('listPRs (LS-8021 token-efficient output)', () => {
   });
 
   it('renders a compact Markdown table with a header row and one row per PR', async () => {
-    mockedGraphQL.mockResolvedValueOnce(page([prNode()]) as never);
+    mockedGraphQL.mockResolvedValueOnce(page([prNode()]));
 
     const text = (await listPRs({})).content[0].text;
 
@@ -70,14 +70,14 @@ describe('listPRs (LS-8021 token-efficient output)', () => {
 
   it('flags when the page limit was reached (more may exist)', async () => {
     // hasNextPage true + limit reached ⇒ the "more may exist" hint fires.
-    mockedGraphQL.mockResolvedValueOnce(page([prNode()], true) as never);
+    mockedGraphQL.mockResolvedValueOnce(page([prNode()], true));
 
     const text = (await listPRs({ limit: 1 })).content[0].text;
     expect(text).toContain('limit 1 reached');
   });
 
   it('emits an explicit signal instead of a blank table when empty', async () => {
-    mockedGraphQL.mockResolvedValueOnce(page([]) as never);
+    mockedGraphQL.mockResolvedValueOnce(page([]));
 
     const text = (await listPRs({})).content[0].text;
     expect(text).toBe('No PRs found matching filters.');

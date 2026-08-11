@@ -14,10 +14,10 @@ jest.mock('../jobs', () => ({
   withCheckoutLock: jest.fn((fn: () => unknown) => fn()),
 }));
 
+import { rebasePR, rebasePRViaApi } from './rebase-pr';
 import { githubGraphQL, githubRest } from '../github-api';
 import { getRepoOwnerName, isLambda } from '../auth';
 import { runWithSyncBudget } from '../jobs';
-import { rebasePR, rebasePRViaApi } from './rebase-pr';
 
 const mockedGraphQL = githubGraphQL as jest.MockedFunction<
   typeof githubGraphQL
@@ -30,6 +30,14 @@ const mockedGetRepoOwnerName = getRepoOwnerName as jest.MockedFunction<
 const mockedRunWithSyncBudget = runWithSyncBudget as jest.MockedFunction<
   typeof runWithSyncBudget
 >;
+
+interface RebaseResultBody {
+  success?: boolean;
+  number?: number;
+  branch?: string;
+  base?: string;
+  error?: string;
+}
 
 function prResponse(overrides: Record<string, unknown> = {}) {
   return {
@@ -67,7 +75,7 @@ describe('rebasePRViaApi — Lambda rebase path (LS-7753)', () => {
       method: 'PUT',
       path: '/repos/bkrupa/legacy-sports/pulls/4812/update-branch',
     });
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as RebaseResultBody;
     expect(body.success).toBe(true);
     expect(body.number).toBe(4812);
     expect(body.branch).toBe('claude/fix-thing');
@@ -88,7 +96,7 @@ describe('rebasePRViaApi — Lambda rebase path (LS-7753)', () => {
 
     expect(result.isError).toBe(true);
     expect(mockedRest).not.toHaveBeenCalled();
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as RebaseResultBody;
     expect(body.error).toMatch(/Cross-repo \(fork\) PRs are not supported/);
   });
 
@@ -103,7 +111,7 @@ describe('rebasePRViaApi — Lambda rebase path (LS-7753)', () => {
     const result = await rebasePRViaApi({ number: 4812 });
 
     expect(result.isError).toBe(true);
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as RebaseResultBody;
     expect(body.success).toBe(false);
     expect(body.error).toMatch(/Rebase conflicts detected/);
   });
@@ -115,7 +123,7 @@ describe('rebasePRViaApi — Lambda rebase path (LS-7753)', () => {
     const result = await rebasePRViaApi({ number: 4812 });
 
     expect(result.isError).toBe(true);
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as RebaseResultBody;
     expect(body.error).toMatch(/^Failed to rebase PR #4812:/);
   });
 
@@ -130,7 +138,7 @@ describe('rebasePRViaApi — Lambda rebase path (LS-7753)', () => {
     const result = await rebasePRViaApi({ number: 422 });
 
     expect(result.isError).toBe(true);
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as RebaseResultBody;
     expect(body.error).toMatch(/^Failed to rebase PR #422:/);
     expect(body.error).not.toMatch(/Rebase conflicts detected/);
   });

@@ -38,7 +38,7 @@ type MockedFsPromises = {
 // import, creating fresh jest.fn() instances. Acquire the mock *after* the
 // reset so the handle matches the instances the imported module uses.
 function freshFsPromisesMock(): MockedFsPromises {
-  return jest.requireMock('node:fs/promises') as MockedFsPromises;
+  return jest.requireMock<MockedFsPromises>('node:fs/promises');
 }
 
 const ENV_KEYS = [
@@ -116,9 +116,9 @@ describe('github-server auth token cache (LS-5982)', () => {
       fsp.writeFile.mockResolvedValue(undefined);
       fsp.chmod.mockResolvedValue(undefined);
 
-      global.fetch = jest.fn(async () => ({
+      global.fetch = jest.fn(() => ({
         ok: true,
-        json: async () => ({
+        json: () => ({
           token: 'ghs_minted_token',
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         }),
@@ -150,10 +150,10 @@ describe('github-server auth token cache (LS-5982)', () => {
       );
 
       // The installation-token exchange fails with a 401.
-      global.fetch = jest.fn(async () => ({
+      global.fetch = jest.fn(() => ({
         ok: false,
         status: 401,
-        text: async () => '{"message":"Bad credentials"}',
+        text: () => '{"message":"Bad credentials"}',
       })) as unknown as typeof fetch;
 
       const { tryResolveToken, getLastTokenResolutionFailureReason } =
@@ -177,7 +177,7 @@ describe('github-server auth token cache (LS-5982)', () => {
         Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
       );
 
-      global.fetch = jest.fn() as unknown as typeof fetch;
+      global.fetch = jest.fn();
 
       const { tryResolveToken, getLastTokenResolutionFailureReason } =
         await import('./auth');
@@ -214,18 +214,18 @@ describe('github-server auth token cache (LS-5982)', () => {
         await import('./auth');
 
       // First call — exchange fails.
-      global.fetch = jest.fn(async () => ({
+      global.fetch = jest.fn(() => ({
         ok: false,
         status: 500,
-        text: async () => 'Internal Server Error',
+        text: () => 'Internal Server Error',
       })) as unknown as typeof fetch;
       await tryResolveToken();
       expect(getLastTokenResolutionFailureReason()).not.toBeNull();
 
       // Second call — exchange succeeds; reason should be reset.
-      global.fetch = jest.fn(async () => ({
+      global.fetch = jest.fn(() => ({
         ok: true,
-        json: async () => ({
+        json: () => ({
           token: 'ghs_second_token',
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         }),
@@ -267,17 +267,17 @@ describe('github-server auth token cache (LS-5982)', () => {
       );
 
       // The installation-token exchange succeeds.
-      global.fetch = jest.fn(async () => ({
+      global.fetch = jest.fn(() => ({
         ok: true,
-        json: async () => ({
+        json: () => ({
           token: 'ghs_minted_token',
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         }),
       })) as unknown as typeof fetch;
 
-      const { LOGGER } = jest.requireMock('@legacy-sports/logging/server') as {
-        LOGGER: { warn: jest.Mock };
-      };
+      const { LOGGER } = jest.requireMock<{ LOGGER: { warn: jest.Mock } }>(
+        '@legacy-sports/logging/server',
+      );
 
       const { getToken } = await import('./auth');
       const token = await getToken();
@@ -324,9 +324,9 @@ describe('github-server auth token cache (LS-5982)', () => {
 
       noCacheFile();
 
-      global.fetch = jest.fn(async () => ({
+      global.fetch = jest.fn(() => ({
         ok: true,
-        json: async () => ({
+        json: () => ({
           token: 'ghs_minted_bot_token',
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         }),
@@ -356,9 +356,9 @@ describe('github-server auth token cache (LS-5982)', () => {
 
       noCacheFile();
 
-      global.fetch = jest.fn(async () => ({
+      global.fetch = jest.fn(() => ({
         ok: true,
-        json: async () => ({ login: 'legacy-sports-code-bot[bot]' }),
+        json: () => ({ login: 'legacy-sports-code-bot[bot]' }),
       })) as unknown as typeof fetch;
 
       const { getAuthorToken } = await import('./auth');
@@ -377,9 +377,9 @@ describe('github-server auth token cache (LS-5982)', () => {
 
       noCacheFile();
 
-      global.fetch = jest.fn(async () => ({
+      global.fetch = jest.fn(() => ({
         ok: true,
-        json: async () => ({ login: 'bkrupa' }),
+        json: () => ({ login: 'bkrupa' }),
       })) as unknown as typeof fetch;
 
       const { getAuthorToken } = await import('./auth');
@@ -396,7 +396,7 @@ describe('github-server auth token cache (LS-5982)', () => {
       delete process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'];
 
       noCacheFile();
-      global.fetch = jest.fn() as unknown as typeof fetch;
+      global.fetch = jest.fn();
 
       const { getAuthorToken } = await import('./auth');
 

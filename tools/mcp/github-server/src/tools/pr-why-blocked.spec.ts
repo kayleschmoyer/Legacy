@@ -317,9 +317,7 @@ describe('diagnose', () => {
       });
       const result = diagnose(pr, NO_CI);
       expect(result.reason).toBe('UNRESOLVED_THREADS');
-      expect(
-        (result.details as Record<string, unknown>).threadCountTruncated,
-      ).toBe(true);
+      expect(result.details.threadCountTruncated).toBe(true);
     });
   });
 
@@ -460,9 +458,7 @@ describe('diagnose', () => {
         },
       });
       const result = diagnose(pr, NO_CI);
-      expect((result.details as Record<string, unknown>).labelsTruncated).toBe(
-        true,
-      );
+      expect(result.details.labelsTruncated).toBe(true);
     });
 
     it('includes reviewsTruncated in details when reviews page is truncated', () => {
@@ -473,9 +469,7 @@ describe('diagnose', () => {
         },
       });
       const result = diagnose(pr, NO_CI);
-      expect((result.details as Record<string, unknown>).reviewsTruncated).toBe(
-        true,
-      );
+      expect(result.details.reviewsTruncated).toBe(true);
     });
   });
 

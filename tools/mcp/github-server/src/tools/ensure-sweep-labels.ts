@@ -1,8 +1,8 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { isAlreadyExistsError } from './create-label.js';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
-import { isAlreadyExistsError } from './create-label.js';
 
 interface SweepLabel {
   name: string;

@@ -1,4 +1,4 @@
-import { getToken, invalidateToken, getRepoOwnerName } from '../auth.js';
+import { getRepoOwnerName, getToken, invalidateToken } from '../auth.js';
 import type { ToolResult } from '../types.js';
 
 interface PrDiffParams {

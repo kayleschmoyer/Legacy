@@ -234,10 +234,6 @@ export default [
     // (LS-9299) have been removed from this ignore list and their lint
     // violations fixed.
     basePath: repoRoot,
-    ignores: [
-      'tools/mcp/aws-server/**',
-      'tools/mcp/github-server/**',
-      'tools/mcp/rollbar-server/**',
-    ],
+    ignores: ['tools/mcp/aws-server/**', 'tools/mcp/rollbar-server/**'],
   },
 ];

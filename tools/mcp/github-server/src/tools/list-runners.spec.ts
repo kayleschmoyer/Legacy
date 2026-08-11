@@ -1,9 +1,9 @@
 jest.mock('../github-api', () => ({ githubRest: jest.fn() }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
+import { listRunners } from './list-runners';
 import { githubRest } from '../github-api';
 import { getRepoOwnerName } from '../auth';
-import { listRunners } from './list-runners';
 
 const mockedRest = githubRest as jest.MockedFunction<typeof githubRest>;
 const mockedRepo = getRepoOwnerName as jest.MockedFunction<
@@ -29,7 +29,7 @@ describe('listRunners (LS-8021 token-efficient output)', () => {
           labels: [{ name: 'self-hosted' }, { name: 'linux' }],
         },
       ],
-    } as never);
+    });
 
     const text = (await listRunners({})).content[0].text;
     expect(text).toContain('id|name|os|status|busy|labels');
@@ -39,7 +39,7 @@ describe('listRunners (LS-8021 token-efficient output)', () => {
   });
 
   it('emits an explicit signal when there are no runners', async () => {
-    mockedRest.mockResolvedValueOnce({ total_count: 0, runners: [] } as never);
+    mockedRest.mockResolvedValueOnce({ total_count: 0, runners: [] });
 
     const text = (await listRunners({})).content[0].text;
     expect(text).toBe('No runners found.');

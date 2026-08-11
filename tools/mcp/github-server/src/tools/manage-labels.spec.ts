@@ -1,17 +1,27 @@
 jest.mock('../github-api', () => ({ githubRest: jest.fn() }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
+import { globToRegex, manageLabels } from './manage-labels';
 import { githubRest } from '../github-api';
 import { getRepoOwnerName } from '../auth';
-import { globToRegex, manageLabels } from './manage-labels';
 
 const mockRest = githubRest as jest.MockedFunction<typeof githubRest>;
 const mockRepo = getRepoOwnerName as jest.MockedFunction<
   typeof getRepoOwnerName
 >;
 
-function parse(result: { content: Array<{ type: string; text: string }> }) {
-  return JSON.parse(result.content[0].text);
+interface ManageLabelsResultBody {
+  prNumber?: number;
+  success?: boolean;
+  clearedLabels?: string[];
+  requestedLabelsAdded?: string[];
+  requestedLabelsRemoved?: string[];
+}
+
+function parse(result: {
+  content: Array<{ type: string; text: string }>;
+}): ManageLabelsResultBody {
+  return JSON.parse(result.content[0].text) as ManageLabelsResultBody;
 }
 
 beforeEach(() => {
@@ -81,7 +91,7 @@ describe('manageLabels — clearPattern', () => {
         { name: 'ci-failure-typecheck' },
         { name: 'bot:ready-for-review' },
       ] as never)
-      .mockResolvedValue(undefined as never); // DELETE calls
+      .mockResolvedValue(undefined); // DELETE calls
 
     const result = await manageLabels({
       prs: [42],
@@ -130,7 +140,7 @@ describe('manageLabels — clearPattern composes with add and remove', () => {
     // GET labels for clearPattern
     mockRest
       .mockResolvedValueOnce([{ name: 'ci-failure-lint' }] as never)
-      .mockResolvedValue(undefined as never); // POST and DELETE calls
+      .mockResolvedValue(undefined); // POST and DELETE calls
 
     const result = await manageLabels({
       prs: [7],
@@ -160,7 +170,7 @@ describe('manageLabels — clearPattern composes with add and remove', () => {
     // ci-failure-lint is both in remove[] and matches the pattern
     mockRest
       .mockResolvedValueOnce([{ name: 'ci-failure-lint' }] as never)
-      .mockResolvedValue(undefined as never);
+      .mockResolvedValue(undefined);
 
     await manageLabels({
       prs: [3],
@@ -185,7 +195,7 @@ describe('manageLabels — clearPattern as drop-in for ci-failure label clearing
         { name: 'ci-failure-format' },
         { name: 'ci-failure-build' },
       ] as never)
-      .mockResolvedValue(undefined as never);
+      .mockResolvedValue(undefined);
 
     const result = await manageLabels({
       prs: [99],

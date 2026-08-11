@@ -1,8 +1,8 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { ensureSweepLabelsInternal } from './ensure-sweep-labels.js';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
-import { ensureSweepLabelsInternal } from './ensure-sweep-labels.js';
 
 interface SweepStaleClaimsParams {
   olderThanMinutes?: number;

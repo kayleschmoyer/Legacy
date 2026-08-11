@@ -5,11 +5,10 @@ jest.mock('./auth', () => ({
   invalidateToken: jest.fn(),
 }));
 
-const { getToken: mockGetToken, invalidateToken: mockInvalidateToken } =
-  jest.requireMock('./auth') as {
-    getToken: jest.Mock;
-    invalidateToken: jest.Mock;
-  };
+const { getToken: mockGetToken } = jest.requireMock<{
+  getToken: jest.Mock;
+  invalidateToken: jest.Mock;
+}>('./auth');
 
 const originalFetch = global.fetch;
 const mockFetch = jest.fn();
@@ -29,7 +28,7 @@ function makeResponse(
 beforeEach(() => {
   jest.clearAllMocks();
   mockGetToken.mockResolvedValue('test-token');
-  global.fetch = mockFetch as unknown as typeof fetch;
+  global.fetch = mockFetch;
 });
 
 afterAll(() => {
@@ -80,7 +79,7 @@ describe('githubRest secondary rate limit handling', () => {
 
   it('gives up after the max number of secondary-rate-limit retries', async () => {
     // Fresh Response per call — a Response body can only be read once.
-    mockFetch.mockImplementation(async () =>
+    mockFetch.mockImplementation(() =>
       makeResponse(
         403,
         { message: 'You have exceeded a secondary rate limit.' },
@@ -163,9 +162,7 @@ describe('githubGraphQL 504 timeout handling', () => {
   });
 
   it('gives up after the max number of 504 retries and reports the timeout', async () => {
-    mockFetch.mockImplementation(async () =>
-      makeResponse(504, 'Gateway Timeout'),
-    );
+    mockFetch.mockImplementation(() => makeResponse(504, 'Gateway Timeout'));
 
     const promise = githubGraphQL('query {}', {});
     const assertion = expect(promise).rejects.toThrow(/failed \(504\)/);

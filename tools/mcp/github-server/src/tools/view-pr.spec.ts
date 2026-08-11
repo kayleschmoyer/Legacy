@@ -1,9 +1,9 @@
 jest.mock('../github-api', () => ({ githubGraphQL: jest.fn() }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
+import { viewPR } from './view-pr';
 import { githubGraphQL } from '../github-api';
 import { getRepoOwnerName } from '../auth';
-import { viewPR } from './view-pr';
 
 const mockedGraphQL = githubGraphQL as jest.MockedFunction<
   typeof githubGraphQL
@@ -91,6 +91,22 @@ function gqlResponse(pr: unknown) {
   return { data: { repository: { pullRequest: pr } }, errors: undefined };
 }
 
+interface ParsedViewPRResult {
+  number: number;
+  title: string;
+  state: string;
+  isDraft: boolean;
+  body?: string;
+  files?: Array<{ path: string; status: string }>;
+  reviews?: Array<{ state: string }>;
+  checksSummary: {
+    total: number;
+    passed: number;
+    failed: number;
+    failedNames: string[];
+  };
+}
+
 beforeEach(() => {
   mockedRepo.mockResolvedValue({ owner: 'org', name: 'repo' });
 });
@@ -103,7 +119,7 @@ describe('viewPR — compact default', () => {
     const result = await viewPR({ number: 42 });
     expect(result.isError).toBeFalsy();
     const text = result.content[0].text;
-    const parsed = JSON.parse(text);
+    const parsed = JSON.parse(text) as ParsedViewPRResult;
     expect(parsed).not.toHaveProperty('body');
     expect(parsed).not.toHaveProperty('files');
     expect(parsed).toHaveProperty('checksSummary');
@@ -115,7 +131,7 @@ describe('viewPR — compact default', () => {
   it('includes checksSummary in compact output', async () => {
     mockedGraphQL.mockResolvedValue(gqlResponse(makePR()));
     const result = await viewPR({ number: 42 });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
     expect(parsed.number).toBe(42);
     expect(parsed.title).toBe('feat: big feature');
     expect(parsed.state).toBe('OPEN');
@@ -190,7 +206,7 @@ describe('viewPR — checksSummary dedup (LS-8667)', () => {
     );
 
     const result = await viewPR({ number: 42 });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
 
     expect(parsed.checksSummary.total).toBe(3);
     expect(parsed.checksSummary.passed).toBe(3);
@@ -262,7 +278,7 @@ describe('viewPR — statusCheckRollup.contexts pagination (LS-9283)', () => {
       });
 
     const result = await viewPR({ number: 42 });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
 
     expect(mockedGraphQL).toHaveBeenCalledTimes(2);
     expect(mockedGraphQL.mock.calls[1][1]).toMatchObject({
@@ -280,7 +296,7 @@ describe('viewPR — fields opt-in', () => {
   it('includes body when fields:["body"] passed', async () => {
     mockedGraphQL.mockResolvedValue(gqlResponse(makePR()));
     const result = await viewPR({ number: 42, fields: ['body'] });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
     expect(parsed).toHaveProperty('body');
     expect(parsed.body).toHaveLength(60_000);
     expect(parsed).not.toHaveProperty('files');
@@ -289,7 +305,7 @@ describe('viewPR — fields opt-in', () => {
   it('includes files when fields:["files"] passed', async () => {
     mockedGraphQL.mockResolvedValue(gqlResponse(makePR()));
     const result = await viewPR({ number: 42, fields: ['files'] });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
     expect(parsed).toHaveProperty('files');
     expect(parsed.files[0].path).toBe('src/foo.ts');
     expect(parsed.files[0].status).toBe('modified');
@@ -337,7 +353,7 @@ describe('viewPR — fields opt-in', () => {
       });
 
     const result = await viewPR({ number: 42, fields: ['files'] });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
 
     expect(mockedGraphQL).toHaveBeenCalledTimes(2);
     expect(mockedGraphQL.mock.calls[1][1]).toMatchObject({
@@ -345,7 +361,7 @@ describe('viewPR — fields opt-in', () => {
       cursor: 'cursor-1',
     });
     expect(parsed.files).toHaveLength(2);
-    expect(parsed.files.map((f: { path: string }) => f.path)).toEqual([
+    expect(parsed.files?.map((f) => f.path)).toEqual([
       'src/foo.ts',
       'src/bar.ts',
     ]);
@@ -380,7 +396,7 @@ describe('viewPR — fields opt-in', () => {
   it('includes reviews when fields:["reviews"] passed', async () => {
     mockedGraphQL.mockResolvedValue(gqlResponse(makePR()));
     const result = await viewPR({ number: 42, fields: ['reviews'] });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
     expect(parsed.reviews[0].state).toBe('APPROVED');
   });
 });

@@ -10,13 +10,12 @@ jest.mock('../auth', () => ({
 }));
 
 const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
-  jest.requireMock('../github-api') as {
-    githubRest: jest.Mock;
-    githubGraphQL: jest.Mock;
-  };
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as { getRepoOwnerName: jest.Mock };
+  jest.requireMock<{ githubRest: jest.Mock; githubGraphQL: jest.Mock }>(
+    '../github-api',
+  );
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
+  getRepoOwnerName: jest.Mock;
+}>('../auth');
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -43,7 +42,9 @@ describe('bulkMerge', () => {
     const result = await bulkMerge({ items: [{ number: 1 }] });
 
     expect(result.isError).toBeUndefined();
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as {
+      succeeded: Array<Record<string, unknown>>;
+    };
     expect(body.succeeded[0]).toMatchObject({
       number: 1,
       strategy: 'queue',
@@ -68,7 +69,9 @@ describe('bulkMerge', () => {
         path: '/repos/o/r/pulls/7/merge',
       }),
     );
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as {
+      succeeded: Array<Record<string, unknown>>;
+    };
     expect(body.succeeded[0]).toMatchObject({
       number: 7,
       strategy: 'direct',
@@ -85,7 +88,9 @@ describe('bulkMerge', () => {
     const result = await bulkMerge({ items: [{ number: 999 }] });
 
     expect(result.isError).toBe(true);
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as {
+      failed: Array<Record<string, unknown>>;
+    };
     expect(body.failed).toEqual([
       { index: 0, key: 999, error: 'PR #999 not found.' },
     ]);

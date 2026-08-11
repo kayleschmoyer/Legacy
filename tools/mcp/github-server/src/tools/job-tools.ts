@@ -1,7 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import {
-  MAX_WAIT_MS,
   listFnJobs,
+  MAX_WAIT_MS,
   snapshotFnJob,
   waitForFnJob,
 } from '../jobs.js';
@@ -26,9 +26,12 @@ function notFound(jobId: string): ToolResult {
   };
 }
 
-export async function jobStatus(params: {
-  jobId: string;
-}): Promise<ToolResult> {
+// Synchronous (not async) because snapshotFnJob does no awaiting — an
+// `async` signature here tripped @typescript-eslint/require-await. Callers
+// (the MCP SDK tool handler in index.ts) await the result either way, so
+// this is a type-signature correction only, not an observable behavior
+// change.
+export function jobStatus(params: { jobId: string }): ToolResult {
   return snapshotFnJob(params.jobId) ?? notFound(params.jobId);
 }
 

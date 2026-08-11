@@ -1,6 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
-import { githubRest, githubGraphQL } from '../github-api.js';
+import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface MergePRParams {

@@ -21,31 +21,37 @@ jest.mock('node:fs', () => ({
 }));
 
 const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
-  jest.requireMock('../github-api') as {
+  jest.requireMock<{
     githubRest: jest.Mock;
     githubGraphQL: jest.Mock;
-  };
+  }>('../github-api');
 const {
   getRepoOwnerName: mockGetRepoOwnerName,
   getAuthorToken: mockGetAuthorToken,
   isLambda: mockIsLambda,
   getRepoRoot: mockGetRepoRoot,
-} = jest.requireMock('../auth') as {
+} = jest.requireMock<{
   getRepoOwnerName: jest.Mock;
   getAuthorToken: jest.Mock;
   isLambda: jest.Mock;
   getRepoRoot: jest.Mock;
-};
-const { execFile: mockExecFile } = jest.requireMock('node:child_process') as {
+}>('../auth');
+const { execFile: mockExecFile } = jest.requireMock<{
   execFile: jest.Mock;
-};
-const { existsSync: mockExistsSync } = jest.requireMock('node:fs') as {
+}>('node:child_process');
+const { existsSync: mockExistsSync } = jest.requireMock<{
   existsSync: jest.Mock;
-};
+}>('node:fs');
+
+type ExecFileCallback = (
+  error: Error | null,
+  stdout: string,
+  stderr: string,
+) => void;
 
 function makeExecFileSuccess(stdout: string) {
   mockExecFile.mockImplementation(
-    (_cmd: string, _args: string[], _opts: object, cb: Function) => {
+    (_cmd: string, _args: string[], _opts: object, cb: ExecFileCallback) => {
       cb(null, stdout, '');
     },
   );
@@ -260,7 +266,7 @@ describe('openPR', () => {
         push: false,
       });
       expect(result.isError).toBeFalsy();
-      const payload = JSON.parse(result.content[0].text);
+      const payload = JSON.parse(result.content[0].text) as { draft: boolean };
       expect(payload.draft).toBe(true);
       // graphQL should not be called for mark-ready
       expect(mockGithubGraphQL).not.toHaveBeenCalled();
@@ -292,12 +298,11 @@ describe('openPR', () => {
         draft: true,
         push: false,
       });
+      const bodyMatcher: unknown = expect.objectContaining({
+        title: 'LS-8537 fix(web): validate JWT payload',
+      });
       expect(mockGithubRest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.objectContaining({
-            title: 'LS-8537 fix(web): validate JWT payload',
-          }),
-        }),
+        expect.objectContaining({ body: bodyMatcher }),
       );
     });
 
@@ -311,12 +316,11 @@ describe('openPR', () => {
         draft: true,
         push: false,
       });
+      const bodyMatcher: unknown = expect.objectContaining({
+        title: 'LS-8537 fix(web): validate JWT payload',
+      });
       expect(mockGithubRest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.objectContaining({
-            title: 'LS-8537 fix(web): validate JWT payload',
-          }),
-        }),
+        expect.objectContaining({ body: bodyMatcher }),
       );
     });
 
@@ -329,12 +333,11 @@ describe('openPR', () => {
         draft: true,
         push: false,
       });
+      const bodyMatcher: unknown = expect.objectContaining({
+        title: 'chore(deps): bump lodash',
+      });
       expect(mockGithubRest).toHaveBeenCalledWith(
-        expect.objectContaining({
-          body: expect.objectContaining({
-            title: 'chore(deps): bump lodash',
-          }),
-        }),
+        expect.objectContaining({ body: bodyMatcher }),
       );
     });
   });
@@ -343,7 +346,7 @@ describe('openPR', () => {
   // carries no key. Jira Link Check requires the `no-jira` label in that case,
   // so without this openPR could mint a guaranteed-failing PR on its own.
   describe('no-jira label for keyless PRs (LS-9043)', () => {
-    const NO_JIRA_LABEL_CALL = expect.objectContaining({
+    const NO_JIRA_LABEL_CALL: unknown = expect.objectContaining({
       method: 'POST',
       path: '/repos/bkrupa/legacy-sports/issues/99/labels',
       body: { labels: ['no-jira'] },

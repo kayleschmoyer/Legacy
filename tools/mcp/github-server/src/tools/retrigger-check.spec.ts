@@ -12,15 +12,15 @@ jest.mock('../pr-utils', () => ({
 
 import { retriggerCheck } from './retrigger-check';
 
-const { githubRest: mockGithubRest } = jest.requireMock('../github-api') as {
+const { githubRest: mockGithubRest } = jest.requireMock<{
   githubRest: jest.Mock;
-};
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as { getRepoOwnerName: jest.Mock };
-const { resolveHeadShaFromPrNumber: mockResolveHeadSha } = jest.requireMock(
-  '../pr-utils',
-) as { resolveHeadShaFromPrNumber: jest.Mock };
+}>('../github-api');
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
+  getRepoOwnerName: jest.Mock;
+}>('../auth');
+const { resolveHeadShaFromPrNumber: mockResolveHeadSha } = jest.requireMock<{
+  resolveHeadShaFromPrNumber: jest.Mock;
+}>('../pr-utils');
 
 const SHA = 'abc1234def5678';
 const REPO = { owner: 'bkrupa', name: 'legacy-sports' };

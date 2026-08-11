@@ -13,21 +13,22 @@ jest.mock('../required-checks', () => ({
   evaluatePRChecks: jest.fn(),
 }));
 
+interface DiagnosePayload {
+  reason: string;
+  summary: string;
+  failingJobs: unknown[];
+}
+
 const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
-  jest.requireMock('../github-api') as {
-    githubRest: jest.Mock;
-    githubGraphQL: jest.Mock;
-  };
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as {
+  jest.requireMock<{ githubRest: jest.Mock; githubGraphQL: jest.Mock }>(
+    '../github-api',
+  );
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
   getRepoOwnerName: jest.Mock;
-};
-const { evaluatePRChecks: mockEvaluatePRChecks } = jest.requireMock(
-  '../required-checks',
-) as {
+}>('../auth');
+const { evaluatePRChecks: mockEvaluatePRChecks } = jest.requireMock<{
   evaluatePRChecks: jest.Mock;
-};
+}>('../required-checks');
 
 const BASE_PR = {
   number: 100,
@@ -75,7 +76,7 @@ describe('diagnose', () => {
     });
     const result = await diagnose({ prNumber: 100 });
     expect(result.isError).toBeFalsy();
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('AWAITING_REVIEW');
   });
 
@@ -84,7 +85,7 @@ describe('diagnose', () => {
       data: { repository: { pullRequest: { ...BASE_PR, isDraft: true } } },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('DRAFT');
   });
 
@@ -95,7 +96,7 @@ describe('diagnose', () => {
       },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('MERGE_CONFLICT');
   });
 
@@ -112,7 +113,7 @@ describe('diagnose', () => {
       },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('MERGE_CONFLICT');
   });
 
@@ -130,7 +131,7 @@ describe('diagnose', () => {
       },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('MERGE_CONFLICT');
   });
 
@@ -148,7 +149,7 @@ describe('diagnose', () => {
       },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('CI_FAILING');
     expect(payload.summary).toContain('conflicts cannot be ruled out');
   });
@@ -177,7 +178,7 @@ describe('diagnose', () => {
       data: { repository: { pullRequest: BASE_PR } },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('CI_FAILING');
     expect(payload.failingJobs).toHaveLength(1);
   });
@@ -203,7 +204,7 @@ describe('diagnose', () => {
       },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('CHANGES_REQUESTED');
   });
 
@@ -234,7 +235,7 @@ describe('diagnose', () => {
       },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).not.toBe('CHANGES_REQUESTED');
     expect(payload.reason).toBe('READY');
   });
@@ -290,7 +291,7 @@ describe('diagnose', () => {
       data: { repository: { pullRequest: { ...BASE_PR, state: 'MERGED' } } },
     });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBe('MERGED');
   });
 
@@ -302,7 +303,7 @@ describe('diagnose', () => {
     const result = await diagnose({ prNumber: 100 });
     // Should succeed despite CI evaluation failure
     expect(result.isError).toBeFalsy();
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).toBeDefined();
   });
 });

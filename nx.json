@@ -47,7 +47,6 @@
         "tools/mcp/browser-server/**",
         "tools/mcp/db-admin-server/**",
         "tools/mcp/dev-process-server/**",
-        "tools/mcp/github-server/**",
         "tools/mcp/jira-server/**",
         "tools/mcp/nx-server/**",
         "tools/mcp/rollbar-server/**",

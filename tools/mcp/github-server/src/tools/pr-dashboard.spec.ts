@@ -8,14 +8,14 @@ jest.mock('../github-api', () => ({
   githubRest: jest.fn(),
 }));
 
-import { getRepoOwnerName } from '../auth';
-import { githubGraphQL } from '../github-api';
 import {
-  prDashboard,
-  renderDashboardMarkdown,
   type DashboardPayload,
   type DashboardRow,
+  prDashboard,
+  renderDashboardMarkdown,
 } from './pr-dashboard';
+import { getRepoOwnerName } from '../auth';
+import { githubGraphQL } from '../github-api';
 
 const mockedGraphQL = githubGraphQL as jest.MockedFunction<
   typeof githubGraphQL
@@ -346,10 +346,10 @@ function searchPage(
   };
 }
 
-async function jsonPayload(
+function jsonPayload(
   result: Awaited<ReturnType<typeof prDashboard>>,
-): Promise<DashboardPayload> {
-  return JSON.parse(result.content[0].text as string) as DashboardPayload;
+): DashboardPayload {
+  return JSON.parse(result.content[0].text) as DashboardPayload;
 }
 
 describe('prDashboard fetch loop (LS-8196)', () => {
@@ -361,21 +361,14 @@ describe('prDashboard fetch loop (LS-8196)', () => {
   it('aggregates rows across multiple pages for the default (repository.pullRequests) path', async () => {
     mockedGraphQL
       .mockResolvedValueOnce(
-        repoPage(
-          [prNode({ number: 1 }), prNode({ number: 2 })],
-          true,
-          'c1',
-        ) as never,
+        repoPage([prNode({ number: 1 }), prNode({ number: 2 })], true, 'c1'),
       )
       .mockResolvedValueOnce(
-        repoPage(
-          [prNode({ number: 3 }), prNode({ number: 4 })],
-          false,
-        ) as never,
+        repoPage([prNode({ number: 3 }), prNode({ number: 4 })], false),
       );
 
     const result = await prDashboard({ limit: 10, format: 'json' });
-    const payload = await jsonPayload(result);
+    const payload = jsonPayload(result);
 
     expect(payload.prs.map((p) => p.number).sort()).toEqual([1, 2, 3, 4]);
     expect(payload.truncated).toBe(false);
@@ -383,15 +376,11 @@ describe('prDashboard fetch loop (LS-8196)', () => {
 
   it('flags truncated when the aggregated count reaches limit while hasNextPage is still true (default path)', async () => {
     mockedGraphQL.mockResolvedValueOnce(
-      repoPage(
-        [prNode({ number: 1 }), prNode({ number: 2 })],
-        true,
-        'c1',
-      ) as never,
+      repoPage([prNode({ number: 1 }), prNode({ number: 2 })], true, 'c1'),
     );
 
     const result = await prDashboard({ limit: 2, format: 'json' });
-    const payload = await jsonPayload(result);
+    const payload = jsonPayload(result);
 
     expect(payload.prs.map((p) => p.number)).toEqual([1, 2]);
     expect(payload.truncated).toBe(true);
@@ -404,13 +393,10 @@ describe('prDashboard fetch loop (LS-8196)', () => {
           [prNode({ number: 11 }), prNode({ number: 12 })],
           true,
           'c1',
-        ) as never,
+        ),
       )
       .mockResolvedValueOnce(
-        searchPage(
-          [prNode({ number: 13 }), prNode({ number: 14 })],
-          false,
-        ) as never,
+        searchPage([prNode({ number: 13 }), prNode({ number: 14 })], false),
       );
 
     const result = await prDashboard({
@@ -418,7 +404,7 @@ describe('prDashboard fetch loop (LS-8196)', () => {
       limit: 10,
       format: 'json',
     });
-    const payload = await jsonPayload(result);
+    const payload = jsonPayload(result);
 
     expect(payload.prs.map((p) => p.number).sort()).toEqual([11, 12, 13, 14]);
     expect(payload.truncated).toBe(false);
@@ -426,11 +412,7 @@ describe('prDashboard fetch loop (LS-8196)', () => {
 
   it('flags truncated when the aggregated count reaches limit while hasNextPage is still true (search path)', async () => {
     mockedGraphQL.mockResolvedValueOnce(
-      searchPage(
-        [prNode({ number: 11 }), prNode({ number: 12 })],
-        true,
-        'c1',
-      ) as never,
+      searchPage([prNode({ number: 11 }), prNode({ number: 12 })], true, 'c1'),
     );
 
     const result = await prDashboard({
@@ -438,7 +420,7 @@ describe('prDashboard fetch loop (LS-8196)', () => {
       limit: 2,
       format: 'json',
     });
-    const payload = await jsonPayload(result);
+    const payload = jsonPayload(result);
 
     expect(payload.prs.map((p) => p.number)).toEqual([11, 12]);
     expect(payload.truncated).toBe(true);
@@ -471,15 +453,15 @@ describe('prDashboard fetch pagination', () => {
       prNode({ number: i + 31 }),
     );
     mockedGraphQL
-      .mockResolvedValueOnce(repoPage(page1Nodes, true, 'cursor-1') as never)
-      .mockResolvedValueOnce(repoPage(page2Nodes, false) as never);
+      .mockResolvedValueOnce(repoPage(page1Nodes, true, 'cursor-1'))
+      .mockResolvedValueOnce(repoPage(page2Nodes, false));
 
     const result = await prDashboard({
       state: 'all',
       limit: 40,
       format: 'json',
     });
-    const payload = await jsonPayload(result);
+    const payload = jsonPayload(result);
 
     // Two chunked calls for the main query (first:30/after:null, then
     // first:10/after:'cursor-1'), each ≤ PAGE_SIZE (30).
@@ -502,10 +484,10 @@ describe('prDashboard fetch pagination', () => {
     const nodes = Array.from({ length: 5 }, (_, i) =>
       prNode({ number: i + 1 }),
     );
-    mockedGraphQL.mockResolvedValueOnce(repoPage(nodes, false) as never);
+    mockedGraphQL.mockResolvedValueOnce(repoPage(nodes, false));
 
     const result = await prDashboard({ format: 'json' });
-    const payload = await jsonPayload(result);
+    const payload = jsonPayload(result);
 
     const mainQueryCalls = mockedGraphQL.mock.calls.filter(([q]) =>
       q.includes('pullRequests('),
@@ -525,7 +507,7 @@ describe('prDashboard fetch pagination', () => {
     const result = await prDashboard({ state: 'all', limit: 60 });
 
     expect(result.isError).toBe(true);
-    const text = result.content[0].text as string;
+    const text = result.content[0].text;
     expect(text).toContain('github_list_prs');
     expect(text).not.toBe(
       "Failed to build PR dashboard: GitHub GraphQL failed (504): We couldn't respond to your request in time.",

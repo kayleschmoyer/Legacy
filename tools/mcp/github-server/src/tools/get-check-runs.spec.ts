@@ -12,15 +12,15 @@ jest.mock('../pr-utils', () => ({
 
 import { getCheckRuns } from './get-check-runs';
 
-const { githubRest: mockGithubRest } = jest.requireMock('../github-api') as {
+const { githubRest: mockGithubRest } = jest.requireMock<{
   githubRest: jest.Mock;
-};
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as { getRepoOwnerName: jest.Mock };
-const { resolveHeadShaFromPrNumber: mockResolveHeadSha } = jest.requireMock(
-  '../pr-utils',
-) as { resolveHeadShaFromPrNumber: jest.Mock };
+}>('../github-api');
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
+  getRepoOwnerName: jest.Mock;
+}>('../auth');
+const { resolveHeadShaFromPrNumber: mockResolveHeadSha } = jest.requireMock<{
+  resolveHeadShaFromPrNumber: jest.Mock;
+}>('../pr-utils');
 
 function makeRun(name: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -62,7 +62,7 @@ describe('getCheckRuns single-sha path', () => {
     expect(result.isError).toBeFalsy();
     // Single-sha results render as a token-efficient Markdown table (LS-8021):
     // a header line plus one row per deduped run.
-    const text = (result.content[0] as { text: string }).text;
+    const text = result.content[0].text;
     expect(text).toContain('total: 2');
     expect(text).toContain('bot-review');
     expect(text).toContain('Build');
@@ -75,7 +75,7 @@ describe('getCheckRuns single-sha path', () => {
 
     const result = await getCheckRuns({ prNumber: 99 });
     expect(result.isError).toBeFalsy();
-    const text = (result.content[0] as { text: string }).text;
+    const text = result.content[0].text;
     expect(text).toContain('headsha'); // sha.slice(0, 7)
     expect(text).toContain('PR #99');
     expect(text).toContain('bot-review');
@@ -90,7 +90,7 @@ describe('getCheckRuns single-sha path', () => {
     mockGithubRest.mockRejectedValueOnce(new Error('boom'));
     const result = await getCheckRuns({ sha: 'bad' });
     expect(result.isError).toBe(true);
-    expect((result.content[0] as { text: string }).text).toContain('boom');
+    expect(result.content[0].text).toContain('boom');
   });
 
   it('filters checkName as a case-insensitive substring against the full display name', async () => {
@@ -104,7 +104,7 @@ describe('getCheckRuns single-sha path', () => {
 
     const result = await getCheckRuns({ sha: 'abc123', checkName: 'LINT' });
     expect(result.isError).toBeFalsy();
-    const text = (result.content[0] as { text: string }).text;
+    const text = result.content[0].text;
     expect(text).toContain('total: 1');
     expect(text).toContain('🚀 CI Pipeline / lint');
     expect(text).not.toContain('custom-checks');
@@ -121,7 +121,7 @@ describe('getCheckRuns single-sha path', () => {
       checkName: 'nonexistent',
     });
     expect(result.isError).toBeFalsy();
-    const text = (result.content[0] as { text: string }).text;
+    const text = result.content[0].text;
     expect(text).toContain('No check runs matching "nonexistent"');
     expect(text).toContain('🚀 CI Pipeline / lint');
     expect(text).toContain('bot-review');
@@ -130,7 +130,7 @@ describe('getCheckRuns single-sha path', () => {
 
 describe('getCheckRuns batch mode', () => {
   it('returns { checkRuns: { [sha]: ... } } for multiple shas', async () => {
-    mockGithubRest.mockImplementation(async ({ path }: { path: string }) => {
+    mockGithubRest.mockImplementation(({ path }: { path: string }) => {
       if (path.includes('/sha_a/')) return pageOnce([makeRun('bot-review')]);
       if (path.includes('/sha_b/')) return pageOnce([makeRun('Build')]);
       throw new Error(`unexpected path: ${path}`);
@@ -138,7 +138,7 @@ describe('getCheckRuns batch mode', () => {
 
     const result = await getCheckRuns({ shas: ['sha_a', 'sha_b'] });
     expect(result.isError).toBeFalsy();
-    const body = parse((result.content[0] as { text: string }).text);
+    const body = parse(result.content[0].text);
     expect(Object.keys(body.checkRuns as object).sort()).toEqual([
       'sha_a',
       'sha_b',
@@ -149,14 +149,14 @@ describe('getCheckRuns batch mode', () => {
   });
 
   it('isolates per-sha failures to missing[]', async () => {
-    mockGithubRest.mockImplementation(async ({ path }: { path: string }) => {
+    mockGithubRest.mockImplementation(({ path }: { path: string }) => {
       if (path.includes('/good/')) return pageOnce([makeRun('bot-review')]);
       throw new Error(`404 for ${path}`);
     });
 
     const result = await getCheckRuns({ shas: ['good', 'bad'] });
     expect(result.isError).toBeFalsy();
-    const body = parse((result.content[0] as { text: string }).text);
+    const body = parse(result.content[0].text);
     expect((body.checkRuns as Record<string, unknown>).good).toBeDefined();
     expect((body.checkRuns as Record<string, unknown>).bad).toBeUndefined();
     expect(body.missing).toHaveLength(1);
@@ -182,7 +182,7 @@ describe('getCheckRuns batch mode', () => {
   });
 
   it('reports noMatch with available names when checkName filters out all runs for a sha', async () => {
-    mockGithubRest.mockImplementation(async ({ path }: { path: string }) => {
+    mockGithubRest.mockImplementation(({ path }: { path: string }) => {
       if (path.includes('/sha_a/'))
         return pageOnce([makeRun('🚀 CI Pipeline / lint')]);
       throw new Error(`unexpected path: ${path}`);
@@ -193,7 +193,7 @@ describe('getCheckRuns batch mode', () => {
       checkName: 'nonexistent',
     });
     expect(result.isError).toBeFalsy();
-    const body = parse((result.content[0] as { text: string }).text);
+    const body = parse(result.content[0].text);
     expect((body.checkRuns as Record<string, unknown[]>).sha_a).toHaveLength(0);
     expect(body.noMatch).toEqual([
       {
@@ -211,7 +211,7 @@ describe('getCheckRuns batch mode', () => {
       shas: ['batch_a'],
     });
     expect(result.isError).toBeFalsy();
-    const body = parse((result.content[0] as { text: string }).text);
+    const body = parse(result.content[0].text);
     expect(body).toHaveProperty('checkRuns');
     expect((body.checkRuns as Record<string, unknown>).batch_a).toBeDefined();
     expect(body).not.toHaveProperty('sha');

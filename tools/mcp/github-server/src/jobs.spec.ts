@@ -14,15 +14,15 @@ function okResult(text: string) {
 
 describe('runWithSyncBudget', () => {
   it('returns the terminal result inline when the fn finishes within budget', async () => {
-    const result = await runWithSyncBudget('fast', async () =>
-      okResult('done'),
+    const result = await runWithSyncBudget('fast', () =>
+      Promise.resolve(okResult('done')),
     );
     expect(result.content[0].text).toBe('done');
     expect(result.isError).toBeUndefined();
   });
 
   it('returns a running snapshot with jobId when the budget expires first', async () => {
-    let release: () => void = () => {};
+    let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -56,7 +56,7 @@ describe('runWithSyncBudget', () => {
   });
 
   it('converts a thrown error into an isError terminal result', async () => {
-    const result = await runWithSyncBudget('boom', async () => {
+    const result = await runWithSyncBudget('boom', () => {
       throw new Error('exploded');
     });
     expect(result.isError).toBe(true);
@@ -69,7 +69,7 @@ describe('job tools', () => {
   it('returns notFound for unknown job ids', async () => {
     expect(snapshotFnJob('gh-nope')).toBeNull();
 
-    const status = await jobStatus({ jobId: 'gh-nope' });
+    const status = jobStatus({ jobId: 'gh-nope' });
     expect(status.isError).toBe(true);
     expect(status.content[0].text).toContain('not found');
 
@@ -78,7 +78,7 @@ describe('job tools', () => {
   });
 
   it('jobStatus is non-blocking and jobWait returns the terminal result', async () => {
-    let release: () => void = () => {};
+    let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -88,7 +88,7 @@ describe('job tools', () => {
       return okResult('after-gate');
     });
 
-    const running = await jobStatus({ jobId });
+    const running = jobStatus({ jobId });
     const runningBody = JSON.parse(running.content[0].text) as {
       status: string;
     };
@@ -100,7 +100,7 @@ describe('job tools', () => {
   });
 
   it('jobList reports recent jobs with their status', async () => {
-    const jobId = startFnJob('listed', async () => okResult('x'));
+    const jobId = startFnJob('listed', () => Promise.resolve(okResult('x')));
     await waitForFnJob(jobId);
 
     const result = jobList();
@@ -113,7 +113,7 @@ describe('job tools', () => {
   });
 
   it('listFnJobs marks unfinished jobs as running', async () => {
-    let release: () => void = () => {};
+    let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -132,7 +132,7 @@ describe('job tools', () => {
 describe('withCheckoutLock', () => {
   it('serializes concurrent callers', async () => {
     const order: string[] = [];
-    let releaseFirst: () => void = () => {};
+    let releaseFirst: () => void = () => undefined;
     const firstGate = new Promise<void>((resolve) => {
       releaseFirst = resolve;
     });
@@ -142,8 +142,9 @@ describe('withCheckoutLock', () => {
       await firstGate;
       order.push('first-end');
     });
-    const second = withCheckoutLock(async () => {
+    const second = withCheckoutLock(() => {
       order.push('second');
+      return Promise.resolve();
     });
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -156,10 +157,12 @@ describe('withCheckoutLock', () => {
 
   it('continues past a rejected task', async () => {
     await expect(
-      withCheckoutLock(async () => {
+      withCheckoutLock(() => {
         throw new Error('bad');
       }),
     ).rejects.toThrow('bad');
-    await expect(withCheckoutLock(async () => 'ok')).resolves.toBe('ok');
+    await expect(withCheckoutLock(() => Promise.resolve('ok'))).resolves.toBe(
+      'ok',
+    );
   });
 });

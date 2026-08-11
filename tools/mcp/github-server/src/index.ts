@@ -3,12 +3,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import {
-  getToken,
-  getRepoOwnerName,
-  tryResolveToken,
-  isLambda,
-  getLastTokenResolutionFailureReason,
   getGitHubUser,
+  getLastTokenResolutionFailureReason,
+  getToken,
+  isLambda,
+  tryResolveToken,
 } from './auth.js';
 import type { TokenSource } from './auth.js';
 import type { ToolResult } from './types.js';
@@ -43,7 +42,7 @@ import { sweepStaleClaims } from './tools/sweep-stale-claims.js';
 import { viewPR } from './tools/view-pr.js';
 import { listLabels } from './tools/list-labels.js';
 import { listRunners } from './tools/list-runners.js';
-import { webhookList, webhookUpdate, webhookPing } from './tools/webhooks.js';
+import { webhookList, webhookPing, webhookUpdate } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prWhyBlocked } from './tools/pr-why-blocked.js';
@@ -82,6 +81,16 @@ if (proxyUrl) {
 }
 
 /**
+ * `Array.isArray` narrows to `any[]` in TypeScript's lib types, which trips
+ * `@typescript-eslint/no-unsafe-return` when the narrowed value flows back
+ * out of a `z.preprocess` callback. This wrapper re-declares the guard with
+ * an `unknown[]` predicate so callers get a safely-typed narrowing instead.
+ */
+function isUnknownArray(val: unknown): val is unknown[] {
+  return Array.isArray(val);
+}
+
+/**
  * Shared Zod schema for generic string arrays. Accepts a real array OR a
  * JSON-encoded array string (MCP callers sometimes serialise arrays to strings).
  * Falls back to wrapping a bare string in a single-element array.
@@ -93,12 +102,12 @@ const stringList = (opts: { min?: number; max?: number } = {}) => {
   if (opts.min !== undefined) inner = inner.min(opts.min);
   if (opts.max !== undefined) inner = inner.max(opts.max);
   return z.preprocess((val) => {
-    if (Array.isArray(val)) return val;
+    if (isUnknownArray(val)) return val;
     if (typeof val === 'string') {
       if (val.trimStart().startsWith('[')) {
         try {
-          const parsed = JSON.parse(val);
-          if (Array.isArray(parsed)) return parsed;
+          const parsed: unknown = JSON.parse(val);
+          if (isUnknownArray(parsed)) return parsed;
         } catch {
           // Not valid JSON — treat as a single element
         }
@@ -116,13 +125,13 @@ const stringList = (opts: { min?: number; max?: number } = {}) => {
  */
 const labelList = z.preprocess(
   (val) => {
-    if (Array.isArray(val)) return val;
+    if (isUnknownArray(val)) return val;
     if (typeof val === 'string') {
       // Handle JSON-encoded array strings (e.g. '["merge-when-ready"]')
       if (val.trimStart().startsWith('[')) {
         try {
-          const parsed = JSON.parse(val);
-          if (Array.isArray(parsed)) return parsed;
+          const parsed: unknown = JSON.parse(val);
+          if (isUnknownArray(parsed)) return parsed;
         } catch {
           // Not valid JSON — treat as bare label string
         }
@@ -865,11 +874,11 @@ export function createServer(): McpServer {
         .preprocess(
           (v) => {
             if (v === undefined || v === null) return undefined;
-            if (Array.isArray(v)) return v;
+            if (isUnknownArray(v)) return v;
             if (typeof v === 'string' && v.trimStart().startsWith('[')) {
               try {
-                const parsed = JSON.parse(v);
-                if (Array.isArray(parsed)) return parsed;
+                const parsed: unknown = JSON.parse(v);
+                if (isUnknownArray(parsed)) return parsed;
               } catch {
                 // Not valid JSON — fall through to wrap as single element
               }
@@ -1209,11 +1218,11 @@ export function createServer(): McpServer {
       prs: z
         .preprocess((v) => {
           if (v === undefined || v === null) return undefined;
-          if (Array.isArray(v)) return v;
+          if (isUnknownArray(v)) return v;
           if (typeof v === 'string' && v.trimStart().startsWith('[')) {
             try {
-              const parsed = JSON.parse(v);
-              if (Array.isArray(parsed)) return parsed;
+              const parsed: unknown = JSON.parse(v);
+              if (isUnknownArray(parsed)) return parsed;
             } catch {
               // Not valid JSON — fall through to wrap as single element
             }
@@ -1333,11 +1342,11 @@ export function createServer(): McpServer {
         ),
       commentDatabaseIds: z
         .preprocess((val) => {
-          if (Array.isArray(val)) return val;
+          if (isUnknownArray(val)) return val;
           if (typeof val === 'string' && val.trimStart().startsWith('[')) {
             try {
-              const parsed = JSON.parse(val);
-              if (Array.isArray(parsed)) return parsed;
+              const parsed: unknown = JSON.parse(val);
+              if (isUnknownArray(parsed)) return parsed;
             } catch {
               // Not valid JSON — fall through
             }
@@ -1886,11 +1895,11 @@ export function createServer(): McpServer {
       actions: z
         .preprocess(
           (val) => {
-            if (Array.isArray(val)) return val;
+            if (isUnknownArray(val)) return val;
             if (typeof val === 'string') {
               try {
-                const parsed = JSON.parse(val);
-                if (Array.isArray(parsed)) return parsed;
+                const parsed: unknown = JSON.parse(val);
+                if (isUnknownArray(parsed)) return parsed;
               } catch {
                 // Not valid JSON
               }
@@ -2093,7 +2102,7 @@ export function createServer(): McpServer {
           .string()
           .describe('Job id from a { status: "running" } tool result'),
       },
-      async (params) => jobStatus(params),
+      (params) => jobStatus(params),
     );
 
     // --- github_job_wait ---
@@ -2119,7 +2128,7 @@ export function createServer(): McpServer {
       'github_job_list',
       'List recent background jobs (newest first). In-memory only — jobs do not survive an MCP server restart.',
       {},
-      async () => jobList(),
+      () => jobList(),
     );
   }
 

@@ -1,4 +1,4 @@
-import { resolveReplyToReviewInput, replyToReview } from './reply-to-review';
+import { replyToReview, resolveReplyToReviewInput } from './reply-to-review';
 
 jest.mock('../github-api', () => ({
   githubRest: jest.fn(),
@@ -9,16 +9,29 @@ jest.mock('../auth', () => ({
   getRepoOwnerName: jest.fn(),
 }));
 
+interface ReplyToReviewRestPayload {
+  success: boolean;
+  commentDatabaseId: number;
+}
+
+interface ReplyToReviewGraphQLPayload {
+  threadId: string;
+  commentNodeId: string;
+}
+
+// `expect.stringContaining` is typed as `any` in the installed @types/jest,
+// so wrap it to give call sites a non-`any` (`unknown`) value.
+function stringContaining(substr: string): unknown {
+  return expect.stringContaining(substr);
+}
+
 const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
-  jest.requireMock('../github-api') as {
-    githubRest: jest.Mock;
-    githubGraphQL: jest.Mock;
-  };
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as {
+  jest.requireMock<{ githubRest: jest.Mock; githubGraphQL: jest.Mock }>(
+    '../github-api',
+  );
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
   getRepoOwnerName: jest.Mock;
-};
+}>('../auth');
 
 describe('resolveReplyToReviewInput', () => {
   describe('prNumber alias', () => {
@@ -72,7 +85,7 @@ describe('resolveReplyToReviewInput', () => {
         commentId: 100,
       });
       expect(result).toMatchObject({
-        error: expect.stringContaining('EITHER'),
+        error: stringContaining('EITHER'),
       });
     });
 
@@ -83,7 +96,7 @@ describe('resolveReplyToReviewInput', () => {
         prNumber: 42,
       });
       expect(result).toMatchObject({
-        error: expect.stringContaining('EITHER'),
+        error: stringContaining('EITHER'),
       });
     });
 
@@ -94,7 +107,7 @@ describe('resolveReplyToReviewInput', () => {
         number: 42,
       });
       expect(result).toMatchObject({
-        error: expect.stringContaining('EITHER'),
+        error: stringContaining('EITHER'),
       });
     });
 
@@ -116,7 +129,7 @@ describe('resolveReplyToReviewInput', () => {
     it('returns an error when neither threadId nor commentId+number is provided', () => {
       const result = resolveReplyToReviewInput({ body: 'reply' });
       expect(result).toMatchObject({
-        error: expect.stringContaining('threadId'),
+        error: stringContaining('threadId'),
       });
     });
 
@@ -126,7 +139,7 @@ describe('resolveReplyToReviewInput', () => {
         commentId: 100,
       });
       expect(result).toMatchObject({
-        error: expect.stringContaining('threadId'),
+        error: stringContaining('threadId'),
       });
     });
   });
@@ -163,8 +176,8 @@ describe('replyToReview', () => {
       });
       expect(result.isError).toBeFalsy();
       const data = JSON.parse(
-        (result.content[0] as { type: string; text: string }).text,
-      );
+        result.content[0].text,
+      ) as ReplyToReviewRestPayload;
       expect(data.success).toBe(true);
       expect(data.commentDatabaseId).toBe(9999);
     });
@@ -183,9 +196,7 @@ describe('replyToReview', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(
-        (result.content[0] as { type: string; text: string }).text,
-      ).toContain('Not Found');
+      expect(result.content[0].text).toContain('Not Found');
     });
   });
 
@@ -210,8 +221,8 @@ describe('replyToReview', () => {
       );
       expect(result.isError).toBeFalsy();
       const data = JSON.parse(
-        (result.content[0] as { type: string; text: string }).text,
-      );
+        result.content[0].text,
+      ) as ReplyToReviewGraphQLPayload;
       expect(data.threadId).toBe('PRRT_kwDOMnECFs5abc');
       expect(data.commentNodeId).toBe('RC_node_abc');
     });
@@ -225,9 +236,7 @@ describe('replyToReview', () => {
       });
 
       expect(result.isError).toBe(true);
-      expect(
-        (result.content[0] as { type: string; text: string }).text,
-      ).toContain('GraphQL error');
+      expect(result.content[0].text).toContain('GraphQL error');
     });
   });
 });

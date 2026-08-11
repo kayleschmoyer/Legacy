@@ -1,5 +1,5 @@
 import { getRepoOwnerName } from '../auth.js';
-import { githubRest, githubGraphQL } from '../github-api.js';
+import { githubGraphQL, githubRest } from '../github-api.js';
 import { assembleBatchResult, checkBatchSize, runBatch } from '../batch.js';
 import type { ToolResult } from '../types.js';
 

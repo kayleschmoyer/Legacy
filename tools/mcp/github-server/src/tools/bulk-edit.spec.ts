@@ -9,12 +9,23 @@ jest.mock('../auth', () => ({
   getRepoOwnerName: jest.fn(),
 }));
 
-const { githubRest: mockGithubRest } = jest.requireMock('../github-api') as {
+const { githubRest: mockGithubRest } = jest.requireMock<{
   githubRest: jest.Mock;
-};
-const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock(
-  '../auth',
-) as { getRepoOwnerName: jest.Mock };
+}>('../github-api');
+const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
+  getRepoOwnerName: jest.Mock;
+}>('../auth');
+
+interface ParsedBulkEditResult {
+  success: boolean;
+  failed: Array<{ error: string }>;
+  succeeded: Array<{
+    index: number;
+    number: number;
+    title: string;
+    url: string;
+  }>;
+}
 
 beforeEach(() => {
   jest.resetAllMocks();
@@ -25,7 +36,7 @@ describe('bulkEdit', () => {
   it('fails the item when neither title nor body is provided', async () => {
     const result = await bulkEdit({ items: [{ number: 1 }] });
     expect(result.isError).toBe(true);
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as ParsedBulkEditResult;
     expect(body.success).toBe(false);
     expect(body.failed[0].error).toMatch(/title or body/);
   });
@@ -50,7 +61,7 @@ describe('bulkEdit', () => {
         body: { title: 'new' },
       }),
     );
-    const body = JSON.parse(result.content[0].text);
+    const body = JSON.parse(result.content[0].text) as ParsedBulkEditResult;
     expect(body.succeeded[0]).toMatchObject({
       index: 0,
       number: 1,

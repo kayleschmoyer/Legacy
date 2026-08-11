@@ -1,9 +1,9 @@
 jest.mock('../github-api', () => ({ githubRest: jest.fn() }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
 
+import { prCommits } from './pr-commits';
 import { githubRest } from '../github-api';
 import { getRepoOwnerName } from '../auth';
-import { prCommits } from './pr-commits';
 
 const mockedRest = githubRest as jest.MockedFunction<typeof githubRest>;
 const mockedRepo = getRepoOwnerName as jest.MockedFunction<
