@@ -3,7 +3,8 @@
  */
 
 import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
-import { ALLOWED_POSITIONS } from '@legacy-sports/utils';
+import { ALLOWED_POSITIONS, shuffleArray } from '@legacy-sports/utils';
+import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, count, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { ForbiddenError } from '../graphql-errors';
 import { addPlayerToRoster } from '../../services/roster-service';
@@ -656,4 +657,76 @@ export async function enableAutoPickForUnmanagedTeams(
   }
 
   return teamIdsWithoutGM;
+}
+
+// ── resolveDraftTeamsOrder (LS-8742) ─────────────────────────────────────────
+
+export interface ResolveDraftTeamsOrderResult {
+  /** Team ids in final draft-pick order (1-indexed positionally by array index). */
+  orderedTeamIds: number[];
+  /** True when draft_teams rows must be (re)inserted for this draft — no rows
+   *  existed yet, or the existing rows no longer match the league's current
+   *  team set. False means the existing rows should be left untouched. */
+  needsInsert: boolean;
+}
+
+/**
+ * Decide the draft_teams order to use when a draft actually starts.
+ *
+ * `approveDraftSlotTrade` (LS-8676) lazily seeds draft_teams pre-draft and
+ * atomically swaps two teams' draftOrder when a trade executes. Both
+ * initializeDraft and autoStartScheduledDrafts previously deleted + reshuffled
+ * draft_teams unconditionally at draft start, silently discarding any
+ * commissioner-approved slot trade the instant the draft began (LS-8742).
+ *
+ * If rows already exist for this draft and their team set still matches the
+ * league's current teams, preserve them as-is. Only randomize a fresh order
+ * when no rows exist yet, or when the seeded team set has drifted from the
+ * league's current teams (e.g. a team was added/removed after seeding) —
+ * in that case the stale seed can no longer be trusted, so fall back to the
+ * original reshuffle behavior.
+ *
+ * `draftId` is `null` when the drafts row itself doesn't exist yet
+ * (initializeDraft's first-ever call for a league) — no draft_teams rows can
+ * exist in that case either, so this always shuffles.
+ */
+export async function resolveDraftTeamsOrder(
+  db: PublicDb,
+  draftId: number | null,
+  currentTeams: { id: number }[],
+): Promise<ResolveDraftTeamsOrderResult> {
+  const existingRows = draftId
+    ? await db
+        .select({
+          teamId: PublicSchema.draftTeams.teamId,
+        })
+        .from(PublicSchema.draftTeams)
+        .where(eq(PublicSchema.draftTeams.draftId, draftId))
+        .orderBy(asc(PublicSchema.draftTeams.draftOrder))
+    : [];
+
+  if (existingRows.length > 0) {
+    const currentTeamIds = new Set(currentTeams.map((t) => t.id));
+    const existingTeamIds = new Set(existingRows.map((r) => r.teamId));
+    const sameTeamSet =
+      existingRows.length === currentTeamIds.size &&
+      [...currentTeamIds].every((id) => existingTeamIds.has(id));
+
+    if (sameTeamSet) {
+      return {
+        orderedTeamIds: existingRows.map((r) => r.teamId),
+        needsInsert: false,
+      };
+    }
+
+    LOGGER.warn(
+      'draft_teams team set no longer matches league teams — reshuffling instead of preserving seeded order',
+      { draftId },
+    );
+  }
+
+  return {
+    orderedTeamIds: shuffleArray(currentTeams).map((t) => t.id),
+    needsInsert: true,
+  };
 }

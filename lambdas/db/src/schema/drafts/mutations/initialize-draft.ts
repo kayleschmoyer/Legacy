@@ -8,12 +8,14 @@ import {
   type StartDraftMessage,
 } from '@legacy-sports/aws-utils';
 import { LOGGER } from '@legacy-sports/logging';
-import { shuffleArray } from '@legacy-sports/utils';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
 import { Draft } from '../types';
-import { enableAutoPickForUnmanagedTeams } from '../helpers';
+import {
+  enableAutoPickForUnmanagedTeams,
+  resolveDraftTeamsOrder,
+} from '../helpers';
 import { cancelPendingDraftSlotTradesForLeague } from '../../draft-slot-trades/helpers';
 import { applyKeeperDesignationsForDraft } from '../keeper-application';
 import { builder } from '../../builder';
@@ -132,9 +134,6 @@ builder.mutationField('initializeDraft', (t) =>
           throw new Error('At least 2 teams are required to start a draft');
         }
 
-        // Randomize draft order
-        const shuffled = shuffleArray(teams);
-
         // Upsert the draft record — update the existing one from league creation,
         // or create a new one if somehow missing
         const [existingDraft] = await context.db
@@ -165,11 +164,22 @@ builder.mutationField('initializeDraft', (t) =>
         const txResult: TxResult = await context.db.transaction(async (tx) => {
           let txDraft: typeof PublicSchema.drafts.$inferSelect;
 
+          // LS-8742: preserve any draft_teams order already seeded by an
+          // approved draft slot trade (LS-8676) instead of unconditionally
+          // reshuffling it away at draft start.
+          const { orderedTeamIds, needsInsert } = await resolveDraftTeamsOrder(
+            tx,
+            existingDraft?.id ?? null,
+            teams,
+          );
+
           if (existingDraft) {
-            // Clear any leftover draft_teams from a previous initialization
-            await tx
-              .delete(PublicSchema.draftTeams)
-              .where(eq(PublicSchema.draftTeams.draftId, existingDraft.id));
+            if (needsInsert) {
+              // Clear any leftover draft_teams from a previous initialization
+              await tx
+                .delete(PublicSchema.draftTeams)
+                .where(eq(PublicSchema.draftTeams.draftId, existingDraft.id));
+            }
 
             // Clear any leftover draft_picks from a previous initialization
             await tx
@@ -205,15 +215,17 @@ builder.mutationField('initializeDraft', (t) =>
             txDraft = created;
           }
 
-          // Insert draft_teams with the randomized order (1-indexed)
-          await tx.insert(PublicSchema.draftTeams).values(
-            shuffled.map((team, index) => ({
-              draftId: txDraft.id,
-              teamId: team.id,
-              leagueId,
-              draftOrder: index + 1,
-            })),
-          );
+          if (needsInsert) {
+            // Insert draft_teams with the resolved order (1-indexed)
+            await tx.insert(PublicSchema.draftTeams).values(
+              orderedTeamIds.map((teamId, index) => ({
+                draftId: txDraft.id,
+                teamId,
+                leagueId,
+                draftOrder: index + 1,
+              })),
+            );
+          }
 
           // The draft is now starting — any still-pending draft slot trades
           // (proposed/accepted/approved) can never execute (LS-8676 AC4).
@@ -248,7 +260,7 @@ builder.mutationField('initializeDraft', (t) =>
               tx,
               leagueId,
               txDraft.id,
-              shuffled.map((t) => t.id),
+              orderedTeamIds,
             );
 
             // Set the initial pick deadline now that draft is live

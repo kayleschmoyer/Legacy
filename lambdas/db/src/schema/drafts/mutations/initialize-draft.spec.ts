@@ -73,6 +73,7 @@ function captureInitializeDraftResolver(): Resolver {
   jest.doMock('../types', () => ({ Draft: {} }));
   jest.doMock('../helpers', () => ({
     enableAutoPickForUnmanagedTeams: jest.fn(),
+    resolveDraftTeamsOrder: jest.fn(),
   }));
   jest.doMock('../../draft-slot-trades/helpers', () => ({
     cancelPendingDraftSlotTradesForLeague: jest.fn(),

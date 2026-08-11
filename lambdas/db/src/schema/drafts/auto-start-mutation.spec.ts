@@ -9,6 +9,12 @@
 
 const enableAutoPickForUnmanagedTeams = jest.fn();
 const shuffleArray = jest.fn((arr: unknown[]) => arr);
+const resolveDraftTeamsOrder = jest.fn(
+  async (_db: unknown, _draftId: unknown, teams: { id: number }[]) => ({
+    orderedTeamIds: teams.map((t) => t.id),
+    needsInsert: true,
+  }),
+);
 
 interface ScheduledDraftRow {
   draftId: number;
@@ -34,7 +40,9 @@ function makeTxMock() {
     delete: jest.fn(() => ({ where: jest.fn(() => Promise.resolve()) })),
     insert: jest.fn(() => ({ values: jest.fn(() => Promise.resolve()) })),
     update: jest.fn(() => ({
-      set: jest.fn(() => ({ where: jest.fn(() => Promise.resolve()) })),
+      set: jest.fn(() => ({
+        where: jest.fn(() => Promise.resolve({ rowCount: 0 })),
+      })),
     })),
   };
 }
@@ -146,6 +154,10 @@ async function captureAutoStartScheduledDraftsResolver(): Promise<ResolverFn> {
       draftPicks: {
         draftId: 'draft_picks.draft_id',
       },
+      draftSlotTrades: {
+        leagueId: 'draft_slot_trades.league_id',
+        status: 'draft_slot_trades.status',
+      },
       leagueMessages: {},
     },
   }));
@@ -154,10 +166,12 @@ async function captureAutoStartScheduledDraftsResolver(): Promise<ResolverFn> {
     and: jest.fn(),
     eq: jest.fn(),
     lte: jest.fn(),
+    inArray: jest.fn(),
   }));
 
   jest.doMock('./helpers', () => ({
     enableAutoPickForUnmanagedTeams,
+    resolveDraftTeamsOrder,
   }));
 
   await import('./auto-start-mutation');
@@ -177,6 +191,13 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
     enableAutoPickForUnmanagedTeams.mockReset();
     enableAutoPickForUnmanagedTeams.mockResolvedValue([]);
     shuffleArray.mockClear();
+    resolveDraftTeamsOrder.mockClear();
+    resolveDraftTeamsOrder.mockImplementation(
+      async (_db: unknown, _draftId: unknown, teams: { id: number }[]) => ({
+        orderedTeamIds: teams.map((t) => t.id),
+        needsInsert: true,
+      }),
+    );
   });
 
   it('rejects non-system, non-admin callers', async () => {
@@ -281,6 +302,58 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
       3,
       [300, 301, 302],
     );
+  });
+
+  it('LS-8742: preserves a draft_teams order already seeded by an approved slot trade instead of reshuffling', async () => {
+    resolveDraftTeamsOrder.mockResolvedValueOnce({
+      orderedTeamIds: [501, 500],
+      needsInsert: false,
+    });
+    const resolve = await captureAutoStartScheduledDraftsResolver();
+    const db = makeMockDb({
+      scheduledDraftsRows: [
+        {
+          draftId: 8,
+          leagueId: 80,
+          draftMode: 'live',
+          selectionMethod: 'standard',
+          draftOrder: 'snake',
+          pickTimeLimitSeconds: 120,
+          scheduledAt: minutesAgo(1),
+        },
+      ],
+      teamsRowsInOrder: [[{ id: 500 }, { id: 501 }]],
+    });
+    const notificationService = makeNotificationService();
+    let txMock: ReturnType<typeof makeTxMock> | undefined;
+    db.transaction.mockImplementationOnce(
+      async (cb: (tx: unknown) => unknown) => {
+        txMock = makeTxMock();
+        return cb(txMock);
+      },
+    );
+
+    await resolve(
+      {},
+      {},
+      { isSystemRequest: true, user: null, db, notificationService },
+    );
+
+    expect(resolveDraftTeamsOrder).toHaveBeenCalledWith(db, 8, [
+      { id: 500 },
+      { id: 501 },
+    ]);
+    expect(enableAutoPickForUnmanagedTeams).toHaveBeenCalledWith(
+      db,
+      80,
+      8,
+      [501, 500],
+    );
+    // needsInsert: false ⇒ the seeded draft_teams rows must be left
+    // untouched: only the (unconditional) draft_picks cleanup delete runs,
+    // and nothing is (re)inserted into draft_teams.
+    expect(txMock?.delete).toHaveBeenCalledTimes(1);
+    expect(txMock?.insert).not.toHaveBeenCalled();
   });
 
   it('wraps the multi-table write sequence in a single transaction', async () => {

@@ -29,10 +29,12 @@
 
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { shuffleArray } from '@legacy-sports/utils';
 import { and, eq, lte } from 'drizzle-orm';
 
-import { enableAutoPickForUnmanagedTeams } from './helpers';
+import {
+  enableAutoPickForUnmanagedTeams,
+  resolveDraftTeamsOrder,
+} from './helpers';
 import { cancelPendingDraftSlotTradesForLeague } from '../draft-slot-trades/helpers';
 import { builder } from '../builder';
 
@@ -200,15 +202,18 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
               continue;
             }
 
-            // Randomize draft order
-            const shuffled = shuffleArray(teams);
+            // LS-8742: preserve any draft_teams order already seeded by an
+            // approved draft slot trade (LS-8676) instead of unconditionally
+            // reshuffling it away at draft start.
+            const { orderedTeamIds, needsInsert } =
+              await resolveDraftTeamsOrder(context.db, draftId, teams);
 
             // LS-545 / LS-480: Enable auto-pick for teams without a general manager
             const autoPickTeamIds = await enableAutoPickForUnmanagedTeams(
               context.db,
               leagueId,
               draftId,
-              shuffled.map((t) => t.id),
+              orderedTeamIds,
             );
 
             if (autoPickTeamIds.length > 0) {
@@ -227,23 +232,27 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
             // Wrap the multi-step write sequence in a transaction so a
             // mid-flight failure cannot leave draft state inconsistent.
             await context.db.transaction(async (tx) => {
-              // Clear any stale draft_teams and draft_picks from previous runs
-              await tx
-                .delete(PublicSchema.draftTeams)
-                .where(eq(PublicSchema.draftTeams.draftId, draftId));
+              if (needsInsert) {
+                // Clear any stale draft_teams from a previous run and insert
+                // the freshly resolved (randomized) order.
+                await tx
+                  .delete(PublicSchema.draftTeams)
+                  .where(eq(PublicSchema.draftTeams.draftId, draftId));
+
+                await tx.insert(PublicSchema.draftTeams).values(
+                  orderedTeamIds.map((teamId, index) => ({
+                    draftId,
+                    teamId,
+                    leagueId,
+                    draftOrder: index + 1,
+                  })),
+                );
+              }
+
+              // Clear any stale draft_picks from a previous run
               await tx
                 .delete(PublicSchema.draftPicks)
                 .where(eq(PublicSchema.draftPicks.draftId, draftId));
-
-              // Insert draft teams in randomized order
-              await tx.insert(PublicSchema.draftTeams).values(
-                shuffled.map((team, index) => ({
-                  draftId,
-                  teamId: team.id,
-                  leagueId,
-                  draftOrder: index + 1,
-                })),
-              );
 
               // Update the draft record with started timestamps + first pick deadline
               await tx
