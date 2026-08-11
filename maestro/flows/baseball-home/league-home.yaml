@@ -53,3 +53,16 @@ tags:
     id: "leagues-add-button"
 - scroll
 - takeScreenshot: maestro/artifacts/baseball-home/06-leagues-scrolled
+# Inline baseball-home-screen coverage (LS-8446, retargeted away by LS-8794,
+# restored by LS-8796): the "Pick your sport" cards that used to reach this
+# mount are gone from the narrow returning-user layout, and the mock-draft /
+# create-league cancel paths now pop back instead of pushing `/baseball`
+# (LS-8823/LS-9248). The `legacysports://baseball` universal-link scheme is
+# the only entry point a returning user still has into the inline
+# `BaseballHomeScreen` mount kept alive by home.tsx (LS-5814) — assert it
+# loudly so a broken deep link or a regressed inline mount fails this flow
+# instead of going unnoticed.
+- openLink: "legacysports://baseball"
+- assertVisible:
+    id: "baseball-home-screen"
+- takeScreenshot: maestro/artifacts/baseball-home/07-baseball-home-screen
