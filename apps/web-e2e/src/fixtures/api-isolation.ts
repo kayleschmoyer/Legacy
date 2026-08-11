@@ -229,21 +229,22 @@ export async function withApiIsolation(
         }
       })();
       if (isRefreshJwtRequest) {
-        // Use allHeaders() instead of headers() — Playwright excludes security-related
-        // headers (including Cookie) from the synchronous headers() result. allHeaders()
-        // returns the full set, which is required to read the ls_jwt cookie.
         const headers = await route.request().allHeaders();
-        const cookieHeader = headers['cookie'] ?? '';
         const authHeader = headers['authorization'] ?? '';
         const csrfHeader =
           headers['x-csrf-token'] ?? headers['x-xsrf-token'] ?? '';
 
-        // Extract ls_jwt cookie value (if present).
-        const lsJwtPart = cookieHeader
-          .split(';')
-          .map((p) => p.trim())
-          .find((p) => p.startsWith('ls_jwt='));
-        const cookieToken = lsJwtPart ? lsJwtPart.slice('ls_jwt='.length) : '';
+        // Read the ls_jwt cookie from Playwright's cookie jar rather than the
+        // intercepted request's Cookie header. WebKit does not reliably
+        // forward HttpOnly cookies set via storageState on page.route()
+        // intercepted requests — the Cookie header seen here is empty even
+        // though the cookie jar has it, which permanently 503s the refresh
+        // and leaves useWebSocket's `!token` guard deferring client creation
+        // forever (LS-9328). context().cookies() reads the jar directly, so
+        // it is accurate on every engine.
+        const contextCookies = await page.context().cookies();
+        const cookieToken =
+          contextCookies.find((c) => c.name === 'ls_jwt')?.value ?? '';
 
         // Decode the JWT payload: check expiry and extract claims.
         // Expired tokens must 401 so session-expiry tests pass.
