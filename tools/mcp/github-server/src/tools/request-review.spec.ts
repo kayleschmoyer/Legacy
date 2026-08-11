@@ -4,9 +4,9 @@ jest.mock('../auth', () => ({
   tryGhAuthToken: jest.fn(),
 }));
 
+import { requestReview } from './request-review';
 import { githubRest } from '../github-api';
 import { getRepoOwnerName, tryGhAuthToken } from '../auth';
-import { requestReview } from './request-review';
 
 const mockedRest = githubRest as jest.MockedFunction<typeof githubRest>;
 const mockedRepo = getRepoOwnerName as jest.MockedFunction<
@@ -15,6 +15,10 @@ const mockedRepo = getRepoOwnerName as jest.MockedFunction<
 const mockedToken = tryGhAuthToken as jest.MockedFunction<
   typeof tryGhAuthToken
 >;
+
+interface ParsedRequestReviewResult {
+  results: Array<{ reviewer: string; success: boolean }>;
+}
 
 beforeEach(() => {
   mockedRepo.mockResolvedValue({ owner: 'org', name: 'repo' });
@@ -32,7 +36,9 @@ describe('requestReview — copilot is opt-in (LS-8707)', () => {
     const result = await requestReview({ prs: [6402], reviewers: ['bkrupa'] });
 
     expect(result.isError).toBeFalsy();
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(
+      result.content[0].text,
+    ) as ParsedRequestReviewResult;
     expect(parsed.results).toEqual([{ reviewer: 'bkrupa', success: true }]);
     // Only the human-reviewer POST — no Copilot precheck/request calls.
     expect(mockedRest).toHaveBeenCalledTimes(1);
@@ -50,7 +56,9 @@ describe('requestReview — copilot is opt-in (LS-8707)', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(
+      result.content[0].text,
+    ) as ParsedRequestReviewResult;
     expect(parsed.results).toEqual([{ reviewer: 'bkrupa', success: true }]);
     expect(mockedRest).toHaveBeenCalledTimes(1);
   });
@@ -65,7 +73,9 @@ describe('requestReview — copilot is opt-in (LS-8707)', () => {
 
     const result = await requestReview({ prs: [6402], copilot: true });
 
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(
+      result.content[0].text,
+    ) as ParsedRequestReviewResult;
     expect(parsed.results[0].reviewer).toBe(
       'copilot-pull-request-reviewer[bot]',
     );

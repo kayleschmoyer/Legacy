@@ -396,27 +396,23 @@ describe('finishFixRound (integration)', () => {
       replies: [{ issueId: 'ISSUE01', kind: 'JUSTIFY', body: 'covered' }],
     });
 
-    const data = parse(
-      result as { content: Array<{ type: string; text: string }> },
-    );
+    const data = parse(result);
     expect(data.labelApplied).toBe(false);
     expect(data.labelReapplied).toBe(true);
 
     const labelPath = '/repos/bkrupa/legacy-sports/issues/42/labels';
-    const deleteCall = mockRest.mock.calls.find(
+    const deleteCallIndex = mockRest.mock.calls.findIndex(
       ([args]) =>
         args.method === 'DELETE' &&
         args.path === `${labelPath}/bot%3Aready-for-review`,
     );
-    const postCall = mockRest.mock.calls.find(
+    const postCallIndex = mockRest.mock.calls.findIndex(
       ([args]) => args.method === 'POST' && args.path === labelPath,
     );
-    expect(deleteCall).toBeDefined();
-    expect(postCall).toBeDefined();
+    expect(deleteCallIndex).toBeGreaterThanOrEqual(0);
+    expect(postCallIndex).toBeGreaterThanOrEqual(0);
     // Remove must happen before the re-add.
-    expect(mockRest.mock.calls.indexOf(deleteCall!)).toBeLessThan(
-      mockRest.mock.calls.indexOf(postCall!),
-    );
+    expect(deleteCallIndex).toBeLessThan(postCallIndex);
   });
 
   it('does a plain add (no delete) when the ready label is not yet present', async () => {
@@ -429,9 +425,7 @@ describe('finishFixRound (integration)', () => {
       replies: [{ issueId: 'ISSUE01', kind: 'JUSTIFY', body: 'covered' }],
     });
 
-    const data = parse(
-      result as { content: Array<{ type: string; text: string }> },
-    );
+    const data = parse(result);
     expect(data.labelApplied).toBe(true);
     expect(data.labelReapplied).toBe(false);
 
@@ -455,9 +449,7 @@ describe('finishFixRound (integration)', () => {
       replies: [{ issueId: 'ISSUE01', kind: 'JUSTIFY', body: 'covered' }],
     });
 
-    const data = parse(
-      result as { content: Array<{ type: string; text: string }> },
-    );
+    const data = parse(result);
     expect(data.labelReapplied).toBe(true);
     expect(data.errors).toEqual([]);
 

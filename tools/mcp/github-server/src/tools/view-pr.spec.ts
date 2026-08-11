@@ -427,7 +427,7 @@ describe('viewPR — reviewDecision derivation (LS-8708)', () => {
       ),
     );
     const result = await viewPR({ number: 42 });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
     expect(parsed.reviewDecision).toBe('APPROVED');
   });
 
@@ -444,7 +444,7 @@ describe('viewPR — reviewDecision derivation (LS-8708)', () => {
       ),
     );
     const result = await viewPR({ number: 42 });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
     expect(parsed.reviewDecision).toBe('REVIEW_REQUIRED');
   });
 
@@ -486,7 +486,7 @@ describe('viewPR — reviewDecision derivation (LS-8708)', () => {
         },
       });
     const result = await viewPR({ number: 42 });
-    const parsed = JSON.parse(result.content[0].text);
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
     expect(parsed.reviewDecision).toBe('APPROVED');
   });
 });

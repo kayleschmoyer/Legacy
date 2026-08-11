@@ -281,7 +281,7 @@ describe('diagnose', () => {
         },
       });
     const result = await diagnose({ prNumber: 100 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as DiagnosePayload;
     expect(payload.reason).not.toBe('CHANGES_REQUESTED');
     expect(payload.reason).toBe('READY');
   });

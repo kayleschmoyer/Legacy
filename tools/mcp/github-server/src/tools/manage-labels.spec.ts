@@ -192,7 +192,7 @@ describe('manageLabels — add re-triggers label-gated workflows', () => {
   it('removes then re-adds a label that is already present', async () => {
     mockRest
       .mockResolvedValueOnce([{ name: 'bot:ready-for-review' }] as never) // GET current labels
-      .mockResolvedValue(undefined as never); // DELETE + POST
+      .mockResolvedValue(undefined); // DELETE + POST
 
     const result = await manageLabels({
       prs: [42],
@@ -213,7 +213,7 @@ describe('manageLabels — add re-triggers label-gated workflows', () => {
   it('does a plain add (no delete) when the label is not yet present', async () => {
     mockRest
       .mockResolvedValueOnce([{ name: 'agent-in-progress' }] as never) // GET current labels
-      .mockResolvedValue(undefined as never); // POST
+      .mockResolvedValue(undefined); // POST
 
     const result = await manageLabels({
       prs: [42],

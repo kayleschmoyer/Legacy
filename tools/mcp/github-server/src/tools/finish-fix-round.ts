@@ -1,8 +1,8 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { fetchPrLabels } from './manage-labels.js';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
-import { fetchPrLabels } from './manage-labels.js';
 
 export type ReplyKind = 'FIX' | 'JUSTIFY' | 'CANNOT-COMPLY';
 

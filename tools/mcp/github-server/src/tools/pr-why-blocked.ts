@@ -130,7 +130,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
 
 type PRStatus = 'DONE' | 'BLOCKED' | 'WAITING' | 'READY';
 
-interface Diagnosis {
+export interface Diagnosis {
   status: PRStatus;
   reason: string;
   summary: string;

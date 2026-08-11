@@ -92,7 +92,7 @@ export async function manageLabels(
             }
 
             if (clearRegex) {
-              for (const name of currentLabels!) {
+              for (const name of currentLabels ?? []) {
                 if (clearRegex.test(name) && !effectiveRemove.includes(name)) {
                   effectiveRemove.push(name);
                   clearedLabels.push(name);
@@ -107,7 +107,7 @@ export async function manageLabels(
               // add-transition via remove-then-add for labels that are
               // already on the PR (LS-8706).
               const alreadyPresent = params.add.filter((l) =>
-                currentLabels!.includes(l),
+                (currentLabels ?? []).includes(l),
               );
               for (const label of alreadyPresent) {
                 try {

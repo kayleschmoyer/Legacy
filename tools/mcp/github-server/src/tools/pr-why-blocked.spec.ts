@@ -9,6 +9,7 @@ jest.mock('../required-checks', () => ({
 }));
 
 import { diagnose, prWhyBlocked } from './pr-why-blocked';
+import type { Diagnosis } from './pr-why-blocked';
 import { githubGraphQL } from '../github-api';
 import { getRepoOwnerName } from '../auth';
 import { evaluatePRChecks, requiresCodeOwnerReview } from '../required-checks';
@@ -551,7 +552,7 @@ describe('prWhyBlocked', () => {
       });
 
     const result = await prWhyBlocked({ number: 42 });
-    const payload = JSON.parse(result.content[0].text);
+    const payload = JSON.parse(result.content[0].text) as Diagnosis;
     expect(payload.reason).not.toBe('CHANGES_REQUESTED');
     expect(payload.status).toBe('READY');
   });
