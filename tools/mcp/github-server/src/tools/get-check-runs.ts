@@ -138,17 +138,25 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+// GitHub's own `check_name` query param is an exact match against the full
+// display name (e.g. "🚀 CI Pipeline / lint"), which no agent can guess —
+// so we always fetch the unfiltered list here and apply our own
+// case-insensitive substring match in `filterRunsByName` instead (LS-8771).
+function filterRunsByName(
+  runs: SerializedCheckRun[],
+  checkName: string,
+): SerializedCheckRun[] {
+  const needle = checkName.toLowerCase();
+  return runs.filter((run) => run.name.toLowerCase().includes(needle));
+}
+
 async function fetchCheckRunsForSha(
   owner: string,
   repo: string,
   sha: string,
-  checkName: string | undefined,
   resolveRunId?: boolean,
 ): Promise<SerializedCheckRun[]> {
   const baseQuery: Record<string, string> = { per_page: '100' };
-  if (checkName) {
-    baseQuery.check_name = checkName;
-  }
 
   let allCheckRuns: CheckRun[] = [];
   let totalCount = 0;
@@ -244,13 +252,15 @@ export async function getCheckRuns(
       }
     }
 
-    const deduped = await fetchCheckRunsForSha(
+    const allRuns = await fetchCheckRunsForSha(
       repo.owner,
       repo.name,
       sha,
-      params.checkName,
       params.resolveRunId,
     );
+    const deduped = params.checkName
+      ? filterRunsByName(allRuns, params.checkName)
+      : allRuns;
 
     const header = `_sha: ${sha.slice(0, 7)}${params.prNumber !== undefined ? `, PR #${params.prNumber}` : ''}, total: ${deduped.length}_`;
     const columns = params.resolveRunId
@@ -258,7 +268,9 @@ export async function getCheckRuns(
       : CHECK_RUN_COLUMNS;
     const text =
       deduped.length === 0
-        ? `No check runs found for ${sha.slice(0, 7)}.`
+        ? params.checkName && allRuns.length > 0
+          ? `No check runs matching "${params.checkName}" for ${sha.slice(0, 7)}. Available check names: ${allRuns.map((r) => r.name).join(', ')}`
+          : `No check runs found for ${sha.slice(0, 7)}.`
         : `${header}\n\n${markdownTable(
             deduped.map((r) => checkRunRow(r, params.resolveRunId)),
             {
@@ -297,16 +309,27 @@ async function getCheckRunsBatch(
 ): Promise<ToolResult> {
   const checkRuns: Record<string, SerializedCheckRun[]> = {};
   const missing: { sha: string; error: string }[] = [];
+  const noMatch: { sha: string; checkName: string; available: string[] }[] = [];
 
   await mapWithConcurrency(shas, BATCH_CONCURRENCY, async (sha) => {
     try {
-      checkRuns[sha] = await fetchCheckRunsForSha(
+      const allRuns = await fetchCheckRunsForSha(
         repo.owner,
         repo.name,
         sha,
-        checkName,
         resolveRunId,
       );
+      const filtered = checkName
+        ? filterRunsByName(allRuns, checkName)
+        : allRuns;
+      checkRuns[sha] = filtered;
+      if (checkName && filtered.length === 0 && allRuns.length > 0) {
+        noMatch.push({
+          sha,
+          checkName,
+          available: allRuns.map((r) => r.name),
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       LOGGER.error(
@@ -323,7 +346,11 @@ async function getCheckRunsBatch(
     content: [
       {
         type: 'text',
-        text: minifiedJson({ checkRuns, missing }),
+        text: minifiedJson(
+          noMatch.length > 0
+            ? { checkRuns, missing, noMatch }
+            : { checkRuns, missing },
+        ),
       },
     ],
   };

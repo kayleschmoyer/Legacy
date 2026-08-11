@@ -1567,7 +1567,7 @@ export function createServer(): McpServer {
         .min(1)
         .optional()
         .describe(
-          'Filter results to a specific check name (e.g. "bot-review")',
+          'Case-insensitive substring match against check run names (e.g. "lint" matches "🚀 CI Pipeline / lint"). When no run matches, the response lists the available check names for that sha instead of a bare "not found".',
         ),
       resolveRunId: z
         .boolean()

@@ -92,6 +92,40 @@ describe('getCheckRuns single-sha path', () => {
     expect(result.isError).toBe(true);
     expect((result.content[0] as { text: string }).text).toContain('boom');
   });
+
+  it('filters checkName as a case-insensitive substring against the full display name', async () => {
+    mockGithubRest.mockResolvedValueOnce(
+      pageOnce([
+        makeRun('🚀 CI Pipeline / lint', { conclusion: 'failure' }),
+        makeRun('🚀 CI Pipeline / custom-checks'),
+        makeRun('bot-review'),
+      ]),
+    );
+
+    const result = await getCheckRuns({ sha: 'abc123', checkName: 'LINT' });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('total: 1');
+    expect(text).toContain('🚀 CI Pipeline / lint');
+    expect(text).not.toContain('custom-checks');
+    expect(text).not.toContain('bot-review');
+  });
+
+  it('lists available check names when checkName matches nothing but the sha has runs', async () => {
+    mockGithubRest.mockResolvedValueOnce(
+      pageOnce([makeRun('🚀 CI Pipeline / lint'), makeRun('bot-review')]),
+    );
+
+    const result = await getCheckRuns({
+      sha: 'abc123',
+      checkName: 'nonexistent',
+    });
+    expect(result.isError).toBeFalsy();
+    const text = (result.content[0] as { text: string }).text;
+    expect(text).toContain('No check runs matching "nonexistent"');
+    expect(text).toContain('🚀 CI Pipeline / lint');
+    expect(text).toContain('bot-review');
+  });
 });
 
 describe('getCheckRuns batch mode', () => {
@@ -145,6 +179,29 @@ describe('getCheckRuns batch mode', () => {
     expect(result.isError).toBeFalsy();
     expect(peak).toBeLessThanOrEqual(5);
     expect(peak).toBeGreaterThan(1);
+  });
+
+  it('reports noMatch with available names when checkName filters out all runs for a sha', async () => {
+    mockGithubRest.mockImplementation(async ({ path }: { path: string }) => {
+      if (path.includes('/sha_a/'))
+        return pageOnce([makeRun('🚀 CI Pipeline / lint')]);
+      throw new Error(`unexpected path: ${path}`);
+    });
+
+    const result = await getCheckRuns({
+      shas: ['sha_a'],
+      checkName: 'nonexistent',
+    });
+    expect(result.isError).toBeFalsy();
+    const body = parse((result.content[0] as { text: string }).text);
+    expect((body.checkRuns as Record<string, unknown[]>).sha_a).toHaveLength(0);
+    expect(body.noMatch).toEqual([
+      {
+        sha: 'sha_a',
+        checkName: 'nonexistent',
+        available: ['🚀 CI Pipeline / lint'],
+      },
+    ]);
   });
 
   it('takes precedence over single-sha params', async () => {
