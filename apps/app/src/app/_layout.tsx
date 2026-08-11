@@ -23,7 +23,11 @@ import { useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { DbClientContext } from '../common/ApolloClientContext';
 import { useCurrentUserInfo } from '../common/auth/AuthHooks';
 import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
-import { ThemeProvider, useThemeContext } from '../context/ThemeContext';
+import {
+  ThemeProvider,
+  ThemeServerSync,
+  useThemeContext,
+} from '../context/ThemeContext';
 import { setUserProperties } from '../utils/analytics';
 import { installGlobalErrorCapture } from '../lib/installGlobalErrorCapture';
 
@@ -116,11 +120,15 @@ function AuthenticatedContent(): React.JSX.Element {
   // LOCAL_USER sentinel (id === -1).
   const { data: currentUser } = useCurrentUserInfo();
 
+  const authenticatedUserId =
+    currentUser?.id && currentUser.id > 0 ? currentUser.id : undefined;
+
   return (
     <ApolloProvider client={client.apolloClient}>
-      {currentUser?.id && currentUser.id > 0 ? (
-        <AnalyticsIdentify userId={currentUser.id} />
+      {authenticatedUserId ? (
+        <AnalyticsIdentify userId={authenticatedUserId} />
       ) : null}
+      <ThemeServerSync userId={authenticatedUserId} />
       <Slot />
     </ApolloProvider>
   );

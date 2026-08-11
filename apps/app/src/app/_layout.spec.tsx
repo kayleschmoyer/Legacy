@@ -37,9 +37,11 @@ jest.mock('../utils/analytics', () => ({
 
 let mockUserData: { user: { subscriptionTier: string } } | null = null;
 const mockUseGetUserByIdQuery = jest.fn(() => ({ data: mockUserData }));
+const mockUpdateUserTheme = jest.fn().mockResolvedValue(undefined);
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: (...args: unknown[]): unknown =>
     mockUseGetUserByIdQuery(...args),
+  useUpdateUserThemeMutation: (): unknown => [mockUpdateUserTheme],
 }));
 
 const mockUseCurrentUserInfo = jest.fn(() => ({
@@ -75,6 +77,7 @@ jest.mock('@legacy-sports/tamagui-config', () => ({ tamaguiConfig: {} }));
 
 jest.mock('../context/ThemeContext', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+  ThemeServerSync: () => null,
   useThemeContext: () => ({
     resolvedTheme: 'dark',
     themePreference: 'system',
