@@ -745,6 +745,7 @@ export const draftForfeitedPicks = pgTable(
         foreignColumns: [keeperDesignations.id],
         name: 'draft_forfeited_picks_keeper_designation_fk',
       }).onDelete('cascade'),
+      teamIdIdx: index('draft_forfeited_picks_team_id_idx').on(table.teamId),
       draftForfeitedPicksUk: unique('draft_forfeited_picks_uk').on(
         table.draftId,
         table.teamId,
@@ -872,6 +873,9 @@ export const tradeOfferPlayers = pgTable(
       }).onDelete('cascade'),
       tradeIdIdx: index('trade_offer_players_trade_id_idx').on(
         table.tradeOfferId,
+      ),
+      fromTeamIdIdx: index('trade_offer_players_from_team_id_idx').on(
+        table.fromTeamId,
       ),
       uniquePlayerPerOffer: unique('trade_offer_players_unique').on(
         table.tradeOfferId,

@@ -66,6 +66,7 @@ export const userBadges = pgTable(
     }).onDelete('set null'),
     userIdIdx: index('user_badges_user_id_idx').on(table.userId),
     leagueIdIdx: index('user_badges_league_id_idx').on(table.leagueId),
+    teamIdIdx: index('user_badges_team_id_idx').on(table.teamId),
     badgeKeyIdx: index('user_badges_badge_key_idx').on(table.badgeKey),
     earnedAtIdx: index('user_badges_earned_at_idx').on(
       table.userId,

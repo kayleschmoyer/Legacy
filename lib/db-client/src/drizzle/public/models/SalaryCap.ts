@@ -133,6 +133,7 @@ export const auctionBudgets = pgTable(
         table.draftId,
         table.teamId,
       ),
+      teamIdIdx: index('auction_budgets_team_id_idx').on(table.teamId),
     };
   },
 );

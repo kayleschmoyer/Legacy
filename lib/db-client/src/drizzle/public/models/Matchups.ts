@@ -366,6 +366,9 @@ export const matchupChatBlocks = pgTable(
       leagueIdIdx: index('matchup_chat_blocks_league_id_idx').on(
         table.leagueId,
       ),
+      matchupIdIdx: index('matchup_chat_blocks_matchup_id_idx').on(
+        table.matchupId,
+      ),
     };
   },
 );
