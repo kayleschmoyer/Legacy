@@ -1,5 +1,5 @@
-import { searchJql } from '../jql-search.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { searchJql } from '../jql-search.js';
 
 interface BulkListChildrenParams {
   keys: string[];

@@ -1,7 +1,7 @@
 import { markdownTable, pickFields } from '@legacy-sports/mcp-format';
-import { searchJql } from '../jql-search.js';
-import { CHILD_COLUMNS, withNextPageHint } from '../format.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { CHILD_COLUMNS, withNextPageHint } from '../format.js';
+import { searchJql } from '../jql-search.js';
 
 const PAGINATE_PAGE_SIZE = 100;
 const PAGINATE_CAP = 500;

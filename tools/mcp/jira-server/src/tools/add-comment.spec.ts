@@ -4,9 +4,9 @@ jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };

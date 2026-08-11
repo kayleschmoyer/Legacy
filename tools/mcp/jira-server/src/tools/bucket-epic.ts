@@ -1,5 +1,5 @@
-import { jiraRequest } from '../jira-api.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { jiraRequest } from '../jira-api.js';
 
 // 5-minute module-scope cache per bucket
 const cache = new Map<string, { key: string; expiresAt: number }>();

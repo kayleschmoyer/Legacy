@@ -1,14 +1,14 @@
 import {
-  minifiedJson,
   markdownTable,
+  minifiedJson,
   pickFields,
 } from '@legacy-sports/mcp-format';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
 import { matchesStatus } from '../locale.js';
 import { COMMENT_COLUMNS } from '../format.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export type IncludeOption =
   | 'comments'
@@ -105,15 +105,19 @@ interface Ticket {
 function extractBlockers(links: JiraIssueLink[]): BlockerInfo[] {
   return links
     .filter(
-      (link) =>
-        link.inwardIssue &&
+      (
+        link,
+      ): link is JiraIssueLink & {
+        inwardIssue: NonNullable<JiraIssueLink['inwardIssue']>;
+      } =>
+        Boolean(link.inwardIssue) &&
         link.type.inward.toLowerCase().includes('is blocked by'),
     )
     .map((link) => ({
-      key: link.inwardIssue!.key,
+      key: link.inwardIssue.key,
       type: 'blocked-by',
-      summary: link.inwardIssue!.fields?.summary,
-      status: link.inwardIssue!.fields?.status?.name,
+      summary: link.inwardIssue.fields?.summary,
+      status: link.inwardIssue.fields?.status?.name,
     }));
 }
 
@@ -332,13 +336,13 @@ async function fetchTicket(
             jql: `parent = ${JSON.stringify(key)}`,
             fields: ['summary', 'status'],
             maxResults: 100,
-          }).catch(() => undefined as undefined)
+          }).catch(() => undefined)
         : Promise.resolve(undefined),
       wantComments
-        ? fetchCommentsForKey(key).catch(() => undefined as undefined)
+        ? fetchCommentsForKey(key).catch(() => undefined)
         : Promise.resolve(undefined),
       wantTransitions
-        ? fetchTransitionsForKey(key).catch(() => undefined as undefined)
+        ? fetchTransitionsForKey(key).catch(() => undefined)
         : Promise.resolve(undefined),
     ]);
 
@@ -403,7 +407,7 @@ export async function view(params: ViewParams): Promise<CallToolResult> {
     const tickets: Record<string, Record<string, unknown>> = {};
     const missing: string[] = [];
     keys.forEach((key, i) => {
-      const r = results[i]!;
+      const r = results[i];
       if (r.status === 'fulfilled') {
         tickets[key] = ticketToJson(r.value);
       } else {

@@ -14,15 +14,13 @@ jest.mock('../jql-search', () => ({
   searchJqlAll: jest.fn(),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 
-const { searchJqlAll: mockSearchJqlAll } = jest.requireMock(
-  '../jql-search',
-) as {
+const { searchJqlAll: mockSearchJqlAll } = jest.requireMock<{
   searchJqlAll: jest.Mock;
-};
+}>('../jql-search');
 
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };

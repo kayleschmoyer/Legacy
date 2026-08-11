@@ -4,24 +4,38 @@ jest.mock('../jql-search', () => ({
   searchJql: jest.fn(),
 }));
 
-const { searchJql: mockSearchJql } = jest.requireMock('../jql-search') as {
-  searchJql: jest.Mock;
-};
-
 interface ParentEntry {
   parent: string;
   count: number;
   children: Array<{ key: string }>;
 }
 
-function parseResult(result: { content: ReadonlyArray<unknown> }): {
+interface SearchJqlCallArgs {
+  jql: string;
+  fields: string[];
+  maxResults?: number;
+  pageToken?: string;
+}
+
+interface ParsedResult {
   success: boolean;
   total: number;
   succeeded: ParentEntry[];
   failed: Array<{ key: string; error: string }>;
-} {
+}
+
+const { searchJql: mockSearchJql } = jest.requireMock<{
+  searchJql: jest.Mock<
+    Promise<{ issues: Array<{ key: string; fields: unknown }> }>,
+    [SearchJqlCallArgs]
+  >;
+}>('../jql-search');
+
+function parseResult(result: {
+  content: ReadonlyArray<unknown>;
+}): ParsedResult {
   const first = result.content[0] as { text: string };
-  return JSON.parse(first.text);
+  return JSON.parse(first.text) as ParsedResult;
 }
 
 beforeEach(() => {
@@ -31,9 +45,9 @@ beforeEach(() => {
 describe('bulkListChildren', () => {
   it('issues one JQL search per parent and returns their children grouped', async () => {
     mockSearchJql.mockImplementation(
-      async (params: { jql: string; maxResults: number }) => {
+      (params: { jql: string; maxResults: number }) => {
         const parent = params.jql.match(/parent = "([^"]+)"/)?.[1] ?? '';
-        return {
+        return Promise.resolve({
           issues: [
             {
               key: `${parent}-child`,
@@ -46,7 +60,7 @@ describe('bulkListChildren', () => {
               },
             },
           ],
-        };
+        });
       },
     );
 
@@ -66,14 +80,14 @@ describe('bulkListChildren', () => {
   it('forwards the status filter into the JQL clause', async () => {
     mockSearchJql.mockResolvedValue({ issues: [] });
     await bulkListChildren({ keys: ['LS-1'], status: 'To Do' });
-    const call = mockSearchJql.mock.calls[0][0] as { jql: string };
+    const call = mockSearchJql.mock.calls[0][0];
     expect(call.jql).toContain('status = "To Do"');
   });
 
   it('reports partial failure when one parent search throws', async () => {
-    mockSearchJql.mockImplementation(async (params: { jql: string }) => {
+    mockSearchJql.mockImplementation((params: { jql: string }) => {
       if (params.jql.includes('LS-2')) throw new Error('JQL error');
-      return { issues: [] };
+      return Promise.resolve({ issues: [] });
     });
 
     const result = await bulkListChildren({ keys: ['LS-1', 'LS-2'] });

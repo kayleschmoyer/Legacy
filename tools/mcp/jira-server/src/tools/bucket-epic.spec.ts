@@ -4,9 +4,9 @@ jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 
 function text(result: { content: Array<{ type: string }> }): string {
   const block = result.content[0] as { type: string; text: string };
@@ -51,7 +51,7 @@ describe('bucket-epic (design-sync bucket)', () => {
     expect(mockJiraRequest).toHaveBeenCalledWith({
       method: 'PUT',
       path: '/rest/api/3/project/LS/properties/bucket.design-sync',
-      body: expect.objectContaining({ key: 'LS-4568' }),
+      body: expect.objectContaining({ key: 'LS-4568' }) as { key: string },
     });
     expect(parseJson(result)).toEqual(
       expect.objectContaining({

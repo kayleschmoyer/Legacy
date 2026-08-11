@@ -9,18 +9,18 @@ jest.mock('../jira-api', () => ({
 }));
 
 jest.mock('../netrc', () => ({
-  getJiraCredentials: jest.fn(async () => ({ type: 'basic' })),
+  getJiraCredentials: jest.fn(() => ({ type: 'basic' })),
 }));
 
 // get-active-sprint pulls in the wider API chain; mock it so importing
 // create-ticket stays cheap and the no-sprint path needs no setup.
 jest.mock('./get-active-sprint', () => ({
-  getActiveSprintId: jest.fn(async () => null),
+  getActiveSprintId: jest.fn(() => null),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 
 interface CreateBody {
   fields: { issuetype: { name: string }; parent?: { key: string } };

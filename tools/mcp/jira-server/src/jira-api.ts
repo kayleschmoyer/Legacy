@@ -1,6 +1,6 @@
 import {
-  getJiraCredentials,
   basicAuthHeader,
+  getJiraCredentials,
   JIRA_SITE_URL_DEFAULT,
   type JiraCredentials,
 } from './netrc.js';
@@ -13,7 +13,10 @@ import { getAccessToken } from './oauth.js';
 function isConnectionError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message.toLowerCase();
-  const cause = err.cause;
+  // `Error.cause` is an ES2022 addition; tsconfig.base.json's `lib` predates
+  // it, so the property is accessed through an explicit local type rather
+  // than relying on the (unavailable) ambient `Error` typing.
+  const cause = (err as { cause?: unknown }).cause;
   const causeCode =
     cause !== null &&
     typeof cause === 'object' &&
@@ -175,7 +178,8 @@ export async function jiraRequest<T = unknown>(
       throw err;
     }
     const errMsg = err instanceof Error ? err.message : String(err);
-    const cause = err instanceof Error ? err.cause : undefined;
+    const cause =
+      err instanceof Error ? (err as { cause?: unknown }).cause : undefined;
     const causeMsg =
       cause !== null &&
       typeof cause === 'object' &&

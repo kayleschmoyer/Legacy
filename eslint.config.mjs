@@ -237,9 +237,7 @@ export default [
       'tools/mcp/db-admin-server/**',
       'tools/mcp/dev-process-server/**',
       'tools/mcp/github-server/**',
-      'tools/mcp/jira-server/**',
       'tools/mcp/rollbar-server/**',
-      'tools/jira-sync/**',
     ],
   },
 ];

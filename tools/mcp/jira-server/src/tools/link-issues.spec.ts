@@ -4,9 +4,14 @@ jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
+
+function parse(result: { content: Array<{ type: string }> }) {
+  const block = result.content[0] as { type: string; text: string };
+  return JSON.parse(block.text) as Record<string, unknown>;
+}
 
 describe('linkIssues', () => {
   beforeEach(() => {
@@ -36,9 +41,7 @@ describe('linkIssues', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const data = JSON.parse(
-      (result.content[0] as { type: string; text: string }).text,
-    );
+    const data = parse(result);
     expect(data.success).toBe(true);
     expect(data.inwardKey).toBe('LS-100');
     expect(data.outwardKey).toBe('LS-200');
@@ -53,9 +56,7 @@ describe('linkIssues', () => {
 
     expect(mockJiraRequest).not.toHaveBeenCalled();
     expect(result.isError).toBe(true);
-    const data = JSON.parse(
-      (result.content[0] as { type: string; text: string }).text,
-    );
+    const data = parse(result);
     expect(data.success).toBe(false);
     expect(data.error).toContain('Cannot link an issue to itself');
   });
@@ -70,9 +71,7 @@ describe('linkIssues', () => {
     });
 
     expect(result.isError).toBe(true);
-    const data = JSON.parse(
-      (result.content[0] as { type: string; text: string }).text,
-    );
+    const data = parse(result);
     expect(data.success).toBe(false);
     expect(data.error).toContain('403 Forbidden');
   });

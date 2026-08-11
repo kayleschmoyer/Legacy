@@ -14,19 +14,19 @@ jest.mock('./bucket-epic', () => ({
   writeBucketEpicKey: jest.fn(),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 const { searchJql: mockSearchJql, searchJqlAll: mockSearchJqlAll } =
-  jest.requireMock('../jql-search') as {
+  jest.requireMock<{
     searchJql: jest.Mock;
     searchJqlAll: jest.Mock;
-  };
+  }>('../jql-search');
 const { readBucketEpicKey: mockReadKey, writeBucketEpicKey: mockWriteKey } =
-  jest.requireMock('./bucket-epic') as {
+  jest.requireMock<{
     readBucketEpicKey: jest.Mock;
     writeBucketEpicKey: jest.Mock;
-  };
+  }>('./bucket-epic');
 
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };
@@ -132,8 +132,8 @@ describe('rolloverSync', () => {
             fields: expect.objectContaining({
               summary: 'Client Bugs — Sprint 9',
               labels: ['bucket:client-bugs', 'pinned-status'],
-            }),
-          }),
+            }) as unknown,
+          }) as unknown,
         }),
       );
       // sync ran afterward and reported completion.

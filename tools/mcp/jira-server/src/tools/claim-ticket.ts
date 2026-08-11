@@ -1,10 +1,10 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
 import { matchesStatus } from '../locale.js';
 import { resolveAndAssign } from '../assignee.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface ClaimTicketParams {
   key: string;
@@ -46,6 +46,16 @@ interface JiraIssueResponse {
   };
 }
 
+/** Narrow issue links down to blocker links with a resolved `inwardIssue`. */
+function isBlockerLink(link: JiraIssueLink): link is JiraIssueLink & {
+  inwardIssue: NonNullable<JiraIssueLink['inwardIssue']>;
+} {
+  return (
+    Boolean(link.inwardIssue) &&
+    link.type.inward.toLowerCase().includes('is blocked by')
+  );
+}
+
 /**
  * Atomically read, validate, and claim a Jira ticket:
  * 1. Fetch ticket details
@@ -73,7 +83,7 @@ export async function claimTicket(
         jql: `parent = ${JSON.stringify(key)}`,
         fields: ['status'],
         maxResults: 100,
-      }).catch(() => undefined as undefined),
+      }).catch(() => undefined),
       jiraRequest<{ transitions: JiraTransition[] }>({
         method: 'GET',
         path: `/rest/api/3/issue/${key}/transitions`,
@@ -116,18 +126,14 @@ export async function claimTicket(
     }
 
     // --- Blocker check ---
-    const blockerLinks = issue.fields.issuelinks.filter(
-      (link) =>
-        link.inwardIssue &&
-        link.type.inward.toLowerCase().includes('is blocked by'),
-    );
+    const blockerLinks = issue.fields.issuelinks.filter(isBlockerLink);
 
     let branchRecommendation = 'base off main';
 
     if (blockerLinks.length > 0) {
       const blockers = blockerLinks.map((link) => ({
-        key: link.inwardIssue!.key,
-        status: link.inwardIssue!.fields.status.name,
+        key: link.inwardIssue.key,
+        status: link.inwardIssue.fields.status.name,
       }));
 
       const unresolved = blockers.filter(
@@ -241,14 +247,10 @@ function buildTicket(
     | undefined,
 ) {
   const blockers = issue.fields.issuelinks
-    .filter(
-      (link) =>
-        link.inwardIssue &&
-        link.type.inward.toLowerCase().includes('is blocked by'),
-    )
+    .filter(isBlockerLink)
     .map((link) => ({
-      key: link.inwardIssue!.key,
-      status: link.inwardIssue!.fields.status.name,
+      key: link.inwardIssue.key,
+      status: link.inwardIssue.fields.status.name,
     }));
 
   const ticket: Record<string, unknown> = {

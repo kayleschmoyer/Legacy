@@ -1,11 +1,11 @@
 import { markdownTable, pickFields } from '@legacy-sports/mcp-format';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { searchJql } from '../jql-search.js';
 import {
   SEARCH_COLUMNS,
   SEARCH_COMPACT_COLUMNS,
   withNextPageHint,
 } from '../format.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface SearchParams {
   jql: string;

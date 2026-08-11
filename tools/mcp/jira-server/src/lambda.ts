@@ -3,9 +3,14 @@ import type {
   APIGatewayProxyResultV2,
 } from 'aws-lambda';
 import {
-  SecretsManagerClient,
   GetSecretValueCommand,
+  SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
+import {
+  authenticateMcpRequest,
+  handleOAuthMetadataRequest,
+  MCP_SCOPE,
+} from '@legacy-sports/mcp-bearer-auth';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
@@ -18,18 +23,13 @@ import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
 import { addComment } from './tools/add-comment.js';
-import { consolidatedTransition, COMMON_STATUSES } from './tools/transition.js';
-import { view, type IncludeOption } from './tools/view.js';
+import { COMMON_STATUSES, consolidatedTransition } from './tools/transition.js';
+import { view } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { claimTicket } from './tools/claim-ticket.js';
 import { jiraKeysSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
-import {
-  MCP_SCOPE,
-  authenticateMcpRequest,
-  handleOAuthMetadataRequest,
-} from '@legacy-sports/mcp-bearer-auth';
 
 const sm = new SecretsManagerClient({});
 let credentialsInitialized = false;
@@ -148,7 +148,7 @@ export function createMcpServer(): McpServer {
       tickets: z.preprocess((v) => {
         if (typeof v === 'string' && v.trimStart().startsWith('[')) {
           try {
-            return JSON.parse(v);
+            return JSON.parse(v) as unknown;
           } catch {
             return v;
           }
@@ -319,7 +319,7 @@ export function createMcpServer(): McpServer {
           ],
         };
       }
-      const include = p.include as IncludeOption[] | undefined;
+      const include = p.include;
       if (p.keys) return view({ keys: p.keys, include });
       if (p.key) return view({ key: p.key, format: p.format, include });
       return {

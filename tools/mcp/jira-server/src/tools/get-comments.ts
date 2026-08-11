@@ -1,8 +1,8 @@
 import { markdownTable, pickFields } from '@legacy-sports/mcp-format';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { jiraRequest } from '../jira-api.js';
 import { extractAdfText } from '../adf.js';
 import { COMMENT_COLUMNS } from '../format.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface GetCommentsParams {
   key?: string;
@@ -117,7 +117,7 @@ export async function getComments(
         chunk.map((k) => fetchCommentsForKey(k)),
       );
       settled.forEach((result, j) => {
-        const k = chunk[j]!;
+        const k = chunk[j];
         if (result.status === 'fulfilled') {
           comments[k] = pickFields(result.value, COMMENT_COLUMNS);
         } else {

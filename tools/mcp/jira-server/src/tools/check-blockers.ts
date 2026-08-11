@@ -1,7 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { jiraRequest } from '../jira-api.js';
 import { matchesStatus } from '../locale.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface CheckBlockersParams {
   key: string;
@@ -51,8 +51,12 @@ export async function checkBlockers(
 
     // Extract "is blocked by" links with their statuses
     const blockerLinks = issue.fields.issuelinks.filter(
-      (link) =>
-        link.inwardIssue &&
+      (
+        link,
+      ): link is JiraIssueLink & {
+        inwardIssue: NonNullable<JiraIssueLink['inwardIssue']>;
+      } =>
+        Boolean(link.inwardIssue) &&
         link.type.inward.toLowerCase().includes('is blocked by'),
     );
 
@@ -65,8 +69,8 @@ export async function checkBlockers(
     }
 
     const blockers: BlockerInfo[] = blockerLinks.map((link) => {
-      const blockerKey = link.inwardIssue!.key;
-      const status = link.inwardIssue!.fields.status.name;
+      const blockerKey = link.inwardIssue.key;
+      const status = link.inwardIssue.fields.status.name;
 
       let reason: string;
       if (matchesStatus(status, 'Done')) {

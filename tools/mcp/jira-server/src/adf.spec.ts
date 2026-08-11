@@ -36,7 +36,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: 'This is **bold** text.',
     });
-    const para = (result!.content as unknown[])[0] as {
+    if (!result) throw new Error('expected a value');
+    const para = (result.content as unknown[])[0] as {
       content: unknown[];
     };
     expect(para.content).toEqual([
@@ -50,7 +51,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: 'This is *italic* text.',
     });
-    const para = (result!.content as unknown[])[0] as {
+    if (!result) throw new Error('expected a value');
+    const para = (result.content as unknown[])[0] as {
       content: unknown[];
     };
     expect(para.content).toEqual([
@@ -64,7 +66,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: 'Call `doThing()` to proceed.',
     });
-    const para = (result!.content as unknown[])[0] as {
+    if (!result) throw new Error('expected a value');
+    const para = (result.content as unknown[])[0] as {
       content: unknown[];
     };
     expect(para.content).toEqual([
@@ -78,7 +81,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: '- Item one\n- Item two\n- Item three',
     });
-    expect(result!.content).toEqual([
+    if (!result) throw new Error('expected a value');
+    expect(result.content).toEqual([
       {
         type: 'bulletList',
         content: [
@@ -118,7 +122,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: '1. First\n2. Second\n3. Third',
     });
-    expect(result!.content).toEqual([
+    if (!result) throw new Error('expected a value');
+    expect(result.content).toEqual([
       {
         type: 'orderedList',
         content: [
@@ -158,7 +163,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: '```typescript\nconst x = 1;\n```',
     });
-    expect(result!.content).toEqual([
+    if (!result) throw new Error('expected a value');
+    expect(result.content).toEqual([
       {
         type: 'codeBlock',
         attrs: { language: 'typescript' },
@@ -171,7 +177,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: '```\nsome code\n```',
     });
-    const block = (result!.content as unknown[])[0] as {
+    if (!result) throw new Error('expected a value');
+    const block = (result.content as unknown[])[0] as {
       type: string;
       attrs: Record<string, unknown>;
     };
@@ -183,7 +190,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: '## Section Title',
     });
-    expect(result!.content).toEqual([
+    if (!result) throw new Error('expected a value');
+    expect(result.content).toEqual([
       {
         type: 'heading',
         attrs: { level: 2 },
@@ -196,8 +204,9 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: 'First paragraph.\n\nSecond paragraph.',
     });
-    expect(result!.content).toHaveLength(2);
-    const [p1, p2] = result!.content as Array<{ content: unknown[] }>;
+    if (!result) throw new Error('expected a value');
+    expect(result.content).toHaveLength(2);
+    const [p1, p2] = result.content as Array<{ content: unknown[] }>;
     expect(p1.content).toEqual([{ type: 'text', text: 'First paragraph.' }]);
     expect(p2.content).toEqual([{ type: 'text', text: 'Second paragraph.' }]);
   });
@@ -206,8 +215,9 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       description: 'Intro paragraph.\n\n- Alpha\n- Beta',
     });
-    expect(result!.content).toHaveLength(2);
-    const [para, list] = result!.content as Array<{ type: string }>;
+    if (!result) throw new Error('expected a value');
+    expect(result.content).toHaveLength(2);
+    const [para, list] = result.content as Array<{ type: string }>;
     expect(para.type).toBe('paragraph');
     expect(list.type).toBe('bulletList');
   });
@@ -220,7 +230,8 @@ describe('buildStructuredDescription', () => {
       planningNotes: 'See file.ts.',
     });
 
-    const content = result!.content as Array<{
+    if (!result) throw new Error('expected a value');
+    const content = result.content as Array<{
       type: string;
       attrs?: { level: number };
       content?: Array<{ type: string; text?: string }>;
@@ -247,7 +258,8 @@ describe('buildStructuredDescription', () => {
 
   it('only description provided — no extra headings appended', () => {
     const result = buildStructuredDescription({ description: 'Only this.' });
-    const content = result!.content as Array<{ type: string }>;
+    if (!result) throw new Error('expected a value');
+    const content = result.content as Array<{ type: string }>;
     expect(content.every((n) => n.type !== 'heading')).toBe(true);
   });
 
@@ -255,7 +267,8 @@ describe('buildStructuredDescription', () => {
     const result = buildStructuredDescription({
       context: '- Reason A\n- Reason B',
     });
-    const content = result!.content as Array<{ type: string }>;
+    if (!result) throw new Error('expected a value');
+    const content = result.content as Array<{ type: string }>;
     // heading + bulletList
     expect(content[0].type).toBe('heading');
     expect(content[1].type).toBe('bulletList');

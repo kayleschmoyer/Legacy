@@ -1,6 +1,6 @@
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { searchJqlAll } from '../jql-search.js';
 import { matchesStatus } from '../locale.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 export interface GetAllDescendantsParams {
   key: string;
@@ -174,13 +174,17 @@ function computeActiveBlockers(
 ): Array<{ key: string; status: string }> {
   return issuelinks
     .filter(
-      (link) =>
+      (
+        link,
+      ): link is JiraIssueLink & {
+        inwardIssue: NonNullable<JiraIssueLink['inwardIssue']>;
+      } =>
         link.inwardIssue !== undefined &&
         link.type.inward.toLowerCase().includes('is blocked by'),
     )
     .map((link) => ({
-      key: link.inwardIssue!.key,
-      status: link.inwardIssue!.fields.status.name,
+      key: link.inwardIssue.key,
+      status: link.inwardIssue.fields.status.name,
     }))
     .filter(
       (b) =>

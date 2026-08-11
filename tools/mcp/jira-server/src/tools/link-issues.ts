@@ -1,5 +1,5 @@
-import { jiraRequest } from '../jira-api.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { jiraRequest } from '../jira-api.js';
 
 interface LinkIssuesParams {
   inwardKey: string;

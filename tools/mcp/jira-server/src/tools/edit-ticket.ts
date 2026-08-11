@@ -1,6 +1,6 @@
+import { getActiveSprintId } from './get-active-sprint.js';
 import { buildStructuredDescription } from '../adf.js';
 import { jiraRequest } from '../jira-api.js';
-import { getActiveSprintId } from './get-active-sprint.js';
 import type { ToolResult } from '../types.js';
 
 interface EditTicketParams {

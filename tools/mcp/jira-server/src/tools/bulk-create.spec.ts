@@ -8,16 +8,16 @@ jest.mock('../jira-api', () => ({
 }));
 
 jest.mock('../netrc', () => ({
-  getJiraCredentials: jest.fn(async () => ({ type: 'basic' })),
+  getJiraCredentials: jest.fn(() => ({ type: 'basic' })),
 }));
 
 jest.mock('./get-active-sprint', () => ({
-  getActiveSprintId: jest.fn(async () => null),
+  getActiveSprintId: jest.fn(() => null),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 
 interface IssueUpdate {
   fields: { issuetype: { name: string }; summary: string };

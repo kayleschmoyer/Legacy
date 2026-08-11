@@ -4,12 +4,18 @@ jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
-  jiraRequest: jest.Mock;
-};
+interface MockJiraRequestOpts {
+  method: string;
+  path?: string;
+  body?: unknown;
+}
+
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
+  jiraRequest: jest.Mock<Promise<unknown>, [MockJiraRequestOpts]>;
+}>('../jira-api');
 
 function parse(result: { content: Array<{ type: string; text: string }> }) {
-  return JSON.parse(result.content[0]!.text) as Record<string, unknown>;
+  return JSON.parse(result.content[0].text) as Record<string, unknown>;
 }
 
 beforeEach(() => {
@@ -37,7 +43,8 @@ describe('editTicket — labels', () => {
     const put = mockJiraRequest.mock.calls.find(
       ([opts]) => opts.method === 'PUT',
     );
-    expect(put![0].body).toEqual({
+    if (!put) throw new Error('expected a PUT call');
+    expect(put[0].body).toEqual({
       update: { labels: [{ add: 'new-one' }] },
     });
   });
@@ -67,7 +74,8 @@ describe('editTicket — labels', () => {
     const put = mockJiraRequest.mock.calls.find(
       ([opts]) => opts.method === 'PUT',
     );
-    expect(put![0].body).toEqual({
+    if (!put) throw new Error('expected a PUT call');
+    expect(put[0].body).toEqual({
       update: { labels: [{ remove: 'drop-me' }] },
     });
   });
@@ -127,7 +135,8 @@ describe('editTicket — labels', () => {
     const put = mockJiraRequest.mock.calls.find(
       ([opts]) => opts.method === 'PUT',
     );
-    expect(put![0].body).toEqual({
+    if (!put) throw new Error('expected a PUT call');
+    expect(put[0].body).toEqual({
       fields: { summary: 'New summary' },
       update: { labels: [{ add: 'human-action' }] },
     });

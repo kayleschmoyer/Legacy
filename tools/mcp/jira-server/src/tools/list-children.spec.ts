@@ -4,13 +4,20 @@ jest.mock('../jql-search', () => ({
   searchJql: jest.fn(),
 }));
 
-const { searchJql: mockSearchJql } = jest.requireMock('../jql-search') as {
+const { searchJql: mockSearchJql } = jest.requireMock<{
   searchJql: jest.Mock;
-};
+}>('../jql-search');
 
 function text(result: { content: Array<{ type: string }> }): string {
   const block = result.content[0] as { type: string; text: string };
   return block.text;
+}
+
+interface PaginatedChildrenPayload {
+  parent: string;
+  total: number;
+  truncated?: boolean;
+  children: Array<{ key: string; summary: string; status: string }>;
 }
 
 const children = [
@@ -88,7 +95,7 @@ describe('listChildren', () => {
         .mockResolvedValueOnce({ issues: [children[0]] });
 
       const result = await listChildren({ key: 'LS-1', paginate: true });
-      const payload = JSON.parse(text(result));
+      const payload = JSON.parse(text(result)) as PaginatedChildrenPayload;
 
       expect(payload.parent).toBe('LS-1');
       expect(payload.total).toBe(3);
@@ -121,7 +128,7 @@ describe('listChildren', () => {
       });
 
       const result = await listChildren({ key: 'LS-1', paginate: true });
-      const payload = JSON.parse(text(result));
+      const payload = JSON.parse(text(result)) as PaginatedChildrenPayload;
 
       expect(payload.total).toBe(500);
       expect(payload.children).toHaveLength(500);
@@ -137,7 +144,7 @@ describe('listChildren', () => {
 
       expect(mockSearchJql).toHaveBeenCalledWith(
         expect.objectContaining({
-          jql: expect.stringContaining('"To Do"'),
+          jql: expect.stringContaining('"To Do"') as string,
         }),
       );
     });

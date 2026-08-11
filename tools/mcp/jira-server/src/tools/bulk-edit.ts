@@ -1,6 +1,6 @@
-import { jiraRequest } from '../jira-api.js';
-import { getActiveSprintId } from './get-active-sprint.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { getActiveSprintId } from './get-active-sprint.js';
+import { jiraRequest } from '../jira-api.js';
 
 export interface BulkEditTicketInput {
   key: string;

@@ -1,8 +1,8 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { jiraRequest } from '../jira-api.js';
 import { matchesStatus } from '../locale.js';
 import { resolveAndAssign } from '../assignee.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
 interface StartWorkParams {
   key: string;

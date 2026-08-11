@@ -4,9 +4,9 @@ jest.mock('../jql-search', () => ({
   searchJql: jest.fn(),
 }));
 
-const { searchJql: mockSearchJql } = jest.requireMock('../jql-search') as {
+const { searchJql: mockSearchJql } = jest.requireMock<{
   searchJql: jest.Mock;
-};
+}>('../jql-search');
 
 function text(result: { content: Array<{ type: string }> }): string {
   const block = result.content[0] as { type: string; text: string };

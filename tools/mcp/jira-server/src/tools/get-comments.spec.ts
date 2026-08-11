@@ -8,9 +8,9 @@ jest.mock('../adf', () => ({
   extractAdfText: jest.fn((body: unknown) => String(body)),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 
 function text(result: { content: Array<{ type: string }> }): string {
   const block = result.content[0] as { type: string; text: string };

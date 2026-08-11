@@ -6,7 +6,7 @@ type AdfNode = {
 };
 
 /** ADF heading node. */
-function adfHeading(text: string, level: number = 2): AdfNode {
+function adfHeading(text: string, level = 2): AdfNode {
   return {
     type: 'heading',
     attrs: { level },

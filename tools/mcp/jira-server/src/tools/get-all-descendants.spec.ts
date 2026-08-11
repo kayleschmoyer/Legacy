@@ -4,11 +4,9 @@ jest.mock('../jql-search', () => ({
   searchJqlAll: jest.fn(),
 }));
 
-const { searchJqlAll: mockSearchJqlAll } = jest.requireMock(
-  '../jql-search',
-) as {
+const { searchJqlAll: mockSearchJqlAll } = jest.requireMock<{
   searchJqlAll: jest.Mock;
-};
+}>('../jql-search');
 
 function parse(result: { content: ReadonlyArray<unknown> }) {
   const block = result.content[0] as { text: string };
@@ -293,7 +291,8 @@ describe('getAllDescendants', () => {
 
       expect(result.isError).toBe(true);
       const block = result.content[0] as { text: string };
-      expect(JSON.parse(block.text).error).toContain('Invalid Jira issue key');
+      const parsed = JSON.parse(block.text) as { error: string };
+      expect(parsed.error).toContain('Invalid Jira issue key');
       expect(mockSearchJqlAll).not.toHaveBeenCalled();
     });
 

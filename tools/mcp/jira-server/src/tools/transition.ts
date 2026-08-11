@@ -1,9 +1,9 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { claimTicket } from './claim-ticket.js';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { matchesStatus } from '../locale.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { claimTicket } from './claim-ticket.js';
 
 /**
  * Statuses commonly exposed by the LS workflow, listed in tool descriptions as
@@ -315,8 +315,10 @@ export async function consolidatedTransition(
           entry['cascadedSubtasks'] = parsed['cascadedSubtasks'];
         results[key] = entry;
       } else {
+        const parsedError =
+          typeof parsed['error'] === 'string' ? parsed['error'] : undefined;
         results[key] = {
-          error: String(parsed['error'] ?? 'transition failed'),
+          error: parsedError ?? text ?? 'transition failed',
         };
       }
     } catch (err) {

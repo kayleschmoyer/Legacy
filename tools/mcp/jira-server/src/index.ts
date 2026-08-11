@@ -12,8 +12,8 @@ import { listChildren } from './tools/list-children.js';
 import { deleteTicket } from './tools/delete-ticket.js';
 import { search } from './tools/search.js';
 import { setParent } from './tools/set-parent.js';
-import { consolidatedTransition, COMMON_STATUSES } from './tools/transition.js';
-import { view, type IncludeOption } from './tools/view.js';
+import { COMMON_STATUSES, consolidatedTransition } from './tools/transition.js';
+import { view } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { bulkEdit } from './tools/bulk-edit.js';
 import { bulkLinkIssues } from './tools/bulk-link-issues.js';
@@ -196,7 +196,7 @@ server.tool(
         return val;
       }
       try {
-        return JSON.parse(val);
+        return JSON.parse(val) as unknown;
       } catch {
         // Return the original string on invalid JSON so z.array() rejects it
         // with a type error rather than letting a thrown exception escape the
@@ -758,7 +758,7 @@ server.tool(
         ],
       };
     }
-    const include = params.include as IncludeOption[] | undefined;
+    const include = params.include;
     if (params.keys) return view({ keys: params.keys, include });
     if (params.key)
       return view({ key: params.key, format: params.format, include });

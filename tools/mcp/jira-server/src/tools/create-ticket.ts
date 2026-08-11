@@ -1,8 +1,8 @@
-import { jiraRequest, getSiteUrl } from '../jira-api.js';
-import { getJiraCredentials } from '../netrc.js';
-import { buildStructuredDescription } from '../adf.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getActiveSprintId } from './get-active-sprint.js';
+import { getSiteUrl, jiraRequest } from '../jira-api.js';
+import { getJiraCredentials } from '../netrc.js';
+import { buildStructuredDescription } from '../adf.js';
 
 interface CreateTicketParams {
   summary: string;

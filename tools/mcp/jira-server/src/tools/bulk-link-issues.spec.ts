@@ -4,9 +4,9 @@ jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 
 interface LinkBody {
   type: { name: string };
@@ -14,14 +14,18 @@ interface LinkBody {
   outwardIssue: { key: string };
 }
 
-function parseResult(result: { content: ReadonlyArray<unknown> }): {
+interface ParsedBulkLinkResult {
   success: boolean;
   total: number;
   succeeded: Array<{ inwardKey: string; outwardKey: string }>;
   failed: Array<{ inwardKey: string; error: string }>;
-} {
+}
+
+function parseResult(result: {
+  content: ReadonlyArray<unknown>;
+}): ParsedBulkLinkResult {
   const first = result.content[0] as { text: string };
-  return JSON.parse(first.text);
+  return JSON.parse(first.text) as ParsedBulkLinkResult;
 }
 
 beforeEach(() => {
@@ -69,10 +73,10 @@ describe('bulkLinkIssues', () => {
   });
 
   it('reports partial failure when a single Jira call rejects', async () => {
-    mockJiraRequest.mockImplementationOnce(async () => undefined);
-    mockJiraRequest.mockImplementationOnce(async () => {
-      throw new Error('403 Forbidden');
-    });
+    mockJiraRequest.mockImplementationOnce(() => undefined);
+    mockJiraRequest.mockImplementationOnce(() =>
+      Promise.reject(new Error('403 Forbidden')),
+    );
 
     const result = await bulkLinkIssues({
       links: [

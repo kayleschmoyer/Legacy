@@ -5,12 +5,12 @@ jest.mock('../jira-api', () => ({
 }));
 
 jest.mock('./get-active-sprint', () => ({
-  getActiveSprintId: jest.fn(async () => 42),
+  getActiveSprintId: jest.fn(() => Promise.resolve(42)),
 }));
 
-const { jiraRequest: mockJiraRequest } = jest.requireMock('../jira-api') as {
+const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
-};
+}>('../jira-api');
 
 interface PutCall {
   method: string;
@@ -18,14 +18,18 @@ interface PutCall {
   body: { fields: Record<string, unknown> };
 }
 
-function parseResult(result: { content: ReadonlyArray<unknown> }): {
+interface BulkEditResultPayload {
   success: boolean;
   total: number;
   succeeded: Array<{ key: string; updatedFields: string[] }>;
   failed: Array<{ key: string; error: string }>;
-} {
+}
+
+function parseResult(result: {
+  content: ReadonlyArray<unknown>;
+}): BulkEditResultPayload {
   const first = result.content[0] as { text: string };
-  return JSON.parse(first.text);
+  return JSON.parse(first.text) as BulkEditResultPayload;
 }
 
 beforeEach(() => {
@@ -45,8 +49,8 @@ describe('bulkEdit', () => {
 
     expect(mockJiraRequest).toHaveBeenCalledTimes(3);
     const calls = mockJiraRequest.mock.calls.map(([c]) => c as PutCall);
-    const byKey = Object.fromEntries(
-      calls.map((c) => [c.path.split('/').pop(), c]),
+    const byKey: Record<string, PutCall> = Object.fromEntries(
+      calls.map((c) => [c.path.split('/').pop() ?? '', c] as const),
     );
 
     expect(byKey['LS-1'].body.fields.summary).toBe('new');
@@ -65,7 +69,7 @@ describe('bulkEdit', () => {
   });
 
   it('reports partial failure without failing the whole batch', async () => {
-    mockJiraRequest.mockImplementation(async (opts: PutCall) => {
+    mockJiraRequest.mockImplementation((opts: PutCall) => {
       if (opts.path.endsWith('LS-2')) throw new Error('400 Bad Request');
     });
 

@@ -10,8 +10,8 @@ export const jiraKeysSchema = z
     (v) => {
       if (typeof v === 'string') {
         try {
-          const parsed = JSON.parse(v);
-          if (Array.isArray(parsed)) return parsed;
+          const parsed: unknown = JSON.parse(v);
+          if (Array.isArray(parsed)) return parsed as unknown[];
         } catch {
           // not JSON — treat as single key string
         }
