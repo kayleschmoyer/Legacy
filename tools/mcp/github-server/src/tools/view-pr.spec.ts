@@ -41,7 +41,7 @@ function makePR(overrides: Record<string, unknown> = {}) {
           changeType: 'MODIFIED',
         },
       ],
-      pageInfo: { hasNextPage: false },
+      pageInfo: { hasNextPage: false, endCursor: null },
     },
     commits: {
       totalCount: 3,
@@ -293,6 +293,87 @@ describe('viewPR — fields opt-in', () => {
     expect(parsed.files[0].path).toBe('src/foo.ts');
     expect(parsed.files[0].status).toBe('modified');
     expect(parsed).not.toHaveProperty('body');
+  });
+
+  it('fetches remaining pages when files are truncated (LS-9305)', async () => {
+    mockedGraphQL
+      .mockResolvedValueOnce(
+        gqlResponse(
+          makePR({
+            files: {
+              nodes: [
+                {
+                  path: 'src/foo.ts',
+                  additions: 10,
+                  deletions: 2,
+                  changeType: 'MODIFIED',
+                },
+              ],
+              pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce({
+        data: {
+          repository: {
+            pullRequest: {
+              files: {
+                nodes: [
+                  {
+                    path: 'src/bar.ts',
+                    additions: 3,
+                    deletions: 0,
+                    changeType: 'ADDED',
+                  },
+                ],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        },
+        errors: undefined,
+      });
+
+    const result = await viewPR({ number: 42, fields: ['files'] });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(mockedGraphQL).toHaveBeenCalledTimes(2);
+    expect(mockedGraphQL.mock.calls[1][1]).toMatchObject({
+      number: 42,
+      cursor: 'cursor-1',
+    });
+    expect(parsed.files).toHaveLength(2);
+    expect(parsed.files.map((f: { path: string }) => f.path)).toEqual([
+      'src/foo.ts',
+      'src/bar.ts',
+    ]);
+    expect(parsed).not.toHaveProperty('filesNote');
+  });
+
+  it('does not paginate files when field is not requested', async () => {
+    mockedGraphQL.mockResolvedValueOnce(
+      gqlResponse(
+        makePR({
+          files: {
+            nodes: [
+              {
+                path: 'src/foo.ts',
+                additions: 10,
+                deletions: 2,
+                changeType: 'MODIFIED',
+              },
+            ],
+            pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+          },
+        }),
+      ),
+    );
+
+    const result = await viewPR({ number: 42 });
+    JSON.parse(result.content[0].text);
+
+    expect(mockedGraphQL).toHaveBeenCalledTimes(1);
   });
 
   it('includes reviews when fields:["reviews"] passed', async () => {

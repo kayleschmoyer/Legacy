@@ -48,7 +48,7 @@ interface PRGraphQLResponse {
       changedFiles: number;
       files: {
         nodes: Array<PRFileNode>;
-        pageInfo: { hasNextPage: boolean };
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
       };
       commits: {
         totalCount: number;
@@ -105,7 +105,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
           deletions
           changeType
         }
-        pageInfo { hasNextPage }
+        pageInfo { hasNextPage endCursor }
       }
       commits(last: 1) {
         totalCount
@@ -239,6 +239,71 @@ async function fetchRemainingContexts(
   return nodes;
 }
 
+/**
+ * Follow-up query for a single PR's remaining `files` pages. `files(first: 100)`
+ * in `VIEW_PR_QUERY` truncates PRs with more than 100 changed files — this
+ * paginates the rest via `after: $cursor` so the `files` field (when
+ * requested via `fields: ["files"]`) is fully enumerated.
+ */
+const FILES_PAGE_QUERY = `
+query($owner: String!, $repo: String!, $number: Int!, $cursor: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      files(first: 100, after: $cursor) {
+        nodes {
+          path
+          additions
+          deletions
+          changeType
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}`;
+
+interface FilesPageResponse {
+  repository: {
+    pullRequest: null | {
+      files: {
+        nodes: Array<PRFileNode>;
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+      };
+    };
+  };
+}
+
+/**
+ * Fetch every remaining `files` page beyond the first, starting from the
+ * initial page's `pageInfo`.
+ */
+async function fetchRemainingFiles(
+  owner: string,
+  repo: string,
+  number: number,
+  pageInfo: { hasNextPage: boolean; endCursor: string | null },
+): Promise<Array<PRFileNode>> {
+  const nodes: Array<PRFileNode> = [];
+  let hasNextPage = pageInfo.hasNextPage;
+  let cursor = pageInfo.endCursor;
+
+  while (hasNextPage && cursor) {
+    const result = await githubGraphQL<FilesPageResponse>(FILES_PAGE_QUERY, {
+      owner,
+      repo,
+      number,
+      cursor,
+    });
+    const files = result.data.repository.pullRequest?.files;
+    if (!files) break;
+    nodes.push(...files.nodes);
+    hasNextPage = files.pageInfo.hasNextPage;
+    cursor = files.pageInfo.endCursor;
+  }
+
+  return nodes;
+}
+
 /** Map GraphQL PullRequestFile.changeType to REST-compatible status strings. */
 const CHANGE_TYPE_MAP: Record<string, string> = {
   ADDED: 'added',
@@ -333,16 +398,22 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
     }
 
     if (include.has('files')) {
-      output['files'] = pr.files.nodes.map((f) => ({
+      let fileNodes = pr.files.nodes;
+      if (pr.files.pageInfo.hasNextPage) {
+        const remaining = await fetchRemainingFiles(
+          repo.owner,
+          repo.name,
+          params.number,
+          pr.files.pageInfo,
+        );
+        fileNodes = [...fileNodes, ...remaining];
+      }
+      output['files'] = fileNodes.map((f) => ({
         path: f.path,
         additions: f.additions,
         deletions: f.deletions,
         status: mapChangeType(f.changeType),
       }));
-      if (pr.files.pageInfo.hasNextPage) {
-        output['filesNote'] =
-          'Truncated to first 100 files; PR has more changed files.';
-      }
     }
 
     if (include.has('reviews')) {
