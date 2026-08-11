@@ -22,7 +22,7 @@
       "executor": "@nx/jest:jest",
       "options": {
         "jestConfig": "apps/app-e2e/jest.config.json",
-        "passWithNoTests": true
+        "passWithNoTests": false
       },
       "configurations": {
         "ci": {
