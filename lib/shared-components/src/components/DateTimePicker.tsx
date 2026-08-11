@@ -54,9 +54,10 @@ export function DateTimePicker({
   onClear,
 }: DateTimePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(
-    value ? new Date(value.getFullYear(), value.getMonth(), 1) : new Date(),
-  );
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const base = value ?? new Date();
+    return new Date(base.getFullYear(), base.getMonth(), 1);
+  });
   const [selectedDate, setSelectedDate] = useState<Date | null>(value || null);
   const [hour, setHour] = useState(value ? to12Hour(value.getHours()) : 12);
   const [minute, setMinute] = useState(value ? value.getMinutes() : 0);
