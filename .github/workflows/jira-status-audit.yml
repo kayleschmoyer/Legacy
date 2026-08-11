@@ -7,11 +7,18 @@ name: "Jira Status Audit"
 # declared `<!-- jira-link -->` marker via tools/jira-sync (PR-title key
 # fallback for pre-marker PRs, branch-name fallback for pre-convention
 # PRs), computes the expected Jira status from the PR state
-# (merged → Done, open draft → In Progress, open ready → In Review), and
+# (merged → Done, any open PR — draft or ready — → In Review), and
 # auto-repairs drift. Repairs are forward-only: the monotonic guard is
 # consulted with a non-pull_request event, under which downgrades are
 # never permitted; anything the guard refuses gets the jira-mismatch
 # label plus a comment stating the proposed action.
+#
+# Expected status does not distinguish draft from ready PRs (LS-8690):
+# jira-branch-sync transitions a ticket to "In Review" on PR open
+# regardless of draft state, so expecting "In Progress" for an open draft
+# PR made every such ticket request a backward move the monotonic guard
+# permanently refused, leaving a stuck jira-mismatch label + comment
+# until the PR was marked ready. See tools/jira-sync/src/audit.js.
 #
 # Auto-repair writes are gated on the repo var JIRA_AUDIT_AUTO_REPAIR being
 # 'true'; anything else (including unset) is dry-run — allowed repairs are

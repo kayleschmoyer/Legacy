@@ -194,7 +194,7 @@ describe('cli audit', () => {
     expect(result.stderr).toContain('guard-allowed');
   });
 
-  it('audits an open draft PR with title fallback', () => {
+  it('audits an open draft PR with title fallback (LS-8690: expected is In Review, matching jira-branch-sync regardless of draft state)', () => {
     const prPath = writeEvent({
       number: 5001,
       title: 'LS-1111 feat: x',
@@ -208,7 +208,7 @@ describe('cli audit', () => {
       skip: false,
       key: 'LS-1111',
       source: 'title',
-      expected: 'In Progress',
+      expected: 'In Review',
     });
   });
 });

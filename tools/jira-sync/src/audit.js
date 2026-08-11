@@ -12,8 +12,7 @@ const { parseMarker } = require('./marker');
  * what Jira status that ticket is expected to be in:
  *
  *   merged PR            → Done
- *   open draft PR        → In Progress
- *   open ready PR        → In Review
+ *   open PR (any)        → In Review
  *
  * Key selection is marker-first (the `<!-- jira-link -->` PR-body marker),
  * falling back to PR-title keys for pre-marker PRs, then to branch-name
@@ -25,9 +24,23 @@ const { parseMarker } = require('./marker');
  * downgrade is ever permitted. The audit never demotes a ticket; drift the
  * guard refuses to fix is labeled instead.
  *
+ * Expected status does not distinguish draft from ready PRs (LS-8690):
+ * jira-branch-sync's decideTarget() (state-machine.js) transitions a ticket
+ * to "In Review" on PR `opened`/`reopened` regardless of draft state, so an
+ * open draft PR's ticket is legitimately "In Review" in normal operation.
+ * Expecting "In Progress" for that case made every draft PR request a
+ * backward move the monotonic guard correctly refuses (isPermittedDowngradeEvent
+ * only permits it on the PR's own `converted_to_draft`/`closed` events, never
+ * on the audit's synthetic non-pull_request event) — producing a permanent
+ * jira-mismatch label + comment until the PR was marked ready. See LS-8699
+ * for the separate, still-open question of whether decideTarget should
+ * itself consult isDraft.
+ *
  * @typedef {Object} AuditInput
  * @property {boolean} merged   Whether the PR is merged.
- * @property {boolean} [isDraft]
+ * @property {boolean} [isDraft]  Unused in `expected` (LS-8690) — kept on
+ *   the input shape so callers passing it (e.g. cli.js's PR-file shape)
+ *   need no change.
  * @property {string} [title]
  * @property {string} [body]
  * @property {string} [branch]  Head branch name.
@@ -45,11 +58,7 @@ const { parseMarker } = require('./marker');
  * @returns {AuditResult}
  */
 function planAudit(input) {
-  const expected = input.merged
-    ? 'Done'
-    : input.isDraft === true
-      ? 'In Progress'
-      : 'In Review';
+  const expected = input.merged ? 'Done' : 'In Review';
 
   /** @param {string} reason */
   const skip = (reason) => ({

@@ -17,14 +17,14 @@ describe('planAudit — expected status from PR state', () => {
     expect(result).toMatchObject({ skip: false, expected: 'Done' });
   });
 
-  it('expects In Progress for an open draft PR', () => {
+  it('expects In Review for an open draft PR (LS-8690: matches jira-branch-sync, which transitions on open regardless of draft state)', () => {
     const result = planAudit({
       merged: false,
       isDraft: true,
       title: 'LS-1 feat: x',
       body: '',
     });
-    expect(result).toMatchObject({ skip: false, expected: 'In Progress' });
+    expect(result).toMatchObject({ skip: false, expected: 'In Review' });
   });
 
   it('expects In Review for an open ready PR', () => {
