@@ -584,7 +584,7 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
       );
 
       if (updates.length === 0) {
-        throw new Error('At least one scoring update is required');
+        throw UserInputError('At least one scoring update is required');
       }
 
       if (!(await checkAdminInDb(context))) {
@@ -600,13 +600,13 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
         const hasEnabledFlag = typeof update.isEnabled === 'boolean';
 
         if (!hasMultiplier && !hasEnabledFlag) {
-          throw new Error(
+          throw UserInputError(
             'Each scoring update must include a multiplier or an isEnabled flag',
           );
         }
 
         if (hasMultiplier && !Number.isFinite(update.multiplier)) {
-          throw new Error('Multiplier values must be finite numbers');
+          throw UserInputError('Multiplier values must be finite numbers');
         }
       }
 
@@ -634,10 +634,18 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
 
       // Invalidate the player scoring cache for this league so the next
       // player browse / draft pool request sees updated scores (LS-696).
-      await refreshPlayerScoringCache(
+      // Not awaited: compute_career_scores() recomputes every player and can
+      // take up to ~115s (LS-9313) — blocking the mutation response on it
+      // risks request timeouts, so the refresh runs fire-and-forget.
+      refreshPlayerScoringCache(
         context.db as unknown as PublicDb,
         args.leagueId,
       ).catch((err: unknown) => {
+        // { err } is intentional, not a mistake: lib/logging's serializeArg
+        // walks plain-object args with an Error-aware replacer, so a nested
+        // Error still gets its name/message/stack extracted (see
+        // lib/logging/src/lib/types.ts errorReplacer). Matches the
+        // notificationService.catch() pattern below in this same file.
         LOGGER.warn(
           'Failed to refresh player scoring cache after scoring update',
           { err },
@@ -797,10 +805,12 @@ builder.mutationField('updateLeagueScoringPositionBonuses', (t) =>
       // Invalidate the player scoring cache for this league so the next
       // player browse / draft pool request sees the updated bonuses,
       // mirroring updateLeagueScoringProfile (LS-696).
-      await refreshPlayerScoringCache(
+      // Not awaited: see the equivalent call above (LS-9313).
+      refreshPlayerScoringCache(
         context.db as unknown as PublicDb,
         args.leagueId,
       ).catch((err: unknown) => {
+        // { err } is intentional — see the equivalent call above.
         LOGGER.warn(
           'Failed to refresh player scoring cache after position bonus update',
           { err },
