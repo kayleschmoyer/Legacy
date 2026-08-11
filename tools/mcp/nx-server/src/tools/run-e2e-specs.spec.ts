@@ -193,10 +193,30 @@ describe('runE2ESpecs', () => {
     it('rejects grep with unsafe characters', async () => {
       const result = await runE2ESpecs({
         specs: ['src/tests/auth.spec.ts'],
-        grep: 'test$(cmd)',
+        grep: 'test; rm -rf /',
       });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toMatch(/disallowed characters/);
+    });
+
+    it('allows regex alternation in grep (LS-8744)', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      const result = await runE2ESpecs({
+        specs: ['src/tests/auth.spec.ts'],
+        grep: 'CSRF-protected request|upload endpoint returns an HTTP error',
+      });
+      expect(result.isError).toBeUndefined();
+    });
+
+    it('allows regex groups, classes, and quantifiers in grep', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      const result = await runE2ESpecs({
+        specs: ['src/tests/auth.spec.ts'],
+        grep: '^(foo|bar)[0-9]+\\.spec$',
+      });
+      expect(result.isError).toBeUndefined();
     });
 
     it('allows backslash in spec path (Windows paths)', async () => {

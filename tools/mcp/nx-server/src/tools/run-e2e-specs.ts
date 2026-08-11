@@ -13,8 +13,23 @@ import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
-/** Characters that must not appear in spec paths or grep patterns. */
-const UNSAFE_CHARS = /[;&`$(){}|<>'"\r\n]/;
+/** Characters that must not appear in spec paths (no legitimate use case there). */
+const UNSAFE_SPEC_CHARS = /[;&`$(){}|<>'"\r\n]/;
+
+/**
+ * Characters that must not appear in grep patterns.
+ *
+ * Standard regex metacharacters (`|`, `(`, `)`, `[`, `]`, `+`, `?`, `.`, `*`,
+ * `^`, `$`) are allowed — Playwright's own `--grep` flag accepts arbitrary JS
+ * regex, and grep is passed as a single argv element with no shell string
+ * interpolation: on POSIX, `pnpmJobSpec` runs with `shell: false`; on Windows
+ * it runs through cmd.exe but `escapeCmdShellArg` (cmd-escape.ts) quotes any
+ * arg containing `|`, `(`, `)`, `<`, `>`, or whitespace, and `$`/`[`/`]`/`+`/
+ * `?`/`.`/`*`/`^` are not cmd.exe metacharacters. True shell metacharacters
+ * that could still corrupt the command line (command separators, backticks,
+ * braces, redirects, quotes, newlines) remain blocked.
+ */
+const UNSAFE_GREP_CHARS = /[;&`{}<>'"\r\n]/;
 
 const ALLOWED_PROJECTS = new Set([
   'chromium',
@@ -295,7 +310,7 @@ export async function runE2ESpecs(
     };
   }
   for (const spec of params.specs) {
-    if (UNSAFE_CHARS.test(spec)) {
+    if (UNSAFE_SPEC_CHARS.test(spec)) {
       return {
         content: [
           {
@@ -321,7 +336,7 @@ export async function runE2ESpecs(
     };
   }
 
-  if (params.grep != null && UNSAFE_CHARS.test(params.grep)) {
+  if (params.grep != null && UNSAFE_GREP_CHARS.test(params.grep)) {
     return {
       content: [{ type: 'text', text: 'grep contains disallowed characters.' }],
       isError: true,
@@ -429,7 +444,8 @@ export async function runE2ESpecs(
   // 'e2e-specs' job formatter into the same structured report. Running pnpm
   // through the platform shell on Windows also fixes the historical EINVAL
   // from spawning pnpm.cmd without a shell; inputs are pre-validated against
-  // UNSAFE_CHARS above, and shell-relevant args are quoted (cmd-escape.ts).
+  // UNSAFE_SPEC_CHARS / UNSAFE_GREP_CHARS above, and shell-relevant args are
+  // quoted (cmd-escape.ts).
   const timeoutMs = integration ? INTEGRATION_TIMEOUT_MS : E2E_TIMEOUT_MS;
   const jobSpec = pnpmJobSpec(args);
   const snapshot = await runJobWithBudget(
