@@ -258,7 +258,76 @@ function formatErrors(results) {
   });
 }
 
+// Lightweight single-file mode (LS-8705): parse + schema-check one workflow
+// or action file, skipping the full-repo glob, the working-directory check,
+// and the second (irrelevant) schema fetch. Intended for iterative editing,
+// where re-running the full validator after every keystroke is too slow.
+function isActionFile(filePath) {
+  return /(^|[/\\])action\.ya?ml$/.test(filePath);
+}
+
+async function validateSingleFile(filePath) {
+  log(`🔍 Validating ${filePath}...`, 'cyan');
+
+  if (!fs.existsSync(filePath)) {
+    log(`\n❌ File not found: ${filePath}`, 'red');
+    process.exit(1);
+  }
+
+  const schemaUrl = isActionFile(filePath)
+    ? ACTION_SCHEMA_URL
+    : WORKFLOW_SCHEMA_URL;
+
+  const schema = await fetchSchema(schemaUrl);
+  if (!schema) {
+    // Fall back to a syntax-only check when the schema host is unreachable —
+    // still catches the YAML parse errors the ad-hoc `node -e` one-liner was
+    // used for, even fully offline.
+    log(
+      '\n⚠️  Schema fetch failed (network or server error) — checking YAML syntax only',
+      'yellow',
+    );
+    try {
+      yaml.load(fs.readFileSync(filePath, 'utf8'));
+      log(`✓ ${filePath} is valid YAML`, 'green');
+      process.exit(0);
+    } catch (error) {
+      log(`\n❌ ${filePath}`, 'red');
+      log(`   YAML parsing error: ${error.message}`, 'red');
+      process.exit(1);
+    }
+  }
+
+  const ajv = new Ajv({
+    allErrors: true,
+    strict: false,
+    allowUnionTypes: true,
+  });
+  addFormats(ajv);
+
+  const result = await validateFile(filePath, schema, ajv);
+  if (result) {
+    formatErrors([result]);
+    log(`\n❌ ${filePath} failed validation`, 'red');
+    process.exit(1);
+  }
+
+  log(`✓ ${filePath} is valid`, 'green');
+  process.exit(0);
+}
+
 async function main() {
+  const fileArgIndex = process.argv.indexOf('--file');
+  if (fileArgIndex !== -1) {
+    const filePath = process.argv[fileArgIndex + 1];
+    if (!filePath) {
+      log('\n❌ --file requires a path argument', 'red');
+      process.exit(1);
+    }
+    await validateSingleFile(filePath);
+    return;
+  }
+
   log('🔍 Validating GitHub Actions workflows...', 'cyan');
 
   try {
@@ -351,6 +420,7 @@ async function main() {
 module.exports = {
   collectWorkingDirectories,
   checkWorkingDirectoryPaths,
+  isActionFile,
 };
 
 if (require.main === module) {

@@ -21,9 +21,11 @@ import { createRequire } from 'node:module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const { collectWorkingDirectories, checkWorkingDirectoryPaths } = require(
-  resolve(__dirname, '..', 'validate-workflows.js'),
-);
+const {
+  collectWorkingDirectories,
+  checkWorkingDirectoryPaths,
+  isActionFile,
+} = require(resolve(__dirname, '..', 'validate-workflows.js'));
 
 // js-yaml is a project dep used by the script under test.
 const yaml = require('js-yaml');
@@ -176,6 +178,18 @@ test('checkWorkingDirectoryPaths flags paths that escape the repo root', () => {
   } finally {
     rmSync(tmpRepo, { recursive: true, force: true });
   }
+});
+
+// isActionFile (LS-8705): routes --file <path> to the correct schema.
+test('isActionFile matches action.yml and action.yaml at any depth', () => {
+  assert.equal(isActionFile('.github/actions/setup/action.yml'), true);
+  assert.equal(isActionFile('.github/actions/setup/action.yaml'), true);
+  assert.equal(isActionFile('action.yml'), true);
+});
+
+test('isActionFile rejects workflow files', () => {
+  assert.equal(isActionFile('.github/workflows/ci.yml'), false);
+  assert.equal(isActionFile('.github/workflows/action-runner.yml'), false);
 });
 
 test('checkWorkingDirectoryPaths flags paths that exist but are files, not directories', () => {
