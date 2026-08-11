@@ -1,9 +1,9 @@
-import { join, resolve, relative } from 'node:path';
+import { minifiedJson } from '@legacy-sports/mcp-format';
+import { join, relative, resolve } from 'node:path';
 import { existsSync, statSync, unlinkSync } from 'node:fs';
 import { writeFile as writeFileAsync } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { randomBytes } from 'node:crypto';
-import { minifiedJson } from '@legacy-sports/mcp-format';
 import { runCommand } from '../run-command.js';
 import { formatResourceList } from '../format.js';
 import { containsUnsafePathChars } from '../path-safety.js';

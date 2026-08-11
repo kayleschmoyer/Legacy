@@ -1,6 +1,13 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
+import type { existsSync } from 'node:fs';
 import { validatePR } from './validate-pr.js';
+import type {
+  JobSnapshot,
+  startMakeInBackground,
+  waitForJobDone,
+} from './make-run-bg.js';
+import type { runCommand, runMake } from '../run-command.js';
 
 jest.mock('../run-command.js', () => ({
   runCommand: jest.fn(),
@@ -36,22 +43,23 @@ jest.mock('node:fs', () => ({
   existsSync: jest.fn(() => true),
 }));
 
-const { runCommand: mockRunCommand, runMake: mockRunMake } = jest.requireMock(
-  '../run-command.js',
-) as { runCommand: jest.Mock<any>; runMake: jest.Mock<any> };
-const { existsSync: mockExistsSync } = jest.requireMock('node:fs') as {
-  existsSync: jest.Mock<any>;
-};
+const { runCommand: mockRunCommand, runMake: mockRunMake } = jest.requireMock<{
+  runCommand: jest.MockedFunction<typeof runCommand>;
+  runMake: jest.MockedFunction<typeof runMake>;
+}>('../run-command.js');
+const { existsSync: mockExistsSync } = jest.requireMock<{
+  existsSync: jest.MockedFunction<typeof existsSync>;
+}>('node:fs');
 const {
   startMakeInBackground: mockStartMakeInBackground,
   waitForJobDone: mockWaitForJobDone,
-} = jest.requireMock('./make-run-bg.js') as {
-  startMakeInBackground: jest.Mock<any>;
-  waitForJobDone: jest.Mock<any>;
-};
+} = jest.requireMock<{
+  startMakeInBackground: jest.MockedFunction<typeof startMakeInBackground>;
+  waitForJobDone: jest.MockedFunction<typeof waitForJobDone>;
+}>('./make-run-bg.js');
 
 /** A terminal job snapshot as returned by waitForJobDone. */
-function doneRecord(exitCode = 0, error: string | null = null) {
+function doneRecord(exitCode = 0, error: string | null = null): JobSnapshot {
   return {
     jobId: 'job-123',
     status: exitCode === 0 && error === null ? 'done' : 'failed',

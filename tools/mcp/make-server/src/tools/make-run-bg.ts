@@ -1,18 +1,18 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import {
-  MAX_WAIT_MS,
   createJobRunner,
   type JobSnapshot,
+  MAX_WAIT_MS,
 } from '@legacy-sports/mcp-jobs';
-import type { ToolResult } from '../types.js';
 import {
-  MAX_OUTPUT_CHARS,
-  STRUCTURED_TARGETS,
-  parseSteps,
-  extractErrors,
-  truncateOutput,
   buildCompactOutput,
+  extractErrors,
+  MAX_OUTPUT_CHARS,
+  parseSteps,
+  STRUCTURED_TARGETS,
+  truncateOutput,
 } from './run-target-utils.js';
+import type { ToolResult } from '../types.js';
 
 export type { JobSnapshot } from '@legacy-sports/mcp-jobs';
 

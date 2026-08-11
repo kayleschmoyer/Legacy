@@ -1,7 +1,7 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { existsSync, lstatSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { minifiedJson } from '@legacy-sports/mcp-format';
-import { runCommand, runMake, getRepoRoot } from '../run-command.js';
+import { getRepoRoot, runCommand, runMake } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 function isSymlink(p: string): boolean {

@@ -1,19 +1,19 @@
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import {
-  startMakeInBackground,
   makeRunStatus,
   makeRunWait,
+  startMakeInBackground,
 } from './make-run-bg.js';
 
 /** Pull the parsed JSON payload out of a ToolResult's text content. */
 function payload(result: {
   content: Array<{ text: string }>;
 }): Record<string, unknown> {
-  return JSON.parse(result.content[0].text);
+  return JSON.parse(result.content[0].text) as Record<string, unknown>;
 }
 
 describe('makeRunStatus / makeRunWait — unknown job', () => {

@@ -1,18 +1,18 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { join, isAbsolute, resolve, relative } from 'node:path';
-import { readdirSync, existsSync } from 'node:fs';
-import { runCommand, getRepoRoot } from '../run-command.js';
+import { isAbsolute, join, relative, resolve } from 'node:path';
+import { existsSync, readdirSync } from 'node:fs';
 import {
+  readJobLog,
   startMakeInBackground,
   waitForJobDone,
-  readJobLog,
 } from './make-run-bg.js';
 import {
-  parseSteps,
   extractErrors,
-  truncateOutput,
   MAX_OUTPUT_CHARS,
+  parseSteps,
+  truncateOutput,
 } from './run-target-utils.js';
+import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 interface ValidatePRParams {
@@ -87,7 +87,7 @@ async function checkMigrationStatus(
       true,
     );
     try {
-      const parsed = JSON.parse(output.trim());
+      const parsed: unknown = JSON.parse(output.trim());
       // If the CLI outputs structured JSON, use it directly
       if (
         typeof parsed === 'object' &&

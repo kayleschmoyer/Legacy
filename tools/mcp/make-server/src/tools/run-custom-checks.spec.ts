@@ -8,11 +8,11 @@ import {
   jest,
 } from '@jest/globals';
 import {
-  mkdtempSync,
-  writeFileSync,
-  mkdirSync,
-  rmSync,
   chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -62,7 +62,7 @@ import { runCustomChecks } from './run-custom-checks.js';
 function payload(result: {
   content: Array<{ text: string }>;
 }): Record<string, unknown> {
-  return JSON.parse(result.content[0].text);
+  return JSON.parse(result.content[0].text) as Record<string, unknown>;
 }
 
 function writeCheckScript(checksDir: string, name: string, body: string) {

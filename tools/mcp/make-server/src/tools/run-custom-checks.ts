@@ -1,9 +1,9 @@
-import { readdirSync, existsSync } from 'node:fs';
-import { join, isAbsolute, resolve, relative } from 'node:path';
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { runCommand, getRepoRoot } from '../run-command.js';
-import { resolveBashExecutable } from '../resolve-bash.js';
+import { existsSync, readdirSync } from 'node:fs';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { truncateOutput } from './run-target-utils.js';
+import { getRepoRoot, runCommand } from '../run-command.js';
+import { resolveBashExecutable } from '../resolve-bash.js';
 import type { ToolResult } from '../types.js';
 
 interface RunCustomChecksParams {

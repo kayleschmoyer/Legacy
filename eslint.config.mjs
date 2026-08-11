@@ -233,7 +233,6 @@ export default [
       'tools/mcp/dev-process-server/**',
       'tools/mcp/github-server/**',
       'tools/mcp/jira-server/**',
-      'tools/mcp/make-server/**',
       'tools/mcp/nx-server/**',
       'tools/mcp/rollbar-server/**',
       'tools/jira-sync/**',

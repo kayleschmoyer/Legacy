@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -16,7 +16,7 @@ import { makeRunWait } from './make-run-bg.js';
 function payload(result: {
   content: Array<{ text: string }>;
 }): Record<string, unknown> {
-  return JSON.parse(result.content[0].text);
+  return JSON.parse(result.content[0].text) as Record<string, unknown>;
 }
 
 describe('runTarget — allowlist gate', () => {

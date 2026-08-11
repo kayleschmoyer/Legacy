@@ -2,9 +2,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { z } from 'zod';
-import { join, resolve, relative, isAbsolute } from 'node:path';
+import { isAbsolute, join, relative, resolve } from 'node:path';
 import { existsSync } from 'node:fs';
-import { runCommand, getRepoRoot } from './run-command.js';
+import { getRepoRoot, runCommand } from './run-command.js';
 import { runTarget } from './tools/run-target.js';
 import { runCustomChecks } from './tools/run-custom-checks.js';
 import { validatePR } from './tools/validate-pr.js';
@@ -12,11 +12,11 @@ import { makeRunStatus, makeRunWait } from './tools/make-run-bg.js';
 import { worktreeCreate } from './tools/worktree-create.js';
 import { wtSetup } from './tools/wt-setup.js';
 import {
+  terraformStateList,
+  terraformStateMvBatch,
   terraformStatePull,
   terraformStatePush,
-  terraformStateList,
   terraformStateRm,
-  terraformStateMvBatch,
 } from './tools/terraform-state.js';
 
 // Absolute path: Windows (C:\... or C:/...) or Unix (/...)
@@ -316,7 +316,7 @@ server.tool(
     // Validate file names if provided
     if (params.files) {
       for (const f of params.files) {
-        if (!/^[a-zA-Z0-9_.\-\/\\]+\.tf$/.test(f)) {
+        if (!/^[a-zA-Z0-9_.\-/\\]+\.tf$/.test(f)) {
           return {
             content: [
               {

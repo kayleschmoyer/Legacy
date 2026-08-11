@@ -1,14 +1,14 @@
 import { describe, expect, it } from '@jest/globals';
 
 import {
-  parseSteps,
-  extractErrors,
-  truncateOutput,
-  parseAndValidateVariables,
-  compressFormatterOutput,
-  truncateStepErrors,
   buildCompactOutput,
+  compressFormatterOutput,
+  extractErrors,
   MAX_OUTPUT_CHARS,
+  parseAndValidateVariables,
+  parseSteps,
+  truncateOutput,
+  truncateStepErrors,
 } from './run-target-utils.js';
 
 describe('parseSteps', () => {

@@ -1,5 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { runMake, getRepoRoot } from '../run-command.js';
+import { getRepoRoot, runMake } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
 interface WorktreeCreateParams {

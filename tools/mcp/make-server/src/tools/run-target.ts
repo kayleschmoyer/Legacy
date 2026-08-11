@@ -1,24 +1,24 @@
-import { execFileSync } from 'node:child_process';
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { getRepoRoot } from '../run-command.js';
-import type { ToolResult } from '../types.js';
+import { execFileSync } from 'node:child_process';
 import {
-  MAX_OUTPUT_CHARS,
-  STRUCTURED_TARGETS,
-  parseSteps,
-  extractErrors,
-  truncateOutput,
   buildCompactOutput,
+  extractErrors,
+  MAX_OUTPUT_CHARS,
   parseAndValidateVariables,
+  parseSteps,
+  STRUCTURED_TARGETS,
+  truncateOutput,
 } from './run-target-utils.js';
 import {
-  SYNC_BUDGET_MS,
   buildStatusResult,
   readJobLog,
   startMakeInBackground,
+  SYNC_BUDGET_MS,
   waitForJobDone,
 } from './make-run-bg.js';
 import type { JobSnapshot } from './make-run-bg.js';
+import { getRepoRoot } from '../run-command.js';
+import type { ToolResult } from '../types.js';
 
 /**
  * Parse the list of files rewritten by the formatter from a make pc error message.
