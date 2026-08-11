@@ -1,6 +1,5 @@
-import { resolve } from 'node:path';
-
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { resolve } from 'node:path';
 
 jest.mock('../run-command.js', () => ({
   getRepoRoot: jest.fn(() => '/repo'),
@@ -12,13 +11,13 @@ jest.mock('node:fs', () => ({
 }));
 
 import { existsSync } from 'node:fs';
-import { getRepoRoot, runPnpm } from '../run-command.js';
 import {
-  MAX_FILES,
   describeFailure,
+  MAX_FILES,
   resolveConfigDir,
   runESLint,
 } from './run-eslint.js';
+import { getRepoRoot, runPnpm } from '../run-command.js';
 
 const mockRunPnpm = runPnpm as jest.MockedFunction<typeof runPnpm>;
 const mockGetRepoRoot = getRepoRoot as jest.MockedFunction<typeof getRepoRoot>;
@@ -61,7 +60,7 @@ describe('runESLint', () => {
       true,
     );
     expect(result.isError).toBeUndefined();
-    expect(JSON.parse(result.content[0].text as string)).toMatchObject({
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
       mode: 'check',
       files: 1,
       projectRoot: '.',
@@ -114,7 +113,7 @@ describe('runESLint', () => {
     const result = await runESLint({ files: ['tools/a.ts'] });
 
     expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text as string)).toMatchObject({
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
       mode: 'check',
       files: 1,
       passed: false,
@@ -232,7 +231,7 @@ describe('runESLint', () => {
       undefined,
       true,
     );
-    expect(JSON.parse(result.content[0].text as string)).toMatchObject({
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
       projectRoot: 'lambdas/db',
     });
   });

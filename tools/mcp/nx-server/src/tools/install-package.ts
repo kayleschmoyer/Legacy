@@ -1,11 +1,11 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { readFile, readdir, access } from 'node:fs/promises';
+import { access, readdir, readFile } from 'node:fs/promises';
 import { lstat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { registerJobFormatter } from '../job-formatters.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
-import { SYNC_BUDGET_MS, pnpmJobSpec } from '../nx-job.js';
+import { pnpmJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
 import { getRepoRoot, runPnpm } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
@@ -19,6 +19,16 @@ interface InstallPackageParams {
   version?: string;
   dev?: boolean;
   worktreePath?: string;
+}
+
+interface PnpmInfoTypesResult {
+  types?: string;
+  typings?: string;
+}
+
+interface RootPackageJson {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 }
 
 /** Check if node_modules is a symlink. Works cross-platform. */
@@ -42,7 +52,7 @@ async function hasBuiltinTypes(
       cwd,
       15_000,
     );
-    const parsed = JSON.parse(output);
+    const parsed = JSON.parse(output) as PnpmInfoTypesResult;
     // pnpm info --json returns an object with the fields
     return Boolean(parsed.types || parsed.typings);
   } catch {
@@ -262,9 +272,12 @@ async function readInstalledVersion(
   try {
     const pkgJson = JSON.parse(
       await readFile(join(cwd, 'package.json'), 'utf-8'),
-    );
-    const deps = { ...pkgJson.dependencies, ...pkgJson.devDependencies };
-    return deps[name] as string | undefined;
+    ) as RootPackageJson;
+    const deps: Record<string, string> = {
+      ...pkgJson.dependencies,
+      ...pkgJson.devDependencies,
+    };
+    return deps[name];
   } catch {
     // Non-critical — version reporting is best-effort
     return undefined;

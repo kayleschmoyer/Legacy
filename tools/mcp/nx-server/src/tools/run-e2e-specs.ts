@@ -1,6 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { existsSync } from 'node:fs';
-import { readFile, readdir, rm, stat } from 'node:fs/promises';
+import { readdir, readFile, rm, stat } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,7 +8,7 @@ import { registerJobFormatter } from '../job-formatters.js';
 import type { FormattedJobResult } from '../job-formatters.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
-import { SYNC_BUDGET_MS, pnpmJobSpec } from '../nx-job.js';
+import { pnpmJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
 import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';

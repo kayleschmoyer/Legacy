@@ -101,7 +101,9 @@ export function truncateStepErrors(output: string): string {
     // the content count is the same regardless of whether the section ends
     // with a newline.
     const trimmed =
-      bodyLines.at(-1) === '' ? bodyLines.slice(0, -1) : bodyLines;
+      bodyLines[bodyLines.length - 1] === ''
+        ? bodyLines.slice(0, -1)
+        : bodyLines;
     const contentLineCount = trimmed.length - 1; // subtract leading ''
     if (contentLineCount > MAX_STEP_BODY_LINES) {
       const remaining = contentLineCount - MAX_STEP_BODY_LINES;

@@ -7,9 +7,9 @@ jest.mock('../jobs.js', () => ({
   waitForJob: jest.fn(),
 }));
 
+import { jobStatus } from './job-tools.js';
 import { snapshotJob } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
-import { jobStatus } from './job-tools.js';
 
 const mockSnapshotJob = snapshotJob as jest.MockedFunction<typeof snapshotJob>;
 
@@ -29,7 +29,11 @@ describe('jobStatus daemon-failure detection (LS-8819)', () => {
     const result = await jobStatus({ jobId: 'nx-1' });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse(result.content[0].text as string);
+    const parsed = JSON.parse(result.content[0].text) as {
+      passed: boolean;
+      daemonError?: boolean;
+      hint?: string;
+    };
     expect(parsed.passed).toBe(false);
     expect(parsed.daemonError).toBe(true);
     expect(parsed.hint).toMatch(/make clean-cache/);
@@ -50,7 +54,11 @@ describe('jobStatus daemon-failure detection (LS-8819)', () => {
     const result = await jobStatus({ jobId: 'nx-2' });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text as string);
+    const parsed = JSON.parse(result.content[0].text) as {
+      passed: boolean;
+      daemonError?: boolean;
+      hint?: string;
+    };
     expect(parsed.passed).toBe(true);
     expect(parsed.daemonError).toBeUndefined();
   });
@@ -70,7 +78,11 @@ describe('jobStatus daemon-failure detection (LS-8819)', () => {
     const result = await jobStatus({ jobId: 'other-1' });
 
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(result.content[0].text as string);
+    const parsed = JSON.parse(result.content[0].text) as {
+      passed: boolean;
+      daemonError?: boolean;
+      hint?: string;
+    };
     expect(parsed.passed).toBe(true);
     expect(parsed.daemonError).toBeUndefined();
   });
@@ -90,7 +102,11 @@ describe('jobStatus daemon-failure detection (LS-8819)', () => {
     const result = await jobStatus({ jobId: 'nx-3' });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse(result.content[0].text as string);
+    const parsed = JSON.parse(result.content[0].text) as {
+      passed: boolean;
+      daemonError?: boolean;
+      hint?: string;
+    };
     expect(parsed.passed).toBe(false);
     expect(parsed.daemonError).toBeUndefined();
   });

@@ -32,9 +32,9 @@ jest.mock('../truncate-output.js', () => ({
 
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
+import { runE2ESpecs } from './run-e2e-specs.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot, StartJobOptions } from '../jobs.js';
-import { runE2ESpecs } from './run-e2e-specs.js';
 
 const mockRunJob = runJobWithBudget as jest.MockedFunction<
   typeof runJobWithBudget
@@ -42,8 +42,8 @@ const mockRunJob = runJobWithBudget as jest.MockedFunction<
 const mockExistsSync = fs.existsSync as jest.MockedFunction<
   typeof fs.existsSync
 >;
-const mockReadFile = fsPromises.readFile as jest.MockedFunction<
-  typeof fsPromises.readFile
+const mockReadFile = fsPromises.readFile as unknown as jest.MockedFunction<
+  (path: unknown, ...rest: unknown[]) => Promise<string>
 >;
 const mockReaddir = fsPromises.readdir as jest.MockedFunction<
   typeof fsPromises.readdir
@@ -57,7 +57,7 @@ const mockRm = fsPromises.rm as jest.MockedFunction<typeof fsPromises.rm>;
 
 /** Configure runJobWithBudget to resolve with a done snapshot echoing job meta. */
 function setupJob(log: string): void {
-  mockRunJob.mockImplementation(async (jobOpts: StartJobOptions) => {
+  mockRunJob.mockImplementation((jobOpts: StartJobOptions) => {
     const snapshot: JobSnapshot = {
       jobId: 'nx-test-job',
       status: 'done',
@@ -69,7 +69,7 @@ function setupJob(log: string): void {
       meta: jobOpts.meta,
       log,
     };
-    return snapshot;
+    return Promise.resolve(snapshot);
   });
 }
 
@@ -104,8 +104,8 @@ describe('runE2ESpecs — integration mode', () => {
     );
     mockReadFile.mockImplementation((p: unknown) => {
       if (String(p).includes('e2e-token.json'))
-        return Promise.resolve(FRESH_JWT) as never;
-      return Promise.resolve(PASSING_REPORT) as never;
+        return Promise.resolve(FRESH_JWT);
+      return Promise.resolve(PASSING_REPORT);
     });
     setupJob('');
   });
@@ -244,7 +244,7 @@ describe('runE2ESpecs — integration mode', () => {
 
   it('warns when JWT file is missing', async () => {
     mockExistsSync.mockReturnValue(false);
-    mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+    mockReadFile.mockResolvedValue(PASSING_REPORT);
 
     const result = await runE2ESpecs({ specs: [SPEC], integration: true });
     const payload = JSON.parse(result.content[0].text) as {
@@ -258,8 +258,8 @@ describe('runE2ESpecs — integration mode', () => {
   it('warns when JWT is expired', async () => {
     mockReadFile.mockImplementation((p: unknown) => {
       if (String(p).includes('e2e-token.json'))
-        return Promise.resolve(EXPIRED_JWT) as never;
-      return Promise.resolve(PASSING_REPORT) as never;
+        return Promise.resolve(EXPIRED_JWT);
+      return Promise.resolve(PASSING_REPORT);
     });
 
     const result = await runE2ESpecs({ specs: [SPEC], integration: true });
@@ -274,8 +274,8 @@ describe('runE2ESpecs — integration mode', () => {
   it('warns when JWT file is unreadable/malformed', async () => {
     mockReadFile.mockImplementation((p: unknown) => {
       if (String(p).includes('e2e-token.json'))
-        return Promise.reject(new Error('EACCES')) as never;
-      return Promise.resolve(PASSING_REPORT) as never;
+        return Promise.reject(new Error('EACCES'));
+      return Promise.resolve(PASSING_REPORT);
     });
 
     const result = await runE2ESpecs({ specs: [SPEC], integration: true });

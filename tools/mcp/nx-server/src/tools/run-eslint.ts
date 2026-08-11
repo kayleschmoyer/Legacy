@@ -1,7 +1,7 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { existsSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoRoot, runPnpm } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';

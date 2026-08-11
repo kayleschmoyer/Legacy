@@ -228,7 +228,9 @@ export default [
     // pattern). Flat config correctly drops that blanket ignore, which
     // would otherwise newly enforce lint on years of previously-unlinted
     // tooling in the same PR as the ESLint 9 migration. Preserving the
-    // pre-migration scope here; LS-8747 tracks a dedicated cleanup pass.
+    // pre-migration scope here for remaining projects; LS-8747 tracks a
+    // dedicated cleanup pass. tools/mcp/nx-server has been removed from
+    // this ignore list and its lint violations fixed (LS-8737).
     basePath: repoRoot,
     ignores: [
       'tools/mcp/aws-server/**',
@@ -237,7 +239,7 @@ export default [
       'tools/mcp/dev-process-server/**',
       'tools/mcp/github-server/**',
       'tools/mcp/jira-server/**',
-      'tools/mcp/nx-server/**',
+      'tools/mcp/rollbar-server/**',
       'tools/jira-sync/**',
     ],
   },

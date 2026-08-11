@@ -1,7 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { DAEMON_FAILURE_HINT, isDaemonFailure } from '../daemon-failure.js';
 import { runJobWithBudget } from '../jobs.js';
-import { SYNC_BUDGET_MS, nxJobSpec } from '../nx-job.js';
+import { nxJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
 import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';

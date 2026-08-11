@@ -1,4 +1,4 @@
-import { MAX_WAIT_MS, createJobRunner } from '@legacy-sports/mcp-jobs';
+import { createJobRunner, MAX_WAIT_MS } from '@legacy-sports/mcp-jobs';
 
 /**
  * nx-server's binding of the shared background-job runner

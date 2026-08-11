@@ -97,6 +97,6 @@ export async function depGraph(params: DepGraphParams): Promise<ToolResult> {
       isError: true,
     };
   } finally {
-    await unlink(tmpFile).catch(() => {});
+    await unlink(tmpFile).catch(() => undefined);
   }
 }

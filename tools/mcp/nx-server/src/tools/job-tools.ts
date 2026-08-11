@@ -1,7 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { DAEMON_FAILURE_HINT, isDaemonFailure } from '../daemon-failure.js';
 import { formatTerminalSnapshot } from '../job-formatters.js';
-import { MAX_WAIT_MS, listJobs, snapshotJob, waitForJob } from '../jobs.js';
+import { listJobs, MAX_WAIT_MS, snapshotJob, waitForJob } from '../jobs.js';
 import type { JobSnapshot } from '../jobs.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';

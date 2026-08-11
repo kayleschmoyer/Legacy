@@ -5,8 +5,8 @@ jest.mock('../run-command.js', () => ({
   runPnpm: jest.fn(),
 }));
 
-import { getRepoRoot, runPnpm } from '../run-command.js';
 import { MAX_FILES, runPrettier } from './run-prettier.js';
+import { getRepoRoot, runPnpm } from '../run-command.js';
 
 const mockRunPnpm = runPnpm as jest.MockedFunction<typeof runPnpm>;
 const mockGetRepoRoot = getRepoRoot as jest.MockedFunction<typeof getRepoRoot>;
@@ -32,7 +32,7 @@ describe('runPrettier', () => {
       true,
     );
     expect(result.isError).toBeUndefined();
-    expect(JSON.parse(result.content[0].text as string)).toMatchObject({
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
       mode: 'check',
       files: 1,
       passed: true,
@@ -84,7 +84,7 @@ describe('runPrettier', () => {
     const result = await runPrettier({ files: ['apps/web/Foo.tsx'] });
 
     expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text as string)).toMatchObject({
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
       mode: 'check',
       files: 1,
       passed: false,

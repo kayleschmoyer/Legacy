@@ -2,8 +2,8 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { runJobWithBudget } from '../jobs.js';
 import { getRepoRoot } from '../run-command.js';
 import {
-  MAX_OUTPUT_CHARS,
   buildCompactOutput,
+  MAX_OUTPUT_CHARS,
   truncateOutput,
 } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';

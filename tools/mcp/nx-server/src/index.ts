@@ -9,13 +9,13 @@ import { jobList, jobStatus, jobWait } from './tools/job-tools.js';
 import { runAffected } from './tools/run-affected.js';
 import { runE2ESpecs } from './tools/run-e2e-specs.js';
 import {
-  runESLint,
   MAX_FILES as ESLINT_MAX_FILES,
+  runESLint,
 } from './tools/run-eslint.js';
-import { runPcChunk, PC_CHUNKS } from './tools/run-pc-chunk.js';
+import { PC_CHUNKS, runPcChunk } from './tools/run-pc-chunk.js';
 import {
-  runPrettier,
   MAX_FILES as PRETTIER_MAX_FILES,
+  runPrettier,
 } from './tools/run-prettier.js';
 import { runTarget } from './tools/run-target.js';
 import { showProject } from './tools/show-project.js';
@@ -442,7 +442,7 @@ server.tool(
     'MCP server process. Use after a session resume or lost tool result to recover a ' +
     'job handle instead of re-running validation.',
   {},
-  async () => jobList(),
+  () => jobList(),
 );
 
 // Start the server

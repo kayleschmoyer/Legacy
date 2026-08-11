@@ -5,13 +5,13 @@ jest.mock('../run-command.js', () => ({
 }));
 jest.mock('../jobs.js', () => ({ runJobWithBudget: jest.fn() }));
 
-import { runJobWithBudget } from '../jobs.js';
-import type { JobSnapshot, StartJobOptions } from '../jobs.js';
 import {
   coalesceWindowsTestPathPatterns,
   isTargetAllowed,
   runTarget,
 } from './run-target.js';
+import { runJobWithBudget } from '../jobs.js';
+import type { JobSnapshot, StartJobOptions } from '../jobs.js';
 
 const mockRunJob = runJobWithBudget as jest.MockedFunction<
   typeof runJobWithBudget
@@ -19,7 +19,7 @@ const mockRunJob = runJobWithBudget as jest.MockedFunction<
 
 /** Configure runJobWithBudget to resolve with a terminal "done" snapshot. */
 function setupJob(): void {
-  mockRunJob.mockImplementation(async (jobOpts: StartJobOptions) => {
+  mockRunJob.mockImplementation((jobOpts: StartJobOptions) => {
     const snapshot: JobSnapshot = {
       jobId: 'nx-test-job',
       status: 'done',
@@ -31,7 +31,7 @@ function setupJob(): void {
       meta: jobOpts.meta,
       log: ' NX   Successfully ran target test\n',
     };
-    return snapshot;
+    return Promise.resolve(snapshot);
   });
 }
 
@@ -221,7 +221,7 @@ describe('runTarget', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    expect(JSON.parse(result.content[0].text as string)).toEqual({
+    expect(JSON.parse(result.content[0].text)).toEqual({
       project: 'shared-components',
       target: 'test',
       passed: true,
@@ -250,7 +250,11 @@ describe('runTarget', () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse(result.content[0].text as string);
+    const parsed = JSON.parse(result.content[0].text) as {
+      passed: boolean;
+      daemonError?: boolean;
+      hint?: string;
+    };
     expect(parsed.passed).toBe(false);
     expect(parsed.daemonError).toBe(true);
     expect(parsed.hint).toMatch(/make clean-cache/);
@@ -275,7 +279,11 @@ describe('runTarget', () => {
     });
 
     expect(result.isError).toBe(true);
-    const parsed = JSON.parse(result.content[0].text as string);
+    const parsed = JSON.parse(result.content[0].text) as {
+      passed: boolean;
+      daemonError?: boolean;
+      hint?: string;
+    };
     expect(parsed.passed).toBe(false);
     expect(parsed.daemonError).toBe(true);
   });
@@ -299,7 +307,7 @@ describe('runTarget', () => {
     });
 
     expect(result.isError).toBeUndefined();
-    expect(JSON.parse(result.content[0].text as string)).toEqual({
+    expect(JSON.parse(result.content[0].text)).toEqual({
       project: 'shared-components',
       target: 'test',
       status: 'running',
@@ -328,7 +336,7 @@ describe('runTarget', () => {
     });
 
     expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text as string)).toMatchObject({
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
       passed: false,
       error: 'nx run shared-components:test exited with code 1',
       output: 'FAIL shared-components/LoginPage.spec.ts',

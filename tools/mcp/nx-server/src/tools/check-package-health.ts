@@ -1,5 +1,5 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
-import { readFile, readdir, access, lstat } from 'node:fs/promises';
+import { access, lstat, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { getRepoRoot, runPnpm } from '../run-command.js';
 import type { ToolResult } from '../types.js';
@@ -13,6 +13,23 @@ interface HealthIssue {
   category: string;
   message: string;
   details?: string;
+}
+
+interface RootPackageJson {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  pnpm?: { overrides?: Record<string, string> };
+}
+
+interface LibPackageJson {
+  name?: string;
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+}
+
+interface PnpmInfoTypesResult {
+  types?: string;
+  typings?: string;
 }
 
 /** Check if node_modules is a symlink. Works cross-platform. */
@@ -56,7 +73,7 @@ async function readRootDependencies(cwd: string): Promise<{
   overrides: Record<string, string>;
 }> {
   const content = await readFile(join(cwd, 'package.json'), 'utf-8');
-  const pkg = JSON.parse(content);
+  const pkg = JSON.parse(content) as RootPackageJson;
   return {
     dependencies: pkg.dependencies ?? {},
     devDependencies: pkg.devDependencies ?? {},
@@ -88,7 +105,7 @@ async function readLibPackageDeps(cwd: string): Promise<
       try {
         const pkgPath = join(libPath, entry.name, 'package.json');
         const content = await readFile(pkgPath, 'utf-8');
-        const pkg = JSON.parse(content);
+        const pkg = JSON.parse(content) as LibPackageJson;
         const deps = pkg.dependencies ?? {};
         const peerDeps = pkg.peerDependencies ?? {};
         if (Object.keys(deps).length > 0 || Object.keys(peerDeps).length > 0) {
@@ -159,7 +176,7 @@ async function findMissingTypes(
         cwd,
         10_000,
       );
-      const parsed = JSON.parse(output);
+      const parsed = JSON.parse(output) as PnpmInfoTypesResult;
       if (!parsed.types && !parsed.typings) {
         // Check if @types/ exists in registry
         try {

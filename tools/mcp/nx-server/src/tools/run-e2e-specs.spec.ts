@@ -46,9 +46,9 @@ jest.mock('../truncate-output.js', () => ({
 
 import * as fs from 'node:fs';
 import * as fsPromises from 'node:fs/promises';
+import { runE2ESpecs } from './run-e2e-specs.js';
 import { runJobWithBudget } from '../jobs.js';
 import type { JobSnapshot, StartJobOptions } from '../jobs.js';
-import { runE2ESpecs } from './run-e2e-specs.js';
 
 const mockRunJob = runJobWithBudget as jest.MockedFunction<
   typeof runJobWithBudget
@@ -56,8 +56,8 @@ const mockRunJob = runJobWithBudget as jest.MockedFunction<
 const mockExistsSync = fs.existsSync as jest.MockedFunction<
   typeof fs.existsSync
 >;
-const mockReadFile = fsPromises.readFile as jest.MockedFunction<
-  typeof fsPromises.readFile
+const mockReadFile = fsPromises.readFile as unknown as jest.MockedFunction<
+  (path: unknown, ...rest: unknown[]) => Promise<string>
 >;
 const mockRm = fsPromises.rm as jest.MockedFunction<typeof fsPromises.rm>;
 
@@ -70,7 +70,7 @@ function setupJob(
   log: string,
   opts: { failed?: boolean; timedOut?: boolean } = {},
 ): void {
-  mockRunJob.mockImplementation(async (jobOpts: StartJobOptions) => {
+  mockRunJob.mockImplementation((jobOpts: StartJobOptions) => {
     const failed = (opts.failed ?? false) || (opts.timedOut ?? false);
     const snapshot: JobSnapshot = {
       jobId: 'nx-test-job',
@@ -87,7 +87,7 @@ function setupJob(
       meta: jobOpts.meta,
       log,
     };
-    return snapshot;
+    return Promise.resolve(snapshot);
   });
 }
 
@@ -201,7 +201,7 @@ describe('runE2ESpecs', () => {
 
     it('allows regex alternation in grep (LS-8744)', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
       const result = await runE2ESpecs({
         specs: ['src/tests/auth.spec.ts'],
         grep: 'CSRF-protected request|upload endpoint returns an HTTP error',
@@ -211,7 +211,7 @@ describe('runE2ESpecs', () => {
 
     it('allows regex groups, classes, and quantifiers in grep', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
       const result = await runE2ESpecs({
         specs: ['src/tests/auth.spec.ts'],
         grep: '^(foo|bar)[0-9]+\\.spec$',
@@ -221,7 +221,7 @@ describe('runE2ESpecs', () => {
 
     it('allows backslash in spec path (Windows paths)', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
       const result = await runE2ESpecs({
         specs: ['src\\tests\\auth.spec.ts'],
       });
@@ -230,7 +230,7 @@ describe('runE2ESpecs', () => {
 
     it('allows backslash in grep (regex anchors like \\b)', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
       const result = await runE2ESpecs({
         specs: ['src/tests/auth.spec.ts'],
         grep: '\\blogin\\b',
@@ -268,7 +268,7 @@ describe('runE2ESpecs', () => {
 
     it('gives hermetic runs a 30-minute process timeout regardless of batch size (LS-8743)', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       await runE2ESpecs({
         specs: Array.from(
@@ -281,7 +281,7 @@ describe('runE2ESpecs', () => {
 
     it('returns error when playwright does not produce a results file', async () => {
       setupJob('some output');
-      mockReadFile.mockRejectedValue(new Error('ENOENT') as never);
+      mockReadFile.mockRejectedValue(new Error('ENOENT'));
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
       expect(result.isError).toBe(true);
@@ -292,7 +292,7 @@ describe('runE2ESpecs', () => {
       setupJob(
         "Error: browserType.launch: Executable doesn't exist at /opt/pw-browsers/chromium_headless_shell-1217/chrome-headless-shell-linux64/chrome-headless-shell",
       );
-      mockReadFile.mockRejectedValue(new Error('ENOENT') as never);
+      mockReadFile.mockRejectedValue(new Error('ENOENT'));
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
       expect(result.isError).toBe(true);
@@ -306,18 +306,20 @@ describe('runE2ESpecs', () => {
     });
 
     it('returns a running snapshot with a jobId when the run exceeds the sync budget', async () => {
-      mockRunJob.mockImplementation(async (jobOpts: StartJobOptions) => ({
-        jobId: 'nx-running-job',
-        status: 'running' as const,
-        label: jobOpts.label,
-        cwd: jobOpts.cwd,
-        elapsedSec: 45,
-        exitCode: null,
-        error: null,
-        meta: jobOpts.meta,
-        logTail: 'Running 3 tests…',
-        hint: 'Call nx_job_wait',
-      }));
+      mockRunJob.mockImplementation((jobOpts: StartJobOptions) =>
+        Promise.resolve({
+          jobId: 'nx-running-job',
+          status: 'running' as const,
+          label: jobOpts.label,
+          cwd: jobOpts.cwd,
+          elapsedSec: 45,
+          exitCode: null,
+          error: null,
+          meta: jobOpts.meta,
+          logTail: 'Running 3 tests…',
+          hint: 'Call nx_job_wait',
+        }),
+      );
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
       expect(result.isError).toBeUndefined();
@@ -333,7 +335,7 @@ describe('runE2ESpecs', () => {
 
     it('returns success:true when all tests pass', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
       expect(result.isError).toBeUndefined();
@@ -350,7 +352,7 @@ describe('runE2ESpecs', () => {
 
     it('returns success:false with failing test details when tests fail', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(FAILING_REPORT as never);
+      mockReadFile.mockResolvedValue(FAILING_REPORT);
 
       const result = await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
       expect(result.isError).toBeUndefined();
@@ -378,7 +380,7 @@ describe('runE2ESpecs', () => {
 
     it('passes E2E_AUTH_MODE=ci and E2E_PORT in the job environment', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
 
@@ -389,7 +391,7 @@ describe('runE2ESpecs', () => {
 
     it('appends --grep flag when grep option is provided', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       await runE2ESpecs({
         specs: ['src/tests/auth.spec.ts'],
@@ -401,7 +403,7 @@ describe('runE2ESpecs', () => {
 
     it('uses specified project browser', async () => {
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       await runE2ESpecs({
         specs: ['src/tests/auth.spec.ts'],
@@ -430,7 +432,7 @@ describe('runE2ESpecs', () => {
         configurable: true,
       });
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
 
@@ -445,7 +447,7 @@ describe('runE2ESpecs', () => {
         configurable: true,
       });
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       await runE2ESpecs({
         specs: ['src/tests/auth.spec.ts'],
@@ -461,7 +463,7 @@ describe('runE2ESpecs', () => {
         configurable: true,
       });
       setupJob('');
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
 
@@ -485,9 +487,9 @@ describe('runE2ESpecs', () => {
       );
       mockReadFile.mockImplementation((p: unknown) => {
         if (String(p).includes('e2e-token.json')) {
-          return Promise.resolve(FRESH_JWT) as never;
+          return Promise.resolve(FRESH_JWT);
         }
-        return Promise.resolve(PASSING_REPORT) as never;
+        return Promise.resolve(PASSING_REPORT);
       });
       setupJob('');
     });
@@ -512,7 +514,7 @@ describe('runE2ESpecs', () => {
 
     it('warns when e2e JWT is missing and omits E2E_AUTH_MODE from env', async () => {
       mockExistsSync.mockReturnValue(false);
-      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
 
       const result = await runE2ESpecs({
         specs: [INTEGRATION_SPEC],

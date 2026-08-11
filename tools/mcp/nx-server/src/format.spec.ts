@@ -11,7 +11,7 @@ describe('projectListText', () => {
   it('fills count from the list length, overriding any passed count', () => {
     const text = projectListText({ count: 99 }, ['a', 'b', 'c']);
     const header = text.split('\n')[0];
-    expect(JSON.parse(header).count).toBe(3);
+    expect((JSON.parse(header) as { count: number }).count).toBe(3);
   });
 
   it('returns just the summary line (count 0) for an empty list', () => {

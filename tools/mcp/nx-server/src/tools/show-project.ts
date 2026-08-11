@@ -9,6 +9,14 @@ interface ShowProjectParams {
 
 const NX_NAME_REGEX = /^[a-z0-9-._]+$/i;
 
+interface NxProjectConfig {
+  tags?: string[];
+  root?: string;
+  sourceRoot?: string;
+  projectType?: string;
+  targets?: Record<string, { executor?: string; dependsOn?: string[] }>;
+}
+
 export async function showProject(
   params: ShowProjectParams,
 ): Promise<ToolResult> {
@@ -32,7 +40,7 @@ export async function showProject(
       cwd,
     );
 
-    const projectConfig = JSON.parse(output);
+    const projectConfig = JSON.parse(output) as NxProjectConfig;
 
     // Extract key info for a concise summary
     const tags = projectConfig.tags || [];
@@ -45,11 +53,7 @@ export async function showProject(
       string,
       { executor?: string; dependsOn?: string[] }
     > = {};
-    for (const [name, config] of Object.entries(projectConfig.targets || {})) {
-      const cfg = config as {
-        executor?: string;
-        dependsOn?: string[];
-      };
+    for (const [name, cfg] of Object.entries(projectConfig.targets || {})) {
       targetDetails[name] = {
         ...(cfg.executor && { executor: cfg.executor }),
         ...(cfg.dependsOn?.length && { dependsOn: cfg.dependsOn }),
