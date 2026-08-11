@@ -20,9 +20,10 @@ const config: Config = {
   moduleFileExtensions: ['ts', 'js'],
   moduleNameMapper: {
     '^(\\.{1,2}/.+)\\.js$': '$1',
-    // Resolve the shared package path alias to source for @swc/jest.
+    // Resolve the shared package path aliases to source for @swc/jest.
     '^@legacy-sports/mcp-format$':
       '<rootDir>/../../../lib/mcp-format/src/index.ts',
+    '^@legacy-sports/mcp-jobs$': '<rootDir>/../../../lib/mcp-jobs/src/index.ts',
   },
   coverageDirectory: '../../../coverage/tools/mcp/worktree-server',
 };
