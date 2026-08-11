@@ -607,16 +607,33 @@ export function createServer(): McpServer {
   // --- github_comment_pr ---
   server.tool(
     'github_comment_pr',
-    'Post a general (top-level) comment on a PR. Use for diagnostic notes, blocker explanations, and status updates — distinct from review thread replies (use github_reply_to_review for those). Maps to POST /repos/{owner}/{repo}/issues/{number}/comments.',
+    'Post a general (top-level) comment on a PR. Use for diagnostic notes, blocker explanations, and status updates — distinct from review thread replies (use github_reply_to_review for those). Maps to POST /repos/{owner}/{repo}/issues/{number}/comments. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
       body: z
         .string()
         .trim()
         .min(1, 'Comment body cannot be empty')
         .describe('Markdown body of the comment'),
     },
-    async (params) => commentPR(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return commentPR({ number: resolved, body: params.body });
+    },
   );
 
   // --- github_list_pr_comments (consolidated) ---
