@@ -1,0 +1,182 @@
+[
+  {
+    "project": "db",
+    "dir": "db",
+    "s3Prefix": "graphql",
+    "ssmName": "graphql",
+    "badgeName": "Upload GraphQL Lambda",
+    "distPath": "lambdas/db/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "stats-lambda",
+    "dir": "stats-lambda",
+    "s3Prefix": "stats",
+    "ssmName": "stats",
+    "badgeName": "Upload Stats Lambda",
+    "distPath": "lambdas/stats-lambda/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "draft-processor",
+    "dir": "draft-processor",
+    "s3Prefix": "draft-processor",
+    "ssmName": "draft-processor",
+    "badgeName": "Upload Draft Processor Lambda",
+    "distPath": "lambdas/draft-processor/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "game-selection",
+    "dir": "game-selection",
+    "s3Prefix": "game-selection",
+    "ssmName": "game-selection",
+    "badgeName": "Upload Game Selection Lambda",
+    "distPath": "lambdas/game-selection/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "jira-proxy",
+    "dir": "jira-proxy",
+    "s3Prefix": "jira-proxy",
+    "ssmName": "jira-proxy",
+    "badgeName": "Upload Jira Proxy Lambda",
+    "distPath": "lambdas/jira-proxy/dist",
+    "rollbar": false,
+    "driftMonitored": true
+  },
+  {
+    "project": "oauth-proxy",
+    "dir": "oauth-proxy",
+    "s3Prefix": "oauth-proxy",
+    "ssmName": "oauth-proxy",
+    "badgeName": "Upload OAuth Proxy Lambda",
+    "distPath": "lambdas/oauth-proxy/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "rollbar-discord",
+    "dir": "rollbar-discord",
+    "s3Prefix": "rollbar-discord",
+    "ssmName": "rollbar-discord",
+    "badgeName": "Upload Rollbar Discord Lambda",
+    "distPath": "lambdas/rollbar-discord/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "stripe-webhook",
+    "dir": "stripe-webhook",
+    "s3Prefix": "stripe-webhook",
+    "ssmName": "stripe-webhook",
+    "badgeName": "Upload Stripe Webhook Lambda",
+    "distPath": "lambdas/stripe-webhook/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "image-upload",
+    "dir": "image-upload",
+    "s3Prefix": "image-upload",
+    "ssmName": "image-upload",
+    "badgeName": "Upload Image Upload Lambda",
+    "distPath": "lambdas/image-upload/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "websocket",
+    "dir": "websocket",
+    "s3Prefix": "websocket",
+    "ssmName": "websocket",
+    "badgeName": "Upload WebSocket Lambda",
+    "distPath": "dist/lambdas/websocket",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "github-webhook",
+    "dir": "github-webhook",
+    "s3Prefix": "github-webhook",
+    "ssmName": "github-webhook",
+    "badgeName": "Upload GitHub Webhook Lambda",
+    "distPath": "lambdas/github-webhook/dist",
+    "rollbar": false,
+    "driftMonitored": true
+  },
+  {
+    "project": "notifications",
+    "dir": "notifications",
+    "s3Prefix": "notifications",
+    "ssmName": "notifications",
+    "badgeName": "Upload Notifications Lambda",
+    "distPath": "lambdas/notifications/dist",
+    "rollbar": true,
+    "driftMonitored": false
+  },
+  {
+    "project": "mcp-jira-server",
+    "dir": "tools/mcp/jira-server",
+    "s3Prefix": "mcp-jira",
+    "ssmName": "mcp-jira",
+    "badgeName": "Upload MCP Jira Lambda",
+    "distPath": "tools/mcp/jira-server/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "mcp-github-server",
+    "dir": "tools/mcp/github-server",
+    "s3Prefix": "mcp-github",
+    "ssmName": "mcp-github",
+    "badgeName": "Upload MCP GitHub Lambda",
+    "distPath": "tools/mcp/github-server/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "mcp-ci-server",
+    "dir": "tools/mcp/ci-server",
+    "s3Prefix": "mcp-ci",
+    "ssmName": "mcp-ci",
+    "badgeName": "Upload MCP CI Lambda",
+    "distPath": "tools/mcp/ci-server/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "mcp-db-admin-server",
+    "dir": "tools/mcp/db-admin-server",
+    "s3Prefix": "mcp-db",
+    "ssmName": "mcp-db",
+    "badgeName": "Upload MCP DB Lambda",
+    "distPath": "tools/mcp/db-admin-server/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "mcp-rollbar-server",
+    "dir": "tools/mcp/rollbar-server",
+    "s3Prefix": "mcp-rollbar",
+    "ssmName": "mcp-rollbar",
+    "badgeName": "Upload MCP Rollbar Lambda",
+    "distPath": "tools/mcp/rollbar-server/dist",
+    "rollbar": true,
+    "driftMonitored": true
+  },
+  {
+    "project": "apple-iap",
+    "dir": "apple-iap",
+    "s3Prefix": "apple-iap",
+    "ssmName": "apple-iap",
+    "badgeName": "Upload Apple IAP Lambda",
+    "distPath": "lambdas/apple-iap/dist",
+    "rollbar": true,
+    "driftMonitored": false
+  }
+]

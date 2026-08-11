@@ -146,26 +146,12 @@ jobs:
         env:
           FRESHNESS_THRESHOLD_HOURS: ${{ vars.LAMBDA_FRESHNESS_THRESHOLD_HOURS || '2' }}
         run: |
-          # Registry of lambda function-name suffixes and their SSM ssmName
-          # segment. Kept in lockstep with upload-lambdas.yml's REGISTRY.
-          REGISTRY='[
-            {"function":"graphql","ssmName":"graphql"},
-            {"function":"stats","ssmName":"stats"},
-            {"function":"draft-processor","ssmName":"draft-processor"},
-            {"function":"game-selection","ssmName":"game-selection"},
-            {"function":"jira-proxy","ssmName":"jira-proxy"},
-            {"function":"oauth-proxy","ssmName":"oauth-proxy"},
-            {"function":"rollbar-discord","ssmName":"rollbar-discord"},
-            {"function":"stripe-webhook","ssmName":"stripe-webhook"},
-            {"function":"image-upload","ssmName":"image-upload"},
-            {"function":"websocket","ssmName":"websocket"},
-            {"function":"github-webhook","ssmName":"github-webhook"},
-            {"function":"mcp-jira","ssmName":"mcp-jira"},
-            {"function":"mcp-github","ssmName":"mcp-github"},
-            {"function":"mcp-ci","ssmName":"mcp-ci"},
-            {"function":"mcp-db","ssmName":"mcp-db"},
-            {"function":"mcp-rollbar","ssmName":"mcp-rollbar"}
-          ]'
+          # Lambda function-name suffixes (== ssmName for every registered
+          # lambda) to monitor for version drift. Derived from the single
+          # source of truth shared with upload-lambdas.yml (LS-8716) — only
+          # entries with driftMonitored:true are included; see
+          # .github/lambda-registry.json.
+          REGISTRY=$(jq -c '[.[] | select(.driftMonitored) | {function: .ssmName, ssmName: .ssmName}]' .github/lambda-registry.json)
 
           NOW_EPOCH=$(date +%s)
           DRIFTED="[]"
@@ -401,27 +387,15 @@ jobs:
           DRIFT_JSON: ${{ needs.version-drift.outputs.drift_json }}
           DRY_RUN: ${{ inputs['dry-run'] == true }}
         run: |
-          # Maps drift-check's ssmName (this file's REGISTRY) to
-          # upload-lambdas.yml's `project` (its REGISTRY / the
-          # workflow_dispatch `lambda` choice). Kept in lockstep with both.
-          declare -A SSM_TO_PROJECT=(
-            [graphql]="db"
-            [stats]="stats-lambda"
-            [draft-processor]="draft-processor"
-            [game-selection]="game-selection"
-            [jira-proxy]="jira-proxy"
-            [oauth-proxy]="oauth-proxy"
-            [rollbar-discord]="rollbar-discord"
-            [stripe-webhook]="stripe-webhook"
-            [image-upload]="image-upload"
-            [websocket]="websocket"
-            [github-webhook]="github-webhook"
-            [mcp-jira]="mcp-jira-server"
-            [mcp-github]="mcp-github-server"
-            [mcp-ci]="mcp-ci-server"
-            [mcp-db]="mcp-db-admin-server"
-            [mcp-rollbar]="mcp-rollbar-server"
-          )
+          # Maps drift-check's ssmName to upload-lambdas.yml's `project`
+          # (the workflow_dispatch `lambda` choice). Derived from the single
+          # source of truth shared with upload-lambdas.yml (LS-8716) — only
+          # driftMonitored entries are included; see
+          # .github/lambda-registry.json.
+          declare -A SSM_TO_PROJECT=()
+          while IFS=$'\t' read -r SSM_NAME PROJECT; do
+            SSM_TO_PROJECT[$SSM_NAME]="$PROJECT"
+          done < <(jq -r '.[] | select(.driftMonitored) | [.ssmName, .project] | @tsv' .github/lambda-registry.json)
 
           TO_REDEPLOY="[]"
           STILL_STALE="[]"
