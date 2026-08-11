@@ -1,7 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
 
-import { resolvePwBrowserExecutable } from './src/resolve-pw-browser';
+import {
+  resolvePwBrowserExecutable,
+  resolvePwFirefoxExecutable,
+  resolvePwWebkitExecutable,
+} from './src/resolve-pw-browser';
 
 /* Cloud sessions (Claude Code on the web) pre-install Playwright's browsers at
  * /opt/pw-browsers, but that image drifts independently of the repo's pinned
@@ -9,8 +13,17 @@ import { resolvePwBrowserExecutable } from './src/resolve-pw-browser';
  * older build is present, fall back to it instead of failing at launch; when
  * /opt/pw-browsers doesn't exist at all (e.g. the GH Actions runner AMI, which
  * uses a separate, already version-locked /opt/playwright-browsers), this is
- * undefined and Playwright resolves the browser itself as before. */
+ * undefined and Playwright resolves the browser itself as before.
+ *
+ * chrome-headless-shell covers both the chromium project and Mobile Chrome
+ * (Playwright picks the headless-shell executable for any chromium-engine
+ * project once `headless` is true, regardless of device/viewport emulation —
+ * LS-8739). firefox and webkit are separate engines with their own pinned
+ * revisions on disk, so they get their own resolvers; Mobile Safari shares
+ * webkit's since it's also a WebKit-engine project. */
 const pwBrowserExecutable = resolvePwBrowserExecutable();
+const pwFirefoxExecutable = resolvePwFirefoxExecutable();
+const pwWebkitExecutable = resolvePwWebkitExecutable();
 
 /**
  * Dedicated E2E port — intentionally different from the Vite dev-server (4200)
@@ -127,6 +140,9 @@ export default defineConfig({
       use: {
         ...devices['Desktop Firefox'],
         viewport: { width: 1280, height: 720 },
+        ...(pwFirefoxExecutable
+          ? { launchOptions: { executablePath: pwFirefoxExecutable } }
+          : {}),
       },
     },
 
@@ -135,6 +151,9 @@ export default defineConfig({
       use: {
         ...devices['Desktop Safari'],
         viewport: { width: 1280, height: 720 },
+        ...(pwWebkitExecutable
+          ? { launchOptions: { executablePath: pwWebkitExecutable } }
+          : {}),
       },
     },
 
@@ -144,6 +163,9 @@ export default defineConfig({
       use: {
         ...devices['Pixel 5'],
         viewport: { width: 375, height: 667 },
+        ...(pwBrowserExecutable
+          ? { launchOptions: { executablePath: pwBrowserExecutable } }
+          : {}),
       },
     },
     {
@@ -151,6 +173,9 @@ export default defineConfig({
       use: {
         ...devices['iPhone 12'],
         viewport: { width: 375, height: 667 },
+        ...(pwWebkitExecutable
+          ? { launchOptions: { executablePath: pwWebkitExecutable } }
+          : {}),
       },
     },
 
