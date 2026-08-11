@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging/server';
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
@@ -107,8 +108,9 @@ export async function awaitRef(params: AwaitRefParams): Promise<ToolResult> {
         const msg = err instanceof Error ? err.message : String(err);
         // 401/403 are fatal (bad token, no access) — propagate immediately.
         if (/\b(401|403)\b/.test(msg)) throw err;
-        process.stderr.write(
-          `[github_await_ref] transient error polling ${normalizedRef}: ${msg}\n`,
+        LOGGER.error(
+          `[github_await_ref] transient error polling ${normalizedRef}`,
+          err instanceof Error ? err : new Error(msg),
         );
       }
     }
