@@ -12,6 +12,8 @@ export interface SyncEvent {
   action?: string;
   /** pull_request merged flag (closed events). */
   merged?: boolean;
+  /** pull_request draft flag (opened/reopened events). */
+  isDraft?: boolean;
 }
 
 export interface GuardResult {

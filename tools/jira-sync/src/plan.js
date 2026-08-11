@@ -21,6 +21,7 @@ const { decideTarget } = require('./state-machine');
  * @property {string} eventName        'push' | 'pull_request'
  * @property {string} [action]         pull_request action
  * @property {boolean} [merged]        pull_request merged flag
+ * @property {boolean} [isDraft]       pull_request draft flag
  * @property {string} [branch]         head branch name
  * @property {string} [prTitle]
  * @property {string} [prBody]

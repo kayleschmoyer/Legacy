@@ -9,6 +9,8 @@ export interface PlanInput {
   action?: string;
   /** pull_request merged flag */
   merged?: boolean;
+  /** pull_request draft flag */
+  isDraft?: boolean;
   /** head branch name */
   branch?: string;
   prTitle?: string;

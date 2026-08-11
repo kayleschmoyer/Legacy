@@ -9,7 +9,9 @@ name: "Jira Branch Sync"
 # the runner's bare node — no pnpm install — from a sparse checkout of main.
 #
 # Event → transition table (tools/jira-sync/src/state-machine.js):
-#   PR opened / reopened / ready_for_review → In Review
+#   PR opened / reopened (not draft)        → In Review
+#   PR opened / reopened (draft)            → In Progress
+#   PR ready_for_review                     → In Review
 #   PR converted_to_draft                   → In Progress
 #   PR closed + merged                      → Done
 #   PR closed without merging               → In Progress

@@ -82,6 +82,32 @@ describe('cli plan', () => {
       target: 'In Review',
     });
   });
+
+  it('plans a draft pull_request event as In Progress, not In Review', () => {
+    const eventPath = writeEvent({
+      action: 'opened',
+      pull_request: {
+        merged: false,
+        draft: true,
+        title: 'LS-8699 fix: draft PR opened',
+        body: '<!-- jira-link\nprimary: LS-8699\n-->',
+        head: { ref: 'claude/some-branch' },
+      },
+    });
+    const result = run([
+      'plan',
+      '--event-name',
+      'pull_request',
+      '--event-path',
+      eventPath,
+    ]);
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      skip: false,
+      keys: ['LS-8699'],
+      target: 'In Progress',
+    });
+  });
 });
 
 describe('cli guard', () => {

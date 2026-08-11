@@ -21,6 +21,18 @@ describe('decideTarget', () => {
     expect(decideTarget({ eventName: 'push' })).toBe('In Progress');
   });
 
+  it('targets In Progress for opened/reopened draft PRs, In Review otherwise', () => {
+    const pr = (action: string, isDraft?: boolean) =>
+      decideTarget({ eventName: 'pull_request', action, isDraft });
+
+    expect(pr('opened', true)).toBe('In Progress');
+    expect(pr('opened', false)).toBe('In Review');
+    expect(pr('opened', undefined)).toBe('In Review');
+    expect(pr('reopened', true)).toBe('In Progress');
+    expect(pr('reopened', false)).toBe('In Review');
+    expect(pr('reopened', undefined)).toBe('In Review');
+  });
+
   it('maps unknown events to null', () => {
     expect(decideTarget({ eventName: 'workflow_dispatch' })).toBeNull();
   });

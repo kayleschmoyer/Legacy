@@ -27,6 +27,7 @@ const STATUS_RANK = {
  * @property {string} eventName  GitHub event name ('push' | 'pull_request').
  * @property {string} [action]   pull_request action (opened, closed, ...).
  * @property {boolean} [merged]  pull_request merged flag (closed events).
+ * @property {boolean} [isDraft] pull_request draft flag (opened/reopened events).
  */
 
 /**
@@ -50,6 +51,7 @@ function decideTarget(event) {
   switch (event.action) {
     case 'opened':
     case 'reopened':
+      return event.isDraft === true ? 'In Progress' : 'In Review';
     case 'ready_for_review':
       return 'In Review';
     case 'converted_to_draft':

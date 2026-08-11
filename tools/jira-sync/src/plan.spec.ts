@@ -108,6 +108,23 @@ describe('planSync — pull_request events', () => {
     }
   });
 
+  it('targets In Progress for a draft PR opened/reopened, In Review for a ready one', () => {
+    const base = {
+      eventName: 'pull_request',
+      prTitle: 'LS-1 x',
+      prBody: '',
+    };
+    expect(
+      planSync({ ...base, action: 'opened', isDraft: true }),
+    ).toMatchObject({ keys: ['LS-1'], target: 'In Progress' });
+    expect(
+      planSync({ ...base, action: 'opened', isDraft: false }),
+    ).toMatchObject({ keys: ['LS-1'], target: 'In Review' });
+    expect(
+      planSync({ ...base, action: 'reopened', isDraft: true }),
+    ).toMatchObject({ keys: ['LS-1'], target: 'In Progress' });
+  });
+
   it('maps merged and unmerged closes correctly', () => {
     const base = {
       eventName: 'pull_request',

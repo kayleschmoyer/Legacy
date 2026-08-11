@@ -86,6 +86,7 @@ function runPlan(flags) {
     eventName,
     action: event.action,
     merged: event.pull_request?.merged === true,
+    isDraft: event.pull_request?.draft === true,
     branch,
     prTitle: event.pull_request?.title ?? '',
     prBody: event.pull_request?.body ?? '',
