@@ -5,6 +5,7 @@ import { FAILED_CONCLUSIONS, summarizeCIStatus } from '../types.js';
 import type { ToolResult } from '../types.js';
 import {
   normalizeChecks,
+  dedupeLatestByName,
   type StatusCheckNode,
 } from '../utils/github-checks.js';
 
@@ -29,9 +30,11 @@ interface PRBatchNode {
   commits: {
     nodes: Array<{
       commit: {
+        oid: string;
         statusCheckRollup: {
           contexts: {
             nodes: Array<StatusCheckNode | null>;
+            pageInfo: { hasNextPage: boolean; endCursor: string | null };
           };
         } | null;
       };
@@ -70,12 +73,14 @@ function buildBatchPRQuery(numbers: number[]): string {
       commits(last: 1) {
         nodes {
           commit {
+            oid
             statusCheckRollup {
               contexts(first: 100) {
                 nodes {
-                  ... on CheckRun { __typename name status conclusion }
-                  ... on StatusContext { __typename context state }
+                  ... on CheckRun { __typename name status conclusion startedAt completedAt }
+                  ... on StatusContext { __typename context state createdAt }
                 }
+                pageInfo { hasNextPage endCursor }
               }
             }
           }
@@ -110,6 +115,68 @@ interface BatchGraphQLResponse {
   } | null;
 }
 
+const CONTEXTS_PAGE_QUERY = `
+query($owner: String!, $repo: String!, $oid: GitObjectID!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    object(oid: $oid) {
+      ... on Commit {
+        statusCheckRollup {
+          contexts(first: 100, after: $after) {
+            nodes {
+              ... on CheckRun { __typename name status conclusion startedAt completedAt }
+              ... on StatusContext { __typename context state createdAt }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+interface ContextsPageResponse {
+  repository: {
+    object: {
+      statusCheckRollup: {
+        contexts: {
+          nodes: Array<StatusCheckNode | null>;
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        };
+      } | null;
+    } | null;
+  } | null;
+}
+
+/**
+ * `statusCheckRollup.contexts(first: 100)` silently truncates PRs with more
+ * than 100 checks. Drain remaining pages via the commit oid so ciSummary and
+ * failedJobs never miss a check (LS-8829 review, Cycle 2).
+ */
+async function fetchRemainingContexts(
+  owner: string,
+  repo: string,
+  oid: string,
+  after: string | null,
+): Promise<Array<StatusCheckNode | null>> {
+  const extra: Array<StatusCheckNode | null> = [];
+  let cursor = after;
+  // Safety cap: 10 additional pages (up to 1000 more checks) to bound worst-case latency.
+  for (let page = 0; page < 10 && cursor; page++) {
+    const result = await githubGraphQL<ContextsPageResponse>(
+      CONTEXTS_PAGE_QUERY,
+      { owner, repo, oid, after: cursor },
+    );
+    const contexts = result.data.repository?.object?.statusCheckRollup
+      ?.contexts ?? {
+      nodes: [],
+      pageInfo: { hasNextPage: false, endCursor: null },
+    };
+    extra.push(...contexts.nodes);
+    cursor = contexts.pageInfo.hasNextPage ? contexts.pageInfo.endCursor : null;
+  }
+  return extra;
+}
+
 export async function prBatchStatus(
   params: PRBatchStatusParams,
 ): Promise<ToolResult> {
@@ -137,68 +204,81 @@ export async function prBatchStatus(
     }
 
     // Build rows
-    const rows = allPRs.map((pr) => {
-      const commitNode = pr.commits.nodes[0];
-      const checkNodes: (StatusCheckNode | null)[] =
-        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
-      const ciJobs = normalizeChecks(checkNodes).map(
-        ({ startedAt: _startedAt, ...ciJob }) => ciJob,
-      );
-      const ciSummary = summarizeCIStatus(ciJobs);
+    const rows = await Promise.all(
+      allPRs.map(async (pr) => {
+        const commitNode = pr.commits.nodes[0];
+        const rollup = commitNode?.commit.statusCheckRollup;
+        let checkNodes: (StatusCheckNode | null)[] =
+          rollup?.contexts.nodes ?? [];
+        if (rollup?.contexts.pageInfo.hasNextPage) {
+          checkNodes = checkNodes.concat(
+            await fetchRemainingContexts(
+              repo.owner,
+              repo.name,
+              commitNode.commit.oid,
+              rollup.contexts.pageInfo.endCursor,
+            ),
+          );
+        }
+        const ciJobs = dedupeLatestByName(normalizeChecks(checkNodes)).map(
+          ({ startedAt: _startedAt, ...ciJob }) => ciJob,
+        );
+        const ciSummary = summarizeCIStatus(ciJobs);
 
-      const totalThreads = pr.reviewThreads.totalCount;
-      const unresolvedThreadNodes = pr.reviewThreads.nodes.filter(
-        (t) => !t.isResolved && !t.isOutdated,
-      );
-      const unresolvedThreads = unresolvedThreadNodes.length;
-      const unresolvedThreadIds = unresolvedThreadNodes.map((t) => t.id);
-      const threadCountTruncated = pr.reviewThreads.pageInfo.hasNextPage;
+        const totalThreads = pr.reviewThreads.totalCount;
+        const unresolvedThreadNodes = pr.reviewThreads.nodes.filter(
+          (t) => !t.isResolved && !t.isOutdated,
+        );
+        const unresolvedThreads = unresolvedThreadNodes.length;
+        const unresolvedThreadIds = unresolvedThreadNodes.map((t) => t.id);
+        const threadCountTruncated = pr.reviewThreads.pageInfo.hasNextPage;
 
-      // Compact mode: omit verbose fields (ciJobs, reviews, labels, url)
-      if (params.compact) {
-        const failedJobs = ciJobs
-          .filter((j) => j.conclusion && FAILED_CONCLUSIONS.has(j.conclusion))
-          .map((j) => j.name);
+        // Compact mode: omit verbose fields (ciJobs, reviews, labels, url)
+        if (params.compact) {
+          const failedJobs = ciJobs
+            .filter((j) => j.conclusion && FAILED_CONCLUSIONS.has(j.conclusion))
+            .map((j) => j.name);
+
+          return {
+            number: pr.number,
+            branch: pr.headRefName,
+            mergeable: pr.mergeable,
+            ciSummary,
+            ...(failedJobs.length > 0 ? { failedJobs } : {}),
+            unresolvedThreads,
+            ...(unresolvedThreadIds.length > 0 ? { unresolvedThreadIds } : {}),
+            ...(threadCountTruncated ? { threadCountTruncated: true } : {}),
+          };
+        }
+
+        const reviews = pr.reviews.nodes.map((r) => ({
+          author: r.author?.login ?? 'unknown',
+          state: r.state,
+          submittedAt: r.submittedAt,
+        }));
 
         return {
           number: pr.number,
+          title: pr.title,
           branch: pr.headRefName,
+          base: pr.baseRefName,
+          author: pr.author?.login ?? 'unknown',
+          isDraft: pr.isDraft,
           mergeable: pr.mergeable,
           ciSummary,
-          ...(failedJobs.length > 0 ? { failedJobs } : {}),
+          ciJobs,
+          reviewDecision: pr.reviewDecision,
+          reviews,
           unresolvedThreads,
           ...(unresolvedThreadIds.length > 0 ? { unresolvedThreadIds } : {}),
-          ...(threadCountTruncated ? { threadCountTruncated: true } : {}),
+          totalThreads,
+          threadCountTruncated,
+          labels: pr.labels.nodes.map((l) => l.name),
+          updatedAt: pr.updatedAt,
+          url: pr.url,
         };
-      }
-
-      const reviews = pr.reviews.nodes.map((r) => ({
-        author: r.author?.login ?? 'unknown',
-        state: r.state,
-        submittedAt: r.submittedAt,
-      }));
-
-      return {
-        number: pr.number,
-        title: pr.title,
-        branch: pr.headRefName,
-        base: pr.baseRefName,
-        author: pr.author?.login ?? 'unknown',
-        isDraft: pr.isDraft,
-        mergeable: pr.mergeable,
-        ciSummary,
-        ciJobs,
-        reviewDecision: pr.reviewDecision,
-        reviews,
-        unresolvedThreads,
-        ...(unresolvedThreadIds.length > 0 ? { unresolvedThreadIds } : {}),
-        totalThreads,
-        threadCountTruncated,
-        labels: pr.labels.nodes.map((l) => l.name),
-        updatedAt: pr.updatedAt,
-        url: pr.url,
-      };
-    });
+      }),
+    );
 
     return {
       content: [
