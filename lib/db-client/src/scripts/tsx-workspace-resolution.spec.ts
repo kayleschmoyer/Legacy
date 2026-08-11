@@ -14,7 +14,14 @@ import { readFileSync } from 'node:fs';
 
 const packageDir = join(__dirname, '..', '..');
 const repoRoot = join(packageDir, '..', '..');
-const tsx = join(repoRoot, 'node_modules', '.bin', 'tsx');
+// Windows can't exec the POSIX shebang shell script at .bin/tsx directly;
+// it needs the .CMD wrapper that pnpm also generates alongside it.
+const tsx = join(
+  repoRoot,
+  'node_modules',
+  '.bin',
+  process.platform === 'win32' ? 'tsx.CMD' : 'tsx',
+);
 
 describe('db-client raw tsx scripts', () => {
   const manifest = JSON.parse(
@@ -37,15 +44,21 @@ describe('db-client raw tsx scripts', () => {
   );
 
   it('resolves a workspace import the same way the pinned scripts do', () => {
+    const isWindows = process.platform === 'win32';
+    const rawArgs = [
+      '--require',
+      'tsconfig-paths/register',
+      '-e',
+      "require('@legacy-sports/env-utilities'); console.log('resolved')",
+    ];
     const output = execFileSync(
       tsx,
-      [
-        '--require',
-        'tsconfig-paths/register',
-        '-e',
-        "require('@legacy-sports/env-utilities'); console.log('resolved')",
-      ],
-      { cwd: packageDir, encoding: 'utf-8' },
+      // .CMD wrappers are batch scripts invoked through cmd.exe (shell: true
+      // below), which splits on shell metacharacters like `;` and `()`
+      // unless each arg is quoted — the POSIX shebang script on other
+      // platforms is exec'd directly and needs no such quoting.
+      isWindows ? rawArgs.map((arg) => `"${arg}"`) : rawArgs,
+      { cwd: packageDir, encoding: 'utf-8', shell: isWindows },
     );
     expect(output.trim()).toBe('resolved');
   });
