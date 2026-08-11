@@ -558,21 +558,31 @@ export function careerGamesCondition(minCareerGames: number): SQL {
  * SQL condition: player meets a minimum career-seasons threshold.
  *
  * Counts only MLB (AL / NL) batting seasons.  Pure pitchers with no
- * MLB batting records pass automatically (no matching rows → NOT EXISTS is true).
+ * MLB batting records pass automatically (COUNT = 0).
  *
  * Optimized (LS-905): replaced IN (GROUP BY HAVING) with a correlated scalar
  * subquery so the planner only evaluates the specific player's seasons
  * via idx_season_batting_player_lgid instead of materializing all players.
+ *
+ * Optimized (LS-9311): collapsed the former `NOT EXISTS (...) OR (SELECT
+ * COUNT(DISTINCT season) ...) >= N` pair into a single scalar subquery. The
+ * NOT EXISTS half was evaluated once per candidate player against the full
+ * season_batting table, so the planner built a hash of the ~100k+ AL/NL rows
+ * (season_batting has no player-agnostic selective predicate) on every call —
+ * this predicate is part of the draft-board query family, the single largest
+ * DB-time consumer in dev pg_stat_statements (~60M ms cumulative). A single
+ * COUNT(DISTINCT season) subquery reuses the same per-player index-only scan
+ * for both the "has no rows" and "meets threshold" checks, so only one
+ * correlated subquery executes per row instead of two, and the full-table
+ * hash build is eliminated entirely. Verified via EXPLAIN ANALYZE against dev
+ * RDS: ~2.8s → ~1.5s for a representative getAvailableDraftPlayers call
+ * (minCareerGames=50, minCareerSeasons=3).
  */
 export function careerSeasonsCondition(minCareerSeasons: number): SQL {
   return sql`(
-    NOT EXISTS (
-      SELECT 1 FROM season_batting
-      WHERE player_id = p.id AND lg_id IN ('AL', 'NL')
-    )
-    OR (SELECT COUNT(DISTINCT season) FROM season_batting
-        WHERE player_id = p.id AND lg_id IN ('AL', 'NL')
-       ) >= ${minCareerSeasons}
+    SELECT COUNT(DISTINCT season) = 0 OR COUNT(DISTINCT season) >= ${minCareerSeasons}
+    FROM season_batting
+    WHERE player_id = p.id AND lg_id IN ('AL', 'NL')
   )`;
 }
 
