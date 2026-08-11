@@ -106,17 +106,24 @@ export function LeagueHistory({
     [historyData],
   );
 
-  // Default to most recent frozen season (or current if only 1 season)
-  const viewingLeagueId = useMemo(() => {
-    if (selectedSeasonLeagueId !== null) return selectedSeasonLeagueId;
-    // Pick the first frozen (past) season, or the current season if none frozen
+  // Default to the most recent frozen (past) season only — never fall back
+  // to the current in-progress season, which would render live standings as history.
+  const defaultSeasonLeagueId = useMemo(() => {
     const frozen = seasons.find((s) => s.frozenAt !== null);
-    return frozen?.leagueId ?? seasons[0]?.leagueId ?? leagueId;
-  }, [selectedSeasonLeagueId, seasons, leagueId]);
+    return frozen?.leagueId ?? null;
+  }, [seasons]);
+
+  const viewingLeagueId = selectedSeasonLeagueId ?? defaultSeasonLeagueId;
 
   const selectedSeason = useMemo(
     () => seasons.find((s) => s.leagueId === viewingLeagueId),
     [seasons, viewingLeagueId],
+  );
+
+  const isFrozenSeasonSelected = !!selectedSeason?.frozenAt;
+  const hasAnyFrozenSeason = useMemo(
+    () => seasons.some((s) => s.frozenAt !== null),
+    [seasons],
   );
 
   const {
@@ -134,7 +141,7 @@ export function LeagueHistory({
     loading: standingsLoading,
     error: standingsError,
   } = useGetLeagueStandingsQuery({
-    variables: { leagueId: viewingLeagueId },
+    variables: { leagueId: viewingLeagueId ?? 0 },
     skip: !viewingLeagueId,
   });
 
@@ -232,7 +239,18 @@ export function LeagueHistory({
       </SectionCard>
 
       {/* Selected Season Detail */}
-      {selectedSeason && (
+      {!isFrozenSeasonSelected ? (
+        <SectionCard>
+          <YStack alignItems="center" gap="$3" padding="$4">
+            <Calendar size={32} color="$textMuted" />
+            <Text color="$textMuted" textAlign="center">
+              {hasAnyFrozenSeason
+                ? 'Final standings will appear once this season is complete.'
+                : 'This league is in its first season. History will be available after season renewal.'}
+            </Text>
+          </YStack>
+        </SectionCard>
+      ) : selectedSeason ? (
         <SectionCard>
           <YStack gap="$4">
             <XStack
@@ -433,7 +451,7 @@ export function LeagueHistory({
             </YStack>
           </YStack>
         </SectionCard>
-      )}
+      ) : null}
 
       {/* Champions Row — past season winners */}
       {seasons.filter((s) => s.frozenAt && s.championTeamName).length > 0 && (

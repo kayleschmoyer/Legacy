@@ -73,10 +73,12 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
     [historyData?.getLeagueHistory],
   );
 
+  // Default to the most recent frozen (past) season only — never fall back
+  // to the current in-progress season, which would render live standings as history.
   const defaultSeasonLeagueId = useMemo(() => {
     const frozen = seasons.find((s) => s.frozenAt !== null);
-    return frozen?.leagueId ?? seasons[0]?.leagueId ?? leagueId;
-  }, [seasons, leagueId]);
+    return frozen?.leagueId ?? null;
+  }, [seasons]);
 
   const [selectedLeagueId, setSelectedLeagueId] = useState<number | null>(null);
   const viewingLeagueId = selectedLeagueId ?? defaultSeasonLeagueId;
@@ -86,12 +88,18 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
     [seasons, viewingLeagueId],
   );
 
+  const isFrozenSeasonSelected = !!selectedSeason?.frozenAt;
+  const hasAnyFrozenSeason = useMemo(
+    () => seasons.some((s) => s.frozenAt !== null),
+    [seasons],
+  );
+
   const {
     data: standingsData,
     loading: standingsLoading,
     error: standingsError,
   } = useGetLeagueStandingsQuery({
-    variables: { leagueId: viewingLeagueId },
+    variables: { leagueId: viewingLeagueId ?? 0 },
     skip: !viewingLeagueId,
     errorPolicy: 'all',
   });
@@ -168,7 +176,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
           seasons.length > 1 ? (
             <select
               className="ls-select"
-              value={viewingLeagueId}
+              value={viewingLeagueId ?? ''}
               onChange={(e) => {
                 const parsed = Number(e.target.value);
                 if (Number.isFinite(parsed)) setSelectedLeagueId(parsed);
@@ -202,26 +210,22 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ league }) => {
             title="First season in progress"
             sub="History will be available after season renewal."
           />
+        ) : !isFrozenSeasonSelected ? (
+          <Empty
+            icon={<I.Calendar size={28} />}
+            title={
+              hasAnyFrozenSeason
+                ? 'Season in progress'
+                : 'First season in progress'
+            }
+            sub={
+              hasAnyFrozenSeason
+                ? 'Final standings will appear once this season is complete.'
+                : 'History will be available after season renewal.'
+            }
+          />
         ) : (
           <div className="ls-table-wrap">
-            {seasons.length <= 1 && !historyLoading ? (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '8px 12px',
-                  marginBottom: 12,
-                  background: 'var(--surface-accent)',
-                  borderRadius: 'var(--radius-3)',
-                  color: 'var(--fg3)',
-                  fontSize: 13,
-                }}
-              >
-                <I.Calendar size={14} />
-                <span>First season — record will be archived at renewal.</span>
-              </div>
-            ) : null}
             <table className="ls-table" aria-label="Season Standings">
               <thead>
                 <tr>

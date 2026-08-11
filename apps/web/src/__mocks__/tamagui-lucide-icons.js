@@ -70,6 +70,12 @@ export const Tag = () => 'Tag';
 export const Compass = () => 'Compass';
 export const Ticket = () => 'Ticket';
 
+// Icons used by League History (LS-8891)
+export const Award = () => 'Award';
+export const Crown = () => 'Crown';
+export const Flame = () => 'Flame';
+export const Target = () => 'Target';
+
 // Default export for any other icons
 const mockIcon = () => 'MockIcon';
 export default mockIcon;
