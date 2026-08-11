@@ -24,8 +24,17 @@ const ALLOWED_PROJECTS = new Set([
   'Mobile Safari',
 ]);
 
-/** 3 minutes — generous for a few hermetic specs, tight enough to surface hangs. */
-const E2E_TIMEOUT_MS = 180_000;
+/**
+ * 30 minutes — matches the other nx-server long-running job tools
+ * (NX_RUN_TIMEOUT_MS, AFFECTED_TIMEOUT_MS, PC_CHUNK_TIMEOUT_MS). The prior
+ * 180s value was sized for "a few specs" but is a hard kill on the
+ * underlying Playwright process regardless of batch size — it fired even on
+ * 10-spec batches, forcing manual chunking of large spec lists (LS-8743).
+ * This is independent of the ~45s single-call sync budget that nx_job_wait
+ * polls past; large batches still finish in the background across multiple
+ * nx_job_wait calls, they just aren't killed at 3 minutes anymore.
+ */
+const E2E_TIMEOUT_MS = 30 * 60 * 1000;
 /** 8 minutes — integration specs hit the live backend and each can take up to 2 min. */
 const INTEGRATION_TIMEOUT_MS = 480_000;
 

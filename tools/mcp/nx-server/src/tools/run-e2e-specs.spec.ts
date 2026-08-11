@@ -246,6 +246,19 @@ describe('runE2ESpecs', () => {
       expect(result.content[0].text).toMatch(/timed out/);
     });
 
+    it('gives hermetic runs a 30-minute process timeout regardless of batch size (LS-8743)', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT as never);
+
+      await runE2ESpecs({
+        specs: Array.from(
+          { length: 174 },
+          (_, i) => `src/tests/spec-${i}.spec.ts`,
+        ),
+      });
+      expect(jobCallOpts().timeoutMs).toBe(30 * 60 * 1000);
+    });
+
     it('returns error when playwright does not produce a results file', async () => {
       setupJob('some output');
       mockReadFile.mockRejectedValue(new Error('ENOENT') as never);
@@ -502,6 +515,14 @@ describe('runE2ESpecs', () => {
         withTracing: true,
       });
       expect(jobCallOpts().args).toContain('--trace=on');
+    });
+
+    it('keeps the 8-minute integration process timeout', async () => {
+      await runE2ESpecs({
+        specs: [INTEGRATION_SPEC],
+        integration: true,
+      });
+      expect(jobCallOpts().timeoutMs).toBe(480_000);
     });
   });
 });
