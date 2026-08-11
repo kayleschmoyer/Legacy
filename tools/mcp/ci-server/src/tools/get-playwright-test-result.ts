@@ -112,31 +112,81 @@ function summariseAttempt(
 }
 
 export async function getPlaywrightTestResult(params: {
-  reportName: string;
-  testTitle: string;
+  reportName?: string;
+  runId?: number | string;
+  testTitle?: string;
   fileName?: string;
+  testFile?: string;
   source?: 'gh-pages' | 's3';
   maxChars?: number;
 }): Promise<ToolResult> {
   const {
     reportName,
+    runId: runIdParam,
     testTitle,
     fileName,
+    testFile,
     source = 'gh-pages',
     maxChars = 10000,
   } = params;
 
+  // reportName and runId are alternative ways to identify the report; fileName
+  // and testFile are alternative names for the same spec-file filter (LS-8888:
+  // the <integration-results> webhook payload only ever gives runId + spec
+  // file path, never a resolved report name or exact test title).
+  const effectiveReportName =
+    reportName ?? (runIdParam != null ? String(runIdParam) : undefined);
+  const effectiveFileName = fileName ?? testFile;
+
+  // Presence of reportName/runId and testTitle/fileName/testFile is enforced
+  // by the inputSchema superRefine in index.ts for the MCP tool call path.
+  // This function is also called directly (unit tests, and any future caller
+  // that bypasses the MCP layer), so the checks stay here too — dropping them
+  // would leave effectiveReportName typed as `string | undefined` for the
+  // rest of the function, which does not type-check against the `string`
+  // fields TestResultResponse declares.
+  if (!effectiveReportName) {
+    return {
+      isError: true,
+      content: [
+        { type: 'text', text: 'One of reportName or runId is required.' },
+      ],
+    };
+  }
+  if (!/^[\w.-]+$/.test(effectiveReportName)) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'reportName/runId must contain only alphanumeric characters, hyphens, underscores, and dots — no path separators or special characters allowed',
+        },
+      ],
+    };
+  }
+  if (!testTitle && !effectiveFileName) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'One of testTitle or fileName/testFile is required to identify which test(s) to look up.',
+        },
+      ],
+    };
+  }
+
   // S3 mode: resolve HEAD SHA from the run ID, list blob artifacts, return
   // presigned URLs. Does not attempt GH Pages at all.
   if (source === 's3') {
-    const runId = parseInt(reportName, 10);
-    if (isNaN(runId) || !NUMERIC_ID_RE.test(reportName)) {
+    const runId = parseInt(effectiveReportName, 10);
+    if (isNaN(runId) || !NUMERIC_ID_RE.test(effectiveReportName)) {
       return {
         isError: true,
         content: [
           {
             type: 'text',
-            text: 'source=s3 requires reportName to be a numeric GitHub run ID (e.g. "28115361551").',
+            text: 'source=s3 requires reportName/runId to be a numeric GitHub run ID (e.g. "28115361551").',
           },
         ],
       };
@@ -185,8 +235,8 @@ export async function getPlaywrightTestResult(params: {
       emptyNote: s3Result.empty
         ? 'No blob artifacts found. S3 objects expire after 3 days — this run may be too old.'
         : undefined,
-      testTitleFilter: testTitle,
-      fileNameFilter: fileName ?? null,
+      testTitleFilter: testTitle ?? null,
+      fileNameFilter: effectiveFileName ?? null,
       note: 'Presigned URLs expire in 1 hour. Each artifact is a Playwright blob zip containing test results. Use playwright merge-reports or inspect the zip to extract individual test error-context.md / trace.zip files.',
       artifacts: s3Result.artifacts,
     };
@@ -199,13 +249,16 @@ export async function getPlaywrightTestResult(params: {
   // GH Pages mode (default): try the supplied name directly; if it is a
   // bare numeric run ID, also try the nightly-{id} and manual-{id} variants
   // that CI actually deploys under.
-  const namesToTry: string[] = [reportName];
-  if (NUMERIC_ID_RE.test(reportName)) {
-    namesToTry.push(`nightly-${reportName}`, `manual-${reportName}`);
+  const namesToTry: string[] = [effectiveReportName];
+  if (NUMERIC_ID_RE.test(effectiveReportName)) {
+    namesToTry.push(
+      `nightly-${effectiveReportName}`,
+      `manual-${effectiveReportName}`,
+    );
   }
 
   let report;
-  let resolvedName = reportName;
+  let resolvedName = effectiveReportName;
   for (const name of namesToTry) {
     const candidate = await fetchPlaywrightReport(name);
     if (!('error' in candidate)) {
@@ -234,8 +287,8 @@ export async function getPlaywrightTestResult(params: {
     };
   }
 
-  const titleNeedle = testTitle.toLowerCase();
-  const fileNeedle = fileName?.toLowerCase();
+  const titleNeedle = testTitle?.toLowerCase();
+  const fileNeedle = effectiveFileName?.toLowerCase();
 
   const matches: Array<{ file: PlaywrightTestFile; test: PlaywrightTest }> = [];
   for (const file of report.files ?? []) {
@@ -243,13 +296,16 @@ export async function getPlaywrightTestResult(params: {
       continue;
     }
     for (const test of file.tests ?? []) {
-      if (fullTitle(test).toLowerCase().includes(titleNeedle)) {
+      if (!titleNeedle || fullTitle(test).toLowerCase().includes(titleNeedle)) {
         matches.push({ file, test });
       }
     }
   }
 
   const url = reportUrlFor(resolvedName);
+  const describeTarget = titleNeedle
+    ? `title "${testTitle}"`
+    : `file "${effectiveFileName}"`;
 
   if (matches.length === 0) {
     const response: TestResultResponse = {
@@ -257,36 +313,51 @@ export async function getPlaywrightTestResult(params: {
       reportName: resolvedName,
       url,
       candidates: [],
-      message: fileNeedle
-        ? `No test matched title "${testTitle}" in files matching "${fileName}".`
-        : `No test matched title "${testTitle}".`,
+      message: `No test matched ${describeTarget}${fileNeedle && titleNeedle ? ` in files matching "${effectiveFileName}"` : ''}.`,
     };
     return {
       content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
     };
   }
 
-  if (matches.length > 1) {
+  // No testTitle to disambiguate with (runId+testFile lookup, LS-8888): if the
+  // file-only match set narrows to exactly one non-passing test, resolve it
+  // automatically — that's the test a caller pulling a spec path out of the
+  // integration-results webhook is almost always after. Otherwise fall through
+  // to the candidates list below same as an ambiguous title match would.
+  let resolvedMatches = matches;
+  if (!titleNeedle && matches.length > 1) {
+    const nonPassing = matches.filter(
+      ({ test }) => test.outcome !== 'expected',
+    );
+    if (nonPassing.length === 1) {
+      resolvedMatches = nonPassing;
+    }
+  }
+
+  if (resolvedMatches.length > 1) {
     const response: TestResultResponse = {
       matched: false,
       reportName: resolvedName,
       url,
-      candidates: matches.slice(0, 25).map(({ file, test }) => ({
+      candidates: resolvedMatches.slice(0, 25).map(({ file, test }) => ({
         title: fullTitle(test),
         file: file.fileName,
         outcome: test.outcome,
         projectName: test.projectName ?? null,
       })),
       message:
-        `Found ${matches.length} tests matching "${testTitle}". ` +
-        `Pass fileName to disambiguate, or use a more specific testTitle.`,
+        `Found ${resolvedMatches.length} tests matching ${describeTarget}. ` +
+        (titleNeedle
+          ? 'Pass fileName to disambiguate, or use a more specific testTitle.'
+          : 'Pass testTitle to disambiguate.'),
     };
     return {
       content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
     };
   }
 
-  const { file, test } = matches[0];
+  const { file, test } = resolvedMatches[0];
   const loc = test.location;
   const location =
     loc && loc.file

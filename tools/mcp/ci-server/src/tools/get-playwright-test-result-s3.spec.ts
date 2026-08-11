@@ -196,3 +196,135 @@ describe('getPlaywrightTestResult — numeric run ID auto-fallback (gh-pages mod
     expect(result.content[0].text).toContain('source="s3"');
   });
 });
+
+describe('getPlaywrightTestResult — runId/testFile lookup (LS-8888)', () => {
+  it('requires one of reportName or runId', async () => {
+    const result = await getPlaywrightTestResult({
+      testTitle: 'any test',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'One of reportName or runId is required.',
+    );
+  });
+
+  it('requires one of testTitle or fileName/testFile', async () => {
+    const result = await getPlaywrightTestResult({
+      runId: RUN_ID,
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'One of testTitle or fileName/testFile is required',
+    );
+  });
+
+  it('accepts runId as an alternative to reportName in s3 mode', async () => {
+    mockResolveRunSha.mockResolvedValue(SHA);
+    mockListArtifacts.mockResolvedValue({
+      sha: SHA,
+      s3Prefix: PREFIX,
+      artifacts: [],
+      empty: true,
+    });
+
+    const result = await getPlaywrightTestResult({
+      runId: Number(RUN_ID),
+      testFile: 'live-draft-ui.integration.spec.ts',
+      source: 's3',
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = JSON.parse(result.content[0].text as string);
+    expect(payload.runId).toBe(Number(RUN_ID));
+    expect(payload.fileNameFilter).toBe('live-draft-ui.integration.spec.ts');
+    expect(mockResolveRunSha).toHaveBeenCalledWith(Number(RUN_ID));
+  });
+
+  it('resolves the single non-passing test in a file when testTitle is omitted', async () => {
+    const { fetchPlaywrightReport, fullTitle } =
+      await import('../playwright-report.js');
+    const mockFetch = fetchPlaywrightReport as jest.MockedFunction<
+      typeof import('../playwright-report.js').fetchPlaywrightReport
+    >;
+    const mockFullTitle = fullTitle as jest.MockedFunction<
+      typeof import('../playwright-report.js').fullTitle
+    >;
+    mockFullTitle.mockImplementation((t: { title: string }) => t.title);
+    mockFetch.mockResolvedValue({
+      stats: {
+        total: 2,
+        expected: 1,
+        unexpected: 1,
+        flaky: 0,
+        skipped: 0,
+        ok: false,
+      },
+      files: [
+        {
+          fileName: 'live-draft-ui.integration.spec.ts',
+          tests: [
+            { title: 'passes', outcome: 'expected', results: [] },
+            { title: 'fails', outcome: 'unexpected', results: [] },
+          ],
+        },
+      ],
+    });
+
+    const result = await getPlaywrightTestResult({
+      runId: RUN_ID,
+      testFile: 'live-draft-ui.integration.spec.ts',
+      source: 'gh-pages',
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = JSON.parse(result.content[0].text as string);
+    expect(payload.matched).toBe(true);
+    expect(payload.test.title).toBe('fails');
+    expect(payload.test.outcome).toBe('unexpected');
+  });
+
+  it('returns candidates when multiple non-passing tests match a file-only lookup', async () => {
+    const { fetchPlaywrightReport, fullTitle } =
+      await import('../playwright-report.js');
+    const mockFetch = fetchPlaywrightReport as jest.MockedFunction<
+      typeof import('../playwright-report.js').fetchPlaywrightReport
+    >;
+    const mockFullTitle = fullTitle as jest.MockedFunction<
+      typeof import('../playwright-report.js').fullTitle
+    >;
+    mockFullTitle.mockImplementation((t: { title: string }) => t.title);
+    mockFetch.mockResolvedValue({
+      stats: {
+        total: 2,
+        expected: 0,
+        unexpected: 2,
+        flaky: 0,
+        skipped: 0,
+        ok: false,
+      },
+      files: [
+        {
+          fileName: 'live-draft-ui.integration.spec.ts',
+          tests: [
+            { title: 'fails one', outcome: 'unexpected', results: [] },
+            { title: 'fails two', outcome: 'unexpected', results: [] },
+          ],
+        },
+      ],
+    });
+
+    const result = await getPlaywrightTestResult({
+      runId: RUN_ID,
+      testFile: 'live-draft-ui.integration.spec.ts',
+      source: 'gh-pages',
+    });
+
+    expect(result.isError).toBeFalsy();
+    const payload = JSON.parse(result.content[0].text as string);
+    expect(payload.matched).toBe(false);
+    expect(payload.candidates).toHaveLength(2);
+    expect(payload.message).toContain('Pass testTitle to disambiguate.');
+  });
+});
