@@ -11,7 +11,10 @@ export const FORMAT_ERROR_MESSAGE =
  *                                  (<sha> = 7–40 hex chars; trailing prose on the
  *                                   same line after the SHA is tolerated)
  *   JUSTIFY: <rationale>         – author explains why issue should be dismissed
- *   CANNOT-COMPLY: <id>\n<reason> – author claims compliance is impossible (Cycle 3+)
+ *   CANNOT-COMPLY: <id> <reason> – author claims compliance is impossible (Cycle 3+).
+ *                                  The reason may follow the id on the same line or
+ *                                  on the next line(s) (LS-8750) — both are documented
+ *                                  forms in pr-lifecycle/SKILL.md.
  *
  * SHA validation against actual PR commits is NOT performed here — use
  * `isShaInPrHistory` after receiving a FIX result.
@@ -42,9 +45,16 @@ export function parseAuthorReply(body) {
     return { type: 'FIX', sha: fixMatch[1] };
   }
 
-  // CANNOT-COMPLY: <issue-id>\n<reason>  — reason must appear on the next line(s).
+  // CANNOT-COMPLY: <issue-id> <reason>  — reason may follow the id on the same
+  // line or on the next line(s). The id must be separated from the colon by a
+  // space/tab (not a newline) so a reply that omits the id entirely (colon
+  // directly followed by a newline) is still MALFORMED rather than treating
+  // the reason's first word as the id. Reported on PR #6379 (LS-8750): a
+  // same-line reply ("CANNOT-COMPLY: manual-android-verification No Android
+  // device...") was rejected because the old regex required a hard newline
+  // between id and reason, contradicting the documented same-line form.
   // Check before JUSTIFY so "CANNOT-COMPLY:" is not partially matched.
-  const cannotMatch = trimmed.match(/^CANNOT-COMPLY:\s+(\S+)\s*\n([\s\S]+)$/);
+  const cannotMatch = trimmed.match(/^CANNOT-COMPLY:[ \t]+(\S+)\s+([\s\S]+)$/);
   if (cannotMatch) {
     return {
       type: 'CANNOT-COMPLY',

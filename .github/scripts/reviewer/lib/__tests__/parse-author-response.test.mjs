@@ -142,6 +142,29 @@ describe('parseAuthorReply — CANNOT-COMPLY token', () => {
       'MALFORMED',
     );
   });
+
+  it('parses with issue-id and reason on the same line (LS-8750)', () => {
+    // Regression for PR #6379: the documented same-line form
+    // "CANNOT-COMPLY: <issue-id> <reason>" was rejected as MALFORMED because
+    // the parser required a hard newline between id and reason.
+    assert.deepStrictEqual(
+      parseAuthorReply(
+        'CANNOT-COMPLY: manual-android-verification No Android device or emulator is available in this cloud/CI session.',
+      ),
+      {
+        type: 'CANNOT-COMPLY',
+        issueId: 'manual-android-verification',
+        reason:
+          'No Android device or emulator is available in this cloud/CI session.',
+      },
+    );
+  });
+
+  it('trims trailing whitespace from a same-line reason', () => {
+    const result = parseAuthorReply('CANNOT-COMPLY: LS-1234 reason text  ');
+    assert.strictEqual(result.type, 'CANNOT-COMPLY');
+    assert.strictEqual(/** @type {any} */ (result).reason, 'reason text');
+  });
 });
 
 describe('parseAuthorReply — MALFORMED', () => {
