@@ -265,10 +265,20 @@ export function SpectatorScreen({
           )}
           <YStack
             accessibilityRole="button"
-            accessibilityLabel="Back to League"
+            accessibilityLabel={
+              data.league?.isMockDraft ? 'Go to My Leagues' : 'Back to League'
+            }
             onPress={() =>
               onNavigate(
-                leagueId ? `/baseball/league/${leagueId}` : '/baseball',
+                // Mock drafts create an ephemeral practice league (LS-9239) —
+                // routing there would land the user on the "home page" of a
+                // league they never meant to create. Send them to the sport
+                // home instead, mirroring DraftCompleteView's mock branch.
+                data.league?.isMockDraft
+                  ? '/baseball'
+                  : leagueId
+                    ? `/baseball/league/${leagueId}`
+                    : '/baseball',
               )
             }
             borderWidth={1}
@@ -284,7 +294,7 @@ export function SpectatorScreen({
               letterSpacing={0.5}
               color="$textMuted"
             >
-              BACK TO LEAGUE
+              {data.league?.isMockDraft ? 'GO TO MY LEAGUES' : 'BACK TO LEAGUE'}
             </Text>
           </YStack>
         </YStack>
