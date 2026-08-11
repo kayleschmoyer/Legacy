@@ -583,10 +583,19 @@ function App() {
         role="main"
         flex={1}
         padding="$4"
-        $sm={{ padding: '$2' }}
-        // Extra bottom padding on mobile so content isn't hidden behind the fixed bottom bar
+        // Extra bottom padding so content isn't hidden behind the fixed bottom bar.
+        // `$ltMd` is not a real media-query key in this project's breakpoint config (only
+        // xs/sm/md/lg/xl/xxl and their gt* counterparts exist — see lib/design-tokens's
+        // mediaQueries) so this override silently never applied; content could scroll to a
+        // rest position under MobileBottomBar's fixed hit area, making bottom-of-page
+        // controls unclickable on phones (LS-9327). `$md` matches MobileBottomBar's own
+        // visibility toggle (`$gtMd={{ display: 'none' }}` below); 112px comfortably clears
+        // the bar's ~87px rendered height. Narrower media queries win precedence over wider
+        // ones in Tamagui's generated cascade, so `$sm`'s padding shorthand must repeat
+        // paddingBottom explicitly or it silently resets it back to `$2` on phones.
+        $sm={{ padding: '$2', paddingBottom: 112 }}
         paddingBottom="$4"
-        $ltMd={{ paddingBottom: 80 }}
+        $md={{ paddingBottom: 112 }}
         id="main-content"
         data-testid="main-content"
         tabIndex={-1}
