@@ -41,7 +41,7 @@ const BASE_PR = {
   baseRefName: 'main',
   reviewDecision: null,
   labels: { nodes: [] },
-  reviews: { nodes: [] },
+  reviews: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
   reviewThreads: { totalCount: 0, nodes: [] },
 };
 
@@ -189,6 +189,7 @@ describe('diagnose', () => {
           pullRequest: {
             ...BASE_PR,
             reviews: {
+              pageInfo: { hasNextPage: false, endCursor: null },
               nodes: [
                 {
                   author: { login: 'bot' },
@@ -214,6 +215,7 @@ describe('diagnose', () => {
             ...BASE_PR,
             reviewDecision: 'APPROVED',
             reviews: {
+              pageInfo: { hasNextPage: false, endCursor: null },
               nodes: [
                 {
                   author: { login: 'bot' },
@@ -231,6 +233,52 @@ describe('diagnose', () => {
         },
       },
     });
+    const result = await diagnose({ prNumber: 100 });
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.reason).not.toBe('CHANGES_REQUESTED');
+    expect(payload.reason).toBe('READY');
+  });
+
+  it("paginates past a truncated first review page to find a reviewer's true latest state (LS-8708)", async () => {
+    mockGithubGraphQL
+      .mockResolvedValueOnce({
+        data: {
+          repository: {
+            pullRequest: {
+              ...BASE_PR,
+              reviewDecision: 'CHANGES_REQUESTED',
+              reviews: {
+                pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+                nodes: [
+                  {
+                    author: { login: 'bot' },
+                    state: 'CHANGES_REQUESTED',
+                    submittedAt: '2026-07-07T16:30:33Z',
+                  },
+                ],
+              },
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          repository: {
+            pullRequest: {
+              reviews: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [
+                  {
+                    author: { login: 'bot' },
+                    state: 'APPROVED',
+                    submittedAt: '2026-07-07T16:50:50Z',
+                  },
+                ],
+              },
+            },
+          },
+        },
+      });
     const result = await diagnose({ prNumber: 100 });
     const payload = JSON.parse(result.content[0].text);
     expect(payload.reason).not.toBe('CHANGES_REQUESTED');

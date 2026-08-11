@@ -3,9 +3,30 @@ jest.mock('../github-api', () => ({
   githubRest: jest.fn(),
 }));
 jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
+jest.mock('../required-checks', () => ({
+  evaluatePRChecks: jest.fn(),
+  requiresCodeOwnerReview: jest.fn(),
+}));
 
-import { diagnose } from './pr-why-blocked';
+import { diagnose, prWhyBlocked } from './pr-why-blocked';
+import { githubGraphQL } from '../github-api';
+import { getRepoOwnerName } from '../auth';
+import { evaluatePRChecks, requiresCodeOwnerReview } from '../required-checks';
 import type { CIPartition } from '../required-checks';
+
+const mockedGraphQL = githubGraphQL as jest.MockedFunction<
+  typeof githubGraphQL
+>;
+const mockedRepo = getRepoOwnerName as jest.MockedFunction<
+  typeof getRepoOwnerName
+>;
+const mockedEvaluatePRChecks = evaluatePRChecks as jest.MockedFunction<
+  typeof evaluatePRChecks
+>;
+const mockedRequiresCodeOwnerReview =
+  requiresCodeOwnerReview as jest.MockedFunction<
+    typeof requiresCodeOwnerReview
+  >;
 
 // ── CI partition helper ───────────────────────────────────────────────────────
 // CI state now arrives pre-computed (from the shared evaluatePRChecks helper);
@@ -40,7 +61,10 @@ function makePR(overrides: Partial<PRInput> = {}): PRInput {
     baseRefName: 'main',
     autoMergeRequest: null,
     labels: { pageInfo: { hasNextPage: false }, nodes: [] },
-    reviews: { pageInfo: { hasNextPage: false }, nodes: [] },
+    reviews: {
+      pageInfo: { hasNextPage: false, endCursor: null },
+      nodes: [],
+    },
     reviewRequests: { pageInfo: { hasNextPage: false }, nodes: [] },
     reviewThreads: {
       totalCount: 0,
@@ -70,7 +94,7 @@ function withReview(
   return {
     ...pr,
     reviews: {
-      pageInfo: { hasNextPage: false },
+      pageInfo: { hasNextPage: false, endCursor: null },
       nodes: [...pr.reviews.nodes, { author: { login }, state, submittedAt }],
     },
   };
@@ -239,6 +263,25 @@ describe('diagnose', () => {
       const pr = withReview(makePR(), 'reviewer', 'CHANGES_REQUESTED');
       const result = diagnose(pr, NO_CI);
       expect(result.reason).toBe('CHANGES_REQUESTED');
+    });
+
+    it('does not report stale CHANGES_REQUESTED once the same reviewer later approves, even when the raw reviewDecision field still lags (LS-8708)', () => {
+      let pr = makePR({ reviewDecision: 'CHANGES_REQUESTED' });
+      pr = withReview(pr, 'bot', 'CHANGES_REQUESTED', '2026-01-01T00:00:00Z');
+      pr = withReview(pr, 'bot', 'APPROVED', '2026-01-01T01:00:00Z');
+      const result = diagnose(pr, NO_CI);
+      expect(result.status).not.toBe('BLOCKED');
+      expect(result.reason).not.toBe('CHANGES_REQUESTED');
+    });
+
+    it('does not report stale AWAITING_RE_REVIEW once the same reviewer later approves and the ready label is applied (LS-8708)', () => {
+      let pr = makePR({ reviewDecision: 'CHANGES_REQUESTED' });
+      pr = withReview(pr, 'bot', 'CHANGES_REQUESTED', '2026-01-01T00:00:00Z');
+      pr = withReview(pr, 'bot', 'APPROVED', '2026-01-01T01:00:00Z');
+      pr = withLabel(pr, 'bot:ready-for-review');
+      const result = diagnose(pr, NO_CI);
+      expect(result.reason).not.toBe('AWAITING_RE_REVIEW');
+      expect(result.reason).toBe('READY');
     });
   });
 
@@ -425,7 +468,7 @@ describe('diagnose', () => {
     it('includes reviewsTruncated in details when reviews page is truncated', () => {
       const pr = makePR({
         reviews: {
-          pageInfo: { hasNextPage: true },
+          pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
           nodes: [],
         },
       });
@@ -459,5 +502,63 @@ describe('diagnose', () => {
         'CI_FAILING',
       );
     });
+  });
+});
+
+// ── prWhyBlocked (async wrapper) ────────────────────────────────────────────
+
+describe('prWhyBlocked', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedRepo.mockResolvedValue({ owner: 'o', name: 'r' });
+    mockedEvaluatePRChecks.mockResolvedValue(NO_CI);
+    mockedRequiresCodeOwnerReview.mockResolvedValue(false);
+  });
+
+  it("paginates past a truncated first review page to find a reviewer's true latest state (LS-8708)", async () => {
+    mockedGraphQL
+      .mockResolvedValueOnce({
+        data: {
+          repository: {
+            pullRequest: {
+              ...makePR(),
+              reviewDecision: 'CHANGES_REQUESTED',
+              reviews: {
+                pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+                nodes: [
+                  {
+                    author: { login: 'bot' },
+                    state: 'CHANGES_REQUESTED',
+                    submittedAt: '2026-07-07T16:30:33Z',
+                  },
+                ],
+              },
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          repository: {
+            pullRequest: {
+              reviews: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [
+                  {
+                    author: { login: 'bot' },
+                    state: 'APPROVED',
+                    submittedAt: '2026-07-07T16:50:50Z',
+                  },
+                ],
+              },
+            },
+          },
+        },
+      });
+
+    const result = await prWhyBlocked({ number: 42 });
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.reason).not.toBe('CHANGES_REQUESTED');
+    expect(payload.status).toBe('READY');
   });
 });

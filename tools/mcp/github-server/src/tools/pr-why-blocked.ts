@@ -11,6 +11,11 @@ import {
 } from '../required-checks.js';
 import type { CIPartition } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
+import {
+  deriveReviewDecision,
+  fetchAllReviews,
+  latestReviewsByAuthor,
+} from '../utils/github-reviews.js';
 
 interface PRWhyBlockedParams {
   number: number;
@@ -49,7 +54,7 @@ interface PRWhyBlockedGraphQLResponse {
       };
       autoMergeRequest: { enabledBy: { login: string } } | null;
       reviews: {
-        pageInfo: { hasNextPage: boolean };
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
         nodes: Array<{
           author: { login: string } | null;
           state: string;
@@ -95,7 +100,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
         nodes { name }
       }
       reviews(first: 100) {
-        pageInfo { hasNextPage }
+        pageInfo { hasNextPage endCursor }
         nodes {
           author { login }
           state
@@ -168,15 +173,21 @@ export function diagnose(
     (t) => !t.isResolved && !t.isOutdated,
   ).length;
 
-  // Latest review state per reviewer (keep most recent)
-  const latestByReviewer = new Map<string, string>();
-  for (const r of pr.reviews.nodes) {
-    const login = r.author?.login ?? 'unknown';
-    latestByReviewer.set(login, r.state);
-  }
-  const hasChangesRequested = [...latestByReviewer.values()].some(
-    (s) => s === 'CHANGES_REQUESTED',
+  // Effective review decision derived from each reviewer's latest review
+  // state (dedup by author + submittedAt), not GitHub's `reviewDecision`
+  // GraphQL field — that field can stay stale for minutes after a reviewer's
+  // newest review supersedes their own earlier one (LS-8364, LS-8708).
+  const effectiveReviewDecision = deriveReviewDecision(
+    pr.reviews.nodes,
+    pr.reviewDecision,
   );
+  const latestByReviewer = new Map(
+    latestReviewsByAuthor(pr.reviews.nodes).map((r) => [
+      r.author?.login ?? 'unknown',
+      r.state,
+    ]),
+  );
+  const hasChangesRequested = effectiveReviewDecision === 'CHANGES_REQUESTED';
 
   // Review requests
   const pendingReviewers = pr.reviewRequests.nodes.map((n) =>
@@ -257,10 +268,7 @@ export function diagnose(
   }
 
   // CHANGES_REQUESTED + agent hasn't applied bot:ready-for-review yet
-  if (
-    (pr.reviewDecision === 'CHANGES_REQUESTED' || hasChangesRequested) &&
-    !hasReadyLabel
-  ) {
+  if (hasChangesRequested && !hasReadyLabel) {
     return {
       status: 'BLOCKED',
       reason: 'CHANGES_REQUESTED',
@@ -269,7 +277,7 @@ export function diagnose(
       details: {
         unresolvedThreads,
         ...(threadsTruncated ? { threadCountTruncated: true } : {}),
-        reviewDecision: pr.reviewDecision,
+        reviewDecision: effectiveReviewDecision,
         reviewerStates: Object.fromEntries(latestByReviewer),
       },
       nextAction:
@@ -294,10 +302,7 @@ export function diagnose(
   }
 
   // CHANGES_REQUESTED but ready label IS present — waiting for bot to re-review
-  if (
-    (pr.reviewDecision === 'CHANGES_REQUESTED' || hasChangesRequested) &&
-    hasReadyLabel
-  ) {
+  if (hasChangesRequested && hasReadyLabel) {
     return {
       status: 'WAITING',
       reason: 'AWAITING_RE_REVIEW',
@@ -333,7 +338,7 @@ export function diagnose(
   // (CODEOWNERS / require_code_owner_review) — distinct from an ordinary
   // manually-requested review so the agent doesn't chase already-green CI or
   // request a review from just anyone.
-  if (pr.reviewDecision === 'REVIEW_REQUIRED' && requireCodeOwnerReview) {
+  if (effectiveReviewDecision === 'REVIEW_REQUIRED' && requireCodeOwnerReview) {
     return {
       status: 'BLOCKED',
       reason: 'AWAITING_CODE_OWNER_REVIEW',
@@ -350,7 +355,10 @@ export function diagnose(
   }
 
   // REVIEW_REQUIRED with pending review requests
-  if (pr.reviewDecision === 'REVIEW_REQUIRED' && pendingReviewers.length > 0) {
+  if (
+    effectiveReviewDecision === 'REVIEW_REQUIRED' &&
+    pendingReviewers.length > 0
+  ) {
     return {
       status: 'WAITING',
       reason: 'AWAITING_REVIEW',
@@ -362,14 +370,14 @@ export function diagnose(
 
   // REVIEW_REQUIRED but nobody assigned
   if (
-    pr.reviewDecision === 'REVIEW_REQUIRED' &&
+    effectiveReviewDecision === 'REVIEW_REQUIRED' &&
     pendingReviewers.length === 0
   ) {
     return {
       status: 'BLOCKED',
       reason: 'NO_REVIEWER_ASSIGNED',
       summary: 'Review is required but no reviewer has been requested.',
-      details: { reviewDecision: pr.reviewDecision },
+      details: { reviewDecision: effectiveReviewDecision },
       nextAction:
         'Request a reviewer via github_request_review or apply the bot:ready-for-review label to trigger the Reviewer Bot.',
     };
@@ -426,7 +434,7 @@ export function diagnose(
     reason: 'READY',
     summary: 'PR is approved, CI is passing, and there are no conflicts.',
     details: {
-      reviewDecision: pr.reviewDecision,
+      reviewDecision: effectiveReviewDecision,
       ciPassing: ci.passing,
       hasMergeWhenReady,
       labels: [...labels],
@@ -470,6 +478,19 @@ export async function prWhyBlocked(
       evaluatePRChecks(repo.owner, repo.name, pr.headRefOid, pr.baseRefName),
       requiresCodeOwnerReview(repo.owner, repo.name, pr.baseRefName),
     ]);
+
+    // A `reviews(first: 100)` first page can still truncate on a
+    // heavily-reviewed PR — fetch the rest so a reviewer's true latest state
+    // is never missed by the per-author dedup inside diagnose().
+    if (pr.reviews.pageInfo.hasNextPage) {
+      pr.reviews.nodes = await fetchAllReviews(
+        repo.owner,
+        repo.name,
+        params.number,
+        pr.reviews,
+      );
+      pr.reviews.pageInfo.hasNextPage = false;
+    }
 
     const diagnosis = diagnose(pr, ci, requireCodeOwnerReview);
 

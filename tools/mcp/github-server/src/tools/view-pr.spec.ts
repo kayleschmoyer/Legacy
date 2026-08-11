@@ -72,6 +72,7 @@ function makePR(overrides: Record<string, unknown> = {}) {
       ],
     },
     reviews: {
+      pageInfo: { hasNextPage: false, endCursor: null },
       nodes: [
         {
           author: { login: 'bob' },
@@ -381,6 +382,96 @@ describe('viewPR — fields opt-in', () => {
     const result = await viewPR({ number: 42, fields: ['reviews'] });
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.reviews[0].state).toBe('APPROVED');
+  });
+});
+
+describe('viewPR — reviewDecision derivation (LS-8708)', () => {
+  it('does not report stale CHANGES_REQUESTED once the same reviewer later approves', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          // GitHub's reviewDecision field lagging behind the true state.
+          reviewDecision: 'CHANGES_REQUESTED',
+          reviews: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [
+              {
+                author: { login: 'bot' },
+                state: 'CHANGES_REQUESTED',
+                submittedAt: '2026-01-02T09:00:00Z',
+              },
+              {
+                author: { login: 'bot' },
+                state: 'APPROVED',
+                submittedAt: '2026-01-02T10:00:00Z',
+              },
+            ],
+          },
+        }),
+      ),
+    );
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.reviewDecision).toBe('APPROVED');
+  });
+
+  it('falls back to the raw reviewDecision field when no reviews exist yet', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          reviewDecision: 'REVIEW_REQUIRED',
+          reviews: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [],
+          },
+        }),
+      ),
+    );
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.reviewDecision).toBe('REVIEW_REQUIRED');
+  });
+
+  it("paginates past a truncated first review page to find a reviewer's true latest state", async () => {
+    mockedGraphQL
+      .mockResolvedValueOnce(
+        gqlResponse(
+          makePR({
+            reviewDecision: 'CHANGES_REQUESTED',
+            reviews: {
+              pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+              nodes: [
+                {
+                  author: { login: 'bot' },
+                  state: 'CHANGES_REQUESTED',
+                  submittedAt: '2026-01-02T09:00:00Z',
+                },
+              ],
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce({
+        data: {
+          repository: {
+            pullRequest: {
+              reviews: {
+                pageInfo: { hasNextPage: false, endCursor: null },
+                nodes: [
+                  {
+                    author: { login: 'bot' },
+                    state: 'APPROVED',
+                    submittedAt: '2026-01-02T10:00:00Z',
+                  },
+                ],
+              },
+            },
+          },
+        },
+      });
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.reviewDecision).toBe('APPROVED');
   });
 });
 

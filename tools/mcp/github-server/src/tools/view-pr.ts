@@ -7,6 +7,10 @@ import {
   normalizeChecks,
   type StatusCheckNode,
 } from '../utils/github-checks.js';
+import {
+  deriveReviewDecision,
+  fetchAllReviews,
+} from '../utils/github-reviews.js';
 
 type ViewPRField = 'body' | 'files' | 'reviews' | 'assignees' | 'milestone';
 
@@ -64,6 +68,7 @@ interface PRGraphQLResponse {
         }>;
       };
       reviews: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
         nodes: Array<{
           author: { login: string } | null;
           state: string;
@@ -136,6 +141,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
         }
       }
       reviews(first: 50) {
+        pageInfo { hasNextPage endCursor }
         nodes {
           author { login }
           state
@@ -352,6 +358,19 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
       ];
     }
 
+    // A `reviews(first: 50)` first page can still truncate on a
+    // heavily-reviewed PR — fetch the rest so a reviewer's true latest state
+    // is never missed by deriveReviewDecision below.
+    let reviewNodes = pr.reviews.nodes;
+    if (pr.reviews.pageInfo.hasNextPage) {
+      reviewNodes = await fetchAllReviews(
+        repo.owner,
+        repo.name,
+        params.number,
+        pr.reviews,
+      );
+    }
+
     const include = new Set<ViewPRField>(params.fields ?? []);
 
     const checksRaw = dedupeLatestByName(normalizeChecks(checkNodes));
@@ -379,7 +398,10 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
       baseRefName: pr.baseRefName,
       url: pr.url,
       labels: pr.labels.nodes,
-      reviewDecision: pr.reviewDecision,
+      // Derived from each reviewer's latest review, not the raw GraphQL field
+      // (can stay stale after a CHANGES_REQUESTED review is superseded by an
+      // APPROVED one from the same author — LS-8364, LS-8708).
+      reviewDecision: deriveReviewDecision(reviewNodes, pr.reviewDecision),
       additions: pr.additions,
       deletions: pr.deletions,
       changedFiles: pr.changedFiles,
@@ -417,7 +439,7 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
     }
 
     if (include.has('reviews')) {
-      output['reviews'] = pr.reviews.nodes.map((r) => ({
+      output['reviews'] = reviewNodes.map((r) => ({
         author: { login: r.author?.login ?? 'unknown' },
         state: r.state,
         submittedAt: r.submittedAt,

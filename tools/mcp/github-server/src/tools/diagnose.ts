@@ -4,6 +4,10 @@ import { detectConflictSignals } from '../conflict-signals.js';
 import { githubGraphQL, githubRest } from '../github-api.js';
 import { evaluatePRChecks } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
+import {
+  fetchAllReviews,
+  latestReviewsByAuthor,
+} from '../utils/github-reviews.js';
 
 interface DiagnoseParams {
   prNumber: number;
@@ -24,6 +28,7 @@ interface PRStateResponse {
       reviewDecision: string | null;
       labels: { nodes: Array<{ name: string }> };
       reviews: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
         nodes: Array<{
           author: { login: string } | null;
           state: string;
@@ -60,6 +65,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
       headRefOid baseRefName reviewDecision
       labels(first: 100) { nodes { name } }
       reviews(first: 20, states: [CHANGES_REQUESTED, APPROVED]) {
+        pageInfo { hasNextPage endCursor }
         nodes { author { login } state submittedAt }
       }
       reviewThreads(first: 50) {
@@ -99,30 +105,6 @@ async function fetchFailingCheckRuns(
       r.conclusion !== 'success' &&
       r.conclusion !== 'skipped',
   );
-}
-
-/**
- * Reduce a PR's review history to each reviewer's most recent review.
- *
- * GraphQL's `reviews` connection returns every review ever submitted, so a
- * reviewer who requested changes and later approved shows up twice. Without
- * this dedup, a stale CHANGES_REQUESTED review outlives the reviewer's
- * actual (approved) state indefinitely (LS-8364).
- */
-function latestReviewsByAuthor(
-  reviews: NonNullable<
-    PRStateResponse['repository']['pullRequest']
-  >['reviews']['nodes'],
-): typeof reviews {
-  const seen = new Map<string, (typeof reviews)[number]>();
-  for (const review of reviews) {
-    const key = review.author?.login ?? 'unknown';
-    const existing = seen.get(key);
-    if (!existing || review.submittedAt > existing.submittedAt) {
-      seen.set(key, review);
-    }
-  }
-  return [...seen.values()];
 }
 
 type BlockReason =
@@ -302,6 +284,18 @@ export async function diagnose(params: DiagnoseParams): Promise<ToolResult> {
     } catch (ciErr: unknown) {
       // CI evaluation failure is non-fatal — surface PR state without CI verdict
       ciEvalWarning = ciErr instanceof Error ? ciErr.message : String(ciErr);
+    }
+
+    // A `reviews(first: 20)` first page only covers the earliest reviews —
+    // fetch the rest so a reviewer's true latest state (which may be beyond
+    // page 1 on a heavily-reviewed PR) is never missed by the dedup below.
+    if (pr.reviews.pageInfo.hasNextPage) {
+      pr.reviews.nodes = await fetchAllReviews(
+        repo.owner,
+        repo.name,
+        params.prNumber,
+        pr.reviews,
+      );
     }
 
     const {
