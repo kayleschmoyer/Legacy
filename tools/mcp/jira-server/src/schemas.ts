@@ -39,3 +39,29 @@ export const jiraKeysSchema = z
     ]),
   )
   .describe('Ticket key (string) or array of ticket keys');
+
+/**
+ * Zod schema for the `openPrs` parameter shared by `jira_transition`
+ * (action='claim') and the deprecated `jira_claim_ticket` alias. Caller-
+ * supplied because the jira server has no GitHub credentials of its own and
+ * cannot look this up itself (LS-9289).
+ */
+export const openPrRefSchema = z.object({
+  number: z.number(),
+  url: z.string().optional(),
+  title: z.string().optional(),
+});
+
+/** A PR the caller has already found to reference a ticket's key (LS-9289). */
+export type OpenPrRef = z.infer<typeof openPrRefSchema>;
+
+export const openPrsSchema = z
+  .array(openPrRefSchema)
+  .optional()
+  .describe(
+    "Only used when action='claim'. Open PRs the caller has already found to reference this ticket key — e.g. " +
+      "github_pr_dashboard(state: 'open') filtered by key. The jira server has no GitHub credentials of its own " +
+      "(LS-9289) and cannot check this itself. When non-empty, claim returns action: 'PR_EXISTS' (instead of " +
+      "'PROCEED') with the PR list attached, to prevent duplicate work on a ticket someone else already opened a " +
+      'PR for. Omit (or pass []) when no open PR was found or the check was skipped.',
+  );

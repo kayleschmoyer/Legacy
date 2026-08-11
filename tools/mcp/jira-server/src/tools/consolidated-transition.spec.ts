@@ -355,6 +355,44 @@ describe('consolidatedTransition — claim action', () => {
     );
     expect(mutations).toHaveLength(0);
   });
+
+  it('passes openPrs through to claimTicket, returning PR_EXISTS without transitioning (LS-9289)', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve({
+            transitions: [
+              { id: '21', name: 'Start', to: { name: 'In Progress' } },
+            ],
+          });
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/LS-1')) {
+          return Promise.resolve(makeIssue('LS-1'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await consolidatedTransition({
+      keys: 'LS-1',
+      status: 'In Progress',
+      action: 'claim',
+      openPrs: [{ number: 6941 }],
+    });
+    const data = parse(result);
+    const results = data['results'] as Record<string, PerKey>;
+    expect(results['LS-1']?.['action']).toBe('PR_EXISTS');
+    expect(results['LS-1']?.['claimed']).toBe(false);
+
+    const mutations = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) =>
+        (opts.method === 'POST' && opts.path.endsWith('/transitions')) ||
+        (opts.method === 'PUT' && opts.path.endsWith('/assignee')),
+    );
+    expect(mutations).toHaveLength(0);
+  });
 });
 
 describe('consolidatedTransition — deprecation', () => {

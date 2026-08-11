@@ -5,6 +5,7 @@ import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
 import { matchesStatus } from '../locale.js';
 import { resolveAndAssign } from '../assignee.js';
+import type { OpenPrRef } from '../schemas.js';
 
 interface ClaimTicketParams {
   key: string;
@@ -15,6 +16,15 @@ interface ClaimTicketParams {
    */
   assignee?: string;
   assigneeAccountId?: string;
+  /**
+   * Open PRs the caller has already found to reference this ticket's key
+   * (e.g. via `github_pr_dashboard(state: 'open')` filtered by key). The
+   * jira server holds no GitHub credentials of its own and cannot look this
+   * up itself (LS-9289), so the duplicate-work guard below only fires when
+   * the caller supplies this. Omit (or pass `[]`) when no open PR was found
+   * or the check was skipped — claim proceeds as before.
+   */
+  openPrs?: OpenPrRef[];
 }
 
 interface JiraIssueLink {
@@ -66,7 +76,7 @@ function isBlockerLink(link: JiraIssueLink): link is JiraIssueLink & {
 export async function claimTicket(
   params: ClaimTicketParams,
 ): Promise<CallToolResult> {
-  const { key, assignee, assigneeAccountId } = params;
+  const { key, assignee, assigneeAccountId, openPrs } = params;
 
   try {
     // Fetch ticket details, child status counts, and available transitions concurrently
@@ -184,6 +194,23 @@ export async function claimTicket(
       }
     }
 
+    // --- Guard: an open PR already references this ticket (LS-9289) ---
+    // Catches the case where the ticket is legitimately To Do/Unassigned
+    // (e.g. a prior claim's assignee-set 401'd — LS-8773) but another agent
+    // already has an open PR against this key. Only fires when the caller
+    // supplies `openPrs` — see the field doc above for why this can't be
+    // self-checked here.
+    if (openPrs && openPrs.length > 0) {
+      return makeResult({
+        action: 'PR_EXISTS',
+        reason: `Open PR(s) already reference ${key}: ${openPrs.map((pr) => `#${pr.number}`).join(', ')}. Check for duplicate work before claiming.`,
+        claimed: false,
+        ticket: buildTicket(issue, childResult),
+        warnings,
+        openPrs,
+      });
+    }
+
     // --- Transition to In Progress ---
     const inProgressTransition = transitionsResponse.transitions.find(
       (t) =>
@@ -285,13 +312,14 @@ function buildTicket(
 }
 
 interface ClaimResult {
-  action: 'PROCEED' | 'STOP' | 'ALREADY_CLAIMED';
+  action: 'PROCEED' | 'STOP' | 'ALREADY_CLAIMED' | 'PR_EXISTS';
   claimed: boolean;
   reason?: string;
   branchRecommendation?: string;
   ticket: Record<string, unknown>;
   warnings: string[];
   blockers?: Array<{ key: string; status: string }>;
+  openPrs?: OpenPrRef[];
 }
 
 function makeResult(result: ClaimResult): CallToolResult {

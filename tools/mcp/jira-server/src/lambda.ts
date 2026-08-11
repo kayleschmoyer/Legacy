@@ -28,7 +28,7 @@ import { view } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { claimTicket } from './tools/claim-ticket.js';
-import { jiraKeysSchema } from './schemas.js';
+import { jiraKeysSchema, openPrsSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
 const sm = new SecretsManagerClient({});
@@ -229,6 +229,7 @@ export function createMcpServer(): McpServer {
       assignee: z.string().email().optional(),
       assigneeAccountId: z.string().optional(),
       cascade: z.boolean().default(false),
+      openPrs: openPrsSchema,
     },
     async (params) => {
       const keys = params.keys ?? params.key;
@@ -253,6 +254,7 @@ export function createMcpServer(): McpServer {
         cascade: params.cascade,
         assignee: params.assignee,
         assigneeAccountId: params.assigneeAccountId,
+        openPrs: params.openPrs,
       });
     },
   );
@@ -282,11 +284,12 @@ export function createMcpServer(): McpServer {
   server.tool(
     'jira_claim_ticket',
     'DEPRECATED: use `jira_transition({ keys, status: "In Progress", action: "claim" })`. ' +
-      'Kept as a thin alias for one release. Returns action: "PROCEED", "STOP", or "ALREADY_CLAIMED".',
+      'Kept as a thin alias for one release. Returns action: "PROCEED", "STOP", "ALREADY_CLAIMED", or "PR_EXISTS".',
     {
       key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
       assignee: z.string().email().optional(),
       assigneeAccountId: z.string().optional(),
+      openPrs: openPrsSchema,
     },
     async (p) => {
       process.stderr.write(

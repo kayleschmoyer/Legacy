@@ -417,3 +417,53 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect(warnings[0]).toContain('403 Forbidden');
   });
 });
+
+describe('claimTicket — duplicate-work guard (LS-9289)', () => {
+  it('returns PR_EXISTS instead of PROCEED when an open PR references the ticket', async () => {
+    const result = await claimTicket({
+      key: 'LS-1',
+      openPrs: [{ number: 6941, url: 'https://github.com/o/r/pull/6941' }],
+    });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PR_EXISTS');
+    expect(data['claimed']).toBe(false);
+    expect(data['reason']).toContain('#6941');
+    expect(data['openPrs']).toEqual([
+      { number: 6941, url: 'https://github.com/o/r/pull/6941' },
+    ]);
+
+    // Must not have transitioned or assigned the ticket.
+    const postCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(([opts]) => opts.method === 'POST' || opts.method === 'PUT');
+    expect(postCalls).toHaveLength(0);
+  });
+
+  it('proceeds as PROCEED when openPrs is an empty array (checked, none found)', async () => {
+    const result = await claimTicket({ key: 'LS-1', openPrs: [] });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+  });
+
+  it('proceeds as PROCEED when openPrs is omitted (not checked — unchanged behaviour)', async () => {
+    const result = await claimTicket({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+  });
+
+  it('does not false-positive when the only PR referencing the ticket has merged (caller passes no open PRs)', async () => {
+    // A merged-PR-only ticket: the caller's open-PR lookup (e.g.
+    // github_pr_dashboard(state: 'open')) would not surface a merged PR, so
+    // it correctly passes an empty/omitted openPrs — claim proceeds.
+    const result = await claimTicket({ key: 'LS-1', openPrs: [] });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+  });
+});

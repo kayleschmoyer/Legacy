@@ -4,6 +4,7 @@ import { claimTicket } from './claim-ticket.js';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { matchesStatus } from '../locale.js';
+import type { OpenPrRef } from '../schemas.js';
 
 /**
  * Statuses commonly exposed by the LS workflow, listed in tool descriptions as
@@ -35,6 +36,11 @@ interface ConsolidatedParams {
   cascade?: boolean;
   assignee?: string;
   assigneeAccountId?: string;
+  /**
+   * Only used when action='claim'. Open PRs the caller has already found to
+   * reference the ticket's key — see `claimTicket`'s `openPrs` doc (LS-9289).
+   */
+  openPrs?: OpenPrRef[];
   /**
    * Optional deprecation label. When set, the response includes a
    * `deprecation` field so callers can surface the warning. Used by the
@@ -277,6 +283,7 @@ export async function consolidatedTransition(
           key,
           assignee: params.assignee,
           assigneeAccountId: params.assigneeAccountId,
+          openPrs: params.openPrs,
         });
         const text = (claim.content[0] as { text: string }).text;
         const parsed = JSON.parse(text) as Record<string, unknown>;

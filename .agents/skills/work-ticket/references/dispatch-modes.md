@@ -91,7 +91,7 @@ This mode runs when `/work-ticket` is invoked on a Story/Task that has children 
    Originating epic: LS-<epic>
    <if applicable: "Design bundle: docs/design/<design-id>/">
 
-   Claim the ticket atomically via \`jira_claim_ticket\` as your first action, then proceed with the work-ticket Leaf Mode flow. If claim returns ALREADY_CLAIMED or STOP, exit per the work-ticket skill's rules.
+   Check for an existing open PR referencing LS-<child> (github_pr_dashboard(state: "open")) and pass any matches as \`openPrs\` to the claim call, then claim the ticket atomically via \`jira_claim_ticket\` as your first action, then proceed with the work-ticket Leaf Mode flow. If claim returns ALREADY_CLAIMED, PR_EXISTS, or STOP, exit per the work-ticket skill's rules.
 
    Load Skill(skill: "work-ticket") FIRST, before any other tool call, and follow every step in it. The skill is authoritative — it owns the read-the-full-ticket gate (quote back ACs as AC1, AC2, ... before any state-changing tool call), scope discipline (Out of Scope is a hard boundary; one ticket = one PR), and the AC verification gate that runs before self-review.
 

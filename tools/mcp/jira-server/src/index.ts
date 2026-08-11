@@ -22,7 +22,7 @@ import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { rolloverSync } from './tools/rollover-sync.js';
 import { claimTicket } from './tools/claim-ticket.js';
 import { startWork } from './tools/start-work.js';
-import { jiraKeysSchema } from './schemas.js';
+import { jiraKeysSchema, openPrsSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
 // Check credentials at startup — warn if missing but don't exit.
@@ -532,12 +532,13 @@ server.tool(
     'and an actionable error listing the available targets is returned if the workflow disallows it. ' +
     'When using a single key, cascade=true auto-transitions open subtasks to Done. ' +
     "When action='claim' (single key, status='In Progress'), atomically validates blockers, " +
-    'sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED ' +
+    'sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS ' +
     'plus the full ticket details — replaces the deprecated jira_claim_ticket). ' +
     'Returns `{ success, results: { [key]: { status?, error?, ... } } }`.',
   {
     keys: jiraKeysSchema.optional(),
     key: jiraKeysSchema.optional().describe('Deprecated: use `keys`.'),
+    openPrs: openPrsSchema,
     status: z
       .string()
       .min(1)
@@ -593,6 +594,7 @@ server.tool(
       cascade: params.cascade,
       assignee: params.assignee,
       assigneeAccountId: params.assigneeAccountId,
+      openPrs: params.openPrs,
     });
   },
 );
@@ -628,7 +630,7 @@ server.tool(
   'DEPRECATED: use `jira_transition({ keys, status: "In Progress", action: "claim" })`. ' +
     'Kept as a thin alias for one release. ' +
     'Atomically reads, validates, and claims a Jira ticket. ' +
-    'Returns action: "PROCEED", "STOP", or "ALREADY_CLAIMED".',
+    'Returns action: "PROCEED", "STOP", "ALREADY_CLAIMED", or "PR_EXISTS".',
   {
     key: z
       .string()
@@ -650,6 +652,7 @@ server.tool(
       .describe(
         'Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works where email-based assignment always 401s (LS-7891). Takes precedence over `assignee`.',
       ),
+    openPrs: openPrsSchema,
   },
   async (params) => {
     process.stderr.write(
