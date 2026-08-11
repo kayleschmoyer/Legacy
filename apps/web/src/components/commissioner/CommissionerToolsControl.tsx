@@ -135,7 +135,7 @@ function LmNoteSection({
       borderColor="$surfacePanelBorder"
     >
       <SectionHeader
-        icon={<FileText size={16} color="#60A5FA" />}
+        icon={<FileText size={16} color="$brandNavyLight" />}
         title="Commissioner Note"
         description="A persistent note displayed to all league members. Use it for announcements, rule updates, or season info."
       />
@@ -272,7 +272,7 @@ function ForceRosterMovesSection({
       borderColor="$surfacePanelBorder"
     >
       <SectionHeader
-        icon={<UserPlus size={16} color="#60A5FA" />}
+        icon={<UserPlus size={16} color="$brandNavyLight" />}
         title="Force Roster Moves"
         description="Add or drop players from any team, bypassing normal waiver and lock rules. All moves are audit-logged."
       />
@@ -496,7 +496,7 @@ export function EditMatchupScoresSection({
       borderColor="$surfacePanelBorder"
     >
       <SectionHeader
-        icon={<RefreshCw size={16} color="#60A5FA" />}
+        icon={<RefreshCw size={16} color="$brandNavyLight" />}
         title="Edit Matchup Scores"
         description="Correct scoring errors for any past or current matchup. All edits are logged in the audit trail."
       />
@@ -653,7 +653,7 @@ export function SwapMatchupTeamsSection({
       borderColor="$surfacePanelBorder"
     >
       <SectionHeader
-        icon={<RefreshCw size={16} color="#60A5FA" />}
+        icon={<RefreshCw size={16} color="$brandNavyLight" />}
         title="Swap Matchup Teams"
         description="Swap the team assignments between two matchups (e.g., to fix scheduling errors)."
       />
@@ -810,7 +810,7 @@ function TeamManagementSection({
       borderColor="$surfacePanelBorder"
     >
       <SectionHeader
-        icon={<Lock size={16} color="#60A5FA" />}
+        icon={<Lock size={16} color="$brandNavyLight" />}
         title="Team Management"
         description="Lock individual teams to prevent roster moves, or bulk-drop all players from inactive teams."
       />
@@ -881,7 +881,7 @@ function TeamManagementSection({
       {/* Bulk Drop */}
       <YStack gap="$2">
         <XStack alignItems="center" gap="$2">
-          <AlertTriangle size={14} color="#f97316" />
+          <AlertTriangle size={14} color="$orange9" />
           <Text fontWeight="600" fontSize="$3" color="$orange11">
             Bulk Drop All Players
           </Text>
@@ -1172,7 +1172,7 @@ function AuditLogSection({ leagueId }: { leagueId: number }) {
     >
       <XStack justifyContent="space-between" alignItems="flex-start">
         <SectionHeader
-          icon={<ClipboardList size={16} color="#60A5FA" />}
+          icon={<ClipboardList size={16} color="$brandNavyLight" />}
           title="Commissioner Audit Log"
           description="All commissioner actions are recorded here for transparency."
         />
