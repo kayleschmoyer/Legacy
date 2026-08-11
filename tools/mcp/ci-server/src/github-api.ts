@@ -269,7 +269,11 @@ async function resolveToken(): Promise<{ token: string; expiresAt?: Date }> {
                 'e.g. mcp__github__actions_run_trigger({ method: "rerun_failed_jobs", owner, repo, run_id }) covers ' +
                 'ci_rerun_failed_jobs/ci_rerun, method: "cancel_workflow_run" covers ci_cancel_run, and ' +
                 'method: "run_workflow" covers ci_dispatch_workflow. It authenticates via the platform\'s own ' +
-                "GitHub token, independent of this server's credential resolution.",
+                "GitHub token, independent of this server's credential resolution. " +
+                'Fallback for ci_get_playwright_test_result(source: "s3"): this tool needs the same run-id-to-commit-SHA ' +
+                'lookup as ci_view_run, so it fails identically. There is no direct substitute for the structured ' +
+                'pass/fail/flaky report — use the already-authenticated mcp__legacy-sports-github__get_job_logs tool ' +
+                "to pull the failing job's raw logs instead (LS-8887).",
             ),
           );
           return;
