@@ -1,20 +1,16 @@
 import { useEffect, useMemo } from 'react';
 import {
-  DEFAULT_BATTING_SCORING,
-  DEFAULT_FIELDING_SCORING,
-  DEFAULT_PITCHING_SCORING,
+  applyMultiplierGroups as applyMultiplierGroupsShared,
+  createDefaultScoringSettings,
+  type ScoringSettings,
 } from '@legacy-sports/scoring';
 import {
   type GetLeagueScoringProfileQuery,
-  ScoringStatGroup,
   useGetLeagueScoringProfileQuery,
 } from '@legacy-sports/graphql';
 
-export type ScoringSettings = {
-  batting: Partial<Record<string, number>>;
-  fielding: Partial<Record<string, number>>;
-  pitching: Partial<Record<string, number>>;
-};
+export type { ScoringSettings };
+export { createDefaultScoringSettings };
 
 type LeagueScoringProfileResult = NonNullable<
   GetLeagueScoringProfileQuery['leagueScoringProfile']
@@ -25,72 +21,11 @@ type MultiplierGroup =
   | null
   | undefined;
 
-export function createDefaultScoringSettings(): ScoringSettings {
-  return {
-    batting: { ...DEFAULT_BATTING_SCORING },
-    fielding: { ...DEFAULT_FIELDING_SCORING },
-    pitching: { ...DEFAULT_PITCHING_SCORING },
-  };
-}
-
 export function applyMultiplierGroups(
   groups: MultiplierGroup,
   base?: ScoringSettings,
 ): ScoringSettings {
-  const result: ScoringSettings = base
-    ? {
-        batting: { ...base.batting },
-        fielding: { ...base.fielding },
-        pitching: { ...base.pitching },
-      }
-    : createDefaultScoringSettings();
-
-  if (!groups) {
-    return result;
-  }
-
-  for (const group of groups) {
-    if (!group?.group || !group.values) {
-      continue;
-    }
-
-    let target: Partial<Record<string, number>> | undefined;
-
-    switch (group.group) {
-      case ScoringStatGroup.Batting:
-        target = result.batting;
-        break;
-      case ScoringStatGroup.Fielding:
-        target = result.fielding;
-        break;
-      case ScoringStatGroup.Pitching:
-        target = result.pitching;
-        break;
-      default:
-        target = undefined;
-    }
-
-    if (!target) {
-      continue;
-    }
-
-    for (const entry of group.values) {
-      if (
-        entry?.sourceColumn &&
-        typeof entry.multiplier === 'number' &&
-        Number.isFinite(entry.multiplier)
-      ) {
-        // Normalize snake_case DB column names (e.g. "e_def") to
-        // camelCase keys (e.g. "eDef") so API overrides replace defaults.
-        const key = entry.sourceColumn.replace(/_([a-z])/g, (_, c: string) =>
-          c.toUpperCase(),
-        );
-        target[key] = entry.multiplier;
-      }
-    }
-  }
-
-  return result;
+  return applyMultiplierGroupsShared(groups, base);
 }
 
 export function useLeagueScoringSettings(leagueId?: number) {

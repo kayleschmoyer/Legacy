@@ -10,3 +10,4 @@ export * from './ComputeScoring';
 export * from './matchup-scoring';
 export * from './matchup-projections';
 export * from './scoring-profile-utils';
+export * from './multiplier-groups';

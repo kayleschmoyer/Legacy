@@ -15,12 +15,9 @@ import { eq } from 'drizzle-orm';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  applyMultiplierGroups,
   calculateMatchupProjection,
   computeScoring,
-  DEFAULT_BATTING_SCORING,
-  DEFAULT_FIELDING_SCORING,
-  DEFAULT_PITCHING_SCORING,
-  type ScoringSettings,
   type SeasonStats,
 } from '@legacy-sports/scoring';
 import { builder, type Context } from '../builder';
@@ -57,45 +54,6 @@ MatchupWinProbabilityType.implement({
     simulationCount: t.exposeInt('simulationCount', { nullable: false }),
   }),
 });
-
-type MultiplierGroup = {
-  group: string;
-  values: Array<{ sourceColumn: string; multiplier: number }>;
-};
-
-/** Mirrors apps/web/src/lib/scoring.ts's applyMultiplierGroups (client-only module, not importable from a lambda). */
-function buildScoringSettings(groups: MultiplierGroup[]): ScoringSettings {
-  const settings: ScoringSettings = {
-    batting: { ...DEFAULT_BATTING_SCORING },
-    pitching: { ...DEFAULT_PITCHING_SCORING },
-    fielding: { ...DEFAULT_FIELDING_SCORING },
-  };
-
-  for (const group of groups) {
-    if (
-      group.group !== 'batting' &&
-      group.group !== 'pitching' &&
-      group.group !== 'fielding'
-    ) {
-      continue;
-    }
-    const target = settings[group.group];
-    for (const entry of group.values) {
-      if (
-        entry.sourceColumn &&
-        typeof entry.multiplier === 'number' &&
-        Number.isFinite(entry.multiplier)
-      ) {
-        const key = entry.sourceColumn.replace(/_([a-z])/g, (_, c: string) =>
-          c.toUpperCase(),
-        );
-        target[key] = entry.multiplier;
-      }
-    }
-  }
-
-  return settings;
-}
 
 interface MatchupForWinProbability {
   id: number;
@@ -144,7 +102,7 @@ export async function resolveMatchupWinProbability(
     if (matchupPlayers.length === 0) return null;
 
     const scoringConfig = await loadLeagueScoringConfig(matchup.leagueId);
-    const scoringSettings = buildScoringSettings(
+    const scoringSettings = applyMultiplierGroups(
       scoringConfig.multiplierGroups,
     );
 
