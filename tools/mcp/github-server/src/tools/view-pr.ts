@@ -57,6 +57,7 @@ interface PRGraphQLResponse {
             statusCheckRollup: {
               contexts: {
                 nodes: Array<StatusCheckNode | null>;
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
               };
             } | null;
           };
@@ -128,6 +129,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
                     createdAt
                   }
                 }
+                pageInfo { hasNextPage endCursor }
               }
             }
           }
@@ -145,6 +147,97 @@ query($owner: String!, $repo: String!, $number: Int!) {
     }
   }
 }`;
+
+/**
+ * Follow-up query for a single PR's remaining `statusCheckRollup.contexts`
+ * pages. `contexts(first: 100)` in `VIEW_PR_QUERY` truncates PRs with more
+ * than 100 status checks/contexts (LS-9283) — this paginates the rest via
+ * `after: $cursor` so `checksSummary` reflects the full set.
+ */
+const CONTEXTS_PAGE_QUERY = `
+query($owner: String!, $repo: String!, $number: Int!, $cursor: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      commits(last: 1) {
+        nodes {
+          commit {
+            statusCheckRollup {
+              contexts(first: 100, after: $cursor) {
+                nodes {
+                  ... on CheckRun {
+                    __typename
+                    name
+                    status
+                    conclusion
+                    startedAt
+                    completedAt
+                  }
+                  ... on StatusContext {
+                    __typename
+                    context
+                    state
+                    createdAt
+                  }
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+interface ContextsPageResponse {
+  repository: {
+    pullRequest: null | {
+      commits: {
+        nodes: Array<{
+          commit: {
+            statusCheckRollup: {
+              contexts: {
+                nodes: Array<StatusCheckNode | null>;
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
+              };
+            } | null;
+          };
+        }>;
+      };
+    };
+  };
+}
+
+/**
+ * Fetch every remaining `statusCheckRollup.contexts` page beyond the first,
+ * starting from the initial page's `pageInfo`.
+ */
+async function fetchRemainingContexts(
+  owner: string,
+  repo: string,
+  number: number,
+  pageInfo: { hasNextPage: boolean; endCursor: string | null },
+): Promise<Array<StatusCheckNode | null>> {
+  const nodes: Array<StatusCheckNode | null> = [];
+  let hasNextPage = pageInfo.hasNextPage;
+  let cursor = pageInfo.endCursor;
+
+  while (hasNextPage && cursor) {
+    const result = await githubGraphQL<ContextsPageResponse>(
+      CONTEXTS_PAGE_QUERY,
+      { owner, repo, number, cursor },
+    );
+    const contexts =
+      result.data.repository.pullRequest?.commits.nodes[0]?.commit
+        .statusCheckRollup?.contexts;
+    if (!contexts) break;
+    nodes.push(...contexts.nodes);
+    hasNextPage = contexts.pageInfo.hasNextPage;
+    cursor = contexts.pageInfo.endCursor;
+  }
+
+  return nodes;
+}
 
 /** Map GraphQL PullRequestFile.changeType to REST-compatible status strings. */
 const CHANGE_TYPE_MAP: Record<string, string> = {
@@ -177,8 +270,22 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
       };
     }
     const commitNode = pr.commits.nodes[0];
-    const checkNodes =
-      commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
+    const contexts = commitNode?.commit.statusCheckRollup?.contexts;
+    let checkNodes = (contexts?.nodes ?? []).filter(
+      (node): node is StatusCheckNode => node !== null,
+    );
+    if (contexts?.pageInfo?.hasNextPage) {
+      const remaining = await fetchRemainingContexts(
+        repo.owner,
+        repo.name,
+        params.number,
+        contexts.pageInfo,
+      );
+      checkNodes = [
+        ...checkNodes,
+        ...remaining.filter((node): node is StatusCheckNode => node !== null),
+      ];
+    }
 
     const include = new Set<ViewPRField>(params.fields ?? []);
 

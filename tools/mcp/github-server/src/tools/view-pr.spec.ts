@@ -64,6 +64,7 @@ function makePR(overrides: Record<string, unknown> = {}) {
                     conclusion: 'FAILURE',
                   },
                 ],
+                pageInfo: { hasNextPage: false, endCursor: null },
               },
             },
           },
@@ -194,6 +195,83 @@ describe('viewPR — checksSummary dedup (LS-8667)', () => {
     expect(parsed.checksSummary.passed).toBe(3);
     expect(parsed.checksSummary.failed).toBe(0);
     expect(parsed.checksSummary.failedNames).toEqual([]);
+  });
+});
+
+describe('viewPR — statusCheckRollup.contexts pagination (LS-9283)', () => {
+  it('fetches remaining pages when the first page is truncated', async () => {
+    mockedGraphQL
+      .mockResolvedValueOnce(
+        gqlResponse(
+          makePR({
+            commits: {
+              totalCount: 1,
+              nodes: [
+                {
+                  commit: {
+                    statusCheckRollup: {
+                      contexts: {
+                        nodes: [
+                          {
+                            __typename: 'CheckRun',
+                            name: 'check-1',
+                            status: 'COMPLETED',
+                            conclusion: 'SUCCESS',
+                          },
+                        ],
+                        pageInfo: { hasNextPage: true, endCursor: 'cursor-1' },
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce({
+        data: {
+          repository: {
+            pullRequest: {
+              commits: {
+                nodes: [
+                  {
+                    commit: {
+                      statusCheckRollup: {
+                        contexts: {
+                          nodes: [
+                            {
+                              __typename: 'CheckRun',
+                              name: 'check-2',
+                              status: 'COMPLETED',
+                              conclusion: 'FAILURE',
+                            },
+                          ],
+                          pageInfo: { hasNextPage: false, endCursor: null },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+        errors: undefined,
+      });
+
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(mockedGraphQL).toHaveBeenCalledTimes(2);
+    expect(mockedGraphQL.mock.calls[1][1]).toMatchObject({
+      number: 42,
+      cursor: 'cursor-1',
+    });
+    expect(parsed.checksSummary.total).toBe(2);
+    expect(parsed.checksSummary.passed).toBe(1);
+    expect(parsed.checksSummary.failed).toBe(1);
+    expect(parsed.checksSummary.failedNames).toEqual(['check-2']);
   });
 });
 
