@@ -18,6 +18,7 @@ import {
   runPrettier,
 } from './tools/run-prettier.js';
 import { runTarget } from './tools/run-target.js';
+import { runTest } from './tools/run-test.js';
 import { showProject } from './tools/show-project.js';
 import { showProjects } from './tools/show-projects.js';
 
@@ -150,6 +151,46 @@ server.tool(
       .describe('Worktree path (default: repo root)'),
   },
   async (params) => runTarget(params),
+);
+
+// --- nx_run_test ---
+server.tool(
+  'nx_run_test',
+  'Prefer this over raw `npx jest --config <path> --testPathPatterns <pattern>` via shell when ' +
+    'iterating on a single spec file or pattern. Thin wrapper over nx_run: resolves `config` to ' +
+    'the matching colon-suffixed jest target (e.g. project "shared-components", config "mobile" ' +
+    'runs target "test:mobile" against jest.config.mobile.ts) and passes testPathPatterns through, ' +
+    'so you never need to reference a jest config file path directly. Omit `config` for projects ' +
+    'with a single "test" target. Same job semantics as nx_run: fast runs return pass/fail output ' +
+    'in one call; a run still going after ~45s returns { status: "running", jobId } — call ' +
+    'nx_job_wait({ jobId }) to continue waiting; do NOT re-run (re-invoking joins the in-flight run).',
+  {
+    project: z.string().describe('Project name'),
+    testPathPatterns: z
+      .string()
+      .describe(
+        'Jest --testPathPatterns value: a spec filename or regex pattern (e.g. "LeagueListRow"). ' +
+          'For multiple patterns, pipe-separate: "FileA|FileB". Capped at 300 characters and rejects ' +
+          'nested-quantifier shapes like "(a+)+" (ReDoS mitigation) — use a simple spec name/pattern.',
+      ),
+    config: z
+      .string()
+      .optional()
+      .describe(
+        'Jest config variant, mapped to the "test:<config>" target (e.g. "mobile", "web", "stories"). ' +
+          'Omit for projects with a single "test" target.',
+      ),
+    updateSnapshot: z
+      .boolean()
+      .default(false)
+      .describe('Update Jest snapshots (appends --updateSnapshot).'),
+    noCache: z.boolean().default(false).describe('Bypass Nx cache'),
+    worktreePath: z
+      .string()
+      .optional()
+      .describe('Worktree path (default: repo root)'),
+  },
+  async (params) => runTest(params),
 );
 
 // --- nx_run_affected ---
