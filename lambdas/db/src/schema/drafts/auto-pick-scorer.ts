@@ -157,8 +157,14 @@ export async function selectAutoPickPlayer(
  * Guard against a concurrent pick taking our preferred player between
  * Phase 1 (pre-computation) and Phase 2 (locked transaction). Walks the
  * ranked list to find the first still-available candidate.
+ *
+ * Exported (LS-9319) so autoProcessDraftPicks's Phase 2 reuse path can
+ * re-verify a Phase 1-predicted player directly under the lock without
+ * paying for the rest of selectAutoPickPlayer's scoring pipeline — this is
+ * the one piece of that pipeline that stays authoritative regardless of
+ * whether the prediction is reused or recomputed fresh.
  */
-async function guardConcurrentPick(
+export async function guardConcurrentPick(
   tx: PublicDb,
   draftId: number,
   preferredId: number,

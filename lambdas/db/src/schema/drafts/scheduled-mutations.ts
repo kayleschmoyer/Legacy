@@ -19,7 +19,7 @@
  *   - Commissioner / General Manager → allowed for their league only
  */
 
-import { PublicSchema } from '@legacy-sports/db-client';
+import { type PublicDb, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
@@ -30,8 +30,8 @@ import {
   getCurrentDraftPickInfo,
   getUnfilledPositionTypes,
 } from './helpers';
-import { fetchCandidatePool } from './candidate-pool';
-import { selectAutoPickPlayer } from './auto-pick-scorer';
+import { type CandidatePool, fetchCandidatePool } from './candidate-pool';
+import { guardConcurrentPick, selectAutoPickPlayer } from './auto-pick-scorer';
 import { executePickEffects } from './draft-pick-effects';
 import { builder, type Context } from '../builder';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
@@ -49,6 +49,383 @@ import { describeDbError, formatDbError } from '../leagues/delete-resilience';
  */
 export function isLockWaitTimeout(error: unknown): boolean {
   return describeDbError(error).code === '57014';
+}
+
+// ── LS-9319: Phase 1 / Phase 2 split for the per-draft auto-pick loop ───────
+//
+// Mirrors the pattern LS-4692 (PR #4146) already proved out for makeDraftPick
+// / commissionerPick: speculatively compute the pick outside any row lock
+// (Phase 1), then re-verify and reuse it inside a short locked transaction
+// (Phase 2), falling back to a full in-lock recomputation only on the rare
+// TOCTOU race where a concurrent invocation (another EventBridge tick, the
+// LS-8107 nudge, or a human's own makeDraftPick) already advanced the pick.
+// This is the one drafts-row lock call site LS-4692 deliberately left
+// unrestructured — its own PR description says only the lock-strength swap
+// (FOR UPDATE -> FOR NO KEY UPDATE) was applied here.
+
+/** Result of {@link predictAutoPick} — a speculative, non-authoritative guess
+ *  at what Phase 2 will need, computed entirely outside the row lock. */
+export interface PredictedAutoPick {
+  currentPickInfo: NonNullable<
+    Awaited<ReturnType<typeof getCurrentDraftPickInfo>>
+  >;
+  unfilledPositionTypes: string[];
+  autoPlayerId: number;
+  autoPickReason: string;
+}
+
+/**
+ * LS-9319 Phase 1 extension: speculatively predict the current pick, its
+ * unfilled roster position types, and the auto-pick player selection using
+ * non-locked reads — the same pattern `fetchCandidatePool` already uses for
+ * the candidate pool itself. When the Phase 2 TOCTOU check (in
+ * {@link runAutoPickLockedTransaction}) confirms nothing raced ahead of this
+ * prediction, it's reused instead of recomputed under the lock, which is
+ * what shrinks the locked critical section from ~15-20 sequential round
+ * trips down to a handful.
+ *
+ * Best-effort only: this call never runs under a lock, so a concurrent pick
+ * can always render it stale between here and Phase 2. Any failure —
+ * including "draft already complete" or "no players available" — resolves
+ * to `null` rather than throwing, so a prediction failure can never break
+ * auto-picking; it only costs Phase 2 the full in-lock computation it would
+ * have done anyway before this ticket.
+ */
+export async function predictAutoPick(
+  db: PublicDb,
+  draftId: number,
+  draftLeagueId: number,
+  candidatePool: CandidatePool,
+): Promise<PredictedAutoPick | null> {
+  try {
+    const currentPickInfo = await getCurrentDraftPickInfo(db, draftId);
+    if (!currentPickInfo || currentPickInfo.isComplete) return null;
+
+    const unfilledPositionTypes = await getUnfilledPositionTypes(
+      db,
+      draftId,
+      currentPickInfo.teamId,
+      draftLeagueId,
+    );
+
+    const { playerId: autoPlayerId, reason: autoPickReason } =
+      await selectAutoPickPlayer({
+        tx: db,
+        draftId,
+        eligibleIds: candidatePool.eligibleIds,
+        playerDraftInfo: candidatePool.playerDraftInfo,
+        rankedEligibleIds: candidatePool.rankedEligibleIds,
+        bestBenchPick: candidatePool.bestBenchPick,
+        currentPickInfo,
+        unfilledPositionTypes,
+      });
+
+    return {
+      currentPickInfo,
+      unfilledPositionTypes,
+      autoPlayerId,
+      autoPickReason,
+    };
+  } catch (predictionError) {
+    LOGGER.warn(
+      '[autoProcessDraftPicks] Phase 1 prediction failed — Phase 2 will fall back to full in-lock computation',
+      {
+        draftId,
+        err:
+          predictionError instanceof Error
+            ? predictionError
+            : new Error(String(predictionError)),
+      },
+    );
+    return null;
+  }
+}
+
+/** Result of {@link runAutoPickLockedTransaction} — `null` when there was
+ *  nothing to pick (deadline no longer expired, draft/league state changed,
+ *  or the draft is already complete). */
+export type AutoPickCommitResult = {
+  draftPick: typeof PublicSchema.draftPicks.$inferSelect;
+  autoPlayerId: number;
+  autoPickReason: string;
+  isDraftComplete: boolean;
+  currentPickInfo: NonNullable<
+    Awaited<ReturnType<typeof getCurrentDraftPickInfo>>
+  >;
+  nextPickInfo: Awaited<ReturnType<typeof getCurrentDraftPickInfo>>;
+  nextDeadline: Date | null;
+} | null;
+
+/**
+ * LS-9319 Phase 2: acquire the `drafts` row lock (FOR NO KEY UPDATE — LS-4692
+ * established this is already the correct, minimal lock mode; this ticket
+ * only shrinks how long it's held) and commit exactly one auto-pick.
+ *
+ * Re-fetches `currentPickInfo` under the lock — this determines whose turn
+ * it truly is and cannot be removed — and uses it as the TOCTOU check against
+ * `predicted`: if the team and overall pick still match, the Phase 1
+ * prediction's `unfilledPositionTypes`/`autoPlayerId` are reused as-is
+ * (skipping their recomputation under the lock); otherwise this falls back to
+ * the same full in-lock computation the mutation always did before this
+ * ticket. Either way, `guardConcurrentPick` re-verifies `draft_picks` state
+ * under `tx` before committing — the actual correctness guard against
+ * double-drafting a player, which must run regardless of which path was
+ * taken (AC2).
+ */
+export async function runAutoPickLockedTransaction(params: {
+  db: PublicDb;
+  draftId: number;
+  draftLeagueId: number;
+  pickTimeLimitSeconds: number;
+  candidatePool: CandidatePool;
+  predicted: PredictedAutoPick | null;
+}): Promise<AutoPickCommitResult> {
+  const {
+    db,
+    draftId,
+    draftLeagueId,
+    pickTimeLimitSeconds,
+    candidatePool,
+    predicted,
+  } = params;
+  const { league } = candidatePool;
+
+  return db.transaction(async (tx) => {
+    // Surface lock waits as errors rather than silent hangs
+    await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+
+    // Acquire row-level lock. FOR NO KEY UPDATE (LS-4692)
+    // serializes concurrent pick writers without blocking
+    // FK-referencing draft_picks INSERTs from other transactions.
+    const draftRows = await tx.execute(
+      sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
+    );
+    const draft = draftRows.rows[0] as
+      | {
+          id: number;
+          league_id: number;
+          current_pick: number;
+          current_pick_deadline: Date | null;
+        }
+      | undefined;
+
+    if (!draft) {
+      // Draft was deleted between the outer query and this transaction
+      // (benign race condition — nothing to auto-pick on).
+      LOGGER.warn(
+        `[autoProcessDraftPicks] Draft ${draftId} not found inside locked transaction — likely deleted mid-flight, skipping`,
+        { draftId },
+      );
+      return null;
+    }
+
+    // Re-check deadline inside transaction (TOCTOU guard)
+    const checkNow = new Date();
+    if (
+      !draft.current_pick_deadline ||
+      new Date(draft.current_pick_deadline) > checkNow
+    ) {
+      LOGGER.info(
+        `[autoProcessDraftPicks] Draft ${draftId} deadline no longer expired (pick was made), skipping`,
+      );
+      return null;
+    }
+
+    // Capture the expired deadline for chaining
+    const expiredDeadline = new Date(draft.current_pick_deadline);
+
+    // Re-validate league status inside the transaction
+    const [txLeague] = await tx
+      .select()
+      .from(PublicSchema.leagues)
+      .where(eq(PublicSchema.leagues.id, draftLeagueId))
+      .limit(1);
+
+    if (!txLeague || txLeague.draftStatus !== 'in-progress') {
+      LOGGER.info(
+        `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
+      );
+      return null;
+    }
+
+    // Get authoritative pick info from the locked draft row. This is the
+    // TOCTOU check for the Phase 1 prediction below — it determines whose
+    // turn it truly is and cannot be removed or replaced by the prediction.
+    const currentPickInfo = await getCurrentDraftPickInfo(tx, draftId);
+
+    if (!currentPickInfo || currentPickInfo.isComplete) {
+      LOGGER.info(
+        `[autoProcessDraftPicks] Draft ${draftId} is already complete`,
+      );
+      return null;
+    }
+
+    const predictionStillValid =
+      predicted !== null &&
+      predicted.currentPickInfo.teamId === currentPickInfo.teamId &&
+      predicted.currentPickInfo.overallPick === currentPickInfo.overallPick;
+
+    let unfilledPositionTypes: string[];
+    let autoPlayerId: number;
+    let autoPickReason: string;
+
+    if (predictionStillValid && predicted) {
+      unfilledPositionTypes = predicted.unfilledPositionTypes;
+
+      // guardConcurrentPick must still re-verify draft_picks availability
+      // under the lock even on the reuse path (AC2) — Phase 1's own guard
+      // check ran outside the lock and is not authoritative.
+      const guardedPlayerId = await guardConcurrentPick(
+        tx,
+        draftId,
+        predicted.autoPlayerId,
+        candidatePool.rankedEligibleIds,
+      );
+      if (guardedPlayerId === undefined) {
+        throw new Error(`No available players for draft ${draftId}`);
+      }
+      autoPlayerId = guardedPlayerId;
+      autoPickReason = predicted.autoPickReason;
+
+      LOGGER.info(
+        '[autoProcessDraftPicks] Reusing Phase 1 prediction (LS-9319)',
+        {
+          draftId,
+          teamId: currentPickInfo.teamId,
+          overallPick: currentPickInfo.overallPick,
+        },
+      );
+    } else {
+      if (predicted) {
+        LOGGER.info(
+          '[autoProcessDraftPicks] Phase 1 prediction stale — falling back to full in-lock computation (LS-9319)',
+          {
+            draftId,
+            predictedTeamId: predicted.currentPickInfo.teamId,
+            predictedOverallPick: predicted.currentPickInfo.overallPick,
+            actualTeamId: currentPickInfo.teamId,
+            actualOverallPick: currentPickInfo.overallPick,
+          },
+        );
+      }
+
+      // Determine unfilled roster positions for the current team
+      unfilledPositionTypes = await getUnfilledPositionTypes(
+        tx,
+        draftId,
+        currentPickInfo.teamId,
+        draftLeagueId,
+      );
+
+      LOGGER.info('[autoProcessDraftPicks] Unfilled position types for team', {
+        draftId,
+        teamId: currentPickInfo.teamId,
+        unfilledPositionTypes,
+        eligibleCount: candidatePool.rankedEligibleIds.length,
+        eligibilityFilters: {
+          playerPool: league.playerPool,
+          minCareerGames: league.minCareerGames,
+          minCareerSeasons: league.minCareerSeasons,
+          baseballHofOnly: league.baseballHofOnly,
+          eraFilter: league.baseballEraFilter,
+        },
+      });
+
+      // Select the best player via the scoring module
+      const selected = await selectAutoPickPlayer({
+        tx,
+        draftId,
+        eligibleIds: candidatePool.eligibleIds,
+        playerDraftInfo: candidatePool.playerDraftInfo,
+        rankedEligibleIds: candidatePool.rankedEligibleIds,
+        bestBenchPick: candidatePool.bestBenchPick,
+        currentPickInfo,
+        unfilledPositionTypes,
+      });
+      autoPlayerId = selected.playerId;
+      autoPickReason = selected.reason;
+    }
+
+    // Validate roster limit
+    const [rosterCount] = await tx
+      .select({ count: count() })
+      .from(PublicSchema.teamMembers)
+      .where(
+        and(
+          eq(PublicSchema.teamMembers.teamId, currentPickInfo.teamId),
+          eq(PublicSchema.teamMembers.leagueId, draftLeagueId),
+        ),
+      );
+
+    if (rosterCount && Number(rosterCount.count) >= league.maxRosterSize) {
+      throw new Error(
+        `Team ${currentPickInfo.teamId} roster is full in draft ${draftId}`,
+      );
+    }
+
+    // Commit the pick: insert pick row, advance draft state, add player to roster.
+    const {
+      draftPick,
+      isDraftComplete,
+      nextDeadline,
+      nextPickInfo,
+      now: pickNow,
+    } = await commitDraftPick({
+      tx,
+      draftId,
+      leagueId: draftLeagueId,
+      pickInfo: currentPickInfo,
+      playerId: autoPlayerId,
+      maxRosterSize: league.maxRosterSize,
+      pickTimeLimitSeconds,
+      deadlineBaseTime: expiredDeadline,
+      isMockDraft: league.isMockDraft,
+    });
+
+    // Mark this team as auto-pick going forward, but only if
+    // unmanaged (no GM or commissioner). Reuses the same guard as
+    // initialization-time enableAutoPickForUnmanagedTeams (LS-4286).
+    await enableAutoPickForUnmanagedTeams(tx, draftLeagueId, draftId, [
+      currentPickInfo.teamId,
+    ]);
+
+    // If the next team has auto-pick enabled, immediately expire
+    // their deadline so the inner loop chains right away (LS-427).
+    let effectiveNextDeadline = nextDeadline;
+    if (nextPickInfo && !isDraftComplete) {
+      const [nextTeamEntry] = await tx
+        .select({ autoPick: PublicSchema.draftTeams.autoPick })
+        .from(PublicSchema.draftTeams)
+        .where(
+          and(
+            eq(PublicSchema.draftTeams.draftId, draftId),
+            eq(PublicSchema.draftTeams.teamId, nextPickInfo.teamId),
+          ),
+        )
+        .limit(1);
+      if (nextTeamEntry?.autoPick) {
+        effectiveNextDeadline = new Date(pickNow.getTime() - 1);
+        await tx
+          .update(PublicSchema.drafts)
+          .set({ currentPickDeadline: effectiveNextDeadline })
+          .where(eq(PublicSchema.drafts.id, draftId));
+        LOGGER.info(
+          '[autoProcessDraftPicks] Next team has auto-pick — expiring deadline immediately',
+          { draftId, nextTeamId: nextPickInfo.teamId },
+        );
+      }
+    }
+
+    return {
+      draftPick,
+      autoPlayerId,
+      autoPickReason,
+      isDraftComplete,
+      currentPickInfo,
+      nextPickInfo,
+      nextDeadline: effectiveNextDeadline,
+    };
+  });
 }
 
 /**
@@ -272,204 +649,25 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
 
               const { league } = candidatePool;
 
+              // LS-9319: speculatively predict currentPickInfo /
+              // unfilledPositionTypes / autoPlayerId outside the lock, so
+              // Phase 2 below can skip recomputing them when nothing raced
+              // ahead of us in the meantime.
+              const predicted = await predictAutoPick(
+                context.db,
+                draftId,
+                draftLeagueId,
+                candidatePool,
+              );
+
               // ─── Phase 2: Short locked write transaction ──────────────────
-              const pickResult = await context.db.transaction(async (tx) => {
-                // Surface lock waits as errors rather than silent hangs
-                await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
-
-                // Acquire row-level lock. FOR NO KEY UPDATE (LS-4692)
-                // serializes concurrent pick writers without blocking
-                // FK-referencing draft_picks INSERTs from other transactions.
-                const draftRows = await tx.execute(
-                  sql`SELECT id, league_id, current_pick, current_pick_deadline FROM drafts WHERE id = ${draftId} FOR NO KEY UPDATE`,
-                );
-                const draft = draftRows.rows[0] as
-                  | {
-                      id: number;
-                      league_id: number;
-                      current_pick: number;
-                      current_pick_deadline: Date | null;
-                    }
-                  | undefined;
-
-                if (!draft) {
-                  // Draft was deleted between the outer query and this transaction
-                  // (benign race condition — nothing to auto-pick on).
-                  LOGGER.warn(
-                    `[autoProcessDraftPicks] Draft ${draftId} not found inside locked transaction — likely deleted mid-flight, skipping`,
-                    { draftId },
-                  );
-                  return null;
-                }
-
-                // Re-check deadline inside transaction (TOCTOU guard)
-                const checkNow = new Date();
-                if (
-                  !draft.current_pick_deadline ||
-                  new Date(draft.current_pick_deadline) > checkNow
-                ) {
-                  LOGGER.info(
-                    `[autoProcessDraftPicks] Draft ${draftId} deadline no longer expired (pick was made), skipping`,
-                  );
-                  return null;
-                }
-
-                // Capture the expired deadline for chaining
-                const expiredDeadline = new Date(draft.current_pick_deadline);
-
-                // Re-validate league status inside the transaction
-                const [txLeague] = await tx
-                  .select()
-                  .from(PublicSchema.leagues)
-                  .where(eq(PublicSchema.leagues.id, draftLeagueId))
-                  .limit(1);
-
-                if (!txLeague || txLeague.draftStatus !== 'in-progress') {
-                  LOGGER.info(
-                    `[autoProcessDraftPicks] League ${draftLeagueId} is not in-progress, skipping draft ${draftId}`,
-                  );
-                  return null;
-                }
-
-                // Get authoritative pick info from the locked draft row
-                const currentPickInfo = await getCurrentDraftPickInfo(
-                  tx,
-                  draftId,
-                );
-
-                if (!currentPickInfo || currentPickInfo.isComplete) {
-                  LOGGER.info(
-                    `[autoProcessDraftPicks] Draft ${draftId} is already complete`,
-                  );
-                  return null;
-                }
-
-                // Determine unfilled roster positions for the current team
-                const unfilledPositionTypes = await getUnfilledPositionTypes(
-                  tx,
-                  draftId,
-                  currentPickInfo.teamId,
-                  draftLeagueId,
-                );
-
-                LOGGER.info(
-                  '[autoProcessDraftPicks] Unfilled position types for team',
-                  {
-                    draftId,
-                    teamId: currentPickInfo.teamId,
-                    unfilledPositionTypes,
-                    eligibleCount: candidatePool.rankedEligibleIds.length,
-                    eligibilityFilters: {
-                      playerPool: league.playerPool,
-                      minCareerGames: league.minCareerGames,
-                      minCareerSeasons: league.minCareerSeasons,
-                      baseballHofOnly: league.baseballHofOnly,
-                      eraFilter: league.baseballEraFilter,
-                    },
-                  },
-                );
-
-                // Select the best player via the scoring module
-                const { playerId: autoPlayerId, reason: autoPickReason } =
-                  await selectAutoPickPlayer({
-                    tx,
-                    draftId,
-                    eligibleIds: candidatePool.eligibleIds,
-                    playerDraftInfo: candidatePool.playerDraftInfo,
-                    rankedEligibleIds: candidatePool.rankedEligibleIds,
-                    bestBenchPick: candidatePool.bestBenchPick,
-                    currentPickInfo,
-                    unfilledPositionTypes,
-                  });
-
-                // Validate roster limit
-                const [rosterCount] = await tx
-                  .select({ count: count() })
-                  .from(PublicSchema.teamMembers)
-                  .where(
-                    and(
-                      eq(
-                        PublicSchema.teamMembers.teamId,
-                        currentPickInfo.teamId,
-                      ),
-                      eq(PublicSchema.teamMembers.leagueId, draftLeagueId),
-                    ),
-                  );
-
-                if (
-                  rosterCount &&
-                  Number(rosterCount.count) >= league.maxRosterSize
-                ) {
-                  throw new Error(
-                    `Team ${currentPickInfo.teamId} roster is full in draft ${draftId}`,
-                  );
-                }
-
-                // Commit the pick: insert pick row, advance draft state, add player to roster.
-                const {
-                  draftPick,
-                  isDraftComplete,
-                  nextDeadline,
-                  nextPickInfo,
-                  now: pickNow,
-                } = await commitDraftPick({
-                  tx,
-                  draftId,
-                  leagueId: draftLeagueId,
-                  pickInfo: currentPickInfo,
-                  playerId: autoPlayerId,
-                  maxRosterSize: league.maxRosterSize,
-                  pickTimeLimitSeconds,
-                  deadlineBaseTime: expiredDeadline,
-                  isMockDraft: league.isMockDraft,
-                });
-
-                // Mark this team as auto-pick going forward, but only if
-                // unmanaged (no GM or commissioner). Reuses the same guard as
-                // initialization-time enableAutoPickForUnmanagedTeams (LS-4286).
-                await enableAutoPickForUnmanagedTeams(
-                  tx,
-                  draftLeagueId,
-                  draftId,
-                  [currentPickInfo.teamId],
-                );
-
-                // If the next team has auto-pick enabled, immediately expire
-                // their deadline so the inner loop chains right away (LS-427).
-                let effectiveNextDeadline = nextDeadline;
-                if (nextPickInfo && !isDraftComplete) {
-                  const [nextTeamEntry] = await tx
-                    .select({ autoPick: PublicSchema.draftTeams.autoPick })
-                    .from(PublicSchema.draftTeams)
-                    .where(
-                      and(
-                        eq(PublicSchema.draftTeams.draftId, draftId),
-                        eq(PublicSchema.draftTeams.teamId, nextPickInfo.teamId),
-                      ),
-                    )
-                    .limit(1);
-                  if (nextTeamEntry?.autoPick) {
-                    effectiveNextDeadline = new Date(pickNow.getTime() - 1);
-                    await tx
-                      .update(PublicSchema.drafts)
-                      .set({ currentPickDeadline: effectiveNextDeadline })
-                      .where(eq(PublicSchema.drafts.id, draftId));
-                    LOGGER.info(
-                      '[autoProcessDraftPicks] Next team has auto-pick — expiring deadline immediately',
-                      { draftId, nextTeamId: nextPickInfo.teamId },
-                    );
-                  }
-                }
-
-                return {
-                  draftPick,
-                  autoPlayerId,
-                  autoPickReason,
-                  isDraftComplete,
-                  currentPickInfo,
-                  nextPickInfo,
-                  nextDeadline: effectiveNextDeadline,
-                };
+              const pickResult = await runAutoPickLockedTransaction({
+                db: context.db,
+                draftId,
+                draftLeagueId,
+                pickTimeLimitSeconds,
+                candidatePool,
+                predicted,
               });
 
               if (!pickResult) {
