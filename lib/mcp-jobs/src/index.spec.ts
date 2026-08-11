@@ -259,6 +259,45 @@ describe('background job registry', () => {
     }
   });
 
+  it(
+    'reattaches to a still-running job via a second runner instance pointed ' +
+      'at the same dirName, without erroring (simulates an MCP server ' +
+      'disconnect/reconnect mid-poll, LS-8889)',
+    async () => {
+      // The "spawning" runner starts the job — analogous to the pre-reconnect
+      // MCP server process.
+      const { jobId } = startJob({
+        command: 'make',
+        args: ['slow'],
+        cwd: workDir,
+        label: 'reconnect-mid-run',
+        timeoutMs: 30_000,
+      });
+
+      // A second runner instance with an empty in-memory registry but the
+      // same dirName — analogous to the reconnected MCP server process, which
+      // has never seen this jobId in memory and must recover it from disk.
+      const reconnected = createJobRunner({
+        idPrefix: 'test',
+        dirName: TEST_DIR_NAME,
+        waitHint: (id) => `Call test_job_wait({ jobId: "${id}" }) to wait.`,
+      });
+
+      // The job is still running at this point (its "slow" target sleeps 5s).
+      // Reattaching must report it running with a re-poll hint, not null or
+      // an orphaned/failed status.
+      const midRun = reconnected.snapshotJob(jobId);
+      expect(midRun?.status).toBe('running');
+      expect(midRun?.hint).toContain('test_job_wait');
+
+      // Waiting via the reconnected runner converges to the real outcome.
+      const final = await reconnected.waitForJob(jobId, 20_000);
+      expect(final?.status).toBe('done');
+      expect(final?.exitCode).toBe(0);
+    },
+    25_000,
+  );
+
   it('writes an exit-code sidecar file when a job completes', async () => {
     const { jobId } = startJob({
       command: 'make',
