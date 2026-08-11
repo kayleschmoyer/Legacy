@@ -176,12 +176,14 @@ function createMcpServer(): McpServer {
 
   server.tool(
     'rollbar_graphql_introspect_type',
-    "Introspect a single type's fields on a deployed GraphQL endpoint's schema — the MCP-native replacement for hand-rolling " +
+    "Introspect one or more types' fields on a deployed GraphQL endpoint's schema — the MCP-native replacement for hand-rolling " +
       '`curl -X POST <endpoint> -d \'{"query":"{__type(name:\\"X\\"){fields{name}}}"}\'` during schema-mismatch RCA. ' +
       'Use this for the "Cannot query field X on type Y" class of Rollbar errors caused by client/server deploy lag. ' +
       'Pass `compareEnv` to also introspect a second environment and get the field-name differences between them in one call. ' +
-      'Returns `type: null` (not an error) when the type does not exist on that schema, and surfaces GraphQL application errors ' +
-      '(e.g. introspection disabled) in an `errors` field rather than failing the call. READ-ONLY.',
+      'Pass `typeNames` (1-20) instead of `typeName` to check several types in one call (e.g. confirming a batch of ' +
+      'query/mutation/type names all landed after a deploy) — bounded concurrency, output capped at 20k chars. ' +
+      'Returns `type: null` / `present: false` (not an error) when a type does not exist on that schema, and surfaces GraphQL ' +
+      'application errors (e.g. introspection disabled) in an `errors` field rather than failing the call. READ-ONLY.',
     {
       env: z
         .enum(['dev', 'prod'])
@@ -189,12 +191,23 @@ function createMcpServer(): McpServer {
       typeName: z
         .string()
         .min(1)
-        .describe('GraphQL type name to introspect, e.g. "TradeOfferPlayer"'),
+        .optional()
+        .describe(
+          'GraphQL type name to introspect, e.g. "TradeOfferPlayer". Provide this OR `typeNames`, not both.',
+        ),
+      typeNames: z
+        .array(z.string().min(1))
+        .min(1)
+        .max(20)
+        .optional()
+        .describe(
+          'Batch mode: 1-20 GraphQL type names to introspect concurrently. Provide this OR `typeName`, not both.',
+        ),
       compareEnv: z
         .enum(['dev', 'prod'])
         .optional()
         .describe(
-          'Optional second environment to introspect and diff field names against (e.g. env: "prod", compareEnv: "dev" to check for deploy lag)',
+          'Optional second environment to introspect and diff field names against (e.g. env: "prod", compareEnv: "dev" to check for deploy lag). Applies to both single and batch mode.',
         ),
     },
     async (params) => graphqlIntrospectType(params),

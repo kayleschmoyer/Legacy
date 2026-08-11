@@ -8,9 +8,17 @@ import type { ToolResult } from '../types.js';
 
 export interface GraphqlIntrospectTypeParams {
   env: GraphqlEnv;
-  typeName: string;
+  typeName?: string;
+  typeNames?: string[];
   compareEnv?: GraphqlEnv;
 }
+
+/** Maximum number of type names accepted in a single batch call. */
+export const MAX_BATCH_TYPES = 20;
+/** Maximum number of concurrent introspection requests in batch mode. */
+export const BATCH_CONCURRENCY = 5;
+/** Hard cap on serialized batch output (LS-8778, LS-5211: unbounded output overflows context). */
+export const MAX_BATCH_OUTPUT_CHARS = 20_000;
 
 interface IntrospectedField {
   name: string;
@@ -88,6 +96,148 @@ async function introspect(
   };
 }
 
+function toolError(message: string): ToolResult {
+  return {
+    isError: true,
+    content: [
+      { type: 'text', text: minifiedJson({ ok: false, error: message }) },
+    ],
+  };
+}
+
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let idx = 0;
+  const workers = Array.from(
+    { length: Math.min(limit, items.length) },
+    async () => {
+      while (true) {
+        const i = idx++;
+        if (i >= items.length) return;
+        results[i] = await worker(items[i]);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+interface BatchTypeEntry {
+  type: string;
+  present: boolean;
+  fields: string[] | null;
+  errors?: unknown;
+  fieldsOnlyIn?: { [env: string]: string[] };
+}
+
+async function introspectOneForBatch(
+  typeName: string,
+  env: GraphqlEnv,
+  compareEnv: GraphqlEnv | undefined,
+): Promise<BatchTypeEntry> {
+  const primary = await introspect(env, typeName);
+
+  if (!compareEnv || compareEnv === env) {
+    return {
+      type: typeName,
+      present: primary.type !== null,
+      fields: memberNames(primary.type),
+      ...(primary.errors ? { errors: primary.errors } : {}),
+    };
+  }
+
+  const compare = await introspect(compareEnv, typeName);
+  const { onlyInFirst, onlyInSecond } = diffNames(
+    memberNames(primary.type),
+    memberNames(compare.type),
+  );
+
+  return {
+    type: typeName,
+    present: primary.type !== null,
+    fields: memberNames(primary.type),
+    ...(primary.errors || compare.errors
+      ? { errors: { [env]: primary.errors, [compareEnv]: compare.errors } }
+      : {}),
+    fieldsOnlyIn: { [env]: onlyInFirst, [compareEnv]: onlyInSecond },
+  };
+}
+
+/**
+ * Batch counterpart of `graphqlIntrospectType` — introspects several type
+ * names against the same environment(s) in one call (bounded concurrency,
+ * `MAX_BATCH_TYPES` cap). Truncates the `types` array (not individual
+ * entries) to stay under `MAX_BATCH_OUTPUT_CHARS` rather than silently
+ * returning an unbounded payload.
+ */
+async function graphqlIntrospectTypeBatch(
+  typeNames: string[],
+  env: GraphqlEnv,
+  compareEnv: GraphqlEnv | undefined,
+): Promise<ToolResult> {
+  if (typeNames.length > MAX_BATCH_TYPES) {
+    return toolError(
+      `Batch mode accepts at most ${MAX_BATCH_TYPES} type names; received ${typeNames.length}.`,
+    );
+  }
+
+  try {
+    const results = await runWithConcurrency(
+      typeNames,
+      BATCH_CONCURRENCY,
+      (name) => introspectOneForBatch(name, env, compareEnv),
+    );
+
+    let truncated = false;
+    let charCount = 0;
+    const types: BatchTypeEntry[] = [];
+    for (const entry of results) {
+      const entryChars = JSON.stringify(entry).length;
+      if (charCount + entryChars > MAX_BATCH_OUTPUT_CHARS) {
+        truncated = true;
+        break;
+      }
+      charCount += entryChars;
+      types.push(entry);
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: minifiedJson({
+            env,
+            ...(compareEnv ? { compareEnv } : {}),
+            types,
+            ...(truncated
+              ? {
+                  truncated: true,
+                  note: `Output truncated at ${MAX_BATCH_OUTPUT_CHARS} chars — ${types.length}/${typeNames.length} types shown.`,
+                }
+              : {}),
+          }),
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `Failed to introspect types [${typeNames.join(', ')}]: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ],
+    };
+  }
+}
+
 /**
  * Introspect a single type's fields on a deployed GraphQL endpoint's schema —
  * the MCP-native replacement for hand-rolling
@@ -100,20 +250,35 @@ async function introspect(
 export async function graphqlIntrospectType(
   params: GraphqlIntrospectTypeParams,
 ): Promise<ToolResult> {
+  const { typeName, typeNames } = params;
+
+  if (typeNames && typeNames.length > 0) {
+    if (typeName) {
+      return toolError(
+        'Provide either `typeName` (singular) or `typeNames` (batch), not both.',
+      );
+    }
+    return graphqlIntrospectTypeBatch(typeNames, params.env, params.compareEnv);
+  }
+
+  if (!typeName) {
+    return toolError('Either `typeName` or `typeNames` must be provided.');
+  }
+
   try {
-    const primary = await introspect(params.env, params.typeName);
+    const primary = await introspect(params.env, typeName);
 
     if (!params.compareEnv || params.compareEnv === params.env) {
       const note =
         primary.type === null && !primary.errors
-          ? `Type "${params.typeName}" was not found on the ${params.env} deployed schema.`
+          ? `Type "${typeName}" was not found on the ${params.env} deployed schema.`
           : undefined;
       return {
         content: [{ type: 'text', text: minifiedJson({ ...primary, note }) }],
       };
     }
 
-    const compare = await introspect(params.compareEnv, params.typeName);
+    const compare = await introspect(params.compareEnv, typeName);
     const { onlyInFirst, onlyInSecond } = diffNames(
       memberNames(primary.type),
       memberNames(compare.type),
@@ -140,7 +305,7 @@ export async function graphqlIntrospectType(
       content: [
         {
           type: 'text',
-          text: `Failed to introspect type "${params.typeName}": ${
+          text: `Failed to introspect type "${typeName}": ${
             error instanceof Error ? error.message : String(error)
           }`,
         },
