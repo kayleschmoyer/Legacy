@@ -299,15 +299,22 @@ async function warmTestUserJwtCache(): Promise<void> {
 }
 
 /**
- * Delete stale, test-pattern-matched leagues for a single resolved JWT. Guards
- * on token expiry and the allowed-test-user email domain so a misconfigured or
- * personal token can never trigger deletions. Protects leagues younger than the
- * 4h threshold (likely in use by a concurrent run). Best-effort — never throws.
- * Returns the number of leagues deleted.
+ * Delete stale, test-pattern-matched leagues owned (as far as `userLeagues`
+ * is concerned) by `jwt`'s identity. Guards on token expiry and the
+ * allowed-test-user email domain so a misconfigured or personal token can
+ * never trigger deletions. Protects leagues younger than the 4h threshold
+ * (likely in use by a concurrent run). Best-effort — never throws. Returns
+ * the number of leagues deleted.
+ *
+ * `deleteJwt` defaults to `jwt` (the legacy owner-deletes-its-own-leagues
+ * path). Pass a distinct admin identity when `jwt`'s leagues are ones it is
+ * merely a *member* of rather than the owner of — `deleteLeague` only allows
+ * the owner or an admin caller (LS-9280).
  */
 async function sweepStaleTestLeaguesForJwt(
   jwt: string,
   label: string,
+  deleteJwt: string = jwt,
 ): Promise<number> {
   if (isJwtExpired(jwt)) {
     LOGGER.warn(`[integration setup] ${label}: token expired — skipping.`);
@@ -354,7 +361,7 @@ async function sweepStaleTestLeaguesForJwt(
   let deleted = 0;
   for (const league of targets) {
     const result = await gqlFetch<{ deleteLeague: string }>(
-      jwt,
+      deleteJwt,
       'mutation($leagueId: Int!) { deleteLeague(leagueId: $leagueId) }',
       { leagueId: league.id },
     );
@@ -375,6 +382,119 @@ async function sweepStaleTestLeaguesForJwt(
     `[integration setup] ${label}: cleaned ${deleted}/${targets.length} stale test league(s).`,
   );
   return deleted;
+}
+
+/**
+ * Sweep stale test leagues by MANAGER_1/2/3 *membership* rather than by
+ * commissioner ownership (LS-9280, root-caused duplicate of LS-8915).
+ *
+ * `sweepPerSpecCommissioners` below reaches at most ~7 of the ~23 per-spec
+ * COMMISSIONER identities each run (bounded by `PER_SPEC_SWEEP_BUDGET_MS`
+ * against the oauth-proxy's 5/60s per-IP login limit), so leagues owned by
+ * the other ~16 stay live. Those leagues still count against whichever
+ * MANAGER persona joined them — and only 3 manager identities are shared
+ * across every spec, so the manager's membership count, not the
+ * commissioner-ownership sweep coverage, is the resource that actually runs
+ * out first (18/24 specs failing on `joinLeagueByCode`'s 3-league cap even
+ * though only ~30% of commissioner identities go unswept per run).
+ *
+ * This sweeps the resource that's exhausted directly: enumerate each of the
+ * 3 base MANAGER personas' own memberships. That's 3 identities instead of
+ * 23, all already warmed by `warmTestUserJwtCache` above — no additional
+ * oauth-proxy logins, so this comfortably fits inside the existing sweep
+ * budget. Managers never own the leagues they join (they're general_manager,
+ * not commissioner, on every league this matches), so deletion goes through
+ * the base COMMISSIONER identity — provisioned `access_level = 'admin'` in
+ * the dev DB, which hits the `deleteLeague` isAdmin bypass instead of the
+ * owner-only check. Best-effort — never throws.
+ */
+async function sweepStaleLeaguesByManagerMembership(
+  commissionerJwt: string,
+): Promise<void> {
+  if (isJwtExpired(commissionerJwt)) {
+    LOGGER.warn(
+      '[integration setup] manager-membership sweep: commissioner token expired — skipping.',
+    );
+    return;
+  }
+  const commissionerEmail = decodeJwtEmail(commissionerJwt);
+  if (!commissionerEmail || !isAllowedTestUser(commissionerEmail)) {
+    LOGGER.warn(
+      `[integration setup] manager-membership sweep: commissioner token belongs to ` +
+        `"${commissionerEmail ?? 'unknown'}" which is not a recognised integration ` +
+        'test user — skipping to prevent an unscoped admin-delete of unknown leagues.',
+    );
+    return;
+  }
+
+  for (const persona of ['MANAGER_1', 'MANAGER_2', 'MANAGER_3'] as const) {
+    const creds = TEST_USERS[persona];
+    if (!creds.email || !creds.password) {
+      LOGGER.info(
+        `[integration setup] manager-membership sweep: no credentials configured for ` +
+          `${persona} — skipping.`,
+      );
+      continue;
+    }
+    try {
+      const managerJwt = await getTestUserJwt(creds);
+      await sweepStaleTestLeaguesForJwt(
+        managerJwt,
+        `manager-membership ${persona}`,
+        commissionerJwt,
+      );
+    } catch (err) {
+      LOGGER.info(
+        `[integration setup] manager-membership sweep skipped ${persona}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+}
+
+/**
+ * Pre-flight quota check (LS-9280, carrying over LS-8915's third AC): after
+ * the manager-membership sweep, read each MANAGER persona's true league count
+ * (`userLeagueCount` — unlike `userLeagues`, this is not subject to the
+ * 50-per-page default, LS-9101) and log loudly if any persona is still at or
+ * above the free-tier cap. A quota exhaustion that survives the sweep is an
+ * environment/infra condition, not a code regression — this makes that
+ * legible to whoever triages the next red run instead of leaving them to
+ * rediscover LS-9280 from scratch. Best-effort — never throws, so a read
+ * failure here can never block the suite.
+ */
+const FREE_TIER_LEAGUE_CAP = 3;
+
+async function preflightCheckManagerQuota(): Promise<void> {
+  for (const persona of ['MANAGER_1', 'MANAGER_2', 'MANAGER_3'] as const) {
+    const creds = TEST_USERS[persona];
+    if (!creds.email || !creds.password) continue;
+    try {
+      const managerJwt = await getTestUserJwt(creds);
+      if (isJwtExpired(managerJwt)) continue;
+      const data = await gqlFetch<{ userLeagueCount: number }>(
+        managerJwt,
+        'query { userLeagueCount }',
+      );
+      const total = data?.userLeagueCount;
+      if (typeof total === 'number' && total >= FREE_TIER_LEAGUE_CAP) {
+        LOGGER.error(
+          `[integration setup] pre-flight: manager persona ${persona} is at ` +
+            `${total}/${FREE_TIER_LEAGUE_CAP} leagues after the manager-membership ` +
+            'sweep — the free-tier league cap will fail joinLeagueByCode for every ' +
+            'spec using this persona. This is a shared-environment quota condition ' +
+            '(LS-9280/LS-8915), not a code regression in the current run.',
+        );
+      }
+    } catch (err) {
+      LOGGER.info(
+        `[integration setup] pre-flight quota check skipped ${persona}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
 }
 
 /**
@@ -489,4 +609,24 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // guarded and best-effort.
   await sweepStaleTestLeaguesForJwt(jwt, 'base commissioner');
   await sweepPerSpecCommissioners();
+
+  // Sweep by manager membership (LS-9280) — the resource the per-spec
+  // commissioner sweep above cannot fully reach within its budget. Mint the
+  // base COMMISSIONER identity explicitly (not the resolved `jwt` above,
+  // which may be a local CLI/env override) since the admin bypass this
+  // depends on is specific to that identity. Already warmed by
+  // `warmTestUserJwtCache`, so this is a disk-cache hit, not a new login.
+  if (TEST_USERS.COMMISSIONER.password) {
+    try {
+      const commissionerJwt = await getTestUserJwt(TEST_USERS.COMMISSIONER);
+      await sweepStaleLeaguesByManagerMembership(commissionerJwt);
+    } catch (err) {
+      LOGGER.info(
+        `[integration setup] manager-membership sweep skipped: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+  await preflightCheckManagerQuota();
 }
