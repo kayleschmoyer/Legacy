@@ -26,6 +26,44 @@ const ERROR_PATTERNS =
 const NX_FAILED_SECTION = /^[\s>]*Failed tasks/i;
 
 /**
+ * GitHub Actions' own failure annotation (LS-8772), rendered from a step's
+ * `::error::...` workflow command or auto-emitted when a `run:` step exits
+ * non-zero. This is the single most reliable anchor for "the failing step" —
+ * unlike the generic ERROR_PATTERNS scan, it cannot false-positive on script
+ * source, branch names, or unrelated job chatter, because GitHub only emits
+ * it for the step GitHub itself considers failed.
+ */
+const GITHUB_ERROR_ANNOTATION = /^##\[error\]/;
+
+export function isGithubErrorAnnotationLine(line: string): boolean {
+  return GITHUB_ERROR_ANNOTATION.test(stripAnsiCodes(line));
+}
+
+/**
+ * Start/end markers for a GitHub Actions `##[group]Run ...` block. These
+ * blocks echo the step's *script source* (the YAML `run:` block content,
+ * verbatim) followed by `shell:`/`env:` scaffolding — never runtime output.
+ * A script that merely contains the word "error"/"failed" in a string
+ * literal (e.g. `echo "❌ pnpm-lock.yaml not found"`) matches ERROR_PATTERNS
+ * even though it never executed, crowding real failures out of the 200-line
+ * cap (LS-8772). Lines inside this block are excluded from the generic
+ * ERROR_PATTERNS scan entirely.
+ */
+const GROUP_RUN_START = /^##\[group\]Run\b/;
+const GROUP_END = /^##\[endgroup\]/;
+
+/**
+ * `git fetch`'s own ref-update output, e.g.
+ * `   * [new branch]      LS-1001-fix-join-league-error-logging -> origin/...`
+ * or `   a1b2c3d..e4f5g6h  main -> origin/main`. Branch names routinely
+ * contain words like "error" or "failed" (e.g. a ticket about fixing error
+ * logging), which matches ERROR_PATTERNS' generic `\berror\b`/`failed` scan
+ * even though this is checkout scaffolding, not job output (LS-8772).
+ */
+const GIT_FETCH_NOISE =
+  /^\s*(?:\*\s*\[new (?:branch|tag)\]|[0-9a-f]{7,40}\.\.[0-9a-f]{7,40})\s+\S+\s+->\s+\S+/;
+
+/**
  * GitHub Actions prints each shell command before running it as an ANSI-colored
  * line (e.g. \x1b[36;1mecho "::error::..."\x1b[0m). These command-echo lines
  * are not runtime output — they are script templates. Matching them as errors
@@ -89,6 +127,17 @@ export function isTestFailureLine(line: string): boolean {
   return isJestFailureLine(line) || isPlaywrightFailureLine(line);
 }
 
+/**
+ * Priority matcher combining framework-specific failure markers with
+ * GitHub's own `##[error]` annotation (LS-8772). Passed to
+ * `fetchRunLogsRing` so these lines always survive the 200-line cap,
+ * regardless of how much unrelated noise (script source, git scaffolding,
+ * other jobs' chatter) also matches the generic ERROR_PATTERNS scan.
+ */
+export function isPriorityFailureLine(line: string): boolean {
+  return isTestFailureLine(line) || isGithubErrorAnnotationLine(line);
+}
+
 function extractErrorSummary(
   allLines: string[],
   priorityLines: string[] = [],
@@ -96,6 +145,7 @@ function extractErrorSummary(
   const result: string[] = [];
   const contextLines = 2;
   let inNxFailedSection = false;
+  let inGroupRunBlock = false;
 
   for (let i = 0; i < allLines.length; i++) {
     const line = allLines[i];
@@ -113,25 +163,42 @@ function extractErrorSummary(
       continue;
     }
 
+    // Track `##[group]Run ...` / `##[endgroup]` blocks — these echo a
+    // step's script source verbatim, never runtime output (LS-8772).
+    if (GROUP_RUN_START.test(line)) {
+      inGroupRunBlock = true;
+    }
+    if (GROUP_END.test(line)) {
+      inGroupRunBlock = false;
+      continue;
+    }
+    if (inGroupRunBlock) {
+      continue;
+    }
+
     if (
       ERROR_PATTERNS.test(line) &&
       !ANSI_ESCAPE_PREFIX.test(line) &&
       !/node_modules/.test(line) &&
-      !/^\s*at\s/.test(line)
+      !/^\s*at\s/.test(line) &&
+      !GIT_FETCH_NOISE.test(line)
     ) {
-      // Add context before
+      // Add context before — never git-fetch noise, even as context (LS-8772)
       for (let j = Math.max(0, i - contextLines); j < i; j++) {
         const ctx = allLines[j];
+        if (GIT_FETCH_NOISE.test(ctx)) continue;
         if (!result.includes(ctx)) result.push(ctx);
       }
       result.push(line);
-      // Add context after
+      // Add context after — same exclusion
       for (
         let j = i + 1;
         j <= Math.min(allLines.length - 1, i + contextLines);
         j++
       ) {
-        result.push(allLines[j]);
+        const ctx = allLines[j];
+        if (GIT_FETCH_NOISE.test(ctx)) continue;
+        result.push(ctx);
       }
     }
   }
@@ -244,7 +311,7 @@ async function buildRunPayload(
         signal,
       },
       streamLimit,
-      params.errorSummary ? isTestFailureLine : undefined,
+      params.errorSummary ? isPriorityFailureLine : undefined,
     );
 
   const base = {

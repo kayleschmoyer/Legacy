@@ -6,8 +6,10 @@ jest.mock('../logs.js', () => ({
 
 import {
   getLogs,
+  isGithubErrorAnnotationLine,
   isJestFailureLine,
   isPlaywrightFailureLine,
+  isPriorityFailureLine,
   isTestFailureLine,
 } from './get-logs.js';
 import * as logs from '../logs.js';
@@ -279,6 +281,107 @@ describe('getLogs', () => {
       expect(isTestFailureLine('FAIL src/foo.spec.ts')).toBe(true);
       expect(isTestFailureLine('TimeoutError: boom')).toBe(true);
       expect(isTestFailureLine('console.log("hello")')).toBe(false);
+    });
+  });
+
+  describe('isGithubErrorAnnotationLine (LS-8772)', () => {
+    it('matches a raw ##[error] annotation', () => {
+      expect(
+        isGithubErrorAnnotationLine(
+          '##[error]Process completed with exit code 1.',
+        ),
+      ).toBe(true);
+    });
+
+    it('matches an ANSI-colored ##[error] annotation', () => {
+      expect(
+        isGithubErrorAnnotationLine(
+          '\x1b[31;1m##[error]Theme compliance check failed\x1b[0m',
+        ),
+      ).toBe(true);
+    });
+
+    it('does not match unrelated lines', () => {
+      expect(isGithubErrorAnnotationLine('##[group]Run pnpm test')).toBe(false);
+      expect(isGithubErrorAnnotationLine('some error occurred')).toBe(false);
+    });
+  });
+
+  describe('isPriorityFailureLine (LS-8772)', () => {
+    it('matches test-failure markers and GitHub error annotations', () => {
+      expect(isPriorityFailureLine('FAIL src/foo.spec.ts')).toBe(true);
+      expect(isPriorityFailureLine('TimeoutError: boom')).toBe(true);
+      expect(
+        isPriorityFailureLine('##[error]Process completed with exit code 1.'),
+      ).toBe(true);
+      expect(isPriorityFailureLine('console.log("hello")')).toBe(false);
+    });
+  });
+
+  describe('errorSummary excludes script-source and git noise (LS-8772)', () => {
+    it('excludes echoed shell source inside a ##[group]Run block even when it contains error-like text', async () => {
+      const lines = [
+        '##[group]Run pnpm run check-lockfile',
+        'if [ ! -f pnpm-lock.yaml ]; then',
+        '  echo "❌ pnpm-lock.yaml not found"',
+        '  exit 1',
+        'fi',
+        'shell: /usr/bin/bash -e {0}',
+        '##[endgroup]',
+        '##[error]Process completed with exit code 1.',
+      ];
+      mockFetch.mockResolvedValue({
+        lines,
+        totalLines: lines.length,
+        priorityLines: ['##[error]Process completed with exit code 1.'],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText).not.toContain('pnpm-lock.yaml not found');
+      expect(logsText).toContain(
+        '##[error]Process completed with exit code 1.',
+      );
+    });
+
+    it('excludes git fetch branch-listing noise even when the branch name contains "error" or "failed"', async () => {
+      const lines = [
+        '* [new branch]      LS-1001-fix-join-league-error-logging -> origin/LS-1001-fix-join-league-error-logging',
+        '* [new branch]      LS-2002-failed-payment-retry -> origin/LS-2002-failed-payment-retry',
+        '##[error]Theme compliance check failed',
+      ];
+      mockFetch.mockResolvedValue({
+        lines,
+        totalLines: lines.length,
+        priorityLines: ['##[error]Theme compliance check failed'],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText).not.toContain('new branch');
+      expect(logsText).toContain('##[error]Theme compliance check failed');
+    });
+
+    it('prioritizes ##[error] annotations over generic-pattern noise when the 200-line cap would otherwise drop them', async () => {
+      const noise = Array.from(
+        { length: 250 },
+        (_, i) => `console.error: React does not recognize prop X (${i})`,
+      );
+      mockFetch.mockResolvedValue({
+        lines: noise,
+        totalLines: noise.length,
+        priorityLines: ['##[error]Theme compliance ratchet: 3 new violations'],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText).toContain('Theme compliance ratchet: 3 new violations');
+      expect(logsText.indexOf('##[error]')).toBeLessThan(
+        logsText.indexOf('console.error'),
+      );
     });
   });
 
