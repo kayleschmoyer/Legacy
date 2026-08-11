@@ -4289,6 +4289,8 @@ export type SeasonDraftGameSummary = {
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMyTurn?: Maybe<Scalars['Boolean']['output']>;
   maxPlayers?: Maybe<Scalars['Int']['output']>;
+  /** The caller's own seasonDraftPlayers row id in this game */
+  myPlayerId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   picksMade?: Maybe<Scalars['Int']['output']>;
   playerCount?: Maybe<Scalars['Int']['output']>;
@@ -11297,6 +11299,7 @@ export type GetSeasonDraftGamesQuery = {
     picksMade?: number | null;
     totalPicks?: number | null;
     winnerName?: string | null;
+    myPlayerId?: number | null;
     players: Array<{
       __typename?: 'SeasonDraftLobbyPlayer';
       id: number;
@@ -28053,6 +28056,7 @@ export const GetSeasonDraftGames = gql`
       picksMade
       totalPicks
       winnerName
+      myPlayerId
       players {
         id
         playerName

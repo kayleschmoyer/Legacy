@@ -15,6 +15,7 @@ query GetSeasonDraftGames {
     picksMade
     totalPicks
     winnerName
+    myPlayerId
     players {
       id
       playerName

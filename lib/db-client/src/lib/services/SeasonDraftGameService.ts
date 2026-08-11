@@ -1263,6 +1263,7 @@ export class SeasonDraftGameService {
       picksMade: number;
       totalPicks: number;
       winnerName: string | null;
+      myPlayerId: number | null;
       players: Array<{ id: number; playerName: string }>;
     }>
   > {
@@ -1277,6 +1278,7 @@ export class SeasonDraftGameService {
         sport: PublicSchema.seasonDraftGames.sport,
         currentTurn: PublicSchema.seasonDraftGames.currentTurn,
         draftOrder: PublicSchema.seasonDraftPlayers.draftOrder,
+        myPlayerId: PublicSchema.seasonDraftPlayers.id,
         inviteCode: PublicSchema.seasonDraftGames.inviteCode,
       })
       .from(PublicSchema.seasonDraftPlayers)
@@ -1377,6 +1379,7 @@ export class SeasonDraftGameService {
         picksMade: pickCount,
         totalPicks: slotCount,
         winnerName: winner?.playerName ?? null,
+        myPlayerId: g.myPlayerId ?? null,
         players: players.map((p) => ({
           id: p.id,
           playerName: p.playerName,

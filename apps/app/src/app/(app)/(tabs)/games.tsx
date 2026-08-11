@@ -121,6 +121,8 @@ export default function GamesTab() {
       round,
       totalRounds,
       playerCount,
+      players: game.players ?? null,
+      myPlayerId: game.myPlayerId ?? null,
     };
   }, [games]);
 

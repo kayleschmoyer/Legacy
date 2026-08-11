@@ -288,6 +288,30 @@ describe('GamesTab', () => {
         round: 3,
         totalRounds: 9,
         playerCount: 4,
+        players: null,
+        myPlayerId: null,
+      });
+    });
+
+    it('passes players and myPlayerId through when the query provides them', () => {
+      mockSeasonDraftGames([
+        {
+          ...DRAFTING_MY_TURN,
+          myPlayerId: 100,
+          players: [
+            { id: 100, playerName: 'Me' },
+            { id: 101, playerName: 'Alice' },
+          ],
+        },
+      ]);
+      render(<GamesTab />);
+
+      expect(receivedProps().resumeGame).toMatchObject({
+        myPlayerId: 100,
+        players: [
+          { id: 100, playerName: 'Me' },
+          { id: 101, playerName: 'Alice' },
+        ],
       });
     });
 

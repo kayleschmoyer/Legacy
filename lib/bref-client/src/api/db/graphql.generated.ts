@@ -4283,6 +4283,8 @@ export type SeasonDraftGameSummary = {
   inviteCode?: Maybe<Scalars['String']['output']>;
   isMyTurn?: Maybe<Scalars['Boolean']['output']>;
   maxPlayers?: Maybe<Scalars['Int']['output']>;
+  /** The caller's own seasonDraftPlayers row id in this game */
+  myPlayerId?: Maybe<Scalars['Int']['output']>;
   name?: Maybe<Scalars['String']['output']>;
   picksMade?: Maybe<Scalars['Int']['output']>;
   playerCount?: Maybe<Scalars['Int']['output']>;

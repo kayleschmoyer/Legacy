@@ -44,6 +44,15 @@ export interface GameRoomResumeGame {
   totalRounds: number | null;
   /** Total managers in the game, the caller included. */
   playerCount: number | null;
+  /** Every manager in the game, the caller included. */
+  players: Array<{ id: number; playerName: string }> | null;
+  /**
+   * The caller's own row id within `players`, from
+   * `SeasonDraftGameSummary.myPlayerId`. Null on older cached responses —
+   * the status line falls back to "vs. {n} others" then, since the caller
+   * can't be excluded from `players` by name.
+   */
+  myPlayerId: number | null;
 }
 
 /** The "Your Numbers" strip. Any null renders as `—`. */
@@ -83,14 +92,37 @@ function glyphFor(kind: MinigameIconKind): GameRoomGlyphName {
   }
 }
 
+/** Opponent names shown on the status line before it's truncated to "+n more". */
+const MAX_NAMED_OPPONENTS = 2;
+
 /**
- * `Round 3 of 9 · vs. 2 others`, dropping whichever half isn't derivable.
- *
- * The design asks for the opponents by name, but `SeasonDraftGameSummary`
- * returns every manager in the game with no marker for which one is the
- * caller, so naming them would list the user among their own opponents.
- * Counting them is the honest read of the same data; LS-8801 adds the
- * self-identification the named version needs.
+ * "vs. Alice, Bob" / "vs. Alice, Bob +2 more", the caller excluded by
+ * `myPlayerId`.
+ */
+function opponentNamesLine(game: GameRoomResumeGame): string | null {
+  if (game.myPlayerId === null || game.players === null) {
+    return null;
+  }
+
+  const opponents = game.players.filter((p) => p.id !== game.myPlayerId);
+  if (opponents.length === 0) {
+    return null;
+  }
+
+  const shown = opponents
+    .slice(0, MAX_NAMED_OPPONENTS)
+    .map((p) => p.playerName);
+  const remaining = opponents.length - shown.length;
+
+  return remaining > 0
+    ? `vs. ${shown.join(', ')} +${remaining} more`
+    : `vs. ${shown.join(', ')}`;
+}
+
+/**
+ * `Round 3 of 9 · vs. Alice, Bob +1 more`, dropping whichever half isn't
+ * derivable. Falls back to `vs. {n} others` when `myPlayerId` is null
+ * (older cached responses can't identify the caller among `players`).
  */
 export function resumeStatusLine(game: GameRoomResumeGame): string | null {
   const parts: string[] = [];
@@ -98,7 +130,11 @@ export function resumeStatusLine(game: GameRoomResumeGame): string | null {
   if (game.round !== null && game.totalRounds !== null) {
     parts.push(`Round ${game.round} of ${game.totalRounds}`);
   }
-  if (game.playerCount !== null && game.playerCount > 1) {
+
+  const namedLine = opponentNamesLine(game);
+  if (namedLine !== null) {
+    parts.push(namedLine);
+  } else if (game.playerCount !== null && game.playerCount > 1) {
     const others = game.playerCount - 1;
     parts.push(`vs. ${others} ${others === 1 ? 'other' : 'others'}`);
   }

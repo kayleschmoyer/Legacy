@@ -322,6 +322,7 @@ const SeasonDraftGameSummary = builder.objectRef<{
   picksMade: number;
   totalPicks: number;
   winnerName: string | null;
+  myPlayerId: number | null;
   players: Array<{ id: number; playerName: string }>;
 }>('SeasonDraftGameSummary');
 
@@ -356,6 +357,10 @@ SeasonDraftGameSummary.implement({
     picksMade: t.exposeInt('picksMade'),
     totalPicks: t.exposeInt('totalPicks'),
     winnerName: t.exposeString('winnerName', { nullable: true }),
+    myPlayerId: t.exposeInt('myPlayerId', {
+      nullable: true,
+      description: "The caller's own seasonDraftPlayers row id in this game",
+    }),
     players: t.field({
       type: [SeasonDraftLobbyPlayer],
       nullable: { list: false, items: false },

@@ -96,6 +96,8 @@ describe('GameRoomScreen', () => {
       round: 3,
       totalRounds: 9,
       playerCount: 4,
+      players: null,
+      myPlayerId: null,
     };
 
     it('is absent from the tree when there is no actionable game', () => {
@@ -126,7 +128,7 @@ describe('GameRoomScreen', () => {
   });
 
   describe('resumeStatusLine', () => {
-    it('joins the round and opponent counts', () => {
+    it('joins the round and opponent counts when myPlayerId is null', () => {
       expect(
         resumeStatusLine({
           gameId: 1,
@@ -134,6 +136,8 @@ describe('GameRoomScreen', () => {
           round: 2,
           totalRounds: 9,
           playerCount: 6,
+          players: null,
+          myPlayerId: null,
         }),
       ).toBe('Round 2 of 9 · vs. 5 others');
     });
@@ -146,6 +150,8 @@ describe('GameRoomScreen', () => {
           round: 1,
           totalRounds: 9,
           playerCount: 2,
+          players: null,
+          myPlayerId: null,
         }),
       ).toBe('Round 1 of 9 · vs. 1 other');
     });
@@ -158,6 +164,8 @@ describe('GameRoomScreen', () => {
           round: null,
           totalRounds: null,
           playerCount: 3,
+          players: null,
+          myPlayerId: null,
         }),
       ).toBe('vs. 2 others');
     });
@@ -170,6 +178,8 @@ describe('GameRoomScreen', () => {
           round: 4,
           totalRounds: 9,
           playerCount: 1,
+          players: null,
+          myPlayerId: null,
         }),
       ).toBe('Round 4 of 9');
     });
@@ -182,8 +192,66 @@ describe('GameRoomScreen', () => {
           round: null,
           totalRounds: null,
           playerCount: null,
+          players: null,
+          myPlayerId: null,
         }),
       ).toBeNull();
+    });
+
+    it('names opponents and excludes the caller when myPlayerId is set', () => {
+      expect(
+        resumeStatusLine({
+          gameId: 1,
+          gameName: 'g',
+          round: 2,
+          totalRounds: 9,
+          playerCount: 3,
+          myPlayerId: 10,
+          players: [
+            { id: 10, playerName: 'Me' },
+            { id: 11, playerName: 'Alice' },
+            { id: 12, playerName: 'Bob' },
+          ],
+        }),
+      ).toBe('Round 2 of 9 · vs. Alice, Bob');
+    });
+
+    it('truncates opponent names beyond two to "+n more"', () => {
+      expect(
+        resumeStatusLine({
+          gameId: 1,
+          gameName: 'g',
+          round: 1,
+          totalRounds: 9,
+          playerCount: 5,
+          myPlayerId: 10,
+          players: [
+            { id: 10, playerName: 'Me' },
+            { id: 11, playerName: 'Alice' },
+            { id: 12, playerName: 'Bob' },
+            { id: 13, playerName: 'Cy' },
+            { id: 14, playerName: 'Dot' },
+          ],
+        }),
+      ).toBe('Round 1 of 9 · vs. Alice, Bob +2 more');
+    });
+
+    it('falls back to the "n others" count when myPlayerId is null but players is present', () => {
+      expect(
+        resumeStatusLine({
+          gameId: 1,
+          gameName: 'g',
+          round: 1,
+          totalRounds: 9,
+          playerCount: 3,
+          myPlayerId: null,
+          players: [
+            { id: 10, playerName: 'Me' },
+            { id: 11, playerName: 'Alice' },
+            { id: 12, playerName: 'Bob' },
+          ],
+        }),
+      ).toBe('Round 1 of 9 · vs. 2 others');
     });
   });
 });

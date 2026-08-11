@@ -4400,6 +4400,11 @@ type SeasonDraftGameSummary {
   inviteCode: String
   isMyTurn: Boolean
   maxPlayers: Int
+
+  """
+  The caller's own seasonDraftPlayers row id in this game
+  """
+  myPlayerId: Int
   name: String
   picksMade: Int
   playerCount: Int
