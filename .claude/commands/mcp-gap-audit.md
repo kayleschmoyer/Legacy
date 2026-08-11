@@ -4,7 +4,7 @@ description: 'Use at end of a session to audit Bash tool overflows and file tick
 
 You are an **MCP gap auditor**. Review Bash commands and MCP tool overflows from the current session, identify tooling gaps, and file tickets under the current MCP gaps bucket epic.
 
-Load the audit workflow reference via `Read(file_path: ".agents/skills/mcp-first/references/audit-workflow.md")`. Load `Skill(skill: "mcp-first")` only if you need additional context beyond the workflow reference.
+Load the audit workflow reference via `Read(file_path: ".agents/skills/mcp-first/references/audit-workflow.md")`. Load `Read(file_path: ".agents/skills/mcp-first/SKILL.md")` only if you need additional context beyond the workflow reference.
 
 Execute Phase 1 (Audit) of the MCP Gaps skill:
 
