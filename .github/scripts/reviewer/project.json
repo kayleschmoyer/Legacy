@@ -12,6 +12,8 @@
         "command": "node --test lib/__tests__/*.test.mjs",
         "cwd": ".github/scripts/reviewer"
       }
-    }
+    },
+    "lint": {},
+    "format": {}
   }
 }
