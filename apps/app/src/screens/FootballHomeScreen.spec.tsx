@@ -1,5 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import type {
   Pressable as RNPressable,
   Text as RNText,
@@ -24,6 +29,12 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
 }));
 
+// Capture the refreshControl element so pull-to-refresh tests can assert it's
+// wired to the leagues + trending players refetch (LS-8862).
+let capturedRefreshControl:
+  | import('../common/hooks/usePullToRefresh').PullToRefreshControlElement
+  | null = null;
+
 // Harness for the shared NFLHome — exposes callbacks the wrapper feeds in so
 // we can assert data wiring without rendering the full component.
 jest.mock('@legacy-sports/shared-components/football', () => {
@@ -41,32 +52,36 @@ jest.mock('@legacy-sports/shared-components/football', () => {
       onBrowsePlayers?: () => void;
       onViewLeague: (id: string | number) => void;
       onSignIn?: () => void;
-    }) => (
-      <View testID="nfl-home">
-        <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
-        <Text>{`loading:${String(props.loading)}`}</Text>
-        <Text>{`error:${String(props.error)}`}</Text>
-        <Text>{`isAuthenticated:${String(props.isAuthenticated)}`}</Text>
-        <Pressable testID="create" onPress={() => props.onCreateLeague()}>
-          <Text>create</Text>
-        </Pressable>
-        <Pressable testID="join" onPress={() => props.onJoinLeague?.()}>
-          <Text>join</Text>
-        </Pressable>
-        <Pressable testID="view" onPress={() => props.onViewLeague(7)}>
-          <Text>view</Text>
-        </Pressable>
-        <Pressable testID="sign-in" onPress={() => props.onSignIn?.()}>
-          <Text>sign-in</Text>
-        </Pressable>
-        <Pressable
-          testID="browse-players"
-          onPress={() => props.onBrowsePlayers?.()}
-        >
-          <Text>browse-players</Text>
-        </Pressable>
-      </View>
-    ),
+      refreshControl?: import('../common/hooks/usePullToRefresh').PullToRefreshControlElement;
+    }) => {
+      capturedRefreshControl = props.refreshControl ?? null;
+      return (
+        <View testID="nfl-home">
+          <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
+          <Text>{`loading:${String(props.loading)}`}</Text>
+          <Text>{`error:${String(props.error)}`}</Text>
+          <Text>{`isAuthenticated:${String(props.isAuthenticated)}`}</Text>
+          <Pressable testID="create" onPress={() => props.onCreateLeague()}>
+            <Text>create</Text>
+          </Pressable>
+          <Pressable testID="join" onPress={() => props.onJoinLeague?.()}>
+            <Text>join</Text>
+          </Pressable>
+          <Pressable testID="view" onPress={() => props.onViewLeague(7)}>
+            <Text>view</Text>
+          </Pressable>
+          <Pressable testID="sign-in" onPress={() => props.onSignIn?.()}>
+            <Text>sign-in</Text>
+          </Pressable>
+          <Pressable
+            testID="browse-players"
+            onPress={() => props.onBrowsePlayers?.()}
+          >
+            <Text>browse-players</Text>
+          </Pressable>
+        </View>
+      );
+    },
   };
 });
 
@@ -78,15 +93,23 @@ jest.mock('../common/auth/AuthorizedUserContext', () => ({
   useAuthorizedUserInfo: () => mockUseAuthorizedUserInfo(),
 }));
 
+const mockRefetchLeagues = jest.fn();
+const mockRefetchTrendingPlayers = jest.fn();
 const mockUseGetUserLeaguesQuery: jest.MockedFunction<
   (options?: { skip?: boolean }) => {
     data: unknown;
     loading: boolean;
     error?: unknown;
+    refetch?: jest.Mock;
   }
 > = jest.fn();
 const mockUseFootballPlayersQuery: jest.MockedFunction<
-  (options?: unknown) => { data: unknown; loading: boolean; error?: unknown }
+  (options?: unknown) => {
+    data: unknown;
+    loading: boolean;
+    error?: unknown;
+    refetch?: jest.Mock;
+  }
 > = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Football: 'football', Baseball: 'baseball' },
@@ -160,6 +183,7 @@ const NULL_SPORT_LEAGUE = {
 describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedRefreshControl = null;
     mockUseAuthorizedUserInfo.mockReturnValue({ id: 1, username: 'testuser' });
     mockUseGetUserLeaguesQuery.mockReturnValue({
       data: {
@@ -167,11 +191,13 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
         userLeagueCount: FOOTBALL_LEAGUES.length,
       },
       loading: false,
+      refetch: mockRefetchLeagues,
     });
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
     mockUseFootballPlayersQuery.mockReturnValue({
       data: { footballPlayers: { nodes: [], pageInfo: {} } },
       loading: false,
+      refetch: mockRefetchTrendingPlayers,
     });
   });
 
@@ -429,6 +455,22 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
     it('skips the leagues query when unauthenticated', () => {
       render(<FootballHomeScreen />);
       expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: true });
+    });
+  });
+
+  describe('pull-to-refresh (LS-8862)', () => {
+    it('passes NFLHome a refreshControl wired to both the leagues and trending-players refetch', async () => {
+      render(<FootballHomeScreen />);
+
+      expect(capturedRefreshControl).toBeTruthy();
+      expect(typeof capturedRefreshControl?.props.onRefresh).toBe('function');
+
+      capturedRefreshControl?.props.onRefresh?.();
+
+      await waitFor(() => {
+        expect(mockRefetchLeagues).toHaveBeenCalledTimes(1);
+        expect(mockRefetchTrendingPlayers).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });

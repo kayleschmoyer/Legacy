@@ -1,6 +1,10 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import type { Text as RNText, View as RNView } from 'react-native';
+import type {
+  ScrollView as RNScrollView,
+  Text as RNText,
+  View as RNView,
+} from 'react-native';
 import { LeagueHistoryTab } from './LeagueHistoryTab';
 
 type RNComponents = {
@@ -8,11 +12,58 @@ type RNComponents = {
   Text: typeof RNText;
 };
 
+// Capture the root ScrollView's refreshControl so pull-to-refresh tests can
+// assert it's wired to all three refetches (LS-8862). The season picker's
+// horizontal ScrollView never carries `refreshControl`, so gate on that to
+// avoid it clobbering the capture. Proxies `actual` (rather than spreading
+// it) so unrelated lazy getters — e.g. RN's DevMenu module lookup — aren't
+// eagerly triggered, which otherwise breaks the test environment.
+let capturedRefreshControl: React.ReactElement<{
+  onRefresh?: () => void;
+}> | null = null;
+jest.mock('react-native', () => {
+  const { createElement } = jest.requireActual<typeof import('react')>('react');
+  const actual =
+    jest.requireActual<typeof import('react-native')>('react-native');
+
+  const MockScrollView = (props: React.ComponentProps<typeof RNScrollView>) => {
+    if (!props.horizontal) {
+      capturedRefreshControl = props.refreshControl ?? null;
+    }
+    return createElement(actual.ScrollView, props);
+  };
+
+  return new Proxy(actual, {
+    get(target, prop) {
+      if (prop === 'ScrollView') return MockScrollView;
+      return Reflect.get(target, prop) as unknown;
+    },
+  });
+});
+
 // ── Mutable mock state (mutated per-test in setupMocks) ───────────────────────
 
-let mockHistoryResult = { data: undefined, loading: false, error: undefined };
-let mockStandingsResult = { data: undefined, loading: false, error: undefined };
-let mockRecordsResult = { data: undefined, loading: false, error: undefined };
+const mockRefetchHistory = jest.fn();
+const mockRefetchStandings = jest.fn();
+const mockRefetchRecords = jest.fn();
+let mockHistoryResult = {
+  data: undefined,
+  loading: false,
+  error: undefined,
+  refetch: mockRefetchHistory,
+};
+let mockStandingsResult = {
+  data: undefined,
+  loading: false,
+  error: undefined,
+  refetch: mockRefetchStandings,
+};
+let mockRecordsResult = {
+  data: undefined,
+  loading: false,
+  error: undefined,
+  refetch: mockRefetchRecords,
+};
 let mockLoggerError: jest.Mock;
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -186,18 +237,21 @@ function setupMocks({
     data: undefined,
     loading: false,
     error: undefined,
+    refetch: mockRefetchHistory,
     ...history,
   };
   mockStandingsResult = {
     data: undefined,
     loading: false,
     error: undefined,
+    refetch: mockRefetchStandings,
     ...standings,
   };
   mockRecordsResult = {
     data: undefined,
     loading: false,
     error: undefined,
+    refetch: mockRefetchRecords,
     ...records,
   };
 }
@@ -208,6 +262,7 @@ describe('LeagueHistoryTab', () => {
   beforeEach(() => {
     setupMocks();
     jest.clearAllMocks();
+    capturedRefreshControl = null;
   });
 
   describe('loading state', () => {
@@ -461,6 +516,27 @@ describe('LeagueHistoryTab', () => {
       });
       render(<LeagueHistoryTab leagueId={10} />);
       expect(screen.queryByText(/^Final:/)).toBeNull();
+    });
+  });
+
+  describe('pull-to-refresh (LS-8862)', () => {
+    it('wires the root ScrollView refreshControl to all three refetches', async () => {
+      setupMocks({
+        history: { data: { getLeagueHistory: [SEASON_1, SEASON_2] } },
+        standings: { data: { getLeagueStandings: STANDINGS } },
+        records: { data: { getAllTimeRecords: RECORDS } },
+      });
+      render(<LeagueHistoryTab leagueId={10} />);
+
+      expect(capturedRefreshControl).toBeTruthy();
+      expect(typeof capturedRefreshControl?.props.onRefresh).toBe('function');
+
+      capturedRefreshControl?.props.onRefresh?.();
+
+      await screen.findByText('League History');
+      expect(mockRefetchHistory).toHaveBeenCalledTimes(1);
+      expect(mockRefetchStandings).toHaveBeenCalledTimes(1);
+      expect(mockRefetchRecords).toHaveBeenCalledTimes(1);
     });
   });
 });

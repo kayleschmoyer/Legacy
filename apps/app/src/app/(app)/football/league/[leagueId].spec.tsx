@@ -13,6 +13,15 @@ type RNComponents = {
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+// Captures TradingCenter's/PendingWaiverClaims' onSubscribeRefresh so
+// pull-to-refresh tests can assert the page wired them up (LS-8862).
+let mockCapturedTradesSubscribeRefresh:
+  | ((refetch: () => void) => (() => void) | void)
+  | null = null;
+const mockCapturedWaiverSubscribeRefresh: Array<
+  ((refetch: () => void) => (() => void) | void) | null
+> = [];
+
 const mockNavigate = jest.fn();
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
@@ -95,6 +104,7 @@ jest.mock('@tamagui/tabs', () => {
 jest.mock('@legacy-sports/shared-components', () => {
   const { View, Text, TouchableOpacity } =
     jest.requireActual<typeof import('react-native')>('react-native');
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
   const LeagueDetailShell = ({
     tabs,
     isCommissioner,
@@ -150,10 +160,25 @@ jest.mock('@legacy-sports/shared-components', () => {
       <View>{children}</View>
     ),
     PendingTradeOfferBanner: () => <View testID="pending-trade-offer-banner" />,
-    PendingWaiverClaims: () => <View testID="pending-waiver-claims" />,
+    PendingWaiverClaims: (props: {
+      onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
+    }) => {
+      // Push once per mount (not per render) — see baseball [leagueId].spec.tsx.
+      ReactActual.useEffect(() => {
+        mockCapturedWaiverSubscribeRefresh.push(
+          props.onSubscribeRefresh ?? null,
+        );
+      }, []);
+      return <View testID="pending-waiver-claims" />;
+    },
     PlayoffBracket: () => <View testID="playoff-bracket" />,
     StandingsTable: () => <View testID="standings-table" />,
-    TradingCenter: () => <View testID="trading-center" />,
+    TradingCenter: (props: {
+      onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
+    }) => {
+      mockCapturedTradesSubscribeRefresh = props.onSubscribeRefresh ?? null;
+      return <View testID="trading-center" />;
+    },
     usePlayoffBracket: jest.fn(() => ({
       bracket: null,
       loading: false,
@@ -315,6 +340,8 @@ jest.mock('@legacy-sports/graphql', () => ({
 describe('FootballLeagueId', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCapturedTradesSubscribeRefresh = null;
+    mockCapturedWaiverSubscribeRefresh.length = 0;
     jest
       .requireMock<{
         useLocalSearchParams: jest.Mock;
@@ -654,6 +681,38 @@ describe('FootballLeagueId', () => {
       fireEvent.press(screen.getByText('Browse Free Agents & Submit Claim'));
       expect(mockNavigate).toHaveBeenCalledWith(
         expect.objectContaining({ pathname: '/FreeAgents' }),
+      );
+    });
+  });
+
+  describe('pull-to-refresh: trades/waivers (LS-8862)', () => {
+    beforeEach(() => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, waiverEnabled: true } },
+        loading: false,
+      });
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: 10 }, loading: false },
+      ]);
+    });
+
+    it('wires TradingCenter and its Trades-tab PendingWaiverClaims to onSubscribeRefresh', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-trades'));
+
+      expect(mockCapturedTradesSubscribeRefresh).toBeInstanceOf(Function);
+      expect(mockCapturedWaiverSubscribeRefresh[0]).toBeInstanceOf(Function);
+    });
+
+    it('wires the Waivers-tab PendingWaiverClaims to its own onSubscribeRefresh', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-trades'));
+      fireEvent.press(screen.getByTestId('tab-waivers'));
+
+      expect(mockCapturedWaiverSubscribeRefresh).toHaveLength(2);
+      expect(mockCapturedWaiverSubscribeRefresh[0]).not.toBe(
+        mockCapturedWaiverSubscribeRefresh[1],
       );
     });
   });

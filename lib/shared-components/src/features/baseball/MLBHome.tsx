@@ -13,6 +13,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
+import type { RefreshControlProps } from 'react-native';
 import {
   CreateLeagueDialog,
   type QuickCreateLeagueInput,
@@ -108,6 +109,8 @@ export interface MLBHomeProps {
    * (LS-8446). Web callers omit it.
    */
   testID?: string;
+  /** Ready-made pull-to-refresh element for the root `ScrollView` (LS-8862). */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 interface LeagueBadge {
@@ -284,6 +287,7 @@ export function MLBHome({
   onSwitchSport,
   onUpgrade,
   testID,
+  refreshControl,
 }: MLBHomeProps) {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
   const [search, setSearch] = React.useState('');
@@ -405,7 +409,11 @@ export function MLBHome({
   }
 
   return (
-    <ScrollView testID={testID} contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView
+      testID={testID}
+      contentContainerStyle={{ flexGrow: 1 }}
+      refreshControl={refreshControl}
+    >
       <YStack
         backgroundColor="$background"
         flexGrow={1}

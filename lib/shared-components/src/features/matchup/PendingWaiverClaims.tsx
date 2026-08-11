@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import { AlertTriangle, Clock, Trash2, X } from '@tamagui/lucide-icons';
 import { LOGGER } from '@legacy-sports/logging';
@@ -10,6 +10,13 @@ import { Button } from '../../Button';
 
 export interface PendingWaiverClaimsProps {
   teamId: number;
+  /**
+   * Optional callback invoked with the component's internal `refetch` so a
+   * caller (e.g. a pull-to-refresh gesture, LS-8862) can trigger a refresh
+   * from outside. Mirrors `TradingCenter`'s `onSubscribeRefresh` — return an
+   * optional cleanup function.
+   */
+  onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
 }
 
 function formatDate(isoString: string): string {
@@ -27,7 +34,10 @@ function formatDate(isoString: string): string {
  * functionality. Self-contained: fetches its own data via GraphQL.
  * Cross-platform (Tamagui).
  */
-export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
+export function PendingWaiverClaims({
+  teamId,
+  onSubscribeRefresh,
+}: PendingWaiverClaimsProps) {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -35,6 +45,14 @@ export function PendingWaiverClaims({ teamId }: PendingWaiverClaimsProps) {
     variables: { teamId, status: 'pending' },
     fetchPolicy: 'cache-and-network',
   });
+
+  useEffect(() => {
+    if (!onSubscribeRefresh) return;
+    const cleanup = onSubscribeRefresh(() => {
+      void refetch();
+    });
+    return cleanup ?? undefined;
+  }, [onSubscribeRefresh, refetch]);
 
   const [cancelClaim] = useCancelWaiverClaimMutation();
 

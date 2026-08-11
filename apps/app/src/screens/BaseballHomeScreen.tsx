@@ -14,6 +14,7 @@ import {
   useGetMyLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../common/auth/AuthorizedUserContext';
+import { usePullToRefresh } from '../common/hooks/usePullToRefresh';
 import { useSubscription } from '../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../features/subscription/constants';
 import { trackPremiumFeatureClick } from '../utils/analytics';
@@ -67,11 +68,17 @@ export default function BaseballHomeScreen({
   const router = useRouter();
   const isAuthenticated = Boolean(userInfo?.id);
 
-  const { data, loading: loadingLeagues } = useGetMyLeaguesQuery({
+  const {
+    data,
+    loading: loadingLeagues,
+    refetch: refetchLeagues,
+  } = useGetMyLeaguesQuery({
     variables: { sport: Sport.Baseball },
     // Only run the query if user is authenticated
     skip: !isAuthenticated,
   });
+
+  const { refreshControl } = usePullToRefresh([() => refetchLeagues()]);
 
   const [createLeague] = useCreateLeagueMutation();
 
@@ -210,6 +217,7 @@ export default function BaseballHomeScreen({
           screenshot. */}
       <MLBHome
         testID="baseball-home-screen"
+        refreshControl={refreshControl}
         leagues={leagues}
         loading={loadingLeagues}
         error={leaguesLoadFailed}

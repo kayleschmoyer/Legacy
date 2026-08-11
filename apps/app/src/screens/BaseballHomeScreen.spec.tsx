@@ -63,6 +63,12 @@ jest.mock('tamagui', () => {
   return mocks.tamaguiMocks;
 });
 
+// Capture the refreshControl element so pull-to-refresh tests can assert it's
+// wired to the leagues refetch (LS-8862).
+let capturedRefreshControl:
+  | import('../common/hooks/usePullToRefresh').PullToRefreshControlElement
+  | null = null;
+
 // Harness for the shared MLBHome — exposes the props/callbacks the wrapper feeds
 // in so we can assert the data wiring without rendering the full component.
 jest.mock('@legacy-sports/shared-components/baseball', () => {
@@ -90,77 +96,81 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
       onAdvancedCreate?: (leagueName: string) => void;
       onBrowsePlayers?: () => void;
       onSwitchSport?: (sport: 'football') => void;
-    }) => (
-      <View testID="mlb-home">
-        <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
-        <Text>{`switcher:${props.onSwitchSport ? 'on' : 'off'}`}</Text>
-        <Pressable
-          testID="switch-sport"
-          onPress={() => props.onSwitchSport?.('football')}
-        >
-          <Text>switch-sport</Text>
-        </Pressable>
-        <Text>{`loading:${String(props.loading)}`}</Text>
-        <Text>{`error:${String(props.error)}`}</Text>
-        <Text>{`isAuthenticated:${String(props.isAuthenticated ?? true)}`}</Text>
-        <Text>{`cap:${
-          props.leagueCap
-            ? `${props.leagueCap.count}/${props.leagueCap.limit}:${props.leagueCap.atLimit}`
-            : 'none'
-        }`}</Text>
-        <Pressable testID="invite" onPress={() => props.onInviteFriends?.()}>
-          <Text>invite</Text>
-        </Pressable>
-        <Pressable testID="join" onPress={() => props.onJoinLeague()}>
-          <Text>join</Text>
-        </Pressable>
-        <Pressable testID="mock-draft" onPress={() => props.onMockDraft?.()}>
-          <Text>mock-draft</Text>
-        </Pressable>
-        <Pressable testID="view" onPress={() => props.onViewLeague(2)}>
-          <Text>view</Text>
-        </Pressable>
-        <Pressable testID="sign-in" onPress={() => props.onSignIn?.()}>
-          <Text>sign-in</Text>
-        </Pressable>
-        <Pressable
-          testID="advanced-create"
-          onPress={() => props.onAdvancedCreate?.('My League')}
-        >
-          <Text>advanced-create</Text>
-        </Pressable>
-        <Pressable
-          testID="cap-upgrade"
-          onPress={() => props.leagueCap?.onUpgrade()}
-        >
-          <Text>upgrade</Text>
-        </Pressable>
-        <Pressable
-          testID="browse-players"
-          onPress={() => props.onBrowsePlayers?.()}
-        >
-          <Text>browse-players</Text>
-        </Pressable>
-        <Pressable
-          testID="create"
-          onPress={() =>
-            void props.onCreateLeague({
-              leagueName: 'My League',
-              numberOfTeams: 8,
-              numberOfDivisions: 2,
-              playerPool: 'all',
-              draftMode: 'live',
-              selectionMethod: 'standard',
-              draftOrder: 'snake',
-              maxRosterSize: 25,
-              isPublic: false,
-            })
-          }
-        >
-          <Text>create</Text>
-        </Pressable>
-      </View>
-    ),
+      refreshControl?: import('../common/hooks/usePullToRefresh').PullToRefreshControlElement;
+    }) => {
+      capturedRefreshControl = props.refreshControl ?? null;
+      return (
+        <View testID="mlb-home">
+          <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
+          <Text>{`switcher:${props.onSwitchSport ? 'on' : 'off'}`}</Text>
+          <Pressable
+            testID="switch-sport"
+            onPress={() => props.onSwitchSport?.('football')}
+          >
+            <Text>switch-sport</Text>
+          </Pressable>
+          <Text>{`loading:${String(props.loading)}`}</Text>
+          <Text>{`error:${String(props.error)}`}</Text>
+          <Text>{`isAuthenticated:${String(props.isAuthenticated ?? true)}`}</Text>
+          <Text>{`cap:${
+            props.leagueCap
+              ? `${props.leagueCap.count}/${props.leagueCap.limit}:${props.leagueCap.atLimit}`
+              : 'none'
+          }`}</Text>
+          <Pressable testID="invite" onPress={() => props.onInviteFriends?.()}>
+            <Text>invite</Text>
+          </Pressable>
+          <Pressable testID="join" onPress={() => props.onJoinLeague()}>
+            <Text>join</Text>
+          </Pressable>
+          <Pressable testID="mock-draft" onPress={() => props.onMockDraft?.()}>
+            <Text>mock-draft</Text>
+          </Pressable>
+          <Pressable testID="view" onPress={() => props.onViewLeague(2)}>
+            <Text>view</Text>
+          </Pressable>
+          <Pressable testID="sign-in" onPress={() => props.onSignIn?.()}>
+            <Text>sign-in</Text>
+          </Pressable>
+          <Pressable
+            testID="advanced-create"
+            onPress={() => props.onAdvancedCreate?.('My League')}
+          >
+            <Text>advanced-create</Text>
+          </Pressable>
+          <Pressable
+            testID="cap-upgrade"
+            onPress={() => props.leagueCap?.onUpgrade()}
+          >
+            <Text>upgrade</Text>
+          </Pressable>
+          <Pressable
+            testID="browse-players"
+            onPress={() => props.onBrowsePlayers?.()}
+          >
+            <Text>browse-players</Text>
+          </Pressable>
+          <Pressable
+            testID="create"
+            onPress={() =>
+              void props.onCreateLeague({
+                leagueName: 'My League',
+                numberOfTeams: 8,
+                numberOfDivisions: 2,
+                playerPool: 'all',
+                draftMode: 'live',
+                selectionMethod: 'standard',
+                draftOrder: 'snake',
+                maxRosterSize: 25,
+                isPublic: false,
+              })
+            }
+          >
+            <Text>create</Text>
+          </Pressable>
+        </View>
+      );
+    },
   };
 });
 
@@ -172,10 +182,12 @@ jest.mock('../common/auth/AuthorizedUserContext', () => ({
   useAuthorizedUserInfo: () => mockUseAuthorizedUserInfo(),
 }));
 
+const mockRefetch = jest.fn();
 const mockUseGetMyLeaguesQuery: jest.MockedFunction<
   (options?: { variables?: { sport?: string }; skip?: boolean }) => {
     data: unknown;
     loading: boolean;
+    refetch?: jest.Mock;
   }
 > = jest.fn();
 const mockCreateLeague = jest.fn();
@@ -228,10 +240,12 @@ const MOCK_LEAGUES = [
 describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedRefreshControl = null;
     mockUseAuthorizedUserInfo.mockReturnValue({ id: 1, username: 'testuser' });
     mockUseGetMyLeaguesQuery.mockReturnValue({
       data: { myLeagues: MOCK_LEAGUES, userLeagueCount: MOCK_LEAGUES.length },
       loading: false,
+      refetch: mockRefetch,
     });
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
     mockCreateLeague.mockResolvedValue({
@@ -581,6 +595,19 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
       render(<BaseballHomeScreen />);
       fireEvent.press(screen.getByTestId('sign-in'));
       expect(mockNavigate).toHaveBeenCalledWith('/login');
+    });
+  });
+
+  describe('pull-to-refresh (LS-8862)', () => {
+    it('passes MLBHome a refreshControl wired to the leagues refetch', async () => {
+      render(<BaseballHomeScreen />);
+
+      expect(capturedRefreshControl).toBeTruthy();
+      expect(typeof capturedRefreshControl?.props.onRefresh).toBe('function');
+
+      capturedRefreshControl?.props.onRefresh?.();
+
+      await waitFor(() => expect(mockRefetch).toHaveBeenCalledTimes(1));
     });
   });
 });

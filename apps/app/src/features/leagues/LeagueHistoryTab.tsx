@@ -7,6 +7,7 @@ import {
   useGetLeagueHistoryQuery,
   useGetLeagueStandingsQuery,
 } from '@legacy-sports/graphql';
+import { usePullToRefresh } from '../../common/hooks/usePullToRefresh';
 
 const RECORD_LABELS: Record<string, string> = {
   highest_score: 'Highest Single-Matchup Score',
@@ -40,6 +41,7 @@ export function LeagueHistoryTab({
     data: historyData,
     loading: historyLoading,
     error: historyError,
+    refetch: refetchHistory,
   } = useGetLeagueHistoryQuery({
     variables: { leagueId },
     skip: !leagueId,
@@ -74,6 +76,7 @@ export function LeagueHistoryTab({
     data: standingsData,
     loading: standingsLoading,
     error: standingsError,
+    refetch: refetchStandings,
   } = useGetLeagueStandingsQuery({
     variables: { leagueId: viewingLeagueId ?? 0 },
     skip: !viewingLeagueId,
@@ -84,11 +87,21 @@ export function LeagueHistoryTab({
     data: recordsData,
     loading: recordsLoading,
     error: recordsError,
+    refetch: refetchRecords,
   } = useGetAllTimeRecordsQuery({
     variables: { leagueId },
     skip: !leagueId,
     errorPolicy: 'all',
   });
+
+  // Self-contained: nothing outside this tab needs these refetches (unlike
+  // Trades, no WS bridging), so it owns its own pull-to-refresh rather than
+  // taking a `refreshControl` prop from the page (LS-8862).
+  const { refreshControl } = usePullToRefresh([
+    () => refetchHistory(),
+    () => (viewingLeagueId ? refetchStandings() : Promise.resolve()),
+    () => refetchRecords(),
+  ]);
 
   React.useEffect(() => {
     if (historyError) {
@@ -150,7 +163,7 @@ export function LeagueHistoryTab({
   }
 
   return (
-    <ScrollView>
+    <ScrollView refreshControl={refreshControl}>
       <YStack padding="$3" gap="$4">
         {/* ── League History Section ── */}
         <YStack gap="$2">

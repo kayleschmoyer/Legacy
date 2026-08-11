@@ -212,4 +212,46 @@ describe('PendingWaiverClaims', () => {
     const { container } = render(<PendingWaiverClaims teamId={TEAM_ID} />);
     expect(container.textContent).toContain('Failed to load waiver claims');
   });
+
+  // ---- onSubscribeRefresh bridge (LS-8862) ----
+
+  it('registers its refetch with onSubscribeRefresh on mount', () => {
+    setClaims([basicClaim]);
+    const onSubscribeRefresh = jest.fn(() => undefined);
+    render(
+      <PendingWaiverClaims
+        teamId={TEAM_ID}
+        onSubscribeRefresh={onSubscribeRefresh}
+      />,
+    );
+
+    expect(onSubscribeRefresh).toHaveBeenCalledTimes(1);
+    const [registeredRefetch] = onSubscribeRefresh.mock.calls[0] as [
+      () => void,
+    ];
+    registeredRefetch();
+    expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  it('invokes the onSubscribeRefresh cleanup on unmount', () => {
+    setClaims([basicClaim]);
+    const cleanup = jest.fn();
+    const onSubscribeRefresh = jest.fn(() => cleanup);
+    const { unmount } = render(
+      <PendingWaiverClaims
+        teamId={TEAM_ID}
+        onSubscribeRefresh={onSubscribeRefresh}
+      />,
+    );
+
+    unmount();
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it('works without onSubscribeRefresh (optional prop)', () => {
+    setClaims([basicClaim]);
+    expect(() =>
+      render(<PendingWaiverClaims teamId={TEAM_ID} />),
+    ).not.toThrow();
+  });
 });

@@ -7,6 +7,7 @@ import {
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../common/auth/AuthorizedUserContext';
+import { usePullToRefresh } from '../common/hooks/usePullToRefresh';
 import { useSubscription } from '../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../features/subscription/constants';
 import { trackPremiumFeatureClick } from '../utils/analytics';
@@ -37,18 +38,31 @@ export default function FootballHomeScreen({
   const userInfo = useAuthorizedUserInfo();
   const router = useRouter();
 
-  const { data, loading, error } = useGetUserLeaguesQuery({
+  const {
+    data,
+    loading,
+    error,
+    refetch: refetchLeagues,
+  } = useGetUserLeaguesQuery({
     skip: !userInfo?.id,
   });
 
   // Top/trending players preview (LS-5411). Pool-wide fantasy points, top 5 —
   // no dedicated "trending" backend metric exists, so this reuses the
   // existing footballPlayers sort support (fpts desc) rather than adding one.
-  const { data: trendingPlayersData, loading: trendingPlayersLoading } =
-    useFootballPlayersQuery({
-      variables: { first: 5, sortBy: 'fpts', sortDir: 'desc' },
-    });
+  const {
+    data: trendingPlayersData,
+    loading: trendingPlayersLoading,
+    refetch: refetchTrendingPlayers,
+  } = useFootballPlayersQuery({
+    variables: { first: 5, sortBy: 'fpts', sortDir: 'desc' },
+  });
   const trendingPlayers = trendingPlayersData?.footballPlayers?.nodes ?? [];
+
+  const { refreshControl } = usePullToRefresh([
+    () => refetchLeagues(),
+    () => refetchTrendingPlayers(),
+  ]);
 
   const { isPremium, loading: subscriptionLoading } = useSubscription();
 
@@ -104,6 +118,7 @@ export default function FootballHomeScreen({
 
   return (
     <NFLHome
+      refreshControl={refreshControl}
       leagues={leagues}
       loading={loading && !data}
       error={!!error}

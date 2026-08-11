@@ -11,7 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { FlatList } from 'react-native';
+import { FlatList, type RefreshControlProps } from 'react-native';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { TrendingPlayersPreview } from './TrendingPlayersPreview';
 import type { FootballPlayerCardPlayer } from './FootballPlayerCard';
@@ -86,6 +86,8 @@ export interface NFLHomeProps {
    * sport key the user selected.
    */
   onSwitchSport?: (sport: 'baseball') => void;
+  /** Ready-made pull-to-refresh element for the root `ScrollView` (LS-8862). */
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }
 
 function getLeagueStatusLabel(league: NFLHomeLeague): string {
@@ -354,6 +356,7 @@ function NFLHome({
   trendingPlayersLoading = false,
   matchupHighlight,
   onSwitchSport,
+  refreshControl,
 }: NFLHomeProps) {
   const hasLeagues = leagues.length > 0;
 
@@ -373,7 +376,10 @@ function NFLHome({
       ];
 
   return (
-    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+    <ScrollView
+      contentContainerStyle={{ flexGrow: 1 }}
+      refreshControl={refreshControl}
+    >
       <YStack
         backgroundColor="$background"
         flexGrow={1}

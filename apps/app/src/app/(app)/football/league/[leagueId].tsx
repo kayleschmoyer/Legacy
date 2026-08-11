@@ -222,6 +222,24 @@ export default function FootballLeagueId(): React.JSX.Element {
     };
   }, []);
 
+  // Same bridge for `PendingWaiverClaims`, which renders once per tab (Trades
+  // and Waivers both embed it) — separate refs even though this page fully
+  // unmounts inactive tabs, matching baseball's wiring for consistency (LS-8862).
+  const tradesWaiverRefetchRef = useRef<(() => void) | null>(null);
+  const onTradesWaiverSubscribeRefresh = useCallback((refetch: () => void) => {
+    tradesWaiverRefetchRef.current = refetch;
+    return () => {
+      tradesWaiverRefetchRef.current = null;
+    };
+  }, []);
+  const waiversRefetchRef = useRef<(() => void) | null>(null);
+  const onWaiversSubscribeRefresh = useCallback((refetch: () => void) => {
+    waiversRefetchRef.current = refetch;
+    return () => {
+      waiversRefetchRef.current = null;
+    };
+  }, []);
+
   // Persist this league as the user's most recently opened one so the next
   // login can redirect them straight here instead of the generic `/` route
   // (LS-6694). Sport is fixed by this route.
@@ -439,6 +457,13 @@ export default function FootballLeagueId(): React.JSX.Element {
     () => refetchStandings(),
     () => refetchPlayoffBracket(),
   ]);
+  const tradesRefresh = usePullToRefresh([
+    () => Promise.resolve(tradeRefetchRef.current?.()),
+    () => Promise.resolve(tradesWaiverRefetchRef.current?.()),
+  ]);
+  const waiversRefresh = usePullToRefresh([
+    () => Promise.resolve(waiversRefetchRef.current?.()),
+  ]);
 
   if (leagueLoading) {
     return <Spinner />;
@@ -586,7 +611,7 @@ export default function FootballLeagueId(): React.JSX.Element {
         {/* Trades Tab — full shared Trading Center (propose / history / veto) */}
         {selectedTab === 'trades' && (
           <YStack flex={1}>
-            <ScrollView>
+            <ScrollView refreshControl={tradesRefresh.refreshControl}>
               <YStack padding="$3" space="$4">
                 {userTeamId ? (
                   <>
@@ -600,7 +625,10 @@ export default function FootballLeagueId(): React.JSX.Element {
                         router.navigate('subscription-settings')
                       }
                     />
-                    <PendingWaiverClaims teamId={userTeamId} />
+                    <PendingWaiverClaims
+                      teamId={userTeamId}
+                      onSubscribeRefresh={onTradesWaiverSubscribeRefresh}
+                    />
                   </>
                 ) : (
                   <Text color="$textMuted">
@@ -614,11 +642,17 @@ export default function FootballLeagueId(): React.JSX.Element {
 
         {selectedTab === 'waivers' && (
           <YStack flex={1}>
-            <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+            <ScrollView
+              contentContainerStyle={{ flexGrow: 1 }}
+              refreshControl={waiversRefresh.refreshControl}
+            >
               <YStack padding="$3" gap="$4">
                 {userTeamId ? (
                   <>
-                    <PendingWaiverClaims teamId={userTeamId} />
+                    <PendingWaiverClaims
+                      teamId={userTeamId}
+                      onSubscribeRefresh={onWaiversSubscribeRefresh}
+                    />
                     <Button
                       size="$4"
                       onPress={() =>
