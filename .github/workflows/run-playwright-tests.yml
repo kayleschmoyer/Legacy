@@ -167,7 +167,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MIN_INTERVAL_HOURS: ${{ vars.FULL_SUITE_MIN_INTERVAL_HOURS || '20' }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           if [ "${{ github.event_name }}" != "workflow_run" ]; then
             echo "should-run=true" >> "$GITHUB_OUTPUT"
             echo "Manual dispatch — always runs." >> "$GITHUB_STEP_SUMMARY"
@@ -175,27 +175,68 @@ jobs:
           fi
 
           CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
-          # All automated runs of this workflow created since the cutoff,
-          # excluding this run itself.
-          RUN_IDS=$(gh api \
-            "repos/${{ github.repository }}/actions/workflows/run-playwright-tests.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=30" \
-            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
 
+          # All automated runs of this workflow created since the cutoff,
+          # excluding this run itself. --paginate follows every page in the
+          # cutoff window so a busy day (50+ debounced no-op workflow_run
+          # records) cannot silently push the prior real attempt off a
+          # single page and re-arm the debounce (LS-9329).
+          RUN_LIST_OUTPUT=$(gh api --paginate \
+            "repos/${{ github.repository }}/actions/workflows/run-playwright-tests.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=100" \
+            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id" 2>&1)
+          LIST_STATUS=$?
+
+          # Fail-open-safe (LS-9329): a gh api error must not hard-fail the
+          # job (see run 31366256925, a rate-limit 403 under set -euo
+          # pipefail that skipped every downstream job). An inconclusive
+          # gate SKIPS rather than runs — this workflow exists to bound CI
+          # spend, so the cheap failure mode (miss at most one interval,
+          # self-heals next merge) is preferred over the expensive one
+          # (an errored gate re-running the full suite every merge).
+          if [ "$LIST_STATUS" -ne 0 ]; then
+            echo "should-run=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Full-Suite Gate decision"
+              echo "- Cutoff: ${CUTOFF} (interval: ${MIN_INTERVAL_HOURS}h)"
+              echo "- Decision: **inconclusive → skip** — \`gh api\` failed while listing prior runs:"
+              echo '```'
+              echo "$RUN_LIST_OUTPUT"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          RUN_IDS="$RUN_LIST_OUTPUT"
+          RUN_COUNT=$(printf '%s\n' "$RUN_IDS" | grep -c '[0-9]' || true)
+
+          FOUND_ID=""
           for id in $RUN_IDS; do
             # Non-skipped, completed "Prepare Matrix" = a real full-suite
             # attempt (in-flight attempts are excluded here but already
-            # serialized by the concurrency group above).
+            # serialized by the concurrency group above). A transient
+            # failure checking one run's jobs is treated as "not prepared"
+            # (fail open) rather than aborting the whole gate.
             PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
-              --jq '[.jobs[] | select(.name == "Prepare Matrix" and .conclusion != null and .conclusion != "skipped")] | length')
+              --jq '[.jobs[] | select(.name == "Prepare Matrix" and .conclusion != null and .conclusion != "skipped")] | length' 2>/dev/null || echo 0)
             if [ "$PREPARED" -gt 0 ]; then
-              echo "should-run=false" >> "$GITHUB_OUTPUT"
-              echo "Debounced — automated full-suite attempt (run ${id}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
+              FOUND_ID="$id"
+              break
             fi
           done
 
-          echo "should-run=true" >> "$GITHUB_OUTPUT"
-          echo "No automated full-suite attempt in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Full-Suite Gate decision"
+            echo "- Cutoff: ${CUTOFF} (interval: ${MIN_INTERVAL_HOURS}h)"
+            echo "- Prior automated runs inspected: ${RUN_COUNT}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "$FOUND_ID" ]; then
+            echo "should-run=false" >> "$GITHUB_OUTPUT"
+            echo "- Decision: debounced — automated full-suite attempt (run ${FOUND_ID}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "- Decision: no automated full-suite attempt in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+          fi
   # ---------------------------------------------------------------------------
   # Compute the test matrix.
   # Nightly: integration (INTEGRATION_SHARD_CEILING shards) + e2e (3 shards,
