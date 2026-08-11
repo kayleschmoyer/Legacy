@@ -1,7 +1,17 @@
-import React from 'react';
+import React, { useId } from 'react';
+import { View } from 'react-native';
 import type { StyleProp, ViewStyle } from 'react-native';
-import Svg, { Circle, G, Path, Rect } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Defs,
+  G,
+  LinearGradient,
+  Path,
+  Rect,
+  Stop,
+} from 'react-native-svg';
 import {
+  BG_DARK,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
   BRAND_SEAM_RED,
@@ -36,13 +46,26 @@ type GlyphProps = {
   strokeWidth: number;
 };
 
-type BrandIconProps = {
+export type BrandIconProps = {
   name: BrandIconName;
   size?: number;
   color?: string;
   accentColor?: string;
   strokeWidth?: number;
   style?: StyleProp<ViewStyle>;
+  testID?: string;
+  accessibilityLabel?: string;
+};
+
+export type BrandIconBadgeProps = {
+  name: BrandIconName;
+  size?: number;
+  iconSize?: number;
+  color?: string;
+  accentColor?: string;
+  borderColor?: string;
+  rounded?: 'circle' | 'square';
+  style?: ViewStyle;
   testID?: string;
   accessibilityLabel?: string;
 };
@@ -827,3 +850,87 @@ export function BrandIcon({
     </Svg>
   );
 }
+
+export function BrandIconBadge({
+  name,
+  size = 44,
+  iconSize = 24,
+  color = BRAND_GOLD_LIGHT,
+  accentColor = BRAND_SEAM_RED,
+  borderColor = withAlpha(BRAND_GOLD_LIGHT, 0.3),
+  rounded = 'circle',
+  style,
+  testID,
+  accessibilityLabel,
+}: BrandIconBadgeProps): React.JSX.Element {
+  // `useId` returns colon-delimited ids (":r0:"); strip them so the value is a
+  // safe SVG fragment identifier. Mirrors GradientSurface.native.tsx (LS-8794)
+  // — react-native-svg gradient instead of adding an expo-linear-gradient dep.
+  const gradientId = `brandIconBadge-${useId().replace(/:/g, '')}`;
+  const borderRadius = rounded === 'circle' ? size / 2 : 14;
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius,
+        borderWidth: 1,
+        borderColor,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        ...style,
+      }}
+      testID={testID}
+    >
+      <Svg
+        width={size}
+        height={size}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+      >
+        <Defs>
+          <LinearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={withAlpha(BRAND_NAVY_LIGHT, 0.28)} />
+            <Stop offset="1" stopColor={withAlpha(BG_DARK, 0.92)} />
+          </LinearGradient>
+        </Defs>
+        <Rect width={size} height={size} fill={`url(#${gradientId})`} />
+      </Svg>
+      <BrandIcon
+        name={name}
+        size={iconSize}
+        color={color}
+        accentColor={accentColor}
+        accessibilityLabel={accessibilityLabel}
+      />
+    </View>
+  );
+}
+
+export const BRAND_ICON_ACCENT = BRAND_NAVY_LIGHT;
+
+/**
+ * Icon names BrandIcon.native.tsx's renderGlyph actually supports — a subset
+ * of web's ~80-name BrandIconName, not a 1:1 copy (LS-8858). Extending this
+ * requires adding the matching case to renderGlyph first.
+ */
+export const ALL_BRAND_ICON_NAMES: BrandIconName[] = [
+  'baseball',
+  'football',
+  'stats',
+  'draft',
+  'live',
+  'secure',
+  'settings',
+  'book',
+  'google',
+  'discord',
+  'apple',
+  'roster',
+  'matchup',
+  'standings',
+  'zap',
+  'award',
+  'message',
+];

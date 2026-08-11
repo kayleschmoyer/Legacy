@@ -56,6 +56,14 @@ module.exports = {
     // assertion is correctly false here. Belongs to
     // shared-components:mobile only.
     '/src/nativeModuleResolution.native.spec.ts',
+    // Mobile-only regression test (LS-8858) — renders BrandIconBadge, which
+    // imports `View` from bare `react-native`. This web project's
+    // transformIgnorePatterns doesn't include `react-native` (only
+    // tamagui/react-native-svg/@react-native-google-signin), so `View`
+    // resolves to an unusable object here ("Element type is invalid").
+    // Belongs to shared-components:mobile only, which has a full
+    // `react-native` mock in jest-setup-mobile.js.
+    '/src/components/icons/BrandIcon.native.spec.tsx',
   ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],
