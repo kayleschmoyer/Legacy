@@ -184,6 +184,69 @@ describe('openPR', () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toMatch(/Lambda mode/);
     });
+
+    // The bare message previously gave no indication the tool had received
+    // worktreePath at all, reading as if it were silently ignored (LS-8837).
+    it('acknowledges worktreePath in the error instead of ignoring it', async () => {
+      mockIsLambda.mockReturnValue(true);
+      const result = await openPR({
+        title: 'LS-8149 test',
+        body: 'body',
+        worktreePath: '/nonexistent/path',
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('/nonexistent/path');
+      expect(result.content[0].text).toMatch(
+        /`head` must be passed explicitly/,
+      );
+    });
+  });
+
+  describe('Windows worktreePath resolution depends on the host platform (LS-8837)', () => {
+    const originalPlatform = process.platform;
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', {
+        value: originalPlatform,
+      });
+    });
+
+    it('attempts to resolve a Windows drive-letter worktreePath when running on a Windows host', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      mockIsLambda.mockReturnValue(false);
+      mockExistsSync.mockReturnValue(true);
+      makeExecFileSuccess('feature-branch');
+
+      await openPR({
+        title: 'LS-8837 test',
+        body: 'body',
+        worktreePath: 'D:\\code\\legacy-sports\\.claude\\worktrees\\some-wt',
+        push: false,
+      });
+
+      // On a Windows host the tool must actually attempt the fs check instead
+      // of silently skipping resolution just because the path looks Windows-y.
+      expect(mockExistsSync).toHaveBeenCalled();
+    });
+
+    it('still skips resolution for a Windows drive-letter worktreePath on a POSIX host', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      mockIsLambda.mockReturnValue(false);
+      makeExecFileSuccess('feature-branch');
+
+      const result = await openPR({
+        title: 'LS-8837 test',
+        body: 'body',
+        worktreePath: 'D:\\code\\legacy-sports\\.claude\\worktrees\\some-wt',
+        push: false,
+      });
+
+      // No existsSync/containment check performed for a Windows path on a
+      // POSIX host — falls through to git auto-detection against repoRoot.
+      expect(mockExistsSync).not.toHaveBeenCalled();
+      expect(result.isError).toBeFalsy();
+    });
   });
 
   describe('draft mode', () => {

@@ -138,10 +138,17 @@ export async function createPR(params: CreatePRParams): Promise<ToolResult> {
         ],
       };
     }
+    // A Windows drive-letter path can only be resolved/checked when this process
+    // itself is running on Windows — the path's shape says nothing about the host
+    // evaluating it. Gating on shape alone skipped cwd resolution even on a genuine
+    // local Windows server, silently falling through to the Lambda-only `head`
+    // requirement below for the wrong reason (LS-8837).
+    const canResolveOnThisHost =
+      !isWindowsDrivePath || process.platform === 'win32';
     // Windows drive-letter paths cannot be accessed from a POSIX server's filesystem.
     // Skip the existsSync check and cwd assignment in that case — the Lambda guard below
     // will require `head` explicitly when git is unavailable on the server.
-    if (!lambda && !isWindowsDrivePath) {
+    if (!lambda && canResolveOnThisHost) {
       const resolved = resolve(params.worktreePath);
       if (!existsSync(resolved)) {
         return {

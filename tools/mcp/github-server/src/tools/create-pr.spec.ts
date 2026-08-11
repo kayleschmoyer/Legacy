@@ -12,6 +12,14 @@ jest.mock('../auth', () => ({
   isLambda: jest.fn(),
 }));
 
+// Mocked (rather than relying on the real filesystem, as before LS-8837) so
+// the win32-host-platform test below can assert the fs check is actually
+// attempted, independent of whatever path any given fake worktreePath
+// resolves to on the real OS running the test.
+jest.mock('node:fs', () => ({
+  existsSync: jest.fn(),
+}));
+
 const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
   jest.requireMock('../github-api') as {
     githubRest: jest.Mock;
@@ -26,6 +34,9 @@ const {
   getAuthorToken: jest.Mock;
   isLambda: jest.Mock;
 };
+const { existsSync: mockExistsSync } = jest.requireMock('node:fs') as {
+  existsSync: jest.Mock;
+};
 
 describe('createPR Lambda behavior (LS-4881)', () => {
   beforeEach(() => {
@@ -39,6 +50,7 @@ describe('createPR Lambda behavior (LS-4881)', () => {
       number: 42,
       html_url: 'https://example/pr/42',
     });
+    mockExistsSync.mockReturnValue(false);
   });
 
   describe('when running in Lambda', () => {
@@ -172,6 +184,46 @@ describe('createPR Lambda behavior (LS-4881)', () => {
       expect(result.isError).toBe(true);
       const text = result.content?.[0];
       expect(text && 'text' in text ? text.text : '').toMatch(/does not exist/);
+    });
+  });
+
+  // On a genuinely local, non-Lambda Windows host, a Windows drive-letter
+  // worktreePath must actually be resolved instead of being silently skipped
+  // just because of its string shape (LS-8837 — the shape-only gate made a
+  // real local session behave as if it had no usable worktreePath at all).
+  describe('Windows worktreePath resolution depends on the host platform (LS-8837)', () => {
+    const originalPlatform = process.platform;
+
+    beforeEach(() => {
+      mockIsLambda.mockReturnValue(false);
+    });
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+    });
+
+    it('attempts the fs check for a Windows drive-letter path when the host is win32', async () => {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+
+      await createPR({
+        title: 'LS-8837 fix(mcp): test',
+        body: 'body',
+        worktreePath: 'D:\\code\\legacy-sports\\.claude\\worktrees\\some-wt',
+      });
+
+      expect(mockExistsSync).toHaveBeenCalled();
+    });
+
+    it('skips the fs check for a Windows drive-letter path when the host is POSIX', async () => {
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+
+      await createPR({
+        title: 'LS-8837 fix(mcp): test',
+        body: 'body',
+        worktreePath: 'D:\\code\\legacy-sports\\.claude\\worktrees\\some-wt',
+      });
+
+      expect(mockExistsSync).not.toHaveBeenCalled();
     });
   });
 });

@@ -145,6 +145,17 @@ async function openPRWorker(
   const repoRoot = getRepoRoot();
   let cwd = repoRoot;
   const isWindowsDrivePath = (p: string) => /^[A-Za-z]:[/\\]/.test(p);
+  // A Windows drive-letter worktreePath can only be resolved/checked when this
+  // process itself is running on Windows — the string SHAPE of the path says
+  // nothing about the HOST it's being evaluated on. Gating on the shape alone
+  // (as opposed to `process.platform`) meant a genuinely local, non-Lambda
+  // Windows session with a real `D:\...` worktreePath fell through this block
+  // without ever setting `cwd`, then hit the "Lambda mode" branch below purely
+  // because `params.head` was omitted — misreporting Lambda mode when the
+  // actual cause was an un-resolved worktreePath (LS-8837).
+  const canResolveOnThisHost =
+    !isWindowsDrivePath(params.worktreePath ?? '') ||
+    process.platform === 'win32';
 
   if (params.worktreePath) {
     if (
@@ -156,7 +167,7 @@ async function openPRWorker(
       );
     }
     // Windows drive-letter paths can't be checked from a POSIX server (Lambda or CI).
-    if (!lambda && !isWindowsDrivePath(params.worktreePath)) {
+    if (!lambda && canResolveOnThisHost) {
       const resolved = resolve(params.worktreePath);
       if (!existsSync(resolved)) {
         return err(`worktreePath does not exist: "${resolved}"`);
@@ -211,8 +222,14 @@ async function openPRWorker(
   if (params.head) {
     head = params.head;
   } else if (lambda) {
+    // Explicitly acknowledge a passed worktreePath instead of silently ignoring
+    // it — a bare "head must be passed explicitly" reads as if the tool never
+    // saw worktreePath at all, when the real reason is that the Lambda server
+    // runs on a different host than the caller and can never read it (LS-8837).
     return err(
-      'In Lambda mode, `head` must be passed explicitly — git is not available to auto-detect the branch.',
+      params.worktreePath
+        ? `In Lambda mode, \`head\` must be passed explicitly — the server cannot read worktreePath "${params.worktreePath}"; that path only exists on the caller's filesystem, not the Lambda server's. Pass \`head\` set to the local branch name (e.g. \`claude/<branch-name>\`).`
+        : 'In Lambda mode, `head` must be passed explicitly — git is not available to auto-detect the branch.',
     );
   } else {
     const currentBranch = await getCurrentBranch(cwd);
