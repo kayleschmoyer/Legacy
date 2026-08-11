@@ -37,6 +37,11 @@ import { PremiumGate } from '../components/premium-gate.component';
  *
  *   Inventory of remaining web-only surfaces (AC3 — each unavailable on native,
  *   each with no portable driver verb yet):
+ *   • `stats.expectStatsSurfaceVisible` — reads the Playwright viewport width
+ *     to pick the phone-width card feed vs. the desktop table (LS-9075/9326);
+ *     viewport width has no native equivalent (native always renders its own
+ *     card list), so this is the sole web-only remainder on an otherwise
+ *     driver-typed surface.
  *   • `premiumGate` — composed from a raw `Locator` root (the shared
  *     premium-overlay component still extends `BaseComponent`); web-only.
  *   • `gotoDetail` / `gotoBrefId` — `page.goto` + `waitForLoadState(waitUntil)`;
@@ -80,7 +85,7 @@ export class PlayersPage {
     // it stays undefined and those surfaces throw when invoked (see class doc).
     this.#page =
       driver instanceof PlaywrightWebDriver ? driver.page : undefined;
-    this.stats = new PlayerStatsSurface(driver);
+    this.stats = new PlayerStatsSurface(driver, this.#page);
     this.detail = new PlayerDetailSurface(driver, this.#page);
     this.compare = new PlayerCompareSurface(this.#driver, this.#page);
   }
@@ -176,6 +181,16 @@ function nameRegExp(prefix: string, name: string): RegExp {
 // ===========================================================================
 
 /**
+ * `media.sm` breakpoint (`maxWidth: 800` — @tamagui/config's default media,
+ * PlayerStatsPage.tsx:1244) at or under which the phone-width card feed
+ * renders instead of the desktop stats table (LS-9075/LS-9076). Mirrored here
+ * so {@link PlayerStatsSurface.expectStatsSurfaceVisible} resolves the same
+ * presentation the app itself would render at the current viewport, instead
+ * of specs hardcoding the desktop-only locators (LS-9326).
+ */
+const CARD_FEED_BREAKPOINT_PX = 800;
+
+/**
  * Semantic surface for the `/players` page. The page renders the title
  * as a styled `div` ("MLB Player Statistics"), a debounced search input, view
  * tabs (Combined / Hitters / Pitchers), and per-grid leader tables whose rows
@@ -183,14 +198,22 @@ function nameRegExp(prefix: string, name: string): RegExp {
  */
 class PlayerStatsSurface {
   readonly #driver: AppDriver;
+  /**
+   * OPTIONAL web escape hatch — used only by {@link expectStatsSurfaceVisible}
+   * to read the viewport width (see class-level doc on `PlayersPage` for the
+   * web-only-remainder inventory). `undefined` on a non-web driver; every
+   * other member of this surface stays driver-typed and works on any driver.
+   */
+  readonly #page: Page | undefined;
   readonly #heading: UIElement;
   readonly #search: UIElement;
   readonly #battingGrid: UIElement;
   readonly #filterControls: UIElement;
   readonly #pageSizeSelect: UIElement;
 
-  constructor(driver: AppDriver) {
+  constructor(driver: AppDriver, page: Page | undefined) {
     this.#driver = driver;
+    this.#page = page;
     this.#heading = driver.byText('MLB Player Statistics');
     this.#search = driver.byPlaceholder('Search player name · min 2 chars');
     this.#battingGrid = driver.byTestId('player-stats-data-grid');
@@ -380,6 +403,35 @@ class PlayerStatsSurface {
     await this.#driver
       .byTestId(`players-stats-card-feed-${sport}`)
       .expectHidden();
+  }
+
+  /**
+   * Assert the stats surface is visible for whichever presentation the
+   * current viewport renders — the phone-width card feed (LS-9075) below the
+   * `media.sm` breakpoint, the desktop table above it (LS-9326). Specs should
+   * call this instead of hardcoding a desktop-only locator (e.g. the
+   * "MLB Player Statistics" heading), which fails outright on the Mobile
+   * Chrome / Mobile Safari Playwright projects. WEB-ONLY: viewport width has
+   * no native equivalent — throws off-web like the driver's other web-only
+   * remainders.
+   */
+  async expectStatsSurfaceVisible(
+    sport: 'mlb' | 'nfl' = 'mlb',
+    timeout = 15_000,
+  ): Promise<void> {
+    if (!this.#page) {
+      throw new Error(
+        'PlayerStatsSurface.expectStatsSurfaceVisible: needs the browser ' +
+          'viewport width, which has no native equivalent — unavailable on ' +
+          'the native driver.',
+      );
+    }
+    const width = this.#page.viewportSize()?.width ?? 0;
+    if (width <= CARD_FEED_BREAKPOINT_PX) {
+      await this.expectCardFeedVisible(sport, timeout);
+    } else {
+      await this.expectLoaded(timeout);
+    }
   }
 
   /** Assert a data-grid column header is visible. */

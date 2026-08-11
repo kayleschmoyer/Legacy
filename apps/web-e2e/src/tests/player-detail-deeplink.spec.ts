@@ -499,7 +499,16 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
     test('desktop: click player row opens /players/:id dialog', async ({
       page,
       playersPage,
+      isMobile,
     }) => {
+      // LS-9326: this test's `stats.row(1)` locator only exists in the
+      // desktop table (LS-9075's card feed has no equivalent) — scoped away
+      // from the mobile projects; the 'mobile: ...' test below already
+      // covers the same flow via the card feed.
+      test.skip(
+        isMobile,
+        'covered by the mobile: variant below via the card feed (LS-9075/LS-9326)',
+      );
       await mockStatsWithPlayerDetail(page);
       await playersPage.gotoStats();
 
@@ -515,7 +524,14 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
     test('desktop: back button returns to /players', async ({
       page,
       playersPage,
+      isMobile,
     }) => {
+      // LS-9326: see the desktop 'click player row' test above — scoped away
+      // from the mobile projects; 'mobile: back button ...' below covers it.
+      test.skip(
+        isMobile,
+        'covered by the mobile: variant below via the card feed (LS-9075/LS-9326)',
+      );
       await mockStatsWithPlayerDetail(page);
       await playersPage.gotoStats();
 

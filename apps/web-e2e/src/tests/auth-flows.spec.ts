@@ -5,7 +5,7 @@
  * and logout — both programmatic and via the profile dropdown UI.
  */
 
-import { adminTest, expect, test, unauthTest } from '../fixtures/auth-enhanced';
+import { adminTest, expect, test, unauthTest } from '../fixtures/pages';
 import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
 
 /** Read the base URL that Playwright is actually using (set in playwright.config.ts). */
@@ -486,13 +486,14 @@ unauthTest.describe('Public Routes @critical', () => {
 
   unauthTest(
     'shows Player Stats page content on /players/stats when not authenticated (LS-3548)',
-    async ({ page }) => {
+    async ({ page, playersPage }) => {
       await page.goto('/players/stats');
       await page.waitForLoadState('load');
 
-      await expect(
-        page.getByText(/MLB Player Statistics/i).first(),
-      ).toBeVisible({ timeout: 15000 });
+      // LS-9326: the desktop table heading has no equivalent at phone width
+      // (LS-9075's card feed) — resolve the presentation the current
+      // viewport actually renders instead of hardcoding the desktop locator.
+      await playersPage.stats.expectStatsSurfaceVisible('mlb');
     },
   );
 
@@ -507,7 +508,7 @@ unauthTest.describe('Public Routes @critical', () => {
   // ---------------------------------------------------------------------------
   unauthTest(
     'does not show the landing-page season badge on /players/stats (LS-3500)',
-    async ({ page }) => {
+    async ({ page, playersPage }) => {
       await page.goto('/players/stats');
       await page.waitForLoadState('load');
 
@@ -517,10 +518,10 @@ unauthTest.describe('Public Routes @critical', () => {
         'Fantasy Baseball · Season 2026',
       );
 
-      // Player stats content is visible — confirming the correct page loaded.
-      await expect(
-        page.getByText(/MLB Player Statistics/i).first(),
-      ).toBeVisible({ timeout: 15000 });
+      // Player stats content is visible — confirming the correct page loaded
+      // (LS-9326: viewport-aware, since phone width renders the LS-9075
+      // card feed rather than the desktop table).
+      await playersPage.stats.expectStatsSurfaceVisible('mlb');
     },
   );
 
@@ -572,15 +573,14 @@ unauthTest.describe('Public Routes @critical', () => {
 
   unauthTest(
     'shows Player Stats content on /players when not authenticated (LS-3497, LS-9076)',
-    async ({ page }) => {
+    async ({ page, playersPage }) => {
       await page.goto('/players');
       await page.waitForLoadState('load');
 
       // LS-9076: /players is the canonical merged player browse + stats
-      // surface — it renders what /players/stats used to render.
-      await expect(
-        page.getByText(/MLB Player Statistics/i).first(),
-      ).toBeVisible({ timeout: 15000 });
+      // surface — it renders what /players/stats used to render. LS-9326:
+      // viewport-aware, since phone width renders the LS-9075 card feed.
+      await playersPage.stats.expectStatsSurfaceVisible('mlb');
     },
   );
 
@@ -595,7 +595,7 @@ unauthTest.describe('Public Routes @critical', () => {
   // ---------------------------------------------------------------------------
   unauthTest(
     'does not show the landing-page season badge on /players (LS-3497)',
-    async ({ page }) => {
+    async ({ page, playersPage }) => {
       await page.goto('/players');
       await page.waitForLoadState('load');
 
@@ -606,10 +606,9 @@ unauthTest.describe('Public Routes @critical', () => {
       );
 
       // Player stats content is visible — confirming the correct page loaded
-      // (LS-9076: /players now renders what /players/stats used to).
-      await expect(
-        page.getByText(/MLB Player Statistics/i).first(),
-      ).toBeVisible({ timeout: 15000 });
+      // (LS-9076: /players now renders what /players/stats used to; LS-9326:
+      // viewport-aware, since phone width renders the LS-9075 card feed).
+      await playersPage.stats.expectStatsSurfaceVisible('mlb');
     },
   );
 

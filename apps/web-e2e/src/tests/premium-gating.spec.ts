@@ -262,7 +262,16 @@ test.describe('Premium gating — premium user @critical', () => {
 
   test('Player Stats Export JSON is available to premium users', async ({
     page,
+    isMobile,
   }) => {
+    // LS-9326: the phone-width card feed (LS-9075) intentionally has no
+    // Export/Share controls, so this assertion has no mobile equivalent —
+    // scope to desktop rather than weakening it (per the LS-9075 design).
+    test.skip(
+      isMobile,
+      'card feed has no Export control by design (LS-9075) — desktop-only assertion',
+    );
+
     await useTier(page, 'premium');
     await page.goto('/players/stats');
 
