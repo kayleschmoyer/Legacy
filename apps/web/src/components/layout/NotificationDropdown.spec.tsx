@@ -5,6 +5,10 @@
  * next open. The fix evicts `getNotificationHistory` from the Apollo cache
  * whenever the unread count changes while the dropdown is closed, so the
  * next open fetches fresh data.
+ *
+ * Also covers LS-8914: the dropdown mirrors NotificationsPage's WebSocket
+ * wiring so the badge updates on a `notification-received` push instead of
+ * relying solely on 30s polling.
  */
 import React from 'react';
 import { act, render } from '@testing-library/react';
@@ -15,16 +19,28 @@ import {
   NotificationDropdown,
 } from './NotificationDropdown';
 
-type UnreadCountResult = { data: { getUnreadNotificationCount: number } };
-type HistoryResult = { data: undefined; loading: boolean };
+type UnreadCountResult = {
+  data: { getUnreadNotificationCount: number };
+  refetch: jest.Mock;
+};
+type HistoryResult = { data: undefined; loading: boolean; refetch: jest.Mock };
+type UseWebSocketOptions = {
+  url?: string;
+  token?: string;
+  autoConnect?: boolean;
+  onNotificationReceived?: () => void;
+};
 
 const mockEvict = jest.fn();
 const mockGc = jest.fn();
+const mockRefetchCount = jest.fn();
+const mockRefetchHistory = jest.fn();
 const mockUseGetUnreadNotificationCountQuery = jest.fn<
   UnreadCountResult,
   unknown[]
 >();
 const mockUseGetNotificationHistoryQuery = jest.fn<HistoryResult, unknown[]>();
+const mockUseWebSocket = jest.fn<unknown, [UseWebSocketOptions]>();
 
 jest.mock('@apollo/client/react', () => {
   const actual = jest.requireActual<Record<string, unknown>>(
@@ -48,7 +64,15 @@ jest.mock('@legacy-sports/graphql', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
-  useAuth: () => ({ isAuthenticated: true }),
+  useAuth: () => ({ isAuthenticated: true, token: 'test-token' }),
+}));
+
+jest.mock('@legacy-sports/shared-components', () => ({
+  useWebSocket: (opts: UseWebSocketOptions): unknown => mockUseWebSocket(opts),
+}));
+
+jest.mock('../../config/environment', () => ({
+  env: { websocketUrl: 'wss://test.example.com' },
 }));
 
 jest.mock('@tamagui/lucide-icons', () => {
@@ -114,6 +138,7 @@ const renderDropdown = () =>
 const setUnreadCount = (count: number): void => {
   mockUseGetUnreadNotificationCountQuery.mockReturnValue({
     data: { getUnreadNotificationCount: count },
+    refetch: mockRefetchCount,
   });
 };
 
@@ -121,11 +146,15 @@ describe('NotificationDropdown — LS-4094 stale-history invalidation', () => {
   beforeEach(() => {
     mockEvict.mockReset();
     mockGc.mockReset();
+    mockRefetchCount.mockReset();
+    mockRefetchHistory.mockReset();
     mockUseGetUnreadNotificationCountQuery.mockReset();
     mockUseGetNotificationHistoryQuery.mockReset();
+    mockUseWebSocket.mockReset();
     mockUseGetNotificationHistoryQuery.mockReturnValue({
       data: undefined,
       loading: false,
+      refetch: mockRefetchHistory,
     });
     setUnreadCount(0);
   });
@@ -169,6 +198,56 @@ describe('NotificationDropdown — LS-4094 stale-history invalidation', () => {
     });
 
     expect(mockEvict).not.toHaveBeenCalled();
+  });
+});
+
+describe('NotificationDropdown — LS-8914 WebSocket subscription', () => {
+  beforeEach(() => {
+    mockEvict.mockReset();
+    mockGc.mockReset();
+    mockRefetchCount.mockReset();
+    mockRefetchHistory.mockReset();
+    mockUseGetUnreadNotificationCountQuery.mockReset();
+    mockUseGetNotificationHistoryQuery.mockReset();
+    mockUseWebSocket.mockReset();
+    mockUseGetNotificationHistoryQuery.mockReturnValue({
+      data: undefined,
+      loading: false,
+      refetch: mockRefetchHistory,
+    });
+    setUnreadCount(0);
+  });
+
+  it('subscribes via useWebSocket with the auth token and websocket url, mirroring NotificationsPage', () => {
+    renderDropdown();
+
+    expect(mockUseWebSocket).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: 'wss://test.example.com',
+        token: 'test-token',
+        autoConnect: true,
+      }),
+    );
+  });
+
+  it('refetches the unread count on a notification-received push', () => {
+    renderDropdown();
+
+    const { onNotificationReceived } = mockUseWebSocket.mock.calls[0][0];
+    act(() => {
+      onNotificationReceived?.();
+    });
+
+    expect(mockRefetchCount).toHaveBeenCalledTimes(1);
+  });
+
+  it('still fetches the unread count on mount independent of the WebSocket push (no regression to initial fetch)', () => {
+    setUnreadCount(4);
+    renderDropdown();
+
+    expect(mockUseGetUnreadNotificationCountQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: false }),
+    );
   });
 });
 

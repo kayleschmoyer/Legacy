@@ -4,6 +4,7 @@ import { useApolloClient } from '@apollo/client/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
+import { useWebSocket } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { Button, Spinner, styled } from 'tamagui';
 import { Bell, CheckCheck, Eye } from '@tamagui/lucide-icons';
@@ -22,6 +23,7 @@ import { DROPDOWN_BORDER, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
 import { categorize } from '../../utils/notificationUtils';
 import { BRAND_NAVY_LIGHT, BRAND_SEAM_RED } from '../../constants/colors';
 import { formatTimeAgo } from '../../utils/formatTimeAgo';
+import { env } from '../../config/environment';
 
 const TriggerButton = styled(Button, {
   size: '$3',
@@ -139,7 +141,7 @@ export function getNotificationLink(notification: {
 }
 
 export const NotificationDropdown: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, token } = useAuth();
   const client = useApolloClient();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -147,15 +149,35 @@ export const NotificationDropdown: React.FC = () => {
   const buttonId = 'notification-menu-button';
   const menuId = 'notification-menu';
 
-  const { data: countData } = useGetUnreadNotificationCountQuery({
-    skip: !isAuthenticated,
-    pollInterval: 30000,
-  });
-  const { data: historyData, loading } = useGetNotificationHistoryQuery({
+  const { data: countData, refetch: refetchCount } =
+    useGetUnreadNotificationCountQuery({
+      skip: !isAuthenticated,
+      pollInterval: 30000,
+    });
+  const {
+    data: historyData,
+    loading,
+    refetch: refetchHistory,
+  } = useGetNotificationHistoryQuery({
     skip: !isAuthenticated || !isOpen,
     variables: { limit: 10, offset: 0 },
     fetchPolicy: 'cache-and-network',
   });
+
+  // Pushed WS update so the badge/list reflect a new notification within
+  // ~1s instead of waiting on the 30s poll above (LS-8914). The poll stays
+  // as a fallback for missed/late connections — see websocket-realtime skill.
+  useWebSocket({
+    url: env.websocketUrl,
+    token: token ?? undefined,
+    viewContext: 'general',
+    autoConnect: isAuthenticated && !!token,
+    onNotificationReceived: () => {
+      void refetchCount();
+      if (isOpen) void refetchHistory();
+    },
+  });
+
   const [markAsRead] = useMarkNotificationAsReadMutation();
   const [markAllAsRead] = useMarkAllNotificationsAsReadMutation();
   const [markAllReadError, setMarkAllReadError] = useState<string | null>(null);
