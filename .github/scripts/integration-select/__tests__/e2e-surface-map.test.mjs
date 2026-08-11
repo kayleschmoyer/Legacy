@@ -73,9 +73,18 @@ describe('e2e-surface-map.json coverage', () => {
         manifest.runAllWhenChanged.length > 0,
       'runAllWhenChanged must be a non-empty array',
     );
+    // LS-8920: the blanket `lib/shared-components/src/**` glob was narrowed
+    // to per-directory entries (attribution data: 12/70 sampled PRs tripped
+    // full-suite via this one glob, spread thinly across many independent
+    // feature subfolders). Generic, genuinely cross-cutting UI primitives
+    // (lib/shared-components/src/components/**) still force the full suite;
+    // feature-scoped subfolders with adequate per-spec surface coverage were
+    // dropped so the affected-spec selection can actually engage for them.
     assert.ok(
-      manifest.runAllWhenChanged.includes('lib/shared-components/src/**'),
-      'shared-components changes must force the full suite',
+      manifest.runAllWhenChanged.includes(
+        'lib/shared-components/src/components/**',
+      ),
+      'generic shared-component changes must still force the full suite',
     );
   });
 });
@@ -108,13 +117,32 @@ describe('e2e surface-map selection', () => {
     );
   });
 
-  it('runs ALL specs when shared-components changes', () => {
+  it('runs ALL specs when a generic shared component changes', () => {
     const r = selectSpecs({
-      changedFiles: ['lib/shared-components/src/ui/Button.tsx'],
+      changedFiles: ['lib/shared-components/src/components/Button.tsx'],
       manifest,
     });
     assert.equal(r.runAll, true);
     assert.equal(r.specs.length, Object.keys(manifest.specs).length);
+  });
+
+  it('does not run-all for a feature-scoped shared-components change with existing surface coverage (LS-8920)', () => {
+    // elite-draft was the single largest runAllWhenChanged contributor in the
+    // LS-8920 attribution sample (4/12 shared-components hits) and is fully
+    // covered by per-spec surface globs, so it was dropped from the blanket
+    // run-all list. This locks in that it still resolves to a real (non-empty)
+    // narrow selection rather than silently selecting nothing.
+    const r = selectSpecs({
+      changedFiles: [
+        'lib/shared-components/src/features/elite-draft/DraftTopBand.tsx',
+      ],
+      manifest,
+    });
+    assert.equal(r.runAll, false);
+    assert.ok(
+      r.specs.length > 0,
+      'expected a non-empty narrow spec selection for elite-draft changes',
+    );
   });
 
   it('selects nothing for a docs-only change', () => {
