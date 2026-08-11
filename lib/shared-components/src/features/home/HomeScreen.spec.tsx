@@ -7,6 +7,7 @@ import {
   type HomeLeagueSummary,
   HomeScreen,
   type HomeScreenProps,
+  LeagueListRow,
 } from './HomeScreen';
 
 // `useMedia` is stubbed to `jest.fn(() => ({}))` by the package-wide `tamagui`
@@ -267,6 +268,87 @@ describe('HomeScreen', () => {
 
       fireEvent.click(getByTestId('sport-card-create-baseball'));
       expect(onCreateLeague).toHaveBeenCalledWith('baseball');
+    });
+  });
+
+  describe('keyboard accessibility (LS-8916)', () => {
+    it('fires onPress on the hero league card when Enter or Space is pressed', () => {
+      const onViewLeague = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          onViewLeague={onViewLeague}
+        />,
+      );
+      const hero = getByTestId('home-hero-card');
+      fireEvent.keyDown(hero, { key: 'Enter' });
+      expect(onViewLeague).toHaveBeenCalledWith(league);
+      onViewLeague.mockClear();
+      fireEvent.keyDown(hero, { key: ' ' });
+      expect(onViewLeague).toHaveBeenCalledWith(league);
+    });
+
+    it('fires onPress on the playboard hero card when Enter or Space is pressed', () => {
+      const footballLeague: HomeLeagueSummary = {
+        leagueId: 51,
+        leagueName: 'Steel Curtain Era',
+        sport: 'football',
+        leaguePhase: 'active',
+      };
+      const onViewLeague = jest.fn();
+      const { getByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[footballLeague]}
+          onViewLeague={onViewLeague}
+        />,
+      );
+      const hero = getByTestId('home-playboard-hero');
+      fireEvent.keyDown(hero, { key: 'Enter' });
+      expect(onViewLeague).toHaveBeenCalledWith(footballLeague);
+      onViewLeague.mockClear();
+      fireEvent.keyDown(hero, { key: ' ' });
+      expect(onViewLeague).toHaveBeenCalledWith(footballLeague);
+    });
+
+    it('fires onPress on a secondary LeagueListRow when Enter or Space is pressed', () => {
+      const summary: HomeLeagueSummary = {
+        leagueId: 43,
+        leagueName: 'Second League',
+        sport: 'baseball',
+        leaguePhase: 'active',
+      };
+      const onPress = jest.fn();
+      const { getByText } = render(
+        <LeagueListRow summary={summary} onPress={onPress} />,
+      );
+      const row = getByText('Second League').closest(
+        '[data-accessibility-role="button"]',
+      ) as HTMLElement;
+      expect(row).toBeTruthy();
+      fireEvent.keyDown(row, { key: 'Enter' });
+      expect(onPress).toHaveBeenCalledTimes(1);
+      fireEvent.keyDown(row, { key: ' ' });
+      expect(onPress).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not fire onPress on unrelated keys', () => {
+      const summary: HomeLeagueSummary = {
+        leagueId: 43,
+        leagueName: 'Second League',
+        sport: 'baseball',
+        leaguePhase: 'active',
+      };
+      const onPress = jest.fn();
+      const { getByText } = render(
+        <LeagueListRow summary={summary} onPress={onPress} />,
+      );
+      const row = getByText('Second League').closest(
+        '[data-accessibility-role="button"]',
+      ) as HTMLElement;
+      fireEvent.keyDown(row, { key: 'Tab' });
+      expect(onPress).not.toHaveBeenCalled();
     });
   });
 

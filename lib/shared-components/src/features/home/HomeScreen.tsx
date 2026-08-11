@@ -768,6 +768,13 @@ function LeagueHeroCard({
       accessibilityRole="button"
       accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
       onPress={onPress}
+      tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPress();
+        }
+      }}
       cursor="pointer"
       borderRadius={6}
       borderWidth={2}
@@ -1026,6 +1033,13 @@ function PlayboardButton({
         onPress?.();
       }}
       tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onPress?.();
+        }
+      }}
       minHeight={44}
       width={fullWidth ? '100%' : undefined}
       paddingVertical={12}
@@ -1441,6 +1455,12 @@ function PlayboardHeroCard({
       accessibilityRole="button"
       accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
       onPress={onPress}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPress();
+        }
+      }}
       onLayout={(e: LayoutChangeEvent) =>
         setBoardWidth(e.nativeEvent.layout.width)
       }
@@ -1683,6 +1703,13 @@ export function LeagueListRow({
       accessibilityRole="button"
       accessibilityLabel={`Open ${summary.leagueName ?? 'League'}`}
       onPress={onPress}
+      tabIndex={0}
+      onKeyDown={(e: React.KeyboardEvent) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onPress();
+        }
+      }}
       cursor="pointer"
       backgroundColor="$glassSurfaceLight"
       borderWidth={1}
@@ -1737,6 +1764,14 @@ export function LeagueListRow({
             onPress={(e: GestureResponderEvent) => {
               e.stopPropagation();
               onMockDraft();
+            }}
+            tabIndex={0}
+            onKeyDown={(e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                e.stopPropagation();
+                onMockDraft();
+              }
             }}
             alignSelf="flex-start"
             marginTop="$1"
