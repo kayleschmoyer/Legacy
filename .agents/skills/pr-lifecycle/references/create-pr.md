@@ -26,17 +26,17 @@ Then create the draft PR (see [Command](#command) below) and apply `agent-in-pro
 
 ## Command
 
-> **⚠️ MCP tool string parameters are not shell-evaluated.** Unlike the Bash tool's `git commit -m "$(cat <<'EOF' ... EOF)"` heredoc convention, an MCP tool call is a plain JSON call — there is no shell to expand `$(...)` or backticks. Passing `body: "$(cat /tmp/pr-body.md)"` to `github_create_pr`/`create_pull_request` (or `commentBody` to a Jira comment tool) lands as the literal string `$(cat /tmp/pr-body.md)`, not the file's contents (LS-8591, caught while opening the draft PR for LS-6031). If you assembled the body in a scratch file via `Write`/`Edit`, `Read` it back and inline the actual text into the `body` param instead. This is cheap to catch: after creating a PR from a scratch-file body, re-read it once (`pull_request_read`/`jira_view`) to confirm the content landed correctly before moving on.
+> **⚠️ MCP tool string parameters are not shell-evaluated.** Unlike the Bash tool's `git commit -m "$(cat <<'EOF' ... EOF)"` heredoc convention, an MCP tool call is a plain JSON call — there is no shell to expand `$(...)` or backticks. Passing `body: "$(cat /tmp/pr-body.md)"` to `github_open_pr`/`create_pull_request` (or `commentBody` to a Jira comment tool) lands as the literal string `$(cat /tmp/pr-body.md)`, not the file's contents (LS-8591, caught while opening the draft PR for LS-6031). If you assembled the body in a scratch file via `Write`/`Edit`, `Read` it back and inline the actual text into the `body` param instead. This is cheap to catch: after creating a PR from a scratch-file body, re-read it once (`pull_request_read`/`jira_view`) to confirm the content landed correctly before moving on.
 
-Tool selection is homed in the [PR-creation tool routing table](../SKILL.md#pr-creation-tool-routing-one-home--link-here-do-not-restate) — the flow below shows the local `github_create_pr` (local-git stdio) path. **Always create as draft** to prevent sweep/review agents from racing with the creating agent:
+Tool selection is homed in the [PR-creation tool routing table](../SKILL.md#pr-creation-tool-routing-one-home--link-here-do-not-restate) — the flow below shows the `github_open_pr` (hosted `legacy-sports-github`) path. **Always create as draft** to prevent sweep/review agents from racing with the creating agent:
 
 ```
-github_create_pr(
+github_open_pr(
   title: "LS-#### type(scope): Brief description",
   body: <PR body markdown>,
-  draft: true,
-  head: <branch-name>,   # from worktree_status().headRefName
-  jiraPrimary: "LS-####" # session's ticket — drives the jira-link marker; omit to derive from title
+  draft: true,           # stop after creation; finish the label sequence yourself
+  head: <branch-name>,   # from worktree_status().headRefName (required in Lambda mode)
+  jiraKey: "LS-####"     # session's ticket — drives the jira-link marker; omit to derive from title
 )
 ```
 
@@ -65,11 +65,11 @@ primary: LS-####
 - Bot/Dependabot PRs (no ticket) use `primary: none` and omit the visible line.
 - Correcting linkage = **edit the PR body** — no force-push or branch rename.
 
-`github_create_pr` injects the marker automatically when the body lacks one: it uses the `jiraPrimary` param if passed, else the first `LS-####` in the title, else `none`. Pass `jiraRelated` for related keys. Bodies that already contain a marker are left untouched, and a body that already has a visible `**Jira:**` line gets only the HTML comment (no duplicate link).
+`github_open_pr` injects the marker automatically when the body lacks one: it uses the `jiraKey` param if passed, else the first `LS-####` in the title, else `none` (with the `no-jira` label applied automatically per LS-8298). Bodies that already contain a marker are left untouched, and a body that already has a visible `**Jira:**` line gets only the HTML comment (no duplicate link).
 
-#### CCR fallback — hand-authoring the marker (no `jiraPrimary` convenience)
+#### CCR fallback — hand-authoring the marker (no `jiraKey` convenience)
 
-The generic `mcp__github__create_pull_request` tool (routing table row 3 — used when the hosted `legacy-sports-github`/`legacy-sports-jira` connectors are unauthenticated in a CCR session, or on Claude Code on the web without the connector) takes a plain `body` string only. It has **no `jiraPrimary` param** and does **not** auto-prepend the marker — you must hand-author the exact three-line block yourself, in the body you pass to the initial `create_pull_request` call.
+The generic `mcp__github__create_pull_request` tool (routing table row 2 — used when the hosted `legacy-sports-github`/`legacy-sports-jira` connectors are unauthenticated in a CCR session, or on Claude Code on the web without the connector) takes a plain `body` string only. It has **no `jiraKey` param** and does **not** auto-prepend the marker — you must hand-author the exact three-line block yourself, in the body you pass to the initial `create_pull_request` call.
 
 The marker key is **newline-separated**, not inline. Both of these look plausible but only the first is valid:
 
@@ -101,7 +101,7 @@ primary: LS-1234
 ...
 ```
 
-If `legacy-sports-github` re-authenticates mid-session, prefer switching back to `github_create_pr({ jiraPrimary: "LS-####" })` for its auto-prepend convenience rather than continuing to hand-author the marker on the generic tool.
+If `legacy-sports-github` re-authenticates mid-session, prefer switching back to `github_open_pr({ jiraKey: "LS-####" })` for its auto-prepend convenience rather than continuing to hand-author the marker on the generic tool.
 
 #### CCR fallback: jira-link marker read-back-and-retry
 
@@ -183,7 +183,7 @@ primary: LS-####
 
 ## After PR Creation
 
-> **⛔ COMMON FAILURE MODE — never stop after `github_create_pr`.** A draft PR is skipped by the reviewer bot, the CI Orchestrator (which is gated on bot review events), and sweep agents — it will receive no automated review or orchestrated CI until you explicitly mark it ready. All 9 steps below are required — `github_create_pr` with `draft: true` is only step 1 of 9.
+> **⛔ COMMON FAILURE MODE — never stop after `github_open_pr({ draft: true })`.** A draft PR is skipped by the reviewer bot, the CI Orchestrator (which is gated on bot review events), and sweep agents — it will receive no automated review or orchestrated CI until you explicitly mark it ready. All 9 steps below are required — `github_open_pr` with `draft: true` is only step 1 of 9.
 
 1. If you used the `gh` CLI with `--body-file`, clean up the temp body file: `bash scripts/cleanup-pr-body.sh` (no-op if `.github/tmp-pr-body.md` does not exist)
 2. **Apply `agent-in-progress` label** (while still a draft): `github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])` — marks the PR as actively watched so sweep and review agents skip it. Applying before marking ready closes the race window. **Remove this label when you exit the task** (PR merged or session ends without completion). Shell fallback: `gh pr edit <PR#> --add-label "agent-in-progress"`
@@ -219,7 +219,7 @@ Claude Code's built-in auto-create paths (the desktop "Create PR" affordance, cl
 - **Never** create a PR from the `main` branch
 - **Never** skip `make pc` — each CI failure costs 40-60 min. It must pass before **mark-ready** (Gate B), but run it **after** the draft PR is open, not before — see the draft-PR-first note under [Prerequisites](#prerequisites). Running `make pc` before the draft PR exists is the dominant cloud-agent timeout failure mode.
 - **Never** inline `--body` in PowerShell — always use `--body-file` or MCP tool
-- **Never** create a PR body without the jira-link marker — it is the source of truth for ticket linkage. `github_create_pr` injects it automatically; if you create a PR any other way (e.g. `gh pr create` fallback), include the full three-line block manually, with exactly one `primary` (or `primary: none` for ticket-less bot PRs). An opening comment with no `primary:` line is **not** a valid marker and fails Jira Link Check:
+- **Never** create a PR body without the jira-link marker — it is the source of truth for ticket linkage. `github_open_pr` injects it automatically; if you create a PR any other way (e.g. `gh pr create` fallback), include the full three-line block manually, with exactly one `primary` (or `primary: none` for ticket-less bot PRs). An opening comment with no `primary:` line is **not** a valid marker and fails Jira Link Check:
 
   ```markdown
   <!-- jira-link

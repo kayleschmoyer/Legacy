@@ -179,7 +179,6 @@ Per-server tool lists, server IDs, and stdio-vs-hosted transport live in `tools/
 | `tools/mcp/nx-server/`          | `nx_run`, `nx_run_affected`, `nx_run_pc_chunk`, …                                          |
 | `tools/mcp/aws-server/`         | AWS read/ops helpers (requires local AWS credentials)                                      |
 | `tools/mcp/browser-server/`     | Browser automation                                                                         |
-| `tools/mcp/local-git-server/`   | Plain-git operations for non-worktree checkouts                                            |
 | `tools/mcp/dev-process-server/` | Dev-process gate/artifact tooling                                                          |
 
 ## Config & Build

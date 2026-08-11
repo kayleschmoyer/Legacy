@@ -75,7 +75,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 > **Ordering is owned by the [ticket-to-merge spine](../workflow-overview/references/ticket-to-merge-spine.md)** — the steps below are the native-flow tool bindings for that sequence (spine step in parentheses). The load-bearing reorder: **the draft PR opens _before_ validation** as a durable checkpoint. If numbering here ever disagrees with the spine, the spine wins.
 
 8. **Plan then implement** (spine 1b, 6) — run the [planning reference](../plan-ticket/references/planning.md) (Step 1b) to classify risk and read affected code before writing anything. Skip for trivial tasks (typos, doc-only, single-line changes). Then read the full ticket description, investigate, and write code + tests. See [work-ticket leaf-mode](../work-ticket/references/leaf-mode.md) steps 4 and 7 for implementation notes + self-review.
-9. **Commit → push → open draft PR (durable checkpoint)** (spine 7–9) — `worktree_commit({ message: "type(scope): LS-#### msg" })` → `worktree_push({ setUpstream: true })` → `github_create_pr(draft: true)` → `github_manage_labels([+"agent-in-progress"])` → post a continuation checkpoint. The draft PR is inert (CI/review gate on `draft == false`) and exists **before** the long validation run, so a session kill mid-validation loses nothing ([draft-PR-before-validation gate](../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions)).
+9. **Commit → push → open draft PR (durable checkpoint)** (spine 7–9) — `worktree_commit({ message: "type(scope): LS-#### msg" })` → `worktree_push({ setUpstream: true })` → `github_open_pr(draft: true)` → `github_manage_labels([+"agent-in-progress"])` → post a continuation checkpoint. The draft PR is inert (CI/review gate on `draft == false`) and exists **before** the long validation run, so a session kill mid-validation loses nothing ([draft-PR-before-validation gate](../workflow-overview/references/ticket-to-merge-spine.md#critical-gates-preconditions)).
    - **Precondition for any commit/push: use the worktree MCP tool.** `git add <files> && git commit -m "..."` → `worktree_commit({ files: ["<file>"], message: "..." })`; `git push -u origin <branch>` (or `HEAD`) → `worktree_push({ setUpstream: true })`. The MCP tools enforce secret-file guards and worktree safety checks that raw git bypasses. Raw `git` is a fallback only after the MCP tool returns an explicit error. See the MCP-first substitution table in `.agents/skills/mcp-first/SKILL.md`.
    - **Pre-push hook fails with `nx` not found or `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL`**: `node_modules/.bin` is empty or missing (where the pnpm shims live). Use `worktree_push({ skipLint: true })` — do **not** use `SKIP_PREPUSH_LINT=1 git push`. **Important:** `skipLint` bypasses the entire hook after the lockfile checks — conflict-marker and Terraform validations are also skipped, not just formatting. Only use as a last resort; manually run Prettier and check for conflict markers before pushing: `node node_modules/prettier/bin/prettier.cjs --write <files>`. Do not attempt `make install` from the worktree while symlinks exist — ask the user to repair the main repo instead.
 10. **Migrations** (spine 11) — `pnpm --prefix lib/db-client run db:status` then `db:up` (or `make db-migrate`).
@@ -126,7 +126,7 @@ for each ticket/PR needing code work:
       Work (order per .agents/skills/workflow-overview/references/ticket-to-merge-spine.md — draft PR before validation):
       6. <specific instructions — implement ticket, fix review, rebase, etc.>
       7. worktree_commit + worktree_push
-      8. github_create_pr(draft: true) (if new) or push to existing PR branch
+      8. github_open_pr(draft: true) (if new) or push to existing PR branch
       9. make_run(target: "pc") — then self-review and github_mark_pr_ready when green
 
       Tool preferences:
@@ -181,7 +181,7 @@ make_worktree_create({ ticket: "####", description: "desc" })   # create branch 
 make_wt_setup({ worktreePath: "<path>" })                       # symlink node_modules, copy .env, link .twig
 worktree_set(key: "LS-####")                                    # make it active
 # ... work ...
-worktree_commit + worktree_push + github_create_pr
+worktree_commit + worktree_push + github_open_pr
 twig worktree clean                                             # after merge
 ```
 

@@ -103,7 +103,7 @@ If you arrived here from `/work-ticket`, `/fix-pr`, `/drive-pr`, `/sweep-prs`, `
 
 1. `worktree_commit({ message: "type(scope): LS-#### msg" })` (if there are unstaged review fixes)
 2. `worktree_push({ setUpstream: true })` (first push) or `worktree_push()` (subsequent pushes)
-3. `github_create_pr({ title: "LS-#### type(scope): msg", body: "...", draft: true, head: <branch-name> })`
+3. `github_open_pr({ title: "LS-#### type(scope): msg", body: "...", jiraKey: "LS-####", draft: true, head: <branch-name> })`
 4. `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })`
 5. `github_mark_pr_ready({ number: <PR#> })`
 6. `jira_transition({ key: "LS-####", status: "In Review" })`

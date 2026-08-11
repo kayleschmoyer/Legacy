@@ -116,7 +116,7 @@ function getUpstreamBranch(cwd: string): Promise<string | null> {
  * Semantic one-shot for Step 12 of the ticket spine (Ship):
  * push branch → create PR as draft → mark ready for review → apply bot:ready-for-review label.
  *
- * Replaces the six-step worktree_push → github_create_pr → github_mark_pr_ready →
+ * Replaces the six-step worktree_push → create-draft-PR → github_mark_pr_ready →
  * github_manage_labels(add: bot:ready-for-review) → github_request_review sequence.
  * The bot:ready-for-review label is always applied (required for fix-push cycles to
  * re-trigger the Reviewer Bot). Pass draft: true to skip mark-ready and the label.

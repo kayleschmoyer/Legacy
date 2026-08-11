@@ -62,7 +62,7 @@ Follow the standard workflow:
 
 1. Commit with conventional message: `feat(mcp): ...` or `docs(skills): ...`
 2. Push with `--force-with-lease`
-3. Create PR with `gh pr create` or `github_create_pr`
+3. Create PR with `gh pr create` or `github_open_pr`
 4. Transition Jira ticket to "In Review"
 
 ## Gotchas

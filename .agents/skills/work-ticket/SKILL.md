@@ -44,7 +44,7 @@ work-ticket <ticket-key> [--batch]
 
 > **Precondition: write the full completion checklist into TaskCreate before starting.** Any ticket that produces a code change is complete only when the PR is **merged**, Jira is **Done**, and the MCP gap audit has run. At the start of work, create these tasks (and do not mark the parent ticket complete until each is `completed`):
 >
-> 1. `Open draft PR` — `github_create_pr({ draft: true })`
+> 1. `Open draft PR` — `github_open_pr({ draft: true })`
 > 2. `Mark PR ready for review` — `github_mark_pr_ready({ number })` + apply `bot:ready-for-review`
 > 3. `Reply to every Reviewer Bot thread` — `FIX: <sha>` / `JUSTIFY:` / `CANNOT-COMPLY:`
 > 4. `PR merged` — `github_view_pr` returns `state: "MERGED"`
@@ -209,7 +209,7 @@ The skill shepherds the PR all the way to "merged" (Leaf Mode step 9). It does N
 - **Always check blockers before starting** — working a ticket whose blocker is still in progress wastes effort; `jira_get_all_descendants` returns blocker state inline.
 - **One ticket = one worktree = one PR** — never combine children into one branch; unrelated findings become a follow-up ticket + chip (see leaf-mode).
 - **Paginate child listings** — `jira_list_children` defaults to 25 results/page, `jira_search` to 15. Always pass `limit: 100` and paginate via `pageToken` until `nextPageToken` is absent (the absence of `nextPageToken`, not a `total` comparison, is the truncation signal — `total` reflects page size). Failing to paginate caused the LS-2079 premature-epic-Done incident.
-- **Checkpoints are not the finish line** — `github_create_pr`, `make pc` green, and `github_mark_pr_ready` each close at most one completion-contract task. The skill ends at **merged** + gap audit + tracking tasks complete.
+- **Checkpoints are not the finish line** — `github_open_pr`, `make pc` green, and `github_mark_pr_ready` each close at most one completion-contract task. The skill ends at **merged** + gap audit + tracking tasks complete.
 
 ## Provenance and maintenance
 

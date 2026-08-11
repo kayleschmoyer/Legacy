@@ -467,7 +467,7 @@ State as of 2026-07-02 — what coverage tooling exists and, more importantly, w
 - **Local coverage is informational only:** `pnpm exec nx run <project>:test --coverage` writes to `coverage/<project-root>/` (per-project `coverageDirectory`). Nothing consumes these files.
 - **The only automated coverage machinery is for E2E, not units:** the `collect-coverage` input on `run-playwright-tests.yml` (LS-7849) runs an istanbul-instrumented build to repopulate the per-spec coverage data behind the [surface maps](#new-spec-registration-contract-surface-maps). It maintains spec→surface mappings; it is not a quality gate.
 - `make check-skipped-tests` reports skipped tests; the script is PowerShell (`scripts/check-skipped-tests.ps1`), so it needs `pwsh` on Linux/macOS.
-- **OPEN — zero-spec surfaces** (no `*.spec.ts` files at all, verified 2026-07-02): `lib/api`, `lib/graphql`, `lib/codegen`, `apps/video`, `lambdas/layers`, `tools/mcp/browser-server`, `tools/mcp/local-git-server`. If your change lands in one of these, there is no existing suite to extend — budget for creating one or state explicitly in the PR why not.
+- **OPEN — zero-spec surfaces** (no `*.spec.ts` files at all, verified 2026-07-02): `lib/api`, `lib/graphql`, `lib/codegen`, `apps/video`, `lambdas/layers`, `tools/mcp/browser-server`. If your change lands in one of these, there is no existing suite to extend — budget for creating one or state explicitly in the PR why not.
 
 ## Integration with Workflow
 

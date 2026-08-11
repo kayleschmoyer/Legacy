@@ -5,7 +5,7 @@
 An MCP server has silently failed to load when **any** of the following is true:
 
 - `ToolSearch(query: "select:worktree_ping")` returns "No matching deferred tools found"
-- `ToolSearch(query: "github_create_pr")` returns empty
+- `ToolSearch(query: "worktree_commit")` returns empty
 - `ToolSearch(query: "make_run")` returns empty
 - The `<system-reminder>` deferred tools list is empty or missing `mcp__legacy-sports-github__*`, `mcp__worktree__*`, `mcp__legacy-sports-make__*`, `mcp__legacy-sports-nx__*`
 - The session's `[MCP WARNING]` output from `check-mcp-servers.sh` reports a failure
@@ -55,7 +55,7 @@ test -f .github/copilot/hooks/mcp-bootstrap.mjs && echo "bootstrap: OK" || echo 
 ### Check 4 — server source files present
 
 ```bash
-for srv in local-git-server worktree-server make-server nx-server ci-server aws-server browser-server dev-process-server; do
+for srv in worktree-server make-server nx-server ci-server aws-server browser-server dev-process-server; do
   test -f "tools/mcp/${srv}/src/index.ts" \
     && echo "${srv}: OK" \
     || echo "${srv}: MISSING — tools/mcp/${srv}/src/index.ts"

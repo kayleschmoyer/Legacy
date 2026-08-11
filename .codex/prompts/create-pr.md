@@ -15,7 +15,7 @@ Load the PR creation reference via `.agents/skills/pr-lifecycle/references/creat
 Execute the skill's procedure exactly:
 
 1. Verify Gate A prerequisites — not on main, branch pushed (stop on first failure)
-2. Create the PR as **draft** using `github_create_pr` MCP tool — **before** running `make pc`
+2. Create the PR as **draft** using `github_open_pr` MCP tool — **before** running `make pc`
 3. Apply `agent-in-progress` label via `github_manage_labels`
    3a. Run Gate B (the validated gate) **now that the draft PR exists**: migrations → `make pc` to green → bug-fix verification if required → self-review
 4. Mark ready for review using `github_mark_pr_ready`

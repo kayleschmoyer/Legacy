@@ -65,7 +65,7 @@
 
     <rect class="phase" x="230" y="215" width="170" height="70" rx="6"/>
     <text class="label" x="315" y="240" text-anchor="middle">7. Draft PR</text>
-    <text class="sub"   x="315" y="258" text-anchor="middle">github_create_pr</text>
+    <text class="sub"   x="315" y="258" text-anchor="middle">github_open_pr</text>
     <text class="sub"   x="315" y="272" text-anchor="middle">label: agent-in-progress</text>
 
     <rect class="phase" x="430" y="215" width="170" height="70" rx="6"/>

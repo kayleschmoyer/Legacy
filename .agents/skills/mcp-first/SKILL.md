@@ -26,7 +26,6 @@ Registered in the repo-root `.mcp.json`, launched per-session as local processes
 
 | `.mcp.json` key             | Tool prefix                        | Purpose                                                                                                                                                                                                                                                                                                                                              |
 | --------------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `local-git`                 | `mcp__local-git__`                 | `github_create_pr` (create-only PR, jira-link marker) and `github_rebase_pr` — see [PR Creation Routing](#pr-creation-routing)                                                                                                                                                                                                                       |
 | `worktree`                  | `mcp__worktree__`                  | Worktree lifecycle: status/commit/push/rebase/stash/reset/reflog…, plus `auth_check_all` and `worktree_ping`                                                                                                                                                                                                                                         |
 | `legacy-sports-make`        | `mcp__legacy-sports-make__`        | Whitelisted Makefile targets: `make_run`, `make_run_wait`, `make_run_status`, `make_worktree_create`, `make_wt_setup`, `validate_pr`, `ci_run_custom_checks`                                                                                                                                                                                         |
 | `legacy-sports-nx`          | `mcp__legacy-sports-nx__`          | Nx discovery + execution: `nx_run`, `nx_run_affected`, `nx_run_pc_chunk`, `nx_run_prettier`, `nx_run_eslint`, `nx_run_e2e_specs`, `nx_show_project(s)`, `nx_dep_graph`                                                                                                                                                                               |
@@ -85,13 +84,15 @@ Two different files, two different jobs:
 - **`.mcp.json`** _registers_ project-scope stdio servers (Surface 1). It contains **only** stdio-launched entries — the hosted servers were removed from it when Claude Code 2.1.100 began silently dropping project-scope HTTP entries (LS-4595, documented in the `scripts/mcp-auth.mjs` header) and moved to claude.ai connectors.
 - **`.claude/settings.json#enabledMcpjsonServers`** _auto-approves_ servers from `.mcp.json` so sessions start them without a permission prompt. It is a name list, not a registration.
 
-The two lists intentionally-or-not disagree (verified 2026-07-02):
+The two lists intentionally-or-not disagree (verified 2026-08-10):
 
-| Name                                                               | In `.mcp.json` | In `enabledMcpjsonServers` | Effect                                                                                                                     |
-| ------------------------------------------------------------------ | :------------: | :------------------------: | -------------------------------------------------------------------------------------------------------------------------- |
-| `worktree`, `legacy-sports-make/nx/aws/browser`, `stripe`          |       ✅       |             ✅             | Start without prompting                                                                                                    |
-| `local-git`, `legacy-sports-ci-local`, `legacy-sports-dev-process` |       ✅       |             ❌             | Registered but not pre-approved — Claude Code may prompt before connecting. Whether the omission is deliberate is **OPEN** |
-| `legacy-sports-github/jira/ci/db-admin`                            |       ❌       |             ✅             | No-op entries — vestiges of the pre-connector era when these were HTTP entries in `.mcp.json`                              |
+| Name                                                      | In `.mcp.json` | In `enabledMcpjsonServers` | Effect                                                                                                                     |
+| --------------------------------------------------------- | :------------: | :------------------------: | -------------------------------------------------------------------------------------------------------------------------- |
+| `worktree`, `legacy-sports-make/nx/aws/browser`, `stripe` |       ✅       |             ✅             | Start without prompting                                                                                                    |
+| `legacy-sports-ci-local`, `legacy-sports-dev-process`     |       ✅       |             ❌             | Registered but not pre-approved — Claude Code may prompt before connecting. Whether the omission is deliberate is **OPEN** |
+| `legacy-sports-github/jira/ci/db-admin`                   |       ❌       |             ✅             | No-op entries — vestiges of the pre-connector era when these were HTTP entries in `.mcp.json`                              |
+
+> The `local-git` stdio server (former home of `github_create_pr` / `github_rebase_pr`) was **removed** in LS-9294 (owner ruling 2026-08-10): it was registered but never enabled or approved, so its tools never actually loaded in sessions, while the skills still documented them as canonical — the hosted `github_open_pr` composite is the single create surface now. If you encounter a doc still routing to `github_create_pr`, treat it as stale and fix it.
 
 Separately, `settings.json#permissions.allow` pre-approves _tool calls_ (e.g. `mcp__legacy-sports-github__*`) — that governs permission prompts, not server startup.
 
@@ -102,10 +103,9 @@ Separately, `settings.json#permissions.allow` pre-approves _tool calls_ (e.g. `m
 **The routing decision — which creation tool per environment, plus the mandatory label sequence — has one home: [pr-lifecycle → PR-creation tool routing](../pr-lifecycle/SKILL.md#pr-creation-tool-routing-one-home--link-here-do-not-restate).** This section holds only the tool-surface facts behind that table:
 
 - `github_open_pr` — registered on the **hosted `legacy-sports-github` connector** only. Semantic one-shot: push branch → create draft → mark ready → apply `bot:ready-for-review`; `draft: true` stops after creation; in Lambda mode `head` is required and push is skipped. When `jiraKey` is passed, the tool auto-inserts the jira-link marker in the body **and** (LS-8679) prepends the key to the title if it isn't already present anywhere in it — so passing a pre-prefixed title is no longer required to pass Jira Link Check.
-- `github_create_pr` — registered on the **`local-git` stdio server** only (`mcp__local-git__`); create-only, auto-prepends the jira-link marker. When no Jira key is provided or derivable from the title, the marker falls back to `primary: none` and the tool applies the `no-jira` label automatically (LS-8298 — Jira Link Check requires that label for `primary: none`); the result surfaces `noJiraLabelApplied`. **Timeout recovery (LS-8213)**: on a transport timeout the tool reconciles by branch lookup and returns `{ success: true, number, url, note }` if the PR was created server-side — do not retry blindly.
-- Neither custom surface available → the routing home's built-in and `gh` rows apply; before any `gh pr create` fallback, diagnose and report first (see [diagnostics Reporting Protocol](references/diagnostics.md#reporting-protocol)) — `gh pr create` silently targets the shell's working directory.
+- `github_open_pr` unavailable → the routing home's built-in and `gh` rows apply; before any `gh pr create` fallback, diagnose and report first (see [diagnostics Reporting Protocol](references/diagnostics.md#reporting-protocol)) — `gh pr create` silently targets the shell's working directory.
 
-`github_create_pr` and `github_open_pr` share the same underlying implementation family (`tools/mcp/github-server/src/tools/create-pr.ts` / `open-pr.ts`; `local-git` imports `createPR` from there) — they are not competing conventions, just different surfaces.
+> **`github_create_pr` no longer exists.** It lived on the `local-git` stdio server, which was removed in LS-9294 — the server was registered but never enabled, so the tool never loaded in sessions anyway. `github_open_pr` (hosted `legacy-sports-github`) is the single custom create surface; it carries the jira-link-marker auto-insert itself (shared `jira-link.js` module: `primary: none` + `no-jira` label fallback per LS-8298, self-healing marker per LS-9043). `github_rebase_pr` went with the server too — use `github_bulk_rebase({ numbers: [N] })` for a single hosted rebase, or `worktree_rebase_onto_main` locally.
 
 ### Pre-flight Auth Check
 
@@ -321,7 +321,7 @@ make_run_status({ jobId })          // non-blocking snapshot (status + log tail)
 
 `make_run_wait` returns the full structured result (with `steps[]` for multi-step targets like `pre-commit`/`full-check`) once the job reaches `done`/`failed`; `nx_job_wait` likewise returns the originating tool's structured result (e.g. the playwright report for `nx_run_e2e_specs`). `runInBackground: true` still exists to skip the initial bounded wait and return the jobId immediately. (Validation routing is unchanged — see [Validation Routing](#validation-routing).)
 
-The same contract covers the git-heavy github tools (LS-8562): `github_rebase_pr` (stdio `local-git` server), `github_bulk_rebase`, and `github_open_pr`'s push phase each run under a ~45s sync budget and may return `{ jobId, status: "running" }` — poll with `github_job_wait` / `github_job_status` **on the same server that returned the jobId** (job registries are per-process). `github_bulk_rebase` reports per-PR progress in `logTail`. These jobs are in-process and do not survive an MCP server restart — if a jobId is lost, verify the outcome (`github_view_pr`, `worktree_status`) instead of re-running. Only the stdio deployments are affected — the Lambda deployment has no `git` binary on its PATH, so `rebasePR`/`bulkRebase` route to a git-free GitHub API merge-style update there instead (`PUT /pulls/{number}/update-branch`) rather than the sync-budget/job path; this produces a merge commit, not a linear rebase (LS-7753).
+The same contract covers the git-heavy github tools (LS-8562): `github_bulk_rebase` and `github_open_pr`'s push phase each run under a ~45s sync budget and may return `{ jobId, status: "running" }` — poll with `github_job_wait` / `github_job_status` **on the same server that returned the jobId** (job registries are per-process). `github_bulk_rebase` reports per-PR progress in `logTail`. These jobs are in-process and do not survive an MCP server restart — if a jobId is lost, verify the outcome (`github_view_pr`, `worktree_status`) instead of re-running. Only the stdio deployments are affected — the Lambda deployment has no `git` binary on its PATH, so `rebasePR`/`bulkRebase` route to a git-free GitHub API merge-style update there instead (`PUT /pulls/{number}/update-branch`) rather than the sync-budget/job path; this produces a merge commit, not a linear rebase (LS-7753).
 
 The aws-server long-runners follow the same contract (LS-8560): `packer_build` always runs the build (including `packer init`) in the background with a 45s initial wait, returning either the finished result or `{ status: "running", buildId }`; `packer_build_wait` is capped at 55s per call and returns a non-error running snapshot with a re-arm hint; `aws_ssm_run_command` polls ≤55s per call and re-arms via `aws_ssm_run_command({ instanceId, commandId })` — never re-send the command while it is in progress.
 
@@ -343,7 +343,7 @@ Use `worktree_file_info({ paths: [...] })` instead of `wc -l file1 file2 ...` vi
 
 ## GitHub PR Operations
 
-> **Opening a PR: route by surface — see [PR Creation Routing](#pr-creation-routing)** (the single home for `github_open_pr` vs `github_create_pr` vs built-ins vs `gh`).
+> **Opening a PR: route by surface — see [PR Creation Routing](#pr-creation-routing)** (the single home for `github_open_pr` vs built-ins vs `gh`).
 
 Use the MCP tools below instead of `gh` CLI. These tools handle temp file body encoding, GraphQL thread IDs, and structured output. Fall back to `gh` CLI **only** when the MCP server is unavailable.
 
@@ -382,7 +382,7 @@ On Claude Code on the web, Claude provides built-in `mcp__github__*` tools that 
 
 | Custom MCP tool                                                   | Built-in equivalent (Claude Code on the web)                                                   |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `github_create_pr` (local-git)                                    | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft })`            |
+| `github_open_pr({ draft: true })` (create phase)                  | `mcp__github__create_pull_request({ owner, repo, title, head, base, body, draft })`            |
 | `github_mark_pr_ready`                                            | `mcp__github__update_pull_request({ owner, repo, pullNumber, draft: false })`                  |
 | `github_view_pr`                                                  | `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber })`                   |
 | `github_get_review_threads`                                       | `mcp__github__pull_request_read({ method: "get_review_comments", owner, repo, pullNumber })`   |
@@ -541,12 +541,12 @@ Use `browser_dev_start` to start a dev server, `browser_navigate` + `browser_scr
 
 ## Provenance and Maintenance
 
-Rewritten 2026-07-02 from the Phase-1 skills audit (`mcp-tool-routing-and-auth` assignment): absorbed the `credentials` skill, added the four-surface model + `local-git`, corrected the `.mcp.json` description, and folded in the owner rulings on degraded-CC-web validation and the DB server name. Re-verify volatile facts before editing:
+Rewritten 2026-07-02 from the Phase-1 skills audit (`mcp-tool-routing-and-auth` assignment): absorbed the `credentials` skill, added the four-surface model, corrected the `.mcp.json` description, and folded in the owner rulings on degraded-CC-web validation and the DB server name. Updated 2026-08-10 (LS-9294): removed the vestigial `local-git` server and its `github_create_pr`/`github_rebase_pr` surface. Re-verify volatile facts before editing:
 
 - stdio server set + order: `node -e "console.log(Object.keys(require('./.mcp.json').mcpServers))"`
 - auto-approval list: `grep -A12 enabledMcpjsonServers .claude/settings.json`
 - hosted server set / scopes: `grep -n "scope_name" terraform/main/lambda-mcp-api-gateway.tf`
-- `github_open_pr` vs `github_create_pr` homes: `grep -rn "github_open_pr\|github_create_pr" tools/mcp/github-server/src/index.ts tools/mcp/local-git-server/src/index.ts`
+- `github_open_pr` home: `grep -rn "github_open_pr" tools/mcp/github-server/src/index.ts`
 - `auth_check_all` home: `grep -n "auth_check_all" tools/mcp/worktree-server/src/index.ts`
 - Copilot bearer flow: `grep -n "BEARER\|mint" .github/copilot/copilot-cloud-mcp-config.json .github/workflows/copilot-setup-steps.yml`
 - background-Bash chunk policy: `sed -n 1,80p .agents/hooks/enforce-background.mjs` (blocks foreground `make pc-*`, allows `run_in_background`)

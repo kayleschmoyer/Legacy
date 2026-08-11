@@ -57,7 +57,7 @@ REPEAT:
   → Loop back to step 1.
 ```
 
-> **Why drain first**: shipping a PR is not the same as merging it. CI may fail, Copilot may post review comments, main may move underneath the branch. The drive-to-merge requirement (LS-2722, AGENTS.md step 13) applies in batch mode too — the orchestrator must re-converge on every PR it opened, not just walk away after `github_create_pr`.
+> **Why drain first**: shipping a PR is not the same as merging it. CI may fail, Copilot may post review comments, main may move underneath the branch. The drive-to-merge requirement (LS-2722, AGENTS.md step 13) applies in batch mode too — the orchestrator must re-converge on every PR it opened, not just walk away after `github_open_pr`.
 
 After the loop exits (no unblocked To Do tickets AND no in-flight PRs — note: escalated PRs may still be open on GitHub and need human follow-up; they are reported below but no longer tracked by the orchestrator):
 

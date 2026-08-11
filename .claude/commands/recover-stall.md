@@ -17,7 +17,7 @@ Do the following, in order:
    - Include the `LS-####` ticket key (from `$ARGUMENTS` if provided, else from your own context) in the message so Jira links it.
 
 3. **Push and open a PR immediately** — even if the work is incomplete and even though validation hasn't run locally:
-   - `github_create_pr` (draft is fine for the create call).
+   - `github_open_pr` (draft is fine for the create call).
    - In the PR body, add a clearly visible note: `⚠️ Local validation skipped — agent recovered from a stall; relying on CI to validate. pc-* still pending locally.` plus a short checklist of what's left.
 
 4. **Mark it ready so CI runs.** Call `github_mark_pr_ready` and apply `bot:ready-for-review`. This kicks off the CI pipeline — let CI do the heavy validation that stalled you locally. Do **not** apply `merge-when-ready` or enable auto-merge yet, and do not apply any maintainer override label.

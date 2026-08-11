@@ -147,7 +147,7 @@ Follow the standard workflow:
    - Data/query bugs: paste query results from `scratch/before-query-result.txt` and `scratch/after-query-result.txt`
    - Distributed system bugs: paste log/test output from the corresponding scratch files
    - Mixed bugs: combine templates for each layer involved
-4. Create PR as draft with `github_create_pr({ draft: true })`, then mark ready with `github_mark_pr_ready`. The PR body **must** use the [bug-fix PR body template](../../../pr-lifecycle/references/create-pr.md#bug-fix-pr-body-template) with the `## Verification` section populated from steps 3 and 6 above. **Do not create the PR if the `## Verification` section is empty.**
+4. Create PR as draft with `github_open_pr({ draft: true })`, then mark ready with `github_mark_pr_ready`. The PR body **must** use the [bug-fix PR body template](../../../pr-lifecycle/references/create-pr.md#bug-fix-pr-body-template) with the `## Verification` section populated from steps 3 and 6 above. **Do not create the PR if the `## Verification` section is empty.**
 5. Transition Jira ticket to "In Review"
 
 ## Gotchas

@@ -52,7 +52,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 
 ## Scenario 4: PR Creation Fails
 
-**Symptom**: `github_create_pr` returns an error.
+**Symptom**: `github_open_pr` returns an error.
 
 **Decision tree**:
 
@@ -107,7 +107,7 @@ Quick-reference decision trees for the most common failure scenarios agents enco
 
 1. Determine what state you're in and resume at the matching spine step:
    - **Code committed, not pushed**: `worktree_push({ setUpstream: true })`, then resume at spine Step 9 (open the **draft** PR — this comes _before_ validation).
-   - **Pushed, no PR**: `github_create_pr({ title: "<pr title>", body: "<pr body>", draft: true })` + `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` + continuation checkpoint — spine Step 9 — then resume at Step 10.
+   - **Pushed, no PR**: `github_open_pr({ title: "<pr title>", body: "<pr body>", draft: true })` + `github_manage_labels({ prs: [<PR#>], add: ["agent-in-progress"] })` + continuation checkpoint — spine Step 9 — then resume at Step 10.
    - **Draft PR exists, validation not run**: resume at spine Step 11 (migrations) then Step 12 (validate).
    - **Validation green, PR not marked ready**: complete self-review (spine Step 13) if not done, then `github_mark_pr_ready({ number: <PR#> })` — spine Step 14.
    - **PR ready, Jira not transitioned**: `jira_transition({ key: "LS-####", status: "In Review" })` (tail of spine Step 14), then resume at Step 15 (watch to merge).

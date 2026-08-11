@@ -1173,7 +1173,7 @@ export function createServer(): McpServer {
   // --- github_bulk_rebase ---
   server.tool(
     'github_bulk_rebase',
-    'Batch variant of github_rebase_pr. Rebase many PR branches onto base and force-push (1-50). Runs sequentially because rebase mutates the local checkout. Returns { success, total, succeeded, failed } per the shared batch-tool convention — one PR\'s rebase conflict does not abort the rest. Conflict details are captured in the per-PR error. Budgeted to ~45s of synchronous work: larger batches return { jobId, status: "running" } — poll with github_job_wait (per-PR progress in logTail) until it returns the final batch result. Do NOT re-run the command while the job is in progress.',
+    'Rebase many PR branches onto base and force-push (1-50). Runs sequentially because rebase mutates the local checkout. Returns { success, total, succeeded, failed } per the shared batch-tool convention — one PR\'s rebase conflict does not abort the rest. Conflict details are captured in the per-PR error. Budgeted to ~45s of synchronous work: larger batches return { jobId, status: "running" } — poll with github_job_wait (per-PR progress in logTail) until it returns the final batch result. Do NOT re-run the command while the job is in progress.',
     {
       numbers: z
         .array(prNumberField('numbers[]'))
@@ -1978,7 +1978,7 @@ export function createServer(): McpServer {
   server.tool(
     'github_open_pr',
     'Semantic one-shot for the Ship step: push branch → create PR as draft → mark ready for review → apply bot:ready-for-review label. ' +
-      'Replaces the six-step worktree_push → github_create_pr → github_mark_pr_ready → github_manage_labels(add: bot:ready-for-review) sequence. ' +
+      'Replaces the six-step worktree_push → create-draft-PR → github_mark_pr_ready → github_manage_labels(add: bot:ready-for-review) sequence. ' +
       'The jira-link marker is auto-inserted when jiraKey is provided. ' +
       'Pass draft: true to leave the PR in draft state (skips mark-ready and label). ' +
       'Pass push: false if the branch is already pushed. ' +
@@ -2060,15 +2060,15 @@ export function createServer(): McpServer {
     },
   );
 
-  // Job polling tools — stdio only. Git-heavy tools (github_rebase_pr,
-  // github_bulk_rebase, github_open_pr) run under a bounded sync budget and
+  // Job polling tools — stdio only. Git-heavy tools (github_bulk_rebase,
+  // github_open_pr) run under a bounded sync budget and
   // may return { jobId, status: "running" }; these tools poll that job. The
   // Lambda deployment guards out git usage, so it has no jobs to poll.
   if (!isLambda()) {
     // --- github_job_status ---
     server.tool(
       'github_job_status',
-      'Non-blocking snapshot of a background job started by github_rebase_pr, github_bulk_rebase, or github_open_pr. Returns the originating tool\'s final result once done, or { status: "running", logTail } while in progress.',
+      'Non-blocking snapshot of a background job started by github_bulk_rebase or github_open_pr. Returns the originating tool\'s final result once done, or { status: "running", logTail } while in progress.',
       {
         jobId: z
           .string()
@@ -2080,7 +2080,7 @@ export function createServer(): McpServer {
     // --- github_job_wait ---
     server.tool(
       'github_job_wait',
-      `Wait (bounded, ≤${MAX_WAIT_MS / 1000}s per call) for a background job started by github_rebase_pr, github_bulk_rebase, or github_open_pr. Returns the originating tool's final result once done; returns { status: "running" } with a log tail if the budget expires first — re-call until terminal. Never re-run the originating command while its job is running.`,
+      `Wait (bounded, ≤${MAX_WAIT_MS / 1000}s per call) for a background job started by github_bulk_rebase or github_open_pr. Returns the originating tool's final result once done; returns { status: "running" } with a log tail if the budget expires first — re-call until terminal. Never re-run the originating command while its job is running.`,
       {
         jobId: z
           .string()

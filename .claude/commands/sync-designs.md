@@ -67,7 +67,7 @@ Load the authoritative playbook via `Skill(skill: "design-sync")` before doing a
    - `make pc` if the environment has it. If not, run `pnpm exec prettier --write` on changed JSON/Markdown.
    - Self-review every changed file in full (read each one, check against the patterns in `.agents/skills/pr-lifecycle/references/common-review-patterns.md`).
    - `git push -u origin <branch>`.
-   - `github_create_pr` with title `LS-#### chore(designs): sync N designs (X new, Y changed, Z removed)` and a body that lists every created ticket key as a checklist plus a link to `SYNC-REPORT.md`.
+   - `github_open_pr` with title `LS-#### chore(designs): sync N designs (X new, Y changed, Z removed)` and a body that lists every created ticket key as a checklist plus a link to `SYNC-REPORT.md`.
    - `github_mark_pr_ready` once the bot review is appropriate (this PR is auto-generated bulk content; mark ready immediately unless the user said otherwise).
    - Drive to merge per the bot-PR contract in AGENTS.md. Reply to every bot thread; resolve `FIX:` threads; never silently leave the PR in draft.
 

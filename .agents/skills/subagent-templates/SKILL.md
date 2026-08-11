@@ -119,7 +119,7 @@ The canonical setup + tool preferences block lives in [`.agents/shared/subagent-
 
 @../../shared/subagent-setup.md
 
-Work subagents inherit all MCP connections from the parent session (the full stdio + connector surface — see [mcp-first → Tool Surfaces](../mcp-first/SKILL.md#tool-surfaces)), so `github_create_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available. Use this pattern only when `mcp__ccd_session__spawn_task` is confirmed unavailable — chips are always preferred over `Agent(isolation: "worktree")` for multi-ticket orchestration.
+Work subagents inherit all MCP connections from the parent session (the full stdio + connector surface — see [mcp-first → Tool Surfaces](../mcp-first/SKILL.md#tool-surfaces)), so `github_open_pr`, `worktree_commit`, `make_run`, `jira_transition` etc. are all available. Use this pattern only when `mcp__ccd_session__spawn_task` is confirmed unavailable — chips are always preferred over `Agent(isolation: "worktree")` for multi-ticket orchestration.
 
 ## Parent-Agent Recovery
 
@@ -127,9 +127,9 @@ Work subagents inherit all MCP connections from the parent session (the full std
 
 ```
 worktree_push(worktree: "<subagent-worktree-path>", setUpstream: true)
-github_create_pr(head: "<branch-name>", title: "...", body: "...", draft: true)  # branch-name from subagent's worktree_status().headRefName
+github_open_pr(head: "<branch-name>", title: "...", body: "...", draft: true)  # branch-name from subagent's worktree_status().headRefName
 github_manage_labels(prs: [<PR#>], add: ["agent-in-progress"])
 github_mark_pr_ready(number: <PR#>)
 ```
 
-The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_create_pr`, `github_mark_pr_ready`, `github_manage_labels`) and should always be preferred. Using `gh pr create` / `gh pr ready` / `gh pr edit --add-label` is the shell fallback for when MCP is unavailable. See `skills/pr-lifecycle/SKILL.md` ("Parent-Agent PR Recovery") for the full recovery workflow.
+The `legacy-sports-github` MCP server exposes all required operations as first-class tools (`github_open_pr`, `github_mark_pr_ready`, `github_manage_labels`) and should always be preferred. Using `gh pr create` / `gh pr ready` / `gh pr edit --add-label` is the shell fallback for when MCP is unavailable. See `skills/pr-lifecycle/SKILL.md` ("Parent-Agent PR Recovery") for the full recovery workflow.
