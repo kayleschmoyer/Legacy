@@ -45,8 +45,10 @@ Re-derive this table any time: `rg -n "useFeatureIsOn\(|useFeatureValue\(" apps 
 
 The call sites intentionally disagree on the fallback when GrowthBook is unloaded:
 
-- **Fail-open** (`useFeatureValue('football_enabled', true)`): `app.tsx` `FootballGate` (redirects to `/` only when the flag is _explicitly_ `false`) and `PlayerStatsPage.tsx`. Rationale in the `FootballGate` doc comment: a `false` fallback would flash-redirect users while features are still loading and would break keyless E2E environments.
-- **Fail-closed** (`useFeatureIsOn('football_enabled')` → `false`): `SportsDropdown.tsx` (top-nav entry), `BaseballScreen.tsx`, `LeagueCreatePage.tsx` (sport tab), and both native players screens (sport switcher).
+- **Fail-open** (`useFeatureValue('football_enabled', true)`): `app.tsx` `FootballGate` (redirects to `/` only when the flag is _explicitly_ `false`), `PlayerStatsPage.tsx`, and `LeagueCreatePage.tsx` (sport tab, since LS-9128/LS-9130 — see feature doc below). Rationale in the `FootballGate` doc comment: a `false` fallback would flash-redirect users while features are still loading and would break keyless E2E environments.
+- **Fail-closed** (`useFeatureIsOn('football_enabled')` → `false`): `SportsDropdown.tsx` (top-nav entry), `BaseballScreen.tsx`, and both native players screens (sport switcher).
+
+`LeagueCreatePage.tsx`'s sport tab used to be fail-closed, disagreeing with the `FootballGate` route guard it sits behind; LS-9128/LS-9130 switched it to the same fail-open fallback and to rendering the Football tab disabled-but-visible instead of removing it, so it no longer disagrees. See `docs/agents/qa-coverage/jira-page-epics/pages/create-league-football/features/feature-flag-gate/feature.md` for the full writeup.
 
 Net effect with no key or flag off-at-source: football **navigation is hidden** everywhere, but `/football/*` routes remain **reachable by direct URL**. This is a deliberate soft gate, not a bug — the flag controls discoverability, not authorization (API resolvers, tables, and background jobs are intentionally never flag-gated). If you add a new `football_enabled` call site, pick the side consciously: nav/entry points fail closed; route gates and already-entered surfaces fail open.
 
