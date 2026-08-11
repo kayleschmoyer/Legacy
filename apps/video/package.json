@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "start": "remotion studio",
-    "render": "remotion render TutorialVideo --output out/tutorial.mp4",
-    "render:gif": "remotion render TutorialVideo --codec=gif --output out/tutorial.gif",
-    "build": "remotion render TutorialVideo --output out/tutorial.mp4"
+    "render": "node scripts/render.mjs TutorialVideo --output out/tutorial.mp4",
+    "render:gif": "node scripts/render.mjs TutorialVideo --codec=gif --output out/tutorial.gif",
+    "build": "node scripts/render.mjs TutorialVideo --output out/tutorial.mp4"
   },
   "dependencies": {
     "@remotion/cli": "4.0.448",
