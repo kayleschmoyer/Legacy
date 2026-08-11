@@ -38,6 +38,13 @@ set -uo pipefail
 #    matter where Monitor starts the script (LS-9045). Arm it with an ABSOLUTE
 #    path regardless — bash resolves the script path before the first line runs,
 #    so a relative invocation still dies with exit 127 before any of this helps.
+#  - `gh` is absent in Claude Code Remote / hosted cloud sessions (LS-8717) and
+#    there is no working fallback: GH_TOKEN/GITHUB_TOKEN in that environment
+#    are the literal placeholder "proxy-injected" — the network proxy injects
+#    real credentials only for the pinned gh/GitHub-MCP operations, so a direct
+#    REST or GraphQL call 403s no matter the endpoint. This script fails fast
+#    and loud instead; callers in that environment must not arm it at all (see
+#    AGENTS.md's Tier-2 PR-watch rule, which branches on gh availability).
 
 PR_NUMBER="${1:?usage: watch-pr.sh <PR#> [interval-seconds]}"
 INTERVAL="${2:-90}"
@@ -81,7 +88,14 @@ cleanup() {
 trap cleanup EXIT
 
 command -v gh >/dev/null 2>&1 || {
-  echo "watch #${PR_NUMBER} degraded: gh CLI not available — watch is DEAD, fall back to push-notification doctrine"
+  # No REST/GraphQL fallback is possible here: Claude Code Remote sessions run
+  # behind a network proxy that injects real GitHub credentials ONLY for the
+  # pinned set of operations gh/the GitHub MCP server issue (LS-8717) — GH_TOKEN
+  # and GITHUB_TOKEN are both literally the placeholder string "proxy-injected"
+  # in that environment, so a direct `curl`/`urllib` call to api.github.com
+  # 403s regardless of which endpoint or auth header is used. Fail fast and
+  # loud instead of retrying a call that can never succeed.
+  echo "watch #${PR_NUMBER} degraded: gh CLI not available — watch is DEAD, fall back to push-notification doctrine (subscribe_pr_activity + send_later check-ins, see AGENTS.md Tier-2 rule)"
   exit 1
 }
 
