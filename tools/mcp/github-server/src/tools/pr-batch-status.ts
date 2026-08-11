@@ -3,26 +3,15 @@ import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL } from '../github-api.js';
 import { FAILED_CONCLUSIONS, summarizeCIStatus } from '../types.js';
 import type { ToolResult } from '../types.js';
+import {
+  normalizeChecks,
+  type StatusCheckNode,
+} from '../utils/github-checks.js';
 
 interface PRBatchStatusParams {
   numbers: number[];
   compact?: boolean;
 }
-
-interface CheckRunNode {
-  __typename: 'CheckRun';
-  name: string;
-  status: string;
-  conclusion: string | null;
-}
-
-interface StatusContextNode {
-  __typename: 'StatusContext';
-  context: string;
-  state: string;
-}
-
-type StatusCheckNode = CheckRunNode | StatusContextNode;
 
 interface PRBatchNode {
   number: number;
@@ -60,31 +49,6 @@ interface PRBatchNode {
     pageInfo: { hasNextPage: boolean };
     nodes: Array<{ id: string; isResolved: boolean; isOutdated: boolean }>;
   };
-}
-
-function normalizeChecks(
-  nodes: (StatusCheckNode | null)[],
-): Array<{ name: string; status: string; conclusion: string | null }> {
-  return nodes.flatMap((node) => {
-    if (node == null) return [];
-    if (node.__typename === 'CheckRun') {
-      return {
-        name: node.name,
-        status: node.status,
-        conclusion: node.conclusion,
-      };
-    }
-    return {
-      name: node.context,
-      status: node.state,
-      conclusion:
-        node.state === 'SUCCESS'
-          ? 'SUCCESS'
-          : node.state === 'PENDING'
-            ? null
-            : node.state,
-    };
-  });
 }
 
 function buildBatchPRQuery(numbers: number[]): string {
@@ -175,10 +139,11 @@ export async function prBatchStatus(
     // Build rows
     const rows = allPRs.map((pr) => {
       const commitNode = pr.commits.nodes[0];
-      const checkNodes = (
-        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? []
-      ).filter((n): n is StatusCheckNode => n != null);
-      const ciJobs = normalizeChecks(checkNodes);
+      const checkNodes: (StatusCheckNode | null)[] =
+        commitNode?.commit.statusCheckRollup?.contexts.nodes ?? [];
+      const ciJobs = normalizeChecks(checkNodes).map(
+        ({ startedAt: _startedAt, ...ciJob }) => ciJob,
+      );
       const ciSummary = summarizeCIStatus(ciJobs);
 
       const totalThreads = pr.reviewThreads.totalCount;
