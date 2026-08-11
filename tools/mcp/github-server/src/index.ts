@@ -1187,7 +1187,7 @@ export function createServer(): McpServer {
   // --- github_request_review ---
   server.tool(
     'github_request_review',
-    'Request reviewers on one or more PRs. Accepts a single PR number or array via "prs", or a single PR number via "prNumber" (alias for prs:[n]). Requests Copilot by default.',
+    'Request reviewers on one or more PRs. Accepts a single PR number or array via "prs", or a single PR number via "prNumber" (alias for prs:[n]). Requests only the reviewers passed in "reviewers" unless "copilot: true" is explicitly set.',
     {
       prs: z
         .preprocess((v) => {
@@ -1219,8 +1219,10 @@ export function createServer(): McpServer {
         .optional()
         .describe('Human reviewer usernames'),
       copilot: coercedBoolean
-        .default(true)
-        .describe('Request Copilot review (default: true)'),
+        .default(false)
+        .describe(
+          'Opt-in: also request copilot-pull-request-reviewer[bot] (default: false — not requested unless explicitly set)',
+        ),
     },
     async (params) => {
       const prs =

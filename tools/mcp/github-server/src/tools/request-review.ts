@@ -243,7 +243,7 @@ export async function requestReview(
   params: RequestReviewParams,
 ): Promise<ToolResult> {
   const uniquePrs = [...new Set(params.prs)];
-  const wantsCopilot = params.copilot !== false;
+  const wantsCopilot = params.copilot === true;
   const humanReviewers = [
     ...new Set((params.reviewers ?? []).map((r) => r.trim()).filter(Boolean)),
   ];
