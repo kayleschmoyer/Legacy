@@ -51,6 +51,7 @@ import {
   startJob,
   waitForJob,
 } from './jobs';
+import { executeWorktreeMv } from './move-file-utils';
 import { mergeFromMain } from './merge-from-main';
 import { rebaseOntoMain } from './rebase-onto-main';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
@@ -1658,6 +1659,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
         'For all other operations prefer the purpose-built tools: ' +
         'worktree_fetch (git fetch), worktree_stash/worktree_stash_pop (git stash), ' +
         'worktree_unstage (git reset HEAD --), worktree_rm (git rm / file deletion), ' +
+        'worktree_mv (git mv), ' +
         'worktree_is_tracked (git ls-files), worktree_check_ignore (git check-ignore), ' +
         'worktree_file_mode / worktree_set_executable (git ls-files -s / git update-index --chmod), ' +
         'worktree_commit (git add + commit), worktree_push (git push), ' +
@@ -2109,6 +2111,47 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           },
         },
         required: ['path'],
+      },
+    },
+    {
+      name: 'worktree_mv',
+      description:
+        'Move or rename one or more tracked files (git mv), preserving rename detection so the ' +
+        'diff shows R instead of a delete+add pair. Creates intermediate directories in the ' +
+        'destination path since git mv does not. Refuses paths outside the worktree root, .git/, ' +
+        'or node_modules/. Accepts multiple { from, to } pairs in one call for batch moves ' +
+        '(e.g. moving a source file and its spec together).',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          moves: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                from: {
+                  type: 'string',
+                  description: 'Current path, relative to the worktree root.',
+                },
+                to: {
+                  type: 'string',
+                  description: 'New path, relative to the worktree root.',
+                },
+              },
+              required: ['from', 'to'],
+            },
+            description:
+              'One or more { from, to } path pairs to move/rename (maximum 50 per call).',
+            minItems: 1,
+            maxItems: 50,
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree.',
+          },
+        },
+        required: ['moves'],
       },
     },
     {
@@ -8570,6 +8613,20 @@ const handleCallTool = async (
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_mv
+    // -----------------------------------------------------------------------
+    case 'worktree_mv': {
+      const { moves, worktree: wtKey } = args as {
+        moves: Array<{ from: string; to: string }>;
+        worktree?: string;
+      };
+      return executeWorktreeMv(
+        { moves, worktree: wtKey },
+        { resolveTargetDir, runGit, mkdirSync },
+      );
     }
 
     // -----------------------------------------------------------------------
