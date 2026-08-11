@@ -182,7 +182,7 @@ async function validateToken(token: string): Promise<boolean> {
         return false;
       } catch (err) {
         process.stderr.write(
-          `Warning: could not validate app token against repo endpoint (${err instanceof Error ? err.message : err}); assuming valid.\n`,
+          `Warning: could not validate app token against repo endpoint (${err instanceof Error ? err.message : String(err)}); assuming valid.\n`,
         );
         return true;
       }
@@ -242,7 +242,7 @@ async function resolveToken(): Promise<{ token: string; expiresAt?: Date }> {
       return { token: appResult.token, expiresAt: appResult.expiresAt };
   } catch (err) {
     process.stderr.write(
-      `Warning: GitHub App token generation failed: ${err instanceof Error ? err.message : err}. Trying gh CLI.\n`,
+      `Warning: GitHub App token generation failed: ${err instanceof Error ? err.message : String(err)}. Trying gh CLI.\n`,
     );
   }
 

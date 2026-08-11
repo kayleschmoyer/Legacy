@@ -1,4 +1,4 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../logs.js', () => ({
   fetchRunLogsRing: jest.fn(),
@@ -32,7 +32,10 @@ function parseBatchHeader(text: string): {
   runIds: number[];
   missing: Array<{ runId: number; reason: string }>;
 } {
-  return JSON.parse(text.split('\n\n')[0]);
+  return JSON.parse(text.split('\n\n')[0]) as {
+    runIds: number[];
+    missing: Array<{ runId: number; reason: string }>;
+  };
 }
 
 function parseBatchRun(
@@ -46,7 +49,7 @@ function parseBatchRun(
   const section = nextMarkerIdx === -1 ? rest : rest.slice(0, nextMarkerIdx);
   const sepIdx = section.indexOf('\n\n');
   return {
-    meta: JSON.parse(section.slice(0, sepIdx)),
+    meta: JSON.parse(section.slice(0, sepIdx)) as Record<string, unknown>,
     logs: section.slice(sepIdx + 2),
   };
 }
@@ -109,10 +112,12 @@ describe('getLogs', () => {
 
   describe('batch runIds', () => {
     it('returns per-run sections keyed by runId', async () => {
-      mockFetch.mockImplementation(async (params) => ({
-        lines: [`log-for-${params.runId}`],
-        totalLines: 1,
-      }));
+      mockFetch.mockImplementation((params) =>
+        Promise.resolve({
+          lines: [`log-for-${params.runId}`],
+          totalLines: 1,
+        }),
+      );
 
       const result = await getLogs({ runIds: [10, 20, 30] });
 
@@ -127,13 +132,16 @@ describe('getLogs', () => {
     });
 
     it('isolates a BlobNotFound 404 to missing[] without failing the others', async () => {
-      mockFetch.mockImplementation(async (params) => {
+      mockFetch.mockImplementation((params) => {
         if (params.runId === 999) {
           throw new Error(
             'GitHub API 404: <Error><Code>BlobNotFound</Code></Error>',
           );
         }
-        return { lines: [`log-for-${params.runId}`], totalLines: 1 };
+        return Promise.resolve({
+          lines: [`log-for-${params.runId}`],
+          totalLines: 1,
+        });
       });
 
       const result = await getLogs({ runIds: [1, 999, 2] });

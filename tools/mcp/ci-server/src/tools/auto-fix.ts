@@ -180,7 +180,10 @@ function classifyLogs(logs: string): Classification {
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   const topCategory = sorted[0][0];
   const topCount = sorted[0][1];
-  const topMatch = matches.find((m) => m.category === topCategory)!;
+  // sorted is derived from counts, which is built from matches — the
+  // category is always present in matches, but avoid a non-null assertion.
+  const topMatch =
+    matches.find((m) => m.category === topCategory) ?? matches[0];
 
   // Collect unique evidence lines for the top category (max 10)
   const evidence = [

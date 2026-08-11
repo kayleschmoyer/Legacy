@@ -1,7 +1,7 @@
 import {
-  S3Client,
-  ListObjectsV2Command,
   GetObjectCommand,
+  ListObjectsV2Command,
+  S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { githubGet } from './github-api.js';
@@ -87,11 +87,21 @@ export async function listPlaywrightS3Artifacts(
 
   const artifacts = await Promise.all(
     objects.map(async (obj): Promise<S3ArtifactItem> => {
-      const key = obj.Key!;
+      if (!obj.Key) {
+        throw new Error('S3 ListObjectsV2 returned an object with no Key');
+      }
+      const key = obj.Key;
       const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-      const presignedUrl = await getSignedUrl(client as any, cmd as any, {
-        expiresIn: PRESIGN_EXPIRY_SECONDS,
-      });
+      // @aws-sdk/s3-request-presigner ships its own nested copy of
+      // @smithy/types, structurally identical to but nominally distinct from
+      // the one @aws-sdk/client-s3 uses — a package-manager dual-package
+      // hazard, not a real type mismatch. Assert through the presigner's own
+      // parameter types (not `any`) to bridge the two copies.
+      const presignedUrl = await getSignedUrl(
+        client as unknown as Parameters<typeof getSignedUrl>[0],
+        cmd as unknown as Parameters<typeof getSignedUrl>[1],
+        { expiresIn: PRESIGN_EXPIRY_SECONDS },
+      );
       return {
         key,
         presignedUrl,

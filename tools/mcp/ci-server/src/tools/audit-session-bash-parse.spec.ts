@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  type BashCall,
   classifyCommand,
   classifyGapType,
   commandPattern,
@@ -14,7 +15,6 @@ import {
   isRecurringInvestigative,
   NOISE_PATTERNS,
   stripCdPrefix,
-  type BashCall,
 } from './audit-session-bash-parse.js';
 
 /** Serialize records to JSONL, one JSON document per line. */

@@ -70,10 +70,14 @@ const GIT_FETCH_NOISE =
  * causes the errorSummary to fill up with duplicate script noise instead of
  * actual failures.
  */
-const ANSI_ESCAPE_PREFIX = /^\x1b\[/;
+// Built from String.fromCharCode rather than a \x1b regex literal: a literal
+// ESC control character trips no-control-regex even though it is the exact,
+// intentional byte GitHub Actions emits for these escape sequences.
+const ESC = String.fromCharCode(27);
+const ANSI_ESCAPE_PREFIX = new RegExp(`^${ESC}\\[`);
 
 /** Matches any ANSI color/style escape sequence, anywhere in a line. */
-const ANSI_ESCAPE_SEQUENCE = /\x1b\[[0-9;]*m/g;
+const ANSI_ESCAPE_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*m`, 'g');
 
 function stripAnsiCodes(line: string): string {
   return line.replace(ANSI_ESCAPE_SEQUENCE, '');
@@ -377,7 +381,7 @@ async function mapWithConcurrency<T, R>(
   concurrency: number,
   mapper: (item: T, index: number) => Promise<R>,
 ): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+  const results: R[] = new Array<R>(items.length);
   let nextIndex = 0;
 
   async function worker(): Promise<void> {

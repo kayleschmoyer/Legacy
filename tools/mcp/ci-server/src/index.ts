@@ -23,7 +23,7 @@ import { viewRunBatch } from './tools/view-run-batch.js';
 import { viewRunJobs } from './tools/view-run-jobs.js';
 import { workflowInfo } from './tools/workflow-info.js';
 import { workflowSetState } from './tools/workflow-state.js';
-import { getToken, buildHeaders, sanitizeErrorBody } from './github-api.js';
+import { buildHeaders, getToken, sanitizeErrorBody } from './github-api.js';
 
 /**
  * Shared Zod schema for boolean parameters. Accepts a real boolean OR a
@@ -815,7 +815,7 @@ export function createServer(): McpServer {
             'Implies includeMcp:true. Use this instead of gapsOnly for the full audit workflow.',
         ),
     },
-    async (params) => auditSessionBash(params),
+    (params) => auditSessionBash(params),
   );
 
   server.tool(

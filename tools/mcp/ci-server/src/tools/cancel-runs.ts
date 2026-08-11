@@ -1,8 +1,8 @@
+import { cancelRun } from './cancel-run.js';
+import { resolveWorkflowId } from './list-runs.js';
 import { assembleBatchResult, runBatch } from '../batch.js';
 import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
-import { cancelRun } from './cancel-run.js';
-import { resolveWorkflowId } from './list-runs.js';
 
 interface CancelRunsParams {
   workflow: string;

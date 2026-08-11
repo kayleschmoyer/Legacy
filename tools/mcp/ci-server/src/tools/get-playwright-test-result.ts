@@ -2,12 +2,12 @@ import type { ToolResult } from '../types.js';
 import {
   fetchPlaywrightReport,
   fullTitle,
-  reportUrlFor,
   type PlaywrightTest,
   type PlaywrightTestFile,
   type PlaywrightTestResult,
+  reportUrlFor,
 } from '../playwright-report.js';
-import { resolveRunSha, listPlaywrightS3Artifacts } from '../s3-artifacts.js';
+import { listPlaywrightS3Artifacts, resolveRunSha } from '../s3-artifacts.js';
 
 /** Hard cap on any single string field in the response. Prevents a chatty
  * test (huge stdout / multi-MB snippet) from blowing past MCP limits. */
@@ -127,7 +127,6 @@ export async function getPlaywrightTestResult(params: {
     fileName,
     testFile,
     source = 'gh-pages',
-    maxChars = 10000,
   } = params;
 
   // reportName and runId are alternative ways to identify the report; fileName

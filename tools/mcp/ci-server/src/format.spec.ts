@@ -6,9 +6,32 @@ import {
   formatRunList,
   formatSessionStats,
   JOB_LIST_COLUMNS,
-  RUN_LIST_COLUMNS,
   type LogMatch,
+  type LogSearchMeta,
+  RUN_LIST_COLUMNS,
 } from './format.js';
+
+/** Parsed shape of a `formatLogSearch` result, for typed assertions in tests. */
+type ParsedSearchResult = LogSearchMeta & {
+  matches: LogMatch[];
+  charTruncated?: boolean;
+};
+
+function parseSearchResult(out: string): ParsedSearchResult {
+  return JSON.parse(out) as ParsedSearchResult;
+}
+
+interface ParsedSessionStats {
+  sessionId?: string;
+  jsonlPath?: string;
+  toolCounts?: Record<string, number>;
+  bashFallbackRatio?: number;
+  subagentStats?: ParsedSessionStats[];
+}
+
+function parseSessionStats(out: string): ParsedSessionStats {
+  return JSON.parse(out) as ParsedSessionStats;
+}
 
 /** A fully-populated run as produced by list-runs' `mapRun`. */
 function makeRun(
@@ -197,7 +220,7 @@ describe('formatLogSearch', () => {
   });
 
   it('preserves result metadata + the matches array', () => {
-    const parsed = JSON.parse(formatLogSearch(meta, [match]));
+    const parsed = parseSearchResult(formatLogSearch(meta, [match]));
     expect(parsed.returnedMatches).toBe(1);
     expect(parsed.truncated).toBe(true);
     expect(parsed.matches).toHaveLength(1);
@@ -207,7 +230,7 @@ describe('formatLogSearch', () => {
   });
 
   it('surfaces scopeNote when the caller supplies one (zero-scope search)', () => {
-    const parsed = JSON.parse(
+    const parsed = parseSearchResult(
       formatLogSearch(
         {
           ...meta,
@@ -228,7 +251,7 @@ describe('formatLogSearch', () => {
 
   it('truncates a pathologically long matched line with an omitted-count marker', () => {
     const longLine = 'x'.repeat(2000);
-    const parsed = JSON.parse(
+    const parsed = parseSearchResult(
       formatLogSearch(meta, [{ ...match, line: longLine }]),
     );
     expect(parsed.matches[0].line.length).toBeLessThanOrEqual(500);
@@ -236,7 +259,7 @@ describe('formatLogSearch', () => {
   });
 
   it('accepts a caller-supplied truncateLineLength applied to matched line and context alike', () => {
-    const parsed = JSON.parse(
+    const parsed = parseSearchResult(
       formatLogSearch(
         meta,
         [
@@ -272,7 +295,7 @@ describe('formatLogSearch', () => {
     );
 
     expect(out.length).toBeLessThanOrEqual(5_000);
-    const parsed = JSON.parse(out);
+    const parsed = parseSearchResult(out);
     expect(parsed.charTruncated).toBe(true);
     expect(parsed.truncated).toBe(true);
     expect(parsed.matches.length).toBeLessThan(20);
@@ -383,7 +406,7 @@ describe('formatSessionStats', () => {
   });
 
   it('prunes the verbose jsonlPath but preserves the stats agents read', () => {
-    const parsed = JSON.parse(formatSessionStats(stats));
+    const parsed = parseSessionStats(formatSessionStats(stats));
     expect(parsed.jsonlPath).toBeUndefined();
     expect(parsed.toolCounts).toEqual({ Bash: 5, Read: 10 });
     expect(parsed.bashFallbackRatio).toBe(0.33);
@@ -394,8 +417,8 @@ describe('formatSessionStats', () => {
       ...stats,
       subagentStats: [{ ...stats, sessionId: 'sub', jsonlPath: '/sub.jsonl' }],
     });
-    const parsed = JSON.parse(out);
-    expect(parsed.subagentStats[0].jsonlPath).toBeUndefined();
-    expect(parsed.subagentStats[0].sessionId).toBe('sub');
+    const parsed = parseSessionStats(out);
+    expect(parsed.subagentStats?.[0].jsonlPath).toBeUndefined();
+    expect(parsed.subagentStats?.[0].sessionId).toBe('sub');
   });
 });

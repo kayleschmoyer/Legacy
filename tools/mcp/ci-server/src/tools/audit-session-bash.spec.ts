@@ -122,13 +122,13 @@ describe('auditSessionBash (node-native)', () => {
     jest.clearAllMocks();
   });
 
-  it('honors an explicit projectsDir param, overriding CLAUDE_PROJECTS_DIR (LS-8867)', async () => {
+  it('honors an explicit projectsDir param, overriding CLAUDE_PROJECTS_DIR (LS-8867)', () => {
     // Simulates a CCR session where the server process's auto-detected home
     // doesn't match the real session location: the caller passes the actual
     // directory explicitly rather than relying on env-var/homedir detection.
     delete process.env.CLAUDE_PROJECTS_DIR;
 
-    const result = await auditSessionBash({
+    const result = auditSessionBash({
       projectsDir,
       project: SLUG,
       sessionId: SESSION_ID,
@@ -139,11 +139,11 @@ describe('auditSessionBash (node-native)', () => {
     expect(resultText(result)).toContain(`Session: ${SESSION_ID}`);
   });
 
-  it('returns a gaps report without any Python interpreter (gapsOnly)', async () => {
+  it('returns a gaps report without any Python interpreter (gapsOnly)', () => {
     // Simulate an environment with no python/python3 anywhere: an empty PATH.
     process.env.PATH = '';
 
-    const result = await auditSessionBash({
+    const result = auditSessionBash({
       project: SLUG,
       sessionId: SESSION_ID,
       gapsOnly: true,
@@ -162,8 +162,8 @@ describe('auditSessionBash (node-native)', () => {
     expect(execFileSync).not.toHaveBeenCalled();
   });
 
-  it('returns the structured JSON report by default, including subagent calls', async () => {
-    const result = await auditSessionBash({
+  it('returns the structured JSON report by default, including subagent calls', () => {
+    const result = auditSessionBash({
       project: SLUG,
       sessionId: SESSION_ID,
     });
@@ -190,8 +190,8 @@ describe('auditSessionBash (node-native)', () => {
     expect(execFile).not.toHaveBeenCalled();
   });
 
-  it('includes MCP overflow issues when includeMcp is set', async () => {
-    const result = await auditSessionBash({
+  it('includes MCP overflow issues when includeMcp is set', () => {
+    const result = auditSessionBash({
       project: SLUG,
       sessionId: SESSION_ID,
       includeMcp: true,
@@ -208,8 +208,8 @@ describe('auditSessionBash (node-native)', () => {
     });
   });
 
-  it('produces the pre-classified audit report in auditMode (implies includeMcp)', async () => {
-    const result = await auditSessionBash({
+  it('produces the pre-classified audit report in auditMode (implies includeMcp)', () => {
+    const result = auditSessionBash({
       project: SLUG,
       sessionId: SESSION_ID,
       auditMode: true,
@@ -232,28 +232,28 @@ describe('auditSessionBash (node-native)', () => {
     expect(execFileSync).not.toHaveBeenCalled();
   });
 
-  it('auto-detects the most recently modified session when sessionId is omitted', async () => {
-    const result = await auditSessionBash({ project: SLUG, gapsOnly: true });
+  it('auto-detects the most recently modified session when sessionId is omitted', () => {
+    const result = auditSessionBash({ project: SLUG, gapsOnly: true });
     expect(result.isError).toBeUndefined();
     expect(resultText(result)).toContain(`Session: ${SESSION_ID}`);
   });
 
-  it('rejects invalid project slugs with the established error message', async () => {
-    const result = await auditSessionBash({ project: '../escape' });
+  it('rejects invalid project slugs with the established error message', () => {
+    const result = auditSessionBash({ project: '../escape' });
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain('Invalid project slug');
     expect(resultText(result)).toContain('Must match /^[A-Za-z0-9._-]+$/');
   });
 
-  it('reports a missing project directory as an error', async () => {
-    const result = await auditSessionBash({ project: 'does-not-exist' });
+  it('reports a missing project directory as an error', () => {
+    const result = auditSessionBash({ project: 'does-not-exist' });
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain('project directory not found');
   });
 
-  it('reports an empty project directory (no JSONL files) as an error', async () => {
+  it('reports an empty project directory (no JSONL files) as an error', () => {
     mkdirSync(join(projectsDir, 'empty-project'));
-    const result = await auditSessionBash({ project: 'empty-project' });
+    const result = auditSessionBash({ project: 'empty-project' });
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain('no JSONL files found');
   });

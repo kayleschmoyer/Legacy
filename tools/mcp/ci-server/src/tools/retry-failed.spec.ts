@@ -1,4 +1,4 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../github-api.js', () => ({
   githubGet: jest.fn(),
@@ -66,19 +66,19 @@ describe('retryFailed', () => {
 
   describe('failed-jobs path', () => {
     beforeEach(() => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/actions/runs/999') {
-          return runResponse({ run_attempt: 1 });
+          return Promise.resolve(runResponse({ run_attempt: 1 }));
         }
         if (path === '/actions/runs/999/jobs') {
-          return {
+          return Promise.resolve({
             total_count: 3,
             jobs: [
               job(1, 'build', 'success'),
               job(2, 'test', 'failure'),
               job(3, 'lint', 'failure'),
             ],
-          };
+          });
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -87,16 +87,18 @@ describe('retryFailed', () => {
     it('triggers rerun-failed-jobs and returns the new attempt id', async () => {
       // Second GET on the run (after rerun) returns incremented attempt.
       let runCallCount = 0;
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/actions/runs/999') {
           runCallCount += 1;
-          return runResponse({ run_attempt: runCallCount === 1 ? 1 : 2 });
+          return Promise.resolve(
+            runResponse({ run_attempt: runCallCount === 1 ? 1 : 2 }),
+          );
         }
         if (path === '/actions/runs/999/jobs') {
-          return {
+          return Promise.resolve({
             total_count: 2,
             jobs: [job(1, 'build', 'success'), job(2, 'test', 'failure')],
-          };
+          });
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -175,17 +177,17 @@ describe('retryFailed', () => {
       const requestedPages: string[] = [];
 
       mockGet.mockImplementation(
-        async (path: string, qs?: Record<string, string>) => {
+        (path: string, qs?: Record<string, string>) => {
           if (path === '/actions/runs/555') {
-            return runResponse({ id: 555, run_attempt: 1 });
+            return Promise.resolve(runResponse({ id: 555, run_attempt: 1 }));
           }
           if (path === '/actions/runs/555/jobs') {
             const page = qs?.['page'] ?? '1';
             requestedPages.push(page);
-            return {
+            return Promise.resolve({
               total_count: totalCount,
               jobs: pagesByPage[page] ?? [],
-            };
+            });
           }
           throw new Error(`unexpected path ${path}`);
         },
@@ -214,15 +216,17 @@ describe('retryFailed', () => {
 
   describe('clean path (no failed jobs)', () => {
     it('returns a clear error and does NOT trigger a rerun', async () => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/actions/runs/777') {
-          return runResponse({ id: 777, conclusion: 'success' });
+          return Promise.resolve(
+            runResponse({ id: 777, conclusion: 'success' }),
+          );
         }
         if (path === '/actions/runs/777/jobs') {
-          return {
+          return Promise.resolve({
             total_count: 2,
             jobs: [job(10, 'build', 'success'), job(11, 'test', 'success')],
-          };
+          });
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -247,15 +251,15 @@ describe('retryFailed', () => {
 
   describe('already-running 403 surfaced by the retry wrapper', () => {
     beforeEach(() => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/actions/runs/999') {
-          return runResponse({ run_attempt: 1 });
+          return Promise.resolve(runResponse({ run_attempt: 1 }));
         }
         if (path === '/actions/runs/999/jobs') {
-          return {
+          return Promise.resolve({
             total_count: 2,
             jobs: [job(1, 'build', 'success'), job(2, 'test', 'failure')],
-          };
+          });
         }
         throw new Error(`unexpected path ${path}`);
       });

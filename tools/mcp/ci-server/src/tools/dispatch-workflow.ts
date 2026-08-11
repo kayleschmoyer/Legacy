@@ -1,7 +1,9 @@
-import { githubGet, githubPost } from '../github-api.js';
-import type { ToolResult } from '../types.js';
+import { LOGGER } from '@legacy-sports/logging';
+
 import { resolveWorkflowId } from './list-runs.js';
 import { waitRunHint } from './wait-run.js';
+import { githubGet, githubPost } from '../github-api.js';
+import type { ToolResult } from '../types.js';
 
 // Hard per-call ceiling. This server runs on a Lambda whose configured
 // timeout is 30s (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout,
@@ -107,9 +109,9 @@ async function findNewRun(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (/\b(401|403|404)\b/.test(msg)) throw err;
-      console.error(
+      LOGGER.error(
         '[ci_dispatch_workflow] transient error polling for new run:',
-        err,
+        err instanceof Error ? err : msg,
       );
     }
   }
@@ -148,9 +150,9 @@ async function pollUntilComplete(
       const msg = err instanceof Error ? err.message : String(err);
       // 4xx errors are fatal (bad token, wrong run ID) — propagate immediately.
       if (/\b(401|403|404)\b/.test(msg)) throw err;
-      console.error(
+      LOGGER.error(
         '[ci_dispatch_workflow] transient error polling run status:',
-        err,
+        err instanceof Error ? err : msg,
       );
     }
   }

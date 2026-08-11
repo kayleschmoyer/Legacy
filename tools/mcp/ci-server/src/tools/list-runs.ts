@@ -52,7 +52,7 @@ export async function resolveWorkflowId(workflow: string): Promise<string> {
   const allWorkflows: GitHubWorkflow[] = [];
   let page = 1;
 
-  let firstPage = await githubGet<GitHubWorkflowsResponse>(
+  const firstPage = await githubGet<GitHubWorkflowsResponse>(
     `/actions/workflows?per_page=${perPage}&page=${page}`,
   );
   allWorkflows.push(...firstPage.workflows);

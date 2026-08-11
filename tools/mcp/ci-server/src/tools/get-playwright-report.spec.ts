@@ -60,6 +60,19 @@ const mockListS3Artifacts =
     typeof s3Artifacts.listPlaywrightS3Artifacts
   >;
 
+/** Parsed shape of the S3-fallback JSON response (LS-9236), for typed assertions. */
+interface ParsedS3FallbackResponse {
+  source: string;
+  sha: string;
+  runId: number | null;
+  s3Prefix: string;
+  artifactCount: number;
+}
+
+function parseS3Fallback(text: string): ParsedS3FallbackResponse {
+  return JSON.parse(text) as ParsedS3FallbackResponse;
+}
+
 afterEach(() => {
   mockDeploysTokenWasFallback.mockReturnValue(false);
 });
@@ -444,7 +457,7 @@ describe('getPlaywrightReport — S3 fallback on credentials gap (LS-9236)', () 
     expect(result.isError).toBeUndefined();
     expect(mockResolveRunSha).toHaveBeenCalledWith(99999);
     expect(mockListS3Artifacts).toHaveBeenCalledWith('abc123sha');
-    const parsed = JSON.parse(result.content[0].text as string);
+    const parsed = parseS3Fallback(result.content[0].text);
     expect(parsed.source).toBe('s3');
     expect(parsed.sha).toBe('abc123sha');
     expect(parsed.runId).toBe(99999);
@@ -467,7 +480,7 @@ describe('getPlaywrightReport — S3 fallback on credentials gap (LS-9236)', () 
 
     expect(result.isError).toBeUndefined();
     expect(mockGithubGet).toHaveBeenCalledWith('/pulls/6855');
-    const parsed = JSON.parse(result.content[0].text as string);
+    const parsed = parseS3Fallback(result.content[0].text);
     expect(parsed.source).toBe('s3');
     expect(parsed.sha).toBe('pr-head-sha');
     expect(parsed.runId).toBeNull();

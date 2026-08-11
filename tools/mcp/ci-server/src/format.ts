@@ -54,7 +54,7 @@ export function formatRunList(runs: readonly Row[]): string {
   const rows = pickFields(runs, RUN_LIST_COLUMNS).map((run) => ({
     ...run,
     displayTitle: truncate(
-      String(run.displayTitle ?? ''),
+      typeof run.displayTitle === 'string' ? run.displayTitle : '',
       RUN_DISPLAY_TITLE_MAX,
     ),
   }));

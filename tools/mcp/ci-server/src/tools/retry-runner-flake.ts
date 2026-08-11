@@ -1,5 +1,5 @@
-import { githubGet } from '../github-api.js';
 import { retryFailed } from './retry-failed.js';
+import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface RetryRunnerFlakeParams {

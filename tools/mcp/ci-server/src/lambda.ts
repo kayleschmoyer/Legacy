@@ -3,16 +3,16 @@ import type {
   APIGatewayProxyResultV2,
 } from 'aws-lambda';
 import {
-  SecretsManagerClient,
   GetSecretValueCommand,
+  SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { createServer } from './index.js';
 import {
-  MCP_SCOPE,
   authenticateMcpRequest,
   handleOAuthMetadataRequest,
+  MCP_SCOPE,
 } from '@legacy-sports/mcp-bearer-auth';
+import { createServer } from './index.js';
 
 const sm = new SecretsManagerClient({});
 let credentialsInitialized = false;

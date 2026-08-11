@@ -1,4 +1,4 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../github-api.js', () => ({
   githubGet: jest.fn(),
@@ -9,8 +9,8 @@ jest.mock('./retry-failed.js', () => ({
 }));
 
 import { retryRunnerFlake } from './retry-runner-flake.js';
-import * as githubApi from '../github-api.js';
 import * as retryFailedModule from './retry-failed.js';
+import * as githubApi from '../github-api.js';
 
 const mockGet = githubApi.githubGet as unknown as jest.MockedFunction<
   (path: string) => Promise<unknown>
@@ -43,12 +43,12 @@ describe('retryRunnerFlake', () => {
 
   describe('label present + comment found', () => {
     it('extracts the run id from the bot comment and delegates to retryFailed', async () => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/issues/42') {
-          return { labels: [{ name: 'CI: Runner Flake' }] };
+          return Promise.resolve({ labels: [{ name: 'CI: Runner Flake' }] });
         }
         if (path === '/issues/42/comments') {
-          return [
+          return Promise.resolve([
             comment('unrelated comment'),
             comment(
               [
@@ -57,7 +57,7 @@ describe('retryRunnerFlake', () => {
                 '[Re-run the failed jobs →](https://github.com/acme/repo/actions/runs/12345)',
               ].join('\n'),
             ),
-          ];
+          ]);
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -69,19 +69,19 @@ describe('retryRunnerFlake', () => {
     });
 
     it('takes the most recent matching comment when a PR has multiple flake cycles', async () => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/issues/7') {
-          return { labels: [{ name: 'CI: Runner Flake' }] };
+          return Promise.resolve({ labels: [{ name: 'CI: Runner Flake' }] });
         }
         if (path === '/issues/7/comments') {
-          return [
+          return Promise.resolve([
             comment(
               'CI cancelled due to a runner restart\n[link](https://github.com/acme/repo/actions/runs/111)',
             ),
             comment(
               'CI cancelled due to a runner restart\n[link](https://github.com/acme/repo/actions/runs/222)',
             ),
-          ];
+          ]);
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -94,12 +94,12 @@ describe('retryRunnerFlake', () => {
 
   describe('label absent, comment absent', () => {
     it('returns a clear no-signal result naming both signals and makes no write calls', async () => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/issues/99') {
-          return { labels: [{ name: 'some-other-label' }] };
+          return Promise.resolve({ labels: [{ name: 'some-other-label' }] });
         }
         if (path === '/issues/99/comments') {
-          return [comment('unrelated comment')];
+          return Promise.resolve([comment('unrelated comment')]);
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -118,12 +118,12 @@ describe('retryRunnerFlake', () => {
 
   describe('label absent, comment present', () => {
     it('treats the bot comment as a sufficient signal on its own and retries', async () => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/issues/101') {
-          return { labels: [{ name: 'some-other-label' }] };
+          return Promise.resolve({ labels: [{ name: 'some-other-label' }] });
         }
         if (path === '/issues/101/comments') {
-          return [
+          return Promise.resolve([
             comment(
               [
                 '⚡ **CI cancelled due to a runner restart** — this is not caused by your code.',
@@ -131,7 +131,7 @@ describe('retryRunnerFlake', () => {
                 '[Re-run the failed jobs →](https://github.com/acme/repo/actions/runs/999)',
               ].join('\n'),
             ),
-          ];
+          ]);
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -145,12 +145,12 @@ describe('retryRunnerFlake', () => {
 
   describe('label present but no matching comment', () => {
     it('returns a clear no-signal result when no comment matches the signature', async () => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/issues/5') {
-          return { labels: [{ name: 'CI: Runner Flake' }] };
+          return Promise.resolve({ labels: [{ name: 'CI: Runner Flake' }] });
         }
         if (path === '/issues/5/comments') {
-          return [comment('just a regular review comment')];
+          return Promise.resolve([comment('just a regular review comment')]);
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -165,14 +165,14 @@ describe('retryRunnerFlake', () => {
     });
 
     it('returns a clear no-signal result when the matching comment has no parseable run id', async () => {
-      mockGet.mockImplementation(async (path: string) => {
+      mockGet.mockImplementation((path: string) => {
         if (path === '/issues/6') {
-          return { labels: [{ name: 'CI: Runner Flake' }] };
+          return Promise.resolve({ labels: [{ name: 'CI: Runner Flake' }] });
         }
         if (path === '/issues/6/comments') {
-          return [
+          return Promise.resolve([
             comment('CI cancelled due to a runner restart, no link here'),
-          ];
+          ]);
         }
         throw new Error(`unexpected path ${path}`);
       });

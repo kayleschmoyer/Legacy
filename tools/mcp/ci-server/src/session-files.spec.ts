@@ -1,13 +1,13 @@
 import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
   describe,
   expect,
   it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
 } from '@jest/globals';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findClaudeProjectsDir, resolveProjectSlug } from './session-files.js';

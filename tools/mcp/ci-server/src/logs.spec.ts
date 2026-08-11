@@ -1,5 +1,5 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { deflateRawSync } from 'node:zlib';
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
 
 jest.mock('./github-api.js', () => ({
   githubGet: jest.fn(),
@@ -23,10 +23,7 @@ const mockGithubGetArrayBuffer =
 
 function textToArrayBuffer(text: string): ArrayBuffer {
   const buf = Buffer.from(text, 'utf-8');
-  return buf.buffer.slice(
-    buf.byteOffset,
-    buf.byteOffset + buf.byteLength,
-  ) as ArrayBuffer;
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
 function bufferToArrayBuffer(buf: Buffer): ArrayBuffer {
@@ -267,13 +264,13 @@ describe('fetchRunLogsRing', () => {
         },
       ],
     });
-    mockGithubGetArrayBuffer.mockImplementation(async (path: string) => {
+    mockGithubGetArrayBuffer.mockImplementation((path: string) => {
       if (path === '/actions/jobs/2/logs') {
         throw new Error(
           'GitHub API 404: <?xml version="1.0" encoding="utf-8"?><Error><Code>BlobNotFound</Code></Error>',
         );
       }
-      return textToArrayBuffer('all good here');
+      return Promise.resolve(textToArrayBuffer('all good here'));
     });
 
     const result = await fetchRunLogsRing(

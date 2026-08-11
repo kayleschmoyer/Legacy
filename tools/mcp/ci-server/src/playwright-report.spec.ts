@@ -1,10 +1,10 @@
 import {
+  afterEach,
+  beforeEach,
   describe,
   expect,
   it,
   jest,
-  beforeEach,
-  afterEach,
 } from '@jest/globals';
 
 // github-api.ts's token-minting logic (network calls, JWT signing) is out of
@@ -19,10 +19,10 @@ jest.mock('./github-api.js', () => ({
 
 import * as githubApi from './github-api.js';
 import {
+  DEPLOYS_BRANCH,
+  DEPLOYS_REPO,
   fetchFileContent,
   fetchPlaywrightReport,
-  DEPLOYS_REPO,
-  DEPLOYS_BRANCH,
 } from './playwright-report.js';
 
 const mockBuildHeaders = githubApi.buildHeaders as jest.MockedFunction<
@@ -84,7 +84,7 @@ describe('fetchFileContent (LS-8322)', () => {
     mockBuildHeaders.mockReturnValue({ Authorization: 'Bearer test-token' });
     mockGetDeploysToken.mockResolvedValue('test-token');
     mockFetch.mockReset();
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
   });
 
   afterEach(() => {
@@ -141,7 +141,7 @@ describe('fetchPlaywrightReport — happy path against a mocked embedded ZIP (LS
     mockGetDeploysToken.mockResolvedValue('test-token');
     mockDeploysTokenWasFallback.mockReturnValue(false);
     mockFetch.mockReset();
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
   });
 
   afterEach(() => {

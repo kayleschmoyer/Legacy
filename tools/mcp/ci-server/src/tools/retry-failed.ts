@@ -34,7 +34,11 @@ interface GitHubJobsResponse {
  */
 const ERROR_PATTERNS =
   /(?:error\b|FAIL|failed|✗|ERR!|error TS\d|Cannot find|Module not found|ENOENT|exit code [1-9]|Failed tasks)/i;
-const ANSI_ESCAPE_PREFIX = /^\x1b\[/;
+// Built from String.fromCharCode rather than a \x1b regex literal: a literal
+// ESC control character trips no-control-regex even though it is the exact,
+// intentional byte GitHub Actions emits for these escape sequences.
+const ESC = String.fromCharCode(27);
+const ANSI_ESCAPE_PREFIX = new RegExp(`^${ESC}\\[`);
 
 const MAX_SNIPPET_LINES = 40;
 const SNIPPET_FETCH_LINES = 2000;

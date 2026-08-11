@@ -22,6 +22,7 @@ const config: Config = {
     // Resolve the shared format-helper path alias to source for @swc/jest.
     '^@legacy-sports/mcp-format$':
       '<rootDir>/../../../lib/mcp-format/src/index.ts',
+    '^@legacy-sports/logging$': '<rootDir>/../../../lib/logging/src/index.ts',
   },
   coverageDirectory: '../../../coverage/tools/mcp/ci-server',
 };

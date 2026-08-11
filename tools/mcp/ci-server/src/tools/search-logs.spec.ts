@@ -1,4 +1,4 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../logs.js', () => ({
   fetchRunLogs: jest.fn(),
@@ -6,6 +6,7 @@ jest.mock('../logs.js', () => ({
 
 import { searchLogs } from './search-logs.js';
 import { fetchRunLogs, type FetchRunLogsResult } from '../logs.js';
+import type { LogMatch, LogSearchMeta } from '../format.js';
 
 const mockFetchRunLogs = fetchRunLogs as jest.MockedFunction<
   typeof fetchRunLogs
@@ -13,6 +14,16 @@ const mockFetchRunLogs = fetchRunLogs as jest.MockedFunction<
 
 function textOf(result: { content: Array<{ text?: string }> }): string {
   return result.content[0]?.text ?? '';
+}
+
+/** Parsed shape of a `searchLogs` JSON response, for typed assertions. */
+type ParsedSearchResult = LogSearchMeta & {
+  matches: LogMatch[];
+  charTruncated?: boolean;
+};
+
+function parseSearchResult(text: string): ParsedSearchResult {
+  return JSON.parse(text) as ParsedSearchResult;
 }
 
 /** Builds a resolved fetchRunLogs() result for a normal (non-zero-scope) fetch. */
@@ -79,7 +90,7 @@ describe('searchLogs ReDoS guard', () => {
     });
     expect(result.isError).toBeUndefined();
     expect(mockFetchRunLogs).toHaveBeenCalledTimes(1);
-    const parsed = JSON.parse(textOf(result));
+    const parsed = parseSearchResult(textOf(result));
     expect(parsed.returnedMatches).toBe(1);
   });
 
@@ -93,7 +104,7 @@ describe('searchLogs ReDoS guard', () => {
       isRegex: true,
     });
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(textOf(result));
+    const parsed = parseSearchResult(textOf(result));
     expect(parsed.returnedMatches).toBe(1);
     expect(parsed.matches[0].line).toBe('ERROR boom');
   });
@@ -134,7 +145,9 @@ describe('searchLogs response-size bound (LS-8390)', () => {
     // The reported overflow was ~58,660 characters on a single line; the
     // response must now stay under the default 50,000-char hard cap.
     expect(text.length).toBeLessThanOrEqual(50_000);
-    expect(() => JSON.parse(text)).not.toThrow();
+    expect(() => {
+      JSON.parse(text);
+    }).not.toThrow();
   });
 
   it('threads a caller-supplied truncateLineLength through to every context line', async () => {
@@ -147,7 +160,7 @@ describe('searchLogs response-size bound (LS-8390)', () => {
       contextAfter: 15,
       truncateLineLength: 50,
     });
-    const parsed = JSON.parse(textOf(result));
+    const parsed = parseSearchResult(textOf(result));
     for (const match of parsed.matches) {
       expect(match.line.length).toBeLessThanOrEqual(50);
       for (const l of [...match.before, ...match.after]) {
@@ -168,7 +181,7 @@ describe('searchLogs response-size bound (LS-8390)', () => {
     });
     const text = textOf(result);
     expect(text.length).toBeLessThanOrEqual(4_000);
-    const parsed = JSON.parse(text);
+    const parsed = parseSearchResult(text);
     expect(parsed.charTruncated).toBe(true);
   });
 });
@@ -192,7 +205,7 @@ describe('searchLogs zero-scope visibility (LS-8301)', () => {
       pattern: 'Successfully merged',
     });
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(textOf(result));
+    const parsed = parseSearchResult(textOf(result));
     expect(parsed.totalMatches).toBe(0);
     expect(parsed.jobsSearched).toBe(0);
     expect(parsed.jobsTotal).toBe(3);
@@ -215,7 +228,7 @@ describe('searchLogs zero-scope visibility (LS-8301)', () => {
       failedOnly: false,
     });
     expect(result.isError).toBeUndefined();
-    const parsed = JSON.parse(textOf(result));
+    const parsed = parseSearchResult(textOf(result));
     expect(parsed.totalMatches).toBe(1);
     expect(parsed.jobsSearched).toBe(3);
     expect(parsed.scopeNote).toBeUndefined();

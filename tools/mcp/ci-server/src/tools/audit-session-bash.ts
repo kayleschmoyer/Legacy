@@ -1,9 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { getRepoRoot } from '../github-api.js';
-import { findClaudeProjectsDir, resolveProjectSlug } from '../session-files.js';
-import type { ToolResult } from '../types.js';
 import {
+  type BashCall,
   extractBashCalls,
   extractMcpCalls,
   extractScratchSubprocessCalls,
@@ -11,10 +9,12 @@ import {
   findSessionByPid,
   formatAudit,
   formatGapsOnly,
-  type BashCall,
   type McpIssue,
   type ScratchCall,
 } from './audit-session-bash-parse.js';
+import { getRepoRoot } from '../github-api.js';
+import { findClaudeProjectsDir, resolveProjectSlug } from '../session-files.js';
+import type { ToolResult } from '../types.js';
 
 /**
  * Strict allow-list for project slug basenames. Mirrors assertSafeSlug in session-files.ts.
@@ -70,9 +70,7 @@ function textError(text: string): ToolResult {
  *   - gapsOnly: compact plain-text frequency table
  *   - auditMode: structured JSON audit report with pre-classified gaps
  */
-export async function auditSessionBash(
-  params: AuditSessionBashParams,
-): Promise<ToolResult> {
+export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
   let projectsDir: string;
   try {
     projectsDir = findClaudeProjectsDir(params.projectsDir);

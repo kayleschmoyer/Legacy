@@ -1,4 +1,4 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../github-api.js', () => ({
   githubGet: jest.fn(),
@@ -131,11 +131,14 @@ function mockResponses(
   jobs: JobFixture[] | null,
 ): void {
   mockGithubGet.mockReset();
-  mockGithubGet.mockImplementation((async (path: string) => {
+  mockGithubGet.mockImplementation(((path: string) => {
     if (path.endsWith('/jobs')) {
-      return { total_count: jobs?.length ?? 0, jobs: jobs ?? [] };
+      return Promise.resolve({
+        total_count: jobs?.length ?? 0,
+        jobs: jobs ?? [],
+      });
     }
-    return run;
+    return Promise.resolve(run);
   }) as typeof githubApi.githubGet);
 }
 

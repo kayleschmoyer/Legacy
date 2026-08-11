@@ -1,10 +1,10 @@
 import {
+  afterEach,
+  beforeEach,
   describe,
   expect,
   it,
   jest,
-  beforeEach,
-  afterEach,
 } from '@jest/globals';
 
 jest.mock('../github-api.js', () => ({
@@ -200,22 +200,24 @@ describe('dispatchWorkflow', () => {
       mockGithubPost.mockResolvedValue(undefined);
       const runId = 555;
       let pollCount = 0;
-      mockGithubGet.mockImplementation(async (path: string) => {
+      mockGithubGet.mockImplementation((path: string) => {
         if (path.includes('/workflows/')) {
-          return findRunResponse({
-            id: runId,
-            status: 'in_progress',
-            conclusion: null,
-          });
+          return Promise.resolve(
+            findRunResponse({
+              id: runId,
+              status: 'in_progress',
+              conclusion: null,
+            }),
+          );
         }
         pollCount++;
-        return {
+        return Promise.resolve({
           id: runId,
           status: pollCount >= 2 ? 'completed' : 'in_progress',
           conclusion: pollCount >= 2 ? 'success' : null,
           html_url: `https://github.com/bkrupa/legacy-sports/actions/runs/${runId}`,
           run_number: 9,
-        };
+        });
       });
 
       jest.useFakeTimers();
@@ -240,21 +242,23 @@ describe('dispatchWorkflow', () => {
     it('returns a bounded in_progress snapshot with a re-arm hint instead of blocking past the Lambda timeout when the run never finishes', async () => {
       mockGithubPost.mockResolvedValue(undefined);
       const runId = 777;
-      mockGithubGet.mockImplementation(async (path: string) => {
+      mockGithubGet.mockImplementation((path: string) => {
         if (path.includes('/workflows/')) {
-          return findRunResponse({
-            id: runId,
-            status: 'in_progress',
-            conclusion: null,
-          });
+          return Promise.resolve(
+            findRunResponse({
+              id: runId,
+              status: 'in_progress',
+              conclusion: null,
+            }),
+          );
         }
-        return {
+        return Promise.resolve({
           id: runId,
           status: 'in_progress',
           conclusion: null,
           html_url: `https://github.com/bkrupa/legacy-sports/actions/runs/${runId}`,
           run_number: 3,
-        };
+        });
       });
 
       jest.useFakeTimers();

@@ -1,4 +1,4 @@
-import { describe, expect, it, jest, beforeEach } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 // Stub github-api (import.meta not compatible with ts-jest CommonJS target).
 jest.mock('../github-api.js', () => ({
@@ -32,6 +32,36 @@ const mockListArtifacts =
   s3Artifacts.listPlaywrightS3Artifacts as jest.MockedFunction<
     typeof s3Artifacts.listPlaywrightS3Artifacts
   >;
+
+/** Parsed shape of the `source=s3` JSON response, for typed assertions. */
+interface ParsedS3Payload {
+  source: string;
+  sha: string;
+  runId: number;
+  artifactCount: number;
+  empty: boolean;
+  emptyNote?: string;
+  artifacts: Array<{ presignedUrl: string }>;
+  ghPagesReportName: string;
+  testTitleFilter?: string;
+  fileNameFilter?: string;
+}
+
+function parseS3Payload(text: string): ParsedS3Payload {
+  return JSON.parse(text) as ParsedS3Payload;
+}
+
+/** Parsed shape of the gh-pages `TestResultResponse` JSON, for typed assertions. */
+interface ParsedTestResultPayload {
+  matched: boolean;
+  test?: { title: string; outcome: string };
+  candidates?: Array<{ title: string }>;
+  message?: string;
+}
+
+function parseTestResultPayload(text: string): ParsedTestResultPayload {
+  return JSON.parse(text) as ParsedTestResultPayload;
+}
 
 const SHA = 'abc123def456';
 const RUN_ID = '28115361551';
@@ -71,7 +101,7 @@ describe('getPlaywrightTestResult — source=s3', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const payload = JSON.parse(result.content[0].text as string);
+    const payload = parseS3Payload(result.content[0].text);
     expect(payload.source).toBe('s3');
     expect(payload.sha).toBe(SHA);
     expect(payload.runId).toBe(parseInt(RUN_ID, 10));
@@ -102,7 +132,7 @@ describe('getPlaywrightTestResult — source=s3', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const payload = JSON.parse(result.content[0].text as string);
+    const payload = parseS3Payload(result.content[0].text);
     expect(payload.empty).toBe(true);
     expect(payload.emptyNote).toMatch(/expire after 3 days/);
   });
@@ -166,7 +196,7 @@ describe('getPlaywrightTestResult — source=s3', () => {
       source: 's3',
     });
 
-    const payload = JSON.parse(result.content[0].text as string);
+    const payload = parseS3Payload(result.content[0].text);
     expect(payload.testTitleFilter).toBe('login flow');
     expect(payload.fileNameFilter).toBe('auth.spec.ts');
   });
@@ -236,7 +266,7 @@ describe('getPlaywrightTestResult — runId/testFile lookup (LS-8888)', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const payload = JSON.parse(result.content[0].text as string);
+    const payload = parseS3Payload(result.content[0].text);
     expect(payload.runId).toBe(Number(RUN_ID));
     expect(payload.fileNameFilter).toBe('live-draft-ui.integration.spec.ts');
     expect(mockResolveRunSha).toHaveBeenCalledWith(Number(RUN_ID));
@@ -279,10 +309,10 @@ describe('getPlaywrightTestResult — runId/testFile lookup (LS-8888)', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const payload = JSON.parse(result.content[0].text as string);
+    const payload = parseTestResultPayload(result.content[0].text);
     expect(payload.matched).toBe(true);
-    expect(payload.test.title).toBe('fails');
-    expect(payload.test.outcome).toBe('unexpected');
+    expect(payload.test?.title).toBe('fails');
+    expect(payload.test?.outcome).toBe('unexpected');
   });
 
   it('returns candidates when multiple non-passing tests match a file-only lookup', async () => {
@@ -322,7 +352,7 @@ describe('getPlaywrightTestResult — runId/testFile lookup (LS-8888)', () => {
     });
 
     expect(result.isError).toBeFalsy();
-    const payload = JSON.parse(result.content[0].text as string);
+    const payload = parseTestResultPayload(result.content[0].text);
     expect(payload.matched).toBe(false);
     expect(payload.candidates).toHaveLength(2);
     expect(payload.message).toContain('Pass testTitle to disambiguate.');

@@ -1,5 +1,5 @@
-import { runBatch } from '../batch.js';
 import { viewRun } from './view-run.js';
+import { runBatch } from '../batch.js';
 import type { ToolResult } from '../types.js';
 
 interface ViewRunBatchParams {

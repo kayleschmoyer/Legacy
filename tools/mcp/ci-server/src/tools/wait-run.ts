@@ -1,3 +1,5 @@
+import { LOGGER } from '@legacy-sports/logging';
+
 import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
@@ -70,7 +72,10 @@ export async function waitRun(params: WaitRunParams): Promise<ToolResult> {
         const msg = err instanceof Error ? err.message : String(err);
         // 4xx errors are fatal (bad token, wrong run ID) — propagate immediately.
         if (/\b(401|403|404)\b/.test(msg)) throw err;
-        console.error('[ci_wait_run] transient error polling run status:', err);
+        LOGGER.error(
+          '[ci_wait_run] transient error polling run status:',
+          err instanceof Error ? err : msg,
+        );
       }
     }
 

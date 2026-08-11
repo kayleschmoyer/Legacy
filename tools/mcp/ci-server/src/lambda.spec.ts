@@ -1,4 +1,9 @@
-const mockSend = jest.fn();
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+
+type SecretIdCommand = { SecretId: string };
+
+const mockSend =
+  jest.fn<(cmd: SecretIdCommand) => Promise<{ SecretString: string }>>();
 jest.mock('@aws-sdk/client-secrets-manager', () => ({
   SecretsManagerClient: jest.fn().mockImplementation(() => ({
     send: mockSend,
@@ -14,8 +19,6 @@ jest.mock('@aws-sdk/client-secrets-manager', () => ({
 jest.mock('./repo-root', () => ({
   getRepoRoot: jest.fn(() => '/tmp/repo-root-that-does-not-exist'),
 }));
-
-type SecretIdCommand = { SecretId: string };
 
 const ENV_KEYS = [
   'GITHUB_TOKEN_SECRET_NAME',
@@ -77,23 +80,23 @@ describe('lambda ensureCredentials (LS-8322)', () => {
   it('sets both credential sets when PREVIEW_APP_TOKEN_SECRET_NAME is configured', async () => {
     process.env['GITHUB_TOKEN_SECRET_NAME'] = 'dev/mcp-github-token';
     process.env['PREVIEW_APP_TOKEN_SECRET_NAME'] = 'dev/mcp-preview-app-token';
-    mockSend.mockImplementation(async (cmd: SecretIdCommand) => {
+    mockSend.mockImplementation((cmd: SecretIdCommand) => {
       if (cmd.SecretId === 'dev/mcp-github-token') {
-        return {
+        return Promise.resolve({
           SecretString: JSON.stringify({
             app_id: '3158619',
             installation_id: '118260223',
             private_key: 'AGENT_AUTHOR_PEM',
           }),
-        };
+        });
       }
       if (cmd.SecretId === 'dev/mcp-preview-app-token') {
-        return {
+        return Promise.resolve({
           SecretString: JSON.stringify({
             app_id: 'PREVIEW_APP_ID_VALUE',
             private_key: 'PREVIEW_APP_PEM',
           }),
-        };
+        });
       }
       throw new Error(`Unexpected SecretId: ${cmd.SecretId}`);
     });
@@ -112,11 +115,11 @@ describe('lambda ensureCredentials (LS-8322)', () => {
   it('does not throw and leaves PREVIEW_APP_* unset when the preview secret fetch fails (non-fatal)', async () => {
     process.env['GITHUB_TOKEN_SECRET_NAME'] = 'dev/mcp-github-token';
     process.env['PREVIEW_APP_TOKEN_SECRET_NAME'] = 'dev/mcp-preview-app-token';
-    mockSend.mockImplementation(async (cmd: SecretIdCommand) => {
+    mockSend.mockImplementation((cmd: SecretIdCommand) => {
       if (cmd.SecretId === 'dev/mcp-github-token') {
-        return {
+        return Promise.resolve({
           SecretString: JSON.stringify({ private_key: 'AGENT_AUTHOR_PEM' }),
-        };
+        });
       }
       throw new Error('AccessDeniedException');
     });
@@ -134,14 +137,16 @@ describe('lambda ensureCredentials (LS-8322)', () => {
   it('does not throw and leaves PREVIEW_APP_* unset when the preview secret is missing required fields', async () => {
     process.env['GITHUB_TOKEN_SECRET_NAME'] = 'dev/mcp-github-token';
     process.env['PREVIEW_APP_TOKEN_SECRET_NAME'] = 'dev/mcp-preview-app-token';
-    mockSend.mockImplementation(async (cmd: SecretIdCommand) => {
+    mockSend.mockImplementation((cmd: SecretIdCommand) => {
       if (cmd.SecretId === 'dev/mcp-github-token') {
-        return {
+        return Promise.resolve({
           SecretString: JSON.stringify({ private_key: 'AGENT_AUTHOR_PEM' }),
-        };
+        });
       }
       // Missing private_key
-      return { SecretString: JSON.stringify({ app_id: 'incomplete' }) };
+      return Promise.resolve({
+        SecretString: JSON.stringify({ app_id: 'incomplete' }),
+      });
     });
 
     const { ensureCredentials } = await import('./lambda.js');

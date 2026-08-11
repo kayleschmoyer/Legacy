@@ -1,12 +1,12 @@
-import { generateKeyPairSync } from 'node:crypto';
 import {
+  afterEach,
+  beforeEach,
   describe,
   expect,
   it,
   jest,
-  beforeEach,
-  afterEach,
 } from '@jest/globals';
+import { generateKeyPairSync } from 'node:crypto';
 
 // http-retry.ts has no import.meta / auth dependencies, so it compiles cleanly
 // under the CommonJS spec tsconfig. We test the retry logic here rather than
@@ -48,7 +48,7 @@ describe('fetchWithRetry (githubGetArrayBuffer retry logic)', () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
     mockFetch.mockReset();
     noopLog.mockReset();
   });
@@ -385,7 +385,7 @@ describe('getDeploysToken (LS-8322)', () => {
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         }),
       );
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { getDeploysToken, deploysTokenWasFallback } =
       await import('./github-api.js');
@@ -414,7 +414,7 @@ describe('getDeploysToken (LS-8322)', () => {
     mockFetch.mockResolvedValueOnce(
       makeJsonResponse(200, { login: 'someone' }),
     );
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { getDeploysToken, deploysTokenWasFallback } =
       await import('./github-api.js');
@@ -443,7 +443,7 @@ describe('getDeploysToken (LS-8322)', () => {
       // falls to getToken() -> resolveToken() validates GH_TOKEN via GET /user
       // (LS-8551) before trusting it as the final fallback.
       .mockResolvedValueOnce(makeJsonResponse(200, { login: 'someone' }));
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { getDeploysToken, deploysTokenWasFallback } =
       await import('./github-api.js');
@@ -476,7 +476,7 @@ describe('getDeploysToken (LS-8322)', () => {
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         }),
       );
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { getDeploysToken, deploysTokenWasFallback } =
       await import('./github-api.js');
@@ -507,7 +507,7 @@ describe('getDeploysToken (LS-8322)', () => {
       // resolveToken() validates GH_TOKEN via GET /user before trusting it
       // (LS-8551) as part of the getToken() fallback below.
       .mockResolvedValueOnce(makeJsonResponse(200, { login: 'someone' }));
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { getDeploysToken, deploysTokenWasFallback } =
       await import('./github-api.js');
@@ -574,7 +574,7 @@ describe('token self-healing (LS-8551)', () => {
       .mockResolvedValueOnce(makeJsonResponse(200, { login: 'someone' }))
       // the actual GET request
       .mockResolvedValueOnce(makeJsonResponse(200, { ok: true }));
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { githubGet } = await import('./github-api.js');
     const result = await githubGet('/actions/runs/1');
@@ -603,7 +603,7 @@ describe('token self-healing (LS-8551)', () => {
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         }),
       );
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { getToken } = await import('./github-api.js');
     const token = await getToken();
@@ -637,7 +637,7 @@ describe('token self-healing (LS-8551)', () => {
       )
       // 4. retry succeeds with the fresh token
       .mockResolvedValueOnce(makeJsonResponse(200, { ok: true }));
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { githubGet } = await import('./github-api.js');
     const result = await githubGet('/actions/runs/1');
@@ -673,7 +673,7 @@ describe('token self-healing (LS-8551)', () => {
       )
       // 4. retry succeeds with the fresh token
       .mockResolvedValueOnce(makeResponse(200));
-    global.fetch = mockFetch as unknown as typeof fetch;
+    global.fetch = mockFetch;
 
     const { githubGetArrayBuffer } = await import('./github-api.js');
     const result = await githubGetArrayBuffer('/actions/jobs/1/logs');

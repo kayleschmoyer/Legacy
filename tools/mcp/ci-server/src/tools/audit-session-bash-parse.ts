@@ -15,7 +15,7 @@
  * JSONL discovery lives in ../session-files.ts (the pre-existing TS half).
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -100,7 +100,7 @@ function contentBlocks(record: JsonRecord): unknown[] | null {
   if (!isRecord(msg)) return null;
   const content = msg['content'];
   if (!Array.isArray(content)) return null;
-  return content;
+  return content as unknown[];
 }
 
 /** Extract Bash tool_use calls from a JSONL file. */
@@ -804,7 +804,10 @@ function pythonStr(value: unknown, nested = false): string {
     );
     return `{${entries.join(', ')}}`;
   }
-  return String(value);
+  // Only `number` remains for a JSON-shaped value once null/boolean/string/
+  // array/object have all been handled above.
+  const remaining: number = value as number;
+  return String(remaining);
 }
 
 /** Produce a compact one-line summary of tool parameters. */
