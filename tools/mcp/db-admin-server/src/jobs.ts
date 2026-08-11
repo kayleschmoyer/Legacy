@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import type postgres from 'postgres';
 import { LOGGER } from '@legacy-sports/logging';
+import { randomUUID } from 'node:crypto';
 
 /**
  * Job-row persistence for the async `db_migrate` worker (LS-8563).

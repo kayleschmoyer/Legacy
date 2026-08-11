@@ -22,7 +22,7 @@ export function resolveChecked(
 }
 
 /** Validate a git ref to prevent argument injection (no leading dash, safe chars only). */
-const SAFE_GIT_REF_RE = /^[a-zA-Z0-9._~^@{}/\-]+$/;
+const SAFE_GIT_REF_RE = /^[a-zA-Z0-9._~^@{}/-]+$/;
 export function isSafeGitRef(ref: string): boolean {
   return SAFE_GIT_REF_RE.test(ref) && !ref.startsWith('-');
 }
@@ -70,8 +70,8 @@ export function parseTestPlanCases(content: string): TestCase[] {
   for (const line of lines) {
     const headingMatch = line.match(/^(#{1,6})\s+(.*)/);
     if (headingMatch) {
-      const level = headingMatch[1]!.length;
-      const title = headingMatch[2]!.trim();
+      const level = headingMatch[1].length;
+      const title = headingMatch[2].trim();
 
       if (/^test plan$/i.test(title)) {
         testPlanLevel = level;
@@ -100,7 +100,7 @@ export function parseTestPlanCases(content: string): TestCase[] {
       const completed = /^\s*-\s*\[[xX]\]/.test(line);
       const text = line.replace(/^\s*-\s*\[[ xX]\]\s*/, '').trim();
       const testFileMatch = text.match(/—\s*(.+)$/);
-      const testFile = testFileMatch ? testFileMatch[1]!.trim() : null;
+      const testFile = testFileMatch ? testFileMatch[1].trim() : null;
       const isManual = testFile != null && /manual/i.test(testFile);
       const isAutomated = testFile != null && !isManual && testFile.length > 0;
       cases.push({ text, completed, isAutomated, isManual, testFile });

@@ -1,33 +1,32 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import {
   existsSync,
   mkdirSync,
-  readFileSync,
   readdirSync,
+  readFileSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { minifiedJson } from '@legacy-sports/mcp-format';
 import {
   isSafeFilePath,
   isSafeGitRef,
   parseTestPlanCases,
   resolveChecked,
   resolveGitHubToken,
-  type TestCase,
 } from './utils.js';
 import {
   ACTION_ITEM_COLUMNS,
   ADR_LIST_COLUMNS,
   POSTMORTEM_RECENT_COLUMNS,
   RFC_LIST_COLUMNS,
-  TESTPLAN_CASE_COLUMNS,
   tableText,
+  TESTPLAN_CASE_COLUMNS,
 } from './format.js';
 
 // ---------------------------------------------------------------------------
@@ -46,7 +45,7 @@ function ensureDir(dirPath: string): void {
 }
 
 function today(): string {
-  return new Date().toISOString().split('T')[0]!;
+  return new Date().toISOString().split('T')[0];
 }
 
 interface GitHubConfig {
@@ -65,7 +64,7 @@ function getGitHubConfig(): GitHubConfig | null {
     }).trim();
     const match = remoteUrl.match(/github\.com[:/]([^/]+)\/([^/.]+)/);
     if (!match) return null;
-    return { token, owner: match[1]!, repo: match[2]! };
+    return { token, owner: match[1], repo: match[2] };
   } catch {
     return null;
   }
@@ -490,7 +489,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ slug, title, ticket, worktreePath }) => {
+  ({ slug, title, ticket, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const rfcsDir = join(root, 'docs', 'rfcs');
     ensureDir(rfcsDir);
@@ -523,7 +522,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ path: rfcPath, worktreePath }) => {
+  ({ path: rfcPath, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const absPath = resolveChecked(rfcPath, root, 'docs/rfcs');
     if (!absPath) {
@@ -546,7 +545,7 @@ server.tool(
     const brokenLinks: string[] = [];
     let match;
     while ((match = linkRegex.exec(content)) !== null) {
-      const href = match[2]!;
+      const href = match[2];
       if (href.startsWith('http') || href.startsWith('#')) continue;
       const linkedPath = join(dirname(absPath), href);
       if (!existsSync(linkedPath)) {
@@ -571,7 +570,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ worktreePath }) => {
+  ({ worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const rfcsDir = join(root, 'docs', 'rfcs');
 
@@ -587,7 +586,7 @@ server.tool(
         const titleMatch = content.match(/^#\s+(.+)$/m);
         return {
           file: `docs/rfcs/${f}`,
-          title: titleMatch ? titleMatch[1]!.trim() : f,
+          title: titleMatch ? titleMatch[1].trim() : f,
           isDraft,
         };
       })
@@ -616,7 +615,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ path: rfcPath, ticket, worktreePath }) => {
+  ({ path: rfcPath, ticket, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const absPath = resolveChecked(rfcPath, root, 'docs/rfcs');
     if (!absPath) {
@@ -630,7 +629,7 @@ server.tool(
     }
 
     // Validate the file is actually a draft
-    const basename = absPath.split(/[\\/]/).pop()!;
+    const basename = absPath.split(/[\\/]/).pop() ?? absPath;
     if (!basename.startsWith('draft-')) {
       return err(
         `Expected a draft RFC — filename must start with "draft-". Got: ${basename}`,
@@ -684,7 +683,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ title, slug, worktreePath }) => {
+  ({ title, slug, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const decisionsDir = join(root, 'docs', 'decisions');
     ensureDir(decisionsDir);
@@ -720,7 +719,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ oldNumber, newNumber, worktreePath }) => {
+  ({ oldNumber, newNumber, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const decisionsDir = join(root, 'docs', 'decisions');
 
@@ -772,7 +771,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ status, worktreePath }) => {
+  ({ status, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const decisionsDir = join(root, 'docs', 'decisions');
 
@@ -788,11 +787,11 @@ server.tool(
       const content = readFileSync(join(decisionsDir, f), 'utf-8');
       const statusMatch = content.match(/^## Status\s*\n+(.+)$/m);
       const titleMatch = content.match(/^#\s+(.+)$/m);
-      const fileStatus = statusMatch ? statusMatch[1]!.trim() : 'Unknown';
+      const fileStatus = statusMatch ? statusMatch[1].trim() : 'Unknown';
       return {
         file: `docs/decisions/${f}`,
         number: f.slice(0, 4),
-        title: titleMatch ? titleMatch[1]!.trim() : f,
+        title: titleMatch ? titleMatch[1].trim() : f,
         status: fileStatus,
       };
     });
@@ -981,7 +980,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ basePath, headPath, baseRef, headRef, filePath, worktreePath }) => {
+  ({ basePath, headPath, baseRef, headRef, filePath, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
 
     let baseContent: string;
@@ -1088,7 +1087,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({
+  ({
     ticket,
     environment,
     steps,
@@ -1138,7 +1137,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ ticket, worktreePath }) => {
+  ({ ticket, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const filePath = join(root, 'docs', 'repros', `${ticket}.md`);
 
@@ -1179,7 +1178,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ ticket, attempted, hypotheses, recommendation, worktreePath }) => {
+  ({ ticket, attempted, hypotheses, recommendation, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const reprosDir = join(root, 'docs', 'repros');
     ensureDir(reprosDir);
@@ -1250,7 +1249,7 @@ server.tool(
       .describe('GitHub username of the new author (default: "agent")'),
   },
   async (params) => {
-    const body = continuationPlanBody(params as ContinuationPlanData);
+    const body = continuationPlanBody(params);
     const ghConfig = getGitHubConfig();
 
     if (!ghConfig) {
@@ -1331,7 +1330,7 @@ server.tool(
       return ok({ found: false, pr });
     }
 
-    const latest = planComments[planComments.length - 1]!;
+    const latest = planComments[planComments.length - 1];
     return ok({
       found: true,
       commentUrl: latest.html_url,
@@ -1369,7 +1368,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ date, slug, severity, authors, worktreePath }) => {
+  ({ date, slug, severity, authors, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const postmortemsDir = join(root, 'docs', 'postmortems');
     ensureDir(postmortemsDir);
@@ -1408,7 +1407,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ path: filePath, worktreePath }) => {
+  ({ path: filePath, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const postmortemsDir = join(root, 'docs', 'postmortems');
 
@@ -1450,7 +1449,7 @@ server.tool(
 
     for (const absPath of filesToScan) {
       const content = readFileSync(absPath, 'utf-8');
-      const postmortemName = absPath.split(/[\\/]/).pop()!;
+      const postmortemName = absPath.split(/[\\/]/).pop() ?? absPath;
       let inActionItems = false;
       let colOwner = 0,
         colAction = 1,
@@ -1491,10 +1490,10 @@ server.tool(
           if (cells.length > Math.max(colOwner, colAction, colDue, colTicket)) {
             actionItems.push({
               postmortem: `docs/postmortems/${postmortemName}`,
-              owner: cells[colOwner]!,
-              action: cells[colAction]!,
-              due: cells[colDue]!,
-              ticket: cells[colTicket]!,
+              owner: cells[colOwner],
+              action: cells[colAction],
+              due: cells[colDue],
+              ticket: cells[colTicket],
             });
           }
         }
@@ -1521,7 +1520,7 @@ server.tool(
       .optional()
       .describe('Repo or worktree root (default: auto-detected)'),
   },
-  async ({ days, worktreePath }) => {
+  ({ days, worktreePath }) => {
     const root = worktreePath ?? getRepoRoot();
     const postmortemsDir = join(root, 'docs', 'postmortems');
 
@@ -1531,7 +1530,7 @@ server.tool(
 
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
-    const cutoffStr = cutoff.toISOString().split('T')[0]!;
+    const cutoffStr = cutoff.toISOString().split('T')[0];
 
     const files = readdirSync(postmortemsDir)
       .filter((f) => /^\d{4}-\d{2}-\d{2}-/.test(f) && f.endsWith('.md'))
@@ -1547,7 +1546,7 @@ server.tool(
         file: `docs/postmortems/${f}`,
         date: f.slice(0, 10),
         severity: severityMatch ? severityMatch[1] : 'Unknown',
-        title: titleMatch ? titleMatch[1]!.trim() : f,
+        title: titleMatch ? titleMatch[1].trim() : f,
       };
     });
 

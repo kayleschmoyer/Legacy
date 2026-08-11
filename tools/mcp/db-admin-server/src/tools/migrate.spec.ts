@@ -1,12 +1,12 @@
+import { applyMigrationModule } from '@legacy-sports/db-client/src/scripts/migration-runner.js';
 import {
   applyMigrationBatch,
-  migrate,
-  migrationRequire,
   evalMigrationModule,
+  migrate,
   type MigrationPayloadItem,
+  migrationRequire,
 } from './migrate';
 import { getMigrationSql } from '../db.js';
-import { applyMigrationModule } from '@legacy-sports/db-client/src/scripts/migration-runner.js';
 import {
   ensureJobsTable,
   findRunningJob,
@@ -60,8 +60,8 @@ const CALLER: McpCaller = { clientId: 'client-abc', sub: 'sub-123' };
  */
 function makeSql(appliedHashes: string[]) {
   return Object.assign(
-    jest.fn(async () => appliedHashes.map((hash) => ({ hash }))),
-    { unsafe: jest.fn(async () => undefined) },
+    jest.fn(() => Promise.resolve(appliedHashes.map((hash) => ({ hash })))),
+    { unsafe: jest.fn(() => Promise.resolve(undefined)) },
   ) as never;
 }
 
@@ -178,7 +178,7 @@ describe('applyMigrationBatch (worker apply loop)', () => {
   });
 
   it('awaits the progress heartbeat after every processed migration', async () => {
-    const onProgress = jest.fn(async () => undefined);
+    const onProgress = jest.fn(() => Promise.resolve(undefined));
 
     await applyMigrationBatch(
       makeSql(['20260616_120000_a.ts']),

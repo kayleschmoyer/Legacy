@@ -229,13 +229,13 @@ export default [
     // would otherwise newly enforce lint on years of previously-unlinted
     // tooling in the same PR as the ESLint 9 migration. Preserving the
     // pre-migration scope here for remaining projects; LS-8747 tracks a
-    // dedicated cleanup pass. tools/mcp/nx-server has been removed from
-    // this ignore list and its lint violations fixed (LS-8737).
+    // dedicated cleanup pass. tools/mcp/nx-server (LS-8737), tools/mcp/ci-server
+    // (LS-9297), tools/mcp/db-admin-server, and tools/mcp/dev-process-server
+    // (LS-9299) have been removed from this ignore list and their lint
+    // violations fixed.
     basePath: repoRoot,
     ignores: [
       'tools/mcp/aws-server/**',
-      'tools/mcp/db-admin-server/**',
-      'tools/mcp/dev-process-server/**',
       'tools/mcp/github-server/**',
       'tools/mcp/rollbar-server/**',
     ],

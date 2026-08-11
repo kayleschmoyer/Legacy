@@ -6,17 +6,17 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
 import {
-  MCP_SCOPE,
   authenticateMcpRequest,
   handleOAuthMetadataRequest,
+  MCP_SCOPE,
 } from '@legacy-sports/mcp-bearer-auth';
 import { query } from './tools/query.js';
 import { migrationStatus } from './tools/migration-status.js';
 import { migrate } from './tools/migrate.js';
 import { extractCaller, type McpCaller } from './audit.js';
 import {
-  isDbMigrateWorkerEvent,
   type DbMigrateWorkerEvent,
+  isDbMigrateWorkerEvent,
 } from './invoke-worker.js';
 import { runDbMigrateWorker } from './worker.js';
 

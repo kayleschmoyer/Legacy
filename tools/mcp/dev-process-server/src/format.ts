@@ -5,7 +5,7 @@
 // the per-tool column sets — the first-order field-selection lever — and a tiny
 // table-or-empty wrapper so every list tool renders identically.
 
-import { markdownTable, type FlatRecord } from '@legacy-sports/mcp-format';
+import { type FlatRecord, markdownTable } from '@legacy-sports/mcp-format';
 
 /** rfc_list_open: the title identifies the RFC, the file path is how it's opened. */
 export const RFC_LIST_COLUMNS = ['title', 'file'] as const;

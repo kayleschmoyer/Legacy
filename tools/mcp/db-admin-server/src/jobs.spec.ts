@@ -1,5 +1,5 @@
-import { isJobStale, jobStaleMs, insertJob } from './jobs';
 import type postgres from 'postgres';
+import { insertJob, isJobStale, jobStaleMs } from './jobs';
 
 describe('jobStaleMs', () => {
   const original = process.env['DB_MIGRATE_JOB_STALE_MS'];
@@ -49,7 +49,7 @@ describe('isJobStale', () => {
 describe('insertJob', () => {
   it('returns null when the single-running-job index rejects the insert', async () => {
     // ON CONFLICT DO NOTHING yields zero returned rows on conflict.
-    const sql = jest.fn(async () => []) as unknown as postgres.Sql;
+    const sql = jest.fn(() => Promise.resolve([])) as unknown as postgres.Sql;
 
     const id = await insertJob(sql, {
       principal: 'p',
@@ -61,9 +61,9 @@ describe('insertJob', () => {
   });
 
   it('returns the generated id on a successful insert', async () => {
-    const sql = jest.fn(async (...args: unknown[]) => {
+    const sql = jest.fn((...args: unknown[]) => {
       // Echo back the id bound as the first template parameter.
-      return [{ id: args[1] }];
+      return Promise.resolve([{ id: args[1] }]);
     }) as unknown as postgres.Sql;
 
     const id = await insertJob(sql, {

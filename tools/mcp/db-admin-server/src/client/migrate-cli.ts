@@ -15,9 +15,9 @@
  * Run: `tsx tools/mcp/db-admin-server/src/client/migrate-cli.ts`
  */
 
+import { LOGGER } from '@legacy-sports/logging';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import { LOGGER } from '@legacy-sports/logging';
 import { runDbMigrate } from './migrate-client.js';
 
 export async function main(): Promise<void> {

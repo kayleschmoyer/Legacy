@@ -10,9 +10,29 @@ const mockGetReadonlySql = getReadonlySql as jest.MockedFunction<
 
 /** A fake postgres tagged-template `sql` that resolves to the given rows. */
 function fakeSql(rows: unknown[]) {
-  return jest.fn(async () => rows) as unknown as Awaited<
+  return jest.fn(() => Promise.resolve(rows)) as unknown as Awaited<
     ReturnType<typeof getReadonlySql>
   >;
+}
+
+interface MigrationStatusPayload {
+  available?: boolean;
+  applied?: number;
+  pending?: number;
+  pendingNames?: string[];
+  needsMigration?: boolean | null;
+  jobId?: string;
+  status?: string;
+  terminal?: boolean;
+  migrationNames?: string[];
+  appliedNames?: string[];
+  success?: boolean;
+  error?: string;
+  found?: boolean;
+}
+
+function parseBody(text: string): MigrationStatusPayload {
+  return JSON.parse(text) as MigrationStatusPayload;
 }
 
 function jobRow(overrides: Partial<DbMigrateJobRow> = {}): DbMigrateJobRow {
@@ -41,7 +61,7 @@ describe('db_migration_status (hosted)', () => {
       localMigrationNames: ['a.ts', 'b.ts', 'c.ts', 'd.ts'],
     });
 
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload.available).toBe(true);
     expect(payload.applied).toBe(2);
     expect(payload.pending).toBe(2);
@@ -58,7 +78,7 @@ describe('db_migration_status (hosted)', () => {
       localMigrationNames: ['a.ts', 'b.ts'],
     });
 
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload.pending).toBe(0);
     expect(payload.needsMigration).toBe(false);
   });
@@ -70,7 +90,7 @@ describe('db_migration_status (hosted)', () => {
 
     const result = await migrationStatus({ localMigrationNames: ['a.ts'] });
 
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload.available).toBe(false);
     expect(payload.needsMigration).toBeNull();
   });
@@ -84,7 +104,7 @@ describe('db_migration_status (async job polling, LS-8563)', () => {
 
     const result = await migrationStatus({ jobId: 'job-1' });
 
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload.jobId).toBe('job-1');
     expect(payload.status).toBe('running');
     expect(payload.terminal).toBe(false);
@@ -109,7 +129,7 @@ describe('db_migration_status (async job polling, LS-8563)', () => {
 
     const result = await migrationStatus({ jobId: 'job-1' });
 
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload.status).toBe('done');
     expect(payload.terminal).toBe(true);
     expect(payload.applied).toBe(2);
@@ -124,7 +144,7 @@ describe('db_migration_status (async job polling, LS-8563)', () => {
 
     const result = await migrationStatus({ jobId: 'job-1' });
 
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload.status).toBe('orphaned');
     expect(payload.terminal).toBe(true);
     expect(payload.success).toBe(false);
@@ -137,7 +157,7 @@ describe('db_migration_status (async job polling, LS-8563)', () => {
     const result = await migrationStatus({ jobId: 'nope' });
 
     expect(result.isError).toBe(true);
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload.found).toBe(false);
   });
 });

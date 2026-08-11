@@ -1,4 +1,3 @@
-import { compileFunction } from 'node:vm';
 import postgres from 'postgres';
 import * as drizzleOrm from 'drizzle-orm';
 import * as drizzleOrmPgCore from 'drizzle-orm/pg-core';
@@ -8,14 +7,15 @@ import {
   applyMigrationModule,
   type MigrationModule,
 } from '@legacy-sports/db-client/src/scripts/migration-runner.js';
+import { compileFunction } from 'node:vm';
 import { getMigrationSql } from '../db.js';
 import { errorMessage, jsonResult, type ToolResult } from '../types.js';
 import type { McpCaller } from '../audit.js';
 import {
   ensureJobsTable,
   findRunningJob,
-  insertJob,
   finishJob,
+  insertJob,
   reapStaleJobs,
 } from '../jobs.js';
 import { invokeWorkerAsync } from '../invoke-worker.js';

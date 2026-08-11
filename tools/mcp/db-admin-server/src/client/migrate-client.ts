@@ -17,9 +17,9 @@
  * by the client-registration ticket (LS-8120).
  */
 
+import { transformSync } from 'esbuild';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { transformSync } from 'esbuild';
 import type { MigrationPayloadItem } from '../tools/migrate.js';
 
 /** Same migration-filename shape the server validates against. */

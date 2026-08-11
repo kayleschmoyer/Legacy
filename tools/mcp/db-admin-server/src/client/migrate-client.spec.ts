@@ -1,13 +1,25 @@
 import {
-  transpileMigrationSource,
   buildMigrationPayload,
-  buildToolCallBody,
   buildStatusCallBody,
+  buildToolCallBody,
+  type LocalMigration,
   parseToolResultPayload,
   pollMigrateJob,
   postMigrations,
-  type LocalMigration,
+  transpileMigrationSource,
 } from './migrate-client';
+
+interface RpcToolCallBody {
+  method: string;
+  params: {
+    name: string;
+    arguments: Record<string, unknown>;
+  };
+}
+
+function parseRpcBody(body: string): RpcToolCallBody {
+  return JSON.parse(body) as RpcToolCallBody;
+}
 
 /** Wrap a tool payload in the MCP JSON-RPC response envelope the server sends. */
 function rpcResponse(payload: unknown): string {
@@ -87,7 +99,7 @@ describe('buildMigrationPayload', () => {
 
 describe('buildToolCallBody', () => {
   it('builds a tools/call request for db_migrate', () => {
-    const body = JSON.parse(
+    const body = parseRpcBody(
       buildToolCallBody([
         { name: 'a.ts', hash: 'a.ts', jsSource: 'exports.up = 1;' },
       ]),
@@ -115,7 +127,7 @@ describe('postMigrations', () => {
     const [, init] = fetchMock.mock.calls[0];
     const headers = init?.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer tok');
-    expect(String(init?.body)).toContain('db_migrate');
+    expect(init?.body as string).toContain('db_migrate');
   });
 
   it('does not double-prefix an existing Bearer value', async () => {
@@ -145,7 +157,7 @@ describe('postMigrations', () => {
 
 describe('buildStatusCallBody', () => {
   it('builds a tools/call request for db_migration_status with the jobId', () => {
-    const body = JSON.parse(buildStatusCallBody('job-1'));
+    const body = parseRpcBody(buildStatusCallBody('job-1'));
 
     expect(body.method).toBe('tools/call');
     expect(body.params.name).toBe('db_migration_status');
@@ -193,8 +205,10 @@ describe('pollMigrateJob (LS-8563)', () => {
     ];
     const fetchMock = jest
       .spyOn(global, 'fetch')
-      .mockImplementation(
-        async () => new Response(responses.shift() ?? '{}', { status: 200 }),
+      .mockImplementation(() =>
+        Promise.resolve(
+          new Response(responses.shift() ?? '{}', { status: 200 }),
+        ),
       );
 
     const terminal = await pollMigrateJob({
@@ -202,14 +216,14 @@ describe('pollMigrateJob (LS-8563)', () => {
       bearer: 'tok',
       jobId: 'j',
       intervalMs: 0,
-      sleep: async () => undefined,
+      sleep: () => Promise.resolve(),
     });
 
     expect(terminal.status).toBe('done');
     expect(terminal.applied).toBe(1);
     expect(fetchMock).toHaveBeenCalledTimes(3);
     // Every poll is a db_migration_status call carrying the jobId.
-    expect(String(fetchMock.mock.calls[0][1]?.body)).toContain(
+    expect(fetchMock.mock.calls[0][1]?.body as string).toContain(
       'db_migration_status',
     );
   });
@@ -228,7 +242,7 @@ describe('pollMigrateJob (LS-8563)', () => {
       serverUrl: 'https://srv/mcp',
       bearer: 'tok',
       jobId: 'j',
-      sleep: async () => undefined,
+      sleep: () => Promise.resolve(),
     });
 
     expect(terminal.status).toBe('orphaned');
@@ -250,7 +264,7 @@ describe('pollMigrateJob (LS-8563)', () => {
         bearer: 'tok',
         jobId: 'j',
         timeoutMs: 0,
-        sleep: async () => undefined,
+        sleep: () => Promise.resolve(),
       }),
     ).rejects.toThrow(/still running/);
   });

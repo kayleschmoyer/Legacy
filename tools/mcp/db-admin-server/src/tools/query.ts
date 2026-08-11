@@ -34,7 +34,7 @@ export async function query(params: QueryParams): Promise<ToolResult> {
     const rows = await sql.begin('READ ONLY', async (tx) =>
       tx.unsafe(sqlQuery),
     );
-    return formatResult(rows as unknown as Record<string, unknown>[], format);
+    return formatResult(rows, format);
   } catch (error) {
     return {
       content: [{ type: 'text', text: `Query failed: ${errorMessage(error)}` }],

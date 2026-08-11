@@ -1,7 +1,7 @@
 import postgres from 'postgres';
 import {
-  SecretsManagerClient,
   GetSecretValueCommand,
+  SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 
 /**

@@ -1,4 +1,3 @@
-import { join } from 'node:path';
 import {
   isSafeFilePath,
   isSafeGitRef,
@@ -14,7 +13,7 @@ describe('resolveChecked', () => {
     const result = resolveChecked('docs/rfcs/draft-foo.md', ROOT, 'docs/rfcs');
     expect(result).not.toBeNull();
     // Verify the result contains the expected path segments (normalise separators)
-    expect(result!.replace(/\\/g, '/')).toContain('docs/rfcs/draft-foo.md');
+    expect(result?.replace(/\\/g, '/')).toContain('docs/rfcs/draft-foo.md');
   });
 
   it('returns null for a path traversal attempt', () => {
@@ -111,9 +110,9 @@ describe('parseTestPlanCases', () => {
 `;
     const cases = parseTestPlanCases(content);
     expect(cases).toHaveLength(2);
-    expect(cases[0]!.text).toBe('User can log in');
-    expect(cases[0]!.completed).toBe(false);
-    expect(cases[1]!.completed).toBe(true);
+    expect(cases[0].text).toBe('User can log in');
+    expect(cases[0].completed).toBe(false);
+    expect(cases[1].completed).toBe(true);
   });
 
   it('marks a case as automated when a test file reference is present', () => {
@@ -123,9 +122,9 @@ describe('parseTestPlanCases', () => {
 - [ ] Login flow works — apps/web-e2e/src/tests/login.spec.ts
 `;
     const cases = parseTestPlanCases(content);
-    expect(cases[0]!.isAutomated).toBe(true);
-    expect(cases[0]!.isManual).toBe(false);
-    expect(cases[0]!.testFile).toBe('apps/web-e2e/src/tests/login.spec.ts');
+    expect(cases[0].isAutomated).toBe(true);
+    expect(cases[0].isManual).toBe(false);
+    expect(cases[0].testFile).toBe('apps/web-e2e/src/tests/login.spec.ts');
   });
 
   it('marks a case as manual when the test file reference contains "manual"', () => {
@@ -135,8 +134,8 @@ describe('parseTestPlanCases', () => {
 - [ ] Visual layout looks correct — manual
 `;
     const cases = parseTestPlanCases(content);
-    expect(cases[0]!.isManual).toBe(true);
-    expect(cases[0]!.isAutomated).toBe(false);
+    expect(cases[0].isManual).toBe(true);
+    expect(cases[0].isAutomated).toBe(false);
   });
 
   it('does not exit the Test Plan section on intermediate sub-headings', () => {
@@ -156,8 +155,8 @@ Some setup notes.
 `;
     const cases = parseTestPlanCases(content);
     expect(cases).toHaveLength(2);
-    expect(cases[0]!.text).toBe('Case A');
-    expect(cases[1]!.text).toBe('Case B');
+    expect(cases[0].text).toBe('Case A');
+    expect(cases[1].text).toBe('Case B');
   });
 
   it('exits the Test Plan section when a sibling heading is encountered', () => {
@@ -172,7 +171,7 @@ Some setup notes.
 `;
     const cases = parseTestPlanCases(content);
     expect(cases).toHaveLength(1);
-    expect(cases[0]!.text).toBe('Inside test plan');
+    expect(cases[0].text).toBe('Inside test plan');
   });
 
   it('returns empty array when no Test Plan section exists', () => {
@@ -198,7 +197,7 @@ Some setup notes.
 `;
     const cases = parseTestPlanCases(content);
     expect(cases).toHaveLength(1);
-    expect(cases[0]!.text).toBe('Direct case without a Cases sub-section');
+    expect(cases[0].text).toBe('Direct case without a Cases sub-section');
   });
 });
 

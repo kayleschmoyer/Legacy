@@ -12,13 +12,25 @@ const mockGetReadonlySql = getReadonlySql as jest.MockedFunction<
 function fakeSql(rows: Record<string, unknown>[]) {
   const beginModes: string[] = [];
   const sql = {
-    begin: jest.fn(async (mode: string, fn: (tx: unknown) => unknown) => {
+    begin: jest.fn((mode: string, fn: (tx: unknown) => unknown) => {
       beginModes.push(mode);
-      const tx = { unsafe: jest.fn(async () => rows) };
-      return fn(tx);
+      const tx = { unsafe: jest.fn(() => Promise.resolve(rows)) };
+      return Promise.resolve(fn(tx));
     }),
   };
   return { sql, beginModes };
+}
+
+interface QueryPayload {
+  rows?: Record<string, unknown>[];
+  rowCount?: number;
+  columns?: string[];
+  available?: boolean;
+  reason?: string;
+}
+
+function parseBody(text: string): QueryPayload {
+  return JSON.parse(text) as QueryPayload;
 }
 
 describe('db_query (hosted, read-only)', () => {
@@ -32,7 +44,7 @@ describe('db_query (hosted, read-only)', () => {
 
     expect(beginModes).toEqual(['READ ONLY']);
     expect(result.isError).toBeUndefined();
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload).toEqual({
       rows: [{ id: 1, name: 'a' }],
       rowCount: 1,
@@ -66,9 +78,9 @@ describe('db_query (hosted, read-only)', () => {
 
   it('returns an error result when the query fails', async () => {
     const sql = {
-      begin: jest.fn(async () => {
-        throw new Error('relation "nope" does not exist');
-      }),
+      begin: jest.fn(() =>
+        Promise.reject(new Error('relation "nope" does not exist')),
+      ),
     };
     mockGetReadonlySql.mockResolvedValue(sql as never);
 
@@ -85,7 +97,7 @@ describe('db_query (hosted, read-only)', () => {
 
     const result = await query({ query: 'SELECT 1' });
 
-    const payload = JSON.parse(result.content[0].text);
+    const payload = parseBody(result.content[0].text);
     expect(payload.available).toBe(false);
     expect(payload.reason).toContain('Database unavailable');
   });

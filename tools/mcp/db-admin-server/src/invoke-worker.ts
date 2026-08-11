@@ -1,4 +1,4 @@
-import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
+import { InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 
 /**
  * Async self-invoke plumbing for the `db_migrate` worker (LS-8563).

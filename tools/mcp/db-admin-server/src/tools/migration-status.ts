@@ -1,9 +1,9 @@
 import { getReadonlySql } from '../db.js';
 import { errorMessage, jsonResult, type ToolResult } from '../types.js';
 import {
-  isJobStale,
   type DbMigrateJobReportedStatus,
   type DbMigrateJobRow,
+  isJobStale,
 } from '../jobs.js';
 
 interface MigrationStatusParams {
