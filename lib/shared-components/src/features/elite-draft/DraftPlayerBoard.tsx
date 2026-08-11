@@ -29,7 +29,22 @@ const PlayerDetailModal: React.FC<{
   onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
 }> = () => null;
 
-const positions = ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'];
+// Position-filter pill sets, one per sport (LS-9241). The baseball list is
+// a curated display collapse of stat positions (not the full
+// ALLOWED_POSITIONS_BY_SPORT['baseball'] slot-type key set, which also
+// includes roster-only slots like DH/IF/XDH); the football list mirrors it
+// with the football stat positions from ALLOWED_POSITIONS_BY_SPORT.football,
+// excluding BENCH (not a meaningful filter value — its eligibility list is
+// every football position).
+const POSITIONS_BY_SPORT: Record<SportKind, readonly string[]> = {
+  baseball: ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'],
+  football: [
+    'ALL',
+    ...Object.keys(ALLOWED_POSITIONS_BY_SPORT.football).filter(
+      (pos) => pos !== 'BENCH', // exclude the BENCH slot — not a meaningful filter value
+    ),
+  ],
+};
 
 // ── Styled primitives ───────────────────────────────────────────────────────
 // tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint;
@@ -384,6 +399,20 @@ export function DraftPlayerBoard({
 
   // O(1) watchlist lookup — avoids O(n) Array.includes per card per render
   const watchlistSet = useMemo(() => new Set(watchlist), [watchlist]);
+
+  // Position-filter pill list, sport-driven (LS-9241 — previously a
+  // module-level baseball-only constant, so football drafts had no pill
+  // that ever matched a football player's position).
+  const positions = useMemo(() => POSITIONS_BY_SPORT[sport], [sport]);
+
+  // Guard against a stale selectedPosition surviving a sport change (e.g.
+  // the MockDraftPage sport-toggle dev affordance) — reset to 'ALL' when
+  // the current selection isn't valid for the new sport's pill list.
+  useEffect(() => {
+    if (!positions.includes(selectedPosition)) {
+      onSetSelectedPosition('ALL');
+    }
+  }, [positions, selectedPosition, onSetSelectedPosition]);
 
   // My Depth Chart view: recomputes on every pick (myTeam updates live via the
   // draft WebSocket / pick history refetch), so the view always reflects the

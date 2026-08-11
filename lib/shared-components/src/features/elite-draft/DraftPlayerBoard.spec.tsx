@@ -5,7 +5,7 @@ import {
 } from '@legacy-sports/utils';
 import { buildDepthChartBuckets, DraftPlayerBoard } from './DraftPlayerBoard';
 import type { DraftPlayer } from './types';
-import { render } from '../../test-utils';
+import { fireEvent, render, within } from '../../test-utils';
 
 const baseballLeaguePositions = DEFAULT_BASEBALL_ROSTER_POSITIONS.map(
   (positionType, id) => ({ id, positionType }),
@@ -102,6 +102,93 @@ describe('DraftPlayerBoard — sport-aware stat headers (LS-4662)', () => {
     expect(getByText('FG')).toBeTruthy();
     expect(queryByText('AVG')).toBeNull();
     expect(queryByText('WAR')).toBeNull();
+  });
+});
+
+describe('DraftPlayerBoard — sport-aware position filter pills (LS-9241)', () => {
+  it('renders the baseball position filter pills by default', () => {
+    const { getByRole } = render(<DraftPlayerBoard {...makeProps()} />);
+    const group = getByRole('radiogroup');
+    expect(
+      ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'].every((pos) =>
+        Boolean(within(group).getByText(pos)),
+      ),
+    ).toBe(true);
+    expect(within(group).queryByText('QB')).toBeNull();
+  });
+
+  it('renders football position filter pills sourced from ALLOWED_POSITIONS_BY_SPORT.football when sport=football', () => {
+    const { getByRole } = render(
+      <DraftPlayerBoard {...makeProps({ sport: 'football' })} />,
+    );
+    const group = getByRole('radiogroup');
+    expect(
+      ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DST', 'FLEX'].every((pos) =>
+        Boolean(within(group).getByText(pos)),
+      ),
+    ).toBe(true);
+    // Baseball-only codes and the non-filterable BENCH slot must not appear.
+    expect(within(group).queryByText('1B')).toBeNull();
+    expect(within(group).queryByText('SS')).toBeNull();
+    expect(within(group).queryByText('BENCH')).toBeNull();
+  });
+
+  it('resets a stale selectedPosition to ALL when the sport changes to one without that pill', () => {
+    const onSetSelectedPosition = jest.fn();
+    render(
+      <DraftPlayerBoard
+        {...makeProps({
+          sport: 'football',
+          selectedPosition: 'SS', // valid for baseball, not football
+          onSetSelectedPosition,
+        })}
+      />,
+    );
+    expect(onSetSelectedPosition).toHaveBeenCalledWith('ALL');
+  });
+
+  it('does not reset selectedPosition when it is valid for the current sport', () => {
+    const onSetSelectedPosition = jest.fn();
+    render(
+      <DraftPlayerBoard
+        {...makeProps({ sport: 'football', selectedPosition: 'WR' })}
+        onSetSelectedPosition={onSetSelectedPosition}
+      />,
+    );
+    expect(onSetSelectedPosition).not.toHaveBeenCalled();
+  });
+
+  it('selecting a football position pill invokes onSetSelectedPosition with that position (AC3 wiring)', () => {
+    const onSetSelectedPosition = jest.fn();
+    const { getByText } = render(
+      <DraftPlayerBoard
+        {...makeProps({ sport: 'football', onSetSelectedPosition })}
+      />,
+    );
+    fireEvent.click(getByText('WR'));
+    expect(onSetSelectedPosition).toHaveBeenCalledWith('WR');
+  });
+
+  it('keyboard-navigates across the football pill row (AC4), matching the sport-driven list', () => {
+    const onSetSelectedPosition = jest.fn();
+    const { getByRole } = render(
+      <DraftPlayerBoard
+        {...makeProps({
+          sport: 'football',
+          selectedPosition: 'ALL',
+          onSetSelectedPosition,
+        })}
+      />,
+    );
+    const group = getByRole('radiogroup');
+    // ['ALL', 'QB', 'RB', 'WR', 'TE', 'K', 'DST', 'FLEX'] — ArrowRight from
+    // 'ALL' (index 0) selects the next entry, 'QB'.
+    fireEvent.keyDown(group, { key: 'ArrowRight' });
+    expect(onSetSelectedPosition).toHaveBeenCalledWith('QB');
+    onSetSelectedPosition.mockClear();
+    // End jumps to the last pill in the football list, 'FLEX'.
+    fireEvent.keyDown(group, { key: 'End' });
+    expect(onSetSelectedPosition).toHaveBeenCalledWith('FLEX');
   });
 });
 
