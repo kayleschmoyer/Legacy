@@ -46,6 +46,8 @@ Installed into `.git/hooks/` by `make setup-hooks` (which `make install` runs). 
 
 `pre-push` runs four checks: (1) reject tracked `package-lock.json`/`yarn.lock`; (2) reject 7-char conflict markers in tracked non-md files; (3) `terraform validate` when `terraform/` changed; (4) `nx format:write` — if formatting changed files and the tree was clean, it auto-amends the last commit and **aborts the push** (re-run `git push`); if the tree was dirty, it blocks the push. Bypass: `SKIP_PREPUSH_LINT=1 git push` (formatting only) or `git push --no-verify` (all checks, emergency only).
 
+`pre-push` has **no** git-lfs dependency as of this ticket (LS-7795) — removed end-to-end in LS-8204 (2026-06-20); re-verified against the live 159-line hook and guarded against regression by `.github/checks/pre-push-no-hard-lfs-guard.sh`. Do not reintroduce an unconditional `command -v <optional-binary> || exit <nonzero>` guard based on stale assumptions about LFS.
+
 ## Provenance and maintenance
 
 Created 2026-07-02 from the skills audit (build-and-env area), which found both Bash guards misdescribed (guard-bash-mcp-first documented as blocking with an `ALLOW_BASH_FALLBACK` bypass — it always exits 0 and has no such variable). Re-verify by reading the scripts, never their descriptions:
