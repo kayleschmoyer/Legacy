@@ -6,12 +6,12 @@ import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 
 import {
-  DEFAULT_TARGET,
-  READINESS_WAIT_MAX_MS,
   buildNxArgs,
   clampReadinessWait,
+  DEFAULT_TARGET,
   isValidTarget,
   probeLoopback,
+  READINESS_WAIT_MAX_MS,
   resolveNxExecutable,
   waitForReadyOrExit,
 } from './dev-server-start.js';
@@ -146,10 +146,11 @@ describe('resolveNxExecutable', () => {
     const worktreePath = makeWorktreeWithBin(['nx', 'nx.cmd']);
     try {
       const executable = resolveNxExecutable(worktreePath);
-      expect(executable).not.toBeNull();
+      if (executable === null)
+        throw new Error('expected a non-null executable path');
       // Must be absolute and use the OS-native separator, so cmd.exe never
       // sees a lone "/"-delimited relative token to mis-tokenize.
-      expect(executable!.startsWith(worktreePath)).toBe(true);
+      expect(executable.startsWith(worktreePath)).toBe(true);
       expect(executable).toContain(sep);
     } finally {
       rmSync(worktreePath, { recursive: true, force: true });

@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
-import { runCommand, getRepoRoot } from '../run-command.js';
+import { getRepoRoot, runCommand } from '../run-command.js';
 import { jsonResult } from '../format.js';
 import type { ToolResult } from '../types.js';
 

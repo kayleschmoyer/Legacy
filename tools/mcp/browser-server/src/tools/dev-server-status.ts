@@ -1,8 +1,8 @@
-import { createConnection } from 'node:net';
 import { pick } from '@legacy-sports/mcp-format';
+import { createConnection } from 'node:net';
+import { probeLoopback } from './dev-server-start.js';
 import { state } from '../state.js';
 import { DEV_SERVER_FIELDS, jsonResult } from '../format.js';
-import { probeLoopback } from './dev-server-start.js';
 import type { ToolResult } from '../types.js';
 
 const SCAN_PORT_START = 4200;

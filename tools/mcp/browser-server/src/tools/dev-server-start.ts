@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { createConnection } from 'node:net';
 import { join } from 'node:path';
@@ -135,7 +135,7 @@ function waitForReady(port: number, budgetMs: number): Promise<boolean> {
         resolve(true);
         return;
       }
-      setTimeout(check, READINESS_POLL_INTERVAL_MS);
+      setTimeout(() => void check(), READINESS_POLL_INTERVAL_MS);
     };
     void check();
   });
@@ -187,7 +187,7 @@ export function waitForReadyOrExit(
         ),
       );
     });
-    waitForReady(port, budgetMs).then((ready) =>
+    void waitForReady(port, budgetMs).then((ready) =>
       settle(() => resolve(ready ? 'ready' : 'starting')),
     );
   });
@@ -229,8 +229,8 @@ export async function devServerStart(
   const port = params.port ?? (await allocatePort());
 
   // Check if port is already tracked
-  if (state.devServers.has(port)) {
-    const existing = state.devServers.get(port)!;
+  const existing = state.devServers.get(port);
+  if (existing) {
     return jsonResult(
       {
         ok: false,

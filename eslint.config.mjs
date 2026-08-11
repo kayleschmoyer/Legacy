@@ -232,7 +232,6 @@ export default [
     basePath: repoRoot,
     ignores: [
       'tools/mcp/aws-server/**',
-      'tools/mcp/browser-server/**',
       'tools/mcp/ci-server/**',
       'tools/mcp/db-admin-server/**',
       'tools/mcp/dev-process-server/**',
