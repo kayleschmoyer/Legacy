@@ -51,7 +51,8 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 
 // Stub the shared AuthCard so the email/password callback is invokable without
 // fighting tamagui's controlled inputs in jsdom. It mirrors the real card's
-// contract for the props this suite exercises.
+// contract for the props this suite exercises. BrandLogo is stubbed too since
+// LoginPage.tsx renders it in the header (LS-9096).
 jest.mock('@legacy-sports/shared-components', () => ({
   LoginPage: ({
     onEmailPasswordSignIn,
@@ -74,6 +75,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
       {errorMessage ? <span>{errorMessage}</span> : null}
     </div>
   ),
+  BrandLogo: () => <div />,
 }));
 
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
