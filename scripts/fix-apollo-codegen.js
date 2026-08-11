@@ -96,9 +96,12 @@ type BaseMutationOptions<TData, TVariables> = any;`;
   // so the codegen-generated overloads produce TS2394/TS2769 errors.
   // We remove the overload declarations and keep only the implementation.
   // The // @ts-ignore + overload lines (ending in ;) before the implementation
-  // are matched and removed.
+  // are matched and removed. Each overload's parameter/return types can span
+  // multiple lines, so `[\s\S]*?` (not `.`) is required to cross newlines —
+  // a same-line `.*` regex silently fails to match wrapped signatures and
+  // leaves the @ts-ignore suppressions in place.
   content = content.replace(
-    /\/\/ @ts-ignore\nexport function (use\w+SuspenseQuery)\(.*;\nexport function \1\(.*;\n/g,
+    /\/\/ @ts-ignore\nexport function (use\w+SuspenseQuery)\([\s\S]*?;\nexport function \1\([\s\S]*?;\n/g,
     '',
   );
 

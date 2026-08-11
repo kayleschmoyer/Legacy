@@ -59,6 +59,9 @@ const mockUseGetSeasonDraftGamesQuery = jest.fn(
 const mockUseGetDisclosureGameBestScoreQuery = jest.fn(
   (): MockQueryResult => IDLE_QUERY,
 );
+const mockUseGetTwentyQuestionsTokenBalanceQuery = jest.fn(
+  (): MockQueryResult => IDLE_QUERY,
+);
 
 jest.mock('@legacy-sports/graphql', () => ({
   // Mirrors the generated `SeasonDraftGameStatus` enum; the module is replaced
@@ -73,6 +76,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetSeasonDraftGamesQuery(...args),
   useGetDisclosureGameBestScoreQuery: (...args: unknown[]) =>
     mockUseGetDisclosureGameBestScoreQuery(...args),
+  useGetTwentyQuestionsTokenBalanceQuery: (...args: unknown[]) =>
+    mockUseGetTwentyQuestionsTokenBalanceQuery(...args),
 }));
 
 // The Game Room layout has its own spec in lib/shared-components; this suite
@@ -149,6 +154,17 @@ function mockBestScore(
   });
 }
 
+function mockTokenBalance(
+  tokens: number | null,
+  { loading = false, error = undefined as Error | undefined } = {},
+) {
+  mockUseGetTwentyQuestionsTokenBalanceQuery.mockReturnValue({
+    data: tokens === null ? undefined : { twentyQuestionsTokenBalance: tokens },
+    loading,
+    error,
+  });
+}
+
 interface ReceivedProps {
   activeGamesCount: number | null;
   bestScore: number | null;
@@ -180,6 +196,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockSeasonDraftGames([]);
   mockBestScore(null);
+  mockTokenBalance(null);
 });
 
 describe('GamesTab', () => {
@@ -243,12 +260,29 @@ describe('GamesTab', () => {
     it('passes null for the stats that have no query yet', () => {
       render(<GamesTab />);
 
-      expect(receivedProps().tokens).toBeNull();
       expect(receivedProps().personalStats).toEqual({
         draftsWon: null,
         dayStreak: null,
         gamesPlayed: null,
       });
+    });
+
+    it('passes the token balance through once loaded', () => {
+      mockTokenBalance(12);
+      render(<GamesTab />);
+
+      expect(receivedProps().tokens).toBe(12);
+    });
+
+    it('passes null for the token balance while loading or on error', () => {
+      mockTokenBalance(null, { loading: true });
+      const { unmount } = render(<GamesTab />);
+      expect(receivedProps().tokens).toBeNull();
+      unmount();
+
+      mockTokenBalance(null, { error: new Error('boom') });
+      render(<GamesTab />);
+      expect(receivedProps().tokens).toBeNull();
     });
   });
 
@@ -271,6 +305,17 @@ describe('GamesTab', () => {
 
       expect(mockLoggerError).toHaveBeenCalledWith(
         expect.stringContaining('disclosureGameBestScore'),
+        error,
+      );
+    });
+
+    it('logs a token balance query error without throwing', () => {
+      const error = new Error('boom');
+      mockTokenBalance(null, { error });
+      render(<GamesTab />);
+
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        expect.stringContaining('twentyQuestionsTokenBalance'),
         error,
       );
     });

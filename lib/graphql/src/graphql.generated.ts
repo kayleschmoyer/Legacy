@@ -3337,6 +3337,10 @@ export type Query = {
   twentyQuestionsActiveGame?: Maybe<TwentyQuestionsGame>;
   /** Paginated history of the caller's past games */
   twentyQuestionsHistory?: Maybe<Array<TwentyQuestionsGame>>;
+  /** The current user's spendable 20 Questions token balance. There is no spend/redeem mechanism yet, so this currently equals twentyQuestionsTokenBalance; exposed separately so clients have a stable field to switch to once spending exists. */
+  twentyQuestionsSpendableTokenBalance?: Maybe<Scalars['Int']['output']>;
+  /** The current user's lifetime 20 Questions token balance — the sum of tokensEarned across their completed (non-active) games */
+  twentyQuestionsTokenBalance?: Maybe<Scalars['Int']['output']>;
   user?: Maybe<User>;
   /** Return progress records for in-progress multi-step badges for a user */
   userBadgeProgress?: Maybe<Array<BadgeProgress>>;
@@ -11342,6 +11346,15 @@ export type GetTeamMembersQuery = {
       } | null;
     } | null;
   }> | null;
+};
+
+export type GetTwentyQuestionsTokenBalanceQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetTwentyQuestionsTokenBalanceQuery = {
+  __typename?: 'Query';
+  twentyQuestionsTokenBalance?: number | null;
 };
 
 export type GetUserByIdQueryVariables = Exact<{
@@ -28234,6 +28247,89 @@ export type GetTeamMembersSuspenseQueryHookResult = ReturnType<
 export type GetTeamMembersQueryResult = Apollo.QueryResult<
   GetTeamMembersQuery,
   GetTeamMembersQueryVariables
+>;
+export const GetTwentyQuestionsTokenBalance = gql`
+  query GetTwentyQuestionsTokenBalance {
+    twentyQuestionsTokenBalance
+  }
+`;
+
+/**
+ * __useGetTwentyQuestionsTokenBalanceQuery__
+ *
+ * To run a query within a React component, call `useGetTwentyQuestionsTokenBalanceQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTwentyQuestionsTokenBalanceQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTwentyQuestionsTokenBalanceQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetTwentyQuestionsTokenBalanceQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetTwentyQuestionsTokenBalanceQuery,
+    GetTwentyQuestionsTokenBalanceQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTwentyQuestionsTokenBalanceQuery,
+    GetTwentyQuestionsTokenBalanceQueryVariables
+  >(GetTwentyQuestionsTokenBalance, options);
+}
+export function useGetTwentyQuestionsTokenBalanceLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTwentyQuestionsTokenBalanceQuery,
+    GetTwentyQuestionsTokenBalanceQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTwentyQuestionsTokenBalanceQuery,
+    GetTwentyQuestionsTokenBalanceQueryVariables
+  >(GetTwentyQuestionsTokenBalance, options);
+}
+export function useGetTwentyQuestionsTokenBalanceSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTwentyQuestionsTokenBalanceQuery,
+        GetTwentyQuestionsTokenBalanceQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTwentyQuestionsTokenBalanceQuery,
+    GetTwentyQuestionsTokenBalanceQueryVariables
+  >(
+    GetTwentyQuestionsTokenBalance,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTwentyQuestionsTokenBalanceQuery,
+          GetTwentyQuestionsTokenBalanceQueryVariables
+        >,
+  );
+}
+export type GetTwentyQuestionsTokenBalanceQueryHookResult = ReturnType<
+  typeof useGetTwentyQuestionsTokenBalanceQuery
+>;
+export type GetTwentyQuestionsTokenBalanceLazyQueryHookResult = ReturnType<
+  typeof useGetTwentyQuestionsTokenBalanceLazyQuery
+>;
+export type GetTwentyQuestionsTokenBalanceSuspenseQueryHookResult = ReturnType<
+  typeof useGetTwentyQuestionsTokenBalanceSuspenseQuery
+>;
+export type GetTwentyQuestionsTokenBalanceQueryResult = Apollo.QueryResult<
+  GetTwentyQuestionsTokenBalanceQuery,
+  GetTwentyQuestionsTokenBalanceQueryVariables
 >;
 export const GetUserById = gql`
   query GetUserById($id: Int!) {

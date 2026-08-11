@@ -18,6 +18,7 @@ describe('twenty-questions resolvers', () => {
     getGameState: jest.Mock;
     guessPlayer: jest.Mock;
     abandonGame: jest.Mock;
+    getLifetimeTokenBalance: jest.Mock;
   };
   let mockDb: Record<string, jest.Mock>;
   let mockContext: { user: { id: number }; db: typeof mockDb };
@@ -48,6 +49,7 @@ describe('twenty-questions resolvers', () => {
         .mockResolvedValue({ ...baseGameState, questions: [] }),
       guessPlayer: jest.fn().mockResolvedValue(undefined),
       abandonGame: jest.fn().mockResolvedValue(undefined),
+      getLifetimeTokenBalance: jest.fn().mockResolvedValue(0),
     };
 
     mockDb = {
@@ -196,6 +198,12 @@ describe('twenty-questions resolvers', () => {
 
   function getMutation(name: string) {
     const field = schema.getMutationType()?.getFields()[name];
+    if (!field?.resolve) throw new Error(`${name} resolver not found`);
+    return field.resolve;
+  }
+
+  function getQuery(name: string) {
+    const field = schema.getQueryType()?.getFields()[name];
     if (!field?.resolve) throw new Error(`${name} resolver not found`);
     return field.resolve;
   }
@@ -352,6 +360,56 @@ describe('twenty-questions resolvers', () => {
         message: 'Game not found',
         extensions: { code: 'BAD_USER_INPUT' },
       });
+    });
+  });
+
+  // ── twentyQuestionsTokenBalance query ─────────────────────────────────────
+
+  describe('twentyQuestionsTokenBalance query', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getQuery('twentyQuestionsTokenBalance');
+      await expect(
+        resolver({}, {}, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it("delegates to the service and returns the caller's balance", async () => {
+      mockTwentyQuestionsService.getLifetimeTokenBalance.mockResolvedValueOnce(
+        37,
+      );
+
+      const resolver = getQuery('twentyQuestionsTokenBalance');
+      const result = await resolver({}, {}, mockContext, undefined as never);
+
+      expect(
+        mockTwentyQuestionsService.getLifetimeTokenBalance,
+      ).toHaveBeenCalledWith(mockContext.db, 42);
+      expect(result).toBe(37);
+    });
+  });
+
+  // ── twentyQuestionsSpendableTokenBalance query ────────────────────────────
+
+  describe('twentyQuestionsSpendableTokenBalance query', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getQuery('twentyQuestionsSpendableTokenBalance');
+      await expect(
+        resolver({}, {}, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it("delegates to the service and returns the caller's balance", async () => {
+      mockTwentyQuestionsService.getLifetimeTokenBalance.mockResolvedValueOnce(
+        37,
+      );
+
+      const resolver = getQuery('twentyQuestionsSpendableTokenBalance');
+      const result = await resolver({}, {}, mockContext, undefined as never);
+
+      expect(
+        mockTwentyQuestionsService.getLifetimeTokenBalance,
+      ).toHaveBeenCalledWith(mockContext.db, 42);
+      expect(result).toBe(37);
     });
   });
 

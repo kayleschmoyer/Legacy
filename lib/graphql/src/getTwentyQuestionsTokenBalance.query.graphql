@@ -1,0 +1,4 @@
+# Fetch the current user's 20 Questions token balance for the Game Room chip
+query GetTwentyQuestionsTokenBalance {
+  twentyQuestionsTokenBalance
+}

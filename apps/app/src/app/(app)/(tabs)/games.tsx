@@ -10,6 +10,7 @@ import {
   SeasonDraftGameStatus,
   useGetDisclosureGameBestScoreQuery,
   useGetSeasonDraftGamesQuery,
+  useGetTwentyQuestionsTokenBalanceQuery,
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
 import { trackMinigameTap } from '../../../utils/analytics';
@@ -21,10 +22,9 @@ import { trackMinigameTap } from '../../../utils/analytics';
  * query wiring, analytics and routing live here (the split LS-8795 used for
  * the Leagues tab).
  *
- * Two of the design's stats have no backing query yet — the 20 Questions token
- * balance (LS-8802) and the "Your Numbers" strip (LS-8803). They pass `null`,
- * which the shared component renders as `—`, matching the existing hub's
- * loading convention.
+ * One of the design's stats has no backing query yet — the "Your Numbers"
+ * strip (LS-8803). It passes `null`, which the shared component renders as
+ * `—`, matching the existing hub's loading convention.
  */
 
 const ROUTES: Record<MinigameId, string> = {
@@ -47,6 +47,11 @@ export default function GamesTab() {
     loading: bestScoreLoading,
     error: bestScoreError,
   } = useGetDisclosureGameBestScoreQuery();
+  const {
+    data: tokenBalanceData,
+    loading: tokenBalanceLoading,
+    error: tokenBalanceError,
+  } = useGetTwentyQuestionsTokenBalanceQuery();
 
   // Errors are non-fatal — every stat falls back to '—' — but log them so a
   // broken query doesn't silently disappear from Rollbar/Discord.
@@ -63,6 +68,14 @@ export default function GamesTab() {
       );
     }
   }, [bestScoreError]);
+  useEffect(() => {
+    if (tokenBalanceError) {
+      LOGGER.error(
+        'GamesTab: twentyQuestionsTokenBalance query failed:',
+        tokenBalanceError,
+      );
+    }
+  }, [tokenBalanceError]);
 
   const games = useMemo(
     () => sdGamesData?.seasonDraftGames ?? [],
@@ -84,6 +97,11 @@ export default function GamesTab() {
     bestScoreLoading || bestScoreError
       ? null
       : (bestScoreData?.disclosureGameBestScore ?? null);
+
+  const tokens =
+    tokenBalanceLoading || tokenBalanceError
+      ? null
+      : (tokenBalanceData?.twentyQuestionsTokenBalance ?? null);
 
   // The banner is for the one game actually waiting on the user. A game in
   // Setup has no turn to take, so only Drafting qualifies.
@@ -143,8 +161,7 @@ export default function GamesTab() {
     <GameRoomScreen
       activeGamesCount={activeGamesCount}
       bestScore={bestScore}
-      // No query exposes a 20 Questions token balance yet (LS-8802).
-      tokens={null}
+      tokens={tokens}
       resumeGame={resumeGame}
       // No query exposes per-user minigame totals yet (LS-8803).
       personalStats={{ draftsWon: null, dayStreak: null, gamesPlayed: null }}

@@ -4022,6 +4022,16 @@ type Query {
     limit: Int = 10
     offset: Int = 0
   ): [TwentyQuestionsGame!]
+
+  """
+  The current user's spendable 20 Questions token balance. There is no spend/redeem mechanism yet, so this currently equals twentyQuestionsTokenBalance; exposed separately so clients have a stable field to switch to once spending exists.
+  """
+  twentyQuestionsSpendableTokenBalance: Int
+
+  """
+  The current user's lifetime 20 Questions token balance — the sum of tokensEarned across their completed (non-active) games
+  """
+  twentyQuestionsTokenBalance: Int
   user(id: Int!): User
 
   """

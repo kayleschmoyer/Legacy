@@ -33,6 +33,7 @@ jest.mock('../../drizzle/public/schema', () => ({
     maxQuestions: 'max_questions',
     difficulty: 'difficulty',
     sport: 'sport',
+    tokensEarned: 'tokens_earned',
   },
   twentyQuestionsQuestions: {
     gameId: 'game_id',
@@ -206,6 +207,45 @@ describe('TwentyQuestionsService — startGame sport storage', () => {
 // They are the single decision point that resolves `{positions:[...]}` vs the
 // legacy `{position:'C'}` shape, so unit-testing them is sufficient to lock the
 // contract — the downstream Drizzle calls (`inArray`, `or`) are framework code.
+
+describe('TwentyQuestionsService — getLifetimeTokenBalance', () => {
+  it("returns the summed tokensEarned across the user's completed games", async () => {
+    const db = makeMockDb();
+    db.where.mockReturnValue(chainResult([{ total: 45 }]));
+
+    const result = await TwentyQuestionsService.getLifetimeTokenBalance(
+      db as never,
+      42,
+    );
+
+    expect(result).toBe(45);
+    expect(db.where).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 0 when the user has no completed games', async () => {
+    const db = makeMockDb();
+    db.where.mockReturnValue(chainResult([{ total: 0 }]));
+
+    const result = await TwentyQuestionsService.getLifetimeTokenBalance(
+      db as never,
+      99,
+    );
+
+    expect(result).toBe(0);
+  });
+
+  it('returns 0 when the query yields no row', async () => {
+    const db = makeMockDb();
+    db.where.mockReturnValue(chainResult([]));
+
+    const result = await TwentyQuestionsService.getLifetimeTokenBalance(
+      db as never,
+      99,
+    );
+
+    expect(result).toBe(0);
+  });
+});
 
 describe('TwentyQuestionsService — readStringList (multi-select param reader)', () => {
   it('returns the plural array when provided, deduped', () => {

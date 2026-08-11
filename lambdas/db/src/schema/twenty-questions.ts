@@ -141,6 +141,36 @@ builder.queryFields((t) => ({
     },
   }),
 
+  twentyQuestionsTokenBalance: t.field({
+    type: 'Int',
+    description:
+      "The current user's lifetime 20 Questions token balance — the sum " +
+      'of tokensEarned across their completed (non-active) games',
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) throw AuthenticationError();
+      return TwentyQuestionsService.getLifetimeTokenBalance(
+        context.db,
+        context.user.id,
+      );
+    },
+  }),
+
+  twentyQuestionsSpendableTokenBalance: t.field({
+    type: 'Int',
+    description:
+      "The current user's spendable 20 Questions token balance. There is " +
+      'no spend/redeem mechanism yet, so this currently equals ' +
+      'twentyQuestionsTokenBalance; exposed separately so clients have a ' +
+      'stable field to switch to once spending exists.',
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) throw AuthenticationError();
+      return TwentyQuestionsService.getLifetimeTokenBalance(
+        context.db,
+        context.user.id,
+      );
+    },
+  }),
+
   twentyQuestionsHistory: t.field({
     type: [TwentyQuestionsGameRef],
     description: "Paginated history of the caller's past games",

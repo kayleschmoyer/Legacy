@@ -3331,6 +3331,10 @@ export type Query = {
   twentyQuestionsActiveGame?: Maybe<TwentyQuestionsGame>;
   /** Paginated history of the caller's past games */
   twentyQuestionsHistory?: Maybe<Array<TwentyQuestionsGame>>;
+  /** The current user's spendable 20 Questions token balance. There is no spend/redeem mechanism yet, so this currently equals twentyQuestionsTokenBalance; exposed separately so clients have a stable field to switch to once spending exists. */
+  twentyQuestionsSpendableTokenBalance?: Maybe<Scalars['Int']['output']>;
+  /** The current user's lifetime 20 Questions token balance — the sum of tokensEarned across their completed (non-active) games */
+  twentyQuestionsTokenBalance?: Maybe<Scalars['Int']['output']>;
   user?: Maybe<User>;
   /** Return progress records for in-progress multi-step badges for a user */
   userBadgeProgress?: Maybe<Array<BadgeProgress>>;
@@ -5149,15 +5153,7 @@ export function useGetPlayerByBrefIdSuspenseQuery(
   return Apollo.useSuspenseQuery<
     GetPlayerByBrefIdQuery,
     GetPlayerByBrefIdQueryVariables
-  >(
-    GetPlayerByBrefId,
-    options as
-      | Apollo.SkipToken
-      | Apollo.SuspenseQueryHookOptions<
-          GetPlayerByBrefIdQuery,
-          GetPlayerByBrefIdQueryVariables
-        >,
-  );
+  >(GetPlayerByBrefId, options);
 }
 export type GetPlayerByBrefIdQueryHookResult = ReturnType<
   typeof useGetPlayerByBrefIdQuery
@@ -5235,15 +5231,7 @@ export function useGetAllPlayersSuspenseQuery(
   return Apollo.useSuspenseQuery<
     GetAllPlayersQuery,
     GetAllPlayersQueryVariables
-  >(
-    GetAllPlayers,
-    options as
-      | Apollo.SkipToken
-      | Apollo.SuspenseQueryHookOptions<
-          GetAllPlayersQuery,
-          GetAllPlayersQueryVariables
-        >,
-  );
+  >(GetAllPlayers, options);
 }
 export type GetAllPlayersQueryHookResult = ReturnType<
   typeof useGetAllPlayersQuery

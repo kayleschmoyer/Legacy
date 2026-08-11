@@ -188,6 +188,34 @@ export class TwentyQuestionsService {
     return TwentyQuestionsService.getGameState(db, game.id);
   }
 
+  /**
+   * Lifetime sum of tokensEarned across the user's completed (non-active)
+   * games. Abandoned games typically earn 0/null tokens, but are included
+   * for completeness since coalesce(sum(...), 0) treats null as 0.
+   */
+  static async getLifetimeTokenBalance(
+    db: PublicDb,
+    userId: number,
+  ): Promise<number> {
+    const [row] = await db
+      .select({
+        total: sql<number>`coalesce(sum(${PublicSchema.twentyQuestionsGames.tokensEarned}), 0)`,
+      })
+      .from(PublicSchema.twentyQuestionsGames)
+      .where(
+        and(
+          eq(PublicSchema.twentyQuestionsGames.userId, userId),
+          inArray(PublicSchema.twentyQuestionsGames.status, [
+            'won',
+            'lost',
+            'abandoned',
+          ]),
+        ),
+      );
+
+    return row?.total ?? 0;
+  }
+
   static async askQuestion(
     db: PublicDb,
     gameId: string,
