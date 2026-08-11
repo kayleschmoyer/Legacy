@@ -855,6 +855,29 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            // Retry helper for GitHub REST calls that can hit the installation's
+            // hourly rate limit (LS-9231). Rapid successive pushes/reruns can
+            // burn through the budget; back off and retry a few times before
+            // giving up, so a transient 403 doesn't need a full re-push to clear.
+            async function withRateLimitRetry(fn, { attempts = 4, baseDelayMs = 2000, label } = {}) {
+              let lastError;
+              for (let attempt = 1; attempt <= attempts; attempt++) {
+                try {
+                  return await fn();
+                } catch (e) {
+                  lastError = e;
+                  const isRateLimit = e.status === 403 && /rate limit/i.test(e.message || '');
+                  if (!isRateLimit || attempt === attempts) {
+                    throw e;
+                  }
+                  const delayMs = baseDelayMs * 2 ** (attempt - 1);
+                  core.warning(`${label}: GitHub API rate limit hit (attempt ${attempt}/${attempts}), retrying in ${delayMs}ms`);
+                  await new Promise(resolve => setTimeout(resolve, delayMs));
+                }
+              }
+              throw lastError;
+            }
+
             // Prefer the PR head SHA over context.sha (which may be the
             // synthetic merge commit for PR runs).
             const sha = context.payload?.pull_request?.head?.sha || context.sha;
@@ -918,11 +941,10 @@ jobs:
             } else {
               for (const prNumber of uniquePrNumbers) {
                 try {
-                  const { data: pr } = await github.rest.pulls.get({
-                    owner,
-                    repo,
-                    pull_number: prNumber,
-                  });
+                  const { data: pr } = await withRateLimitRetry(
+                    () => github.rest.pulls.get({ owner, repo, pull_number: prNumber }),
+                    { label: `pulls.get #${prNumber}` }
+                  );
                   const prHasOverride = Array.isArray(pr.labels) && pr.labels.some(l => l && l.name === 'security-override');
                   if (prHasOverride) {
                     hasOverrideLabel = true;
@@ -930,6 +952,8 @@ jobs:
                     break;
                   }
                 } catch (e) {
+                  // Non-fatal: worst case the override label is missed and the
+                  // gate falls back to its default (blocking) behavior.
                   core.warning(`Failed to fetch PR #${prNumber} labels: ${e.message}`);
                 }
               }
@@ -989,16 +1013,36 @@ jobs:
 
             core.info(`Setting commit status: ${state} - ${description}`);
 
-            // Set the commit status
-            await github.rest.repos.createCommitStatus({
-              owner,
-              repo,
-              sha,
-              state,
-              target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
-              description,
-              context: 'security',
-            });
+            // Set the commit status. Retries transparently on rate-limit 403s;
+            // if it's still rate-limited after retries, fail with a clear,
+            // actionable message (LS-9231) instead of an unhandled exception,
+            // so a plain job rerun is enough to clear it once the window rolls
+            // over — no re-push required.
+            try {
+              await withRateLimitRetry(
+                () => github.rest.repos.createCommitStatus({
+                  owner,
+                  repo,
+                  sha,
+                  state,
+                  target_url: `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`,
+                  description,
+                  context: 'security',
+                }),
+                { label: 'createCommitStatus' }
+              );
+            } catch (e) {
+              const isRateLimit = e.status === 403 && /rate limit/i.test(e.message || '');
+              if (isRateLimit) {
+                core.setFailed(
+                  `Security gate could not report the '${state}' status (${description}). ` +
+                    `GitHub API rate limit exhausted for this app installation — transient, ` +
+                    `rerun this job once the rate limit window resets.`
+                );
+                return;
+              }
+              throw e;
+            }
 
             core.info(`Commit status 'security' set to '${state}' on ${sha}`);
 
