@@ -215,6 +215,48 @@ describe('DraftTopBand global Disable Auto-Pick control (LS-8783)', () => {
   });
 });
 
+describe('DraftTopBand Exit Draft control (LS-9238)', () => {
+  it('is hidden when isMockDraft is false', () => {
+    const { queryByRole } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={false}
+        isOwner={false}
+        isMockDraft={false}
+        onExitDraft={jest.fn()}
+      />,
+    );
+    expect(queryByRole('button', { name: /exit draft/i })).toBeNull();
+  });
+
+  it('is hidden when no onExitDraft handler is supplied, even if isMockDraft is true', () => {
+    const { queryByRole } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={false}
+        isOwner={false}
+        isMockDraft={true}
+      />,
+    );
+    expect(queryByRole('button', { name: /exit draft/i })).toBeNull();
+  });
+
+  it('renders and calls onExitDraft when clicked for a mock draft', () => {
+    const onExitDraft = jest.fn();
+    const { getByRole } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={false}
+        isOwner={false}
+        isMockDraft={true}
+        onExitDraft={onExitDraft}
+      />,
+    );
+    fireEvent.click(getByRole('button', { name: /exit draft/i }));
+    expect(onExitDraft).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('DraftTopBand untimed (offline) mode (LS-9144, LS-9243)', () => {
   it('renders no pick timer at all', () => {
     const { queryByRole, queryByText } = render(

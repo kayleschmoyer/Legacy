@@ -22,15 +22,20 @@ interface DraftTopBandProps {
   pickTimeLimitSeconds: number;
   /** Offline mock draft mode (LS-9144): no clock, no pressure. */
   untimed?: boolean;
+  /**
+   * Mock drafts auto-register the human as commissioner so the pick flow
+   * works, but there's no real commissioner role to manage in a solo
+   * practice draft — commissioner controls never render there (LS-9242).
+   * Also gates the Exit Draft control — mock drafts have no real teammates
+   * to leave hanging (LS-9238).
+   */
+  isMockDraft?: boolean;
+  onExitDraft?: () => void;
   isMyPick: boolean;
   currentPickInfo: CurrentDraftPickInfo | null;
   leagueTeamsLength: number;
   isCommissioner: boolean;
   isOwner: boolean;
-  /** Mock drafts auto-register the human as commissioner so the pick flow works,
-   * but there's no real commissioner role to manage in a solo practice draft — the
-   * commissioner controls should never render there (LS-9242). */
-  isMockDraft?: boolean;
   draftId: number | null;
   commPickMode: boolean;
   autoPickDisabled: boolean;
@@ -345,12 +350,13 @@ export function DraftTopBand({
   timeRemaining,
   pickTimeLimitSeconds,
   untimed = false,
+  isMockDraft = false,
+  onExitDraft,
   isMyPick,
   currentPickInfo,
   leagueTeamsLength,
   isCommissioner,
   isOwner: _isOwner,
-  isMockDraft = false,
   draftId,
   commPickMode,
   autoPickDisabled,
@@ -681,6 +687,20 @@ export function DraftTopBand({
             </UserApPanel>
           )}
         </CommishBar>
+      )}
+
+      {/* Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) */}
+      {isMockDraft && onExitDraft && (
+        <GhostBtn
+          {...BUTTON_A11Y}
+          onPress={onExitDraft}
+          aria-label="Exit Draft"
+          borderColor={withAlpha(BRAND_SEAM_RED, 0.3)}
+          backgroundColor={withAlpha(BRAND_SEAM_RED, 0.12)}
+          hoverStyle={{ backgroundColor: withAlpha(BRAND_SEAM_RED, 0.2) }}
+        >
+          <GhostBtnLabel color="$brandSeamRedLight">Exit Draft</GhostBtnLabel>
+        </GhostBtn>
       )}
     </TopBandRoot>
   );

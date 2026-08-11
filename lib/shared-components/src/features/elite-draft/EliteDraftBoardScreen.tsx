@@ -297,6 +297,9 @@ interface CompactLiveDraftBoardProps {
   timeRemaining: number;
   round: number;
   currentPick: number;
+  /** Mock drafts only — no real teammates to leave hanging (LS-9238). */
+  isMockDraft: boolean;
+  onExitDraft: () => void;
   onDraftPlayer: (id: number) => void;
   onCommissionerPick: (id: number) => void;
   onLoadMore: () => void;
@@ -312,6 +315,8 @@ function CompactLiveDraftBoard({
   timeRemaining,
   round,
   currentPick,
+  isMockDraft,
+  onExitDraft,
   onDraftPlayer,
   onCommissionerPick,
   onLoadMore,
@@ -448,6 +453,18 @@ function CompactLiveDraftBoard({
             tone={ui.commPickMode ? 'active' : 'neutral'}
             onPress={() => ui.setCommPickMode(!ui.commPickMode)}
           />
+        </XStack>
+      )}
+
+      {/* ---- Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) ---- */}
+      {isMockDraft && (
+        <XStack
+          gap="$2"
+          paddingHorizontal="$3"
+          paddingTop={8}
+          alignItems="center"
+        >
+          <GhostButton label="EXIT DRAFT" onPress={onExitDraft} />
         </XStack>
       )}
 
@@ -835,6 +852,14 @@ export function EliteDraftBoardScreen({
   // own turn. Only meaningful for mock drafts — undefined/false for real leagues.
   const untimed = queries.league?.isOfflineDraft === true;
 
+  // LS-9238: the live board otherwise has no way to leave a mock draft in
+  // progress — real leagues intentionally omit this (other drafters are
+  // waiting on you), but a mock draft has no one to leave hanging.
+  const isMockDraft = queries.league?.isMockDraft === true;
+  const handleExitDraft = useCallback(() => {
+    onNavigate('/baseball');
+  }, [onNavigate]);
+
   const { timeRemaining } = useDraftTimer({
     draftId: queries.draftId,
     leagueId,
@@ -1150,6 +1175,8 @@ export function EliteDraftBoardScreen({
         timeRemaining={timeRemaining}
         round={round}
         currentPick={currentPick}
+        isMockDraft={isMockDraft}
+        onExitDraft={handleExitDraft}
         onDraftPlayer={handleDraftPlayer}
         onCommissionerPick={handleCommissionerPick}
         onLoadMore={handleLoadMore}
@@ -1170,12 +1197,13 @@ export function EliteDraftBoardScreen({
           timeRemaining={timeRemaining}
           pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
           untimed={untimed}
+          isMockDraft={isMockDraft}
+          onExitDraft={handleExitDraft}
           isMyPick={isMyPick}
           currentPickInfo={queries.currentPickInfo}
           leagueTeamsLength={queries.leagueTeams.length}
           isCommissioner={queries.isCommissioner}
           isOwner={queries.isOwner}
-          isMockDraft={queries.league?.isMockDraft ?? false}
           draftId={queries.draftId}
           commPickMode={ui.commPickMode}
           autoPickDisabled={ui.autoPickDisabled}

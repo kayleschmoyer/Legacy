@@ -123,7 +123,22 @@ jest.mock('./DraftPlayerBoard', () => ({
   ),
 }));
 jest.mock('./DraftTopBand', () => ({
-  DraftTopBand: () => <div data-testid="draft-top-band" />,
+  DraftTopBand: ({
+    isMockDraft,
+    onExitDraft,
+  }: {
+    isMockDraft?: boolean;
+    onExitDraft?: () => void;
+  }) => (
+    <div
+      data-testid="draft-top-band"
+      data-is-mock-draft={String(!!isMockDraft)}
+    >
+      {isMockDraft && onExitDraft && (
+        <button onClick={onExitDraft}>Exit Draft</button>
+      )}
+    </div>
+  ),
 }));
 jest.mock('./DraftRail', () => ({
   DraftRail: ({ isPremium }: { isPremium: boolean }) => (
@@ -1394,6 +1409,72 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
 
     expect(screen.queryByText('PAUSE')).toBeNull();
     expect(screen.queryByText('COMM PICK')).toBeNull();
+  });
+});
+
+describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
+  it('compact: shows Exit Draft for a mock draft and navigates to /baseball on click', () => {
+    const onNavigate = jest.fn();
+    setupCompactLiveDraft({
+      queries: {
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'in-progress',
+          isMockDraft: true,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+      },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} onNavigate={onNavigate} />);
+    fireEvent.click(screen.getByText('EXIT DRAFT'));
+
+    expect(onNavigate).toHaveBeenCalledWith('/baseball');
+  });
+
+  it('compact: hides Exit Draft for a real league draft', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.queryByText('EXIT DRAFT')).toBeNull();
+  });
+
+  it('wide: shows Exit Draft for a mock draft and navigates to /baseball on click', () => {
+    const onNavigate = jest.fn();
+    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        leagueTeams: TEAMS,
+        boardOrderedTeams: TEAMS,
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'in-progress',
+          isMockDraft: true,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+      }),
+    );
+
+    const { getByRole } = render(
+      <EliteDraftBoardScreen {...defaultProps} onNavigate={onNavigate} />,
+    );
+    fireEvent.click(getByRole('button', { name: /exit draft/i }));
+
+    expect(onNavigate).toHaveBeenCalledWith('/baseball');
+  });
+
+  it('wide: hides Exit Draft for a real league draft', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
+    );
+
+    const { queryByRole } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(queryByRole('button', { name: /exit draft/i })).toBeNull();
   });
 });
 
