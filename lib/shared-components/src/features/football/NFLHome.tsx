@@ -62,6 +62,20 @@ export interface NFLHomeMatchupHighlight {
   onPress?: () => void;
 }
 
+/**
+ * Free-tier league-cap context, mirroring `MLBHomeLeagueCap` (LS-8928). The
+ * cap is global across every sport — `count`/`limit` reflect the user's
+ * total non-mock league membership, not football-only. Supplied only by
+ * platforms that gate league creation; when omitted the cap indicator is
+ * hidden and `onCreateLeague` is called unconditionally.
+ */
+export interface NFLHomeLeagueCap {
+  count: number;
+  limit: number;
+  atLimit: boolean;
+  onUpgrade: () => void;
+}
+
 export interface NFLHomeProps {
   leagues?: NFLHomeLeague[];
   loading?: boolean;
@@ -88,6 +102,8 @@ export interface NFLHomeProps {
   onSwitchSport?: (sport: 'baseball') => void;
   /** Ready-made pull-to-refresh element for the root `ScrollView` (LS-8862). */
   refreshControl?: React.ReactElement<RefreshControlProps>;
+  /** Free-tier league-cap context (LS-8928). Mirrors `MLBHome`'s `leagueCap`. */
+  leagueCap?: NFLHomeLeagueCap;
 }
 
 function getLeagueStatusLabel(league: NFLHomeLeague): string {
@@ -357,6 +373,7 @@ function NFLHome({
   matchupHighlight,
   onSwitchSport,
   refreshControl,
+  leagueCap,
 }: NFLHomeProps) {
   const hasLeagues = leagues.length > 0;
 
@@ -587,6 +604,43 @@ function NFLHome({
                 Baseball
               </Text>
             </Button>
+          </XStack>
+        ) : null}
+
+        {/* League-cap indicator: free-tier count/limit, visible before the
+            user taps Create so the cross-sport cap is never a silent
+            redirect (LS-8928). Mirrors MLBHome's leagueCap indicator. */}
+        {leagueCap ? (
+          <XStack
+            alignItems="center"
+            flexWrap="wrap"
+            gap="$2"
+            testID="football-league-cap-indicator"
+          >
+            <Text color="$gray11" fontSize="$4">
+              Your leagues: {leagueCap.count}/{leagueCap.limit} — counts across
+              every sport
+            </Text>
+            <Text
+              color="$orange9"
+              fontSize="$4"
+              fontWeight="bold"
+              onPress={leagueCap.onUpgrade}
+              accessibilityLabel={
+                leagueCap.atLimit
+                  ? 'Upgrade to add more leagues'
+                  : 'Upgrade to Premium'
+              }
+              aria-label={
+                leagueCap.atLimit
+                  ? 'Upgrade to add more leagues'
+                  : 'Upgrade to Premium'
+              }
+            >
+              {leagueCap.atLimit
+                ? '— Upgrade to add more'
+                : '— Upgrade to Premium'}
+            </Text>
           </XStack>
         ) : null}
 

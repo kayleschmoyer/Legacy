@@ -137,6 +137,16 @@ export default function FootballHomeScreen({
       trendingPlayers={trendingPlayers}
       trendingPlayersLoading={trendingPlayersLoading}
       onSwitchSport={onSwitchSport}
+      leagueCap={
+        showLeagueCap
+          ? {
+              count: activeLeagueCount,
+              limit: FREE_TIER_LEAGUE_LIMIT,
+              atLimit: atFreeLeagueLimit,
+              onUpgrade: goToUpgrade,
+            }
+          : undefined
+      }
     />
   );
 }
