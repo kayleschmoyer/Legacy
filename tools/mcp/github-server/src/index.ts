@@ -371,12 +371,29 @@ export function createServer(): McpServer {
   // --- github_close_pr ---
   server.tool(
     'github_close_pr',
-    'Close a PR with optional comment.',
+    'Close a PR with optional comment. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
       comment: z.string().trim().min(1).optional().describe('Closing comment'),
     },
-    async (params) => closePR(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return closePR({ number: resolved, comment: params.comment });
+    },
   );
 
   // --- github_reopen_pr ---
@@ -501,7 +518,7 @@ export function createServer(): McpServer {
   // --- github_list_reviews ---
   server.tool(
     'github_list_reviews',
-    "List reviews on a PR (or many PRs in one batched GraphQL call). Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix). Pass `prs: number[]` (1-50) to fetch reviews for many PRs in one GraphQL round-trip; the response is `{ reviews: { [prNumber]: [...] }, missing: number[], truncated: number[] }`. Batch mode caps reviews at 100 per PR (GraphQL `first` limit); PRs whose totalCount exceeds the cap are listed in `truncated` so callers can fall back to single-PR mode if they need the full history. Pass `compact: false` to also get the full review body text (e.g. to read a monolithic bot review's findings) — no extra API call is made; the body is truncated to `maxBodyChars` (default 10000) with a trailing `[truncated]` marker when it exceeds that length.",
+    'List reviews on a PR (or many PRs in one batched GraphQL call). Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix). Pass `prs: number[]` (1-50) to fetch reviews for many PRs in one GraphQL round-trip; the response is `{ reviews: { [prNumber]: [...] }, missing: number[], truncated: number[] }`. Batch mode caps reviews at 100 per PR (GraphQL `first` limit); PRs whose totalCount exceeds the cap are listed in `truncated` so callers can fall back to single-PR mode if they need the full history. Pass `compact: false` to also get the full review body text (e.g. to read a monolithic bot review\'s findings) — no extra API call is made; the body is truncated to `maxBodyChars` (default 10000) with a trailing `[truncated]` marker when it exceeds that length. Single-PR mode accepts the PR number as "number" (preferred) or "prNumber" (alias).',
     {
       number: z.coerce
         .number()
@@ -509,6 +526,14 @@ export function createServer(): McpServer {
         .positive()
         .optional()
         .describe('PR number (single-PR mode). Use `prs` for batch mode.'),
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Alias for "number" in single-PR mode — use either, not both',
+        ),
       prs: z
         .array(z.coerce.number().int().positive())
         .min(1)
@@ -544,7 +569,10 @@ export function createServer(): McpServer {
           'Only applies when compact: false. Review bodies longer than this are truncated to this length with a trailing "\\n[truncated]" marker.',
         ),
     },
-    async (params) => listReviews(params),
+    async (params) => {
+      const { prNumber, ...rest } = params;
+      return listReviews({ ...rest, number: params.number ?? prNumber });
+    },
   );
 
   // --- github_reply_to_review / github_reply_to_review_thread ---
@@ -717,9 +745,12 @@ export function createServer(): McpServer {
   // --- github_list_pr_inline_comments (DEPRECATED alias) ---
   server.tool(
     'github_list_pr_inline_comments',
-    'DEPRECATED: use github_list_pr_comments with type: "inline" instead. Returns inline PR review comments; will be removed in a future release.',
+    'DEPRECATED: use github_list_pr_comments with type: "inline" instead. Returns inline PR review comments; will be removed in a future release. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
       path: z
         .string()
         .trim()
@@ -733,15 +764,36 @@ export function createServer(): McpServer {
           'ISO 8601 timestamp — only return comments posted at or after this time',
         ),
     },
-    async (params) => listPRInlineComments(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return listPRInlineComments({
+        number: resolved,
+        path: params.path,
+        since: params.since,
+      });
+    },
   );
 
   // --- github_list_review_comments (DEPRECATED alias) ---
   server.tool(
     'github_list_review_comments',
-    'DEPRECATED: use github_list_pr_comments with type: "review" instead. Returns inline PR review comments with reviewId filtering; will be removed in a future release.',
+    'DEPRECATED: use github_list_pr_comments with type: "review" instead. Returns inline PR review comments with reviewId filtering; will be removed in a future release. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
       since: z
         .string()
         .optional()
@@ -757,19 +809,58 @@ export function createServer(): McpServer {
           'Filter to comments from a specific review submission (pull_request_review_id)',
         ),
     },
-    async (params) => listReviewComments(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return listReviewComments({
+        number: resolved,
+        since: params.since,
+        reviewId: params.reviewId,
+      });
+    },
   );
 
   // --- github_edit_pr ---
   server.tool(
     'github_edit_pr',
-    "Update a PR's title and/or body. Use when Copilot or reviewers request description fixes. Maps to PATCH /repos/{owner}/{repo}/pulls/{pull_number}.",
+    'Update a PR\'s title and/or body. Use when Copilot or reviewers request description fixes. Maps to PATCH /repos/{owner}/{repo}/pulls/{pull_number}. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
       title: z.string().trim().min(1).optional().describe('New PR title'),
       body: z.string().optional().describe('New PR body (markdown)'),
     },
-    async (params) => editPR(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return editPR({
+        number: resolved,
+        title: params.title,
+        body: params.body,
+      });
+    },
   );
 
   // --- github_bulk_edit ---
@@ -1272,9 +1363,12 @@ export function createServer(): McpServer {
   // --- github_finish_fix_round ---
   server.tool(
     'github_finish_fix_round',
-    'Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies the bot:ready-for-review label that re-triggers the Reviewer Bot cycle. Validates every reply BEFORE any side effect (exactly one of threadId/issueId, FIX requires `sha`, JUSTIFY/CANNOT-COMPLY require `body`) — a single invalid entry rejects the whole call. FIX reply body is emitted as exactly `FIX: <sha>` (no trailing prose — the bot is strict). JUSTIFY/CANNOT-COMPLY bodies are prefixed with the kind token if not already present. Partial failures do not block successful replies: failed replies are surfaced in `errors[]` and their threads are NOT resolved. Only FIX threads are resolved — JUSTIFY and CANNOT-COMPLY remain open for bot/human adjudication in the next cycle. Replaces the three-step github_reply_to_review_thread → github_resolve_threads → github_manage_labels(add: bot:ready-for-review) sequence. For a PR-level (threadless — no file/line) finding, pass issueId instead of threadId: the reply posts as a top-level PR comment in the issue-id-qualified format the Reviewer Bot resolves back to that specific finding (LS-7938) — see .agents/skills/pr-lifecycle/references/respond-to-review.md.',
+    'Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies the bot:ready-for-review label that re-triggers the Reviewer Bot cycle. Validates every reply BEFORE any side effect (exactly one of threadId/issueId, FIX requires `sha`, JUSTIFY/CANNOT-COMPLY require `body`) — a single invalid entry rejects the whole call. FIX reply body is emitted as exactly `FIX: <sha>` (no trailing prose — the bot is strict). JUSTIFY/CANNOT-COMPLY bodies are prefixed with the kind token if not already present. Partial failures do not block successful replies: failed replies are surfaced in `errors[]` and their threads are NOT resolved. Only FIX threads are resolved — JUSTIFY and CANNOT-COMPLY remain open for bot/human adjudication in the next cycle. Replaces the three-step github_reply_to_review_thread → github_resolve_threads → github_manage_labels(add: bot:ready-for-review) sequence. For a PR-level (threadless — no file/line) finding, pass issueId instead of threadId: the reply posts as a top-level PR comment in the issue-id-qualified format the Reviewer Bot resolves back to that specific finding (LS-7938) — see .agents/skills/pr-lifecycle/references/respond-to-review.md. Pass the PR number as "prNumber" (preferred) or "number" (alias).',
     {
-      prNumber: prNumberField('prNumber').describe('PR number'),
+      prNumber: prNumberField('prNumber').optional().describe('PR number'),
+      number: prNumberField('number')
+        .optional()
+        .describe('Alias for "prNumber" — use either, not both'),
       replies: z
         .array(
           z.object({
@@ -1327,13 +1421,31 @@ export function createServer(): McpServer {
           'Label to apply after replying + resolving (default: bot:ready-for-review)',
         ),
     },
-    async (params) => finishFixRound(params),
+    async (params) => {
+      const resolved = params.prNumber ?? params.number;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "prNumber" (or alias "number") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return finishFixRound({
+        prNumber: resolved,
+        replies: params.replies,
+        readyLabel: params.readyLabel,
+      });
+    },
   );
 
   // --- github_resolve_threads ---
   server.tool(
     'github_resolve_threads',
-    'Batch-resolve review threads (groups of 50). Accepts PRRT_ thread node IDs (from github_get_review_threads) via threadIds, OR numeric comment databaseIds (from mcp__github__* get_review_comments or github_get_review_threads comment entries) via commentDatabaseIds — the tool maps comment IDs to thread IDs internally. When using commentDatabaseIds, prNumber is required. If prNumber is provided and all threads resolved, triggers bot-review recheck.',
+    'Batch-resolve review threads (groups of 50). Accepts PRRT_ thread node IDs (from github_get_review_threads) via threadIds, OR numeric comment databaseIds (from mcp__github__* get_review_comments or github_get_review_threads comment entries) via commentDatabaseIds — the tool maps comment IDs to thread IDs internally. When using commentDatabaseIds, prNumber (or its alias "number") is required. If prNumber is provided and all threads resolved, triggers bot-review recheck.',
     {
       threadIds: stringList({ min: 1, max: 100 })
         .optional()
@@ -1365,8 +1477,17 @@ export function createServer(): McpServer {
         .describe(
           'PR number — required when using commentDatabaseIds; also triggers Copilot Auto-Approve recheck after resolving threads when all resolutions succeed',
         ),
+      number: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Alias for "prNumber" — use either, not both'),
     },
-    async (params) => resolveThreads(params),
+    async (params) => {
+      const { number, ...rest } = params;
+      return resolveThreads({ ...rest, prNumber: params.prNumber ?? number });
+    },
   );
 
   // --- github_secrets_check ---
@@ -1388,9 +1509,12 @@ export function createServer(): McpServer {
   // --- github_pr_commits ---
   server.tool(
     'github_pr_commits',
-    'List commits on a pull request. Returns sha, shortSha, message (first line), author, date, and url for each commit. Useful for correlating pushes with review events or inspecting PR history.',
+    'List commits on a pull request. Returns sha, shortSha, message (first line), author, date, and url for each commit. Useful for correlating pushes with review events or inspecting PR history. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
       limit: z.coerce
         .number()
         .int()
@@ -1399,7 +1523,21 @@ export function createServer(): McpServer {
         .default(30)
         .describe('Max commits to return (default: 30, max: 100)'),
     },
-    async (params) => prCommits(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return prCommits({ number: resolved, limit: params.limit });
+    },
   );
 
   // --- github_view_pr ---
@@ -1446,13 +1584,14 @@ export function createServer(): McpServer {
   // --- github_pr_diff ---
   server.tool(
     'github_pr_diff',
-    'Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as "prNumber". Use maxBytes to cap response size for very large PRs (default: 500 000 bytes).',
+    'Prefer this over `gh pr diff` via shell. Returns the unified diff for a pull request. Useful for inspecting the exact code changes introduced by a PR, especially dependency PRs that have not yet merged. Pass the PR number as "prNumber" (preferred) or "number" (alias). Use maxBytes to cap response size for very large PRs (default: 500 000 bytes).',
     {
-      prNumber: z.coerce
-        .number()
-        .int()
-        .positive()
+      prNumber: prNumberField('prNumber')
+        .optional()
         .describe('PR number to fetch the unified diff for'),
+      number: prNumberField('number')
+        .optional()
+        .describe('Alias for "prNumber" — use either, not both'),
       maxBytes: z.coerce
         .number()
         .int()
@@ -1462,7 +1601,21 @@ export function createServer(): McpServer {
           'Maximum bytes of diff to return (default: 500 000). Increase for large PRs.',
         ),
     },
-    async (params) => prDiff(params),
+    async (params) => {
+      const resolved = params.prNumber ?? params.number;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "prNumber" (or alias "number") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return prDiff({ prNumber: resolved, maxBytes: params.maxBytes });
+    },
   );
 
   // --- github_secret_delete ---
@@ -1619,9 +1772,12 @@ export function createServer(): McpServer {
   // --- github_set_commit_status ---
   server.tool(
     'github_set_commit_status',
-    'Set a commit status on a PR. Auto-resolves head SHA from PR number. Use to update stale bot-review or custom statuses.',
+    'Set a commit status on a PR. Auto-resolves head SHA from PR number. Use to update stale bot-review or custom statuses. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
-      number: z.coerce.number().int().positive().describe('PR number'),
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
       context: z
         .string()
         .trim()
@@ -1636,7 +1792,26 @@ export function createServer(): McpServer {
         .optional()
         .describe('Human-readable description'),
     },
-    async (params) => setCommitStatus(params),
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return setCommitStatus({
+        number: resolved,
+        context: params.context,
+        state: params.state,
+        description: params.description,
+      });
+    },
   );
 
   // --- github_list_commit_statuses ---
