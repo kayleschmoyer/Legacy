@@ -47,6 +47,7 @@ function playersListResponse(): object {
       footballPlayers: {
         nodes: [MAHOMES],
         pageInfo: { hasNextPage: false, endCursor: null },
+        totalCount: 1,
       },
     },
   };
@@ -71,6 +72,10 @@ async function mockFootballRoutes(
 ): Promise<void> {
   await createGraphQLRouter(page, {
     footballplayers: (route) => fulfillJson(route, playersListResponse()),
+    // The desktop table on the canonical route is FootballStatsDataGrid,
+    // which fires FootballPlayerStatsGrid (LS-9366) — same connection shape.
+    footballplayerstatsgrid: (route) =>
+      fulfillJson(route, playersListResponse()),
     footballplayer: (route) => fulfillJson(route, playerDetailResponse()),
   });
 }

@@ -5,15 +5,13 @@
  *   1. Is present on the page with an "All Teams" default
  *   2. Sends nflTeam: "<abbrev>" in the GraphQL request when a team is selected
  *   3. Renders only rows belonging to that team
- *   4. Updates the dropdown trigger label to the team's full name
+ *   4. Updates the filter control's visible label to the team's full name
  *   5. Restores the full list and sends no nflTeam variable when "All Teams" is
  *      reselected
  *
- * Interaction strategy: Tamagui's Select renders a hidden native <select>
- * (select[name="team-filter"]) alongside the visible trigger. Tests target that
- * element via Playwright's selectOption() with force:true to bypass the
- * opacity:0 / pointer-events:none styles, mirroring the approach in
- * football-team-filter.spec.ts (LS-6493 / LS-6494).
+ * Interaction strategy: the canonical surface renders a native <select> with
+ * name="team-filter" (footballStatsConfig.tsx). Tests target it via
+ * Playwright's selectOption() with force:true.
  *
  * All GraphQL responses are mocked via route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -68,6 +66,7 @@ function playersResponse(nodes: readonly MockPlayer[]): object {
       footballPlayers: {
         nodes: [...nodes],
         pageInfo: { hasNextPage: false, endCursor: null },
+        totalCount: nodes.length,
       },
     },
   };
@@ -88,14 +87,23 @@ function nativeSelect(page: import('@playwright/test').Page) {
 async function mockTeamFilterablePlayers(
   page: import('@playwright/test').Page,
 ): Promise<void> {
+  // One handler serves both players-surface operations: FootballPlayers
+  // (narrow-viewport card feed) and FootballPlayerStatsGrid (desktop grid,
+  // LS-9366) — both send the same nflTeam variable and read the same
+  // footballPlayers connection.
+  const byTeam = (
+    route: import('@playwright/test').Route,
+    variables: Record<string, unknown>,
+  ) => {
+    const nflTeam = variables.nflTeam as string | undefined;
+    return fulfillJson(
+      route,
+      playersResponse(filterByTeam(ALL_PLAYERS, nflTeam)),
+    );
+  };
   await createGraphQLRouter(page, {
-    footballplayers: (route, { variables }) => {
-      const nflTeam = variables.nflTeam as string | undefined;
-      return fulfillJson(
-        route,
-        playersResponse(filterByTeam(ALL_PLAYERS, nflTeam)),
-      );
-    },
+    footballplayers: (route, { variables }) => byTeam(route, variables),
+    footballplayerstatsgrid: (route, { variables }) => byTeam(route, variables),
   });
 }
 
@@ -128,8 +136,11 @@ test.describe('FootballPlayers — team filter (LS-5607) @regression', () => {
           variables?: Record<string, unknown>;
         };
         return (
-          body.operationName?.toLowerCase() === 'footballplayers' &&
-          body.variables?.nflTeam === 'BUF'
+          // The desktop grid fires FootballPlayerStatsGrid; the narrow-viewport
+          // card feed fires FootballPlayers (LS-9366). Match either.
+          ['footballplayers', 'footballplayerstatsgrid'].includes(
+            body.operationName?.toLowerCase() ?? '',
+          ) && body.variables?.nflTeam === 'BUF'
         );
       } catch {
         return false;
@@ -154,12 +165,14 @@ test.describe('FootballPlayers — team filter (LS-5607) @regression', () => {
     await expect(page.getByText('Patrick Mahomes')).not.toBeVisible();
   });
 
-  test('selecting a team updates the trigger label to the team full name', async ({
+  test('selecting a team updates the filter control to the team full name', async ({
     page,
   }) => {
+    // The canonical /players surface renders a real native <select> whose
+    // selected option is the visible label (no separate trigger element).
     await nativeSelect(page).selectOption('BUF', { force: true });
 
-    await expect(page.getByTestId('team-filter-trigger')).toContainText(
+    await expect(nativeSelect(page).locator('option:checked')).toContainText(
       'Buffalo Bills',
     );
   });
@@ -190,7 +203,9 @@ test.describe('FootballPlayers — team filter (LS-5607) @regression', () => {
         const body = JSON.parse(req.postData() ?? '{}') as {
           operationName?: string;
         };
-        return body.operationName?.toLowerCase() === 'footballplayers';
+        return ['footballplayers', 'footballplayerstatsgrid'].includes(
+          body.operationName?.toLowerCase() ?? '',
+        );
       } catch {
         return false;
       }

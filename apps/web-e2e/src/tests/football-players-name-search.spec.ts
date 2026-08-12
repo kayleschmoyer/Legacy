@@ -14,7 +14,7 @@
  *  - Accent-insensitive search: unaccented input matches accented names (LS-7049)
  *  - Accent-insensitive search: accented input matches accented stored names
  *  - Debounce window: search query does not fire during the 300 ms window (LS-7641)
- *  - Cursor reset: changing the search term discards accumulated pages (LS-7641)
+ *  - Cursor reset: changing the search term resets the grid pager to page one (LS-7641)
  *
  * All GraphQL responses are mocked with route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -108,10 +108,19 @@ function playersResponse<T>(nodes: readonly T[]): object {
       footballPlayers: {
         nodes: [...nodes],
         pageInfo: { hasNextPage: false, endCursor: null },
+        totalCount: nodes.length,
       },
     },
   };
 }
+
+/**
+ * The two players-surface operations that carry the `search` variable: the
+ * FootballPlayers list operation (narrow-viewport card feed) and the
+ * FootballPlayerStatsGrid operation the desktop grid fires (LS-9366). Both
+ * read the same footballPlayers connection, so one handler serves both.
+ */
+const PLAYER_SEARCH_OPS = ['footballplayers', 'footballplayerstatsgrid'];
 
 /**
  * Register a smart route that mirrors server-side search filtering so each test
@@ -120,14 +129,20 @@ function playersResponse<T>(nodes: readonly T[]): object {
 async function mockSearchableFootballPlayers(
   page: import('@playwright/test').Page,
 ): Promise<void> {
+  const bySearch = (
+    route: import('@playwright/test').Route,
+    variables: Record<string, unknown>,
+  ) => {
+    const search = variables.search as string | undefined;
+    return fulfillJson(
+      route,
+      playersResponse(filterBySearch(ALL_PLAYERS, search)),
+    );
+  };
   await createGraphQLRouter(page, {
-    footballplayers: (route, { variables }) => {
-      const search = variables.search as string | undefined;
-      return fulfillJson(
-        route,
-        playersResponse(filterBySearch(ALL_PLAYERS, search)),
-      );
-    },
+    footballplayers: (route, { variables }) => bySearch(route, variables),
+    footballplayerstatsgrid: (route, { variables }) =>
+      bySearch(route, variables),
   });
 }
 
@@ -138,14 +153,20 @@ async function mockSearchableFootballPlayers(
 async function mockSearchableFootballPlayersWithAccents(
   page: import('@playwright/test').Page,
 ): Promise<void> {
+  const bySearch = (
+    route: import('@playwright/test').Route,
+    variables: Record<string, unknown>,
+  ) => {
+    const search = variables.search as string | undefined;
+    return fulfillJson(
+      route,
+      playersResponse(filterBySearch(ALL_PLAYERS_WITH_ACCENTED, search)),
+    );
+  };
   await createGraphQLRouter(page, {
-    footballplayers: (route, { variables }) => {
-      const search = variables.search as string | undefined;
-      return fulfillJson(
-        route,
-        playersResponse(filterBySearch(ALL_PLAYERS_WITH_ACCENTED, search)),
-      );
-    },
+    footballplayers: (route, { variables }) => bySearch(route, variables),
+    footballplayerstatsgrid: (route, { variables }) =>
+      bySearch(route, variables),
   });
 }
 
@@ -181,12 +202,14 @@ test.describe('NFL player name search @regression', () => {
     // Wait long enough for the 300 ms debounce to fire if it were going to.
     await page.waitForTimeout(450);
 
-    // Any footballplayers request made while 'M' was the input must not carry a
+    // Any players-surface request made while 'M' was the input must not carry a
     // search variable (the frontend gate is debouncedSearch.length >= 2).
     const footballRequests = requestBodies.filter((b) => {
       try {
         const parsed = JSON.parse(b) as { operationName?: string };
-        return parsed.operationName?.toLowerCase() === 'footballplayers';
+        return PLAYER_SEARCH_OPS.includes(
+          parsed.operationName?.toLowerCase() ?? '',
+        );
       } catch {
         return false;
       }
@@ -220,7 +243,7 @@ test.describe('NFL player name search @regression', () => {
 
     await expect(page.getByText('No players found')).toBeVisible();
     await expect(
-      page.getByText('Try adjusting your filters or search term.'),
+      page.getByText('No players match the current filters', { exact: false }),
     ).toBeVisible();
   });
 
@@ -272,7 +295,9 @@ test.describe('NFL player name search — debounce and cursor-reset (LS-7641) @r
             variables?: { search?: string };
           };
           if (
-            parsed.operationName?.toLowerCase() === 'footballplayers' &&
+            PLAYER_SEARCH_OPS.includes(
+              parsed.operationName?.toLowerCase() ?? '',
+            ) &&
             parsed.variables?.search
           ) {
             searchVariables.push(parsed.variables.search);
@@ -296,64 +321,77 @@ test.describe('NFL player name search — debounce and cursor-reset (LS-7641) @r
     expect(searchVariables[0]).toBe('Ma');
   });
 
-  test('changing the search term resets the pagination cursor and discards accumulated pages', async ({
+  test('changing the search term resets the pagination cursor and discards the current page', async ({
     page,
   }) => {
-    // Paginated mock: page 1 = Mahomes (hasNextPage: true), page 2 = Allen.
-    // Searching by name returns a filtered single-page result (no Load more).
-    await createGraphQLRouter(page, {
-      footballplayers: (route, { variables }) => {
-        const { search, after } = variables as {
-          search?: string;
-          after?: string;
-        };
-        if (search) {
-          return fulfillJson(
-            route,
-            playersResponse(filterBySearch(ALL_PLAYERS, search)),
-          );
-        }
-        if (!after) {
-          return fulfillJson(route, {
-            data: {
-              footballPlayers: {
-                nodes: [MAHOMES],
-                pageInfo: { hasNextPage: true, endCursor: 'cursor-abc' },
-              },
-            },
-          });
-        }
+    // Paginated grid mock (LS-9366 — the desktop grid pages with a numbered
+    // pager over an offset cursor: page 2 requests after: '25' at the default
+    // page size of 25). Unsearched pool: 26 players → 2 pages, page 1 =
+    // Mahomes, page 2 = Allen. Searching returns a filtered single page.
+    const paginated = (
+      route: import('@playwright/test').Route,
+      variables: Record<string, unknown>,
+    ) => {
+      const { search, after } = variables as {
+        search?: string;
+        after?: string;
+      };
+      if (search) {
+        return fulfillJson(
+          route,
+          playersResponse(filterBySearch(ALL_PLAYERS, search)),
+        );
+      }
+      if (!after) {
         return fulfillJson(route, {
           data: {
             footballPlayers: {
-              nodes: [ALLEN],
-              pageInfo: { hasNextPage: false, endCursor: null },
+              nodes: [MAHOMES],
+              pageInfo: { hasNextPage: true, endCursor: '25' },
+              totalCount: 26,
             },
           },
         });
-      },
+      }
+      return fulfillJson(route, {
+        data: {
+          footballPlayers: {
+            nodes: [ALLEN],
+            pageInfo: { hasNextPage: false, endCursor: null },
+            totalCount: 26,
+          },
+        },
+      });
+    };
+    await createGraphQLRouter(page, {
+      footballplayers: (route, { variables }) => paginated(route, variables),
+      footballplayerstatsgrid: (route, { variables }) =>
+        paginated(route, variables),
     });
     await page.goto(PAGE_URL);
 
-    // Page 1: Mahomes is visible and a 'Load more' button is present.
+    // Page 1: Mahomes is visible and the pager reports two pages.
     await expect(page.getByText('Patrick Mahomes')).toBeVisible();
-    await expect(page.getByText('Load more')).toBeVisible();
+    await expect(page.getByText('Page 1 of 2')).toBeVisible();
 
-    // Load page 2: Allen joins the accumulated list.
-    await page.getByText('Load more').click();
+    // Go to page 2: the grid replaces the page with Allen's row.
+    await page.getByRole('button', { name: 'Next →' }).click();
     await expect(page.getByText('Josh Allen')).toBeVisible();
+    await expect(page.getByText('Page 2 of 2')).toBeVisible();
 
-    // Type a search term — the 300 ms debounce fires, cursor resets to
-    // undefined, and allNodes is replaced with the filtered first page.
+    // Type a search term — the 300 ms debounce fires, the committed filters
+    // change, and the grid's resetKey snaps pagination back to page one with
+    // an undefined cursor (the offset cursor is only valid for the result set
+    // that produced it).
     const search = page.getByRole('textbox', { name: 'Search players' });
     await search.fill('Mahomes');
 
     // After the debounce window: only Mahomes from the fresh filtered page 1
-    // is visible; Allen (accumulated from the now-discarded page 2) is gone.
+    // is visible; Allen (from the now-discarded page 2) is gone, and the
+    // filtered single-page result collapses the pager to one page.
     await expect(page.getByText('Patrick Mahomes')).toBeVisible();
     await expect(page.getByText('Josh Allen')).not.toBeVisible();
-    // The filtered result has no next page, so Load more is also gone.
-    await expect(page.getByText('Load more')).not.toBeVisible();
+    await expect(page.getByText('Page 1 of 1')).toBeVisible();
   });
 });
 

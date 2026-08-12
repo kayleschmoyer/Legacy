@@ -168,6 +168,23 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
       },
     },
   },
+  // The canonical /players?sport=nfl desktop surface mounts
+  // FootballStatsDataGrid, which fires FootballPlayerStatsGrid on every load
+  // (LS-9366 — the LS-9077 route fold made this the default players view and
+  // LS-9347 removed the page-wide PremiumGate in front of it). Same
+  // footballPlayers root field as the FootballPlayers baseline above but a
+  // different selection set: the grid also reads totalCount. Empty connection
+  // renders the grid's EmptyCard cleanly; specs that assert on grid rows
+  // register their own override.
+  footballplayerstatsgrid: {
+    data: {
+      footballPlayers: {
+        nodes: [],
+        pageInfo: { hasNextPage: false, endCursor: null },
+        totalCount: 0,
+      },
+    },
+  },
   // GetMyLeagues fetches the same userLeagueCount field (LS-9101).
   getmyleagues: { data: { myLeagues: [], userLeagueCount: 0 } },
   getpublicleagues: { data: { publicLeagues: [] } },

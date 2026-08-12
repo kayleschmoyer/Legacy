@@ -63,6 +63,7 @@ function playersResponse() {
       footballPlayers: {
         nodes: [MAHOMES, ALLEN],
         pageInfo: { hasNextPage: false, endCursor: null },
+        totalCount: 2,
       },
     },
   };
@@ -72,15 +73,20 @@ async function mockFootballPlayers(
   page: import('@playwright/test').Page,
 ): Promise<void> {
   await createGraphQLRouter(page, {
+    // Narrow viewports mount PlayersCardFeed, which fires FootballPlayers;
+    // desktop mounts FootballStatsDataGrid, which fires FootballPlayerStatsGrid
+    // (LS-9366). Both read the same footballPlayers connection shape, so one
+    // response body serves both operations.
     footballplayers: (route) => fulfillJson(route, playersResponse()),
+    footballplayerstatsgrid: (route) => fulfillJson(route, playersResponse()),
   });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Locator for the cards grid container (only present in cards view). */
+/** Locator for the card feed container (only present in cards view). */
 function cardsContainer(page: import('@playwright/test').Page) {
-  return page.getByTestId('player-list-cards');
+  return page.getByTestId('players-stats-card-feed-nfl');
 }
 
 /** Locator for the table container (only present in table view). */

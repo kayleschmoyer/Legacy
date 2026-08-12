@@ -8,14 +8,13 @@
  *   - Selecting "Free Agents" sends freeAgent:true and shows only free agents
  *   - Resetting to "All Teams" restores the full player pool
  *
- * The availability filter is implemented via the FootballTeamFilter component.
- * Selecting the "FREE_AGENT" sentinel option sets freeAgent:true on the
- * FootballPlayers GraphQL query and omits nflTeam.
+ * The availability filter is the team-filter select's "FREE_AGENT" sentinel
+ * option: selecting it sets freeAgent:true on the players query and omits
+ * nflTeam (see buildFootballQueryVars in footballStatsHelpers.ts).
  *
- * Interaction strategy: FootballTeamFilter renders a hidden native <select>
- * with name="team-filter" for reliable headless interaction (see
- * FootballTeamFilter.tsx). Tests target it via selectOption() with force:true
- * to bypass the opacity:0 / pointer-events:none styles applied by Tamagui.
+ * Interaction strategy: the canonical surface renders a native <select> with
+ * name="team-filter" (footballStatsConfig.tsx). Tests target it via
+ * selectOption() with force:true.
  *
  * All GraphQL responses are mocked via route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -70,6 +69,7 @@ function playersResponse(
       footballPlayers: {
         nodes: [...nodes],
         pageInfo: { hasNextPage: false, endCursor: null },
+        totalCount: nodes.length,
       },
     },
   };
@@ -82,16 +82,24 @@ function nativeSelect(page: import('@playwright/test').Page) {
 /**
  * Smart route that mirrors server-side free-agent filtering:
  * freeAgent:true in variables → return only SPILLER; otherwise return all.
+ * Registered for both the FootballPlayers list operation (card feed) and the
+ * FootballPlayerStatsGrid operation the desktop grid fires (LS-9366) — both
+ * send the same freeAgent variable and read the same connection shape.
  */
 async function mockAvailabilityFilter(
   page: import('@playwright/test').Page,
 ): Promise<void> {
+  const byAvailability = (
+    route: import('@playwright/test').Route,
+    variables: Record<string, unknown>,
+  ) => {
+    const nodes = variables.freeAgent === true ? FREE_AGENTS_ONLY : ALL_PLAYERS;
+    return fulfillJson(route, playersResponse(nodes));
+  };
   await createGraphQLRouter(page, {
-    footballplayers: (route, { variables }) => {
-      const nodes =
-        variables.freeAgent === true ? FREE_AGENTS_ONLY : ALL_PLAYERS;
-      return fulfillJson(route, playersResponse(nodes));
-    },
+    footballplayers: (route, { variables }) => byAvailability(route, variables),
+    footballplayerstatsgrid: (route, { variables }) =>
+      byAvailability(route, variables),
   });
 }
 
@@ -135,21 +143,23 @@ test.describe('Football availability / free-agent filter (LS-5602) @regression',
     await expect(page.getByText('Jordan Spiller')).toBeVisible();
   });
 
-  test('trigger label updates to "Free Agents" when filter is active', async ({
+  test('filter control shows "Free Agents" when filter is active', async ({
     page,
   }) => {
+    // The canonical /players surface renders a real native <select> whose
+    // selected option is the visible label (no separate trigger element).
     await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
-    await expect(page.getByTestId('team-filter-trigger')).toContainText(
+    await expect(nativeSelect(page).locator('option:checked')).toHaveText(
       'Free Agents',
     );
   });
 
-  test('trigger label resets to "All Teams" when filter is cleared', async ({
+  test('filter control resets to "All Teams" when filter is cleared', async ({
     page,
   }) => {
     await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
     await nativeSelect(page).selectOption('All', { force: true });
-    await expect(page.getByTestId('team-filter-trigger')).toContainText(
+    await expect(nativeSelect(page).locator('option:checked')).toHaveText(
       'All Teams',
     );
   });
