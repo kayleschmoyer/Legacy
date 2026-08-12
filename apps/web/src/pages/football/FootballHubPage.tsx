@@ -183,7 +183,7 @@ export function FootballHubPage() {
           onCreateLeague={handleCreateLeague}
           onJoinLeague={() => navigate('/football/league/join')}
           onBrowseLeagues={() => navigate('/football/leagues')}
-          onBrowsePlayers={() => navigate('/football/players')}
+          onBrowsePlayers={() => navigate('/players?sport=nfl')}
           onViewLeague={(id: string | number) =>
             navigate(`/football/league/${id}`)
           }

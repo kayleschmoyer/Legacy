@@ -1,7 +1,7 @@
 /**
  * NFL Player Name Search — hermetic E2E tests (LS-5442, LS-7049, LS-7641)
  *
- * Verifies the search input on /football/players filters the displayed player
+ * Verifies the search input on /players?sport=nfl filters the displayed player
  * list by forwarding a `search` variable to the `FootballPlayers` GraphQL query.
  *
  * Covered behaviours:
@@ -25,7 +25,7 @@ import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PAGE_URL = '/football/players';
+const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock player fixtures ───────────────────────────────────────────────────────
 

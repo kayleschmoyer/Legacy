@@ -3,7 +3,8 @@
  *
  * Covers the "Browse Players" journey from Football Home (epic LS-5267):
  *  - The trending-players preview renders mocked top players on /football.
- *  - The Browse Players CTA is visible and navigates to /football/players.
+ *  - The Browse Players CTA is visible and navigates to /players?sport=nfl
+ *    (repointed from the retired /football/players route — LS-9077).
  *
  * All GraphQL responses are mocked with route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -105,7 +106,7 @@ test.describe('Football Home — player discovery entry point @regression', () =
     ).not.toBeVisible();
   });
 
-  test('clicking Browse Players navigates to /football/players', async ({
+  test('clicking Browse Players navigates to the canonical players route with NFL selected', async ({
     page,
   }) => {
     await mockTrendingFootballPlayers(page);
@@ -115,6 +116,8 @@ test.describe('Football Home — player discovery entry point @regression', () =
     await expect(cta).toBeVisible({ timeout: 10000 });
     await cta.click();
 
-    await expect(page).toHaveURL('/football/players');
+    // Repointed from the retired /football/players route to the canonical
+    // merged players route with NFL pre-selected (LS-9077).
+    await expect(page).toHaveURL(/\/players\?sport=nfl$/);
   });
 });

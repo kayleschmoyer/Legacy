@@ -2,7 +2,7 @@
  * Sport-Aware Player List — E2E tests (LS-5606)
  *
  * Verifies that the football player list reflects the active league's sport
- * context: /football/players shows football positions (QB, RB, WR …) and NFL
+ * context: /players?sport=nfl shows football positions (QB, RB, WR …) and NFL
  * team options — not baseball positions or MLB teams.
  *
  * The former baseball-context coverage (/players showing baseball positions
@@ -10,6 +10,12 @@
  * longer renders at /players (LS-9076 — /players is now the canonical merged
  * player stats page, formerly at /players/stats). Removed rather than
  * adapted; there is no equivalent position-filter-rail UI on the stats page.
+ *
+ * Originally exercised the standalone /football/players route; retargeted to
+ * the canonical route when that page was retired (LS-9077). The visible
+ * header text changed from "Football Players" to "NFL Player Statistics"
+ * (the shared FootballStatsPage title) — the position-filter group and team
+ * select assertions are unchanged since they hit the same shared component.
  *
  * All GraphQL responses are mocked with route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -21,7 +27,7 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const FOOTBALL_URL = '/football/players';
+const FOOTBALL_URL = '/players?sport=nfl';
 
 // ── Football mock ─────────────────────────────────────────────────────────────
 
@@ -60,10 +66,10 @@ test.describe('Sport-aware player list — football context @regression', () => 
     await page.goto(FOOTBALL_URL);
   });
 
-  test('shows Football Players heading in football context', async ({
+  test('shows NFL Player Statistics heading in football context', async ({
     page,
   }) => {
-    await expect(page.getByText('Football Players').first()).toBeVisible();
+    await expect(page.getByText('NFL Player Statistics').first()).toBeVisible();
   });
 
   test('position filter shows core football positions (QB, RB, WR, TE)', async ({

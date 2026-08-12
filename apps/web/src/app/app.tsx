@@ -158,9 +158,9 @@ const FootballHubPage = lazyWithRetry(() =>
     default: m.FootballHubPage,
   })),
 );
-const FootballPlayersPage = lazyWithRetry(() =>
-  import('../pages/football/FootballPlayersPage').then((m) => ({
-    default: m.FootballPlayersPage,
+const FootballPlayersRedirectPage = lazyWithRetry(() =>
+  import('../pages/football/FootballPlayersRedirectPage').then((m) => ({
+    default: m.FootballPlayersRedirectPage,
   })),
 );
 const FootballPlayerDetailPage = lazyWithRetry(() =>
@@ -641,11 +641,15 @@ function App() {
               }
             />
             <Route path="/league/create" element={<CreateLeagueWizardPage />} />
+            {/* /football/players redirects to the canonical merged players
+                route with NFL selected (LS-9077) — the standalone list page
+                was retired once LS-8442 landed NFL browsing inline on
+                /players via the sport switcher. */}
             <Route
               path="/football/players"
               element={
                 <FootballGate>
-                  <FootballPlayersPage />
+                  <FootballPlayersRedirectPage />
                 </FootballGate>
               }
             />

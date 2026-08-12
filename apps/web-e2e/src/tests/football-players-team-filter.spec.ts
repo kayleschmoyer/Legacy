@@ -1,7 +1,7 @@
 /**
  * Football Players — Team Filter row filtering E2E tests (LS-5607)
  *
- * Verifies that the team filter on /football/players:
+ * Verifies that the team filter on /players?sport=nfl:
  *   1. Is present on the page with an "All Teams" default
  *   2. Sends nflTeam: "<abbrev>" in the GraphQL request when a team is selected
  *   3. Renders only rows belonging to that team
@@ -24,7 +24,7 @@ import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const PAGE_URL = '/football/players';
+const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock player fixtures ───────────────────────────────────────────────────────
 

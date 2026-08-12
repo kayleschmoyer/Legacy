@@ -1,7 +1,7 @@
 /**
  * Football Availability / Free Agent Filter — E2E tests (LS-5602)
  *
- * Verifies that the availability filter on /football/players correctly toggles
+ * Verifies that the availability filter on /players?sport=nfl correctly toggles
  * the player list between all players and free agents only:
  *
  *   - Initial load: both rostered and free-agent players are visible
@@ -24,7 +24,7 @@
 import { expect, test } from '../fixtures/auth-enhanced';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
-const PAGE_URL = '/football/players';
+const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock player fixtures ──────────────────────────────────────────────────────
 

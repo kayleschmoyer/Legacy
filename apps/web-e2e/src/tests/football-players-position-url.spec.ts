@@ -2,7 +2,7 @@
  * Football Players — URL position persistence E2E tests (LS-6465)
  *
  * Verifies that the `?position=` URL search param drives the position filter:
- *   1. Deep-linking to /football/players?position=QB pre-selects QB.
+ *   1. Deep-linking to /players?sport=nfl&position=QB pre-selects QB.
  *   2. Selecting a position, navigating to a player detail page, and pressing
  *      browser back restores the previously selected position.
  *   3. Selecting All clears the param; invalid params fall back to All.
@@ -19,7 +19,7 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const PAGE_URL = '/football/players';
+const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   });
 
   test('deep-link ?position=QB pre-selects the QB pill', async ({ page }) => {
-    await page.goto(`${PAGE_URL}?position=QB`);
+    await page.goto(`${PAGE_URL}&position=QB`);
 
     const qbPill = page.getByRole('button', { name: 'QB' });
     const allPill = page.getByRole('button', { name: 'All' });
@@ -73,7 +73,7 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   test('deep-link ?position=FLEX pre-selects the FLEX pill', async ({
     page,
   }) => {
-    await page.goto(`${PAGE_URL}?position=FLEX`);
+    await page.goto(`${PAGE_URL}&position=FLEX`);
 
     const flexPill = page.getByRole('button', { name: 'FLEX' });
     await expect(flexPill).toHaveAttribute('aria-pressed', 'true');
@@ -82,7 +82,7 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   test('invalid ?position= param falls back to All being selected', async ({
     page,
   }) => {
-    await page.goto(`${PAGE_URL}?position=INVALID`);
+    await page.goto(`${PAGE_URL}&position=INVALID`);
 
     const allPill = page.getByRole('button', { name: 'All' });
     await expect(allPill).toHaveAttribute('aria-pressed', 'true');
@@ -105,7 +105,7 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
   test('selecting All clears the ?position= param from the URL', async ({
     page,
   }) => {
-    await page.goto(`${PAGE_URL}?position=QB`);
+    await page.goto(`${PAGE_URL}&position=QB`);
 
     await page.getByRole('button', { name: 'All' }).click();
 
@@ -128,7 +128,7 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
     // Navigate forward to a player detail page (simulates clicking a player card)
     await page.goto('/football/players/1');
 
-    // Browser back returns to /football/players?position=QB
+    // Browser back returns to /players?sport=nfl&position=QB
     await page.goBack();
 
     await expect(page.getByRole('button', { name: 'QB' })).toHaveAttribute(

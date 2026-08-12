@@ -160,13 +160,13 @@ export function FootballPlayersComparePage() {
           tabIndex={0}
           onPress={() => {
             if (window.history.length > 1) navigate(-1);
-            else navigate('/football/players');
+            else navigate('/players?sport=nfl');
           }}
           onKeyDown={(e: { key: string; preventDefault: () => void }) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
               if (window.history.length > 1) navigate(-1);
-              else navigate('/football/players');
+              else navigate('/players?sport=nfl');
             }
           }}
           hoverStyle={{ opacity: 0.8 }}

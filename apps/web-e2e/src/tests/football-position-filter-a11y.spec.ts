@@ -2,7 +2,7 @@
  * FootballPositionFilter — multi-select toggle group a11y & keyboard tests
  * (LS-6466, multi-select promoted in LS-6464)
  *
- * The position pill row on /football/players is a multi-select toggle-button
+ * The position pill row on /players?sport=nfl is a multi-select toggle-button
  * group: each pill is a `role=button` with `aria-pressed`, the container is a
  * `role=group`, and keyboard users get roving tabindex (arrow keys move focus)
  * with Space/Enter toggling the focused pill. "All" clears the selection.
@@ -17,7 +17,7 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const PAGE_URL = '/football/players';
+const PAGE_URL = '/players?sport=nfl';
 
 // Selectable position pills, excluding the leading "All" pill.
 const POSITIONS = [

@@ -63,7 +63,7 @@ import { useFeatureValue } from '../../context/GrowthBookProvider';
 // NFL statistics render inline through the sport-agnostic PlayerStatsShell via
 // the shared FootballStatsPage binding when the sport switcher selects NFL
 // (LS-8442), replacing the former embedded FootballPlayersPage. The standalone
-// /football/players route still renders the bespoke FootballPlayersPage.
+// /football/players route now redirects here with sport=nfl (LS-9077).
 
 // GraphQL Int is a 32-bit signed integer — clamp URL param values to prevent query errors
 const MAX_GRAPHQL_INT = 2147483647;
@@ -1713,7 +1713,7 @@ export function PlayerStatsRoute() {
   // PlayerStatsShell (LS-8442), the same shell the MLB browser renders through,
   // instead of redirecting away or embedding the bespoke football page. Placed
   // after all hooks to satisfy Rules of Hooks; the standalone /football/players
-  // route still renders the bespoke FootballPlayersPage.
+  // route now redirects here with sport=nfl (LS-9077).
   if (showFootball) {
     // Seed the football controller from the URL params the route persists.
     const nflInitialFilters: Partial<FootballStatsFilters> = {};

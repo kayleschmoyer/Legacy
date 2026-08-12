@@ -1582,6 +1582,7 @@
     ],
     "apps/web-e2e/src/tests/football-availability-filter.spec.ts": [
       "apps/web/src/pages/football/**",
+      "apps/web/src/pages/players/**",
       "apps/web/src/components/football/**",
       "apps/web/src/components/**",
       "apps/web/src/components/icons/**",
@@ -1959,6 +1960,7 @@
     ],
     "apps/web-e2e/src/tests/football-player-row-navigation.spec.ts": [
       "apps/web/src/pages/football/**",
+      "apps/web/src/pages/players/**",
       "apps/web/src/components/football/**",
       "lib/shared-components/src/features/football/FootballPlayerHeader.tsx",
       "lib/shared-components/src/features/football/FootballPlayerDetail.tsx",
@@ -2023,6 +2025,7 @@
     ],
     "apps/web-e2e/src/tests/football-players-name-search.spec.ts": [
       "apps/web/src/pages/football/**",
+      "apps/web/src/pages/players/**",
       "apps/web/src/components/football/**",
       "lambdas/db/src/schema/football.ts",
       "apps/web/src/components/**",
@@ -2053,6 +2056,7 @@
     ],
     "apps/web-e2e/src/tests/football-players-position-url.spec.ts": [
       "apps/web/src/pages/football/**",
+      "apps/web/src/pages/players/**",
       "apps/web/src/components/football/**",
       "apps/web/src/components/**",
       "apps/web/src/components/icons/**",
@@ -2083,6 +2087,7 @@
     "apps/web-e2e/src/tests/football-players-team-filter.spec.ts": [
       "apps/web/src/components/football/**",
       "apps/web/src/pages/football/**",
+      "apps/web/src/pages/players/**",
       "apps/web/src/components/**",
       "apps/web/src/components/icons/**",
       "apps/web/src/components/scoreboard/**",
@@ -2111,6 +2116,7 @@
     ],
     "apps/web-e2e/src/tests/football-position-filter-a11y.spec.ts": [
       "apps/web/src/components/football/**",
+      "apps/web/src/pages/players/**",
       "apps/web/src/constants/colors.ts",
       "lib/shared-components/src/utils/colors.ts",
       "apps/web/src/components/**",
@@ -2206,6 +2212,7 @@
     "apps/web-e2e/src/tests/football-team-filter.spec.ts": [
       "apps/web/src/components/football/**",
       "apps/web/src/pages/football/**",
+      "apps/web/src/pages/players/**",
       "apps/web/src/components/**",
       "apps/web/src/components/icons/**",
       "apps/web/src/components/scoreboard/**",
@@ -3616,6 +3623,7 @@
     ],
     "apps/web-e2e/src/tests/nfl-players-view-mode-toggle.spec.ts": [
       "apps/web/src/pages/football/**",
+      "apps/web/src/pages/players/**",
       "apps/web/src/components/football/**",
       "apps/web/src/components/**",
       "apps/web/src/components/icons/**",

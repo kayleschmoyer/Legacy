@@ -279,7 +279,7 @@ describe('FootballPlayersComparePage — back navigation', () => {
 
     fireEvent.click(screen.getByText('Back to players'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('/football/players');
+    expect(mockNavigate).toHaveBeenCalledWith('/players?sport=nfl');
   });
 });
 

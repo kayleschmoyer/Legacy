@@ -26,7 +26,7 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const PAGE_URL = '/football/players';
+const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
 
