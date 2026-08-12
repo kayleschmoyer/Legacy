@@ -370,6 +370,66 @@ describe('AdminUsersPage — impersonation', () => {
   });
 });
 
+describe('AdminUsersPage — test user toggle', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupMocks();
+  });
+
+  it('defaults to excluding test users on fresh load', () => {
+    renderPage();
+
+    expect(mockUseGetAllUsersQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({ includeTestUsers: false }),
+      }),
+    );
+    expect(mockUseGetUsersCountQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({ includeTestUsers: false }),
+      }),
+    );
+  });
+
+  it('reveals test users when the toggle is enabled', async () => {
+    renderPage();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: /show test users/i }),
+    );
+
+    expect(mockUseGetAllUsersQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({ includeTestUsers: true }),
+      }),
+    );
+    expect(mockUseGetUsersCountQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({ includeTestUsers: true }),
+      }),
+    );
+  });
+
+  it('re-hides test users when the toggle is disabled again', async () => {
+    renderPage();
+
+    const toggle = () =>
+      screen.getByRole('button', { name: /(show|hide) test users/i });
+
+    await userEvent.click(toggle());
+    expect(toggle()).toHaveTextContent(/hide test users/i);
+
+    await userEvent.click(toggle());
+
+    expect(toggle()).toHaveTextContent(/show test users/i);
+    expect(mockUseGetAllUsersQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: expect.objectContaining({ includeTestUsers: false }),
+      }),
+    );
+  });
+});
+
 describe('AdminUsersPage — grant temporary premium', () => {
   beforeEach(() => {
     jest.clearAllMocks();

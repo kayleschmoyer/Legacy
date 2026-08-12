@@ -62,6 +62,8 @@ export default function AdminUsersPage() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [accessLevelFilter, setAccessLevelFilter] =
     useState<AccessLevelFilter>('all');
+  // Client-side only — resets to hidden on every fresh page load (LS-9223 AC4).
+  const [showTestUsers, setShowTestUsers] = useState(false);
   // Springs settle at browser-dependent real-world durations; collapse to a
   // near-instant timing animation under prefers-reduced-motion so both
   // confirmation dialogs' enter/exit is deterministic for users who request
@@ -107,7 +109,7 @@ export default function AdminUsersPage() {
   // Reset to page 1 when sort or filter changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [sortField, sortDirection, accessLevelFilter]);
+  }, [sortField, sortDirection, accessLevelFilter, showTestUsers]);
 
   const searchVar = debouncedSearch.length > 0 ? debouncedSearch : undefined;
   const accessLevelVar =
@@ -122,13 +124,18 @@ export default function AdminUsersPage() {
       orderBy: sortField,
       orderDirection: sortDirection,
       accessLevel: accessLevelVar,
+      includeTestUsers: showTestUsers,
     },
     fetchPolicy: 'cache-and-network',
     skip: !isAdmin,
   });
 
   const { data: countData, loading: countLoading } = useGetUsersCountQuery({
-    variables: { search: searchVar, accessLevel: accessLevelVar },
+    variables: {
+      search: searchVar,
+      accessLevel: accessLevelVar,
+      includeTestUsers: showTestUsers,
+    },
     fetchPolicy: 'cache-and-network',
     skip: !isAdmin,
   });
@@ -397,6 +404,20 @@ export default function AdminUsersPage() {
             {ACCESS_LEVEL_LABELS[level]}
           </Button>
         ))}
+
+        <Button
+          size="$3"
+          onPress={() => setShowTestUsers((prev) => !prev)}
+          backgroundColor={
+            showTestUsers ? withAlpha(BRAND_NAVY, 0.12) : undefined
+          }
+          borderColor={showTestUsers ? '$brandNavy' : '$borderColor'}
+          borderWidth={1}
+          color={showTestUsers ? '$brandNavy' : '$color'}
+          fontWeight={showTestUsers ? '700' : '400'}
+        >
+          {showTestUsers ? 'Hide test users' : 'Show test users'}
+        </Button>
       </XStack>
 
       {/* Initial loading state (no users yet) */}

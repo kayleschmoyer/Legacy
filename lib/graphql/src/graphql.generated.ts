@@ -4019,6 +4019,7 @@ export type QueryUserTeamIdArgs = {
 
 export type QueryUsersArgs = {
   accessLevel?: InputMaybe<Scalars['String']['input']>;
+  includeTestUsers?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
@@ -4028,6 +4029,7 @@ export type QueryUsersArgs = {
 
 export type QueryUsersCountArgs = {
   accessLevel?: InputMaybe<Scalars['String']['input']>;
+  includeTestUsers?: InputMaybe<Scalars['Boolean']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -8608,6 +8610,7 @@ export type GetAllUsersQueryVariables = Exact<{
   orderBy?: InputMaybe<Scalars['String']['input']>;
   orderDirection?: InputMaybe<Scalars['String']['input']>;
   accessLevel?: InputMaybe<Scalars['String']['input']>;
+  includeTestUsers?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type GetAllUsersQuery = {
@@ -8627,6 +8630,7 @@ export type GetAllUsersQuery = {
 export type GetUsersCountQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
   accessLevel?: InputMaybe<Scalars['String']['input']>;
+  includeTestUsers?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type GetUsersCountQuery = {
@@ -22361,6 +22365,7 @@ export const GetAllUsers = gql`
     $orderBy: String
     $orderDirection: String
     $accessLevel: String
+    $includeTestUsers: Boolean
   ) {
     users(
       limit: $limit
@@ -22369,6 +22374,7 @@ export const GetAllUsers = gql`
       orderDirection: $orderDirection
       search: $search
       accessLevel: $accessLevel
+      includeTestUsers: $includeTestUsers
     ) {
       ...User
     }
@@ -22394,6 +22400,7 @@ export const GetAllUsers = gql`
  *      orderBy: // value for 'orderBy'
  *      orderDirection: // value for 'orderDirection'
  *      accessLevel: // value for 'accessLevel'
+ *      includeTestUsers: // value for 'includeTestUsers'
  *   },
  * });
  */
@@ -22455,8 +22462,16 @@ export type GetAllUsersQueryResult = Apollo.QueryResult<
   GetAllUsersQueryVariables
 >;
 export const GetUsersCount = gql`
-  query GetUsersCount($search: String, $accessLevel: String) {
-    usersCount(search: $search, accessLevel: $accessLevel)
+  query GetUsersCount(
+    $search: String
+    $accessLevel: String
+    $includeTestUsers: Boolean
+  ) {
+    usersCount(
+      search: $search
+      accessLevel: $accessLevel
+      includeTestUsers: $includeTestUsers
+    )
   }
 `;
 
@@ -22474,6 +22489,7 @@ export const GetUsersCount = gql`
  *   variables: {
  *      search: // value for 'search'
  *      accessLevel: // value for 'accessLevel'
+ *      includeTestUsers: // value for 'includeTestUsers'
  *   },
  * });
  */

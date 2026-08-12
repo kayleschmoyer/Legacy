@@ -4100,13 +4100,18 @@ type Query {
   userTeamId(leagueId: Int!): Int
   users(
     accessLevel: String
+    includeTestUsers: Boolean
     limit: Int
     offset: Int
     orderBy: String
     orderDirection: String
     search: String
   ): [User!]
-  usersCount(accessLevel: String, search: String): Int
+  usersCount(
+    accessLevel: String
+    includeTestUsers: Boolean
+    search: String
+  ): Int
   validateInviteCode(code: String!): InviteCodeInfo
 
   """

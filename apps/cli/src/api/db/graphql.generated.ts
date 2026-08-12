@@ -4013,6 +4013,7 @@ export type QueryUserTeamIdArgs = {
 
 export type QueryUsersArgs = {
   accessLevel?: InputMaybe<Scalars['String']['input']>;
+  includeTestUsers?: InputMaybe<Scalars['Boolean']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
   orderBy?: InputMaybe<Scalars['String']['input']>;
@@ -4022,6 +4023,7 @@ export type QueryUsersArgs = {
 
 export type QueryUsersCountArgs = {
   accessLevel?: InputMaybe<Scalars['String']['input']>;
+  includeTestUsers?: InputMaybe<Scalars['Boolean']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
 };
 

@@ -173,6 +173,8 @@ builder.queryField('users', (t) =>
       orderDirection: t.arg.string({ required: false }),
       search: t.arg.string({ required: false }),
       accessLevel: t.arg.string({ required: false }),
+      // Defaults to excluding test/seed users (LS-9223); pass true to reveal them.
+      includeTestUsers: t.arg.boolean({ required: false }),
     },
     resolve: async (root, args, context) => {
       // Admin only — this endpoint lists all users with their email addresses
@@ -185,6 +187,7 @@ builder.queryField('users', (t) =>
       const orderBy = rawOrderBy === 'email' ? 'canonicalEmail' : rawOrderBy;
       const orderDirection = validateOrderDirection(args.orderDirection);
       const accessLevelFilter = validateAccessLevelFilter(args.accessLevel);
+      const includeTestUsers = args.includeTestUsers === true;
 
       const users = await dbService.users.getUsers({
         limit: args.limit || undefined,
@@ -192,9 +195,10 @@ builder.queryField('users', (t) =>
         orderBy: orderBy || 'canonicalEmail',
         orderDirection: orderDirection || 'asc',
         searchTerm: args.search || undefined,
-        filters: accessLevelFilter
-          ? { accessLevel: accessLevelFilter }
-          : undefined,
+        filters: {
+          ...(accessLevelFilter ? { accessLevel: accessLevelFilter } : {}),
+          ...(includeTestUsers ? {} : { excludeTestUsers: true }),
+        },
       });
 
       // Audit log for a routine admin view — logged at info so it isn't
@@ -225,6 +229,8 @@ builder.queryField('usersCount', (t) =>
     args: {
       search: t.arg.string({ required: false }),
       accessLevel: t.arg.string({ required: false }),
+      // Defaults to excluding test/seed users (LS-9223); pass true to reveal them.
+      includeTestUsers: t.arg.boolean({ required: false }),
     },
     resolve: async (root, args, context) => {
       // Admin only
@@ -234,12 +240,14 @@ builder.queryField('usersCount', (t) =>
       }
 
       const accessLevelFilter = validateAccessLevelFilter(args.accessLevel);
+      const includeTestUsers = args.includeTestUsers === true;
 
       const count = await dbService.users.countUsers({
         searchTerm: args.search || undefined,
-        filters: accessLevelFilter
-          ? { accessLevel: accessLevelFilter }
-          : undefined,
+        filters: {
+          ...(accessLevelFilter ? { accessLevel: accessLevelFilter } : {}),
+          ...(includeTestUsers ? {} : { excludeTestUsers: true }),
+        },
       });
 
       // Audit log for a routine admin view — logged at info so it isn't

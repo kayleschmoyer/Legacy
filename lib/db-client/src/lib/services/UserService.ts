@@ -28,6 +28,8 @@ export interface UserFilters {
   usernameLike?: string;
   accessLevel?: 'none' | 'admin';
   hasCanonicalEmail?: boolean;
+  /** Exclude rows flagged isTestUser=true (LS-9223). NULL rows (unflagged, pre-LS-9222) count as non-test. */
+  excludeTestUsers?: boolean;
 }
 
 export interface UserQueryOptions {
@@ -473,6 +475,15 @@ export class UserService {
 
     if (filters.accessLevel) {
       conditions.push(eq(PublicSchema.users.accessLevel, filters.accessLevel));
+    }
+
+    if (filters.excludeTestUsers) {
+      conditions.push(
+        or(
+          eq(PublicSchema.users.isTestUser, false),
+          isNull(PublicSchema.users.isTestUser),
+        ) as SQL,
+      );
     }
 
     if (filters.hasCanonicalEmail === true) {

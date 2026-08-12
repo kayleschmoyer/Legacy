@@ -35,6 +35,7 @@ query GetAllUsers(
   $orderBy: String
   $orderDirection: String
   $accessLevel: String
+  $includeTestUsers: Boolean
 ) {
   users(
     limit: $limit
@@ -43,13 +44,22 @@ query GetAllUsers(
     orderDirection: $orderDirection
     search: $search
     accessLevel: $accessLevel
+    includeTestUsers: $includeTestUsers
   ) {
     ...User
   }
 }
 
-query GetUsersCount($search: String, $accessLevel: String) {
-  usersCount(search: $search, accessLevel: $accessLevel)
+query GetUsersCount(
+  $search: String
+  $accessLevel: String
+  $includeTestUsers: Boolean
+) {
+  usersCount(
+    search: $search
+    accessLevel: $accessLevel
+    includeTestUsers: $includeTestUsers
+  )
 }
 
 mutation UpdateUserRole($userId: Int!, $accessLevel: String!) {
