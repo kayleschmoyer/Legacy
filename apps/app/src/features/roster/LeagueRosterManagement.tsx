@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
-import { ScrollView, YStack } from 'tamagui';
+import React, { useMemo, useRef, useState } from 'react';
+import { YStack } from 'tamagui';
+import { ScrollView } from 'react-native';
 import type { RefreshControlProps } from 'react-native';
 import {
   PendingTradeOffers,
   PendingWaiverClaims,
+  RosterActionBar,
   RosterBoard,
+  RosterScoreboard,
+  type RosterScorelineTeam,
   RosterStatusBanners,
-  RosterWeekNavigation,
 } from '@legacy-sports/shared-components/roster';
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
+  useGetMatchupsByWeekQuery,
 } from '@legacy-sports/graphql';
 
 export interface LeagueRosterManagementProps {
@@ -47,10 +51,14 @@ export interface LeagueRosterManagementProps {
 /**
  * LeagueRosterManagement — native roster tab.
  *
- * Wraps the cross-platform shared `RosterBoard` with `RosterWeekNavigation`,
- * `RosterStatusBanners`, and the pending trade-offer / waiver-claim banners,
- * reaching parity with the canonical web league-detail v2 roster tab (LS-7813).
- * Past weeks are read-only; the board's mutations are gated on `!isPast`.
+ * Wraps the cross-platform shared `RosterBoard` with the "command center"
+ * chrome (LS-9355): the `RosterScoreboard` scoreline header is pinned above
+ * the ScrollView, the `RosterStatusBanners` + pending trade-offer /
+ * waiver-claim banners scroll with the board, and the `RosterActionBar` sits
+ * in thumb reach below. The matchup scoreline for the viewed week is fetched
+ * here (server-stored scores) so all league screens get it without extra
+ * wiring. Past weeks are read-only; the board's mutations are gated on
+ * `!isPast`.
  */
 export function LeagueRosterManagement({
   positions,
@@ -72,48 +80,87 @@ export function LeagueRosterManagement({
   // follows `currentWeek` once the league query resolves without an effect.
   const [week, setWeek] = useState<number | null>(null);
   const activeWeek = week ?? effectiveCurrent;
+  const scrollRef = useRef<ScrollView>(null);
 
   const isPast = activeWeek < effectiveCurrent;
   const isFuture = activeWeek > effectiveCurrent;
   const isCurrent = activeWeek === effectiveCurrent;
   const showWeekNav = currentWeek != null && effectiveTotal > 1;
 
+  // Matchup scoreline for the viewed week (LS-9355). Server-stored scores —
+  // native does not recompute live scores client-side, so projections are
+  // omitted and the hero degrades to names + scores.
+  const { data: matchupsData } = useGetMatchupsByWeekQuery({
+    variables: { leagueId: leagueId ?? 0, weekNumber: activeWeek },
+    skip: leagueId == null || myTeamId == null || !showWeekNav,
+  });
+  const scoreline = useMemo<{
+    myTeam: RosterScorelineTeam;
+    opponent: RosterScorelineTeam;
+  } | null>(() => {
+    if (myTeamId == null) return null;
+    const myMatchup =
+      matchupsData?.getMatchupsByWeek?.find(
+        (m) => m != null && (m.team1Id === myTeamId || m.team2Id === myTeamId),
+      ) ?? null;
+    if (!myMatchup) return null;
+    const iAmTeam1 = myMatchup.team1Id === myTeamId;
+    const side = (team1: boolean): RosterScorelineTeam => ({
+      name: (team1 ? myMatchup.team1?.name : myMatchup.team2?.name) ?? null,
+      score: (team1 ? myMatchup.team1Score : myMatchup.team2Score) ?? 0,
+    });
+    return {
+      myTeam: side(iAmTeam1),
+      opponent: side(!iAmTeam1),
+    };
+  }, [matchupsData?.getMatchupsByWeek, myTeamId]);
+
   return (
-    <ScrollView refreshControl={refreshControl}>
-      <YStack padding="$4" gap="$4">
-        {showWeekNav && (
-          <RosterWeekNavigation
-            week={activeWeek}
-            currentWeek={effectiveCurrent}
-            totalWeeks={effectiveTotal}
-            onWeekChange={setWeek}
-            onResetToCurrent={() => setWeek(effectiveCurrent)}
-          />
-        )}
-
-        <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
-
-        {isCurrent && myTeamId != null && (
-          <PendingTradeOffers
-            teamId={myTeamId}
-            leagueId={leagueId ?? undefined}
-          />
-        )}
-        {isCurrent && myTeamId != null && (
-          <PendingWaiverClaims teamId={myTeamId} />
-        )}
-
-        <RosterBoard<AppTeamMemberFragment, LeaguePositionFragment>
-          positions={positions}
-          teamPlayers={teamPlayers}
-          onPlayerAssign={onPlayerAssign}
-          onPlayerRemove={onPlayerRemove}
-          onPlayerSwap={onPlayerSwap}
-          onPlayerPress={onPlayerPress}
-          loading={loading}
-          readOnly={isPast || isFuture}
+    <YStack flex={1}>
+      {showWeekNav && (
+        <RosterScoreboard
+          week={activeWeek}
+          currentWeek={effectiveCurrent}
+          totalWeeks={effectiveTotal}
+          onWeekChange={setWeek}
+          onResetToCurrent={() => setWeek(effectiveCurrent)}
+          myTeam={scoreline?.myTeam ?? null}
+          opponent={scoreline?.opponent ?? null}
         />
-      </YStack>
-    </ScrollView>
+      )}
+
+      <ScrollView ref={scrollRef} refreshControl={refreshControl}>
+        <YStack padding="$4" gap="$4">
+          <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
+
+          {isCurrent && myTeamId != null && (
+            <PendingTradeOffers
+              teamId={myTeamId}
+              leagueId={leagueId ?? undefined}
+            />
+          )}
+          {isCurrent && myTeamId != null && (
+            <PendingWaiverClaims teamId={myTeamId} />
+          )}
+
+          <RosterBoard<AppTeamMemberFragment, LeaguePositionFragment>
+            positions={positions}
+            teamPlayers={teamPlayers}
+            onPlayerAssign={onPlayerAssign}
+            onPlayerRemove={onPlayerRemove}
+            onPlayerSwap={onPlayerSwap}
+            onPlayerPress={onPlayerPress}
+            loading={loading}
+            readOnly={isPast || isFuture}
+          />
+        </YStack>
+      </ScrollView>
+
+      {isCurrent && (
+        <RosterActionBar
+          onQuickSwap={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        />
+      )}
+    </YStack>
   );
 }

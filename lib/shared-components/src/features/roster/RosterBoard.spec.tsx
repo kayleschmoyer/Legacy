@@ -272,4 +272,124 @@ describe('RosterBoard', () => {
     );
     expect(screen.queryByText(/^[A-Z]{2,3} #\d+$/)).toBeNull();
   });
+
+  // ── Command-center stats + quick-swap (LS-9355) ────────────────────────────
+
+  it('renders actual/projected scores and the stat sub-line from getPlayerStats', () => {
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+        getPlayerStats={(p) =>
+          p.id === 101
+            ? {
+                actual: 32.5,
+                projected: 28.6,
+                gamesPlayed: 1,
+                totalGames: 1,
+                seasonYear: 2007,
+                teamAbbr: 'NE',
+              }
+            : p.id === 102
+              ? { projected: 23.8 }
+              : null
+        }
+      />,
+    );
+    // Starter row actual + card-head total both render the same value.
+    expect(screen.getAllByText('32.5')).toHaveLength(2);
+    expect(screen.getByText('28.6 proj')).toBeTruthy();
+    expect(screen.getByText('2007 · NE · 1/1 G')).toBeTruthy();
+    // Bench row shows the projection with a bare "proj" label.
+    expect(screen.getByText('23.8')).toBeTruthy();
+    // Starters card head shows computed totals.
+    expect(screen.getByText(/Total:/)).toBeTruthy();
+  });
+
+  it('quick-swap menu assigns an eligible bench player to an empty slot', () => {
+    const onPlayerAssign = jest.fn<
+      void,
+      [RosterBoardPlayer, RosterBoardPosition]
+    >();
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={onPlayerAssign}
+        onPlayerRemove={noop}
+      />,
+    );
+    // Open the quick-swap menu on the empty SP slot.
+    fireEvent.click(screen.getByRole('button', { name: 'Quick swap SP' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Assign Nolan Ryan to SP' }),
+    );
+    expect(onPlayerAssign).toHaveBeenCalledTimes(1);
+    expect(onPlayerAssign.mock.calls[0]?.[0].id).toBe(103);
+    expect(onPlayerAssign.mock.calls[0]?.[1].id).toBe(3);
+  });
+
+  it('quick-swap menu swaps an eligible bench player into an occupied slot', () => {
+    const onPlayerSwap = jest.fn<
+      void,
+      [RosterBoardPlayer, RosterBoardPosition, RosterBoardPlayer]
+    >();
+    const players: RosterBoardPlayer[] = [
+      mk(101, 'Mike', 'Johnson', ['C'], 1),
+      mk(102, 'Wade', 'Boggs', ['C', '1B'], null),
+    ];
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={players}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+        onPlayerSwap={onPlayerSwap}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Quick swap C' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Swap in Wade Boggs at C' }),
+    );
+    expect(onPlayerSwap).toHaveBeenCalledTimes(1);
+    expect(onPlayerSwap.mock.calls[0]?.[0].id).toBe(102); // incoming: Wade
+    expect(onPlayerSwap.mock.calls[0]?.[1].id).toBe(1); // target: C slot
+    expect(onPlayerSwap.mock.calls[0]?.[2].id).toBe(101); // displaced: Mike
+  });
+
+  it('overflow menu moves a starter to the bench', () => {
+    const onPlayerRemove = jest.fn<void, [RosterBoardPosition]>();
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={noop}
+        onPlayerRemove={onPlayerRemove}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'More actions for Mike Johnson' }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Move Mike Johnson to bench' }),
+    );
+    expect(onPlayerRemove).toHaveBeenCalledTimes(1);
+    expect(onPlayerRemove.mock.calls[0]?.[0].id).toBe(1);
+  });
+
+  it('hides quick-swap and overflow actions when read-only', () => {
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={PLAYERS}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+        readOnly
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Quick swap/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
+  });
 });

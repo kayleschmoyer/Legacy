@@ -1,16 +1,22 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  RosterActionBar,
   RosterBoard,
+  type RosterPlayerStats,
+  RosterScoreboard,
+  type RosterScorelineTeam,
   RosterStatusBanners,
-  RosterWeekNavigation,
 } from '@legacy-sports/shared-components/roster';
 import { PendingTradeOfferBanner } from '@legacy-sports/shared-components';
+import { type SeasonStats } from '@legacy-sports/scoring';
 import {
   type LeagueFragment,
   type LeaguePositionFragment,
+  type MatchupPlayerFragment,
   Sport,
   type TeamMemberFragment,
+  useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
   useSwapTeamMemberPositionsMutation,
@@ -18,8 +24,19 @@ import {
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
-import { Button, Text, YStack } from 'tamagui';
+import { Button, Text, useMedia, YStack } from 'tamagui';
 import { PendingWaiverClaims } from '../../../../features/roster';
+import {
+  computeMatchupPlayerStats,
+  computeMatchupScores,
+  type MatchupPlayerComputedStats,
+} from '../../../../features/matchup/MatchupScoreboard';
+import {
+  useMatchupById,
+  useMatchupsByWeek,
+} from '../../../../hooks/useMatchup';
+import { useLeagueScoringSettings } from '../../../../lib/scoring';
+import { mapMatchupPlayerToSeasonStats } from '../../../../lib/scoring/mapGraphQLToScoringFormat';
 import { Empty } from '../Shared';
 import { I } from '../Icons';
 import { PremiumGate } from '../../../../components/PremiumGate';
@@ -30,8 +47,18 @@ export interface RosterTabProps {
   myTeamId: number | null;
 }
 
+/** "Thu Nov 12" — the scoreline hero's matchup-period date format. */
+function formatPeriodDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   const navigate = useNavigate();
+  const media = useMedia();
   const hasOptimalLineup = useHasEntitlement(ENTITLEMENTS.optimal_lineup);
   const { data: positionsData } = useGetPositionsForLeagueQuery({
     variables: { leagueId: league.id ?? 0 },
@@ -179,6 +206,150 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   const isPast = week < currentWeek;
   const isFuture = week > currentWeek;
   const isCurrent = week === currentWeek;
+  const readOnly = isPast || isFuture;
+
+  // ── Matchup scoreline + per-player stats (LS-9355) ────────────────────────
+  // Mirrors the Matchup tab's client-side scoring pipeline: my matchup for the
+  // viewed week → matchup players → league scoring settings → computed
+  // scores/projections. All of it degrades gracefully (hero hides the
+  // scoreline, rows fall back to eligibility sub-lines) when data is missing.
+  const { matchups } = useMatchupsByWeek(league.id ?? null, week);
+  const myMatchup = useMemo(() => {
+    if (myTeamId == null) return null;
+    return (
+      matchups.find(
+        (m) => m != null && (m.team1Id === myTeamId || m.team2Id === myTeamId),
+      ) ?? null
+    );
+  }, [matchups, myTeamId]);
+  const matchupId = myMatchup?.id != null ? Number(myMatchup.id) : null;
+  const { matchup } = useMatchupById(matchupId);
+
+  const { data: playersData, error: playersError } = useGetMatchupPlayersQuery({
+    variables: { matchupId: matchupId ?? 0 },
+    skip: !matchupId,
+    errorPolicy: 'all',
+  });
+  const { settings: scoringSettings } = useLeagueScoringSettings(
+    league.id ?? undefined,
+  );
+  const seasonStatsMap = useMemo(() => {
+    const map = new Map<number, SeasonStats>();
+    playersData?.getMatchupPlayers?.forEach((mp: MatchupPlayerFragment) => {
+      const stats = mapMatchupPlayerToSeasonStats(mp);
+      if (stats) map.set(stats.playerId, stats);
+    });
+    return map;
+  }, [playersData?.getMatchupPlayers]);
+
+  const computed = useMemo(
+    () =>
+      computeMatchupScores({
+        matchup,
+        players: playersData?.getMatchupPlayers,
+        hasPlayersError: playersError != null,
+        scoringSettings,
+        seasonStatsMap,
+      }),
+    [
+      matchup,
+      playersData?.getMatchupPlayers,
+      playersError,
+      scoringSettings,
+      seasonStatsMap,
+    ],
+  );
+
+  const perPlayerStats = useMemo<readonly MatchupPlayerComputedStats[]>(() => {
+    if (
+      !matchup ||
+      !playersData?.getMatchupPlayers ||
+      playersError != null ||
+      !scoringSettings
+    )
+      return [];
+    return computeMatchupPlayerStats(
+      matchup,
+      playersData.getMatchupPlayers,
+      scoringSettings,
+      seasonStatsMap,
+    );
+  }, [
+    matchup,
+    playersData?.getMatchupPlayers,
+    playersError,
+    scoringSettings,
+    seasonStatsMap,
+  ]);
+
+  const myPlayerStats = useMemo(() => {
+    const map = new Map<number, MatchupPlayerComputedStats>();
+    for (const s of perPlayerStats) {
+      if (s.playerId != null && s.teamId === myTeamId) map.set(s.playerId, s);
+    }
+    return map;
+  }, [perPlayerStats, myTeamId]);
+
+  const getPlayerStats = useCallback(
+    (tm: TeamMemberFragment): RosterPlayerStats | null => {
+      const playerId = tm.player?.id ?? tm.playerId;
+      if (playerId == null) return null;
+      const s = myPlayerStats.get(playerId);
+      if (!s) return null;
+      return {
+        actual: s.actual,
+        projected: s.projected,
+        gamesPlayed: s.gamesPlayed,
+        totalGames: s.totalGames,
+        seasonYear: s.season,
+        teamAbbr: tm.player?.mlbTeam,
+      };
+    },
+    [myPlayerStats],
+  );
+
+  const scoreline = useMemo<{
+    myTeam: RosterScorelineTeam;
+    opponent: RosterScorelineTeam;
+  } | null>(() => {
+    if (!matchup || myTeamId == null) return null;
+    if (matchup.team1Id !== myTeamId && matchup.team2Id !== myTeamId)
+      return null;
+    const iAmTeam1 = matchup.team1Id === myTeamId;
+    const sideFor = (
+      teamId: number | null | undefined,
+    ): RosterScorelineTeam => {
+      const starters = perPlayerStats.filter(
+        (s) => s.teamId === teamId && s.positionId != null,
+      );
+      const played = starters.filter(
+        (s) => s.totalGames > 0 && s.gamesPlayed >= s.totalGames,
+      ).length;
+      const isTeam1 = teamId === matchup.team1Id;
+      return {
+        name: (isTeam1 ? matchup.team1?.name : matchup.team2?.name) ?? null,
+        score: isTeam1 ? computed.team1Score : computed.team2Score,
+        projected: isTeam1 ? computed.team1Projected : computed.team2Projected,
+        playersPlayed: starters.length > 0 ? played : null,
+        playersTotal: starters.length > 0 ? starters.length : null,
+      };
+    };
+    return {
+      myTeam: sideFor(iAmTeam1 ? matchup.team1Id : matchup.team2Id),
+      opponent: sideFor(iAmTeam1 ? matchup.team2Id : matchup.team1Id),
+    };
+  }, [matchup, myTeamId, perPlayerStats, computed]);
+
+  const dateRange =
+    matchup?.startTime && matchup?.endTime
+      ? `${formatPeriodDate(matchup.startTime)} – ${formatPeriodDate(matchup.endTime)}`
+      : null;
+
+  const handleQuickSwap = useCallback(() => {
+    document
+      .querySelector('[data-testid="roster-section-bench"]')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   if (!myTeamId) {
     return (
@@ -190,14 +361,36 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
     );
   }
 
+  // Set Optimal Lineup lives in the hero's action band for premium users
+  // (mockup 2a); free users keep the PremiumGate upsell section below. The
+  // button itself remains the pre-redesign disabled placeholder — wiring the
+  // optimizer is not part of the presentation-only redesign (LS-9355).
+  const optimalLineupButton =
+    isCurrent && hasOptimalLineup ? (
+      <button
+        type="button"
+        className="ls-btn ls-btn-gold sm"
+        disabled
+        aria-label="Set Optimal Lineup"
+      >
+        <I.Zap size={12} /> Set Optimal Lineup
+      </button>
+    ) : null;
+
+  const isNarrow = media.md;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <RosterWeekNavigation
+      <RosterScoreboard
         week={week}
         currentWeek={currentWeek}
         totalWeeks={totalMatchups}
         onWeekChange={setWeek}
         onResetToCurrent={() => setWeek(currentWeek)}
+        myTeam={scoreline?.myTeam ?? null}
+        opponent={scoreline?.opponent ?? null}
+        dateRange={dateRange}
+        actions={optimalLineupButton}
       />
 
       <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
@@ -216,10 +409,13 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
       )}
 
       {(isCurrent || isFuture) && (
-        <PendingWaiverClaims teamId={myTeamId} compact={!isCurrent} />
+        <PendingWaiverClaims
+          teamId={myTeamId}
+          compact={!isCurrent || isNarrow}
+        />
       )}
 
-      {isCurrent && (
+      {isCurrent && !hasOptimalLineup && (
         <PremiumGate
           isPremium={hasOptimalLineup}
           featureName="Optimal Lineup"
@@ -261,9 +457,18 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         }}
         loading={loading}
         error={error ?? null}
-        readOnly={isPast || isFuture}
+        readOnly={readOnly}
         disabledPositionIds={inFlightPositionIds}
+        getPlayerStats={getPlayerStats}
       />
+
+      {isNarrow && isCurrent && (
+        <RosterActionBar
+          onOptimalLineup={hasOptimalLineup ? () => undefined : undefined}
+          optimalLineupDisabled
+          onQuickSwap={handleQuickSwap}
+        />
+      )}
     </div>
   );
 };

@@ -41,7 +41,7 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
     RosterBoard: ({ readOnly }: { readOnly?: boolean }) => (
       <RNText>{`board-readonly-${String(!!readOnly)}`}</RNText>
     ),
-    RosterWeekNavigation: ({
+    RosterScoreboard: ({
       week,
       onWeekChange,
     }: {
@@ -54,6 +54,7 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
         <RNText onPress={() => onWeekChange(week + 1)}>go-next</RNText>
       </View>
     ),
+    RosterActionBar: () => <RNText>action-bar</RNText>,
     RosterStatusBanners: ({
       isPast,
       isFuture,
@@ -67,6 +68,12 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
     PendingWaiverClaims: () => <RNText>pending-waivers</RNText>,
   };
 });
+
+// The wrapper fetches the viewed week's matchup scoreline itself (LS-9355);
+// stub the generated hook so no ApolloProvider is needed here.
+jest.mock('@legacy-sports/graphql', () => ({
+  useGetMatchupsByWeekQuery: jest.fn(() => ({ data: undefined })),
+}));
 
 // ── Test data ────────────────────────────────────────────────────────────────
 
@@ -98,6 +105,7 @@ describe('LeagueRosterManagement', () => {
     expect(screen.getByText('pending-trades')).toBeTruthy();
     expect(screen.getByText('pending-waivers')).toBeTruthy();
     expect(screen.getByText('board-readonly-false')).toBeTruthy();
+    expect(screen.getByText('action-bar')).toBeTruthy();
   });
 
   it('hides week navigation when no current week is provided', () => {
@@ -113,8 +121,9 @@ describe('LeagueRosterManagement', () => {
     fireEvent.press(screen.getByText('go-next'));
     expect(screen.getByText('banner-future')).toBeTruthy();
     expect(screen.getByText('board-readonly-true')).toBeTruthy();
-    // Pending banners only show on the current week.
+    // Pending banners and the action bar only show on the current week.
     expect(screen.queryByText('pending-trades')).toBeNull();
+    expect(screen.queryByText('action-bar')).toBeNull();
   });
 
   it('makes the board read-only and shows the historical banner on past weeks', () => {

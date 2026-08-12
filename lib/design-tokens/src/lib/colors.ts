@@ -473,6 +473,14 @@ export const glassLight = {
  */
 export const modalScrim = 'rgba(0, 0, 0, 0.8)';
 
+/**
+ * Dark ink for text set on light accent fills (heritage-gold buttons and
+ * K/FLEX position chips). Matches the league-detail-v2 stylesheet's
+ * `.ls-btn-gold` / `.ls-pchip` ink; theme-invariant like the accent fills
+ * it sits on (LS-9355).
+ */
+export const accentInk = '#151515';
+
 export const colors = {
   brand,
   positions,

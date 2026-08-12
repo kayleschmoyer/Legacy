@@ -59,17 +59,39 @@ interface TeamTotals {
 const SCORE_PARITY_EPSILON = 0.05;
 
 /**
- * Sum per-player, per-game scores (and projections) onto each team. This is
- * the expensive path — for a 24-player x 5-game matchup that's 360
- * `computeScoring` invocations — so callers should only reach for it when the
- * matchup is still live or a per-player breakdown is genuinely needed.
+ * Per-player computed matchup stats: what a roster/matchup row displays for
+ * one player in the matchup window (LS-9355).
  */
-function calculateTeamTotals(
+export interface MatchupPlayerComputedStats {
+  playerId: number | null;
+  /** Fantasy points scored so far this matchup. */
+  actual: number;
+  /** Projected final fantasy points (actual + per-game projection × remaining). */
+  projected: number;
+  /** Games with recorded stats within the matchup window. */
+  gamesPlayed: number;
+  /** Games in the matchup window for this player (SP-aware). */
+  totalGames: number;
+  /** Historical season the roster entry drafts from. */
+  season: number | null;
+  teamId: number | null;
+  positionId: number | null;
+}
+
+/**
+ * Compute each player's actual score, projection, and game counts for a
+ * matchup. This is the expensive path — for a 24-player x 5-game matchup
+ * that's 360 `computeScoring` invocations — so callers should only reach for
+ * it when the matchup is still live or a per-player breakdown is genuinely
+ * needed. Single source for both the team totals below and the roster tab's
+ * per-row scores (LS-9355) — do not fork this computation.
+ */
+export function computeMatchupPlayerStats(
   matchup: MatchupFragment,
   players: readonly MatchupPlayerFragment[],
   scoringSettings: ScoringSettings,
   seasonStatsMap: ReadonlyMap<number, SeasonStats>,
-): TeamTotals {
+): MatchupPlayerComputedStats[] {
   const gamesPerMatchup = matchup.gamesPerMatchup ?? 0;
 
   const calculateGameScore = (
@@ -95,63 +117,89 @@ function calculateTeamTotals(
     return total;
   };
 
-  // Calculate projection for a single player using their selected season stats
-  const calculatePlayerProjection = (player: MatchupPlayerFragment): number => {
+  const result: MatchupPlayerComputedStats[] = [];
+
+  players.forEach((player) => {
     const gamesPlayed = player.games?.length ?? 0;
-    const actualScore =
+    const actual =
       player.games?.reduce((sum, game) => sum + calculateGameScore(game), 0) ??
       0;
     // Use player-specific numberOfGames (SP gets pitcherStartsPerMatchup, others get gamesPerMatchup)
-    const playerTotalGames = player.numberOfGames ?? gamesPerMatchup;
-    const remaining = playerTotalGames - gamesPlayed;
+    const totalGames = player.numberOfGames ?? gamesPerMatchup;
+    const remaining = totalGames - gamesPlayed;
 
-    if (remaining <= 0) return actualScore;
-
-    const playerId = player.playerId;
-    if (playerId) {
-      const seasonStats = seasonStatsMap.get(playerId);
-      if (seasonStats && scoringSettings) {
+    let projected = actual;
+    if (remaining > 0) {
+      const playerId = player.playerId;
+      const seasonStats = playerId ? seasonStatsMap.get(playerId) : undefined;
+      let projectedFromSeason: number | null = null;
+      if (seasonStats) {
         try {
           const projection = calculateMatchupProjection(
             seasonStats,
             scoringSettings,
           );
-          return actualScore + projection.totalPerGame * remaining;
+          projectedFromSeason = actual + projection.totalPerGame * remaining;
         } catch {
           // Fall through to fallback
         }
       }
+      if (projectedFromSeason != null) {
+        projected = projectedFromSeason;
+      } else if (gamesPlayed > 0) {
+        // Fallback: use average from games already played
+        projected = actual + (actual / gamesPlayed) * remaining;
+      }
     }
 
-    // Fallback: use average from games already played
-    if (gamesPlayed > 0) {
-      return actualScore + (actualScore / gamesPlayed) * remaining;
-    }
-    return actualScore;
-  };
+    result.push({
+      playerId: player.playerId ?? null,
+      actual,
+      projected,
+      gamesPlayed,
+      totalGames,
+      season: player.season ?? null,
+      teamId: player.teamId ?? null,
+      positionId: player.positionId ?? null,
+    });
+  });
+
+  return result;
+}
+
+/**
+ * Sum per-player scores (and projections) onto each team via
+ * `computeMatchupPlayerStats`. Bench players (null positionId) are excluded.
+ */
+function calculateTeamTotals(
+  matchup: MatchupFragment,
+  players: readonly MatchupPlayerFragment[],
+  scoringSettings: ScoringSettings,
+  seasonStatsMap: ReadonlyMap<number, SeasonStats>,
+): TeamTotals {
+  const perPlayer = computeMatchupPlayerStats(
+    matchup,
+    players,
+    scoringSettings,
+    seasonStatsMap,
+  );
 
   let team1Total = 0;
   let team2Total = 0;
   let team1ProjTotal = 0;
   let team2ProjTotal = 0;
 
-  players.forEach((player) => {
-    if (player.positionId === null) return;
+  for (const stats of perPlayer) {
+    if (stats.positionId === null) continue;
 
-    const playerScore =
-      player.games?.reduce((sum, game) => sum + calculateGameScore(game), 0) ??
-      0;
-
-    const playerProjected = calculatePlayerProjection(player);
-
-    if (player.teamId === matchup.team1Id) {
-      team1Total += playerScore;
-      team1ProjTotal += playerProjected;
-    } else if (player.teamId === matchup.team2Id) {
-      team2Total += playerScore;
-      team2ProjTotal += playerProjected;
+    if (stats.teamId === matchup.team1Id) {
+      team1Total += stats.actual;
+      team1ProjTotal += stats.projected;
+    } else if (stats.teamId === matchup.team2Id) {
+      team2Total += stats.actual;
+      team2ProjTotal += stats.projected;
     }
-  });
+  }
 
   return { team1Total, team2Total, team1ProjTotal, team2ProjTotal };
 }

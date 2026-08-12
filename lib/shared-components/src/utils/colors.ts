@@ -15,6 +15,7 @@
  */
 
 import {
+  accentInk,
   baseballPositionBadges,
   brand,
   darkSurface,
@@ -38,6 +39,9 @@ export const withAlpha = withAlphaToken;
  *  (e.g. a position badge hue as chip/tile label text) without a second
  *  hand-picked hex per accent (LS-8832). */
 export const lightenForContrast = lightenForContrastToken;
+
+/** Dark ink for text on light accent fills (gold buttons, K/FLEX chips). */
+export const ACCENT_INK = accentInk;
 
 // -- Backgrounds & Surfaces ------------------------------------------
 
