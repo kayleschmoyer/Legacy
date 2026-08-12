@@ -970,6 +970,75 @@ resource "aws_iam_role_policy_attachment" "github_actions_supplemental" {
   policy_arn = aws_iam_policy.github_actions_supplemental.arn
 }
 
+# Second supplemental managed policy — **default home for new permissions.**
+#
+# Added on LS-9382. Both `github_actions_additional` (inline, 10,240-byte
+# limit) and `github_actions_supplemental` (managed, 6,144 bytes per version)
+# were >98% full, leaving too little headroom for the grants below; a third
+# policy on the same role was cheaper and lower-risk than trimming unrelated
+# statements out of either. AWS allows 10 managed policies per role, so there
+# is room for this pattern to repeat if it fills up too.
+#
+# Run `python scripts/check-iam-policy-size.py` before pushing any change to
+# this file. See `.agents/skills/infrastructure/references/iam-policies.md`.
+resource "aws_iam_policy" "github_actions_supplemental_2" {
+  name        = "${local.name_prefix}-github-actions-supplemental-2"
+  description = "Second supplemental permissions policy for the GitHub Actions OIDC role (overflow from the full inline and supplemental policies)"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      # S3 lifecycle write on the Terraform state bucket. The S3 bucket-admin
+      # statement in the inline policy already grants s3:PutLifecycleConfiguration,
+      # but only on `${local.name_prefix}-*`, which does not match the
+      # legacy-sports-terraform-state bucket — so
+      # aws_s3_bucket_lifecycle_configuration.terraform_state failed at apply with
+      # AccessDenied. Only the write action is missing: the matching read,
+      # s3:GetLifecycleConfiguration, already covers this bucket explicitly via
+      # the inline policy's S3 read statement, so plan/refresh was never blocked.
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutLifecycleConfiguration"]
+        Resource = ["arn:aws:s3:::legacy-sports-terraform-state"]
+      },
+      # Secrets Manager write for three Terraform-managed secrets missing from the
+      # per-secret allowlist on `github_actions_supplemental`:
+      #   - ${var.environment}/vapid-public-key and .../vapid-private-key — the
+      #     aws_secretsmanager_secret_version resources need PutSecretValue.
+      #   - ${var.environment}/mcp-preview-app-token — the aws_secretsmanager_secret
+      #     resource needs CreateSecret, plus TagResource because it carries
+      #     local.common_tags (CreateSecret with tags authorizes both actions).
+      # Update/Delete/Untag round out the lifecycle Terraform manages for these
+      # three resources. Secrets Manager appends a random 6-char suffix to every
+      # secret ARN, hence the trailing wildcard — CreateSecret is authorized
+      # against the suffixed ARN, which is not predictable before creation.
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource"
+        ]
+        Resource = [
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/vapid-public-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/vapid-private-key*",
+          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${var.environment}/mcp-preview-app-token*"
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_supplemental_2" {
+  role       = aws_iam_role.github_actions.name
+  policy_arn = aws_iam_policy.github_actions_supplemental_2.arn
+}
+
 # Output the apply role ARN for GitHub Secrets
 output "github_actions_role_arn" {
   description = "ARN of the GitHub Actions apply IAM role (main branch only)"

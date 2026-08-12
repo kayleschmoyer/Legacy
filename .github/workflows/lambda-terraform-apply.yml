@@ -236,7 +236,9 @@ jobs:
             -target=aws_iam_role_policy.github_actions_additional \
             -target=aws_iam_role_policy.github_actions_plan_policy \
             -target=aws_iam_policy.github_actions_supplemental \
-            -target=aws_iam_role_policy_attachment.github_actions_supplemental
+            -target=aws_iam_role_policy_attachment.github_actions_supplemental \
+            -target=aws_iam_policy.github_actions_supplemental_2 \
+            -target=aws_iam_role_policy_attachment.github_actions_supplemental_2
           echo "✅ IAM bootstrap complete"
 
       - name: Wait for IAM Propagation

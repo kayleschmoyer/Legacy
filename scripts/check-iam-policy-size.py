@@ -50,6 +50,11 @@ LOCAL_SUBS = {
     "${local.account_id}": "176661590736",
     "${local.name_prefix}": "legacy-sports-dev",
     "${data.aws_caller_identity.current.account_id}": "176661590736",
+    # var.environment is "dev" for the only environment this role exists in.
+    # Left unsubstituted this inflated every measurement by 15 bytes per
+    # occurrence — ~255 bytes on github_actions_supplemental alone, which has
+    # one entry per externally-managed secret (LS-9382).
+    "${var.environment}": "dev",
 }
 
 
@@ -174,6 +179,9 @@ def main() -> int:
         managed_size = measure_policy(
             content, 'resource "aws_iam_policy" "github_actions_supplemental"'
         )
+        managed_2_size = measure_policy(
+            content, 'resource "aws_iam_policy" "github_actions_supplemental_2"'
+        )
     except ParseError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         print(
@@ -187,9 +195,12 @@ def main() -> int:
     managed_ok = report(
         "github_actions_supplemental (managed)", managed_size, MANAGED_LIMIT
     )
+    managed_2_ok = report(
+        "github_actions_supplemental_2 (managed)", managed_2_size, MANAGED_LIMIT
+    )
 
     print()
-    if inline_ok and managed_ok:
+    if inline_ok and managed_ok and managed_2_ok:
         print("All policies fit with headroom. Safe to push.")
         return 0
 
