@@ -361,6 +361,41 @@ describe('twenty-questions resolvers', () => {
         extensions: { code: 'BAD_USER_INPUT' },
       });
     });
+
+    it('classifies "Game is not active" as UserInputError instead of an uncaught server error', async () => {
+      mockTwentyQuestionsService.guessPlayer.mockRejectedValueOnce(
+        new Error('Game is not active (status: abandoned)'),
+      );
+
+      const resolver = getMutation('twentyQuestionsGuess');
+      await expect(
+        resolver(
+          {},
+          { gameId: 'game-1', playerId: 99 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        message: 'Game is not active (status: abandoned)',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
+    it('rethrows unrecognized errors unchanged', async () => {
+      mockTwentyQuestionsService.guessPlayer.mockRejectedValueOnce(
+        new Error('Unexpected database failure'),
+      );
+
+      const resolver = getMutation('twentyQuestionsGuess');
+      await expect(
+        resolver(
+          {},
+          { gameId: 'game-1', playerId: 99 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Unexpected database failure');
+    });
   });
 
   // ── twentyQuestionsTokenBalance query ─────────────────────────────────────
@@ -433,6 +468,31 @@ describe('twenty-questions resolvers', () => {
         message: 'Game not found',
         extensions: { code: 'BAD_USER_INPUT' },
       });
+    });
+
+    it('classifies "Game is not active" as UserInputError instead of an uncaught server error', async () => {
+      mockTwentyQuestionsService.abandonGame.mockRejectedValueOnce(
+        new Error('Game is not active (status: abandoned)'),
+      );
+
+      const resolver = getMutation('twentyQuestionsAbandon');
+      await expect(
+        resolver({}, { gameId: 'game-1' }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        message: 'Game is not active (status: abandoned)',
+        extensions: { code: 'BAD_USER_INPUT' },
+      });
+    });
+
+    it('rethrows unrecognized errors unchanged', async () => {
+      mockTwentyQuestionsService.abandonGame.mockRejectedValueOnce(
+        new Error('Unexpected database failure'),
+      );
+
+      const resolver = getMutation('twentyQuestionsAbandon');
+      await expect(
+        resolver({}, { gameId: 'game-1' }, mockContext, undefined as never),
+      ).rejects.toThrow('Unexpected database failure');
     });
   });
 });

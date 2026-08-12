@@ -115,6 +115,37 @@ TwentyQuestionsGameRef.implement({
   }),
 });
 
+// --- Helpers ---
+
+// TwentyQuestionsService throws plain Errors for expected game-state
+// conflicts (e.g. asking/guessing/abandoning a game that's already
+// finished, or racing a stale client against a just-abandoned game).
+// Reclassify those into a client-facing UserInputError so they surface as
+// BAD_USER_INPUT to the caller instead of an uncaught INTERNAL_SERVER_ERROR
+// (LS-9169 — the latter gets logged to Rollbar as a system error).
+function isExpectedGameStateError(err: unknown): err is Error {
+  return (
+    err instanceof Error &&
+    (err.message.startsWith('Game is not active') ||
+      err.message === 'Maximum questions reached' ||
+      err.message.startsWith('Game not found') ||
+      err.message === 'Game does not belong to this user')
+  );
+}
+
+async function withGameStateErrorClassification<T>(
+  fn: () => Promise<T>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (isExpectedGameStateError(err)) {
+      throw UserInputError(err.message);
+    }
+    throw err;
+  }
+}
+
 // --- Input types ---
 
 const TwentyQuestionsAskInput = builder.inputType('TwentyQuestionsAskInput', {
@@ -252,27 +283,17 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, { input }, context) => {
       if (!context.user?.id) throw AuthenticationError();
+      const userId = context.user.id;
       const parameter = JSON.parse(input.parameter) as Record<string, unknown>;
-      try {
-        await TwentyQuestionsService.askQuestion(
+      await withGameStateErrorClassification(() =>
+        TwentyQuestionsService.askQuestion(
           context.db,
           input.gameId,
-          context.user.id,
+          userId,
           input.category,
           parameter,
-        );
-      } catch (err) {
-        if (
-          err instanceof Error &&
-          (err.message.startsWith('Game is not active') ||
-            err.message === 'Maximum questions reached' ||
-            err.message.startsWith('Game not found') ||
-            err.message === 'Game does not belong to this user')
-        ) {
-          throw UserInputError(err.message);
-        }
-        throw err;
-      }
+        ),
+      );
       const state = await TwentyQuestionsService.getGameState(
         context.db,
         input.gameId,
@@ -292,11 +313,14 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, { gameId, playerId }, context) => {
       if (!context.user?.id) throw AuthenticationError();
-      await TwentyQuestionsService.guessPlayer(
-        context.db,
-        gameId,
-        context.user.id,
-        playerId,
+      const userId = context.user.id;
+      await withGameStateErrorClassification(() =>
+        TwentyQuestionsService.guessPlayer(
+          context.db,
+          gameId,
+          userId,
+          playerId,
+        ),
       );
       const state = await TwentyQuestionsService.getGameState(
         context.db,
@@ -315,10 +339,9 @@ builder.mutationFields((t) => ({
     },
     resolve: async (_parent, { gameId }, context) => {
       if (!context.user?.id) throw AuthenticationError();
-      await TwentyQuestionsService.abandonGame(
-        context.db,
-        gameId,
-        context.user.id,
+      const userId = context.user.id;
+      await withGameStateErrorClassification(() =>
+        TwentyQuestionsService.abandonGame(context.db, gameId, userId),
       );
       const state = await TwentyQuestionsService.getGameState(
         context.db,
