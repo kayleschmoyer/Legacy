@@ -10,10 +10,79 @@
  */
 
 import axios from 'axios';
-import { mapMlbStatus, MlbStatsApiProvider } from './mlb-statsapi';
+import type { AxiosError } from 'axios';
+import {
+  isRetryableError,
+  mapMlbStatus,
+  MlbStatsApiProvider,
+} from './mlb-statsapi';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+// The lint and build TS programs disagree on setTimeout's return type, so a
+// direct assertion is stripped by eslint --fix under one yet required by the
+// other. Route through `unknown` in a helper so the assertion survives --fix.
+const asTimeoutHandle = (value: unknown): ReturnType<typeof setTimeout> =>
+  value as ReturnType<typeof setTimeout>;
+
+// Plain-object stand-ins for AxiosError — axios is fully jest.mock()'d in
+// this file, so `new AxiosError(...)` would construct from the automocked
+// (behavior-stripped) class. `axios.isAxiosError` is stubbed below to key
+// off the `isAxiosError` marker instead of a real instanceof check.
+function makeAxiosError(
+  status?: number,
+  retryAfter?: string,
+  code?: string,
+): AxiosError {
+  return {
+    isAxiosError: true,
+    name: 'AxiosError',
+    message: status !== undefined ? `HTTP ${status}` : 'Network Error',
+    code,
+    response:
+      status !== undefined
+        ? {
+            status,
+            headers: retryAfter ? { 'retry-after': retryAfter } : {},
+            data: {},
+            statusText: '',
+          }
+        : undefined,
+  } as unknown as AxiosError;
+}
+
+function makeTimeoutError(): AxiosError {
+  return makeAxiosError(undefined, undefined, 'ECONNABORTED');
+}
+
+const SCHEDULE_RESPONSE = {
+  data: {
+    dates: [
+      {
+        date: '2024-07-04',
+        games: [
+          {
+            gamePk: 1,
+            gameDate: '2024-07-04T19:05:00Z',
+            status: { detailedState: 'Final' },
+            teams: {
+              home: { team: { id: 147, name: 'Yankees', abbreviation: 'NYY' } },
+              away: { team: { id: 111, name: 'Red Sox', abbreviation: 'BOS' } },
+            },
+            linescore: {
+              teams: {
+                home: { runs: 4, hits: 7, errors: 0, innings: [] },
+                away: { runs: 2, hits: 5, errors: 1, innings: [] },
+              },
+            },
+            venue: { name: 'Yankee Stadium' },
+          },
+        ],
+      },
+    ],
+  },
+};
 
 describe('mapMlbStatus', () => {
   it('maps "In Progress" → "Live"', () => {
@@ -239,5 +308,166 @@ describe('MlbStatsApiProvider.getPlayerInfo', () => {
     const calls = mockedAxios.get.mock.calls;
     expect(calls).toHaveLength(1);
     expect(calls[0][0]).toContain('/v1/people/592450');
+  });
+});
+
+// ── isRetryableError ─────────────────────────────────────────────────────────
+
+describe('isRetryableError', () => {
+  beforeEach(() => {
+    mockedAxios.isAxiosError = jest
+      .fn()
+      .mockImplementation(
+        (err: unknown) =>
+          typeof err === 'object' &&
+          err !== null &&
+          (err as { isAxiosError?: boolean }).isAxiosError === true,
+      ) as never;
+  });
+
+  it('returns true for a network error (no response)', () => {
+    expect(isRetryableError(makeAxiosError())).toBe(true);
+  });
+
+  it('returns false for a timeout error (ECONNABORTED)', () => {
+    expect(isRetryableError(makeTimeoutError())).toBe(false);
+  });
+
+  it('returns true for status 429', () => {
+    expect(isRetryableError(makeAxiosError(429))).toBe(true);
+  });
+
+  it.each([500, 502, 503, 504, 529])('returns true for status %d', (status) => {
+    expect(isRetryableError(makeAxiosError(status))).toBe(true);
+  });
+
+  it('returns false for status 400', () => {
+    expect(isRetryableError(makeAxiosError(400))).toBe(false);
+  });
+
+  it('returns false for non-axios errors', () => {
+    expect(isRetryableError(new Error('generic'))).toBe(false);
+    expect(isRetryableError('string error')).toBe(false);
+  });
+});
+
+// ── MlbStatsApiProvider.getScoreboard retry + stale-cache (LS-9167) ─────────
+
+describe('MlbStatsApiProvider.getScoreboard', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedAxios.isAxiosError = jest
+      .fn()
+      .mockImplementation(
+        (err: unknown) =>
+          typeof err === 'object' &&
+          err !== null &&
+          (err as { isAxiosError?: boolean }).isAxiosError === true,
+      ) as never;
+    jest.spyOn(global, 'setTimeout').mockImplementation((fn: () => void) => {
+      fn();
+      return asTimeoutHandle(0);
+    });
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('returns scoreboard on successful first attempt', async () => {
+    mockedAxios.get.mockResolvedValueOnce(SCHEDULE_RESPONSE);
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getScoreboard('2024-07-04');
+
+    expect(result.games).toHaveLength(1);
+    expect(mockedAxios.get.mock.calls).toHaveLength(1);
+  });
+
+  it('retries on a network error and succeeds on second attempt', async () => {
+    mockedAxios.get
+      .mockRejectedValueOnce(makeAxiosError())
+      .mockResolvedValueOnce(SCHEDULE_RESPONSE);
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getScoreboard('2024-07-05');
+
+    expect(mockedAxios.get.mock.calls).toHaveLength(2);
+    expect(result.games).toHaveLength(1);
+  });
+
+  it('retries on a 5xx error and succeeds on second attempt', async () => {
+    mockedAxios.get
+      .mockRejectedValueOnce(makeAxiosError(503))
+      .mockResolvedValueOnce(SCHEDULE_RESPONSE);
+
+    const provider = new MlbStatsApiProvider();
+    const result = await provider.getScoreboard('2024-07-06');
+
+    expect(mockedAxios.get.mock.calls).toHaveLength(2);
+    expect(result.games).toHaveLength(1);
+  });
+
+  it('does not retry on a non-retryable 400 error', async () => {
+    mockedAxios.get.mockRejectedValueOnce(makeAxiosError(400));
+
+    const provider = new MlbStatsApiProvider();
+    await expect(provider.getScoreboard('2024-07-07')).rejects.toMatchObject({
+      message: 'HTTP 400',
+    });
+    expect(mockedAxios.get.mock.calls).toHaveLength(1);
+  });
+
+  it('serves stale cache when retries are exhausted after a prior success', async () => {
+    const provider = new MlbStatsApiProvider();
+
+    // Populate the cache with a successful fetch.
+    mockedAxios.get.mockResolvedValueOnce(SCHEDULE_RESPONSE);
+    await provider.getScoreboard('2024-07-08');
+
+    // Expire the cache entry manually so the next call misses on freshness
+    // but the stale entry is still present for fallback.
+    const cacheMap = (
+      provider as unknown as {
+        cache: Map<string, { data: unknown; timestamp: number; ttl: number }>;
+      }
+    ).cache;
+    const entry = cacheMap.get(
+      '/v1/schedule?' +
+        JSON.stringify({
+          sportId: 1,
+          date: '2024-07-08',
+          hydrate: 'linescore',
+        }),
+    );
+    if (entry) entry.timestamp = Date.now() - entry.ttl - 1;
+
+    // Upstream is down for every retry attempt.
+    mockedAxios.get.mockRejectedValue(makeAxiosError(503));
+
+    const result = await provider.getScoreboard('2024-07-08');
+
+    expect(result.games).toHaveLength(1);
+    // 1 initial populate + (1 + MAX_RETRIES) failed attempts
+    expect(mockedAxios.get.mock.calls).toHaveLength(5);
+  });
+
+  it('throws when retries are exhausted and no stale cache is available', async () => {
+    mockedAxios.get.mockRejectedValue(makeAxiosError(503));
+
+    const provider = new MlbStatsApiProvider();
+    await expect(provider.getScoreboard('2024-07-09')).rejects.toMatchObject({
+      message: 'HTTP 503',
+    });
+    // 1 initial + MAX_RETRIES (3) retries = 4 total
+    expect(mockedAxios.get.mock.calls).toHaveLength(4);
+  });
+
+  it('does not retry on timeout and throws immediately with no stale cache', async () => {
+    mockedAxios.get.mockRejectedValue(makeTimeoutError());
+
+    const provider = new MlbStatsApiProvider();
+    await expect(provider.getScoreboard('2024-07-10')).rejects.toMatchObject({
+      message: 'Network Error',
+    });
+    expect(mockedAxios.get.mock.calls).toHaveLength(1);
   });
 });

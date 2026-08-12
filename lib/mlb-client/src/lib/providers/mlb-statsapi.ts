@@ -64,6 +64,26 @@ const MIN_REQUEST_INTERVAL_MS = 1_000; // 1 req/sec rate limit
 const MAX_RETRIES = 3;
 const MAX_CACHE_SIZE = 500; // evict oldest entries when exceeded
 
+/**
+ * Returns true for errors worth retrying: rate limits (429), server errors
+ * (5xx, including the 529 "site overloaded" code some upstreams use), and
+ * transient network-level failures (ECONNRESET, ECONNREFUSED, etc.).
+ *
+ * Timeout errors (ECONNABORTED) are excluded: an immediate retry after a
+ * 10s timeout will almost certainly also timeout, and chaining attempts
+ * back-to-back risks exceeding the Lambda's execution limit (LS-4856).
+ * Exported for unit testing.
+ */
+export function isRetryableError(err: unknown): boolean {
+  if (!axios.isAxiosError(err)) return false;
+  if (!err.response) {
+    if (err.code === 'ECONNABORTED') return false;
+    return true;
+  }
+  const { status } = err.response;
+  return status === 429 || (status >= 500 && status <= 599);
+}
+
 interface CacheEntry {
   data: unknown;
   timestamp: number;
@@ -81,10 +101,17 @@ export class MlbStatsApiProvider implements MlbDataProvider {
     const entry = this.cache.get(key);
     if (!entry) return null;
     if (Date.now() - entry.timestamp > entry.ttl) {
-      this.cache.delete(key);
+      // Expired for fresh reads, but left in place so getStaleCached can
+      // still serve it as a last-resort fallback on upstream failure.
       return null;
     }
     return entry.data as T;
+  }
+
+  /** Returns the cached value regardless of TTL — used as a stale fallback. */
+  private getStaleCached<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    return entry ? (entry.data as T) : null;
   }
 
   private setCached(key: string, data: unknown, ttl: number): void {
@@ -124,6 +151,7 @@ export class MlbStatsApiProvider implements MlbDataProvider {
       }
 
       let attempt = 0;
+      let lastErr: unknown;
       while (attempt <= MAX_RETRIES) {
         try {
           // Enforce minimum interval between requests
@@ -145,8 +173,8 @@ export class MlbStatsApiProvider implements MlbDataProvider {
           this.setCached(cacheKey, response.data, ttl);
           return response.data;
         } catch (err) {
-          const status = axios.isAxiosError(err) ? err.response?.status : null;
-          if ((status === 429 || status === 529) && attempt < MAX_RETRIES) {
+          lastErr = err;
+          if (isRetryableError(err) && attempt < MAX_RETRIES) {
             const retryAfter = axios.isAxiosError(err)
               ? Number(err.response?.headers['retry-after'] ?? 0)
               : 0;
@@ -154,19 +182,34 @@ export class MlbStatsApiProvider implements MlbDataProvider {
               retryAfter > 0
                 ? retryAfter * 1000
                 : Math.pow(2, attempt + 1) * 5_000; // 10s, 20s, 40s
-            LOGGER.warn('[mlb-statsapi] rate limited, retrying', {
+            LOGGER.warn('[mlb-statsapi] transient error, retrying', {
               attempt,
               delayMs: delay,
               path,
+              error: axios.isAxiosError(err) ? err.message : String(err),
             });
             await new Promise((resolve) => setTimeout(resolve, delay));
             attempt++;
           } else {
-            throw err;
+            break;
           }
         }
       }
-      throw new Error(`[mlb-statsapi] max retries exceeded for ${path}`);
+
+      // Serve stale cache for any exhausted/non-retryable failure (timeout,
+      // network error, rate limit, 5xx). A stale scoreboard beats a 502
+      // bubbling up to the client (mirrors the balldontlie provider, LS-4856).
+      const stale = this.getStaleCached<T>(cacheKey);
+      if (stale !== null) {
+        LOGGER.warn('[mlb-statsapi] request failed; serving stale cache', {
+          path,
+          error: axios.isAxiosError(lastErr)
+            ? lastErr.message
+            : String(lastErr),
+        });
+        return stale;
+      }
+      throw lastErr;
     });
 
     // Chain the queue so next caller waits for this request to complete.
