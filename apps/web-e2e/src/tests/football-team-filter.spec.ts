@@ -1,20 +1,23 @@
 /**
- * FootballTeamFilter — E2E tests (LS-6493, LS-6494)
+ * Football team filter — E2E tests (LS-6493, LS-6494; reconciled with the
+ * canonical /players surface in LS-9371)
  *
  * Covers two features:
  *
  *   1. Free Agents filter (LS-6493): selecting "Free Agents" from the team
  *      dropdown sends freeAgent:true to the GraphQL query and omits nflTeam.
  *
- *   2. Team dropdown sort order (LS-6494): sentinel options appear first
- *      (All Teams, Free Agents, AFC, NFC), followed by individual teams in
- *      conference → division → city order.
+ *   2. Team dropdown sort order: sentinel options appear first (All Teams,
+ *      Free Agents, AFC, NFC), followed by every team sorted alphabetically
+ *      by abbreviation (FOOTBALL_TEAM_OPTIONS in footballStatsHelpers.ts —
+ *      the canonical surface replaced the old page's conference → division →
+ *      city grouping with a flat alphabetical list).
  *
- * Interaction strategy: Tamagui Select renders a hidden native <select> for
- * form submission (the "BubbleSelect"). Clicking the visible trigger does not
- * open the dropdown in headless Chromium, so tests target the native element
- * via select[name="team-filter"] and Playwright's selectOption() with
- * force:true to bypass the opacity:0 / pointer-events:none styles.
+ * Interaction strategy: the canonical surface renders a real native <select>
+ * with name="team-filter" (footballStatsConfig.tsx) whose selected option is
+ * the visible label — there is no separate Tamagui trigger element. Tests
+ * target it via select[name="team-filter"] and Playwright's selectOption()
+ * with force:true.
  *
  * All GraphQL responses are mocked via route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -35,6 +38,7 @@ const EMPTY_PLAYERS_RESPONSE = {
     footballPlayers: {
       nodes: [],
       pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 0,
     },
   },
 };
@@ -44,7 +48,9 @@ async function mockFootballPlayers(page: import('@playwright/test').Page) {
     (url) => isGraphQLEndpoint(url),
     async (route) => {
       const op = extractOperationName(route).toLowerCase();
-      if (op === 'footballplayers') {
+      // The desktop grid fires FootballPlayerStatsGrid; the narrow-viewport
+      // card feed fires FootballPlayers (LS-9366). Serve both.
+      if (op === 'footballplayers' || op === 'footballplayerstatsgrid') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -61,8 +67,8 @@ async function mockFootballPlayers(page: import('@playwright/test').Page) {
   );
 }
 
-// Locator for Tamagui's hidden native <select> (BubbleSelect).
-// Tamagui populates this from the name prop on <Select name="team-filter">.
+// Locator for the canonical surface's real native <select> (rendered by
+// footballStatsConfig.tsx with name="team-filter").
 function nativeSelect(page: import('@playwright/test').Page) {
   return page.locator('select[name="team-filter"]');
 }
@@ -94,8 +100,12 @@ test.describe('FootballTeamFilter — Free Agents filter (LS-6493) @regression',
               variables?: Record<string, unknown>;
             };
             return (
-              body.operationName?.toLowerCase() === 'footballplayers' &&
-              body.variables?.freeAgent === true
+              // The desktop grid fires FootballPlayerStatsGrid; the
+              // narrow-viewport card feed fires FootballPlayers (LS-9366).
+              // Match either.
+              ['footballplayers', 'footballplayerstatsgrid'].includes(
+                body.operationName?.toLowerCase() ?? '',
+              ) && body.variables?.freeAgent === true
             );
           } catch {
             return false;
@@ -113,19 +123,21 @@ test.describe('FootballTeamFilter — Free Agents filter (LS-6493) @regression',
     expect(body.variables?.nflTeam).toBeUndefined();
   });
 
-  test('selecting "Free Agents" updates the trigger label to "Free Agents"', async ({
+  test('selecting "Free Agents" updates the filter control label to "Free Agents"', async ({
     page,
   }) => {
+    // The canonical /players surface renders a real native <select> whose
+    // selected option is the visible label (no separate trigger element).
     await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
-    await expect(page.getByTestId('team-filter-trigger')).toContainText(
+    await expect(nativeSelect(page).locator('option:checked')).toContainText(
       'Free Agents',
     );
   });
 });
 
-// ── Tests: Sort order (LS-6494) ──────────────────────────────────────────────
+// ── Tests: Sort order (LS-6494; canonical alphabetical order per LS-9371) ────
 
-test.describe('FootballTeamFilter — sort order (LS-6494) @regression', () => {
+test.describe('FootballTeamFilter — sort order @regression', () => {
   test.beforeEach(async ({ page }) => {
     await mockFootballPlayers(page);
     await page.goto(PAGE_URL);
@@ -150,45 +162,29 @@ test.describe('FootballTeamFilter — sort order (LS-6494) @regression', () => {
     await expect(nativeSelect(page).locator('option')).toHaveCount(36);
   });
 
-  test('AFC teams appear before NFC teams (BUF before DAL)', async ({
+  test('first team option after the sentinels is ARI (alphabetical by abbreviation)', async ({
     page,
   }) => {
-    const allTexts = await nativeSelect(page).locator('option').allInnerTexts();
-
-    const bufIndex = allTexts.findIndex((t) => t.includes('BUF'));
-    const dalIndex = allTexts.findIndex((t) => t.includes('DAL'));
-
-    expect(bufIndex).toBeGreaterThan(-1);
-    expect(dalIndex).toBeGreaterThan(-1);
-    // BUF is AFC East; DAL is NFC East — AFC must come first
-    expect(bufIndex).toBeLessThan(dalIndex);
+    // The canonical surface lists teams alphabetically by abbreviation
+    // (footballStatsHelpers.ts) — ARI sorts first.
+    await expect(nativeSelect(page).locator('option').nth(4)).toHaveAttribute(
+      'value',
+      'ARI',
+    );
   });
 
-  test('within AFC, East division precedes North division (BUF before BAL)', async ({
+  test('all 32 team options are sorted alphabetically by abbreviation', async ({
     page,
   }) => {
-    const allTexts = await nativeSelect(page).locator('option').allInnerTexts();
+    const values = await nativeSelect(page)
+      .locator('option')
+      .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
 
-    const bufIndex = allTexts.findIndex((t) => t.includes('BUF'));
-    const balIndex = allTexts.findIndex((t) => t.includes('BAL'));
-
-    expect(bufIndex).toBeGreaterThan(-1);
-    expect(balIndex).toBeGreaterThan(-1);
-    // BUF is AFC East (division 0); BAL is AFC North (division 1)
-    expect(bufIndex).toBeLessThan(balIndex);
-  });
-
-  test('within a division, teams are sorted alphabetically by city (HOU before IND)', async ({
-    page,
-  }) => {
-    const allTexts = await nativeSelect(page).locator('option').allInnerTexts();
-
-    // AFC South: Houston (HOU) < Indianapolis (IND) < Jacksonville (JAX) < Tennessee (TEN)
-    const houIndex = allTexts.findIndex((t) => t.includes('HOU'));
-    const indIndex = allTexts.findIndex((t) => t.includes('IND'));
-
-    expect(houIndex).toBeGreaterThan(-1);
-    expect(indIndex).toBeGreaterThan(-1);
-    expect(houIndex).toBeLessThan(indIndex);
+    // Skip the 4 sentinels (All, FREE_AGENT, AFC, NFC).
+    const teamValues = values.slice(4);
+    expect(teamValues).toHaveLength(32);
+    expect(teamValues).toEqual(
+      [...teamValues].sort((a, b) => a.localeCompare(b)),
+    );
   });
 });

@@ -1,11 +1,14 @@
 /**
- * FootballPositionFilter — multi-select toggle group a11y & keyboard tests
- * (LS-6466, multi-select promoted in LS-6464)
+ * Football position filter — multi-select toggle group a11y & keyboard tests
+ * (LS-6466, multi-select promoted in LS-6464; canonical-surface parity
+ * restored in LS-9371)
  *
- * The position pill row on /players?sport=nfl is a multi-select toggle-button
- * group: each pill is a `role=button` with `aria-pressed`, the container is a
- * `role=group`, and keyboard users get roving tabindex (arrow keys move focus)
- * with Space/Enter toggling the focused pill. "All" clears the selection.
+ * The position pill row on /players?sport=nfl (the shared
+ * FootballPositionPillGroup in footballStatsConfig.tsx) is a multi-select
+ * toggle-button group: each pill is a `role=button` with `aria-pressed`, the
+ * container is a `role=group`, and keyboard users get roving tabindex (arrow
+ * keys move focus) with Space/Enter toggling the focused pill. "All" clears
+ * the selection.
  *
  * All GraphQL responses are mocked with route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
@@ -42,6 +45,7 @@ const EMPTY_PLAYERS_RESPONSE = {
     footballPlayers: {
       nodes: [],
       pageInfo: { hasNextPage: false, endCursor: null },
+      totalCount: 0,
     },
   },
 };
@@ -51,7 +55,9 @@ async function mockFootballPlayers(page: import('@playwright/test').Page) {
     (url) => isGraphQLEndpoint(url),
     async (route) => {
       const op = extractOperationName(route).toLowerCase();
-      if (op === 'footballplayers') {
+      // The desktop grid fires FootballPlayerStatsGrid; the narrow-viewport
+      // card feed fires FootballPlayers (LS-9366). Serve both.
+      if (op === 'footballplayers' || op === 'footballplayerstatsgrid') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

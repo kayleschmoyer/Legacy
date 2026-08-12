@@ -139,6 +139,130 @@ const numericInputStyle = {
   width: 140,
 } as const;
 
+/**
+ * Position multi-select pill row with WAI-ARIA toolbar-style roving tabindex:
+ * exactly one pill sits in the tab order at a time, Arrow keys move focus
+ * (wrapping), Home/End jump to the ends, and Space/Enter toggle the focused
+ * pill (Pressable's built-in keyboard activation). Restores the keyboard
+ * parity the standalone football players page had (LS-6466) after the LS-9077
+ * route consolidation dropped it (LS-9371). `onKeyDown`/`tabIndex` are
+ * web-only; native platforms ignore them.
+ */
+function FootballPositionPillGroup({
+  positions,
+  onToggle,
+  onClear,
+}: {
+  positions: FootballPosition[];
+  onToggle: (pos: FootballPosition) => void;
+  onClear: () => void;
+}) {
+  // Index 0 is the "All" pill; positions follow at 1..N. Defaults to "All".
+  const pillCount = FOOTBALL_POSITIONS.length + 1;
+  const [focusIdx, setFocusIdx] = useState(0);
+
+  return (
+    <XStack
+      gap={6}
+      flexWrap="wrap"
+      alignItems="center"
+      role="group"
+      aria-label="Filter by position"
+      onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+        let next: number | null = null;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+          next = (focusIdx + 1) % pillCount;
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+          next = (focusIdx - 1 + pillCount) % pillCount;
+        } else if (e.key === 'Home') {
+          next = 0;
+        } else if (e.key === 'End') {
+          next = pillCount - 1;
+        }
+        if (next !== null) {
+          e.preventDefault();
+          setFocusIdx(next);
+          // Every pill (and nothing else in the group) carries aria-pressed.
+          e.currentTarget
+            .querySelectorAll<HTMLElement>('[aria-pressed]')
+            [next]?.focus();
+        }
+      }}
+    >
+      <Pressable
+        onPress={() => {
+          setFocusIdx(0);
+          onClear();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="All positions"
+        accessibilityState={{ selected: positions.length === 0 }}
+        aria-pressed={positions.length === 0}
+        tabIndex={focusIdx === 0 ? 0 : -1}
+        style={csp({
+          paddingHorizontal: 12,
+          paddingVertical: 8,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderStyle: 'solid',
+          borderColor: positions.length === 0 ? BRAND_NAVY : OUTLINE_SUBTLE,
+          backgroundColor:
+            positions.length === 0 ? withAlpha(BRAND_NAVY, 0.3) : 'transparent',
+        })}
+      >
+        <Text
+          style={csp({
+            fontFamily: FONT_BODY,
+            fontSize: 13,
+            fontWeight: '600',
+            color: positions.length === 0 ? TEXT_PRIMARY : FG3,
+          })}
+        >
+          All
+        </Text>
+      </Pressable>
+      {FOOTBALL_POSITIONS.map((pos, i) => {
+        const active = positions.includes(pos);
+        const accent = getPositionColor('football', pos);
+        return (
+          <Pressable
+            key={pos}
+            onPress={() => {
+              setFocusIdx(i + 1);
+              onToggle(pos);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={pos}
+            accessibilityState={{ selected: active }}
+            aria-pressed={active}
+            tabIndex={focusIdx === i + 1 ? 0 : -1}
+            style={csp({
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderStyle: 'solid',
+              borderColor: active ? accent : OUTLINE_SUBTLE,
+              backgroundColor: active ? withAlpha(accent, 0.3) : 'transparent',
+            })}
+          >
+            <Text
+              style={csp({
+                fontFamily: FONT_BODY,
+                fontSize: 13,
+                fontWeight: '600',
+                color: active ? accent : FG3,
+              })}
+            >
+              {pos}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </XStack>
+  );
+}
+
 /** Debounce a changing value by `delay` ms. */
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -480,81 +604,12 @@ export function useFootballController(
           ) : null}
         </YStack>
 
-        {/* Position multi-select pills */}
-        <XStack
-          gap={6}
-          flexWrap="wrap"
-          alignItems="center"
-          role="group"
-          aria-label="Filter by position"
-        >
-          <Pressable
-            onPress={() => setPositions([])}
-            accessibilityRole="button"
-            accessibilityLabel="All positions"
-            accessibilityState={{ selected: positions.length === 0 }}
-            aria-pressed={positions.length === 0}
-            style={csp({
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderStyle: 'solid',
-              borderColor: positions.length === 0 ? BRAND_NAVY : OUTLINE_SUBTLE,
-              backgroundColor:
-                positions.length === 0
-                  ? withAlpha(BRAND_NAVY, 0.3)
-                  : 'transparent',
-            })}
-          >
-            <Text
-              style={csp({
-                fontFamily: FONT_BODY,
-                fontSize: 13,
-                fontWeight: '600',
-                color: positions.length === 0 ? TEXT_PRIMARY : FG3,
-              })}
-            >
-              All
-            </Text>
-          </Pressable>
-          {FOOTBALL_POSITIONS.map((pos) => {
-            const active = positions.includes(pos);
-            const accent = getPositionColor('football', pos);
-            return (
-              <Pressable
-                key={pos}
-                onPress={() => togglePosition(pos)}
-                accessibilityRole="button"
-                accessibilityLabel={pos}
-                accessibilityState={{ selected: active }}
-                aria-pressed={active}
-                style={csp({
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 16,
-                  borderWidth: 1,
-                  borderStyle: 'solid',
-                  borderColor: active ? accent : OUTLINE_SUBTLE,
-                  backgroundColor: active
-                    ? withAlpha(accent, 0.3)
-                    : 'transparent',
-                })}
-              >
-                <Text
-                  style={csp({
-                    fontFamily: FONT_BODY,
-                    fontSize: 13,
-                    fontWeight: '600',
-                    color: active ? accent : FG3,
-                  })}
-                >
-                  {pos}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </XStack>
+        {/* Position multi-select pills (roving tabindex — LS-9371) */}
+        <FootballPositionPillGroup
+          positions={positions}
+          onToggle={togglePosition}
+          onClear={() => setPositions([])}
+        />
 
         {/* Team select */}
         <YStack style={selectFieldStyle}>
