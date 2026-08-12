@@ -603,7 +603,11 @@ unauthTest.describe(
     unauthTest(
       'redirects to /players for unauthenticated users — no auth-guard interception',
       async ({ page }) => {
-        await expect(page).toHaveURL('/players', { timeout: 15_000 });
+        // LS-9076: /players is the canonical route and always stamps its
+        // default view-state (pageSize/sport/v/view) onto the URL on mount
+        // for bookmarkable/shareable links — assert the path, not an exact
+        // querystring-free URL (LS-9306).
+        await expect(page).toHaveURL(/\/players(\?.*)?$/, { timeout: 15_000 });
       },
     );
 
