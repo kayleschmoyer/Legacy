@@ -94,6 +94,7 @@ Reports are published to `playwright-report/manual-<run_number>/` on GitHub Page
 
 - Collects results from all stages
 - **Posts the `CI Gate` aggregate commit status** for the PR head SHA (`.github/scripts/ci-gate.js`) — the required CI context post-LS-8014; folded-job list, pass semantics, and the cancelled-exclusion rule (LS-8219) live in [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md#ci-gate)
+  - **Verdict recency (LS-9378):** a `failure` verdict is always posted, but a `success` verdict is withheld unless this run proves it is the newest run for the SHA — otherwise re-running an **older** run replays its stale green over a newer red (this landed a red PR, #7006). Guards fail closed. Anything gating on "did CI pass" — including `verify-ci` in `upload-lambdas.yml` — must read this status, never workflow-run conclusions. See [ci-gate-aggregator.md](../../../../docs/ci-cd/ci-gate-aggregator.md#verdict-recency-ls-9378).
 - Posts PR comment with status table
 - Labels PR with failure reasons
 - Discord notification on main branch failures

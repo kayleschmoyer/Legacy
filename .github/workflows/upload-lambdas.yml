@@ -78,6 +78,7 @@ permissions:
   id-token: write
   contents: read
   pull-requests: read # Required for listPullRequestsAssociatedWithCommit in verify-ci
+  statuses: read # Required to read the `CI Gate` commit status in verify-ci (LS-9378)
 
 # ---------------------------------------------------------------------------
 # Job 0a — Optionally trigger CI and wait for it to pass
@@ -196,6 +197,53 @@ jobs:
                 core.info(`Push event: no merged PR found, using commit SHA ${sha}`);
               }
             }
+
+            // LS-9378: the MERGE gate evaluates the `CI Gate` commit status
+            // (.github/ruleset.json, posted by .github/scripts/ci-gate.js), so
+            // the DEPLOY gate must evaluate the same signal — otherwise the two
+            // readers disagree by construction, in both directions:
+            //   - A run whose only cancelled job is non-gating (e.g. "Deploy
+            //     Playwright Report" under concurrency-cancel) concludes
+            //     `cancelled`, so a perfectly healthy SHA has no `success` run
+            //     and the `?? find(isCI)` fallback below picks an arbitrary red
+            //     one, blocking a deploy CI actually passed.
+            //   - Conversely a red run for a SHA whose gate is green blocked the
+            //     upload after branch protection had already allowed the merge
+            //     (observed on PR #7006 / Deploy run 31620270238).
+            const CI_GATE_CONTEXT = 'CI Gate';
+
+            const { data: commitStatuses } = await github.rest.repos.listCommitStatusesForRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: sha,
+              per_page: 100,
+            });
+
+            // listCommitStatusesForRef returns newest-first, so the first entry
+            // for a context is the effective latest-wins verdict — the very one
+            // GitHub's ruleset evaluator gates the merge on.
+            const gate = commitStatuses.find(s => s.context === CI_GATE_CONTEXT);
+
+            if (gate) {
+              core.info(`Found ${CI_GATE_CONTEXT}: ${gate.state} — ${gate.description || '(no description)'}`);
+              if (gate.state === 'success') {
+                core.info(`${CI_GATE_CONTEXT} passed for ${sha} — proceeding with upload`);
+              } else {
+                core.setFailed(
+                  `${CI_GATE_CONTEXT} did not pass for ${sha} (state: ${gate.state}). ` +
+                  `${gate.description || ''} Run: ${gate.target_url || 'n/a'}`
+                );
+              }
+              return;
+            }
+
+            // The gate is PR-scoped, so its absence is expected only for commits
+            // with no associated PR. Fall back to the historical run-conclusion
+            // check rather than hard-failing those.
+            core.warning(
+              `No ${CI_GATE_CONTEXT} status found for ${sha} — falling back to ` +
+              `workflow-run conclusions.`
+            );
 
             const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
               owner: context.repo.owner,

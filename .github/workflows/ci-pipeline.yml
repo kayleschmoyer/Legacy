@@ -53,12 +53,18 @@ on:
         type: string
         default: ""
       base-sha:
-        description: "PR base SHA to diff format-check against (LS-9148 — resolved by the orchestrator for workflow_dispatch runs; falls back to github.event.pull_request.base.sha on native PR triggers)"
+        description: >-
+          PR base SHA to diff format-check against (LS-9148 — resolved by the
+          orchestrator for workflow_dispatch runs; falls back to
+          github.event.pull_request.base.sha on native PR triggers)
         required: false
         type: string
         default: ""
       head-sha:
-        description: "PR head SHA to diff format-check against (LS-9148 — resolved by the orchestrator for workflow_dispatch runs; falls back to github.event.pull_request.head.sha on native PR triggers)"
+        description: >-
+          PR head SHA to diff format-check against (LS-9148 — resolved by the
+          orchestrator for workflow_dispatch runs; falls back to
+          github.event.pull_request.head.sha on native PR triggers)
         required: false
         type: string
         default: ""
@@ -305,7 +311,8 @@ jobs:
             HEAD_SHA="${{ inputs.head-sha || github.event.pull_request.head.sha || github.sha }}"
 
             if [ -z "$BASE_SHA" ]; then
-              echo "::warning::No PR base SHA available (not a pull_request-triggered run, and no pr_number was resolved for this workflow_dispatch) — running Prettier check on the whole repository instead of the PR diff."
+              NO_BASE_REASON="not a pull_request-triggered run, and no pr_number was resolved for this workflow_dispatch"
+              echo "::warning::No PR base SHA available (${NO_BASE_REASON}) — running Prettier check on the whole repo instead of the PR diff."
               pnpm exec prettier --check --ignore-unknown .
               return
             fi
@@ -1027,8 +1034,12 @@ jobs:
       # under concurrency cancellation and 405 genuinely-green PRs). A commit
       # status — not a check run — is used deliberately: GitHub evaluates the
       # latest status per context and has no "cancelled" status state, so it
-      # cannot latch onto a stale duplicate. Computation + SHA-currency guard
-      # live in .github/scripts/ci-gate.js (unit-tested). This runs only on
+      # cannot latch onto a stale duplicate. Computation + the SHA-currency and
+      # run-recency guards live in .github/scripts/ci-gate.js (unit-tested).
+      # LS-9378: latest-status-wins also means a re-run of an OLDER run would
+      # replay its stale verdict over a newer one, so a `success` verdict is
+      # withheld unless this run proves it is the newest run for the SHA; a
+      # `failure` verdict is always posted. This runs only on
       # PR-scoped events and only when summarize itself runs (always() &&
       # !cancelled() on this job), so a cancelled CI run never posts a verdict.
       #

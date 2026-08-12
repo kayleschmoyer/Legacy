@@ -7,6 +7,9 @@
  *  - postCiGate posts the aggregate commit status on the happy path.
  *  - postCiGate SHA-currency guard no-ops when the PR head advanced.
  *  - postCiGate no-ops when there is no pull_request in the event payload.
+ *  - LS-9378 run-recency guard: a `failure` verdict may always be posted, but a
+ *    `success` verdict must prove it is the newest word on the SHA, so a
+ *    re-run of a superseded run can never replay stale green over newer red.
  *
  * Run via: node --test .github/scripts/__tests__/ci-gate.test.mjs
  */
@@ -22,6 +25,7 @@ const {
   CI_GATE_CONTEXT,
   GATE_INPUT_JOBS,
   computeGateConclusion,
+  runIdFromTargetUrl,
   postCiGate,
 } = require(
   path.join(path.dirname(fileURLToPath(import.meta.url)), '../ci-gate.js'),
@@ -29,6 +33,24 @@ const {
 
 const HEAD_SHA = 'abc123def456abc123def456abc123def456abc1';
 const ADVANCED_SHA = 'def456abc123def456abc123def456abc123def4';
+
+// LS-9378: run ids are compared to establish verdict recency. `SELF_RUN_ID` is
+// the run under test; OLDER/NEWER bracket it.
+const SELF_RUN_ID = 5000;
+const OLDER_RUN_ID = 4000;
+const NEWER_RUN_ID = 6000;
+const CI_WORKFLOW = 'Legacy Sports CI Orchestrator';
+
+process.env.GITHUB_RUN_ID = String(SELF_RUN_ID);
+
+/** A `CI Gate` commit status as returned by listCommitStatusesForRef. */
+function gateStatus(state, runId) {
+  return {
+    context: CI_GATE_CONTEXT,
+    state,
+    target_url: `https://github.com/test-owner/test-repo/actions/runs/${runId}`,
+  };
+}
 
 // All folded jobs passing.
 function allPass() {
@@ -43,8 +65,18 @@ const core = {
 
 // Minimal GitHub mock that records createCommitStatus calls and returns a
 // configurable current head SHA from pulls.get.
-function makeGithub({ currentSha = HEAD_SHA } = {}) {
-  const calls = { statuses: [], get: 0 };
+//
+// LS-9378: also serves the two recency lookups. Defaults describe the ordinary
+// case — this run is the only CI run for the SHA and no gate status exists yet —
+// so the pre-existing tests exercise the unguarded happy path unchanged.
+function makeGithub({
+  currentSha = HEAD_SHA,
+  runs = [{ id: SELF_RUN_ID, name: CI_WORKFLOW }],
+  existingStatuses = [],
+  runsError = null,
+  statusesError = null,
+} = {}) {
+  const calls = { statuses: [], get: 0, listRuns: 0, listStatuses: 0 };
   const github = {
     rest: {
       pulls: {
@@ -53,10 +85,22 @@ function makeGithub({ currentSha = HEAD_SHA } = {}) {
           return { data: { head: { sha: currentSha } } };
         },
       },
+      actions: {
+        listWorkflowRunsForRepo: async () => {
+          calls.listRuns++;
+          if (runsError) throw new Error(runsError);
+          return { data: { workflow_runs: runs } };
+        },
+      },
       repos: {
         createCommitStatus: async (args) => {
           calls.statuses.push(args);
           return { data: {} };
+        },
+        listCommitStatusesForRef: async () => {
+          calls.listStatuses++;
+          if (statusesError) throw new Error(statusesError);
+          return { data: existingStatuses };
         },
       },
     },
@@ -316,5 +360,291 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
       results: allFail,
     });
     assert.ok(calls.statuses[0].description.length <= 140);
+  });
+});
+
+// ── LS-9378: run-recency guard ────────────────────────────────────────────────
+
+describe('ci-gate — runIdFromTargetUrl', () => {
+  it('extracts the run id from an Actions run URL', () => {
+    assert.strictEqual(
+      runIdFromTargetUrl(
+        'https://github.com/test-owner/test-repo/actions/runs/31462018381',
+      ),
+      31462018381,
+    );
+  });
+
+  it('returns null for a missing, non-string, or non-Actions URL', () => {
+    assert.strictEqual(runIdFromTargetUrl(undefined), null);
+    assert.strictEqual(runIdFromTargetUrl(null), null);
+    assert.strictEqual(runIdFromTargetUrl(''), null);
+    assert.strictEqual(
+      runIdFromTargetUrl('https://example.com/whatever'),
+      null,
+    );
+  });
+});
+
+describe('ci-gate — a success verdict must be current (LS-9378)', () => {
+  it('posts success when this run is the newest CI run for the SHA', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: OLDER_RUN_ID, name: CI_WORKFLOW },
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it('WITHHOLDS success when a newer CI run exists for the SHA', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+        { id: NEWER_RUN_ID, name: CI_WORKFLOW },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(
+      calls.statuses.length,
+      0,
+      'a superseded run must not replay its stale green verdict',
+    );
+  });
+
+  it('STILL posts failure when a newer CI run exists — red is always safe', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+        { id: NEWER_RUN_ID, name: CI_WORKFLOW },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), e2e: 'failure' },
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'failure');
+    assert.strictEqual(
+      calls.listRuns,
+      0,
+      'the recency lookups are for success verdicts only',
+    );
+  });
+
+  it('WITHHOLDS success when a newer run already posted a red gate', async () => {
+    // The runs listing is incomplete (pagination / API lag) but the newer run's
+    // red verdict is visible in the statuses — guard (B) must still catch it.
+    const { github, calls } = makeGithub({
+      runs: [{ id: SELF_RUN_ID, name: CI_WORKFLOW }],
+      existingStatuses: [gateStatus('failure', NEWER_RUN_ID)],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'newer-failure-posted');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('ALLOWS success when the red gate came from an OLDER run (legitimate re-run to green)', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: OLDER_RUN_ID, name: CI_WORKFLOW },
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+      ],
+      existingStatuses: [gateStatus('failure', OLDER_RUN_ID)],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it('ignores newer runs from OTHER workflows (e.g. Deploy) when judging recency', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+        { id: NEWER_RUN_ID, name: 'Deploy' },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it('ignores a newer run that will never post a verdict (scoped-out label run)', async () => {
+    // The orchestrator emits an extra run per `pull_request` label event that
+    // scopes out and concludes `skipped`. It can carry a higher run id than the
+    // real gating run, but it never posts — so treating it as superseding would
+    // strand the SHA with no `CI Gate` status at all.
+    for (const conclusion of ['skipped', 'cancelled', 'neutral']) {
+      const { github, calls } = makeGithub({
+        runs: [
+          { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+          { id: NEWER_RUN_ID, name: CI_WORKFLOW, conclusion },
+        ],
+      });
+      const res = await postCiGate({
+        github,
+        context: makeContext(),
+        core,
+        results: allPass(),
+      });
+
+      assert.strictEqual(
+        res.posted,
+        true,
+        `a newer '${conclusion}' run must not block the real verdict`,
+      );
+      assert.strictEqual(calls.statuses[0].state, 'success');
+    }
+  });
+
+  it('an in-flight newer run (conclusion null) DOES supersede — it will post', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          status: 'in_progress',
+          conclusion: null,
+        },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('fails CLOSED — withholds success when the runs lookup errors', async () => {
+    const { github, calls } = makeGithub({ runsError: 'API is down' });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'run-lookup-failed');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('fails CLOSED — withholds success when the statuses lookup errors', async () => {
+    const { github, calls } = makeGithub({ statusesError: 'API is down' });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'status-lookup-failed');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('fails CLOSED — withholds success when GITHUB_RUN_ID is unavailable', async () => {
+    const saved = process.env.GITHUB_RUN_ID;
+    delete process.env.GITHUB_RUN_ID;
+    try {
+      const { github, calls } = makeGithub();
+      const res = await postCiGate({
+        github,
+        context: makeContext(),
+        core,
+        results: allPass(),
+      });
+
+      assert.strictEqual(res.posted, false);
+      assert.strictEqual(res.reason, 'unknown-run-id');
+      assert.strictEqual(calls.statuses.length, 0);
+    } finally {
+      process.env.GITHUB_RUN_ID = saved;
+    }
+  });
+
+  it('regression: PR #7006 — a re-run of the older run cannot overwrite the newer failure', async () => {
+    // Reproduces the exact production sequence. Run 31462018381 posted
+    // `failure` (e2e) for 735d003; the OLDER run 31458492265 was then re-run
+    // ~35h later and re-posted its own stale `success`, which became the latest
+    // status and let the merge queue land a red PR.
+    const OLDER_GREEN_RUN = 31458492265;
+    const NEWER_RED_RUN = 31462018381;
+    const saved = process.env.GITHUB_RUN_ID;
+    process.env.GITHUB_RUN_ID = String(OLDER_GREEN_RUN);
+    try {
+      const { github, calls } = makeGithub({
+        runs: [
+          { id: OLDER_GREEN_RUN, name: CI_WORKFLOW },
+          { id: NEWER_RED_RUN, name: CI_WORKFLOW },
+        ],
+        existingStatuses: [gateStatus('failure', NEWER_RED_RUN)],
+      });
+
+      // The older run's own view of the world: everything it ran passed.
+      const res = await postCiGate({
+        github,
+        context: makeContext(),
+        core,
+        results: allPass(),
+      });
+
+      assert.strictEqual(res.posted, false);
+      assert.strictEqual(res.reason, 'superseded-run');
+      assert.strictEqual(res.supersededBy, NEWER_RED_RUN);
+      assert.strictEqual(
+        calls.statuses.length,
+        0,
+        'the stale green verdict that merged PR #7006 must not be posted',
+      );
+    } finally {
+      process.env.GITHUB_RUN_ID = saved;
+    }
   });
 });
