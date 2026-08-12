@@ -120,6 +120,36 @@ describe('stripe-webhook handler', () => {
       const body = JSON.parse(result.body) as { error: string };
       expect(body.error).toContain('Invalid signature');
     });
+
+    it("reads the signature when the header arrives with Stripe's actual casing (Stripe-Signature)", async () => {
+      mockConstructEvent.mockReturnValue(fakeStripeEvent());
+      mockRunWithInternalClient.mockImplementationOnce(
+        (_opts: unknown, cb: (db: unknown) => unknown) =>
+          cb({
+            insert: () => ({
+              values: () => ({
+                onConflictDoNothing: () => ({
+                  returning: () =>
+                    Promise.resolve([{ eventId: 'evt_test_123' }]),
+                }),
+              }),
+            }),
+          }),
+      );
+
+      const result = await handler(
+        makeEvent({
+          headers: { 'Stripe-Signature': 'sig_test' },
+        }),
+      );
+
+      expect(mockConstructEvent).toHaveBeenCalledWith(
+        expect.any(String),
+        'sig_test',
+        expect.anything(),
+      );
+      expect(result.statusCode).toBe(200);
+    });
   });
 
   describe('idempotency', () => {

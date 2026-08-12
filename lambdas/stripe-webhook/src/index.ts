@@ -1224,7 +1224,17 @@ async function pushSubscriptionUpdated(
 const baseStripeWebhookHandler = async (
   event: APIGatewayProxyEvent,
 ): Promise<APIGatewayProxyResult> => {
-  const signature = event.headers['stripe-signature'] ?? '';
+  // API Gateway REST API v1 (Lambda proxy integration) preserves header casing
+  // exactly as sent by the client — it does not lowercase-normalize like HTTP
+  // API v2 does. Stripe sends `Stripe-Signature` (mixed case), so headers must
+  // be normalized before lookup or every real delivery fails verification.
+  const normalizedHeaders = Object.fromEntries(
+    Object.entries(event.headers).map(([key, value]) => [
+      key.toLowerCase(),
+      value,
+    ]),
+  );
+  const signature = normalizedHeaders['stripe-signature'] ?? '';
   const rawBody = event.isBase64Encoded
     ? Buffer.from(event.body ?? '', 'base64').toString('utf-8')
     : (event.body ?? '');
