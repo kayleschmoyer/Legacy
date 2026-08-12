@@ -1836,6 +1836,17 @@ export type MergeAccountsResult = {
   targetUserId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** The authenticated caller's personal totals across all three minigames (Season Draft, Who Am I?, 20 Questions). See LS-8803 for field definitions. */
+export type MinigamePersonalStats = {
+  __typename?: 'MinigamePersonalStats';
+  /** Consecutive UTC calendar days, ending on the most recent day with activity, on which the caller completed at least one minigame. Returns 0 for no activity. */
+  dayStreak: Scalars['Int']['output'];
+  /** Completed Season Draft games where the caller had the highest total score (ties broken by draft order, matching the game's own winner display). Returns 0 for no activity. */
+  draftsWon: Scalars['Int']['output'];
+  /** Total finished minigames across Season Draft, Who Am I?, and 20 Questions (games/sessions that reached a terminal status). Returns 0 for no activity. */
+  gamesPlayed: Scalars['Int']['output'];
+};
+
 /** Aggregate statistics about the baseball database powering the minigames */
 export type MinigamesStats = {
   __typename?: 'MinigamesStats';
@@ -3261,6 +3272,8 @@ export type Query = {
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
   matchupScores: Array<MatchupStats>;
+  /** The authenticated caller's personal minigame totals — drafts won, day streak, and games played — across Season Draft, Who Am I?, and 20 Questions. Powers the Game Room 'Your Numbers' strip (LS-8803). */
+  minigamePersonalStats: MinigamePersonalStats;
   /** Aggregate statistics about the baseball database powering the minigames hub */
   minigamesStats?: Maybe<MinigamesStats>;
   /** Get the current user's votes for a league season */

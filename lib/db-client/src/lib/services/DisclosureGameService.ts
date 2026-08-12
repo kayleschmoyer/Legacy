@@ -1,4 +1,13 @@
-import { and, count, desc, eq, gte, inArray, sql } from 'drizzle-orm';
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  sql,
+} from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { orderFactsByDifficulty } from './DifficultyOrdering';
 import type { DifficultyTier, FactCategory } from './DifficultyOrdering';
@@ -1180,5 +1189,24 @@ export class DisclosureGameService {
       createdAt: r.createdAt,
       completedAt: r.completedAt ?? null,
     }));
+  }
+
+  /**
+   * Completion timestamps for the user's finished sessions (won, lost, or
+   * given_up — i.e. `completedAt` is set). Used for the personal minigame
+   * games-played total and day streak (LS-8803).
+   */
+  async getCompletedSessionsForUser(
+    userId: number,
+  ): Promise<Array<{ completedAt: string | null }>> {
+    return this.db
+      .select({ completedAt: PublicSchema.disclosureGameSessions.completedAt })
+      .from(PublicSchema.disclosureGameSessions)
+      .where(
+        and(
+          eq(PublicSchema.disclosureGameSessions.userId, userId),
+          isNotNull(PublicSchema.disclosureGameSessions.completedAt),
+        ),
+      );
   }
 }

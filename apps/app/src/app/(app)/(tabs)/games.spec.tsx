@@ -62,6 +62,9 @@ const mockUseGetDisclosureGameBestScoreQuery = jest.fn(
 const mockUseGetTwentyQuestionsTokenBalanceQuery = jest.fn(
   (): MockQueryResult => IDLE_QUERY,
 );
+const mockUseGetMinigamePersonalStatsQuery = jest.fn(
+  (): MockQueryResult => IDLE_QUERY,
+);
 
 jest.mock('@legacy-sports/graphql', () => ({
   // Mirrors the generated `SeasonDraftGameStatus` enum; the module is replaced
@@ -78,6 +81,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetDisclosureGameBestScoreQuery(...args),
   useGetTwentyQuestionsTokenBalanceQuery: (...args: unknown[]) =>
     mockUseGetTwentyQuestionsTokenBalanceQuery(...args),
+  useGetMinigamePersonalStatsQuery: (...args: unknown[]) =>
+    mockUseGetMinigamePersonalStatsQuery(...args),
 }));
 
 // The Game Room layout has its own spec in lib/shared-components; this suite
@@ -165,6 +170,23 @@ function mockTokenBalance(
   });
 }
 
+interface PersonalStatsFixture {
+  draftsWon: number;
+  dayStreak: number;
+  gamesPlayed: number;
+}
+
+function mockPersonalStats(
+  stats: PersonalStatsFixture | null,
+  { loading = false, error = undefined as Error | undefined } = {},
+) {
+  mockUseGetMinigamePersonalStatsQuery.mockReturnValue({
+    data: stats === null ? undefined : { minigamePersonalStats: stats },
+    loading,
+    error,
+  });
+}
+
 interface ReceivedProps {
   activeGamesCount: number | null;
   bestScore: number | null;
@@ -197,6 +219,7 @@ beforeEach(() => {
   mockSeasonDraftGames([]);
   mockBestScore(null);
   mockTokenBalance(null);
+  mockPersonalStats(null);
 });
 
 describe('GamesTab', () => {
@@ -257,16 +280,6 @@ describe('GamesTab', () => {
       expect(receivedProps().bestScore).toBeNull();
     });
 
-    it('passes null for the stats that have no query yet', () => {
-      render(<GamesTab />);
-
-      expect(receivedProps().personalStats).toEqual({
-        draftsWon: null,
-        dayStreak: null,
-        gamesPlayed: null,
-      });
-    });
-
     it('passes the token balance through once loaded', () => {
       mockTokenBalance(12);
       render(<GamesTab />);
@@ -283,6 +296,52 @@ describe('GamesTab', () => {
       mockTokenBalance(null, { error: new Error('boom') });
       render(<GamesTab />);
       expect(receivedProps().tokens).toBeNull();
+    });
+  });
+
+  describe('personal stats derivation', () => {
+    it('passes the personal minigame totals through once loaded', () => {
+      mockPersonalStats({ draftsWon: 3, dayStreak: 5, gamesPlayed: 12 });
+      render(<GamesTab />);
+
+      expect(receivedProps().personalStats).toEqual({
+        draftsWon: 3,
+        dayStreak: 5,
+        gamesPlayed: 12,
+      });
+    });
+
+    it('reports real zeroes rather than treating them as missing', () => {
+      mockPersonalStats({ draftsWon: 0, dayStreak: 0, gamesPlayed: 0 });
+      render(<GamesTab />);
+
+      expect(receivedProps().personalStats).toEqual({
+        draftsWon: 0,
+        dayStreak: 0,
+        gamesPlayed: 0,
+      });
+    });
+
+    it('passes null for every field while loading', () => {
+      mockPersonalStats(null, { loading: true });
+      render(<GamesTab />);
+
+      expect(receivedProps().personalStats).toEqual({
+        draftsWon: null,
+        dayStreak: null,
+        gamesPlayed: null,
+      });
+    });
+
+    it('passes null for every field when the query errored', () => {
+      mockPersonalStats(null, { error: new Error('boom') });
+      render(<GamesTab />);
+
+      expect(receivedProps().personalStats).toEqual({
+        draftsWon: null,
+        dayStreak: null,
+        gamesPlayed: null,
+      });
     });
   });
 
@@ -316,6 +375,17 @@ describe('GamesTab', () => {
 
       expect(mockLoggerError).toHaveBeenCalledWith(
         expect.stringContaining('twentyQuestionsTokenBalance'),
+        error,
+      );
+    });
+
+    it('logs a personal stats query error without throwing', () => {
+      const error = new Error('boom');
+      mockPersonalStats(null, { error });
+      render(<GamesTab />);
+
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        expect.stringContaining('minigamePersonalStats'),
         error,
       );
     });

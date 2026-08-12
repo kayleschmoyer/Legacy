@@ -1842,6 +1842,17 @@ export type MergeAccountsResult = {
   targetUserId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** The authenticated caller's personal totals across all three minigames (Season Draft, Who Am I?, 20 Questions). See LS-8803 for field definitions. */
+export type MinigamePersonalStats = {
+  __typename?: 'MinigamePersonalStats';
+  /** Consecutive UTC calendar days, ending on the most recent day with activity, on which the caller completed at least one minigame. Returns 0 for no activity. */
+  dayStreak: Scalars['Int']['output'];
+  /** Completed Season Draft games where the caller had the highest total score (ties broken by draft order, matching the game's own winner display). Returns 0 for no activity. */
+  draftsWon: Scalars['Int']['output'];
+  /** Total finished minigames across Season Draft, Who Am I?, and 20 Questions (games/sessions that reached a terminal status). Returns 0 for no activity. */
+  gamesPlayed: Scalars['Int']['output'];
+};
+
 /** Aggregate statistics about the baseball database powering the minigames */
 export type MinigamesStats = {
   __typename?: 'MinigamesStats';
@@ -3267,6 +3278,8 @@ export type Query = {
   leagueTradeBlock?: Maybe<Array<TeamMember>>;
   leagueTradeOffers?: Maybe<Array<TradeOffer>>;
   matchupScores: Array<MatchupStats>;
+  /** The authenticated caller's personal minigame totals — drafts won, day streak, and games played — across Season Draft, Who Am I?, and 20 Questions. Powers the Game Room 'Your Numbers' strip (LS-8803). */
+  minigamePersonalStats: MinigamePersonalStats;
   /** Aggregate statistics about the baseball database powering the minigames hub */
   minigamesStats?: Maybe<MinigamesStats>;
   /** Get the current user's votes for a league season */
@@ -11010,6 +11023,20 @@ export type GetMatchupsForLeagueQuery = {
       name?: string | null;
     } | null;
   }> | null;
+};
+
+export type GetMinigamePersonalStatsQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetMinigamePersonalStatsQuery = {
+  __typename?: 'Query';
+  minigamePersonalStats: {
+    __typename?: 'MinigamePersonalStats';
+    draftsWon: number;
+    dayStreak: number;
+    gamesPlayed: number;
+  };
 };
 
 export type GetMinigamesStatsQueryVariables = Exact<{ [key: string]: never }>;
@@ -27119,6 +27146,93 @@ export type GetMatchupsForLeagueSuspenseQueryHookResult = ReturnType<
 export type GetMatchupsForLeagueQueryResult = Apollo.QueryResult<
   GetMatchupsForLeagueQuery,
   GetMatchupsForLeagueQueryVariables
+>;
+export const GetMinigamePersonalStats = gql`
+  query GetMinigamePersonalStats {
+    minigamePersonalStats {
+      draftsWon
+      dayStreak
+      gamesPlayed
+    }
+  }
+`;
+
+/**
+ * __useGetMinigamePersonalStatsQuery__
+ *
+ * To run a query within a React component, call `useGetMinigamePersonalStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetMinigamePersonalStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetMinigamePersonalStatsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetMinigamePersonalStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetMinigamePersonalStatsQuery,
+    GetMinigamePersonalStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetMinigamePersonalStatsQuery,
+    GetMinigamePersonalStatsQueryVariables
+  >(GetMinigamePersonalStats, options);
+}
+export function useGetMinigamePersonalStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetMinigamePersonalStatsQuery,
+    GetMinigamePersonalStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetMinigamePersonalStatsQuery,
+    GetMinigamePersonalStatsQueryVariables
+  >(GetMinigamePersonalStats, options);
+}
+export function useGetMinigamePersonalStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetMinigamePersonalStatsQuery,
+        GetMinigamePersonalStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetMinigamePersonalStatsQuery,
+    GetMinigamePersonalStatsQueryVariables
+  >(
+    GetMinigamePersonalStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetMinigamePersonalStatsQuery,
+          GetMinigamePersonalStatsQueryVariables
+        >,
+  );
+}
+export type GetMinigamePersonalStatsQueryHookResult = ReturnType<
+  typeof useGetMinigamePersonalStatsQuery
+>;
+export type GetMinigamePersonalStatsLazyQueryHookResult = ReturnType<
+  typeof useGetMinigamePersonalStatsLazyQuery
+>;
+export type GetMinigamePersonalStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetMinigamePersonalStatsSuspenseQuery
+>;
+export type GetMinigamePersonalStatsQueryResult = Apollo.QueryResult<
+  GetMinigamePersonalStatsQuery,
+  GetMinigamePersonalStatsQueryVariables
 >;
 export const GetMinigamesStats = gql`
   query GetMinigamesStats {

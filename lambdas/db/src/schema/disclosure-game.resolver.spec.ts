@@ -5,6 +5,8 @@
  *   - disclosureGameBestScore: unauthenticated throws; returns null and number
  *   - minigamesStats: unauthenticated throws; returns correct aggregate shape;
  *     returns null earliestYear when table is empty
+ *   - minigamePersonalStats: unauthenticated throws; delegates to
+ *     MinigamePersonalStatsService.getStats and returns its result (LS-8803)
  *   - startDisclosureGame: GameUnavailableError when no eligible players
  *   - nextClue: UserInputError for all expected service error messages
  *   - submitGuess: UserInputError for session-not-found / already-ended
@@ -25,11 +27,18 @@ describe('disclosure-game resolvers', () => {
   };
   let mockFromBatting: jest.Mock;
   let mockFromPlayers: jest.Mock;
+  let mockMinigamePersonalStatsService: { getStats: jest.Mock };
   let mockDb: Record<string, jest.Mock>;
   let mockContext: { user: { id: number }; db: typeof mockDb };
 
   beforeEach(() => {
     jest.resetModules();
+
+    mockMinigamePersonalStatsService = {
+      getStats: jest
+        .fn()
+        .mockResolvedValue({ draftsWon: 0, dayStreak: 0, gamesPlayed: 0 }),
+    };
 
     mockDisclosureGameService = {
       getActiveSession: jest.fn().mockResolvedValue(null),
@@ -116,6 +125,7 @@ describe('disclosure-game resolvers', () => {
       DisclosureGameService: jest
         .fn()
         .mockImplementation(() => mockDisclosureGameService),
+      MinigamePersonalStatsService: mockMinigamePersonalStatsService,
       PublicSchema: {
         seasonBatting: { playerId: 'playerId', season: 'season' },
         players: { id: 'id', firstName: 'firstName', lastName: 'lastName' },
@@ -313,6 +323,47 @@ describe('disclosure-game resolvers', () => {
       expect(result.playerSeasons).toBe(2_000_000);
       expect(typeof result.playersTracked).toBe('number');
       expect(result.playersTracked).toBe(10_000);
+    });
+  });
+
+  // ── minigamePersonalStats ─────────────────────────────────────────────────
+
+  describe('minigamePersonalStats query', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getQuery('minigamePersonalStats');
+      await expect(
+        resolver({}, {}, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('delegates to MinigamePersonalStatsService.getStats for the caller', async () => {
+      mockMinigamePersonalStatsService.getStats.mockResolvedValueOnce({
+        draftsWon: 3,
+        dayStreak: 5,
+        gamesPlayed: 12,
+      });
+
+      const resolver = getQuery('minigamePersonalStats');
+      const result = await resolver({}, {}, mockContext, undefined as never);
+
+      expect(result).toEqual({ draftsWon: 3, dayStreak: 5, gamesPlayed: 12 });
+      expect(mockMinigamePersonalStatsService.getStats).toHaveBeenCalledWith(
+        mockDb,
+        42,
+      );
+    });
+
+    it('returns real zeroes for a user with no minigame activity', async () => {
+      mockMinigamePersonalStatsService.getStats.mockResolvedValueOnce({
+        draftsWon: 0,
+        dayStreak: 0,
+        gamesPlayed: 0,
+      });
+
+      const resolver = getQuery('minigamePersonalStats');
+      const result = await resolver({}, {}, mockContext, undefined as never);
+
+      expect(result).toEqual({ draftsWon: 0, dayStreak: 0, gamesPlayed: 0 });
     });
   });
 

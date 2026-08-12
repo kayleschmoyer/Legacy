@@ -9,6 +9,7 @@ import {
 import {
   SeasonDraftGameStatus,
   useGetDisclosureGameBestScoreQuery,
+  useGetMinigamePersonalStatsQuery,
   useGetSeasonDraftGamesQuery,
   useGetTwentyQuestionsTokenBalanceQuery,
 } from '@legacy-sports/graphql';
@@ -21,10 +22,6 @@ import { trackMinigameTap } from '../../../utils/analytics';
  * and expo-router navigation. The shared component is presentational, so all
  * query wiring, analytics and routing live here (the split LS-8795 used for
  * the Leagues tab).
- *
- * One of the design's stats has no backing query yet — the "Your Numbers"
- * strip (LS-8803). It passes `null`, which the shared component renders as
- * `—`, matching the existing hub's loading convention.
  */
 
 const ROUTES: Record<MinigameId, string> = {
@@ -52,6 +49,11 @@ export default function GamesTab() {
     loading: tokenBalanceLoading,
     error: tokenBalanceError,
   } = useGetTwentyQuestionsTokenBalanceQuery();
+  const {
+    data: personalStatsData,
+    loading: personalStatsLoading,
+    error: personalStatsError,
+  } = useGetMinigamePersonalStatsQuery();
 
   // Errors are non-fatal — every stat falls back to '—' — but log them so a
   // broken query doesn't silently disappear from Rollbar/Discord.
@@ -76,6 +78,14 @@ export default function GamesTab() {
       );
     }
   }, [tokenBalanceError]);
+  useEffect(() => {
+    if (personalStatsError) {
+      LOGGER.error(
+        'GamesTab: minigamePersonalStats query failed:',
+        personalStatsError,
+      );
+    }
+  }, [personalStatsError]);
 
   const games = useMemo(
     () => sdGamesData?.seasonDraftGames ?? [],
@@ -102,6 +112,18 @@ export default function GamesTab() {
     tokenBalanceLoading || tokenBalanceError
       ? null
       : (tokenBalanceData?.twentyQuestionsTokenBalance ?? null);
+
+  const personalStats = useMemo(() => {
+    if (personalStatsLoading || personalStatsError) {
+      return { draftsWon: null, dayStreak: null, gamesPlayed: null };
+    }
+    const stats = personalStatsData?.minigamePersonalStats;
+    return {
+      draftsWon: stats?.draftsWon ?? null,
+      dayStreak: stats?.dayStreak ?? null,
+      gamesPlayed: stats?.gamesPlayed ?? null,
+    };
+  }, [personalStatsData, personalStatsLoading, personalStatsError]);
 
   // The banner is for the one game actually waiting on the user. A game in
   // Setup has no turn to take, so only Drafting qualifies.
@@ -163,8 +185,7 @@ export default function GamesTab() {
       bestScore={bestScore}
       tokens={tokens}
       resumeGame={resumeGame}
-      // No query exposes per-user minigame totals yet (LS-8803).
-      personalStats={{ draftsWon: null, dayStreak: null, gamesPlayed: null }}
+      personalStats={personalStats}
       onSelectGame={handleSelectGame}
       onResumeGame={handleResumeGame}
       topInset={topInset}

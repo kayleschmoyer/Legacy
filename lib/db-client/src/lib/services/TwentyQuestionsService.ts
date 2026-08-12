@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte, or, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lte, or, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import type { PublicDb } from '../client/PublicDbClient';
 import * as PublicSchema from '../../drizzle/public/schema';
@@ -214,6 +214,26 @@ export class TwentyQuestionsService {
       );
 
     return row?.total ?? 0;
+  }
+
+  /**
+   * Completion timestamps for the user's finished games (won, lost, or
+   * abandoned — i.e. `completedAt` is set). Used for the personal minigame
+   * games-played total and day streak (LS-8803).
+   */
+  static async getCompletedGamesForUser(
+    db: PublicDb,
+    userId: number,
+  ): Promise<Array<{ completedAt: string | null }>> {
+    return db
+      .select({ completedAt: PublicSchema.twentyQuestionsGames.completedAt })
+      .from(PublicSchema.twentyQuestionsGames)
+      .where(
+        and(
+          eq(PublicSchema.twentyQuestionsGames.userId, userId),
+          isNotNull(PublicSchema.twentyQuestionsGames.completedAt),
+        ),
+      );
   }
 
   static async askQuestion(

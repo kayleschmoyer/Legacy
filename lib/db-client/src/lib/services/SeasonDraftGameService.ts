@@ -1387,4 +1387,74 @@ export class SeasonDraftGameService {
       };
     });
   }
+
+  /**
+   * Completed Season Draft games the user played in, with a `won` flag.
+   * Winner is the player with the highest `totalScore` in the game, ties
+   * broken by lowest draftOrder — same tie-break `getGamesForUser`'s
+   * `winnerName` already uses, so this agrees with what the game's own
+   * lobby displays as the winner (LS-8803).
+   */
+  static async getCompletedGamesForUser(
+    db: PublicDb,
+    userId: number,
+  ): Promise<
+    Array<{ gameId: number; completedAt: string | null; won: boolean }>
+  > {
+    const myRows = await db
+      .select({
+        gameId: PublicSchema.seasonDraftGames.id,
+        completedAt: PublicSchema.seasonDraftGames.completedAt,
+        myDraftOrder: PublicSchema.seasonDraftPlayers.draftOrder,
+      })
+      .from(PublicSchema.seasonDraftPlayers)
+      .innerJoin(
+        PublicSchema.seasonDraftGames,
+        eq(
+          PublicSchema.seasonDraftPlayers.gameId,
+          PublicSchema.seasonDraftGames.id,
+        ),
+      )
+      .where(
+        and(
+          eq(PublicSchema.seasonDraftPlayers.userId, userId),
+          eq(PublicSchema.seasonDraftGames.status, 'completed'),
+        ),
+      );
+
+    if (myRows.length === 0) return [];
+
+    const gameIds = myRows.map((r) => r.gameId);
+    const allPlayers = await db
+      .select({
+        gameId: PublicSchema.seasonDraftPlayers.gameId,
+        totalScore: PublicSchema.seasonDraftPlayers.totalScore,
+        draftOrder: PublicSchema.seasonDraftPlayers.draftOrder,
+      })
+      .from(PublicSchema.seasonDraftPlayers)
+      .where(inArray(PublicSchema.seasonDraftPlayers.gameId, gameIds))
+      .orderBy(PublicSchema.seasonDraftPlayers.draftOrder);
+
+    const playersByGame = new Map<number, typeof allPlayers>();
+    for (const p of allPlayers) {
+      const list = playersByGame.get(p.gameId);
+      if (list) list.push(p);
+      else playersByGame.set(p.gameId, [p]);
+    }
+
+    return myRows.map((r) => {
+      const players = playersByGame.get(r.gameId) ?? [];
+      const winner =
+        players.length > 0
+          ? players.reduce((best, p) =>
+              p.totalScore > best.totalScore ? p : best,
+            )
+          : null;
+      return {
+        gameId: r.gameId,
+        completedAt: r.completedAt,
+        won: winner !== null && winner.draftOrder === r.myDraftOrder,
+      };
+    });
+  }
 }

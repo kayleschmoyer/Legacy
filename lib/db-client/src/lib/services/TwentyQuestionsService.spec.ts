@@ -203,6 +203,24 @@ describe('TwentyQuestionsService — startGame sport storage', () => {
   });
 });
 
+describe('TwentyQuestionsService — getCompletedGamesForUser (LS-8803)', () => {
+  it('returns the completion timestamps the query resolves', async () => {
+    const rows = [
+      { completedAt: '2026-08-10T00:00:00.000Z' },
+      { completedAt: '2026-08-08T00:00:00.000Z' },
+    ];
+    const db = makeMockDb();
+    db.where.mockReturnValue(rows);
+
+    const result = await TwentyQuestionsService.getCompletedGamesForUser(
+      db as never,
+      42,
+    );
+
+    expect(result).toEqual(rows);
+  });
+});
+
 // Parameter readers back the multi-select branches of answerQuestion (LS-8131).
 // They are the single decision point that resolves `{positions:[...]}` vs the
 // legacy `{position:'C'}` shape, so unit-testing them is sufficient to lock the

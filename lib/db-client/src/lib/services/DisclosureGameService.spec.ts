@@ -49,6 +49,26 @@ describe('DisclosureGameService', () => {
     });
   });
 
+  describe('getCompletedSessionsForUser (LS-8803)', () => {
+    it('returns the rows the query resolves, unmodified', async () => {
+      const rows = [
+        { completedAt: '2026-08-10T00:00:00.000Z' },
+        { completedAt: '2026-08-09T00:00:00.000Z' },
+      ];
+      const where = jest.fn().mockResolvedValue(rows);
+      const from = jest.fn().mockReturnValue({ where });
+      const select = jest.fn().mockReturnValue({ from });
+      const db = { select } as unknown as ConstructorParameters<
+        typeof DisclosureGameService
+      >[0];
+
+      const service = new DisclosureGameService(db);
+      const result = await service.getCompletedSessionsForUser(42);
+
+      expect(result).toEqual(rows);
+    });
+  });
+
   describe('calculateScore', () => {
     it('returns 1000 for first clue (cluesRevealed=1)', () => {
       expect(DisclosureGameService.calculateScore(1, 10)).toBe(1000);

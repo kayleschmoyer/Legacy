@@ -2138,6 +2138,26 @@ type MergeAccountsResult {
 }
 
 """
+The authenticated caller's personal totals across all three minigames (Season Draft, Who Am I?, 20 Questions). See LS-8803 for field definitions.
+"""
+type MinigamePersonalStats {
+  """
+  Consecutive UTC calendar days, ending on the most recent day with activity, on which the caller completed at least one minigame. Returns 0 for no activity.
+  """
+  dayStreak: Int!
+
+  """
+  Completed Season Draft games where the caller had the highest total score (ties broken by draft order, matching the game's own winner display). Returns 0 for no activity.
+  """
+  draftsWon: Int!
+
+  """
+  Total finished minigames across Season Draft, Who Am I?, and 20 Questions (games/sessions that reached a terminal status). Returns 0 for no activity.
+  """
+  gamesPlayed: Int!
+}
+
+"""
 Aggregate statistics about the baseball database powering the minigames
 """
 type MinigamesStats {
@@ -3738,6 +3758,11 @@ type Query {
     status: String
   ): [TradeOffer!]
   matchupScores(leagueId: Int!, weekNum: Int!): [MatchupStats!]!
+
+  """
+  The authenticated caller's personal minigame totals — drafts won, day streak, and games played — across Season Draft, Who Am I?, and 20 Questions. Powers the Game Room 'Your Numbers' strip (LS-8803).
+  """
+  minigamePersonalStats: MinigamePersonalStats!
 
   """
   Aggregate statistics about the baseball database powering the minigames hub

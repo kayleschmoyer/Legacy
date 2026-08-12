@@ -1,0 +1,9 @@
+# Fetch the current user's personal minigame totals (drafts won, day streak,
+# games played) for the Game Room "Your Numbers" strip (LS-8803)
+query GetMinigamePersonalStats {
+  minigamePersonalStats {
+    draftsWon
+    dayStreak
+    gamesPlayed
+  }
+}

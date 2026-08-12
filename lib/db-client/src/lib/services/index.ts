@@ -53,6 +53,11 @@ export {
 } from './DisclosureGameService';
 export type { PlayerFact, EligiblePlayer } from './DisclosureGameService';
 export {
+  MinigamePersonalStatsService,
+  computeDayStreak,
+} from './MinigamePersonalStatsService';
+export type { MinigamePersonalStats } from './MinigamePersonalStatsService';
+export {
   assignTierFromValue,
   bucketValue,
   orderFactsByDifficulty,

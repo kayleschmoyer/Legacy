@@ -1,5 +1,9 @@
 import { count, sql } from 'drizzle-orm';
-import { DisclosureGameService, PublicSchema } from '@legacy-sports/db-client';
+import {
+  DisclosureGameService,
+  MinigamePersonalStatsService,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { builder } from './builder';
 import {
   AuthenticationError,
@@ -153,6 +157,34 @@ MinigamesStats.implement({
   }),
 });
 
+const MinigamePersonalStats = builder.objectRef<{
+  draftsWon: number;
+  dayStreak: number;
+  gamesPlayed: number;
+}>('MinigamePersonalStats');
+
+MinigamePersonalStats.implement({
+  description:
+    "The authenticated caller's personal totals across all three minigames (Season Draft, Who Am I?, 20 Questions). See LS-8803 for field definitions.",
+  fields: (t) => ({
+    draftsWon: t.exposeInt('draftsWon', {
+      nullable: false,
+      description:
+        "Completed Season Draft games where the caller had the highest total score (ties broken by draft order, matching the game's own winner display). Returns 0 for no activity.",
+    }),
+    dayStreak: t.exposeInt('dayStreak', {
+      nullable: false,
+      description:
+        'Consecutive UTC calendar days, ending on the most recent day with activity, on which the caller completed at least one minigame. Returns 0 for no activity.',
+    }),
+    gamesPlayed: t.exposeInt('gamesPlayed', {
+      nullable: false,
+      description:
+        'Total finished minigames across Season Draft, Who Am I?, and 20 Questions (games/sessions that reached a terminal status). Returns 0 for no activity.',
+    }),
+  }),
+});
+
 // ──────────────────────────────────────────────────────────────
 // In-memory TTL cache for minigamesStats aggregates.
 // These are full-table COUNT/MIN scans; caching avoids hitting
@@ -293,6 +325,20 @@ builder.queryFields((t) => ({
       cachedMinigamesStatsExpiresAt = now + MINIGAMES_STATS_CACHE_TTL_MS;
 
       return stats;
+    },
+  }),
+
+  minigamePersonalStats: t.field({
+    type: MinigamePersonalStats,
+    nullable: false,
+    description:
+      "The authenticated caller's personal minigame totals — drafts won, day streak, and games played — across Season Draft, Who Am I?, and 20 Questions. Powers the Game Room 'Your Numbers' strip (LS-8803).",
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      return MinigamePersonalStatsService.getStats(context.db, context.user.id);
     },
   }),
 }));
