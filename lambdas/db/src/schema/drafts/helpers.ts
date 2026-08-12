@@ -2,7 +2,11 @@
  * Draft domain â€” helper functions
  */
 
-import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import {
+  calculateStandings,
+  PublicDb,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { ALLOWED_POSITIONS, shuffleArray } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, count, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
@@ -284,12 +288,85 @@ export function eligibleStatPositionsForUnfilledSlots(
 const MAX_ROUND_SEARCH = 500;
 
 /**
+ * Seed order (round-1 order) for a keeper league's "Reverse Standings" /
+ * previous-year-inverse draft (LS-8929): the worst finisher from the prior
+ * season picks first. Returns `null` when there is no usable prior-season
+ * order — the caller falls back to its normal random shuffle — which covers
+ * a league's inaugural keeper season (no `previousLeagueId` yet) and any
+ * case where the prior season's standings can't be resolved.
+ *
+ * Team lineage across a season renewal has no dedicated mapping column —
+ * `renewLeague` (leagues/mutations.ts) inserts each new season's teams in
+ * the same relative order as the teams they were copied from, so sorting
+ * both seasons' teams by id ascending and zipping them positionally recovers
+ * the old-team -> new-team correspondence. A current team that can't be
+ * matched this way (e.g. an expansion team added after renewal, or a
+ * mismatched team count) drafts last, in id order — it has no prior-season
+ * record to justify a better slot.
+ */
+export async function resolveReverseStandingsSeedOrder(
+  db: PublicDb,
+  params: {
+    previousLeagueId: number | null;
+    teams: { id: number }[];
+  },
+): Promise<{ id: number }[] | null> {
+  const { previousLeagueId, teams } = params;
+  if (!previousLeagueId) return null;
+
+  const previousTeams = await db
+    .select({ id: PublicSchema.teams.id })
+    .from(PublicSchema.teams)
+    .where(eq(PublicSchema.teams.leagueId, previousLeagueId))
+    .orderBy(asc(PublicSchema.teams.id));
+
+  if (previousTeams.length === 0 || previousTeams.length !== teams.length) {
+    return null;
+  }
+
+  const currentTeamsByPreviousId = new Map(
+    [...teams]
+      .sort((a, b) => a.id - b.id)
+      .map((team, index) => [previousTeams[index].id, team] as const),
+  );
+
+  const standings = await calculateStandings(db, previousLeagueId);
+  if (standings.length === 0) return null;
+
+  // Worst finisher first: highest rank number picks first.
+  const worstFirst = [...standings].sort(
+    (a, b) => (b.rank ?? 0) - (a.rank ?? 0),
+  );
+
+  const ordered: { id: number }[] = [];
+  const seen = new Set<number>();
+  for (const standing of worstFirst) {
+    const currentTeam = currentTeamsByPreviousId.get(standing.teamId);
+    if (currentTeam && !seen.has(currentTeam.id)) {
+      ordered.push(currentTeam);
+      seen.add(currentTeam.id);
+    }
+  }
+
+  const unmatched = teams
+    .filter((team) => !seen.has(team.id))
+    .sort((a, b) => a.id - b.id);
+
+  return [...ordered, ...unmatched];
+}
+
+/**
  * Walk rounds in draft order (skipping any team's forfeited round — LS-8674
  * keeper round-penalty) until `overallPick` falls within a round's active
  * teams. With an empty `forfeited` set this is arithmetically identical to
  * the plain snake/linear computation it replaces (round = ceil(pick/teams),
  * teamIndex mirrored on even rounds for snake) — keeper leagues with no
  * forfeited picks and non-keeper leagues both draft in the original order.
+ *
+ * `isSnake` also covers 'reverse_standings' drafts (LS-8929) — the reverse-
+ * standings order only determines round 1's seed; rounds still alternate
+ * snake-style like a standard third-party-standings draft, so the caller
+ * passes `isSnake = draftOrder === 'snake' || draftOrder === 'reverse_standings'`.
  */
 export function resolvePickAssignment(params: {
   overallPick: number;
@@ -373,7 +450,8 @@ export async function getCurrentDraftPickInfo(
   }
 
   const currentOverallPick = draft.currentPick + 1;
-  const isSnake = draft.draftOrder === 'snake';
+  const isSnake =
+    draft.draftOrder === 'snake' || draft.draftOrder === 'reverse_standings';
 
   const forfeitedRows = await db
     .select({
@@ -688,12 +766,23 @@ export interface ResolveDraftTeamsOrderResult {
  *
  * `draftId` is `null` when the drafts row itself doesn't exist yet
  * (initializeDraft's first-ever call for a league) — no draft_teams rows can
- * exist in that case either, so this always shuffles.
+ * exist in that case either, so this always resolves a fresh order.
+ *
+ * When a fresh order is needed, `freshOrderOptions` (LS-8929) determines
+ * whether it comes from Reverse Standings (keeper leagues only) or the
+ * original random shuffle — see {@link resolveReverseStandingsSeedOrder}.
+ * Omit it (or leave `draftOrder`/`rosterContinuity` non-matching) to always
+ * shuffle, e.g. for mock drafts.
  */
 export async function resolveDraftTeamsOrder(
   db: PublicDb,
   draftId: number | null,
   currentTeams: { id: number }[],
+  freshOrderOptions?: {
+    draftOrder: string;
+    rosterContinuity: string | null;
+    previousLeagueId: number | null;
+  },
 ): Promise<ResolveDraftTeamsOrderResult> {
   const existingRows = draftId
     ? await db
@@ -725,8 +814,19 @@ export async function resolveDraftTeamsOrder(
     );
   }
 
+  const reverseStandingsOrder =
+    freshOrderOptions?.draftOrder === 'reverse_standings' &&
+    freshOrderOptions.rosterContinuity === 'keeper'
+      ? await resolveReverseStandingsSeedOrder(db, {
+          previousLeagueId: freshOrderOptions.previousLeagueId,
+          teams: currentTeams,
+        })
+      : null;
+
   return {
-    orderedTeamIds: shuffleArray(currentTeams).map((t) => t.id),
+    orderedTeamIds: (reverseStandingsOrder ?? shuffleArray(currentTeams)).map(
+      (t) => t.id,
+    ),
     needsInsert: true,
   };
 }

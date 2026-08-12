@@ -154,6 +154,7 @@ function LeagueCommissionerTools({
               leagueId={leagueId}
               draftStatus={league.draftStatus}
               playerPool={league.playerPool}
+              rosterContinuity={league.rosterContinuity}
               isPremium={isPremium}
               onSuccess={handleSuccess}
               onError={handleError}

@@ -79,10 +79,16 @@ builder.mutationField('initializeDraft', (t) =>
           'standard') as 'standard' | 'auction' | 'random';
         const draftOrder = (args.draftOrder ??
           savedDraft?.draftOrder ??
-          'snake') as 'snake' | 'linear';
+          'snake') as 'snake' | 'linear' | 'reverse_standings';
 
-        if (draftOrder !== 'snake' && draftOrder !== 'linear') {
-          throw new Error("draftOrder must be 'snake' or 'linear'");
+        if (
+          draftOrder !== 'snake' &&
+          draftOrder !== 'linear' &&
+          draftOrder !== 'reverse_standings'
+        ) {
+          throw new Error(
+            "draftOrder must be 'snake', 'linear', or 'reverse_standings'",
+          );
         }
         if (draftMode !== 'live' && draftMode !== 'automated') {
           throw new Error("draftMode must be 'live' or 'automated'");
@@ -102,6 +108,17 @@ builder.mutationField('initializeDraft', (t) =>
         if (league.draftStatus !== 'not-started') {
           throw UserInputError(
             `Cannot initialize draft: current status is '${league.draftStatus}'`,
+          );
+        }
+
+        // Reverse Standings requires a keeper league's prior-season data —
+        // out of scope for redraft/dynasty leagues (LS-8929).
+        if (
+          draftOrder === 'reverse_standings' &&
+          league.rosterContinuity !== 'keeper'
+        ) {
+          throw UserInputError(
+            "The 'reverse_standings' draft order is only available for keeper leagues",
           );
         }
 
@@ -166,11 +183,20 @@ builder.mutationField('initializeDraft', (t) =>
 
           // LS-8742: preserve any draft_teams order already seeded by an
           // approved draft slot trade (LS-8676) instead of unconditionally
-          // reshuffling it away at draft start.
+          // reshuffling it away at draft start. When a fresh order is
+          // needed, Reverse Standings (keeper leagues only, LS-8929) orders
+          // worst-to-best by the previous season's final standings; falls
+          // back to random otherwise (including a keeper league's
+          // inaugural season, with no previous standings to draw from).
           const { orderedTeamIds, needsInsert } = await resolveDraftTeamsOrder(
             tx,
             existingDraft?.id ?? null,
             teams,
+            {
+              draftOrder,
+              rosterContinuity: league.rosterContinuity,
+              previousLeagueId: league.previousLeagueId,
+            },
           );
 
           if (existingDraft) {

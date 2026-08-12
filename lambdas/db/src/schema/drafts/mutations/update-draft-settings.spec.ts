@@ -29,6 +29,7 @@ interface MakeCtxOptions {
   tier?: 'free' | 'premium';
   leagueOwner?: number;
   leagueSport?: string;
+  leagueRosterContinuity?: string;
   entitlements?: string[];
 }
 
@@ -38,6 +39,7 @@ function makeCtx({
   tier = 'free',
   leagueOwner = 1,
   leagueSport = 'baseball',
+  leagueRosterContinuity = 'redraft',
   // requirePremium() (the blanket LS-5014 gate) reads the DB subscription_tier
   // column mocked below via tierSelectMock and doesn't need this. The granular
   // auction_draft / historical_era_filters gates (LS-5017) go through
@@ -53,6 +55,7 @@ function makeCtx({
     owner: leagueOwner,
     draftStatus: 'not-started',
     sport: leagueSport,
+    rosterContinuity: leagueRosterContinuity,
     playerPool: 'all',
     eraFilter: 'all',
     baseballHofOnly: false,
@@ -265,6 +268,34 @@ describe('updateDraftSettings — entitlement gates (LS-5017)', () => {
             eraFilter: 'modern',
           },
         },
+        ctx,
+      ),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe('updateDraftSettings — reverse_standings draft order (LS-8929)', () => {
+  it('rejects draftOrder=reverse_standings for a redraft league', async () => {
+    const resolve = captureResolver();
+    const ctx = makeCtx({ tier: 'premium', leagueRosterContinuity: 'redraft' });
+
+    await expect(
+      resolve(
+        null,
+        { input: { leagueId: 10, draftOrder: 'reverse_standings' } },
+        ctx,
+      ),
+    ).rejects.toThrow(/keeper leagues/i);
+  });
+
+  it('allows draftOrder=reverse_standings for a keeper league', async () => {
+    const resolve = captureResolver();
+    const ctx = makeCtx({ tier: 'premium', leagueRosterContinuity: 'keeper' });
+
+    await expect(
+      resolve(
+        null,
+        { input: { leagueId: 10, draftOrder: 'reverse_standings' } },
         ctx,
       ),
     ).resolves.toBeDefined();

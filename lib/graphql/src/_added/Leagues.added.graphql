@@ -143,6 +143,7 @@ fragment AppLeague on League {
   bannerUrl
   primaryColor
   secondaryColor
+  rosterContinuity
   userMembership {
     ...AppLeagueMember
   }

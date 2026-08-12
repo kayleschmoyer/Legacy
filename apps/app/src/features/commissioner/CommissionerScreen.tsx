@@ -125,6 +125,7 @@ export function CommissionerScreen({
             leagueId={leagueId}
             draftStatus={league.draftStatus}
             playerPool={league.playerPool ?? undefined}
+            rosterContinuity={league.rosterContinuity}
             eraFilter={league.eraFilter ?? undefined}
             baseballHofOnly={league.baseballHofOnly ?? undefined}
             customEraStartYear={league.customEraStartYear ?? undefined}

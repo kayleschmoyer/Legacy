@@ -2,9 +2,10 @@
  * Resolver-level tests for autoStartScheduledDrafts (LS-8309).
  *
  * Covers the happy path, the <2-teams skip branch, the
- * enableAutoPickForUnmanagedTeams interaction, the transaction wrapping, and
- * the guarded-rollout staleness cutoff that keeps a long-dormant backlog of
- * past-due `scheduled_at` rows from mass-starting in a single invocation.
+ * enableAutoPickForUnmanagedTeams interaction, the transaction wrapping, the
+ * guarded-rollout staleness cutoff that keeps a long-dormant backlog of
+ * past-due `scheduled_at` rows from mass-starting in a single invocation, and
+ * the Reverse Standings seeding branch for keeper leagues (LS-8929).
  */
 
 const enableAutoPickForUnmanagedTeams = jest.fn();
@@ -24,6 +25,8 @@ interface ScheduledDraftRow {
   draftOrder: string;
   pickTimeLimitSeconds: number;
   scheduledAt: Date | null;
+  rosterContinuity?: string | null;
+  previousLeagueId?: number | null;
 }
 
 interface AutoStartScheduledDraftsResultShape {
@@ -140,6 +143,8 @@ async function captureAutoStartScheduledDraftsResolver(): Promise<ResolverFn> {
       leagues: {
         id: 'leagues.id',
         draftStatus: 'leagues.draft_status',
+        rosterContinuity: 'leagues.roster_continuity',
+        previousLeagueId: 'leagues.previous_league_id',
       },
       teams: {
         id: 'teams.id',
@@ -339,10 +344,16 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
       { isSystemRequest: true, user: null, db, notificationService },
     );
 
-    expect(resolveDraftTeamsOrder).toHaveBeenCalledWith(db, 8, [
-      { id: 500 },
-      { id: 501 },
-    ]);
+    expect(resolveDraftTeamsOrder).toHaveBeenCalledWith(
+      db,
+      8,
+      [{ id: 500 }, { id: 501 }],
+      {
+        draftOrder: 'snake',
+        rosterContinuity: undefined,
+        previousLeagueId: undefined,
+      },
+    );
     expect(enableAutoPickForUnmanagedTeams).toHaveBeenCalledWith(
       db,
       80,
@@ -354,6 +365,104 @@ describe('autoStartScheduledDrafts resolver — LS-8309', () => {
     // and nothing is (re)inserted into draft_teams.
     expect(txMock?.delete).toHaveBeenCalledTimes(1);
     expect(txMock?.insert).not.toHaveBeenCalled();
+  });
+
+  describe('Reverse Standings seeding (LS-8929)', () => {
+    it('passes reverse-standings options through to resolveDraftTeamsOrder for a keeper league with draftOrder=reverse_standings', async () => {
+      resolveDraftTeamsOrder.mockResolvedValueOnce({
+        orderedTeamIds: [402, 401, 400],
+        needsInsert: true,
+      });
+      const resolve = await captureAutoStartScheduledDraftsResolver();
+      const db = makeMockDb({
+        scheduledDraftsRows: [
+          {
+            draftId: 4,
+            leagueId: 40,
+            draftMode: 'live',
+            selectionMethod: 'standard',
+            draftOrder: 'reverse_standings',
+            pickTimeLimitSeconds: 120,
+            scheduledAt: minutesAgo(1),
+            rosterContinuity: 'keeper',
+            previousLeagueId: 39,
+          },
+        ],
+        teamsRowsInOrder: [[{ id: 400 }, { id: 401 }, { id: 402 }]],
+      });
+      const notificationService = makeNotificationService();
+
+      await resolve(
+        {},
+        {},
+        { isSystemRequest: true, user: null, db, notificationService },
+      );
+
+      expect(resolveDraftTeamsOrder).toHaveBeenCalledWith(
+        db,
+        4,
+        [{ id: 400 }, { id: 401 }, { id: 402 }],
+        {
+          draftOrder: 'reverse_standings',
+          rosterContinuity: 'keeper',
+          previousLeagueId: 39,
+        },
+      );
+      expect(enableAutoPickForUnmanagedTeams).toHaveBeenCalledWith(
+        db,
+        40,
+        4,
+        [402, 401, 400],
+      );
+    });
+
+    it('passes rosterContinuity=redraft through when draftOrder=reverse_standings but the league is not a keeper league', async () => {
+      const resolve = await captureAutoStartScheduledDraftsResolver();
+      const db = makeMockDb({
+        scheduledDraftsRows: [
+          {
+            draftId: 5,
+            leagueId: 50,
+            draftMode: 'live',
+            selectionMethod: 'standard',
+            draftOrder: 'reverse_standings',
+            pickTimeLimitSeconds: 120,
+            scheduledAt: minutesAgo(1),
+            rosterContinuity: 'redraft',
+            previousLeagueId: null,
+          },
+        ],
+        teamsRowsInOrder: [[{ id: 500 }, { id: 501 }]],
+      });
+      const notificationService = makeNotificationService();
+
+      await resolve(
+        {},
+        {},
+        { isSystemRequest: true, user: null, db, notificationService },
+      );
+
+      // resolveDraftTeamsOrder (not this test) is responsible for deciding
+      // reverse-standings-vs-shuffle from these options — this test only
+      // verifies the resolver passes the league's real rosterContinuity
+      // through unchanged rather than assuming keeper eligibility itself.
+      expect(resolveDraftTeamsOrder).toHaveBeenCalledWith(
+        db,
+        5,
+        [{ id: 500 }, { id: 501 }],
+        {
+          draftOrder: 'reverse_standings',
+          rosterContinuity: 'redraft',
+          previousLeagueId: null,
+        },
+      );
+      expect(enableAutoPickForUnmanagedTeams).toHaveBeenCalledWith(
+        db,
+        50,
+        5,
+        [500, 501],
+      );
+    });
   });
 
   it('wraps the multi-table write sequence in a single transaction', async () => {

@@ -60,6 +60,7 @@ builder.mutationField('updateDraftSettings', (t) =>
             id: PublicSchema.leagues.id,
             owner: PublicSchema.leagues.owner,
             draftStatus: PublicSchema.leagues.draftStatus,
+            rosterContinuity: PublicSchema.leagues.rosterContinuity,
             sport: PublicSchema.leagues.sport,
             playerPool: PublicSchema.leagues.playerPool,
             eraFilter: PublicSchema.leagues.baseballEraFilter,
@@ -98,7 +99,7 @@ builder.mutationField('updateDraftSettings', (t) =>
         // Validate enum values
         const validDraftModes = ['live', 'automated'];
         const validSelectionMethods = ['standard', 'auction', 'random'];
-        const validDraftOrders = ['snake', 'linear'];
+        const validDraftOrders = ['snake', 'linear', 'reverse_standings'];
         const validPlayerPools = ['all', 'nl', 'al'];
 
         if (draftMode && !validDraftModes.includes(draftMode)) {
@@ -117,6 +118,14 @@ builder.mutationField('updateDraftSettings', (t) =>
         if (draftOrder && !validDraftOrders.includes(draftOrder)) {
           throw UserInputError(
             `Invalid draft order: ${draftOrder}. Must be one of: ${validDraftOrders.join(', ')}`,
+          );
+        }
+        if (
+          draftOrder === 'reverse_standings' &&
+          league.rosterContinuity !== 'keeper'
+        ) {
+          throw UserInputError(
+            "The 'reverse_standings' draft order is only available for keeper leagues",
           );
         }
         if (playerPool && !validPlayerPools.includes(playerPool)) {

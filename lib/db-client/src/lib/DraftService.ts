@@ -36,7 +36,7 @@ export interface DraftServiceOptions {
   leagueId: number;
   draftMode: 'live' | 'automated';
   selectionMethod: 'standard' | 'auction' | 'random';
-  draftOrder: 'snake' | 'linear';
+  draftOrder: 'snake' | 'linear' | 'reverse_standings';
   requestedBy: number;
   validateUserAccess?: boolean; // Allow bypassing user access check for admin operations
 }

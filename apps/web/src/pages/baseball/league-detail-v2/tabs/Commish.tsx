@@ -360,6 +360,7 @@ export const CommishTab: React.FC<CommishTabProps> = ({
                 leagueId={leagueId}
                 draftStatus={league.draftStatus}
                 playerPool={league.playerPool}
+                rosterContinuity={league.rosterContinuity}
                 eraFilter={league.eraFilter}
                 baseballHofOnly={league.baseballHofOnly}
                 customEraStartYear={league.customEraStartYear ?? undefined}

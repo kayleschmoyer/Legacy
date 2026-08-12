@@ -6766,6 +6766,7 @@ export type AppLeagueFragment = {
   bannerUrl?: string | null;
   primaryColor?: string | null;
   secondaryColor?: string | null;
+  rosterContinuity?: RosterContinuity | null;
   userMembership?: {
     __typename?: 'LeagueMember';
     leagueId?: number | null;
@@ -6830,6 +6831,7 @@ export type CreateLeagueMutation = {
       bannerUrl?: string | null;
       primaryColor?: string | null;
       secondaryColor?: string | null;
+      rosterContinuity?: RosterContinuity | null;
       userMembership?: {
         __typename?: 'LeagueMember';
         leagueId?: number | null;
@@ -14611,6 +14613,7 @@ export const AppLeagueFragmentDoc = gql`
     bannerUrl
     primaryColor
     secondaryColor
+    rosterContinuity
     userMembership {
       ...AppLeagueMember
     }

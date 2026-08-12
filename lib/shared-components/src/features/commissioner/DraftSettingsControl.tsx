@@ -20,6 +20,7 @@ import {
   DRAFT_MODES,
   DRAFT_ORDERS,
   ERA_FILTERS_BY_SPORT,
+  KEEPER_ONLY_DRAFT_ORDERS,
   PICK_TIME_OPTIONS,
   PLAYER_POOLS_BY_SPORT,
   SELECTION_METHODS,
@@ -34,6 +35,8 @@ export interface DraftSettingsControlProps {
   playerPool: string | null | undefined;
   /** Sport kind — determines which player pool and era filter options are shown. Defaults to 'baseball'. */
   sport?: SportKind;
+  /** League's roster-continuity mode. When 'keeper', the "Reverse Standings" draft order becomes selectable (LS-8929). */
+  rosterContinuity?: string | null;
   /** Current era filter for the league (editable before draft starts). */
   eraFilter?: string | null | undefined;
   baseballHofOnly?: boolean | null | undefined;
@@ -147,6 +150,7 @@ export function DraftSettingsControl({
   draftStatus,
   playerPool: leaguePlayerPool,
   sport = 'baseball',
+  rosterContinuity,
   eraFilter,
   baseballHofOnly,
   customEraStartYear,
@@ -164,6 +168,13 @@ export function DraftSettingsControl({
     ...m,
     locked: m.value === 'auction' && !isPremium,
   }));
+
+  // Reverse Standings only makes sense for keeper leagues, which have a
+  // prior season's standings to draw the seed order from (LS-8929).
+  const draftOrderOptions =
+    rosterContinuity === 'keeper'
+      ? [...DRAFT_ORDERS, ...KEEPER_ONLY_DRAFT_ORDERS]
+      : DRAFT_ORDERS;
 
   // Fetch the current draft record (if any)
   const {
@@ -615,8 +626,12 @@ export function DraftSettingsControl({
               {/* Draft Order */}
               <OptionSelector
                 label="Draft Order"
-                description="Snake reverses pick order each round (1-2-3, 3-2-1). Linear keeps the same order every round."
-                options={DRAFT_ORDERS}
+                description={
+                  rosterContinuity === 'keeper'
+                    ? 'Snake reverses pick order each round (1-2-3, 3-2-1). Linear keeps the same order every round. Reverse Standings seeds round 1 from last season’s final standings, worst team first.'
+                    : 'Snake reverses pick order each round (1-2-3, 3-2-1). Linear keeps the same order every round.'
+                }
+                options={draftOrderOptions}
                 value={draftOrder}
                 onChange={handleDraftOrderChange}
                 disabled={isDraftLocked || saving}

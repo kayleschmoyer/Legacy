@@ -122,6 +122,8 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
             draftOrder: PublicSchema.drafts.draftOrder,
             pickTimeLimitSeconds: PublicSchema.drafts.pickTimeLimitSeconds,
             scheduledAt: PublicSchema.drafts.scheduledAt,
+            rosterContinuity: PublicSchema.leagues.rosterContinuity,
+            previousLeagueId: PublicSchema.leagues.previousLeagueId,
           })
           .from(PublicSchema.drafts)
           .innerJoin(
@@ -204,9 +206,17 @@ builder.mutationField('autoStartScheduledDrafts', (t) =>
 
             // LS-8742: preserve any draft_teams order already seeded by an
             // approved draft slot trade (LS-8676) instead of unconditionally
-            // reshuffling it away at draft start.
+            // reshuffling it away at draft start. When a fresh order is
+            // needed, Reverse Standings (keeper leagues only, LS-8929)
+            // orders worst-to-best by the previous season's final
+            // standings; falls back to random otherwise (including a
+            // keeper league's inaugural season).
             const { orderedTeamIds, needsInsert } =
-              await resolveDraftTeamsOrder(context.db, draftId, teams);
+              await resolveDraftTeamsOrder(context.db, draftId, teams, {
+                draftOrder: draft.draftOrder,
+                rosterContinuity: draft.rosterContinuity,
+                previousLeagueId: draft.previousLeagueId,
+              });
 
             // LS-545 / LS-480: Enable auto-pick for teams without a general manager
             const autoPickTeamIds = await enableAutoPickForUnmanagedTeams(

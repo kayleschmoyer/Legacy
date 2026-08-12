@@ -33,7 +33,11 @@ export const VALID_SELECTION_METHODS = [
 ] as const;
 export type SelectionMethod = (typeof VALID_SELECTION_METHODS)[number];
 
-export const VALID_DRAFT_ORDERS = ['snake', 'linear'] as const;
+export const VALID_DRAFT_ORDERS = [
+  'snake',
+  'linear',
+  'reverse_standings',
+] as const;
 export type DraftOrder = (typeof VALID_DRAFT_ORDERS)[number];
 
 export interface DraftValidationOptions {

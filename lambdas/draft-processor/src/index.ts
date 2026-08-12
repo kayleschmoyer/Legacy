@@ -75,7 +75,7 @@ const SqsDraftMessageSchema = z.object({
     leagueId: z.number().int().positive(),
     draftMode: z.enum(['live', 'automated']),
     selectionMethod: z.enum(['standard', 'auction', 'random']),
-    draftOrder: z.enum(['snake', 'linear']),
+    draftOrder: z.enum(['snake', 'linear', 'reverse_standings']),
     requestedBy: z.number().int().positive(),
     timestamp: z.string(),
   }),

@@ -159,6 +159,34 @@ describe('initializeDraft resolver', () => {
     expect(mockLoggerError).not.toHaveBeenCalled();
   });
 
+  it('rejects draftOrder=reverse_standings for a non-keeper league (LS-8929)', async () => {
+    const initializeDraft = captureInitializeDraftResolver();
+    const { db } = makeDb([
+      [], // saved draft settings lookup
+      [
+        {
+          id: 1,
+          draftStatus: 'not-started',
+          rosterContinuity: 'redraft',
+        },
+      ], // league lookup
+    ]);
+    const ctx = { user: { id: 99 }, db };
+
+    await expect(
+      initializeDraft(
+        {},
+        { leagueId: 1, draftOrder: 'reverse_standings' },
+        ctx,
+        undefined,
+      ),
+    ).rejects.toMatchObject({
+      message:
+        "The 'reverse_standings' draft order is only available for keeper leagues",
+      extensions: { code: 'BAD_USER_INPUT' },
+    });
+  });
+
   it('still logs an unexpected error at error level', async () => {
     const initializeDraft = captureInitializeDraftResolver();
     const db = {

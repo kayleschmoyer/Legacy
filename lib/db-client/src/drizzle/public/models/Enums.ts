@@ -1,7 +1,11 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
 export const accessLevel = pgEnum('access_level', ['none', 'admin']);
-export const draftOrder = pgEnum('draft_order', ['snake', 'linear']);
+export const draftOrder = pgEnum('draft_order', [
+  'snake',
+  'linear',
+  'reverse_standings',
+]);
 export const draftMode = pgEnum('draft_mode', ['live', 'automated']);
 export const selectionMethod = pgEnum('selection_method', [
   'standard',

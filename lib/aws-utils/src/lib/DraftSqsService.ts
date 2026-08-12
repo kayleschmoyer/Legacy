@@ -6,7 +6,7 @@ export interface StartDraftMessage {
   leagueId: number;
   draftMode: 'live' | 'automated';
   selectionMethod: 'standard' | 'auction' | 'random';
-  draftOrder: 'snake' | 'linear';
+  draftOrder: 'snake' | 'linear' | 'reverse_standings';
   requestedBy: number; // User ID who requested the draft
   timestamp: string;
 }

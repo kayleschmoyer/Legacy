@@ -121,6 +121,18 @@ export const DRAFT_ORDERS = Object.freeze([
   { label: 'Linear', value: 'linear' },
 ]);
 
+/**
+ * Reverse Standings / previous-year-inverse draft order (LS-8929): worst
+ * finisher from the prior season picks first. Keeper leagues only — a
+ * redraft/dynasty league has no meaningful "prior season standings" concept
+ * carried into the new draft, so this is appended separately rather than
+ * folded into {@link DRAFT_ORDERS}; callers add it when `rosterContinuity
+ * === 'keeper'`.
+ */
+export const KEEPER_ONLY_DRAFT_ORDERS = Object.freeze([
+  { label: 'Reverse Standings', value: 'reverse_standings' },
+]);
+
 /** Seconds-per-pick options for the draft pick timer.
  * Includes slow-mode options (24h, 48h) for asynchronous email-pace drafts.
  */
