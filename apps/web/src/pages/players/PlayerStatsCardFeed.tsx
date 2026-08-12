@@ -13,7 +13,6 @@ import {
   useResettableCursor,
 } from '@legacy-sports/shared-components/players';
 import { useFootballPlayersQuery } from '@legacy-sports/graphql';
-import { LOGGER } from '@legacy-sports/logging';
 import { sanitizeSearchParam } from './PlayerStatsPage';
 
 // Web card-feed presentation of /players/stats at phone width (LS-9075). This
@@ -41,21 +40,6 @@ import { sanitizeSearchParam } from './PlayerStatsPage';
 const PAGE_SIZE = 25;
 const SEARCH_MIN_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 300;
-
-/**
- * `PlayersCardFeed.onPremiumPress` fires only from its own internal
- * premium-teaser row, which it never renders when `isPremium` is true — and
- * the caller (`PlayerStatsPage.tsx`) already wraps both card-feed branches in
- * the same `PremiumGate` the desktop table uses, which blocks all pointer
- * events for free viewers. So this callback should be unreachable either way;
- * log rather than silently no-op so a wrong assumption here (e.g. the gate
- * not actually blocking clicks in some browser) surfaces instead of hiding.
- */
-function warnPremiumPressUnreachable(): void {
-  LOGGER.warn(
-    '[PlayerStatsCardFeed] onPremiumPress fired — expected unreachable behind PremiumGate',
-  );
-}
 
 /** Read the current `position` URL param, defaulting to the "no filter" chip. */
 function readPositionParam(searchParams: URLSearchParams): string {
@@ -135,6 +119,8 @@ export interface WebSportCardFeedProps {
   onSportChange: (sport: 'mlb' | 'nfl') => void;
   onPlayerPress: (id: string) => void;
   onCompare: () => void;
+  /** Fired when a free viewer taps the feed's inline premium-teaser row. */
+  onPremiumPress: () => void;
 }
 
 /** MLB card feed for narrow-viewport `/players/stats` (LS-9075). */
@@ -144,6 +130,7 @@ export function WebBaseballCardFeed({
   onSportChange,
   onPlayerPress,
   onCompare,
+  onPremiumPress,
 }: WebSportCardFeedProps) {
   const {
     position,
@@ -218,7 +205,7 @@ export function WebBaseballCardFeed({
       onRetry={() => void refetch()}
       onClearFilters={handleClearFilters}
       isPremium={isPremium}
-      onPremiumPress={warnPremiumPressUnreachable}
+      onPremiumPress={onPremiumPress}
       hasMore={hasNextPage}
       isLoadingMore={isLoadingMore}
       onEndReached={handleEndReached}
@@ -239,6 +226,7 @@ export function WebFootballCardFeed({
   onSportChange,
   onPlayerPress,
   onCompare,
+  onPremiumPress,
 }: WebSportCardFeedProps) {
   const {
     position,
@@ -319,7 +307,7 @@ export function WebFootballCardFeed({
       onRetry={() => void refetch()}
       onClearFilters={handleClearFilters}
       isPremium={isPremium}
-      onPremiumPress={warnPremiumPressUnreachable}
+      onPremiumPress={onPremiumPress}
       hasMore={hasMore}
       isLoadingMore={isLoadingMore}
       onEndReached={handleEndReached}

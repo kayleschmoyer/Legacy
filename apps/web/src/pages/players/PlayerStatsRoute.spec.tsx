@@ -243,8 +243,19 @@ jest.mock('../../components/FootballPlayerDetailModal', () => ({
 
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 
+// Spyable so LS-9347 regression tests can assert the stats grid is never
+// wrapped in the page-wide gate (still used elsewhere, e.g. PlayerDetailPage).
+const mockPremiumGate = jest.fn(
+  ({ children }: { featureName: string; children: React.ReactNode }) =>
+    children,
+);
 jest.mock('../../components/PremiumGate', () => ({
-  PremiumGate: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  PremiumGate: (props: { featureName: string; children: React.ReactNode }) =>
+    mockPremiumGate(props),
+}));
+
+jest.mock('../../components/UpgradeModal', () => ({
+  UpgradeModal: () => null,
 }));
 
 let mockHasEntitlement = true;
@@ -1303,6 +1314,17 @@ describe('PlayerStatsRoute export entitlement (LS-9140)', () => {
     render(<PlayerStatsRoute />);
     fireEvent.click(screen.getByTestId('export-button'));
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not gate the whole stats page behind PremiumGate for non-premium viewers (LS-9347)', () => {
+    mockHasEntitlement = false;
+    mockPremiumGate.mockClear();
+    render(<PlayerStatsRoute />);
+    // The table/card feed renders unconditionally (mockStatsPageProps is
+    // always populated regardless of entitlement) — asserting PremiumGate
+    // was never invoked confirms it no longer wraps the page.
+    expect(mockPremiumGate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('can-export')).toBeInTheDocument();
   });
 
   it('does not run the client-side export for non-premium viewers (LS-9140)', () => {

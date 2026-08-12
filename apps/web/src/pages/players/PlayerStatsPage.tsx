@@ -43,6 +43,8 @@ import {
 } from './PlayerStatsCardFeed';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
+import { UpgradeModal } from '../../components/UpgradeModal';
+import { trackPremiumFeatureClick } from '../../utils/analytics';
 import { useHasEntitlement } from '../../hooks/useIsPremium';
 import {
   BG_DARK,
@@ -1132,6 +1134,14 @@ export function PlayerStatsRoute() {
   const isPremiumLargePageSize = useHasEntitlement(
     ENTITLEMENTS.large_player_stats_page_size,
   );
+  // The card feed (LS-9347) is no longer wrapped in a page-wide PremiumGate —
+  // its own inline premium-teaser row opens this modal directly instead.
+  const [showCardFeedUpgradeModal, setShowCardFeedUpgradeModal] =
+    useState(false);
+  const handleCardFeedPremiumPress = useCallback(() => {
+    trackPremiumFeatureClick('Player Statistics & Projections');
+    setShowCardFeedUpgradeModal(true);
+  }, []);
 
   // `/players/stats` is a PUBLIC, shareable route (LS-3548) — a shared link can
   // be opened by a signed-out recipient. Track auth state so we never fire
@@ -1785,6 +1795,7 @@ export function PlayerStatsRoute() {
             onSportChange={handleSelectSport}
             onPlayerPress={handleCardPlayerPress}
             onCompare={() => navigate('/players/compare')}
+            onPremiumPress={handleCardFeedPremiumPress}
           />
         ) : (
           <FootballStatsPage
@@ -1812,6 +1823,14 @@ export function PlayerStatsRoute() {
             }}
             playerId={selectedPlayerId}
             onViewFullPage={handleNflViewFullPage}
+          />
+        )}
+        {!isPremium && (
+          <UpgradeModal
+            open={showCardFeedUpgradeModal}
+            onOpenChange={setShowCardFeedUpgradeModal}
+            featureName="Player Statistics & Projections"
+            featureDescription="Unlock advanced player statistics, projected fantasy points, and ADP rankings with Premium."
           />
         )}
       </div>
@@ -1962,55 +1981,57 @@ export function PlayerStatsRoute() {
           onSelectNfl={() => handleSelectSport('nfl')}
         />
       )}
-      <PremiumGate
-        isPremium={isPremium}
-        featureName="Player Statistics & Projections"
-        featureDescription="Unlock advanced player statistics, projected fantasy points, and ADP rankings with Premium."
-      >
-        {isNarrowViewport ? (
-          // Card presentation has no Export/Share controls (see
-          // PlayerStatsCardFeed.tsx scope note) — the whole branch, like the
-          // table, sits behind this same PremiumGate, so the entitlement gate
-          // is unaffected by which presentation renders (LS-9075 AC).
-          <WebBaseballCardFeed
-            isPremium={isPremium}
-            showSportToggle={false}
-            onSportChange={handleSelectSport}
-            onPlayerPress={handleCardPlayerPress}
-            onCompare={() => navigate('/players/compare')}
-          />
-        ) : (
-          <PlayerStatsPage
-            title="MLB Player Statistics"
-            initialViewMode={initialState.viewMode}
-            initialFilters={initialState.filters}
-            initialPageSize={
-              isPremiumLargePageSize
-                ? initialState.pageSize
-                : Math.min(initialState.pageSize, 100)
-            }
-            showHeader={true}
-            showActions={true}
-            canExport={isPremium}
-            exportFormats={isPremium ? ['json', 'csv', 'xlsx'] : []}
-            canCustomizeColumns={isPremium}
-            isPremiumPageSize={isPremiumLargePageSize}
-            statsFormat={statsFormat}
-            initialVisibleColumns={visibleColumns}
-            onVisibleColumnsChange={handleVisibleColumnsChange}
-            onPlayerDetails={handlePlayerDetails}
-            onExport={handleExport}
-            onVisibleRowsChange={handleVisibleRowsChange}
-            onShare={handleShare}
-            onFiltersChange={handleFiltersChange}
-            showAvailabilityFilter={showBaseballAvailabilityFilter}
-            rosteredPlayerIds={baseballRosteredIds}
-            leagues={baseballLeagues.length > 1 ? baseballLeagues : undefined}
-            leagueId={effectiveBaseballLeagueId}
-            onLeagueChange={setBaseballLeagueId}
-          />
-        )}
-      </PremiumGate>
+      {/* The stats page itself is publicly accessible (LS-9347) — only specific
+          premium features are gated: export, column customization, large page
+          sizes (below), and the card feed's own inline premium-teaser row
+          (PlayersCardFeed, isPremium prop). This used to sit behind a
+          page-wide PremiumGate that blurred and blocked the entire grid for
+          free users, a regression from the LS-9076 route consolidation that
+          swapped the free /players directory for the premium-gated
+          /players/stats surface. */}
+      {isNarrowViewport ? (
+        // Card presentation has no Export/Share controls (see
+        // PlayerStatsCardFeed.tsx scope note); it still receives `isPremium`
+        // so PlayersCardFeed can render its own inline premium-teaser row.
+        <WebBaseballCardFeed
+          isPremium={isPremium}
+          showSportToggle={false}
+          onSportChange={handleSelectSport}
+          onPlayerPress={handleCardPlayerPress}
+          onCompare={() => navigate('/players/compare')}
+          onPremiumPress={handleCardFeedPremiumPress}
+        />
+      ) : (
+        <PlayerStatsPage
+          title="MLB Player Statistics"
+          initialViewMode={initialState.viewMode}
+          initialFilters={initialState.filters}
+          initialPageSize={
+            isPremiumLargePageSize
+              ? initialState.pageSize
+              : Math.min(initialState.pageSize, 100)
+          }
+          showHeader={true}
+          showActions={true}
+          canExport={isPremium}
+          exportFormats={isPremium ? ['json', 'csv', 'xlsx'] : []}
+          canCustomizeColumns={isPremium}
+          isPremiumPageSize={isPremiumLargePageSize}
+          statsFormat={statsFormat}
+          initialVisibleColumns={visibleColumns}
+          onVisibleColumnsChange={handleVisibleColumnsChange}
+          onPlayerDetails={handlePlayerDetails}
+          onExport={handleExport}
+          onVisibleRowsChange={handleVisibleRowsChange}
+          onShare={handleShare}
+          onFiltersChange={handleFiltersChange}
+          showAvailabilityFilter={showBaseballAvailabilityFilter}
+          rosteredPlayerIds={baseballRosteredIds}
+          leagues={baseballLeagues.length > 1 ? baseballLeagues : undefined}
+          leagueId={effectiveBaseballLeagueId}
+          onLeagueChange={setBaseballLeagueId}
+        />
+      )}
       {/* Routable player detail modal (PST-051 / LS-7124). Rendered in place over
           the filtered list when ?playerId=X is present — opened by a row click or
           restored on reload of a shared deep link — and offers an "open full
@@ -2030,6 +2051,14 @@ export function PlayerStatsRoute() {
           playerName="Player details"
           onBack={handleClosePlayerDetails}
           onViewFullPage={handleViewFullPage}
+        />
+      )}
+      {!isPremium && (
+        <UpgradeModal
+          open={showCardFeedUpgradeModal}
+          onOpenChange={setShowCardFeedUpgradeModal}
+          featureName="Player Statistics & Projections"
+          featureDescription="Unlock advanced player statistics, projected fantasy points, and ADP rankings with Premium."
         />
       )}
     </div>

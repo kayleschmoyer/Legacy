@@ -340,13 +340,13 @@ test.describe('Player Stats — Modal Premium Gate (LS-5595) @regression', () =>
     await playersPage.stats.expectLoaded();
     await entitlementsResolved;
 
-    // With the entitlement set settled as free, the premium-gate overlay
-    // must be up (it renders from the same `useHasEntitlement` state that
-    // gates the modal)…
-    await expect(page.getByTestId('premium-feature-gate')).toBeVisible();
+    // The stats page itself is public (LS-9347) — no page-wide gate overlay
+    // for a free viewer, and the table is visible…
+    await expect(page.getByTestId('premium-feature-gate')).toHaveCount(0);
+    await playersPage.stats.expectLoaded();
 
-    // …and the modal must not mount even though the URL carries ?playerId,
-    // because the entitlement gate is false.
+    // …but the modal must not mount even though the URL carries ?playerId,
+    // because the entitlement gate on the modal itself is false.
     await playersPage.detail.expectClosed();
   });
 });

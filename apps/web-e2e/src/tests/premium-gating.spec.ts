@@ -11,10 +11,16 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 /**
  * E2E coverage for the premium gating added in LS-5024.
  *
- * PlayerStats, View Game Logs (baseball + football), and the Player Detail
- * career-stats surface were previously ungated — a free user had full access to
+ * View Game Logs (baseball + football) and the Player Detail career-stats
+ * surface were previously ungated — a free user had full access to
  * advanced/historical statistics. Each is now wrapped in `PremiumGate`, so a
  * free user should see the blurred lock overlay + "Upgrade to Premium" CTA.
+ *
+ * The Player Stats page itself is a public, browsable surface (LS-9347) — a
+ * free user sees the full table/card feed, with only specific premium
+ * features (export, column customization, large page sizes) withheld. See
+ * "Player Stats page is accessible but export is withheld for free users"
+ * below.
  *
  * Premium status is sourced from `GetUserById.subscriptionTier` by `useIsPremium`
  * (apps/web/src/hooks/useIsPremium.ts), and the baseline mock returns a premium
@@ -28,14 +34,28 @@ const UPGRADE_CTA = /upgrade to premium/i;
 const EXPORT_BUTTON = /export player statistics as json/i;
 
 test.describe('Premium gating — free user @critical', () => {
-  test('Player Stats page is gated for free users', async ({ page }) => {
+  test('Player Stats page is accessible but export is withheld for free users (LS-9347)', async ({
+    page,
+    isMobile,
+  }) => {
+    // LS-9326/LS-9075: the phone-width card feed has no Export control by
+    // design — scope the export assertion to desktop, matching the existing
+    // premium-user counterpart test below.
+    test.skip(
+      isMobile,
+      'card feed has no Export control by design (LS-9075) — desktop-only assertion',
+    );
+
     await useTier(page, 'free');
     await page.goto('/players/stats');
 
-    await expect(page.getByTestId(GATE)).toBeVisible();
-    await expect(
-      page.getByRole('button', { name: UPGRADE_CTA }).first(),
-    ).toBeVisible();
+    // No page-wide lock overlay — the stats table itself is public
+    // (LS-9347). Export (a premium-only capability, LS-9140) is withheld:
+    // the shared shell renders no Export button at all when canExport=false.
+    await expect(page.getByTestId(GATE)).toHaveCount(0);
+    await expect(page.getByRole('button', { name: EXPORT_BUTTON })).toHaveCount(
+      0,
+    );
   });
 
   test('View Game Logs page is gated for free users', async ({ page }) => {
