@@ -1987,7 +1987,7 @@ export function createServer(): McpServer {
   // --- github_get_branch_protection ---
   server.tool(
     'github_get_branch_protection',
-    'Read branch protection rules and GitHub rulesets for a branch. Returns required status checks (from both classic protection and active rulesets), conversation resolution requirement, required review count, and a summary of all rulesets. Use this to diagnose why a PR is stuck in the merge queue or to understand which checks are truly required vs. informational.',
+    'Read branch protection rules and GitHub rulesets for a branch. Returns required status checks (from both classic protection and active rulesets), conversation resolution requirement, required review count, whether a code-owner review is required (requireCodeOwnerReview — note this can be true while requiredReviewCount is 0), and a summary of all rulesets. Use this to diagnose why a PR is stuck in the merge queue or to understand which checks are truly required vs. informational.',
     {
       branch: z
         .string()

@@ -1,6 +1,7 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { getRepoOwnerName } from '../auth.js';
 import { githubRest } from '../github-api.js';
+import { requiresCodeOwnerReview } from '../required-checks.js';
 import type { ToolResult } from '../types.js';
 
 interface GetBranchProtectionParams {
@@ -65,6 +66,17 @@ export async function getBranchProtection(
       // 404 = no classic protection configured; 403 = no admin access — both are acceptable
     }
 
+    // Code-owner review requirement — read from the branch-scoped rules
+    // endpoint (and classic protection) by the same helper github_pr_why_blocked
+    // uses, so the two tools agree. `requiredReviewCount: 0` alone used to hide
+    // this rule entirely, which made a PR blocked on CODEOWNERS look unblocked
+    // when callers cross-referenced the two tools (LS-9379).
+    const requireCodeOwnerReview = await requiresCodeOwnerReview(
+      repo.owner,
+      repo.name,
+      branch,
+    );
+
     // Repository rulesets
     const rulesets = await githubRest<Ruleset[]>({
       method: 'GET',
@@ -117,6 +129,7 @@ export async function getBranchProtection(
             requiredStatusChecks: allRequired,
             requireConversationResolution,
             requiredReviewCount,
+            requireCodeOwnerReview,
             rulesets: rulesetSummaries,
           }),
         },

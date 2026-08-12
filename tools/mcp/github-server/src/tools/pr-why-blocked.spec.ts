@@ -414,6 +414,63 @@ describe('diagnose', () => {
       const result = diagnose(pr, ci({ failing: ['lint (failure)'] }), true);
       expect(result.reason).toBe('CI_FAILING');
     });
+
+    // LS-9379: reviewDecision flips to APPROVED as soon as the CODEOWNERS
+    // catch-all (`*` -> review bot) approves, so an outstanding path-specific
+    // code-owner request used to fall through to a false READY while GitHub's
+    // merge API kept rejecting the merge (PR #7084).
+    it('returns BLOCKED/AWAITING_CODE_OWNER_REVIEW when the catch-all bot approved but a code-owner request is still outstanding', () => {
+      const pr = withReview(
+        makePR({
+          reviewDecision: 'APPROVED',
+          reviewRequests: {
+            pageInfo: { hasNextPage: false },
+            nodes: [
+              { requestedReviewer: { __typename: 'User', login: 'bkrupa' } },
+            ],
+          },
+        }),
+        'legacy-sports-review-bot',
+        'APPROVED',
+      );
+      const result = diagnose(withLabel(pr, 'merge-when-ready'), NO_CI, true);
+      expect(result.status).toBe('BLOCKED');
+      expect(result.reason).toBe('AWAITING_CODE_OWNER_REVIEW');
+      expect(
+        (result.details as { pendingReviewers: string[] }).pendingReviewers,
+      ).toEqual(['bkrupa']);
+      expect(
+        (result.details as { approvedByOtherReviewers?: boolean })
+          .approvedByOtherReviewers,
+      ).toBe(true);
+      expect(result.nextAction).toContain('bkrupa');
+    });
+
+    it('returns READY once the code owner has also approved and the request is cleared', () => {
+      const pr = withReview(
+        withReview(
+          makePR({ reviewDecision: 'APPROVED' }),
+          'legacy-sports-review-bot',
+          'APPROVED',
+        ),
+        'bkrupa',
+        'APPROVED',
+      );
+      const result = diagnose(pr, ci({ passing: 4 }), true);
+      expect(result.status).toBe('READY');
+      expect(result.reason).toBe('READY');
+    });
+
+    it('still reports READY on catch-all bot approval alone when no code owner was requested', () => {
+      const pr = withReview(
+        makePR({ reviewDecision: 'APPROVED' }),
+        'legacy-sports-review-bot',
+        'APPROVED',
+      );
+      const result = diagnose(pr, ci({ passing: 4 }), true);
+      expect(result.status).toBe('READY');
+      expect(result.reason).toBe('READY');
+    });
   });
 
   describe('merge queue / auto-merge', () => {

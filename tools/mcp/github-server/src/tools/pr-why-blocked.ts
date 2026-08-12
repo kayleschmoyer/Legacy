@@ -334,22 +334,48 @@ export function diagnose(
     };
   }
 
-  // REVIEW_REQUIRED because branch protection mandates a code-owner review
-  // (CODEOWNERS / require_code_owner_review) — distinct from an ordinary
-  // manually-requested review so the agent doesn't chase already-green CI or
-  // request a review from just anyone.
-  if (effectiveReviewDecision === 'REVIEW_REQUIRED' && requireCodeOwnerReview) {
+  // Branch protection mandates a code-owner review (CODEOWNERS /
+  // require_code_owner_review) and that requirement is not yet satisfied —
+  // distinct from an ordinary manually-requested review so the agent doesn't
+  // chase already-green CI or request a review from just anyone.
+  //
+  // Two ways the requirement can still be outstanding:
+  //   1. REVIEW_REQUIRED — nothing has approved yet.
+  //   2. APPROVED but a review request is still open. `reviewDecision` flips to
+  //      APPROVED as soon as ANY required reviewer approves, so a CODEOWNERS
+  //      catch-all entry (`*` -> the review bot) satisfies it while a
+  //      path-specific owner has not approved. GraphQL does not decompose the
+  //      decision per code-owner path, so the outstanding review request is the
+  //      only direct signal — and GitHub's merge API keeps rejecting the merge
+  //      with 405 "Waiting on code owner review from <owner>" the whole time.
+  //      Trusting the decision alone reported a false READY (LS-9379, PR #7084).
+  const hasPendingReviewRequest = pendingReviewers.length > 0;
+  if (
+    requireCodeOwnerReview &&
+    (effectiveReviewDecision === 'REVIEW_REQUIRED' || hasPendingReviewRequest)
+  ) {
+    const owners = pendingReviewers.join(', ');
+    const approvedButOutstanding =
+      effectiveReviewDecision === 'APPROVED' && hasPendingReviewRequest;
     return {
       status: 'BLOCKED',
       reason: 'AWAITING_CODE_OWNER_REVIEW',
-      summary:
-        pendingReviewers.length > 0
-          ? `A code-owner review is required and has not been submitted yet (requested from ${pendingReviewers.join(', ')}).`
+      summary: approvedButOutstanding
+        ? `A code-owner review from ${owners} is still outstanding — the PR reads as APPROVED because another required reviewer (e.g. the CODEOWNERS catch-all) approved, but GitHub will refuse the merge until ${owners} approves.`
+        : pendingReviewers.length > 0
+          ? `A code-owner review is required and has not been submitted yet (requested from ${owners}).`
           : 'A code-owner review is required but no reviewer has been requested yet.',
-      details: { pendingReviewers, requireCodeOwnerReviews: true },
+      details: {
+        pendingReviewers,
+        requireCodeOwnerReviews: true,
+        reviewDecision: effectiveReviewDecision,
+        ...(approvedButOutstanding ? { approvedByOtherReviewers: true } : {}),
+        ...(reviewRequestsTruncated ? { reviewRequestsTruncated: true } : {}),
+        ...(hasMergeWhenReady ? { hasMergeWhenReady } : {}),
+      },
       nextAction:
         pendingReviewers.length > 0
-          ? 'Wait for the requested code owner to submit their review.'
+          ? `Wait for ${owners} to approve — the merge stays blocked until then, and the merge-when-ready label will not bypass it.`
           : 'Request a review from the code owner (see CODEOWNERS) or wait for GitHub to auto-assign one via CODEOWNERS.',
     };
   }
