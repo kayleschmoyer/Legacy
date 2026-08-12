@@ -8,10 +8,12 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+
 import { Draft } from '../types';
 import { builder } from '../../builder';
 import type { Context } from '../../builder';
-import { requirePremium } from '../../authorization';
+import { requireEntitlement } from '../../authorization';
 import {
   AuthenticationError,
   ForbiddenError,
@@ -85,7 +87,7 @@ builder.mutationField('setDraftOrder', (t) =>
       if (!context.user) {
         throw AuthenticationError();
       }
-      await requirePremium(context, 'Draft pick order');
+      await requireEntitlement(context, ENTITLEMENTS.premium_draft_controls);
 
       const { draftId, teamIds } = args;
       const userId = context.user.id;
@@ -279,7 +281,7 @@ builder.mutationField('randomizeDraftOrder', (t) =>
       if (!context.user) {
         throw AuthenticationError();
       }
-      await requirePremium(context, 'Draft pick order');
+      await requireEntitlement(context, ENTITLEMENTS.premium_draft_controls);
 
       const { draftId } = args;
       const userId = context.user.id;

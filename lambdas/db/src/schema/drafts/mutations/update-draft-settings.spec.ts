@@ -1,16 +1,18 @@
 /**
- * Unit tests for updateDraftSettings entitlement gates (LS-5017)
+ * Unit tests for updateDraftSettings entitlement gates (LS-5017, LS-8807)
  *
  * Verifies that auction_draft and historical_era_filters entitlements are
  * enforced before any DB writes — mirroring the identical gate in
  * createLeagueAndTeams (LS-5159).
  *
- * Draft settings became a blanket premium-only feature in LS-5014, checked
- * after the ownership/draft-status guards but before the granular
- * auction/era-filter entitlement checks above. A free-tier caller therefore
- * never reaches those granular checks — the "free era filter" cases below
- * run as a premium user to isolate what they actually verify: that a
- * free-tier-safe era value doesn't spuriously trip requireEntitlement.
+ * Draft settings became a blanket premium-only feature in LS-5014 (migrated
+ * from the raw-tier requirePremium check to requireEntitlement against
+ * premium_draft_controls by LS-8807), checked after the ownership/draft-status
+ * guards but before the granular auction/era-filter entitlement checks above.
+ * A caller without premium_draft_controls therefore never reaches those
+ * granular checks — the "free era filter" cases below run as a premium user
+ * to isolate what they actually verify: that a free-tier-safe era value
+ * doesn't spuriously trip requireEntitlement.
  */
 
 import { ENTITLEMENTS } from '@legacy-sports/utils';
@@ -40,14 +42,17 @@ function makeCtx({
   leagueOwner = 1,
   leagueSport = 'baseball',
   leagueRosterContinuity = 'redraft',
-  // requirePremium() (the blanket LS-5014 gate) reads the DB subscription_tier
-  // column mocked below via tierSelectMock and doesn't need this. The granular
-  // auction_draft / historical_era_filters gates (LS-5017) go through
-  // requireEntitlement/hasEntitlement, which read the JWT-claim-derived
-  // context.user.entitlements (LS-8643) — default premium callers to holding
-  // both entitlements exercised by this file's test cases.
+  // Both the blanket LS-5014/LS-8807 gate (premium_draft_controls) and the
+  // granular auction_draft / historical_era_filters gates (LS-5017) go
+  // through requireEntitlement/hasEntitlement, which read the JWT-claim-
+  // derived context.user.entitlements (LS-8643) — default premium callers to
+  // holding every entitlement exercised by this file's test cases.
   entitlements = tier === 'premium'
-    ? [ENTITLEMENTS.auction_draft, ENTITLEMENTS.historical_era_filters]
+    ? [
+        ENTITLEMENTS.premium_draft_controls,
+        ENTITLEMENTS.auction_draft,
+        ENTITLEMENTS.historical_era_filters,
+      ]
     : [],
 }: MakeCtxOptions = {}) {
   const league = {

@@ -1,8 +1,10 @@
 /**
- * Unit tests: requirePremium gate on setDraftOrder + randomizeDraftOrder (LS-5014)
+ * Unit tests: requireEntitlement(premium_draft_controls) gate on setDraftOrder +
+ * randomizeDraftOrder (LS-5014, migrated from the raw-tier requirePremium check
+ * to the Stripe entitlement model by LS-8807).
  *
- * Verifies that both mutations reject unauthenticated callers and free-tier
- * users before any database writes occur.
+ * Verifies that both mutations reject unauthenticated callers and callers
+ * without the entitlement before any database writes occur.
  */
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -69,21 +71,25 @@ function captureResolvers(): {
 /**
  * Build a minimal context.
  *
- * requirePremium calls context.db.select().from().where().limit(1) and checks
- * rows[0]?.tier.  Returning an empty array causes tier to fall back to 'free'
- * and requirePremium to throw PremiumRequiredError.
- * Returning [{ tier: 'premium' }] lets the call proceed.
+ * requireEntitlement -> hasEntitlement reads the memoized gating row
+ * (context.db.select({tier, entitlementsUpdatedAt}).from().where().limit(1))
+ * to check token freshness, then checks context.user.entitlements for the
+ * key. Omitting entitlementsUpdatedAt yields a null marker, which skips the
+ * staleness check entirely — the tests below aren't exercising that path.
  */
-function makeCtx({ subscriptionTier = 'free' } = {}) {
-  const tierRows = subscriptionTier === 'premium' ? [{ tier: 'premium' }] : [];
-
+function makeCtx({ hasEntitlement = false } = {}) {
   return {
-    user: { id: 1, username: 'testuser' },
+    user: {
+      id: 1,
+      username: 'testuser',
+      entitlements: hasEntitlement ? ['premium_draft_controls'] : [],
+      iat: Math.floor(Date.now() / 1000),
+    },
     db: {
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue(tierRows),
+            limit: jest.fn().mockResolvedValue([]),
           }),
         }),
       }),
@@ -106,22 +112,22 @@ describe('setDraftOrder — authentication guard (LS-5014)', () => {
   });
 });
 
-describe('setDraftOrder — premium gate (LS-5014)', () => {
-  it('rejects a free-tier user with a premium-required error', async () => {
+describe('setDraftOrder — entitlement gate (LS-8807)', () => {
+  it('rejects a caller without premium_draft_controls with a premium-required error', async () => {
     const { setDraftOrder } = captureResolvers();
-    const ctx = makeCtx({ subscriptionTier: 'free' });
+    const ctx = makeCtx({ hasEntitlement: false });
 
     await expect(
       setDraftOrder(null, { draftId: 1, teamIds: [1, 2] }, ctx),
-    ).rejects.toThrow(/premium/i);
+    ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
   });
 
-  it('allows a premium user past the gate (proceeds to mutation logic)', async () => {
+  it('allows a caller with premium_draft_controls past the gate (proceeds to mutation logic)', async () => {
     const { setDraftOrder } = captureResolvers();
-    const ctx = makeCtx({ subscriptionTier: 'premium' });
+    const ctx = makeCtx({ hasEntitlement: true });
 
-    // requirePremium passes; the transaction mock throws "Draft not found" —
-    // confirming the call advanced past the premium gate.
+    // requireEntitlement passes; the transaction mock throws "Draft not
+    // found" — confirming the call advanced past the entitlement gate.
     await expect(
       setDraftOrder(null, { draftId: 1, teamIds: [1, 2] }, ctx),
     ).rejects.toThrow(/Draft not found/i);
@@ -141,22 +147,22 @@ describe('randomizeDraftOrder — authentication guard (LS-5014)', () => {
   });
 });
 
-describe('randomizeDraftOrder — premium gate (LS-5014)', () => {
-  it('rejects a free-tier user with a premium-required error', async () => {
+describe('randomizeDraftOrder — entitlement gate (LS-8807)', () => {
+  it('rejects a caller without premium_draft_controls with a premium-required error', async () => {
     const { randomizeDraftOrder } = captureResolvers();
-    const ctx = makeCtx({ subscriptionTier: 'free' });
+    const ctx = makeCtx({ hasEntitlement: false });
 
     await expect(
       randomizeDraftOrder(null, { draftId: 1 }, ctx),
-    ).rejects.toThrow(/premium/i);
+    ).rejects.toMatchObject({ extensions: { code: 'PREMIUM_REQUIRED' } });
   });
 
-  it('allows a premium user past the gate (proceeds to mutation logic)', async () => {
+  it('allows a caller with premium_draft_controls past the gate (proceeds to mutation logic)', async () => {
     const { randomizeDraftOrder } = captureResolvers();
-    const ctx = makeCtx({ subscriptionTier: 'premium' });
+    const ctx = makeCtx({ hasEntitlement: true });
 
-    // requirePremium passes; the transaction mock throws "Draft not found" —
-    // confirming the call advanced past the premium gate.
+    // requireEntitlement passes; the transaction mock throws "Draft not
+    // found" — confirming the call advanced past the entitlement gate.
     await expect(
       randomizeDraftOrder(null, { draftId: 1 }, ctx),
     ).rejects.toThrow(/Draft not found/i);

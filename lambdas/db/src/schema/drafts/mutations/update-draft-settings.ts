@@ -15,7 +15,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from '../../graphql-errors';
-import { requireEntitlement, requirePremium } from '../../authorization';
+import { requireEntitlement } from '../../authorization';
 import {
   isEraFreeForSport,
   normalizeSport,
@@ -89,12 +89,17 @@ builder.mutationField('updateDraftSettings', (t) =>
           );
         }
 
-        // Draft settings are a premium-only feature (LS-5014). Checked after
-        // ownership/draft-status so an unauthorized or already-blocked caller
-        // gets that error rather than a premium prompt for a league they
-        // don't control — matching the auth-then-authz-then-entitlement order
-        // the `authorized()` wrapper uses elsewhere in this file's siblings.
-        await requirePremium(context, 'Draft settings');
+        // Draft settings are a premium-only feature (LS-5014, migrated to the
+        // entitlement model by LS-8807). Checked after ownership/draft-status
+        // so an unauthorized or already-blocked caller gets that error rather
+        // than a premium prompt for a league they don't control — matching
+        // the auth-then-authz-then-entitlement order the `authorized()`
+        // wrapper uses elsewhere in this file's siblings.
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.premium_draft_controls,
+          'Draft settings requires a premium subscription. Upgrade to unlock this feature.',
+        );
 
         // Validate enum values
         const validDraftModes = ['live', 'automated'];

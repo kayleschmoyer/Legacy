@@ -63,7 +63,9 @@ but has **no backing Stripe entitlement** (or no backend enforcement at all).
    (`app_internal.users.subscription_tier`) is retained only as a coarse billing-state
    cache (free-tier league limit + downgrade side-effects); admins are treated as
    premium for reads. The legacy `requirePremium(ctx)` (raw tier check, no entitlement
-   key) remains for coarse cases.
+   key) has no remaining user-facing call site as of LS-8807 (which migrated the last
+   two — draft pick order + draft settings — to `premium_draft_controls`); it survives
+   only as the generic, currently-unused `authorized({ premium: true })` wrapper config.
 
 3. **Frontend gates (`PremiumGate` upsell overlays).** Purely presentational —
    they blur/overlay content and show an "Upgrade" CTA based on an `isPremium`
@@ -85,16 +87,17 @@ These 8 keys are in the `ENTITLEMENTS` catalog and seeded into Stripe by
 derives from the same catalog); a customer on the premium plan receives them in
 their JWT entitlement claim at login/refresh.
 
-| Entitlement key             | Label                               | Backend enforced? | Where                                                            |
-| --------------------------- | ----------------------------------- | ----------------- | ---------------------------------------------------------------- |
-| `salary_cap_leagues`        | Salary cap leagues                  | ✅                | `leagues/mutations.ts` (create/update league)                    |
-| `advanced_playoff_formats`  | Advanced playoff formats (6/8-team) | ✅                | `leagues/mutations.ts`                                           |
-| `unlimited_mock_drafts`     | Unlimited mock drafts               | ✅                | `drafts/queries.ts`, `drafts/mutations/initialize-mock-draft.ts` |
-| `unlimited_leagues`         | Unlimited active leagues            | ✅                | `leagues/mutations.ts` (create/renew league cap)                 |
-| `faab_waiver_type`          | FAAB waivers                        | ✅                | `leagues/mutations.ts`                                           |
-| `historical_era_filters`    | Historical era filters              | ✅                | `leagues/mutations.ts`                                           |
-| `auction_draft`             | Auction draft mode                  | ✅                | `leagues/mutations.ts`                                           |
-| `extended_trade_expiration` | Extended trade expiration           | ✅                | `trades/mutations.ts`                                            |
+| Entitlement key             | Label                               | Backend enforced? | Where                                                                                    |
+| --------------------------- | ----------------------------------- | ----------------- | ---------------------------------------------------------------------------------------- |
+| `salary_cap_leagues`        | Salary cap leagues                  | ✅                | `leagues/mutations.ts` (create/update league)                                            |
+| `advanced_playoff_formats`  | Advanced playoff formats (6/8-team) | ✅                | `leagues/mutations.ts`                                                                   |
+| `unlimited_mock_drafts`     | Unlimited mock drafts               | ✅                | `drafts/queries.ts`, `drafts/mutations/initialize-mock-draft.ts`                         |
+| `unlimited_leagues`         | Unlimited active leagues            | ✅                | `leagues/mutations.ts` (create/renew league cap)                                         |
+| `faab_waiver_type`          | FAAB waivers                        | ✅                | `leagues/mutations.ts`                                                                   |
+| `historical_era_filters`    | Historical era filters              | ✅                | `leagues/mutations.ts`                                                                   |
+| `auction_draft`             | Auction draft mode                  | ✅                | `leagues/mutations.ts`                                                                   |
+| `extended_trade_expiration` | Extended trade expiration           | ✅                | `trades/mutations.ts`                                                                    |
+| `premium_draft_controls`    | Draft pick order & draft settings   | ✅                | `drafts/mutations/draft-order.ts`, `drafts/mutations/update-draft-settings.ts` (LS-8807) |
 
 ### ✅ Gap A (resolved, LS-6475 — code removal completed 2026-07-02) — `advanced_football_stats` removed
 
