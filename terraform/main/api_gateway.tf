@@ -96,6 +96,11 @@ resource "aws_api_gateway_deployment" "main" {
       aws_api_gateway_resource.apple_iap.id,
       aws_api_gateway_method.apple_iap_post.id,
       aws_api_gateway_integration.apple_iap_post.id,
+      # Stripe webhook /stripe/webhook alias (LS-9356)
+      aws_api_gateway_resource.stripe.id,
+      aws_api_gateway_resource.stripe_webhook_alias.id,
+      aws_api_gateway_method.stripe_webhook_alias_post.id,
+      aws_api_gateway_integration.stripe_webhook_alias_post.id,
     ]))
   }
 

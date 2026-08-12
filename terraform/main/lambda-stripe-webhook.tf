@@ -261,3 +261,49 @@ resource "aws_lambda_permission" "stripe_webhook_api_gateway" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/stripe-webhook"
 }
+
+# ── /stripe/webhook alias (LS-9356) ─────────────────────────────────────────
+# The Stripe Dashboard's registered dev webhook endpoint URL is
+# https://api.legacy-fantasy.com/stripe/webhook (nested path), not
+# /stripe-webhook (single hyphenated resource) above. That mismatch meant
+# every delivery hit API Gateway's default "Missing Authentication Token"
+# 403 for an unmatched route before ever reaching signature verification —
+# confirmed by comparing curl responses: /stripe/webhook returns 403
+# (identical to a nonexistent path) while /stripe-webhook returns 400
+# "Invalid signature" (reaches the Lambda correctly). This alias restores
+# delivery immediately without depending on a Stripe Dashboard change.
+resource "aws_api_gateway_resource" "stripe" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "stripe"
+}
+
+resource "aws_api_gateway_resource" "stripe_webhook_alias" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_resource.stripe.id
+  path_part   = "webhook"
+}
+
+resource "aws_api_gateway_method" "stripe_webhook_alias_post" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.stripe_webhook_alias.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "stripe_webhook_alias_post" {
+  rest_api_id             = aws_api_gateway_rest_api.main.id
+  resource_id             = aws_api_gateway_resource.stripe_webhook_alias.id
+  http_method             = aws_api_gateway_method.stripe_webhook_alias_post.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.stripe_webhook.invoke_arn
+}
+
+resource "aws_lambda_permission" "stripe_webhook_alias_api_gateway" {
+  statement_id  = "AllowExecutionFromAPIGatewayStripeAlias"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.stripe_webhook.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/stripe/webhook"
+}
