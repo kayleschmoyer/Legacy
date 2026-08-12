@@ -1419,6 +1419,7 @@ export type League = {
   auctionMinBid?: Maybe<Scalars['Int']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
   baseballHofOnly?: Maybe<Scalars['Boolean']['output']>;
+  controlAllTeams?: Maybe<Scalars['Boolean']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   currentWeek?: Maybe<Scalars['Int']['output']>;
   /** The current active week number for the league */
@@ -2358,6 +2359,7 @@ export type MutationInitializeDraftArgs = {
 };
 
 export type MutationInitializeMockDraftArgs = {
+  controlAllTeams?: InputMaybe<Scalars['Boolean']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   isOffline?: InputMaybe<Scalars['Boolean']['input']>;
   numTeams: Scalars['Int']['input'];
@@ -6286,6 +6288,7 @@ export type CreateLeagueAndTeamsMutation = {
       lmNotes?: string | null;
       isMockDraft?: boolean | null;
       isOfflineDraft?: boolean | null;
+      controlAllTeams?: boolean | null;
       isPublic?: boolean | null;
       logoUrl?: string | null;
       bannerUrl?: string | null;
@@ -6366,6 +6369,7 @@ export type GetUserLeaguesQuery = {
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
     isOfflineDraft?: boolean | null;
+    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -6445,6 +6449,7 @@ export type GetMyLeaguesQuery = {
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
     isOfflineDraft?: boolean | null;
+    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -6533,6 +6538,7 @@ export type StartDraftMutation = {
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
     isOfflineDraft?: boolean | null;
+    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -6685,6 +6691,7 @@ export type StartSeasonMutation = {
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
     isOfflineDraft?: boolean | null;
+    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -9410,6 +9417,7 @@ export type UpdateLeagueSettingsMutation = {
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
     isOfflineDraft?: boolean | null;
+    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -10590,6 +10598,7 @@ export type GetLeagueByIdQuery = {
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
     isOfflineDraft?: boolean | null;
+    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -11532,6 +11541,7 @@ export type LeagueFragment = {
   lmNotes?: string | null;
   isMockDraft?: boolean | null;
   isOfflineDraft?: boolean | null;
+  controlAllTeams?: boolean | null;
   isPublic?: boolean | null;
   logoUrl?: string | null;
   bannerUrl?: string | null;
@@ -12188,6 +12198,7 @@ export type InitializeMockDraftMutationVariables = Exact<{
   playerPool?: InputMaybe<Scalars['String']['input']>;
   sport?: InputMaybe<Scalars['String']['input']>;
   isOffline?: InputMaybe<Scalars['Boolean']['input']>;
+  controlAllTeams?: InputMaybe<Scalars['Boolean']['input']>;
 }>;
 
 export type InitializeMockDraftMutation = {
@@ -12915,6 +12926,7 @@ export type RenewLeagueMutation = {
     lmNotes?: string | null;
     isMockDraft?: boolean | null;
     isOfflineDraft?: boolean | null;
+    controlAllTeams?: boolean | null;
     isPublic?: boolean | null;
     logoUrl?: string | null;
     bannerUrl?: string | null;
@@ -15382,6 +15394,7 @@ export const LeagueFragmentDoc = gql`
     lmNotes
     isMockDraft
     isOfflineDraft
+    controlAllTeams
     isPublic
     logoUrl
     bannerUrl
@@ -31243,6 +31256,7 @@ export const InitializeMockDraft = gql`
     $playerPool: String
     $sport: String
     $isOffline: Boolean
+    $controlAllTeams: Boolean
   ) {
     initializeMockDraft(
       numTeams: $numTeams
@@ -31253,6 +31267,7 @@ export const InitializeMockDraft = gql`
       playerPool: $playerPool
       sport: $sport
       isOffline: $isOffline
+      controlAllTeams: $controlAllTeams
     ) {
       leagueId
       draftId
@@ -31286,6 +31301,7 @@ export type InitializeMockDraftMutationFn = MutationFunction<
  *      playerPool: // value for 'playerPool'
  *      sport: // value for 'sport'
  *      isOffline: // value for 'isOffline'
+ *      controlAllTeams: // value for 'controlAllTeams'
  *   },
  * });
  */

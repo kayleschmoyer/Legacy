@@ -43,6 +43,15 @@ jest.mock('../../context/GrowthBookProvider', () => ({
   useFeatureIsOn: jest.fn(() => false),
 }));
 
+// Control All Teams entitlement (LS-9253) — controlled per-test, defaults to
+// not entitled so the gated-option tests exercise the locked path. Mocked
+// (rather than letting the real useEntitlements/useAuth chain run) since
+// these page tests don't wrap in an AuthProvider.
+const mockUseHasEntitlement = jest.fn(() => false);
+jest.mock('../../hooks/useIsPremium', () => ({
+  useHasEntitlement: () => mockUseHasEntitlement(),
+}));
+
 jest.mock('../../components/PageMeta', () => ({ PageMeta: () => null }));
 jest.mock('../../components/UpgradeModal', () => ({
   UpgradeModal: () => null,

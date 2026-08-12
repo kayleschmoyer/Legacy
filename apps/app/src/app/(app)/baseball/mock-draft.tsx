@@ -13,7 +13,11 @@ import {
   useInitializeMockDraftMutation,
 } from '@legacy-sports/graphql';
 import { brand } from '@legacy-sports/design-tokens';
-import { useSubscription } from '../../../features/subscription/useSubscription';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+import {
+  useHasEntitlement,
+  useSubscription,
+} from '../../../features/subscription/useSubscription';
 import { trackPremiumFeatureClick } from '../../../utils/analytics';
 import { closeToHomeTab } from '../../../common/utilities/RouteUtils';
 
@@ -164,6 +168,9 @@ export function MockDraftPage(): React.JSX.Element {
   const router = useRouter();
   const { isPremium, loading: subscriptionLoading } = useSubscription();
   const footballMockEnabled = useFeatureIsOn(FOOTBALL_MOCK_PLAYERS_FLAG);
+  const isControlAllTeamsEntitled = useHasEntitlement(
+    ENTITLEMENTS.mock_draft_control_all_teams,
+  );
   const [initializeMockDraft, { loading, error }] =
     useInitializeMockDraftMutation();
   const [missingLeagueIdError, setMissingLeagueIdError] = useState<
@@ -193,7 +200,10 @@ export function MockDraftPage(): React.JSX.Element {
 
   const handleStart = async (settings: MockDraftSettings) => {
     setMissingLeagueIdError(null);
-    const isOffline = settings.mode === 'offline';
+    // Control All Teams always implies offline (LS-9253) — the server forces
+    // this too, but computing it client-side keeps pickTimeLimitSeconds correct.
+    const isOffline =
+      settings.mode === 'offline' || settings.controlAllTeams === true;
     const result = await initializeMockDraft({
       variables: {
         numTeams: settings.numTeams,
@@ -205,6 +215,7 @@ export function MockDraftPage(): React.JSX.Element {
         playerPool: settings.playerPool,
         sport: settings.sport,
         isOffline,
+        controlAllTeams: settings.controlAllTeams,
       },
     });
     const initialized = result.data?.initializeMockDraft;
@@ -272,6 +283,11 @@ export function MockDraftPage(): React.JSX.Element {
     );
   }
 
+  const handleControlAllTeamsUpgrade = () => {
+    trackPremiumFeatureClick('Control All Teams');
+    void router.navigate('subscription-settings');
+  };
+
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
       <YStack
@@ -303,6 +319,8 @@ export function MockDraftPage(): React.JSX.Element {
           usageLabel={usageLabel}
           header={showUpsell ? <PremiumUpsell /> : null}
           onJoinInstead={() => router.navigate('/baseball/mock-draft-join')}
+          isControlAllTeamsEntitled={isControlAllTeamsEntitled}
+          onControlAllTeamsUpgrade={handleControlAllTeamsUpgrade}
         />
 
         <Text color="$gray10" fontSize="$2" marginTop="$3" textAlign="center">

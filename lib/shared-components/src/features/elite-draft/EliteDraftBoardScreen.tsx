@@ -207,15 +207,16 @@ function PlayerRow({
   adp,
   canDraft,
   commPickMode,
-  onDraft,
-  onCommissionerPick,
+  onPress,
 }: {
   player: DraftPlayer;
   adp: number;
   canDraft: boolean;
+  /** Drives the "ASSIGN" vs "DRAFT" label only — a real commissioner
+   *  force-pick override, never Control All Teams (LS-9253), which should
+   *  read as a first-class pick action rather than an override. */
   commPickMode: boolean;
-  onDraft: (id: number) => void;
-  onCommissionerPick: (id: number) => void;
+  onPress: (id: number) => void;
 }) {
   const posColor = getPositionColor('baseball', player.position);
 
@@ -269,9 +270,7 @@ function PlayerRow({
         <GoldButton
           size="sm"
           label={commPickMode ? 'ASSIGN' : 'DRAFT'}
-          onPress={() =>
-            commPickMode ? onCommissionerPick(player.id) : onDraft(player.id)
-          }
+          onPress={() => onPress(player.id)}
         />
       )}
     </XStack>
@@ -299,6 +298,10 @@ interface CompactLiveDraftBoardProps {
   currentPick: number;
   /** Mock drafts only — no real teammates to leave hanging (LS-9238). */
   isMockDraft: boolean;
+  /** Premium (LS-9253): every team's turn is pickable, routed through the
+   *  commissionerPick mutation under the hood — no CPU auto-picker exists
+   *  in this mode. */
+  controlAllTeams: boolean;
   onExitDraft: () => void;
   onDraftPlayer: (id: number) => void;
   onCommissionerPick: (id: number) => void;
@@ -316,6 +319,7 @@ function CompactLiveDraftBoard({
   round,
   currentPick,
   isMockDraft,
+  controlAllTeams,
   onExitDraft,
   onDraftPlayer,
   onCommissionerPick,
@@ -357,8 +361,34 @@ function CompactLiveDraftBoard({
     );
   }, [rankedPlayers, sortKey]);
 
-  const canCommissionerPick = ui.commPickMode && queries.isCommissioner;
-  const canDraft = isMyPick || canCommissionerPick;
+  // A real commissioner force-pick override — never true for Control All
+  // Teams mock drafts, since LS-9242 hides the commissioner bar (and its
+  // COMM PICK toggle) there entirely. Kept separate from controlAllTeams so
+  // the "ASSIGN"/Force-Pick framing stays exclusive to actual commissioner
+  // overrides (LS-9253 wants a first-class pick action, not an override).
+  const isRealCommPick = ui.commPickMode && queries.isCommissioner;
+  const canDraft = isMyPick || controlAllTeams || isRealCommPick;
+  // Which mutation a tap on the Draft/Assign button should fire: real
+  // commissioner overrides and Control All Teams turns for teams other than
+  // the human's own seat both go through commissionerPick (it doesn't check
+  // turn ownership, just commissioner permission); the human's own turn
+  // still uses the normal makeDraftPick path.
+  const handlePlayerRowPress = useCallback(
+    (id: number) => {
+      if (isRealCommPick || (controlAllTeams && !isMyPick)) {
+        onCommissionerPick(id);
+      } else {
+        onDraftPlayer(id);
+      }
+    },
+    [
+      isRealCommPick,
+      controlAllTeams,
+      isMyPick,
+      onCommissionerPick,
+      onDraftPlayer,
+    ],
+  );
   // Mock drafts auto-register the human as "commissioner" (initialize-mock-draft.ts)
   // so the queue/pick flow works, but there's no real commissioner role to manage
   // in a solo practice draft — the controls should never surface there (LS-9242).
@@ -577,9 +607,8 @@ function CompactLiveDraftBoard({
             player={item.player}
             adp={item.adp}
             canDraft={canDraft}
-            commPickMode={canCommissionerPick}
-            onDraft={onDraftPlayer}
-            onCommissionerPick={onCommissionerPick}
+            commPickMode={isRealCommPick}
+            onPress={handlePlayerRowPress}
           />
         )}
         onEndReached={() => {
@@ -856,6 +885,9 @@ export function EliteDraftBoardScreen({
   // progress — real leagues intentionally omit this (other drafters are
   // waiting on you), but a mock draft has no one to leave hanging.
   const isMockDraft = queries.league?.isMockDraft === true;
+  // Premium Control All Teams mode (LS-9253): the human picks for every
+  // team, so every turn should be pickable regardless of whose seat it is.
+  const controlAllTeams = queries.league?.controlAllTeams === true;
   const handleExitDraft = useCallback(() => {
     onNavigate('/baseball');
   }, [onNavigate]);
@@ -1176,6 +1208,7 @@ export function EliteDraftBoardScreen({
         round={round}
         currentPick={currentPick}
         isMockDraft={isMockDraft}
+        controlAllTeams={controlAllTeams}
         onExitDraft={handleExitDraft}
         onDraftPlayer={handleDraftPlayer}
         onCommissionerPick={handleCommissionerPick}
@@ -1240,6 +1273,7 @@ export function EliteDraftBoardScreen({
           commPickMode={ui.commPickMode}
           isOwner={queries.isCommissioner}
           isMyPick={isMyPick}
+          controlAllTeams={controlAllTeams}
           pickLoading={actions.pickLoading}
           myTeamId={queries.myTeamId}
           draftId={queries.draftId}
@@ -1275,6 +1309,7 @@ export function EliteDraftBoardScreen({
           isPremium={isPremium}
           isMyPick={isMyPick}
           commPickMode={ui.commPickMode}
+          controlAllTeams={controlAllTeams}
           isOwner={queries.isCommissioner}
           isGeneralManager={queries.isGeneralManager}
           draftId={queries.draftId}

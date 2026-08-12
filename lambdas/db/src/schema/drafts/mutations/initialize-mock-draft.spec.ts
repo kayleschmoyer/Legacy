@@ -1,13 +1,17 @@
 /**
  * Unit tests for initializeMockDraft resolver (LS-4853)
  *
- * Test list:
+ * Core coverage:
  *   1. UNAUTHENTICATED guard — ctx.user = null → UNAUTHENTICATED
  *   2. BAD_USER_INPUT — numTeams out of range
  *   3. BAD_USER_INPUT — userPickPosition out of bounds
  *   4. BAD_USER_INPUT — pickTimeLimitSeconds out of range
  *   5. Transaction success — returns leagueId and draftId
  *   6. Transaction failure — propagates error, no partial data returned
+ *
+ * Mode-specific coverage lives in dedicated describe blocks below: Offline
+ * (LS-9144), football sport (LS-9040), Shared-mode lobby (LS-9181), and
+ * Control All Teams (LS-9253).
  */
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -19,9 +23,10 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
-async function captureInitializeMockDraftResolver(): Promise<
-  (...args: unknown[]) => Promise<unknown>
-> {
+async function captureInitializeMockDraftResolver(opts?: {
+  /** Override requireEntitlement's behavior (e.g. reject like a free user). */
+  requireEntitlementImpl?: (...args: unknown[]) => Promise<void>;
+}): Promise<(...args: unknown[]) => Promise<unknown>> {
   jest.resetModules();
   let capturedFn: ((...args: unknown[]) => Promise<unknown>) | undefined;
 
@@ -100,10 +105,15 @@ async function captureInitializeMockDraftResolver(): Promise<
 
   jest.doMock('../../authorization', () => ({
     hasEntitlement: jest.fn().mockResolvedValue(true),
+    requireEntitlement:
+      opts?.requireEntitlementImpl ?? jest.fn().mockResolvedValue(undefined),
   }));
 
   jest.doMock('../../entitlements', () => ({
-    ENTITLEMENTS: { unlimited_mock_drafts: 'unlimited_mock_drafts' },
+    ENTITLEMENTS: {
+      unlimited_mock_drafts: 'unlimited_mock_drafts',
+      mock_draft_control_all_teams: 'mock_draft_control_all_teams',
+    },
   }));
 
   jest.doMock('../helpers', () => ({
@@ -570,6 +580,135 @@ describe('initializeMockDraft Shared-mode lobby behavior (LS-9181)', () => {
 
     expect(typeof result.inviteCode).toBe('string');
     expect(result.inviteCode).toHaveLength(8);
+  });
+});
+
+describe('initializeMockDraft Control All Teams (LS-9253)', () => {
+  function makeMockDb(transactionImpl: (cb: unknown) => Promise<unknown>) {
+    return {
+      select: jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            limit: jest.fn().mockResolvedValue([]),
+          })),
+        })),
+      })),
+      transaction: jest.fn(transactionImpl),
+    };
+  }
+
+  function makeChainAndTx() {
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }]) // league
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }]) // teams
+      .mockResolvedValueOnce([{ id: 100 }]); // draft
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+    return { chain, mockTx };
+  }
+
+  it('rejects a non-entitled user requesting controlAllTeams with PAYMENT_REQUIRED', async () => {
+    const requireEntitlementImpl = jest.fn().mockImplementation(() => {
+      const err = new Error('Upgrade required') as Error & {
+        extensions: { code: string };
+      };
+      err.extensions = { code: 'PAYMENT_REQUIRED' };
+      return Promise.reject(err);
+    });
+    const resolve = await captureInitializeMockDraftResolver({
+      requireEntitlementImpl,
+    });
+
+    await expect(
+      resolve(
+        {},
+        { ...VALID_ARGS, controlAllTeams: true },
+        { user: { id: 1 }, db: {} },
+        undefined,
+      ),
+    ).rejects.toMatchObject({ extensions: { code: 'PAYMENT_REQUIRED' } });
+    expect(requireEntitlementImpl).toHaveBeenCalledWith(
+      expect.anything(),
+      'mock_draft_control_all_teams',
+    );
+  });
+
+  it('does not call requireEntitlement when controlAllTeams is not requested', async () => {
+    const requireEntitlementImpl = jest.fn().mockResolvedValue(undefined);
+    const resolve = await captureInitializeMockDraftResolver({
+      requireEntitlementImpl,
+    });
+    const { chain, mockTx } = makeChainAndTx();
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    await resolve({}, VALID_ARGS, { user: { id: 1 }, db }, undefined);
+
+    expect(requireEntitlementImpl).not.toHaveBeenCalled();
+    expect(chain.values.mock.calls[0][0]).toMatchObject({
+      controlAllTeams: false,
+    });
+  });
+
+  it('seats every team autoPick:false, skips CPU naming, forces offline, and disables draft-level auto-pick for an entitled user', async () => {
+    const resolve = await captureInitializeMockDraftResolver({
+      requireEntitlementImpl: jest.fn().mockResolvedValue(undefined),
+    });
+    const { chain, mockTx } = makeChainAndTx();
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    // userPickPosition: 2, numTeams: 4 (VALID_ARGS) — team ids returned in
+    // draft order are [10, 11, 12, 13]; the human's slot (index 1) is 11.
+    const result = await resolve(
+      {},
+      { ...VALID_ARGS, controlAllTeams: true },
+      { user: { id: 1 }, db },
+      undefined,
+    );
+    expect(result).toMatchObject({ leagueId: 1, draftId: 100 });
+
+    // League insert: controlAllTeams + forced isOfflineDraft.
+    expect(chain.values.mock.calls[0][0]).toMatchObject({
+      controlAllTeams: true,
+      isOfflineDraft: true,
+    });
+
+    // Teams insert: no "CPU Team" naming anywhere — every non-human slot is
+    // just "Team N".
+    const teamInserts = chain.values.mock.calls[1][0] as Array<{
+      name: string;
+    }>;
+    expect(teamInserts.map((t) => t.name)).toEqual([
+      'Team 1',
+      'My Team',
+      'Team 3',
+      'Team 4',
+    ]);
+
+    // Drafts insert: draft-level auto-pick disabled — the authoritative
+    // guard against autoProcessDraftPicks ever picking for this draft.
+    expect(chain.values.mock.calls[3][0]).toMatchObject({
+      autoPickDisabled: true,
+    });
+
+    // draft_teams insert: every team seated autoPick:false, including the
+    // human's own slot — no CPU auto-picker anywhere on the board.
+    const draftTeamInserts = chain.values.mock.calls[4][0] as Array<{
+      autoPick: boolean;
+    }>;
+    expect(draftTeamInserts).toHaveLength(4);
+    expect(draftTeamInserts.every((dt) => dt.autoPick === false)).toBe(true);
   });
 });
 

@@ -47,6 +47,7 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     commPickMode: false,
     isOwner: false,
     isMyPick: false,
+    controlAllTeams: false,
     pickLoading: false,
     myTeamId: 1,
     draftId: 42,
@@ -102,6 +103,71 @@ describe('DraftPlayerBoard — sport-aware stat headers (LS-4662)', () => {
     expect(getByText('FG')).toBeTruthy();
     expect(queryByText('AVG')).toBeNull();
     expect(queryByText('WAR')).toBeNull();
+  });
+});
+
+describe('DraftPlayerBoard — Control All Teams (LS-9253)', () => {
+  it("hides the Draft action for another team's turn by default", () => {
+    const { queryByText } = render(
+      <DraftPlayerBoard {...makeProps({ isMyPick: false })} />,
+    );
+    expect(queryByText('Draft')).toBeNull();
+    expect(queryByText('Force Pick')).toBeNull();
+  });
+
+  it("shows a first-class Draft action (not Force Pick) for another team's turn when controlAllTeams is on, routed through onCommissionerPick", () => {
+    const onCommissionerPick = jest.fn();
+    const onDraftPlayer = jest.fn();
+    const { getByText, queryByText } = render(
+      <DraftPlayerBoard
+        {...makeProps({
+          isMyPick: false,
+          controlAllTeams: true,
+          onCommissionerPick,
+          onDraftPlayer,
+        })}
+      />,
+    );
+
+    expect(queryByText('Force Pick')).toBeNull();
+    fireEvent.click(getByText('Draft'));
+
+    expect(onCommissionerPick).toHaveBeenCalledWith(1);
+    expect(onDraftPlayer).not.toHaveBeenCalled();
+  });
+
+  it("still routes through onDraftPlayer on the human's own turn when controlAllTeams is on", () => {
+    const onCommissionerPick = jest.fn();
+    const onDraftPlayer = jest.fn();
+    const { getByText } = render(
+      <DraftPlayerBoard
+        {...makeProps({
+          isMyPick: true,
+          controlAllTeams: true,
+          onCommissionerPick,
+          onDraftPlayer,
+        })}
+      />,
+    );
+
+    fireEvent.click(getByText('Draft'));
+
+    expect(onDraftPlayer).toHaveBeenCalledWith(1);
+    expect(onCommissionerPick).not.toHaveBeenCalled();
+  });
+
+  it('keeps the real commissioner Force Pick override distinct from controlAllTeams', () => {
+    const { getByText } = render(
+      <DraftPlayerBoard
+        {...makeProps({
+          isMyPick: false,
+          controlAllTeams: false,
+          commPickMode: true,
+          isOwner: true,
+        })}
+      />,
+    );
+    expect(getByText('Force Pick')).toBeTruthy();
   });
 });
 

@@ -35,6 +35,7 @@ fragment League on League {
   lmNotes
   isMockDraft
   isOfflineDraft
+  controlAllTeams
   isPublic
   logoUrl
   bannerUrl

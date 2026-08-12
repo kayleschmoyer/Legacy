@@ -46,6 +46,9 @@ export interface MockDraftSettings {
   playerPool: MockDraftPlayerPool;
   sport: MockDraftSport;
   mode: MockDraftMode;
+  /** Premium (LS-9253): the user makes every pick for every team — no CPU
+   *  auto-picker anywhere on the board. Always untimed regardless of `mode`. */
+  controlAllTeams: boolean;
 }
 
 export interface MockDraftSetupProps {
@@ -72,6 +75,16 @@ export interface MockDraftSetupProps {
    * mode). Consumer owns navigation to the join-by-code screen (LS-9181).
    */
   onJoinInstead?: () => void;
+  /**
+   * Whether the current user's plan grants Control All Teams (LS-9253).
+   * Defaults to false. When false the option is still shown (an upgrade
+   * surface, not hidden) but selecting it calls `onControlAllTeamsUpgrade`
+   * instead of enabling the setting — server-side `initializeMockDraft`
+   * enforces the real gate regardless of this prop.
+   */
+  isControlAllTeamsEntitled?: boolean;
+  /** Invoked when a non-entitled user taps the Control All Teams option. */
+  onControlAllTeamsUpgrade?: () => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -98,6 +111,24 @@ const DRAFT_MODE_OPTIONS: {
     label: 'Offline',
     value: 'offline',
     helper: 'No clock — pause and pick at your own pace.',
+  },
+];
+
+const CONTROL_ALL_TEAMS_OPTIONS: {
+  label: string;
+  value: boolean;
+  helper: string;
+}[] = [
+  {
+    label: 'Off',
+    value: false,
+    helper: 'Practice against AI-controlled opponents.',
+  },
+  {
+    label: 'On',
+    value: true,
+    helper:
+      'You make every pick for every team — always untimed, no CPU opponents.',
   },
 ];
 
@@ -162,6 +193,13 @@ interface OptionButtonProps {
   accent: string;
   onPress: () => void;
   width?: number;
+  /**
+   * Visible-but-locked upgrade surface (LS-9253 AC2): renders a lock glyph
+   * and dims the label without hiding or disabling the button — `onPress`
+   * still fires (callers route it to an upgrade CTA instead of the normal
+   * selection handler).
+   */
+  locked?: boolean;
 }
 
 function OptionButton({
@@ -170,6 +208,7 @@ function OptionButton({
   accent,
   onPress,
   width,
+  locked = false,
 }: OptionButtonProps): React.JSX.Element {
   return (
     <Button
@@ -185,15 +224,23 @@ function OptionButton({
       }}
       pressStyle={{ scale: 0.96 }}
       aria-pressed={selected}
+      aria-label={locked ? `${label} (requires Premium)` : undefined}
     >
-      <Text
-        fontFamily="$body"
-        fontSize={15}
-        fontWeight={selected ? '700' : '500'}
-        color={selected ? '$color' : '$gray11'}
-      >
-        {label}
-      </Text>
+      <XStack alignItems="center" gap="$1.5">
+        {locked && (
+          <Text fontSize={13} aria-hidden={true}>
+            🔒
+          </Text>
+        )}
+        <Text
+          fontFamily="$body"
+          fontSize={15}
+          fontWeight={selected ? '700' : '500'}
+          color={locked ? '$gray10' : selected ? '$color' : '$gray11'}
+        >
+          {label}
+        </Text>
+      </XStack>
     </Button>
   );
 }
@@ -211,6 +258,8 @@ export function MockDraftSetup({
   usageLabel,
   header,
   onJoinInstead,
+  isControlAllTeamsEntitled = false,
+  onControlAllTeamsUpgrade,
 }: MockDraftSetupProps): React.JSX.Element {
   const [numTeams, setNumTeams] = React.useState(
     initialNumTeams != null ? clampToTeamOption(initialNumTeams) : 8,
@@ -224,6 +273,7 @@ export function MockDraftSetup({
     React.useState<MockDraftPlayerPool>('all');
   const [sport, setSport] = React.useState<MockDraftSport>('baseball');
   const [mode, setMode] = React.useState<MockDraftMode>('shared');
+  const [controlAllTeams, setControlAllTeams] = React.useState(false);
 
   const handleStart = () => {
     onStart({
@@ -233,7 +283,9 @@ export function MockDraftSetup({
       draftOrder,
       playerPool,
       sport,
-      mode,
+      // Control All Teams is always untimed — no CPU opponents to wait on.
+      mode: controlAllTeams ? 'offline' : mode,
+      controlAllTeams,
     });
   };
 
@@ -314,7 +366,14 @@ export function MockDraftSetup({
               label={opt.label}
               selected={mode === opt.value}
               accent={EMERALD}
-              onPress={() => setMode(opt.value)}
+              onPress={() => {
+                setMode(opt.value);
+                // Shared (real multiplayer, LS-9181) and Control All Teams
+                // (solo, LS-9253) are mutually exclusive — picking Shared
+                // here backs out of Control All Teams rather than leaving it
+                // on and silently forcing Offline again at submit time.
+                if (opt.value === 'shared') setControlAllTeams(false);
+              }}
               width={140}
             />
           ))}
@@ -340,6 +399,59 @@ export function MockDraftSetup({
             </Button>
           </XStack>
         )}
+      </FieldSection>
+
+      {/* Control All Teams — premium (LS-9253). Visible to free users but
+          gated: selecting "On" without the entitlement routes to the upgrade
+          CTA instead of enabling the setting (AC2) — server-side
+          initializeMockDraft is the real enforcement (AC3) regardless. */}
+      <FieldSection
+        label="Control All Teams"
+        labelId="control-all-teams-label"
+        helper={
+          <Paragraph
+            fontFamily="$body"
+            fontSize={12}
+            color="$gray10"
+            textAlign="center"
+            margin={0}
+          >
+            {
+              CONTROL_ALL_TEAMS_OPTIONS.find(
+                (opt) => opt.value === controlAllTeams,
+              )?.helper
+            }
+            {!isControlAllTeamsEntitled &&
+              ' Premium unlocks making every pick yourself.'}
+          </Paragraph>
+        }
+      >
+        <XStack gap="$2" flexWrap="wrap" justifyContent="center">
+          {CONTROL_ALL_TEAMS_OPTIONS.map((opt) => {
+            const locked = opt.value && !isControlAllTeamsEntitled;
+            return (
+              <OptionButton
+                key={String(opt.value)}
+                label={opt.label}
+                selected={controlAllTeams === opt.value}
+                accent={BRAND_GOLD}
+                locked={locked}
+                width={140}
+                onPress={() => {
+                  if (locked) {
+                    onControlAllTeamsUpgrade?.();
+                    return;
+                  }
+                  setControlAllTeams(opt.value);
+                  // Mutually exclusive with Shared (LS-9181) — force the
+                  // visible Draft Mode selection to Offline so the UI never
+                  // shows "Shared" selected while Control All Teams is on.
+                  if (opt.value) setMode('offline');
+                }}
+              />
+            );
+          })}
+        </XStack>
       </FieldSection>
 
       {/* Number of Teams */}

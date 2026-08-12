@@ -46,6 +46,7 @@ describe('MockDraftSetup', () => {
       playerPool: 'all',
       sport: 'baseball',
       mode: 'shared',
+      controlAllTeams: false,
     });
   });
 
@@ -60,6 +61,58 @@ describe('MockDraftSetup', () => {
 
     expect(onStart).toHaveBeenCalledWith(
       expect.objectContaining({ mode: 'offline' }),
+    );
+  });
+
+  it('renders Control All Teams as a visible upgrade surface for non-entitled users, not hidden (LS-9253)', () => {
+    const { getByText } = render(
+      <MockDraftSetup onStart={noop} onCancel={noop} />,
+    );
+
+    expect(getByText('Control All Teams')).toBeTruthy();
+    expect(getByText('Off')).toBeTruthy();
+    expect(getByText('On')).toBeTruthy();
+  });
+
+  it('routes a non-entitled user who taps the locked "On" option to the upgrade callback instead of enabling it', () => {
+    const onStart = jest.fn();
+    const onControlAllTeamsUpgrade = jest.fn();
+    const { getByText } = render(
+      <MockDraftSetup
+        onStart={onStart}
+        onCancel={noop}
+        isControlAllTeamsEntitled={false}
+        onControlAllTeamsUpgrade={onControlAllTeamsUpgrade}
+      />,
+    );
+
+    fireEvent.click(getByText('On'));
+    expect(onControlAllTeamsUpgrade).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(getByText('Start Mock Draft'));
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ controlAllTeams: false }),
+    );
+  });
+
+  it('lets an entitled user enable Control All Teams, which also forces offline mode in the onStart payload', () => {
+    const onStart = jest.fn();
+    const onControlAllTeamsUpgrade = jest.fn();
+    const { getByText } = render(
+      <MockDraftSetup
+        onStart={onStart}
+        onCancel={noop}
+        isControlAllTeamsEntitled
+        onControlAllTeamsUpgrade={onControlAllTeamsUpgrade}
+      />,
+    );
+
+    fireEvent.click(getByText('On'));
+    fireEvent.click(getByText('Start Mock Draft'));
+
+    expect(onControlAllTeamsUpgrade).not.toHaveBeenCalled();
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ controlAllTeams: true, mode: 'offline' }),
     );
   });
 

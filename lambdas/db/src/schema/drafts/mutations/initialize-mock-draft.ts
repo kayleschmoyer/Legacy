@@ -43,7 +43,7 @@ import {
   PremiumRequiredError,
   UserInputError,
 } from '../../graphql-errors';
-import { hasEntitlement } from '../../authorization';
+import { hasEntitlement, requireEntitlement } from '../../authorization';
 import { ENTITLEMENTS } from '../../entitlements';
 import {
   countRecentMockDrafts,
@@ -181,6 +181,14 @@ builder.mutationField('initializeMockDraft', (t) =>
           "practice session with no pick-clock pressure on the human's own turns. " +
           'AI opponents still auto-pick immediately. Ignores pickTimeLimitSeconds. Default: false.',
       }),
+      controlAllTeams: t.arg.boolean({
+        required: false,
+        description:
+          'Premium (LS-9253): when true, seats every team as human-controlled — ' +
+          'no CPU auto-picker anywhere on the board, and the user makes every ' +
+          'pick for every team. Implies isOffline (no pick-clock pressure) and ' +
+          'requires the mock_draft_control_all_teams entitlement. Default: false.',
+      }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -198,9 +206,17 @@ builder.mutationField('initializeMockDraft', (t) =>
         playerPool: rawPlayerPool,
         sport: rawSport,
         isOffline: rawIsOffline,
+        controlAllTeams: rawControlAllTeams,
       } = args;
       const userId = context.user.id;
-      const isOffline = rawIsOffline ?? false;
+      const controlAllTeams = rawControlAllTeams ?? false;
+      // Control All Teams (LS-9253) always implies Offline: with no CPU
+      // opponents to wait on, there is no reason to put the human on a
+      // pick clock, and forcing the untimed sentinel below is also the
+      // first line of defense against autoProcessDraftPicks ever advancing
+      // this draft (belt-and-suspenders alongside drafts.autoPickDisabled,
+      // set further down).
+      const isOffline = (rawIsOffline ?? false) || controlAllTeams;
       // Mock drafts use a shorter default timer (30 s) so practice sessions
       // complete quickly. The caller can override via pickTimeLimitSeconds.
       // Offline drafts ignore the caller's time limit entirely — see
@@ -274,6 +290,17 @@ builder.mutationField('initializeMockDraft', (t) =>
         }
       }
 
+      // ── Feature gating: Control All Teams (LS-9253) is a separate premium
+      // capability from unlimited_mock_drafts — a free user may still have
+      // mock drafts remaining this week but cannot start one in this mode.
+      // Server-enforced regardless of the client's PremiumGate (AC3).
+      if (controlAllTeams) {
+        await requireEntitlement(
+          context,
+          ENTITLEMENTS.mock_draft_control_all_teams,
+        );
+      }
+
       LOGGER.info('Initializing mock draft', {
         userId,
         numTeams,
@@ -283,6 +310,7 @@ builder.mutationField('initializeMockDraft', (t) =>
         playerPool,
         sport,
         isOffline,
+        controlAllTeams,
       });
 
       try {
@@ -313,6 +341,7 @@ builder.mutationField('initializeMockDraft', (t) =>
           minCareerSeasons: 0,
           isMockDraft: true,
           isOfflineDraft: isOffline,
+          controlAllTeams,
         };
 
         // ── Steps 1-6: single atomic transaction ─────────────────────────────
@@ -336,17 +365,21 @@ builder.mutationField('initializeMockDraft', (t) =>
             .returning();
 
           // ── 2. Create teams ─────────────────────────────────────────────
-          // Teams are created in draft-order slots 1..numTeams.
-          // Slot userPickPosition belongs to the human; the rest are CPU for
-          // Offline drafts, or left "Open" for real players to claim via
-          // joinMockDraft for Shared drafts (LS-9181).
+          // Teams are created in draft-order slots 1..numTeams. Slot
+          // userPickPosition belongs to the human. The rest: Control All
+          // Teams (LS-9253) labels every slot as human-controlled (no "CPU"
+          // teams exist in this mode); otherwise Offline drafts get CPU
+          // teams, and Shared drafts leave slots "Open" for real players to
+          // claim via joinMockDraft (LS-9181).
           const teamInserts = Array.from({ length: numTeams }, (_, i) => ({
             name:
               i + 1 === userPickPosition
                 ? 'My Team'
-                : isOffline
-                  ? `CPU Team ${i + 1}`
-                  : `Open Slot ${i + 1}`,
+                : controlAllTeams
+                  ? `Team ${i + 1}`
+                  : isOffline
+                    ? `CPU Team ${i + 1}`
+                    : `Open Slot ${i + 1}`,
             leagueId: league.id,
           }));
 
@@ -377,6 +410,19 @@ builder.mutationField('initializeMockDraft', (t) =>
               currentPick: 0,
               pickTimeLimitSeconds: pickTimeLimit,
               ...(isOffline ? { draftStartedAt: new Date() } : {}),
+              // Control All Teams (LS-9253): this is the authoritative guard
+              // against auto-pick. autoProcessDraftPicks (scheduled-mutations.ts)
+              // excludes any draft with auto_pick_disabled=true at the SQL level
+              // — it never even considers the draft, regardless of how expired
+              // current_pick_deadline becomes (including after a long idle
+              // period). This is the same flag commissionerSetDraftAutoPickDisabled
+              // sets on real leagues (LS-481); reusing it here means every
+              // existing enforcement path (this query, toggleDraftAutoPick's
+              // reject-if-disabled check) already respects it with no new code.
+              // Only meaningful for Offline drafts — Control All Teams always
+              // implies isOffline, so a Shared-lobby draft_teams row (created
+              // later by initializeDraft) is never affected by this value.
+              autoPickDisabled: controlAllTeams,
             })
             .returning();
 
@@ -395,14 +441,16 @@ builder.mutationField('initializeMockDraft', (t) =>
           }
 
           // ── 5. Create draft_teams rows ───────────────────────────────────
-          // Maintains the requested draft order; CPU teams get autoPick=true
+          // Maintains the requested draft order; CPU teams get autoPick=true.
+          // Control All Teams mode seats every team with autoPick=false —
+          // there are no CPU teams at all in this mode.
           await tx.insert(PublicSchema.draftTeams).values(
             teams.map((team, i) => ({
               draftId: draft.id,
               teamId: team.id,
               leagueId: league.id,
               draftOrder: i + 1,
-              autoPick: team.id !== humanTeamId,
+              autoPick: controlAllTeams ? false : team.id !== humanTeamId,
             })),
           );
 

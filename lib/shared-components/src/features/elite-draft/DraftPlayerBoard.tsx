@@ -252,6 +252,11 @@ interface DraftPlayerBoardProps {
   commPickMode: boolean;
   isOwner: boolean;
   isMyPick: boolean;
+  /** Premium (LS-9253): every team's turn is pickable — no CPU auto-picker
+   *  exists in this mode. Kept separate from commPickMode so the Force-Pick
+   *  red styling/"Force Pick" label stay exclusive to real commissioner
+   *  overrides; this should read as a first-class pick action. */
+  controlAllTeams: boolean;
   pickLoading: boolean;
   myTeamId: number | null;
   draftId: number | null;
@@ -356,6 +361,7 @@ export function DraftPlayerBoard({
   commPickMode,
   isOwner,
   isMyPick,
+  controlAllTeams,
   pickLoading,
   myTeamId,
   draftId,
@@ -473,16 +479,31 @@ export function DraftPlayerBoard({
     });
   }, [filteredPlayers, sortKey, sortDir, sport]);
 
+  // A real commissioner force-pick override — never true for Control All
+  // Teams mock drafts (LS-9242 hides the commissioner bar there entirely).
+  // Kept separate from controlAllTeams so the Force-Pick red styling/label
+  // stay exclusive to actual overrides (LS-9253 wants a first-class pick
+  // action, not an override).
+  const isRealCommPick = commPickMode && isOwner;
+  // Whether the Draft button should render at all for a given team's turn.
+  const canPickForTeam = isMyPick || controlAllTeams || isRealCommPick;
+
   // Stable callbacks passed to PlayerCard to prevent re-renders via React.memo
   const handleDraftPlayer = useCallback(
     (playerId: number) => {
-      if (commPickMode && isOwner) {
+      if (isRealCommPick || (controlAllTeams && !isMyPick)) {
         onCommissionerPick(playerId);
       } else {
         onDraftPlayer(playerId);
       }
     },
-    [commPickMode, isOwner, onCommissionerPick, onDraftPlayer],
+    [
+      isRealCommPick,
+      controlAllTeams,
+      isMyPick,
+      onCommissionerPick,
+      onDraftPlayer,
+    ],
   );
 
   const handleToggleWatch = useCallback(
@@ -937,7 +958,7 @@ export function DraftPlayerBoard({
                       </XStack>
                     ))}
                     <XStack width={90} justifyContent="flex-end" padding={8}>
-                      {(commPickMode ? isOwner : isMyPick) && (
+                      {canPickForTeam && (
                         <XStack
                           role="button"
                           accessibilityRole="button"
@@ -951,14 +972,13 @@ export function DraftPlayerBoard({
                           paddingHorizontal={10}
                           borderRadius={8}
                           style={csp({
-                            background:
-                              commPickMode && isOwner
-                                ? COMM_OVERRIDE
-                                : `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_DARK} 100%)`,
+                            background: isRealCommPick
+                              ? COMM_OVERRIDE
+                              : `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_DARK} 100%)`,
                           })}
                         >
                           <Text fontSize={11} fontWeight="700" color="white">
-                            {commPickMode && isOwner ? 'Force Pick' : 'Draft'}
+                            {isRealCommPick ? 'Force Pick' : 'Draft'}
                           </Text>
                         </XStack>
                       )}
@@ -1108,9 +1128,13 @@ export function DraftPlayerBoard({
                   key={player.id}
                   player={player}
                   index={idx}
-                  isMyPick={commPickMode ? isOwner : isMyPick}
-                  isCommPick={commPickMode && isOwner}
-                  pickLoading={commPickMode ? false : pickLoading}
+                  isMyPick={canPickForTeam}
+                  isCommPick={isRealCommPick}
+                  pickLoading={
+                    isRealCommPick || (controlAllTeams && !isMyPick)
+                      ? false
+                      : pickLoading
+                  }
                   isWatched={watchlistSet.has(player.id)}
                   isQueued={queuedPlayerIds.has(player.id)}
                   onDraft={handleDraftPlayer}

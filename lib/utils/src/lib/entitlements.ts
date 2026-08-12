@@ -31,6 +31,7 @@ export const ENTITLEMENTS = {
   salary_cap_leagues: 'salary_cap_leagues',
   advanced_playoff_formats: 'advanced_playoff_formats',
   unlimited_mock_drafts: 'unlimited_mock_drafts',
+  mock_draft_control_all_teams: 'mock_draft_control_all_teams',
   unlimited_leagues: 'unlimited_leagues',
   faab_waiver_type: 'faab_waiver_type',
   historical_era_filters: 'historical_era_filters',
@@ -73,6 +74,8 @@ export const ENTITLEMENT_LABELS: Record<EntitlementKey, string> = {
   salary_cap_leagues: 'Salary cap leagues',
   advanced_playoff_formats: 'Advanced playoff formats (6-team, 8-team)',
   unlimited_mock_drafts: 'Unlimited mock drafts',
+  mock_draft_control_all_teams:
+    'Control All Teams mock draft mode (pick for every team)',
   unlimited_leagues: 'Unlimited active leagues',
   faab_waiver_type:
     'FAAB waiver type (commissioner league-creation only; members of FAAB leagues may participate regardless of tier)',

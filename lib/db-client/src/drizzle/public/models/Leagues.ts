@@ -143,6 +143,13 @@ export const leagues = pgTable(
      *  turns never expire, but AI opponent teams still auto-pick immediately.
      *  Only meaningful when isMockDraft=true. */
     isOfflineDraft: boolean('is_offline_draft').notNull().default(false),
+    /** True for mock drafts started in "Control All Teams" mode (LS-9253,
+     *  premium-gated): the human user makes every pick for every team — no
+     *  CPU auto-picker anywhere on the board. Implies isOfflineDraft (no
+     *  pick-clock pressure) and pairs with drafts.autoPickDisabled=true so
+     *  autoProcessDraftPicks never fires for the draft. Only meaningful when
+     *  isMockDraft=true. */
+    controlAllTeams: boolean('control_all_teams').notNull().default(false),
     /** Client-generated key from a single create-league form submission attempt
      *  (LS-6063). Lets createLeague dedupe a resubmission (double-click, retry,
      *  parallel tab) against an already-created league instead of inserting a

@@ -250,6 +250,9 @@ interface DraftRailProps {
   isPremium: boolean;
   isMyPick: boolean;
   commPickMode: boolean;
+  /** Premium (LS-9253): every team's turn is pickable — no CPU auto-picker
+   *  exists in this mode. Kept separate from commPickMode; see DraftPlayerBoard. */
+  controlAllTeams: boolean;
   isOwner: boolean;
   /** Whether the user is the team general manager (gates the draft-queue query). */
   isGeneralManager: boolean;
@@ -310,6 +313,7 @@ export function DraftRail({
   isPremium,
   isMyPick,
   commPickMode,
+  controlAllTeams,
   isOwner,
   isGeneralManager,
   draftId,
@@ -344,8 +348,10 @@ export function DraftRail({
   // LS-8068: drag-to-draft. A player card dropped onto an eligible roster slot
   // drafts that player (the server is the final gate on the pick). Mirrors the
   // PlayerCard "Draft Now" gating: commissioner force-pick when in comm-pick
-  // mode, otherwise only on the user's own turn.
-  const canDraft = commPickMode ? isOwner : isMyPick;
+  // mode, every turn when Control All Teams (LS-9253) is on, otherwise only
+  // on the user's own turn.
+  const isRealCommPick = commPickMode && isOwner;
+  const canDraft = isMyPick || controlAllTeams || isRealCommPick;
   const handleSlotDrop = (slotPos: string, label: string) => {
     const player = draggedPlayer;
     if (!player) return;
@@ -357,7 +363,7 @@ export function DraftRail({
       onShowToast(`${player.name} isn't eligible at ${label}.`);
       return;
     }
-    if (commPickMode && isOwner) {
+    if (isRealCommPick || (controlAllTeams && !isMyPick)) {
       onCommissionerPick(player.id);
     } else {
       onDraftPlayer(player.id);

@@ -66,7 +66,12 @@ const MOCK_POSITIONS = [
 
 // ── GraphQL Route Handler ─────────────────────────────────────────────────────
 
-async function setupGraphQL(page: import('@playwright/test').Page) {
+async function setupGraphQL(
+  page: import('@playwright/test').Page,
+  /** LS-9253: when provided, records the variables of the last
+   *  initializeMockDraft request the client sent, for assertions. */
+  capture?: { initializeMockDraftVariables?: Record<string, unknown> },
+) {
   await page.route(isGraphQLEndpoint, async (route) => {
     const postData = route.request().postData()?.toLowerCase() ?? '';
 
@@ -127,6 +132,12 @@ async function setupGraphQL(page: import('@playwright/test').Page) {
         }),
       });
     } else if (postData.includes('initializemockdraft')) {
+      if (capture) {
+        const body = route.request().postDataJSON() as {
+          variables?: Record<string, unknown>;
+        };
+        capture.initializeMockDraftVariables = body.variables;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -226,6 +237,42 @@ test.describe('Mock Draft Simulator @regression', () => {
     const startBtn = page.getByRole('button', { name: /Start Mock Draft/i });
     await expect(startBtn).toBeVisible();
     await expect(startBtn).toBeEnabled();
+  });
+
+  test('shows the Control All Teams option as a visible upgrade surface (LS-9253)', async ({
+    page,
+  }) => {
+    await setupGraphQL(page);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByText('Control All Teams')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Off', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'On', exact: true }),
+    ).toBeVisible();
+  });
+
+  test('starting a draft with Control All Teams on sends controlAllTeams:true to initializeMockDraft (LS-9253)', async ({
+    page,
+  }) => {
+    const capture: { initializeMockDraftVariables?: Record<string, unknown> } =
+      {};
+    await setupGraphQL(page, capture);
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    // This suite's baseline JWT is premium (LS-8058), so the option is
+    // entitled here — selecting "On" enables the setting rather than
+    // routing to an upgrade CTA.
+    await page.getByRole('button', { name: 'On', exact: true }).click();
+    await page.getByRole('button', { name: /Start Mock Draft/i }).click();
+
+    await expect
+      .poll(() => capture.initializeMockDraftVariables)
+      .toMatchObject({ controlAllTeams: true, isOffline: true });
   });
 
   test('draft position buttons update when team count changes', async ({

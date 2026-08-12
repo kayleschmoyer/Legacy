@@ -32,11 +32,29 @@ jest.mock('@legacy-sports/utils/node', () => ({
   getDbOptions: jest.fn(() => ({})),
 }));
 
+// Captures every builder.mutationField(name, fn) registration so LS-9253's
+// test below can invoke the real autoProcessDraftPicks resolve function
+// (rather than leaving mutationField a pure no-op, as it was before) without
+// standing up the full Pothos builder.
+const capturedResolvers: Record<
+  string,
+  (...args: unknown[]) => Promise<unknown>
+> = {};
+
 jest.mock('../builder', () => ({
   builder: {
     objectRef: jest.fn(() => ({})),
     objectType: jest.fn(),
-    mutationField: jest.fn(),
+    mutationField: jest.fn((name: string, fn: (t: unknown) => void) => {
+      fn({
+        field: (opts: {
+          resolve: (...args: unknown[]) => Promise<unknown>;
+        }) => {
+          capturedResolvers[name] = opts.resolve;
+        },
+        arg: { int: () => ({}) },
+      });
+    }),
   },
 }));
 
@@ -261,5 +279,53 @@ describe('isLockWaitTimeout (LS-8398)', () => {
     expect(
       isLockWaitTimeout(new Error('Team 5 roster is full in draft 100')),
     ).toBe(false);
+  });
+});
+
+describe('autoProcessDraftPicks expired-drafts query (LS-9253)', () => {
+  /** Recursively flattens a Drizzle `SQL` template's queryChunks into a
+   *  plain string, so the literal SQL text can be asserted on without a
+   *  real Postgres connection — `sql` is drizzle-orm's real (unmocked)
+   *  template tag, so this only needs to walk what it actually built. */
+  function flattenSqlChunks(node: unknown): string {
+    if (node == null) return '';
+    if (typeof node === 'string') return node;
+    // drizzle-orm's StringChunk wraps literal template segments as
+    // { value: string[] } rather than a bare string.
+    const stringChunkValue = (node as { value?: unknown }).value;
+    if (Array.isArray(stringChunkValue)) {
+      return stringChunkValue.map(flattenSqlChunks).join(' ');
+    }
+    const chunks = (node as { queryChunks?: unknown[] }).queryChunks;
+    if (Array.isArray(chunks)) {
+      return chunks.map(flattenSqlChunks).join(' ');
+    }
+    return '';
+  }
+
+  it('scans for expired drafts with auto_pick_disabled = FALSE — the guard a Control All Teams draft (autoPickDisabled=true at creation) is excluded by', async () => {
+    const resolve = capturedResolvers.autoProcessDraftPicks;
+    expect(resolve).toBeDefined();
+
+    let capturedQuery: unknown;
+    const db = {
+      execute: jest.fn((query: unknown) => {
+        capturedQuery = query;
+        return Promise.resolve({ rows: [] });
+      }),
+    };
+    const ctx = makeContext({ isSystemRequest: true, db: db as never });
+
+    const result = await resolve({}, {}, ctx, undefined);
+
+    // Early-return path (no expired drafts found) — proves the query ran
+    // and nothing downstream (candidate pool, auto-pick scorer, pick
+    // commit) needed to be exercised for this assertion.
+    expect(result).toMatchObject({ draftsProcessed: 0, picksAutoMade: 0 });
+    expect(db.execute).toHaveBeenCalledTimes(1);
+
+    const sqlText = flattenSqlChunks(capturedQuery);
+    expect(sqlText).toContain('auto_pick_disabled = FALSE');
+    expect(sqlText).toContain("draft_status = 'in-progress'");
   });
 });

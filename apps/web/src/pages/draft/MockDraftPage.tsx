@@ -19,9 +19,11 @@ import {
   useGetMyMockDraftUsageQuery,
   useInitializeMockDraftMutation,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { PageMeta } from '../../components/PageMeta';
 import { useFeatureIsOn } from '../../context/GrowthBookProvider';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import {
   BLACK,
   BRAND_GOLD,
@@ -58,6 +60,8 @@ interface SetupScreenProps {
   usageLabel?: string;
   /** Navigates to the join-by-code screen when Shared mode is selected. */
   onJoinInstead?: () => void;
+  /** Whether the current user's plan grants Control All Teams (LS-9253). */
+  isControlAllTeamsEntitled: boolean;
 }
 
 /**
@@ -76,8 +80,11 @@ function SetupScreen({
   initialDraftOrder,
   usageLabel,
   onJoinInstead,
+  isControlAllTeamsEntitled,
 }: SetupScreenProps): React.JSX.Element {
   const navigate = useNavigate();
+  const [showControlAllTeamsUpgrade, setShowControlAllTeamsUpgrade] =
+    React.useState(false);
 
   return (
     <YStack
@@ -157,6 +164,8 @@ function SetupScreen({
             initialDraftOrder={initialDraftOrder}
             usageLabel={usageLabel}
             onJoinInstead={onJoinInstead}
+            isControlAllTeamsEntitled={isControlAllTeamsEntitled}
+            onControlAllTeamsUpgrade={() => setShowControlAllTeamsUpgrade(true)}
           />
         </YStack>
 
@@ -173,6 +182,13 @@ function SetupScreen({
           strategy
         </Paragraph>
       </YStack>
+
+      <UpgradeModal
+        open={showControlAllTeamsUpgrade}
+        onOpenChange={setShowControlAllTeamsUpgrade}
+        featureName="Control All Teams"
+        featureDescription="Upgrade to Premium to make every pick for every team in a mock draft."
+      />
     </YStack>
   );
 }
@@ -373,6 +389,9 @@ function LimitReachedScreen({
 export function MockDraftPage(): React.JSX.Element {
   const navigate = useNavigate();
   const footballMockEnabled = useFeatureIsOn(FOOTBALL_MOCK_PLAYERS_FLAG);
+  const isControlAllTeamsEntitled = useHasEntitlement(
+    ENTITLEMENTS.mock_draft_control_all_teams,
+  );
   const [initializeMockDraft, { loading, error }] =
     useInitializeMockDraftMutation();
   const [missingLeagueIdError, setMissingLeagueIdError] = React.useState<
@@ -409,7 +428,9 @@ export function MockDraftPage(): React.JSX.Element {
 
   const handleStart = async (s: MockDraftSettings) => {
     setMissingLeagueIdError(null);
-    const isOffline = s.mode === 'offline';
+    // Control All Teams always implies offline (LS-9253) — the server forces
+    // this too, but computing it client-side keeps pickTimeLimitSeconds correct.
+    const isOffline = s.mode === 'offline' || s.controlAllTeams === true;
     const result = await initializeMockDraft({
       variables: {
         numTeams: s.numTeams,
@@ -421,6 +442,7 @@ export function MockDraftPage(): React.JSX.Element {
         playerPool: s.playerPool,
         sport: s.sport,
         isOffline,
+        controlAllTeams: s.controlAllTeams,
       },
     });
     const initialized = result.data?.initializeMockDraft;
@@ -522,6 +544,7 @@ export function MockDraftPage(): React.JSX.Element {
         initialDraftOrder={initialDraftOrder}
         usageLabel={usageLabel}
         onJoinInstead={() => navigate('/baseball/mock-draft/join')}
+        isControlAllTeamsEntitled={isControlAllTeamsEntitled}
       />
     </>
   );

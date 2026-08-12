@@ -1303,6 +1303,41 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(handleMakePick).toHaveBeenCalledWith(1);
   });
 
+  // LS-9253: Control All Teams — every team's turn is pickable, not just the
+  // human's own seat, routed through commissionerPick (not makeDraftPick)
+  // since the current-clock team isn't the human's own registered team.
+  it("shows a first-class DRAFT action (not Force Pick) on another team's turn when Control All Teams is on, and routes the pick through commissionerPick", () => {
+    const handleMakePick = jest.fn();
+    const handleCommissionerPick = jest.fn();
+    setupCompactLiveDraft({
+      isMyPick: false,
+      players: [makeDraftPlayer()],
+      queries: {
+        isCommissioner: true,
+        league: {
+          id: 1,
+          name: 'Mock Draft Practice',
+          draftStatus: 'in-progress',
+          isMockDraft: true,
+          controlAllTeams: true,
+          userMembership: { permissionLevel: 'commissioner', teamId: 1 },
+        },
+      },
+    });
+    mockUseDraftActions.mockReturnValue(
+      makeBaseActions({ handleMakePick, handleCommissionerPick }),
+    );
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    // Reads as a first-class pick action, not a commissioner override.
+    expect(screen.queryByText('ASSIGN')).toBeNull();
+    fireEvent.click(screen.getByText('DRAFT'));
+
+    expect(handleCommissionerPick).toHaveBeenCalledWith(1);
+    expect(handleMakePick).not.toHaveBeenCalled();
+  });
+
   it('re-sorts the list by projected points without renumbering ADP', () => {
     setupCompactLiveDraft({
       players: [

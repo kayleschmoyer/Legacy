@@ -115,6 +115,9 @@ export const League = builder.objectRef<{
   isMockDraft?: boolean;
   /** True for mock drafts started in "Offline" (untimed solo practice) mode (LS-9144) */
   isOfflineDraft?: boolean;
+  /** True for mock drafts started in "Control All Teams" premium mode (LS-9253):
+   *  the human makes every pick for every team, no CPU auto-picker at all. */
+  controlAllTeams?: boolean;
   isPublic?: boolean;
   logoUrl?: string | null;
   bannerUrl?: string | null;
@@ -223,6 +226,7 @@ League.implement({
     lmNotes: t.exposeString('lmNotes', { nullable: true }),
     isMockDraft: t.exposeBoolean('isMockDraft', { nullable: true }),
     isOfflineDraft: t.exposeBoolean('isOfflineDraft', { nullable: true }),
+    controlAllTeams: t.exposeBoolean('controlAllTeams', { nullable: true }),
     isPublic: t.exposeBoolean('isPublic', { nullable: true }),
     logoUrl: t.exposeString('logoUrl', { nullable: true }),
     bannerUrl: t.exposeString('bannerUrl', { nullable: true }),

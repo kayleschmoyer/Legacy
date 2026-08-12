@@ -1625,6 +1625,7 @@ type League {
   auctionMinBid: Int
   bannerUrl: String
   baseballHofOnly: Boolean
+  controlAllTeams: Boolean
   currentMatchup: Int
   currentWeek: Int
 
@@ -2473,6 +2474,11 @@ type Mutation {
   Create an ephemeral mock draft league. Offline mode practices solo against AI teams; Shared mode opens a joinable lobby other real users can enter via joinMockDraft using the returned inviteCode, seating into whichever slots stay open when the commissioner starts the draft (LS-9181). Picks are recorded but rosters are not persisted to any real league.
   """
   initializeMockDraft(
+    """
+    Premium (LS-9253): when true, seats every team as human-controlled — no CPU auto-picker anywhere on the board, and the user makes every pick for every team. Implies isOffline (no pick-clock pressure) and requires the mock_draft_control_all_teams entitlement. Default: false.
+    """
+    controlAllTeams: Boolean
+
     """
     Draft order style: "snake" (default) or "linear"
     """

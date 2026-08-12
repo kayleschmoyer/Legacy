@@ -1413,6 +1413,7 @@ export type League = {
   auctionMinBid?: Maybe<Scalars['Int']['output']>;
   bannerUrl?: Maybe<Scalars['String']['output']>;
   baseballHofOnly?: Maybe<Scalars['Boolean']['output']>;
+  controlAllTeams?: Maybe<Scalars['Boolean']['output']>;
   currentMatchup?: Maybe<Scalars['Int']['output']>;
   currentWeek?: Maybe<Scalars['Int']['output']>;
   /** The current active week number for the league */
@@ -2352,6 +2353,7 @@ export type MutationInitializeDraftArgs = {
 };
 
 export type MutationInitializeMockDraftArgs = {
+  controlAllTeams?: InputMaybe<Scalars['Boolean']['input']>;
   draftOrder?: InputMaybe<Scalars['String']['input']>;
   isOffline?: InputMaybe<Scalars['Boolean']['input']>;
   numTeams: Scalars['Int']['input'];
@@ -5162,7 +5164,15 @@ export function useGetPlayerByBrefIdSuspenseQuery(
   return Apollo.useSuspenseQuery<
     GetPlayerByBrefIdQuery,
     GetPlayerByBrefIdQueryVariables
-  >(GetPlayerByBrefId, options);
+  >(
+    GetPlayerByBrefId,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayerByBrefIdQuery,
+          GetPlayerByBrefIdQueryVariables
+        >,
+  );
 }
 export type GetPlayerByBrefIdQueryHookResult = ReturnType<
   typeof useGetPlayerByBrefIdQuery
@@ -5242,7 +5252,15 @@ export function useGetAllPlayersSuspenseQuery(
   return Apollo.useSuspenseQuery<
     GetAllPlayersQuery,
     GetAllPlayersQueryVariables
-  >(GetAllPlayers, options);
+  >(
+    GetAllPlayers,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetAllPlayersQuery,
+          GetAllPlayersQueryVariables
+        >,
+  );
 }
 export type GetAllPlayersQueryHookResult = ReturnType<
   typeof useGetAllPlayersQuery

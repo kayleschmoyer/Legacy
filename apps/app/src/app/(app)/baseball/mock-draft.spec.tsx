@@ -42,8 +42,12 @@ interface SubscriptionResult {
 const mockUseSubscription = jest.fn(
   (): SubscriptionResult => ({ isPremium: false, loading: false }),
 );
+// Control All Teams entitlement (LS-9253) — controlled per-test, defaults to
+// not entitled so the gated-option tests exercise the locked path.
+const mockUseHasEntitlement = jest.fn((): boolean => false);
 jest.mock('../../../features/subscription/useSubscription', () => ({
   useSubscription: (): SubscriptionResult => mockUseSubscription(),
+  useHasEntitlement: (): boolean => mockUseHasEntitlement(),
 }));
 
 // Analytics
@@ -170,6 +174,7 @@ describe('MockDraftPage', () => {
             playerPool: 'all',
             sport: 'baseball',
             isOffline: false,
+            controlAllTeams: false,
           },
         });
       });

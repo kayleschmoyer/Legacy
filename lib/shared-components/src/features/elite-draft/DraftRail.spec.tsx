@@ -23,6 +23,7 @@ const baseProps = {
   isPremium: false,
   isMyPick: false,
   commPickMode: false,
+  controlAllTeams: false,
   isOwner: false,
   isGeneralManager: false,
   draftId: null,

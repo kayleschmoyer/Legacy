@@ -247,6 +247,78 @@ test.describe('Premium gating — position-scoped scoring bonuses (LS-9105) @cri
   });
 });
 
+// ── Mock Draft "Control All Teams" (LS-9253) ─────────────────────────────────
+//
+// Free users must see the option as a visible upgrade surface (not hidden)
+// but cannot enable it — selecting "On" routes to the upgrade CTA instead.
+// Isolated the same way as the position-bonus gate above: base tier stays
+// `premium` (so the page itself renders normally) and only the
+// `MyEntitlements` claim is overridden to omit mock_draft_control_all_teams.
+
+test.describe('Premium gating — Mock Draft Control All Teams (LS-9253) @critical', () => {
+  test('a non-entitled user sees Control All Teams as a visible upgrade surface, not hidden', async ({
+    page,
+  }) => {
+    await useTier(page, 'premium');
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const op = extractOperationName(route).toLowerCase();
+      if (op === 'myentitlements') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              myEntitlements: Object.values(ENTITLEMENTS).filter(
+                (key) => key !== ENTITLEMENTS.mock_draft_control_all_teams,
+              ),
+            },
+          }),
+        });
+        return;
+      }
+      if (op === 'getmymockdraftusage') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              getMyMockDraftUsage: {
+                __typename: 'MockDraftUsage',
+                isUnlimited: true,
+                used: 0,
+                limit: 2,
+                remaining: 2,
+              },
+            },
+          }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+
+    await page.goto('/baseball/mock-draft');
+    await page.waitForLoadState('load');
+
+    // Visible, not hidden — the option and both choices render. The locked
+    // "On" option carries an accessible name noting the upgrade requirement
+    // (OptionButton's `locked` aria-label), rather than being hidden.
+    await expect(page.getByText('Control All Teams')).toBeVisible();
+    const onOption = page.getByRole('button', {
+      name: 'On (requires Premium)',
+    });
+    await expect(onOption).toBeVisible();
+
+    // Tapping the locked option opens the upgrade modal (UpgradeModal's own
+    // CTA reads "Get Premium") instead of enabling the setting — Start
+    // remains available for a normal (non-Control-All-Teams) draft.
+    await onOption.click();
+    await expect(
+      page.getByRole('button', { name: 'Get Premium' }),
+    ).toBeVisible();
+  });
+});
+
 test.describe('Premium gating — premium user @critical', () => {
   test('View Game Logs page is not gated for premium users', async ({
     page,
