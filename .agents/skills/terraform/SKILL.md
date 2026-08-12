@@ -32,7 +32,7 @@ The two skills are complementary: `add-secret-or-env-var.md` references `secrets
 
 - **Never widen the CI role trust policies for local development.** They are OIDC-locked to specific refs by design — see [`references/local-plan-as-ci-role.md`](references/local-plan-as-ci-role.md).
 - **Never edit the permission boundary** (`aws_iam_policy.github_actions_boundary`) unless explicitly granting access to a new resource namespace.
-- **New apply-time actions go in `github_actions_supplemental`. New plan-time read actions go in `github_actions_plan_policy`.** The inline `github_actions_additional` policy is closed for new edits (10K byte limit).
+- **New apply-time actions go in `github_actions_supplemental_2`. New plan-time read actions go in `github_actions_plan_policy`.** Both the inline `github_actions_additional` policy (10K byte limit) and `github_actions_supplemental` (6K per version) are closed for new edits — they are at their limits, and terraform plan does not catch policy-size violations (LS-9382).
 - **Never pipe `terraform apply` through output-truncating filters** — interrupts Terraform before it releases the DynamoDB state lock.
 - **Never commit `secrets.auto.tfvars`** — gitignored on purpose.
 

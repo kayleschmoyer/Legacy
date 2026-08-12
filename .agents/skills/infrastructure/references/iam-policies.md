@@ -1,6 +1,6 @@
 ---
 name: iam-policies
-description: 'Add IAM permissions to the github-actions deploy role without exceeding AWS policy size limits. Read this before adding any new statement to terraform/main/github-actions-oidc.tf.'
+description: 'Add IAM permissions to the github-actions deploy role without exceeding AWS policy size limits. New permissions go in github_actions_supplemental_2 — the other two policies are full. Read this before adding any new statement to terraform/main/github-actions-oidc.tf.'
 ---
 
 # Skill: Adding IAM Permissions to the GitHub Actions Deploy Role
@@ -15,23 +15,27 @@ LimitExceeded: Maximum policy size of 10240 bytes exceeded
 
 That error doesn't surface until **`terraform apply` runs in CI on `main`** — i.e. after merge. The fix required a follow-up PR (#3298) and another deploy cycle. **Read this file before touching `github-actions-oidc.tf`.**
 
-## The two policies and where to put new permissions
+## The three policies and where to put new permissions
 
-`terraform/main/github-actions-oidc.tf` defines two policies on the same role:
+`terraform/main/github-actions-oidc.tf` defines three policies on the same role. All three attach to the same role, so behavior is identical — only the size budget differs.
 
-| Resource                                        | Type    | AWS limit             | Use for                                                                                            |
-| ----------------------------------------------- | ------- | --------------------- | -------------------------------------------------------------------------------------------------- |
-| `aws_iam_role_policy.github_actions_additional` | Inline  | **10,240 bytes**      | Permissions that have been here since the role was created. Treat as **closed for new edits**.     |
-| `aws_iam_policy.github_actions_supplemental`    | Managed | 6,144 bytes / version | **Default home for all new permissions.** Already houses CloudTrail and external-secrets overflow. |
+| Resource                                        | Type    | AWS limit             | Use for                                                                                                                              |
+| ----------------------------------------------- | ------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `aws_iam_role_policy.github_actions_additional` | Inline  | **10,240 bytes**      | Permissions that have been here since the role was created. **Closed for new edits** — effectively full.                             |
+| `aws_iam_policy.github_actions_supplemental`    | Managed | 6,144 bytes / version | **Also closed for new edits.** Houses CloudTrail and external-secrets overflow. Was the default home until LS-9382; now ~94.8% full. |
+| `aws_iam_policy.github_actions_supplemental_2`  | Managed | 6,144 bytes / version | **Default home for all new permissions** (added on LS-9382). This is the only policy with meaningful headroom.                       |
 
-**Default rule: add new statements to `github_actions_supplemental`.** Both policies attach to the same role, so behavior is identical — only the size budget differs. Only edit the inline policy if you are removing a statement or fixing a typo.
+**Default rule: add new statements to `github_actions_supplemental_2`.** Only edit the other two if you are removing a statement or fixing a typo.
 
-The inline policy already carries an in-file comment marking the convention:
+> **Why the default moved (LS-9382).** Both older policies reached their AWS limit at the same time — the inline policy at 10,189/10,240 bytes (99.5%) and `github_actions_supplemental` at 5,822/6,144 (94.8%, ~322 bytes of headroom). `github_actions_supplemental_2` was added because a third policy on the same role was cheaper and lower-risk than trimming unrelated statements out of either. **These byte counts are a snapshot (2026-08-12) — always re-run the size check below rather than trusting them.**
+
+`github_actions_supplemental_2` carries the in-file comment marking the current convention:
 
 ```hcl
-# CloudTrail log group ARNs + metric filter actions live in the supplemental
-# policy (github_actions_supplemental) to keep this inline policy under 10 KB.
+# Second supplemental managed policy — **default home for new permissions.**
 ```
+
+Note that older comments elsewhere in the file still point at `github_actions_supplemental` — for example the CloudTrail note in the inline policy (`# ... live in the supplemental policy (github_actions_supplemental) ...`). Those describe where existing statements already live, not where new ones go.
 
 ## Validation: estimate policy size before pushing
 
@@ -42,14 +46,19 @@ Terraform plan does **not** catch policy-size violations. Run this Python check 
 python scripts/check-iam-policy-size.py
 ```
 
-The check should report:
+The script measures **all three** policies and exits non-zero when any of them is within 240 bytes of its limit. Expectations are per-policy, and two of the three are already over the "leave headroom" line by design:
 
-- **inline (`github_actions_additional`)**: under 10,000 bytes (leave headroom)
-- **managed (`github_actions_supplemental`)**: under 5,800 bytes per version (leave headroom)
+| Policy                                    | Target                        | Reality (2026-08-12)                                                                                                                     |
+| ----------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| inline (`github_actions_additional`)      | n/a — closed for new edits    | 10,189 / 10,240 (99.5%) — **expected to fail the check**; tracked as LS-9383. Do not "fix" this as a side effect of an unrelated change. |
+| managed (`github_actions_supplemental`)   | n/a — closed for new edits    | 5,822 / 6,144 (94.8%) — will not come back under 5,800 and is not supposed to.                                                           |
+| managed (`github_actions_supplemental_2`) | under 5,800 bytes per version | 619 / 6,144 (10.1%) — this is the number your change should move.                                                                        |
+
+**So a non-zero exit is the current baseline, not necessarily your fault.** Compare the output against the table above: the only regression that should block your push is `github_actions_supplemental_2` growing past ~5,800 bytes, or either closed policy growing at all. If a closed policy grew, you edited the wrong one — move the statement to `github_actions_supplemental_2`.
 
 If you don't have the script, do a rough sanity check with `terraform plan -out=tfplan && terraform show -json tfplan | python -c "..."` — but the script is faster and worth committing.
 
-## Three IAM gotchas this codebase has hit
+## Four IAM gotchas this codebase has hit
 
 ### 1. Some actions don't support resource-level permissions
 
@@ -95,27 +104,50 @@ Function URLs (used by `mcp-jira` and any Lambda exposed via `aws_lambda_functio
 "lambda:DeleteFunctionUrlConfig"
 ```
 
+### 4. A NEW policy resource must be added to the apply workflow's `-target` bootstrap list
+
+This only applies when you add a **new policy resource** (as LS-9382 did), not when you add a statement to an existing one.
+
+`.github/workflows/lambda-terraform-apply.yml` runs a targeted `terraform apply` — the "Bootstrapping IAM policy changes" step — **before** the main plan/apply, to grant the role any new permissions it will need to apply the rest of the config. That step uses a **hardcoded `-target` list**:
+
+```yaml
+terraform apply \
+-input=false -auto-approve -refresh=false -lock-timeout=5m \
+-target=aws_iam_role_policy.github_actions_additional \
+-target=aws_iam_role_policy.github_actions_plan_policy \
+-target=aws_iam_policy.github_actions_supplemental \
+-target=aws_iam_role_policy_attachment.github_actions_supplemental \
+-target=aws_iam_policy.github_actions_supplemental_2 \
+-target=aws_iam_role_policy_attachment.github_actions_supplemental_2
+```
+
+A new policy that is **not** in this list is skipped by the targeted pass. It then gets created during the main apply, which has **no ordering guarantee** against the resources that need those permissions — so the apply can fail with `AccessDenied` on a resource whose grant exists in the same plan.
+
+Add **two** entries per new policy — the `aws_iam_policy` **and** its `aws_iam_role_policy_attachment`. The policy alone grants nothing until it is attached to the role.
+
 ## Workflow for adding a new permission
 
 1. Identify the AWS API call(s) that Terraform will make. (Check `terraform plan` output or AWS CloudTrail for the failing apply.)
 2. Look up the action(s) in the [Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html). Note whether each action supports resource-level permissions.
-3. Find the right statement block in `github_actions_supplemental` (group with similar service actions when one exists; otherwise add a new block).
+3. Find the right statement block in `github_actions_supplemental_2` (group with similar service actions when one exists; otherwise add a new block). Do not add to `github_actions_additional` or `github_actions_supplemental` — both are full.
 4. If any action doesn't support resource-level permissions, **split it into its own statement** with `Resource = "*"`.
 5. Add a brief comment explaining what the actions are for (Terraform calls? Specific resource lifecycle?).
 6. Run `terraform fmt`.
-7. Run the policy-size check (above) — abort if either policy is within 240 bytes of its limit.
+7. Run the policy-size check (above) — abort if `github_actions_supplemental_2` is within 240 bytes of its limit, or if either closed policy grew. A non-zero exit caused only by the two closed policies is the known baseline (see Validation).
+   - If you added a **new policy resource**, also add it plus its role attachment to the `-target` list in `.github/workflows/lambda-terraform-apply.yml` (gotcha #4).
 8. Run `make pc`, commit, push.
 9. Watch the `Apply Lambda Infrastructure` workflow on `main` after merge. **Do not consider the change shipped until apply succeeds**, because terraform plan does not catch size or resource-level violations.
 
 ## Common failure modes
 
-| Symptom                                                       | Cause                                                               | Fix                                                                  |
-| ------------------------------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `LimitExceeded: Maximum policy size of 10240 bytes`           | Added to inline `github_actions_additional`                         | Move to `github_actions_supplemental`                                |
-| `LimitExceeded: Cannot exceed quota for PolicySize: 6144`     | Managed policy version is full                                      | Trim/refactor; or rotate by deleting an older managed policy version |
-| `AccessDenied` on `sqs:ListQueues` despite policy in HCL      | Action mixed with resource-scoped statement                         | Split into own statement with `Resource = "*"`                       |
-| ApiGatewayV2 stage create fails with TagResource AccessDenied | `apigateway:PUT` only — TagResource missing                         | Add `apigateway:TagResource` against `/tags/*`                       |
-| Function URL create fails with AccessDenied                   | Permissions cover `lambda:GetFunction` but not `*FunctionUrlConfig` | Add the four `*FunctionUrlConfig` actions                            |
+| Symptom                                                       | Cause                                                                                                   | Fix                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LimitExceeded: Maximum policy size of 10240 bytes`           | Added to inline `github_actions_additional`                                                             | Move to `github_actions_supplemental_2`                                                                                                                                                                                                                                                              |
+| `LimitExceeded: Cannot exceed quota for PolicySize: 6144`     | A managed policy version is full — usually `github_actions_supplemental`, which is closed for new edits | Move the statement to `github_actions_supplemental_2`. If **that** is also full, add a further supplemental policy (`_3`) on the same role — AWS allows 10 managed policies per role, and this is the pattern LS-9382 established. Do not trim unrelated statements or delete older policy versions. |
+| New policy created but apply still fails `AccessDenied`       | New policy resource missing from the `-target` bootstrap list in `lambda-terraform-apply.yml`           | Add the `aws_iam_policy` **and** its `aws_iam_role_policy_attachment` to that list (gotcha #4)                                                                                                                                                                                                       |
+| `AccessDenied` on `sqs:ListQueues` despite policy in HCL      | Action mixed with resource-scoped statement                                                             | Split into own statement with `Resource = "*"`                                                                                                                                                                                                                                                       |
+| ApiGatewayV2 stage create fails with TagResource AccessDenied | `apigateway:PUT` only — TagResource missing                                                             | Add `apigateway:TagResource` against `/tags/*`                                                                                                                                                                                                                                                       |
+| Function URL create fails with AccessDenied                   | Permissions cover `lambda:GetFunction` but not `*FunctionUrlConfig`                                     | Add the four `*FunctionUrlConfig` actions                                                                                                                                                                                                                                                            |
 
 ## Related references
 

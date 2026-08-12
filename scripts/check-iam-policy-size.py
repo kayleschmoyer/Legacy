@@ -18,13 +18,17 @@ Usage:
   python scripts/check-iam-policy-size.py [path/to/github-actions-oidc.tf]
 
 Exit codes:
-  0 — both policies are within limits (with at least 240 bytes headroom)
+  0 — all policies are within limits (with at least 240 bytes headroom)
   1 — one or more policies exceed (or are within 240 bytes of) their limit
   2 — script failed to parse the file (something changed shape; investigate)
 
+Note: exit 1 is the current baseline — github_actions_additional and
+github_actions_supplemental are both closed for new edits and sit near their
+limits by design. See the per-policy expectations table in the reference below.
+
 Read .agents/skills/infrastructure/references/iam-policies.md for the
-full convention (inline = closed, supplemental = default home for new
-permissions, the resource-level gotchas, etc.).
+full convention (inline and supplemental = closed, supplemental_2 = default
+home for new permissions, the resource-level gotchas, etc.).
 """
 
 from __future__ import annotations
@@ -207,7 +211,9 @@ def main() -> int:
     print(
         "Policy size check FAILED. Read "
         ".agents/skills/infrastructure/references/iam-policies.md for the "
-        "convention (default new permissions to github_actions_supplemental)."
+        "convention (default new permissions to github_actions_supplemental_2; "
+        "the inline and supplemental policies are closed for new edits and are "
+        "expected to report near their limits)."
     )
     return 1
 

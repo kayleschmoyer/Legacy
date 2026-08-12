@@ -25,15 +25,16 @@ This skill flips the loop: **enumerate the permission delta before the first pus
 
 Both roles have a permission boundary (`aws_iam_policy.github_actions_boundary`) that prevents privilege escalation outside the `legacy-sports-dev-*` namespace. New permissions go into either the apply role or the plan role — **never edit the boundary** unless you're explicitly granting access to a new resource namespace.
 
-### Three policy attachments on the apply role
+### Four policy attachments on the apply role
 
-| Resource                                         | Type    | AWS limit             | When to edit                                                   |
-| ------------------------------------------------ | ------- | --------------------- | -------------------------------------------------------------- |
-| `aws_iam_role_policy.github_actions_additional`  | Inline  | **10,240 bytes**      | Closed for new edits — only remove or fix typos                |
-| `aws_iam_policy.github_actions_supplemental`     | Managed | 6,144 bytes / version | **Default home for all new apply-time perms**                  |
-| `aws_iam_role_policy.github_actions_plan_policy` | Inline  | 10,240 bytes          | Read-only equivalents needed by `terraform plan` (PR workflow) |
+| Resource                                         | Type    | AWS limit             | When to edit                                                     |
+| ------------------------------------------------ | ------- | --------------------- | ---------------------------------------------------------------- |
+| `aws_iam_role_policy.github_actions_additional`  | Inline  | **10,240 bytes**      | Closed for new edits — only remove or fix typos                  |
+| `aws_iam_policy.github_actions_supplemental`     | Managed | 6,144 bytes / version | Closed for new edits as of LS-9382 — ~94.8% full                 |
+| `aws_iam_policy.github_actions_supplemental_2`   | Managed | 6,144 bytes / version | **Default home for all new apply-time perms** (added on LS-9382) |
+| `aws_iam_role_policy.github_actions_plan_policy` | Inline  | 10,240 bytes          | Read-only equivalents needed by `terraform plan` (PR workflow)   |
 
-See [iam-policies.md](../../infrastructure/references/iam-policies.md) for the full size-budget rationale (LS-3839).
+See [iam-policies.md](../../infrastructure/references/iam-policies.md) for the full size-budget rationale (LS-3839), the per-policy size expectations, and the `-target` bootstrap-list gotcha that applies when adding a brand-new policy resource.
 
 ## The five-step loop
 
@@ -54,16 +55,17 @@ Use the [action-mapping cheatsheet](action-mapping.md) as the starting point. Wh
 # Dump the union of current apply-role perms
 terraform -chdir=terraform/main state show aws_iam_role_policy.github_actions_additional | grep -oE '"[a-z0-9]+:[A-Za-z*]+"' | sort -u > current-additional.txt
 terraform -chdir=terraform/main state show aws_iam_policy.github_actions_supplemental    | grep -oE '"[a-z0-9]+:[A-Za-z*]+"' | sort -u > current-supplemental.txt
+terraform -chdir=terraform/main state show aws_iam_policy.github_actions_supplemental_2  | grep -oE '"[a-z0-9]+:[A-Za-z*]+"' | sort -u > current-supplemental-2.txt
 terraform -chdir=terraform/main state show aws_iam_role_policy.github_actions_plan_policy | grep -oE '"[a-z0-9]+:[A-Za-z*]+"' | sort -u > current-plan.txt
 ```
 
-Compare your predicted action list against the union of the three files. The difference is your patch.
+Compare your predicted action list against the union of the four files. The difference is your patch.
 
 > Wildcard caveat: a current entry like `sso:*` covers any `sso:` action — manual diff alone is not enough; if a wildcard exists for the service prefix, treat the action as already granted.
 
 ### 3. Patch — minimal scope, right policy
 
-Default rule: **new apply-time actions go in `github_actions_supplemental`. New plan-time read actions go in `github_actions_plan_policy`.**
+Default rule: **new apply-time actions go in `github_actions_supplemental_2`. New plan-time read actions go in `github_actions_plan_policy`.**
 
 Scope every action to the narrowest resource ARN it supports:
 
@@ -85,7 +87,9 @@ Apply-only perms (`Create*`, `Update*`, `Delete*`, `Tag*`) cannot be validated p
 python scripts/check-iam-policy-size.py
 ```
 
-Abort the push if either policy is within **240 bytes** of its limit. If the supplemental policy is full, the fix is either consolidate wildcards (e.g. merge `sso:CreateApplication`, `sso:UpdateApplication`, `sso:DeleteApplication` into `sso:*Application*` when no scoping is lost) or rotate to a second supplemental policy attached to the same role.
+The script measures the three policies attached to the apply role (not `github_actions_plan_policy`). Two of them (`github_actions_additional`, `github_actions_supplemental`) are **already** near their limits and closed for new edits, so a non-zero exit is the current baseline — see the per-policy expectations table in [iam-policies.md § Validation](../../infrastructure/references/iam-policies.md#validation-estimate-policy-size-before-pushing). Abort the push if `github_actions_supplemental_2` is within **240 bytes** of its limit, or if either closed policy grew at all.
+
+If `github_actions_supplemental_2` fills up, consolidate wildcards where no scoping is lost (e.g. merge `sso:CreateApplication`, `sso:UpdateApplication`, `sso:DeleteApplication` into `sso:*Application*`), or add a further supplemental policy (`_3`) attached to the same role — AWS allows 10 managed policies per role. A new policy resource must also be added to the `-target` bootstrap list in `.github/workflows/lambda-terraform-apply.yml`.
 
 ## Quick decision tree
 
@@ -102,13 +106,13 @@ Did you add or modify any terraform/**/*.tf?
 
 ## Common antipatterns
 
-| Antipattern                                                                          | Why it bites                                                                                           | Fix                                                                                              |
-| ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Adding apply-time perms only — forgetting the plan role needs `Get*`/`Describe*` too | PR plan in CI fails with AccessDenied during refresh; merge blocks                                     | Mirror every new `Get*`/`Describe*`/`List*` into `github_actions_plan_policy`                    |
-| Using `Resource = "*"` for everything because it "just works"                        | Trips the permission boundary on namespace-scoped actions (e.g. `iam:*` outside `legacy-sports-dev-*`) | Scope to predictable resource ARNs; use `"*"` only for actions that genuinely don't support ARNs |
-| Granting `service:*` to skip enumeration                                             | Bypasses minimal-permission principle; harder to audit; may exceed boundary                            | Enumerate; only use service wildcards when you'll genuinely use ≥5 actions in that service       |
-| Splitting one resource's perms across multiple PRs to "fix one CI failure at a time" | Each cycle is 5+ min of CI + 1 PR + bot review                                                         | Patch all four buckets (create/read/tag/delete) in the same PR as the resource                   |
-| Editing `github_actions_additional` because it's "where similar perms already live"  | Inline policy is at 10K limit; new statement pushes it over and apply fails                            | Put new statements in `github_actions_supplemental` regardless of where peers live               |
+| Antipattern                                                                                                            | Why it bites                                                                                                        | Fix                                                                                              |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Adding apply-time perms only — forgetting the plan role needs `Get*`/`Describe*` too                                   | PR plan in CI fails with AccessDenied during refresh; merge blocks                                                  | Mirror every new `Get*`/`Describe*`/`List*` into `github_actions_plan_policy`                    |
+| Using `Resource = "*"` for everything because it "just works"                                                          | Trips the permission boundary on namespace-scoped actions (e.g. `iam:*` outside `legacy-sports-dev-*`)              | Scope to predictable resource ARNs; use `"*"` only for actions that genuinely don't support ARNs |
+| Granting `service:*` to skip enumeration                                                                               | Bypasses minimal-permission principle; harder to audit; may exceed boundary                                         | Enumerate; only use service wildcards when you'll genuinely use ≥5 actions in that service       |
+| Splitting one resource's perms across multiple PRs to "fix one CI failure at a time"                                   | Each cycle is 5+ min of CI + 1 PR + bot review                                                                      | Patch all four buckets (create/read/tag/delete) in the same PR as the resource                   |
+| Editing `github_actions_additional` or `github_actions_supplemental` because that's "where similar perms already live" | Both are at their limits; a new statement pushes them over and apply fails **after merge** — plan does not catch it | Put new statements in `github_actions_supplemental_2` regardless of where peers live             |
 
 ## Worked example: adding a new SQS queue
 
@@ -122,13 +126,13 @@ resource "aws_sqs_queue" "ingest" {
 
 Predicted action set:
 
-| Bucket           | Actions                                                                      | Policy              |
-| ---------------- | ---------------------------------------------------------------------------- | ------------------- |
-| Create           | `sqs:CreateQueue`, `sqs:SetQueueAttributes`, `sqs:TagQueue`                  | supplemental        |
-| Read             | `sqs:GetQueueAttributes`, `sqs:GetQueueUrl`, `sqs:ListQueueTags`             | supplemental + plan |
-| Tag              | `sqs:TagQueue`, `sqs:UntagQueue`, `sqs:ListQueueTags`                        | supplemental        |
-| Delete           | `sqs:DeleteQueue`                                                            | supplemental        |
-| **`*` resource** | `sqs:ListQueues` — does not support resource-level perms; separate statement | supplemental        |
+| Bucket           | Actions                                                                      | Policy                |
+| ---------------- | ---------------------------------------------------------------------------- | --------------------- |
+| Create           | `sqs:CreateQueue`, `sqs:SetQueueAttributes`, `sqs:TagQueue`                  | supplemental_2        |
+| Read             | `sqs:GetQueueAttributes`, `sqs:GetQueueUrl`, `sqs:ListQueueTags`             | supplemental_2 + plan |
+| Tag              | `sqs:TagQueue`, `sqs:UntagQueue`, `sqs:ListQueueTags`                        | supplemental_2        |
+| Delete           | `sqs:DeleteQueue`                                                            | supplemental_2        |
+| **`*` resource** | `sqs:ListQueues` — does not support resource-level perms; separate statement | supplemental_2        |
 
 Resource ARN for the scoped statement: `arn:aws:sqs:${local.region}:${local.account_id}:legacy-sports-dev-*`.
 

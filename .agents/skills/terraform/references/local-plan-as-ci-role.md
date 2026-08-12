@@ -25,7 +25,7 @@ This catches missing `Get*` / `List*` / `Describe*` actions in `github_actions_p
 2. Push the branch and open a **draft PR**.
 3. The `Plan` job runs on every push. Wait for it (Claude Code surfaces CI completion as a push notification — no polling).
 4. If the job fails on `AccessDenied`, the GHA log shows exactly which action is missing on which resource ARN.
-5. Add the missing action to `github_actions_plan_policy` (and mirror to `github_actions_supplemental` if the resource will also be applied — see [permission-planning.md step 3](permission-planning.md#3-patch--minimal-scope-right-policy)).
+5. Add the missing action to `github_actions_plan_policy` (and mirror to `github_actions_supplemental_2` if the resource will also be applied — see [permission-planning.md step 3](permission-planning.md#3-patch--minimal-scope-right-policy)).
 6. Force-push and repeat until the `Plan` job succeeds.
 
 > Reading the failure from the CI log: see [github-actions-logs.md](../../infrastructure/references/github-actions-logs.md).
