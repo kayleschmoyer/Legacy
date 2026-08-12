@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 720" font-family="Literata, Georgia, serif" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 760" font-family="Literata, Georgia, serif" font-size="13">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#1B3A5C"/>
@@ -18,7 +18,7 @@
     </style>
   </defs>
 
-  <rect width="880" height="720" fill="#F7F4EC"/>
+  <rect width="880" height="760" fill="#F7F4EC"/>
   <text x="440" y="40" text-anchor="middle" class="title">PROACTIVE TERRAFORM PERMISSION PLANNING</text>
   <line x1="100" y1="55" x2="780" y2="55" stroke="#C5A55A" stroke-width="2"/>
 
@@ -29,7 +29,7 @@
   <line x1="440" y1="124" x2="440" y2="155" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- Step 1: Predict -->
-  <rect x="80" y="160" width="320" height="100" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
+  <rect x="80" y="160" width="320" height="124" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
   <text x="100" y="195" class="step-num">1</text>
   <text x="135" y="183" class="step-title">PREDICT</text>
   <text x="135" y="203" class="step-body">For each new/changed resource, enumerate</text>
@@ -38,79 +38,81 @@
   <text x="135" y="251" class="step-body">Source: action-mapping.md cheatsheet</text>
 
   <!-- Arrow 1->2 -->
-  <line x1="400" y1="210" x2="480" y2="210" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="400" y1="222" x2="480" y2="222" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- Step 2: Diff -->
-  <rect x="480" y="160" width="320" height="100" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
+  <rect x="480" y="160" width="320" height="124" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
   <text x="500" y="195" class="step-num">2</text>
   <text x="535" y="183" class="step-title">DIFF</text>
   <text x="535" y="203" class="step-body">Pull current actions from state:</text>
   <text x="535" y="219" class="step-body">  &#8226; github_actions_additional (inline)</text>
   <text x="535" y="235" class="step-body">  &#8226; github_actions_supplemental (managed)</text>
-  <text x="535" y="251" class="step-body">  &#8226; github_actions_plan_policy (read-only)</text>
+  <text x="535" y="251" class="step-body">  &#8226; github_actions_supplemental_2 (managed)</text>
+  <text x="535" y="267" class="step-body">  &#8226; github_actions_plan_policy (read-only)</text>
 
   <!-- Arrow down 2->3 -->
-  <line x1="640" y1="260" x2="640" y2="295" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="640" y1="284" x2="640" y2="335" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- Step 3: Patch -->
-  <rect x="480" y="300" width="320" height="100" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
-  <text x="500" y="335" class="step-num">3</text>
-  <text x="535" y="323" class="step-title">PATCH (minimal scope)</text>
-  <text x="535" y="343" class="step-body">Apply-time perms &#8594; supplemental</text>
-  <text x="535" y="359" class="step-body">Read-only perms &#8594; plan_policy</text>
-  <text x="535" y="375" class="step-body">No-ARN actions &#8594; own statement, Resource="*"</text>
-  <text x="535" y="391" class="step-body">Never edit additional (size-locked)</text>
+  <rect x="480" y="340" width="320" height="100" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="500" y="375" class="step-num">3</text>
+  <text x="535" y="363" class="step-title">PATCH (minimal scope)</text>
+  <text x="535" y="383" class="step-body">Apply-time perms &#8594; supplemental_2</text>
+  <text x="535" y="399" class="step-body">Read-only perms &#8594; plan_policy</text>
+  <text x="535" y="415" class="step-body">No-ARN actions &#8594; own statement, Resource="*"</text>
+  <text x="535" y="431" class="step-body">Never edit additional / supplemental (full)</text>
 
   <!-- Arrow 3->4 (curve back left) -->
-  <line x1="480" y1="350" x2="400" y2="350" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="480" y1="390" x2="400" y2="390" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- Step 4: Validate locally -->
-  <rect x="80" y="300" width="320" height="100" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
-  <text x="100" y="335" class="step-num">4</text>
-  <text x="135" y="323" class="step-title">VALIDATE LOCALLY (assume CI role)</text>
-  <text x="135" y="343" class="step-body">AWS_PROFILE=ls-ci-apply</text>
-  <text x="135" y="359" class="step-body">terraform plan -refresh=true</text>
-  <text x="135" y="375" class="step-body">Optionally: targeted apply on new resources</text>
-  <text x="135" y="391" class="step-body">~30s/iteration vs ~5min in CI</text>
+  <rect x="80" y="340" width="320" height="100" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="100" y="375" class="step-num">4</text>
+  <text x="135" y="363" class="step-title">VALIDATE LOCALLY (assume CI role)</text>
+  <text x="135" y="383" class="step-body">AWS_PROFILE=ls-ci-apply</text>
+  <text x="135" y="399" class="step-body">terraform plan -refresh=true</text>
+  <text x="135" y="415" class="step-body">Optionally: targeted apply on new resources</text>
+  <text x="135" y="431" class="step-body">~30s/iteration vs ~5min in CI</text>
 
   <!-- Arrow 4->5 -->
-  <line x1="240" y1="400" x2="240" y2="435" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="240" y1="440" x2="240" y2="475" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- Step 5: Size gate -->
-  <rect x="80" y="440" width="320" height="100" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
-  <text x="100" y="475" class="step-num">5</text>
-  <text x="135" y="463" class="step-title">SIZE-BUDGET GATE</text>
-  <text x="135" y="483" class="step-body">python scripts/check-iam-policy-size.py</text>
-  <text x="135" y="499" class="step-body">Abort if within 240B of limit:</text>
-  <text x="135" y="515" class="step-body">  &#8226; additional &lt; 10,000 B</text>
-  <text x="135" y="531" class="step-body">  &#8226; supplemental &lt; 5,800 B / version</text>
+  <rect x="80" y="480" width="320" height="120" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1.5"/>
+  <text x="100" y="515" class="step-num">5</text>
+  <text x="135" y="503" class="step-title">SIZE-BUDGET GATE</text>
+  <text x="135" y="523" class="step-body">python scripts/check-iam-policy-size.py</text>
+  <text x="135" y="539" class="step-body">Abort if supplemental_2 is near its limit:</text>
+  <text x="135" y="555" class="step-body">  &#8226; supplemental_2 &lt; 5,800 B / version</text>
+  <text x="135" y="571" class="step-body">  &#8226; additional / supplemental: closed, full</text>
+  <text x="135" y="587" class="step-body">  &#8226; non-zero exit = known baseline</text>
 
   <!-- Decision diamond: passed? -->
-  <polygon points="640,440 760,500 640,560 520,500" fill="#FFFFFF" stroke="#C5A55A" stroke-width="2"/>
-  <text x="640" y="495" text-anchor="middle" class="step-title">Local plan +</text>
-  <text x="640" y="511" text-anchor="middle" class="step-title">size gate pass?</text>
+  <polygon points="640,480 760,540 640,600 520,540" fill="#FFFFFF" stroke="#C5A55A" stroke-width="2"/>
+  <text x="640" y="535" text-anchor="middle" class="step-title">Local plan +</text>
+  <text x="640" y="551" text-anchor="middle" class="step-title">size gate pass?</text>
 
   <!-- Arrow 5->diamond -->
-  <line x1="400" y1="490" x2="520" y2="500" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="400" y1="540" x2="520" y2="540" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
 
   <!-- Diamond NO loop back to step 1 -->
-  <path d="M 640 440 Q 640 100 440 100" fill="none" stroke="#C41E3A" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-red)"/>
-  <text x="675" y="280" class="loop-label">NO: missing action</text>
-  <text x="675" y="295" class="loop-label">surfaced &#8594; loop</text>
+  <path d="M 640 480 Q 640 100 440 100" fill="none" stroke="#C41E3A" stroke-width="2" stroke-dasharray="6,4" marker-end="url(#arrow-red)"/>
+  <text x="675" y="305" class="loop-label">NO: missing action</text>
+  <text x="675" y="320" class="loop-label">surfaced &#8594; loop</text>
 
   <!-- Diamond YES -> push -->
-  <line x1="640" y1="560" x2="640" y2="600" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
-  <text x="655" y="585" class="arrow-label">YES</text>
+  <line x1="640" y1="600" x2="640" y2="640" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
+  <text x="655" y="625" class="arrow-label">YES</text>
 
   <!-- Push -->
-  <rect x="540" y="605" width="200" height="44" rx="22" fill="#C5A55A"/>
-  <text x="640" y="632" class="start-end">make pc &amp; push</text>
+  <rect x="540" y="645" width="200" height="44" rx="22" fill="#C5A55A"/>
+  <text x="640" y="672" class="start-end">make pc &amp; push</text>
 
   <!-- Reactive loop sidebar (annotation) -->
-  <rect x="80" y="605" width="380" height="80" rx="6" fill="#F0E8D2" stroke="#C5A55A" stroke-width="1"/>
-  <text x="100" y="628" class="step-title">What this replaces</text>
-  <text x="100" y="648" class="step-body">Old loop: edit &#8594; plan passes &#8594; push &#8594; CI apply</text>
-  <text x="100" y="664" class="step-body">fails on AccessDenied &#8594; add one perm &#8594; new PR &#8594;</text>
-  <text x="100" y="680" class="step-body">repeat 3-5x. Each cycle = 1 PR + ~5 min CI burn.</text>
+  <rect x="80" y="645" width="380" height="80" rx="6" fill="#F0E8D2" stroke="#C5A55A" stroke-width="1"/>
+  <text x="100" y="668" class="step-title">What this replaces</text>
+  <text x="100" y="688" class="step-body">Old loop: edit &#8594; plan passes &#8594; push &#8594; CI apply</text>
+  <text x="100" y="704" class="step-body">fails on AccessDenied &#8594; add one perm &#8594; new PR &#8594;</text>
+  <text x="100" y="720" class="step-body">repeat 3-5x. Each cycle = 1 PR + ~5 min CI burn.</text>
 
 </svg>

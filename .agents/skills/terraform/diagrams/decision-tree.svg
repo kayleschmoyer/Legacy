@@ -36,7 +36,7 @@
   <text x="180" y="232" class="leaf-title">github_actions_plan_policy</text>
   <text x="180" y="252" class="leaf-body">inline, 10,240 B limit</text>
   <text x="180" y="268" class="leaf-body">used by PR plan workflow</text>
-  <text x="180" y="280" class="leaf-body">+ also add to supplemental (apply role refresh)</text>
+  <text x="180" y="280" class="leaf-body">+ also add to supplemental_2 (apply refresh)</text>
 
   <!-- RIGHT BRANCH: write -->
   <polygon points="740,210 880,265 740,320 600,265" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="2"/>
@@ -44,25 +44,25 @@
   <text x="740" y="273" class="q">resource-level perms?</text>
   <text x="740" y="291" class="q">(check Service Auth Ref)</text>
 
-  <!-- YES (right) -> supplemental scoped -->
+  <!-- YES (right) -> supplemental_2 scoped -->
   <line x1="740" y1="320" x2="660" y2="395" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
   <text x="680" y="350" class="label">YES</text>
 
-  <!-- NO (right) -> supplemental wildcard -->
+  <!-- NO (right) -> supplemental_2 wildcard -->
   <line x1="880" y1="265" x2="880" y2="395" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
   <text x="888" y="340" class="label">NO</text>
 
-  <!-- Leaf: supplemental scoped -->
+  <!-- Leaf: supplemental_2 scoped -->
   <rect x="450" y="400" width="280" height="100" rx="6" fill="#1B3A5C"/>
-  <text x="590" y="427" class="leaf-title">github_actions_supplemental</text>
+  <text x="590" y="427" class="leaf-title">github_actions_supplemental_2</text>
   <text x="590" y="447" class="leaf-body">managed, 6,144 B / version</text>
   <text x="590" y="465" class="leaf-body">scope to narrowest resource ARN</text>
   <text x="590" y="481" class="leaf-body">use locals.account_id / locals.region</text>
   <text x="590" y="495" class="leaf-body">e.g. arn:...:legacy-sports-dev-*</text>
 
-  <!-- Leaf: supplemental wildcard -->
+  <!-- Leaf: supplemental_2 wildcard -->
   <rect x="760" y="400" width="150" height="100" rx="6" fill="#C41E3A"/>
-  <text x="835" y="427" class="leaf-title">supplemental</text>
+  <text x="835" y="427" class="leaf-title">supplemental_2</text>
   <text x="835" y="445" class="leaf-body">SEPARATE statement</text>
   <text x="835" y="461" class="leaf-body">Resource = "*"</text>
   <text x="835" y="478" class="leaf-body">never mix with</text>
@@ -76,9 +76,9 @@
 
   <line x1="180" y1="285" x2="180" y2="335" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
 
-  <!-- Q2 YES -> mirror to supplemental -->
+  <!-- Q2 YES -> mirror to supplemental_2 -->
   <line x1="320" y1="395" x2="450" y2="450" stroke="#1B3A5C" stroke-width="2" marker-end="url(#arrow)"/>
-  <text x="380" y="415" class="label">YES &#8594; also supplemental</text>
+  <text x="326" y="386" class="label">YES &#8594; also supplemental_2</text>
 
   <!-- Q2 NO -> plan only -->
   <rect x="20" y="475" width="240" height="60" rx="6" fill="#16223A"/>
@@ -89,8 +89,8 @@
 
   <!-- DO NOT EDIT box -->
   <rect x="320" y="555" width="580" height="60" rx="6" fill="#F0E8D2" stroke="#C41E3A" stroke-width="2"/>
-  <text x="610" y="580" text-anchor="middle" class="q" style="fill:#C41E3A">DO NOT EDIT: github_actions_additional</text>
-  <text x="610" y="600" text-anchor="middle" class="meta">inline, near 10 KB limit since LS-3839 &#8212; closed for new statements; only remove or fix typos</text>
+  <text x="610" y="580" text-anchor="middle" class="q" style="fill:#C41E3A">DO NOT EDIT: github_actions_additional &#183; github_actions_supplemental</text>
+  <text x="610" y="600" text-anchor="middle" class="meta">both at their size limits (LS-3839, LS-9382) &#8212; closed for new statements; only remove or fix typos</text>
 
   <!-- Legend -->
   <rect x="20" y="555" width="280" height="115" rx="6" fill="#FFFFFF" stroke="#1B3A5C" stroke-width="1"/>
