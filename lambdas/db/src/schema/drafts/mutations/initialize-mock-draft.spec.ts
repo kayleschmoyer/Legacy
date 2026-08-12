@@ -270,7 +270,7 @@ describe('initializeMockDraft transaction behavior', () => {
     ).rejects.toThrow('connection lost');
   });
 
-  it('returns webSocketReady:true when the notification succeeds', async () => {
+  it('returns webSocketReady:true when the notification succeeds (isOffline=true)', async () => {
     const resolve = await captureInitializeMockDraftResolver();
 
     const chain: Record<string, jest.Mock> = {};
@@ -296,7 +296,7 @@ describe('initializeMockDraft transaction behavior', () => {
 
     const result = await resolve(
       {},
-      VALID_ARGS,
+      { ...VALID_ARGS, isOffline: true },
       { user: { id: 1 }, db, notificationService: { notifyDraftStarted } },
       undefined,
     );
@@ -413,7 +413,7 @@ describe('initializeMockDraft transaction behavior', () => {
     });
   });
 
-  it('returns webSocketReady:false without throwing when the notification fails after commit', async () => {
+  it('returns webSocketReady:false without throwing when the notification fails after commit (isOffline=true)', async () => {
     const resolve = await captureInitializeMockDraftResolver();
 
     const chain: Record<string, jest.Mock> = {};
@@ -441,7 +441,7 @@ describe('initializeMockDraft transaction behavior', () => {
 
     const result = await resolve(
       {},
-      VALID_ARGS,
+      { ...VALID_ARGS, isOffline: true },
       { user: { id: 1 }, db, notificationService: { notifyDraftStarted } },
       undefined,
     );
@@ -451,6 +451,125 @@ describe('initializeMockDraft transaction behavior', () => {
       draftId: 100,
       webSocketReady: false,
     });
+  });
+});
+
+// ── LS-9181: Shared mode (isOffline=false, the default) creates a joinable
+// lobby instead of an instant AI-only draft ────────────────────────────────
+describe('initializeMockDraft Shared-mode lobby behavior (LS-9181)', () => {
+  function makeMockDb() {
+    return {
+      select: jest.fn(() => ({
+        from: jest.fn(() => ({
+          where: jest.fn(() => ({
+            limit: jest.fn().mockResolvedValue([]),
+          })),
+        })),
+      })),
+    };
+  }
+
+  function makeChainAndTx() {
+    const chain: Record<string, jest.Mock> = {};
+    chain.values = jest.fn(() => chain);
+    chain.set = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.returning = jest
+      .fn()
+      .mockResolvedValueOnce([{ id: 1 }]) // league
+      .mockResolvedValueOnce([{ id: 10 }, { id: 11 }, { id: 12 }, { id: 13 }]) // teams
+      .mockResolvedValueOnce([{ id: 100 }]); // draft
+
+    const mockTx = {
+      insert: jest.fn(() => chain),
+      update: jest.fn(() => chain),
+    };
+    return { chain, mockTx };
+  }
+
+  it('names non-creator slots "Open Slot N" instead of CPU when isOffline is not passed', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+    const { chain, mockTx } = makeChainAndTx();
+
+    const db = makeMockDb();
+    (db as { transaction?: unknown }).transaction = jest.fn(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+
+    await resolve({}, VALID_ARGS, { user: { id: 1 }, db }, undefined);
+
+    // Second insert().values() call is the teams insert.
+    const teamNames = (chain.values.mock.calls[1][0] as { name: string }[]).map(
+      (t) => t.name,
+    );
+    expect(teamNames).toContain('My Team');
+    expect(teamNames).toEqual(
+      expect.arrayContaining([expect.stringMatching(/^Open Slot \d+$/)]),
+    );
+    expect(teamNames.some((n) => n.startsWith('CPU Team'))).toBe(false);
+  });
+
+  it('does not create draft_teams rows or flip the league to in-progress', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+    const { mockTx } = makeChainAndTx();
+
+    const db = makeMockDb();
+    (db as { transaction?: unknown }).transaction = jest.fn(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+
+    await resolve({}, VALID_ARGS, { user: { id: 1 }, db }, undefined);
+
+    // 4 inserts: league, teams, leagueMembers, drafts — no draft_teams insert.
+    expect(mockTx.insert).toHaveBeenCalledTimes(4);
+    // No currentPickDeadline / draftStatus updates — league stays 'not-started'.
+    expect(mockTx.update).not.toHaveBeenCalled();
+  });
+
+  it('returns webSocketReady:true and skips notifyDraftStarted (no draft to announce yet)', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+    const { mockTx } = makeChainAndTx();
+
+    const db = makeMockDb();
+    (db as { transaction?: unknown }).transaction = jest.fn(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+
+    const notifyDraftStarted = jest.fn().mockResolvedValue(undefined);
+
+    const result = await resolve(
+      {},
+      VALID_ARGS,
+      { user: { id: 1 }, db, notificationService: { notifyDraftStarted } },
+      undefined,
+    );
+
+    expect(notifyDraftStarted).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      leagueId: 1,
+      draftId: 100,
+      webSocketReady: true,
+    });
+  });
+
+  it('returns the generated inviteCode in the response', async () => {
+    const resolve = await captureInitializeMockDraftResolver();
+    const { mockTx } = makeChainAndTx();
+
+    const db = makeMockDb();
+    (db as { transaction?: unknown }).transaction = jest.fn(
+      (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+    );
+
+    const result = (await resolve(
+      {},
+      VALID_ARGS,
+      { user: { id: 1 }, db },
+      undefined,
+    )) as { inviteCode: string };
+
+    expect(typeof result.inviteCode).toBe('string');
+    expect(result.inviteCode).toHaveLength(8);
   });
 });
 

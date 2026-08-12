@@ -2161,6 +2161,11 @@ Identifiers for a newly created mock draft session
 """
 type MockDraftInit {
   draftId: Int
+
+  """
+  Invite code other real users can redeem via joinMockDraft to be seated into an open slot (LS-9181). Always present, but only useful for a Shared (non-offline) mock draft that has not yet been started — offline drafts and already-started drafts have no open slots left to join.
+  """
+  inviteCode: String
   leagueId: Int
 
   """
@@ -2465,7 +2470,7 @@ type Mutation {
   ): Draft
 
   """
-  Create an ephemeral mock draft league to practice drafting against AI teams. Picks are recorded but rosters are not persisted to any real league.
+  Create an ephemeral mock draft league. Offline mode practices solo against AI teams; Shared mode opens a joinable lobby other real users can enter via joinMockDraft using the returned inviteCode, seating into whichever slots stay open when the commissioner starts the draft (LS-9181). Picks are recorded but rosters are not persisted to any real league.
   """
   initializeMockDraft(
     """
@@ -2511,6 +2516,11 @@ type Mutation {
   inviteAssistantManager(teamId: Int!, username: String!): LeagueMember
   joinLeague(inviteCode: String!, teamName: String!): JoinLeaguePayload
   joinLeagueByCode(inviteCode: String!, teamName: String!): Team
+
+  """
+  Join a Shared mock draft lobby by invite code, claiming an open slot that would otherwise be seated by AI when the commissioner starts the draft (LS-9181). Fails once the draft has started — join before then.
+  """
+  joinMockDraft(inviteCode: String!, teamName: String!): Team
   joinPublicLeague(leagueId: Int!, teamName: String!): JoinLeaguePayload
 
   """

@@ -111,6 +111,11 @@ const MockDraftPage = lazyWithRetry(() =>
     default: m.MockDraftPage,
   })),
 );
+const JoinMockDraftPage = lazyWithRetry(() =>
+  import('../pages/draft/JoinMockDraftPage').then((m) => ({
+    default: m.JoinMockDraftPage,
+  })),
+);
 const SeasonDraftGamePage = lazyWithRetry(
   () => import('../pages/games/SeasonDraftGamePage'),
 );
@@ -741,6 +746,14 @@ function App() {
               element={<EliteDraftSpectatorScreen />}
             />
             <Route path="/baseball/mock-draft" element={<MockDraftPage />} />
+            <Route
+              path="/baseball/mock-draft/join"
+              element={<JoinMockDraftPage />}
+            />
+            <Route
+              path="/baseball/mock-draft/join:inviteCode"
+              element={<JoinMockDraftPage />}
+            />
             <Route
               path="/baseball/league/create"
               element={<LeagueCreatePage />}

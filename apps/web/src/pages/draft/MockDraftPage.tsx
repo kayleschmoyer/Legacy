@@ -10,6 +10,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { Skeleton } from '@legacy-sports/shared-components';
 import {
+  MockDraftInviteCard,
   type MockDraftSettings,
   MockDraftSetup,
 } from '@legacy-sports/shared-components/draft';
@@ -55,6 +56,8 @@ interface SetupScreenProps {
    * users (LS-5178).
    */
   usageLabel?: string;
+  /** Navigates to the join-by-code screen when Shared mode is selected. */
+  onJoinInstead?: () => void;
 }
 
 /**
@@ -72,6 +75,7 @@ function SetupScreen({
   initialNumTeams,
   initialDraftOrder,
   usageLabel,
+  onJoinInstead,
 }: SetupScreenProps): React.JSX.Element {
   const navigate = useNavigate();
 
@@ -152,6 +156,7 @@ function SetupScreen({
             initialNumTeams={initialNumTeams}
             initialDraftOrder={initialDraftOrder}
             usageLabel={usageLabel}
+            onJoinInstead={onJoinInstead}
           />
         </YStack>
 
@@ -373,6 +378,14 @@ export function MockDraftPage(): React.JSX.Element {
   const [missingLeagueIdError, setMissingLeagueIdError] = React.useState<
     string | null
   >(null);
+  // Shared-mode drafts pause here to let the creator share the invite code
+  // before entering the draft room lobby (LS-9181). Offline drafts navigate
+  // straight through, unchanged.
+  const [pendingInvite, setPendingInvite] = React.useState<{
+    leagueId: number;
+    inviteCode: string;
+    sport: MockDraftSettings['sport'];
+  } | null>(null);
 
   // Gate the page on remaining weekly allowance rather than subscription tier:
   // free users get a fixed number of mock drafts per week, so blocking the form
@@ -410,12 +423,23 @@ export function MockDraftPage(): React.JSX.Element {
         isOffline,
       },
     });
-    const leagueId = result.data?.initializeMockDraft?.leagueId;
-    if (leagueId) {
-      navigate(`/${s.sport}/league/${leagueId}/draft`);
-    } else {
+    const initialized = result.data?.initializeMockDraft;
+    const leagueId = initialized?.leagueId;
+    if (!leagueId) {
       setMissingLeagueIdError("Couldn't start mock draft — please try again.");
+      return;
     }
+    if (!isOffline && initialized.inviteCode) {
+      // Pause on the invite screen instead of navigating straight into the
+      // draft room lobby (LS-9181).
+      setPendingInvite({
+        leagueId,
+        inviteCode: initialized.inviteCode,
+        sport: s.sport,
+      });
+      return;
+    }
+    navigate(`/${s.sport}/league/${leagueId}/draft`);
   };
 
   // Render a neutral skeleton while the usage query resolves on first load so
@@ -449,6 +473,38 @@ export function MockDraftPage(): React.JSX.Element {
       ? `${usage.used} of ${usage.limit} free mock drafts used this week`
       : undefined;
 
+  if (pendingInvite) {
+    return (
+      <YStack
+        minHeight="100vh"
+        alignItems="center"
+        justifyContent="center"
+        padding="$5"
+        style={{ background: GRADIENT_BOARD_BG }}
+      >
+        <YStack
+          width="100%"
+          maxWidth={480}
+          backgroundColor={SURFACE_CARD}
+          borderRadius="$6"
+          padding="$6"
+          borderWidth={1}
+          borderColor={OVERLAY_WHITE_10}
+          style={{ boxShadow: `0 16px 64px ${withAlpha(BLACK, 0.4)}` }}
+        >
+          <MockDraftInviteCard
+            inviteCode={pendingInvite.inviteCode}
+            onContinue={() =>
+              navigate(
+                `/${pendingInvite.sport}/league/${pendingInvite.leagueId}/draft`,
+              )
+            }
+          />
+        </YStack>
+      </YStack>
+    );
+  }
+
   return (
     <>
       <PageMeta
@@ -465,6 +521,7 @@ export function MockDraftPage(): React.JSX.Element {
         initialNumTeams={initialNumTeams}
         initialDraftOrder={initialDraftOrder}
         usageLabel={usageLabel}
+        onJoinInstead={() => navigate('/baseball/mock-draft/join')}
       />
     </>
   );

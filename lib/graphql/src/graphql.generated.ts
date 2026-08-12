@@ -1856,6 +1856,8 @@ export type MinigamesStats = {
 export type MockDraftInit = {
   __typename?: 'MockDraftInit';
   draftId?: Maybe<Scalars['Int']['output']>;
+  /** Invite code other real users can redeem via joinMockDraft to be seated into an open slot (LS-9181). Always present, but only useful for a Shared (non-offline) mock draft that has not yet been started — offline drafts and already-started drafts have no open slots left to join. */
+  inviteCode?: Maybe<Scalars['String']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   /** False if the draft-started WebSocket notification failed to send. The draft itself was created successfully either way; when false, the client should fall back to polling immediately instead of waiting for a WS event that will never arrive. */
   webSocketReady?: Maybe<Scalars['Boolean']['output']>;
@@ -1963,11 +1965,13 @@ export type Mutation = {
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
-  /** Create an ephemeral mock draft league to practice drafting against AI teams. Picks are recorded but rosters are not persisted to any real league. */
+  /** Create an ephemeral mock draft league. Offline mode practices solo against AI teams; Shared mode opens a joinable lobby other real users can enter via joinMockDraft using the returned inviteCode, seating into whichever slots stay open when the commissioner starts the draft (LS-9181). Picks are recorded but rosters are not persisted to any real league. */
   initializeMockDraft?: Maybe<MockDraftInit>;
   inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
+  /** Join a Shared mock draft lobby by invite code, claiming an open slot that would otherwise be seated by AI when the commissioner starts the draft (LS-9181). Fails once the draft has started — join before then. */
+  joinMockDraft?: Maybe<Team>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
   /** Join a Season Draft Game via invite code. Returns the game ID. */
   joinSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
@@ -2375,6 +2379,11 @@ export type MutationJoinLeagueArgs = {
 };
 
 export type MutationJoinLeagueByCodeArgs = {
+  inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
+};
+
+export type MutationJoinMockDraftArgs = {
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
 };
@@ -12185,6 +12194,22 @@ export type InitializeMockDraftMutation = {
     __typename?: 'MockDraftInit';
     leagueId?: number | null;
     draftId?: number | null;
+    inviteCode?: string | null;
+  } | null;
+};
+
+export type JoinMockDraftMutationVariables = Exact<{
+  inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
+}>;
+
+export type JoinMockDraftMutation = {
+  __typename?: 'Mutation';
+  joinMockDraft?: {
+    __typename?: 'Team';
+    id?: number | null;
+    name?: string | null;
+    leagueId?: number | null;
   } | null;
 };
 
@@ -31228,6 +31253,7 @@ export const InitializeMockDraft = gql`
     ) {
       leagueId
       draftId
+      inviteCode
     }
   }
 `;
@@ -31280,6 +31306,59 @@ export type InitializeMockDraftMutationResult =
 export type InitializeMockDraftMutationOptions = BaseMutationOptions<
   InitializeMockDraftMutation,
   InitializeMockDraftMutationVariables
+>;
+export const JoinMockDraft = gql`
+  mutation JoinMockDraft($inviteCode: String!, $teamName: String!) {
+    joinMockDraft(inviteCode: $inviteCode, teamName: $teamName) {
+      id
+      name
+      leagueId
+    }
+  }
+`;
+export type JoinMockDraftMutationFn = MutationFunction<
+  JoinMockDraftMutation,
+  JoinMockDraftMutationVariables
+>;
+
+/**
+ * __useJoinMockDraftMutation__
+ *
+ * To run a mutation, you first call `useJoinMockDraftMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useJoinMockDraftMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [joinMockDraftMutation, { data, loading, error }] = useJoinMockDraftMutation({
+ *   variables: {
+ *      inviteCode: // value for 'inviteCode'
+ *      teamName: // value for 'teamName'
+ *   },
+ * });
+ */
+export function useJoinMockDraftMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    JoinMockDraftMutation,
+    JoinMockDraftMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    JoinMockDraftMutation,
+    JoinMockDraftMutationVariables
+  >(JoinMockDraft, options);
+}
+export type JoinMockDraftMutationHookResult = ReturnType<
+  typeof useJoinMockDraftMutation
+>;
+export type JoinMockDraftMutationResult =
+  Apollo.MutationResult<JoinMockDraftMutation>;
+export type JoinMockDraftMutationOptions = BaseMutationOptions<
+  JoinMockDraftMutation,
+  JoinMockDraftMutationVariables
 >;
 export const MakeSeasonDraftPick = gql`
   mutation MakeSeasonDraftPick(

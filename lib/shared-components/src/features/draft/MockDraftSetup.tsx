@@ -31,8 +31,9 @@ export type MockDraftOrder = 'snake' | 'linear';
 export type MockDraftPlayerPool = 'all' | 'nl' | 'al';
 export type MockDraftSport = 'baseball' | 'football';
 /**
- * Draft Mode (LS-9144):
- * - 'shared': today's default — timed picks against AI opponents.
+ * Draft Mode (LS-9144, LS-9181):
+ * - 'shared': default — invite real friends to join before it starts; any
+ *   slots still open when the draft starts fall back to AI.
  * - 'offline': solo practice — no pick clock, pause/resume at your own pace.
  */
 export type MockDraftMode = 'shared' | 'offline';
@@ -66,6 +67,11 @@ export interface MockDraftSetupProps {
   usageLabel?: string;
   /** Optional content rendered above the settings (e.g. a Premium upsell). */
   header?: React.ReactNode;
+  /**
+   * Invoked when the user taps "Have an invite code?" (only shown in Shared
+   * mode). Consumer owns navigation to the join-by-code screen (LS-9181).
+   */
+  onJoinInstead?: () => void;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -86,7 +92,7 @@ const DRAFT_MODE_OPTIONS: {
   {
     label: 'Shared',
     value: 'shared',
-    helper: 'Timed picks against AI opponents.',
+    helper: 'Invite friends to join. Open slots fall back to AI at start.',
   },
   {
     label: 'Offline',
@@ -204,6 +210,7 @@ export function MockDraftSetup({
   initialDraftOrder,
   usageLabel,
   header,
+  onJoinInstead,
 }: MockDraftSetupProps): React.JSX.Element {
   const [numTeams, setNumTeams] = React.useState(
     initialNumTeams != null ? clampToTeamOption(initialNumTeams) : 8,
@@ -312,6 +319,27 @@ export function MockDraftSetup({
             />
           ))}
         </XStack>
+        {mode === 'shared' && onJoinInstead && (
+          <XStack justifyContent="center" marginTop="$2">
+            <Button
+              size="$2"
+              backgroundColor="transparent"
+              borderWidth={0}
+              onPress={onJoinInstead}
+              pressStyle={{ opacity: 0.7 }}
+            >
+              <Text
+                fontFamily="$body"
+                fontSize={13}
+                fontWeight="600"
+                color={BRAND_GOLD}
+                textDecorationLine="underline"
+              >
+                Have an invite code? Join a friend&apos;s draft →
+              </Text>
+            </Button>
+          </XStack>
+        )}
       </FieldSection>
 
       {/* Number of Teams */}

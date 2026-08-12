@@ -328,6 +328,41 @@ describe('MockDraftPage', () => {
     });
   });
 
+  describe('Shared-mode invite pause (LS-9181)', () => {
+    it('shows the invite card instead of navigating when a Shared draft returns an inviteCode', async () => {
+      mockInitMutate.mockResolvedValue({
+        data: {
+          initializeMockDraft: {
+            leagueId: 42,
+            draftId: 7,
+            inviteCode: 'ABC12XYZ',
+          },
+        },
+      });
+      render(<MockDraftPage />);
+      fireEvent.press(screen.getByRole('button', { name: 'Start Mock Draft' }));
+
+      await waitFor(() => {
+        expect(screen.getByText('ABC12XYZ')).toBeTruthy();
+      });
+      expect(mockNavigate).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByText('Continue to Draft Room'));
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/DraftBoardPage',
+        params: { leagueId: '42' },
+      });
+    });
+
+    it('navigates to the join-by-code screen when "Have an invite code?" is pressed', () => {
+      render(<MockDraftPage />);
+      fireEvent.press(
+        screen.getByText("Have an invite code? Join a friend's draft →"),
+      );
+      expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft-join');
+    });
+  });
+
   // LS-8823 — cancelling used to push the standalone `/baseball` home, which
   // took the user out of the tab shell onto a second home surface.
   describe('cancel', () => {

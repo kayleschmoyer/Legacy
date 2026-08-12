@@ -4,6 +4,7 @@ import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import { Lock } from '@tamagui/lucide-icons';
 import { Button, H1, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
+  MockDraftInviteCard,
   type MockDraftSettings,
   MockDraftSetup,
 } from '@legacy-sports/shared-components/draft';
@@ -168,6 +169,13 @@ export function MockDraftPage(): React.JSX.Element {
   const [missingLeagueIdError, setMissingLeagueIdError] = useState<
     string | null
   >(null);
+  // Shared-mode drafts pause here to let the creator share the invite code
+  // before entering the draft room lobby (LS-9181). Offline drafts navigate
+  // straight through, unchanged.
+  const [pendingInvite, setPendingInvite] = useState<{
+    leagueId: number;
+    inviteCode: string;
+  } | null>(null);
 
   // Weekly free-tier usage, mirroring web's usage label. `cache-and-network`
   // keeps the count fresh when the user returns to start another draft.
@@ -199,15 +207,22 @@ export function MockDraftPage(): React.JSX.Element {
         isOffline,
       },
     });
-    const leagueId = result.data?.initializeMockDraft?.leagueId;
-    if (leagueId != null) {
-      router.navigate({
-        pathname: '/DraftBoardPage',
-        params: { leagueId: String(leagueId) },
-      });
-    } else {
+    const initialized = result.data?.initializeMockDraft;
+    if (initialized?.leagueId == null) {
       setMissingLeagueIdError("Couldn't start mock draft — please try again.");
+      return;
     }
+    const leagueId = initialized.leagueId;
+    if (!isOffline && initialized.inviteCode) {
+      // Pause on the invite screen instead of navigating straight into the
+      // draft room lobby (LS-9181).
+      setPendingInvite({ leagueId, inviteCode: initialized.inviteCode });
+      return;
+    }
+    router.navigate({
+      pathname: '/DraftBoardPage',
+      params: { leagueId: String(leagueId) },
+    });
   };
 
   // Free-tier users who have exhausted their weekly allowance see a blocking
@@ -233,6 +248,29 @@ export function MockDraftPage(): React.JSX.Element {
 
   const errorMessage = error?.message ?? missingLeagueIdError;
   const showUpsell = !subscriptionLoading && !isPremium;
+
+  if (pendingInvite) {
+    return (
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <YStack
+          backgroundColor="$background"
+          flexGrow={1}
+          padding="$5"
+          justifyContent="center"
+        >
+          <MockDraftInviteCard
+            inviteCode={pendingInvite.inviteCode}
+            onContinue={() =>
+              router.navigate({
+                pathname: '/DraftBoardPage',
+                params: { leagueId: String(pendingInvite.leagueId) },
+              })
+            }
+          />
+        </YStack>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
@@ -264,6 +302,7 @@ export function MockDraftPage(): React.JSX.Element {
           footballMockEnabled={footballMockEnabled}
           usageLabel={usageLabel}
           header={showUpsell ? <PremiumUpsell /> : null}
+          onJoinInstead={() => router.navigate('/baseball/mock-draft-join')}
         />
 
         <Text color="$gray10" fontSize="$2" marginTop="$3" textAlign="center">

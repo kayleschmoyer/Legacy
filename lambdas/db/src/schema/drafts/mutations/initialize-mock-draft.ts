@@ -1,17 +1,35 @@
 /**
- * Draft mutation: initializeMockDraft (LS-470)
+ * Draft mutation: initializeMockDraft (LS-470, LS-9144, LS-9181)
  *
- * Creates an ephemeral mock draft for a logged-in user to practice against
- * AI auto-pick teams using the real EliteDraftBoard UI.
+ * Creates an ephemeral mock draft league using the real EliteDraftBoard UI.
  * No rosters are persisted and no matchups are created at the end.
  *
- * Steps:
- *  1. Create a temporary league (isMockDraft=true)
- *  2. Create numTeams teams – one human team at userPickPosition, the rest CPU
- *  3. Register the human as a commissioner member of the league
- *  4. Create the draft record and draft_teams rows (CPU teams: autoPick=true)
- *  5. Set draftStatus → 'in-progress' with an initial pick deadline
- *  6. Return { leagueId, draftId } so the front-end can render EliteDraftBoardScreen
+ * Two modes, selected by `isOffline`:
+ *
+ *  - Offline (isOffline=true): solo practice against AI auto-pick teams,
+ *    unchanged since LS-9144. Steps:
+ *     1. Create a temporary league (isMockDraft=true, draftStatus='in-progress')
+ *     2. Create numTeams teams – one human team at userPickPosition, rest CPU
+ *     3. Register the human as a commissioner member of the league
+ *     4. Create the draft + draft_teams rows (CPU teams: autoPick=true)
+ *     5. Set an initial pick deadline
+ *
+ *  - Shared (isOffline=false, LS-9181): a real multiplayer lobby other users
+ *    can join via `joinMockDraft` before it starts, mirroring how real
+ *    leagues work pre-draft:
+ *     1. Create a temporary league (isMockDraft=true, draftStatus='not-started')
+ *     2. Create numTeams teams – one human team ("My Team") at
+ *        userPickPosition, the rest left open ("Open Slot N") for joiners
+ *     3. Register the creator as a commissioner member of the league
+ *     4. Create the draft record with the chosen settings, but no
+ *        draft_teams rows yet — `initializeDraft` (the same generic mutation
+ *        real leagues use to start their draft, reused here unmodified)
+ *        creates those when the commissioner starts the draft, seating any
+ *        still-open slots with AI auto-pick teams.
+ *
+ * Returns { leagueId, draftId, inviteCode } so the front-end can render
+ * EliteDraftBoardScreen (which already renders PreDraftLobby for any
+ * not-started league) and, for Shared mode, share the invite code.
  */
 
 import { PublicSchema } from '@legacy-sports/db-client';
@@ -72,6 +90,7 @@ interface MockDraftInitShape {
   leagueId: number;
   draftId: number;
   webSocketReady: boolean;
+  inviteCode: string;
 }
 
 const MockDraftInit = builder.objectRef<MockDraftInitShape>('MockDraftInit');
@@ -87,6 +106,14 @@ builder.objectType(MockDraftInit, {
         'The draft itself was created successfully either way; when false, ' +
         'the client should fall back to polling immediately instead of ' +
         'waiting for a WS event that will never arrive.',
+    }),
+    inviteCode: t.exposeString('inviteCode', {
+      description:
+        'Invite code other real users can redeem via joinMockDraft to be ' +
+        'seated into an open slot (LS-9181). Always present, but only ' +
+        'useful for a Shared (non-offline) mock draft that has not yet ' +
+        'been started — offline drafts and already-started drafts have no ' +
+        'open slots left to join.',
     }),
   }),
 });
@@ -111,8 +138,11 @@ builder.mutationField('initializeMockDraft', (t) =>
   t.field({
     type: MockDraftInit,
     description:
-      'Create an ephemeral mock draft league to practice drafting against AI teams. ' +
-      'Picks are recorded but rosters are not persisted to any real league.',
+      'Create an ephemeral mock draft league. Offline mode practices solo against ' +
+      'AI teams; Shared mode opens a joinable lobby other real users can enter via ' +
+      'joinMockDraft using the returned inviteCode, seating into whichever slots ' +
+      'stay open when the commissioner starts the draft (LS-9181). Picks are ' +
+      'recorded but rosters are not persisted to any real league.',
     args: {
       numTeams: t.arg.int({
         required: true,
@@ -294,7 +324,8 @@ builder.mutationField('initializeMockDraft', (t) =>
           leagueId: number;
           draftId: number;
           humanTeamId: number;
-          initialDeadline: Date;
+          /** Null for a Shared lobby that hasn't been started yet (LS-9181). */
+          initialDeadline: Date | null;
         }
 
         const txResult: TxResult = await context.db.transaction(async (tx) => {
@@ -306,9 +337,16 @@ builder.mutationField('initializeMockDraft', (t) =>
 
           // ── 2. Create teams ─────────────────────────────────────────────
           // Teams are created in draft-order slots 1..numTeams.
-          // Slot userPickPosition belongs to the human; rest are CPU.
+          // Slot userPickPosition belongs to the human; the rest are CPU for
+          // Offline drafts, or left "Open" for real players to claim via
+          // joinMockDraft for Shared drafts (LS-9181).
           const teamInserts = Array.from({ length: numTeams }, (_, i) => ({
-            name: i + 1 === userPickPosition ? 'My Team' : `CPU Team ${i + 1}`,
+            name:
+              i + 1 === userPickPosition
+                ? 'My Team'
+                : isOffline
+                  ? `CPU Team ${i + 1}`
+                  : `Open Slot ${i + 1}`,
             leagueId: league.id,
           }));
 
@@ -338,9 +376,23 @@ builder.mutationField('initializeMockDraft', (t) =>
               draftOrder,
               currentPick: 0,
               pickTimeLimitSeconds: pickTimeLimit,
-              draftStartedAt: new Date(),
+              ...(isOffline ? { draftStartedAt: new Date() } : {}),
             })
             .returning();
+
+          if (!isOffline) {
+            // Shared mode (LS-9181): stop here. The league stays
+            // 'not-started' with open slots so other real users can join via
+            // joinMockDraft; the commissioner starts the draft later via the
+            // same generic `initializeDraft` mutation real leagues use (it
+            // creates draft_teams and auto-picks any still-open slots).
+            return {
+              leagueId: league.id,
+              draftId: draft.id,
+              humanTeamId,
+              initialDeadline: null,
+            };
+          }
 
           // ── 5. Create draft_teams rows ───────────────────────────────────
           // Maintains the requested draft order; CPU teams get autoPick=true
@@ -389,8 +441,11 @@ builder.mutationField('initializeMockDraft', (t) =>
         // must not fail the mutation and strand the client without
         // leagueId/draftId (LS-6954). webSocketReady tells the client
         // whether to expect the WS event or fall back to polling now.
+        // Shared-mode lobbies (initialDeadline === null) haven't started, so
+        // there's no "draft started" event to send yet — that fires later
+        // from initializeDraft when the commissioner actually starts it.
         let webSocketReady = true;
-        if (context.notificationService) {
+        if (txResult.initialDeadline && context.notificationService) {
           try {
             await context.notificationService.notifyDraftStarted(
               txResult.leagueId,
@@ -410,7 +465,7 @@ builder.mutationField('initializeMockDraft', (t) =>
               { leagueId: txResult.leagueId, draftId: txResult.draftId },
             );
           }
-        } else {
+        } else if (txResult.initialDeadline) {
           webSocketReady = false;
         }
 
@@ -431,6 +486,7 @@ builder.mutationField('initializeMockDraft', (t) =>
           leagueId: txResult.leagueId,
           draftId: txResult.draftId,
           webSocketReady,
+          inviteCode,
         };
       } catch (error) {
         LOGGER.error(

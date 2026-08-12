@@ -1850,6 +1850,8 @@ export type MinigamesStats = {
 export type MockDraftInit = {
   __typename?: 'MockDraftInit';
   draftId?: Maybe<Scalars['Int']['output']>;
+  /** Invite code other real users can redeem via joinMockDraft to be seated into an open slot (LS-9181). Always present, but only useful for a Shared (non-offline) mock draft that has not yet been started — offline drafts and already-started drafts have no open slots left to join. */
+  inviteCode?: Maybe<Scalars['String']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   /** False if the draft-started WebSocket notification failed to send. The draft itself was created successfully either way; when false, the client should fall back to polling immediately instead of waiting for a WS event that will never arrive. */
   webSocketReady?: Maybe<Scalars['Boolean']['output']>;
@@ -1957,11 +1959,13 @@ export type Mutation = {
   /** Admin only: generate a JWT that authenticates as the specified user for debugging purposes. */
   impersonateUser?: Maybe<ImpersonateUserResult>;
   initializeDraft?: Maybe<Draft>;
-  /** Create an ephemeral mock draft league to practice drafting against AI teams. Picks are recorded but rosters are not persisted to any real league. */
+  /** Create an ephemeral mock draft league. Offline mode practices solo against AI teams; Shared mode opens a joinable lobby other real users can enter via joinMockDraft using the returned inviteCode, seating into whichever slots stay open when the commissioner starts the draft (LS-9181). Picks are recorded but rosters are not persisted to any real league. */
   initializeMockDraft?: Maybe<MockDraftInit>;
   inviteAssistantManager?: Maybe<LeagueMember>;
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
+  /** Join a Shared mock draft lobby by invite code, claiming an open slot that would otherwise be seated by AI when the commissioner starts the draft (LS-9181). Fails once the draft has started — join before then. */
+  joinMockDraft?: Maybe<Team>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
   /** Join a Season Draft Game via invite code. Returns the game ID. */
   joinSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
@@ -2369,6 +2373,11 @@ export type MutationJoinLeagueArgs = {
 };
 
 export type MutationJoinLeagueByCodeArgs = {
+  inviteCode: Scalars['String']['input'];
+  teamName: Scalars['String']['input'];
+};
+
+export type MutationJoinMockDraftArgs = {
   inviteCode: Scalars['String']['input'];
   teamName: Scalars['String']['input'];
 };

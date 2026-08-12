@@ -88,9 +88,11 @@ jest.mock('@legacy-sports/shared-components/draft', () => ({
   MockDraftSetup: ({
     usageLabel,
     onStart,
+    onJoinInstead,
   }: {
     usageLabel?: string;
     onStart?: (settings: unknown) => void;
+    onJoinInstead?: () => void;
     [key: string]: unknown;
   }) => (
     <div data-testid="mock-draft-setup">
@@ -98,6 +100,21 @@ jest.mock('@legacy-sports/shared-components/draft', () => ({
       <button onClick={() => onStart?.(mockStartSettings)}>
         Start Mock Draft
       </button>
+      {onJoinInstead ? (
+        <button onClick={onJoinInstead}>Join instead</button>
+      ) : null}
+    </div>
+  ),
+  MockDraftInviteCard: ({
+    inviteCode,
+    onContinue,
+  }: {
+    inviteCode: string;
+    onContinue: () => void;
+  }) => (
+    <div data-testid="mock-draft-invite-card">
+      <p>{inviteCode}</p>
+      <button onClick={onContinue}>Continue to Draft Room</button>
     </div>
   ),
 }));
@@ -342,5 +359,50 @@ describe('MockDraftPage — offline mode threading (LS-9144)', () => {
         }),
       }),
     );
+  });
+});
+
+describe('MockDraftPage — Shared-mode invite pause (LS-9181)', () => {
+  afterEach(() => jest.clearAllMocks());
+
+  it('shows the invite card instead of navigating when a Shared draft returns an inviteCode', async () => {
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    mockStartSettings = {
+      numTeams: 8,
+      rosterSize: 15,
+      userPickPosition: 1,
+      draftOrder: 'snake',
+      playerPool: 'all',
+      sport: 'baseball',
+      mode: 'shared',
+    };
+    mockInitializeMockDraft.mockResolvedValueOnce({
+      data: {
+        initializeMockDraft: { leagueId: 42, inviteCode: 'ABC12XYZ' },
+      },
+    });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start Mock Draft/i }));
+
+    expect(
+      await screen.findByTestId('mock-draft-invite-card'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('ABC12XYZ')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Continue to Draft Room/i }),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42/draft');
+  });
+
+  it('navigates to the join-by-code screen when "Join instead" is pressed', () => {
+    setUsage({ used: 0, limit: 2, remaining: 2, isUnlimited: false });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Join instead/i }));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/baseball/mock-draft/join');
   });
 });

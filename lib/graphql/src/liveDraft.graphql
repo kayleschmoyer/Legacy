@@ -447,5 +447,14 @@ mutation InitializeMockDraft(
   ) {
     leagueId
     draftId
+    inviteCode
+  }
+}
+
+mutation JoinMockDraft($inviteCode: String!, $teamName: String!) {
+  joinMockDraft(inviteCode: $inviteCode, teamName: $teamName) {
+    id
+    name
+    leagueId
   }
 }

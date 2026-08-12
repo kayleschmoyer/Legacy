@@ -135,4 +135,33 @@ describe('MockDraftSetup', () => {
     fireEvent.click(getByText('Football — Coming Soon'));
     expect(onStart).not.toHaveBeenCalled();
   });
+
+  it('shows a "Have an invite code?" link in Shared mode when onJoinInstead is provided (LS-9181)', () => {
+    const onJoinInstead = jest.fn();
+    const { getByText, queryByText } = render(
+      <MockDraftSetup
+        onStart={noop}
+        onCancel={noop}
+        onJoinInstead={onJoinInstead}
+      />,
+    );
+
+    const link = getByText("Have an invite code? Join a friend's draft →");
+    fireEvent.click(link);
+    expect(onJoinInstead).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(getByText('Offline'));
+    expect(
+      queryByText("Have an invite code? Join a friend's draft →"),
+    ).toBeNull();
+  });
+
+  it('hides the join-instead link when onJoinInstead is not provided', () => {
+    const { queryByText } = render(
+      <MockDraftSetup onStart={noop} onCancel={noop} />,
+    );
+    expect(
+      queryByText("Have an invite code? Join a friend's draft →"),
+    ).toBeNull();
+  });
 });
