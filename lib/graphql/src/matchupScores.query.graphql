@@ -1,0 +1,15 @@
+query MatchupScores($leagueId: Int!, $weekNum: Int!) {
+  matchupScores(leagueId: $leagueId, weekNum: $weekNum) {
+    ... on FootballMatchupStats {
+      teamId
+      teamName
+      totalPoints
+      players {
+        playerId
+        playerName
+        position
+        totalPoints
+      }
+    }
+  }
+}

@@ -80,6 +80,10 @@ jest.mock('@legacy-sports/graphql', () => ({
     Completed: 'completed',
     Cancelled: 'cancelled',
   },
+  Sport: {
+    Baseball: 'baseball',
+    Football: 'football',
+  },
   useGetUserTeamIdQuery: jest.fn(() => ({ data: { userTeamId: 10 } })),
   useGetLeagueByIdQuery: jest.fn(() => ({
     data: mockLeagueSport ? { league: { sport: mockLeagueSport } } : undefined,
@@ -109,6 +113,9 @@ jest.mock('../../features/matchup/MatchupRosterComparison', () => ({
 jest.mock('../../features/matchup/MatchupRosterEditor', () => ({
   MatchupRosterEditor: () => <div data-testid="roster-editor" />,
 }));
+jest.mock('../../features/matchup/MatchupAdditionalSections', () => ({
+  MatchupAdditionalSections: () => <div data-testid="additional-sections" />,
+}));
 jest.mock('@legacy-sports/shared-components/matchup', () => ({
   MatchupDetailLayout: (props: {
     header?: React.ReactNode;
@@ -117,6 +124,7 @@ jest.mock('@legacy-sports/shared-components/matchup', () => ({
     rosterEditor?: React.ReactNode;
     recapPanel?: React.ReactNode;
     rosterComparison?: React.ReactNode;
+    additionalSections?: React.ReactNode;
   }) => (
     <div data-testid="matchup-detail-layout">
       {props.header}
@@ -125,6 +133,7 @@ jest.mock('@legacy-sports/shared-components/matchup', () => ({
       {props.rosterEditor}
       {props.recapPanel}
       {props.rosterComparison}
+      {props.additionalSections}
     </div>
   ),
   MatchupRecapPanel: () => <div data-testid="recap-panel" />,

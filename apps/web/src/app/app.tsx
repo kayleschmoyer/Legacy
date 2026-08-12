@@ -736,6 +736,14 @@ function App() {
                 </FootballGate>
               }
             />
+            <Route
+              path="/football/league/:leagueId/matchups/:matchupId"
+              element={
+                <FootballGate>
+                  <MatchupDetailPage />
+                </FootballGate>
+              }
+            />
             <Route path="/baseball" element={<BaseballScreen />} />
             <Route
               path="/baseball/league/:id/draft"

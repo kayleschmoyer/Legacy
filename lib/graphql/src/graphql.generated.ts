@@ -12438,6 +12438,31 @@ export type MatchupRecapFragmentFragment = {
   winnerId?: number | null;
 };
 
+export type MatchupScoresQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  weekNum: Scalars['Int']['input'];
+}>;
+
+export type MatchupScoresQuery = {
+  __typename?: 'Query';
+  matchupScores: Array<
+    | { __typename?: 'BaseballMatchupStats' }
+    | {
+        __typename?: 'FootballMatchupStats';
+        teamId: number;
+        teamName: string;
+        totalPoints: number;
+        players: Array<{
+          __typename?: 'FootballMatchupPlayer';
+          playerId: number;
+          playerName: string;
+          position: string;
+          totalPoints: number;
+        }>;
+      }
+  >;
+};
+
 export type MatchupWinProbabilityFragmentFragment = {
   __typename?: 'MatchupWinProbability';
   team1WinProbability: number;
@@ -31445,6 +31470,107 @@ export type MakeSeasonDraftPickMutationResult =
 export type MakeSeasonDraftPickMutationOptions = BaseMutationOptions<
   MakeSeasonDraftPickMutation,
   MakeSeasonDraftPickMutationVariables
+>;
+export const MatchupScores = gql`
+  query MatchupScores($leagueId: Int!, $weekNum: Int!) {
+    matchupScores(leagueId: $leagueId, weekNum: $weekNum) {
+      ... on FootballMatchupStats {
+        teamId
+        teamName
+        totalPoints
+        players {
+          playerId
+          playerName
+          position
+          totalPoints
+        }
+      }
+    }
+  }
+`;
+
+/**
+ * __useMatchupScoresQuery__
+ *
+ * To run a query within a React component, call `useMatchupScoresQuery` and pass it any options that fit your needs.
+ * When your component renders, `useMatchupScoresQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useMatchupScoresQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      weekNum: // value for 'weekNum'
+ *   },
+ * });
+ */
+export function useMatchupScoresQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    MatchupScoresQuery,
+    MatchupScoresQueryVariables
+  > &
+    (
+      | { variables: MatchupScoresQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<MatchupScoresQuery, MatchupScoresQueryVariables>(
+    MatchupScores,
+    options,
+  );
+}
+export function useMatchupScoresLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    MatchupScoresQuery,
+    MatchupScoresQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<MatchupScoresQuery, MatchupScoresQueryVariables>(
+    MatchupScores,
+    options,
+  );
+}
+export function useMatchupScoresSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        MatchupScoresQuery,
+        MatchupScoresQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    MatchupScoresQuery,
+    MatchupScoresQueryVariables
+  >(
+    MatchupScores,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          MatchupScoresQuery,
+          MatchupScoresQueryVariables
+        >,
+  );
+}
+export type MatchupScoresQueryHookResult = ReturnType<
+  typeof useMatchupScoresQuery
+>;
+export type MatchupScoresLazyQueryHookResult = ReturnType<
+  typeof useMatchupScoresLazyQuery
+>;
+export type MatchupScoresSuspenseQueryHookResult = ReturnType<
+  typeof useMatchupScoresSuspenseQuery
+>;
+export type MatchupScoresQueryResult = Apollo.QueryResult<
+  MatchupScoresQuery,
+  MatchupScoresQueryVariables
 >;
 export const MyEntitlements = gql`
   query MyEntitlements {

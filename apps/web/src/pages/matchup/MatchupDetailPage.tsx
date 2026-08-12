@@ -10,11 +10,13 @@ import {
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   MatchupStatus,
+  Sport,
   useGetLeagueByIdQuery,
   useGetUserTeamIdQuery,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
+import { MatchupAdditionalSections } from '../../features/matchup/MatchupAdditionalSections';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { MatchupWinProbabilityPanel } from '../../features/matchup/MatchupWinProbabilityPanel';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';
@@ -286,6 +288,14 @@ export function MatchupDetailPage() {
         }
         rosterComparison={
           <MatchupRosterComparison matchup={matchup} userTeamId={userTeamId} />
+        }
+        additionalSections={
+          leagueSport === Sport.Football ? (
+            <MatchupAdditionalSections
+              matchup={matchup}
+              leagueId={leagueIdNum}
+            />
+          ) : undefined
         }
       />
     </>

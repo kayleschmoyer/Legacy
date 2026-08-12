@@ -25,6 +25,8 @@ export interface MatchupDetailLayoutProps {
   recapPanel?: ReactNode;
   /** Platform-specific roster comparison */
   rosterComparison?: ReactNode;
+  /** Supplementary matchup context beyond the score (key players, history, league context) */
+  additionalSections?: ReactNode;
 }
 
 function formatMatchupTimestamp(value: string): string {
@@ -57,6 +59,7 @@ function formatMatchupTimestamp(value: string): string {
  *   7. rosterEditor
  *   8. recapPanel
  *   9. rosterComparison
+ *   10. additionalSections
  */
 export function MatchupDetailLayout({
   matchup,
@@ -73,6 +76,7 @@ export function MatchupDetailLayout({
   rosterEditor,
   recapPanel,
   rosterComparison,
+  additionalSections,
 }: MatchupDetailLayoutProps) {
   const totalGames = matchup.gamesPerMatchup ?? 0;
   const selectedGamesCount = matchup.selectedGamesCount ?? 0;
@@ -143,6 +147,8 @@ export function MatchupDetailLayout({
       {recapPanel}
 
       {rosterComparison}
+
+      {additionalSections}
     </YStack>
   );
 }

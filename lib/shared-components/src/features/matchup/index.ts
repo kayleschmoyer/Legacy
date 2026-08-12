@@ -11,6 +11,7 @@ export * from './PendingTradeOffers';
 export * from './PendingTradeOfferBanner';
 export * from './PendingWaiverClaims';
 export * from './MatchupNavigationControls';
+export * from './MatchupAdditionalSections';
 export * from './MatchupDetailLayout';
 export * from './MatchupDetailSkeleton';
 export * from './PlayoffBracket';
