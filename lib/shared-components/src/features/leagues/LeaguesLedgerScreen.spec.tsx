@@ -71,6 +71,28 @@ describe('LeaguesLedgerScreen', () => {
     });
   });
 
+  describe('safe-area handling', () => {
+    // LS-8758: the header must clear the Android status bar, mirroring the
+    // Home tab's `topInset` treatment (LS-8625).
+    it('pads the loading state by the top safe-area inset', () => {
+      const { getByTestId } = render(
+        <LeaguesLedgerScreen {...baseProps} loading topInset={44} />,
+      );
+      expect(getByTestId('leagues-ledger-loading')).toHaveStyle({
+        paddingTop: 44,
+      });
+    });
+
+    it('pads the ledger scroll view by the top safe-area inset', () => {
+      const { getByTestId } = render(
+        <LeaguesLedgerScreen {...baseProps} topInset={44} />,
+      );
+      expect(getByTestId('leagues-ledger-scroll')).toHaveStyle({
+        paddingTop: 44,
+      });
+    });
+  });
+
   describe('masthead', () => {
     it('shows the league count and the active-only aggregate record', () => {
       const { getByTestId } = render(

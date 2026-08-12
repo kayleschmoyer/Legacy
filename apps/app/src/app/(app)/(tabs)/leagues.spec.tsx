@@ -14,32 +14,42 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate, push: mockPush }),
 }));
 
+const mockUseSafeAreaInsets = jest.fn(() => ({
+  top: 0,
+  bottom: 0,
+  left: 0,
+  right: 0,
+}));
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockUseSafeAreaInsets(),
 }));
 
 // The ledger itself is covered by its own spec in lib/shared-components; this
 // suite verifies the mobile wiring — query usage, navigation, and callbacks.
+const mockLedgerScreenProps = jest.fn();
 jest.mock('@legacy-sports/shared-components/leagues', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports, so the module must be pulled in with require(). No ESM alternative; same pattern as the other tab specs.
   const RN = require('react-native') as typeof import('react-native');
   const { View, Text, ActivityIndicator } = RN;
   return {
-    LeaguesLedgerScreen: ({
-      leagues,
-      loading,
-      onViewLeague,
-      onCreateLeague,
-      onJoinLeague,
-      onBrowseLeagues,
-    }: {
+    LeaguesLedgerScreen: (props: {
       leagues: { leagueId?: number | null; leagueName?: string | null }[];
       loading?: boolean;
+      topInset?: number;
       onViewLeague: (s: unknown) => void;
       onCreateLeague: () => void;
       onJoinLeague: () => void;
       onBrowseLeagues: () => void;
     }) => {
+      mockLedgerScreenProps(props);
+      const {
+        leagues,
+        loading,
+        onViewLeague,
+        onCreateLeague,
+        onJoinLeague,
+        onBrowseLeagues,
+      } = props;
       if (loading) return <ActivityIndicator testID="spinner" />;
       return (
         <View testID="leagues-ledger">
@@ -101,6 +111,30 @@ describe('LeaguesTab', () => {
     jest.clearAllMocks();
     mockSummaries(null);
     mockUseAuthorizedUserInfo.mockReturnValue({ id: 1, name: 'Test User' });
+    mockUseSafeAreaInsets.mockReturnValue({
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+    });
+  });
+
+  describe('safe-area handling', () => {
+    // LS-8758: the header must clear the Android status bar, mirroring the
+    // Home tab's `topInset` treatment (LS-8625).
+    it('forwards the top safe-area inset to the ledger screen', () => {
+      mockUseSafeAreaInsets.mockReturnValue({
+        top: 44,
+        bottom: 0,
+        left: 0,
+        right: 0,
+      });
+      mockSummaries([]);
+      render(<LeaguesTab />);
+      expect(mockLedgerScreenProps).toHaveBeenCalledWith(
+        expect.objectContaining({ topInset: 44 }),
+      );
+    });
   });
 
   describe('data source', () => {

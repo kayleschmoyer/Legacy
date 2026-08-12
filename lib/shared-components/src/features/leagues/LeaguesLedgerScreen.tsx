@@ -465,6 +465,7 @@ export function LeaguesLedgerScreen({
   if (loading) {
     return (
       <YStack
+        testID="leagues-ledger-loading"
         flex={1}
         alignItems="center"
         justifyContent="center"
@@ -478,6 +479,7 @@ export function LeaguesLedgerScreen({
 
   return (
     <ScrollView
+      testID="leagues-ledger-scroll"
       flex={1}
       backgroundColor="$background"
       paddingTop={topInset}
