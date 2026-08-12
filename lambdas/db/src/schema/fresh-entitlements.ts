@@ -19,7 +19,7 @@
  * the fresh check and the token claim are derived from the same Stripe source
  * (`stripe.entitlements.activeEntitlements.list`).
  */
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { InternalSchema } from '@legacy-sports/db-client';
 import { type EntitlementKey, ENTITLEMENTS } from '@legacy-sports/utils';
 import type { Context } from './builder';
@@ -40,6 +40,11 @@ const ENTITLEMENT_KEY_SET: ReadonlySet<string> = new Set<string>(
 /**
  * Resolve the caller's Stripe customer id from the subscriptions table, or
  * `null` when the user has no Stripe customer (free users never billed).
+ *
+ * Ordered by created_at DESC (id DESC tiebreaker) so a user with more than one
+ * subscription row (e.g. a stale canceled/Apple row alongside a new Stripe
+ * row) resolves to the most recent one, not an arbitrary one — same class of
+ * bug as LS-5201.
  */
 async function getStripeCustomerId(
   context: Context,
@@ -51,6 +56,10 @@ async function getStripeCustomerId(
     })
     .from(InternalSchema.subscriptions)
     .where(eq(InternalSchema.subscriptions.userId, userId))
+    .orderBy(
+      desc(InternalSchema.subscriptions.createdAt),
+      desc(InternalSchema.subscriptions.id),
+    )
     .limit(1);
   return row?.stripeCustomerId ?? null;
 }

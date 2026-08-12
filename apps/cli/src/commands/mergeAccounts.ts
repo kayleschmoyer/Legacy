@@ -5,7 +5,7 @@ import {
   runWithInternalClient,
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
-import { eq, sql } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 
 export interface MergeAccountsArgs {
   primaryId: number;
@@ -105,6 +105,10 @@ export async function fetchSubscriptionSnapshot(
     })
     .from(InternalSchema.subscriptions)
     .where(eq(InternalSchema.subscriptions.userId, userId))
+    .orderBy(
+      desc(InternalSchema.subscriptions.createdAt),
+      desc(InternalSchema.subscriptions.id),
+    )
     .limit(1);
 
   return rows[0] ?? null;

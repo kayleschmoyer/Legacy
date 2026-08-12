@@ -17,16 +17,27 @@ jest.mock('@legacy-sports/logging', () => ({
 // ── DB mock helpers ──────────────────────────────────────────────────────────
 
 // Returns an object that is both thenable (for queries that await .where()
-// directly) and exposes .limit() (for queries that chain .limit(1) after
-// .where()). Both paths resolve to `data`.
-function makeWhereResult(data: unknown[]) {
-  return {
+// directly) and exposes .limit() / .orderBy() (for queries that chain
+// .orderBy(...).limit(1) after .where()). All paths resolve to `data`.
+interface WhereResult {
+  limit: (...args: unknown[]) => Promise<unknown[]>;
+  orderBy: (...args: unknown[]) => WhereResult;
+  then: (
+    resolve: (v: unknown) => unknown,
+    reject?: (e: unknown) => unknown,
+  ) => Promise<unknown>;
+}
+
+function makeWhereResult(data: unknown[]): WhereResult {
+  const result: WhereResult = {
     limit: jest.fn().mockResolvedValue(data),
+    orderBy: jest.fn(() => result),
     then: (
       resolve: (v: unknown) => unknown,
       reject?: (e: unknown) => unknown,
     ) => Promise.resolve(data).then(resolve, reject),
   };
+  return result;
 }
 
 // Default implementation returns an empty result; tests override with
@@ -89,6 +100,7 @@ jest.mock('@legacy-sports/utils/node', () => ({
 }));
 
 jest.mock('drizzle-orm', () => ({
+  desc: jest.fn((col: unknown) => ({ desc: col })),
   eq: jest.fn((col: unknown, val: unknown) => ({ col, val })),
   sql: Object.assign(
     (strings: TemplateStringsArray, ..._vals: unknown[]) => ({

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithInternalClient } from '../client/Helpers';
 import * as InternalSchema from '../../drizzle/internal/schema';
@@ -29,6 +29,13 @@ export class SubscriptionService {
   /**
    * Get the active subscription record for a user.
    * Returns null if the user has no subscription row.
+   *
+   * Ordered by created_at DESC (id DESC tiebreaker) so a user with more than
+   * one subscription row — e.g. a canceled/Apple row plus a new Stripe row —
+   * always resolves to the most recent one. Without ordering, `.limit(1)` can
+   * return an arbitrary row, including a stale free/canceled one, which left
+   * paying users' JWT-minted entitlements empty even after a fresh login
+   * (same class of bug as LS-5201, fixed there for `getSubscriptionForUser`).
    */
   async getSubscriptionByUserId(
     userId: number,
@@ -38,6 +45,10 @@ export class SubscriptionService {
         .select()
         .from(InternalSchema.subscriptions)
         .where(eq(InternalSchema.subscriptions.userId, userId))
+        .orderBy(
+          desc(InternalSchema.subscriptions.createdAt),
+          desc(InternalSchema.subscriptions.id),
+        )
         .limit(1);
 
       return results[0] ?? null;

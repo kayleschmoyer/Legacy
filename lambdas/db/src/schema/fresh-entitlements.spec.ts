@@ -23,6 +23,8 @@ jest.mock('@legacy-sports/db-client', () => ({
     subscriptions: {
       userId: 'app_internal.subscriptions.user_id',
       stripeCustomerId: 'app_internal.subscriptions.stripe_customer_id',
+      createdAt: 'app_internal.subscriptions.created_at',
+      id: 'app_internal.subscriptions.id',
     },
   },
 }));
@@ -63,11 +65,13 @@ function makeContext(
     select: jest.fn(() => ({
       from: jest.fn(() => ({
         where: jest.fn(() => ({
-          limit: jest
-            .fn()
-            .mockResolvedValue(
-              customerId === null ? [] : [{ stripeCustomerId: customerId }],
-            ),
+          orderBy: jest.fn(() => ({
+            limit: jest
+              .fn()
+              .mockResolvedValue(
+                customerId === null ? [] : [{ stripeCustomerId: customerId }],
+              ),
+          })),
         })),
       })),
     })),
