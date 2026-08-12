@@ -167,6 +167,12 @@ jobs:
       id-token: write # required for AWS OIDC in the reusable workflow
       contents: read # required by the reusable workflow and cannot be elevated by the callee
       pull-requests: read # required by the reusable workflow and cannot be elevated by the callee
+      # verify-ci reads the `CI Gate` commit status (LS-9378). A callee cannot
+      # request a scope the caller withholds: declaring it only in
+      # upload-lambdas.yml failed the WHOLE Deploy run at startup with "workflow
+      # file issue" and zero jobs (LS-9380). deploy.yml runs only on push to main,
+      # so PR CI never starts it and cannot catch this class of break.
+      statuses: read
     uses: ./.github/workflows/upload-lambdas.yml
     secrets: inherit
 
