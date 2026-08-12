@@ -55,7 +55,8 @@ resource "aws_iam_policy" "stripe_webhook_lambda_secrets" {
           aws_secretsmanager_secret.stripe_webhook_secret.arn,
           aws_secretsmanager_secret.discord_stripe_webhook_url.arn,
           aws_secretsmanager_secret.ga_api_secret.arn,
-          aws_secretsmanager_secret.rollbar_access_token.arn
+          aws_secretsmanager_secret.rollbar_access_token.arn,
+          aws_secretsmanager_secret.database_credentials.arn
         ]
       }
     ]
@@ -197,6 +198,9 @@ resource "aws_lambda_function" "stripe_webhook" {
       DB_HOST                             = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
       DB_PORT                             = "5432"
       DB_NAME                             = "legacy_sports"
+      DB_SECRET_NAME                      = aws_secretsmanager_secret.database_credentials.name
+      # Legacy support - keep DB_CREDS_PATH as fallback
+      DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
 
       # Discord notifications for Stripe events (fetched from Secrets Manager at cold start)
       DISCORD_STRIPE_WEBHOOK_URL_SECRET_NAME = aws_secretsmanager_secret.discord_stripe_webhook_url.name
