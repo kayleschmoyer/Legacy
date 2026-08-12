@@ -1,18 +1,115 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@apollo/client/react';
+import { Text, XStack, YStack } from 'tamagui';
 import {
   GetDraftRecommendations as GET_DRAFT_RECOMMENDATIONS,
   type GetDraftRecommendationsQuery,
   type GetDraftRecommendationsQueryVariables,
 } from '@legacy-sports/graphql';
 import { getPositionColor } from './utils';
+import {
+  BRAND_GOLD,
+  BRAND_NAVY,
+  EMERALD,
+  SURFACE_SUBTLE,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
+  WHITE,
+  withAlpha,
+} from '../../utils/colors';
+import { tamaguiStyled } from '../../utils/tamaguiStyled';
 
 // ---------------------------------------------------------------------------
 // Draft Intelligence Panel — server-driven (LS-467)
 //
 // Calls getDraftRecommendations on the server and re-fetches after each pick
 // so the suggestions stay current throughout the draft.
+//
+// Ported from raw DOM/CSS-vars to Tamagui primitives (LS-9152, mirroring the
+// LS-9064 DraftRail.tsx approach). tamaguiStyled() isolates Tamagui's
+// any-typed styled() API from strict lint. Colors are theme tokens or
+// withAlpha() derivations rather than literal hex/rgba strings so the
+// theme-compliance ratchet (scripts/check-theme-compliance.mjs) doesn't flag
+// them; see .agents/skills/ui/SKILL.md (epic LS-8518).
 // ---------------------------------------------------------------------------
+
+type StyledComponent = React.ComponentType<Record<string, unknown>>;
+
+const BORDER_HAIRLINE = withAlpha(WHITE, 0.06);
+const SURFACE_OVERLAY_SUBTLE = withAlpha(WHITE, 0.05);
+const SURFACE_OVERLAY_FAINT = withAlpha(WHITE, 0.07);
+
+const IntelPanel = tamaguiStyled(YStack, {
+  backgroundColor: withAlpha(BRAND_GOLD, 0.07),
+  borderWidth: 1,
+  borderColor: withAlpha(BRAND_GOLD, 0.18),
+  borderRadius: 16,
+  padding: 14,
+}) as StyledComponent;
+
+const IntelItem = tamaguiStyled(YStack, {
+  backgroundColor: withAlpha(SURFACE_SUBTLE, 0.55),
+  borderWidth: 1,
+  borderColor: SURFACE_OVERLAY_SUBTLE,
+  borderRadius: 8,
+  padding: 8,
+  gap: 5,
+  hoverStyle: {
+    borderColor: withAlpha(BRAND_GOLD, 0.2),
+    backgroundColor: withAlpha(BRAND_NAVY, 0.2),
+  },
+}) as StyledComponent;
+
+const StatPill = tamaguiStyled(XStack, {
+  alignItems: 'baseline',
+  gap: 2,
+  backgroundColor: SURFACE_OVERLAY_SUBTLE,
+  borderWidth: 1,
+  borderColor: BORDER_HAIRLINE,
+  borderRadius: 4,
+  paddingHorizontal: 5,
+  paddingVertical: 2,
+  flexShrink: 0,
+}) as StyledComponent;
+
+const ScoreBarTrack = tamaguiStyled(YStack, {
+  flex: 1,
+  height: 3,
+  backgroundColor: SURFACE_OVERLAY_FAINT,
+  borderRadius: 2,
+  overflow: 'hidden',
+}) as StyledComponent;
+
+const DraftBtn = tamaguiStyled(XStack, {
+  tag: 'button',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginTop: 6,
+  width: '100%',
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+  borderRadius: 8,
+  borderWidth: 0,
+  backgroundColor: EMERALD,
+  cursor: 'pointer',
+  hoverStyle: {
+    opacity: 0.9,
+  },
+}) as StyledComponent;
+
+const CancelBtn = tamaguiStyled(XStack, {
+  tag: 'button',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: withAlpha(WHITE, 0.1),
+  backgroundColor: SURFACE_OVERLAY_SUBTLE,
+  cursor: 'pointer',
+  flexShrink: 0,
+}) as StyledComponent;
 
 export function DraftIntelligence({
   draftId,
@@ -75,103 +172,147 @@ export function DraftIntelligence({
   if (recommendations.length === 0) return null;
 
   return (
-    <div className="d-intel-panel">
-      <div className="d-intel-title">BEST AVAILABLE</div>
-      <div className="d-intel-list">
+    <IntelPanel>
+      <Text
+        fontSize={11}
+        fontWeight="800"
+        letterSpacing={1.5}
+        textTransform="uppercase"
+        color={BRAND_GOLD}
+        marginBottom={10}
+      >
+        BEST AVAILABLE
+      </Text>
+      <YStack gap={6}>
         {recommendations.map((rec, i) => {
           if (!rec) return null;
           return (
-            <div
-              key={rec.playerId}
-              className="d-intel-item"
-              style={{ animationDelay: `${i * 0.06}s` }}
-            >
-              <div className="d-intel-header-row">
-                <span className="d-intel-rank">#{i + 1}</span>
-                <span className="d-intel-name">{rec.playerName}</span>
-                <span
-                  className="d-intel-pos"
-                  style={{
-                    background: getPositionColor(
-                      'baseball',
-                      rec.position ?? '',
-                    ),
-                  }}
+            <IntelItem key={rec.playerId}>
+              <XStack alignItems="center" gap={6}>
+                <Text
+                  fontSize={10}
+                  fontWeight="800"
+                  color={BRAND_GOLD}
+                  minWidth={22}
+                  flexShrink={0}
+                >
+                  #{i + 1}
+                </Text>
+                <Text
+                  fontSize={12}
+                  fontWeight="700"
+                  color={TEXT_PRIMARY}
+                  flex={1}
+                  numberOfLines={1}
+                >
+                  {rec.playerName}
+                </Text>
+                <Text
+                  fontSize={9}
+                  fontWeight="700"
+                  color={WHITE}
+                  paddingHorizontal={5}
+                  paddingVertical={1}
+                  borderRadius={4}
+                  flexShrink={0}
+                  backgroundColor={getPositionColor(
+                    'baseball',
+                    rec.position ?? '',
+                  )}
                 >
                   {rec.position}
-                </span>
-              </div>
-              <div className="d-intel-stats-row">
+                </Text>
+              </XStack>
+              <XStack alignItems="center" gap={5}>
                 {(rec.topStats ?? []).map((s) => {
                   if (!s) return null;
                   return (
-                    <span key={s.label} className="d-intel-stat-pill">
-                      <span className="d-intel-stat-val">{s.value}</span>
-                      <span className="d-intel-stat-lbl">{s.label}</span>
-                    </span>
+                    <StatPill key={s.label}>
+                      <Text fontSize={11} fontWeight="700" color={TEXT_PRIMARY}>
+                        {s.value}
+                      </Text>
+                      <Text fontSize={9} fontWeight="600" color={TEXT_MUTED}>
+                        {s.label}
+                      </Text>
+                    </StatPill>
                   );
                 })}
-                <div className="d-intel-score-bar-wrap">
-                  <div
-                    className="d-intel-score-bar"
-                    style={{
-                      width: `${Math.round((rec.score ?? 0) * 100)}%`,
-                    }}
+                <ScoreBarTrack>
+                  <YStack
+                    height="100%"
+                    borderRadius={2}
+                    backgroundColor={BRAND_GOLD}
+                    style={{ width: `${Math.round((rec.score ?? 0) * 100)}%` }}
                   />
-                </div>
-              </div>
-              <div className="d-intel-reason">{rec.reason}</div>
+                </ScoreBarTrack>
+              </XStack>
+              <Text
+                fontSize={10}
+                color={TEXT_MUTED}
+                fontStyle="italic"
+                lineHeight={13}
+              >
+                {rec.reason}
+              </Text>
               {onDraft &&
                 rec.playerId != null &&
                 rec.playerName != null &&
                 (pendingConfirm === rec.playerId ? (
-                  <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                    <button
-                      className="d-intel-draft-btn"
-                      style={{ flex: 1 }}
-                      onClick={() => {
+                  <XStack gap={4} marginTop={2}>
+                    <DraftBtn
+                      flex={1}
+                      aria-label={`Confirm draft ${rec.playerName}`}
+                      onPress={() => {
                         const pid = rec.playerId;
                         if (pid != null && onDraft) {
                           onDraft(pid);
                           setPendingConfirm(null);
                         }
                       }}
-                      aria-label={`Confirm draft ${rec.playerName}`}
                     >
-                      ✓ Confirm
-                    </button>
-                    <button
-                      style={{
-                        padding: '5px 10px',
-                        borderRadius: 'var(--d-radius-sm)',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        background: 'rgba(255,255,255,0.05)',
-                        color: 'var(--d-text-secondary)',
-                        fontSize: 11,
-                        fontWeight: 600,
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        flexShrink: 0,
-                      }}
-                      onClick={() => setPendingConfirm(null)}
+                      <Text
+                        color={WHITE}
+                        fontSize={11}
+                        fontWeight="700"
+                        letterSpacing={0.4}
+                      >
+                        ✓ Confirm
+                      </Text>
+                    </DraftBtn>
+                    <CancelBtn
                       aria-label="Cancel"
+                      onPress={() => setPendingConfirm(null)}
                     >
-                      ✕
-                    </button>
-                  </div>
+                      <Text color={TEXT_MUTED} fontSize={11} fontWeight="600">
+                        ✕
+                      </Text>
+                    </CancelBtn>
+                  </XStack>
                 ) : (
-                  <button
-                    className="d-intel-draft-btn"
-                    onClick={() => setPendingConfirm(rec.playerId ?? null)}
+                  <DraftBtn
                     aria-label={`Draft ${rec.playerName}`}
+                    onPress={() => setPendingConfirm(rec.playerId ?? null)}
                   >
-                    <span aria-hidden="true">⚡</span> Draft
-                  </button>
+                    <XStack alignItems="center" gap={4}>
+                      {/* jsx-a11y/accessible-emoji requires a literal <span>
+                          — Text compiles to <span> on web but the static
+                          rule doesn't recognize it (same shim as DraftRail). */}
+                      <span aria-hidden="true">⚡</span>
+                      <Text
+                        color={WHITE}
+                        fontSize={11}
+                        fontWeight="700"
+                        letterSpacing={0.4}
+                      >
+                        Draft
+                      </Text>
+                    </XStack>
+                  </DraftBtn>
                 ))}
-            </div>
+            </IntelItem>
           );
         })}
-      </div>
-    </div>
+      </YStack>
+    </IntelPanel>
   );
 }

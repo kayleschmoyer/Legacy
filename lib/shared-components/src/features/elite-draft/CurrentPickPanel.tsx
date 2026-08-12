@@ -1,5 +1,76 @@
 import React from 'react';
+import { Text, XStack, YStack } from 'tamagui';
 import type { CurrentDraftPickInfo } from './types';
+import {
+  AMBER,
+  BLUE,
+  BRAND_GOLD,
+  BRAND_GOLD_DARK,
+  OUTLINE_SUBTLE,
+  SCORE_LOSS,
+  SCORE_WIN,
+  STATUS_DANGER,
+  SURFACE_PANEL,
+  TEXT_MUTED,
+  TEXT_PRIMARY,
+  WHITE,
+  withAlpha,
+} from '../../utils/colors';
+import { tamaguiStyled } from '../../utils/tamaguiStyled';
+
+// ---------------------------------------------------------------------------
+// Current Pick Panel — ported 1:1 from styles.ts .d-panel/.d-state-btn rules
+// (LS-9152, mirroring the LS-9064 DraftRail.tsx approach).
+// tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint.
+// Colors are theme tokens or withAlpha() derivations rather than literal
+// hex/rgba strings so the theme-compliance ratchet
+// (scripts/check-theme-compliance.mjs) doesn't flag them; see
+// .agents/skills/ui/SKILL.md (epic LS-8518).
+// ---------------------------------------------------------------------------
+
+type StyledComponent = React.ComponentType<Record<string, unknown>>;
+
+const Panel = tamaguiStyled(YStack, {
+  backgroundColor: SURFACE_PANEL,
+  borderWidth: 1,
+  borderColor: OUTLINE_SUBTLE,
+  borderRadius: 16,
+  padding: 16,
+  alignItems: 'center',
+}) as StyledComponent;
+
+const StateLabel = tamaguiStyled(Text, {
+  fontSize: 11,
+  fontWeight: '700',
+  letterSpacing: 1.5,
+  textTransform: 'uppercase',
+  marginBottom: 6,
+}) as StyledComponent;
+
+const OnlineDot = tamaguiStyled(YStack, {
+  width: 9,
+  height: 9,
+  borderRadius: 9999,
+  flexShrink: 0,
+}) as StyledComponent;
+
+// tamaguiStyled's config object is a fixed hex (matches the .d-state-btn
+// gradient's start color) rather than the original CSS custom-property
+// gradient — background-image gradients aren't a Tamagui style prop.
+const StateBtn = tamaguiStyled(XStack, {
+  tag: 'button',
+  alignItems: 'center',
+  justifyContent: 'center',
+  backgroundColor: BRAND_GOLD,
+  borderWidth: 0,
+  paddingHorizontal: 28,
+  paddingVertical: 12,
+  borderRadius: 12,
+  cursor: 'pointer',
+  hoverStyle: {
+    backgroundColor: BRAND_GOLD_DARK,
+  },
+}) as StyledComponent;
 
 interface CurrentPickPanelProps {
   currentPickInfo: CurrentDraftPickInfo | null;
@@ -32,36 +103,14 @@ export function CurrentPickPanel({
 }: CurrentPickPanelProps): React.JSX.Element {
   if (currentPickInfo) {
     return (
-      <div
-        className="d-panel"
-        data-testid="current-pick-panel"
-        style={{ textAlign: 'center' }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            marginBottom: 6,
-            color: isMyPick ? 'var(--d-success)' : 'var(--d-text-secondary)',
-          }}
-        >
+      <Panel testID="current-pick-panel">
+        <StateLabel color={isMyPick ? SCORE_WIN : TEXT_MUTED}>
           {isMyPick ? 'YOUR PICK' : 'ON THE CLOCK'}
-        </div>
-        <div
-          style={{
-            fontSize: 18,
-            fontWeight: 800,
-            color: isMyPick ? 'var(--d-success)' : 'var(--d-text)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-          }}
-        >
+        </StateLabel>
+        <XStack alignItems="center" gap={6}>
           {currentPickTeamId !== null && (
-            <span
-              role="img"
+            <OnlineDot
+              testID="current-pick-online-indicator"
               aria-label={
                 onlineTeamIds.has(String(currentPickTeamId))
                   ? 'online'
@@ -72,146 +121,109 @@ export function CurrentPickPanel({
                   ? 'Manager is online'
                   : 'Manager is offline'
               }
-              style={{
-                display: 'inline-block',
-                width: 9,
-                height: 9,
-                borderRadius: '50%',
-                background: onlineTeamIds.has(String(currentPickTeamId))
-                  ? 'var(--d-success)'
-                  : 'var(--d-text-muted)',
-                flexShrink: 0,
-              }}
+              backgroundColor={
+                onlineTeamIds.has(String(currentPickTeamId))
+                  ? SCORE_WIN
+                  : TEXT_MUTED
+              }
             />
           )}
-          {teamNameById(currentPickTeamId)}
-        </div>
-        <div
-          style={{ fontSize: 12, color: 'var(--d-text-muted)', marginTop: 4 }}
-        >
-          Round {currentPickInfo.round} &middot; Pick{' '}
-          {currentPickInfo.pickNumber}
-        </div>
-        {myTeamId === null && (
-          <div
-            style={{
-              marginTop: 8,
-              padding: '6px 10px',
-              background: 'rgba(239,68,68,0.12)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              borderRadius: 6,
-              fontSize: 11,
-              color: '#f87171',
-              lineHeight: 1.4,
-            }}
+          <Text
+            fontSize={18}
+            fontWeight="800"
+            color={isMyPick ? SCORE_WIN : TEXT_PRIMARY}
           >
-            <span role="img" aria-label="Warning">
-              ⚠️
-            </span>{' '}
-            Your league membership has no team assigned. Commissioner Pick can
-            be used as a workaround.
-          </div>
+            {teamNameById(currentPickTeamId)}
+          </Text>
+        </XStack>
+        <Text fontSize={12} color={TEXT_MUTED} marginTop={4}>
+          Round {currentPickInfo.round} · Pick {currentPickInfo.pickNumber}
+        </Text>
+        {myTeamId === null && (
+          <YStack
+            marginTop={8}
+            paddingHorizontal={10}
+            paddingVertical={6}
+            backgroundColor={withAlpha(STATUS_DANGER, 0.12)}
+            borderWidth={1}
+            borderColor={withAlpha(STATUS_DANGER, 0.3)}
+            borderRadius={6}
+          >
+            <XStack alignItems="flex-start" gap={4}>
+              {/* jsx-a11y/accessible-emoji requires a literal <span> — Text
+                  compiles to <span> on web but the static rule doesn't
+                  recognize it (same shim used in DraftRail.tsx). */}
+              <span role="img" aria-label="Warning">
+                ⚠️
+              </span>
+              <Text fontSize={11} color={SCORE_LOSS} lineHeight={15} flex={1}>
+                Your league membership has no team assigned. Commissioner Pick
+                can be used as a workaround.
+              </Text>
+            </XStack>
+          </YStack>
         )}
         {myTeamId !== null && !isMyPick && !currentPickInfo.isComplete && (
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 10,
-              color: 'var(--d-text-muted)',
-              lineHeight: 1.4,
-            }}
-          >
-            Your team ID: {myTeamId} &middot; On clock: {currentPickTeamId}
-          </div>
+          <Text fontSize={10} color={TEXT_MUTED} marginTop={8} lineHeight={14}>
+            Your team ID: {myTeamId} · On clock: {currentPickTeamId}
+          </Text>
         )}
-      </div>
+      </Panel>
     );
   }
 
   if (currentPickLoadError) {
     return (
-      <div
-        className="d-panel"
-        role="alert"
-        aria-live="polite"
-        style={{ textAlign: 'center' }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: 1.5,
-            textTransform: 'uppercase',
-            marginBottom: 6,
-            color: 'var(--d-error)',
-          }}
-        >
-          Pick Load Error
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--d-text)' }}>
+      <Panel role="alert" aria-live="polite">
+        <StateLabel color={STATUS_DANGER}>Pick Load Error</StateLabel>
+        <Text fontSize={14} fontWeight="700" color={TEXT_PRIMARY}>
           Failed to load current pick
-        </div>
-        <div
-          style={{ fontSize: 12, color: 'var(--d-text-muted)', marginTop: 6 }}
-        >
+        </Text>
+        <Text fontSize={12} color={TEXT_MUTED} marginTop={6}>
           There was a problem checking whose turn it is. The draft is still
           running.
-        </div>
-        <button
-          className="d-state-btn"
-          style={{ marginTop: 12 }}
-          onClick={onRetryCurrentPick}
-        >
-          Retry
-        </button>
-      </div>
+        </Text>
+        <StateBtn marginTop={12} onPress={onRetryCurrentPick}>
+          <Text color={WHITE} fontSize={14} fontWeight="700">
+            Retry
+          </Text>
+        </StateBtn>
+      </Panel>
     );
   }
 
   return (
-    <div className="d-panel" style={{ textAlign: 'center' }}>
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: 1.5,
-          textTransform: 'uppercase',
-          marginBottom: 6,
-          color: 'var(--d-warning)',
-        }}
-      >
-        Draft Order Pending
-      </div>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--d-text)' }}>
+    <Panel>
+      <StateLabel color={AMBER}>Draft Order Pending</StateLabel>
+      <Text fontSize={14} fontWeight="700" color={TEXT_PRIMARY}>
         Waiting for pick order setup
-      </div>
-      <div style={{ fontSize: 12, color: 'var(--d-text-muted)', marginTop: 6 }}>
+      </Text>
+      <Text fontSize={12} color={TEXT_MUTED} marginTop={6}>
         We can&apos;t determine whose turn it is yet.
-      </div>
+      </Text>
       {isOwner && pickHistoryLength === 0 && (
-        <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
-          <button
-            className="d-state-btn"
-            onClick={() => onInitializeDraft('snake')}
+        <YStack gap={8} marginTop={12} width="100%">
+          <StateBtn
             disabled={initDraftLoading}
-            style={{ opacity: initDraftLoading ? 0.6 : 1 }}
+            opacity={initDraftLoading ? 0.6 : 1}
+            onPress={() => onInitializeDraft('snake')}
           >
-            {initDraftLoading ? 'Starting...' : 'Generate Snake Order'}
-          </button>
-          <button
-            className="d-state-btn"
-            onClick={() => onInitializeDraft('linear')}
+            <Text color={WHITE} fontSize={14} fontWeight="700">
+              {initDraftLoading ? 'Starting...' : 'Generate Snake Order'}
+            </Text>
+          </StateBtn>
+          <StateBtn
             disabled={initDraftLoading}
-            style={{
-              opacity: initDraftLoading ? 0.6 : 1,
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              boxShadow: '0 4px 16px rgba(59,130,246,0.25)',
-            }}
+            opacity={initDraftLoading ? 0.6 : 1}
+            backgroundColor={BLUE}
+            onPress={() => onInitializeDraft('linear')}
           >
-            {initDraftLoading ? 'Starting...' : 'Generate Linear Order'}
-          </button>
-        </div>
+            <Text color={WHITE} fontSize={14} fontWeight="700">
+              {initDraftLoading ? 'Starting...' : 'Generate Linear Order'}
+            </Text>
+          </StateBtn>
+        </YStack>
       )}
-    </div>
+    </Panel>
   );
 }
