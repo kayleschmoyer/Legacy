@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Text, XStack, YStack } from 'tamagui';
+import { Button, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
   brand,
   darkText,
@@ -160,14 +160,23 @@ export function DraftCompleteView({
         style={{ backgroundImage: BG_FX_IMAGE }}
       />
 
-      <YStack
+      {/* Scrollable: a centred, unscrollable column clipped the action
+          buttons and roster grid off the top of the screen once a large
+          roster (>7 picks) pushed the content taller than the viewport —
+          the user had no way to reach "Go to My Leagues" / "Back to
+          League" (LS-9240). `flexGrow: 1` keeps short content centred
+          exactly as before. */}
+      <ScrollView
         flex={1}
-        alignItems="center"
-        justifyContent="center"
-        gap="$4"
-        padding="$8"
         position="relative"
         zIndex={1}
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 16,
+          padding: 32,
+        }}
       >
         <Text fontSize={56} lineHeight={56} role="img" aria-label="trophy">
           {'🏆'}
@@ -357,7 +366,7 @@ export function DraftCompleteView({
             <RosterCardGrid picks={myTeamPicks} players={myTeam} />
           </YStack>
         )}
-      </YStack>
+      </ScrollView>
     </YStack>
   );
 }

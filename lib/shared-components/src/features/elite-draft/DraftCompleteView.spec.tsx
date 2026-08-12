@@ -9,7 +9,41 @@
  */
 import React from 'react';
 import { DraftCompleteView } from './DraftCompleteView';
+import type { DraftPickRecord, DraftPlayer } from './types';
 import { render } from '../../test-utils';
+
+function buildLargeRoster(count: number): {
+  picks: DraftPickRecord[];
+  players: DraftPlayer[];
+  statsLookup: Map<number, DraftPlayer>;
+} {
+  const players: DraftPlayer[] = Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    name: `Player ${i + 1}`,
+    position: 'OF',
+    avg: 0.3,
+    hr: 10,
+    rbi: 40,
+    runs: 30,
+    sb: 5,
+    games: 100,
+    hits: 100,
+    obp: 0.35,
+    slg: 0.45,
+  }));
+  const picks: DraftPickRecord[] = players.map((player, i) => ({
+    id: String(i + 1),
+    draftId: 1,
+    round: i + 1,
+    pickNumber: 1,
+    overallPick: i + 1,
+    pickedAt: new Date(0).toISOString(),
+    teamId: 1,
+    playerId: player.id,
+  }));
+  const statsLookup = new Map(players.map((p) => [p.id, p]));
+  return { picks, players, statsLookup };
+}
 
 const defaultProps = {
   league: { isMockDraft: false, name: 'Test League' },
@@ -72,5 +106,29 @@ describe('DraftCompleteView', () => {
     );
     getByText('Set My Lineup').click();
     expect(onNavigate).toHaveBeenCalledWith('/baseball/league/1/roster');
+  });
+
+  // Regression for LS-9240: a roster with more than 7 picks used to overflow
+  // an unscrollable, clipped column and bury the "Go to My Leagues" / "Back
+  // to League" CTA off the top of the screen on mobile. This can't assert
+  // real layout/overflow in jsdom, but it pins that the CTA and the full
+  // roster grid both still render together for a large roster — a regression
+  // that dropped the ScrollView wrapper (or the CTA above a large grid)
+  // would show up as a missing node here.
+  it('renders the "Go to My Leagues" CTA alongside a full roster of more than 7 picks', () => {
+    const { picks, players, statsLookup } = buildLargeRoster(15);
+    const { getByText, getAllByText } = render(
+      <DraftCompleteView
+        {...defaultProps}
+        league={{ isMockDraft: true, name: 'Test League' }}
+        pickHistory={picks}
+        myTeam={players}
+        myTeamPicks={picks}
+        statsLookup={statsLookup}
+      />,
+    );
+    expect(getByText('Go to My Leagues')).toBeTruthy();
+    expect(getByText('Your Roster (15 players)')).toBeTruthy();
+    expect(getAllByText(/Player \d+/)).toHaveLength(15);
   });
 });
