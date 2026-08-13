@@ -20,6 +20,22 @@
  *   3. pool miss -> `pnpm install --frozen-lockfile` in the worktree, move the
  *      result into <pool>/.tmp-<pid>, atomic-rename to <pool>/<hash>, then symlink.
  *
+ * A slot also captures the NESTED per-package node_modules dirs that pnpm's
+ * workspace protocol creates under hoisted linking (e.g.
+ * apps/app/node_modules/@legacy-sports/shared-components -> a symlink into the
+ * sibling lib/ package). The root-only symlink is enough for tsconfig-paths
+ * resolvers (Vite/Nx/tsc), but Metro (React Native, apps/app) has no
+ * tsconfig-paths equivalent and resolves @legacy-sports/* imports via those
+ * nested symlinks (see apps/app/metro.config.js's nodeModulesPaths) — without
+ * them a native `expo export`/`expo run:android` fails with "Unable to resolve
+ * module @legacy-sports/X" (LS-9421 follow-up). Nested dirs are discovered from
+ * pnpm-lock.yaml's `importers:` list (the authoritative set of workspace
+ * package paths pnpm actually installed), moved into `<slot>/nested/<path>/
+ * node_modules` alongside the root snapshot on materialise, and symlinked back
+ * into the worktree on every link (hit or miss). Slots built before this
+ * feature simply have no `nested/` dir — nested linking silently no-ops for
+ * them until the slot is rebuilt (`--rebuild`).
+ *
  * After linking node_modules it also symlinks the main repo's gitignored secret
  * env files (.env, .env.local) into the worktree — what lets agents run
  * integration tests and pick up MCP_* credentials. This mirrors the behaviour of
@@ -81,7 +97,15 @@ import {
   readlinkSync,
 } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { basename, dirname, join, resolve } from 'node:path';
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  normalize as normalizePath,
+  resolve,
+  sep,
+} from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const POOL_DIRNAME = '.modules-pool';
@@ -204,6 +228,8 @@ if (slotState.healthy && !args['rebuild']) {
   console.log('[ok] slot materialised and linked.');
 }
 
+linkNestedWorkspaceModules(slotDir);
+
 // Link the main repo's gitignored secret env files (.env, .env.local) and the
 // certs/ directory into the worktree, mirroring the behaviour the SessionStart
 // hook relied on before the pool became the default resolver. The .env link is
@@ -251,6 +277,25 @@ function materialiseSlot(noFrozen = false) {
   mkdirSync(tmpSlot, { recursive: true });
   renameSync(nmPath, join(tmpSlot, 'node_modules'));
 
+  // Capture nested per-package node_modules (workspace symlinks pnpm creates
+  // under hoisted linking) alongside the root snapshot — see the file-header
+  // comment. Best-effort per path: a workspace package pnpm skipped (no deps)
+  // simply has no node_modules to capture.
+  let nestedCaptured = 0;
+  for (const rel of nestedNodeModulesRelPaths(lockfilePath)) {
+    const src = join(worktree, rel, 'node_modules');
+    if (!lstatExists(src)) continue;
+    const dest = join(tmpSlot, 'nested', rel, 'node_modules');
+    mkdirSync(dirname(dest), { recursive: true });
+    renameSync(src, dest);
+    nestedCaptured++;
+  }
+  if (nestedCaptured > 0) {
+    console.log(
+      `[install] captured ${nestedCaptured} nested workspace node_modules dir(s) into the slot.`,
+    );
+  }
+
   try {
     renameSync(tmpSlot, slotDir);
   } catch (err) {
@@ -259,6 +304,10 @@ function materialiseSlot(noFrozen = false) {
       console.log(
         '[race] slot published by another process — discarding our copy.',
       );
+      // Our nested captures live only in the discarded tmpSlot — restore them
+      // to the worktree so linkNestedWorkspaceModules() has a fallback source
+      // if the winning slot (built by an older link.mjs) has no nested/ dir.
+      restoreNestedDirs(tmpSlot);
       removeDir(tmpSlot);
     } else {
       removeDir(tmpSlot);
@@ -271,26 +320,74 @@ function materialiseSlot(noFrozen = false) {
 // Symlinking
 // ---------------------------------------------------------------------------
 function linkWorktreeToSlot(target) {
+  try {
+    ensureDirSymlink(nmPath, target, 'node_modules');
+  } catch (err) {
+    fail(String(err.message ?? err));
+  }
+}
+
+/**
+ * Symlink nested per-package node_modules dirs (apps/app/node_modules/
+ * @legacy-sports/*, etc.) from the slot's `nested/` capture back into the
+ * worktree — see the file-header comment for why Metro needs these. No-ops
+ * per path when the slot has nothing captured for it (older slot, or that
+ * workspace package genuinely has no deps). Non-fatal: nested linking is only
+ * required for native/Metro builds, not the common web/lambda dev path, so a
+ * failure here must never abort node_modules linking, which already succeeded.
+ */
+function linkNestedWorkspaceModules(slot) {
+  const nestedRoot = join(slot, 'nested');
+  if (!existsSync(nestedRoot)) return;
+  let linked = 0;
+  for (const rel of nestedNodeModulesRelPaths(lockfilePath)) {
+    const src = join(nestedRoot, rel, 'node_modules');
+    if (!existsSync(src)) continue;
+    const dest = join(worktree, rel, 'node_modules');
+    try {
+      mkdirSync(dirname(dest), { recursive: true });
+      ensureDirSymlink(dest, src, `${rel}/node_modules`);
+      linked++;
+    } catch (err) {
+      console.warn(
+        `[warn] ${rel}/node_modules: failed to link nested workspace module: ${String(err.message ?? err)}`,
+      );
+    }
+  }
+  if (linked > 0) {
+    console.log(
+      `[ok] ${linked} nested workspace node_modules dir(s) linked (needed for native/Metro builds).`,
+    );
+  }
+}
+
+/**
+ * Symlink `linkPath` -> `target` as a directory symlink, replacing whatever
+ * is already at `linkPath` (idempotent if already correctly linked). Throws
+ * an Error with an actionable message on failure — callers decide whether
+ * that's fatal (fail()) or a warning (nested linking).
+ */
+function ensureDirSymlink(linkPath, target, label) {
   // Already correctly linked?
-  if (lstatExists(nmPath)) {
-    const st = safeLstat(nmPath);
+  if (lstatExists(linkPath)) {
+    const st = safeLstat(linkPath);
     if (st && st.isSymbolicLink()) {
-      const cur = safeRealpath(nmPath) ?? safeReadlink(nmPath);
+      const cur = safeRealpath(linkPath) ?? safeReadlink(linkPath);
       if (cur && normalize(cur) === normalize(target)) return;
     }
-    removeNodeModulesEntry(nmPath);
+    removeNodeModulesEntry(linkPath);
     // removeNodeModulesEntry is best-effort (e.g. a locked file inside a stale
     // real directory can make rmSync throw silently) — verify it actually
     // cleared the path. Otherwise mklink/symlinkSync below fails with a raw
     // "already exists" error that gives no hint the removal itself failed
     // (LS-8649).
-    if (lstatExists(nmPath)) {
-      fail(
-        `node_modules already exists and could not be removed automatically:\n  ${nmPath}\n\n` +
+    if (lstatExists(linkPath)) {
+      throw new Error(
+        `${label} already exists and could not be removed automatically:\n  ${linkPath}\n\n` +
           'It may be a stale real directory left over from a prior install, or a ' +
           'file inside it may be locked by a running process (nx daemon, editor, ' +
           'antivirus scan). Close anything that might be holding it open and ' +
-          `remove it manually, then re-run this script:\n  rm -rf "${nmPath}"`,
+          `remove it manually, then re-run this script:\n  rm -rf "${linkPath}"`,
       );
     }
   }
@@ -300,7 +397,7 @@ function linkWorktreeToSlot(target) {
     // Requires Windows Developer Mode.
     let mkErr;
     try {
-      execFileSync('cmd', ['/c', 'mklink', '/D', nmPath, target], {
+      execFileSync('cmd', ['/c', 'mklink', '/D', linkPath, target], {
         encoding: 'utf-8',
         timeout: 15_000,
         windowsHide: true,
@@ -308,12 +405,12 @@ function linkWorktreeToSlot(target) {
     } catch (err) {
       mkErr = err;
     }
-    if (mkErr || !winPathIsContainer(nmPath)) {
+    if (mkErr || !winPathIsContainer(linkPath)) {
       const msg = mkErr
         ? String(mkErr.message ?? mkErr)
         : 'mklink exited 0 but path is not accessible';
       const devMode = /privilege|EPERM|1314/i.test(msg);
-      fail(
+      throw new Error(
         `Failed to create directory symlink: ${msg}` +
           (devMode
             ? '\n\nDirectory symlinks require Windows Developer Mode.\n' +
@@ -322,7 +419,7 @@ function linkWorktreeToSlot(target) {
       );
     }
   } else {
-    symlinkSync(target, nmPath);
+    symlinkSync(target, linkPath);
   }
 }
 
@@ -378,6 +475,83 @@ function computeHash(lockPath, saltWorktree) {
     if (pm) h.update('\0' + pm);
   }
   return h.digest('hex').slice(0, HASH_LEN);
+}
+
+/**
+ * Extract the list of workspace-package relative paths (e.g. "apps/app",
+ * "lib/shared-components") from pnpm-lock.yaml's `importers:` map. This is
+ * the authoritative set of paths pnpm actually installed nested node_modules
+ * for — driving it off pnpm-workspace.yaml's globs would list packages that
+ * may not have been resolved. A minimal regex-based parse keeps the script
+ * dependency-free (no `yaml` package) rather than a full YAML parser; the
+ * lockfile's `importers:` block is machine-generated and simple enough
+ * (2-space-indented `<path>:` keys, optionally quoted) for this to be
+ * reliable. The root importer (".") is excluded — it's the already-handled
+ * root node_modules, not a nested one.
+ */
+function nestedNodeModulesRelPaths(lockPath) {
+  let lines;
+  try {
+    lines = readFileSync(lockPath, 'utf-8').split(/\r?\n/);
+  } catch {
+    return [];
+  }
+  const start = lines.findIndex((l) => /^importers:\s*$/.test(l));
+  if (start === -1) return [];
+  const paths = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.length === 0) continue;
+    if (!/^\s/.test(line)) break; // back to a top-level key — importers block ended
+    // Trailing content after the colon varies: a bare `path:` followed by a
+    // nested block, or a flow-style `path: {}` when the package has no deps.
+    const m = line.match(/^ {2}(?:'([^']+)'|"([^"]+)"|([^\s:][^:]*)):.*$/);
+    if (!m) continue;
+    const p = m[1] ?? m[2] ?? m[3];
+    if (!p || p === '.') continue;
+    // Defence in depth: importer paths are pnpm-generated and normally
+    // trusted, but these strings flow straight into renameSync/mkdirSync/
+    // symlinkSync/rmSync targets under `worktree`/`slot`. Reject anything
+    // absolute or that escapes the workspace root via `..` before it ever
+    // reaches a filesystem call (LS-9434 review finding).
+    const normalized = normalizePath(p);
+    if (
+      isAbsolute(normalized) ||
+      normalized === '..' ||
+      normalized.startsWith(`..${sep}`)
+    ) {
+      console.warn(
+        `[warn] ignoring suspicious importer path in pnpm-lock.yaml: ${p}`,
+      );
+      continue;
+    }
+    paths.push(p);
+  }
+  return paths;
+}
+
+/**
+ * Best-effort restore of a discarded materialise attempt's nested captures
+ * (see the [race] branch in materialiseSlot) — moves each
+ * `<tmpSlot>/nested/<rel>/node_modules` back to `<worktree>/<rel>/
+ * node_modules` before the tmp dir is deleted, so a lost race doesn't strand
+ * the worktree without nested dirs it had before this run started.
+ */
+function restoreNestedDirs(tmpSlot) {
+  const nestedRoot = join(tmpSlot, 'nested');
+  if (!existsSync(nestedRoot)) return;
+  for (const rel of nestedNodeModulesRelPaths(lockfilePath)) {
+    const src = join(nestedRoot, rel, 'node_modules');
+    if (!existsSync(src)) continue;
+    const dest = join(worktree, rel, 'node_modules');
+    if (lstatExists(dest)) continue; // don't clobber something already restored/present
+    try {
+      mkdirSync(dirname(dest), { recursive: true });
+      renameSync(src, dest);
+    } catch {
+      /* best effort — the slot's own nested/ dir remains the primary source */
+    }
+  }
 }
 
 function readPackageManager(wt) {

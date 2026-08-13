@@ -32,7 +32,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join, dirname, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const LINK = join(here, 'link.mjs');
@@ -1025,6 +1025,245 @@ test(
       assert.ok(
         existsSync(join(pool, hash, 'node_modules', 'nx', 'package.json')),
         'a fresh slot must be published under the same hash',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+// --- nested workspace node_modules (LS-9421 follow-up) -----------------------
+// The pool historically snapshotted only the root node_modules. Metro (React
+// Native, apps/app) resolves @legacy-sports/* imports via the NESTED
+// per-package node_modules pnpm creates for workspace deps (no
+// tsconfig-paths equivalent), so those must be captured into the slot and
+// symlinked back into the worktree too — on both the materialise (miss) and
+// link (hit) paths.
+
+const LOCK_WORKSPACE =
+  'lockfileVersion: 9\n' +
+  'importers:\n' +
+  '  .: {}\n' +
+  '  apps/app:\n' +
+  '    dependencies:\n' +
+  "      '@legacy-sports/shared-components': link:../../lib/shared-components\n" +
+  '  lib/shared-components: {}\n';
+
+/** Fake pnpm that also creates nested per-package node_modules dirs, mirroring
+ * what a real `pnpm install` produces for workspace-protocol deps under
+ * hoisted linking. */
+function makeFakePnpmWithNested(binDir) {
+  mkdirSync(binDir, { recursive: true });
+  if (process.platform === 'win32') {
+    writeFileSync(
+      join(binDir, 'pnpm.cmd'),
+      [
+        '@echo off',
+        'mkdir node_modules\\nx',
+        'echo {"name":"nx"} > node_modules\\nx\\package.json',
+        'mkdir node_modules\\.bin',
+        'echo x > node_modules\\.bin\\placeholder',
+        'echo x > node_modules\\.bin\\nx',
+        'echo hoistedDependencies: {} > node_modules\\.modules.yaml',
+        'mkdir apps\\app\\node_modules\\@legacy-sports\\shared-components',
+        'echo {} > apps\\app\\node_modules\\@legacy-sports\\shared-components\\package.json',
+        'mkdir lib\\shared-components\\node_modules',
+      ].join('\r\n') + '\r\n',
+    );
+  } else {
+    const p = join(binDir, 'pnpm');
+    writeFileSync(
+      p,
+      '#!/bin/sh\nmkdir -p node_modules/nx node_modules/.bin\n' +
+        'echo \'{"name":"nx"}\' > node_modules/nx/package.json\n' +
+        'echo x > node_modules/.bin/placeholder\n' +
+        'echo x > node_modules/.bin/nx\n' +
+        'echo "hoistedDependencies: {}" > node_modules/.modules.yaml\n' +
+        'mkdir -p apps/app/node_modules/@legacy-sports/shared-components\n' +
+        "echo '{}' > apps/app/node_modules/@legacy-sports/shared-components/package.json\n" +
+        'mkdir -p lib/shared-components/node_modules\n',
+    );
+    chmodSync(p, 0o755);
+  }
+}
+
+test(
+  'materialise captures nested workspace node_modules into the slot and links them back',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'nested-wt', LOCK_WORKSPACE);
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+
+      const shim = join(root, 'fake-bin');
+      makeFakePnpmWithNested(shim);
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`], fakePnpmEnv(shim));
+
+      const slotNested = join(root, '.modules-pool', hash, 'nested');
+      assert.ok(
+        existsSync(
+          join(
+            slotNested,
+            'apps',
+            'app',
+            'node_modules',
+            '@legacy-sports',
+            'shared-components',
+            'package.json',
+          ),
+        ),
+        'nested node_modules must be captured into the slot',
+      );
+
+      const appNm = join(wt, 'apps', 'app', 'node_modules');
+      assert.ok(
+        lstatSync(appNm).isSymbolicLink(),
+        'apps/app/node_modules must be a symlink',
+      );
+      assert.equal(
+        realpathSync(appNm),
+        realpathSync(join(slotNested, 'apps', 'app', 'node_modules')),
+        'apps/app/node_modules must point into the slot',
+      );
+
+      const libNm = join(wt, 'lib', 'shared-components', 'node_modules');
+      assert.ok(
+        lstatSync(libNm).isSymbolicLink(),
+        'lib/shared-components/node_modules must be a symlink too',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'pool hit links nested workspace node_modules from an existing slot capture',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'nested-hit-wt', LOCK_WORKSPACE);
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+      const slotNm = join(root, '.modules-pool', hash, 'node_modules');
+      makeHealthyNodeModules(slotNm);
+      const slotNested = join(
+        root,
+        '.modules-pool',
+        hash,
+        'nested',
+        'apps',
+        'app',
+        'node_modules',
+      );
+      mkdirSync(slotNested, { recursive: true });
+      writeFileSync(join(slotNested, 'marker.txt'), 'x');
+
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+
+      const appNm = join(wt, 'apps', 'app', 'node_modules');
+      assert.ok(
+        lstatSync(appNm).isSymbolicLink(),
+        'apps/app/node_modules must be linked on a cache hit too',
+      );
+      assert.equal(realpathSync(appNm), realpathSync(slotNested));
+
+      // Idempotent.
+      runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      assert.equal(realpathSync(appNm), realpathSync(slotNested));
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+const LOCK_EVIL =
+  'lockfileVersion: 9\n' +
+  'importers:\n' +
+  '  .: {}\n' +
+  "  '../evil-sibling': {}\n" +
+  '  apps/app: {}\n';
+
+test(
+  'materialise ignores a path-traversal importer entry instead of moving files outside the worktree (security)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'evil-wt', LOCK_EVIL);
+      // Simulate a directory sitting where the traversal would land — a
+      // sibling worktree's node_modules, one level up from this worktree.
+      const evilNm = join(
+        root,
+        '.claude',
+        'worktrees',
+        'evil-sibling',
+        'node_modules',
+      );
+      mkdirSync(evilNm, { recursive: true });
+      writeFileSync(join(evilNm, 'marker.txt'), 'do-not-move-me');
+
+      const shim = join(root, 'fake-bin');
+      makeFakePnpm(shim); // root-only fake install — apps/app importer captures nothing, which is fine
+      // console.warn (the traversal rejection) goes to stderr, not the
+      // stdout runLink() returns — capture both via spawnSync directly.
+      const result = spawnSync(
+        'node',
+        [LINK, `--worktree=${wt}`, `--main-repo=${root}`],
+        { encoding: 'utf-8', env: fakePnpmEnv(shim) },
+      );
+      const out = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+
+      assert.match(
+        out,
+        /ignoring suspicious importer path.*\.\.\/evil-sibling/,
+        'the traversal path must be rejected with a warning',
+      );
+      assert.ok(
+        existsSync(join(evilNm, 'marker.txt')),
+        'the sibling directory must be untouched — never captured into the pool slot',
+      );
+
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+      assert.ok(
+        !existsSync(
+          join(root, '.modules-pool', hash, 'nested', '..', 'evil-sibling'),
+        ),
+        'no pool content should reference the traversal path',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'nested linking is a silent no-op for a slot built before this feature (no nested/ dir)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'no-nested-wt', LOCK_WORKSPACE);
+      prebuildSlot(root, wt);
+
+      const out = runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
+      assert.match(out, /node_modules → pool slot \(cache hit\)/);
+      assert.ok(
+        !existsSync(join(wt, 'apps', 'app', 'node_modules')),
+        'no nested link should be created when the slot has no nested/ capture',
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
