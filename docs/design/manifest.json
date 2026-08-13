@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-08-10T00:00:00.000Z",
+  "lastSyncedAt": "2026-08-12T00:00:00.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -282,6 +282,17 @@
       "projectId": "db205fee-0bf0-4284-9334-d6b11bbcc658",
       "title": "MatchupRosterComparison responsive layout",
       "status": "active"
+    },
+    {
+      "id": "mobile-draft-room-v2-2026-08-12",
+      "url": null,
+      "title": "Mobile Draft Room v2 (ESPN × Sleeper hybrid)",
+      "slug": "legacy-sports-draft-room-v2",
+      "status": "active",
+      "lastSyncedHash": "sha256-60f761c5f8fa7bc639757104f186f48229c9aca1925c2854f144f5d35f476aa3",
+      "lastSyncedAt": "2026-08-12T00:00:00.000Z",
+      "jiraKey": "LS-9395",
+      "source": "manual-local-sync"
     }
   ]
 }

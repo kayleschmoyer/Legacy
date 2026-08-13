@@ -1,0 +1,91 @@
+/*
+ * Mobile Draft Room v2 — design tokens
+ *
+ * Transcribed from README.md § "Design Tokens" and § "Typography".
+ * This handoff documented tokens as prose rather than a token file (no Claude
+ * Design ds/ export exists for this manual handoff) — generated here to
+ * satisfy the completeness-gate B4 check on real content. See SYNC-REPORT.md
+ * for the substitution note. Source of truth for values remains README.md;
+ * production values live in lib/design-tokens/src/lib/colors.ts.
+ */
+
+:root {
+  /* Surfaces */
+  --color-background: #0A0F1A;
+  --color-surface-subtle: #0D1526;
+  --color-surface-panel: #111B2F;
+  --color-surface-card: #16223A;
+  --color-surface-raised: #1C2A47;
+
+  /* Outlines */
+  --color-outline-subtle: #1C2740;
+  --color-outline-default: #2F3B53;
+  --color-outline-strong: #4D5D80;
+  --color-outline-panel-border: #1F2D48;
+
+  /* Text */
+  --color-text-fg1: #F8FAFC;
+  --color-text-fg3-muted: #9CAAC5;
+  --color-text-fg4-faint: #6C80BA;
+
+  /* Brand */
+  --color-brand-gold: #C5A55A;
+  --color-brand-gold-light: #D4BB78;
+  --color-brand-gold-dark: #A68B3E;
+  --color-brand-accent-ink: #151515; /* ink on gold */
+
+  /* Semantic */
+  --color-danger-fg: #E07A8C;
+  --color-success-fg: #6FD39A;
+
+  /* Football position colors (footballPositionBadges) */
+  --color-position-qb: #C41E3A;
+  --color-position-rb: #8B6F47;
+  --color-position-wr: #2D6A4F;
+  --color-position-te: #7C8794;
+  --color-position-flex: #C49A6C;
+  --color-position-k: #C5A55A;
+  --color-position-dst: #5B7FA6; /* IDP steel blue, used for D/ST slot in this design */
+  --color-position-bn: #4D5D80; /* neutral */
+
+  /* Radii */
+  --radius-chip-pill: 999px;
+  --radius-card: 12px;
+  --radius-board-cell: 8px;
+  --radius-sheet: 18px;
+
+  /* Spacing scale */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+
+  /* Alpha tints (withAlpha() reference values) */
+  --alpha-badge-bg-min: 0.14;
+  --alpha-badge-bg-max: 0.18;
+  --alpha-board-cell-filled: 0.32;
+  --alpha-board-cell-filled-my-column: 0.5;
+  /* chip active fills are solid (alpha 1) */
+
+  /* Typography — headings/numerals: Big Shoulders Display 700/800 */
+  --font-heading-family: 'Big Shoulders Display', sans-serif;
+  --font-heading-weight-bold: 700;
+  --font-heading-weight-black: 800;
+  --font-size-clock: 26px; /* weight 800 */
+  --font-size-board-round-label: 12px; /* weight 800 */
+  --font-size-draft-button: 12px; /* weight 800, letter-spacing 1px */
+  --font-size-splash-name: 30px; /* weight 800 */
+  --font-size-recap-title: 38px; /* weight 800 */
+
+  /* Typography — body: Literata */
+  --font-body-family: 'Literata', Georgia, serif;
+  --font-size-player-name-min: 13.5px; /* weight 600 */
+  --font-size-player-name-max: 15px; /* weight 600 */
+  --font-size-stat-line-min: 9.5px;
+  --font-size-stat-line-max: 11.5px;
+  --font-size-eyebrow-min: 9.5px; /* weight 700, uppercase */
+  --font-size-eyebrow-max: 10px; /* weight 700, uppercase */
+  --letter-spacing-eyebrow-min: 2px;
+  --letter-spacing-eyebrow-max: 2.5px;
+}

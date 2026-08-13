@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Literata:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#05080F;font-family:'Literata',Georgia,serif;color:#F8FAFC}
+a{color:#D4BB78;text-decoration:none}a:hover{color:#C5A55A}
+@keyframes ringPulse{0%,100%{opacity:1}50%{opacity:.2}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:36px 20px;gap:14px">
+<div style="text-align:center">
+<div style="font-family:'Big Shoulders Display';font-size:22px;font-weight:800;letter-spacing:1px;color:#F8FAFC">CURRENT MOBILE DRAFT ROOM — RECREATION</div>
+<div style="font-size:12px;color:#9CAAC5;margin-top:4px">Faithful to <span style="font-family:ui-monospace,monospace">CompactLiveDraftBoard</span> in EliteDraftBoardScreen.tsx · baseline for the redesign</div>
+</div>
+<div style="width:390px;height:844px;background:#0A0F1A;border:1px solid #2F3B53;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 48px rgba(8,12,20,.75)">
+  <!-- On the clock header (isMyPick=false variant) -->
+  <div style="padding:10px 12px 11px;background:#111B2F;border-bottom:1px solid #1C2740">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#6C80BA">On the clock</div>
+        <div style="font-family:'Big Shoulders Display';font-size:19px;font-weight:800;letter-spacing:.5px;line-height:21px;color:#F8FAFC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">DINGER DYNASTY</div>
+        <div style="font-size:11px;color:#6C80BA;margin-top:1px">Round 3 · Pick #27</div>
+      </div>
+      <div style="position:relative;width:52px;height:52px;flex:none">
+        <svg width="52" height="52" viewBox="0 0 62 62">
+          <circle cx="31" cy="31" r="26" fill="none" stroke="#1F2D48" stroke-width="6"></circle>
+          <circle cx="31" cy="31" r="26" fill="none" stroke="#D4BB78" stroke-width="6" stroke-linecap="round" stroke-dasharray="163.4" stroke-dashoffset="49" transform="rotate(-90 31 31)"></circle>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Big Shoulders Display';font-size:14px;font-weight:700;color:#D4BB78">1:03</div>
+      </div>
+    </div>
+    <!-- Mini board -->
+    <div style="display:flex;gap:3px;margin-bottom:4px">
+      <sc-for list="{{ boardTeams }}" as="t" hint-placeholder-count="8">
+        <div style="flex:1;text-align:center;font-family:'Big Shoulders Display';font-size:9px;font-weight:800;letter-spacing:.5px;color:{{ t.hdrColor }};white-space:nowrap;overflow:hidden">{{ t.initials }}</div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <sc-for list="{{ boardRows }}" as="row" hint-placeholder-count="4">
+        <div style="display:flex;gap:3px">
+          <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="8">
+            <div style="flex:1;position:relative;height:23px;border-radius:4px;border:1px solid {{ c.border }};background:{{ c.bg }};display:flex;align-items:center;justify-content:center;font-size:8.5px;font-weight:700;color:{{ c.fg }}">{{ c.label }}<sc-if value="{{ c.isCurrent }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-2px;border-radius:6px;border:2px solid #C5A55A;animation:ringPulse 1.4s ease-in-out infinite"></div></sc-if></div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+    <div style="font-size:11px;color:#9CAAC5;margin-top:8px;min-height:14px">Tap a cell to inspect a pick. Gold column is your team.</div>
+  </div>
+  <!-- Search + sort -->
+  <div style="display:flex;gap:8px;padding:9px 12px 0;align-items:center">
+    <div style="flex:1;background:#111B2F;border:1px solid #1F2D48;border-radius:10px;padding:9px 12px;font-size:13px;color:#6C80BA">Search…</div>
+    <div style="display:flex;border:1px solid #1F2D48;border-radius:9px;overflow:hidden">
+      <div style="padding:8px 11px;background:#1C2A47;font-size:11px;font-weight:800;color:#F8FAFC">ADP</div>
+      <div style="padding:8px 11px;font-size:11px;font-weight:800;color:#6C80BA">PTS</div>
+    </div>
+  </div>
+  <!-- Position chips -->
+  <div style="display:flex;gap:4px;padding:8px 12px;overflow-x:auto">
+    <sc-for list="{{ posChips }}" as="p" hint-placeholder-count="10">
+      <div style="padding:4px 10px;border-radius:999px;border:1px solid {{ p.border }};background:{{ p.bg }};font-size:11.5px;font-weight:700;color:{{ p.fg }};white-space:nowrap">{{ p.label }}</div>
+    </sc-for>
+  </div>
+  <!-- Player list -->
+  <div style="flex:1;overflow-y:auto;padding:0 12px 8px;min-height:0">
+    <sc-for list="{{ players }}" as="pl" hint-placeholder-count="6">
+      <div style="display:flex;align-items:center;gap:10px;background:#16223A;border:1px solid #1F2D48;border-radius:12px;padding:10px 13px;margin-bottom:7px">
+        <div style="padding:3px 8px;border-radius:6px;background:{{ pl.badgeBg }};color:{{ pl.posColor }};font-size:11px;font-weight:700;flex:none">{{ pl.pos }}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:15px;color:#F8FAFC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pl.name }}</div>
+          <div style="font-size:11.5px;color:#9CAAC5;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ pl.stat }}</div>
+        </div>
+        <div style="text-align:right;flex:none">
+          <div style="font-family:'Big Shoulders Display';font-size:16px;font-weight:700;color:#D4BB78">{{ pl.ppg }}</div>
+          <div style="font-size:9px;color:#6C80BA;letter-spacing:.5px">ADP {{ pl.adp }}</div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+  <!-- My squad strip -->
+  <div style="background:rgba(10,15,26,.9);border-top:1px solid #1F2D48;padding:9px 12px 13px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+      <div style="font-family:'Big Shoulders Display';font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#D4BB78">My Squad · 2/15</div>
+      <div style="font-size:10.5px;color:#6C80BA">1×OF · 1×SS ▴</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <sc-for list="{{ squadSlots }}" as="s" hint-placeholder-count="6">
+        <div style="flex:1;border:1px solid {{ s.border }};border-radius:9px;padding:5px 4px;text-align:center;background:{{ s.bg }}">
+          <div style="font-size:10.5px;font-weight:800;color:{{ s.posColor }};white-space:nowrap;overflow:hidden">{{ s.top }}</div>
+          <div style="font-size:9.5px;margin-top:1px;color:{{ s.nameColor }};white-space:nowrap;overflow:hidden">{{ s.name }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</div>
+<div style="font-size:12px;color:#6C80BA;max-width:390px;text-align:center;line-height:1.6">Sources: EliteDraftBoardScreen.tsx (compact branch), DraftMiniBoard.native.tsx, DraftClockRing.native.tsx, DraftSquadStrip.native.tsx, design-tokens/colors.ts</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const POS = {P:'#4A708B',C:'#C41E3A','1B':'#B5651D','2B':'#C5A55A','3B':'#2D6A4F',SS:'#2C4A7C',OF:'#64748B',DH:'#8B2635',RP:'#2E7D6E',SP:'#4A708B'};
+    const wa=(h,a)=>{const n=h.replace('#','');return `rgba(${parseInt(n.slice(0,2),16)}, ${parseInt(n.slice(2,4),16)}, ${parseInt(n.slice(4,6),16)}, ${a})`};
+    const teams=[{n:'Bronx Bombers',mine:false},{n:'Dinger Dynasty',mine:false},{n:'The Sandlot',mine:true},{n:'Moonshots',mine:false},{n:'Rally Caps',mine:false},{n:'Heaters',mine:false},{n:'Warning Track',mine:false},{n:'Cycle Chasers',mine:false}];
+    const initials=n=>{const w=n.trim().split(/\s+/);const f=w.map(x=>x[0]).join('');return (f.length>1?f:w[0]).slice(0,2).toUpperCase()};
+    const boardTeams=teams.map(t=>({initials:initials(t.n),hdrColor:t.mine?'#D4BB78':'#6C80BA'}));
+    // picks[round][col] = position or null; current = R3 col1 (Dinger Dynasty pick #27... col index 2 in snake R3? keep simple: col 1)
+    const grid=[['OF','SS','1B','OF','SP','3B','C','2B'],['SP','RP','OF','SS','1B','OF','SP','OF'],['2B',null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null],[null,null,null,null,null,null,null,null]];
+    const boardRows=grid.map((row,ri)=>({cells:row.map((pos,ci)=>{const mine=teams[ci].mine;const cur=ri===2&&ci===1;return{
+      label:pos||(cur?'●':''),
+      bg:pos?wa(POS[pos],mine?0.85:0.55):'#111B2F',
+      border:cur?'#C5A55A':(pos&&mine?wa('#C5A55A',0.6):'#1F2D48'),
+      fg:pos?'#F8FAFC':'#C5A55A',
+      isCurrent:cur};})}));
+    const chips=['ALL','C','1B','2B','3B','SS','OF','SP','RP','DH'];
+    const posChips=chips.map((p,i)=>{const active=i===0;const tint=p==='ALL'?'#C5A55A':POS[p];return{label:p,border:active?tint:'#2F3B53',bg:active?tint:'transparent',fg:active?'#151515':'#9CAAC5'}});
+    const mk=(name,pos,stat,ppg,adp)=>({name,pos,stat,ppg,adp,posColor:POS[pos],badgeBg:wa(POS[pos],0.14)});
+    const players=[
+      mk('Gunnar Henderson','SS','AVG .281 · HR 37 · RBI 92','9.4','25'),
+      mk('Corbin Carroll','OF','AVG .259 · HR 31 · RBI 84','9.1','26'),
+      mk('Tarik Skubal','SP','ERA 2.21 · K 241 · W 18-4','8.9','27'),
+      mk('Vladimir Guerrero Jr.','1B','AVG .323 · HR 30 · RBI 103','8.7','28'),
+      mk('Jackson Chourio','OF','AVG .275 · HR 28 · RBI 89','8.5','29'),
+      mk('William Contreras','C','AVG .281 · HR 23 · RBI 92','8.2','30'),
+      mk('Paul Skenes','SP','ERA 1.97 · K 216 · W 13-9','8.1','31'),
+      mk('Jazz Chisholm Jr.','3B','AVG .256 · HR 24 · RBI 71','7.8','32'),
+    ];
+    const squadPicks=[{pos:'OF',name:'Judge'},{pos:'SS',name:'Witt'}];
+    const squadSlots=Array.from({length:6},(_,i)=>{const p=squadPicks[i];if(p){const c=POS[p.pos];return{top:p.pos,name:p.name,posColor:c,border:c,bg:wa(c,0.18),nameColor:'#F8FAFC'}}return{top:'R'+(i+1),name:'open',posColor:'#6C80BA',border:'#2F3B53',bg:'transparent',nameColor:'#6C80BA'}});
+    return {boardTeams,boardRows,posChips,players,squadSlots};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800&family=Literata:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#05080F;font-family:'Literata',Georgia,serif;color:#F8FAFC}
+a{color:#D4BB78;text-decoration:none}a:hover{color:#C5A55A}
+*{box-sizing:border-box}
+::-webkit-scrollbar{width:0;height:0}
+input{font-family:'Literata',Georgia,serif}
+@keyframes ringPulse{0%,100%{opacity:1}50%{opacity:.15}}
+@keyframes splashUp{from{opacity:0;transform:translateY(48px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastIn{from{opacity:0;transform:translateY(-16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes confFall{from{transform:translateY(-20px) rotate(0deg)}to{transform:translateY(660px) rotate(720deg)}}
+@keyframes clockBreath{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:36px 20px;gap:14px">
+<div style="text-align:center">
+<div style="font-family:'Big Shoulders Display';font-size:22px;font-weight:800;letter-spacing:1px">DRAFT ROOM V2 — LIVE PROTOTYPE</div>
+<div style="font-size:12px;color:#9CAAC5;margin-top:4px">Sleeper board-first + ESPN inline pick markers, on Legacy Sports navy/gold · the draft is running — you pick 5th</div>
+</div>
+<div style="width:390px;height:844px;background:#0A0F1A;border:1px solid #2F3B53;border-radius:24px;overflow:hidden;display:flex;flex-direction:column;position:relative;box-shadow:0 20px 48px rgba(8,12,20,.75)">
+
+  <sc-if value="{{ notComplete }}" hint-placeholder-val="{{ true }}">
+  <!-- ══ Header band ══ -->
+  <div style="padding:10px 14px 9px;background:{{ headerBg }};border-bottom:1px solid {{ headerBorder }}">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div onClick="{{ noop }}" style="font-size:12px;font-weight:600;color:{{ headerDim }};padding:6px 2px;cursor:pointer;flex:none">Exit</div>
+      <div style="flex:1;min-width:0;text-align:center">
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:{{ headerEyebrowColor }}">{{ headerEyebrow }}</div>
+        <div style="font-family:'Big Shoulders Display';font-size:26px;font-weight:800;line-height:26px;color:{{ headerInk }};animation:{{ clockAnim }}">{{ clockLabel }}</div>
+      </div>
+      <div style="text-align:right;flex:none">
+        <div style="font-size:9.5px;letter-spacing:1px;color:{{ headerDim }}">RD {{ round }} · PICK {{ pickInRound }}</div>
+        <div style="font-family:'Big Shoulders Display';font-size:14px;font-weight:800;color:{{ headerInk }};max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ onClockName }}</div>
+      </div>
+    </div>
+    <sc-if value="{{ showAutoHint }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:6px;text-align:center;font-size:11px;color:{{ headerInk }};background:rgba(0,0,0,.14);border-radius:6px;padding:4px 8px">Auto pick would be <b>{{ autoHint }}</b> · queue drafts first</div>
+    </sc-if>
+  </div>
+  <!-- ══ Last pick strip ══ -->
+  <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;background:#0D1526;border-bottom:1px solid #1C2740;font-size:11px;color:#9CAAC5;white-space:nowrap;overflow:hidden">
+    <span style="color:#6C80BA;letter-spacing:1px;font-size:9.5px;font-weight:700">LAST</span>
+    <span style="overflow:hidden;text-overflow:ellipsis">{{ lastPickLine }}</span>
+  </div>
+
+  <!-- ══ BOARD tab ══ -->
+  <sc-if value="{{ tabBoard }}" hint-placeholder-val="{{ true }}">
+  <div style="flex:1;min-height:0;overflow:auto;padding:10px 0 10px 10px">
+    <div style="display:inline-flex;flex-direction:column;gap:4px;padding-right:10px">
+      <div style="display:flex;gap:4px">
+        <div style="width:30px;flex:none"></div>
+        <sc-for list="{{ boardHeader }}" as="h" hint-placeholder-count="8">
+          <div style="width:92px;flex:none;text-align:center">
+            <div style="width:26px;height:26px;border-radius:13px;margin:0 auto 2px;display:flex;align-items:center;justify-content:center;font-family:'Big Shoulders Display';font-size:11px;font-weight:800;background:{{ h.avatarBg }};color:{{ h.avatarFg }};border:1.5px solid {{ h.avatarBorder }}">{{ h.initials }}</div>
+            <div style="font-size:9px;font-weight:700;letter-spacing:.5px;color:{{ h.nameColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ h.name }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <sc-for list="{{ boardRows }}" as="row" hint-placeholder-count="5">
+        <div style="display:flex;gap:4px;align-items:stretch">
+          <div style="width:30px;flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px">
+            <div style="font-family:'Big Shoulders Display';font-size:12px;font-weight:800;color:#6C80BA">{{ row.label }}</div>
+            <div style="font-size:10px;color:#4D5D80">{{ row.arrow }}</div>
+          </div>
+          <sc-for list="{{ row.cells }}" as="c" hint-placeholder-count="8">
+            <div onClick="{{ c.onTap }}" style="width:92px;height:56px;flex:none;position:relative;border-radius:8px;border:1px solid {{ c.border }};background:{{ c.bg }};padding:5px 7px;overflow:hidden;cursor:pointer">
+              <div style="font-size:8.5px;font-weight:700;letter-spacing:.5px;color:{{ c.numColor }}">{{ c.num }}</div>
+              <div style="font-size:11px;font-weight:700;line-height:12.5px;color:{{ c.nameColor }};overflow:hidden;max-height:26px">{{ c.name }}</div>
+              <div style="font-size:8.5px;font-weight:700;color:{{ c.metaColor }};margin-top:1px">{{ c.meta }}</div>
+              <sc-if value="{{ c.isCurrent }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:-1px;border-radius:8px;border:2px solid #C5A55A;animation:ringPulse 1.4s ease-in-out infinite;pointer-events:none"></div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ══ PLAYERS tab ══ -->
+  <sc-if value="{{ tabPlayers }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;flex-direction:column;flex:1;min-height:0">
+    <div style="display:flex;gap:8px;padding:9px 12px 0">
+      <input value="{{ search }}" onChange="{{ onSearch }}" placeholder="Search players" style="flex:1;min-width:0;background:#111B2F;border:1px solid #1F2D48;border-radius:10px;padding:9px 12px;font-size:13px;color:#F8FAFC;outline:none">
+    </div>
+    <div style="display:flex;gap:5px;padding:8px 12px;overflow-x:auto;flex:none">
+      <sc-for list="{{ chips }}" as="ch" hint-placeholder-count="8">
+        <div onClick="{{ ch.onTap }}" style="flex:none;text-align:center;padding:5px 11px;border-radius:999px;border:1px solid {{ ch.border }};background:{{ ch.bg }};cursor:pointer">
+          <div style="font-size:11.5px;font-weight:700;color:{{ ch.fg }}">{{ ch.label }}</div>
+          <div style="font-size:8.5px;color:{{ ch.subFg }};letter-spacing:.5px">{{ ch.sub }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:1;overflow-y:auto;min-height:0;padding:0 12px 8px">
+      <sc-for list="{{ listRows }}" as="r" hint-placeholder-count="8">
+        <sc-if value="{{ r.isMarker }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px">
+            <div style="flex:1;height:1px;background:#C5A55A"></div>
+            <div style="border:1px solid #C5A55A;border-radius:999px;padding:2px 10px;font-size:9.5px;font-weight:700;letter-spacing:1px;color:#D4BB78">{{ r.label }}</div>
+            <div style="flex:1;height:1px;background:#C5A55A"></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ r.isPlayer }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;align-items:center;gap:9px;background:#16223A;border:1px solid #1F2D48;border-radius:12px;padding:9px 10px;margin-bottom:6px">
+            <div onClick="{{ r.onStar }}" style="width:30px;height:30px;flex:none;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;font-size:15px;color:{{ r.starColor }};background:{{ r.starBg }}">{{ r.star }}</div>
+            <div style="width:34px;flex:none;text-align:center">
+              <div style="padding:2px 0;border-radius:5px;background:{{ r.badgeBg }};color:{{ r.posColor }};font-size:10px;font-weight:700">{{ r.pos }}</div>
+              <div style="font-size:8.5px;color:#6C80BA;margin-top:2px">{{ r.teamBye }}</div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:13.5px;color:#F8FAFC;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div>
+              <div style="display:flex;gap:10px;font-size:9.5px;color:#9CAAC5;margin-top:2px">
+                <span><span style="color:#6C80BA">ADP</span> {{ r.adp }}</span>
+                <span><span style="color:#6C80BA">PROJ</span> <span style="color:#D4BB78;font-weight:700">{{ r.proj }}</span></span>
+                <span><span style="color:#6C80BA">ROST</span> {{ r.rost }}%</span>
+              </div>
+            </div>
+            <sc-if value="{{ r.canDraft }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ r.onDraft }}" style="flex:none;background:#C5A55A;border-radius:999px;padding:10px 14px;font-family:'Big Shoulders Display';font-size:12px;font-weight:800;letter-spacing:1px;color:#151515;cursor:pointer">DRAFT</div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ══ QUEUE tab ══ -->
+  <sc-if value="{{ tabQueue }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:12px">
+    <div style="font-family:'Big Shoulders Display';font-size:11px;font-weight:800;letter-spacing:2px;color:#D4BB78;margin-bottom:10px">MY QUEUE · {{ queueCount }}</div>
+    <sc-if value="{{ queueEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="border:1px dashed #2F3B53;border-radius:12px;padding:22px 16px;text-align:center;color:#6C80BA;font-size:12.5px;line-height:1.6">Queue is empty. Star players in the <b style="color:#9CAAC5">Players</b> tab — if the clock runs out, your top queued player is drafted automatically.</div>
+    </sc-if>
+    <sc-for list="{{ queueRows }}" as="q" hint-placeholder-count="3">
+      <div style="display:flex;align-items:center;gap:10px;background:#16223A;border:1px solid #1F2D48;border-radius:12px;padding:10px 12px;margin-bottom:6px">
+        <div style="font-family:'Big Shoulders Display';font-size:15px;font-weight:800;color:#6C80BA;width:18px;text-align:center">{{ q.rank }}</div>
+        <div style="padding:3px 8px;border-radius:6px;background:{{ q.badgeBg }};color:{{ q.posColor }};font-size:11px;font-weight:700;flex:none">{{ q.pos }}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ q.name }}</div>
+          <div style="font-size:10px;color:#9CAAC5;margin-top:1px">{{ q.teamBye }} · ADP {{ q.adp }} · PROJ {{ q.proj }}</div>
+        </div>
+        <div onClick="{{ q.onUp }}" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid #2F3B53;border-radius:8px;color:#9CAAC5;cursor:pointer">▲</div>
+        <div onClick="{{ q.onDown }}" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid #2F3B53;border-radius:8px;color:#9CAAC5;cursor:pointer">▼</div>
+        <div onClick="{{ q.onRemove }}" style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:1px solid #2F3B53;border-radius:8px;color:#E07A8C;cursor:pointer">✕</div>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- ══ TEAM tab ══ -->
+  <sc-if value="{{ tabTeam }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+    <div style="display:flex;gap:5px;padding:10px 12px 6px;overflow-x:auto;flex:none">
+      <sc-for list="{{ teamChips }}" as="tc" hint-placeholder-count="8">
+        <div onClick="{{ tc.onTap }}" style="flex:none;padding:6px 12px;border-radius:999px;border:1px solid {{ tc.border }};background:{{ tc.bg }};font-size:11px;font-weight:700;color:{{ tc.fg }};cursor:pointer;white-space:nowrap">{{ tc.label }}</div>
+      </sc-for>
+    </div>
+    <div style="flex:1;overflow-y:auto;min-height:0;padding:4px 12px 12px">
+      <sc-for list="{{ rosterRows }}" as="s" hint-placeholder-count="10">
+        <div style="display:flex;align-items:center;gap:11px;padding:10px 4px;border-bottom:1px solid #1C2740">
+          <div style="width:44px;flex:none;text-align:center;padding:5px 0;border-radius:8px;background:{{ s.slotBg }};color:{{ s.slotFg }};font-size:11px;font-weight:800;letter-spacing:.5px">{{ s.slot }}</div>
+          <sc-if value="{{ s.filled }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</div>
+              <div style="font-size:10.5px;color:#9CAAC5;margin-top:1px">{{ s.meta }}</div>
+            </div>
+            <div style="font-family:'Big Shoulders Display';font-size:16px;font-weight:700;color:#D4BB78">{{ s.proj }}</div>
+          </sc-if>
+          <sc-if value="{{ s.empty }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:1;font-size:13px;font-style:italic;color:#4D5D80">Empty</div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ══ CHAT tab ══ -->
+  <sc-if value="{{ tabChat }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+    <div style="flex:1;overflow-y:auto;min-height:0;padding:12px;display:flex;flex-direction:column;gap:8px">
+      <sc-for list="{{ chatRows }}" as="m" hint-placeholder-count="5">
+        <div style="display:flex;flex-direction:column;align-items:{{ m.align }}">
+          <div style="font-size:9px;color:#6C80BA;margin:0 6px 2px;letter-spacing:.5px">{{ m.who }}</div>
+          <div style="max-width:75%;padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.45;background:{{ m.bg }};color:{{ m.fg }};border:1px solid {{ m.border }}">{{ m.text }}</div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display:flex;gap:8px;padding:10px 12px;border-top:1px solid #1C2740;flex:none">
+      <input value="{{ chatInput }}" onChange="{{ onChatInput }}" onKeyDown="{{ onChatKey }}" placeholder="Talk trash…" style="flex:1;min-width:0;background:#111B2F;border:1px solid #1F2D48;border-radius:999px;padding:10px 14px;font-size:13px;color:#F8FAFC;outline:none">
+      <div onClick="{{ sendChat }}" style="flex:none;background:#C5A55A;border-radius:999px;padding:10px 16px;font-family:'Big Shoulders Display';font-size:12px;font-weight:800;letter-spacing:1px;color:#151515;cursor:pointer;display:flex;align-items:center">SEND</div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ══ Bottom nav ══ -->
+  <div style="display:flex;border-top:1px solid #1F2D48;background:#0D1526;flex:none">
+    <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="5">
+      <div onClick="{{ n.onTap }}" style="flex:1;padding:9px 0 11px;text-align:center;cursor:pointer;position:relative">
+        <div style="font-size:16px;line-height:18px;color:{{ n.color }}">{{ n.icon }}</div>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:.5px;margin-top:2px;color:{{ n.color }}">{{ n.label }}</div>
+        <sc-if value="{{ n.hasDot }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:7px;left:calc(50% + 10px);width:7px;height:7px;border-radius:4px;background:#C41E3A"></div></sc-if>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- ══ RECAP (draft complete) ══ -->
+  <sc-if value="{{ isComplete }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:26px 18px">
+    <div style="text-align:center;margin-bottom:18px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:3px;color:#D4BB78">LEGACY SPORTS · 2026</div>
+      <div style="font-family:'Big Shoulders Display';font-size:38px;font-weight:800;line-height:40px;margin-top:4px">DRAFT COMPLETE</div>
+      <div style="font-size:12.5px;color:#9CAAC5;margin-top:6px">Victory Formation · Pick 5 of 8 · 10 rounds</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <div style="flex:1;background:#16223A;border:1px solid #1F2D48;border-radius:14px;padding:12px;text-align:center">
+        <div style="font-family:'Big Shoulders Display';font-size:30px;font-weight:800;color:#D4BB78">{{ recapGrade }}</div>
+        <div style="font-size:9.5px;letter-spacing:1px;color:#6C80BA;margin-top:2px">DRAFT GRADE</div>
+      </div>
+      <div style="flex:1;background:#16223A;border:1px solid #1F2D48;border-radius:14px;padding:12px;text-align:center">
+        <div style="font-family:'Big Shoulders Display';font-size:30px;font-weight:800;color:#F8FAFC">{{ recapProj }}</div>
+        <div style="font-size:9.5px;letter-spacing:1px;color:#6C80BA;margin-top:2px">PROJ PTS</div>
+      </div>
+      <div style="flex:1;background:#16223A;border:1px solid #1F2D48;border-radius:14px;padding:12px;text-align:center">
+        <div style="font-family:'Big Shoulders Display';font-size:30px;font-weight:800;color:#6FD39A">+{{ recapValue }}</div>
+        <div style="font-size:9.5px;letter-spacing:1px;color:#6C80BA;margin-top:2px">ADP VALUE</div>
+      </div>
+    </div>
+    <div style="background:rgba(197,165,90,.08);border:1px solid rgba(197,165,90,.4);border-radius:14px;padding:12px 14px;margin-bottom:16px">
+      <div style="font-size:9.5px;font-weight:700;letter-spacing:2px;color:#D4BB78">BEST VALUE</div>
+      <div style="font-weight:700;font-size:15px;margin-top:3px">{{ recapSteal }}</div>
+    </div>
+    <div style="font-family:'Big Shoulders Display';font-size:12px;font-weight:800;letter-spacing:2px;color:#9CAAC5;margin-bottom:8px">YOUR ROSTER</div>
+    <sc-for list="{{ rosterRows }}" as="s" hint-placeholder-count="10">
+      <div style="display:flex;align-items:center;gap:11px;padding:9px 4px;border-bottom:1px solid #1C2740">
+        <div style="width:44px;flex:none;text-align:center;padding:5px 0;border-radius:8px;background:{{ s.slotBg }};color:{{ s.slotFg }};font-size:11px;font-weight:800">{{ s.slot }}</div>
+        <div style="flex:1;min-width:0;font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.name }}</div>
+        <div style="font-size:11px;color:#9CAAC5">{{ s.meta }}</div>
+      </div>
+    </sc-for>
+  </div>
+  </sc-if>
+
+  <!-- ══ AI pick toast ══ -->
+  <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+    <div style="position:absolute;top:110px;left:14px;right:14px;z-index:40;display:flex;align-items:center;gap:10px;background:#1C2A47;border:1px solid {{ toastBorder }};border-radius:14px;padding:10px 13px;box-shadow:0 12px 32px rgba(8,12,20,.65);animation:toastIn .25s ease-out">
+      <div style="padding:4px 8px;border-radius:6px;background:{{ toastBadgeBg }};color:{{ toastPosColor }};font-size:11px;font-weight:800;flex:none">{{ toastPos }}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:9px;font-weight:700;letter-spacing:1.5px;color:#6C80BA">{{ toastEyebrow }}</div>
+        <div style="font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ toastName }}</div>
+      </div>
+      <div style="font-family:'Big Shoulders Display';font-size:16px;font-weight:800;color:#6C80BA;flex:none">{{ toastNum }}</div>
+    </div>
+  </sc-if>
+
+  <!-- ══ My-pick splash ══ -->
+  <sc-if value="{{ hasSplash }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ dismissSplash }}" style="position:absolute;inset:0;z-index:50;background:rgba(10,15,26,.82);display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:20px;cursor:pointer;overflow:hidden">
+      <sc-if value="{{ showConfetti }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ confetti }}" as="cf" hint-placeholder-count="0">
+          <div style="position:absolute;top:-14px;left:{{ cf.left }};width:7px;height:11px;border-radius:2px;background:{{ cf.color }};animation:confFall {{ cf.dur }} linear {{ cf.delay }} forwards;opacity:.95"></div>
+        </sc-for>
+      </sc-if>
+      <div style="width:100%;margin-bottom:26px;background:#1C2A47;border:1px solid #C5A55A;border-radius:18px;padding:22px 20px;text-align:center;animation:splashUp .3s ease-out">
+        <div style="width:64px;height:64px;border-radius:32px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;border:2px solid {{ splashPosColor }};background:{{ splashBadgeBg }};font-family:'Big Shoulders Display';font-size:22px;font-weight:800;color:{{ splashPosColor }}">{{ splashInitials }}</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;color:#D4BB78">{{ splashEyebrow }}</div>
+        <div style="font-family:'Big Shoulders Display';font-size:30px;font-weight:800;margin-top:4px;line-height:32px">{{ splashName }}</div>
+        <div style="font-size:13px;color:#9CAAC5;margin-top:5px">{{ splashMeta }}</div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+<div style="font-size:12px;color:#6C80BA;max-width:420px;text-align:center;line-height:1.7">Combines the Sleeper board-first room (snake board, position chips with roster counts, compact stat rows) with ESPN's inline <span style="color:#D4BB78">YOUR PICK</span> markers. Live simulation: 7 AI teams pick by ADP + roster need; your queue auto-drafts on clock expiry. Tweak the home tab, pick clock, and celebration in the Tweaks panel.</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:900,&quot;height&quot;:980},&quot;homeTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;board&quot;,&quot;players&quot;],&quot;default&quot;:&quot;board&quot;,&quot;tsType&quot;:&quot;'board' | 'players'&quot;,&quot;section&quot;:&quot;Layout&quot;},&quot;clockSeconds&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:30,&quot;min&quot;:15,&quot;max&quot;:90,&quot;step&quot;:5,&quot;unit&quot;:&quot;s&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Draft&quot;},&quot;celebration&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Draft&quot;}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const D = `Jahmyr Gibbs|RB|DET|6|331;Bijan Robinson|RB|ATL|11|325;Ja'Marr Chase|WR|CIN|6|311;Puka Nacua|WR|LAR|11|313;Christian McCaffrey|RB|SF|8|291;Jaxon Smith-Njigba|WR|SEA|11|285;Jonathan Taylor|RB|IND|13|272;Amon-Ra St. Brown|WR|DET|6|281;CeeDee Lamb|WR|DAL|14|271;Justin Jefferson|WR|MIN|6|250;De'Von Achane|RB|MIA|6|245;James Cook|RB|BUF|7|261;Drake London|WR|ATL|11|250;Saquon Barkley|RB|PHI|10|258;Nico Collins|WR|HOU|8|244;Derrick Henry|RB|BAL|13|247;Ashton Jeanty|RB|LV|10|240;Malik Nabers|WR|NYG|11|243;Brian Thomas Jr.|WR|JAX|12|238;A.J. Brown|WR|PHI|10|236;Josh Allen|QB|BUF|7|388;Lamar Jackson|QB|BAL|13|396;Bucky Irving|RB|TB|11|232;Chase Brown|RB|CIN|6|228;Kyren Williams|RB|LAR|11|231;Tyreek Hill|WR|MIA|6|224;Jayden Daniels|QB|WAS|9|371;Tee Higgins|WR|CIN|6|221;Trey McBride|TE|ARI|14|214;Brock Bowers|TE|LV|10|219;Ladd McConkey|WR|LAC|8|218;Breece Hall|RB|NYJ|9|216;Josh Jacobs|RB|GB|5|226;Terry McLaurin|WR|WAS|9|212;Garrett Wilson|WR|NYJ|9|214;Marvin Harrison Jr.|WR|ARI|14|208;Jalen Hurts|QB|PHI|10|352;Kenneth Walker III|RB|SEA|11|204;Omarion Hampton|RB|LAC|8|208;James Conner|RB|ARI|14|206;Joe Burrow|QB|CIN|6|361;Sam LaPorta|TE|DET|6|188;Jaylen Waddle|WR|MIA|6|196;DK Metcalf|WR|PIT|5|194;Zay Flowers|WR|BAL|13|192;Rashee Rice|WR|KC|8|198;Xavier Worthy|WR|KC|8|189;Courtland Sutton|WR|DEN|7|186;DeVonta Smith|WR|PHI|10|187;Jordan Addison|WR|MIN|6|182;David Montgomery|RB|DET|6|184;Aaron Jones|RB|MIN|6|181;D'Andre Swift|RB|CHI|5|178;TreVeyon Henderson|RB|NE|11|183;Quinshon Judkins|RB|CLE|9|179;RJ Harvey|RB|DEN|7|176;Kaleb Johnson|RB|PIT|5|172;Tony Pollard|RB|TEN|10|171;Isiah Pacheco|RB|KC|8|168;Alvin Kamara|RB|NO|11|174;Joe Mixon|RB|HOU|8|169;Jameson Williams|WR|DET|6|176;Rome Odunze|WR|CHI|5|174;DJ Moore|WR|CHI|5|172;Mike Evans|WR|TB|11|178;Davante Adams|WR|LAR|11|173;Jerry Jeudy|WR|CLE|9|166;Calvin Ridley|WR|TEN|10|164;Travis Hunter|WR|JAX|12|168;Tetairoa McMillan|WR|CAR|14|162;George Kittle|TE|SF|8|172;T.J. Hockenson|TE|MIN|6|158;Travis Kelce|TE|KC|8|156;Dalton Kincaid|TE|BUF|7|148;Patrick Mahomes|QB|KC|8|338;Baker Mayfield|QB|TB|11|341;Kyler Murray|QB|ARI|14|332;Caleb Williams|QB|CHI|5|324;Bo Nix|QB|DEN|7|336;Justin Herbert|QB|LAC|8|328;Drake Maye|QB|NE|11|326;Jordan Love|QB|GB|5|318;Dak Prescott|QB|DAL|14|321;Brock Purdy|QB|SF|8|316;Stefon Diggs|WR|NE|11|158;Chris Godwin|WR|TB|11|156;Cooper Kupp|WR|SEA|11|152;Keon Coleman|WR|BUF|7|149;Jakobi Meyers|WR|LV|10|154;Matthew Golden|WR|GB|5|151;Ricky Pearsall|WR|SF|8|147;Jauan Jennings|WR|SF|8|145;Rachaad White|RB|TB|11|142;Braelon Allen|RB|NYJ|9|138;Tyrone Tracy Jr.|RB|NYG|11|141;Najee Harris|RB|LAC|8|139;Rhamondre Stevenson|RB|NE|11|137;Brian Robinson Jr.|RB|WAS|9|136;Zach Charbonnet|RB|SEA|11|134;Jaylen Warren|RB|PIT|5|132;Tucker Kraft|TE|GB|5|138;Colston Loveland|TE|CHI|5|132;David Njoku|TE|CLE|9|129;Evan Engram|TE|DEN|7|127;Kyle Pitts|TE|ATL|11|124;Jake Ferguson|TE|DAL|14|121;Ravens D/ST|DST|BAL|13|128;Broncos D/ST|DST|DEN|7|126;Eagles D/ST|DST|PHI|10|123;Texans D/ST|DST|HOU|8|120;Steelers D/ST|DST|PIT|5|118;49ers D/ST|DST|SF|8|116;Bills D/ST|DST|BUF|7|114;Chiefs D/ST|DST|KC|8|112;Brandon Aubrey|K|DAL|14|158;Cameron Dicker|K|LAC|8|150;Chris Boswell|K|PIT|5|148;Tyler Bass|K|BUF|7|146;Harrison Butker|K|KC|8|144;Evan McPherson|K|CIN|6|142;Jake Elliott|K|PHI|10|138;Wil Lutz|K|DEN|7|136`;
+    this.PLAYERS = D.split(';').map((row, i) => {
+      const [name, pos, team, bye, proj] = row.split('|');
+      return { id: i, name, pos, team, bye, proj: +proj, adp: (i + 1) + ((i * 3) % 10) / 10, rost: Math.max(46, 99.4 - i * 0.45).toFixed(1) };
+    });
+    this.TEAMS = ['Gridiron Gang', 'Blitz Bros', 'Hail Marys', 'Fourth & Long', 'Victory Formation', 'Cheese Heads', 'Prime Time', 'The Waterboys'];
+    this.MY = 4; this.NT = 8; this.ROUNDS = 10;
+    this.SLOTS = ['QB', 'RB', 'RB', 'WR', 'WR', 'TE', 'FLEX', 'DST', 'K', 'BN'];
+    this.POSC = { QB: '#C41E3A', RB: '#8B6F47', WR: '#2D6A4F', TE: '#7C8794', FLEX: '#C49A6C', K: '#C5A55A', DST: '#5B7FA6', BN: '#4D5D80' };
+    this.CONF = ['#C5A55A', '#D4BB78', '#C41E3A', '#F8FAFC', '#2D6A4F', '#5B84C4'];
+    this.state = {
+      tab: props.homeTab ?? 'board', picks: [], queue: [], search: '', filter: 'ALL',
+      clock: this.clockMax(), splash: null, toast: null, chatInput: '', selTeam: 4, unreadChat: false,
+      chat: [
+        { who: 'Blitz Bros', mine: false, text: 'good luck everyone 🤝' },
+        { who: 'Hail Marys', mine: false, text: 'whoever takes Gibbs at 1 is a coward' },
+        { who: 'Prime Time', mine: false, text: 'my queue is 40 deep, come at me' },
+      ],
+    };
+    this.aiAt = this.clockMax() - (2 + Math.floor(Math.random() * 3));
+    this.trash = ['that was MY guy', 'reach city', 'ok that\u2019s actually a good pick', 'somebody panicking', 'value falling into my lap', 'bold strategy', 'my sleeper is still on the board 😅'];
+  }
+  clockMax() { return this.props.clockSeconds ?? 30; }
+  wa(h, a) { const n = h.replace('#', ''); return `rgba(${parseInt(n.slice(0, 2), 16)}, ${parseInt(n.slice(2, 4), 16)}, ${parseInt(n.slice(4, 6), 16)}, ${a})`; }
+  teamAt(overall) { const r = Math.floor(overall / this.NT), p = overall % this.NT; return r % 2 === 0 ? p : this.NT - 1 - p; }
+  takenIds() { return new Set(this.state.picks.map(p => p.playerId)); }
+  available() { const t = this.takenIds(); return this.PLAYERS.filter(p => !t.has(p.id)); }
+  teamPicks(ti) { return this.state.picks.filter(p => p.teamIdx === ti); }
+  slotFor(rosterSlots, pos) {
+    for (let i = 0; i < this.SLOTS.length; i++) {
+      if (rosterSlots[i]) continue;
+      const s = this.SLOTS[i];
+      if (s === pos) return i;
+      if (s === 'FLEX' && (pos === 'RB' || pos === 'WR' || pos === 'TE')) return i;
+      if (s === 'BN') return i;
+    }
+    return -1;
+  }
+  buildSlots(ti) {
+    const slots = new Array(this.SLOTS.length).fill(null);
+    for (const pk of this.teamPicks(ti)) {
+      const pl = this.PLAYERS[pk.playerId];
+      const i = this.slotFor(slots, pl.pos);
+      if (i >= 0) slots[i] = { pl, pk };
+    }
+    return slots;
+  }
+  aiChoice(ti) {
+    const round = Math.floor(this.state.picks.length / this.NT) + 1;
+    const mine = this.teamPicks(ti).map(p => this.PLAYERS[p.playerId]);
+    const count = pos => mine.filter(p => p.pos === pos).length;
+    const need = [];
+    if (!count('QB')) need.push('QB');
+    if (count('RB') < 2) need.push('RB');
+    if (count('WR') < 2) need.push('WR');
+    if (!count('TE')) need.push('TE');
+    if (!count('DST')) need.push('DST');
+    if (!count('K')) need.push('K');
+    const left = this.ROUNDS - mine.length;
+    const avail = this.available();
+    if (left <= need.length && need.length) {
+      const forced = avail.find(p => need.includes(p.pos));
+      if (forced) return forced;
+    }
+    const ok = p => {
+      if (p.pos === 'K' || p.pos === 'DST') return round >= 9 && !count(p.pos);
+      if (p.pos === 'QB') return count('QB') < 1 || round >= 8;
+      if (p.pos === 'TE') return count('TE') < (round >= 8 ? 2 : 1);
+      if (p.pos === 'RB') return count('RB') < 4;
+      if (p.pos === 'WR') return count('WR') < 4;
+      return true;
+    };
+    const pool = avail.filter(ok).slice(0, 5);
+    return pool[Math.floor(Math.random() * Math.min(3, pool.length))] ?? avail[0];
+  }
+  makePick(playerId, isAuto) {
+    const overall = this.state.picks.length;
+    if (overall >= this.NT * this.ROUNDS) return;
+    const ti = this.teamAt(overall);
+    const pl = this.PLAYERS[playerId];
+    const round = Math.floor(overall / this.NT) + 1;
+    const pick = { playerId, teamIdx: ti, overall: overall + 1, round, inRound: (overall % this.NT) + 1 };
+    const mine = ti === this.MY;
+    this.aiAt = this.clockMax() - (2 + Math.floor(Math.random() * 3));
+    const chat = [...this.state.chat];
+    if (!mine && Math.random() < 0.28) chat.push({ who: this.TEAMS[this.teamAt(overall) === 0 ? 1 : 0], mine: false, text: this.trash[Math.floor(Math.random() * this.trash.length)] });
+    this.setState(s => ({
+      picks: [...s.picks, pick],
+      queue: s.queue.filter(id => id !== playerId),
+      clock: this.clockMax(),
+      chat,
+      unreadChat: chat.length !== s.chat.length && s.tab !== 'chat' ? true : s.unreadChat,
+      splash: mine ? { pick, until: Date.now() + 2800, seed: overall } : s.splash,
+      toast: !mine ? { pick, isAuto, until: Date.now() + 1900 } : s.toast,
+    }));
+  }
+  tick = () => {
+    const total = this.NT * this.ROUNDS;
+    const s = this.state;
+    const patch = {};
+    if (s.splash && Date.now() > s.splash.until) patch.splash = null;
+    if (s.toast && Date.now() > s.toast.until) patch.toast = null;
+    if (Object.keys(patch).length) this.setState(patch);
+    if (s.picks.length >= total) return;
+    const ti = this.teamAt(s.picks.length);
+    const clock = s.clock - 1;
+    if (ti !== this.MY && clock <= this.aiAt) { this.makePick(this.aiChoice(ti).id, false); return; }
+    if (clock <= 0) {
+      if (ti === this.MY) {
+        const t = this.takenIds();
+        const qid = this.state.queue.find(id => !t.has(id));
+        this.makePick(qid ?? this.available()[0].id, true);
+      } else { this.makePick(this.aiChoice(ti).id, true); }
+      return;
+    }
+    this.setState({ clock });
+  };
+  componentDidMount() { this.iv = setInterval(this.tick, 1000); }
+  componentWillUnmount() { clearInterval(this.iv); }
+  renderVals() {
+    const s = this.state, wa = this.wa.bind(this), POSC = this.POSC;
+    const total = this.NT * this.ROUNDS;
+    const isComplete = s.picks.length >= total;
+    const overall = Math.min(s.picks.length, total - 1);
+    const curTeam = this.teamAt(s.picks.length);
+    const isMyPick = !isComplete && curTeam === this.MY;
+    const round = Math.floor(s.picks.length / this.NT) + 1;
+    const pickInRound = (s.picks.length % this.NT) + 1;
+    const gold = '#C5A55A', goldL = '#D4BB78';
+    const initials = n => { const w = n.trim().split(/\s+/); const f = w.map(x => x[0]).join(''); return (f.length > 1 ? f : w[0]).slice(0, 2).toUpperCase(); };
+    const shortName = n => { const w = n.split(' '); return w.length > 1 ? w[0][0] + '. ' + w.slice(1).join(' ') : n; };
+
+    // header
+    const clockLabel = isComplete ? '—' : `0:${String(Math.max(0, s.clock)).padStart(2, '0')}`;
+    const danger = s.clock <= 10 && isMyPick;
+
+    // pick lookup by round/team
+    const byRT = new Map();
+    for (const pk of s.picks) byRT.set(pk.round + '-' + pk.teamIdx, pk);
+
+    // board
+    const boardHeader = this.TEAMS.map((n, i) => ({
+      initials: initials(n), name: i === this.MY ? 'YOU' : n,
+      avatarBg: i === this.MY ? wa(gold, 0.2) : '#16223A',
+      avatarFg: i === this.MY ? goldL : '#9CAAC5',
+      avatarBorder: i === curTeam && !isComplete ? gold : (i === this.MY ? wa(gold, 0.6) : '#2F3B53'),
+      nameColor: i === this.MY ? goldL : '#6C80BA',
+    }));
+    const goPlayers = () => this.setState({ tab: 'players' });
+    const boardRows = Array.from({ length: this.ROUNDS }, (_, ri) => {
+      const r = ri + 1;
+      return {
+        label: 'R' + r, arrow: ri % 2 === 0 ? '→' : '←',
+        cells: this.TEAMS.map((_, ci) => {
+          const pk = byRT.get(r + '-' + ci);
+          const isCur = !isComplete && r === round && ci === curTeam;
+          const mineCol = ci === this.MY;
+          if (pk) {
+            const pl = this.PLAYERS[pk.playerId];
+            const c = POSC[pl.pos];
+            return { num: pk.round + '.' + pk.inRound, name: shortName(pl.name), meta: pl.pos + ' · ' + pl.team, bg: wa(c, mineCol ? 0.5 : 0.32), border: mineCol ? wa(gold, 0.55) : wa(c, 0.5), numColor: 'rgba(248,250,252,.6)', nameColor: '#F8FAFC', metaColor: 'rgba(248,250,252,.65)', isCurrent: false, onTap: () => {} };
+          }
+          const num = r + '.' + (ri % 2 === 0 ? ci + 1 : this.NT - ci);
+          if (isCur) return { num, name: isMyPick ? 'MAKE PICK' : 'On the clock…', meta: '', bg: isMyPick ? wa(gold, 0.22) : '#111B2F', border: gold, numColor: goldL, nameColor: goldL, metaColor: '', isCurrent: true, onTap: isMyPick ? goPlayers : () => {} };
+          return { num, name: '', meta: '', bg: '#0D1526', border: mineCol ? wa(gold, 0.3) : '#1C2740', numColor: '#4D5D80', nameColor: '', metaColor: '', isCurrent: false, onTap: () => {} };
+        }),
+      };
+    });
+
+    // chips with roster counts
+    const mySlots = this.buildSlots(this.MY);
+    const slotCount = names => { const idxs = this.SLOTS.map((x, i) => [x, i]).filter(([x]) => names.includes(x)); return { filled: idxs.filter(([, i]) => mySlots[i]).length, total: idxs.length }; };
+    const chipDefs = [['ALL', null], ['QB', ['QB']], ['RB', ['RB']], ['WR', ['WR']], ['TE', ['TE']], ['FLEX', ['FLEX']], ['DST', ['DST']], ['K', ['K']]];
+    const chips = chipDefs.map(([label, names]) => {
+      const active = s.filter === label;
+      const tint = label === 'ALL' ? gold : POSC[label];
+      const c = names ? slotCount(names) : { filled: this.teamPicks(this.MY).length, total: this.ROUNDS };
+      return { label, sub: c.filled + '/' + c.total, border: active ? tint : '#2F3B53', bg: active ? tint : 'transparent', fg: active ? '#151515' : '#9CAAC5', subFg: active ? 'rgba(21,21,21,.7)' : '#6C80BA', onTap: () => this.setState({ filter: label }) };
+    });
+
+    // player list + inline YOUR PICK markers
+    const avail = this.available();
+    const q = s.search.trim().toLowerCase();
+    let filtered = avail;
+    if (s.filter !== 'ALL') filtered = filtered.filter(p => s.filter === 'FLEX' ? ['RB', 'WR', 'TE'].includes(p.pos) : p.pos === s.filter);
+    if (q) filtered = filtered.filter(p => (p.name + ' ' + p.team).toLowerCase().includes(q));
+    const markers = new Map();
+    if (s.filter === 'ALL' && !q && !isComplete) {
+      let cnt = 0;
+      for (let ov = s.picks.length; ov < total && cnt < 2; ov++) {
+        if (this.teamAt(ov) === this.MY) {
+          const r = Math.floor(ov / this.NT) + 1, pr = (ov % this.NT) + 1;
+          const dist = ov - s.picks.length;
+          if (dist > 0) { markers.set(dist, `YOUR PICK (R${r}, P${pr})`); cnt++; }
+          else cnt++;
+        }
+      }
+    }
+    const listRows = [];
+    filtered.slice(0, 40).forEach((p, i) => {
+      if (markers.has(i)) listRows.push({ isMarker: true, isPlayer: false, label: markers.get(i), key: 'm' + i });
+      const starred = s.queue.includes(p.id);
+      listRows.push({
+        isMarker: false, isPlayer: true, key: p.id,
+        pos: p.pos, posColor: POSC[p.pos], badgeBg: wa(POSC[p.pos], 0.16), teamBye: p.team + ' (' + p.bye + ')',
+        name: p.name, adp: p.adp.toFixed(1), proj: p.proj, rost: p.rost,
+        star: starred ? '★' : '☆', starColor: starred ? goldL : '#4D5D80', starBg: starred ? wa(gold, 0.12) : 'transparent',
+        canDraft: isMyPick,
+        onStar: () => this.setState(st => ({ queue: starred ? st.queue.filter(x => x !== p.id) : [...st.queue, p.id] })),
+        onDraft: () => this.makePick(p.id, false),
+      });
+    });
+
+    // queue
+    const taken = this.takenIds();
+    const queueRows = s.queue.filter(id => !taken.has(id)).map((id, i, arr) => {
+      const p = this.PLAYERS[id];
+      const move = d => this.setState(st => { const qq = st.queue.filter(x => !taken.has(x)); const j = qq.indexOf(id); const k = j + d; if (k < 0 || k >= qq.length) return {}; const nq = [...qq];[nq[j], nq[k]] = [nq[k], nq[j]]; return { queue: nq }; });
+      return { rank: i + 1, pos: p.pos, posColor: POSC[p.pos], badgeBg: wa(POSC[p.pos], 0.16), name: p.name, teamBye: p.team + ' (' + p.bye + ')', adp: p.adp.toFixed(1), proj: p.proj, onUp: () => move(-1), onDown: () => move(1), onRemove: () => this.setState(st => ({ queue: st.queue.filter(x => x !== id) })) };
+    });
+
+    // team tab
+    const teamChips = this.TEAMS.map((n, i) => ({ label: i === this.MY ? 'MY TEAM' : initials(n), border: s.selTeam === i ? gold : '#2F3B53', bg: s.selTeam === i ? wa(gold, 0.15) : 'transparent', fg: s.selTeam === i ? goldL : '#9CAAC5', onTap: () => this.setState({ selTeam: i }) }));
+    const selSlots = this.buildSlots(s.selTeam);
+    const rosterRows = this.SLOTS.map((slot, i) => {
+      const e = (isComplete ? this.buildSlots(this.MY) : selSlots)[i];
+      const c = POSC[slot];
+      return e ? { slot, slotBg: wa(c, 0.2), slotFg: slot === 'BN' ? '#9CAAC5' : c === '#C5A55A' ? '#151515' : this.lightFg(c), filled: true, empty: false, name: e.pl.name, meta: e.pl.pos + ' · ' + e.pl.team + ' · Bye ' + e.pl.bye + ' · Pick ' + e.pk.round + '.' + e.pk.inRound, proj: e.pl.proj }
+        : { slot, slotBg: wa(c, 0.14), slotFg: this.lightFg(c), filled: false, empty: true, name: '', meta: '', proj: '' };
+    });
+
+    // chat
+    const chatRows = s.chat.map((m, i) => ({ ...m, key: i, align: m.mine ? 'flex-end' : 'flex-start', bg: m.mine ? wa(gold, 0.18) : '#16223A', fg: '#F8FAFC', border: m.mine ? wa(gold, 0.45) : '#1F2D48', who: m.mine ? 'You' : m.who }));
+
+    // nav
+    const tabs = [['board', '▦', 'BOARD'], ['players', '☰', 'PLAYERS'], ['queue', '★', 'QUEUE'], ['team', '▤', 'TEAM'], ['chat', '◗', 'CHAT']];
+    const navItems = tabs.map(([id, icon, label]) => ({ icon, label, color: s.tab === id ? goldL : '#6C80BA', hasDot: id === 'chat' && s.unreadChat, onTap: () => this.setState({ tab: id, unreadChat: id === 'chat' ? false : s.unreadChat }) }));
+
+    // toast / splash
+    const toast = s.toast, splash = s.splash;
+    const tp = toast ? this.PLAYERS[toast.pick.playerId] : null;
+    const sp = splash ? this.PLAYERS[splash.pick.playerId] : null;
+    const confetti = splash ? Array.from({ length: 26 }, (_, i) => ({ left: ((i * 37 + splash.seed * 13) % 100) + '%', color: this.CONF[i % this.CONF.length], dur: (1.6 + (i % 5) * 0.25) + 's', delay: ((i % 7) * 0.09) + 's' })) : [];
+
+    // recap
+    const myPicks = this.teamPicks(this.MY);
+    const recapProj = myPicks.reduce((a, p) => a + this.PLAYERS[p.playerId].proj, 0);
+    const value = myPicks.reduce((a, p) => a + (p.overall - this.PLAYERS[p.playerId].adp), 0);
+    const best = myPicks.reduce((b, p) => { const v = p.overall - this.PLAYERS[p.playerId].adp; return !b || v > b.v ? { v, p } : b; }, null);
+    const grade = value > 12 ? 'A' : value > 4 ? 'A-' : value > -4 ? 'B+' : 'B';
+
+    const lastPk = s.picks[s.picks.length - 1];
+    const lp = lastPk ? this.PLAYERS[lastPk.playerId] : null;
+
+    const autoP = s.queue.map(id => this.PLAYERS[id]).find(p => !taken.has(p.id)) ?? avail[0];
+
+    return {
+      notComplete: !isComplete, isComplete,
+      headerBg: isMyPick ? 'linear-gradient(135deg,#C5A55A,#A68B3E)' : '#111B2F',
+      headerBorder: isMyPick ? '#D4BB78' : '#1C2740',
+      headerInk: isMyPick ? '#151515' : '#F8FAFC',
+      headerDim: isMyPick ? 'rgba(21,21,21,.65)' : '#6C80BA',
+      headerEyebrow: isComplete ? 'Draft complete' : isMyPick ? "You're on the clock!" : 'On the clock',
+      headerEyebrowColor: isMyPick ? 'rgba(21,21,21,.75)' : goldL,
+      clockLabel, clockAnim: danger ? 'clockBreath 1s ease-in-out infinite' : 'none',
+      round, pickInRound, onClockName: isComplete ? '—' : (isMyPick ? 'YOU' : this.TEAMS[curTeam]),
+      showAutoHint: isMyPick && !!autoP, autoHint: autoP ? autoP.name + ', ' + autoP.pos : '',
+      lastPickLine: lp ? `${lastPk.round}.${lastPk.inRound} — ${lp.name}, ${lp.pos} (${this.TEAMS[lastPk.teamIdx]})` : 'Draft is underway — no picks yet',
+      tabBoard: s.tab === 'board' && !isComplete, tabPlayers: s.tab === 'players' && !isComplete, tabQueue: s.tab === 'queue' && !isComplete, tabTeam: s.tab === 'team' && !isComplete, tabChat: s.tab === 'chat' && !isComplete,
+      boardHeader, boardRows, chips, listRows, search: s.search,
+      onSearch: e => this.setState({ search: e.target.value }),
+      queueRows, queueCount: queueRows.length, queueEmpty: queueRows.length === 0,
+      teamChips, rosterRows, chatRows, chatInput: s.chatInput,
+      onChatInput: e => this.setState({ chatInput: e.target.value }),
+      onChatKey: e => { if (e.key === 'Enter') this.sendChat(); },
+      sendChat: () => this.sendChat(),
+      navItems,
+      hasToast: !!toast, toastPos: tp?.pos ?? '', toastPosColor: tp ? POSC[tp.pos] : gold, toastBadgeBg: tp ? wa(POSC[tp.pos], 0.18) : '', toastBorder: '#2F3B53',
+      toastEyebrow: toast ? (toast.isAuto ? 'AUTO PICK · ' : 'PICK ') + toast.pick.round + '.' + toast.pick.inRound + ' · ' + this.TEAMS[toast.pick.teamIdx].toUpperCase() : '',
+      toastName: tp?.name ?? '', toastNum: toast ? '#' + toast.pick.overall : '',
+      hasSplash: !!splash, showConfetti: !!splash && (this.props.celebration ?? true), confetti,
+      splashInitials: sp ? initials(sp.name) : '', splashPosColor: sp ? POSC[sp.pos] : gold, splashBadgeBg: sp ? wa(POSC[sp.pos], 0.18) : '',
+      splashEyebrow: splash ? `WITH PICK #${splash.pick.overall}, YOU SELECT` : '',
+      splashName: sp?.name ?? '', splashMeta: sp ? `${sp.pos} · ${sp.team} · Bye ${sp.bye} · Proj ${sp.proj}` : '',
+      dismissSplash: () => this.setState({ splash: null }),
+      recapGrade: grade, recapProj, recapValue: Math.max(0, Math.round(value)),
+      recapSteal: best ? `${this.PLAYERS[best.p.playerId].name} — ADP ${this.PLAYERS[best.p.playerId].adp.toFixed(1)}, taken ${best.p.round}.${best.p.inRound}` : '—',
+      noop: () => {},
+    };
+  }
+  lightFg(hex) {
+    const n = hex.replace('#', '');
+    const r = parseInt(n.slice(0, 2), 16), g = parseInt(n.slice(2, 4), 16), b = parseInt(n.slice(4, 6), 16);
+    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    if (lum > 140) return '#151515';
+    const f = c => Math.min(255, Math.round(c + (255 - c) * 0.45)).toString(16).padStart(2, '0');
+    return '#' + f(r) + f(g) + f(b);
+  }
+  sendChat() {
+    const t = this.state.chatInput.trim();
+    if (!t) return;
+    this.setState(s => ({ chat: [...s.chat, { who: 'You', mine: true, text: t }], chatInput: '' }));
+  }
+}
+</script>
+</body>
+</html>
