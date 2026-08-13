@@ -1,0 +1,26 @@
+/*
+ * Design tokens transcribed verbatim from README.md § "Design Tokens (dark-theme resolutions)".
+ * This handoff was authored outside Claude Design and shipped no ds/tokens.json or colors_and_type.css —
+ * these custom properties exist to satisfy the design-sync completeness gate's token-source check (B4)
+ * without inventing values; every value below traces 1:1 to the README prose.
+ */
+:root {
+  /* Colors */
+  --background: #0A0F1A;
+  --brand-navy: #1B3A5C;
+  --brand-gold-light: #D4BB78;
+  --gold-rule: rgba(197, 165, 90, 0.65);
+  --text-muted: #9CAAC5; /* fg3 */
+  --fg4: #6C80BA;
+  --fg1: #F8FAFC;
+
+  /* Radii */
+  --radius-button: 12px;
+
+  /* Sizing */
+  --button-height: 52px;
+
+  /* Typography */
+  --font-heading: 'Big Shoulders Display', sans-serif; /* 800 weight for headings */
+  --font-body: 'Literata', serif; /* 400 italic + 700 for body */
+}

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastSyncedAt": "2026-08-12T00:00:00.000Z",
+  "lastSyncedAt": "2026-08-13T00:00:00.000Z",
   "bucketEpic": "LS-4568",
   "designs": [
     {
@@ -292,6 +292,17 @@
       "lastSyncedHash": "sha256-83faf5ff1826d10eaa9661085a2d39d46cab468f5740f7fc7dee997e194d994e",
       "lastSyncedAt": "2026-08-12T00:00:00.000Z",
       "jiraKey": "LS-9395",
+      "source": "manual-local-sync"
+    },
+    {
+      "id": "sign-in-redesign-2026-08-13",
+      "url": null,
+      "title": "Sign-in Screen Redesign (2a — Lifted Abstract)",
+      "slug": "legacy-sports-sign-in-redesign",
+      "status": "active",
+      "lastSyncedHash": "sha256-c6ca3c620512e148bfc95d97a8f8bdcf811d76d1868a74796123885938992b15",
+      "lastSyncedAt": "2026-08-13T00:00:00.000Z",
+      "jiraKey": "LS-9432",
       "source": "manual-local-sync"
     }
   ]
