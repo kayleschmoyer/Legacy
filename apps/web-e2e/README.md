@@ -120,6 +120,32 @@ make e2e-auth
 
 The CLI lives at [`scripts/e2e-auth.mjs`](../../scripts/e2e-auth.mjs) and shares its device-flow + cache implementation with [`src/global-setup.ts`](src/global-setup.ts) (LS-4679).
 
+### ⚠️ Local mode breaks hermetic specs gated on `GetUserById` state
+
+The hermetic E2E suite's baseline mocks (`src/fixtures/shared-mocks.ts`) always
+return `id: 1` from `GetUserById`. Local auth mode signs you in with your real
+Google account, whose id is never `1`. Any hook that compares the two — e.g.
+`useIsPremiumStatus()` in `apps/web/src/hooks/useIsPremium.ts`, which treats an
+id mismatch as "still loading" and freezes `isPremium` at `false` forever —
+will render its real `PremiumGate` paywall for the whole test run, even though
+the baseline mock reports a premium tier. This can produce full-width overlay
+divs (`data-testid="premium-feature-gate"`) that intercept clicks on unrelated
+elements elsewhere on the page, surfacing as a deterministic local-only
+failure ("intercepts pointer events") on specs that never intended to test the
+free tier.
+
+**Always prefix `CI=1` when locally reproducing a hermetic spec** so
+`global-setup.ts` takes the synthetic hermetic-JWT branch (`id: 1`) instead of
+local device-flow OAuth:
+
+```bash
+CI=1 pnpm exec playwright test apps/web-e2e/src/tests/<spec>.spec.ts --project=chromium
+```
+
+Omitting `CI=1` is safe for specs that don't touch `PremiumGate`/entitlement
+state, but defaulting to it avoids chasing a phantom regression that only
+exists locally.
+
 ## Why two suites?
 
 The split mirrors the distinction between unit tests and integration tests in the backend:
