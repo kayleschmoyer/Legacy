@@ -4,7 +4,7 @@
 **Jira ticket:** LS-9395
 **Source:** manual-local-sync (no Claude Design project URL — this is a manually-exported design handoff, not a `/pull-design` pull)
 **Source path (requester's machine):** `Mobile draft experience redesign/design_handoff_draft_room_v2/`
-**Bundle hash:** `sha256-60f761c5f8fa7bc639757104f186f48229c9aca1925c2854f144f5d35f476aa3`
+**Bundle hash:** `sha256-83faf5ff1826d10eaa9661085a2d39d46cab468f5740f7fc7dee997e194d994e`
 
 ## Bundle contents
 
@@ -35,6 +35,10 @@ This handoff was authored outside Claude Design (a flat, manually-exported bundl
 - **B4 — token source under `project/`**: the handoff documents all design tokens as prose in `README.md` § "Design Tokens" and § "Typography" rather than a `colorsandtype.css`/`ds/tokens.json` file. Generated `project/colorsandtype.css` by transcribing those two sections verbatim into CSS custom properties (surfaces, outlines, text, brand, semantic, position colors, radii, spacing scale, alpha tints, heading/body typography). Values were transcribed 1:1 from the README text, not invented.
 
 All other block-level checks (B1 README, B2 ≥1 HTML prototype, B5 unique slug directory) pass on the copied content with no substitution needed — verified directly against the written bundle, not assumed.
+
+## Post-sync deviation from verbatim copy
+
+`project/Draft Room v2.dc.html` was not left byte-identical to the source export. The Reviewer Bot flagged (HIGH, security) that the prototype's chat tab renders `{{ m.text }}` — sourced from both seeded demo messages and the live `sendChat()` input — without escaping, an XSS pattern in the demo JS. Rather than leave a real (if low-risk, demo-only) HTML-injection pattern sitting in a file the handoff's own README instructs engineers to "open in a browser," a minimal `escapeHtml()` helper was added and applied to `chatRows` text before interpolation — no visual, layout, or interaction change, purely a safety fix to the demo's text-rendering path. The bundle hash was recomputed after this change (see above); the original as-exported byte count/content is preserved in git history at the first commit on this PR if a pure comparison is ever needed.
 
 ## Next step
 

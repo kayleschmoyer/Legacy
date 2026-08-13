@@ -522,7 +522,7 @@ class Component extends DCLogic {
     });
 
     // chat
-    const chatRows = s.chat.map((m, i) => ({ ...m, key: i, align: m.mine ? 'flex-end' : 'flex-start', bg: m.mine ? wa(gold, 0.18) : '#16223A', fg: '#F8FAFC', border: m.mine ? wa(gold, 0.45) : '#1F2D48', who: m.mine ? 'You' : m.who }));
+    const chatRows = s.chat.map((m, i) => ({ ...m, key: i, align: m.mine ? 'flex-end' : 'flex-start', bg: m.mine ? wa(gold, 0.18) : '#16223A', fg: '#F8FAFC', border: m.mine ? wa(gold, 0.45) : '#1F2D48', who: m.mine ? 'You' : m.who, text: this.escapeHtml(m.text) }));
 
     // nav
     const tabs = [['board', '▦', 'BOARD'], ['players', '☰', 'PLAYERS'], ['queue', '★', 'QUEUE'], ['team', '▤', 'TEAM'], ['chat', '◗', 'CHAT']];
@@ -587,6 +587,9 @@ class Component extends DCLogic {
     if (lum > 140) return '#151515';
     const f = c => Math.min(255, Math.round(c + (255 - c) * 0.45)).toString(16).padStart(2, '0');
     return '#' + f(r) + f(g) + f(b);
+  }
+  escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   }
   sendChat() {
     const t = this.state.chatInput.trim();

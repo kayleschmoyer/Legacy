@@ -289,7 +289,7 @@
       "title": "Mobile Draft Room v2 (ESPN × Sleeper hybrid)",
       "slug": "legacy-sports-draft-room-v2",
       "status": "active",
-      "lastSyncedHash": "sha256-60f761c5f8fa7bc639757104f186f48229c9aca1925c2854f144f5d35f476aa3",
+      "lastSyncedHash": "sha256-83faf5ff1826d10eaa9661085a2d39d46cab468f5740f7fc7dee997e194d994e",
       "lastSyncedAt": "2026-08-12T00:00:00.000Z",
       "jiraKey": "LS-9395",
       "source": "manual-local-sync"
