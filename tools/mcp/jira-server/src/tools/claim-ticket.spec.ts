@@ -190,7 +190,14 @@ describe('claimTicket — auto-assign behaviour', () => {
     );
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0][0].body).toEqual({ accountId: 'abc123' });
-    expect((data['warnings'] as string[]).length).toBe(0);
+
+    // Falling back to the server-side env var (rather than an explicit
+    // `assignee` param) is now flagged — the Lambda is shared across every
+    // caller, so this default silently misattributes without the warning.
+    const warnings = data['warnings'] as string[];
+    expect(warnings.length).toBe(1);
+    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(warnings[0]).toContain('shared across all callers');
   });
 
   it('adds a warning (and does not assign) when JIRA_ASSIGNEE_EMAIL is set but no user is found', async () => {
@@ -225,8 +232,10 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect(putCalls).toHaveLength(0);
 
     const warnings = data['warnings'] as string[];
-    expect(warnings.length).toBe(1);
-    expect(warnings[0]).toContain('no Jira user found');
+    expect(warnings.length).toBe(2);
+    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(warnings[0]).toContain('shared across all callers');
+    expect(warnings[1]).toContain('no Jira user found');
   });
 
   it('assigns directly from JIRA_ASSIGNEE_ACCOUNT_ID without any user-lookup API call', async () => {
@@ -258,7 +267,11 @@ describe('claimTicket — auto-assign behaviour', () => {
     );
     expect(putCalls).toHaveLength(1);
     expect(putCalls[0][0].body).toEqual({ accountId: '712020:abcd-1234' });
-    expect((data['warnings'] as string[]).length).toBe(0);
+
+    const warnings = data['warnings'] as string[];
+    expect(warnings.length).toBe(1);
+    expect(warnings[0]).toContain('JIRA_ASSIGNEE_ACCOUNT_ID');
+    expect(warnings[0]).toContain('shared across all callers');
   });
 
   it('prefers JIRA_ASSIGNEE_ACCOUNT_ID over JIRA_ASSIGNEE_EMAIL', async () => {
@@ -412,9 +425,11 @@ describe('claimTicket — auto-assign behaviour', () => {
     expect(data['claimed']).toBe(true);
 
     const warnings = data['warnings'] as string[];
-    expect(warnings.length).toBe(1);
-    expect(warnings[0]).toContain('Assignee update failed');
-    expect(warnings[0]).toContain('403 Forbidden');
+    expect(warnings.length).toBe(2);
+    expect(warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
+    expect(warnings[0]).toContain('shared across all callers');
+    expect(warnings[1]).toContain('Assignee update failed');
+    expect(warnings[1]).toContain('403 Forbidden');
   });
 });
 

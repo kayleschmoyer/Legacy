@@ -18,6 +18,29 @@ export interface ResolveAndAssignResult {
 }
 
 /**
+ * The Lambda serving this tool is shared across every caller's session — an
+ * env-var-based assignee default has no way to distinguish which user's
+ * session is claiming a given ticket, so it silently misattributes every
+ * claim that omits an explicit `assignee`/`assigneeAccountId` param to the
+ * same fixed account. Surface that loudly (log + returned warning) so it
+ * isn't mistaken for correct per-user attribution.
+ */
+function warnEnvFallback(
+  toolName: string,
+  key: string,
+  envVar: 'JIRA_ASSIGNEE_ACCOUNT_ID' | 'JIRA_ASSIGNEE_EMAIL',
+  warnings: string[],
+): void {
+  const msg =
+    `${toolName}: no explicit assignee param was passed for ${key}; falling back to the ` +
+    `server-side ${envVar} env var. This Lambda is shared across all callers, so every ` +
+    'session that omits an explicit assignee gets attributed to this same fixed account — ' +
+    'pass `assignee`/`assigneeAccountId` explicitly to attribute the claim to the caller.';
+  LOGGER.warn(msg, { key, toolName, envVar });
+  warnings.push(msg);
+}
+
+/**
  * Resolve an assignee accountId and PUT it onto the ticket.
  *
  * Precedence: explicit `assigneeAccountId` param (direct, no lookup) >
@@ -48,8 +71,10 @@ export async function resolveAndAssign({
     emailToLookUp = explicitAssignee;
   } else if (process.env['JIRA_ASSIGNEE_ACCOUNT_ID']) {
     accountId = process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
+    warnEnvFallback(toolName, key, 'JIRA_ASSIGNEE_ACCOUNT_ID', warnings);
   } else if (process.env['JIRA_ASSIGNEE_EMAIL']) {
     emailToLookUp = process.env['JIRA_ASSIGNEE_EMAIL'];
+    warnEnvFallback(toolName, key, 'JIRA_ASSIGNEE_EMAIL', warnings);
   }
 
   try {
