@@ -26,6 +26,7 @@
         "foregroundImage": "./assets/adaptive_icon.png",
         "backgroundColor": "#001944"
       },
+      "allowBackup": false,
       "package": "com.legacysports.app",
       "googleServicesFile": "./android/app/google-services.json",
       "intentFilters": [

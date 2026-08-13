@@ -5,6 +5,9 @@
  * - Deep-link preservation: a successful login returns the user to their
  *   deep-linked route, falling back to home from the bare /login route
  *   (LGN-037).
+ * - Last-visited-league redirect: a stored league is reopened with the `(tabs)`
+ *   anchor loaded beneath it, so the user is never stranded on a headerless
+ *   league screen with no back affordance (LS-6694).
  * - Google sign-in wiring: button press invokes googleLogin, the loading state
  *   surfaces while in flight, errors are displayed, and the error clears on
  *   retry (LS-6657).
@@ -75,6 +78,16 @@ const mockGetMobileOAuthConfig = jest.fn();
 jest.mock('../common/auth/mobileOAuthConfig', () => ({
   getMobileOAuthConfig: (...args: unknown[]): unknown =>
     mockGetMobileOAuthConfig(...args),
+}));
+
+// Drives the last-visited-league branch of the post-login redirect (LS-6694).
+// Defaults to "nothing stored" so every other test lands on home.
+const mockGetLastVisitedLeague = jest.fn<
+  Promise<{ leagueId: number; sport: string } | null>,
+  []
+>();
+jest.mock('../common/utilities/lastVisitedLeague', () => ({
+  getLastVisitedLeague: (): unknown => mockGetLastVisitedLeague(),
 }));
 
 // tamagui's Theme/YStack/Button/Spinner/Text are layout-only in login.tsx;
@@ -209,6 +222,14 @@ async function renderLogin(): Promise<void> {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+// "Nothing stored" is the default for every suite below; the last-visited-league
+// suite overrides it per test. Set at the root so it survives the
+// `jest.clearAllMocks()` each nested beforeEach runs (clearAllMocks resets call
+// records, not implementations).
+beforeEach(() => {
+  mockGetLastVisitedLeague.mockResolvedValue(null);
+});
+
 describe('Mobile Login screen — deep-link preservation (LGN-037)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -232,7 +253,9 @@ describe('Mobile Login screen — deep-link preservation (LGN-037)', () => {
       await Promise.resolve();
     });
 
-    expect(mockReplace).toHaveBeenCalledWith('/baseball/league/123');
+    expect(mockReplace).toHaveBeenCalledWith('/baseball/league/123', {
+      withAnchor: true,
+    });
   });
 
   it('falls back to home when login was reached at the /login route', async () => {
@@ -245,6 +268,87 @@ describe('Mobile Login screen — deep-link preservation (LGN-037)', () => {
     });
 
     expect(mockReplace).toHaveBeenCalledWith('/');
+  });
+});
+
+/**
+ * The post-login redirect must never leave the user on a screen with nothing
+ * beneath it. Every route in the `(app)` group is headerless (LS-8766), so a
+ * league screen mounted as the sole stack entry has no back button, no tab bar,
+ * and a `canGoBack()` of false — the Android back button quits the app. Passing
+ * `withAnchor: true` loads the group's `(tabs)` anchor underneath the
+ * destination, which is what makes back work.
+ */
+describe('Mobile Login screen — last-visited-league redirect (LS-6694)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockAuthCallbacks.current = undefined;
+    mockPathname = '/login';
+    mockGetMobileOAuthConfig.mockReturnValue({
+      oauthProxyUrl: 'https://oauth-proxy.example.com',
+      googleClientId: 'test-google-client-id',
+      discordClientId: undefined,
+    });
+  });
+
+  it('anchors the tab shell under a stored baseball league', async () => {
+    mockGetLastVisitedLeague.mockResolvedValue({
+      leagueId: 123,
+      sport: 'baseball',
+    });
+    await renderLogin();
+
+    await act(async () => {
+      mockAuthCallbacks.current?.onSuccess?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        {
+          pathname: '/baseball/league/[leagueId]',
+          params: { leagueId: '123' },
+        },
+        { withAnchor: true },
+      );
+    });
+  });
+
+  it('anchors the tab shell under a stored football league', async () => {
+    mockGetLastVisitedLeague.mockResolvedValue({
+      leagueId: 7,
+      sport: 'football',
+    });
+    await renderLogin();
+
+    await act(async () => {
+      mockAuthCallbacks.current?.onSuccess?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith(
+        {
+          pathname: '/football/league/[leagueId]',
+          params: { leagueId: '7' },
+        },
+        { withAnchor: true },
+      );
+    });
+  });
+
+  it('lands on home when no league is stored', async () => {
+    mockGetLastVisitedLeague.mockResolvedValue(null);
+    await renderLogin();
+
+    await act(async () => {
+      mockAuthCallbacks.current?.onSuccess?.();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/');
+    });
   });
 });
 

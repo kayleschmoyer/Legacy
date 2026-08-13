@@ -125,11 +125,14 @@ The two paths are kept as redirects rather than deleted because they are live **
 
 Consequences for call sites:
 
-| Intent                          | Use                                                      | Not                                      |
-| ------------------------------- | -------------------------------------------------------- | ---------------------------------------- |
-| Cancel / close a pushed screen  | `closeToHomeTab(router)` (`common/utilities/RouteUtils`) | `router.navigate('/<sport>')`            |
-| Go to the home surface outright | `router.navigate(HOME_TAB_HREF)` (`/home`)               | `router.navigate('/')` — only a redirect |
-| Switch the active sport         | the host's `onSwitchSport` (inline state)                | `router.navigate('/<sport>')`            |
+| Intent                                     | Use                                                      | Not                                      |
+| ------------------------------------------ | -------------------------------------------------------- | ---------------------------------------- |
+| Cancel / close a pushed screen             | `closeToHomeTab(router)` (`common/utilities/RouteUtils`) | `router.navigate('/<sport>')`            |
+| Go to the home surface outright            | `router.navigate(HOME_TAB_HREF)` (`/home`)               | `router.navigate('/')` — only a redirect |
+| Switch the active sport                    | the host's `onSwitchSport` (inline state)                | `router.navigate('/<sport>')`            |
+| Enter a deep screen from outside the shell | `router.replace(href, { withAnchor: true })`             | a bare `router.replace(href)`            |
+
+That last row is what keeps the shell underneath a screen the user did not walk to. React Navigation defaults a cross-navigator navigation to `initial: true`, which means the target navigator's anchor is **not** loaded and the incoming screen becomes the sole entry in the `(app)` Stack. Because every route in that group is headerless (LS-8766), such a screen has no back button, no tab bar, and a `canGoBack()` of `false` — the Android back button quits the app. `withAnchor: true` loads the `(tabs)` anchor beneath the destination instead. The post-login redirect in `app/login.tsx` (deep link, or the last-visited league from LS-6694) is the entry point this applies to.
 
 `(app)/index.tsx` remains a `<Redirect href="/home" />`; it is the post-login/logout landing for `router.replace('/')` and is not a home surface.
 

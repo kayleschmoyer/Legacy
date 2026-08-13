@@ -83,21 +83,35 @@ const Login: React.FC = () => {
   // (the route the guard rendered this screen in place at) wins (LGN-037);
   // otherwise fall back to the user's last-opened league, then the home
   // screen (LS-6694).
+  //
+  // Both non-home destinations pass `withAnchor: true`. React Navigation
+  // defaults a cross-navigator navigation to `initial: true`, meaning the
+  // target navigator's `initialRouteName` is *not* loaded and the incoming
+  // screen becomes the only entry in the stack. Landing on `/baseball/league/1`
+  // that way produced a league screen with nothing beneath it in the `(app)`
+  // Stack — and since every route in that group is headerless (LS-8766), there
+  // was no back affordance, no tab bar, and `canGoBack()` was false, so the
+  // Android back button quit the app instead of going anywhere. `withAnchor`
+  // loads the group's anchor — the `(tabs)` shell, see `(app)/_layout.tsx` —
+  // underneath the destination, so back returns to the Home tab.
   const redirectAfterLogin = useCallback(async () => {
     const deepLink = resolvePostLoginDestination(pathname);
     if (deepLink !== '/') {
-      router.replace(deepLink);
+      router.replace(deepLink, { withAnchor: true });
       return;
     }
     const last = await getLastVisitedLeague();
     if (last) {
-      router.replace({
-        pathname:
-          last.sport === 'football'
-            ? '/football/league/[leagueId]'
-            : '/baseball/league/[leagueId]',
-        params: { leagueId: String(last.leagueId) },
-      });
+      router.replace(
+        {
+          pathname:
+            last.sport === 'football'
+              ? '/football/league/[leagueId]'
+              : '/baseball/league/[leagueId]',
+          params: { leagueId: String(last.leagueId) },
+        },
+        { withAnchor: true },
+      );
       return;
     }
     router.replace('/');

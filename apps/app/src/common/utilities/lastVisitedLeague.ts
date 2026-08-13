@@ -6,6 +6,17 @@
  * of the generic `/` landing route. The canonical shape, key, and validation
  * rules live in `@legacy-sports/shared-components/utils` and are shared with the
  * web wrapper.
+ *
+ * This pointer must not outlive the install that wrote it. AsyncStorage keeps
+ * its data in `databases/RKStorage`, which Android Auto Backup archives and
+ * restores at install time; the app therefore used to ship with
+ * `android:allowBackup="true"` and a reinstall would resurrect a league pointer
+ * from the *previous* install. The credential that would have justified acting
+ * on it does not come back with it — expo-secure-store's values are encrypted
+ * with an Android Keystore key, and the keystore is never backed up — so the
+ * user signed in as if new and was dropped straight into a stale league instead
+ * of home. `android.allowBackup` is now `false` (`apps/app/app.json`), which is
+ * what makes a fresh install actually fresh.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LOGGER } from '@legacy-sports/logging';
