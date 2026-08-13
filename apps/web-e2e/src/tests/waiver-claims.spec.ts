@@ -342,7 +342,12 @@ test.describe('Pending Waiver Claims — component hidden when empty @regression
 });
 
 test.describe('Pending Waiver Claims — list display @critical', () => {
-  test('header reads "Pending Waiver Claims"', async ({
+  // At/below the Tamagui `md` breakpoint (both mobile Playwright projects)
+  // the panel renders in `compact` mode (LS-9355/LS-9408): a condensed pill
+  // with none of the full-panel surface below. Each test here asserts the
+  // surface the viewport actually renders, never a weakened either/or check.
+
+  test('header reads "Pending Waiver Claims" on desktop; compact pill shows the count on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -351,10 +356,15 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.header.expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(1).expectVisible();
+      await waiversPage.header.expectHidden();
+    } else {
+      await waiversPage.header.expectVisible();
+    }
   });
 
-  test('displays player name for a pending claim', async ({
+  test('displays player name for a pending claim on desktop; compact pill omits per-claim detail on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -363,10 +373,15 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.playerName('John Doe').expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(1).expectVisible();
+      await waiversPage.playerName('John Doe').expectHidden();
+    } else {
+      await waiversPage.playerName('John Doe').expectVisible();
+    }
   });
 
-  test('shows fallback "Player #N" when playerName is null', async ({
+  test('shows fallback "Player #N" when playerName is null on desktop; compact pill omits it on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -375,10 +390,18 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.playerName('Player #42').expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(1).expectVisible();
+      await waiversPage.playerName('Player #42').expectHidden();
+    } else {
+      await waiversPage.playerName('Player #42').expectVisible();
+    }
   });
 
-  test('renders multiple claims', async ({ page, waiversPage }) => {
+  test('renders multiple claims on desktop; compact pill shows the pluralized count on narrow viewports', async ({
+    page,
+    waiversPage,
+  }) => {
     await setupGraphQL(page, {
       claims: [
         mockClaim({ id: 1, playerName: 'Player One' }),
@@ -388,12 +411,16 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.playerName('Player One').expectVisible();
-    await waiversPage.playerName('Player Two').expectVisible();
-    await waiversPage.playerName('Player Three').expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(3).expectVisible();
+    } else {
+      await waiversPage.playerName('Player One').expectVisible();
+      await waiversPage.playerName('Player Two').expectVisible();
+      await waiversPage.playerName('Player Three').expectVisible();
+    }
   });
 
-  test('footer shows singular "1 pending claim — processed hourly"', async ({
+  test('footer shows singular "1 pending claim — processed hourly" on desktop; compact pill shows singular copy on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -402,10 +429,14 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.footerSummary(1).expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(1).expectVisible();
+    } else {
+      await waiversPage.footerSummary(1).expectVisible();
+    }
   });
 
-  test('footer shows plural "N pending claims — processed hourly"', async ({
+  test('footer shows plural "N pending claims — processed hourly" on desktop; compact pill shows plural copy on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -417,12 +448,16 @@ test.describe('Pending Waiver Claims — list display @critical', () => {
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.footerSummary(2).expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(2).expectVisible();
+    } else {
+      await waiversPage.footerSummary(2).expectVisible();
+    }
   });
 });
 
 test.describe('Pending Waiver Claims — cancel button @critical', () => {
-  test('each claim has a cancel button with correct aria-label', async ({
+  test('each claim has a cancel button with correct aria-label on desktop; the compact surface offers no cancel action on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -431,10 +466,15 @@ test.describe('Pending Waiver Claims — cancel button @critical', () => {
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.cancelButtonFor('John Doe').expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(1).expectVisible();
+      await waiversPage.cancelButtonFor('John Doe').expectHidden();
+    } else {
+      await waiversPage.cancelButtonFor('John Doe').expectVisible();
+    }
   });
 
-  test('clicking cancel triggers CancelWaiverClaim mutation', async ({
+  test('clicking cancel triggers CancelWaiverClaim mutation on desktop; the compact surface offers no cancel action on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -447,6 +487,12 @@ test.describe('Pending Waiver Claims — cancel button @critical', () => {
     });
     await waiversPage.goto(LEAGUE_ID);
 
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(1).expectVisible();
+      await waiversPage.cancelButtonFor('Jane Smith').expectHidden();
+      return;
+    }
+
     await waiversPage.cancelClaim('Jane Smith');
 
     await expect.poll(() => cancelledIds, { timeout: 10000 }).toContain(7);
@@ -454,7 +500,7 @@ test.describe('Pending Waiver Claims — cancel button @critical', () => {
 });
 
 test.describe('Pending Waiver Claims — special claim attributes @regression', () => {
-  test('shows FAAB bid amount when faabBid > 0', async ({
+  test('shows FAAB bid amount when faabBid > 0 on desktop; compact pill omits it on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -463,7 +509,12 @@ test.describe('Pending Waiver Claims — special claim attributes @regression', 
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.faabBadge(25).expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(1).expectVisible();
+      await waiversPage.faabBadge(25).expectHidden();
+    } else {
+      await waiversPage.faabBadge(25).expectVisible();
+    }
   });
 
   test('does not show FAAB label when faabBid is null', async ({
@@ -478,7 +529,7 @@ test.describe('Pending Waiver Claims — special claim attributes @regression', 
     await waiversPage.faabLabel.expectHidden();
   });
 
-  test('shows drop player name when dropPlayerId is set', async ({
+  test('shows drop player name when dropPlayerId is set on desktop; compact pill omits it on narrow viewports', async ({
     page,
     waiversPage,
   }) => {
@@ -493,8 +544,14 @@ test.describe('Pending Waiver Claims — special claim attributes @regression', 
     });
     await waiversPage.goto(LEAGUE_ID);
 
-    await waiversPage.dropLabel.expectVisible();
-    await waiversPage.playerName('Old Guy').expectVisible();
+    if (waiversPage.isCompactSurface()) {
+      await waiversPage.compactSummary(1).expectVisible();
+      await waiversPage.dropLabel.expectHidden();
+      await waiversPage.playerName('Old Guy').expectHidden();
+    } else {
+      await waiversPage.dropLabel.expectVisible();
+      await waiversPage.playerName('Old Guy').expectVisible();
+    }
   });
 });
 
