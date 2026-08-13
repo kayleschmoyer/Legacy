@@ -10,3 +10,5 @@ export {
   extractStaticRoutes,
 } from './spa-route-fallback-plugin';
 export type { SpaRouteFallbackPluginOptions } from './spa-route-fallback-plugin';
+export { chunkPreloadPlugin } from './chunk-preload-plugin';
+export type { ChunkPreloadPluginOptions } from './chunk-preload-plugin';

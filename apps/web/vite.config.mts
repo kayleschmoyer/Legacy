@@ -8,6 +8,7 @@ import { tamaguiPlugin } from '@tamagui/vite-plugin';
 import reactNativeWeb from 'vite-plugin-react-native-web';
 import { execSync } from 'child_process';
 import {
+  chunkPreloadPlugin,
   rollbarSourcemapPlugin,
   spaRouteFallbackPlugin,
 } from '../../tools/vite-configs';
@@ -146,6 +147,17 @@ export default defineConfig(({ mode }) => {
         ? [
             spaRouteFallbackPlugin({
               routesFile: 'src/app/app.tsx',
+            }),
+          ]
+        : []),
+      // Preload the HomePage route chunk so its fetch overlaps with the
+      // eager bundle's parse/execute instead of only starting after the
+      // router discovers the dynamic import('../pages/home/HomePage')
+      // call (LS-9424).
+      ...(isProduction
+        ? [
+            chunkPreloadPlugin({
+              moduleIdIncludes: 'src/pages/home/HomePage',
             }),
           ]
         : []),

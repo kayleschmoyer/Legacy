@@ -8,8 +8,6 @@ import { Provider as ReduxProvider } from 'react-redux';
 
 // Import Tamagui CSS
 import '@tamagui/core/reset.css';
-import '@tamagui/font-inter/css/400.css';
-import '@tamagui/font-inter/css/700.css';
 import './styles.css';
 
 import {
