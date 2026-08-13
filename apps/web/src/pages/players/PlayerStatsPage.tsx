@@ -1815,7 +1815,11 @@ export function PlayerStatsRoute() {
             onLeagueChange={setFootballLeagueId}
           />
         )}
-        {selectedPlayerId !== null && (
+        {/* Detail modal gated on the same entitlement as the stats list,
+            matching the MLB branch's PlayerDetailModal gating above (LS-9346:
+            this guard was previously missing on the NFL branch, letting free
+            viewers open the modal here while baseball already blocked it). */}
+        {isPremium && selectedPlayerId !== null && (
           <FootballPlayerDetailModal
             open={true}
             onOpenChange={(open) => {

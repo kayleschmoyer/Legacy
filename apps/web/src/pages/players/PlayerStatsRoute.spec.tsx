@@ -375,6 +375,63 @@ describe('PlayerStatsRoute inline NFL view', () => {
   });
 });
 
+// LS-9346: the NFL in-place detail modal had no entitlement guard at all,
+// while the MLB detail modal was already gated on `isPremium` — so a free
+// viewer could open the football player-detail modal but not the baseball
+// one. (The page-wide PremiumGate wrap this ticket originally investigated
+// was superseded by LS-9347, which removed page-wide gating from both
+// sports — see the "does not gate" tests below.) These tests pin the
+// remaining inconsistency fix: the NFL modal now matches the MLB modal's
+// entitlement gate.
+describe('PlayerStatsRoute detail-modal gate consistency (LS-9346)', () => {
+  beforeEach(() => {
+    mockNavigate.mockClear();
+    mockSetSearchParams.mockClear();
+    mockFootballEnabled = true;
+    mockMediaSm = false;
+  });
+
+  it('does not gate the NFL stats surface behind PremiumGate either (parity with MLB, LS-9347)', async () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockHasEntitlement = false;
+    mockPremiumGate.mockClear();
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    expect(mockPremiumGate).not.toHaveBeenCalled();
+  });
+
+  it('wires onPremiumPress on the NFL card feed to the shared upgrade-modal handler, matching MLB', () => {
+    mockSearchParams = new URLSearchParams('sport=nfl');
+    mockMediaSm = true;
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    expect(mockFootballCardFeedProps.onPremiumPress).toEqual(
+      expect.any(Function),
+    );
+  });
+
+  it('does not render the football detail modal for a non-premium viewer, matching the MLB modal gate', async () => {
+    mockSearchParams = new URLSearchParams('sport=nfl&playerId=42');
+    mockHasEntitlement = false;
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    expect(
+      screen.queryByTestId('football-player-detail-modal'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the football detail modal for a premium viewer', async () => {
+    mockSearchParams = new URLSearchParams('sport=nfl&playerId=42');
+    mockHasEntitlement = true;
+    render(<PlayerStatsRoute />);
+    await screen.findByTestId('football-stats-page');
+    expect(screen.getByTestId('football-player-detail-modal')).toHaveAttribute(
+      'data-player-id',
+      '42',
+    );
+  });
+});
+
 describe('PlayerStatsRoute sport switcher', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
