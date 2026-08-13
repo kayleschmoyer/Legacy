@@ -107,7 +107,7 @@ export interface NFLHomeProps {
 }
 
 function getLeagueStatusLabel(league: NFLHomeLeague): string {
-  if (!league.draftStatus) return '';
+  if (!league.draftStatus) return 'Setup';
   if (league.draftStatus === 'not-started' || league.draftStatus === 'queued') {
     return 'Draft Pending';
   }

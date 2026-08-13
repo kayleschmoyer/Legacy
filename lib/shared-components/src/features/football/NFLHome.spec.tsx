@@ -170,6 +170,19 @@ describe('NFLHome — league row metadata (LS-6256)', () => {
     );
     expect(screen.getByText('Advance failed')).toBeInTheDocument();
   });
+
+  it('renders a "Setup" status badge when draftStatus is null (LS-6259)', () => {
+    const league: NFLHomeLeague = {
+      id: 5,
+      name: 'Brand New League',
+      draftStatus: null,
+      currentWeekNumber: null,
+    };
+    render(
+      <NFLHome leagues={[league]} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    expect(screen.getByText('Setup')).toBeInTheDocument();
+  });
 });
 
 describe('NFLHome — player discovery entry point (LS-5411)', () => {
