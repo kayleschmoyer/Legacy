@@ -11,10 +11,12 @@ import { AuctionDraftRoom } from './auction/AuctionDraftRoom';
 import { PreDraftLobby } from './PreDraftLobby';
 import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
-import { DraftClockRing } from './DraftClockRing';
 import { DraftMiniBoard } from './DraftMiniBoard';
 import { DraftPickAnnouncement } from './DraftPickAnnouncement';
 import { DraftSquadStrip } from './DraftSquadStrip';
+import { DraftHeaderBand } from './DraftHeaderBand';
+import { DraftLastPickTicker } from './DraftLastPickTicker';
+import { DraftBottomNav } from './DraftBottomNav';
 import { useDraftPalette } from './nativeDraftPalette';
 import {
   MIN_BOARD_ROUNDS,
@@ -43,7 +45,8 @@ import {
 import { DraftChatOverlay } from './DraftChatOverlay';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
-import type { DraftPlayer } from './types';
+import type { DraftPickRecord, DraftPlayer } from './types';
+import type { DraftRoomTab } from './hooks/useDraftUIState';
 import { PositionBadge } from '../../components/PositionBadge';
 import { useAuth } from '../../features/auth';
 import type { SportKind } from '../../config/sports';
@@ -91,31 +94,22 @@ const POSITION_FILTERS = [
 
 type SortKey = 'adp' | 'pts';
 
+/**
+ * Draft Room v2 shell (LS-9397): the Board tab keeps this file's existing
+ * compact-board content; the other four tabs are placeholders until siblings
+ * 2-6 build their real bodies (Out of Scope for this ticket).
+ */
+const TAB_PLACEHOLDER_COPY: Record<Exclude<DraftRoomTab, 'board'>, string> = {
+  players: 'Players tab is coming soon.',
+  queue: 'Queue tab is coming soon.',
+  team: 'Team tab is coming soon.',
+  chat: 'Chat tab is coming soon.',
+};
+
 // ---------------------------------------------------------------------------
 // Compact-branch chrome (narrow-viewport only — folded in from the former
 // EliteDraftBoardScreen.native.tsx fork, LS-9207)
 // ---------------------------------------------------------------------------
-
-/** Uppercase, wide-tracked label used above every headline on the compact board. */
-function Eyebrow({
-  children,
-  color = '$fg4',
-}: {
-  children: React.ReactNode;
-  color?: string;
-}) {
-  return (
-    <Text
-      fontSize={9.5}
-      fontWeight="700"
-      letterSpacing={2}
-      textTransform="uppercase"
-      color={color}
-    >
-      {children}
-    </Text>
-  );
-}
 
 /** The gold lozenge used for every primary action on the compact draft board. */
 function GoldButton({
@@ -395,258 +389,272 @@ function CompactLiveDraftBoard({
   const showCommissionerBar =
     queries.isCommissioner && !queries.league?.isMockDraft;
 
+  // ---- Draft Room v2 shell (LS-9397): header band + ticker + bottom nav ----
+  const lastPick = useMemo(
+    () =>
+      queries.pickHistory.reduce<DraftPickRecord | null>(
+        (latest, pick) =>
+          latest == null || pick.overallPick > latest.overallPick
+            ? pick
+            : latest,
+        null,
+      ),
+    [queries.pickHistory],
+  );
+
+  const topQueuedPlayerName = useMemo(() => {
+    if (!isMyPick) return null;
+    const entries = queries.queueEntries ?? [];
+    if (entries.length === 0) return null;
+    const top = [...entries].sort(
+      (a, b) =>
+        (a.priority ?? Number.MAX_SAFE_INTEGER) -
+        (b.priority ?? Number.MAX_SAFE_INTEGER),
+    )[0];
+    if (top?.playerId == null) return null;
+    const stats = playerData.statsLookup.get(top.playerId);
+    if (stats) return stats.name;
+    return top.player
+      ? `${top.player.firstName} ${top.player.lastName}`.trim()
+      : null;
+  }, [isMyPick, queries.queueEntries, playerData.statsLookup]);
+
   return (
     <YStack flex={1} backgroundColor="$background">
-      {/* ---- On the clock: team, countdown ring, and the board itself ---- */}
-      <YStack
-        paddingHorizontal="$3"
-        paddingTop={10}
-        paddingBottom={11}
-        borderBottomWidth={1}
-        backgroundColor={isMyPick ? '$surfaceRaised' : '$surfacePanel'}
-        borderBottomColor={isMyPick ? '$brandGold' : '$outlineSubtle'}
-      >
-        <XStack
-          justifyContent="space-between"
-          alignItems="center"
-          gap="$3"
-          marginBottom={8}
-        >
-          <YStack flex={1} minWidth={0}>
-            <Eyebrow color={isMyPick ? '$brandGoldLight' : '$fg4'}>
-              {ui.draftPaused
-                ? 'Draft paused'
-                : untimed && isMyPick
-                  ? 'Your pick — take your time'
-                  : isMyPick
-                    ? 'You’re on the clock'
-                    : 'On the clock'}
-            </Eyebrow>
-            <Text
-              fontFamily="$heading"
-              fontSize={19}
-              fontWeight="800"
-              letterSpacing={0.5}
-              lineHeight={21}
-              color="$color"
-              numberOfLines={1}
-            >
-              {queries.teamNameById(queries.currentPickTeamId)}
-            </Text>
-            <Text fontSize={11} color="$fg4" marginTop={1}>
-              Round {round} · Pick #{currentPick}
-            </Text>
-          </YStack>
-          <DraftClockRing
-            secondsRemaining={timeRemaining}
-            totalSeconds={ui.pickTimeLimitSeconds}
-            emphasize={isMyPick}
-            paused={ui.draftPaused}
-            untimed={untimed}
-          />
-        </XStack>
+      <DraftHeaderBand
+        isMyPick={isMyPick}
+        draftPaused={ui.draftPaused}
+        untimed={untimed}
+        round={round}
+        roundPickNumber={queries.currentPickInfo?.pickNumber ?? currentPick}
+        timeRemaining={timeRemaining}
+        pickTimeLimitSeconds={ui.pickTimeLimitSeconds}
+        onClockTeamName={queries.teamNameById(queries.currentPickTeamId)}
+        topQueuedPlayerName={topQueuedPlayerName}
+      />
+      <DraftLastPickTicker
+        lastPick={lastPick}
+        statsLookup={playerData.statsLookup}
+        teamName={lastPick ? queries.teamNameById(lastPick.teamId) : ''}
+      />
 
-        <DraftMiniBoard
-          teams={boardTeams}
-          picks={queries.pickHistory}
-          currentPickInfo={queries.currentPickInfo}
-          myTeamId={queries.myTeamId}
-          statsLookup={playerData.statsLookup}
-          rounds={boardRounds}
-        />
-      </YStack>
-
-      {/* ---- Commissioner controls ---- */}
-      {showCommissionerBar && (
-        <XStack
-          gap="$2"
-          paddingHorizontal="$3"
-          paddingTop={8}
-          alignItems="center"
-        >
-          {!ui.draftPaused ? (
-            <GhostButton
-              label="PAUSE"
-              disabled={actions.pauseLoading}
-              onPress={() => void actions.handlePauseDraft()}
-            />
-          ) : (
-            <GhostButton
-              label="RESUME"
-              tone="active"
-              disabled={actions.resumeLoading}
-              onPress={() => void actions.handleResumeDraft()}
-            />
-          )}
-          <GhostButton
-            label={ui.commPickMode ? 'COMM PICK ON' : 'COMM PICK'}
-            tone={ui.commPickMode ? 'active' : 'neutral'}
-            onPress={() => ui.setCommPickMode(!ui.commPickMode)}
-          />
-        </XStack>
-      )}
-
-      {/* ---- Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) ---- */}
-      {isMockDraft && (
-        <XStack
-          gap="$2"
-          paddingHorizontal="$3"
-          paddingTop={8}
-          alignItems="center"
-        >
-          <GhostButton label="EXIT DRAFT" onPress={onExitDraft} />
-        </XStack>
-      )}
-
-      {/* ---- Search + sort ---- */}
-      <XStack
-        gap="$2"
-        paddingHorizontal="$3"
-        paddingTop={9}
-        alignItems="center"
-      >
-        <Input
+      {ui.activeTab !== 'board' ? (
+        <YStack
           flex={1}
-          minWidth={0}
-          size="$3"
-          borderRadius={10}
-          backgroundColor="$surfacePanel"
-          borderColor="$surfacePanelBorder"
-          color="$color"
-          placeholder="Search…"
-          placeholderTextColor={palette.text.fg4}
-          value={ui.searchTerm}
-          onChangeText={ui.setSearchTerm}
-        />
-        <XStack
-          borderWidth={1}
-          borderColor="$surfacePanelBorder"
-          borderRadius={9}
-          overflow="hidden"
+          alignItems="center"
+          justifyContent="center"
+          padding="$6"
         >
-          {(['adp', 'pts'] as const).map((key) => {
-            const active = sortKey === key;
-            return (
-              <Pressable
-                key={key}
-                accessibilityRole="button"
-                accessibilityLabel={`Sort by ${key.toUpperCase()}`}
-                accessibilityState={{ selected: active }}
-                onPress={() => setSortKey(key)}
-              >
-                <YStack
-                  paddingVertical={8}
-                  paddingHorizontal={11}
-                  backgroundColor={active ? '$surfaceRaised' : 'transparent'}
-                >
-                  <Text
-                    fontSize={11}
-                    fontWeight="800"
-                    color={active ? '$color' : '$fg4'}
-                  >
-                    {key.toUpperCase()}
-                  </Text>
-                </YStack>
-              </Pressable>
-            );
-          })}
-        </XStack>
-      </XStack>
-
-      {/* ---- Position filter chips ---- */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        flexGrow={0}
-        flexShrink={0}
-      >
-        <XStack gap={4} paddingHorizontal="$3" paddingVertical={8}>
-          {POSITION_FILTERS.map((pos) => {
-            const active = ui.selectedPosition === pos;
-            const tint =
-              pos === 'ALL'
-                ? palette.gold.gold
-                : getPositionColor('baseball', pos);
-            return (
-              <Pressable
-                key={pos}
-                accessibilityRole="button"
-                accessibilityLabel={`Filter by ${pos}`}
-                accessibilityState={{ selected: active }}
-                onPress={() => ui.setSelectedPosition(pos)}
-              >
-                <YStack
-                  paddingVertical={4}
-                  paddingHorizontal={10}
-                  borderRadius={999}
-                  borderWidth={1}
-                  borderColor={active ? tint : '$outlineDefault'}
-                  backgroundColor={active ? tint : 'transparent'}
-                >
-                  <Text
-                    fontSize={11.5}
-                    fontWeight="700"
-                    color={active ? '$textOnAccent' : '$textMuted'}
-                  >
-                    {pos}
-                  </Text>
-                </YStack>
-              </Pressable>
-            );
-          })}
-        </XStack>
-      </ScrollView>
-
-      {/* ---- Available players ---- */}
-      <FlatList
-        data={listedPlayers}
-        keyExtractor={(item) => String(item.player.id)}
-        contentContainerStyle={styles.playerList}
-        renderItem={({ item }) => (
-          <PlayerRow
-            player={item.player}
-            adp={item.adp}
-            canDraft={canDraft}
-            commPickMode={isRealCommPick}
-            onPress={handlePlayerRowPress}
+          <Text color="$fg4" textAlign="center">
+            {TAB_PLACEHOLDER_COPY[ui.activeTab]}
+          </Text>
+        </YStack>
+      ) : (
+        <>
+          <DraftMiniBoard
+            teams={boardTeams}
+            picks={queries.pickHistory}
+            currentPickInfo={queries.currentPickInfo}
+            myTeamId={queries.myTeamId}
+            statsLookup={playerData.statsLookup}
+            rounds={boardRounds}
           />
-        )}
-        onEndReached={() => {
-          if (queries.hasMorePlayers && !queries.loadingMore) {
-            onLoadMore();
-          }
-        }}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={
-          queries.loadingMore ? (
-            <YStack
-              testID="draft-loading-more"
-              padding="$3"
+
+          {/* ---- Commissioner controls ---- */}
+          {showCommissionerBar && (
+            <XStack
+              gap="$2"
+              paddingHorizontal="$3"
+              paddingTop={8}
               alignItems="center"
             >
-              <Spinner color="$brandGold" />
-            </YStack>
-          ) : null
-        }
-        ListEmptyComponent={
-          <YStack padding="$6" alignItems="center">
-            <Text color="$textMuted">No players match that filter</Text>
-          </YStack>
-        }
-      />
+              {!ui.draftPaused ? (
+                <GhostButton
+                  label="PAUSE"
+                  disabled={actions.pauseLoading}
+                  onPress={() => void actions.handlePauseDraft()}
+                />
+              ) : (
+                <GhostButton
+                  label="RESUME"
+                  tone="active"
+                  disabled={actions.resumeLoading}
+                  onPress={() => void actions.handleResumeDraft()}
+                />
+              )}
+              <GhostButton
+                label={ui.commPickMode ? 'COMM PICK ON' : 'COMM PICK'}
+                tone={ui.commPickMode ? 'active' : 'neutral'}
+                onPress={() => ui.setCommPickMode(!ui.commPickMode)}
+              />
+            </XStack>
+          )}
 
-      {/* ---- My squad strip + roster sheet ---- */}
-      <DraftSquadStrip
-        myPicks={playerData.myTeamPicks}
-        myTeam={playerData.myTeam}
-        statsLookup={playerData.statsLookup}
-        rounds={Math.max(boardRounds, MIN_BOARD_ROUNDS)}
-        teamName={queries.teamNameById(queries.myTeamId)}
-        isMyPick={isMyPick}
-        open={rosterOpen}
-        onOpen={() => setRosterOpen(true)}
-        onClose={() => setRosterOpen(false)}
-      />
+          {/* ---- Exit Draft — mock drafts only, no real teammates to leave hanging (LS-9238) ---- */}
+          {isMockDraft && (
+            <XStack
+              gap="$2"
+              paddingHorizontal="$3"
+              paddingTop={8}
+              alignItems="center"
+            >
+              <GhostButton label="EXIT DRAFT" onPress={onExitDraft} />
+            </XStack>
+          )}
+
+          {/* ---- Search + sort ---- */}
+          <XStack
+            gap="$2"
+            paddingHorizontal="$3"
+            paddingTop={9}
+            alignItems="center"
+          >
+            <Input
+              flex={1}
+              minWidth={0}
+              size="$3"
+              borderRadius={10}
+              backgroundColor="$surfacePanel"
+              borderColor="$surfacePanelBorder"
+              color="$color"
+              placeholder="Search…"
+              placeholderTextColor={palette.text.fg4}
+              value={ui.searchTerm}
+              onChangeText={ui.setSearchTerm}
+            />
+            <XStack
+              borderWidth={1}
+              borderColor="$surfacePanelBorder"
+              borderRadius={9}
+              overflow="hidden"
+            >
+              {(['adp', 'pts'] as const).map((key) => {
+                const active = sortKey === key;
+                return (
+                  <Pressable
+                    key={key}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sort by ${key.toUpperCase()}`}
+                    accessibilityState={{ selected: active }}
+                    onPress={() => setSortKey(key)}
+                  >
+                    <YStack
+                      paddingVertical={8}
+                      paddingHorizontal={11}
+                      backgroundColor={
+                        active ? '$surfaceRaised' : 'transparent'
+                      }
+                    >
+                      <Text
+                        fontSize={11}
+                        fontWeight="800"
+                        color={active ? '$color' : '$fg4'}
+                      >
+                        {key.toUpperCase()}
+                      </Text>
+                    </YStack>
+                  </Pressable>
+                );
+              })}
+            </XStack>
+          </XStack>
+
+          {/* ---- Position filter chips ---- */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            flexGrow={0}
+            flexShrink={0}
+          >
+            <XStack gap={4} paddingHorizontal="$3" paddingVertical={8}>
+              {POSITION_FILTERS.map((pos) => {
+                const active = ui.selectedPosition === pos;
+                const tint =
+                  pos === 'ALL'
+                    ? palette.gold.gold
+                    : getPositionColor('baseball', pos);
+                return (
+                  <Pressable
+                    key={pos}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Filter by ${pos}`}
+                    accessibilityState={{ selected: active }}
+                    onPress={() => ui.setSelectedPosition(pos)}
+                  >
+                    <YStack
+                      paddingVertical={4}
+                      paddingHorizontal={10}
+                      borderRadius={999}
+                      borderWidth={1}
+                      borderColor={active ? tint : '$outlineDefault'}
+                      backgroundColor={active ? tint : 'transparent'}
+                    >
+                      <Text
+                        fontSize={11.5}
+                        fontWeight="700"
+                        color={active ? '$textOnAccent' : '$textMuted'}
+                      >
+                        {pos}
+                      </Text>
+                    </YStack>
+                  </Pressable>
+                );
+              })}
+            </XStack>
+          </ScrollView>
+
+          {/* ---- Available players ---- */}
+          <FlatList
+            data={listedPlayers}
+            keyExtractor={(item) => String(item.player.id)}
+            contentContainerStyle={styles.playerList}
+            renderItem={({ item }) => (
+              <PlayerRow
+                player={item.player}
+                adp={item.adp}
+                canDraft={canDraft}
+                commPickMode={isRealCommPick}
+                onPress={handlePlayerRowPress}
+              />
+            )}
+            onEndReached={() => {
+              if (queries.hasMorePlayers && !queries.loadingMore) {
+                onLoadMore();
+              }
+            }}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={
+              queries.loadingMore ? (
+                <YStack
+                  testID="draft-loading-more"
+                  padding="$3"
+                  alignItems="center"
+                >
+                  <Spinner color="$brandGold" />
+                </YStack>
+              ) : null
+            }
+            ListEmptyComponent={
+              <YStack padding="$6" alignItems="center">
+                <Text color="$textMuted">No players match that filter</Text>
+              </YStack>
+            }
+          />
+
+          {/* ---- My squad strip + roster sheet ---- */}
+          <DraftSquadStrip
+            myPicks={playerData.myTeamPicks}
+            myTeam={playerData.myTeam}
+            statsLookup={playerData.statsLookup}
+            rounds={Math.max(boardRounds, MIN_BOARD_ROUNDS)}
+            teamName={queries.teamNameById(queries.myTeamId)}
+            isMyPick={isMyPick}
+            open={rosterOpen}
+            onOpen={() => setRosterOpen(true)}
+            onClose={() => setRosterOpen(false)}
+          />
+        </>
+      )}
 
       {/* ---- Pick announcement ---- */}
       <DraftPickAnnouncement
@@ -722,6 +730,7 @@ function CompactLiveDraftBoard({
       >
         {ui.liveMessage}
       </Text>
+      <DraftBottomNav activeTab={ui.activeTab} onChangeTab={ui.setActiveTab} />
     </YStack>
   );
 }

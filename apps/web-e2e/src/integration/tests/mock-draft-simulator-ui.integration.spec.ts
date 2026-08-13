@@ -193,6 +193,18 @@ test.describe
         .click();
     });
 
+    // Draft Mode defaults to "Shared" (LS-9181), which pauses on an invite-code
+    // screen instead of navigating to the draft board — the mutation succeeds
+    // but the URL never changes, so the next step's redirect wait times out.
+    // This test drafts solo against AI, so "Offline" is the correct mode and
+    // matches this phase's original (pre-LS-9181) direct-redirect assumption.
+    await test.step('Select Offline mode', async () => {
+      await page
+        .getByRole('button', { name: 'Offline', exact: true })
+        .first()
+        .click();
+    });
+
     await test.step('Click "Start Mock Draft"', async () => {
       const startBtn = page.getByRole('button', {
         name: /Start Mock Draft/i,

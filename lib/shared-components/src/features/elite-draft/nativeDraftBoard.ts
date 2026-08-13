@@ -229,6 +229,25 @@ function formatAvg(avg: number): string {
   return fixed.startsWith('0.') ? fixed.slice(1) : fixed;
 }
 
+/**
+ * Last-pick ticker line: `"{r}.{p} — {Player}, {POS} ({Team})"` (Draft Room
+ * v2 persistent chrome, LS-9397).
+ */
+export function formatLastPickLine(
+  pick: DraftPickRecord,
+  statsLookup: Map<number, DraftPlayer>,
+  teamName: string,
+): string {
+  const player = statsLookup.get(pick.playerId) ?? null;
+  const playerName =
+    player?.name ??
+    (pick.player
+      ? `${pick.player.firstName} ${pick.player.lastName}`.trim()
+      : `Player #${pick.playerId}`);
+  const position = player?.position ?? pick.player?.eligiblePositions?.[0];
+  return `${pick.round}.${pick.pickNumber} — ${playerName}, ${position ?? '—'} (${teamName})`;
+}
+
 /** Compact stat line under a player's name on the draft list. */
 export function statLineFor(player: DraftPlayer): string {
   if (player.isPitcher) {

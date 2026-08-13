@@ -18,6 +18,31 @@ export interface ToastMessage {
   type: 'error' | 'warning' | 'info' | 'success';
 }
 
+/** The five persistent bottom-nav destinations in the Draft Room v2 shell (LS-9397). */
+export type DraftRoomTab = 'board' | 'players' | 'queue' | 'team' | 'chat';
+
+/** One queued AI-pick toast (Draft Room v2 header/overlay chrome, LS-9397). Rendering
+ *  and dequeue-on-dismiss timing belong to the overlay ticket (child 6) — this hook
+ *  only owns the queue's shape and mutation. */
+export interface PickToastQueueItem {
+  id: string;
+  player: DraftPlayer | AvailableDraftPlayer;
+  pickNumber: number;
+  round: number;
+  roundPickNumber: number;
+  teamName: string;
+  isAuto: boolean;
+}
+
+/** One queued my-pick splash (Draft Room v2, LS-9397) — see {@link PickToastQueueItem}. */
+export interface PickSplashQueueItem {
+  id: string;
+  player: DraftPlayer | AvailableDraftPlayer;
+  pickNumber: number;
+  round: number;
+  roundPickNumber: number;
+}
+
 export function useDraftUIState() {
   const [selectedPosition, setSelectedPosition] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
@@ -154,6 +179,39 @@ export function useDraftUIState() {
   // Debounced player search
   const [playerSearch, setPlayerSearch] = useState('');
 
+  // ---------------------------------------------------------------------
+  // Draft Room v2 shell (LS-9397) — additive UI state the persistent chrome
+  // (header band, ticker, bottom nav) and the tab bodies siblings 2-6 add
+  // share. Every field here is new and optional to callers: nothing above
+  // this block changed, so existing consumers (spectator screen, auction
+  // room, LS-8790's native draft screen if it shares this hook) are
+  // unaffected whether or not they read these fields.
+  // ---------------------------------------------------------------------
+  const [activeTab, setActiveTab] = useState<DraftRoomTab>('board');
+  /** Team whose roster the Team tab is showing — null means "my team". */
+  const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
+  const [unreadChat, setUnreadChat] = useState(false);
+
+  const [pickToastQueue, setPickToastQueue] = useState<PickToastQueueItem[]>(
+    [],
+  );
+  const enqueuePickToast = useCallback((item: PickToastQueueItem) => {
+    setPickToastQueue((queue) => [...queue, item]);
+  }, []);
+  const dequeuePickToast = useCallback(() => {
+    setPickToastQueue((queue) => queue.slice(1));
+  }, []);
+
+  const [pickSplashQueue, setPickSplashQueue] = useState<PickSplashQueueItem[]>(
+    [],
+  );
+  const enqueuePickSplash = useCallback((item: PickSplashQueueItem) => {
+    setPickSplashQueue((queue) => [...queue, item]);
+  }, []);
+  const dequeuePickSplash = useCallback(() => {
+    setPickSplashQueue((queue) => queue.slice(1));
+  }, []);
+
   return {
     // Position/search/view
     selectedPosition,
@@ -210,5 +268,18 @@ export function useDraftUIState() {
     // Player search
     playerSearch,
     setPlayerSearch,
+    // Draft Room v2 shell (LS-9397)
+    activeTab,
+    setActiveTab,
+    selectedTeamId,
+    setSelectedTeamId,
+    unreadChat,
+    setUnreadChat,
+    pickToastQueue,
+    enqueuePickToast,
+    dequeuePickToast,
+    pickSplashQueue,
+    enqueuePickSplash,
+    dequeuePickSplash,
   } as const;
 }

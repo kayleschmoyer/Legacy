@@ -4,6 +4,7 @@ import {
   describeBoardCell,
   describeSquadNeed,
   formatClock,
+  formatLastPickLine,
   initialsOf,
   MIN_BOARD_ROUNDS,
   resolveBoardRounds,
@@ -346,5 +347,46 @@ describe('statLineFor', () => {
     expect(statLineFor(makePlayer({ isPitcher: true }))).toBe(
       'ERA — · K — · W 0-0',
     );
+  });
+});
+
+describe('formatLastPickLine', () => {
+  it('formats round.pick, player, position, and team', () => {
+    const statsLookup = new Map([[1, makePlayer()]]);
+    const line = formatLastPickLine(
+      makePick({ round: 2, pickNumber: 5 }),
+      statsLookup,
+      'Bronx Bombers',
+    );
+
+    expect(line).toBe('2.5 — Bobby Witt Jr., SS (Bronx Bombers)');
+  });
+
+  it('falls back to the pick record player name and eligible position when the player is absent from statsLookup', () => {
+    const line = formatLastPickLine(
+      makePick({
+        playerId: 99,
+        player: {
+          id: 99,
+          firstName: 'Ace',
+          lastName: 'Adams',
+          eligiblePositions: ['SP'],
+        },
+      }),
+      new Map(),
+      'Dinger Dynasty',
+    );
+
+    expect(line).toBe('1.1 — Ace Adams, SP (Dinger Dynasty)');
+  });
+
+  it('falls back to a placeholder player name and position when neither source has data', () => {
+    const line = formatLastPickLine(
+      makePick({ playerId: 7 }),
+      new Map(),
+      'Dinger Dynasty',
+    );
+
+    expect(line).toBe('1.1 — Player #7, — (Dinger Dynasty)');
   });
 });
