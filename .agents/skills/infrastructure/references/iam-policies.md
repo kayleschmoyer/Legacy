@@ -39,6 +39,12 @@ Note that older comments elsewhere in the file still point at `github_actions_su
 
 ## Validation: estimate policy size before pushing
 
+> **This check is CI-enforced — it is not just a manual pre-push step (LS-9412).** `.github/checks/iam-policy-size.sh` runs the script below on every PR as part of the `custom-checks` job, so an oversized policy fails CI **before** merge instead of breaking `terraform apply` on `main`. Running it locally is still the fast way to find out; CI is the backstop, not the first signal.
+>
+> The CI wrapper reports the script's two failure modes as distinct errors: **exit 1** is a size failure (a policy is over its limit or inside the 240-byte headroom window), while **exit 2** is a parse failure — the Terraform file changed shape, so nothing was measured and the policies are currently _unchecked_. Fix the script before trusting any size estimate.
+>
+> This became enforceable on LS-9383. Before that trim, the inline policy sat at 99.5% and the script was permanently red by design, so it could not be wired to a gate.
+
 Terraform plan does **not** catch policy-size violations. Run this Python check before `git push` whenever you add or remove statements:
 
 ```bash
