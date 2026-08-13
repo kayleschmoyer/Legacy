@@ -171,7 +171,7 @@ Timing and motion conventions (for annotation only):
 
 ## Breakpoints
 
-The app uses seven breakpoint bands (min-width thresholds, mirroring the Tamagui media defaults in `lib/design-tokens/src/lib/breakpoints.ts` — that file is canonical if this table drifts):
+Mockups use seven breakpoint bands (min-width thresholds, from `lib/design-tokens/src/lib/breakpoints.ts` — that file is canonical for this table):
 
 | Band  | Starts at | Typical device               |
 | ----- | --------- | ---------------------------- |
@@ -182,6 +182,8 @@ The app uses seven breakpoint bands (min-width thresholds, mirroring the Tamagui
 | `lg`  | 980px     | Small laptops                |
 | `xl`  | 1120px    | Laptops                      |
 | `xxl` | 1280px    | Desktops (design at 1280px)  |
+
+> **These are mockup bands, not the implementation's media tokens.** Despite the "mirrors Tamagui" claim that used to sit above this table, `md`/`lg`/`xl` do not match: Tamagui's `$md` fires at ≤1020px, not 860, and there is no `$xxl` at all. A reflow you design at 860 will land at 1020 when implemented unless the implementer is told otherwise. So **annotate reflows with the pixel width, not just the band name** — "collapses below 860px" survives the handoff; "collapses at `md`" does not. Full mapping: [`.agents/skills/ui/references/responsive-density.md`](../../../.agents/skills/ui/references/responsive-density.md#known-drift).
 
 The mockup must account for **all seven bands**, not just phone and desktop:
 

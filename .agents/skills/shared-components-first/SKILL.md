@@ -92,19 +92,22 @@ Tamagui media tokens apply inline style overrides at defined breakpoints. Use th
 ```tsx
 <XStack
   flexDirection="row"
-  $sm={{ flexDirection: 'column' }}   // stacks at ≤640px
+  $sm={{ flexDirection: 'column' }}   // stacks at ≤800px
   gap="$4"
-  $gtMd={{ gap: '$6' }}               // wider gap above 1024px
+  $gtMd={{ gap: '$6' }}               // wider gap at ≥1021px
 >
 ```
 
-Common tokens (defined in the Tamagui config):
+Tokens as `@tamagui/config` actually compiles them:
 
-- `$sm` — applies at **≤640px**
-- `$gtSm` — applies at **>640px**
-- `$md` — applies at **≤768px**
-- `$gtMd` — applies at **>1024px**
-- `$lg` / `$gtLg` — applies at ≤/> 1280px
+- `$xxs` — **≤390px** (does not default to active — see the density reference)
+- `$xs` / `$gtXs` — **≤660px** / **≥661px**
+- `$sm` / `$gtSm` — **≤800px** / **≥801px**
+- `$md` / `$gtMd` — **≤1020px** / **≥1021px**
+- `$lg` / `$gtLg` — **≤1280px** / **≥1281px**
+- `$xl` / `$gtXl` — **≤1650px** / **≥1651px**
+
+There is no `$xxl`. `lib/design-tokens/src/lib/breakpoints.ts` defines one, plus `md`/`lg`/`xl` values that do not match the above — it is the source for raw numbers outside Tamagui, not for media props. See [`../ui/references/responsive-density.md`](../ui/references/responsive-density.md#known-drift).
 
 **Real example** (`MatchupScoreboardView.tsx`):
 

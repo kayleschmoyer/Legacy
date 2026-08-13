@@ -1,45 +1,48 @@
 # League Detail — persistent guidance
 
-Rules derived from responsive iteration on this prototype. They are easy to re-derive
-badly and easy to lose between sessions — read them before changing layout, padding, or
-hit targets here. Tracked by LS-9414.
+The app-wide responsive rules that came out of this page now live in
+[`.agents/skills/ui/references/responsive-density.md`](../../../../../.agents/skills/ui/references/responsive-density.md)
+— density ladder, the 44px touch-target floor, and the reduction order for narrow tiers.
+**Read that first.** This file covers only what is specific to League Detail.
 
-## Responsive density
+## Tier mapping
 
-Tiers: XXS <380 · XS <600 · MD ≥780 (tabs reappear).
+This prototype is HTML/CSS, so it uses raw `@media` breakpoints. The implementation is
+Tamagui and uses media props. The mapping (this resolves the open question in LS-9414 —
+express tiers as token names, not the prototype's raw pixels):
 
-1. **Chrome shrinks before content.** Tab bar 10px/15px padding (9px/13px at ≤780,
-   9px/11px at ≤380), week pager 8px/14px, card interiors 15px (≤600) / 13px (≤380),
-   card title 16px at ≤380. Desktop 20px card padding is too heavy for a ~300px column.
-2. **Hit areas are decoupled from visual size.** Any control under 44px on touch gets a
-   transparent `::after`/`::before` inset expansion instead of being made physically
-   bigger — tabs, `.ls-navbtn` (32px visual, −6px inset), `.ls-icon-mini`, `.ls-btn.sm`,
-   `.ls-backlink`.
-3. **Cut repeated content, don't just tighten it.** Facts constant across tabs (sport,
-   scoring format, team count, invite code, season-status chip) belong on Overview, not
-   in every tab's header.
+| Prototype tier   | Implement as       | Fires at |
+| ---------------- | ------------------ | -------- |
+| XXS (<380)       | `$xxs`             | ≤390     |
+| XS (<600)        | `$xs`              | ≤660     |
+| Tabs reappear    | `$gtSm`            | ≥801     |
 
-## Phone header structure (≤600)
+The prototype's own `@media` tiers (`@979 / @859 / @799 / @659`) are documented in the header
+comment of `league-styles.css` and snap to `lib/design-tokens`' band table. Those bands are
+**not** what Tamagui media props fire at — see the drift table in the reference above before
+porting any threshold literally.
 
-Two lines total: breadcrumb + role badge, then league name with the week riding beside
-it (`h1` goes `display:inline`, `.ls-hero-status` inline, status chip hidden). Crest,
-Invite action, era, and the stacked meta grid are all hidden. Padding 20/18/22
-(18/15/20 at ≤380), 16px under the breadcrumb line.
+## Phone header structure (`$xs`)
 
-## Known xxs gaps (not yet addressed)
+Two lines total: breadcrumb + role badge, then league name with the week riding beside it
+(`h1` goes `display:inline`, `.ls-hero-status` inline, status chip hidden). Crest, Invite
+action, era, and the stacked meta grid are all hidden. Padding 20/18/22 (18/15/20 at `$xxs`),
+16px under the breadcrumb line.
+
+This is the page's own hero arrangement, not a general pattern — a two-line header is right
+here because the league name and current week are the only two facts that change per view.
+
+## What this page cuts, and why
+
+Sport, scoring format, team count, invite code, and season-status chip are constant across
+every tab, so they live on Overview and appear in no other tab's header. This is the worked
+example behind the app-wide "cut repeated content" rule.
+
+## Known gaps at `$xxs` (not yet addressed)
 
 - `.ls-player-row` wraps actions to a second line at ~340px.
-- Commissioner badge is icon-only at ≤600 and reads as decoration.
+- Commissioner badge is icon-only at `$xs` and reads as decoration rather than a role.
 
-## Unresolved: these thresholds are not the canonical bands
-
-The 380 / 600 / 780 tiers above do **not** correspond to the repo's canonical
-breakpoints in `lib/design-tokens/src/lib/breakpoints.ts`
-(`xxs: 0, xs: 660, sm: 800, md: 860, lg: 980, xl: 1120, xxl: 1280`), which
-`league-styles.css` currently snaps to via its `@979 / @859 / @799 / @659` tiers and
-documents in its own header comment.
-
-Before implementing against this guidance, resolve which vocabulary wins — either
-re-snap these numbers to the canonical bands, or record here that League Detail
-intentionally uses its own sub-thresholds, so the next agent does not "fix" the drift.
-See LS-9414.
+Both are tracked in LS-9414. Note that the hit-target fixes there must use the padded-wrapper
+pattern from the reference — the prototype's `::after` inset technique is web-only and has no
+effect on native.

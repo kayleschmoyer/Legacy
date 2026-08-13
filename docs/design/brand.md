@@ -66,3 +66,14 @@ Official third-party auth button treatments (Discord, Google, Apple, and similar
 - **Editorial hierarchy**: not everything is equal weight — a standings table and a player card are different, treat them differently
 - **No generic card grids**: not every piece of content belongs in the same card template
 - **Data is the product**: statistics tables should feel as designed as headlines — crisp, legible, visually weighted
+
+## Responsive Principles
+
+Narrowing the viewport is an editorial act, not a scaling one. A phone is not a small desktop; it is the same product with less room, and what it gives up should be a decision rather than a side effect.
+
+- **Chrome shrinks before content**: tab bars, pagers, headers, and card padding surrender space first. The data the user came for shrinks last. Desktop padding on a narrow column reads as waste, not generosity.
+- **Hit areas are decoupled from visual size**: a control may look small; it may never be small to a thumb. 44×44px minimum interactive box at every width. Density is never bought with missed taps.
+- **Cut repeated content, don't just tighten it**: below phone width, tightening stops working and the honest move is to show less. A fact that is constant across a surface's tabs belongs in one place on that surface, not in every tab's header.
+- **One layout, many widths**: a narrow desktop window and a phone are the same viewport and get the same layout. Never branch on platform — see [shared-components architecture](../architecture/shared-components.md).
+
+Implementation — tier table, density ladder, touch-target pattern, and per-tier checklists: [`.agents/skills/ui/references/responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md).

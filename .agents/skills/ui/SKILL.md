@@ -106,4 +106,5 @@ When a prop genuinely needs a CSS string a token can't fill:
 
 - **[references/brand-colors.md](references/brand-colors.md)** — full token palette, `$blue*` → brand-token replacement table, semantic usage rules
 - **[references/styling-guide.md](references/styling-guide.md)** — Tamagui styling patterns, glassmorphism, interactive cards, gradients, layout best practices
+- **[references/responsive-density.md](references/responsive-density.md)** — breakpoint tier table (the real `@tamagui/config` values), density ladder, the 44px touch-target floor, and what to cut at narrow tiers. Load before changing padding, type size, hit targets, or what a surface shows on a phone.
 - **[references/websocket-refetch-ux.md](references/websocket-refetch-ux.md)** — prevent full-page content flash when Apollo queries are refetched via WebSocket events

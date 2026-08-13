@@ -217,7 +217,18 @@ Components automatically adapt:
 
 - **Web**: CSS-based styling
 - **React Native**: Native platform styling
-- **Responsive**: Breakpoint-based layouts
+- **Responsive**: Breakpoint-based layouts — adapt by viewport width, never by platform
+
+Two cross-platform traps when building responsive components here:
+
+- **`hitSlop` does not work on web.** react-native-web implements it only on the legacy
+  `Touchable` export; `Pressable` and `View` ignore it. Use a ≥44×44 transparent pressable
+  wrapper around the smaller visual element instead — it behaves identically on both platforms.
+- **`::after` / `::before` insets do not exist on native.** Anything relying on pseudo-elements
+  for a hit area has no hit area at all on mobile.
+
+Tier table, density ladder, and the full touch-target pattern:
+[`.agents/skills/ui/references/responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md).
 
 ## 📱 Usage
 

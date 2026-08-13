@@ -97,18 +97,22 @@ Tamagui supports inline media-query overrides directly on any primitive:
 ```tsx
 <XStack
   flexDirection="row"
-  $sm={{ flexDirection: 'column' }}   // ≤640px: stack vertically
+  $sm={{ flexDirection: 'column' }}   // ≤800px: stack vertically
   gap="$4"
-  $gtMd={{ gap: '$6' }}               // >1024px: wider gap
+  $gtMd={{ gap: '$6' }}               // ≥1021px: wider gap
 >
 ```
 
-Common tokens (defined in the project Tamagui config):
+Tokens as `@tamagui/config` actually compiles them:
 
-- `$sm` — ≤640px
-- `$gtSm` — >640px
-- `$md` — ≤768px
-- `$gtMd` — >1024px
+- `$xxs` — ≤390px
+- `$xs` / `$gtXs` — ≤660px / ≥661px
+- `$sm` / `$gtSm` — ≤800px / ≥801px
+- `$md` / `$gtMd` — ≤1020px / ≥1021px
+- `$lg` / `$gtLg` — ≤1280px / ≥1281px
+- `$xl` / `$gtXl` — ≤1650px / ≥1651px
+
+There is no `$xxl`. `lib/design-tokens/src/lib/breakpoints.ts` defines one, and its `md`/`lg`/`xl` values differ from the above; it is the source for raw numbers outside Tamagui, not for media props.
 
 ### 2. `useMedia()` hook (conditional rendering)
 
@@ -144,6 +148,12 @@ const fontFamily = isWeb ? 'Big Shoulders Display, system-ui' : undefined;
 ```
 
 Permitted only for unavoidable runtime divergences (CSS `backdrop-filter`, display font resolution, native-only APIs). Never for layout: `isWeb ? <DesktopLayout/> : <MobileLayout/>` breaks mobile web (gets the desktop layout) and tablets (get the phone layout). The decision test: _would this differ between a narrow desktop window and a wide tablet?_ If it varies with width, it's a breakpoint, not a platform branch.
+
+### Density
+
+Breakpoints decide _structure_ — one column or two. **Density** — how much padding, type, and content a tier gives up, plus the 44px touch-target floor — is covered in [`.agents/skills/ui/references/responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md).
+
+Two cross-platform traps that page covers in full, worth flagging here: `hitSlop` is ignored by react-native-web's `Pressable`/`View` (it exists only on the legacy `Touchable`), and `::after`/`::before` inset expansion does not exist on native at all. Neither is a valid way to enlarge a hit area in shared code.
 
 ## Platform-Specific Resolution
 
