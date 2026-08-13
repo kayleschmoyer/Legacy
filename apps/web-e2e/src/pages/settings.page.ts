@@ -9,8 +9,6 @@ type PreferencesTheme = 'System' | 'Light' | 'Dark';
 type PreferencesSport = 'Baseball' | 'Football';
 /** Stats-format options on the Preferences Sports & Stats section. */
 type PreferencesStatsFormat = 'Standard' | 'Expanded';
-/** Theme options rendered on the Profile Settings appearance section. */
-type ProfileTheme = 'System' | 'Light' | 'Dark';
 
 /**
  * Page object for the settings / preferences / profile surfaces (ADR-0015 §1,
@@ -44,11 +42,10 @@ type ProfileTheme = 'System' | 'Light' | 'Dark';
  * ADR-0016 migration status: the `preferences` surface is fully platform-neutral
  * (driver-typed only). The `profile` surface is driver-typed with a slim,
  * DOCUMENTED web-only remainder reached via the Playwright `Page` escape hatch
- * (constructed alongside the driver): `toBeFocused()` for the theme radio
- * roving-tabindex model and a whole-node `toHaveText` on the 2FA error alert —
- * neither has a portable driver verb (focus is not a first-class native concept;
- * the vocabulary offers substring `expectContainsText`, not exact text). Because
- * of that remainder, constructing this object REQUIRES the web driver.
+ * (constructed alongside the driver): a whole-node `toHaveText` on the 2FA
+ * error alert, which has no portable driver verb (the vocabulary offers
+ * substring `expectContainsText`, not exact text). Because of that remainder,
+ * constructing this object REQUIRES the web driver.
  */
 export class SettingsPage extends BaseScreen {
   /** `/preferences` surface (driver-typed — platform neutral). */
@@ -61,8 +58,8 @@ export class SettingsPage extends BaseScreen {
     if (!(driver instanceof PlaywrightWebDriver)) {
       throw new Error(
         'SettingsPage requires the web driver: its profile surface keeps a ' +
-          'documented web-only remainder (theme roving-tabindex focus + exact ' +
-          '2FA-alert text) reached via the Page escape hatch (LS-8456).',
+          'documented web-only remainder (exact 2FA-alert text) reached via ' +
+          'the Page escape hatch (LS-8456).',
       );
     }
     this.preferences = new PreferencesSurface(driver);
@@ -300,8 +297,6 @@ class PreferencesSurface {
  * Semantic surface for the `/profile/settings` page (ADR-0016). Driver-typed
  * reads/actions/assertions resolve through the {@link AppDriver}. A slim,
  * DOCUMENTED web-only remainder reaches the Playwright `Page`:
- *   • theme radio roving-tabindex focus (`toBeFocused()`) — focus is not a
- *     first-class native concept, so it has no portable driver assertion;
  *   • the exact `toHaveText` on the 2FA error alert — the driver vocabulary
  *     offers substring `expectContainsText`, not a whole-node text match.
  * Everything else on the page is expressed as a portable verb.
@@ -354,18 +349,6 @@ class ProfileSurface {
     this.#alert = driver.byRole('alert');
   }
 
-  // ── Private parameterised locators ────────────────────────────────
-
-  /**
-   * A theme radio on the profile page. Its accessible name is
-   * "<Label> theme" (e.g. "Dark theme") — Tamagui does not forward
-   * `data-testid` on these styled radios, so role + accessible name is the
-   * stable, cross-platform locator (LS-4912).
-   */
-  #themeRadio(name: ProfileTheme): UIElement {
-    return this.#driver.byRole('radio', { name: `${name} theme` });
-  }
-
   // ── Navigation ────────────────────────────────────────────────────
 
   /**
@@ -379,20 +362,6 @@ class ProfileSurface {
   }
 
   // ── Actions ───────────────────────────────────────────────────────
-
-  /** Select a theme option (System / Light / Dark). */
-  async selectTheme(name: ProfileTheme): Promise<void> {
-    await this.#themeRadio(name).tap();
-  }
-
-  /**
-   * Press a key on a theme radio (drives the roving-tabindex model). Playwright
-   * focuses the target before dispatching, so this both focuses and keys —
-   * portable via the element `press` verb (no page-level keyboard needed).
-   */
-  async pressThemeKey(name: ProfileTheme, key: string): Promise<void> {
-    await this.#themeRadio(name).press(key);
-  }
 
   /** Click the "Set as primary" button for a non-canonical identity. */
   async clickSetAsPrimary(): Promise<void> {
@@ -525,44 +494,6 @@ class ProfileSurface {
         /You will be signed out of your Legacy Sports account and redirected to the login page/,
       )
       .expectVisible();
-  }
-
-  // ── Assertions: appearance / theme ────────────────────────────────
-
-  /** Assert the Appearance section heading is visible. */
-  async expectAppearanceSection(): Promise<void> {
-    await this.#driver.byText('Appearance').expectVisible();
-  }
-
-  /** Assert a theme option (System / Light / Dark) is visible. */
-  async expectThemeOptionVisible(name: ProfileTheme): Promise<void> {
-    await this.#themeRadio(name).expectVisible();
-  }
-
-  /** Assert a theme option is the selected one (`aria-checked="true"`). */
-  async expectThemeSelected(name: ProfileTheme): Promise<void> {
-    await this.#themeRadio(name).expectAttribute('aria-checked', 'true');
-  }
-
-  /** Assert a theme option is NOT selected (`aria-checked="false"`). */
-  async expectThemeUnselected(name: ProfileTheme): Promise<void> {
-    await this.#themeRadio(name).expectAttribute('aria-checked', 'false');
-  }
-
-  /** Assert a theme option's `tabindex` (roving-tabindex model). */
-  async expectThemeTabindex(name: ProfileTheme, value: string): Promise<void> {
-    await this.#themeRadio(name).expectAttribute('tabindex', value);
-  }
-
-  /**
-   * Assert a theme option currently holds DOM focus. WEB-ONLY: `toBeFocused()`
-   * has no portable driver assertion (focus is not a first-class native
-   * concept), so this stays on the raw `Page`.
-   */
-  async expectThemeFocused(name: ProfileTheme): Promise<void> {
-    await expect(
-      this.#page.getByRole('radio', { name: `${name} theme` }),
-    ).toBeFocused();
   }
 
   // ── Assertions: Linked Identities (LS-7825) ───────────────────────

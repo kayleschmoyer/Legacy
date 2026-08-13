@@ -127,6 +127,16 @@ test.describe('Mobile panel navigation links @critical', () => {
   test('shows You section heading @regression', async ({ navHeader }) => {
     await navHeader.expectMobileMenuItem(/^you$/i);
   });
+
+  // LS-9135: the Profile Settings page's duplicate Appearance/theme section
+  // was removed, so mobile users need a nav path to /preferences (the sole
+  // remaining theme location) — this link fills the gap LS-4912 previously
+  // worked around by duplicating the control.
+  test('shows Preferences link in You section @regression', async ({
+    navHeader,
+  }) => {
+    await navHeader.expectMobileMenuItem(/^preferences$/i);
+  });
 });
 
 // ── Panel closes on link click ────────────────────────────────────────────
@@ -147,6 +157,25 @@ test.describe('Mobile panel interaction: close on link click @regression', () =>
     await expect(page).toHaveURL('/players');
 
     // Menu should close after clicking a link
+    await navHeader.expectMobileMenuHidden();
+  });
+
+  // LS-9135: mobile users must be able to reach the sole remaining theme
+  // control on /preferences from the nav drawer.
+  test('Preferences link navigates to /preferences @regression', async ({
+    page,
+    navHeader,
+  }) => {
+    await page.setViewportSize(MOBILE_VIEWPORT);
+    await page.goto('/about');
+    await page.waitForLoadState('load');
+
+    await navHeader.openMobileMenu();
+    await navHeader.expectMobileMenuVisible();
+
+    await navHeader.clickMobileMenuItem(/^preferences$/i);
+    await expect(page).toHaveURL('/preferences');
+
     await navHeader.expectMobileMenuHidden();
   });
 });

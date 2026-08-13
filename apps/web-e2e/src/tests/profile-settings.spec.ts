@@ -198,84 +198,16 @@ test.describe('Profile Settings Page @smoke', () => {
 });
 
 // ---------------------------------------------------------------------------
-// LS-4912: Appearance / theme switcher must be reachable from
-// /profile/settings — including on mobile, where the desktop user-profile
-// dropdown (which carries its own theme picker) is not rendered. Users on
-// mobile reach this page via the bottom-bar "You" tab and had no way to
-// change theme before this fix.
-// ---------------------------------------------------------------------------
-
-test.describe('Profile Settings Page — appearance @regression', () => {
-  test('renders Appearance section with all three theme options', async ({
-    page,
-    settingsPage,
-  }) => {
-    await setupProfileGraphQL(page);
-    await settingsPage.profile.goto();
-
-    await settingsPage.profile.expectAppearanceSection();
-    // The theme options are Tamagui styled `role="radio"` buttons. Tamagui does
-    // not forward `data-testid` on these (it does forward role/aria-*), so the
-    // accessible name (aria-label="<Label> theme") is the stable locator — the
-    // same role-based approach dark-mode.spec.ts uses for the preferences chips.
-    await settingsPage.profile.expectThemeOptionVisible('Light');
-    await settingsPage.profile.expectThemeOptionVisible('System');
-    await settingsPage.profile.expectThemeOptionVisible('Dark');
-  });
-
-  test('theme can be changed on mobile (412x784 viewport)', async ({
-    page,
-    settingsPage,
-  }) => {
-    // Match the reporter's viewport from LS-4912 exactly.
-    await page.setViewportSize({ width: 412, height: 784 });
-    await setupProfileGraphQL(page);
-    await settingsPage.profile.goto();
-
-    await settingsPage.profile.expectThemeOptionVisible('Light');
-    await settingsPage.profile.selectTheme('Light');
-    await settingsPage.profile.expectThemeSelected('Light');
-
-    await settingsPage.profile.selectTheme('Dark');
-    await settingsPage.profile.expectThemeSelected('Dark');
-    await settingsPage.profile.expectThemeUnselected('Light');
-  });
-
-  test('theme radio group follows ARIA roving-tabindex model', async ({
-    page,
-    settingsPage,
-  }) => {
-    await setupProfileGraphQL(page);
-    await settingsPage.profile.goto();
-
-    // Select Light so we have a known starting point.
-    await settingsPage.profile.selectTheme('Light');
-    await settingsPage.profile.expectThemeSelected('Light');
-
-    // Only the checked option is in the tab order.
-    await settingsPage.profile.expectThemeTabindex('Light', '0');
-    await settingsPage.profile.expectThemeTabindex('System', '-1');
-    await settingsPage.profile.expectThemeTabindex('Dark', '-1');
-
-    // ArrowRight moves selection (and focus) to System.
-    await settingsPage.profile.pressThemeKey('Light', 'ArrowRight');
-    await settingsPage.profile.expectThemeSelected('System');
-    await settingsPage.profile.expectThemeTabindex('System', '0');
-    await settingsPage.profile.expectThemeTabindex('Light', '-1');
-    await settingsPage.profile.expectThemeFocused('System');
-
-    // ArrowLeft wraps back to Light from System.
-    await settingsPage.profile.pressThemeKey('System', 'ArrowLeft');
-    await settingsPage.profile.expectThemeSelected('Light');
-    await settingsPage.profile.expectThemeFocused('Light');
-
-    // End jumps to the last option (Dark).
-    await settingsPage.profile.pressThemeKey('Light', 'End');
-    await settingsPage.profile.expectThemeSelected('Dark');
-    await settingsPage.profile.expectThemeFocused('Dark');
-  });
-});
-
+// LS-9135: the Appearance / theme section that LS-4912 added to this page was
+// removed — theme selection now lives solely on /preferences (the canonical
+// location per docs/design/UUCswUjg_28Xzcqii7Rt2Q), eliminating the
+// duplicate control the client reported. LS-4912's original concern — mobile
+// users reaching this page via the bottom-bar "You" tab had no path to the
+// theme control because the desktop nav dropdown (which carries its own
+// theme picker) isn't rendered on mobile — is now addressed by a
+// "Preferences" link in the mobile nav drawer's "You" section instead (see
+// mobile-responsive-nav.spec.ts). Theme-control coverage for /preferences
+// itself lives in dark-mode.spec.ts.
 // ---------------------------------------------------------------------------
 // LS-7825: Linked Identities section — canonical email management
 // ---------------------------------------------------------------------------

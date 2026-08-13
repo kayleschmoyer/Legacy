@@ -11,6 +11,7 @@ import { LogOut } from '@tamagui/lucide-icons/icons/LogOut';
 import { Plus } from '@tamagui/lucide-icons/icons/Plus';
 import { Settings } from '@tamagui/lucide-icons/icons/Settings';
 import { Shuffle } from '@tamagui/lucide-icons/icons/Shuffle';
+import { SlidersHorizontal } from '@tamagui/lucide-icons/icons/SlidersHorizontal';
 import { Ticket } from '@tamagui/lucide-icons/icons/Ticket';
 import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { User } from '@tamagui/lucide-icons/icons/User';
@@ -486,6 +487,11 @@ export const MobileNavDrawer: React.FC<Props> = ({
             icon: <Settings size={18} />,
             label: 'Settings',
             to: '/profile/settings',
+          },
+          {
+            icon: <SlidersHorizontal size={18} />,
+            label: 'Preferences',
+            to: '/preferences',
           },
           {
             icon: <HelpCircle size={18} />,
