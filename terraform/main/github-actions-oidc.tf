@@ -73,14 +73,16 @@ resource "aws_iam_role_policy" "github_actions_additional" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
-      # Secrets Manager access for RDS credentials and application secrets
+      # Secrets Manager access for RDS credentials and application secrets.
+      # The RDS credentials secret is named with the name_prefix + "-db-creds-" prefix (see
+      # secrets.tf), so it is already covered by the name_prefix wildcard entry below — do not
+      # re-add an explicit db-creds ARN here (LS-9383).
       {
         Effect = "Allow"
         Action = [
           "secretsmanager:GetSecretValue"
         ]
         Resource = [
-          "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:legacy-sports-dev-db-creds-*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:${local.name_prefix}-*",
           "arn:aws:secretsmanager:${local.region}:${local.account_id}:secret:dev/*"
         ]
@@ -222,6 +224,11 @@ resource "aws_iam_role_policy" "github_actions_additional" {
       #
       # logs:DescribeLogGroups does not support resource-level permissions — it must use Resource "*".
       # Splitting it into its own statement avoids AccessDeniedException during terraform plan/refresh.
+      #
+      # The log-group ARNs below deliberately have no ":*" companion entries: an IAM "*" matches any
+      # characters including ":", so a trailing-wildcard log-group ARN already covers both the bare
+      # group ARN and its ":*" / ":log-stream:<name>" forms. The ":*" duplicates were removed on
+      # LS-9383 to reclaim headroom — do not re-add them.
       {
         Effect   = "Allow"
         Action   = ["logs:DescribeLogGroups"]
@@ -236,9 +243,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*"
         ]
       },
       # CloudWatch Logs write permissions for Terraform apply (creating new log groups)
@@ -258,9 +263,7 @@ resource "aws_iam_role_policy" "github_actions_additional" {
         ]
         Resource = [
           "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/lambda/${local.name_prefix}-*:*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*",
-          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*:*"
+          "arn:aws:logs:${local.region}:${local.account_id}:log-group:/aws/apigateway/${local.name_prefix}-*"
         ]
       },
       # Secrets Manager read permissions
@@ -510,6 +513,10 @@ resource "aws_iam_role_policy" "github_actions_additional" {
       },
       # API Gateway write permissions for Terraform apply (integration responses, methods, domains, account, etc.)
       # /apis (no wildcard) is required for POST when creating new HTTP APIs (apigatewayv2_api).
+      # /tags/* covers v1 (REST API) tag operations — do not add a separate `apigateway:PUT` on
+      # /tags/* statement; it is subsumed by this one (LS-9383). ApiGatewayV2 tagging needs the
+      # explicit apigateway:TagResource/UntagResource actions, which live in
+      # github_actions_supplemental — not a PUT grant.
       {
         Effect = "Allow"
         Action = [
@@ -526,16 +533,6 @@ resource "aws_iam_role_policy" "github_actions_additional" {
           "arn:aws:apigateway:${local.region}::/domainnames/*",
           "arn:aws:apigateway:${local.region}::/tags/*",
           "arn:aws:apigateway:${local.region}::/account"
-        ]
-      },
-      # API Gateway tagging - scoped to PUT only (Terraform tag operations)
-      {
-        Effect = "Allow"
-        Action = [
-          "apigateway:PUT"
-        ]
-        Resource = [
-          "arn:aws:apigateway:${local.region}::/tags/*"
         ]
       },
       # Lambda read permissions

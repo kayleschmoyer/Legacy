@@ -22,9 +22,11 @@ Exit codes:
   1 — one or more policies exceed (or are within 240 bytes of) their limit
   2 — script failed to parse the file (something changed shape; investigate)
 
-Note: exit 1 is the current baseline — github_actions_additional and
-github_actions_supplemental are both closed for new edits and sit near their
-limits by design. See the per-policy expectations table in the reference below.
+Note: exit 0 is the expected baseline as of LS-9383, which trimmed provably
+redundant grants out of github_actions_additional. A non-zero exit means your
+change pushed a policy over the line — do not ignore it. New permissions belong
+in github_actions_supplemental_2; the other two policies are closed for new
+edits. See the per-policy expectations table in the reference below.
 
 Read .agents/skills/infrastructure/references/iam-policies.md for the
 full convention (inline and supplemental = closed, supplemental_2 = default
@@ -209,11 +211,12 @@ def main() -> int:
         return 0
 
     print(
-        "Policy size check FAILED. Read "
-        ".agents/skills/infrastructure/references/iam-policies.md for the "
-        "convention (default new permissions to github_actions_supplemental_2; "
-        "the inline and supplemental policies are closed for new edits and are "
-        "expected to report near their limits)."
+        "Policy size check FAILED. This is NOT the baseline — all three "
+        "policies fit with headroom as of LS-9383, so a failure here is your "
+        "change. Read .agents/skills/infrastructure/references/iam-policies.md "
+        "for the convention (default new permissions to "
+        "github_actions_supplemental_2; the inline and supplemental policies "
+        "are closed for new edits)."
     )
     return 1
 

@@ -1,6 +1,6 @@
 ---
 name: iam-policies
-description: 'Add IAM permissions to the github-actions deploy role without exceeding AWS policy size limits. New permissions go in github_actions_supplemental_2 — the other two policies are full. Read this before adding any new statement to terraform/main/github-actions-oidc.tf.'
+description: 'Add IAM permissions to the github-actions deploy role without exceeding AWS policy size limits. New permissions go in github_actions_supplemental_2 — the other two policies are closed for new edits. Read this before adding any new statement to terraform/main/github-actions-oidc.tf.'
 ---
 
 # Skill: Adding IAM Permissions to the GitHub Actions Deploy Role
@@ -19,15 +19,15 @@ That error doesn't surface until **`terraform apply` runs in CI on `main`** — 
 
 `terraform/main/github-actions-oidc.tf` defines three policies on the same role. All three attach to the same role, so behavior is identical — only the size budget differs.
 
-| Resource                                        | Type    | AWS limit             | Use for                                                                                                                              |
-| ----------------------------------------------- | ------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `aws_iam_role_policy.github_actions_additional` | Inline  | **10,240 bytes**      | Permissions that have been here since the role was created. **Closed for new edits** — effectively full.                             |
-| `aws_iam_policy.github_actions_supplemental`    | Managed | 6,144 bytes / version | **Also closed for new edits.** Houses CloudTrail and external-secrets overflow. Was the default home until LS-9382; now ~94.8% full. |
-| `aws_iam_policy.github_actions_supplemental_2`  | Managed | 6,144 bytes / version | **Default home for all new permissions** (added on LS-9382). This is the only policy with meaningful headroom.                       |
+| Resource                                        | Type    | AWS limit             | Use for                                                                                                                               |
+| ----------------------------------------------- | ------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `aws_iam_role_policy.github_actions_additional` | Inline  | **10,240 bytes**      | Permissions that have been here since the role was created. **Closed for new edits** — the LS-9383 trim is safety margin, not budget. |
+| `aws_iam_policy.github_actions_supplemental`    | Managed | 6,144 bytes / version | **Also closed for new edits.** Houses CloudTrail and external-secrets overflow. Was the default home until LS-9382; now ~94.8% full.  |
+| `aws_iam_policy.github_actions_supplemental_2`  | Managed | 6,144 bytes / version | **Default home for all new permissions** (added on LS-9382). This is the only policy with meaningful headroom.                        |
 
 **Default rule: add new statements to `github_actions_supplemental_2`.** Only edit the other two if you are removing a statement or fixing a typo.
 
-> **Why the default moved (LS-9382).** Both older policies reached their AWS limit at the same time — the inline policy at 10,189/10,240 bytes (99.5%) and `github_actions_supplemental` at 5,822/6,144 (94.8%, ~322 bytes of headroom). `github_actions_supplemental_2` was added because a third policy on the same role was cheaper and lower-risk than trimming unrelated statements out of either. **These byte counts are a snapshot (2026-08-12) — always re-run the size check below rather than trusting them.**
+> **Why the default moved (LS-9382).** Both older policies reached their AWS limit at the same time — the inline policy at 10,189/10,240 bytes (99.5%) and `github_actions_supplemental` at 5,822/6,144 (94.8%, ~322 bytes of headroom). `github_actions_supplemental_2` was added because a third policy on the same role was cheaper and lower-risk than trimming unrelated statements out of either. LS-9383 later reclaimed 520 bytes of the inline policy by deleting provably redundant grants (a subsumed `apigateway:PUT` statement, a hardcoded db-creds ARN already covered by the `name_prefix` wildcard, and four `:*` log-group duplicates) — that headroom is a safety margin, **not** a reason to move the default back. **These byte counts are a snapshot (2026-08-12) — always re-run the size check below rather than trusting them.**
 
 `github_actions_supplemental_2` carries the in-file comment marking the current convention:
 
@@ -46,15 +46,15 @@ Terraform plan does **not** catch policy-size violations. Run this Python check 
 python scripts/check-iam-policy-size.py
 ```
 
-The script measures **all three** policies and exits non-zero when any of them is within 240 bytes of its limit. Expectations are per-policy, and two of the three are already over the "leave headroom" line by design:
+The script measures **all three** policies and exits non-zero when any of them is within 240 bytes of its limit. As of LS-9383 all three clear that line, so **exit 0 is the baseline and a non-zero exit is your change** — do not wave it through:
 
-| Policy                                    | Target                        | Reality (2026-08-12)                                                                                                                     |
-| ----------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| inline (`github_actions_additional`)      | n/a — closed for new edits    | 10,189 / 10,240 (99.5%) — **expected to fail the check**; tracked as LS-9383. Do not "fix" this as a side effect of an unrelated change. |
-| managed (`github_actions_supplemental`)   | n/a — closed for new edits    | 5,822 / 6,144 (94.8%) — will not come back under 5,800 and is not supposed to.                                                           |
-| managed (`github_actions_supplemental_2`) | under 5,800 bytes per version | 619 / 6,144 (10.1%) — this is the number your change should move.                                                                        |
+| Policy                                    | Target                        | Reality (2026-08-13)                                                                                              |
+| ----------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| inline (`github_actions_additional`)      | n/a — closed for new edits    | 9,669 / 10,240 (94.4%) — trimmed on LS-9383. Any growth here means you edited the wrong policy.                   |
+| managed (`github_actions_supplemental`)   | n/a — closed for new edits    | 5,822 / 6,144 (94.8%) — will not come back under 5,800 and is not supposed to. Any growth means the wrong policy. |
+| managed (`github_actions_supplemental_2`) | under 5,800 bytes per version | 619 / 6,144 (10.1%) — this is the number your change should move.                                                 |
 
-**So a non-zero exit is the current baseline, not necessarily your fault.** Compare the output against the table above: the only regression that should block your push is `github_actions_supplemental_2` growing past ~5,800 bytes, or either closed policy growing at all. If a closed policy grew, you edited the wrong one — move the statement to `github_actions_supplemental_2`.
+If the check fails, find which policy moved. `github_actions_supplemental_2` past ~5,800 bytes means it is time for a `_3` policy (see the failure-modes table below); either closed policy growing at all means you added the statement to the wrong one — move it to `github_actions_supplemental_2`.
 
 If you don't have the script, do a rough sanity check with `terraform plan -out=tfplan && terraform show -json tfplan | python -c "..."` — but the script is faster and worth committing.
 
@@ -129,11 +129,11 @@ Add **two** entries per new policy — the `aws_iam_policy` **and** its `aws_iam
 
 1. Identify the AWS API call(s) that Terraform will make. (Check `terraform plan` output or AWS CloudTrail for the failing apply.)
 2. Look up the action(s) in the [Service Authorization Reference](https://docs.aws.amazon.com/service-authorization/latest/reference/reference_policies_actions-resources-contextkeys.html). Note whether each action supports resource-level permissions.
-3. Find the right statement block in `github_actions_supplemental_2` (group with similar service actions when one exists; otherwise add a new block). Do not add to `github_actions_additional` or `github_actions_supplemental` — both are full.
+3. Find the right statement block in `github_actions_supplemental_2` (group with similar service actions when one exists; otherwise add a new block). Do not add to `github_actions_additional` or `github_actions_supplemental` — both are closed for new edits.
 4. If any action doesn't support resource-level permissions, **split it into its own statement** with `Resource = "*"`.
 5. Add a brief comment explaining what the actions are for (Terraform calls? Specific resource lifecycle?).
 6. Run `terraform fmt`.
-7. Run the policy-size check (above) — abort if `github_actions_supplemental_2` is within 240 bytes of its limit, or if either closed policy grew. A non-zero exit caused only by the two closed policies is the known baseline (see Validation).
+7. Run the policy-size check (above) — it must exit 0. Abort if `github_actions_supplemental_2` is within 240 bytes of its limit, or if either closed policy grew.
    - If you added a **new policy resource**, also add it plus its role attachment to the `-target` list in `.github/workflows/lambda-terraform-apply.yml` (gotcha #4).
 8. Run `make pc`, commit, push.
 9. Watch the `Apply Lambda Infrastructure` workflow on `main` after merge. **Do not consider the change shipped until apply succeeds**, because terraform plan does not catch size or resource-level violations.

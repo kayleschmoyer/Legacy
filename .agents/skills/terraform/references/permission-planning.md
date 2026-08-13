@@ -87,7 +87,7 @@ Apply-only perms (`Create*`, `Update*`, `Delete*`, `Tag*`) cannot be validated p
 python scripts/check-iam-policy-size.py
 ```
 
-The script measures the three policies attached to the apply role (not `github_actions_plan_policy`). Two of them (`github_actions_additional`, `github_actions_supplemental`) are **already** near their limits and closed for new edits, so a non-zero exit is the current baseline — see the per-policy expectations table in [iam-policies.md § Validation](../../infrastructure/references/iam-policies.md#validation-estimate-policy-size-before-pushing). Abort the push if `github_actions_supplemental_2` is within **240 bytes** of its limit, or if either closed policy grew at all.
+The script measures the three policies attached to the apply role (not `github_actions_plan_policy`). All three clear the 240-byte headroom line as of LS-9383, so **exit 0 is the baseline and a non-zero exit is your change** — see the per-policy expectations table in [iam-policies.md § Validation](../../infrastructure/references/iam-policies.md#validation-estimate-policy-size-before-pushing). Abort the push if `github_actions_supplemental_2` is within **240 bytes** of its limit, or if either closed policy (`github_actions_additional`, `github_actions_supplemental` — both still closed for new edits) grew at all.
 
 If `github_actions_supplemental_2` fills up, consolidate wildcards where no scoping is lost (e.g. merge `sso:CreateApplication`, `sso:UpdateApplication`, `sso:DeleteApplication` into `sso:*Application*`), or add a further supplemental policy (`_3`) attached to the same role — AWS allows 10 managed policies per role. A new policy resource must also be added to the `-target` bootstrap list in `.github/workflows/lambda-terraform-apply.yml`.
 
