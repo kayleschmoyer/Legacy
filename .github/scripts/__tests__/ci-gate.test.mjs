@@ -10,6 +10,9 @@
  *  - LS-9378 run-recency guard: a `failure` verdict may always be posted, but a
  *    `success` verdict must prove it is the newest word on the SHA, so a
  *    re-run of a superseded run can never replay stale green over newer red.
+ *  - LS-9359: createCommitStatus retries transient rate-limit/5xx errors and
+ *    degrades to a no-op (rather than throwing) once retries are exhausted, so
+ *    a rate-limit blip can never fail the summarize job outright.
  *
  * Run via: node --test .github/scripts/__tests__/ci-gate.test.mjs
  */
@@ -26,6 +29,7 @@ const {
   GATE_INPUT_JOBS,
   computeGateConclusion,
   runIdFromTargetUrl,
+  isRetryableStatusError,
   postCiGate,
 } = require(
   path.join(path.dirname(fileURLToPath(import.meta.url)), '../ci-gate.js'),
@@ -75,6 +79,9 @@ function makeGithub({
   existingStatuses = [],
   runsError = null,
   statusesError = null,
+  // LS-9359: queue of errors createCommitStatus throws on successive calls,
+  // consumed one per attempt (shift). Once empty, calls succeed normally.
+  createStatusErrors = [],
 } = {}) {
   const calls = { statuses: [], get: 0, listRuns: 0, listStatuses: 0 };
   const github = {
@@ -94,6 +101,9 @@ function makeGithub({
       },
       repos: {
         createCommitStatus: async (args) => {
+          if (createStatusErrors.length > 0) {
+            throw createStatusErrors.shift();
+          }
           calls.statuses.push(args);
           return { data: {} };
         },
@@ -106,6 +116,13 @@ function makeGithub({
     },
   };
   return { github, calls };
+}
+
+/** Build an Octokit-shaped error with a `status` code, per real error objects. */
+function statusError(status, message) {
+  const err = new Error(message);
+  err.status = status;
+  return err;
 }
 
 function makeContext(pr = { number: 7, head: { sha: HEAD_SHA } }) {
@@ -646,5 +663,121 @@ describe('ci-gate — a success verdict must be current (LS-9378)', () => {
     } finally {
       process.env.GITHUB_RUN_ID = saved;
     }
+  });
+});
+
+// ── LS-9359: createCommitStatus rate-limit/5xx resilience ─────────────────────
+
+describe('ci-gate — isRetryableStatusError classifies transient errors', () => {
+  it('treats installation rate-limit 403s as retryable', () => {
+    assert.strictEqual(
+      isRetryableStatusError(
+        statusError(403, 'API rate limit exceeded for installation'),
+      ),
+      true,
+    );
+  });
+
+  it('treats 429 as retryable', () => {
+    assert.strictEqual(
+      isRetryableStatusError(statusError(429, 'too many')),
+      true,
+    );
+  });
+
+  it('treats 5xx as retryable', () => {
+    assert.strictEqual(
+      isRetryableStatusError(statusError(502, 'bad gateway')),
+      true,
+    );
+  });
+
+  it('does not retry a non-rate-limit 403 (e.g. permissions)', () => {
+    assert.strictEqual(
+      isRetryableStatusError(statusError(403, 'Resource not accessible')),
+      false,
+    );
+  });
+
+  it('does not retry a 404 or other 4xx', () => {
+    assert.strictEqual(
+      isRetryableStatusError(statusError(404, 'not found')),
+      false,
+    );
+  });
+
+  it('does not retry an error with no status code', () => {
+    assert.strictEqual(isRetryableStatusError(new Error('boom')), false);
+  });
+});
+
+describe('ci-gate — postCiGate survives createCommitStatus rate-limit/5xx blips', () => {
+  it('retries a transient rate-limit error and posts on the next attempt', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      createStatusErrors: [
+        statusError(403, 'API rate limit exceeded for installation'),
+      ],
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(
+      calls.statuses.length,
+      1,
+      'the retried attempt posts once',
+    );
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it('degrades to a no-op instead of throwing once retries are exhausted', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      // withStatusRetry defaults to 2 retries (3 attempts total) — exhaust all.
+      createStatusErrors: [
+        statusError(500, 'internal server error'),
+        statusError(500, 'internal server error'),
+        statusError(500, 'internal server error'),
+      ],
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(
+      res.posted,
+      false,
+      'must not throw — a missed post degrades to posted: false',
+    );
+    assert.strictEqual(res.reason, 'status-post-failed');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('does not retry a non-transient error — fails fast', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      createStatusErrors: [statusError(422, 'unprocessable')],
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'status-post-failed');
+    assert.strictEqual(calls.statuses.length, 0);
   });
 });

@@ -267,6 +267,46 @@ async function assertSuccessIsCurrent({
 }
 
 /**
+ * Whether an Octokit REST error is a transient rate-limit/5xx condition worth
+ * retrying (LS-9359). Primary GitHub App installation rate limits surface as
+ * 403 with an "API rate limit exceeded" message; secondary rate limits can
+ * surface as 403 or 429; server-side failures are 5xx.
+ */
+function isRetryableStatusError(err) {
+  const status = err && err.status;
+  if (typeof status !== 'number') return false;
+  if (status >= 500) return true;
+  if (status === 429) return true;
+  if (status === 403 && /rate limit/i.test(err.message || '')) return true;
+  return false;
+}
+
+/**
+ * Retry an Octokit call a couple of times with a short fixed backoff, but only
+ * for transient rate-limit/5xx errors (isRetryableStatusError). Any other
+ * error — or the final exhausted attempt — rethrows so the caller decides how
+ * to degrade.
+ *
+ * @template T
+ * @param {() => Promise<T>} fn
+ * @param {{ retries?: number, delayMs?: number }} [opts]
+ * @returns {Promise<T>}
+ */
+async function withStatusRetry(fn, { retries = 2, delayMs = 500 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt === retries || !isRetryableStatusError(err)) throw err;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastErr;
+}
+
+/**
  * Post the aggregate `CI Gate` commit status for the PR head SHA.
  *
  * SHA-currency guard: re-fetch the PR's current head SHA and no-op (post
@@ -389,15 +429,37 @@ async function postCiGate({
     ? `https://github.com/${owner}/${repo}/actions/runs/${selfRunId}`
     : undefined;
 
-  await github.rest.repos.createCommitStatus({
-    owner,
-    repo,
-    sha: targetSha,
-    state,
-    context: CI_GATE_CONTEXT,
-    description,
-    target_url,
-  });
+  // LS-9359: a GitHub App installation rate-limit/5xx blip here must not throw
+  // unhandled — that fails the whole summarize job (and CI Gate /
+  // process-merge-queue with it) even though every real check already passed.
+  // Retry transient errors briefly; if they persist, degrade to a no-op post
+  // (mirroring the pulls.get() fallback above) rather than crashing the job.
+  try {
+    await withStatusRetry(() =>
+      github.rest.repos.createCommitStatus({
+        owner,
+        repo,
+        sha: targetSha,
+        state,
+        context: CI_GATE_CONTEXT,
+        description,
+        target_url,
+      }),
+    );
+  } catch (e) {
+    core.warning(
+      `CI Gate: failed to post '${state}' for ${targetSha} on PR #${pr.number} ` +
+        `after retries (${e.message}) — the gate status was not posted; a ` +
+        `subsequent run or manual retrigger will post it.`,
+    );
+    return {
+      posted: false,
+      reason: 'status-post-failed',
+      sha: targetSha,
+      failing,
+      ignored,
+    };
+  }
 
   core.info(
     `CI Gate: posted '${state}' for ${targetSha} on PR #${pr.number} — ${description}`,
@@ -412,5 +474,6 @@ module.exports = {
   computeGateConclusion,
   runIdFromTargetUrl,
   assertSuccessIsCurrent,
+  isRetryableStatusError,
   postCiGate,
 };
