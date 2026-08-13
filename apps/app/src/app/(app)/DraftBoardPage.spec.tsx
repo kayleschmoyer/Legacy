@@ -19,7 +19,7 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate }),
 }));
 
-jest.mock('@legacy-sports/shared-components', () => {
+jest.mock('@legacy-sports/shared-components/elite-draft', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {

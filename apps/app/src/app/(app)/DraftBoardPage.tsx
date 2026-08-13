@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Text, YStack } from 'tamagui';
-import { EliteDraftBoardScreen } from '@legacy-sports/shared-components';
+import { EliteDraftBoardScreen } from '@legacy-sports/shared-components/elite-draft';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import { toIntId } from '../../common/utilities/RouteUtils';
