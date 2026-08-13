@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { Button, ScrollView, Text, useMedia, XStack, YStack } from 'tamagui';
 import type { LeagueTeam } from './types';
 import { DraftSlotTradePanel } from './DraftSlotTradePanel';
@@ -55,6 +56,43 @@ const LOBBY_CHROME: Record<
 // nav bar the same way the rest of the draft board does.
 const NAV_HEIGHT_PX = 75;
 const NAV_Z_INDEX = 200;
+
+/**
+ * `position: 'fixed'` has no React Native equivalent (RN only supports
+ * 'absolute'/'relative') — on native the unrecognized value, combined with
+ * unhonored right/bottom/left offsets, left this screen with no resolved
+ * size and rendered a blank page for freshly-created shared mock drafts
+ * (LS-9392: any draft landing here in the 'not-started' lobby state before
+ * the live board takes over). Native instead relies on the parent's own
+ * `flex: 1` container (DraftBoardPage.tsx) to fill the screen, mirroring how
+ * LeagueDetailShell.tsx's sticky-below-nav header handles the same
+ * web-only-positioning split ("native renders it inline").
+ *
+ * Exported as a pure function (rather than inlined in the component) so it
+ * can be unit-tested directly — Tamagui's Jest mock strips
+ * position/top/right/bottom/left/flex before they reach the DOM, which makes
+ * this branch unobservable through a mounted-component assertion.
+ */
+export function resolveLobbyOverlayProps(platformOS: string):
+  | {
+      position: 'fixed';
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+    }
+  | { flex: number } {
+  if (platformOS === 'web') {
+    return {
+      position: 'fixed',
+      top: NAV_HEIGHT_PX,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    };
+  }
+  return { flex: 1 };
+}
 
 // DraftSlotTradePanel (LS-8677) is rendered exclusively by this screen but is
 // its own component, out of scope for this port (see LS-9061) — it still
@@ -141,13 +179,11 @@ export function PreDraftLobby({
     setCustomDraftOrder(next);
   };
 
+  const lobbyLayoutProps = resolveLobbyOverlayProps(Platform.OS);
+
   return (
     <YStack
-      position="fixed"
-      top={NAV_HEIGHT_PX}
-      right={0}
-      bottom={0}
-      left={0}
+      {...lobbyLayoutProps}
       zIndex={NAV_Z_INDEX - 2}
       backgroundColor="$background"
       overflow="hidden"

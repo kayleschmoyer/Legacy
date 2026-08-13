@@ -1,5 +1,6 @@
 import React from 'react';
-import { PreDraftLobby } from './PreDraftLobby';
+import { Platform } from 'react-native';
+import { PreDraftLobby, resolveLobbyOverlayProps } from './PreDraftLobby';
 import type { LeagueTeam } from './types';
 import { render } from '../../test-utils';
 
@@ -190,5 +191,37 @@ describe('PreDraftLobby — init error state (LS-9061)', () => {
       />,
     );
     expect(getByText('Failed to start the draft.')).toBeTruthy();
+  });
+});
+
+// LS-9392 regression: `position: 'fixed'` has no React Native equivalent —
+// on native the value (plus unhonored right/bottom/left offsets) left this
+// screen with no resolved size, rendering a blank page after "Continue to
+// Draft Room" for a freshly-created shared mock draft (which lands here,
+// draftStatus='not-started', before the live board takes over). Tamagui's
+// Jest mock strips position/top/right/bottom/left/flex before they reach the
+// DOM (same constraint the LS-8440 PlayerStatsPage native-render regression
+// documents), so the platform branch is asserted directly against the pure
+// `resolveLobbyOverlayProps` helper rather than through rendered output.
+describe('PreDraftLobby — overlay positioning is platform-safe (LS-9392)', () => {
+  it('never returns position "fixed" for a native platform', () => {
+    expect(resolveLobbyOverlayProps('ios')).toEqual({ flex: 1 });
+    expect(resolveLobbyOverlayProps('android')).toEqual({ flex: 1 });
+  });
+
+  it('keeps the existing fixed, below-nav positioning on web', () => {
+    expect(resolveLobbyOverlayProps('web')).toEqual({
+      position: 'fixed',
+      top: 75,
+      right: 0,
+      bottom: 0,
+      left: 0,
+    });
+  });
+
+  it(`renders lobby content under the current platform (Platform.OS === "${Platform.OS}") without throwing`, () => {
+    expect(() =>
+      render(<PreDraftLobby {...makeProps({ leagueTeams: TEAMS })} />),
+    ).not.toThrow();
   });
 });
