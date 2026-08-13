@@ -17,6 +17,13 @@ Use WebFetch to load it and apply all tokens, colors, typography, and component 
 
 See [`docs/design/brand.md`](../../../docs/design/brand.md) for brand personality, color application rules, typography, motion principles, and layout guidelines specific to this project.
 
+### Per-surface persistent guidance
+
+Some surfaces carry hard-won rules that are easy to re-derive badly. Read the surface's
+`CLAUDE.md` before changing its layout, padding, or hit targets:
+
+- **League Detail** — [`docs/design/qDGBVlOyaV-306Id0kWq0Q/league-detail-page/project/CLAUDE.md`](../../../docs/design/qDGBVlOyaV-306Id0kWq0Q/league-detail-page/project/CLAUDE.md): responsive density tiers, phone header structure, and the rule that touch hit areas expand via transparent pseudo-element insets rather than physical size.
+
 ## Implementation
 
 Produce production-grade, visually distinctive code that executes the design system with precision:
