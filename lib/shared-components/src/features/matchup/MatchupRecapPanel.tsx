@@ -16,7 +16,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { BookOpen, Star, Trophy } from '@tamagui/lucide-icons';
+import { BookOpen } from '@tamagui/lucide-icons/icons/BookOpen';
+import { Star } from '@tamagui/lucide-icons/icons/Star';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { useGetMatchupRecapQuery } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
 import { EmptyState } from '../../components/EmptyState';

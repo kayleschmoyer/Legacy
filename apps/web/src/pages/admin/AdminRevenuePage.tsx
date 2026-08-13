@@ -7,7 +7,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { Card, Spinner, Text } from 'tamagui';
 import { styled } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { captureError } from '@legacy-sports/rollbar/web';
 import {

@@ -12,15 +12,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  ArrowUpDown,
-  ChevronDown,
-  RefreshCw,
-  Search,
-  Tag,
-  TrendingUp,
-  User,
-} from '@tamagui/lucide-icons';
+import { ArrowUpDown } from '@tamagui/lucide-icons/icons/ArrowUpDown';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
+import { Tag } from '@tamagui/lucide-icons/icons/Tag';
+import { TrendingUp } from '@tamagui/lucide-icons/icons/TrendingUp';
+import { User } from '@tamagui/lucide-icons/icons/User';
 import { PlayerFragment, useGetAllPlayersQuery } from './PlayersApi';
 import { formatProjection } from './usePlayerProjections';
 

@@ -12,7 +12,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { ChevronDown, RefreshCw, Search } from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
 import {
   formatBaseballCardSubStats,
   PlayerFeedCard,

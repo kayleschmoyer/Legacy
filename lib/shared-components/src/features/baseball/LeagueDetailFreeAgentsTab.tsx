@@ -1,14 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Input, ScrollView, Text, XStack, YStack } from 'tamagui';
-import {
-  ArrowDown,
-  ArrowUp,
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  Info,
-  Search,
-} from '@tamagui/lucide-icons';
+import { ArrowDown } from '@tamagui/lucide-icons/icons/ArrowDown';
+import { ArrowUp } from '@tamagui/lucide-icons/icons/ArrowUp';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { Eye } from '@tamagui/lucide-icons/icons/Eye';
+import { Info } from '@tamagui/lucide-icons/icons/Info';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
 import { useApolloClient } from '@apollo/client/react';
 import { LOGGER } from '@legacy-sports/logging';
 import {

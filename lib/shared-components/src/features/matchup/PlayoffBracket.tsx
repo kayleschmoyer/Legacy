@@ -10,7 +10,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Trophy } from '@tamagui/lucide-icons';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { PlayoffMatchupStatus, PlayoffRound } from '@legacy-sports/graphql';
 import { BRAND_GOLD, BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 

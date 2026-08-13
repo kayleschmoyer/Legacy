@@ -10,7 +10,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { AlertTriangle } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
 import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,

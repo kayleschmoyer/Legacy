@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { ERAS_BY_SPORT, type LeagueSport } from './constants';
 import {
   BG_DARK,

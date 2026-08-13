@@ -7,7 +7,7 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Dialog } from 'tamagui';
-import { Bug } from '@tamagui/lucide-icons';
+import { Bug } from '@tamagui/lucide-icons/icons/Bug';
 import { env } from '../../config/environment';
 import { CSRF_HEADER, getCsrfToken } from '../../lib/csrf';
 import type { CapturedError } from '../../lib/consoleErrorCapture';

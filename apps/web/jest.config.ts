@@ -21,6 +21,16 @@ export default {
       '<rootDir>/src/__mocks__/@react-navigation/stack.js',
     '^@tamagui/lucide-icons$':
       '<rootDir>/src/__mocks__/tamagui-lucide-icons.js',
+    // LS-9423: deep icon imports (@tamagui/lucide-icons/icons/<Name>) must
+    // resolve to the same mock as the barrel import, or they fall through
+    // to the generic '@tamagui/(.*)$' mock below and break icon rendering.
+    // This app has no jest.mock('@tamagui/lucide-icons', ...) registration
+    // anywhere (unlike shared-components/app) — moduleNameMapper is the
+    // only interception point here, and mapped-to values are not re-run
+    // through moduleNameMapper, so this must point straight at the mock
+    // file rather than at the bare '@tamagui/lucide-icons' specifier.
+    '^@tamagui/lucide-icons/icons/.*$':
+      '<rootDir>/src/__mocks__/tamagui-lucide-icons.js',
     '^@tamagui/config/v4$': '<rootDir>/src/__mocks__/@tamagui/config/v4.js',
     '^@tamagui/(.*)$': '<rootDir>/src/__mocks__/tamagui.js',
     '^__PLATFORM_COMPONENTS__$':

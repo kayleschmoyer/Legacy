@@ -11,14 +11,12 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ScrollView, Separator, styled, Text } from 'tamagui';
-import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Star,
-  X,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { Star } from '@tamagui/lucide-icons/icons/Star';
+import { X } from '@tamagui/lucide-icons/icons/X';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { PageMeta } from '../../components/PageMeta';
 import { PriceSkeleton } from '../../components/PriceSkeleton';
 import {

@@ -7,7 +7,9 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useWebSocket } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
 import { Button, Spinner, styled } from 'tamagui';
-import { Bell, CheckCheck, Eye } from '@tamagui/lucide-icons';
+import { Bell } from '@tamagui/lucide-icons/icons/Bell';
+import { CheckCheck } from '@tamagui/lucide-icons/icons/CheckCheck';
+import { Eye } from '@tamagui/lucide-icons/icons/Eye';
 import {
   GetNotificationHistory,
   type GetNotificationHistoryQuery,

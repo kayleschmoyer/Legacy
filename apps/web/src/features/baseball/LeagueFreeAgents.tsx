@@ -9,16 +9,14 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  AlertCircle,
-  Award,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  UserPlus,
-  Users,
-  X,
-} from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { Award } from '@tamagui/lucide-icons/icons/Award';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
+import { UserPlus } from '@tamagui/lucide-icons/icons/UserPlus';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { useGetPlayersWithStatsQuery } from '@legacy-sports/graphql';
 import { WaiverClaimModal } from './WaiverClaimModal';
 import { useLeagueTakenPlayers } from '../../hooks/useLeagueTakenPlayers';

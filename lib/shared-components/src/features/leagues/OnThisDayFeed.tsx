@@ -7,13 +7,11 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Separator, Spinner, styled, Text, XStack, YStack } from 'tamagui';
-import {
-  ArrowLeftRight,
-  Calendar,
-  ChevronRight,
-  TrendingUp,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { TrendingUp } from '@tamagui/lucide-icons/icons/TrendingUp';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import {
   cleanDescription,
   extractPlayerNameFromDescription,

@@ -9,13 +9,11 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  AlertTriangle,
-  Check,
-  CircleDollarSign,
-  DollarSign,
-  X as XIcon,
-} from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { CircleDollarSign } from '@tamagui/lucide-icons/icons/CircleDollarSign';
+import { DollarSign } from '@tamagui/lucide-icons/icons/DollarSign';
+import { X as XIcon } from '@tamagui/lucide-icons/icons/X';
 import {
   useGetLeagueDuesStatusQuery,
   useMarkMemberPaidMutation,

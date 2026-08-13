@@ -1,17 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Card, H3, H4, Spinner, styled, Text } from 'tamagui';
-import {
-  Award,
-  Calendar,
-  Crown,
-  Flame,
-  Star,
-  Target,
-  TrendingUp,
-  Trophy,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { Award } from '@tamagui/lucide-icons/icons/Award';
+import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
+import { Crown } from '@tamagui/lucide-icons/icons/Crown';
+import { Flame } from '@tamagui/lucide-icons/icons/Flame';
+import { Star } from '@tamagui/lucide-icons/icons/Star';
+import { Target } from '@tamagui/lucide-icons/icons/Target';
+import { TrendingUp } from '@tamagui/lucide-icons/icons/TrendingUp';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import {
   useGetAllTimeRecordsQuery,
   useGetLeagueHistoryQuery,

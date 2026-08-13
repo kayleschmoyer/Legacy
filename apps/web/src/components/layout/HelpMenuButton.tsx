@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bug, HelpCircle, MessageSquare } from '@tamagui/lucide-icons';
+import { Bug } from '@tamagui/lucide-icons/icons/Bug';
+import { HelpCircle } from '@tamagui/lucide-icons/icons/HelpCircle';
+import { MessageSquare } from '@tamagui/lucide-icons/icons/MessageSquare';
 import { FONT_DISPLAY, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
 import {
   BORDER_INTERACTIVE,

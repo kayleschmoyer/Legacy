@@ -26,24 +26,22 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  AlertTriangle,
-  ArrowLeftRight,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Clock,
-  DollarSign,
-  Filter,
-  History,
-  MessageSquare,
-  Send,
-  Shield,
-  Users,
-  X,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { DollarSign } from '@tamagui/lucide-icons/icons/DollarSign';
+import { Filter } from '@tamagui/lucide-icons/icons/Filter';
+import { History } from '@tamagui/lucide-icons/icons/History';
+import { MessageSquare } from '@tamagui/lucide-icons/icons/MessageSquare';
+import { Send } from '@tamagui/lucide-icons/icons/Send';
+import { Shield } from '@tamagui/lucide-icons/icons/Shield';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
+import { X } from '@tamagui/lucide-icons/icons/X';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   GetLeagueTradeOffers,

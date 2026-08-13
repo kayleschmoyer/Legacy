@@ -9,19 +9,17 @@ import {
   HELP_HISTORICAL_FAQ_ITEMS,
   type HelpFaqItem,
 } from '@legacy-sports/utils';
-import {
-  AlertTriangle,
-  BarChart3,
-  Bug,
-  ChevronDown,
-  Gamepad2,
-  Lightbulb,
-  MessageCircle,
-  Plus,
-  Settings,
-  Trophy,
-  Users,
-} from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { BarChart3 } from '@tamagui/lucide-icons/icons/BarChart3';
+import { Bug } from '@tamagui/lucide-icons/icons/Bug';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { Gamepad2 } from '@tamagui/lucide-icons/icons/Gamepad2';
+import { Lightbulb } from '@tamagui/lucide-icons/icons/Lightbulb';
+import { MessageCircle } from '@tamagui/lucide-icons/icons/MessageCircle';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { BugReportButton } from '../../components/layout/BugReportButton';
 import { env } from '../../config/environment';
 import { OnboardingTutorial } from '../../components/onboarding';

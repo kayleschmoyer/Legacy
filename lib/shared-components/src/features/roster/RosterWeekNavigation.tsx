@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import { ChevronLeft, ChevronRight } from '@tamagui/lucide-icons';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
 
 export interface RosterWeekNavigationProps {
   /** The week currently being viewed. */

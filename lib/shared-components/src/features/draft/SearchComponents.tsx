@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import type { TextInput } from 'react-native';
-import { Search } from '@tamagui/lucide-icons';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
 import { Button, Input, Text, XStack, YStack } from 'tamagui';
 import { Animated, FlatList } from '../../platform-components';
 

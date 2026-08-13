@@ -256,7 +256,7 @@ export default defineConfig(({ mode }) => {
       sourcemap: isDeployBuild ? 'hidden' : false,
       // Vite's chunk size warning is generated independently from Rollup's
       // onwarn — it can only be controlled via this limit. The tamagui-vendor
-      // chunk (~1.6 MB: Tamagui + react-native-web + lucide-react) has
+      // chunk (Tamagui + react-native-web + used lucide icons) has
       // circular internal deps preventing further splitting. All other
       // chunks are under 500 kB.
       chunkSizeWarningLimit: 1700,
@@ -276,15 +276,12 @@ export default defineConfig(({ mode }) => {
                   )
                 )
                   return 'react-vendor';
-                // Tamagui UI framework + react-native-web shims.
-                // lucide-react is included because @tamagui/lucide-icons
-                // wraps it — without this, those modules land in the main
-                // index chunk instead of the vendor bundle.
-                if (
-                  /[\\/](tamagui|@tamagui|react-native-web|lucide-react)/.test(
-                    id,
-                  )
-                )
+                // Tamagui UI framework + react-native-web shims + used
+                // lucide icons (@tamagui/lucide-icons deep imports).
+                // The literal 'lucide-react' package is not a dependency
+                // here — that clause never matched and was removed
+                // (LS-9423).
+                if (/[\\/](tamagui|@tamagui|react-native-web)/.test(id))
                   return 'tamagui-vendor';
                 return undefined;
               }

@@ -1,13 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import {
-  ArrowLeftRight,
-  BarChart2,
-  ChevronLeft,
-  RefreshCw,
-  Users,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { ENTITLEMENTS } from '@legacy-sports/utils';

@@ -16,7 +16,9 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
-import { ImageOff, Search, X } from '@tamagui/lucide-icons';
+import { ImageOff } from '@tamagui/lucide-icons/icons/ImageOff';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
 // ---------------------------------------------------------------------------

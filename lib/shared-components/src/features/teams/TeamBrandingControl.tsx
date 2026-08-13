@@ -11,7 +11,8 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Shirt, Upload } from '@tamagui/lucide-icons';
+import { Shirt } from '@tamagui/lucide-icons/icons/Shirt';
+import { Upload } from '@tamagui/lucide-icons/icons/Upload';
 import {
   initialsFromTeamName,
   type TeamBrandingTeam,

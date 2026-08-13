@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
-import { ArrowLeft } from '@tamagui/lucide-icons';
+import { ArrowLeft } from '@tamagui/lucide-icons/icons/ArrowLeft';
 import {
   type FootballPlayerQuery,
   useFootballPlayerQuery,

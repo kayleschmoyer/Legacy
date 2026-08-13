@@ -5,15 +5,13 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import {
-  ChevronDown,
-  ChevronUp,
-  Lock,
-  RotateCcw,
-  Save,
-  Settings2,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { RotateCcw } from '@tamagui/lucide-icons/icons/RotateCcw';
+import { Save } from '@tamagui/lucide-icons/icons/Save';
+import { Settings2 } from '@tamagui/lucide-icons/icons/Settings2';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { AnimatePresence, Input, Text } from 'tamagui';
 import {
   type GetLeagueScoringProfileQuery,

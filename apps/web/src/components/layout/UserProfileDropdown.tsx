@@ -10,20 +10,18 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
-import {
-  ChevronDown,
-  ChevronUp,
-  CreditCard,
-  HelpCircle,
-  LogOut,
-  Monitor,
-  Moon,
-  Settings,
-  Settings2,
-  Shield,
-  Sun,
-  User,
-} from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { CreditCard } from '@tamagui/lucide-icons/icons/CreditCard';
+import { HelpCircle } from '@tamagui/lucide-icons/icons/HelpCircle';
+import { LogOut } from '@tamagui/lucide-icons/icons/LogOut';
+import { Monitor } from '@tamagui/lucide-icons/icons/Monitor';
+import { Moon } from '@tamagui/lucide-icons/icons/Moon';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
+import { Settings2 } from '@tamagui/lucide-icons/icons/Settings2';
+import { Shield } from '@tamagui/lucide-icons/icons/Shield';
+import { Sun } from '@tamagui/lucide-icons/icons/Sun';
+import { User } from '@tamagui/lucide-icons/icons/User';
 import {
   DROPDOWN_BORDER,
   FONT_DISPLAY,

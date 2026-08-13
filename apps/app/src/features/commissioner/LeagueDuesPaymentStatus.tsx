@@ -8,7 +8,8 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Check, X as XIcon } from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { X as XIcon } from '@tamagui/lucide-icons/icons/X';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetLeagueDuesStatusQuery,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Select, XStack, YStack } from 'tamagui';
-import { Check, ChevronDown } from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
 import type { NflTeam } from '@legacy-sports/shared-components';
 import { NFL_TEAMS, StatusBadge } from '@legacy-sports/shared-components';
 import type { SosTier } from '@legacy-sports/graphql';

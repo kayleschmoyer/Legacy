@@ -18,7 +18,9 @@
 
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import { Lock, Minus, Plus } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Minus } from '@tamagui/lucide-icons/icons/Minus';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
 import { WIZARD_TAP_TARGET, WizardFieldRow } from './chrome';
 import {
   type DefensiveFormatChoice,

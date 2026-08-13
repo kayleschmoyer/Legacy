@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { Button, H1, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
   MockDraftInviteCard,

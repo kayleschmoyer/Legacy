@@ -20,7 +20,9 @@ import {
 } from '@legacy-sports/shared-components/auth';
 import { BrandIcon } from '@legacy-sports/shared-components/icons';
 import { Input, ScrollView, Spinner, styled } from 'tamagui';
-import { Monitor, Moon, Sun } from '@tamagui/lucide-icons';
+import { Monitor } from '@tamagui/lucide-icons/icons/Monitor';
+import { Moon } from '@tamagui/lucide-icons/icons/Moon';
+import { Sun } from '@tamagui/lucide-icons/icons/Sun';
 import {
   useGetUserByIdQuery,
   useMyIdentitiesQuery,

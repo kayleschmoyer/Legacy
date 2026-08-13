@@ -13,7 +13,9 @@
 import React from 'react';
 import type { TextInputChangeEvent } from 'react-native';
 import { Input, Text, XStack, YStack } from 'tamagui';
-import { Check, Lock, X } from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import {
   BG_DARK,
   BRAND_GOLD,

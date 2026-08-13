@@ -14,7 +14,8 @@ import {
   TextInput,
 } from 'react-native';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Search, X } from '@tamagui/lucide-icons';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
+import { X } from '@tamagui/lucide-icons/icons/X';
 
 import type { GifPickerProps } from './GifPicker';
 

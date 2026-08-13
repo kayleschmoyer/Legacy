@@ -15,7 +15,8 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Award, Check } from '@tamagui/lucide-icons';
+import { Award } from '@tamagui/lucide-icons/icons/Award';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
 import {
   useCastAwardVoteMutation,
   useGetAwardVoteResultsQuery,

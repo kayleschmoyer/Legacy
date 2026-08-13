@@ -8,7 +8,8 @@ import {
   YStack,
 } from 'tamagui';
 import type { GetProps } from 'tamagui';
-import { Check, Minus } from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { Minus } from '@tamagui/lucide-icons/icons/Minus';
 
 // ─── Switch ──────────────────────────────────────────────────────────────────
 export interface SwitchProps extends GetProps<typeof TamaguiSwitch> {

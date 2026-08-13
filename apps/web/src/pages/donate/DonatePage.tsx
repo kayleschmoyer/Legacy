@@ -1,7 +1,7 @@
 import React from 'react';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Button, ScrollView, styled } from 'tamagui';
-import { Heart } from '@tamagui/lucide-icons';
+import { Heart } from '@tamagui/lucide-icons/icons/Heart';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useGetDonationPaymentLinkQuery } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';

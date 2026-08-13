@@ -10,7 +10,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { AlertTriangle, Check, DollarSign } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { DollarSign } from '@tamagui/lucide-icons/icons/DollarSign';
 import {
   useGetLeagueDuesSettingsQuery,
   useUpdateDuesSettingsMutation,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button, Dialog as TamaguiDialog, Text, XStack, YStack } from 'tamagui';
 import type { GetProps } from 'tamagui';
-import { X } from '@tamagui/lucide-icons';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 
 export interface DialogProps extends Omit<

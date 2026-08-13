@@ -9,7 +9,10 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { GripVertical, List, Lock, Shuffle } from '@tamagui/lucide-icons';
+import { GripVertical } from '@tamagui/lucide-icons/icons/GripVertical';
+import { List } from '@tamagui/lucide-icons/icons/List';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Shuffle } from '@tamagui/lucide-icons/icons/Shuffle';
 import {
   closestCenter,
   DndContext,

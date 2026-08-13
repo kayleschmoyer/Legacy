@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
 import type { RefreshControlProps } from 'react-native';
-import { Trophy } from '@tamagui/lucide-icons';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { formatDraftDate } from '@legacy-sports/utils';
 import {
   formatDraftDayShort,

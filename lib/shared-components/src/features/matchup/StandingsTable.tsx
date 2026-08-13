@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Card, H3, Separator, Text, XStack, YStack } from 'tamagui';
-import { Eye } from '@tamagui/lucide-icons';
+import { Eye } from '@tamagui/lucide-icons/icons/Eye';
 import { type GetLeagueStandingsQuery } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD,

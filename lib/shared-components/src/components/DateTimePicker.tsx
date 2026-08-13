@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { Adapt, Button, Popover, Text, XStack, YStack } from 'tamagui';
-import {
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  Clock,
-  X,
-} from '@tamagui/lucide-icons';
+import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { to12Hour, to24Hour } from './dateTimePickerUtils';
 import { Platform } from '../platform-components';
 

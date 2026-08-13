@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Button, Dialog, H3, Text, XStack, YStack } from 'tamagui';
-import { X } from '@tamagui/lucide-icons';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { useReducedMotion } from '@legacy-sports/shared-components/utils';
 import {
   BRAND_NAVY,

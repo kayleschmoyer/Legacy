@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Separator, Spinner, styled, Text } from 'tamagui';
-import { Trophy } from '@tamagui/lucide-icons';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   BRAND_GOLD_LIGHT,

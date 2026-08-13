@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button, Text, YStack } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { PriceSkeleton } from './PriceSkeleton';
 import { UpgradeModal } from './UpgradeModal';
 import {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../utils/colors';
 
 export interface PremiumGateProps {

@@ -1,15 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Spinner, YStack } from 'tamagui';
-import {
-  AlertCircle,
-  AlertTriangle,
-  Check,
-  Plus,
-  RefreshCw,
-  Search,
-  Trophy,
-} from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import {
   GetPublicLeagues,
   useGetPublicLeaguesQuery,

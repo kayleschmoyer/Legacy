@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { Button, Text, XStack, YStack } from 'tamagui';
-import { AlertCircle, Check, Star } from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { Star } from '@tamagui/lucide-icons/icons/Star';
 import { PriceSkeleton } from './PriceSkeleton';
 import { BaseModal } from './BaseModal';
 import {

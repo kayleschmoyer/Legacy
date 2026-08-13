@@ -13,19 +13,17 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  AlertTriangle,
-  Calculator,
-  Check,
-  ClipboardList,
-  FileText,
-  Lock,
-  RefreshCw,
-  Trash2,
-  Unlock,
-  UserMinus,
-  UserPlus,
-} from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Calculator } from '@tamagui/lucide-icons/icons/Calculator';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ClipboardList } from '@tamagui/lucide-icons/icons/ClipboardList';
+import { FileText } from '@tamagui/lucide-icons/icons/FileText';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
+import { Trash2 } from '@tamagui/lucide-icons/icons/Trash2';
+import { Unlock } from '@tamagui/lucide-icons/icons/Unlock';
+import { UserMinus } from '@tamagui/lucide-icons/icons/UserMinus';
+import { UserPlus } from '@tamagui/lucide-icons/icons/UserPlus';
 import {
   GetLeagueTeamsQuery,
   useBulkDropTeamPlayersMutation,

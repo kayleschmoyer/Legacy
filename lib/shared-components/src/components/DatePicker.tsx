@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Button, Popover, Text, XStack, YStack } from 'tamagui';
-import { Calendar, ChevronLeft, ChevronRight } from '@tamagui/lucide-icons';
+import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
 import { Platform } from '../platform-components';
 
 export interface DatePickerProps {

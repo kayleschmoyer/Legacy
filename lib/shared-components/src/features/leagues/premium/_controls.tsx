@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { BRAND_GOLD } from '../../../utils/colors';
 
 interface OptionButtonGroupProps<T extends string | number> {

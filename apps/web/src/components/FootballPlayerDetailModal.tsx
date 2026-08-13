@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, Text, XStack } from 'tamagui';
-import { ExternalLink } from '@tamagui/lucide-icons';
+import { ExternalLink } from '@tamagui/lucide-icons/icons/ExternalLink';
 import { FootballPlayerDetail } from '@legacy-sports/shared-components/football';
 import { config } from '@legacy-sports/app-config/web';
 import { ENTITLEMENTS } from '@legacy-sports/utils';

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Spinner, styled, Text, XStack, YStack } from 'tamagui';
-import { AlertCircle, Calendar, Swords } from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
+import { Swords } from '@tamagui/lucide-icons/icons/Swords';
 import { MatchupCard } from '@legacy-sports/shared-components/matchup';
 import {
   type MatchupFragment,

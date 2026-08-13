@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, Spinner, Text, XStack, YStack } from 'tamagui';
-import { AlertCircle, CheckCircle } from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { CheckCircle } from '@tamagui/lucide-icons/icons/CheckCircle';
 // import { StatsLoadingStatus } from '@legacy-sports/graphql';
 enum StatsLoadingStatus {
   NotStarted = 'NOT_STARTED',

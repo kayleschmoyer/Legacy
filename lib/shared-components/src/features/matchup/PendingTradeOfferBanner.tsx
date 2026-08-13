@@ -9,7 +9,9 @@
  */
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
-import { ArrowLeftRight, Check, X } from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetTeamTradeOffersQuery,

@@ -7,14 +7,12 @@
  */
 import React, { useCallback, useEffect } from 'react';
 import { Card, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
-import {
-  AlertTriangle,
-  ArrowLeftRight,
-  Check,
-  Clock,
-  Send,
-  X,
-} from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { Send } from '@tamagui/lucide-icons/icons/Send';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useAcceptTradeMutation,

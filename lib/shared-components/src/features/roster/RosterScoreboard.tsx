@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, isWeb, Text, useMedia, XStack, YStack } from 'tamagui';
-import { ChevronLeft, ChevronRight } from '@tamagui/lucide-icons';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
 import {
   BG_DARK,
   BLACK,

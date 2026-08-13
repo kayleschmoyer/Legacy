@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { XStack, YStack } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { LeagueFieldRow, PillToggle } from './_controls';
 import { BRAND_GOLD } from '../../../utils/colors';
 

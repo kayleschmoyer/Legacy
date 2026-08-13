@@ -28,6 +28,13 @@ module.exports = {
     '^expo-constants$': '<rootDir>/__mocks__/expo-constants.js',
     '^@legacy-sports/rollbar/native$': '<rootDir>/../../lib/rollbar/src/native',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
+    // LS-9423: deep icon imports (@tamagui/lucide-icons/icons/<Name>) must
+    // route to the same specifier as the barrel import so per-spec-file
+    // `jest.mock('@tamagui/lucide-icons', ...)` overrides (many spec files
+    // define their own, e.g. MatchupWinProbabilityPanel.spec.tsx) still
+    // take effect. Without this, deep imports load the real package,
+    // which needs a live TamaguiProvider/theme these specs don't set up.
+    '^@tamagui/lucide-icons/icons/.*$': '@tamagui/lucide-icons',
   },
   globals: {
     __DEV__: true,

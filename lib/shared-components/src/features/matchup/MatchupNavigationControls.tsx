@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Card, Spinner, styled, Text, XStack, YStack } from 'tamagui';
-import {
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
-} from '@tamagui/lucide-icons';
+import { Calendar } from '@tamagui/lucide-icons/icons/Calendar';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { RotateCcw } from '@tamagui/lucide-icons/icons/RotateCcw';
 import {
   type MatchupFragment,
   useGetLeagueTeamsQuery,

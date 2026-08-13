@@ -1,6 +1,6 @@
 import React from 'react';
 import { isWeb, Text, XStack } from 'tamagui';
-import { Zap } from '@tamagui/lucide-icons';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import {
   ACCENT_INK,
   BG_DARK,

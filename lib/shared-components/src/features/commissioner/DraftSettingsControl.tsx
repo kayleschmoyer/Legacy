@@ -9,7 +9,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Check, Lock, Settings } from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
 import {
   useGetLeagueDraftQuery,
   useUpdateDraftSettingsMutation,

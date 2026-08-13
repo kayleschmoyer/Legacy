@@ -20,33 +20,31 @@ import {
   styled,
   Text,
 } from 'tamagui';
-import {
-  ArrowLeftRight,
-  BarChart3,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Clock,
-  Copy,
-  Crown,
-  Edit3,
-  Eye,
-  Info,
-  LayoutGrid,
-  Link2,
-  MessageSquare,
-  QrCode,
-  Settings,
-  Share2,
-  Shield,
-  Swords,
-  Trophy,
-  UserPlus,
-  X,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { BarChart3 } from '@tamagui/lucide-icons/icons/BarChart3';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { ClipboardList } from '@tamagui/lucide-icons/icons/ClipboardList';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { Copy } from '@tamagui/lucide-icons/icons/Copy';
+import { Crown } from '@tamagui/lucide-icons/icons/Crown';
+import { Edit3 } from '@tamagui/lucide-icons/icons/Edit3';
+import { Eye } from '@tamagui/lucide-icons/icons/Eye';
+import { Info } from '@tamagui/lucide-icons/icons/Info';
+import { LayoutGrid } from '@tamagui/lucide-icons/icons/LayoutGrid';
+import { Link2 } from '@tamagui/lucide-icons/icons/Link2';
+import { MessageSquare } from '@tamagui/lucide-icons/icons/MessageSquare';
+import { QrCode } from '@tamagui/lucide-icons/icons/QrCode';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
+import { Share2 } from '@tamagui/lucide-icons/icons/Share2';
+import { Shield } from '@tamagui/lucide-icons/icons/Shield';
+import { Swords } from '@tamagui/lucide-icons/icons/Swords';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { UserPlus } from '@tamagui/lucide-icons/icons/UserPlus';
+import { X } from '@tamagui/lucide-icons/icons/X';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { QRCodeSVG } from 'qrcode.react';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import {

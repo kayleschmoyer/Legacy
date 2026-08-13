@@ -11,7 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Image as ImageIcon } from '@tamagui/lucide-icons';
+import { Image as ImageIcon } from '@tamagui/lucide-icons/icons/Image';
 import { useUpdateLeagueBrandingMutation } from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 import { AvatarPicker } from '../../components/AvatarPicker';

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Input, Paragraph, Spinner, XStack, YStack } from 'tamagui';
-import { AlertTriangle, Shield } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Shield } from '@tamagui/lucide-icons/icons/Shield';
 import { LOGGER } from '@legacy-sports/logging';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {

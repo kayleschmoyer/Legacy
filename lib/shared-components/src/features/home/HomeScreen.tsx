@@ -15,13 +15,11 @@ import type {
   RefreshControlProps,
   ScrollView as ScrollViewHandle,
 } from 'react-native';
-import {
-  ArrowRight,
-  ChevronRight,
-  Plus,
-  TrendingUp,
-  Users,
-} from '@tamagui/lucide-icons';
+import { ArrowRight } from '@tamagui/lucide-icons/icons/ArrowRight';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { TrendingUp } from '@tamagui/lucide-icons/icons/TrendingUp';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { formatDraftDate } from '@legacy-sports/utils';
 // Football playboard-hero palette (LS-9035) — theme-invariant physical-object
 // colors, sourced from the sanctioned unscanned palette home so they never

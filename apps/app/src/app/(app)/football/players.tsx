@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
-import { ChevronDown, Star } from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { Star } from '@tamagui/lucide-icons/icons/Star';
 import { useRouter } from 'expo-router';
 import { useFeatureIsOn } from '@growthbook/growthbook-react';
 import {

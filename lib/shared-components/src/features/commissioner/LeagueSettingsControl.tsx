@@ -10,7 +10,10 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { AlertTriangle, Check, Lock, Settings } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
 import { useUpdateLeagueSettingsMutation } from '@legacy-sports/graphql';
 import { GAMES_PER_MATCHUP_BY_SPORT } from '../../config/sports';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';

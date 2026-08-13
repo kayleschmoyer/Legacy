@@ -1,7 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Text, XStack, YStack } from 'tamagui';
-import { AlertCircle, ExternalLink } from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { ExternalLink } from '@tamagui/lucide-icons/icons/ExternalLink';
 import type { WizardState } from '../CreateLeagueWizard';
 
 interface StepConfirmationProps {

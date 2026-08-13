@@ -21,7 +21,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Gavel, Timer, Trophy } from '@tamagui/lucide-icons';
+import { Gavel } from '@tamagui/lucide-icons/icons/Gavel';
+import { Timer } from '@tamagui/lucide-icons/icons/Timer';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import {
   AuctionBudgetFragmentFragment,
   AuctionStateFragmentFragment,

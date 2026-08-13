@@ -9,7 +9,10 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Check, RefreshCw, Scale, Settings } from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
+import { Scale } from '@tamagui/lucide-icons/icons/Scale';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   TiebreakerMethod,

@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Card, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
-import { AlertTriangle, Clock, Trash2, X } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { Trash2 } from '@tamagui/lucide-icons/icons/Trash2';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useCancelWaiverClaimMutation,

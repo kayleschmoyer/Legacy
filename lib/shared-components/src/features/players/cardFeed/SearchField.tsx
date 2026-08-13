@@ -1,6 +1,6 @@
 import React from 'react';
 import { Input, XStack } from 'tamagui';
-import { Search } from '@tamagui/lucide-icons';
+import { Search } from '@tamagui/lucide-icons/icons/Search';
 import {
   STATS_BORDER,
   SURFACE_PANEL,

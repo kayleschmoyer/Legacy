@@ -14,16 +14,14 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import {
-  Bell,
-  Check,
-  ChevronDown,
-  LogIn,
-  Minus,
-  Plus,
-  SunMoon,
-  Trophy,
-} from '@tamagui/lucide-icons';
+import { Bell } from '@tamagui/lucide-icons/icons/Bell';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { LogIn } from '@tamagui/lucide-icons/icons/LogIn';
+import { Minus } from '@tamagui/lucide-icons/icons/Minus';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { SunMoon } from '@tamagui/lucide-icons/icons/SunMoon';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { ScrollView, Spinner, styled } from 'tamagui';
 import {
   GetUserNotificationPreferences,

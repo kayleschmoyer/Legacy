@@ -17,7 +17,10 @@ import {
   PITCHING_POSITIONS,
 } from '@legacy-sports/shared-components/utils';
 import { H4, styled, Text } from 'tamagui';
-import { AlertTriangle, Edit3, Info, Lock } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Edit3 } from '@tamagui/lucide-icons/icons/Edit3';
+import { Info } from '@tamagui/lucide-icons/icons/Info';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,

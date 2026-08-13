@@ -9,13 +9,11 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  ArrowLeftRight,
-  ChevronRight,
-  EllipsisVertical,
-  Lock,
-  Users,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { EllipsisVertical } from '@tamagui/lucide-icons/icons/EllipsisVertical';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { contrastRatio } from '@legacy-sports/design-tokens';
 import {
   canPlayerPlayPosition,

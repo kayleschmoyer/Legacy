@@ -8,7 +8,7 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { styled } from 'tamagui';
-import { Menu } from '@tamagui/lucide-icons';
+import { Menu } from '@tamagui/lucide-icons/icons/Menu';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';

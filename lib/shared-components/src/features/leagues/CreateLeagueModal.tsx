@@ -12,16 +12,14 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  AlertCircle,
-  Award,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Lock,
-  ShieldCheck,
-  X,
-} from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { Award } from '@tamagui/lucide-icons/icons/Award';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { ShieldCheck } from '@tamagui/lucide-icons/icons/ShieldCheck';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { Platform } from '../../platform-components';
 import {
   DRAFT_MODES,

@@ -1,14 +1,12 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import {
-  ArrowLeftRight,
-  CheckCircle,
-  RotateCcw,
-  Settings,
-  ShieldAlert,
-  Trophy,
-  XCircle,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { CheckCircle } from '@tamagui/lucide-icons/icons/CheckCircle';
+import { RotateCcw } from '@tamagui/lucide-icons/icons/RotateCcw';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
+import { ShieldAlert } from '@tamagui/lucide-icons/icons/ShieldAlert';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { XCircle } from '@tamagui/lucide-icons/icons/XCircle';
 import type { ChatMessage } from '../../hooks/useLeagueChat';
 import {
   BRAND_GOLD_LIGHT,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Input, Label, Text, XStack, YStack } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import {
   CustomEraRange,
   EraFilterGrid,

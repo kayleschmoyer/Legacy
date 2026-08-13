@@ -9,7 +9,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Settings } from '@tamagui/lucide-icons';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
 import {
   type NotificationPreference,
   type NotificationPreferenceInput,

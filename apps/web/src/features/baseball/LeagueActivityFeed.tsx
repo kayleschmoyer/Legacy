@@ -9,16 +9,14 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  ArrowLeftRight,
-  ChevronRight,
-  Clock,
-  Filter,
-  Shield,
-  Trophy,
-  UserCheck,
-  UserMinus,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { Filter } from '@tamagui/lucide-icons/icons/Filter';
+import { Shield } from '@tamagui/lucide-icons/icons/Shield';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { UserCheck } from '@tamagui/lucide-icons/icons/UserCheck';
+import { UserMinus } from '@tamagui/lucide-icons/icons/UserMinus';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   LeagueActivityEventType,

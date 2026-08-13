@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Card, XStack, YStack } from 'tamagui';
-import { BarChart3 } from '@tamagui/lucide-icons';
+import { BarChart3 } from '@tamagui/lucide-icons/icons/BarChart3';
 import { Text } from 'tamagui';
 import {
   createDefaultScoringSettings,

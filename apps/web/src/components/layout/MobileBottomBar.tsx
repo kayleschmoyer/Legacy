@@ -1,6 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart2, Bell, Users, Zap } from '@tamagui/lucide-icons';
+import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
+import { Bell } from '@tamagui/lucide-icons/icons/Bell';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { useGetUnreadNotificationCountQuery } from '@legacy-sports/graphql';
 import { FONT_DISPLAY } from './NavDropdownShared';

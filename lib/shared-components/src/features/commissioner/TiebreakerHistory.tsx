@@ -1,6 +1,9 @@
 import React from 'react';
 import { Card, H4, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Clock, Scale, Trophy, User } from '@tamagui/lucide-icons';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { Scale } from '@tamagui/lucide-icons/icons/Scale';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { User } from '@tamagui/lucide-icons/icons/User';
 import {
   TiebreakerMethod,
   useGetTiebreakerHistoryQuery,

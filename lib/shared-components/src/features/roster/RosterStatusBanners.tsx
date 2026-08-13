@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import { Info, Lock } from '@tamagui/lucide-icons';
+import { Info } from '@tamagui/lucide-icons/icons/Info';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 
 export interface RosterStatusBannersProps {
   /** Viewing a finalized past week — lineup is read-only. */

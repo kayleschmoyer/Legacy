@@ -7,7 +7,8 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Check, ChevronDown } from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
 import { Chip, type ChipTone } from './Chip';
 import { Popover } from './Popover';
 

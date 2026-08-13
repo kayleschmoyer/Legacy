@@ -4,7 +4,9 @@ import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { styled } from 'tamagui';
-import { ChevronDown, ChevronUp, Trophy } from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import {
   DROPDOWN_BORDER,

@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, Spinner, Text, YStack } from 'tamagui';
-import { ShoppingCart } from '@tamagui/lucide-icons';
+import { ShoppingCart } from '@tamagui/lucide-icons/icons/ShoppingCart';
 import { PendingWaiverClaims } from '@legacy-sports/shared-components';
 import { useGetUserTeamIdQuery } from '@legacy-sports/graphql';
 import { toIntId } from '../../common/utilities/RouteUtils';

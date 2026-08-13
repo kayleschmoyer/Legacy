@@ -19,15 +19,13 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  AlertCircle,
-  Check,
-  ChevronRight,
-  Copy,
-  Lock,
-  Upload,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { Copy } from '@tamagui/lucide-icons/icons/Copy';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Upload } from '@tamagui/lucide-icons/icons/Upload';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import {
   Dialog,

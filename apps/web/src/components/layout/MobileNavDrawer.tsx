@@ -1,24 +1,22 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  BarChart2,
-  Bug,
-  ChevronRight,
-  Compass,
-  HelpCircle,
-  ListOrdered,
-  LogOut,
-  Plus,
-  Settings,
-  Shuffle,
-  Ticket,
-  Trophy,
-  User,
-  Users,
-  X,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
+import { Bug } from '@tamagui/lucide-icons/icons/Bug';
+import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
+import { Compass } from '@tamagui/lucide-icons/icons/Compass';
+import { HelpCircle } from '@tamagui/lucide-icons/icons/HelpCircle';
+import { ListOrdered } from '@tamagui/lucide-icons/icons/ListOrdered';
+import { LogOut } from '@tamagui/lucide-icons/icons/LogOut';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
+import { Shuffle } from '@tamagui/lucide-icons/icons/Shuffle';
+import { Ticket } from '@tamagui/lucide-icons/icons/Ticket';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { User } from '@tamagui/lucide-icons/icons/User';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
+import { X } from '@tamagui/lucide-icons/icons/X';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
 import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';

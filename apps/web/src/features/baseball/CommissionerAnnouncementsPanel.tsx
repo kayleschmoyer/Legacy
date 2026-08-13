@@ -8,7 +8,12 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Edit3, Megaphone, Plus, Send, Trash2, X } from '@tamagui/lucide-icons';
+import { Edit3 } from '@tamagui/lucide-icons/icons/Edit3';
+import { Megaphone } from '@tamagui/lucide-icons/icons/Megaphone';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { Send } from '@tamagui/lucide-icons/icons/Send';
+import { Trash2 } from '@tamagui/lucide-icons/icons/Trash2';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   GetLeagueAnnouncements,

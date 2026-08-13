@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Paragraph, XStack } from '@legacy-sports/shared-components/ui';
 import { consumeBillingNotice } from '@legacy-sports/shared-components/auth';
-import { AlertTriangle, X } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { AMBER, BRAND_NAVY_DARK, WHITE, withAlpha } from '../constants/colors';
 
 /**

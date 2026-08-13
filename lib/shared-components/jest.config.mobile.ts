@@ -15,6 +15,12 @@ module.exports = {
     '\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$':
       'identity-obj-proxy',
     '^__PLATFORM_COMPONENTS__$': '<rootDir>/src/platform-components/mobile',
+    // LS-9423: deep icon imports (@tamagui/lucide-icons/icons/<Name>) must
+    // route to the same specifier as the barrel import so they hit the
+    // jest.mock('@tamagui/lucide-icons', ...) factory in
+    // jest-setup-mobile.js instead of loading the real package (which
+    // requires the real, not mocked, @tamagui/core).
+    '^@tamagui/lucide-icons/icons/.*$': '@tamagui/lucide-icons',
     '^@legacy-sports/logging$': '<rootDir>/../../lib/logging/src',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
     // Apollo Client 4.x exports @apollo/client/react with nested export conditions

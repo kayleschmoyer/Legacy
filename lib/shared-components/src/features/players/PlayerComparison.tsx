@@ -20,14 +20,12 @@ import {
   type ViewProps,
   type ViewStyle,
 } from 'react-native';
-import {
-  ChevronDown,
-  ChevronUp,
-  Info,
-  Lock,
-  Plus,
-  X,
-} from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { Info } from '@tamagui/lucide-icons/icons/Info';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { X } from '@tamagui/lucide-icons/icons/X';
 // Structural table elements use a Tamagui stack: on web the `tag` prop renders
 // a real <table>/<thead>/<tbody>/<tr>/<th>/<td> host element (with `role` kept
 // for native screen readers, since the optimizer strips `role` from the web

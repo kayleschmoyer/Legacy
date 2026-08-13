@@ -6,7 +6,8 @@ import React, {
   useState,
 } from 'react';
 import { Button, Spinner, styled, Text, XStack, YStack } from 'tamagui';
-import { ChevronDown, MessageSquare } from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { MessageSquare } from '@tamagui/lucide-icons/icons/MessageSquare';
 import { SystemMessageCard } from './SystemMessageCard';
 import { GifPicker } from './GifPicker';
 import { useLeagueChat } from '../../hooks/useLeagueChat';

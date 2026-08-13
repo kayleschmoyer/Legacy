@@ -2,13 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Text } from '@legacy-sports/ui-abstractions';
-import {
-  ArrowLeftRight,
-  BarChart2,
-  ChevronDown,
-  ChevronUp,
-  Users,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import {
   DROPDOWN_BORDER,
   DropdownButton,

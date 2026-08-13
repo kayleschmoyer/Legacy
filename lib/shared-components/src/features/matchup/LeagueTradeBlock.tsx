@@ -1,13 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import { Card, Input, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
-import {
-  ArrowLeftRight,
-  ChevronDown,
-  ChevronUp,
-  DollarSign,
-  Plus,
-} from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { DollarSign } from '@tamagui/lucide-icons/icons/DollarSign';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
 import {
   type TeamMemberFragment,
   useGetLeagueTradeBlockQuery,

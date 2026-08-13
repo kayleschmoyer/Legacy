@@ -10,7 +10,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Bell } from '@tamagui/lucide-icons';
+import { Bell } from '@tamagui/lucide-icons/icons/Bell';
 import { LOGGER } from '@legacy-sports/logging';
 import { type NotificationHistoryItem } from '@legacy-sports/graphql';
 import { NotificationList } from './components/NotificationList';

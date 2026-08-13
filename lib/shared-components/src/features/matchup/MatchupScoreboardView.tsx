@@ -1,13 +1,11 @@
 import React from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
-import {
-  Activity,
-  AlertTriangle,
-  Clock,
-  Swords,
-  TrendingUp,
-  Trophy,
-} from '@tamagui/lucide-icons';
+import { Activity } from '@tamagui/lucide-icons/icons/Activity';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { Swords } from '@tamagui/lucide-icons/icons/Swords';
+import { TrendingUp } from '@tamagui/lucide-icons/icons/TrendingUp';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import { MatchupStatus } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,

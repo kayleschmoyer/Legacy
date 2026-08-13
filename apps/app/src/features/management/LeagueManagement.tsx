@@ -10,7 +10,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { AlertTriangle, Settings, Shield } from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
+import { Shield } from '@tamagui/lucide-icons/icons/Shield';
 import {
   CommissionerAuditLog,
   CommissionerNoteControl,

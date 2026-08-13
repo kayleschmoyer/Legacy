@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
-import { Minus, Plus } from '@tamagui/lucide-icons';
+import { Minus } from '@tamagui/lucide-icons/icons/Minus';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
 import {
   WIZARD_TAP_TARGET,
   WizardBottomBar,

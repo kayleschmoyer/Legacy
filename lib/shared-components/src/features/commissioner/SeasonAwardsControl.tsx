@@ -17,7 +17,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Award, Check, Trash2 } from '@tamagui/lucide-icons';
+import { Award } from '@tamagui/lucide-icons/icons/Award';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { Trash2 } from '@tamagui/lucide-icons/icons/Trash2';
 import {
   LeagueSeasonAwardFragment,
   useCloseAwardVotingMutation,

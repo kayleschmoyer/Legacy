@@ -1,7 +1,10 @@
 import React from 'react';
 import { Platform } from 'react-native';
 import { Card, Text, XStack, YStack } from 'tamagui';
-import { Activity, CheckCircle, Clock, XCircle } from '@tamagui/lucide-icons';
+import { Activity } from '@tamagui/lucide-icons/icons/Activity';
+import { CheckCircle } from '@tamagui/lucide-icons/icons/CheckCircle';
+import { Clock } from '@tamagui/lucide-icons/icons/Clock';
+import { XCircle } from '@tamagui/lucide-icons/icons/XCircle';
 import { type MatchupFragment, MatchupStatus } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,

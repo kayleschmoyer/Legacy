@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Text } from '@legacy-sports/ui-abstractions';
-import { ChevronDown, ChevronUp, Globe, Grid2x2 } from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { Globe } from '@tamagui/lucide-icons/icons/Globe';
+import { Grid2x2 } from '@tamagui/lucide-icons/icons/Grid2x2';
 import {
   DROPDOWN_BORDER,
   DropdownButton,

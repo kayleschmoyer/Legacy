@@ -9,7 +9,9 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { Lock, Shield, Star } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Shield } from '@tamagui/lucide-icons/icons/Shield';
+import { Star } from '@tamagui/lucide-icons/icons/Star';
 import {
   useDesignateKeeperMutation,
   useGetKeeperEligibleRosterQuery,

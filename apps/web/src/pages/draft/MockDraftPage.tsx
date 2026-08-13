@@ -14,7 +14,7 @@ import {
   type MockDraftSettings,
   MockDraftSetup,
 } from '@legacy-sports/shared-components/draft';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import {
   useGetMyMockDraftUsageQuery,
   useInitializeMockDraftMutation,

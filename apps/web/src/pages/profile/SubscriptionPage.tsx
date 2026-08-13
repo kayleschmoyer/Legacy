@@ -6,14 +6,12 @@ import {
   YStack,
 } from '@legacy-sports/shared-components/ui';
 import { Button, ScrollView, Separator, styled } from 'tamagui';
-import {
-  AlertTriangle,
-  CheckCircle2,
-  CreditCard,
-  Crown,
-  RefreshCw,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { CheckCircle2 } from '@tamagui/lucide-icons/icons/CheckCircle2';
+import { CreditCard } from '@tamagui/lucide-icons/icons/CreditCard';
+import { Crown } from '@tamagui/lucide-icons/icons/Crown';
+import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
 import { useWebSocket } from '@legacy-sports/shared-components';

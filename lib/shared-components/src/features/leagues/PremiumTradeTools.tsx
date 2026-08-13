@@ -11,16 +11,14 @@
  */
 import React, { useState } from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
-import {
-  BarChart2,
-  Calculator,
-  ChevronDown,
-  ChevronUp,
-  Lock,
-  TrendingDown,
-  TrendingUp,
-  Zap,
-} from '@tamagui/lucide-icons';
+import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
+import { Calculator } from '@tamagui/lucide-icons/icons/Calculator';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { TrendingDown } from '@tamagui/lucide-icons/icons/TrendingDown';
+import { TrendingUp } from '@tamagui/lucide-icons/icons/TrendingUp';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import type { TradeOfferFragment } from '@legacy-sports/graphql';
 import { Button } from '../../Button';
 import {

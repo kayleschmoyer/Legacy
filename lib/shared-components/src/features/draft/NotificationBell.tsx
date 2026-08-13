@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from 'tamagui';
-import { Badge } from '@tamagui/lucide-icons';
+import { Badge } from '@tamagui/lucide-icons/icons/Badge';
 
 interface Update {
   type: string;

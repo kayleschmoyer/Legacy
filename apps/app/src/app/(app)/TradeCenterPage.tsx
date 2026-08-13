@@ -7,7 +7,9 @@ import React, {
 } from 'react';
 import { ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeftRight, RefreshCw, Users } from '@tamagui/lucide-icons';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { config } from '@legacy-sports/app-config/native';
 import { TradingCenter, useWebSocket } from '@legacy-sports/shared-components';

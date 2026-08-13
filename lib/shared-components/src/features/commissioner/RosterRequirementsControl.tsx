@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, H4, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Minus, Plus, Settings } from '@tamagui/lucide-icons';
+import { Minus } from '@tamagui/lucide-icons/icons/Minus';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { Settings } from '@tamagui/lucide-icons/icons/Settings';
 import {
   useGetLeaguePositionsQuery,
   useUpdateRosterPositionsMutation,

@@ -11,14 +11,12 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  AlertCircle,
-  ArrowRightLeft,
-  Check,
-  DollarSign,
-  UserMinus,
-  UserPlus,
-} from '@tamagui/lucide-icons';
+import { AlertCircle } from '@tamagui/lucide-icons/icons/AlertCircle';
+import { ArrowRightLeft } from '@tamagui/lucide-icons/icons/ArrowRightLeft';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { DollarSign } from '@tamagui/lucide-icons/icons/DollarSign';
+import { UserMinus } from '@tamagui/lucide-icons/icons/UserMinus';
+import { UserPlus } from '@tamagui/lucide-icons/icons/UserPlus';
 import {
   type TeamMemberFragment,
   useClaimFreeAgentMutation,

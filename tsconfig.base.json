@@ -17,6 +17,9 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@tamagui/lucide-icons/icons/*": [
+        "node_modules/@tamagui/lucide-icons/types/icons/*"
+      ],
       "@legacy-sports/analytics": ["lib/analytics/src/index.ts"],
       "@legacy-sports/api": ["lib/api/src/index.ts"],
       "@legacy-sports/aws-utils": ["lib/aws-utils/src/index.ts"],

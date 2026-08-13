@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Lock } from '@tamagui/lucide-icons';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { FootballPlayerHeader } from './FootballPlayerHeader';
 import { GameLogsTable } from '../stats/GameLogsTable';
 import { Select } from '../../components/Select';

@@ -15,7 +15,8 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { ExternalLink, X } from '@tamagui/lucide-icons';
+import { ExternalLink } from '@tamagui/lucide-icons/icons/ExternalLink';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   useGetAllPlayerSeasonStatsQuery,

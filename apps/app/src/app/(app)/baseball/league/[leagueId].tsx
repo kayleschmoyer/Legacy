@@ -7,7 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { Button, Spinner, Text, YStack } from 'tamagui';
-import { ShoppingCart } from '@tamagui/lucide-icons';
+import { ShoppingCart } from '@tamagui/lucide-icons/icons/ShoppingCart';
 import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';

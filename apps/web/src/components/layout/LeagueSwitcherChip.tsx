@@ -1,13 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import {
-  Check,
-  ChevronDown,
-  Compass,
-  Plus,
-  Ticket,
-} from '@tamagui/lucide-icons';
+import { Check } from '@tamagui/lucide-icons/icons/Check';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { Compass } from '@tamagui/lucide-icons/icons/Compass';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { Ticket } from '@tamagui/lucide-icons/icons/Ticket';
 import { useGetUserLeaguesQuery } from '@legacy-sports/graphql';
 import { FONT_DISPLAY, NAV_DROPDOWN_ANIMATION } from './NavDropdownShared';
 import {

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
-import { Download } from '@tamagui/lucide-icons';
+import { Download } from '@tamagui/lucide-icons/icons/Download';
 import { useGetLeagueTeamsQuery } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
 import {

@@ -9,13 +9,11 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import {
-  ChevronDown,
-  ChevronUp,
-  List,
-  Lock,
-  Shuffle,
-} from '@tamagui/lucide-icons';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
+import { List } from '@tamagui/lucide-icons/icons/List';
+import { Lock } from '@tamagui/lucide-icons/icons/Lock';
+import { Shuffle } from '@tamagui/lucide-icons/icons/Shuffle';
 import { type DraftOrderControlProps, useDraftOrder } from './useDraftOrder';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 import { PremiumGate } from '../../components/PremiumGate';

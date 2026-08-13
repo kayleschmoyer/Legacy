@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Card, H4, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
-import { Users } from '@tamagui/lucide-icons';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import {
   type StatsLoadingStatus,
   useGetLeagueTeamsQuery,

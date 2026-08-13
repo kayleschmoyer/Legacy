@@ -11,7 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { X } from '@tamagui/lucide-icons';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import type { BaseballScoringSettings } from '@legacy-sports/scoring';
 
 import type { MatchupPlayerFragment } from '@legacy-sports/graphql';

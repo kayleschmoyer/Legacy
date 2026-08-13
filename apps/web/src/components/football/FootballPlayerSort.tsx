@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, XStack } from 'tamagui';
-import { ArrowDown, ArrowUp } from '@tamagui/lucide-icons';
+import { ArrowDown } from '@tamagui/lucide-icons/icons/ArrowDown';
+import { ArrowUp } from '@tamagui/lucide-icons/icons/ArrowUp';
 import {
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,

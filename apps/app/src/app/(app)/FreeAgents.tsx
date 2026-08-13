@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView } from 'react-native';
 import { Button, Card, Input, Spinner, Text, XStack, YStack } from 'tamagui';
-import { UserPlus, Users } from '@tamagui/lucide-icons';
+import { UserPlus } from '@tamagui/lucide-icons/icons/UserPlus';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { useLocalSearchParams } from 'expo-router';
 import { LOGGER } from '@legacy-sports/logging';
 import {

@@ -1,4 +1,8 @@
-import { Gamepad2, Home, Trophy, User, Users } from '@tamagui/lucide-icons';
+import { Gamepad2 } from '@tamagui/lucide-icons/icons/Gamepad2';
+import { Home } from '@tamagui/lucide-icons/icons/Home';
+import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { User } from '@tamagui/lucide-icons/icons/User';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { Tabs } from 'expo-router';
 import { useGetUnreadNotificationCountQuery } from '@legacy-sports/graphql';
 import { colors } from '@legacy-sports/design-tokens';

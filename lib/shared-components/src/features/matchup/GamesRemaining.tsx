@@ -1,6 +1,8 @@
 import React from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
-import { CheckCircle2, Circle, Hourglass } from '@tamagui/lucide-icons';
+import { CheckCircle2 } from '@tamagui/lucide-icons/icons/CheckCircle2';
+import { Circle } from '@tamagui/lucide-icons/icons/Circle';
+import { Hourglass } from '@tamagui/lucide-icons/icons/Hourglass';
 import { BRAND_NAVY_LIGHT } from '../../utils/colors';
 
 export interface GamesRemainingProps {

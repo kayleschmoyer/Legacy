@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
 import { Text, XStack, YStack } from 'tamagui';
-import {
-  Activity,
-  ArrowLeftRight,
-  Bell,
-  Info,
-  Star,
-} from '@tamagui/lucide-icons';
+import { Activity } from '@tamagui/lucide-icons/icons/Activity';
+import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
+import { Bell } from '@tamagui/lucide-icons/icons/Bell';
+import { Info } from '@tamagui/lucide-icons/icons/Info';
+import { Star } from '@tamagui/lucide-icons/icons/Star';
 import { Popover } from './Popover';
 
 export type NotificationItemType = 'draft' | 'trade' | 'matchup' | 'system';

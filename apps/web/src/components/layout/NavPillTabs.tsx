@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart2, Users, Zap } from '@tamagui/lucide-icons';
+import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
+import { Users } from '@tamagui/lucide-icons/icons/Users';
+import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { FONT_DISPLAY } from './NavDropdownShared';
 import {
   BRAND_NAVY,

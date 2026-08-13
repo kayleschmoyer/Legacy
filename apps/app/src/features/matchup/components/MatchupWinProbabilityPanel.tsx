@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Card, Text, XStack, YStack } from 'tamagui';
-import { Target, TrendingUp } from '@tamagui/lucide-icons';
+import { Target } from '@tamagui/lucide-icons/icons/Target';
+import { TrendingUp } from '@tamagui/lucide-icons/icons/TrendingUp';
 import {
   calculateMatchupProjection,
   computeScoring,

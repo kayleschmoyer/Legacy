@@ -5,7 +5,8 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { Plus, Trash2 } from '@tamagui/lucide-icons';
+import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { Trash2 } from '@tamagui/lucide-icons/icons/Trash2';
 import { Input, Text } from 'tamagui';
 import { DefensiveFormat } from '@legacy-sports/graphql';
 import {

@@ -11,7 +11,7 @@ import {
   XStack,
   YStack,
 } from 'tamagui';
-import { X } from '@tamagui/lucide-icons';
+import { X } from '@tamagui/lucide-icons/icons/X';
 import { LOGGER } from '@legacy-sports/logging';
 import { useGetAllPlayerSeasonStatsQuery } from '@legacy-sports/graphql';
 import { WHITE, withAlpha } from '../../constants/colors';
