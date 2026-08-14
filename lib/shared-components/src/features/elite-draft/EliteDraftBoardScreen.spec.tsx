@@ -220,9 +220,22 @@ jest.mock('./DraftBottomNav', () => ({
     />
   ),
 }));
-jest.mock('./DraftMiniBoard', () => ({
-  DraftMiniBoard: ({ rounds }: { rounds: number }) => (
-    <div data-testid="draft-mini-board" data-rounds={rounds} />
+jest.mock('./DraftBoardGrid', () => ({
+  DraftBoardGrid: ({
+    rounds,
+    sport,
+    onMakePick,
+  }: {
+    rounds: number;
+    sport: string;
+    onMakePick: () => void;
+  }) => (
+    <button
+      data-testid="draft-board-grid"
+      data-rounds={rounds}
+      data-sport={sport}
+      onClick={onMakePick}
+    />
   ),
 }));
 jest.mock('./DraftPickAnnouncement', () => ({
@@ -1311,12 +1324,25 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(header.getAttribute('data-draft-paused')).toBe('true');
   });
 
-  it('passes the resolved board rounds to DraftMiniBoard', () => {
+  it('passes the resolved board rounds and sport to DraftBoardGrid', () => {
     setupCompactLiveDraft({ picks: [makePickRecord()] });
+
+    render(<EliteDraftBoardScreen {...defaultProps} sport="football" />);
+
+    const grid = screen.getByTestId('draft-board-grid');
+    expect(grid).toBeTruthy();
+    expect(grid.getAttribute('data-sport')).toBe('football');
+  });
+
+  it('navigates to the Players tab when DraftBoardGrid fires onMakePick', () => {
+    const setActiveTab = jest.fn();
+    setupCompactLiveDraft({ ui: { setActiveTab } });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    expect(screen.getByTestId('draft-mini-board')).toBeTruthy();
+    fireEvent.click(screen.getByTestId('draft-board-grid'));
+
+    expect(setActiveTab).toHaveBeenCalledWith('players');
   });
 
   it('shows a loading footer while more players are being fetched', () => {
@@ -1544,7 +1570,7 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    expect(screen.getByTestId('draft-mini-board')).toBeTruthy();
+    expect(screen.getByTestId('draft-board-grid')).toBeTruthy();
     expect(screen.getByTestId('flatlist')).toBeTruthy();
     expect(screen.queryByText('Players tab is coming soon.')).toBeNull();
   });

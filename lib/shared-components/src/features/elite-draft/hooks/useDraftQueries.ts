@@ -51,8 +51,9 @@ interface UseDraftQueriesParams {
   playerSearch: string;
   selectedPosition: string;
   viewMode: 'grid' | 'list' | 'compact' | 'board' | 'table' | 'depth';
-  /** True on the compact/native draft board, which always renders DraftMiniBoard
-   * regardless of `viewMode` and therefore always needs the real slot order (LS-9245). */
+  /** True on the compact/native draft board, which always renders the Board
+   * tab grid (DraftBoardGrid, LS-9398; formerly DraftMiniBoard) regardless of
+   * `viewMode` and therefore always needs the real slot order (LS-9245). */
   isCompact?: boolean;
 }
 
@@ -463,9 +464,9 @@ export function useDraftQueries({
   // Fetched for the 'board' view (existing), the pre-draft lobby (LS-8677, so
   // an executed draft slot trade's swap is reflected in the lobby's order
   // display immediately), and the compact/native board (LS-9245, which always
-  // renders DraftMiniBoard off `boardOrderedTeams` regardless of `viewMode`
-  // and silently fell back to unsorted `leagueTeams` once the draft went
-  // live). Still skipped for other desktop views (grid/list/compact/table)
+  // renders the Board tab grid off `boardOrderedTeams` regardless of
+  // `viewMode` and silently fell back to unsorted `leagueTeams` once the
+  // draft went live). Still skipped for other desktop views (grid/list/compact/table)
   // once the draft is live, to avoid firing an unused query throughout an
   // active draft.
   const isPreDraft =

@@ -1,4 +1,5 @@
 import {
+  abbreviatedPlayerName,
   buildBoardCells,
   buildSquadSlots,
   describeBoardCell,
@@ -9,6 +10,7 @@ import {
   MIN_BOARD_ROUNDS,
   resolveBoardRounds,
   shortPlayerName,
+  snakePickInRound,
   statLineFor,
 } from './nativeDraftBoard';
 import type {
@@ -388,5 +390,39 @@ describe('formatLastPickLine', () => {
     );
 
     expect(line).toBe('1.1 — Player #7, — (Dinger Dynasty)');
+  });
+});
+
+describe('abbreviatedPlayerName', () => {
+  it('abbreviates the first name to an initial', () => {
+    expect(abbreviatedPlayerName('Mike Trout')).toBe('M. Trout');
+  });
+
+  it('drops generational suffixes before abbreviating', () => {
+    expect(abbreviatedPlayerName('Bobby Witt Jr.')).toBe('B. Witt');
+  });
+
+  it('returns a single-word name unchanged', () => {
+    expect(abbreviatedPlayerName('Ohtani')).toBe('Ohtani');
+  });
+});
+
+describe('snakePickInRound', () => {
+  it('runs left-to-right on odd rounds', () => {
+    expect(snakePickInRound({ round: 1, columnIndex: 0, teamCount: 8 })).toBe(
+      1,
+    );
+    expect(snakePickInRound({ round: 1, columnIndex: 7, teamCount: 8 })).toBe(
+      8,
+    );
+  });
+
+  it('reverses on even rounds', () => {
+    expect(snakePickInRound({ round: 2, columnIndex: 0, teamCount: 8 })).toBe(
+      8,
+    );
+    expect(snakePickInRound({ round: 2, columnIndex: 7, teamCount: 8 })).toBe(
+      1,
+    );
   });
 });

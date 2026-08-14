@@ -248,6 +248,35 @@ export function formatLastPickLine(
   return `${pick.round}.${pick.pickNumber} — ${playerName}, ${position ?? '—'} (${teamName})`;
 }
 
+/**
+ * "F. Lastname" abbreviation for the Board tab grid cell (README "Board tab",
+ * LS-9398) — reuses {@link shortPlayerName}'s suffix-stripping so "Bobby Witt
+ * Jr." reads as "B. Witt" rather than "B. Jr.".
+ */
+export function abbreviatedPlayerName(fullName: string): string {
+  const words = fullName.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 1) return fullName.trim();
+  return `${words[0].charAt(0)}. ${shortPlayerName(fullName)}`;
+}
+
+/**
+ * 1-indexed pick number within a round for a snake-ordered board column
+ * (LS-9398 Board tab empty cells) — odd rounds run left-to-right, even
+ * rounds reverse, mirroring the `→`/`←` gutter arrow.
+ */
+export function snakePickInRound({
+  round,
+  columnIndex,
+  teamCount,
+}: {
+  round: number;
+  columnIndex: number;
+  teamCount: number;
+}): number {
+  const reversed = round % 2 === 0;
+  return (reversed ? teamCount - 1 - columnIndex : columnIndex) + 1;
+}
+
 /** Compact stat line under a player's name on the draft list. */
 export function statLineFor(player: DraftPlayer): string {
   if (player.isPitcher) {

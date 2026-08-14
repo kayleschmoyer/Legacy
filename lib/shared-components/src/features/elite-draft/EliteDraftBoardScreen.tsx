@@ -11,7 +11,7 @@ import { AuctionDraftRoom } from './auction/AuctionDraftRoom';
 import { PreDraftLobby } from './PreDraftLobby';
 import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
-import { DraftMiniBoard } from './DraftMiniBoard';
+import { DraftBoardGrid } from './DraftBoardGrid';
 import { DraftPickAnnouncement } from './DraftPickAnnouncement';
 import { DraftSquadStrip } from './DraftSquadStrip';
 import { DraftHeaderBand } from './DraftHeaderBand';
@@ -290,6 +290,7 @@ interface CompactLiveDraftBoardProps {
   timeRemaining: number;
   round: number;
   currentPick: number;
+  sport: SportKind;
   /** Mock drafts only — no real teammates to leave hanging (LS-9238). */
   isMockDraft: boolean;
   /** Premium (LS-9253): every team's turn is pickable, routed through the
@@ -312,6 +313,7 @@ function CompactLiveDraftBoard({
   timeRemaining,
   round,
   currentPick,
+  sport,
   isMockDraft,
   controlAllTeams,
   onExitDraft,
@@ -419,6 +421,14 @@ function CompactLiveDraftBoard({
       : null;
   }, [isMyPick, queries.queueEntries, playerData.statsLookup]);
 
+  // Board tab (LS-9398): tapping the current-pick cell on my turn jumps to
+  // the Players tab — the tab body may still be LS-9397's placeholder, but
+  // the navigation call itself is the in-scope behavior (README AC4).
+  const { setActiveTab } = ui;
+  const handleMakePick = useCallback(() => {
+    setActiveTab('players');
+  }, [setActiveTab]);
+
   return (
     <YStack flex={1} backgroundColor="$background">
       <DraftHeaderBand
@@ -451,13 +461,15 @@ function CompactLiveDraftBoard({
         </YStack>
       ) : (
         <>
-          <DraftMiniBoard
+          <DraftBoardGrid
             teams={boardTeams}
             picks={queries.pickHistory}
             currentPickInfo={queries.currentPickInfo}
             myTeamId={queries.myTeamId}
             statsLookup={playerData.statsLookup}
             rounds={boardRounds}
+            sport={sport}
+            onMakePick={handleMakePick}
           />
 
           {/* ---- Commissioner controls ---- */}
@@ -1216,6 +1228,7 @@ export function EliteDraftBoardScreen({
         timeRemaining={timeRemaining}
         round={round}
         currentPick={currentPick}
+        sport={sport}
         isMockDraft={isMockDraft}
         controlAllTeams={controlAllTeams}
         onExitDraft={handleExitDraft}
