@@ -10,6 +10,17 @@
 # scripts/ci/mobile-startup-benchmark.sh for why `am start -W`'s own timing is
 # not used here).
 #
+# Two jobs per variant, mirroring build-android-app.yml's build-android /
+# smoke-android split — NOT one combined job. Run #31767123756 proved why:
+# building a release APK (2 ABIs, debugSignRelease) AND booting an emulator in
+# the same GH-hosted `ubuntu-latest` job OOM-killed the runner mid-Gradle-build
+# (free RAM: 707MB -> 333 -> 240 -> 132 -> 124MB over ~3 minutes, then the whole
+# job died). So: `build` runs on the dedicated (bigger) Android runner pool
+# (falls back to ubuntu-latest only if that pool isn't configured, same as
+# build-android-app.yml), `benchmark` downloads the artifact and only boots the
+# emulator — on GH-hosted ubuntu-latest, which is the one place in this fleet
+# with KVM (non-metal self-hosted EC2 instance types don't expose it).
+#
 # workflow_dispatch ONLY — this must not run on every push. It exists to
 # produce the baseline/treatment numbers LS-9425's acceptance criteria require,
 # not as ongoing CI. Remove this file (or leave it dispatch-gated indefinitely,
@@ -46,16 +57,16 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Build + boot + measure, once per variant. GH-hosted ubuntu-latest is forced
-  # (not the self-hosted runner pools) because reactivecircus/android-emulator-runner
-  # needs KVM, which — per run-maestro-sweep.yml and build-android-app.yml's
-  # smoke-android job — is only exposed on GH-hosted Linux in this fleet, not on
-  # our non-metal self-hosted EC2 instance types.
+  # Build the release APK per variant. Uses the same runner-selection and
+  # SDK/NDK setup pattern as build-android-app.yml's build-android job —
+  # ANDROID_RUNNER_LABEL when configured (bigger, AMI has SDK baked in), else
+  # falls back to GH-hosted ubuntu-latest (which has enough RAM for a build,
+  # just not for build+emulator together).
   # ---------------------------------------------------------------------------
-  benchmark:
-    name: "Cold Start (${{ matrix.variant }})"
-    runs-on: ubuntu-latest
-    timeout-minutes: 50
+  build:
+    name: "Build (${{ matrix.variant }})"
+    runs-on: ${{ vars.ANDROID_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix:
@@ -91,7 +102,10 @@ jobs:
           set-nx-shas: false
           skip-system-deps: true
 
+      # Mirrors build-android-app.yml: self-hosted Android runners bake JDK/SDK
+      # into the AMI, so skip the download there; GH-hosted fallback needs both.
       - name: Setup Java
+        if: ${{ vars.ANDROID_RUNNER_LABEL == '' }}
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: "temurin"
@@ -102,9 +116,31 @@ jobs:
             pnpm-lock.yaml
 
       - name: Setup Android SDK
+        if: ${{ vars.ANDROID_RUNNER_LABEL == '' }}
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
+
+      - name: Ensure ANDROID_HOME (self-hosted fallback)
+        if: ${{ vars.ANDROID_RUNNER_LABEL != '' }}
+        shell: bash
+        run: |
+          if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
+            echo "✅ ANDROID_HOME already set: $ANDROID_HOME"
+            exit 0
+          fi
+          SDK_DIR="/opt/android-sdk"
+          if [ ! -d "$SDK_DIR" ]; then
+            echo "❌ ANDROID_HOME is unset and $SDK_DIR does not exist on this runner." >&2
+            exit 1
+          fi
+          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "$SDK_DIR/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$SDK_DIR/platform-tools" >> "$GITHUB_PATH"
+          if [ -d "$SDK_DIR/build-tools/${{ env.ANDROID_API_LEVEL }}.0.0" ]; then
+            echo "$SDK_DIR/build-tools/${{ env.ANDROID_API_LEVEL }}.0.0" >> "$GITHUB_PATH"
+          fi
 
       # Only the `inline-requires` leg patches the flag; `baseline` builds the
       # repo as-committed (inlineRequires: false) so it can never drift from
@@ -129,13 +165,46 @@ jobs:
         with:
           build-type: release
           cache-key-suffix: ${{ matrix.variant }}
-        timeout-minutes: 40
+        timeout-minutes: 35
 
-      - name: Move APK into ./artifacts
-        shell: bash
-        run: |
-          mkdir -p ./artifacts
-          cp "apps/app/android/${{ steps.build.outputs.apk-path }}" ./artifacts/app-release-${{ matrix.variant }}.apk
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: startup-apk-${{ matrix.variant }}
+          path: apps/app/android/${{ steps.build.outputs.apk-path }}
+          retention-days: 3
+
+  # ---------------------------------------------------------------------------
+  # Boot the emulator and measure cold start. GH-hosted ubuntu-latest is forced
+  # (not the self-hosted runner pools) because reactivecircus/android-emulator-runner
+  # needs KVM, which — per run-maestro-sweep.yml and build-android-app.yml's
+  # smoke-android job — is only exposed on GH-hosted Linux in this fleet, not on
+  # our non-metal self-hosted EC2 instance types. No build happens here — just
+  # install the already-built APK and boot, matching smoke-android's shape.
+  # ---------------------------------------------------------------------------
+  benchmark:
+    name: "Cold Start (${{ matrix.variant }})"
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [baseline, inline-requires]
+    steps:
+      - name: Checkout Repository
+        # Needed for scripts/ci/mobile-startup-benchmark.sh — the
+        # emulator-runner invokes its `script:` in the workspace dir, so the
+        # script file must be on disk before that step runs.
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: Download APK Artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: startup-apk-${{ matrix.variant }}
+          path: ./artifacts
 
       - name: Enable KVM group permissions
         run: |
