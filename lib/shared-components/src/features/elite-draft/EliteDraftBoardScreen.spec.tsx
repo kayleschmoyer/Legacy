@@ -251,6 +251,46 @@ jest.mock('./DraftPickAnnouncement', () => ({
       />
     ) : null,
 }));
+jest.mock('./DraftPlayersTab', () => ({
+  DraftPlayersTab: ({
+    players,
+    myTeam,
+    selectedPosition,
+    searchTerm,
+    canDraft,
+    myTeamId,
+    onSetSelectedPosition,
+    onSetSearchTerm,
+    onToggleQueue,
+    onDraftPlayer,
+  }: {
+    players: unknown[];
+    myTeam: unknown[];
+    selectedPosition: string;
+    searchTerm: string;
+    canDraft: boolean;
+    myTeamId: number | null;
+    onSetSelectedPosition: (pos: string) => void;
+    onSetSearchTerm: (term: string) => void;
+    onToggleQueue: (id: number) => void;
+    onDraftPlayer: (id: number) => void;
+  }) => (
+    <div
+      data-testid="draft-players-tab"
+      data-players-count={players.length}
+      data-my-team-count={myTeam.length}
+      data-selected-position={selectedPosition}
+      data-search-term={searchTerm}
+      data-can-draft={String(canDraft)}
+      data-my-team-id={myTeamId ?? ''}
+    >
+      <button onClick={() => onSetSelectedPosition('QB')}>set-position</button>
+      <button onClick={() => onSetSearchTerm('mahomes')}>set-search</button>
+      <button onClick={() => onToggleQueue(7)}>toggle-queue</button>
+      <button onClick={() => onDraftPlayer(7)}>draft-player</button>
+    </div>
+  ),
+}));
 jest.mock('./DraftSquadStrip', () => ({
   DraftSquadStrip: ({
     myTeam,
@@ -1571,24 +1611,96 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
     expect(ticker.getAttribute('data-team')).toBe('Bronx Bombers');
   });
 
-  it('defaults to the Board tab, showing the existing board content and hiding tab placeholders', () => {
+  it('defaults to the Board tab, showing the existing board content and hiding tab placeholders and the other tabs', () => {
     setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(screen.getByTestId('draft-board-grid')).toBeTruthy();
     expect(screen.getByTestId('flatlist')).toBeTruthy();
-    expect(screen.queryByText('Players tab is coming soon.')).toBeNull();
+    expect(screen.queryByText('Chat tab is coming soon.')).toBeNull();
+    expect(screen.queryByTestId('draft-players-tab')).toBeNull();
+    expect(screen.queryByTestId('draft-queue-tab')).toBeNull();
+    expect(screen.queryByTestId('draft-team-tab')).toBeNull();
   });
 
-  it('shows a placeholder body and hides the board content for a non-board active tab', () => {
+  it('shows a placeholder body and hides the board content for the one remaining placeholder tab (chat)', () => {
+    setupCompactLiveDraft({ ui: { activeTab: 'chat' } });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('Chat tab is coming soon.')).toBeTruthy();
+    expect(screen.queryByTestId('draft-mini-board')).toBeNull();
+    expect(screen.queryByTestId('flatlist')).toBeNull();
+    expect(screen.queryByTestId('draft-players-tab')).toBeNull();
+  });
+
+  it('renders DraftPlayersTab (LS-9399) instead of a placeholder for the Players tab, and hides the board content', () => {
     setupCompactLiveDraft({ ui: { activeTab: 'players' } });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    expect(screen.getByText('Players tab is coming soon.')).toBeTruthy();
+    expect(screen.getByTestId('draft-players-tab')).toBeTruthy();
+    expect(screen.queryByText('Players tab is coming soon.')).toBeNull();
     expect(screen.queryByTestId('draft-mini-board')).toBeNull();
     expect(screen.queryByTestId('flatlist')).toBeNull();
+  });
+
+  it('wires players, myTeam, position/search state, canDraft, and myTeamId through to DraftPlayersTab', () => {
+    const player = makeDraftPlayer({ id: 5 });
+    setupCompactLiveDraft({
+      isMyPick: true,
+      players: [player],
+      ui: { activeTab: 'players', selectedPosition: 'RB', searchTerm: 'kelce' },
+    });
+    mockUsePlayerData.mockReturnValue({
+      enrichedPlayers: [player],
+      myTeam: [player],
+      myTeamPicks: [],
+      statsLookup: new Map([[player.id, player]]),
+    } as unknown as ReturnType<typeof usePlayerData>);
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    const tab = screen.getByTestId('draft-players-tab');
+    expect(tab.getAttribute('data-players-count')).toBe('1');
+    expect(tab.getAttribute('data-my-team-count')).toBe('1');
+    expect(tab.getAttribute('data-selected-position')).toBe('RB');
+    expect(tab.getAttribute('data-search-term')).toBe('kelce');
+    expect(tab.getAttribute('data-can-draft')).toBe('true');
+    expect(tab.getAttribute('data-my-team-id')).toBe('1');
+  });
+
+  it('routes DraftPlayersTab callbacks to ui state setters and the shared draft/queue handlers', () => {
+    const setSelectedPosition = jest.fn();
+    const setSearchTerm = jest.fn();
+    const handleToggleQueue = jest.fn();
+    const handleMakePick = jest.fn();
+    setupCompactLiveDraft({
+      isMyPick: true,
+      ui: {
+        activeTab: 'players',
+        setSelectedPosition,
+        setSearchTerm,
+      },
+    });
+    mockUseDraftActions.mockReturnValue(
+      makeBaseActions({ handleToggleQueue, handleMakePick }),
+    );
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    fireEvent.click(screen.getByText('set-position'));
+    expect(setSelectedPosition).toHaveBeenCalledWith('QB');
+
+    fireEvent.click(screen.getByText('set-search'));
+    expect(setSearchTerm).toHaveBeenCalledWith('mahomes');
+
+    fireEvent.click(screen.getByText('toggle-queue'));
+    expect(handleToggleQueue).toHaveBeenCalledWith(7);
+
+    fireEvent.click(screen.getByText('draft-player'));
+    expect(handleMakePick).toHaveBeenCalledWith(7);
   });
 
   it('renders the bottom nav with the current active tab and routes taps to ui.setActiveTab', () => {

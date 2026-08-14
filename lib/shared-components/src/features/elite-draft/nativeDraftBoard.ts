@@ -248,6 +248,61 @@ export function formatLastPickLine(
   return `${pick.round}.${pick.pickNumber} — ${playerName}, ${position ?? '—'} (${teamName})`;
 }
 
+export interface UpcomingPick {
+  round: number;
+  /** 1-based pick number within the round. */
+  roundPickNumber: number;
+  overallPick: number;
+  /** Players between the current pick and this one — how many rows down the
+   *  inline "YOUR PICK" marker (LS-9399) sits in the available-players list. */
+  picksUntil: number;
+}
+
+/**
+ * The viewer's next `count` picks, computed from standard snake order (round
+ * direction alternates — mirrors the Board tab's `R{n}` arrow, README "Board
+ * tab" §3). `myTeamIndex` is the viewer's 0-based slot in the draft's team
+ * order (`boardOrderedTeams`); a negative index (team not found) yields no
+ * picks. Only strictly-future picks are returned — the pick currently on the
+ * clock, even if it's the viewer's, is never "next" (Players tab inline
+ * markers, LS-9399).
+ */
+export function computeMyUpcomingPicks({
+  currentPickInfo,
+  teamCount,
+  myTeamIndex,
+  count = 2,
+}: {
+  currentPickInfo: CurrentDraftPickInfo | null;
+  teamCount: number;
+  myTeamIndex: number;
+  count?: number;
+}): UpcomingPick[] {
+  if (!currentPickInfo || teamCount <= 0 || myTeamIndex < 0) return [];
+  const currentOverall = currentPickInfo.overallPick;
+  const results: UpcomingPick[] = [];
+  // Bounded scan — at most one of my picks per round, so `count` rounds past
+  // the current one always finds `count` future picks (or the draft ends).
+  for (
+    let round = currentPickInfo.round;
+    results.length < count && round <= currentPickInfo.round + count;
+    round++
+  ) {
+    const roundPickNumber =
+      round % 2 === 1 ? myTeamIndex + 1 : teamCount - myTeamIndex;
+    const overallPick = (round - 1) * teamCount + roundPickNumber;
+    if (overallPick > currentOverall) {
+      results.push({
+        round,
+        roundPickNumber,
+        overallPick,
+        picksUntil: overallPick - currentOverall,
+      });
+    }
+  }
+  return results;
+}
+
 /**
  * "F. Lastname" abbreviation for the Board tab grid cell (README "Board tab",
  * LS-9398) — reuses {@link shortPlayerName}'s suffix-stripping so "Bobby Witt

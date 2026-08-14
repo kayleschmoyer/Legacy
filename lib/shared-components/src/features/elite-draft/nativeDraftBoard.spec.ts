@@ -2,6 +2,7 @@ import {
   abbreviatedPlayerName,
   buildBoardCells,
   buildSquadSlots,
+  computeMyUpcomingPicks,
   describeBoardCell,
   describeSquadNeed,
   formatClock,
@@ -390,6 +391,65 @@ describe('formatLastPickLine', () => {
     );
 
     expect(line).toBe('1.1 — Player #7, — (Dinger Dynasty)');
+  });
+});
+
+describe('computeMyUpcomingPicks', () => {
+  const currentPickInfo: CurrentDraftPickInfo = {
+    draftId: 42,
+    teamId: 1,
+    round: 1,
+    pickNumber: 1,
+    overallPick: 1,
+    isComplete: false,
+  };
+
+  it('returns my next two picks in snake order (round direction alternates)', () => {
+    const picks = computeMyUpcomingPicks({
+      currentPickInfo,
+      teamCount: 4,
+      myTeamIndex: 1,
+      count: 2,
+    });
+
+    expect(picks).toEqual([
+      { round: 1, roundPickNumber: 2, overallPick: 2, picksUntil: 1 },
+      { round: 2, roundPickNumber: 3, overallPick: 7, picksUntil: 6 },
+    ]);
+  });
+
+  it('excludes the current pick even when it is mine', () => {
+    const picks = computeMyUpcomingPicks({
+      currentPickInfo: { ...currentPickInfo, teamId: 1, overallPick: 2 },
+      teamCount: 4,
+      myTeamIndex: 1,
+      count: 2,
+    });
+
+    expect(picks).toEqual([
+      { round: 2, roundPickNumber: 3, overallPick: 7, picksUntil: 5 },
+      { round: 3, roundPickNumber: 2, overallPick: 10, picksUntil: 8 },
+    ]);
+  });
+
+  it('returns an empty list with no current pick, no teams, or an unresolved team index', () => {
+    expect(
+      computeMyUpcomingPicks({
+        currentPickInfo: null,
+        teamCount: 4,
+        myTeamIndex: 1,
+      }),
+    ).toEqual([]);
+    expect(
+      computeMyUpcomingPicks({ currentPickInfo, teamCount: 0, myTeamIndex: 1 }),
+    ).toEqual([]);
+    expect(
+      computeMyUpcomingPicks({
+        currentPickInfo,
+        teamCount: 4,
+        myTeamIndex: -1,
+      }),
+    ).toEqual([]);
   });
 });
 

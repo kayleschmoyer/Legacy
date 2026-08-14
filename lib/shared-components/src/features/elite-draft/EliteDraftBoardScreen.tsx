@@ -17,6 +17,7 @@ import { DraftSquadStrip } from './DraftSquadStrip';
 import { DraftHeaderBand } from './DraftHeaderBand';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftBottomNav } from './DraftBottomNav';
+import { DraftPlayersTab } from './DraftPlayersTab';
 import { DraftQueueTab } from './DraftQueueTab';
 import { DraftTeamTab } from './DraftTeamTab';
 import { useDraftPalette } from './nativeDraftPalette';
@@ -48,6 +49,7 @@ import { DraftChatOverlay } from './DraftChatOverlay';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import type { DraftPickRecord, DraftPlayer } from './types';
+import type { DraftRoomTab } from './hooks/useDraftUIState';
 import { PositionBadge } from '../../components/PositionBadge';
 import { useAuth } from '../../features/auth';
 import type { SportKind } from '../../config/sports';
@@ -96,13 +98,15 @@ const POSITION_FILTERS = [
 type SortKey = 'adp' | 'pts';
 
 /**
- * Draft Room v2 shell (LS-9397) + Queue/Team tabs (LS-9400): the Board tab
- * keeps this file's existing compact-board content, Queue and Team render
- * their real bodies below; Players and Chat remain placeholders until
- * siblings 3 and 5 build them (Out of Scope for this ticket).
+ * Draft Room v2 shell (LS-9397) + Players tab (LS-9399) + Queue/Team tabs
+ * (LS-9400): the Board tab keeps this file's existing compact-board content;
+ * Players, Queue, and Team render their real bodies below. Chat remains a
+ * placeholder until sibling 5 builds it (Out of Scope for this ticket).
  */
-const TAB_PLACEHOLDER_COPY: Record<'players' | 'chat', string> = {
-  players: 'Players tab is coming soon.',
+const TAB_PLACEHOLDER_COPY: Record<
+  Exclude<DraftRoomTab, 'board' | 'players' | 'queue' | 'team'>,
+  string
+> = {
   chat: 'Chat tab is coming soon.',
 };
 
@@ -290,6 +294,7 @@ interface CompactLiveDraftBoardProps {
   timeRemaining: number;
   round: number;
   currentPick: number;
+  /** Active league sport — drives Queue/Team tab position colors (LS-9400). */
   sport: SportKind;
   /** Mock drafts only — no real teammates to leave hanging (LS-9238). */
   isMockDraft: boolean;
@@ -297,8 +302,6 @@ interface CompactLiveDraftBoardProps {
    *  commissionerPick mutation under the hood — no CPU auto-picker exists
    *  in this mode. */
   controlAllTeams: boolean;
-  /** Active league sport — drives Queue/Team tab position colors (LS-9400). */
-  sport: SportKind;
   onExitDraft: () => void;
   onDraftPlayer: (id: number) => void;
   onCommissionerPick: (id: number) => void;
@@ -318,7 +321,6 @@ function CompactLiveDraftBoard({
   sport,
   isMockDraft,
   controlAllTeams,
-  sport,
   onExitDraft,
   onDraftPlayer,
   onCommissionerPick,
@@ -388,6 +390,12 @@ function CompactLiveDraftBoard({
       onDraftPlayer,
     ],
   );
+  const handleToggleQueue = useCallback(
+    (id: number) => {
+      void actions.handleToggleQueue(id);
+    },
+    [actions],
+  );
   // Mock drafts auto-register the human as "commissioner" (initialize-mock-draft.ts)
   // so the queue/pick flow works, but there's no real commissioner role to manage
   // in a solo practice draft — the controls should never surface there (LS-9242).
@@ -451,7 +459,25 @@ function CompactLiveDraftBoard({
         teamName={lastPick ? queries.teamNameById(lastPick.teamId) : ''}
       />
 
-      {ui.activeTab === 'queue' ? (
+      {ui.activeTab === 'players' ? (
+        <DraftPlayersTab
+          players={playerData.enrichedPlayers}
+          myTeam={playerData.myTeam}
+          leaguePositions={queries.leaguePositions}
+          maxRosterSize={queries.league?.maxRosterSize ?? null}
+          selectedPosition={ui.selectedPosition}
+          searchTerm={ui.searchTerm}
+          onSetSelectedPosition={ui.setSelectedPosition}
+          onSetSearchTerm={ui.setSearchTerm}
+          canDraft={canDraft}
+          currentPickInfo={queries.currentPickInfo}
+          boardOrderedTeams={boardTeams}
+          myTeamId={queries.myTeamId}
+          queuedPlayerIds={queries.queuedPlayerIds}
+          onToggleQueue={handleToggleQueue}
+          onDraftPlayer={handlePlayerRowPress}
+        />
+      ) : ui.activeTab === 'queue' ? (
         <DraftQueueTab
           draftId={queries.draftId ?? 0}
           entries={queries.queueEntries}
@@ -1259,7 +1285,6 @@ export function EliteDraftBoardScreen({
         sport={sport}
         isMockDraft={isMockDraft}
         controlAllTeams={controlAllTeams}
-        sport={sport}
         onExitDraft={handleExitDraft}
         onDraftPlayer={handleDraftPlayer}
         onCommissionerPick={handleCommissionerPick}
