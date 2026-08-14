@@ -279,12 +279,16 @@ function aggregateSeasonPassing(
   let yds = 0;
   let td = 0;
   let int = 0;
+  let sacked = 0;
+  let sackYds = 0;
   for (const game of games) {
     cmp += game.cmp ?? 0;
     att += game.att ?? 0;
     yds += game.yds ?? 0;
     td += game.td ?? 0;
     int += game.int ?? 0;
+    sacked += game.sacked ?? 0;
+    sackYds += game.sackYds ?? 0;
   }
 
   return {
@@ -293,11 +297,17 @@ function aggregateSeasonPassing(
     team,
     pfrRowId: `${season}`,
     g: games.length,
+    // Not exposed per-game — only the main-page season/career parsers carry these.
+    gs: null,
     cmp,
     att,
     yds,
     td,
     int,
+    firstDowns: null,
+    sacked,
+    sackYds,
+    lng: null,
     // Season passer rating is recomputed downstream from the totals.
     rating: null,
   };
@@ -315,11 +325,13 @@ function aggregateSeasonRushing(
   let yds = 0;
   let td = 0;
   let fumbles = 0;
+  let lng: number | null = null;
   for (const game of games) {
     att += game.att ?? 0;
     yds += game.yds ?? 0;
     td += game.td ?? 0;
     fumbles += game.fumbles ?? 0;
+    if (game.lng !== null) lng = Math.max(lng ?? game.lng, game.lng);
   }
 
   return {
@@ -328,10 +340,15 @@ function aggregateSeasonRushing(
     team,
     pfrRowId: `${season}`,
     g: games.length,
+    // Not exposed per-game — only the main-page season/career parsers carry these.
+    gs: null,
     att,
     yds,
     td,
+    lng,
+    firstDowns: null,
     fumbles,
+    ydsPerAtt: att > 0 ? yds / att : null,
   };
 }
 
@@ -348,12 +365,14 @@ function aggregateSeasonReceiving(
   let yds = 0;
   let td = 0;
   let fumbles = 0;
+  let lng: number | null = null;
   for (const game of games) {
     rec += game.rec ?? 0;
     tgt += game.tgt ?? 0;
     yds += game.yds ?? 0;
     td += game.td ?? 0;
     fumbles += game.fumbles ?? 0;
+    if (game.lng !== null) lng = Math.max(lng ?? game.lng, game.lng);
   }
 
   return {
@@ -362,11 +381,16 @@ function aggregateSeasonReceiving(
     team,
     pfrRowId: `${season}`,
     g: games.length,
+    // Not exposed per-game — only the main-page season/career parsers carry these.
+    gs: null,
     rec,
     tgt,
     yds,
     td,
+    lng,
+    firstDowns: null,
     fumbles,
+    ydsPerRec: rec > 0 ? yds / rec : null,
   };
 }
 
@@ -453,8 +477,11 @@ function parseMainPageSkillRow(
   const g = parseIntCell(row, 'games');
   const fumbles = parseIntCell(row, 'fumbles');
 
+  const gs = parseIntCell(row, 'games_started');
+
   const tgt = parseIntCell(row, 'targets');
   const rec = parseIntCell(row, 'rec');
+  const recYds = parseIntCell(row, 'rec_yds');
   const receiving: FootballSeasonReceiving | null =
     tgt || rec
       ? {
@@ -463,11 +490,15 @@ function parseMainPageSkillRow(
           team,
           pfrRowId: `${season}`,
           g,
+          gs,
           rec,
           tgt,
-          yds: parseIntCell(row, 'rec_yds'),
+          yds: recYds,
           td: parseIntCell(row, 'rec_td'),
+          lng: parseIntCell(row, 'rec_long'),
+          firstDowns: parseIntCell(row, 'rec_first_down'),
           fumbles,
+          ydsPerRec: parseFloatCell(row, 'rec_yds_per_rec'),
         }
       : null;
 
@@ -479,10 +510,14 @@ function parseMainPageSkillRow(
         team,
         pfrRowId: `${season}`,
         g,
+        gs,
         att: rushAtt,
         yds: parseIntCell(row, 'rush_yds'),
         td: parseIntCell(row, 'rush_td'),
+        lng: parseIntCell(row, 'rush_long'),
+        firstDowns: parseIntCell(row, 'rush_first_down'),
         fumbles,
+        ydsPerAtt: parseFloatCell(row, 'rush_yds_per_att'),
       }
     : null;
 
@@ -504,12 +539,19 @@ function parseMainPagePassingRow(
     team: parseMainPageTeam(row),
     pfrRowId: `${season}`,
     g: parseIntCell(row, 'games'),
+    gs: parseIntCell(row, 'games_started'),
     cmp: parseIntCell(row, 'pass_cmp'),
     att,
     yds: parseIntCell(row, 'pass_yds'),
     td: parseIntCell(row, 'pass_td'),
     int: parseIntCell(row, 'pass_int'),
-    rating: null,
+    firstDowns: parseIntCell(row, 'pass_first_down'),
+    sacked: parseIntCell(row, 'pass_sacked'),
+    sackYds: parseIntCell(row, 'pass_sacked_yds'),
+    lng: parseIntCell(row, 'pass_long'),
+    // PFR publishes the season passer rating directly on this table — read it
+    // rather than recomputing, so it matches PFR's own displayed value.
+    rating: parseFloatCell(row, 'pass_rating'),
   };
 }
 
@@ -652,7 +694,10 @@ function parseMainPageDefenseRow(
   if (g === null) return null;
 
   const soloTkl = parseIntCell(row, 'tackles_solo');
-  const astTkl = parseIntCell(row, 'tackles_assist');
+  // PFR's live main-page defense table uses the plural `tackles_assists` —
+  // not `tackles_assist` — confirmed against a live player page; the old
+  // singular name silently matched nothing and left ast_tkl null on every row.
+  const astTkl = parseIntCell(row, 'tackles_assists');
   // Prefer PFR's own combined column; fall back to solo+ast (matching the
   // gamelog-footer parser in IDPStats).
   const totalTkl =

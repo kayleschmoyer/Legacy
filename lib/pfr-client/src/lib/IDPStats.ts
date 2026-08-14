@@ -34,7 +34,7 @@ function parseIdpGameRow(
 
   // PFR defensive game log data-stat names:
   // tackles_solo    → solo tackles
-  // tackles_assist  → assisted tackles
+  // tackles_assists → assisted tackles
   // sacks           → sacks (float, supports 0.5 half-sacks)
   // def_int         → interceptions
   // pass_defended   → passes defensed
@@ -49,7 +49,7 @@ function parseIdpGameRow(
     gameNum,
     gameIdentifier,
     soloTkl: parseIntCell(row, 'tackles_solo'),
-    astTkl: parseIntCell(row, 'tackles_assist'),
+    astTkl: parseIntCell(row, 'tackles_assists'),
     // sacks must be float — half-sacks (0.5) are valid PFR values
     sacks: parseFloatCell(row, 'sacks'),
     int: parseIntCell(row, 'def_int'),
@@ -72,7 +72,7 @@ function parseIdpSeasonRow(
   const rowId = getCellText(row, 'ranker') ?? `${season}`;
 
   const soloTkl = parseIntCell(row, 'tackles_solo');
-  const astTkl = parseIntCell(row, 'tackles_assist');
+  const astTkl = parseIntCell(row, 'tackles_assists');
   const totalTkl =
     soloTkl !== null && astTkl !== null ? soloTkl + astTkl : null;
 

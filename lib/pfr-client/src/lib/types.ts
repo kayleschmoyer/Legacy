@@ -138,11 +138,16 @@ export interface FootballSeasonPassing {
   team: string;
   pfrRowId: string;
   g: number | null;
+  gs: number | null;
   cmp: number | null;
   att: number | null;
   yds: number | null;
   td: number | null;
   int: number | null;
+  firstDowns: number | null;
+  sacked: number | null;
+  sackYds: number | null;
+  lng: number | null;
   rating: number | null;
 }
 
@@ -152,10 +157,14 @@ export interface FootballSeasonRushing {
   team: string;
   pfrRowId: string;
   g: number | null;
+  gs: number | null;
   att: number | null;
   yds: number | null;
   td: number | null;
+  lng: number | null;
+  firstDowns: number | null;
   fumbles: number | null;
+  ydsPerAtt: number | null;
 }
 
 export interface FootballSeasonReceiving {
@@ -164,11 +173,15 @@ export interface FootballSeasonReceiving {
   team: string;
   pfrRowId: string;
   g: number | null;
+  gs: number | null;
   rec: number | null;
   tgt: number | null;
   yds: number | null;
   td: number | null;
+  lng: number | null;
+  firstDowns: number | null;
   fumbles: number | null;
+  ydsPerRec: number | null;
 }
 
 export interface FootballSeasonKicking {

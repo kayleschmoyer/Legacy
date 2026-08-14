@@ -17,7 +17,7 @@ const FIXTURE_HTML = `
       <td data-stat="game_date">Date</td>
       <td data-stat="team">Tm</td>
       <td data-stat="tackles_solo">Solo</td>
-      <td data-stat="tackles_assist">Ast</td>
+      <td data-stat="tackles_assists">Ast</td>
       <td data-stat="sacks">Sacks</td>
       <td data-stat="def_int">Int</td>
       <td data-stat="pass_defended">PD</td>
@@ -33,7 +33,7 @@ const FIXTURE_HTML = `
       <td data-stat="game_date"><a href="/boxscores/202409080kan.htm">2024-09-08</a></td>
       <td data-stat="team"><a href="/teams/kan/2024.htm">KAN</a></td>
       <td data-stat="tackles_solo">5</td>
-      <td data-stat="tackles_assist">3</td>
+      <td data-stat="tackles_assists">3</td>
       <td data-stat="sacks">0.5</td>
       <td data-stat="def_int">1</td>
       <td data-stat="pass_defended">2</td>
@@ -47,7 +47,7 @@ const FIXTURE_HTML = `
       <td data-stat="game_date">2024-10-27</td>
       <td data-stat="team"><a href="/teams/kan/2024.htm">KAN</a></td>
       <td data-stat="tackles_solo"></td>
-      <td data-stat="tackles_assist"></td>
+      <td data-stat="tackles_assists"></td>
       <td data-stat="sacks"></td>
       <td data-stat="def_int"></td>
       <td data-stat="pass_defended"></td>
@@ -65,7 +65,7 @@ const FIXTURE_HTML = `
       <td data-stat="game_count">17</td>
       <td data-stat="games_started">16</td>
       <td data-stat="tackles_solo">60</td>
-      <td data-stat="tackles_assist">20</td>
+      <td data-stat="tackles_assists">20</td>
       <td data-stat="sacks">3.5</td>
       <td data-stat="def_int">2</td>
       <td data-stat="pass_defended">8</td>

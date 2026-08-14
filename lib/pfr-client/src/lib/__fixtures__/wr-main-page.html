@@ -5,9 +5,12 @@
   season 2015 has both receiving and rushing.
 
   Expected season totals:
-    2014: receiving(g=16, tgt=66, rec=38, yds=446, td=3), rushing=null
-    2015: receiving(g=15, tgt=94, rec=50, yds=536, td=1, fumbles=1),
-          rushing(g=15, att=2, yds=8, td=0)
+    2014: receiving(g=16, gs=14, tgt=66, rec=38, yds=446, td=3, lng=32,
+          firstDowns=20, ydsPerRec=11.7), rushing=null
+    2015: receiving(g=15, gs=15, tgt=94, rec=50, yds=536, td=1, lng=28,
+          firstDowns=25, fumbles=1, ydsPerRec=10.7),
+          rushing(g=15, gs=15, att=2, yds=8, td=0, lng=6,
+          firstDowns=1, ydsPerAtt=4.0)
 -->
 <html>
   <body>
@@ -19,13 +22,20 @@
               <th data-stat="year_id">Year</th>
               <th data-stat="team_name_abbr">Tm</th>
               <th data-stat="games">G</th>
+              <th data-stat="games_started">GS</th>
               <th data-stat="targets">Tgt</th>
               <th data-stat="rec">Rec</th>
               <th data-stat="rec_yds">Yds</th>
               <th data-stat="rec_td">TD</th>
+              <th data-stat="rec_first_down">1D</th>
+              <th data-stat="rec_long">Lng</th>
+              <th data-stat="rec_yds_per_rec">Y/R</th>
               <th data-stat="rush_att">Att</th>
               <th data-stat="rush_yds">Yds</th>
               <th data-stat="rush_td">TD</th>
+              <th data-stat="rush_first_down">1D</th>
+              <th data-stat="rush_long">Lng</th>
+              <th data-stat="rush_yds_per_att">Y/A</th>
               <th data-stat="fumbles">Fmb</th>
             </tr>
           </thead>
@@ -34,39 +44,60 @@
               <th data-stat="year_id">2014</th>
               <td data-stat="team_name_abbr"><a href="/teams/gnb/2014.htm">GNB</a></td>
               <td data-stat="games">16</td>
+              <td data-stat="games_started">14</td>
               <td data-stat="targets">66</td>
               <td data-stat="rec">38</td>
               <td data-stat="rec_yds">446</td>
               <td data-stat="rec_td">3</td>
+              <td data-stat="rec_first_down">20</td>
+              <td data-stat="rec_long">32</td>
+              <td data-stat="rec_yds_per_rec">11.7</td>
               <td data-stat="rush_att">0</td>
               <td data-stat="rush_yds">0</td>
               <td data-stat="rush_td">0</td>
+              <td data-stat="rush_first_down">0</td>
+              <td data-stat="rush_long">0</td>
+              <td data-stat="rush_yds_per_att">0</td>
               <td data-stat="fumbles">0</td>
             </tr>
             <tr>
               <th data-stat="year_id">2015</th>
               <td data-stat="team_name_abbr"><a href="/teams/gnb/2015.htm">GNB</a></td>
               <td data-stat="games">15</td>
+              <td data-stat="games_started">15</td>
               <td data-stat="targets">94</td>
               <td data-stat="rec">50</td>
               <td data-stat="rec_yds">536</td>
               <td data-stat="rec_td">1</td>
+              <td data-stat="rec_first_down">25</td>
+              <td data-stat="rec_long">28</td>
+              <td data-stat="rec_yds_per_rec">10.7</td>
               <td data-stat="rush_att">2</td>
               <td data-stat="rush_yds">8</td>
               <td data-stat="rush_td">0</td>
+              <td data-stat="rush_first_down">1</td>
+              <td data-stat="rush_long">6</td>
+              <td data-stat="rush_yds_per_att">4.0</td>
               <td data-stat="fumbles">1</td>
             </tr>
             <tr>
               <th data-stat="year_id">Career</th>
               <td data-stat="team_name_abbr"></td>
               <td data-stat="games">31</td>
+              <td data-stat="games_started">29</td>
               <td data-stat="targets">160</td>
               <td data-stat="rec">88</td>
               <td data-stat="rec_yds">982</td>
               <td data-stat="rec_td">4</td>
+              <td data-stat="rec_first_down">45</td>
+              <td data-stat="rec_long">32</td>
+              <td data-stat="rec_yds_per_rec">11.2</td>
               <td data-stat="rush_att">2</td>
               <td data-stat="rush_yds">8</td>
               <td data-stat="rush_td">0</td>
+              <td data-stat="rush_first_down">1</td>
+              <td data-stat="rush_long">6</td>
+              <td data-stat="rush_yds_per_att">4.0</td>
               <td data-stat="fumbles">1</td>
             </tr>
           </tbody>

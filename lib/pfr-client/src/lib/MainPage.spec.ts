@@ -37,10 +37,14 @@ describe('parseMainPageSeasonTotals — WR (receiving_and_rushing in comment)', 
       season: 2014,
       team: 'GNB',
       g: 16,
+      gs: 14,
       tgt: 66,
       rec: 38,
       yds: 446,
       td: 3,
+      lng: 32,
+      firstDowns: 20,
+      ydsPerRec: 11.7,
     });
     expect(seasons[0].rushing).toBeNull();
     expect(seasons[0].passing).toBeNull();
@@ -53,18 +57,26 @@ describe('parseMainPageSeasonTotals — WR (receiving_and_rushing in comment)', 
     expect(seasons[1].receiving).toMatchObject({
       season: 2015,
       g: 15,
+      gs: 15,
       tgt: 94,
       rec: 50,
       yds: 536,
       td: 1,
+      lng: 28,
+      firstDowns: 25,
       fumbles: 1,
+      ydsPerRec: 10.7,
     });
     expect(seasons[1].rushing).toMatchObject({
       season: 2015,
       g: 15,
+      gs: 15,
       att: 2,
       yds: 8,
       td: 0,
+      lng: 6,
+      firstDowns: 1,
+      ydsPerAtt: 4.0,
     });
   });
 
@@ -85,18 +97,26 @@ describe('parseMainPageSeasonTotals — RB (rushing_and_receiving, no comment)',
       playerId: 20,
       season: 2019,
       g: 16,
+      gs: 15,
       att: 303,
       yds: 1540,
       td: 16,
+      lng: 68,
+      firstDowns: 76,
       fumbles: 1,
+      ydsPerAtt: 5.1,
     });
     expect(seasons[0].receiving).toMatchObject({
       season: 2019,
       g: 16,
+      gs: 15,
       tgt: 24,
       rec: 18,
       yds: 206,
       td: 2,
+      lng: 30,
+      firstDowns: 8,
+      ydsPerRec: 11.4,
     });
   });
 
@@ -105,9 +125,13 @@ describe('parseMainPageSeasonTotals — RB (rushing_and_receiving, no comment)',
 
     expect(seasons[1].rushing).toMatchObject({
       season: 2020,
+      gs: 16,
       att: 378,
       yds: 2027,
       td: 17,
+      lng: 94,
+      firstDowns: 88,
+      ydsPerAtt: 5.4,
     });
     expect(seasons[1].receiving).toBeNull();
   });
@@ -123,11 +147,17 @@ describe('parseMainPageSeasonTotals — QB (passing + rushing_and_receiving)', (
       season: 2018,
       team: 'KAN',
       g: 16,
+      gs: 16,
       cmp: 383,
       att: 580,
       yds: 5097,
       td: 50,
       int: 12,
+      firstDowns: 225,
+      sacked: 26,
+      sackYds: 156,
+      lng: 75,
+      rating: 113.8,
     });
   });
 
@@ -136,9 +166,13 @@ describe('parseMainPageSeasonTotals — QB (passing + rushing_and_receiving)', (
 
     expect(seasons[0].rushing).toMatchObject({
       season: 2018,
+      gs: 16,
       att: 60,
       yds: 272,
       td: 2,
+      lng: 27,
+      firstDowns: 14,
+      ydsPerAtt: 4.5,
     });
     expect(seasons[0].receiving).toBeNull();
   });
@@ -146,7 +180,11 @@ describe('parseMainPageSeasonTotals — QB (passing + rushing_and_receiving)', (
   it('covers both seasons from passing + skill tables', () => {
     const seasons = parseMainPageSeasonTotals(QB_HTML, qb);
 
-    expect(seasons[1].passing).toMatchObject({ season: 2019, att: 484 });
+    expect(seasons[1].passing).toMatchObject({
+      season: 2019,
+      att: 484,
+      rating: 105.3,
+    });
     expect(seasons[1].rushing).toMatchObject({ season: 2019, att: 51 });
   });
 });

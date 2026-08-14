@@ -5,10 +5,14 @@
   (rec=0, tgt=0 rows are not emitted).
 
   Expected season totals:
-    2018: passing(g=16, cmp=383, att=580, yds=5097, td=50, int=12),
-          rushing(g=16, att=60, yds=272, td=2)
-    2019: passing(g=14, cmp=319, att=484, yds=4031, td=26, int=5),
-          rushing(g=14, att=51, yds=218, td=2)
+    2018: passing(g=16, gs=16, cmp=383, att=580, yds=5097, td=50, int=12,
+          firstDowns=225, sacked=26, sackYds=156, lng=75, rating=113.8),
+          rushing(g=16, gs=16, att=60, yds=272, td=2, lng=27,
+          firstDowns=14, ydsPerAtt=4.5)
+    2019: passing(g=14, gs=14, cmp=319, att=484, yds=4031, td=26, int=5,
+          firstDowns=180, sacked=28, sackYds=157, lng=54, rating=105.3),
+          rushing(g=14, gs=14, att=51, yds=218, td=2, lng=25,
+          firstDowns=12, ydsPerAtt=4.3)
 -->
 <html>
   <body>
@@ -19,11 +23,17 @@
             <th data-stat="year_id">Year</th>
             <th data-stat="team_name_abbr">Tm</th>
             <th data-stat="games">G</th>
+            <th data-stat="games_started">GS</th>
             <th data-stat="pass_cmp">Cmp</th>
             <th data-stat="pass_att">Att</th>
             <th data-stat="pass_yds">Yds</th>
             <th data-stat="pass_td">TD</th>
             <th data-stat="pass_int">Int</th>
+            <th data-stat="pass_first_down">1D</th>
+            <th data-stat="pass_long">Lng</th>
+            <th data-stat="pass_rating">Rate</th>
+            <th data-stat="pass_sacked">Sk</th>
+            <th data-stat="pass_sacked_yds">Yds</th>
           </tr>
         </thead>
         <tbody>
@@ -33,11 +43,17 @@
               <a href="/teams/kan/2018.htm">KAN</a>
             </td>
             <td data-stat="games">16</td>
+            <td data-stat="games_started">16</td>
             <td data-stat="pass_cmp">383</td>
             <td data-stat="pass_att">580</td>
             <td data-stat="pass_yds">5097</td>
             <td data-stat="pass_td">50</td>
             <td data-stat="pass_int">12</td>
+            <td data-stat="pass_first_down">225</td>
+            <td data-stat="pass_long">75</td>
+            <td data-stat="pass_rating">113.8</td>
+            <td data-stat="pass_sacked">26</td>
+            <td data-stat="pass_sacked_yds">156</td>
           </tr>
           <tr>
             <th data-stat="year_id">2019</th>
@@ -45,11 +61,17 @@
               <a href="/teams/kan/2019.htm">KAN</a>
             </td>
             <td data-stat="games">14</td>
+            <td data-stat="games_started">14</td>
             <td data-stat="pass_cmp">319</td>
             <td data-stat="pass_att">484</td>
             <td data-stat="pass_yds">4031</td>
             <td data-stat="pass_td">26</td>
             <td data-stat="pass_int">5</td>
+            <td data-stat="pass_first_down">180</td>
+            <td data-stat="pass_long">54</td>
+            <td data-stat="pass_rating">105.3</td>
+            <td data-stat="pass_sacked">28</td>
+            <td data-stat="pass_sacked_yds">157</td>
           </tr>
         </tbody>
       </table>
@@ -59,9 +81,13 @@
             <th data-stat="year_id">Year</th>
             <th data-stat="team_name_abbr">Tm</th>
             <th data-stat="games">G</th>
+            <th data-stat="games_started">GS</th>
             <th data-stat="rush_att">Att</th>
             <th data-stat="rush_yds">Yds</th>
             <th data-stat="rush_td">TD</th>
+            <th data-stat="rush_first_down">1D</th>
+            <th data-stat="rush_long">Lng</th>
+            <th data-stat="rush_yds_per_att">Y/A</th>
             <th data-stat="targets">Tgt</th>
             <th data-stat="rec">Rec</th>
             <th data-stat="rec_yds">Yds</th>
@@ -76,9 +102,13 @@
               <a href="/teams/kan/2018.htm">KAN</a>
             </td>
             <td data-stat="games">16</td>
+            <td data-stat="games_started">16</td>
             <td data-stat="rush_att">60</td>
             <td data-stat="rush_yds">272</td>
             <td data-stat="rush_td">2</td>
+            <td data-stat="rush_first_down">14</td>
+            <td data-stat="rush_long">27</td>
+            <td data-stat="rush_yds_per_att">4.5</td>
             <td data-stat="targets">0</td>
             <td data-stat="rec">0</td>
             <td data-stat="rec_yds">0</td>
@@ -91,9 +121,13 @@
               <a href="/teams/kan/2019.htm">KAN</a>
             </td>
             <td data-stat="games">14</td>
+            <td data-stat="games_started">14</td>
             <td data-stat="rush_att">51</td>
             <td data-stat="rush_yds">218</td>
             <td data-stat="rush_td">2</td>
+            <td data-stat="rush_first_down">12</td>
+            <td data-stat="rush_long">25</td>
+            <td data-stat="rush_yds_per_att">4.3</td>
             <td data-stat="targets">0</td>
             <td data-stat="rec">0</td>
             <td data-stat="rec_yds">0</td>

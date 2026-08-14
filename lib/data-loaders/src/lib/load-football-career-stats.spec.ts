@@ -46,11 +46,16 @@ const PASSING_SEASON = {
     team: 'KAN',
     pfrRowId: '1',
     g: 17,
+    gs: 17,
     cmp: 380,
     att: 560,
     yds: 4200,
     td: 32,
     int: 10,
+    firstDowns: 210,
+    sacked: 24,
+    sackYds: 150,
+    lng: 70,
     rating: 97.5,
   },
   rushing: null,
@@ -421,16 +426,56 @@ describe('loadFootballCareerStats — stat-group routing', () => {
         team: 'KAN',
         pfrRowId: '1',
         g: 17,
+        gs: 17,
         cmp: 380,
         att: 560,
         yds: 4200,
         td: 32,
         int: 10,
+        firstDowns: 210,
+        sacked: 24,
+        sackYds: 150,
+        lng: 70,
         rating: 97.5,
       },
     ]);
     // Career aggregate is still written alongside the season rows.
     expect(db.upserted['career_football_passing']).toHaveLength(1);
+  });
+
+  it('sums sacked/sackYds from season rows into the career passing aggregate', async () => {
+    const db = makeDb({
+      id: 1,
+      pfrId: 'TestQb00',
+      isDst: false,
+      nflTeam: null,
+      position: 'QB',
+      sport: 'football',
+    });
+    const season2023 = {
+      ...PASSING_SEASON.passing,
+      season: 2023,
+      pfrRowId: '2023',
+      sacked: 20,
+      sackYds: 130,
+    };
+    const season2024 = {
+      ...PASSING_SEASON.passing,
+      season: 2024,
+      pfrRowId: '2024',
+      sacked: 24,
+      sackYds: 150,
+    };
+    mockCareerGetAllSeasonTotals.mockResolvedValue([
+      { passing: season2023, rushing: null, receiving: null, kicking: null },
+      { passing: season2024, rushing: null, receiving: null, kicking: null },
+    ]);
+
+    await loadFootballCareerStats(db, 1, 2024);
+
+    expect(db.upserted['career_football_passing']).toEqual([
+      expect.objectContaining({ sacked: 44, sackYds: 280 }),
+    ]);
   });
 
   it('persists season rows for every stat group present on a season (LS-8513)', async () => {
@@ -448,10 +493,14 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       team: 'DET',
       pfrRowId: 'r1',
       g: 16,
+      gs: 16,
       att: 250,
       yds: 1100,
       td: 12,
+      lng: 55,
+      firstDowns: 60,
       fumbles: 2,
+      ydsPerAtt: 4.4,
     };
     const receiving = {
       playerId: 1,
@@ -459,11 +508,15 @@ describe('loadFootballCareerStats — stat-group routing', () => {
       team: 'DET',
       pfrRowId: 'r1',
       g: 16,
+      gs: 16,
       rec: 45,
       tgt: 60,
       yds: 380,
       td: 3,
+      lng: 22,
+      firstDowns: 18,
       fumbles: 0,
+      ydsPerRec: 8.4,
     };
     mockCareerGetAllSeasonTotals.mockResolvedValue([
       { passing: null, rushing, receiving, kicking: null },
@@ -478,10 +531,14 @@ describe('loadFootballCareerStats — stat-group routing', () => {
         team: 'DET',
         pfrRowId: 'r1',
         g: 16,
+        gs: 16,
         att: 250,
         yds: 1100,
         td: 12,
+        lng: 55,
+        firstDowns: 60,
         fumbles: 2,
+        ydsPerAtt: 4.4,
       },
     ]);
     expect(db.upserted['football_season_receiving']).toEqual([
@@ -491,12 +548,103 @@ describe('loadFootballCareerStats — stat-group routing', () => {
         team: 'DET',
         pfrRowId: 'r1',
         g: 16,
+        gs: 16,
         rec: 45,
         tgt: 60,
         yds: 380,
         td: 3,
+        lng: 22,
+        firstDowns: 18,
         fumbles: 0,
+        ydsPerRec: 8.4,
       },
+    ]);
+  });
+
+  it('takes the max lng across season rows into the career rushing aggregate', async () => {
+    const db = makeDb({
+      id: 1,
+      pfrId: 'TestRb00',
+      isDst: false,
+      nflTeam: null,
+      position: 'RB',
+      sport: 'football',
+    });
+    const season2023 = {
+      playerId: 1,
+      season: 2023,
+      team: 'DET',
+      pfrRowId: 'r1',
+      g: 16,
+      gs: 16,
+      att: 250,
+      yds: 1100,
+      td: 12,
+      lng: 40,
+      firstDowns: 60,
+      fumbles: 2,
+      ydsPerAtt: 4.4,
+    };
+    const season2024 = {
+      ...season2023,
+      season: 2024,
+      pfrRowId: 'r2',
+      lng: 55,
+    };
+    mockCareerGetAllSeasonTotals.mockResolvedValue([
+      { passing: null, rushing: season2023, receiving: null, kicking: null },
+      { passing: null, rushing: season2024, receiving: null, kicking: null },
+    ]);
+
+    await loadFootballCareerStats(db, 1, 2024);
+
+    // career_football_rushing has no first_downs column — only lng aggregates.
+    expect(db.upserted['career_football_rushing']).toEqual([
+      expect.objectContaining({ lng: 55 }),
+    ]);
+  });
+
+  it('takes the max lng across season rows into the career receiving aggregate', async () => {
+    const db = makeDb({
+      id: 1,
+      pfrId: 'TestWr00',
+      isDst: false,
+      nflTeam: null,
+      position: 'WR',
+      sport: 'football',
+    });
+    const season2023 = {
+      playerId: 1,
+      season: 2023,
+      team: 'DET',
+      pfrRowId: 'r1',
+      g: 16,
+      gs: 16,
+      rec: 45,
+      tgt: 60,
+      yds: 380,
+      td: 3,
+      lng: 35,
+      firstDowns: 18,
+      fumbles: 0,
+      ydsPerRec: 8.4,
+    };
+    const season2024 = {
+      ...season2023,
+      season: 2024,
+      pfrRowId: 'r2',
+      lng: 22,
+    };
+    mockCareerGetAllSeasonTotals.mockResolvedValue([
+      { passing: null, rushing: null, receiving: season2023, kicking: null },
+      { passing: null, rushing: null, receiving: season2024, kicking: null },
+    ]);
+
+    await loadFootballCareerStats(db, 1, 2024);
+
+    // career_football_receiving has no first_downs column — only lng aggregates.
+    expect(db.upserted['career_football_receiving']).toEqual([
+      expect.objectContaining({ lng: 35 }),
     ]);
   });
 

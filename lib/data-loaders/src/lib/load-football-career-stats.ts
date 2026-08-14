@@ -58,8 +58,8 @@ function aggregatePassingSeasons(
   let yds: number | null = null;
   let td: number | null = null;
   let intCareer: number | null = null;
-  const sacked: number | null = null;
-  const sackYds: number | null = null;
+  let sacked: number | null = null;
+  let sackYds: number | null = null;
 
   for (const s of seasons) {
     g = sumNullable(g, s.g);
@@ -68,6 +68,8 @@ function aggregatePassingSeasons(
     yds = sumNullable(yds, s.yds);
     td = sumNullable(td, s.td);
     intCareer = sumNullable(intCareer, s.int);
+    sacked = sumNullable(sacked, s.sacked);
+    sackYds = sumNullable(sackYds, s.sackYds);
   }
 
   if (!att || att === 0) return null;
@@ -104,7 +106,7 @@ function aggregateRushingSeasons(
   let att: number | null = null;
   let yds: number | null = null;
   let td: number | null = null;
-  const lng: number | null = null;
+  let lng: number | null = null;
   let fumbles: number | null = null;
 
   for (const s of seasons) {
@@ -113,10 +115,12 @@ function aggregateRushingSeasons(
     yds = sumNullable(yds, s.yds);
     td = sumNullable(td, s.td);
     fumbles = sumNullable(fumbles, s.fumbles);
-    // lng is per-game data not available in season totals — leave null
+    if (s.lng !== null) lng = Math.max(lng ?? s.lng, s.lng);
   }
 
   if (!att || att === 0) return null;
+  // career_football_rushing has no first_downs column (season-only stat) —
+  // firstDowns is intentionally not carried into the career aggregate.
   return { playerId, g, att, yds, td, lng, fumbles };
 }
 
@@ -131,7 +135,7 @@ function aggregateReceivingSeasons(
   let tgt: number | null = null;
   let yds: number | null = null;
   let td: number | null = null;
-  const lng: number | null = null;
+  let lng: number | null = null;
   let fumbles: number | null = null;
 
   for (const s of seasons) {
@@ -141,9 +145,12 @@ function aggregateReceivingSeasons(
     yds = sumNullable(yds, s.yds);
     td = sumNullable(td, s.td);
     fumbles = sumNullable(fumbles, s.fumbles);
+    if (s.lng !== null) lng = Math.max(lng ?? s.lng, s.lng);
   }
 
   if (!rec || rec === 0) return null;
+  // career_football_receiving has no first_downs column (season-only stat) —
+  // firstDowns is intentionally not carried into the career aggregate.
   return { playerId, g, rec, tgt, yds, td, lng, fumbles };
 }
 
@@ -356,11 +363,16 @@ async function upsertSeasonPassing(
       ],
       set: {
         g: sql`excluded.g`,
+        gs: sql`excluded.gs`,
         cmp: sql`excluded.cmp`,
         att: sql`excluded.att`,
         yds: sql`excluded.yds`,
         td: sql`excluded.td`,
         int: sql`excluded.int`,
+        firstDowns: sql`excluded.first_downs`,
+        sacked: sql`excluded.sacked`,
+        sackYds: sql`excluded.sack_yds`,
+        lng: sql`excluded.lng`,
         rating: sql`excluded.rating`,
       },
     });
@@ -382,10 +394,14 @@ async function upsertSeasonRushing(
       ],
       set: {
         g: sql`excluded.g`,
+        gs: sql`excluded.gs`,
         att: sql`excluded.att`,
         yds: sql`excluded.yds`,
         td: sql`excluded.td`,
+        lng: sql`excluded.lng`,
+        firstDowns: sql`excluded.first_downs`,
         fumbles: sql`excluded.fumbles`,
+        ydsPerAtt: sql`excluded.yds_per_att`,
       },
     });
 }
@@ -406,11 +422,15 @@ async function upsertSeasonReceiving(
       ],
       set: {
         g: sql`excluded.g`,
+        gs: sql`excluded.gs`,
         rec: sql`excluded.rec`,
         tgt: sql`excluded.tgt`,
         yds: sql`excluded.yds`,
         td: sql`excluded.td`,
+        lng: sql`excluded.lng`,
+        firstDowns: sql`excluded.first_downs`,
         fumbles: sql`excluded.fumbles`,
+        ydsPerRec: sql`excluded.yds_per_rec`,
       },
     });
 }
@@ -683,11 +703,16 @@ async function loadFootballCareerStatsInner(
         team: s.team,
         pfrRowId: s.pfrRowId,
         g: s.g,
+        gs: s.gs,
         cmp: s.cmp,
         att: s.att,
         yds: s.yds,
         td: s.td,
         int: s.int,
+        firstDowns: s.firstDowns,
+        sacked: s.sacked,
+        sackYds: s.sackYds,
+        lng: s.lng,
         rating: s.rating,
       });
     }
@@ -700,10 +725,14 @@ async function loadFootballCareerStatsInner(
         team: s.team,
         pfrRowId: s.pfrRowId,
         g: s.g,
+        gs: s.gs,
         att: s.att,
         yds: s.yds,
         td: s.td,
+        lng: s.lng,
+        firstDowns: s.firstDowns,
         fumbles: s.fumbles,
+        ydsPerAtt: s.ydsPerAtt,
       });
     }
     if (totals.receiving) {
@@ -715,11 +744,15 @@ async function loadFootballCareerStatsInner(
         team: s.team,
         pfrRowId: s.pfrRowId,
         g: s.g,
+        gs: s.gs,
         rec: s.rec,
         tgt: s.tgt,
         yds: s.yds,
         td: s.td,
+        lng: s.lng,
+        firstDowns: s.firstDowns,
         fumbles: s.fumbles,
+        ydsPerRec: s.ydsPerRec,
       });
     }
     if (totals.kicking) {
