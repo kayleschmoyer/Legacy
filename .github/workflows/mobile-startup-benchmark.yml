@@ -1,0 +1,249 @@
+# =============================================================================
+# Mobile Startup Benchmark (LS-9425)
+# =============================================================================
+# One-off, manually-dispatched cold-start comparison for Metro's
+# `inlineRequires` transform on apps/app. Builds two RELEASE APKs — the current
+# `inlineRequires: false` baseline and an `inlineRequires: true` variant — boots
+# the same x86_64/KVM emulator config `run-maestro-sweep.yml` / the
+# `smoke-android` job in `build-android-app.yml` already use, and times several
+# cold starts of each via the "Displayed" logcat signal (see
+# scripts/ci/mobile-startup-benchmark.sh for why `am start -W`'s own timing is
+# not used here).
+#
+# workflow_dispatch ONLY — this must not run on every push. It exists to
+# produce the baseline/treatment numbers LS-9425's acceptance criteria require,
+# not as ongoing CI. Remove this file (or leave it dispatch-gated indefinitely,
+# it costs nothing at rest) once LS-9425 is resolved.
+# =============================================================================
+
+name: "Mobile Startup Benchmark"
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: "Cold-start runs per variant"
+        required: false
+        default: "8"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-startup-benchmark-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  JAVA_VERSION: "17"
+  NODE_VERSION: "22"
+  ANDROID_API_LEVEL: "35"
+  NDK_VERSION: "27.1.12297006"
+  GRADLE_OPTS: >-
+    -Dorg.gradle.internal.http.connectionTimeout=120000
+    -Dorg.gradle.internal.http.socketTimeout=120000
+  NODE_OPTIONS: "--max-old-space-size=2048"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build + boot + measure, once per variant. GH-hosted ubuntu-latest is forced
+  # (not the self-hosted runner pools) because reactivecircus/android-emulator-runner
+  # needs KVM, which — per run-maestro-sweep.yml and build-android-app.yml's
+  # smoke-android job — is only exposed on GH-hosted Linux in this fleet, not on
+  # our non-metal self-hosted EC2 instance types.
+  # ---------------------------------------------------------------------------
+  benchmark:
+    name: "Cold Start (${{ matrix.variant }})"
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: baseline
+            inline_requires: "false"
+          - variant: inline-requires
+            inline_requires: "true"
+    # Real (non-bypass) auth config, matching what actually ships — this is a
+    # release-build perf measurement, not a QA/functional sweep, so no
+    # EXPO_PUBLIC_BYPASS_AUTH here (and AuthHooks.ts would throw on it anyway
+    # under a production-mode release build).
+    env:
+      EXPO_PUBLIC_OAUTH_PROXY: ${{ secrets.OAUTH_PROXY_URL }}
+      EXPO_PUBLIC_GRAPHQL_HOST: ${{ secrets.GRAPHQL_HOST }}
+      EXPO_PUBLIC_WEBSOCKET_URL: ${{ secrets.WEBSOCKET_URL }}
+      EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
+      EXPO_PUBLIC_STRIPE_MONTHLY_PRICE_ID: ${{ secrets.STRIPE_MONTHLY_PRICE_ID }}
+      EXPO_PUBLIC_STRIPE_ANNUAL_PRICE_ID: ${{ secrets.STRIPE_ANNUAL_PRICE_ID }}
+      EXPO_PUBLIC_GIPHY_API_KEY: ${{ secrets.GIPHY_API_KEY }}
+      EXPO_PUBLIC_GROWTHBOOK_CLIENT_KEY: ${{ secrets.GROWTHBOOK_CLIENT_KEY }}
+      EXPO_PUBLIC_APP_BASE_URL: https://legacy-fantasy.com
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Workspace
+        uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          install-dependencies: true
+          set-nx-shas: false
+          skip-system-deps: true
+
+      - name: Setup Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: "temurin"
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: "gradle"
+          cache-dependency-path: |
+            apps/app/app.json
+            pnpm-lock.yaml
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
+        with:
+          packages: "platform-tools platforms;android-${{ env.ANDROID_API_LEVEL }} build-tools;${{ env.ANDROID_API_LEVEL }}.0.0 ndk;${{ env.NDK_VERSION }}"
+
+      # Only the `inline-requires` leg patches the flag; `baseline` builds the
+      # repo as-committed (inlineRequires: false) so it can never drift from
+      # what's actually shipping. experimentalImportSupport is left untouched
+      # on both legs per the ticket's "change one flag at a time" guidance.
+      - name: Set inlineRequires for this variant
+        if: matrix.inline_requires == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BEFORE=$(grep -c 'inlineRequires: false,' apps/app/metro.config.js || true)
+          if [ "$BEFORE" -ne 1 ]; then
+            echo "❌ Expected exactly one 'inlineRequires: false,' in apps/app/metro.config.js, found $BEFORE — metro.config.js shape changed, update this workflow." >&2
+            exit 1
+          fi
+          sed -i 's/inlineRequires: false,/inlineRequires: true,/' apps/app/metro.config.js
+          grep -n 'inlineRequires' apps/app/metro.config.js
+
+      - name: Build release APK (arm64-v8a + x86_64 for the emulator)
+        id: build
+        uses: ./.github/actions/build-android
+        with:
+          build-type: release
+          cache-key-suffix: ${{ matrix.variant }}
+        timeout-minutes: 40
+
+      - name: Move APK into ./artifacts
+        shell: bash
+        run: |
+          mkdir -p ./artifacts
+          cp "apps/app/android/${{ steps.build.outputs.apk-path }}" ./artifacts/app-release-${{ matrix.variant }}.apk
+
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: AVD Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api34-x86_64-google_apis
+
+      - name: Boot emulator and benchmark cold start
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          VARIANT: ${{ matrix.variant }}
+          RUNS: ${{ github.event.inputs.runs || '8' }}
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          disk-size: 6G
+          force-avd-creation: false
+          emulator-options: -no-window -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect -noaudio -accel on
+          disable-animations: true
+          # Single-command invocation — the emulator-runner splits multi-line
+          # inline `script:` blocks across separate `sh -c` calls (LS-4755).
+          script: bash scripts/ci/mobile-startup-benchmark.sh
+
+      - name: Upload benchmark result
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: startup-benchmark-${{ matrix.variant }}
+          path: |
+            artifacts/startup-${{ matrix.variant }}.json
+            artifacts/logcat-startup-${{ matrix.variant }}.txt
+          retention-days: 14
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Diffs the two variants' medians into one summary once both legs finish.
+  # Does not make the enable/decline call — that's a human read of the numbers
+  # per LS-9425's acceptance criteria — it just puts them side by side.
+  # ---------------------------------------------------------------------------
+  compare:
+    name: "Compare"
+    needs: [benchmark]
+    # Always attempt a summary, even if one matrix leg failed — a lone
+    # successful variant's median is still worth surfacing rather than being
+    # hidden behind a skipped job (review finding on PR #7121).
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download baseline result
+        id: download-baseline
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        continue-on-error: true
+        with:
+          name: startup-benchmark-baseline
+          path: ./results/baseline
+
+      - name: Download inline-requires result
+        id: download-treatment
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        continue-on-error: true
+        with:
+          name: startup-benchmark-inline-requires
+          path: ./results/inline-requires
+
+      - name: Summarize
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASELINE_JSON=./results/baseline/startup-baseline.json
+          TREATMENT_JSON=./results/inline-requires/startup-inline-requires.json
+          BASELINE_MEDIAN=""
+          TREATMENT_MEDIAN=""
+          [ -f "$BASELINE_JSON" ] && BASELINE_MEDIAN=$(node -p "require('$BASELINE_JSON').median_ms")
+          [ -f "$TREATMENT_JSON" ] && TREATMENT_MEDIAN=$(node -p "require('$TREATMENT_JSON').median_ms")
+
+          {
+            echo "## 📱 LS-9425 — inlineRequires cold-start comparison"
+            echo ""
+            if [ -z "$BASELINE_MEDIAN" ] && [ -z "$TREATMENT_MEDIAN" ]; then
+              echo "❌ Neither variant produced a result — both benchmark legs failed."
+            else
+              echo "| Variant | Median cold start |"
+              echo "| --- | --- |"
+              echo "| baseline (inlineRequires: false, current) | ${BASELINE_MEDIAN:-❌ leg failed} |"
+              echo "| inlineRequires: true | ${TREATMENT_MEDIAN:-❌ leg failed} |"
+              echo ""
+              if [ -n "$BASELINE_MEDIAN" ] && [ -n "$TREATMENT_MEDIAN" ]; then
+                DELTA_MS=$((BASELINE_MEDIAN - TREATMENT_MEDIAN))
+                DELTA_PCT=$(node -p "(($DELTA_MS / $BASELINE_MEDIAN) * 100).toFixed(1)")
+                echo "**Delta: ${DELTA_MS}ms faster (${DELTA_PCT}%)** with inlineRequires enabled."
+                echo ""
+                echo "_Both variants ran on the same GH-hosted x86_64 emulator config, so the delta is the relevant number even though absolute cold-start ms is not representative of a real device._"
+              else
+                echo "⚠️ Only one variant produced a result — re-run the failed leg before drawing a conclusion."
+              fi
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"
