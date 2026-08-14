@@ -68,6 +68,7 @@ function SlotRow({
 }) {
   return (
     <XStack
+      testID={`roster-slot-${slot}`}
       alignItems="center"
       justifyContent="space-between"
       padding="$3"
@@ -86,6 +87,21 @@ function SlotRow({
       </YStack>
       <XStack alignItems="center" gap="$3">
         <XStack
+          testID={`roster-slot-${slot}-decrement`}
+          accessibilityRole="button"
+          accessibilityLabel={`Decrease ${slot}`}
+          aria-label={`Decrease ${slot}`}
+          tabIndex={canDecrement ? 0 : -1}
+          onKeyDown={
+            canDecrement
+              ? (event: React.KeyboardEvent) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onDecrement();
+                  }
+                }
+              : undefined
+          }
           pressStyle={{ opacity: 0.7 }}
           onPress={canDecrement ? onDecrement : undefined}
           width={28}
@@ -105,6 +121,7 @@ function SlotRow({
           />
         </XStack>
         <Text
+          testID={`roster-slot-${slot}-count`}
           fontSize={16}
           fontWeight="700"
           color="$brandGold"
@@ -114,6 +131,17 @@ function SlotRow({
           {count}
         </Text>
         <XStack
+          testID={`roster-slot-${slot}-increment`}
+          accessibilityRole="button"
+          accessibilityLabel={`Increase ${slot}`}
+          aria-label={`Increase ${slot}`}
+          tabIndex={0}
+          onKeyDown={(event: React.KeyboardEvent) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onIncrement();
+            }
+          }}
           pressStyle={{ opacity: 0.7 }}
           onPress={onIncrement}
           width={28}
@@ -174,6 +202,7 @@ export function StepRosterSettings({
       </YStack>
 
       <YStack
+        testID="roster-positions-totals"
         padding="$3"
         backgroundColor="$surfaceInteractive"
         borderRadius="$2"
@@ -182,7 +211,12 @@ export function StepRosterSettings({
       >
         <XStack gap="$4">
           <YStack alignItems="center">
-            <Text fontSize={20} fontWeight="700" color="$brandGold">
+            <Text
+              testID="roster-positions-totals-starters"
+              fontSize={20}
+              fontWeight="700"
+              color="$brandGold"
+            >
               {totalStarters}
             </Text>
             <Text fontSize={11} color="$textMuted">
@@ -190,7 +224,12 @@ export function StepRosterSettings({
             </Text>
           </YStack>
           <YStack alignItems="center">
-            <Text fontSize={20} fontWeight="700" color="$color">
+            <Text
+              testID="roster-positions-totals-bench"
+              fontSize={20}
+              fontWeight="700"
+              color="$color"
+            >
               {bench}
             </Text>
             <Text fontSize={11} color="$textMuted">
@@ -198,7 +237,12 @@ export function StepRosterSettings({
             </Text>
           </YStack>
           <YStack alignItems="center">
-            <Text fontSize={20} fontWeight="700" color="$color">
+            <Text
+              testID="roster-positions-totals-total"
+              fontSize={20}
+              fontWeight="700"
+              color="$color"
+            >
               {totalRoster}
             </Text>
             <Text fontSize={11} color="$textMuted">

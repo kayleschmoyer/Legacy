@@ -201,6 +201,24 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId('numberOfDivisions-field');
   }
 
+  /**
+   * The football-only per-slot roster config wrapper (`StepRosterSettings`,
+   * LS-6147) — Roster & Schedule section.
+   */
+  get rosterPositionsConfig(): UIElement {
+    return this.driver.byTestId('roster-positions-config');
+  }
+
+  /** A single roster-slot row (e.g. `QB`, `FLEX`, `BN`) by its position key. */
+  rosterSlotRow(slot: string): UIElement {
+    return this.driver.byTestId(`roster-slot-${slot}`);
+  }
+
+  /** The Starters / Bench / Total summary card above the roster-slot rows. */
+  get rosterPositionsTotals(): UIElement {
+    return this.driver.byTestId('roster-positions-totals');
+  }
+
   // ── Reads: named detail getters ──────────────────────────────────
 
   /** The league name rendered as the detail page `<h1>`. */
@@ -556,6 +574,61 @@ export class LeaguePage extends BaseScreen {
   ): Promise<void> {
     const target = this.text(value, { exact: opts?.exact });
     await (opts?.first ? target.first() : target).tap();
+  }
+
+  /** The current count for a roster slot (e.g. `QB`, `FLEX`, `BN`). */
+  async rosterSlotCount(slot: string): Promise<number> {
+    const text = await this.driver.byTestId(`roster-slot-${slot}-count`).text();
+    return Number(text);
+  }
+
+  /** Tap the `+` control for a roster slot the given number of times. */
+  async incrementRosterSlot(slot: string, times = 1): Promise<void> {
+    for (let i = 0; i < times; i += 1) {
+      const before = await this.rosterSlotCount(slot);
+      await this.tapRosterSlotControlUntilCountChanges(
+        `roster-slot-${slot}-increment`,
+        slot,
+        before,
+      );
+    }
+  }
+
+  /** Tap the `-` control for a roster slot the given number of times. */
+  async decrementRosterSlot(slot: string, times = 1): Promise<void> {
+    for (let i = 0; i < times; i += 1) {
+      const before = await this.rosterSlotCount(slot);
+      await this.tapRosterSlotControlUntilCountChanges(
+        `roster-slot-${slot}-decrement`,
+        slot,
+        before,
+      );
+    }
+  }
+
+  /**
+   * Tap a roster-slot +/- control, retrying the tap if it doesn't register
+   * (observed under heavy CI load as an animated pressable occasionally
+   * missing its first pointer event — LS-5379). Confirms success by
+   * polling the slot's own count rather than assuming a single click always
+   * lands.
+   */
+  private async tapRosterSlotControlUntilCountChanges(
+    testId: string,
+    slot: string,
+    before: number,
+  ): Promise<void> {
+    const button = this.driver.byTestId(testId);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await button.tap();
+      const after = await this.rosterSlotCount(slot);
+      if (after !== before) return;
+    }
+  }
+
+  /** Select the football defensive format (`dst` or `idp`). */
+  async selectDefensiveFormat(format: 'dst' | 'idp'): Promise<void> {
+    await this.driver.byTestId(`defensive-format-${format}`).tap();
   }
 
   /** The draft date/time picker trigger (Draft Settings section). */
