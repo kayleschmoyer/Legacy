@@ -22,9 +22,20 @@ inputs:
     required: false
     default: "10"
   browser:
-    description: "Browser to use for testing"
+    description: >-
+      Playwright engine to install (chromium/firefox/webkit); also the
+      cache-key suffix. A valid `playwright install` arg, NOT a project
+      name — Mobile Chrome uses chromium, so pass browser=chromium plus
+      project='Mobile Chrome'.
     required: false
     default: "chromium"
+  project:
+    description: >-
+      Playwright --project to run. Defaults to `browser` (desktop
+      projects share their name with their engine); set explicitly when
+      the project differs from the engine, e.g. 'Mobile Chrome' (LS-9411).
+    required: false
+    default: ""
   headless:
     description: "Run browser in headless mode"
     required: false
@@ -188,9 +199,19 @@ runs:
 
         PLAYWRIGHT_BIN="pnpm exec playwright"
 
+        # PROJECT defaults to the engine name (desktop projects share their
+        # name with their engine, e.g. "chromium"); pass inputs.project
+        # explicitly when the Playwright project differs from the engine
+        # (e.g. "Mobile Chrome" runs on the chromium engine — LS-9411).
+        PROJECT="${{ inputs.project }}"
+        if [ -z "$PROJECT" ]; then
+          PROJECT="${{ inputs.browser }}"
+        fi
+
         echo "📋 E2E Test Configuration:"
         echo "- **Test Directory**: apps/web-e2e/src/tests"
-        echo "- **Browser**: ${{ inputs.browser }} (headless: ${{ inputs.headless }})"
+        echo "- **Browser engine**: ${{ inputs.browser }} (headless: ${{ inputs.headless }})"
+        echo "- **Project**: $PROJECT"
         echo "- **Test Patterns**: ${{ inputs.test-patterns }}"
         echo "- **Exclude Patterns**: ${{ inputs.test-patterns-invert }}"
 
@@ -279,7 +300,7 @@ runs:
 
         # Build Playwright command
         PLAYWRIGHT_CMD="$PLAYWRIGHT_BIN test --config=apps/web-e2e/playwright.config.ts"
-        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=${{ inputs.browser }}"
+        PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --project=\"$PROJECT\""
         if [ -n "${{ inputs.test-patterns }}" ]; then
           PLAYWRIGHT_CMD="$PLAYWRIGHT_CMD --grep=\"${{ inputs.test-patterns }}\""
         fi

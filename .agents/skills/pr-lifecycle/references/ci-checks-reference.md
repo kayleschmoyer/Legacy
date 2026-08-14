@@ -89,21 +89,22 @@ Two consumers already bridge the config/live gap — useful when debugging:
 
 **Writer:** the CI Pipeline `summarize` job ("Post CI Gate aggregate status" step) via `.github/scripts/ci-gate.js`, exactly once per head SHA, on PR-scoped events only.
 
-**What it folds:** the six granular job results — `lint` (which also runs the format check as of LS-8901 — the two share one job for CI cost, see below), `test` (which runs `nx affected -t typecheck test`), `build`, `custom-checks`, `lockfile-check`, `e2e` (`GATE_INPUT_JOBS` in ci-gate.js). `success`/`skipped` pass; `failure`/`timed_out`/missing fail; **`cancelled` is ignored** (LS-8219 — a cancelled granular job is a superseded duplicate, not a failure). E2E merge-gate semantics (formerly the separate required `e2e-affected` check, LS-7846) are folded in: CI Gate fails if any affected e2e shard fails.
+**What it folds:** the seven granular job results — `lint` (which also runs the format check as of LS-8901 — the two share one job for CI cost, see below), `test` (which runs `nx affected -t typecheck test`), `build`, `custom-checks`, `lockfile-check`, `e2e`, `e2e-mobile` (LS-9411 — narrow Mobile Chrome affected-spec pass) (`GATE_INPUT_JOBS` in ci-gate.js). `success`/`skipped` pass; `failure`/`timed_out`/missing fail; **`cancelled` is ignored** (LS-8219 — a cancelled granular job is a superseded duplicate, not a failure). E2E merge-gate semantics (formerly the separate required `e2e-affected` check, LS-7846) are folded in: CI Gate fails if any affected e2e shard OR the mobile pass fails.
 
 **Guards worth knowing:** a SHA-currency guard no-ops if the PR head advanced mid-run (stale runs post nothing), and `summarize` runs under `always() && !cancelled()` so a killed run posts nothing rather than a terminal `cancelled` row — both are why a commit status was chosen over a check run (LS-7988 root cause).
 
-**Why it fails:** one of the six granular jobs failed — the status description lists which (`Failing: test (failure)` …). Debug the granular job, not the gate:
+**Why it fails:** one of the granular jobs failed — the status description lists which (`Failing: test (failure)` …). Debug the granular job, not the gate:
 
-| Failing input    | Local reproduction                                     | Failure label                                |
-| ---------------- | ------------------------------------------------------ | -------------------------------------------- |
-| `lint`           | `pnpm exec nx affected -t lint --fix`                  | `CI: Lint Failure`                           |
-| `lint` (format)  | `pnpm exec nx format:write` then commit                | `CI: Formatting`                             |
-| `test`           | `pnpm exec nx affected -t typecheck test`              | `CI: Test Failure`                           |
-| `build`          | `pnpm exec nx affected -t build`                       | `CI: Build Failure`                          |
-| `custom-checks`  | see below                                              | `CI: Migration Immutability` (for that step) |
-| `lockfile-check` | `pnpm install --lockfile-only` and commit the lockfile | —                                            |
-| `e2e`            | `pnpm exec nx e2e web-e2e -- --grep='@critical'`       | `CI: E2E Failure`                            |
+| Failing input    | Local reproduction                                                                                                                                 | Failure label                                |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `lint`           | `pnpm exec nx affected -t lint --fix`                                                                                                              | `CI: Lint Failure`                           |
+| `lint` (format)  | `pnpm exec nx format:write` then commit                                                                                                            | `CI: Formatting`                             |
+| `test`           | `pnpm exec nx affected -t typecheck test`                                                                                                          | `CI: Test Failure`                           |
+| `build`          | `pnpm exec nx affected -t build`                                                                                                                   | `CI: Build Failure`                          |
+| `custom-checks`  | see below                                                                                                                                          | `CI: Migration Immutability` (for that step) |
+| `lockfile-check` | `pnpm install --lockfile-only` and commit the lockfile                                                                                             | —                                            |
+| `e2e`            | `pnpm exec nx e2e web-e2e -- --grep='@critical'`                                                                                                   | `CI: E2E Failure`                            |
+| `e2e-mobile`     | `pnpm exec playwright test --config=apps/web-e2e/playwright.config.ts --project="Mobile Chrome" --grep='@critical'` (plus the PR's affected specs) | `CI: E2E Failure`                            |
 
 `custom-checks` bundles: `node scripts/lint-skills.js` (agent-skill lint), `node scripts/check-migration-immutability.js --branch` (a merged migration file was edited — revert it and add a **new** migration instead), `node scripts/validate-workflows.js`, touch-map freshness (advisory), and the repo-script unit suites `pnpm run test:scripts` / `test:scripts:ps`.
 

@@ -763,20 +763,159 @@ jobs:
           if-no-files-found: warn
 
   # ============================================================================
+  # STAGE 3-mobile — Narrow mobile-viewport E2E coverage (LS-9411)
+  # ============================================================================
+  # LS-9326 and LS-9408 both shipped viewport-gated regressions (useMedia()/
+  # isNarrowViewport branches) that PR CI could not have caught: the e2e job
+  # above only ever runs --project=chromium at a 1280px viewport. Both bugs
+  # were only visible on the post-deploy nightly's mobile matrix
+  # (run-playwright-tests.yml), hours after merge and non-blocking.
+  #
+  # This job closes that gap WITHOUT undoing the cost discipline LS-8920 built
+  # into the affected-spec selection (LS-8905 measured 79% of E2E-triggering
+  # PRs escalating to the full 182-spec suite before that narrowing; bolting a
+  # second full mobile sweep onto PR CI would repeat that mistake). Instead it
+  # re-runs the EXACT SAME LS-7846 selection the chromium affected-spec pass
+  # already computed — same e2e-grep, same e2e-affected-specs — a second time
+  # on one mobile project. No second selection is computed here.
+  #
+  # Scope decisions:
+  #   - Mobile Chrome only. It shares the chromium engine (and therefore the
+  #     already-AMI-baked/user-cached browser binary — see the "Verify
+  #     AMI-baked Playwright browsers" step and playwright.config.ts's
+  #     resolvePwBrowserExecutable comment, LS-8739) with the desktop chromium
+  #     pass above, so it adds no new browser-install cost.
+  #   - Mobile Safari is deliberately EXCLUDED from PR CI. It has its own
+  #     recent flake history independent of viewport (LS-9328, LS-9409) and
+  #     stabilizing a flaky project on a merge-blocking gate would trade a
+  #     missed-regression problem for a stuck-PR problem. It keeps running
+  #     nightly-only in run-playwright-tests.yml until that flake history
+  #     clears; revisit adding it here once it does.
+  #   - Gated on the identical condition the chromium "E2E Tests (affected
+  #     specs)" step above uses (run-all != true && affected-specs != ''): a
+  #     broad change still only gets the full chromium sweep (no mobile
+  #     duplication of the 182-spec suite), and a PR with no e2e-relevant
+  #     changes skips this job entirely, same as it already skips the e2e job
+  #     (preserves the ~30% skip rate measured in LS-8905).
+  e2e-mobile:
+    name: "E2E Tests (Mobile Chrome — affected)"
+    needs: [detect-changes, lint, test, build]
+    if: >-
+      needs.lint.result == 'success' &&
+      needs.test.result == 'success' &&
+      needs.build.result == 'success' &&
+      needs.detect-changes.outputs.e2e-affected-run-all != 'true' &&
+      needs.detect-changes.outputs.e2e-affected-specs != ''
+    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: "Setup Workspace"
+        uses: ./.github/actions/setup
+        with:
+          node-version: 22
+          install-dependencies: true
+          set-nx-shas: false
+          include-optional-deps: false
+
+      - name: "Download Web Build from S3"
+        if: needs.build.outputs.artifacts-ready == 'true'
+        id: download-web
+        uses: ./.github/actions/s3-artifact
+        with:
+          mode: download
+          name: web-build
+          path: dist/apps/web
+          if-no-files-found: error
+
+      # Same @critical safety net as the chromium "E2E Testing" step above,
+      # reusing the identical e2e-grep/e2e-grep-invert outputs — no second
+      # selection — just re-run at Mobile Chrome's 375x667 viewport instead of
+      # chromium's 1280x720.
+      - name: "E2E Testing (Mobile Chrome)"
+        id: e2e-mobile
+        uses: ./.github/actions/e2e-testing
+        with:
+          should-run-e2e: ${{ needs.build.outputs.artifacts-ready }}
+          # browser stays "chromium" — Mobile Chrome runs on the chromium
+          # engine (LS-8739), so this shares the desktop chromium job's
+          # browser-binary cache key instead of triggering a redundant
+          # install. `project` selects the actual Playwright project.
+          browser: "chromium"
+          project: "Mobile Chrome"
+          test-patterns: ${{ needs.detect-changes.outputs.e2e-grep }}
+          test-patterns-invert: ${{ needs.detect-changes.outputs.e2e-grep-invert }}
+          e2e-commissioner-email: ${{ secrets.E2E_COMMISSIONER_EMAIL }}
+          e2e-commissioner-password: ${{ secrets.E2E_COMMISSIONER_PASSWORD }}
+          e2e-manager-1-email: ${{ secrets.E2E_MANAGER_1_EMAIL }}
+          e2e-manager-1-password: ${{ secrets.E2E_MANAGER_1_PASSWORD }}
+          e2e-manager-2-email: ${{ secrets.E2E_MANAGER_2_EMAIL }}
+          e2e-manager-2-password: ${{ secrets.E2E_MANAGER_2_PASSWORD }}
+          e2e-manager-3-email: ${{ secrets.E2E_MANAGER_3_EMAIL }}
+          e2e-manager-3-password: ${{ secrets.E2E_MANAGER_3_PASSWORD }}
+
+      # LS-7846/LS-9411: the same affected-spec list the chromium step above
+      # runs, re-run at Mobile Chrome's viewport. Reuses
+      # needs.detect-changes.outputs.e2e-affected-specs verbatim — the job-
+      # level `if` above already guarantees this is non-empty and we are not
+      # in the run-all (full-suite) case.
+      - name: "E2E Tests (Mobile Chrome — affected specs)"
+        if: needs.build.outputs.artifacts-ready == 'true'
+        shell: bash
+        env:
+          CI: "true"
+          AFFECTED_SPECS: ${{ needs.detect-changes.outputs.e2e-affected-specs }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$AFFECTED_SPECS" | grep -v '^[[:space:]]*$' > /tmp/affected-specs-mobile.txt
+          mapfile -t SPECS < /tmp/affected-specs-mobile.txt
+          if [ "${#SPECS[@]}" -eq 0 ]; then
+            echo "No affected specs after filtering — nothing to run."
+            exit 0
+          fi
+          echo "🎯 Running affected hermetic e2e specs on Mobile Chrome (excluding @critical/@slow):"
+          cat /tmp/affected-specs-mobile.txt
+          pnpm exec playwright test \
+            --config=apps/web-e2e/playwright.config.ts \
+            --project="Mobile Chrome" \
+            --grep-invert="@critical|@slow" \
+            --reporter=line \
+            --pass-with-no-tests \
+            --output=apps/web-e2e/test-results-affected-mobile \
+            "${SPECS[@]}"
+
+      - name: "Upload Blob Report to S3"
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/s3-artifact
+        with:
+          mode: upload
+          name: playwright-blobs/mobile
+          path: blob-report/
+          if-no-files-found: warn
+
+  # ============================================================================
   # STAGE 3a — E2E affected-selection merge gate (LS-7846)
   # ============================================================================
   # Stable-named aggregation check over the (matrix, dynamically-sharded) e2e
   # job so the merge gate has ONE fixed required-check context regardless of how
   # many shards ran. This is the check listed in .github/ruleset.json — it makes
   # hermetic e2e regressions (in @critical OR the affected area) block merge
-  # instead of leaking to the nightly.
+  # instead of leaking to the nightly. LS-9411: also folds in e2e-mobile so a
+  # mobile-viewport-only regression (LS-9326/LS-9408 shape) blocks merge the
+  # same way a desktop-viewport one does, instead of only surfacing here as an
+  # informational job result.
   #
   # Always runs (if: always()) so it never sits "Expected" and never blocks a
-  # PR that legitimately skipped e2e. Passes when e2e succeeded OR was skipped
-  # (no web/e2e/api change); fails when any e2e shard failed.
+  # PR that legitimately skipped e2e. Passes when e2e/e2e-mobile succeeded OR
+  # were skipped (no web/e2e/api change, or e2e-mobile's narrower affected-spec
+  # gate); fails when any e2e shard OR the mobile pass failed.
   e2e-affected:
     name: "e2e-affected"
-    needs: [detect-changes, e2e]
+    needs: [detect-changes, e2e, e2e-mobile]
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
@@ -784,31 +923,44 @@ jobs:
       - name: "Evaluate e2e result"
         env:
           E2E_RESULT: ${{ needs.e2e.result }}
+          E2E_MOBILE_RESULT: ${{ needs.e2e-mobile.result }}
           RUN_ALL: ${{ needs.detect-changes.outputs.e2e-affected-run-all }}
           SPEC_LIST: ${{ needs.detect-changes.outputs.e2e-affected-specs }}
         run: |
           set -euo pipefail
           echo "e2e job result: $E2E_RESULT"
+          echo "e2e-mobile job result: $E2E_MOBILE_RESULT"
           echo "run-all: ${RUN_ALL:-false}"
           echo "affected specs:"
           printf '%s\n' "${SPEC_LIST:-}" | grep -v '^[[:space:]]*$' || echo "  (none — @critical only)"
+          FAILED=false
           case "$E2E_RESULT" in
-            success|skipped)
-              echo "✅ e2e-affected gate passed (e2e=$E2E_RESULT)"
-              ;;
+            success|skipped) ;;
             *)
               echo "::error::e2e-affected gate failed — the e2e job result was '$E2E_RESULT'."
               echo "::error::A hermetic e2e regression in @critical or the PR's affected area must be fixed before merge."
-              exit 1
+              FAILED=true
               ;;
           esac
+          case "$E2E_MOBILE_RESULT" in
+            success|skipped) ;;
+            *)
+              echo "::error::e2e-affected gate failed — the e2e-mobile job result was '$E2E_MOBILE_RESULT'."
+              echo "::error::A hermetic e2e regression visible only at the Mobile Chrome viewport must be fixed before merge."
+              FAILED=true
+              ;;
+          esac
+          if [ "$FAILED" = "true" ]; then
+            exit 1
+          fi
+          echo "✅ e2e-affected gate passed (e2e=$E2E_RESULT, e2e-mobile=$E2E_MOBILE_RESULT)"
 
   # ============================================================================
   # STAGE 3b — Merge E2E shard reports and deploy to GitHub Pages
   # ============================================================================
   deploy-playwright-report:
     name: "Deploy Playwright Report"
-    needs: [e2e]
+    needs: [e2e, e2e-mobile]
     # Each deploy workflow pushes to a unique subdirectory of the gh-pages branch
     # on bkrupa/legacy-sports-deploys. Push conflicts are handled by the retry-
     # with-rebase loop in the deploy step below. A shared concurrency group is
@@ -976,7 +1128,7 @@ jobs:
   # ============================================================================
   summarize:
     name: "Summarize & Report"
-    needs: [detect-changes, e2e, lint, test, build, custom-checks, lockfile-check]
+    needs: [detect-changes, e2e, e2e-mobile, lint, test, build, custom-checks, lockfile-check]
     if: "always() && !cancelled() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')"
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
@@ -1008,6 +1160,7 @@ jobs:
           echo "custom-checks.result      = ${{ needs.custom-checks.result }}"
           echo "lockfile-check.result     = ${{ needs.lockfile-check.result }}"
           echo "e2e.result                = ${{ needs.e2e.result }}"
+          echo "e2e-mobile.result         = ${{ needs.e2e-mobile.result }}"
           echo "::endgroup::"
 
       - name: "Collect Results"
@@ -1022,10 +1175,11 @@ jobs:
               "build":           "${{ needs.build.result }}",
               "custom-checks":   "${{ needs.custom-checks.result }}",
               "lockfile-check":  "${{ needs.lockfile-check.result }}",
-              "e2e-testing":     "${{ needs.e2e.result }}"
+              "e2e-testing":     "${{ needs.e2e.result }}",
+              "e2e-mobile-testing": "${{ needs.e2e-mobile.result }}"
             }
           workflow-start-time: ${{ github.event.head_commit.timestamp || github.event.pull_request.updated_at }}
-          failure-threshold: "lint,test,build,custom-checks,lockfile-check,e2e-testing"
+          failure-threshold: "lint,test,build,custom-checks,lockfile-check,e2e-testing,e2e-mobile-testing"
 
       # Aggregate "CI Gate" required status (LS-7991, Phase 2 of LS-7988).
       # Posts ONE commit status per head SHA folding the granular job results,
@@ -1068,7 +1222,8 @@ jobs:
               "build":          "${{ needs.build.result }}",
               "custom-checks":  "${{ needs.custom-checks.result }}",
               "lockfile-check": "${{ needs.lockfile-check.result }}",
-              "e2e":            "${{ needs.e2e.result }}"
+              "e2e":            "${{ needs.e2e.result }}",
+              "e2e-mobile":     "${{ needs.e2e-mobile.result }}"
             }
           DISPATCH_PR_NUMBER: ${{ inputs.pr-number }}
           DISPATCH_HEAD_SHA: ${{ inputs.head-sha }}

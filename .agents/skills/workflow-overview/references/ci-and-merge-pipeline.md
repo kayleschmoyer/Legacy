@@ -48,7 +48,12 @@ lint  test build custom- lockfile-   (5 granular jobs, PARALLEL)
       (+format)         checks  check
   +----+----+----+----+----+
        |
-     e2e              (sharded matrix; gated on the five above)
+  +----+----+
+  |         |
+ e2e     e2e-mobile     (e2e: sharded chromium matrix; e2e-mobile: narrow
+  |         |            Mobile Chrome re-run of the same affected-spec
+  |         |            selection, LS-9411 — skipped on run-all/no-op PRs)
+  +----+----+
        |
    summarize          (always() && !cancelled() — PR comment, labels,
                        posts the `CI Gate` commit status)
@@ -73,7 +78,8 @@ Every one of these jobs (and `summarize`) skips when the PR carries the `skip-ci
 - PRs: `@critical` (excluding `@slow`) **plus** the affected specs mapped from changed files; a broad-surface change escalates to the full hermetic suite, sharded
 - Downloads the web build artifact from the `build` job
 - Uploads blob reports for the merged Playwright report
-- The `e2e-affected` job summarizes the shard results as one informational check run
+- **`e2e-mobile` (LS-9411):** re-runs the _same_ narrow selection (same `e2e-grep`/`e2e-affected-specs` outputs, no second selection computed) a second time on the Mobile Chrome project (375×667 device-emulated viewport), so a viewport-gated regression (`useMedia()`/breakpoint branches invisible at chromium's fixed 1280×720) can't merge silently. Gated on the same condition as the chromium affected-specs step (`run-all != true && affected-specs != ''`) — skips entirely on no-op PRs, and a broad/run-all change still only gets the full suite on chromium, never duplicated onto mobile. Mobile Safari stays nightly-only (own flake history, LS-9328/LS-9409).
+- The `e2e-affected` job folds both `e2e` and `e2e-mobile` results into one informational check run
 
 **Stage 3b -- Deploy Playwright Report:** Merges shard reports and deploys to GitHub Pages (`bkrupa/legacy-sports-deploys`). The merge step emits both `index.html` (browsable SPA) and `summary.md` (compact agent-targeted Markdown, ~20–50× smaller). Both are copied to `playwright-report/<name>/` — agents should fetch `summary.md` first via `ci_get_playwright_report` (one GET, no zip inflation); the HTML SPA is the human-readable fallback. See [read-playwright-report skill](../../read-playwright-report/SKILL.md).
 

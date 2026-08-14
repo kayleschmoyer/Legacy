@@ -34,7 +34,8 @@ const MAX_DESCRIPTION_LENGTH = 140;
 // the failure-threshold set in .github/actions/collect-results (the existing
 // definition of overall pipeline success): lint (which also runs the format
 // check as of LS-8901 — the two share one job), test, build, custom-checks,
-// lockfile-check, e2e. Pass semantics: `success` and `skipped` pass;
+// lockfile-check, e2e, e2e-mobile (LS-9411 — the narrow Mobile Chrome
+// affected-spec pass). Pass semantics: `success` and `skipped` pass;
 // `failure`, `timed_out`, or any missing/unknown value fail.
 //
 // `cancelled` is DELIBERATELY excluded from the verdict (LS-8219): a cancelled
@@ -52,6 +53,7 @@ const GATE_INPUT_JOBS = Object.freeze([
   'custom-checks',
   'lockfile-check',
   'e2e',
+  'e2e-mobile',
 ]);
 
 /**
