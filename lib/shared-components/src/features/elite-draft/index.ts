@@ -25,6 +25,15 @@ export { DraftGrid } from './DraftGrid';
 export { PickAnnouncement } from './PickAnnouncement';
 export { SkeletonCard as DraftSkeletonCard } from './SkeletonCard';
 
+// Draft Room v2 Queue/Team tabs (LS-9400). DraftRosterSlotRow is exported
+// standalone so the draft-complete recap (LS-9402) can reuse the same row.
+export {
+  DraftRosterSlotRow,
+  type DraftRosterSlotRowProps,
+} from './DraftRosterSlotRow';
+export { DraftTeamTab, type DraftTeamTabProps } from './DraftTeamTab';
+export { DraftQueueTab, type DraftQueueTabProps } from './DraftQueueTab';
+
 // Chat overlay types for render prop
 export type { DraftChatProps, DraftChatRenderer } from './DraftChatOverlay';
 

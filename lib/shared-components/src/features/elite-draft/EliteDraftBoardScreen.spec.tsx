@@ -274,6 +274,12 @@ jest.mock('./DraftSquadStrip', () => ({
     </button>
   ),
 }));
+jest.mock('./DraftQueueTab', () => ({
+  DraftQueueTab: () => <div data-testid="draft-queue-tab" />,
+}));
+jest.mock('./DraftTeamTab', () => ({
+  DraftTeamTab: () => <div data-testid="draft-team-tab" />,
+}));
 jest.mock('./styles', () => ({ CSS: '' }));
 
 const mockUseAuth = jest.mocked(useAuth);

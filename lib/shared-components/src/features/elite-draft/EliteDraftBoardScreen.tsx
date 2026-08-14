@@ -17,6 +17,8 @@ import { DraftSquadStrip } from './DraftSquadStrip';
 import { DraftHeaderBand } from './DraftHeaderBand';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftBottomNav } from './DraftBottomNav';
+import { DraftQueueTab } from './DraftQueueTab';
+import { DraftTeamTab } from './DraftTeamTab';
 import { useDraftPalette } from './nativeDraftPalette';
 import {
   MIN_BOARD_ROUNDS,
@@ -46,7 +48,6 @@ import { DraftChatOverlay } from './DraftChatOverlay';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
 import type { DraftPickRecord, DraftPlayer } from './types';
-import type { DraftRoomTab } from './hooks/useDraftUIState';
 import { PositionBadge } from '../../components/PositionBadge';
 import { useAuth } from '../../features/auth';
 import type { SportKind } from '../../config/sports';
@@ -95,14 +96,13 @@ const POSITION_FILTERS = [
 type SortKey = 'adp' | 'pts';
 
 /**
- * Draft Room v2 shell (LS-9397): the Board tab keeps this file's existing
- * compact-board content; the other four tabs are placeholders until siblings
- * 2-6 build their real bodies (Out of Scope for this ticket).
+ * Draft Room v2 shell (LS-9397) + Queue/Team tabs (LS-9400): the Board tab
+ * keeps this file's existing compact-board content, Queue and Team render
+ * their real bodies below; Players and Chat remain placeholders until
+ * siblings 3 and 5 build them (Out of Scope for this ticket).
  */
-const TAB_PLACEHOLDER_COPY: Record<Exclude<DraftRoomTab, 'board'>, string> = {
+const TAB_PLACEHOLDER_COPY: Record<'players' | 'chat', string> = {
   players: 'Players tab is coming soon.',
-  queue: 'Queue tab is coming soon.',
-  team: 'Team tab is coming soon.',
   chat: 'Chat tab is coming soon.',
 };
 
@@ -297,6 +297,8 @@ interface CompactLiveDraftBoardProps {
    *  commissionerPick mutation under the hood — no CPU auto-picker exists
    *  in this mode. */
   controlAllTeams: boolean;
+  /** Active league sport — drives Queue/Team tab position colors (LS-9400). */
+  sport: SportKind;
   onExitDraft: () => void;
   onDraftPlayer: (id: number) => void;
   onCommissionerPick: (id: number) => void;
@@ -316,6 +318,7 @@ function CompactLiveDraftBoard({
   sport,
   isMockDraft,
   controlAllTeams,
+  sport,
   onExitDraft,
   onDraftPlayer,
   onCommissionerPick,
@@ -448,7 +451,32 @@ function CompactLiveDraftBoard({
         teamName={lastPick ? queries.teamNameById(lastPick.teamId) : ''}
       />
 
-      {ui.activeTab !== 'board' ? (
+      {ui.activeTab === 'queue' ? (
+        <DraftQueueTab
+          draftId={queries.draftId ?? 0}
+          entries={queries.queueEntries}
+          statsLookup={playerData.statsLookup}
+          sport={sport}
+          onRemove={(playerId) => void actions.handleToggleQueue(playerId)}
+          onError={(message) => ui.showToast(message, 'error')}
+        />
+      ) : ui.activeTab === 'team' ? (
+        <DraftTeamTab
+          teams={
+            queries.boardOrderedTeams.length > 0
+              ? queries.boardOrderedTeams
+              : queries.leagueTeams
+          }
+          myTeamId={queries.myTeamId}
+          selectedTeamId={ui.selectedTeamId}
+          onSelectTeam={ui.setSelectedTeamId}
+          pickHistory={queries.pickHistory}
+          statsLookup={playerData.statsLookup}
+          leaguePositions={queries.leaguePositions}
+          sport={sport}
+          maxRosterSize={queries.league?.maxRosterSize ?? null}
+        />
+      ) : ui.activeTab !== 'board' ? (
         <YStack
           flex={1}
           alignItems="center"
@@ -1231,6 +1259,7 @@ export function EliteDraftBoardScreen({
         sport={sport}
         isMockDraft={isMockDraft}
         controlAllTeams={controlAllTeams}
+        sport={sport}
         onExitDraft={handleExitDraft}
         onDraftPlayer={handleDraftPlayer}
         onCommissionerPick={handleCommissionerPick}
