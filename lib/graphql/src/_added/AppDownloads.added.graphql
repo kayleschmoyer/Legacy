@@ -1,0 +1,36 @@
+fragment AppDownloadAllowlistEntryFields on AppDownloadAllowlistEntry {
+  id
+  email
+  note
+  addedByEmail
+  createdAt
+  revokedAt
+  hasAccount
+  lastDownloadAt
+}
+
+query AppDownloadAllowlist {
+  appDownloadAllowlist {
+    ...AppDownloadAllowlistEntryFields
+  }
+}
+
+mutation AddAppDownloadAllowlistEntry($email: String!, $note: String) {
+  addAppDownloadAllowlistEntry(email: $email, note: $note) {
+    success
+    message
+    entries {
+      ...AppDownloadAllowlistEntryFields
+    }
+  }
+}
+
+mutation SetAppDownloadAllowlistRevoked($id: Int!, $revoked: Boolean!) {
+  setAppDownloadAllowlistRevoked(id: $id, revoked: $revoked) {
+    success
+    message
+    entries {
+      ...AppDownloadAllowlistEntryFields
+    }
+  }
+}

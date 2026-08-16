@@ -232,13 +232,19 @@ export type {
   AwardedBadgeResult,
 } from './BadgeService';
 
-// App download allowlist + audit (LS-9455). Plain functions rather than a
-// factory: both call sites already hold an InternalDb.
+// App download allowlist + audit (LS-9455, admin surface LS-9456). Plain
+// functions rather than a factory: every call site already holds a database
+// handle, and the two tables live outside the generated public schema.
 export {
   isEmailAllowlisted,
   recordDownloadAttempt,
+  listAllowlist,
+  addAllowlistEntry,
+  setAllowlistRevoked,
 } from './AppDownloadService';
 export type {
+  AppDownloadDb,
   AppDownloadOutcome,
   AppDownloadAttempt,
+  AppDownloadAllowlistRow,
 } from './AppDownloadService';

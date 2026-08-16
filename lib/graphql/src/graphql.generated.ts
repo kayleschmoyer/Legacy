@@ -108,6 +108,29 @@ export type AllTimeRecord = {
   value?: Maybe<Scalars['Float']['output']>;
 };
 
+/** One address permitted to download the Android build */
+export type AppDownloadAllowlistEntry = {
+  __typename?: 'AppDownloadAllowlistEntry';
+  addedByEmail?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  email?: Maybe<Scalars['String']['output']>;
+  /** Whether a user account exists for this address yet. Display only — an address may be allowlisted before its owner has ever signed in. */
+  hasAccount?: Maybe<Scalars['Boolean']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  /** When this address last downloaded, or null if it never has. */
+  lastDownloadAt?: Maybe<Scalars['String']['output']>;
+  note?: Maybe<Scalars['String']['output']>;
+  revokedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Outcome of an allowlist edit, plus the refreshed list */
+export type AppDownloadAllowlistResult = {
+  __typename?: 'AppDownloadAllowlistResult';
+  entries?: Maybe<Array<AppDownloadAllowlistEntry>>;
+  message?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+};
+
 export type AppleVerifyResult = {
   __typename?: 'AppleVerifyResult';
   status?: Maybe<Scalars['String']['output']>;
@@ -1895,6 +1918,8 @@ export type Mutation = {
   acceptPrivacyPolicy?: Maybe<PrivacyPolicyStatus>;
   /** Accept a pending trade offer. Players are swapped between teams immediately. */
   acceptTrade?: Maybe<TradeOffer>;
+  /** Allowlist an address for the Android download. The address need not have a user account — that is the normal case for a new tester. Admin only. */
+  addAppDownloadAllowlistEntry?: Maybe<AppDownloadAllowlistResult>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
   addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
@@ -2060,6 +2085,8 @@ export type Mutation = {
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
   setActiveLeagues?: Maybe<Scalars['Boolean']['output']>;
+  /** Revoke an allowlist entry, or re-instate a revoked one. Admin only. */
+  setAppDownloadAllowlistRevoked?: Maybe<AppDownloadAllowlistResult>;
   /** Set the authenticated user's canonical email from one of their linked, verified provider identities. */
   setCanonicalEmail: SetCanonicalEmailResult;
   setDraftOrder?: Maybe<Draft>;
@@ -2138,6 +2165,11 @@ export type Mutation = {
 
 export type MutationAcceptTradeArgs = {
   tradeId: Scalars['Int']['input'];
+};
+
+export type MutationAddAppDownloadAllowlistEntryArgs = {
+  email: Scalars['String']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
@@ -2602,6 +2634,11 @@ export type MutationSendMatchupMessageArgs = {
 
 export type MutationSetActiveLeaguesArgs = {
   leagueIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetAppDownloadAllowlistRevokedArgs = {
+  id: Scalars['Int']['input'];
+  revoked: Scalars['Boolean']['input'];
 };
 
 export type MutationSetCanonicalEmailArgs = {
@@ -3174,6 +3211,8 @@ export type Query = {
   adminRevenueStats?: Maybe<AdminRevenueStats>;
   /** List all badge definitions available in the system */
   allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
+  /** Every address on the Android download allowlist, newest first. Admin only. */
+  appDownloadAllowlist?: Maybe<Array<AppDownloadAllowlistEntry>>;
   auctionBudgets?: Maybe<Array<AuctionBudget>>;
   auctionState?: Maybe<AuctionState>;
   /** Aggregated vote results for a league season. No voter identity is exposed. */
@@ -5097,6 +5136,87 @@ export type AdminRevenueStatsQuery = {
       __typename?: 'SubscriberGrowthPoint';
       month?: string | null;
       newSubscribers?: number | null;
+    }> | null;
+  } | null;
+};
+
+export type AppDownloadAllowlistEntryFieldsFragment = {
+  __typename?: 'AppDownloadAllowlistEntry';
+  id?: number | null;
+  email?: string | null;
+  note?: string | null;
+  addedByEmail?: string | null;
+  createdAt?: string | null;
+  revokedAt?: string | null;
+  hasAccount?: boolean | null;
+  lastDownloadAt?: string | null;
+};
+
+export type AppDownloadAllowlistQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type AppDownloadAllowlistQuery = {
+  __typename?: 'Query';
+  appDownloadAllowlist?: Array<{
+    __typename?: 'AppDownloadAllowlistEntry';
+    id?: number | null;
+    email?: string | null;
+    note?: string | null;
+    addedByEmail?: string | null;
+    createdAt?: string | null;
+    revokedAt?: string | null;
+    hasAccount?: boolean | null;
+    lastDownloadAt?: string | null;
+  }> | null;
+};
+
+export type AddAppDownloadAllowlistEntryMutationVariables = Exact<{
+  email: Scalars['String']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+export type AddAppDownloadAllowlistEntryMutation = {
+  __typename?: 'Mutation';
+  addAppDownloadAllowlistEntry?: {
+    __typename?: 'AppDownloadAllowlistResult';
+    success?: boolean | null;
+    message?: string | null;
+    entries?: Array<{
+      __typename?: 'AppDownloadAllowlistEntry';
+      id?: number | null;
+      email?: string | null;
+      note?: string | null;
+      addedByEmail?: string | null;
+      createdAt?: string | null;
+      revokedAt?: string | null;
+      hasAccount?: boolean | null;
+      lastDownloadAt?: string | null;
+    }> | null;
+  } | null;
+};
+
+export type SetAppDownloadAllowlistRevokedMutationVariables = Exact<{
+  id: Scalars['Int']['input'];
+  revoked: Scalars['Boolean']['input'];
+}>;
+
+export type SetAppDownloadAllowlistRevokedMutation = {
+  __typename?: 'Mutation';
+  setAppDownloadAllowlistRevoked?: {
+    __typename?: 'AppDownloadAllowlistResult';
+    success?: boolean | null;
+    message?: string | null;
+    entries?: Array<{
+      __typename?: 'AppDownloadAllowlistEntry';
+      id?: number | null;
+      email?: string | null;
+      note?: string | null;
+      addedByEmail?: string | null;
+      createdAt?: string | null;
+      revokedAt?: string | null;
+      hasAccount?: boolean | null;
+      lastDownloadAt?: string | null;
     }> | null;
   } | null;
 };
@@ -14364,6 +14484,18 @@ export type CancelWaiverClaimMutation = {
   } | null;
 };
 
+export const AppDownloadAllowlistEntryFieldsFragmentDoc = gql`
+  fragment AppDownloadAllowlistEntryFields on AppDownloadAllowlistEntry {
+    id
+    email
+    note
+    addedByEmail
+    createdAt
+    revokedAt
+    hasAccount
+    lastDownloadAt
+  }
+`;
 export const DraftSlotTradeFragmentDoc = gql`
   fragment DraftSlotTrade on DraftSlotTrade {
     id
@@ -16082,6 +16214,204 @@ export type AdminRevenueStatsSuspenseQueryHookResult = ReturnType<
 export type AdminRevenueStatsQueryResult = Apollo.QueryResult<
   AdminRevenueStatsQuery,
   AdminRevenueStatsQueryVariables
+>;
+export const AppDownloadAllowlist = gql`
+  query AppDownloadAllowlist {
+    appDownloadAllowlist {
+      ...AppDownloadAllowlistEntryFields
+    }
+  }
+  ${AppDownloadAllowlistEntryFieldsFragmentDoc}
+`;
+
+/**
+ * __useAppDownloadAllowlistQuery__
+ *
+ * To run a query within a React component, call `useAppDownloadAllowlistQuery` and pass it any options that fit your needs.
+ * When your component renders, `useAppDownloadAllowlistQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useAppDownloadAllowlistQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useAppDownloadAllowlistQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    AppDownloadAllowlistQuery,
+    AppDownloadAllowlistQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    AppDownloadAllowlistQuery,
+    AppDownloadAllowlistQueryVariables
+  >(AppDownloadAllowlist, options);
+}
+export function useAppDownloadAllowlistLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    AppDownloadAllowlistQuery,
+    AppDownloadAllowlistQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    AppDownloadAllowlistQuery,
+    AppDownloadAllowlistQueryVariables
+  >(AppDownloadAllowlist, options);
+}
+export function useAppDownloadAllowlistSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        AppDownloadAllowlistQuery,
+        AppDownloadAllowlistQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    AppDownloadAllowlistQuery,
+    AppDownloadAllowlistQueryVariables
+  >(
+    AppDownloadAllowlist,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          AppDownloadAllowlistQuery,
+          AppDownloadAllowlistQueryVariables
+        >,
+  );
+}
+export type AppDownloadAllowlistQueryHookResult = ReturnType<
+  typeof useAppDownloadAllowlistQuery
+>;
+export type AppDownloadAllowlistLazyQueryHookResult = ReturnType<
+  typeof useAppDownloadAllowlistLazyQuery
+>;
+export type AppDownloadAllowlistSuspenseQueryHookResult = ReturnType<
+  typeof useAppDownloadAllowlistSuspenseQuery
+>;
+export type AppDownloadAllowlistQueryResult = Apollo.QueryResult<
+  AppDownloadAllowlistQuery,
+  AppDownloadAllowlistQueryVariables
+>;
+export const AddAppDownloadAllowlistEntry = gql`
+  mutation AddAppDownloadAllowlistEntry($email: String!, $note: String) {
+    addAppDownloadAllowlistEntry(email: $email, note: $note) {
+      success
+      message
+      entries {
+        ...AppDownloadAllowlistEntryFields
+      }
+    }
+  }
+  ${AppDownloadAllowlistEntryFieldsFragmentDoc}
+`;
+export type AddAppDownloadAllowlistEntryMutationFn = MutationFunction<
+  AddAppDownloadAllowlistEntryMutation,
+  AddAppDownloadAllowlistEntryMutationVariables
+>;
+
+/**
+ * __useAddAppDownloadAllowlistEntryMutation__
+ *
+ * To run a mutation, you first call `useAddAppDownloadAllowlistEntryMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useAddAppDownloadAllowlistEntryMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [addAppDownloadAllowlistEntryMutation, { data, loading, error }] = useAddAppDownloadAllowlistEntryMutation({
+ *   variables: {
+ *      email: // value for 'email'
+ *      note: // value for 'note'
+ *   },
+ * });
+ */
+export function useAddAppDownloadAllowlistEntryMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    AddAppDownloadAllowlistEntryMutation,
+    AddAppDownloadAllowlistEntryMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    AddAppDownloadAllowlistEntryMutation,
+    AddAppDownloadAllowlistEntryMutationVariables
+  >(AddAppDownloadAllowlistEntry, options);
+}
+export type AddAppDownloadAllowlistEntryMutationHookResult = ReturnType<
+  typeof useAddAppDownloadAllowlistEntryMutation
+>;
+export type AddAppDownloadAllowlistEntryMutationResult =
+  Apollo.MutationResult<AddAppDownloadAllowlistEntryMutation>;
+export type AddAppDownloadAllowlistEntryMutationOptions = BaseMutationOptions<
+  AddAppDownloadAllowlistEntryMutation,
+  AddAppDownloadAllowlistEntryMutationVariables
+>;
+export const SetAppDownloadAllowlistRevoked = gql`
+  mutation SetAppDownloadAllowlistRevoked($id: Int!, $revoked: Boolean!) {
+    setAppDownloadAllowlistRevoked(id: $id, revoked: $revoked) {
+      success
+      message
+      entries {
+        ...AppDownloadAllowlistEntryFields
+      }
+    }
+  }
+  ${AppDownloadAllowlistEntryFieldsFragmentDoc}
+`;
+export type SetAppDownloadAllowlistRevokedMutationFn = MutationFunction<
+  SetAppDownloadAllowlistRevokedMutation,
+  SetAppDownloadAllowlistRevokedMutationVariables
+>;
+
+/**
+ * __useSetAppDownloadAllowlistRevokedMutation__
+ *
+ * To run a mutation, you first call `useSetAppDownloadAllowlistRevokedMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetAppDownloadAllowlistRevokedMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setAppDownloadAllowlistRevokedMutation, { data, loading, error }] = useSetAppDownloadAllowlistRevokedMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *      revoked: // value for 'revoked'
+ *   },
+ * });
+ */
+export function useSetAppDownloadAllowlistRevokedMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SetAppDownloadAllowlistRevokedMutation,
+    SetAppDownloadAllowlistRevokedMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SetAppDownloadAllowlistRevokedMutation,
+    SetAppDownloadAllowlistRevokedMutationVariables
+  >(SetAppDownloadAllowlistRevoked, options);
+}
+export type SetAppDownloadAllowlistRevokedMutationHookResult = ReturnType<
+  typeof useSetAppDownloadAllowlistRevokedMutation
+>;
+export type SetAppDownloadAllowlistRevokedMutationResult =
+  Apollo.MutationResult<SetAppDownloadAllowlistRevokedMutation>;
+export type SetAppDownloadAllowlistRevokedMutationOptions = BaseMutationOptions<
+  SetAppDownloadAllowlistRevokedMutation,
+  SetAppDownloadAllowlistRevokedMutationVariables
 >;
 export const BaseballPlayers = gql`
   query BaseballPlayers(

@@ -113,7 +113,6 @@ function SlotRow({
           alignItems="center"
           justifyContent="center"
           cursor={canDecrement ? 'pointer' : 'default'}
-          animation="quick"
         >
           <Minus
             size={12}
@@ -151,7 +150,6 @@ function SlotRow({
           alignItems="center"
           justifyContent="center"
           cursor="pointer"
-          animation="quick"
         >
           <Plus size={12} color="$textOnAccent" />
         </XStack>

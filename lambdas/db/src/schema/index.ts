@@ -38,6 +38,7 @@ import './twenty-questions';
 import './sports';
 import './football';
 import './entitlement-check';
+import './app-downloads';
 
 // Export the final schema
 export const schema = builder.toSchema();

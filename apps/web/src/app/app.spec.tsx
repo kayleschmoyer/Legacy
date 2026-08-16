@@ -227,6 +227,20 @@ jest.mock('../pages/admin/AdminRevenuePage', () => {
   return MockAdminRevenuePage;
 });
 
+jest.mock('../pages/admin/AdminAppDownloadsPage', () => {
+  function MockAdminAppDownloadsPage() {
+    const { useAuth } = jest.requireMock(
+      '@legacy-sports/shared-components/auth',
+    );
+    const { user } = useAuth();
+    if (user?.accessLevel !== 'admin') {
+      return <div>Admin Access Required</div>;
+    }
+    return <div>Admin App Downloads Page</div>;
+  }
+  return MockAdminAppDownloadsPage;
+});
+
 // Mock hooks
 jest.mock('../hooks/usePageTracking', () => ({
   usePageTracking: () => null,
@@ -533,6 +547,48 @@ describe('App', () => {
       await act(() => Promise.resolve());
       // Page-level access check passes — renders revenue page, not redirected to home
       expect(container).not.toHaveTextContent('Home Page');
+    });
+
+    it('shows access-restricted state for non-admin user at /admin/app-downloads (not redirected to home)', async () => {
+      // Gated at page level rather than by AdminGuard (LS-9456), mirroring
+      // /admin/revenue: a non-admin gets an explanation, not a bounce home.
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/admin/app-downloads']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      await act(() => Promise.resolve());
+      expect(container).not.toHaveTextContent('Home Page');
+      expect(container).toHaveTextContent('Admin Access Required');
+    });
+
+    it('allows admin user to access /admin/app-downloads', async () => {
+      useAuthMock.mockReturnValue({
+        isAuthenticated: true,
+        isLoading: false,
+        isImpersonating: false,
+        user: {
+          id: 'admin-user-id',
+          username: 'adminuser',
+          email: 'admin@example.com',
+          accessLevel: 'admin',
+        },
+        logout: jest.fn(),
+      });
+
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/admin/app-downloads']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      await act(() => Promise.resolve());
+      expect(container).toHaveTextContent('Admin App Downloads Page');
     });
   });
 

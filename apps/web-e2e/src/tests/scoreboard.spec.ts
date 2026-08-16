@@ -780,6 +780,9 @@ test.describe('ScoreboardTicker — global ticker visibility @regression', () =>
     await expect(scoreboardLink).toBeVisible();
     await scoreboardLink.click();
 
-    await expect(page).toHaveURL('/scoreboard');
+    // 10s: SPA route transition after the click needs main-thread time (route
+    // chunk load + render) that can exceed the 3s expect default on a loaded
+    // CI shard (LS-9449).
+    await expect(page).toHaveURL('/scoreboard', { timeout: 10_000 });
   });
 });

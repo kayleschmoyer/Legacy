@@ -84,6 +84,37 @@ type AllTimeRecord {
   value: Float
 }
 
+"""
+One address permitted to download the Android build
+"""
+type AppDownloadAllowlistEntry {
+  addedByEmail: String
+  createdAt: String
+  email: String
+
+  """
+  Whether a user account exists for this address yet. Display only — an address may be allowlisted before its owner has ever signed in.
+  """
+  hasAccount: Boolean
+  id: Int
+
+  """
+  When this address last downloaded, or null if it never has.
+  """
+  lastDownloadAt: String
+  note: String
+  revokedAt: String
+}
+
+"""
+Outcome of an allowlist edit, plus the refreshed list
+"""
+type AppDownloadAllowlistResult {
+  entries: [AppDownloadAllowlistEntry!]
+  message: String
+  success: Boolean
+}
+
 type AppleVerifyResult {
   status: String
   success: Boolean
@@ -2232,6 +2263,14 @@ type Mutation {
   Accept a pending trade offer. Players are swapped between teams immediately.
   """
   acceptTrade(tradeId: Int!): TradeOffer
+
+  """
+  Allowlist an address for the Android download. The address need not have a user account — that is the normal case for a new tester. Admin only.
+  """
+  addAppDownloadAllowlistEntry(
+    email: String!
+    note: String
+  ): AppDownloadAllowlistResult
   addDefaultPositionsToLeague(leagueId: Int!): [LeaguePosition!]
 
   """
@@ -2771,6 +2810,14 @@ type Mutation {
     """
     leagueIds: [Int!]!
   ): Boolean
+
+  """
+  Revoke an allowlist entry, or re-instate a revoked one. Admin only.
+  """
+  setAppDownloadAllowlistRevoked(
+    id: Int!
+    revoked: Boolean!
+  ): AppDownloadAllowlistResult
 
   """
   Set the authenticated user's canonical email from one of their linked, verified provider identities.
@@ -3474,6 +3521,11 @@ type Query {
   List all badge definitions available in the system
   """
   allBadgeDefinitions: [BadgeDefinition!]
+
+  """
+  Every address on the Android download allowlist, newest first. Admin only.
+  """
+  appDownloadAllowlist: [AppDownloadAllowlistEntry!]
   auctionBudgets(draftId: Int!): [AuctionBudget!]
   auctionState(draftId: Int!): AuctionState
 

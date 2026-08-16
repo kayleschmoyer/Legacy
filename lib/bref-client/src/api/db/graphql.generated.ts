@@ -102,6 +102,29 @@ export type AllTimeRecord = {
   value?: Maybe<Scalars['Float']['output']>;
 };
 
+/** One address permitted to download the Android build */
+export type AppDownloadAllowlistEntry = {
+  __typename?: 'AppDownloadAllowlistEntry';
+  addedByEmail?: Maybe<Scalars['String']['output']>;
+  createdAt?: Maybe<Scalars['String']['output']>;
+  email?: Maybe<Scalars['String']['output']>;
+  /** Whether a user account exists for this address yet. Display only — an address may be allowlisted before its owner has ever signed in. */
+  hasAccount?: Maybe<Scalars['Boolean']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  /** When this address last downloaded, or null if it never has. */
+  lastDownloadAt?: Maybe<Scalars['String']['output']>;
+  note?: Maybe<Scalars['String']['output']>;
+  revokedAt?: Maybe<Scalars['String']['output']>;
+};
+
+/** Outcome of an allowlist edit, plus the refreshed list */
+export type AppDownloadAllowlistResult = {
+  __typename?: 'AppDownloadAllowlistResult';
+  entries?: Maybe<Array<AppDownloadAllowlistEntry>>;
+  message?: Maybe<Scalars['String']['output']>;
+  success?: Maybe<Scalars['Boolean']['output']>;
+};
+
 export type AppleVerifyResult = {
   __typename?: 'AppleVerifyResult';
   status?: Maybe<Scalars['String']['output']>;
@@ -1889,6 +1912,8 @@ export type Mutation = {
   acceptPrivacyPolicy?: Maybe<PrivacyPolicyStatus>;
   /** Accept a pending trade offer. Players are swapped between teams immediately. */
   acceptTrade?: Maybe<TradeOffer>;
+  /** Allowlist an address for the Android download. The address need not have a user account — that is the normal case for a new tester. Admin only. */
+  addAppDownloadAllowlistEntry?: Maybe<AppDownloadAllowlistResult>;
   addDefaultPositionsToLeague?: Maybe<Array<LeaguePosition>>;
   /** Add a player to the end of the current user's draft queue. No-ops if already queued. */
   addToDraftQueue?: Maybe<Array<DraftQueueEntry>>;
@@ -2054,6 +2079,8 @@ export type Mutation = {
   sendMatchupMessage?: Maybe<MatchupMessage>;
   /** Select up to 3 leagues to keep active after a subscription downgrade. Leagues not included in the list will be tier-frozen (read-only). Only callable on the free tier — all leagues are automatically active on premium. */
   setActiveLeagues?: Maybe<Scalars['Boolean']['output']>;
+  /** Revoke an allowlist entry, or re-instate a revoked one. Admin only. */
+  setAppDownloadAllowlistRevoked?: Maybe<AppDownloadAllowlistResult>;
   /** Set the authenticated user's canonical email from one of their linked, verified provider identities. */
   setCanonicalEmail: SetCanonicalEmailResult;
   setDraftOrder?: Maybe<Draft>;
@@ -2132,6 +2159,11 @@ export type Mutation = {
 
 export type MutationAcceptTradeArgs = {
   tradeId: Scalars['Int']['input'];
+};
+
+export type MutationAddAppDownloadAllowlistEntryArgs = {
+  email: Scalars['String']['input'];
+  note?: InputMaybe<Scalars['String']['input']>;
 };
 
 export type MutationAddDefaultPositionsToLeagueArgs = {
@@ -2596,6 +2628,11 @@ export type MutationSendMatchupMessageArgs = {
 
 export type MutationSetActiveLeaguesArgs = {
   leagueIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetAppDownloadAllowlistRevokedArgs = {
+  id: Scalars['Int']['input'];
+  revoked: Scalars['Boolean']['input'];
 };
 
 export type MutationSetCanonicalEmailArgs = {
@@ -3168,6 +3205,8 @@ export type Query = {
   adminRevenueStats?: Maybe<AdminRevenueStats>;
   /** List all badge definitions available in the system */
   allBadgeDefinitions?: Maybe<Array<BadgeDefinition>>;
+  /** Every address on the Android download allowlist, newest first. Admin only. */
+  appDownloadAllowlist?: Maybe<Array<AppDownloadAllowlistEntry>>;
   auctionBudgets?: Maybe<Array<AuctionBudget>>;
   auctionState?: Maybe<AuctionState>;
   /** Aggregated vote results for a league season. No voter identity is exposed. */

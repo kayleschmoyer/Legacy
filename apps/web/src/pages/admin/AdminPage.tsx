@@ -484,6 +484,28 @@ function AdminNavHub() {
           </svg>
         }
       />
+      <NavCard
+        to="/admin/app-downloads"
+        label="App Downloads"
+        description="Manage who can download the Android build."
+        icon={
+          <svg
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden
+          >
+            <path
+              d="M12 3v11m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"
+              stroke="currentColor"
+              strokeWidth={1.75}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        }
+      />
     </div>
   );
 }

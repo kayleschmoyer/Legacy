@@ -240,6 +240,9 @@ const AdminRevenuePage = lazyWithRetry(
 const AdminUsersPage = lazyWithRetry(
   () => import('../pages/admin/AdminUsersPage'),
 );
+const AdminAppDownloadsPage = lazyWithRetry(
+  () => import('../pages/admin/AdminAppDownloadsPage'),
+);
 const ProfileSettingsPage = lazyWithRetry(
   () => import('../pages/profile/ProfileSettingsPage'),
 );
@@ -832,6 +835,13 @@ function App() {
               }
             />
             <Route path="/admin/revenue" element={<AdminRevenuePage />} />
+            {/* Page-level access check rather than AdminGuard, matching
+                /admin/revenue: a non-admin sees an explanation here instead of
+                being redirected to the home page. */}
+            <Route
+              path="/admin/app-downloads"
+              element={<AdminAppDownloadsPage />}
+            />
             <Route
               path="/admin/users"
               element={

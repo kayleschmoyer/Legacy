@@ -524,7 +524,12 @@ test.describe('NFL stats — sport switch to MLB (LS-8566) @regression', () => {
     await page.getByRole('button', { name: /view mlb statistics/i }).click();
 
     // The MLB grid renders (mocked Barry Bonds row) on the Combined tab.
-    await expect(page.getByText('Barry Bonds')).toBeVisible();
+    // 10s: the first paint after the sport switch loads the lazy MLB grid
+    // chunk + runs the mocked query; that first-render budget can exceed the
+    // 3s expect default on a loaded CI shard (LS-9449).
+    await expect(page.getByText('Barry Bonds')).toBeVisible({
+      timeout: 10_000,
+    });
     await expect(page).toHaveURL(/sport=mlb/);
 
     // No NFL params leak across the switch.
