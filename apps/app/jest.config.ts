@@ -26,6 +26,7 @@ module.exports = {
       '<rootDir>/../../lib/app-config/src/native',
     '^@legacy-sports/app-config/web$': '<rootDir>/../../lib/app-config/src/web',
     '^expo-constants$': '<rootDir>/__mocks__/expo-constants.js',
+    '^expo-image-picker$': '<rootDir>/__mocks__/expo-image-picker.js',
     '^@legacy-sports/rollbar/native$': '<rootDir>/../../lib/rollbar/src/native',
     '^@legacy-sports/(.*)$': '<rootDir>/../../lib/$1/src',
     // LS-9423: deep icon imports (@tamagui/lucide-icons/icons/<Name>) must
