@@ -103,19 +103,22 @@ primary: LS-1234
 
 If `legacy-sports-github` re-authenticates mid-session, prefer switching back to `github_open_pr({ jiraKey: "LS-####" })` for its auto-prepend convenience rather than continuing to hand-author the marker on the generic tool.
 
-#### CCR fallback: jira-link marker read-back-and-retry
+#### CCR: verifying the jira-link marker landed
 
-When the only PR-body write path available is the built-in `mcp__github__update_pull_request` / `mcp__github__issue_write` (no `legacy-sports-github` connector — some Claude Code Remote / cloud sessions), these tools strip any `<!-- ... -->` HTML comment from the body, including the jira-link marker (LS-9202; full root-cause writeup at [mcp-first § Built-in GitHub Tools](../../mcp-first/SKILL.md#built-in-github-tools-claude-code-on-the-web)). LS-8934 found this stripping is **intermittent, not deterministic**: on PR #6630 (LS-6147) and PR #6744 (LS-6153) a first `update_pull_request` call echoed a 200 response with the marker apparently intact, but reading the body back showed it had been silently dropped — and retrying the exact same call a second time (no escaping or content changes) then persisted it correctly.
+**Do not verify a marker write by reading the PR body back.** The built-in `mcp__github__pull_request_read` strips `<!-- ... -->` HTML comments on the way _out_, so the marker is absent from every read-back whether or not the write succeeded. A read-back is a false negative 100% of the time, not evidence of anything (LS-9463).
 
-Because a "successful" write can be a false positive, never trust a body write containing an HTML comment without confirming it landed:
+Evidence, PR #7128 (LS-9453): the marker was passed to `mcp__github__create_pull_request`, was absent from two subsequent `pull_request_read` calls, and was in the stored body the whole time — the Jira Link Check run echoed `PR_BODY` verbatim, starting with the marker block, and reported `✅ Jira Link Check passed (primary: LS-9453)`. Acting on the read-back cost a full turn and two escalations to the user over a marker that was never missing.
 
-1. Write the body via `mcp__github__update_pull_request` (or the initial `create_pull_request`) as normal.
-2. **Read it back immediately**: `mcp__github__pull_request_read({ method: "get", owner, repo, pullNumber, fields: ["body"] })` (or `github_view_pr({ number, fields: ["body"] })` if that tool is present).
-3. If the `<!-- jira-link ... -->` block is present with a `primary:` line, done.
-4. If it's missing, retry the identical `update_pull_request` call once (do not alter the text) and read back again.
-5. If it's still missing after the retry, stop treating this as transient — fall back to the `legacy-sports-github` connector (`github_edit_pr`) if it becomes available, `gh pr edit --body-file` via Bash, or ask the user to add the marker through the GitHub UI. Do not loop retrying indefinitely; two failed read-backs is the signal to escalate to a different write path.
+This is easy to get wrong because the stripping is asymmetric: `mcp__github__add_issue_comment` round-trips HTML comments intact on both write and read, so testing the behaviour through comments suggests the body write path is the broken one. It isn't — or at least, that is not what a read-back demonstrates.
 
-This same read-back-and-retry loop is also the fastest way to confirm the Jira Link Check will pass before waiting on CI — a marker missing at read-back time will always fail that check.
+So:
+
+1. Write the body via `create_pull_request` (preferred — put the marker in the initial body) or `mcp__github__update_pull_request`, as normal.
+2. Treat the write as having landed. Do not read the body back to check the marker; that read cannot see it.
+3. If you need positive confirmation before CI settles, read the **Jira Link Check job log** — it echoes the stored `PR_BODY` into the step env and prints the pass/fail verdict. That log is the authoritative reader; so is any other consumer that reads the raw body server-side.
+4. Escalate only when Jira Link Check actually fails on the marker. Then, in order: `github_edit_pr` via the `legacy-sports-github` connector if present, `gh pr edit --body-file` via Bash, or ask the user to paste the marker through the GitHub UI.
+
+Historical context, since the prior tickets read the other way: LS-9202 and LS-8934 concluded the _write_ path strips (LS-8934 attributing it to intermittency and prescribing the read-back-and-retry loop this section replaced), and LS-9227 / LS-9228 were both closed **Won't Do** on that basis. Whether the write path ever stripped is unresolved — the reports may have been accurate then, may have been this same misdiagnosis, or the platform may have changed since. What is verifiable now is above. LS-9279 remains open and its repro steps carry the same flaw (step 2 is "re-fetch the body and observe the comment is gone", which proves nothing).
 
 ### PR Body Template
 
