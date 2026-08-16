@@ -286,6 +286,112 @@ describe('useDraftWebSocket — pick announcement fallback (LS-8845)', () => {
   });
 });
 
+// ── Draft Room v2 toast/splash queue wiring (LS-9402) ──────────────────────
+
+describe('useDraftWebSocket — pick toast/splash queue wiring (LS-9402)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('enqueues a splash (not a toast) for my own team pick', () => {
+    const params = {
+      ...makeDefaultParams(),
+      enqueuePickToast: jest.fn(),
+      enqueuePickSplash: jest.fn(),
+    };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, {
+        draftId: 42,
+        pickId: 301,
+        teamId: 10, // matches makeDefaultParams()'s myTeamId
+        playerId: 700,
+        round: 1,
+        pickNumber: 3,
+        overallPick: 3,
+        wasAutoPick: false,
+        autoPickReason: null,
+        currentPickDeadline: null,
+        nextPick: { teamId: 11, round: 1, pickNumber: 4, overallPick: 4 },
+      });
+    });
+
+    expect(params.enqueuePickSplash).toHaveBeenCalledTimes(1);
+    expect(params.enqueuePickSplash).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pickNumber: 3,
+        round: 1,
+        roundPickNumber: 3,
+      }),
+    );
+    expect(params.enqueuePickToast).not.toHaveBeenCalled();
+  });
+
+  it('enqueues a toast (not a splash) for another team pick, marking auto-picks', () => {
+    const params = {
+      ...makeDefaultParams(),
+      enqueuePickToast: jest.fn(),
+      enqueuePickSplash: jest.fn(),
+    };
+
+    renderHook(() => useDraftWebSocket(params));
+
+    act(() => {
+      mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, {
+        draftId: 42,
+        pickId: 302,
+        teamId: 11, // not myTeamId (10)
+        playerId: 701,
+        round: 1,
+        pickNumber: 4,
+        overallPick: 4,
+        wasAutoPick: true,
+        autoPickReason: 'timer_expired',
+        currentPickDeadline: null,
+        nextPick: { teamId: 12, round: 1, pickNumber: 5, overallPick: 5 },
+      });
+    });
+
+    expect(params.enqueuePickToast).toHaveBeenCalledTimes(1);
+    expect(params.enqueuePickToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pickNumber: 4,
+        round: 1,
+        roundPickNumber: 4,
+        isAuto: true,
+        teamName: 'Team A', // makeDefaultParams()'s teamNameById() stub
+      }),
+    );
+    expect(params.enqueuePickSplash).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when enqueuePickToast/enqueuePickSplash are omitted (e.g. the spectator screen)', () => {
+    const params = makeDefaultParams();
+
+    renderHook(() => useDraftWebSocket(params));
+
+    expect(() => {
+      act(() => {
+        mockInstance._emit(ClientNotificationType.DRAFT_PICK_MADE, {
+          draftId: 42,
+          pickId: 303,
+          teamId: 2,
+          playerId: 702,
+          round: 1,
+          pickNumber: 5,
+          overallPick: 5,
+          wasAutoPick: false,
+          autoPickReason: null,
+          currentPickDeadline: null,
+          nextPick: { teamId: 3, round: 1, pickNumber: 6, overallPick: 6 },
+        });
+      });
+    }).not.toThrow();
+  });
+});
+
 // ── Reconnect recovery (LS-8506) ───────────────────────────────────────────
 
 /**

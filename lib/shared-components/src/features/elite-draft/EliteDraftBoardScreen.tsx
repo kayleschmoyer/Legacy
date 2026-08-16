@@ -12,13 +12,15 @@ import { PreDraftLobby } from './PreDraftLobby';
 import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
 import { DraftBoardGrid } from './DraftBoardGrid';
-import { DraftPickAnnouncement } from './DraftPickAnnouncement';
 import { DraftHeaderBand } from './DraftHeaderBand';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftBottomNav } from './DraftBottomNav';
 import { DraftPlayersTab } from './DraftPlayersTab';
 import { DraftQueueTab } from './DraftQueueTab';
 import { DraftTeamTab } from './DraftTeamTab';
+import { DraftPickToast } from './DraftPickToast';
+import { DraftMyPickSplash } from './DraftMyPickSplash';
+import { DraftRoomRecap } from './DraftRoomRecap';
 import { useDraftPalette } from './nativeDraftPalette';
 import { resolveBoardRounds, statLineFor } from './nativeDraftBoard';
 import { getPositionColor } from './utils';
@@ -342,6 +344,12 @@ function CompactLiveDraftBoard({
 }: CompactLiveDraftBoardProps): React.JSX.Element {
   const palette = useDraftPalette();
   const [sortKey, setSortKey] = useState<SortKey>('adp');
+
+  // AC3 (LS-9402): the same `celebrate` flag the pre-v2 full-screen
+  // DraftPickAnnouncement consumed — currently hardcoded on, since there is
+  // no user-facing celebration toggle yet (README "Settings surfaced in the
+  // prototype's Tweaks panel" documents `celebration` as a future setting).
+  const celebrateOnMyPick = true;
 
   const boardTeams =
     queries.boardOrderedTeams.length > 0
@@ -722,11 +730,17 @@ function CompactLiveDraftBoard({
         </>
       )}
 
-      {/* ---- Pick announcement ---- */}
-      <DraftPickAnnouncement
-        announcement={ui.announcement}
-        celebrate
-        onDismiss={ui.dismissAnnouncement}
+      {/* ---- Draft Room v2 overlays (LS-9402): AI-pick toast + my-pick splash ---- */}
+      <DraftPickToast
+        queue={ui.pickToastQueue}
+        onDismiss={ui.dequeuePickToast}
+        sport={sport}
+      />
+      <DraftMyPickSplash
+        queue={ui.pickSplashQueue}
+        onDismiss={ui.dequeuePickSplash}
+        sport={sport}
+        celebrate={celebrateOnMyPick}
       />
 
       {/* Toast overlay */}
@@ -935,6 +949,8 @@ export function EliteDraftBoardScreen({
     notifiedPicksRef: ui.notifiedPicksRef,
     showAnnouncement: ui.showAnnouncement,
     showToast: ui.showToast,
+    enqueuePickToast: ui.enqueuePickToast,
+    enqueuePickSplash: ui.enqueuePickSplash,
     setDraftComplete: ui.setDraftComplete,
     setDraftPaused: ui.setDraftPaused,
     setPickDeadline: ui.setPickDeadline,
@@ -1183,6 +1199,23 @@ export function EliteDraftBoardScreen({
     queries.leagueDraft?.draftCompletedAt ||
     queries.currentPickInfo?.isComplete
   ) {
+    // Draft Room v2 (LS-9402): the compact branch gets the new recap —
+    // README "Draft-complete recap" — reusing LS-9400's roster-slot-row.
+    // The wide-viewport branch is out of scope for this redesign and keeps
+    // the pre-v2 DraftCompleteView unchanged.
+    if (isCompact) {
+      return (
+        <DraftRoomRecap
+          pickHistory={queries.pickHistory}
+          myTeamPicks={playerData.myTeamPicks}
+          myTeam={playerData.myTeam}
+          statsLookup={playerData.statsLookup}
+          leaguePositions={queries.leaguePositions}
+          sport={sport}
+          maxRosterSize={queries.league?.maxRosterSize ?? null}
+        />
+      );
+    }
     return (
       <DraftCompleteView
         league={

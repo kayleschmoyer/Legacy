@@ -241,18 +241,28 @@ jest.mock('./DraftBoardGrid', () => ({
     />
   ),
 }));
-jest.mock('./DraftPickAnnouncement', () => ({
-  DraftPickAnnouncement: ({
-    announcement,
+jest.mock('./DraftPickToast', () => ({
+  DraftPickToast: ({
+    queue,
   }: {
-    announcement: { pickNumber: number } | null;
+    queue: ReadonlyArray<{ pickNumber: number }>;
   }) =>
-    announcement ? (
-      <div
-        data-testid="draft-pick-announcement"
-        data-pick={announcement.pickNumber}
-      />
+    queue[0] ? (
+      <div data-testid="draft-pick-toast" data-pick={queue[0].pickNumber} />
     ) : null,
+}));
+jest.mock('./DraftMyPickSplash', () => ({
+  DraftMyPickSplash: ({
+    queue,
+  }: {
+    queue: ReadonlyArray<{ pickNumber: number }>;
+  }) =>
+    queue[0] ? (
+      <div data-testid="draft-my-pick-splash" data-pick={queue[0].pickNumber} />
+    ) : null,
+}));
+jest.mock('./DraftRoomRecap', () => ({
+  DraftRoomRecap: () => <div data-testid="draft-room-recap" />,
 }));
 jest.mock('./DraftPlayersTab', () => ({
   DraftPlayersTab: ({
@@ -674,6 +684,34 @@ describe('EliteDraftBoardScreen — draft completion paths (LS-4268 regression g
     expect(queryByTestId('draft-complete-view')).toBeNull();
     expect(queryByTestId('pre-draft-lobby')).toBeNull();
     expect(queryByTestId('draft-board-loading')).toBeTruthy();
+  });
+});
+
+// AC4 (LS-9402): the compact branch swaps in the Draft Room v2 recap in
+// place of the pre-v2 DraftCompleteView; the wide branch is untouched.
+describe('EliteDraftBoardScreen — draft-complete recap viewport swap (LS-9402)', () => {
+  it('renders DraftRoomRecap (not DraftCompleteView) on the compact viewport', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(true);
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: true }));
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('draft-room-recap')).toBeTruthy();
+    expect(queryByTestId('draft-complete-view')).toBeNull();
+  });
+
+  it('keeps rendering DraftCompleteView (not DraftRoomRecap) on the wide viewport', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: true }));
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('draft-complete-view')).toBeTruthy();
+    expect(queryByTestId('draft-room-recap')).toBeNull();
   });
 });
 
@@ -1860,35 +1898,67 @@ describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
   });
 });
 
-describe('EliteDraftBoardScreen — compact viewport, pick announcement', () => {
-  it('wires the current announcement through to DraftPickAnnouncement', () => {
+describe('EliteDraftBoardScreen — compact viewport, Draft Room v2 overlays (LS-9402)', () => {
+  it('wires the toast queue through to DraftPickToast', () => {
     setupCompactLiveDraft({
       ui: {
-        announcement: {
-          player: makeDraftPlayer(),
-          pickNumber: 7,
-          round: 1,
-          roundPickNumber: 7,
-          isMyPick: true,
-          isAuto: false,
-          teamName: 'Dinger Dynasty',
-        },
+        pickToastQueue: [
+          {
+            id: '7',
+            player: makeDraftPlayer(),
+            pickNumber: 7,
+            round: 1,
+            roundPickNumber: 7,
+            teamName: 'Dinger Dynasty',
+            isAuto: false,
+          },
+        ],
       },
     });
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
     expect(
-      screen.getByTestId('draft-pick-announcement').getAttribute('data-pick'),
+      screen.getByTestId('draft-pick-toast').getAttribute('data-pick'),
     ).toBe('7');
   });
 
-  it('renders nothing for DraftPickAnnouncement when there is no announcement', () => {
+  it('renders nothing for DraftPickToast when the toast queue is empty', () => {
     setupCompactLiveDraft();
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    expect(screen.queryByTestId('draft-pick-announcement')).toBeNull();
+    expect(screen.queryByTestId('draft-pick-toast')).toBeNull();
+  });
+
+  it('wires the splash queue through to DraftMyPickSplash', () => {
+    setupCompactLiveDraft({
+      ui: {
+        pickSplashQueue: [
+          {
+            id: '3',
+            player: makeDraftPlayer(),
+            pickNumber: 3,
+            round: 1,
+            roundPickNumber: 3,
+          },
+        ],
+      },
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('draft-my-pick-splash').getAttribute('data-pick'),
+    ).toBe('3');
+  });
+
+  it('renders nothing for DraftMyPickSplash when the splash queue is empty', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.queryByTestId('draft-my-pick-splash')).toBeNull();
   });
 });
 

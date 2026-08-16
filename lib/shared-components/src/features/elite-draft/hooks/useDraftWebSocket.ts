@@ -7,6 +7,10 @@ import {
   useRef,
 } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
+import type {
+  PickSplashQueueItem,
+  PickToastQueueItem,
+} from './useDraftUIState';
 import {
   type DraftCompletedNotification,
   type DraftPausedNotification,
@@ -75,6 +79,14 @@ interface UseDraftWebSocketParams {
     text: string,
     type?: 'error' | 'warning' | 'info' | 'success',
   ) => void;
+  /**
+   * Draft Room v2 overlays (LS-9402) — consumers of LS-9397's toast/splash
+   * queues. Optional: the spectator screen (useSpectatorScreenState.ts) has
+   * no "my team" concept and doesn't pass these, so a pick there simply
+   * never enqueues either overlay.
+   */
+  enqueuePickToast?: (item: PickToastQueueItem) => void;
+  enqueuePickSplash?: (item: PickSplashQueueItem) => void;
   setDraftComplete: (v: boolean) => void;
   setDraftPaused: (v: boolean) => void;
   setPickDeadline: (v: Date | null) => void;
@@ -113,6 +125,8 @@ export function useDraftWebSocket({
   notifiedPicksRef,
   showAnnouncement,
   showToast,
+  enqueuePickToast,
+  enqueuePickSplash,
   setDraftComplete,
   setDraftPaused,
   setPickDeadline,
@@ -198,6 +212,30 @@ export function useDraftWebSocket({
           notification.wasAutoPick,
           teamName,
         );
+
+        // Draft Room v2 overlays (LS-9402): consume the same pick event to
+        // populate LS-9397's toast/splash queues — my own pick gets the
+        // full-screen splash, every other pick (human or auto) gets the toast.
+        if (isMyTeamPick) {
+          enqueuePickSplash?.({
+            id: String(notification.overallPick),
+            player: announcementPlayer,
+            pickNumber: notification.overallPick,
+            round: notification.round,
+            roundPickNumber: notification.pickNumber,
+          });
+        } else {
+          enqueuePickToast?.({
+            id: String(notification.overallPick),
+            player: announcementPlayer,
+            pickNumber: notification.overallPick,
+            round: notification.round,
+            roundPickNumber: notification.pickNumber,
+            teamName,
+            isAuto: notification.wasAutoPick,
+          });
+        }
+
         if (pickedPlayer) {
           onPlayerDrafted?.(
             notification.playerId,
@@ -259,6 +297,8 @@ export function useDraftWebSocket({
       notifiedPicksRef,
       showAnnouncement,
       showToast,
+      enqueuePickToast,
+      enqueuePickSplash,
       setLiveMessage,
       setDraftComplete,
       setPickDeadline,
