@@ -129,6 +129,68 @@ export async function getAuthenticatedUserId(
   }
 }
 
+/** A caller resolved from a top-level browser navigation. */
+export interface NavigationUser {
+  id: number;
+  email: string;
+  isAdmin: boolean;
+}
+
+/**
+ * Resolve the signed-in user for a **top-level browser navigation** (a GET the
+ * user reached by following a link or scanning a QR code). Returns null when
+ * there is no valid session cookie.
+ *
+ * Deliberately does NOT require the CSRF double-submit that
+ * {@link getAuthenticatedUser} enforces, and that is the whole reason this
+ * exists: a browser following a link sends no `X-CSRF-Token` header, so
+ * `getAuthenticatedUser` rejects every such request with a 403. CSRF protection
+ * guards state-changing requests made on a user's behalf from another origin;
+ * this is for safe GETs whose response the attacking origin cannot read anyway
+ * (an opaque cross-origin response). **Do not use it for anything that mutates
+ * state on the strength of the caller's identity** — use `getAuthenticatedUser`
+ * there and keep the CSRF check.
+ *
+ * Cookie-only by design: a top-level navigation has no Authorization header, so
+ * accepting a Bearer token here would only widen the surface.
+ *
+ * `isAdmin` is derived from the JWT's `accessLevel` claim (minted in
+ * util/jwt.ts), matching how lambdas/db reads it — no database round-trip.
+ */
+export async function getNavigationUser(
+  event: APIGatewayEvent,
+): Promise<NavigationUser | null> {
+  const cookieHeader = event.headers?.['Cookie'] ?? event.headers?.['cookie'];
+  const token = parseJwtFromCookies(cookieHeader);
+  if (!token) return null;
+
+  try {
+    const jwtKey = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
+    const payload = verify(token, jwtKey, {
+      algorithms: ['HS256'],
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    }) as { id?: number; email?: string; accessLevel?: string };
+
+    if (typeof payload.id !== 'number' || !Number.isFinite(payload.id)) {
+      LOGGER.warn('getNavigationUser: token payload missing valid user id');
+      return null;
+    }
+
+    return {
+      id: payload.id,
+      email: payload.email ?? `user-${payload.id}`,
+      isAdmin: payload.accessLevel === 'admin',
+    };
+  } catch (err) {
+    LOGGER.warn(
+      'getNavigationUser: token verification failed:',
+      err instanceof Error ? err.message : String(err),
+    );
+    return null;
+  }
+}
+
 /**
  * Validate the CSRF double-submit token for a cookie-authenticated request.
  * Returns an error response when validation fails, or null when it passes.

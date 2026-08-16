@@ -13,6 +13,7 @@ import {
   ResolveOrCreateUserResult,
 } from './resolveOrCreateUser';
 import { linkProviderIdentity, unlinkProviderIdentity } from './IdentityLink';
+import { ANDROID_DOWNLOAD_PATH, DOWNLOAD_RETURN_STATE } from './AppDownload';
 import { Secret, SECRET_CONFIG } from '../util';
 import { createJwt, JWT_COOKIE_NAME } from '../util/jwt';
 import { encryptCookies } from '../util/cookie';
@@ -263,6 +264,12 @@ export const handleGoogleCallback = async (
       };
     }
 
+    // The extra state slot carries either a CLI device code or the app-download
+    // return marker (LS-9455). They are mutually exclusive, and the marker must
+    // NOT reach completeDeviceFlow — it would be treated as a device code and
+    // fail the lookup.
+    const isDownloadReturn = deviceCode === DOWNLOAD_RETURN_STATE;
+
     // Create a synthetic event for the existing Google auth handler.
     // Forward only the device code (not the CSRF token) as the downstream
     // `state`, so completeDeviceFlow continues to receive the device code
@@ -274,11 +281,38 @@ export const handleGoogleCallback = async (
       body: JSON.stringify({ code, redirect_uri: getRedirectUri(event) }),
       queryStringParameters: {
         ...event.queryStringParameters,
-        state: deviceCode || undefined,
+        state: isDownloadReturn ? undefined : deviceCode || undefined,
       },
     };
 
     const downstream = await handleSecureGoogleAuth(syntheticEvent);
+
+    // App-download return path (LS-9455). The default flow answers with
+    // handleSecureGoogleAuth's JSON body, which is useless to a browser that
+    // arrived here from a QR code — so when, and only when, the marker is
+    // present and sign-in succeeded, answer with a redirect back to the
+    // download route instead. The session cookies the downstream handler set
+    // are preserved verbatim; without them the route would bounce the browser
+    // straight back to Google in a loop.
+    //
+    // Every other sign-in takes the untouched path below.
+    if (
+      isDownloadReturn &&
+      downstream.statusCode >= 200 &&
+      downstream.statusCode < 300
+    ) {
+      const downstreamCookies =
+        downstream.multiValueHeaders?.['Set-Cookie'] ?? [];
+      return {
+        statusCode: 302,
+        headers: { Location: ANDROID_DOWNLOAD_PATH },
+        multiValueHeaders: {
+          ...downstream.multiValueHeaders,
+          'Set-Cookie': [...(downstreamCookies as string[]), clearStateCookie],
+        },
+        body: '',
+      };
+    }
 
     // Append the clearing Set-Cookie alongside whatever downstream cookies
     // the secure handler set, so the state cookie is single-use even on

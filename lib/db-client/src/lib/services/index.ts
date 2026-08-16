@@ -231,3 +231,14 @@ export type {
   BadgeProgressRecord,
   AwardedBadgeResult,
 } from './BadgeService';
+
+// App download allowlist + audit (LS-9455). Plain functions rather than a
+// factory: both call sites already hold an InternalDb.
+export {
+  isEmailAllowlisted,
+  recordDownloadAttempt,
+} from './AppDownloadService';
+export type {
+  AppDownloadOutcome,
+  AppDownloadAttempt,
+} from './AppDownloadService';

@@ -6,6 +6,7 @@ import {
   handleSecureGoogleAuth,
 } from './Google';
 import { resolveOrCreateUser } from './resolveOrCreateUser';
+import { ANDROID_DOWNLOAD_PATH, DOWNLOAD_RETURN_STATE } from './AppDownload';
 import { verifyOauthState } from '../util/oauth-state';
 
 // Mock dependencies
@@ -640,5 +641,60 @@ describe('handleGoogleCallback — CSRF state verification', () => {
     expect(result.statusCode).toBe(400);
     const body = JSON.parse(result.body) as { error: string };
     expect(body.error).toBe('Missing authorization code');
+  });
+});
+
+describe('handleGoogleCallback — app-download return path (LS-9455)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyOauthState.mockReturnValue(true);
+  });
+
+  function makeCallbackEvent(extraState: string): APIGatewayEvent {
+    return {
+      ...makeEvent({}),
+      httpMethod: 'GET',
+      queryStringParameters: {
+        code: 'auth-code',
+        state: `test-csrf-token.${extraState}`,
+      },
+      headers: { Cookie: 'ls_oauth_state=test-csrf-token' },
+    };
+  }
+
+  it('redirects the browser back to the download route when the marker is present', async () => {
+    const result = await handleGoogleCallback(
+      makeCallbackEvent(DOWNLOAD_RETURN_STATE),
+    );
+
+    expect(result.statusCode).toBe(302);
+    expect(result.headers?.['Location']).toBe(ANDROID_DOWNLOAD_PATH);
+  });
+
+  it('carries the session cookies onto the redirect', async () => {
+    // Without them the download route sees no session and bounces the browser
+    // straight back to Google — an infinite loop rather than a visible error.
+    const result = await handleGoogleCallback(
+      makeCallbackEvent(DOWNLOAD_RETURN_STATE),
+    );
+
+    const cookies = (result.multiValueHeaders?.['Set-Cookie'] ??
+      []) as string[];
+    expect(cookies.length).toBeGreaterThan(0);
+    // The single-use state cookie is still cleared alongside them.
+    expect(cookies.some((c) => c.includes('Max-Age=0'))).toBe(true);
+  });
+
+  it('does not redirect for an ordinary sign-in carrying no marker', async () => {
+    // The guard against this branch widening to every Google web sign-in.
+    const result = await handleGoogleCallback(makeCallbackEvent(''));
+
+    expect(result.headers?.['Location']).toBeUndefined();
+  });
+
+  it('does not redirect for a device-flow sign-in carrying a device code', async () => {
+    const result = await handleGoogleCallback(makeCallbackEvent('ABCD-1234'));
+
+    expect(result.headers?.['Location']).toBeUndefined();
   });
 });

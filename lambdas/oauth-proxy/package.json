@@ -14,8 +14,10 @@
   "dependencies": {
     "@apollo/client": "*",
     "@aws-sdk/client-dynamodb": "*",
+    "@aws-sdk/client-s3": "*",
     "@aws-sdk/client-secrets-manager": "*",
     "@aws-sdk/client-sesv2": "3.1025.0",
+    "@aws-sdk/s3-request-presigner": "*",
     "@legacy-sports/app-config": "workspace:*",
     "@legacy-sports/aws-utils": "workspace:*",
     "@legacy-sports/db-client": "workspace:*",

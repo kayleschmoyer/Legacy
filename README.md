@@ -73,6 +73,16 @@ These are published automatically by CI workflows — no manual steps required.
 2. Enable "Install from Unknown Sources" in your Android settings (if prompted)
 3. Open the downloaded APK to install it
 
+#### Gated download (testers)
+
+There is also an authenticated download that checks the caller against an approved-tester allowlist before serving the app:
+
+**https://api.legacy-fantasy.com/oauth/download/android**
+
+Opening it signs you in with Google and then hands back the current release APK — the same build the link above serves. Admins are always allowed; everyone else needs their address on the allowlist, which an admin manages from the admin area. An address can be added before that person has ever signed up: their account is created when they first sign in here. Every attempt is recorded, so an admin can see who tried and was refused.
+
+> **The public link and QR code above are still live and still unauthenticated.** The gated URL is an additional path, not a replacement — anyone with the release link can still install the app. Restricting that is a separate change.
+
 > **Note:** iOS builds are currently disabled as we are not actively using the iOS platform.
 
 ## 🔒 Security

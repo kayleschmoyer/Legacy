@@ -56,6 +56,7 @@ import {
   handleMfaVerifySetup,
 } from './handlers/Mfa';
 import { handleStepUpVerify } from './handlers/StepUp';
+import { handleAndroidDownload } from './handlers/AppDownload';
 import { withRateLimit } from './util/rate-limit';
 import { describeErrorCause, sanitizeHeaders } from './util/lambda';
 
@@ -63,6 +64,10 @@ import { describeErrorCause, sanitizeHeaders } from './util/lambda';
 // Lambda execution context (see util/rate-limit.ts). Edge throttling
 // (API Gateway / WAF) should be layered on top — these are a floor.
 const AUTH_RATE_LIMIT = { limit: 5, windowMs: 60 * 1000 };
+// Looser than AUTH_RATE_LIMIT: a download is a navigation a tester may retry
+// (sign-in bounce, a tap-back, a failed transfer) without it being an attack,
+// but still bounded so the route cannot be used to farm presigned URLs.
+const DOWNLOAD_RATE_LIMIT = { limit: 20, windowMs: 60 * 1000 };
 const DEVICE_POLL_RATE_LIMIT = { limit: 30, windowMs: 60 * 1000 };
 
 // Initialize Rollbar
@@ -360,6 +365,20 @@ const baseOAuthHandler = async (
         if (event.httpMethod === 'POST') {
           const result = handleLogout(event);
           return cors(result);
+        }
+        break;
+
+      case '/oauth/download/android':
+      case '/dev/oauth/download/android':
+        // Browser navigation, not an API call: the response is a 302 to a
+        // presigned S3 URL or an HTML page, so it is deliberately not wrapped
+        // in cors() — there is no cross-origin caller to satisfy.
+        if (event.httpMethod === 'GET') {
+          return await withRateLimit(
+            event,
+            { route: 'oauth.download.android', ...DOWNLOAD_RATE_LIMIT },
+            () => handleAndroidDownload(event),
+          );
         }
         break;
 
