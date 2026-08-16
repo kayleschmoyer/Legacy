@@ -1763,7 +1763,7 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
 });
 
 describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
-  it('compact: shows Exit Draft for a mock draft and navigates to /baseball on click', () => {
+  it('compact: shows Exit Draft for a mock draft and navigates to /baseball on click when onExitDraft is not supplied', () => {
     const onNavigate = jest.fn();
     setupCompactLiveDraft({
       queries: {
@@ -1781,6 +1781,38 @@ describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
     fireEvent.click(screen.getByText('EXIT DRAFT'));
 
     expect(onNavigate).toHaveBeenCalledWith('/baseball');
+  });
+
+  // LS-9446: native wires onExitDraft to a stack-popping navigator instead of
+  // the forward onNavigate('/baseball') push, which stranded the home screen
+  // behind the mock-draft stack. web still omits onExitDraft, so the case
+  // above continues to cover its onNavigate('/baseball') fallback unchanged.
+  it('compact: calls onExitDraft instead of onNavigate when onExitDraft is supplied', () => {
+    const onNavigate = jest.fn();
+    const onExitDraft = jest.fn();
+    setupCompactLiveDraft({
+      queries: {
+        league: {
+          id: 1,
+          name: 'Test League',
+          draftStatus: 'in-progress',
+          isMockDraft: true,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+      },
+    });
+
+    render(
+      <EliteDraftBoardScreen
+        {...defaultProps}
+        onNavigate={onNavigate}
+        onExitDraft={onExitDraft}
+      />,
+    );
+    fireEvent.click(screen.getByText('EXIT DRAFT'));
+
+    expect(onExitDraft).toHaveBeenCalledTimes(1);
+    expect(onNavigate).not.toHaveBeenCalled();
   });
 
   it('compact: hides Exit Draft for a real league draft', () => {

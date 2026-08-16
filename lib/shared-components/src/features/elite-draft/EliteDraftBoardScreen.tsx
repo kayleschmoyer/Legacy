@@ -82,6 +82,15 @@ export interface EliteDraftBoardScreenProps {
    * platforms without a safe-area concept (web).
    */
   bottomInset?: number;
+  /**
+   * Optional override for the Exit Draft control's navigation. When omitted,
+   * Exit Draft falls back to `onNavigate('/baseball')` (web's behavior, where
+   * `/baseball` is a real page). Native callers should pass a stack-popping
+   * navigator (e.g. `closeToHomeTab`) instead of a forward push, since native's
+   * `/baseball` is a redirect-only route sitting outside the tab stack
+   * (LS-9446).
+   */
+  onExitDraft?: () => void;
 }
 
 const POSITION_FILTERS = [
@@ -806,6 +815,7 @@ export function EliteDraftBoardScreen({
   sport = 'baseball',
   onActiveDraftChange,
   bottomInset = 0,
+  onExitDraft,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user, token: authToken } = useAuth();
   const userId = user?.id ?? 0;
@@ -960,8 +970,12 @@ export function EliteDraftBoardScreen({
   // team, so every turn should be pickable regardless of whose seat it is.
   const controlAllTeams = queries.league?.controlAllTeams === true;
   const handleExitDraft = useCallback(() => {
+    if (onExitDraft) {
+      onExitDraft();
+      return;
+    }
     onNavigate('/baseball');
-  }, [onNavigate]);
+  }, [onExitDraft, onNavigate]);
 
   const { timeRemaining } = useDraftTimer({
     draftId: queries.draftId,

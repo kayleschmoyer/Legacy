@@ -5,7 +5,7 @@ import { Text, YStack } from 'tamagui';
 import { EliteDraftBoardScreen } from '@legacy-sports/shared-components/elite-draft';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
-import { toIntId } from '../../common/utilities/RouteUtils';
+import { closeToHomeTab, toIntId } from '../../common/utilities/RouteUtils';
 
 // Deliberately no pull-to-refresh here (LS-8847): the board is WebSocket-driven
 // and already live-updates via `EliteDraftBoardScreen`'s socket connection, and
@@ -48,6 +48,7 @@ export default function DraftBoardPage() {
         onNavigate={(path) => router.navigate(path)}
         websocketUrl={websocketUrl ?? ''}
         bottomInset={bottomInset}
+        onExitDraft={() => closeToHomeTab(router)}
       />
     </YStack>
   );

@@ -13,13 +13,19 @@ jest.mock('@legacy-sports/app-config/native', () => ({
 }));
 
 const mockNavigate = jest.fn();
+const mockBack = jest.fn();
+let mockCanGoBack = true;
 
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
-  useRouter: () => ({ navigate: mockNavigate }),
+  useRouter: () => ({
+    navigate: mockNavigate,
+    back: mockBack,
+    canGoBack: () => mockCanGoBack,
+  }),
 }));
 
-const mockEliteDraftBoardScreen = jest.fn();
+const mockEliteDraftBoardScreen = jest.fn<void, [Record<string, unknown>]>();
 jest.mock('@legacy-sports/shared-components/elite-draft', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
@@ -66,6 +72,7 @@ describe('DraftBoardPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockWebsocketUrl = undefined;
+    mockCanGoBack = true;
   });
 
   describe('when websocketUrl is not configured', () => {
@@ -104,5 +111,34 @@ describe('DraftBoardPage', () => {
     expect(mockEliteDraftBoardScreen).toHaveBeenCalledWith(
       expect.objectContaining({ bottomInset: 48 }),
     );
+  });
+
+  // LS-9446: Exit Draft used to push router.navigate('/baseball') — a
+  // redirect-only route on native that left the (tabs)/Home screen hidden
+  // behind the stale draft stack instead of revealing it. onExitDraft pops
+  // the stack via closeToHomeTab instead.
+  describe('onExitDraft', () => {
+    it('pops the navigation stack via router.back() instead of pushing /baseball', () => {
+      render(<DraftBoardPage />);
+
+      const onExitDraft = mockEliteDraftBoardScreen.mock.calls[0][0]
+        .onExitDraft as () => void;
+      onExitDraft();
+
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).not.toHaveBeenCalledWith('/baseball');
+    });
+
+    it('falls back to navigating to the Home tab when there is nothing to pop', () => {
+      mockCanGoBack = false;
+      render(<DraftBoardPage />);
+
+      const onExitDraft = mockEliteDraftBoardScreen.mock.calls[0][0]
+        .onExitDraft as () => void;
+      onExitDraft();
+
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith('/home');
+    });
   });
 });
