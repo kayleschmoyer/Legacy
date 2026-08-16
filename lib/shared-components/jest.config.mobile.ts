@@ -97,7 +97,6 @@ module.exports = {
     // red for every PR that touches this library.
     '/src/features/elite-draft/DraftPickAnnouncement\\.spec\\.tsx$',
     '/src/features/elite-draft/DraftClockRing\\.spec\\.tsx$',
-    '/src/features/elite-draft/DraftSquadStrip\\.spec\\.tsx$',
     '/src/features/elite-draft/DraftMiniBoard\\.spec\\.tsx$',
     // useVoiceCommands.native.ts is a static stub (no RN speech-recognition
     // equivalent) with no branches to test; its generic spec drives the web

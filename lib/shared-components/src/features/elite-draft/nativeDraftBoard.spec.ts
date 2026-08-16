@@ -1,10 +1,8 @@
 import {
   abbreviatedPlayerName,
   buildBoardCells,
-  buildSquadSlots,
   computeMyUpcomingPicks,
   describeBoardCell,
-  describeSquadNeed,
   formatClock,
   formatLastPickLine,
   initialsOf,
@@ -271,31 +269,6 @@ describe('describeBoardCell', () => {
   });
 });
 
-describe('buildSquadSlots', () => {
-  it('emits one slot per round, filled by the round the pick was made in', () => {
-    const slots = buildSquadSlots({
-      myPicks: [makePick({ round: 2, playerId: 1 })],
-      statsLookup: new Map([[1, makePlayer()]]),
-      rounds: 3,
-    });
-
-    expect(slots.map((s) => s.round)).toEqual([1, 2, 3]);
-    expect(slots[0].player).toBeNull();
-    expect(slots[1].player?.name).toBe('Bobby Witt Jr.');
-    expect(slots[2].player).toBeNull();
-  });
-
-  it('leaves a slot empty when the drafted player is missing from the stats map', () => {
-    const slots = buildSquadSlots({
-      myPicks: [makePick({ playerId: 404 })],
-      statsLookup: new Map(),
-      rounds: 1,
-    });
-
-    expect(slots[0].player).toBeNull();
-  });
-});
-
 describe('shortPlayerName', () => {
   it('returns the surname', () => {
     expect(shortPlayerName('Aaron Judge')).toBe('Judge');
@@ -308,22 +281,6 @@ describe('shortPlayerName', () => {
 
   it('passes a single-word name through', () => {
     expect(shortPlayerName('Ichiro')).toBe('Ichiro');
-  });
-});
-
-describe('describeSquadNeed', () => {
-  it('prompts when no picks have been made', () => {
-    expect(describeSquadNeed([])).toBe('Board is open — take best available');
-  });
-
-  it('summarises the roster by position, most-held first', () => {
-    const summary = describeSquadNeed([
-      makePlayer({ id: 1, position: 'OF' }),
-      makePlayer({ id: 2, position: 'OF' }),
-      makePlayer({ id: 3, position: 'SP', isPitcher: true }),
-    ]);
-
-    expect(summary).toBe('2×OF · 1×P');
   });
 });
 

@@ -13,7 +13,6 @@ import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
 import { DraftBoardGrid } from './DraftBoardGrid';
 import { DraftPickAnnouncement } from './DraftPickAnnouncement';
-import { DraftSquadStrip } from './DraftSquadStrip';
 import { DraftHeaderBand } from './DraftHeaderBand';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftBottomNav } from './DraftBottomNav';
@@ -21,11 +20,7 @@ import { DraftPlayersTab } from './DraftPlayersTab';
 import { DraftQueueTab } from './DraftQueueTab';
 import { DraftTeamTab } from './DraftTeamTab';
 import { useDraftPalette } from './nativeDraftPalette';
-import {
-  MIN_BOARD_ROUNDS,
-  resolveBoardRounds,
-  statLineFor,
-} from './nativeDraftBoard';
+import { resolveBoardRounds, statLineFor } from './nativeDraftBoard';
 import { getPositionColor } from './utils';
 import {
   AuctionNotSupportedScreen,
@@ -328,7 +323,6 @@ function CompactLiveDraftBoard({
 }: CompactLiveDraftBoardProps): React.JSX.Element {
   const palette = useDraftPalette();
   const [sortKey, setSortKey] = useState<SortKey>('adp');
-  const [rosterOpen, setRosterOpen] = useState(false);
 
   const boardTeams =
     queries.boardOrderedTeams.length > 0
@@ -705,19 +699,6 @@ function CompactLiveDraftBoard({
                 <Text color="$textMuted">No players match that filter</Text>
               </YStack>
             }
-          />
-
-          {/* ---- My squad strip + roster sheet ---- */}
-          <DraftSquadStrip
-            myPicks={playerData.myTeamPicks}
-            myTeam={playerData.myTeam}
-            statsLookup={playerData.statsLookup}
-            rounds={Math.max(boardRounds, MIN_BOARD_ROUNDS)}
-            teamName={queries.teamNameById(queries.myTeamId)}
-            isMyPick={isMyPick}
-            open={rosterOpen}
-            onOpen={() => setRosterOpen(true)}
-            onClose={() => setRosterOpen(false)}
           />
         </>
       )}

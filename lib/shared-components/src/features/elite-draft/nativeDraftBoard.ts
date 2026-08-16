@@ -157,42 +157,10 @@ export function describeBoardCell(
   return `R${cell.round} · ${teamName} — ${cell.playerName ?? 'Unknown'}${position}`;
 }
 
-export interface SquadSlot {
-  round: number;
-  player: DraftPlayer | null;
-}
-
-/**
- * One slot per draft round for the sticky "My Squad" strip. The league's roster
- * shape isn't exposed to the draft board, so slots are keyed by round — the
- * one grouping that is always true for a snake or linear draft.
- */
-export function buildSquadSlots({
-  myPicks,
-  statsLookup,
-  rounds,
-}: {
-  myPicks: DraftPickRecord[];
-  statsLookup: Map<number, DraftPlayer>;
-  rounds: number;
-}): SquadSlot[] {
-  const byRound = new Map<number, DraftPickRecord>();
-  for (const pick of myPicks) byRound.set(pick.round, pick);
-
-  return Array.from({ length: rounds }, (_, i) => {
-    const round = i + 1;
-    const pick = byRound.get(round);
-    return {
-      round,
-      player: pick ? (statsLookup.get(pick.playerId) ?? null) : null,
-    };
-  });
-}
-
 const NAME_SUFFIXES = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'v']);
 
 /**
- * Surname for the squad strip, where a slot is barely wider than the position
+ * Surname for the board grid, where a cell is barely wider than the position
  * label. Generational suffixes are dropped so "Bobby Witt Jr." reads as "Witt"
  * rather than "Jr.".
  */
@@ -204,23 +172,6 @@ export function shortPlayerName(name: string): string {
     if (!NAME_SUFFIXES.has(bare)) return words[i];
   }
   return words[words.length - 1];
-}
-
-/**
- * Summary line for the squad strip: how the viewer's roster is shaping up by
- * position bucket, or a prompt when they haven't picked yet.
- */
-export function describeSquadNeed(players: DraftPlayer[]): string {
-  if (players.length === 0) return 'Board is open — take best available';
-  const counts = new Map<string, number>();
-  for (const player of players) {
-    const key = player.isPitcher ? 'P' : (player.position ?? 'UTIL');
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return Array.from(counts.entries())
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .map(([pos, n]) => `${n}×${pos}`)
-    .join(' · ');
 }
 
 /** Batting-average display style: three decimals with no leading zero (`.332`). */

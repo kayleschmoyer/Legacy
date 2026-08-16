@@ -291,29 +291,6 @@ jest.mock('./DraftPlayersTab', () => ({
     </div>
   ),
 }));
-jest.mock('./DraftSquadStrip', () => ({
-  DraftSquadStrip: ({
-    myTeam,
-    rounds,
-    open,
-    onOpen,
-    onClose,
-  }: {
-    myTeam: unknown[];
-    rounds: number;
-    open: boolean;
-    onOpen: () => void;
-    onClose: () => void;
-  }) => (
-    <button
-      data-testid="draft-squad-strip"
-      data-open={String(open)}
-      onClick={open ? onClose : onOpen}
-    >
-      {`My Squad · ${myTeam.length}/${rounds}`}
-    </button>
-  ),
-}));
 jest.mock('./DraftQueueTab', () => ({
   DraftQueueTab: () => <div data-testid="draft-queue-tab" />,
 }));
@@ -1496,7 +1473,10 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
     expect(screen.getByText('ADP 2')).toBeTruthy();
   });
 
-  it('summarises the squad strip and toggles the roster sheet', () => {
+  // LS-9447: the "My Squad" drawer is gone from the board tab — the Team tab
+  // (LS-9400) is the one place the compact board shows a roster now, so the
+  // strip was a redundant second entry point taking up board real estate.
+  it('renders no My Squad drawer on the board tab', () => {
     const player = makeDraftPlayer();
     setupCompactLiveDraft({ players: [player], picks: [makePickRecord()] });
     mockUsePlayerData.mockReturnValue({
@@ -1508,13 +1488,11 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
 
     render(<EliteDraftBoardScreen {...defaultProps} />);
 
-    const strip = screen.getByTestId('draft-squad-strip');
-    expect(strip.textContent).toBe('My Squad · 1/5');
-    expect(strip.getAttribute('data-open')).toBe('false');
-
-    fireEvent.click(strip);
-
-    expect(strip.getAttribute('data-open')).toBe('true');
+    expect(screen.queryByText(/My Squad/)).toBeNull();
+    expect(screen.queryByLabelText(/Open roster/i)).toBeNull();
+    // The board tab still renders, so the assertions above are about the
+    // drawer's absence rather than an empty screen.
+    expect(screen.getByTestId('draft-board-grid')).toBeTruthy();
   });
 
   it('exposes commissioner pause and comm-pick controls to the commissioner', () => {
