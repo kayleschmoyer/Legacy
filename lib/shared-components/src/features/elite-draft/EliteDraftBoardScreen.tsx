@@ -75,6 +75,13 @@ export interface EliteDraftBoardScreenProps {
    * prevent accidental back-button exits from an active draft session (LS-4986).
    */
   onActiveDraftChange?: (active: boolean) => void;
+  /**
+   * Bottom safe-area inset (e.g. from `useSafeAreaInsets().bottom`), forwarded
+   * to the compact branch's persistent bottom nav so Android's edge-to-edge
+   * system navigation bar does not cover the tabs (LS-9444). Defaults to 0 for
+   * platforms without a safe-area concept (web).
+   */
+  bottomInset?: number;
 }
 
 const POSITION_FILTERS = [
@@ -297,6 +304,8 @@ interface CompactLiveDraftBoardProps {
    *  commissionerPick mutation under the hood — no CPU auto-picker exists
    *  in this mode. */
   controlAllTeams: boolean;
+  /** Bottom safe-area inset reserved under the persistent bottom nav (LS-9444). */
+  bottomInset: number;
   onExitDraft: () => void;
   onDraftPlayer: (id: number) => void;
   onCommissionerPick: (id: number) => void;
@@ -316,6 +325,7 @@ function CompactLiveDraftBoard({
   sport,
   isMockDraft,
   controlAllTeams,
+  bottomInset,
   onExitDraft,
   onDraftPlayer,
   onCommissionerPick,
@@ -777,7 +787,11 @@ function CompactLiveDraftBoard({
       >
         {ui.liveMessage}
       </Text>
-      <DraftBottomNav activeTab={ui.activeTab} onChangeTab={ui.setActiveTab} />
+      <DraftBottomNav
+        activeTab={ui.activeTab}
+        onChangeTab={ui.setActiveTab}
+        bottomInset={bottomInset}
+      />
     </YStack>
   );
 }
@@ -791,6 +805,7 @@ export function EliteDraftBoardScreen({
   onPlayerDrafted,
   sport = 'baseball',
   onActiveDraftChange,
+  bottomInset = 0,
 }: EliteDraftBoardScreenProps): React.JSX.Element {
   const { user, token: authToken } = useAuth();
   const userId = user?.id ?? 0;
@@ -1266,6 +1281,7 @@ export function EliteDraftBoardScreen({
         sport={sport}
         isMockDraft={isMockDraft}
         controlAllTeams={controlAllTeams}
+        bottomInset={bottomInset}
         onExitDraft={handleExitDraft}
         onDraftPlayer={handleDraftPlayer}
         onCommissionerPick={handleCommissionerPick}

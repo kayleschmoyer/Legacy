@@ -209,13 +209,16 @@ jest.mock('./DraftBottomNav', () => ({
   DraftBottomNav: ({
     activeTab,
     onChangeTab,
+    bottomInset,
   }: {
     activeTab: string;
     onChangeTab: (tab: string) => void;
+    bottomInset?: number;
   }) => (
     <button
       data-testid="draft-bottom-nav"
       data-active-tab={activeTab}
+      data-bottom-inset={String(bottomInset)}
       onClick={() => onChangeTab('players')}
     />
   ),
@@ -1693,6 +1696,29 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
     fireEvent.click(nav);
 
     expect(setActiveTab).toHaveBeenCalledWith('players');
+  });
+
+  // LS-9444: the draft room is pushed outside the `(tabs)` shell, so its own
+  // bottom nav is the only thing that can reserve Android's edge-to-edge
+  // navigation-bar inset — it never gets there unless this screen forwards it.
+  it('forwards the bottom safe-area inset to the bottom nav', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} bottomInset={48} />);
+
+    expect(
+      screen.getByTestId('draft-bottom-nav').getAttribute('data-bottom-inset'),
+    ).toBe('48');
+  });
+
+  it('defaults the bottom nav inset to 0 when no inset is supplied', () => {
+    setupCompactLiveDraft();
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('draft-bottom-nav').getAttribute('data-bottom-inset'),
+    ).toBe('0');
   });
 
   it('shows the top queued player on DraftHeaderBand only when it is my pick', () => {

@@ -12,6 +12,29 @@ import type { DraftRoomTab } from './hooks/useDraftUIState';
 export interface DraftBottomNavProps {
   activeTab: DraftRoomTab;
   onChangeTab: (tab: DraftRoomTab) => void;
+  /**
+   * Bottom safe-area inset (e.g. from `useSafeAreaInsets().bottom`), reserved
+   * below the tab row. The Draft Room is pushed on top of the root Stack, so —
+   * unlike the `(tabs)` shell, whose React Navigation tab bar pads itself — no
+   * ancestor accounts for Android's edge-to-edge system navigation bar here,
+   * and it drew straight over the tabs (LS-9444). Defaults to 0 for platforms
+   * without a safe-area concept (web), mirroring `HomeScreen`/`PlayersCardFeed`'s
+   * `topInset` prop.
+   */
+  bottomInset?: number;
+}
+
+/** Height of the tab row itself, excluding any safe-area inset. */
+export const DRAFT_BOTTOM_NAV_ROW_HEIGHT = 56;
+
+/**
+ * Total height of the bottom nav: the tab row plus the safe-area inset
+ * reserved beneath it. The inset is padding, not extra tappable row — the tab
+ * targets stay `DRAFT_BOTTOM_NAV_ROW_HEIGHT` tall and sit entirely above the
+ * system navigation bar (LS-9444).
+ */
+export function draftBottomNavHeight(bottomInset = 0): number {
+  return DRAFT_BOTTOM_NAV_ROW_HEIGHT + Math.max(bottomInset, 0);
 }
 
 const TABS: ReadonlyArray<{
@@ -34,14 +57,21 @@ const TABS: ReadonlyArray<{
 export function DraftBottomNav({
   activeTab,
   onChangeTab,
+  bottomInset = 0,
 }: DraftBottomNavProps): React.JSX.Element {
+  // Clamped once so the padding and the height it is subtracted from can never
+  // disagree — a negative inset would otherwise shrink the row below
+  // DRAFT_BOTTOM_NAV_ROW_HEIGHT while `draftBottomNavHeight` clamped it.
+  const safeBottomInset = Math.max(bottomInset, 0);
+
   return (
     <XStack
       testID="draft-bottom-nav"
       backgroundColor="$surfaceSubtle"
       borderTopWidth={1}
       borderTopColor="$surfacePanelBorder"
-      height={56}
+      height={draftBottomNavHeight(safeBottomInset)}
+      paddingBottom={safeBottomInset}
     >
       {TABS.map(({ tab, label, Icon }) => {
         const active = tab === activeTab;

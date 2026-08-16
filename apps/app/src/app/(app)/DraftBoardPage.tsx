@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, YStack } from 'tamagui';
 import { EliteDraftBoardScreen } from '@legacy-sports/shared-components/elite-draft';
 import { LOGGER } from '@legacy-sports/logging';
@@ -15,6 +16,12 @@ export default function DraftBoardPage() {
   const router = useRouter();
   const leagueId = toIntId(leagueIdParam);
   const websocketUrl = config.websocketUrl;
+  // This route is pushed on top of the root Stack, outside the `(tabs)` group,
+  // so nothing above it reserves the Android edge-to-edge navigation-bar inset
+  // the way React Navigation's tab bar does for the tab shell — the draft
+  // room's own bottom nav has to reserve it itself (LS-9444). `(app)/_layout`
+  // already supplies the matching top inset via the Stack's `contentStyle`.
+  const { bottom: bottomInset } = useSafeAreaInsets();
 
   useEffect(() => {
     if (!websocketUrl) {
@@ -40,6 +47,7 @@ export default function DraftBoardPage() {
         leagueId={leagueId}
         onNavigate={(path) => router.navigate(path)}
         websocketUrl={websocketUrl ?? ''}
+        bottomInset={bottomInset}
       />
     </YStack>
   );

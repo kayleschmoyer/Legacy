@@ -19,13 +19,24 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ navigate: mockNavigate }),
 }));
 
+const mockEliteDraftBoardScreen = jest.fn();
 jest.mock('@legacy-sports/shared-components/elite-draft', () => {
   const { View } =
     jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    EliteDraftBoardScreen: () => <View testID="elite-draft-board-screen" />,
+    EliteDraftBoardScreen: (props: Record<string, unknown>) => {
+      mockEliteDraftBoardScreen(props);
+      return <View testID="elite-draft-board-screen" />;
+    },
   };
 });
+
+// Mirrors the other `(app)` screen specs (LS-8625/LS-8834): no real
+// SafeAreaProvider is mounted in this unit-test tree, so the hook needs a
+// fixed value. `bottom: 48` stands in for Android's 3-button nav bar.
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 44, bottom: 48, left: 0, right: 0 }),
+}));
 
 jest.mock('tamagui', () => {
   const { View, Text } =
@@ -81,5 +92,17 @@ describe('DraftBoardPage', () => {
       expect(screen.getByTestId('elite-draft-board-screen')).toBeTruthy();
       expect(screen.queryByText(/Real-time updates unavailable/i)).toBeNull();
     });
+  });
+
+  // LS-9444: this route is pushed outside the `(tabs)` group, so React
+  // Navigation's tab bar never reserves the Android navigation-bar inset for
+  // it — the draft board's own bottom nav has to, and only gets the chance if
+  // this screen forwards the inset.
+  it('forwards the safe-area bottom inset to the draft board', () => {
+    render(<DraftBoardPage />);
+
+    expect(mockEliteDraftBoardScreen).toHaveBeenCalledWith(
+      expect.objectContaining({ bottomInset: 48 }),
+    );
   });
 });
