@@ -102,6 +102,38 @@ resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_rds" {
   role       = aws_iam_role.oauth_proxy_lambda.name
 }
 
+# Read access to the signed Android APKs (LS-9454, bucket in app-downloads.tf).
+# Needed so the presigned URLs this Lambda mints for the gated download route
+# (LS-9455) actually resolve — a presigned URL carries the signer's authority,
+# so without GetObject here every download 403s at fetch time rather than at
+# signing time.
+resource "aws_iam_policy" "oauth_proxy_lambda_app_downloads" {
+  name        = "${local.name_prefix}-oauth-proxy-lambda-app-downloads"
+  description = "IAM policy for OAuth Lambda to presign reads of the Android APK"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = [
+          "${aws_s3_bucket.app_downloads.arn}/android/*"
+        ]
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "oauth_proxy_lambda_app_downloads" {
+  policy_arn = aws_iam_policy.oauth_proxy_lambda_app_downloads.arn
+  role       = aws_iam_role.oauth_proxy_lambda.name
+}
+
 # DynamoDB table for persisting OAuth device-flow codes
 resource "aws_dynamodb_table" "oauth_device_flows" {
   name         = "${local.name_prefix}-oauth-device-flows"
@@ -250,6 +282,12 @@ resource "aws_lambda_function" "oauth_proxy" {
       DB_HOST               = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
       USE_LOCAL_CREDENTIALS = "false"
 
+      # Gated Android APK download (LS-9454 / LS-9455). The route presigns
+      # APP_DOWNLOAD_ANDROID_CURRENT_KEY out of APP_DOWNLOAD_BUCKET; CI writes
+      # both that pointer and the versioned keys under android/.
+      APP_DOWNLOAD_BUCKET              = aws_s3_bucket.app_downloads.bucket
+      APP_DOWNLOAD_ANDROID_CURRENT_KEY = "android/current/legacy-sports-latest.apk"
+
       # Runtime configuration
       NODE_ENV                            = var.environment
       LOG_LEVEL                           = "debug"
@@ -308,6 +346,7 @@ resource "aws_lambda_function" "oauth_proxy" {
     aws_iam_role_policy_attachment.oauth_proxy_lambda_secrets,
     aws_iam_role_policy_attachment.oauth_proxy_lambda_rds,
     aws_iam_role_policy_attachment.oauth_proxy_lambda_dynamodb,
+    aws_iam_role_policy_attachment.oauth_proxy_lambda_app_downloads,
     aws_cloudwatch_log_group.oauth_proxy_lambda
   ]
 
