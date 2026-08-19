@@ -2,7 +2,7 @@
  * LS-7711 — MockDraftSetup is the shared Mock Draft configuration form adopted
  * by both web and native. These tests cover the form's interactive behavior:
  * default settings payload, setting changes, cancel, error/usage surfaces, and
- * the football preview gate.
+ * the sport-aware player pool (LS-9470).
  */
 import React from 'react';
 import { type MockDraftSettings, MockDraftSetup } from './MockDraftSetup';
@@ -174,19 +174,68 @@ describe('MockDraftSetup', () => {
     expect(getByText('Sport')).toBeTruthy();
   });
 
-  it('gates Start behind a preview when football is selected', () => {
+  it('starts a football mock draft with a football player pool (LS-9470)', () => {
     const onStart = jest.fn();
-    const { getByText, getByTestId } = render(
+    const { getByText } = render(
       <MockDraftSetup onStart={onStart} onCancel={noop} footballMockEnabled />,
     );
 
     fireEvent.click(getByText('🏈 Football'));
+    fireEvent.click(getByText('AFC Only'));
+    fireEvent.click(getByText('Start Mock Draft'));
 
-    // Football is preview-only: the pool preview shows and Start is replaced
-    // with a disabled "Coming Soon" affordance that does not fire onStart.
-    expect(getByTestId('football-mock-pool-preview')).toBeTruthy();
-    fireEvent.click(getByText('Football — Coming Soon'));
-    expect(onStart).not.toHaveBeenCalled();
+    expect(onStart).toHaveBeenCalledWith<[MockDraftSettings]>({
+      numTeams: 8,
+      rosterSize: 10,
+      userPickPosition: 1,
+      draftOrder: 'snake',
+      playerPool: 'afc',
+      sport: 'football',
+      mode: 'shared',
+      controlAllTeams: false,
+    });
+  });
+
+  it('swaps the Player Pool options with the selected sport (LS-9470)', () => {
+    const onSportChange = jest.fn();
+    const { getByText, queryByText } = render(
+      <MockDraftSetup
+        onStart={noop}
+        onCancel={noop}
+        footballMockEnabled
+        onSportChange={onSportChange}
+      />,
+    );
+
+    // Baseball (default) exposes the MLB pools only.
+    expect(getByText('All MLB')).toBeTruthy();
+    expect(queryByText('AFC Only')).toBeNull();
+
+    fireEvent.click(getByText('🏈 Football'));
+
+    expect(onSportChange).toHaveBeenCalledWith('football');
+    expect(getByText('All NFL')).toBeTruthy();
+    expect(getByText('AFC Only')).toBeTruthy();
+    expect(getByText('NFC Only')).toBeTruthy();
+    expect(queryByText('All MLB')).toBeNull();
+    expect(queryByText('NL Only')).toBeNull();
+  });
+
+  it('resets a baseball-only pool when switching to football (LS-9470)', () => {
+    const onStart = jest.fn();
+    const { getByText } = render(
+      <MockDraftSetup onStart={onStart} onCancel={noop} footballMockEnabled />,
+    );
+
+    // Pick an AL-only baseball pool, then switch sports: the stale 'al' value
+    // would be rejected by initializeMockDraft, so it must reset to 'all'.
+    fireEvent.click(getByText('AL Only'));
+    fireEvent.click(getByText('🏈 Football'));
+    fireEvent.click(getByText('Start Mock Draft'));
+
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({ sport: 'football', playerPool: 'all' }),
+    );
   });
 
   it('shows a "Have an invite code?" link in Shared mode when onJoinInstead is provided (LS-9181)', () => {

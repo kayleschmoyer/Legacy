@@ -47,7 +47,7 @@ interface SetupScreenProps {
   onStart: (settings: MockDraftSettings) => void;
   loading?: boolean;
   error?: string | null;
-  /** When true, the Sport selector exposes a Football option (LS-4666). */
+  /** When true, the Sport selector exposes a Football option (LS-9470). */
   footballMockEnabled?: boolean;
   /** Prefill values from URL query params (e.g. when launched from a real league row). */
   initialNumTeams?: number;
@@ -62,7 +62,40 @@ interface SetupScreenProps {
   onJoinInstead?: () => void;
   /** Whether the current user's plan grants Control All Teams (LS-9253). */
   isControlAllTeamsEntitled: boolean;
+  /** Sport currently selected in the form — drives the page chrome (LS-9470). */
+  sport: MockDraftSettings['sport'];
+  /** Called when the form's Sport selection changes. */
+  onSportChange: (sport: MockDraftSettings['sport']) => void;
 }
+
+/** Page chrome that follows the selected sport (badge, copy, exit route). */
+const SPORT_CHROME: Record<
+  MockDraftSettings['sport'],
+  {
+    emoji: string;
+    label: string;
+    accent: string;
+    blurb: string;
+    homePath: string;
+  }
+> = {
+  baseball: {
+    emoji: '⚾',
+    label: 'Baseball',
+    accent: BRAND_SEAM_RED,
+    blurb:
+      'Practice your draft strategy against AI opponents without affecting any real league.',
+    homePath: '/baseball',
+  },
+  football: {
+    emoji: '🏈',
+    label: 'Football',
+    accent: BRAND_GOLD,
+    blurb:
+      'Practice your football draft strategy against AI opponents without affecting any real league.',
+    homePath: '/football',
+  },
+};
 
 /**
  * Web Mock Draft setup screen: brand chrome (gradient background, "Practice
@@ -81,10 +114,13 @@ function SetupScreen({
   usageLabel,
   onJoinInstead,
   isControlAllTeamsEntitled,
+  sport,
+  onSportChange,
 }: SetupScreenProps): React.JSX.Element {
   const navigate = useNavigate();
   const [showControlAllTeamsUpgrade, setShowControlAllTeamsUpgrade] =
     React.useState(false);
+  const chrome = SPORT_CHROME[sport];
 
   return (
     <YStack
@@ -103,18 +139,18 @@ function SetupScreen({
             paddingHorizontal="$3"
             paddingVertical="$1.5"
             borderRadius={9999}
-            backgroundColor={withAlpha(BRAND_SEAM_RED, 0.15)}
+            backgroundColor={withAlpha(chrome.accent, 0.15)}
             borderWidth={1}
-            borderColor={withAlpha(BRAND_SEAM_RED, 0.3)}
+            borderColor={withAlpha(chrome.accent, 0.3)}
           >
-            <span role="img" aria-label="Baseball" style={{ fontSize: 14 }}>
-              ⚾
+            <span role="img" aria-label={chrome.label} style={{ fontSize: 14 }}>
+              {chrome.emoji}
             </span>
             <Text
               fontFamily="$display"
               fontSize={12}
               fontWeight="700"
-              color={BRAND_SEAM_RED}
+              color={chrome.accent}
               textTransform="uppercase"
               letterSpacing={1.5}
             >
@@ -140,8 +176,7 @@ function SetupScreen({
             margin={0}
             maxWidth={460}
           >
-            Practice your draft strategy against AI opponents without affecting
-            any real league.
+            {chrome.blurb}
           </Paragraph>
         </YStack>
 
@@ -156,10 +191,11 @@ function SetupScreen({
         >
           <MockDraftSetup
             onStart={onStart}
-            onCancel={() => navigate('/baseball')}
+            onCancel={() => navigate(chrome.homePath)}
             loading={loading}
             error={error}
             footballMockEnabled={footballMockEnabled}
+            onSportChange={onSportChange}
             initialNumTeams={initialNumTeams}
             initialDraftOrder={initialDraftOrder}
             usageLabel={usageLabel}
@@ -397,6 +433,11 @@ export function MockDraftPage(): React.JSX.Element {
   const [missingLeagueIdError, setMissingLeagueIdError] = React.useState<
     string | null
   >(null);
+  // Mirrors the shared form's own Sport state so the page chrome (badge, copy,
+  // Cancel destination) tracks it. The form stays the source of truth — this
+  // is a read-only reflection updated via onSportChange.
+  const [sport, setSport] =
+    React.useState<MockDraftSettings['sport']>('baseball');
   // Shared-mode drafts pause here to let the creator share the invite code
   // before entering the draft room lobby (LS-9181). Offline drafts navigate
   // straight through, unchanged.
@@ -531,7 +572,7 @@ export function MockDraftPage(): React.JSX.Element {
     <>
       <PageMeta
         title="Mock Draft Simulator"
-        description="Practice your fantasy baseball draft strategy risk-free with the full Mock Draft simulator."
+        description="Practice your fantasy baseball or football draft strategy risk-free with the full Mock Draft simulator."
       />
       <SetupScreen
         onStart={(s) => {
@@ -545,6 +586,8 @@ export function MockDraftPage(): React.JSX.Element {
         usageLabel={usageLabel}
         onJoinInstead={() => navigate('/baseball/mock-draft/join')}
         isControlAllTeamsEntitled={isControlAllTeamsEntitled}
+        sport={sport}
+        onSportChange={setSport}
       />
     </>
   );

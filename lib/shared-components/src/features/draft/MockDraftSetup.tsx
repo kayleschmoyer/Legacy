@@ -16,7 +16,6 @@
  */
 import React from 'react';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
-import { FootballMockPoolPreview } from './FootballMockPoolPreview';
 import {
   BRAND_GOLD,
   BRAND_NAVY_LIGHT,
@@ -28,7 +27,13 @@ import {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type MockDraftOrder = 'snake' | 'linear';
-export type MockDraftPlayerPool = 'all' | 'nl' | 'al';
+/**
+ * Player pool restriction. `all` is shared by both sports; the league-scoped
+ * values are sport-specific (baseball: NL/AL, football: AFC/NFC conference)
+ * and mirror `VALID_POOLS_BY_SPORT` on the server, which rejects a pool that
+ * does not belong to the submitted sport.
+ */
+export type MockDraftPlayerPool = 'all' | 'nl' | 'al' | 'afc' | 'nfc';
 export type MockDraftSport = 'baseball' | 'football';
 /**
  * Draft Mode (LS-9144, LS-9181):
@@ -60,8 +65,13 @@ export interface MockDraftSetupProps {
   loading?: boolean;
   /** Inline error surfaced above the actions (mutation error, etc.). */
   error?: string | null;
-  /** When true, exposes the Sport selector + football pool preview (LS-4666). */
+  /** When true, exposes the Sport selector (baseball / football) (LS-4666). */
   footballMockEnabled?: boolean;
+  /**
+   * Invoked whenever the Sport selection changes, so the consumer can keep its
+   * own page chrome (badge, copy, cancel destination) in step with the form.
+   */
+  onSportChange?: (sport: MockDraftSport) => void;
   /** Prefill team count (e.g. when launched from a real league row). */
   initialNumTeams?: number;
   /** Prefill draft order. */
@@ -132,11 +142,38 @@ const CONTROL_ALL_TEAMS_OPTIONS: {
   },
 ];
 
-const PLAYER_POOL_OPTIONS: { label: string; value: MockDraftPlayerPool }[] = [
-  { label: 'All MLB', value: 'all' },
-  { label: 'NL Only', value: 'nl' },
-  { label: 'AL Only', value: 'al' },
-];
+interface PlayerPoolOption {
+  label: string;
+  value: MockDraftPlayerPool;
+}
+
+/**
+ * Player Pool choices per sport (LS-9470). Selecting a sport swaps the whole
+ * option set — a baseball league can never be created with an AFC/NFC pool
+ * (and vice versa), which is exactly what `initializeMockDraft` enforces
+ * server-side.
+ */
+const PLAYER_POOL_OPTIONS_BY_SPORT: Record<MockDraftSport, PlayerPoolOption[]> =
+  {
+    baseball: [
+      { label: 'All MLB', value: 'all' },
+      { label: 'NL Only', value: 'nl' },
+      { label: 'AL Only', value: 'al' },
+    ],
+    football: [
+      { label: 'All NFL', value: 'all' },
+      { label: 'AFC Only', value: 'afc' },
+      { label: 'NFC Only', value: 'nfc' },
+    ],
+  };
+
+/** Helper copy under the Player Pool selector, per sport. */
+const PLAYER_POOL_HELPER_BY_SPORT: Record<MockDraftSport, string> = {
+  baseball:
+    'Restricts the draft board to players with a season in the chosen league.',
+  football:
+    'Restricts the draft board to players on a team in the chosen conference.',
+};
 
 // Snap an arbitrary prefilled team count to the closest supported option so the
 // selector buttons stay in sync with the seed value.
@@ -253,6 +290,7 @@ export function MockDraftSetup({
   loading = false,
   error = null,
   footballMockEnabled = false,
+  onSportChange,
   initialNumTeams,
   initialDraftOrder,
   usageLabel,
@@ -275,6 +313,16 @@ export function MockDraftSetup({
   const [mode, setMode] = React.useState<MockDraftMode>('shared');
   const [controlAllTeams, setControlAllTeams] = React.useState(false);
 
+  // Changing sport resets the pool to the sport-neutral 'all' so a stale
+  // baseball pool (nl/al) can never be submitted with sport=football — the
+  // server rejects those combinations outright.
+  const handleSportChange = (next: MockDraftSport) => {
+    if (next === sport) return;
+    setSport(next);
+    setPlayerPool('all');
+    onSportChange?.(next);
+  };
+
   const handleStart = () => {
     onStart({
       numTeams,
@@ -289,15 +337,9 @@ export function MockDraftSetup({
     });
   };
 
-  // Football mock-draft engine wiring lands with LS-4657 → LS-4665. Until those
-  // ship, the football toggle is a preview affordance only — Start is disabled.
-  const footballPreviewActive = footballMockEnabled && sport === 'football';
+  const playerPoolOptions = PLAYER_POOL_OPTIONS_BY_SPORT[sport];
 
-  const startLabel = loading
-    ? 'Starting…'
-    : footballPreviewActive
-      ? 'Football — Coming Soon'
-      : 'Start Mock Draft';
+  const startLabel = loading ? 'Starting…' : 'Start Mock Draft';
 
   return (
     <YStack>
@@ -311,36 +353,18 @@ export function MockDraftSetup({
               label="⚾ Baseball"
               selected={sport === 'baseball'}
               accent={BRAND_SEAM_RED}
-              onPress={() => setSport('baseball')}
+              onPress={() => handleSportChange('baseball')}
               width={140}
             />
             <OptionButton
               label="🏈 Football"
               selected={sport === 'football'}
               accent={BRAND_GOLD}
-              onPress={() => setSport('football')}
+              onPress={() => handleSportChange('football')}
               width={140}
             />
           </XStack>
         </FieldSection>
-      )}
-
-      {/* Football mock pool preview — engine wiring follows in LS-4657→LS-4665 */}
-      {footballPreviewActive && (
-        <YStack marginBottom="$5" gap="$2">
-          <FootballMockPoolPreview />
-          <Paragraph
-            fontFamily="$body"
-            fontSize={12}
-            color="$gray10"
-            margin={0}
-            textAlign="center"
-          >
-            Football draft engine wiring lands with the rest of the sport toggle
-            slice (LS-4657 → LS-4665). Start is disabled until the backend can
-            consume this pool.
-          </Paragraph>
-        </YStack>
       )}
 
       {/* Draft Mode — offline (no clock) vs shared (timed) (LS-9144) */}
@@ -539,10 +563,24 @@ export function MockDraftSetup({
         </XStack>
       </FieldSection>
 
-      {/* Player Pool */}
-      <FieldSection label="Player Pool" labelId="player-pool-label">
+      {/* Player Pool — options follow the selected sport (LS-9470) */}
+      <FieldSection
+        label="Player Pool"
+        labelId="player-pool-label"
+        helper={
+          <Paragraph
+            fontFamily="$body"
+            fontSize={12}
+            color="$gray10"
+            textAlign="center"
+            margin={0}
+          >
+            {PLAYER_POOL_HELPER_BY_SPORT[sport]}
+          </Paragraph>
+        }
+      >
         <XStack gap="$2" flexWrap="wrap" justifyContent="center">
-          {PLAYER_POOL_OPTIONS.map((opt) => (
+          {playerPoolOptions.map((opt) => (
             <OptionButton
               key={opt.value}
               label={opt.label}
@@ -590,18 +628,13 @@ export function MockDraftSetup({
         <Button
           size="$5"
           onPress={handleStart}
-          disabled={loading || footballPreviewActive}
+          disabled={loading}
           flex={1}
           backgroundColor={BRAND_SEAM_RED}
           borderColor={BRAND_SEAM_RED}
           hoverStyle={{ backgroundColor: '#A8182F' }}
           pressStyle={{ scale: 0.98 }}
-          opacity={loading || footballPreviewActive ? 0.5 : 1}
-          aria-label={
-            footballPreviewActive
-              ? 'Football mock draft coming soon — engine wiring pending'
-              : undefined
-          }
+          opacity={loading ? 0.5 : 1}
         >
           <Text
             fontFamily="$display"

@@ -37,9 +37,11 @@ export function JoinMockDraftPage(): React.JSX.Element {
       });
       const leagueId = result.data?.joinMockDraft?.leagueId;
       if (leagueId) {
-        // Hardcoded to baseball, mirroring JoinLeagueByCodePage — football
-        // mock drafts aren't joinable yet (engine wiring is still "Coming
-        // Soon" per FootballMockPoolPreview, LS-4657 → LS-4665).
+        // Hardcoded to baseball, mirroring JoinLeagueByCodePage: joinMockDraft
+        // returns a Team, which carries no sport, so the joiner's sport isn't
+        // known here. Football mock drafts still render correctly — both sport
+        // routes mount EliteDraftBoardScreen, which reads league.sport itself
+        // (LS-9470) — only the URL says baseball.
         navigate(`/baseball/league/${leagueId}/draft`);
       } else {
         setError(

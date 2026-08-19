@@ -104,6 +104,9 @@ jest.mock('../../features/auth', () => ({
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserByIdQuery: jest.fn(() => ({ data: undefined })),
+  // The screen compares league.sport against the generated Sport enum, so the
+  // mocked module has to carry it (its members are the schema's string values).
+  Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
 jest.mock('./auction/AuctionDraftRoom', () => ({
@@ -558,6 +561,54 @@ describe('EliteDraftBoardScreen — sport prop (LS-4662)', () => {
     );
     expect(getByTestId('pre-draft-lobby').getAttribute('data-sport')).toBe(
       'football',
+    );
+  });
+
+  // LS-9470 — neither the web route nor the native route passes `sport`, so
+  // the board has to read it off the league it already queries; otherwise a
+  // football league renders a baseball board.
+  it('falls back to league.sport when no sport prop is supplied', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Mock Draft Practice',
+          sport: 'football',
+          draftStatus: 'in-progress',
+          isMockDraft: true,
+          userMembership: { permissionLevel: 'commissioner', teamId: 1 },
+        },
+      }),
+    );
+    const { getByTestId, container } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+    expect(getByTestId('draft-player-board').getAttribute('data-sport')).toBe(
+      'football',
+    );
+    expect(container.querySelector('.d-root')?.getAttribute('data-sport')).toBe(
+      'football',
+    );
+  });
+
+  it('prefers an explicit sport prop over league.sport', () => {
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({
+        league: {
+          id: 1,
+          name: 'Test League',
+          sport: 'football',
+          draftStatus: 'in-progress',
+          isMockDraft: false,
+          userMembership: { permissionLevel: 'member', teamId: 1 },
+        },
+      }),
+    );
+    const { getByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} sport="baseball" />,
+    );
+    expect(getByTestId('draft-player-board').getAttribute('data-sport')).toBe(
+      'baseball',
     );
   });
 });

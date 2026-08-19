@@ -2,8 +2,9 @@ import type { DraftPlayer } from './types';
 import type { SportKind } from '../../config/sports';
 
 // Football stat fields on DraftPlayer are not yet wired; the loader still
-// serves baseball fields. Until LS-4666 lands a football mock player pool,
-// reads through a permissive view that may return undefined.
+// serves baseball fields, so a football board renders em-dashes until real
+// football stats ingestion lands (a follow-up outside epic LS-4568). Reads go
+// through a permissive view that may return undefined.
 type SportPlayerView = DraftPlayer & {
   passYds?: number;
   rushYds?: number;

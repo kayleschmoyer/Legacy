@@ -19,6 +19,10 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 const getUnfilledPositionTypes = jest.fn();
 const eligibleStatPositionsForUnfilledSlots = jest.fn();
 const verifyLeagueMembership = jest.fn();
+// No extra league-static predicates so the only player_eligible_positions
+// reference in the query can come from the LS-8065 positional filter. Held at
+// module scope so tests can assert the settings the resolver passes through.
+const buildEligibilityConditions = jest.fn(() => [] as unknown[]);
 
 async function captureResolver(): Promise<
   (...args: unknown[]) => Promise<unknown>
@@ -71,9 +75,7 @@ async function captureResolver(): Promise<
         customEraEndYear: 'leagues.custom_era_end_year',
       },
     },
-    // No extra league-static predicates so the only player_eligible_positions
-    // reference in the query can come from the LS-8065 positional filter.
-    buildEligibilityConditions: jest.fn(() => []),
+    buildEligibilityConditions,
   }));
 
   jest.doMock('./helpers', () => ({
@@ -141,7 +143,7 @@ const LEAGUE_ROW = {
  * Chainable DB stub. The two `.limit(1)` lookups resolve to the draft row then
  * the league row; `.execute` records the SQL it receives and returns no rows.
  */
-function makeDb() {
+function makeDb(league: Record<string, unknown> = LEAGUE_ROW) {
   const executed: unknown[] = [];
   let limitCall = 0;
   const chain: Record<string, unknown> = {};
@@ -150,7 +152,7 @@ function makeDb() {
   chain.where = jest.fn(() => chain);
   chain.limit = jest.fn(() => {
     limitCall += 1;
-    return Promise.resolve(limitCall === 1 ? [{ leagueId: 7 }] : [LEAGUE_ROW]);
+    return Promise.resolve(limitCall === 1 ? [{ leagueId: 7 }] : [league]);
   });
   chain.execute = jest.fn((q: unknown) => {
     executed.push(q);
@@ -172,6 +174,7 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     getUnfilledPositionTypes.mockReset();
     eligibleStatPositionsForUnfilledSlots.mockReset();
     verifyLeagueMembership.mockReset();
+    buildEligibilityConditions.mockClear();
   });
 
   it('restricts the board to players eligible for an unfilled slot', async () => {
@@ -232,5 +235,97 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
     expect(getUnfilledPositionTypes).toHaveBeenCalledWith(db, 100, 11, 7);
     const { sql: text } = serializeExecutedQuery(db);
     expect(text).not.toContain('player_eligible_positions');
+  });
+});
+
+/**
+ * LS-9470 — mock football drafts. `players` is one multi-sport table, and a
+ * football league with playerPool='all' contributes no eligibility predicate
+ * of its own, so the board query itself has to scope the pool to the league's
+ * sport or a football draft lists every MLB player as draftable.
+ */
+describe('getAvailableDraftPlayers — sport-scoped player pool (LS-9470)', () => {
+  const FOOTBALL_LEAGUE = { ...LEAGUE_ROW, sport: 'football' };
+
+  beforeEach(() => {
+    getUnfilledPositionTypes.mockReset();
+    eligibleStatPositionsForUnfilledSlots.mockReset();
+    verifyLeagueMembership.mockReset();
+    buildEligibilityConditions.mockClear();
+    verifyLeagueMembership.mockResolvedValue({ teamId: null });
+  });
+
+  it('restricts a baseball league to baseball players', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb();
+
+    await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
+
+    const { sql: text, params } = serializeExecutedQuery(db);
+    expect(text).toContain('p.sport =');
+    expect(params).toEqual(expect.arrayContaining(['baseball']));
+  });
+
+  it('restricts a football league to football players', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb(FOOTBALL_LEAGUE);
+
+    await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
+
+    const { sql: text, params } = serializeExecutedQuery(db);
+    expect(text).toContain('p.sport =');
+    expect(params).toEqual(expect.arrayContaining(['football']));
+    expect(params).not.toEqual(expect.arrayContaining(['baseball']));
+  });
+
+  it('forwards the football conference pool to the eligibility builder', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb({ ...FOOTBALL_LEAGUE, playerPool: 'afc' });
+
+    await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
+
+    expect(buildEligibilityConditions).toHaveBeenCalledWith(
+      expect.objectContaining({ sport: 'football', playerPool: 'afc' }),
+    );
+  });
+
+  it('expands the football DEF pill to both team-defense labels', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb(FOOTBALL_LEAGUE);
+
+    await resolve(
+      {},
+      { draftId: 100, position: 'DEF' },
+      { user: { id: 7 }, db },
+    );
+
+    const { sql: text, params } = serializeExecutedQuery(db);
+    expect(text).toContain('player_eligible_positions');
+    expect(params).toEqual(expect.arrayContaining(['DEF', 'DST']));
+  });
+
+  it('still expands the baseball P pill to SP/RP', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb();
+
+    await resolve({}, { draftId: 100, position: 'P' }, { user: { id: 7 }, db });
+
+    const { params } = serializeExecutedQuery(db);
+    expect(params).toEqual(expect.arrayContaining(['SP', 'RP']));
+  });
+
+  it('sorts a football board alphabetically — the scoring cache is baseball-only', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb(FOOTBALL_LEAGUE);
+
+    await resolve(
+      {},
+      { draftId: 100, orderBy: 'projectedMatchupPoints' },
+      { user: { id: 7 }, db },
+    );
+
+    const { sql: text } = serializeExecutedQuery(db);
+    expect(text).toContain('p.last_name');
+    expect(text).not.toContain('player_scoring_cache');
   });
 });

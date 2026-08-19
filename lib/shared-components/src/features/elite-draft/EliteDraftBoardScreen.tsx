@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet } from 'react-native';
 import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
-import { useGetUserByIdQuery } from '@legacy-sports/graphql';
+import { Sport, useGetUserByIdQuery } from '@legacy-sports/graphql';
 import { CSS } from './styles';
 import { DraftCompleteView } from './DraftCompleteView';
 import { DraftPlayerBoard } from './DraftPlayerBoard';
@@ -66,9 +66,11 @@ export interface EliteDraftBoardScreenProps {
   /** Optional callback fired when a player is drafted (for analytics). */
   onPlayerDrafted?: (playerId: number, position: string) => void;
   /**
-   * Active sport for this league. Drives stat-table headers, lobby copy, and
-   * the `data-sport` attribute on the root. Defaults to `'baseball'` until
-   * callers can read `league.sport` (ADR 0011 / LS-4658).
+   * Active sport for this league. Drives stat-table headers, position filter
+   * pills, lobby copy, and the `data-sport` attribute on the root. Optional:
+   * when omitted the screen reads `league.sport` from its own league query, so
+   * a football league renders a football board on either sport's route
+   * (ADR 0011 / LS-4658). Pass it explicitly only to override that.
    */
   sport?: SportKind;
   /**
@@ -826,7 +828,7 @@ export function EliteDraftBoardScreen({
   token,
   renderChat,
   onPlayerDrafted,
-  sport = 'baseball',
+  sport: sportOverride,
   onActiveDraftChange,
   bottomInset = 0,
   onExitDraft,
@@ -858,6 +860,15 @@ export function EliteDraftBoardScreen({
     viewMode: ui.viewMode,
     isCompact,
   });
+
+  // The league itself is the source of truth for the board's sport: neither the
+  // web nor the native route passes a `sport` prop, so before this every league
+  // rendered a baseball board (baseball stat columns and position pills) even
+  // when `league.sport === 'football'`. The explicit prop still wins when a
+  // caller supplies one.
+  const sport: SportKind =
+    sportOverride ??
+    (queries.league?.sport === Sport.Football ? 'football' : 'baseball');
 
   const isMyPick = Boolean(
     queries.currentPickInfo &&

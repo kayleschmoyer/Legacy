@@ -50,6 +50,30 @@ import {
 } from '../graphql-errors';
 
 /**
+ * Draft-board position filter → stat positions, per sport.
+ *
+ * The board's filter pills are display positions (see `POSITIONS_BY_SPORT` in
+ * `DraftPlayerBoard`), a few of which collapse several `player_eligible_positions`
+ * rows. Positions not listed here match their own stat position verbatim.
+ */
+const POSITION_FILTER_EXPANSIONS_BASEBALL: Readonly<
+  Record<string, readonly string[]>
+> = Object.freeze({
+  P: ['SP', 'RP'],
+  OF: ['LF', 'CF', 'RF'],
+});
+
+const POSITION_FILTER_EXPANSIONS_FOOTBALL: Readonly<
+  Record<string, readonly string[]>
+> = Object.freeze({
+  // Most feeds label a team defense 'DEF'; some use 'DST'. Match either so the
+  // pill returns the same set regardless of which the ingest wrote.
+  DEF: ['DEF', 'DST'],
+  DST: ['DEF', 'DST'],
+  FLEX: ['RB', 'WR', 'TE'],
+});
+
+/**
  * Query: Get draft by ID
  */
 builder.queryField('getDraft', (t) =>
@@ -333,6 +357,16 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // ---- Build raw SQL conditions (all reference table alias 'p') ----
       const sqlConditions: ReturnType<typeof sql>[] = [];
 
+      // Restrict the board to the league's own sport (LS-9470). `players` is a
+      // single multi-sport table (players.sport, NOT NULL DEFAULT 'baseball'),
+      // and none of the eligibility predicates below imply a sport on their
+      // own — a football league with playerPool='all' adds no predicate at all
+      // — so without this a football draft would list every MLB player as
+      // draftable. Baseball leagues are unaffected: every baseball player
+      // carries sport='baseball'.
+      const leagueSport = league?.sport ?? 'baseball';
+      sqlConditions.push(sql`p.sport = ${leagueSport}`);
+
       // Exclude already-drafted players via NOT EXISTS (avoids growing literal list)
       sqlConditions.push(sql`NOT EXISTS (
         SELECT 1 FROM public.draft_picks dp
@@ -362,31 +396,27 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         );
       }
 
-      // Apply optional position filter (server-side)
+      // Apply optional position filter (server-side). The board's filter pills
+      // send display positions, which collapse several stat positions in both
+      // sports: baseball P → SP/RP and OF → LF/CF/RF; football DEF → DEF/DST
+      // (feeds disagree on the team-defense label). Anything else matches the
+      // stat position directly.
       if (position && position.trim().length > 0) {
         const pos = position.trim().toUpperCase();
-        if (pos === 'P') {
-          sqlConditions.push(
-            sql`EXISTS (
+        const expandedPositions =
+          leagueSport === 'football'
+            ? POSITION_FILTER_EXPANSIONS_FOOTBALL[pos]
+            : POSITION_FILTER_EXPANSIONS_BASEBALL[pos];
+        const positionValues = sql.join(
+          (expandedPositions ?? [pos]).map((statPos) => sql`${statPos}`),
+          sql`, `,
+        );
+        sqlConditions.push(
+          sql`EXISTS (
               SELECT 1 FROM public.player_eligible_positions pep
-              WHERE pep.player_id = p.id AND pep.position IN ('SP', 'RP')
+              WHERE pep.player_id = p.id AND pep.position IN (${positionValues})
             )`,
-          );
-        } else if (pos === 'OF') {
-          sqlConditions.push(
-            sql`EXISTS (
-              SELECT 1 FROM public.player_eligible_positions pep
-              WHERE pep.player_id = p.id AND pep.position IN ('LF', 'CF', 'RF')
-            )`,
-          );
-        } else {
-          sqlConditions.push(
-            sql`EXISTS (
-              SELECT 1 FROM public.player_eligible_positions pep
-              WHERE pep.player_id = p.id AND pep.position = ${pos}
-            )`,
-          );
-        }
+        );
       }
 
       // Apply the league's static eligibility predicates (player pool, career
@@ -396,7 +426,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // show a player the pick endpoints would reject. Career minimums default
       // to 50 games / 3 seasons when the league has no explicit setting.
       const eligibilityConditions = buildEligibilityConditions({
-        sport: league?.sport ?? 'baseball',
+        sport: leagueSport,
         playerPool: league?.playerPool ?? 'all',
         minCareerGames: league?.minCareerGames ?? 50,
         minCareerSeasons: league?.minCareerSeasons ?? 3,
@@ -421,7 +451,11 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // the league defines no position requirements, or every slot is already
       // filled, getUnfilledPositionTypes returns an empty list, the eligible
       // stat-position set is empty, and no positional predicate is added —
-      // preserving the prior unfiltered behaviour.
+      // preserving the prior unfiltered behaviour. Football leagues land on
+      // that same no-op path today: eligibleStatPositionsForUnfilledSlots maps
+      // slot types through the baseball-only ALLOWED_POSITIONS, which has no
+      // QB/RB/WR/TE/K/DEF keys, so a football board is narrowed by sport and
+      // pool but not by remaining roster needs.
       if (membership.teamId != null) {
         const unfilledPositionTypes = await getUnfilledPositionTypes(
           context.db,
@@ -535,7 +569,17 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
             : null,
       });
 
-      const orderByKey = orderBy ?? 'hitterAvgPointsPerGame';
+      // Every sort key below (including the default) reads
+      // `player_scoring_cache`, which is computed from baseball career stats
+      // only. For a football league every candidate therefore ties at 0 and the
+      // board's row order is whatever the planner happens to return — different
+      // between pages of the same scroll. Until football projections land, a
+      // football board sorts alphabetically, which is at least stable and
+      // pageable. An explicit `lastName` request lands on the same branch.
+      const orderByKey =
+        leagueSport === 'football'
+          ? 'lastName'
+          : (orderBy ?? 'hitterAvgPointsPerGame');
 
       if (orderByKey === 'careerOffensiveWAR') {
         // Sort by lWAR via LEFT JOIN to career_batting view

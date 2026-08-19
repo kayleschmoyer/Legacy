@@ -2,9 +2,10 @@
  * Football mock pool preview.
  *
  * Visual summary of the football mock player pool seeded in
- * `@legacy-sports/test-fixtures`. Used by `MockDraftPage` (behind the
- * `football-mock-players` feature flag) and by Storybook to verify the
- * pool shape end-to-end before the sport-aware draft engine ships.
+ * `@legacy-sports/test-fixtures`. A Storybook/reference surface for the
+ * fixture pool's shape — the live Mock Draft form no longer renders it, since
+ * a real football mock draft now drafts from the league's own football player
+ * pool (LS-9470).
  */
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
