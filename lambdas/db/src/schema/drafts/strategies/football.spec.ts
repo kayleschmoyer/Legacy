@@ -173,6 +173,69 @@ describe('footballStrategy.scoreForUnfilledPositions', () => {
     const info: PlayerDraftInfo = { fpg: 0, positions: ['QB'] };
     expect(effectiveFootballFpg(info, 42)).toBe(effectiveFootballFpg(info, 42));
   });
+
+  // ── LS-9476: never present the archetype baseline as a projection ──────
+  // players.projected_fantasy_points is unset for every football player, so
+  // the un-projected branch is what real drafts actually hit today.
+
+  test('quotes no number when the pick has no served projection', () => {
+    const pool: Map<number, PlayerDraftInfo> = new Map([
+      [1, { fpg: 0, positions: ['QB'] }],
+    ]);
+    const result = footballStrategy.scoreForUnfilledPositions(pool, ['QB']);
+
+    expect(result.playerId).toBe(1);
+    expect(result.reason).toBe(
+      'Best available for QB — ranked by position (no projection available)',
+    );
+    // The fabricated figure must not reach the user in any form: no decimal
+    // number, and none of the archetype baselines, anywhere in the string.
+    expect(result.reason).not.toMatch(/\d+\.\d/);
+    expect(result.reason).not.toContain('projected matchup pts');
+  });
+
+  test('quotes the real figure when a projection was served', () => {
+    const pool: Map<number, PlayerDraftInfo> = new Map([
+      [1, { fpg: 27.5, positions: ['QB'] }],
+    ]);
+    const result = footballStrategy.scoreForUnfilledPositions(pool, ['QB']);
+
+    expect(result.playerId).toBe(1);
+    expect(result.reason).toBe(
+      'Best available for QB — 27.5 projected matchup pts',
+    );
+  });
+
+  test('wording follows the winning player, not the rest of the pool', () => {
+    // A projected QB outranks an un-projected one, so the reason must quote
+    // the number; the reverse pool must not borrow the projected player's
+    // wording.
+    const projectedWins: Map<number, PlayerDraftInfo> = new Map([
+      [1, { fpg: 30, positions: ['QB'] }],
+      [2, { fpg: 0, positions: ['QB'] }],
+    ]);
+    const projectedResult = footballStrategy.scoreForUnfilledPositions(
+      projectedWins,
+      ['QB'],
+    );
+    expect(projectedResult.playerId).toBe(1);
+    expect(projectedResult.reason).toContain('30.0 projected matchup pts');
+
+    // fpg 1 is a real projection but ranks BELOW the ~24 QB baseline, so the
+    // un-projected player wins and the wording must switch with it.
+    const baselineWins: Map<number, PlayerDraftInfo> = new Map([
+      [1, { fpg: 1, positions: ['QB'] }],
+      [2, { fpg: 0, positions: ['QB'] }],
+    ]);
+    const baselineResult = footballStrategy.scoreForUnfilledPositions(
+      baselineWins,
+      ['QB'],
+    );
+    expect(baselineResult.playerId).toBe(2);
+    expect(baselineResult.reason).toBe(
+      'Best available for QB — ranked by position (no projection available)',
+    );
+  });
 });
 
 describe('ALLOWED_POSITIONS_FOOTBALL derives from shared map (LS-4763)', () => {

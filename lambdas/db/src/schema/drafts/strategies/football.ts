@@ -49,7 +49,11 @@ const FOOTBALL_FILL_ORDER: readonly string[] = [
   'FLEX',
 ];
 
-/** Mock baseline projected matchup points by stat position. */
+/**
+ * Position-archetype baseline used to ORDER candidates when no projection has
+ * been served. These are ranking weights, not measurements — never surface one
+ * to a user as a projected total (LS-9476).
+ */
 const MOCK_FPG_BY_POSITION: Readonly<Record<string, number>> = Object.freeze({
   QB: 24,
   RB: 16,
@@ -88,15 +92,26 @@ export function effectiveFootballFpg(
   return Math.max(0, baseline + jitterFromPlayerId(id));
 }
 
+/**
+ * True when the player carries a real served projection rather than the
+ * position-archetype baseline. `effectiveFootballFpg` treats any `fpg > 0` as
+ * real, so this is the same test it branches on — kept beside it so the two
+ * cannot drift.
+ */
+function hasServedProjection(info: PlayerDraftInfo): boolean {
+  return info.fpg > 0;
+}
+
 function pickBestForSlot(
   playerDraftInfo: Map<number, PlayerDraftInfo>,
   slotType: string,
-): { playerId: number; fpg: number } | undefined {
+): { playerId: number; fpg: number; projected: boolean } | undefined {
   const allowedStatPositions = ALLOWED_POSITIONS_FOOTBALL[slotType] ?? [
     slotType,
   ];
   let bestId: number | undefined;
   let bestFpg = -Infinity;
+  let bestProjected = false;
   for (const [id, info] of playerDraftInfo) {
     if (!allowedStatPositions.some((sp) => info.positions.includes(sp))) {
       continue;
@@ -105,9 +120,12 @@ function pickBestForSlot(
     if (fpg > bestFpg) {
       bestFpg = fpg;
       bestId = id;
+      bestProjected = hasServedProjection(info);
     }
   }
-  return bestId === undefined ? undefined : { playerId: bestId, fpg: bestFpg };
+  return bestId === undefined
+    ? undefined
+    : { playerId: bestId, fpg: bestFpg, projected: bestProjected };
 }
 
 function scoreForUnfilledPositions(
@@ -134,7 +152,14 @@ function scoreForUnfilledPositions(
     if (best) {
       return {
         playerId: best.playerId,
-        reason: `Best available for ${slotType} — ${best.fpg.toFixed(1)} projected matchup pts`,
+        // Only quote a number when one was actually served. The archetype
+        // baseline exists to ORDER candidates, not to measure them: with
+        // players.projected_fantasy_points unset league-wide every football
+        // player takes that path, so quoting it printed an invented figure
+        // to the draft room as though it were a projection (LS-9476).
+        reason: best.projected
+          ? `Best available for ${slotType} — ${best.fpg.toFixed(1)} projected matchup pts`
+          : `Best available for ${slotType} — ranked by position (no projection available)`,
       };
     }
   }

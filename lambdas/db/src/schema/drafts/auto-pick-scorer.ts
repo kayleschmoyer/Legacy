@@ -54,6 +54,25 @@ export interface AutoPickParams {
  * After selection, a concurrent-pick guard walks the ranked list if the
  * preferred player was drafted between Phase 1 and this transaction.
  */
+/**
+ * Bench-pick announcement text. Quotes a figure only when one was actually
+ * served: the football candidate pool reads
+ * COALESCE(projected_fantasy_points, 0) and that column is unset league-wide,
+ * so every football bench pick reached this line with fpg 0 and announced
+ * "0.0 projected matchup pts" — a measurement the system never had (LS-9476).
+ * Baseball serves a real fpg from career stats and is unaffected.
+ */
+export function formatBenchPickReason(pick: {
+  fpg: number;
+  slotsCoverable: number;
+  totalSlots: number;
+}): string {
+  const slots = `starts in ${pick.slotsCoverable}/${pick.totalSlots} slots`;
+  return pick.fpg > 0
+    ? `Best available (bench) — ${pick.fpg.toFixed(1)} projected matchup pts, ${slots}`
+    : `Best available (bench) — ${slots} (no projection available)`;
+}
+
 export async function selectAutoPickPlayer(
   params: AutoPickParams,
 ): Promise<AutoPickResult> {
@@ -114,7 +133,7 @@ export async function selectAutoPickPlayer(
   // without a position match).
   if (autoPlayerId === undefined && bestBenchPick) {
     autoPlayerId = bestBenchPick.playerId;
-    autoPickReason = `Best available (bench) — ${bestBenchPick.fpg.toFixed(1)} projected matchup pts, starts in ${bestBenchPick.slotsCoverable}/${bestBenchPick.totalSlots} slots`;
+    autoPickReason = formatBenchPickReason(bestBenchPick);
     LOGGER.info(
       '[autoProcessDraftPicks] Auto-pick for bench (versatility + matchup pts)',
       {
