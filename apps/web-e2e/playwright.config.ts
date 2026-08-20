@@ -32,6 +32,25 @@ const pwWebkitExecutable = resolvePwWebkitExecutable();
 const E2E_PORT = Number(process.env.E2E_PORT) || 4280;
 
 /**
+ * LS-9075 gave phone-width browsers (`media.sm`, maxWidth 800 — well above
+ * both mobile projects' 375px viewport) a dedicated card-feed UI
+ * (`PlayersCardFeed`: sport toggle, a fixed ALL/QB/RB/WR/TE/K/DST chip rail,
+ * search, infinite-scroll cards) in place of the desktop data grid. These
+ * specs assert desktop-grid-only affordances that the card feed has no
+ * equivalent for by design — sortable column headers, the format/column
+ * picker, the team-filter `<select>`, Hitters/Pitchers/Combined view tabs,
+ * and category tabs with header-driven sort — so they only make sense
+ * against the desktop `chromium`/`firefox`/`webkit` projects (LS-9471).
+ */
+const DESKTOP_GRID_ONLY_SPECS = [
+  /nfl-player-stats-category-tabs\.spec\.ts$/,
+  /player-stats-fantasy-sort\.spec\.ts$/,
+  /player-stats-format-preference\.spec\.ts$/,
+  /player-stats-search-and-filters\.spec\.ts$/,
+  /sport-aware-player-list\.spec\.ts$/,
+];
+
+/**
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
@@ -160,6 +179,7 @@ export default defineConfig({
     /* Test against mobile viewports. */
     {
       name: 'Mobile Chrome',
+      testIgnore: DESKTOP_GRID_ONLY_SPECS,
       use: {
         ...devices['Pixel 5'],
         viewport: { width: 375, height: 667 },
@@ -170,6 +190,7 @@ export default defineConfig({
     },
     {
       name: 'Mobile Safari',
+      testIgnore: DESKTOP_GRID_ONLY_SPECS,
       use: {
         ...devices['iPhone 12'],
         viewport: { width: 375, height: 667 },

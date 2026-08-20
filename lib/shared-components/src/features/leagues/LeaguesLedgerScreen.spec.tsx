@@ -78,8 +78,12 @@ describe('LeaguesLedgerScreen', () => {
       const { getByTestId } = render(
         <LeaguesLedgerScreen {...baseProps} loading topInset={44} />,
       );
+      // jest-dom's toHaveStyle coerces a bare number through the CSSOM,
+      // which rejects an un-suffixed length value and leaves the check
+      // vacuous — assert the CSS string form instead (see jest-setup-web.js
+      // and jest-setup-mobile.js's LS-9459 notes).
       expect(getByTestId('leagues-ledger-loading')).toHaveStyle({
-        paddingTop: 44,
+        paddingTop: '44px',
       });
     });
 
@@ -88,7 +92,7 @@ describe('LeaguesLedgerScreen', () => {
         <LeaguesLedgerScreen {...baseProps} topInset={44} />,
       );
       expect(getByTestId('leagues-ledger-scroll')).toHaveStyle({
-        paddingTop: 44,
+        paddingTop: '44px',
       });
     });
   });

@@ -50,6 +50,51 @@ PR CI runs `pnpm exec nx affected -t typecheck test` (ci-pipeline.yml `test` job
 
 See [Coverage Truth](../SKILL.md#coverage-truth): no thresholds, nothing in CI collects unit coverage; `--coverage` is local-informational only.
 
+## `lib/shared-components` Tamagui jest mock — what a spec can and cannot observe
+
+`lib/shared-components/jest-setup-web.js` and `jest-setup-mobile.js` each mock
+`tamagui`'s primitives (`YStack`, `XStack`, `Text`, `Button`, …) as plain DOM
+elements so specs can render them under jsdom without the real `tamagui`
+package. Layout/style shorthand props (`paddingTop`, `backgroundColor`,
+`flex`, …) are forwarded into a real `style` object on the mock element — see
+`STYLE_PROPS` / `STYLE_SHORTHAND_EXPANSIONS` in either setup file — so
+`toHaveStyle` assertions observe what the component actually set (LS-9459).
+Not forwarded, by design: pseudo-state style objects (`pressStyle`,
+`hoverStyle`, …), RN-only shapes with no safe CSS translation (`shadowOffset`
+is an object, `fontVariant` is an array), and the single/double-letter
+Tamagui shorthand aliases (`p`, `pt`, `bg`, …) — no spec in this repo uses
+those aliases today.
+
+**`toHaveStyle` with a bare number is silently vacuous for length
+properties.** `@testing-library/jest-dom`'s `toHaveStyle` builds its
+"expected" side by assigning each value onto a scratch element's CSSOM style
+(`el.style[prop] = value`). A bare unitless number (e.g. `paddingTop: 44`)
+gets WebIDL-coerced to the unitless string `"44"`, which the CSS engine
+rejects as an invalid length and silently drops — the scratch element's
+`paddingTop` stays `''`. The matcher then compares that `''` against
+`getComputedStyle(el).getPropertyValue('paddingTop')`, which is _also_ `''`
+because `getPropertyValue` requires the kebab-case name (`padding-top`), not
+the camelCase JS property name. Both sides collapse to `''` and the
+assertion passes **regardless of the element's real style** — this holds
+even for a plain `<div style={{ paddingTop: 16 }}>` with no Tamagui mock
+involved. Always assert the CSS string form instead:
+
+```tsx
+// ❌ Vacuous — passes even if the real paddingTop is 0, 500, anything
+expect(el).toHaveStyle({ paddingTop: 44 });
+
+// ✅ Real assertion
+expect(el).toHaveStyle({ paddingTop: '44px' });
+```
+
+Properties where the _only_ value under test is `0` are unaffected (`0` is
+valid CSS without a unit); properties that are legitimately unitless in CSS
+(`opacity`, `flexGrow`/`flexShrink`, `fontWeight`, `zIndex`, `lineHeight`)
+are also unaffected — only non-zero length values passed as bare numbers
+are silently un-asserted. When touching a `toHaveStyle` call, verify it is
+a real guard the way LS-9459 did: temporarily break the source behavior,
+confirm the test fails, then restore it.
+
 ## Common issues
 
 | Symptom                             | Fix                                                                                                    |

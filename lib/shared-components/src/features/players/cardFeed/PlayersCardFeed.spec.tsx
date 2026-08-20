@@ -153,8 +153,12 @@ describe('PlayersCardFeed', () => {
   test('pads the header by the page gutter alone when topInset is omitted', () => {
     render(<PlayersCardFeed {...baseProps()} />);
 
+    // jest-dom's toHaveStyle coerces a bare number through the CSSOM, which
+    // rejects an un-suffixed length value and leaves the check vacuous —
+    // assert the CSS string form instead (see jest-setup-web.js and
+    // jest-setup-mobile.js's LS-9459 notes).
     expect(screen.getByTestId('players-card-feed-header')).toHaveStyle({
-      paddingTop: 16,
+      paddingTop: '16px',
     });
   });
 
@@ -162,7 +166,7 @@ describe('PlayersCardFeed', () => {
     render(<PlayersCardFeed {...baseProps()} topInset={44} />);
 
     expect(screen.getByTestId('players-card-feed-header')).toHaveStyle({
-      paddingTop: 60,
+      paddingTop: '60px',
     });
   });
 
