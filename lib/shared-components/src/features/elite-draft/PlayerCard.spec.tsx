@@ -63,3 +63,70 @@ describe('PlayerCard drag-to-draft source', () => {
     expect(card.getAttribute('draggable')).toBe('false');
   });
 });
+
+/**
+ * LS-9473: the card is the draft room's default view and was hardcoded to
+ * baseball with no `sport` prop, so a football player rendered
+ * `AVG .000 / HR 0 / RBI 0 / SB 0` — fabricated zeros reading as real
+ * measurements. These cover both halves: football never shows a baseball
+ * label, and an unmeasured stat renders as an em-dash rather than 0.
+ */
+describe('PlayerCard sport-aware stat block (LS-9473)', () => {
+  // A football player as the board actually builds one: usePlayerData fills
+  // the baseball fields with `?? 0`, and no football stat fields exist yet.
+  const footballPlayer: DraftPlayer = {
+    id: 21,
+    name: 'Gridiron Tester',
+    position: 'QB',
+    eligiblePositions: ['QB'],
+    avg: 0,
+    hr: 0,
+    rbi: 0,
+    runs: 0,
+    sb: 0,
+    games: 0,
+    hits: 0,
+    obp: 0,
+    slg: 0,
+    ppg: 0,
+  };
+
+  it('renders football stat labels and never baseball ones', () => {
+    const { getByText, queryByText } = render(
+      <PlayerCard {...baseProps} player={footballPlayer} sport="football" />,
+    );
+
+    for (const label of ['PASS YDS', 'RUSH YDS', 'REC', 'TD', 'FG']) {
+      expect(getByText(label)).toBeTruthy();
+    }
+    for (const label of ['AVG', 'HR', 'RBI', 'SB', 'OBP', 'SLG']) {
+      expect(queryByText(label)).toBeNull();
+    }
+  });
+
+  it('shows an em-dash for unserved football stats, never a zero', () => {
+    const { container } = render(
+      <PlayerCard {...baseProps} player={footballPlayer} sport="football" />,
+    );
+
+    const values = Array.from(container.querySelectorAll('.d-stat-val')).map(
+      (el) => el.textContent,
+    );
+    expect(values).toHaveLength(5);
+    expect(values.every((v) => v === '—')).toBe(true);
+  });
+
+  it('withholds the baseball-derived Career Pts/Matchup bar for football', () => {
+    const { queryByText } = render(
+      <PlayerCard {...baseProps} player={footballPlayer} sport="football" />,
+    );
+    expect(queryByText('Career Pts/Matchup')).toBeNull();
+  });
+
+  it('leaves the baseball card unchanged and defaults to baseball', () => {
+    const { getByText } = render(<PlayerCard {...baseProps} />);
+    expect(getByText('AVG')).toBeTruthy();
+    expect(getByText('HR')).toBeTruthy();
+    expect(getByText('0.300')).toBeTruthy();
+  });
+});

@@ -300,14 +300,36 @@ export const createEligiblePositionsLoader = (
     // Fetch only the uncached player IDs
     if (missing.length > 0) {
       const ids = [...new Set(missing)];
-      const rows = await db
-        .select({
-          playerId: PublicSchema.playerEligiblePositions.playerId,
-          position: PublicSchema.playerEligiblePositions.position,
-          games: PublicSchema.playerEligiblePositions.games,
-        })
-        .from(PublicSchema.playerEligiblePositions)
-        .where(inArray(PublicSchema.playerEligiblePositions.playerId, ids));
+      // Positions live in one table per sport and a player belongs to exactly
+      // one sport, so the two lookups are disjoint and can simply be merged
+      // (LS-9474). Before this, football players resolved to `[]` here, which
+      // the draft board renders as the `UTIL` position for every one of them.
+      // The football view carries no `games` column — each football player has
+      // exactly one row — so those rows sort trivially at games 0.
+      const [baseballRows, footballRows] = await Promise.all([
+        db
+          .select({
+            playerId: PublicSchema.playerEligiblePositions.playerId,
+            position: PublicSchema.playerEligiblePositions.position,
+            games: PublicSchema.playerEligiblePositions.games,
+          })
+          .from(PublicSchema.playerEligiblePositions)
+          .where(inArray(PublicSchema.playerEligiblePositions.playerId, ids)),
+        db
+          .select({
+            playerId: PublicSchema.footballPlayerEligiblePositions.playerId,
+            position: PublicSchema.footballPlayerEligiblePositions.position,
+          })
+          .from(PublicSchema.footballPlayerEligiblePositions)
+          .where(
+            inArray(PublicSchema.footballPlayerEligiblePositions.playerId, ids),
+          ),
+      ]);
+
+      const rows = [
+        ...baseballRows,
+        ...footballRows.map((r) => ({ ...r, games: 0 })),
+      ];
 
       const posMap = new Map<
         number,

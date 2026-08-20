@@ -24,6 +24,15 @@ jest.mock('@legacy-sports/db-client', () => ({
       leagueId: 'leaguePosition.leagueId',
       positionType: 'leaguePosition.positionType',
     },
+    playerEligiblePositions: {
+      playerId: 'pep.playerId',
+      position: 'pep.position',
+      games: 'pep.games',
+    },
+    footballPlayerEligiblePositions: {
+      playerId: 'fpep.playerId',
+      position: 'fpep.position',
+    },
   },
   // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
   // up to 2x on the pool's connection-timeout message) so the loader-level
@@ -51,6 +60,8 @@ jest.mock('@legacy-sports/db-client', () => ({
 }));
 
 import {
+  clearEligiblePositionsCache,
+  createEligiblePositionsLoader,
   createLeaguePayrollConfigLoader,
   createLeaguePositionByIdLoader,
   createTeamPayrollLoader,
@@ -242,5 +253,53 @@ describe('createLeaguePositionByIdLoader (LS-8478)', () => {
       'syntax error at or near "SELECT"',
     );
     expect(calls).toHaveLength(1);
+  });
+});
+
+/**
+ * LS-9474: this loader read only `player_eligible_positions`, which holds zero
+ * football rows, so every football player resolved to `[]`. `usePlayerData`
+ * falls back to `'UTIL'` on an empty list, so the draft board labelled every
+ * football player UTIL — on real leagues and mock drafts alike.
+ */
+describe('createEligiblePositionsLoader — multi-sport (LS-9474)', () => {
+  beforeEach(() => clearEligiblePositionsCache());
+
+  /** The mocked PublicSchema entries are objects, so identify the relation by
+   *  one of its column markers rather than by reference. */
+  const tableOf = (t: unknown): string =>
+    (t as { playerId?: string })?.playerId?.split('.')[0] ?? 'unknown';
+
+  it('resolves football positions from the football relation', async () => {
+    const { db, calls } = makeMockDb((state) =>
+      tableOf(state.table) === 'fpep' ? [{ playerId: 42, position: 'QB' }] : [],
+    );
+    const loader = createEligiblePositionsLoader(db);
+
+    await expect(loader.load(42)).resolves.toEqual(['QB']);
+    // Both relations are consulted; a player belongs to exactly one sport, so
+    // the two result sets are disjoint and merge without conflict.
+    expect(calls.map((c) => tableOf(c.table)).sort()).toEqual(['fpep', 'pep']);
+  });
+
+  it('still resolves baseball positions, ordered by games played', async () => {
+    const { db } = makeMockDb((state) =>
+      tableOf(state.table) === 'pep'
+        ? [
+            { playerId: 7, position: 'LF', games: 20 },
+            { playerId: 7, position: 'SS', games: 140 },
+          ]
+        : [],
+    );
+    const loader = createEligiblePositionsLoader(db);
+
+    await expect(loader.load(7)).resolves.toEqual(['SS', 'LF']);
+  });
+
+  it('returns an empty list when neither relation has the player', async () => {
+    const { db } = makeMockDb(() => []);
+    const loader = createEligiblePositionsLoader(db);
+
+    await expect(loader.load(999)).resolves.toEqual([]);
   });
 });

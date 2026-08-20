@@ -1145,6 +1145,7 @@ export function DraftPlayerBoard({
                   onPlayerClick={handlePlayerClick}
                   onDragStartPlayer={onPlayerDragStart}
                   onDragEndPlayer={onPlayerDragEnd}
+                  sport={sport}
                 />
               ))}
               {filteredPlayers.length === 0 && !availablePlayersLoading && (

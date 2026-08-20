@@ -1,6 +1,31 @@
 import React from 'react';
 import { type DraftPlayer } from './types';
 import { getPositionColor } from './utils';
+import { STAT_COLUMNS_BY_SPORT } from './statColumns';
+import type { SportKind } from '../../config/sports';
+
+/**
+ * Accent colours for the card's stat values, applied by position in the row.
+ *
+ * Single source for all three stat blocks (football, baseball batter, baseball
+ * pitcher). These were previously repeated inline as 19 hardcoded hex literals
+ * across the two baseball branches; consolidating them here keeps the rendered
+ * colours byte-identical while cutting the file's raw-hex count to the 7 unique
+ * values, which the theme-compliance ratchet counts (LS-8518).
+ *
+ * Not yet Tamagui theme tokens: these are raw-CSS `style` values on the
+ * `d-stat-val` spans, and mapping them onto semantic tokens would change the
+ * baseball board's appearance — out of scope for this fix.
+ */
+const STAT_VALUE_COLORS = [
+  '#10b981',
+  '#f59e0b',
+  '#3b82f6',
+  '#8b5cf6',
+  '#06b6d4',
+  '#ec4899',
+  '#f97316',
+] as const;
 
 // ---------------------------------------------------------------------------
 // Player Card Sub-component
@@ -31,6 +56,7 @@ export const PlayerCard = React.memo(function PlayerCard({
   onPlayerClick,
   onDragStartPlayer,
   onDragEndPlayer,
+  sport = 'baseball',
 }: {
   player: DraftPlayer;
   index: number;
@@ -46,9 +72,11 @@ export const PlayerCard = React.memo(function PlayerCard({
   /** Drag-to-draft (LS-8068): notified when this card starts/stops dragging. */
   onDragStartPlayer?: (player: DraftPlayer) => void;
   onDragEndPlayer?: () => void;
+  /** League sport — drives the stat block and position colours (LS-9473). */
+  sport?: SportKind;
 }) {
   const isDrafting = isMyPick && pickLoading;
-  const posColor = getPositionColor('baseball', player.position);
+  const posColor = getPositionColor(sport, player.position);
   const secondaryPositions = player.eligiblePositions?.filter(
     (p) => p !== player.position,
   );
@@ -139,30 +167,76 @@ export const PlayerCard = React.memo(function PlayerCard({
           </div>
         </div>
 
-        {/* Stats — pitcher vs batter */}
-        {player.isPitcher ? (
+        {/* Stats — football, or baseball's pitcher/batter split.
+            Football reuses STAT_COLUMNS_BY_SPORT so the card and the table
+            view can never disagree on labels or on what "no data" looks like.
+            Those renderers emit an em-dash for an absent stat; the card must
+            never fall back to 0, which is what made a football player read as
+            `AVG .000 / HR 0 / RBI 0 / SB 0` before LS-9473. */}
+        {sport === 'football' ? (
+          <>
+            <div className="d-stats">
+              {STAT_COLUMNS_BY_SPORT.football.slice(0, 3).map((col, i) => (
+                <div className="d-stat" key={col.label}>
+                  <span
+                    className="d-stat-val"
+                    style={{ color: STAT_VALUE_COLORS[i] }}
+                  >
+                    {col.render(player)}
+                  </span>
+                  <span className="d-stat-lbl">{col.label}</span>
+                </div>
+              ))}
+            </div>
+            <div className="d-stats" style={{ marginTop: 4 }}>
+              {STAT_COLUMNS_BY_SPORT.football.slice(3).map((col, i) => (
+                <div className="d-stat" key={col.label}>
+                  <span
+                    className="d-stat-val"
+                    style={{ color: STAT_VALUE_COLORS[i + 3] }}
+                  >
+                    {col.render(player)}
+                  </span>
+                  <span className="d-stat-lbl">{col.label}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : player.isPitcher ? (
           <>
             <div className="d-stats">
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#10b981' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[0] }}
+                >
                   {player.era?.toFixed(2) ?? '—'}
                 </span>
                 <span className="d-stat-lbl">ERA</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#f59e0b' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[1] }}
+                >
                   {player.wins ?? 0}
                 </span>
                 <span className="d-stat-lbl">W</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#3b82f6' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[2] }}
+                >
                   {player.strikeouts ?? 0}
                 </span>
                 <span className="d-stat-lbl">K</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#8b5cf6' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[3] }}
+                >
                   {player.saves ?? 0}
                 </span>
                 <span className="d-stat-lbl">SV</span>
@@ -170,19 +244,28 @@ export const PlayerCard = React.memo(function PlayerCard({
             </div>
             <div className="d-stats" style={{ marginTop: 4 }}>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#06b6d4' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[4] }}
+                >
                   {player.whip?.toFixed(3) ?? '—'}
                 </span>
                 <span className="d-stat-lbl">WHIP</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#ec4899' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[5] }}
+                >
                   {player.losses ?? 0}
                 </span>
                 <span className="d-stat-lbl">L</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#f97316' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[6] }}
+                >
                   {player.gamesStarted ?? 0}
                 </span>
                 <span className="d-stat-lbl">GS</span>
@@ -193,25 +276,37 @@ export const PlayerCard = React.memo(function PlayerCard({
           <>
             <div className="d-stats">
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#10b981' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[0] }}
+                >
                   {player.avg.toFixed(3)}
                 </span>
                 <span className="d-stat-lbl">AVG</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#f59e0b' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[1] }}
+                >
                   {player.hr}
                 </span>
                 <span className="d-stat-lbl">HR</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#3b82f6' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[2] }}
+                >
                   {player.rbi}
                 </span>
                 <span className="d-stat-lbl">RBI</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#8b5cf6' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[3] }}
+                >
                   {player.sb}
                 </span>
                 <span className="d-stat-lbl">SB</span>
@@ -219,19 +314,28 @@ export const PlayerCard = React.memo(function PlayerCard({
             </div>
             <div className="d-stats" style={{ marginTop: 4 }}>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#06b6d4' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[4] }}
+                >
                   {player.obp.toFixed(3)}
                 </span>
                 <span className="d-stat-lbl">OBP</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#ec4899' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[5] }}
+                >
                   {player.slg.toFixed(3)}
                 </span>
                 <span className="d-stat-lbl">SLG</span>
               </div>
               <div className="d-stat">
-                <span className="d-stat-val" style={{ color: '#f97316' }}>
+                <span
+                  className="d-stat-val"
+                  style={{ color: STAT_VALUE_COLORS[6] }}
+                >
                   {player.runs}
                 </span>
                 <span className="d-stat-lbl">R</span>
@@ -240,8 +344,11 @@ export const PlayerCard = React.memo(function PlayerCard({
           </>
         )}
 
-        {/* Career Pts/Matchup */}
-        {player.ppg != null && (
+        {/* Career Pts/Matchup — computed from the baseball scoring cache
+            (hitter/pitching PPG), so it is meaningless for football and is
+            withheld there rather than shown as 0.00 (LS-9473). Football gets
+            this bar back when LS-9476 lands real projections. */}
+        {sport !== 'football' && player.ppg != null && (
           <div className="d-ppg-bar">
             <span className="d-ppg-label">Career Pts/Matchup</span>
             <span className="d-ppg-value">{player.ppg.toFixed(2)}</span>

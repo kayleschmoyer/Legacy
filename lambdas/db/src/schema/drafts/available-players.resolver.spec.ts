@@ -289,6 +289,41 @@ describe('getAvailableDraftPlayers — sport-scoped player pool (LS-9470)', () =
     );
   });
 
+  // LS-9474: football positions live in their own relation. The baseball table
+  // holds zero football rows, so filtering a football board against it returned
+  // an empty board for every pill. Note `football_player_eligible_positions`
+  // contains the baseball table's name as a substring — asserting
+  // `toContain('player_eligible_positions')` passes for BOTH tables and is
+  // exactly the kind of check that let the original defect ship green. These
+  // assertions pin the exact relation instead.
+  it('filters a football board against football_player_eligible_positions', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb(FOOTBALL_LEAGUE);
+
+    await resolve(
+      {},
+      { draftId: 100, position: 'QB' },
+      { user: { id: 7 }, db },
+    );
+
+    const { sql: text, params } = serializeExecutedQuery(db);
+    expect(text).toContain('football_player_eligible_positions');
+    expect(text).not.toMatch(/(?<!football_)player_eligible_positions/);
+    expect(params).toEqual(expect.arrayContaining(['QB']));
+  });
+
+  it('filters a baseball board against player_eligible_positions only', async () => {
+    const resolve = await captureResolver();
+    const db = makeDb();
+
+    await resolve({}, { draftId: 100, position: 'P' }, { user: { id: 7 }, db });
+
+    const { sql: text, params } = serializeExecutedQuery(db);
+    expect(text).toContain('player_eligible_positions');
+    expect(text).not.toContain('football_player_eligible_positions');
+    expect(params).toEqual(expect.arrayContaining(['SP', 'RP']));
+  });
+
   it('expands the football DEF pill to both team-defense labels', async () => {
     const resolve = await captureResolver();
     const db = makeDb(FOOTBALL_LEAGUE);
@@ -300,18 +335,12 @@ describe('getAvailableDraftPlayers — sport-scoped player pool (LS-9470)', () =
     );
 
     const { sql: text, params } = serializeExecutedQuery(db);
-    expect(text).toContain('player_eligible_positions');
+    expect(text).toContain('football_player_eligible_positions');
     expect(params).toEqual(expect.arrayContaining(['DEF', 'DST']));
-  });
-
-  it('still expands the baseball P pill to SP/RP', async () => {
-    const resolve = await captureResolver();
-    const db = makeDb();
-
-    await resolve({}, { draftId: 100, position: 'P' }, { user: { id: 7 }, db });
-
-    const { params } = serializeExecutedQuery(db);
-    expect(params).toEqual(expect.arrayContaining(['SP', 'RP']));
+    // NOTE: no DEF/DST rows exist in the data today — the ingested football
+    // positions are DB/LB/DL (IDP), not team defenses. This asserts the
+    // expansion is wired to the right relation, not that it returns players.
+    // LS-9475 owns making the vocabulary match the league's defensiveFormat.
   });
 
   it('sorts a football board alphabetically — the scoring cache is baseball-only', async () => {

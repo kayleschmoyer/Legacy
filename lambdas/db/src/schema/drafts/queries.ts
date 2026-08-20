@@ -405,16 +405,26 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // stat position directly.
       if (position && position.trim().length > 0) {
         const pos = position.trim().toUpperCase();
-        const expandedPositions =
-          leagueSport === 'football'
-            ? POSITION_FILTER_EXPANSIONS_FOOTBALL[pos]
-            : POSITION_FILTER_EXPANSIONS_BASEBALL[pos];
+        const isFootball = leagueSport === 'football';
+        const expandedPositions = isFootball
+          ? POSITION_FILTER_EXPANSIONS_FOOTBALL[pos]
+          : POSITION_FILTER_EXPANSIONS_BASEBALL[pos];
         const positionValues = sql.join(
           (expandedPositions ?? [pos]).map((statPos) => sql`${statPos}`),
           sql`, `,
         );
+        // Each sport keeps its eligible positions in its own relation, and
+        // football's holds no rows in the baseball one — filtering a football
+        // board against `player_eligible_positions` returned an empty board for
+        // every pill (LS-9474). `candidate-pool.ts` already branches this way
+        // for auto-pick; the board now matches it.
         sqlConditions.push(
-          sql`EXISTS (
+          isFootball
+            ? sql`EXISTS (
+              SELECT 1 FROM public.football_player_eligible_positions fpep
+              WHERE fpep.player_id = p.id AND fpep.position IN (${positionValues})
+            )`
+            : sql`EXISTS (
               SELECT 1 FROM public.player_eligible_positions pep
               WHERE pep.player_id = p.id AND pep.position IN (${positionValues})
             )`,
