@@ -86,6 +86,7 @@ function makePlayer(overrides: Partial<DraftPlayer> = {}): DraftPlayer {
     obp: 0,
     slg: 0,
     ppg: 24.5,
+    adp: 1,
     ...overrides,
   };
 }

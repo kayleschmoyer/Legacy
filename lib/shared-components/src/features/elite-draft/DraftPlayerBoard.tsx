@@ -463,8 +463,8 @@ export function DraftPlayerBoard({
         aVal = a.position ?? '';
         bVal = b.position ?? '';
       } else if (sortKey === 'adp') {
-        aVal = (a as DraftPlayer & { adp?: number }).adp ?? Infinity;
-        bVal = (b as DraftPlayer & { adp?: number }).adp ?? Infinity;
+        aVal = a.adp ?? Infinity;
+        bVal = b.adp ?? Infinity;
       } else {
         const col = STAT_COLUMNS_BY_SPORT[sport].find(
           (c) => c.label === sortKey,
@@ -940,9 +940,7 @@ export function DraftPlayerBoard({
                     </XStack>
                     <XStack width={70} justifyContent="flex-end" padding={8}>
                       <Text fontSize={12} color={TEXT}>
-                        {(
-                          player as DraftPlayer & { adp?: number }
-                        ).adp?.toFixed(1) ?? '—'}
+                        {player.adp?.toFixed(1) ?? '—'}
                       </Text>
                     </XStack>
                     {STAT_COLUMNS_BY_SPORT[sport].map((col) => (

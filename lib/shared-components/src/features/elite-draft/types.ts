@@ -33,6 +33,8 @@ export interface DraftPlayer {
   careerStartYear?: number | null;
   /** Final MLB season (4-digit year). */
   careerEndYear?: number | null;
+  /** Stack-rank ADP fallback — see AvailableDraftPlayer.adp. Stable across the draft (not the player's index in the remaining/undrafted list). */
+  adp?: number | null;
 }
 
 export interface AvailableDraftPlayer {
@@ -45,6 +47,16 @@ export interface AvailableDraftPlayer {
   hitterAvgPointsPerGame?: number | null;
   pitchingAvgPointsPerGame?: number | null;
   projectedMatchupPoints?: number | null;
+  /**
+   * Stack-rank fallback for Average Draft Position: the player's 1-based rank
+   * across the league's entire draftable pool by projected value, using the
+   * league's customized scoring settings when it has ever edited them
+   * (falling back to default scoring otherwise). Stable for the life of the
+   * draft — does not renumber as other players are drafted, searched for, or
+   * filtered out of the current page. Real historical ADP data isn't
+   * collected yet.
+   */
+  adp?: number | null;
 }
 
 /** Stats lookup entry built from careerBattingStats connection */

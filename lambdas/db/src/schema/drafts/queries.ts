@@ -365,7 +365,8 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // draftable. Baseball leagues are unaffected: every baseball player
       // carries sport='baseball'.
       const leagueSport = league?.sport ?? 'baseball';
-      sqlConditions.push(sql`p.sport = ${leagueSport}`);
+      const sportCondition = sql`p.sport = ${leagueSport}`;
+      sqlConditions.push(sportCondition);
 
       // Exclude already-drafted players via NOT EXISTS (avoids growing literal list)
       sqlConditions.push(sql`NOT EXISTS (
@@ -377,10 +378,11 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // designations are applied to rosters before the draft's first pick,
       // so kept players must not appear in the draftable pool). A no-op for
       // redraft leagues, whose rosters are empty at draft time.
-      sqlConditions.push(sql`NOT EXISTS (
+      const rosteredExclusionCondition = sql`NOT EXISTS (
         SELECT 1 FROM public.team_members tm
         WHERE tm.league_id = ${draft.leagueId} AND tm.player_id = p.id
-      )`);
+      )`;
+      sqlConditions.push(rosteredExclusionCondition);
 
       // Apply optional name filter
       if (search && search.trim().length > 0) {
@@ -496,20 +498,78 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         `COALESCE(cs.hitter_avg_ppg, 0) * ${gpm} + COALESCE(cs.pitching_avg_ppg, 0) * ${spm}`,
       );
 
+      // "True" ADP (real historical draft data) isn't collected yet, so the
+      // board falls back to a stack rank: each player's 1-based position when
+      // the league's *entire* draftable pool is ordered by projected value,
+      // using the league's own customized scoring settings when the league
+      // has ever edited them (player_scoring_cache row keyed by this
+      // league's id — LS-696), falling back to the default (league_id IS
+      // NULL) scoring profile otherwise. Football has no per-league scoring
+      // cache yet (LS-4568 follow-up — see the orderByKey branch above),
+      // so it ranks by the same projections/ADP pipeline column
+      // (players.projected_fantasy_points) candidate-pool.ts already uses
+      // for auto-pick.
+      //
+      // Computed as a window function over the pool-defining predicates only
+      // (sport, rostered-players exclusion, static eligibility) — deliberately
+      // *not* the already-drafted exclusion, search term, position pill, or
+      // open-roster-slot predicates layered on below — so a player's rank is
+      // fixed for the life of the draft: it does not shift when other players
+      // are picked, searched for, or filtered off the current page. Previously
+      // the board recomputed "ADP" as each player's array index within the
+      // remaining/paginated list, so drafting the top player reset the next
+      // best remaining player's ADP to 1 instead of preserving their rank.
+      const poolConditions = [
+        sportCondition,
+        rosteredExclusionCondition,
+        ...eligibilityConditions.map(({ condition }) => condition),
+      ];
+      const poolWhereClause = sql`WHERE ${sql.join(poolConditions, sql` AND `)}`;
+      const draftAdpCte =
+        leagueSport === 'football'
+          ? sql`
+        WITH draft_adp AS (
+          SELECT p.id AS player_id,
+            RANK() OVER (
+              ORDER BY COALESCE(p.projected_fantasy_points, 0) DESC
+            ) AS adp
+          FROM public.players p
+          ${poolWhereClause}
+        )
+      `
+          : sql`
+        WITH draft_adp AS (
+          SELECT p.id AS player_id,
+            RANK() OVER (
+              ORDER BY COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, 0) DESC
+            ) AS adp
+          FROM public.players p
+          LEFT JOIN public.player_scoring_cache cs_league
+            ON cs_league.player_id = p.id AND cs_league.league_id = ${draft.leagueId}
+          LEFT JOIN public.player_scoring_cache cs_default
+            ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
+          ${poolWhereClause}
+        )
+      `;
+
       // Base SELECT — no scoring join (used for non-scoring sorts).
       const basePlayerSelect = sql`
+        ${draftAdpCte}
         SELECT
           p.id, p.first_name, p.last_name, p.bref_id,
           p.stats_last_fetched_at, p.all_star_selections, p.gold_gloves,
           p.silver_sluggers, p.mvp_awards, p.cy_young_awards,
-          p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year
+          p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year,
+          da.adp AS adp
         FROM public.players p
+        LEFT JOIN draft_adp da ON da.player_id = p.id
       `;
 
       // Scoring-joined SELECT: joins only the default (NULL league) scoring cache (LS-3115).
       // Reads pre-computed per-game rates from player_scoring_cache (LS-4688) so the
       // SELECT is a column read instead of per-row arithmetic.
       const basePlayerSelectWithScoring = sql`
+        ${draftAdpCte}
         SELECT
           p.id, p.first_name, p.last_name, p.bref_id,
           p.stats_last_fetched_at, p.all_star_selections, p.gold_gloves,
@@ -517,10 +577,12 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           p.world_series_rings, p.hall_of_fame, p.rookie_of_the_year,
           COALESCE(cs.hitter_avg_ppg, 0) AS hitter_avg_ppg,
           COALESCE(cs.pitching_avg_ppg, 0) AS pitching_avg_ppg,
-          ${projMatchupExpr} AS projected_matchup_pts
+          ${projMatchupExpr} AS projected_matchup_pts,
+          da.adp AS adp
         FROM public.players p
         LEFT JOIN public.player_scoring_cache cs
           ON cs.player_id = p.id AND cs.league_id IS NULL
+        LEFT JOIN draft_adp da ON da.player_id = p.id
       `;
 
       type RawPlayerRow = {
@@ -541,6 +603,8 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         hitter_avg_ppg?: string | null;
         pitching_avg_ppg?: string | null;
         projected_matchup_pts?: string | null;
+        // Stack-rank ADP fallback (LS-696 scoring cache) — present on every branch.
+        adp?: string | number | null;
       };
 
       const mapRow = (row: RawPlayerRow) => ({
@@ -567,6 +631,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
           row.projected_matchup_pts != null
             ? Number(row.projected_matchup_pts)
             : null,
+        adp: row.adp != null ? Number(row.adp) : null,
       });
 
       // Every sort key below (including the default) reads

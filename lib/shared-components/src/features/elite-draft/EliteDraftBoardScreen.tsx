@@ -223,7 +223,7 @@ function PlayerRow({
   onPress,
 }: {
   player: DraftPlayer;
-  adp: number;
+  adp: number | null;
   canDraft: boolean;
   /** Drives the "ASSIGN" vs "DRAFT" label only — a real commissioner
    *  force-pick override, never Control All Teams (LS-9253), which should
@@ -276,7 +276,7 @@ function PlayerRow({
           {player.ppg != null ? player.ppg.toFixed(1) : '—'}
         </Text>
         <Text fontSize={9} color="$fg4" letterSpacing={0.5}>
-          ADP {adp}
+          ADP {adp ?? '—'}
         </Text>
       </YStack>
       {canDraft && (
@@ -368,18 +368,27 @@ function CompactLiveDraftBoard({
     ),
   });
 
-  // ADP is the server's own ordering of the available pool, so capture it
-  // before any client-side re-sort — otherwise the PTS sort renumbers it.
+  // `adp` is the server's stack-rank fallback (player_scoring_cache, LS-696)
+  // — a stable rank across the league's whole draftable pool, not the
+  // player's index within the current remaining/paginated list. Sorting by
+  // "ADP" re-sorts ascending by that stable value instead of trusting
+  // whatever order the server returned the page in (the default fetch order
+  // is by projectedMatchupPoints, which can disagree with the adp stack
+  // rank's own ordering).
   const rankedPlayers = useMemo(
     () =>
-      playerData.enrichedPlayers.map((player, index) => ({
+      playerData.enrichedPlayers.map((player) => ({
         player,
-        adp: index + 1,
+        adp: player.adp ?? null,
       })),
     [playerData.enrichedPlayers],
   );
   const listedPlayers = useMemo(() => {
-    if (sortKey === 'adp') return rankedPlayers;
+    if (sortKey === 'adp') {
+      return [...rankedPlayers].sort(
+        (a, b) => (a.adp ?? Infinity) - (b.adp ?? Infinity),
+      );
+    }
     return [...rankedPlayers].sort(
       (a, b) => (b.player.ppg ?? 0) - (a.player.ppg ?? 0),
     );

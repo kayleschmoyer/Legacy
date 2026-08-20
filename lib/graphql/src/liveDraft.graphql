@@ -334,6 +334,7 @@ query GetAvailableDraftPlayers(
     hitterAvgPointsPerGame
     pitchingAvgPointsPerGame
     projectedMatchupPoints
+    adp
   }
 }
 

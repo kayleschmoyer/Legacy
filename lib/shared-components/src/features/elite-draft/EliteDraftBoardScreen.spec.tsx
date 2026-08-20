@@ -1313,6 +1313,7 @@ function makeDraftPlayer(overrides: Partial<DraftPlayer> = {}): DraftPlayer {
     obp: 0.389,
     slg: 0.588,
     ppg: 11.4,
+    adp: 1,
     ...overrides,
   };
 }
@@ -1550,8 +1551,8 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
   it('re-sorts the list by projected points without renumbering ADP', () => {
     setupCompactLiveDraft({
       players: [
-        makeDraftPlayer({ id: 1, name: 'Ace Adams', ppg: 6 }),
-        makeDraftPlayer({ id: 2, name: 'Bo Baker', ppg: 12 }),
+        makeDraftPlayer({ id: 1, name: 'Ace Adams', ppg: 6, adp: 1 }),
+        makeDraftPlayer({ id: 2, name: 'Bo Baker', ppg: 12, adp: 2 }),
       ],
     });
 
@@ -1563,6 +1564,19 @@ describe('EliteDraftBoardScreen — compact viewport, live board', () => {
       screen.getAllByText(/Adams|Baker/).map((node) => node.textContent),
     ).toEqual(['Bo Baker', 'Ace Adams']);
     expect(screen.getByText('ADP 2')).toBeTruthy();
+  });
+
+  it('does not reset the best remaining player to ADP 1 once earlier picks are drafted', () => {
+    // Players 1-2 are already off the board (drafted) — only the stack-rank
+    // #3 player remains available. The board must show his own stable ADP,
+    // not renumber him to 1 just because he is first in the remaining list.
+    setupCompactLiveDraft({
+      players: [makeDraftPlayer({ id: 3, name: 'Cy Cooper', adp: 3 })],
+    });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('ADP 3')).toBeTruthy();
   });
 
   // LS-9447: the "My Squad" drawer is gone from the board tab — the Team tab

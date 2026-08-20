@@ -709,6 +709,8 @@ export type DraftPick = {
 /** A player in the context of a draft */
 export type DraftPlayer = {
   __typename?: 'DraftPlayer';
+  /** Stack-rank fallback for Average Draft Position: the player's 1-based rank across the league's entire draftable pool by projected value, using the league's customized scoring settings when it has ever edited them (falling back to default scoring otherwise). Stable for the life of the draft — it does not renumber as other players are drafted, searched for, or filtered out of the current page. Real historical ADP data is not collected yet. */
+  adp?: Maybe<Scalars['Int']['output']>;
   brefId?: Maybe<Scalars['String']['output']>;
   /** Career batting statistics for the player */
   careerBatting?: Maybe<CareerBatting>;

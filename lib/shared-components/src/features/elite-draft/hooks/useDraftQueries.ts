@@ -329,6 +329,7 @@ export function useDraftQueries({
             hitterAvgPointsPerGame?: number | null;
             pitchingAvgPointsPerGame?: number | null;
             projectedMatchupPoints?: number | null;
+            adp?: number | null;
           } =>
             p.id != null &&
             p.firstName != null &&
@@ -344,6 +345,7 @@ export function useDraftQueries({
           hitterAvgPointsPerGame: p.hitterAvgPointsPerGame ?? null,
           pitchingAvgPointsPerGame: p.pitchingAvgPointsPerGame ?? null,
           projectedMatchupPoints: p.projectedMatchupPoints ?? null,
+          adp: p.adp ?? null,
         })),
     [allRawPlayers],
   );

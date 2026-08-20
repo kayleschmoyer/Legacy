@@ -161,6 +161,7 @@ export const DraftPlayer = builder.objectRef<{
   hitterAvgPointsPerGame?: number | null;
   pitchingAvgPointsPerGame?: number | null;
   projectedMatchupPoints?: number | null;
+  adp?: number | null;
 }>('DraftPlayer');
 
 DraftPlayer.implement({
@@ -184,6 +185,17 @@ DraftPlayer.implement({
       nullable: true,
       description:
         'Projected fantasy points per matchup, accounting for the league schedule (hitter_avg_ppg * gamesPerMatchup + pitching_avg_ppg * pitcherStartsPerMatchup)',
+    }),
+    adp: t.exposeInt('adp', {
+      nullable: true,
+      description:
+        "Stack-rank fallback for Average Draft Position: the player's 1-based " +
+        "rank across the league's entire draftable pool by projected value, " +
+        "using the league's customized scoring settings when it has ever " +
+        'edited them (falling back to default scoring otherwise). Stable for ' +
+        'the life of the draft — it does not renumber as other players are ' +
+        'drafted, searched for, or filtered out of the current page. Real ' +
+        'historical ADP data is not collected yet.',
     }),
     eligiblePositions: t.stringList({
       description:

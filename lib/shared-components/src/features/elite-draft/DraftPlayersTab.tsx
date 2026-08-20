@@ -28,7 +28,7 @@ const POSITION_CHIPS = [
 interface PlayerListRow {
   kind: 'player';
   player: DraftPlayer;
-  adp: number;
+  adp: number | null;
 }
 
 interface MarkerListRow {
@@ -136,14 +136,17 @@ export function DraftPlayersTab({
   const showMarkers = selectedPosition === 'ALL' && searchTerm === '';
 
   const rows = useMemo<ListRow[]>(() => {
-    // `adp` is the player's 1-based rank in the current (already
-    // server-sorted-by-projection) list — the same proxy the Board tab's
-    // player list already uses — not a static, pre-draft Average Draft
-    // Position. No ADP field exists on `DraftPlayer` to source a real one.
-    const playerRows: PlayerListRow[] = players.map((player, index) => ({
+    // `adp` is the server's stack-rank fallback (player_scoring_cache,
+    // LS-696) — the player's 1-based rank across the league's whole
+    // draftable pool, using its customized scoring settings when it has
+    // ever edited them. Stable for the life of the draft: it does not
+    // renumber when other players are picked, so it is not simply the
+    // player's index within this (already server-sorted, already-drafted-
+    // excluded) list. Real historical ADP data isn't collected yet.
+    const playerRows: PlayerListRow[] = players.map((player) => ({
       kind: 'player',
       player,
-      adp: index + 1,
+      adp: player.adp ?? null,
     }));
     if (!showMarkers || upcomingPicks.length === 0) return playerRows;
 
@@ -336,7 +339,7 @@ function PlayersTabRow({
   onDraftPlayer,
 }: {
   player: DraftPlayer;
-  adp: number;
+  adp: number | null;
   isQueued: boolean;
   canDraft: boolean;
   onToggleQueue: (playerId: number) => void;
@@ -407,7 +410,7 @@ function PlayersTabRow({
         </Text>
         <Text fontSize={9.5} color="$textMuted" marginTop={2} numberOfLines={1}>
           {'ADP '}
-          {adp.toFixed(1)}
+          {adp != null ? adp.toFixed(1) : dash}
           {' · PROJ '}
           <Text fontSize={9.5} fontWeight="700" color="$brandGoldLight">
             {proj}
