@@ -27,6 +27,12 @@ export interface DraftPlayer {
   whip?: number;
   winPct?: number;
   gamesStarted?: number;
+  /** Career WAR (offensive for hitters, pitching for pitchers). Not currently
+   * populated by usePlayerData — the BASEBALL_COLUMNS WAR column renders an
+   * em-dash until a source is wired up. Declared here (rather than via a
+   * permissive widening cast in statColumns.ts) so the compiler enforces the
+   * field on the same type BASEBALL_COLUMNS reads (LS-9478). */
+  war?: number;
   /** Projected fantasy points per matchup (hitter_avg_ppg * gamesPerMatchup + pitching_avg_ppg * pitcherStartsPerMatchup) */
   ppg?: number | null;
   /** First MLB season (4-digit year). When paired with careerEndYear, drives the career-span sub-line. */
@@ -35,6 +41,32 @@ export interface DraftPlayer {
   careerEndYear?: number | null;
   /** Stack-rank ADP fallback — see AvailableDraftPlayer.adp. Stable across the draft (not the player's index in the remaining/undrafted list). */
   adp?: number | null;
+  // Football stat fields (LS-9478), sourced from getDraftFootballPlayerStats.
+  // Undefined — never 0 — when the player has no career row in that stat
+  // category, so STAT_COLUMNS_BY_SPORT renders an em-dash rather than a
+  // fabricated measurement (the LS-9473 postmortem this ticket exists to
+  // avoid repeating).
+  /** career_football_passing.yds */
+  passYds?: number;
+  /** career_football_passing.td */
+  passTd?: number;
+  /** career_football_rushing.yds */
+  rushYds?: number;
+  /** career_football_rushing.td */
+  rushTd?: number;
+  /** career_football_receiving.rec */
+  rec?: number;
+  /** career_football_receiving.td */
+  recTd?: number;
+  /**
+   * Board's generic TD column = rushTd + recTd. Passing TDs are intentionally
+   * excluded (they're already implied by passYds for QBs); undefined only
+   * when the player has neither a rushing nor a receiving row, not when both
+   * are a measured 0.
+   */
+  td?: number;
+  /** career_football_kicking.fgm */
+  fg?: number;
 }
 
 export interface AvailableDraftPlayer {
@@ -75,6 +107,22 @@ export interface PlayerStatsEntry {
   obp: number;
   slg: number;
   war: number;
+}
+
+/**
+ * Stats lookup entry built from the getDraftFootballPlayerStats query
+ * (LS-9478). Fields are undefined — never 0 — when the player has no row in
+ * that career_football_* table.
+ */
+export interface PlayerFootballStatsEntry {
+  playerId: number;
+  passYds?: number;
+  passTd?: number;
+  rushYds?: number;
+  rushTd?: number;
+  rec?: number;
+  recTd?: number;
+  fg?: number;
 }
 
 export interface CurrentDraftPickInfo {

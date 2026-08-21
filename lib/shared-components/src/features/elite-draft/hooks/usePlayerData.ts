@@ -3,14 +3,47 @@ import type {
   AvailableDraftPlayer,
   DraftPickRecord,
   DraftPlayer,
+  PlayerFootballStatsEntry,
   PlayerStatsEntry,
 } from '../types';
+import type { SportKind } from '../../../config/sports';
 
 const PITCHER_POSITIONS = new Set(['P', 'SP', 'RP']);
 const OUTFIELD_POSITIONS = new Set(['OF', 'CF', 'LF', 'RF']);
 
 export const isPitcherPosition = (pos: string): boolean =>
   PITCHER_POSITIONS.has(pos.toUpperCase());
+
+/**
+ * Football stat fields for a DraftPlayer (LS-9478). Every field stays
+ * undefined — never defaults to 0 — when the player has no entry in
+ * footballStatsMap (no career row in any of the four source tables) so the
+ * board renders an em-dash instead of repeating the LS-9473 fabricated-zero
+ * defect (`?? 0` on an unmeasured stat).
+ *
+ * `td` is the board's generic TD column: rushTd + recTd. Passing TDs are
+ * excluded (already implied by passYds for QBs, per the LS-9478 field-mapping
+ * decision) — it stays undefined only when the player has neither a rushing
+ * nor a receiving row, not when both are a measured 0.
+ */
+function footballStatFields(
+  stats: PlayerFootballStatsEntry | undefined,
+): Pick<
+  DraftPlayer,
+  'passYds' | 'passTd' | 'rushYds' | 'rushTd' | 'rec' | 'recTd' | 'td' | 'fg'
+> {
+  const hasRushOrRecTd = stats?.rushTd != null || stats?.recTd != null;
+  return {
+    passYds: stats?.passYds,
+    passTd: stats?.passTd,
+    rushYds: stats?.rushYds,
+    rushTd: stats?.rushTd,
+    rec: stats?.rec,
+    recTd: stats?.recTd,
+    td: hasRushOrRecTd ? (stats?.rushTd ?? 0) + (stats?.recTd ?? 0) : undefined,
+    fg: stats?.fg,
+  };
+}
 
 interface PitchingStats {
   wins: number;
@@ -30,7 +63,16 @@ interface UsePlayerDataParams {
   playerStatsMap: Map<number, PlayerStatsEntry>;
   pitchingStatsMap: Map<number, PitchingStats>;
   myTeamId: number | null;
+  /** League sport (LS-9478). Defaults to 'baseball' so existing callers that
+   * don't yet pass a sport (e.g. the spectator room) are unaffected. */
+  sport?: SportKind;
+  /** Football stat lookup (LS-9478), keyed by player id. Ignored when sport
+   * is not 'football'. Defaults to an empty map. */
+  footballStatsMap?: Map<number, PlayerFootballStatsEntry>;
 }
+
+const EMPTY_FOOTBALL_STATS_MAP: Map<number, PlayerFootballStatsEntry> =
+  new Map();
 
 export function usePlayerData({
   availablePlayers,
@@ -38,7 +80,10 @@ export function usePlayerData({
   playerStatsMap,
   pitchingStatsMap,
   myTeamId,
+  sport = 'baseball',
+  footballStatsMap = EMPTY_FOOTBALL_STATS_MAP,
 }: UsePlayerDataParams) {
+  const isFootball = sport === 'football';
   // Build a lookup map by player ID for displaying player names in history/board
   const statsLookup = useMemo(() => {
     const map = new Map<number, DraftPlayer>();
@@ -113,6 +158,9 @@ export function usePlayerData({
         gamesStarted: ps?.gamesStarted,
         ppg: ap.projectedMatchupPoints ?? null,
         adp: ap.adp ?? null,
+        ...footballStatFields(
+          isFootball ? footballStatsMap.get(ap.id) : undefined,
+        ),
       });
     }
     // Seed from pick history for drafted players absent from stats, and fix
@@ -151,6 +199,9 @@ export function usePlayerData({
             strikeouts: ps.strikeouts,
             gamesStarted: ps.gamesStarted,
           }),
+          ...footballStatFields(
+            isFootball ? footballStatsMap.get(pick.playerId) : undefined,
+          ),
         });
       } else if (pick.player.eligiblePositions?.length) {
         // Player is in map from playerStatsMap with hardcoded 'UTIL' — patch
@@ -166,7 +217,14 @@ export function usePlayerData({
       }
     }
     return map;
-  }, [availablePlayers, pickHistory, playerStatsMap, pitchingStatsMap]);
+  }, [
+    availablePlayers,
+    pickHistory,
+    playerStatsMap,
+    pitchingStatsMap,
+    isFootball,
+    footballStatsMap,
+  ]);
 
   // Merge available players with stats for rich card display
   const enrichedPlayers: DraftPlayer[] = useMemo(() => {
@@ -208,9 +266,18 @@ export function usePlayerData({
         gamesStarted: ps?.gamesStarted,
         ppg: ap.projectedMatchupPoints ?? null,
         adp: ap.adp ?? null,
+        ...footballStatFields(
+          isFootball ? footballStatsMap.get(ap.id) : undefined,
+        ),
       };
     });
-  }, [availablePlayers, playerStatsMap, pitchingStatsMap]);
+  }, [
+    availablePlayers,
+    playerStatsMap,
+    pitchingStatsMap,
+    isFootball,
+    footballStatsMap,
+  ]);
 
   // My team picks from history
   const myTeamPicks = useMemo(

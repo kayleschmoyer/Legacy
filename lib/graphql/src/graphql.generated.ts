@@ -696,6 +696,26 @@ export type Draft = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+/** Career football stat totals for a player, sourced from the career_football_* tables. Football analogue of GetDraftPlayerStats (LS-9478). */
+export type DraftFootballPlayerStats = {
+  __typename?: 'DraftFootballPlayerStats';
+  /** career_football_kicking.fgm */
+  fg?: Maybe<Scalars['Int']['output']>;
+  /** career_football_passing.td */
+  passTd?: Maybe<Scalars['Int']['output']>;
+  /** career_football_passing.yds */
+  passYds?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  /** career_football_receiving.rec */
+  rec?: Maybe<Scalars['Int']['output']>;
+  /** career_football_receiving.td */
+  recTd?: Maybe<Scalars['Int']['output']>;
+  /** career_football_rushing.td */
+  rushTd?: Maybe<Scalars['Int']['output']>;
+  /** career_football_rushing.yds */
+  rushYds?: Maybe<Scalars['Int']['output']>;
+};
+
 /** A single pick made during a draft */
 export type DraftPick = {
   __typename?: 'DraftPick';
@@ -3254,6 +3274,8 @@ export type Query = {
   getCurrentWeekForLeague?: Maybe<Scalars['Int']['output']>;
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
+  /** Career football stat totals (passing/rushing/receiving/kicking) for football players with at least one stat row. Football analogue of GetDraftPlayerStats (LS-9478). */
+  getDraftFootballPlayerStats?: Maybe<Array<DraftFootballPlayerStats>>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
   /** Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%). */
   getDraftRecommendations?: Maybe<Array<DraftRecommendation>>;
@@ -12318,6 +12340,25 @@ export type GetDraftPitchingStatsQuery = {
     winPercentage?: number | null;
     hits?: number | null;
     pitchingWAR?: number | null;
+  }> | null;
+};
+
+export type GetDraftFootballPlayerStatsQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetDraftFootballPlayerStatsQuery = {
+  __typename?: 'Query';
+  getDraftFootballPlayerStats?: Array<{
+    __typename?: 'DraftFootballPlayerStats';
+    playerId?: number | null;
+    passYds?: number | null;
+    passTd?: number | null;
+    rushYds?: number | null;
+    rushTd?: number | null;
+    rec?: number | null;
+    recTd?: number | null;
+    fg?: number | null;
   }> | null;
 };
 
@@ -31635,6 +31676,98 @@ export type GetDraftPitchingStatsSuspenseQueryHookResult = ReturnType<
 export type GetDraftPitchingStatsQueryResult = Apollo.QueryResult<
   GetDraftPitchingStatsQuery,
   GetDraftPitchingStatsQueryVariables
+>;
+export const GetDraftFootballPlayerStats = gql`
+  query GetDraftFootballPlayerStats {
+    getDraftFootballPlayerStats {
+      playerId
+      passYds
+      passTd
+      rushYds
+      rushTd
+      rec
+      recTd
+      fg
+    }
+  }
+`;
+
+/**
+ * __useGetDraftFootballPlayerStatsQuery__
+ *
+ * To run a query within a React component, call `useGetDraftFootballPlayerStatsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetDraftFootballPlayerStatsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetDraftFootballPlayerStatsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetDraftFootballPlayerStatsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetDraftFootballPlayerStatsQuery,
+    GetDraftFootballPlayerStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetDraftFootballPlayerStatsQuery,
+    GetDraftFootballPlayerStatsQueryVariables
+  >(GetDraftFootballPlayerStats, options);
+}
+export function useGetDraftFootballPlayerStatsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetDraftFootballPlayerStatsQuery,
+    GetDraftFootballPlayerStatsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetDraftFootballPlayerStatsQuery,
+    GetDraftFootballPlayerStatsQueryVariables
+  >(GetDraftFootballPlayerStats, options);
+}
+export function useGetDraftFootballPlayerStatsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetDraftFootballPlayerStatsQuery,
+        GetDraftFootballPlayerStatsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetDraftFootballPlayerStatsQuery,
+    GetDraftFootballPlayerStatsQueryVariables
+  >(
+    GetDraftFootballPlayerStats,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetDraftFootballPlayerStatsQuery,
+          GetDraftFootballPlayerStatsQueryVariables
+        >,
+  );
+}
+export type GetDraftFootballPlayerStatsQueryHookResult = ReturnType<
+  typeof useGetDraftFootballPlayerStatsQuery
+>;
+export type GetDraftFootballPlayerStatsLazyQueryHookResult = ReturnType<
+  typeof useGetDraftFootballPlayerStatsLazyQuery
+>;
+export type GetDraftFootballPlayerStatsSuspenseQueryHookResult = ReturnType<
+  typeof useGetDraftFootballPlayerStatsSuspenseQuery
+>;
+export type GetDraftFootballPlayerStatsQueryResult = Apollo.QueryResult<
+  GetDraftFootballPlayerStatsQuery,
+  GetDraftFootballPlayerStatsQueryVariables
 >;
 export const GetDraftRecommendations = gql`
   query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {

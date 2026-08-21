@@ -811,6 +811,47 @@ type Draft {
 }
 
 """
+Career football stat totals for a player, sourced from the career_football_* tables. Football analogue of GetDraftPlayerStats (LS-9478).
+"""
+type DraftFootballPlayerStats {
+  """
+  career_football_kicking.fgm
+  """
+  fg: Int
+
+  """
+  career_football_passing.td
+  """
+  passTd: Int
+
+  """
+  career_football_passing.yds
+  """
+  passYds: Int
+  playerId: Int
+
+  """
+  career_football_receiving.rec
+  """
+  rec: Int
+
+  """
+  career_football_receiving.td
+  """
+  recTd: Int
+
+  """
+  career_football_rushing.td
+  """
+  rushTd: Int
+
+  """
+  career_football_rushing.yds
+  """
+  rushYds: Int
+}
+
+"""
 A single pick made during a draft
 """
 type DraftPick {
@@ -3685,6 +3726,11 @@ type Query {
   getCurrentWeekForLeague(leagueId: Int!): Int
   getDirectMessages(limit: Int, otherUserId: Int!): [DirectMessage!]
   getDraft(draftId: Int!): Draft
+
+  """
+  Career football stat totals (passing/rushing/receiving/kicking) for football players with at least one stat row. Football analogue of GetDraftPlayerStats (LS-9478).
+  """
+  getDraftFootballPlayerStats: [DraftFootballPlayerStats!]
   getDraftPicks(draftId: Int!): [DraftPick!]
 
   """

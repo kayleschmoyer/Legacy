@@ -1,26 +1,13 @@
 import type { DraftPlayer } from './types';
 import type { SportKind } from '../../config/sports';
 
-// Football stat fields on DraftPlayer are not yet wired; the loader still
-// serves baseball fields, so a football board renders em-dashes until real
-// football stats ingestion lands (a follow-up outside epic LS-4568). Reads go
-// through a permissive view that may return undefined.
-type SportPlayerView = DraftPlayer & {
-  passYds?: number;
-  rushYds?: number;
-  rec?: number;
-  td?: number;
-  fg?: number;
-  war?: number;
-};
-
 export interface StatColumn {
   /** Header label rendered in the data table thead. */
   label: string;
   /** Renders the cell value for a player; returns the em-dash for missing data. */
-  render: (player: SportPlayerView) => string;
+  render: (player: DraftPlayer) => string;
   /** Returns a numeric value for sorting; missing/N-A fields should return -Infinity so they sort last. */
-  sortValue: (player: SportPlayerView) => number;
+  sortValue: (player: DraftPlayer) => number;
 }
 
 const dash = '—';

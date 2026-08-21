@@ -6,7 +6,7 @@ import {
   buildEligibilityConditions,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { LOGGER } from '@legacy-sports/logging';
 
@@ -20,6 +20,7 @@ import {
 import {
   CurrentDraftPick,
   Draft,
+  DraftFootballPlayerStats,
   DraftPick,
   DraftPlayer,
   DraftQueueEntry,
@@ -750,6 +751,91 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       `;
       const result = await context.db.execute(rawQuery);
       return (result.rows as unknown as RawPlayerRow[]).map(mapRow);
+    },
+  }),
+);
+
+/**
+ * Query: Get career football stat totals for the draft board (LS-9478)
+ *
+ * Football analogue of GetDraftPlayerStats/GetDraftPitchingStats — those two
+ * queries feed the board's baseball stat columns (AVG/HR/RBI/... and
+ * ERA/W/K/...) from career_batting/career_pitching; this one feeds the
+ * football columns (PASS YDS/RUSH YDS/REC/TD/FG) from the four
+ * career_football_* tables via LEFT JOIN. Kept as its own query rather than
+ * folded into getAvailableDraftPlayers (the board's largest DB-time consumer
+ * per the LS-9311 note in DraftUtils.ts) so baseball leagues never pay for
+ * these joins: the client only calls this query for football leagues, and
+ * the WHERE clause below is a second, server-side guarantee of the same.
+ *
+ * Only players with at least one of the four career rows are returned —
+ * players with none (e.g. a DB/LB/DL with no offensive/kicking stats) are
+ * simply absent, which the client must treat as "no data" (em-dash), not 0
+ * (LS-9473 fabricated-zero postmortem).
+ */
+builder.queryField('getDraftFootballPlayerStats', (t) =>
+  t.field({
+    type: [DraftFootballPlayerStats],
+    description:
+      'Career football stat totals (passing/rushing/receiving/kicking) for football players with at least one stat row. Football analogue of GetDraftPlayerStats (LS-9478).',
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const rows = await context.db
+        .select({
+          playerId: PublicSchema.players.id,
+          passYds: PublicSchema.careerFootballPassing.yds,
+          passTd: PublicSchema.careerFootballPassing.td,
+          rushYds: PublicSchema.careerFootballRushing.yds,
+          rushTd: PublicSchema.careerFootballRushing.td,
+          rec: PublicSchema.careerFootballReceiving.rec,
+          recTd: PublicSchema.careerFootballReceiving.td,
+          fg: PublicSchema.careerFootballKicking.fgm,
+        })
+        .from(PublicSchema.players)
+        .leftJoin(
+          PublicSchema.careerFootballPassing,
+          eq(
+            PublicSchema.careerFootballPassing.playerId,
+            PublicSchema.players.id,
+          ),
+        )
+        .leftJoin(
+          PublicSchema.careerFootballRushing,
+          eq(
+            PublicSchema.careerFootballRushing.playerId,
+            PublicSchema.players.id,
+          ),
+        )
+        .leftJoin(
+          PublicSchema.careerFootballReceiving,
+          eq(
+            PublicSchema.careerFootballReceiving.playerId,
+            PublicSchema.players.id,
+          ),
+        )
+        .leftJoin(
+          PublicSchema.careerFootballKicking,
+          eq(
+            PublicSchema.careerFootballKicking.playerId,
+            PublicSchema.players.id,
+          ),
+        )
+        .where(
+          and(
+            eq(PublicSchema.players.sport, 'football'),
+            or(
+              isNotNull(PublicSchema.careerFootballPassing.playerId),
+              isNotNull(PublicSchema.careerFootballRushing.playerId),
+              isNotNull(PublicSchema.careerFootballReceiving.playerId),
+              isNotNull(PublicSchema.careerFootballKicking.playerId),
+            ),
+          ),
+        );
+
+      return rows;
     },
   }),
 );

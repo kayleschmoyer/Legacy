@@ -928,6 +928,8 @@ export function EliteDraftBoardScreen({
     playerStatsMap: queries.playerStatsMap,
     pitchingStatsMap: queries.pitchingStatsMap,
     myTeamId: queries.myTeamId,
+    sport,
+    footballStatsMap: queries.footballStatsMap,
   });
 
   const actions = useDraftActions({

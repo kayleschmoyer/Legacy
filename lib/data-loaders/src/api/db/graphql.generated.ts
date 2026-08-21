@@ -690,6 +690,26 @@ export type Draft = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+/** Career football stat totals for a player, sourced from the career_football_* tables. Football analogue of GetDraftPlayerStats (LS-9478). */
+export type DraftFootballPlayerStats = {
+  __typename?: 'DraftFootballPlayerStats';
+  /** career_football_kicking.fgm */
+  fg?: Maybe<Scalars['Int']['output']>;
+  /** career_football_passing.td */
+  passTd?: Maybe<Scalars['Int']['output']>;
+  /** career_football_passing.yds */
+  passYds?: Maybe<Scalars['Int']['output']>;
+  playerId?: Maybe<Scalars['Int']['output']>;
+  /** career_football_receiving.rec */
+  rec?: Maybe<Scalars['Int']['output']>;
+  /** career_football_receiving.td */
+  recTd?: Maybe<Scalars['Int']['output']>;
+  /** career_football_rushing.td */
+  rushTd?: Maybe<Scalars['Int']['output']>;
+  /** career_football_rushing.yds */
+  rushYds?: Maybe<Scalars['Int']['output']>;
+};
+
 /** A single pick made during a draft */
 export type DraftPick = {
   __typename?: 'DraftPick';
@@ -709,6 +729,8 @@ export type DraftPick = {
 /** A player in the context of a draft */
 export type DraftPlayer = {
   __typename?: 'DraftPlayer';
+  /** Stack-rank fallback for Average Draft Position: the player's 1-based rank across the league's entire draftable pool by projected value, using the league's customized scoring settings when it has ever edited them (falling back to default scoring otherwise). Stable for the life of the draft — it does not renumber as other players are drafted, searched for, or filtered out of the current page. Real historical ADP data is not collected yet. */
+  adp?: Maybe<Scalars['Int']['output']>;
   brefId?: Maybe<Scalars['String']['output']>;
   /** Career batting statistics for the player */
   careerBatting?: Maybe<CareerBatting>;
@@ -3246,6 +3268,8 @@ export type Query = {
   getCurrentWeekForLeague?: Maybe<Scalars['Int']['output']>;
   getDirectMessages?: Maybe<Array<DirectMessage>>;
   getDraft?: Maybe<Draft>;
+  /** Career football stat totals (passing/rushing/receiving/kicking) for football players with at least one stat row. Football analogue of GetDraftPlayerStats (LS-9478). */
+  getDraftFootballPlayerStats?: Maybe<Array<DraftFootballPlayerStats>>;
   getDraftPicks?: Maybe<Array<DraftPick>>;
   /** Returns top-5 draft pick recommendations for a team using the Draft Intelligence algorithm (stat value 50% + positional need 30% + scarcity 20%). */
   getDraftRecommendations?: Maybe<Array<DraftRecommendation>>;

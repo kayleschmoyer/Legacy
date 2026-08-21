@@ -410,6 +410,23 @@ query GetDraftPitchingStats($limit: Int, $minGames: Int) {
   }
 }
 
+# Career football stat totals for the draft board (LS-9478). Football
+# analogue of GetDraftPlayerStats/GetDraftPitchingStats — fetched once per
+# draft (not scoped to available players) and matched client-side, same
+# pattern as the baseball queries above. Only called for football leagues.
+query GetDraftFootballPlayerStats {
+  getDraftFootballPlayerStats {
+    playerId
+    passYds
+    passTd
+    rushYds
+    rushTd
+    rec
+    recTd
+    fg
+  }
+}
+
 # Server-computed draft pick recommendations (LS-467)
 # Refetch after each pick to keep suggestions current.
 query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {

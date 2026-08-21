@@ -5,6 +5,7 @@ import { useApolloClient, useQuery } from '@apollo/client/react';
 import {
   GetAvailableDraftPlayers as GET_AVAILABLE_DRAFT_PLAYERS,
   GetCurrentDraftPick as GET_CURRENT_DRAFT_PICK,
+  GetDraftFootballPlayerStats as GET_DRAFT_FOOTBALL_PLAYER_STATS,
   GetDraftPicks as GET_DRAFT_PICKS,
   GetDraftPitchingStats as GET_DRAFT_PITCHING_STATS,
   GetDraftPlayerStats as GET_DRAFT_PLAYER_STATS,
@@ -19,6 +20,7 @@ import {
   type GetAvailableDraftPlayersQueryVariables,
   type GetCurrentDraftPickQuery,
   type GetCurrentDraftPickQueryVariables,
+  type GetDraftFootballPlayerStatsQuery,
   type GetDraftPicksQuery,
   type GetDraftPicksQueryVariables,
   type GetDraftPitchingStatsQuery,
@@ -34,12 +36,14 @@ import {
   type GetMyDraftQueueQueryVariables,
   type GetPositionsForLeagueQuery,
   type GetPositionsForLeagueQueryVariables,
+  Sport,
 } from '@legacy-sports/graphql';
 import type {
   AvailableDraftPlayer,
   CurrentDraftPickInfo,
   DraftPickRecord,
   LeagueTeam,
+  PlayerFootballStatsEntry,
   PlayerStatsEntry,
 } from '../types';
 import { normalizeTeamId } from '../utils';
@@ -447,6 +451,42 @@ export function useDraftQueries({
     return map;
   }, [pitchingStatsData]);
 
+  // ---- Career Football Stats (LS-9478) ----
+  // Football analogue of the career batting/pitching queries above. Skipped
+  // entirely for baseball leagues (and before the league's sport is known)
+  // so baseball boards never pay for this query or its LEFT JOINs — the
+  // resolver's own WHERE clause is a second, server-side guarantee of the
+  // same (see getDraftFootballPlayerStats).
+  const isFootballLeague = league?.sport === Sport.Football;
+  const { data: footballStatsData } =
+    useQuery<GetDraftFootballPlayerStatsQuery>(
+      GET_DRAFT_FOOTBALL_PLAYER_STATS,
+      {
+        skip: isAuctionDraft || !isFootballLeague,
+        errorPolicy: 'all',
+      },
+    );
+
+  const footballStatsMap = useMemo(() => {
+    const map = new Map<number, PlayerFootballStatsEntry>();
+    const rows = footballStatsData?.getDraftFootballPlayerStats;
+    if (!Array.isArray(rows)) return map;
+    for (const r of rows) {
+      if (r?.playerId == null) continue;
+      map.set(r.playerId, {
+        playerId: r.playerId,
+        passYds: r.passYds ?? undefined,
+        passTd: r.passTd ?? undefined,
+        rushYds: r.rushYds ?? undefined,
+        rushTd: r.rushTd ?? undefined,
+        rec: r.rec ?? undefined,
+        recTd: r.recTd ?? undefined,
+        fg: r.fg ?? undefined,
+      });
+    }
+    return map;
+  }, [footballStatsData]);
+
   // ---- Auto-pick statuses ----
   // No pollInterval here — statuses are refetched via explicit calls after
   // pick events (useDraftWebSocket) and after the user toggles their own
@@ -616,6 +656,7 @@ export function useDraftQueries({
     // Stats
     playerStatsMap,
     pitchingStatsMap,
+    footballStatsMap,
     // Auto-pick / team order
     boardOrderedTeams,
     autoPickTeamIds,

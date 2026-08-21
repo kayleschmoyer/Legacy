@@ -216,6 +216,65 @@ DraftPlayer.implement({
 });
 
 /**
+ * DraftFootballPlayerStats — career football stat totals for the draft
+ * board's table/card views (LS-9478). Football analogue of the baseball
+ * GetDraftPlayerStats/GetDraftPitchingStats queries: unlike baseball,
+ * football's box-score categories (passing/rushing/receiving/kicking) are
+ * combined into a single row per player rather than split by batter/pitcher.
+ *
+ * Each field is null — never 0 — when the player has no row in that career
+ * table, so the client can distinguish "measured zero" from "never
+ * measured" and render an em-dash for the latter (LS-9473 fabricated-zero
+ * postmortem).
+ */
+export const DraftFootballPlayerStats = builder.objectRef<{
+  playerId: number;
+  passYds: number | null;
+  passTd: number | null;
+  rushYds: number | null;
+  rushTd: number | null;
+  rec: number | null;
+  recTd: number | null;
+  fg: number | null;
+}>('DraftFootballPlayerStats');
+
+DraftFootballPlayerStats.implement({
+  description:
+    'Career football stat totals for a player, sourced from the career_football_* tables. Football analogue of GetDraftPlayerStats (LS-9478).',
+  fields: (t) => ({
+    playerId: t.exposeInt('playerId'),
+    passYds: t.exposeInt('passYds', {
+      nullable: true,
+      description: 'career_football_passing.yds',
+    }),
+    passTd: t.exposeInt('passTd', {
+      nullable: true,
+      description: 'career_football_passing.td',
+    }),
+    rushYds: t.exposeInt('rushYds', {
+      nullable: true,
+      description: 'career_football_rushing.yds',
+    }),
+    rushTd: t.exposeInt('rushTd', {
+      nullable: true,
+      description: 'career_football_rushing.td',
+    }),
+    rec: t.exposeInt('rec', {
+      nullable: true,
+      description: 'career_football_receiving.rec',
+    }),
+    recTd: t.exposeInt('recTd', {
+      nullable: true,
+      description: 'career_football_receiving.td',
+    }),
+    fg: t.exposeInt('fg', {
+      nullable: true,
+      description: 'career_football_kicking.fgm',
+    }),
+  }),
+});
+
+/**
  * DraftTeamOrder - Represents a single team's draft slot position
  */
 export const DraftTeamOrderEntry = builder.objectRef<{
