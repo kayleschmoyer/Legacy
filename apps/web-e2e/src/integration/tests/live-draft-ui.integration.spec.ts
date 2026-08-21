@@ -296,6 +296,40 @@ test.describe
       { label: 'Manager 3', page: managerPage3 },
     ];
 
+    // LS-9410: `page.on('websocket', ...)` only fires for a WebSocket created
+    // AFTER the listener is attached — it does not retroactively see a socket
+    // that already opened. The draft board navigation below (`page.goto`) is
+    // a full page load that tears down and recreates each page's WebSocket
+    // client, so these listeners MUST be registered before that navigation.
+    // The previous placement (inside the "Make all draft picks" step, after
+    // navigation + the "LIVE DRAFT" wait + a currentPick poll had already
+    // completed) attached 8-30+s too late: every socket had already opened
+    // and fired its one-time 'websocket' event, so wsFrames stayed empty for
+    // the whole draft regardless of whether the server actually broadcast —
+    // masquerading as a "WS stack may be down" failure (LS-8884 canary) on
+    // every run instead of only on a genuine delivery outage.
+    const wsFrames: { label: string; type: string; receivedAt: number }[] = [];
+    for (const { label, page } of pages) {
+      page.on('websocket', (ws) => {
+        ws.on('framereceived', (frame) => {
+          try {
+            const payload = JSON.parse(String(frame.payload)) as {
+              type?: string;
+            };
+            if (payload?.type) {
+              wsFrames.push({
+                label,
+                type: payload.type,
+                receivedAt: Date.now(),
+              });
+            }
+          } catch {
+            // Non-JSON frame (e.g. a heartbeat/pong) — not a notification.
+          }
+        });
+      });
+    }
+
     await test.step('All users navigate to draft board', async () => {
       const draftUrl = `/baseball/league/${state.leagueId}/draft`;
       await Promise.all(
@@ -394,31 +428,10 @@ test.describe
 
       // LS-8884: every other assertion in this suite detects a pick via the
       // 5 s Apollo HTTP poll, so a total outage of the deployed WebSocket
-      // stack would never fail CI. Listen for raw WS frames on every client
-      // now, before any picks are made, so the first pick can be verified as
-      // WS-delivered independently of that poll (see wsPickVerified below).
-      const wsFrames: { label: string; type: string; receivedAt: number }[] =
-        [];
-      for (const { label, page } of pages) {
-        page.on('websocket', (ws) => {
-          ws.on('framereceived', (frame) => {
-            try {
-              const payload = JSON.parse(String(frame.payload)) as {
-                type?: string;
-              };
-              if (payload?.type) {
-                wsFrames.push({
-                  label,
-                  type: payload.type,
-                  receivedAt: Date.now(),
-                });
-              }
-            } catch {
-              // Non-JSON frame (e.g. a heartbeat/pong) — not a notification.
-            }
-          });
-        });
-      }
+      // stack would never fail CI. wsFrames is populated by the raw WS frame
+      // listeners registered before navigation, above (LS-9410), so the first
+      // pick can be verified as WS-delivered independently of that poll (see
+      // wsPickVerified below).
       let wsPickConfirmed = false;
       let wsPickAttempts = 0;
       // Cap retries rather than gating strictly on pick #1: the WS connection
