@@ -46,7 +46,12 @@ describe('JoinMockDraftScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockJoinMockDraft.mockResolvedValue({
-      data: { joinMockDraft: { leagueId: 42, id: 55, name: 'My Team' } },
+      data: {
+        joinMockDraft: {
+          team: { leagueId: 42, id: 55, name: 'My Team' },
+          sport: 'baseball',
+        },
+      },
     });
   });
 

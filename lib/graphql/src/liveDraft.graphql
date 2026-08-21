@@ -473,8 +473,11 @@ mutation InitializeMockDraft(
 
 mutation JoinMockDraft($inviteCode: String!, $teamName: String!) {
   joinMockDraft(inviteCode: $inviteCode, teamName: $teamName) {
-    id
-    name
-    leagueId
+    team {
+      id
+      name
+      leagueId
+    }
+    sport
   }
 }

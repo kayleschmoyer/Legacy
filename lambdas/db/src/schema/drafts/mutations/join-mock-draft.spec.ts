@@ -1,5 +1,5 @@
 /**
- * Unit tests for joinMockDraft resolver (LS-9181)
+ * Unit tests for joinMockDraft resolver (LS-9181, LS-9480)
  *
  * Test list:
  *   1. UNAUTHENTICATED guard — ctx.user = null → UNAUTHENTICATED
@@ -8,7 +8,8 @@
  *   4. BAD_USER_INPUT — league draftStatus is not 'not-started'
  *   5. BAD_USER_INPUT — caller is already a member
  *   6. BAD_USER_INPUT — claimUnassignedTeamForUser reports a full league
- *   7. Success — claims a team, no capCheck passed, returns the team
+ *   7. Success — claims a team, no capCheck passed, returns { team, sport }
+ *   8. Success — returns the football league's sport, not a hardcoded baseball (LS-9480)
  */
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -46,6 +47,13 @@ async function captureJoinMockDraftResolver(): Promise<
           },
         });
       }),
+      // The module also declares the JoinMockDraftResult wrapper type
+      // (objectRef + objectType) at import time, ahead of the
+      // mutationField call captured above — both must be stubbed or the
+      // `await import('./join-mock-draft')` below throws before capturing
+      // anything.
+      objectRef: jest.fn(() => ({})),
+      objectType: jest.fn(),
     },
   }));
 
@@ -65,6 +73,7 @@ async function captureJoinMockDraftResolver(): Promise<
         isMockDraft: 'isMockDraft',
         draftStatus: 'draftStatus',
         inviteCode: 'inviteCode',
+        sport: 'sport',
       },
       leagueMembers: { leagueId: 'leagueId', userId: 'userId' },
       teams: {
@@ -130,6 +139,7 @@ async function captureJoinMockDraftResolver(): Promise<
 
   jest.doMock('../../leagues/types', () => ({
     Team: 'Team',
+    SportKindEnum: 'Sport',
   }));
 
   await import('./join-mock-draft');
@@ -241,11 +251,18 @@ describe('joinMockDraft input validation', () => {
 });
 
 describe('joinMockDraft success', () => {
-  it('claims an open team without a capCheck and returns it', async () => {
+  it('claims an open team without a capCheck and returns { team, sport }', async () => {
     const resolve = await captureJoinMockDraftResolver();
     claimUnassignedTeamForUser.mockResolvedValue({ teamId: 55 });
     const db = makeDb({
-      leagueRows: [{ id: 1, isMockDraft: true, draftStatus: 'not-started' }],
+      leagueRows: [
+        {
+          id: 1,
+          isMockDraft: true,
+          draftStatus: 'not-started',
+          sport: 'football',
+        },
+      ],
       teamRows: [{ id: 55, leagueId: 1, name: 'My New Team' }],
     });
 
@@ -269,14 +286,56 @@ describe('joinMockDraft success', () => {
     expect(claimUnassignedTeamForUser.mock.calls[0][1]).not.toHaveProperty(
       'capCheck',
     );
-    expect(result).toMatchObject({ id: 55, leagueId: 1 });
+    expect(result).toMatchObject({
+      team: { id: 55, leagueId: 1 },
+      sport: 'football',
+    });
+  });
+
+  // LS-9480: the joiner reaches this mutation without ever having chosen a
+  // sport-specific route (a mock-draft invite code carries no sport hint),
+  // so the client can only route correctly if this resolver reports the
+  // *actual* league sport rather than a hardcoded/assumed one. Exercising
+  // both sports (this test + the one above) guards against a
+  // find-and-replace that swaps which literal is hardcoded rather than
+  // wiring the real column through.
+  it("returns the league's actual sport, not a hardcoded baseball", async () => {
+    const resolve = await captureJoinMockDraftResolver();
+    claimUnassignedTeamForUser.mockResolvedValue({ teamId: 55 });
+    const db = makeDb({
+      leagueRows: [
+        {
+          id: 1,
+          isMockDraft: true,
+          draftStatus: 'not-started',
+          sport: 'baseball',
+        },
+      ],
+      teamRows: [{ id: 55, leagueId: 1, name: 'My New Team' }],
+    });
+
+    const result = await resolve(
+      {},
+      ARGS,
+      { user: { id: 1, username: 'tester' }, db },
+      undefined,
+    );
+
+    expect(result).toMatchObject({ sport: 'baseball' });
   });
 
   it('does not throw when the league chat notification fails (best-effort)', async () => {
     const resolve = await captureJoinMockDraftResolver();
     claimUnassignedTeamForUser.mockResolvedValue({ teamId: 55 });
     const db = makeDb({
-      leagueRows: [{ id: 1, isMockDraft: true, draftStatus: 'not-started' }],
+      leagueRows: [
+        {
+          id: 1,
+          isMockDraft: true,
+          draftStatus: 'not-started',
+          sport: 'football',
+        },
+      ],
       teamRows: [{ id: 55, leagueId: 1, name: 'My New Team' }],
     });
 
@@ -295,7 +354,7 @@ describe('joinMockDraft success', () => {
       undefined,
     );
 
-    expect(result).toMatchObject({ id: 55, leagueId: 1 });
+    expect(result).toMatchObject({ team: { id: 55, leagueId: 1 } });
   });
 });
 

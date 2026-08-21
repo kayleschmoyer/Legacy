@@ -1399,6 +1399,14 @@ export type JoinLeaguePayload = {
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** The team claimed by joinMockDraft, plus the league sport. */
+export type JoinMockDraftResult = {
+  __typename?: 'JoinMockDraftResult';
+  /** Sport of the joined mock draft — lets the client route to /football/... or /baseball/... without guessing (LS-9480). */
+  sport?: Maybe<Sport>;
+  team?: Maybe<Team>;
+};
+
 /** A manager's pre-draft designation of a roster player to keep into the next season. Locks once the league draft goes live. (LS-8673) */
 export type KeeperDesignation = {
   __typename?: 'KeeperDesignation';
@@ -2030,7 +2038,7 @@ export type Mutation = {
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   /** Join a Shared mock draft lobby by invite code, claiming an open slot that would otherwise be seated by AI when the commissioner starts the draft (LS-9181). Fails once the draft has started — join before then. */
-  joinMockDraft?: Maybe<Team>;
+  joinMockDraft?: Maybe<JoinMockDraftResult>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
   /** Join a Season Draft Game via invite code. Returns the game ID. */
   joinSeasonDraftGame?: Maybe<Scalars['Int']['output']>;
@@ -12414,10 +12422,14 @@ export type JoinMockDraftMutationVariables = Exact<{
 export type JoinMockDraftMutation = {
   __typename?: 'Mutation';
   joinMockDraft?: {
-    __typename?: 'Team';
-    id?: number | null;
-    name?: string | null;
-    leagueId?: number | null;
+    __typename?: 'JoinMockDraftResult';
+    sport?: Sport | null;
+    team?: {
+      __typename?: 'Team';
+      id?: number | null;
+      name?: string | null;
+      leagueId?: number | null;
+    } | null;
   } | null;
 };
 
@@ -31951,9 +31963,12 @@ export type InitializeMockDraftMutationOptions = BaseMutationOptions<
 export const JoinMockDraft = gql`
   mutation JoinMockDraft($inviteCode: String!, $teamName: String!) {
     joinMockDraft(inviteCode: $inviteCode, teamName: $teamName) {
-      id
-      name
-      leagueId
+      team {
+        id
+        name
+        leagueId
+      }
+      sport
     }
   }
 `;

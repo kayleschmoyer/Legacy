@@ -35,19 +35,20 @@ export function JoinMockDraftPage(): React.JSX.Element {
       const result = await joinMockDraft({
         variables: { inviteCode, teamName },
       });
-      const leagueId = result.data?.joinMockDraft?.leagueId;
-      if (leagueId) {
-        // Hardcoded to baseball, mirroring JoinLeagueByCodePage: joinMockDraft
-        // returns a Team, which carries no sport, so the joiner's sport isn't
-        // known here. Football mock drafts still render correctly — both sport
-        // routes mount EliteDraftBoardScreen, which reads league.sport itself
-        // (LS-9470) — only the URL says baseball.
-        navigate(`/baseball/league/${leagueId}/draft`);
+      const leagueId = result.data?.joinMockDraft?.team?.leagueId;
+      const sport = result.data?.joinMockDraft?.sport;
+      if (leagueId && sport) {
+        // joinMockDraft returns the league's sport alongside the claimed team
+        // (LS-9480) — the joiner reaches this page without ever choosing a
+        // sport-specific route, so routing on the mutation result (rather
+        // than a hardcoded/guessed sport) is what keeps FootballGate applied
+        // to football joiners the same way it already applies to creators.
+        navigate(`/${sport}/league/${leagueId}/draft`);
       } else {
         setError(
           'Joined the mock draft but navigation failed — please visit My Leagues.',
         );
-        LOGGER.warn('joinMockDraft mutation returned no leagueId', {
+        LOGGER.warn('joinMockDraft mutation returned no leagueId or sport', {
           data: result.data?.joinMockDraft,
         });
       }

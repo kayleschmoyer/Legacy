@@ -1393,6 +1393,14 @@ export type JoinLeaguePayload = {
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
+/** The team claimed by joinMockDraft, plus the league sport. */
+export type JoinMockDraftResult = {
+  __typename?: 'JoinMockDraftResult';
+  /** Sport of the joined mock draft — lets the client route to /football/... or /baseball/... without guessing (LS-9480). */
+  sport?: Maybe<Sport>;
+  team?: Maybe<Team>;
+};
+
 /** A manager's pre-draft designation of a roster player to keep into the next season. Locks once the league draft goes live. (LS-8673) */
 export type KeeperDesignation = {
   __typename?: 'KeeperDesignation';
@@ -2024,7 +2032,7 @@ export type Mutation = {
   joinLeague?: Maybe<JoinLeaguePayload>;
   joinLeagueByCode?: Maybe<Team>;
   /** Join a Shared mock draft lobby by invite code, claiming an open slot that would otherwise be seated by AI when the commissioner starts the draft (LS-9181). Fails once the draft has started — join before then. */
-  joinMockDraft?: Maybe<Team>;
+  joinMockDraft?: Maybe<JoinMockDraftResult>;
   joinPublicLeague?: Maybe<JoinLeaguePayload>;
   /** Join a Season Draft Game via invite code. Returns the game ID. */
   joinSeasonDraftGame?: Maybe<Scalars['Int']['output']>;

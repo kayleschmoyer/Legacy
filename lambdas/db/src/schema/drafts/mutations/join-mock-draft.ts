@@ -19,11 +19,42 @@ import { GraphQLError } from 'graphql';
 import { builder } from '../../builder';
 import { AuthenticationError, UserInputError } from '../../graphql-errors';
 import { claimUnassignedTeamForUser } from '../../leagues/mutations';
-import { Team } from '../../leagues/types';
+import { SportKindEnum, Team } from '../../leagues/types';
+
+// ── Response type ────────────────────────────────────────────────────────────
+// joinMockDraft returns the league's sport alongside the claimed team
+// (LS-9480): the joiner didn't choose a sport-specific route to get here (a
+// mock-draft invite code carries no sport hint), so the sport isn't knowable
+// client-side until the join resolves. Team itself intentionally carries no
+// sport — that would require a league DataLoader on every Team consumer just
+// to serve this one caller — so this mutation-local wrapper is the smallest
+// way to hand the joiner what it needs to route to the right board.
+interface JoinMockDraftResultShape {
+  team: typeof Team.$inferType;
+  sport: 'baseball' | 'football';
+}
+
+const JoinMockDraftResult = builder.objectRef<JoinMockDraftResultShape>(
+  'JoinMockDraftResult',
+);
+
+builder.objectType(JoinMockDraftResult, {
+  description: 'The team claimed by joinMockDraft, plus the league sport.',
+  fields: (t) => ({
+    team: t.field({ type: Team, resolve: (parent) => parent.team }),
+    sport: t.field({
+      type: SportKindEnum,
+      description:
+        'Sport of the joined mock draft — lets the client route to ' +
+        '/football/... or /baseball/... without guessing (LS-9480).',
+      resolve: (parent) => parent.sport,
+    }),
+  }),
+});
 
 builder.mutationField('joinMockDraft', (t) =>
   t.field({
-    type: Team,
+    type: JoinMockDraftResult,
     description:
       'Join a Shared mock draft lobby by invite code, claiming an open slot ' +
       'that would otherwise be seated by AI when the commissioner starts the ' +
@@ -48,6 +79,7 @@ builder.mutationField('joinMockDraft', (t) =>
             id: PublicSchema.leagues.id,
             isMockDraft: PublicSchema.leagues.isMockDraft,
             draftStatus: PublicSchema.leagues.draftStatus,
+            sport: PublicSchema.leagues.sport,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.inviteCode, inviteCode.toUpperCase()))
@@ -166,7 +198,7 @@ builder.mutationField('joinMockDraft', (t) =>
           );
         }
 
-        return team;
+        return { team, sport: league.sport };
       } catch (error) {
         if (error instanceof GraphQLError) {
           throw error;

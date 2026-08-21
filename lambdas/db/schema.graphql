@@ -1600,6 +1600,17 @@ type JoinLeaguePayload {
 }
 
 """
+The team claimed by joinMockDraft, plus the league sport.
+"""
+type JoinMockDraftResult {
+  """
+  Sport of the joined mock draft — lets the client route to /football/... or /baseball/... without guessing (LS-9480).
+  """
+  sport: Sport
+  team: Team
+}
+
+"""
 A manager's pre-draft designation of a roster player to keep into the next season. Locks once the league draft goes live. (LS-8673)
 """
 type KeeperDesignation {
@@ -2630,7 +2641,7 @@ type Mutation {
   """
   Join a Shared mock draft lobby by invite code, claiming an open slot that would otherwise be seated by AI when the commissioner starts the draft (LS-9181). Fails once the draft has started — join before then.
   """
-  joinMockDraft(inviteCode: String!, teamName: String!): Team
+  joinMockDraft(inviteCode: String!, teamName: String!): JoinMockDraftResult
   joinPublicLeague(leagueId: Int!, teamName: String!): JoinLeaguePayload
 
   """

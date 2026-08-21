@@ -74,7 +74,9 @@ jest.mock('@legacy-sports/shared-components/draft', () => ({
 }));
 
 let mockJoinResult: () => Promise<unknown> = () =>
-  Promise.resolve({ data: { joinMockDraft: { leagueId: 42 } } });
+  Promise.resolve({
+    data: { joinMockDraft: { team: { leagueId: 42 }, sport: 'baseball' } },
+  });
 const mockJoinMockDraft = jest.fn(() => mockJoinResult());
 
 jest.mock('@legacy-sports/graphql', () => ({
@@ -97,7 +99,7 @@ function renderPage() {
 describe('JoinMockDraftPage', () => {
   afterEach(() => jest.clearAllMocks());
 
-  it('joins and navigates to the draft room on success', async () => {
+  it('joins a baseball mock draft and navigates to the baseball draft room', async () => {
     renderPage();
 
     fireEvent.click(screen.getByRole('button', { name: /Join Draft/i }));
@@ -108,6 +110,38 @@ describe('JoinMockDraftPage', () => {
     expect(await screen.findByText(/Join Mock Draft/i)).toBeInTheDocument();
     await screen.findByRole('button', { name: /Join Draft/i });
     expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42/draft');
+  });
+
+  // LS-9480: joining a football mock draft previously always landed on the
+  // /baseball URL (bypassing FootballGate) because the mutation carried no
+  // sport. It now routes on the sport the mutation itself returns.
+  it('joins a football mock draft and navigates to the football draft room, not baseball', async () => {
+    mockJoinResult = () =>
+      Promise.resolve({
+        data: { joinMockDraft: { team: { leagueId: 99 }, sport: 'football' } },
+      });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Join Draft/i }));
+
+    await screen.findByRole('button', { name: /Join Draft/i });
+    expect(mockNavigate).toHaveBeenCalledWith('/football/league/99/draft');
+    expect(mockNavigate).not.toHaveBeenCalledWith('/baseball/league/99/draft');
+  });
+
+  it('surfaces a navigation error and does not navigate when sport is missing from the response', async () => {
+    mockJoinResult = () =>
+      Promise.resolve({
+        data: { joinMockDraft: { team: { leagueId: 42 }, sport: null } },
+      });
+    renderPage();
+
+    fireEvent.click(screen.getByRole('button', { name: /Join Draft/i }));
+
+    expect(
+      await screen.findByText(/Joined the mock draft but navigation failed/i),
+    ).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('surfaces the mutation error inline without navigating', async () => {
