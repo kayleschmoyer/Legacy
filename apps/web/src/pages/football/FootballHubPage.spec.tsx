@@ -95,9 +95,11 @@ interface StubLeague {
   name: string;
   sport: string;
   draftStatus: string;
-  currentWeekNumber: number;
+  currentWeekNumber: number | null;
   weekAdvanceStatus: string | null;
   currentMatchup?: number | null;
+  leaguePhase?: string | null;
+  userMembership?: { teamId?: number | null } | null;
 }
 
 function leaguesOfCount(n: number, sport = 'football'): StubLeague[] {
@@ -405,5 +407,50 @@ describe('FootballHubPage — matchup highlight wiring (LS-5407, LS-6265)', () =
       awayTeamName: 'Delta Crew',
       homeTeamName: 'Gamma Squad',
     });
+  });
+});
+
+describe('FootballHubPage — bye-week empty state (FBH-010)', () => {
+  it('passes a bye-status, no-opponent matchupHighlights entry when the active league has no current matchup', () => {
+    setLeagues([
+      {
+        ...leaguesOfCount(1)[0],
+        id: 1,
+        name: 'My League',
+        currentMatchup: null,
+        currentWeekNumber: 9,
+        leaguePhase: 'active',
+      },
+    ]);
+
+    render(<FootballHubPage />);
+
+    const calls = mockNFLHome.mock.calls;
+    const highlights = calls[calls.length - 1][0].matchupHighlights;
+    expect(highlights).toHaveLength(1);
+    expect(highlights?.[0]).toMatchObject({
+      leagueId: 1,
+      weekNumber: 9,
+      awayTeamName: 'My League',
+      status: 'bye',
+      noOpponent: true,
+    });
+  });
+
+  it('passes an empty matchupHighlights array when the league with no matchup is not mid-season (e.g. pre-draft)', () => {
+    setLeagues([
+      {
+        ...leaguesOfCount(1)[0],
+        id: 1,
+        currentMatchup: null,
+        currentWeekNumber: 1,
+        leaguePhase: 'pre-draft',
+      },
+    ]);
+
+    render(<FootballHubPage />);
+
+    const highlights = mockNFLHome.mock.calls[0][0].matchupHighlights;
+    expect(highlights).toEqual([]);
   });
 });

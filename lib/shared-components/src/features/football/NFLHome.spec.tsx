@@ -546,6 +546,39 @@ describe('NFLHome — matchup highlight cards (LS-5407, LS-6265)', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders the defined bye-week empty state instead of hiding the card (FBH-010)', () => {
+    const league: NFLHomeLeague = {
+      id: 1,
+      name: 'Test Football League',
+      draftStatus: 'completed',
+      currentWeekNumber: 9,
+    };
+    render(
+      <NFLHome
+        leagues={[league]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        matchupHighlights={[
+          {
+            leagueId: 1,
+            leagueName: 'Test Football League',
+            weekNumber: 9,
+            awayTeamName: 'Alpha Offense',
+            homeTeamName: '',
+            status: 'bye',
+            noOpponent: true,
+          },
+        ]}
+      />,
+    );
+
+    const card = screen.getByTestId('matchup-highlight-card-1');
+    expect(card).toBeInTheDocument();
+    expect(within(card).getByText('Alpha Offense')).toBeInTheDocument();
+    expect(within(card).getByText('No opponent')).toBeInTheDocument();
+    expect(within(card).getByText(/BYE/)).toBeInTheDocument();
+  });
+
   it('renders one card per league when multiple leagues have a scheduled matchup (LS-6265)', () => {
     const leagues: NFLHomeLeague[] = [
       { id: 1, name: 'League One', draftStatus: 'completed' },

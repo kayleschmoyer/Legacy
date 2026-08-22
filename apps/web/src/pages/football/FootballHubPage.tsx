@@ -84,6 +84,7 @@ export function FootballHubPage() {
           weekAdvanceStatus: l.weekAdvanceStatus,
           maxRosterSize: l.maxRosterSize,
           currentMatchup: l.currentMatchup,
+          leaguePhase: l.leaguePhase,
         })),
     [data?.userLeagues],
   );
@@ -91,7 +92,10 @@ export function FootballHubPage() {
   // Matchup highlights (LS-5407 / LS-6265, FBH-011): one "This Week's
   // Matchup" card per league that has an active/upcoming matchup, instead of
   // arbitrarily picking just the first league with a matchup and hiding the
-  // rest for multi-league users.
+  // rest for multi-league users. Bye week (LS-6264 / FBH-010): a league with
+  // no matchup this week isn't necessarily "nothing to show" — the hook also
+  // surfaces a defined bye-week card for active, mid-season leagues with no
+  // current matchup, instead of that league silently dropping out.
   const handlePressMatchupLeague = React.useCallback(
     (leagueId: string | number) => {
       navigate(`/football/league/${leagueId}/matchup`);

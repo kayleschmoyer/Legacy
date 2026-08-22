@@ -13,6 +13,9 @@ export interface MatchupHighlightLeague {
   id: string | number;
   name?: string | null;
   currentMatchup?: number | null;
+  /** Authoritative season phase — `'active'` gates the bye-week fallback below. */
+  leaguePhase?: string | null;
+  currentWeekNumber?: number | null;
 }
 
 /**
@@ -23,6 +26,13 @@ export interface MatchupHighlightLeague {
  * about, and every other league's matchup was silently hidden (LS-6265 /
  * FBH-011). Fetches `getMatchupById` per league in parallel, since the
  * leagues list only carries a `currentMatchup` id, not the matchup itself.
+ *
+ * Bye week (LS-6264 / FBH-010): a mid-season league with no `currentMatchup`
+ * isn't "nothing to show" — it can mean the highlighted team is on bye. Those
+ * leagues get a defined bye-week card (`status: 'bye'`, `noOpponent: true`)
+ * instead of silently dropping out of the highlights list. A league that
+ * simply hasn't started its season yet (`leaguePhase !== 'active'`) is not
+ * treated as a bye — it still has no highlight.
  */
 export function useFootballMatchupHighlights(
   leagues: MatchupHighlightLeague[],
@@ -37,9 +47,27 @@ export function useFootballMatchupHighlights(
       (l): l is MatchupHighlightLeague & { currentMatchup: number } =>
         l.currentMatchup != null,
     );
+    const byeLeagues = leagues.filter(
+      (l): l is MatchupHighlightLeague & { currentWeekNumber: number } =>
+        l.currentMatchup == null &&
+        l.leaguePhase === 'active' &&
+        l.currentWeekNumber != null,
+    );
+    const byeHighlights: NFLHomeMatchupHighlight[] = byeLeagues.map(
+      (league) => ({
+        leagueId: league.id,
+        leagueName: league.name,
+        weekNumber: league.currentWeekNumber,
+        awayTeamName: league.name ?? 'Your team',
+        homeTeamName: '',
+        status: 'bye',
+        noOpponent: true,
+        onPress: () => onPressLeague(league.id),
+      }),
+    );
 
     if (leaguesWithMatchups.length === 0) {
-      setHighlights([]);
+      setHighlights(byeHighlights);
       return;
     }
 
@@ -88,12 +116,13 @@ export function useFootballMatchupHighlights(
     Promise.all(leaguesWithMatchups.map(resolveLeague))
       .then((results) => {
         if (cancelled) return;
-        setHighlights(
-          results.filter(
+        setHighlights([
+          ...results.filter(
             (highlight): highlight is NFLHomeMatchupHighlight =>
               highlight != null,
           ),
-        );
+          ...byeHighlights,
+        ]);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -101,7 +130,7 @@ export function useFootballMatchupHighlights(
           'Failed to resolve football matchup highlights',
           err instanceof Error ? err : String(err),
         );
-        setHighlights([]);
+        setHighlights(byeHighlights);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

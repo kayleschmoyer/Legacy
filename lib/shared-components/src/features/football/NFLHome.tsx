@@ -62,6 +62,12 @@ export interface NFLHomeMatchupHighlight {
   awayTeamName: string;
   homeTeamName: string;
   status?: 'live' | 'pre' | 'final' | 'bye';
+  /**
+   * Bye week (FBH-010): the highlighted team has no opponent this week.
+   * Renders the "No opponent" slot instead of `homeTeamName`, matching
+   * `MatchupCard`'s bye-week empty state.
+   */
+  noOpponent?: boolean;
   onPress?: () => void;
 }
 
@@ -615,6 +621,7 @@ function NFLHome({
                     home={{ name: highlight.homeTeamName }}
                     status={highlight.status ?? 'pre'}
                     week={`Week ${highlight.weekNumber}`}
+                    noOpponent={highlight.noOpponent}
                     onPress={highlight.onPress}
                   />
                 </YStack>
