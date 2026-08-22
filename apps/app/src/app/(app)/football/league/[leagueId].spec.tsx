@@ -1,5 +1,11 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import FootballLeagueId from './[leagueId]';
@@ -52,9 +58,18 @@ jest.mock('react-native/Libraries/Alert/Alert', () => ({
   alert: jest.fn(),
 }));
 
+// The 'react-native' index exposes `Share` via a `default` re-export, so the
+// mock must expose the share object as the module's *default* export (see
+// baseball [leagueId].spec.tsx) — otherwise `Share.share` resolves to
+// undefined and the invite-share handler throws.
+const mockShareFn = jest.fn().mockResolvedValue({ action: 'dismissedAction' });
 jest.mock('react-native/Libraries/Share/Share', () => ({
-  share: jest.fn().mockResolvedValue({ action: 'dismissedAction' }),
-  dismissedAction: 'dismissedAction',
+  __esModule: true,
+  default: {
+    share: mockShareFn,
+    dismissedAction: 'dismissedAction',
+    sharedAction: 'sharedAction',
+  },
 }));
 
 jest.mock('tamagui', () => {
@@ -115,6 +130,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     isCommissioner,
     isMember,
     onTabChange,
+    onInvite,
     children,
   }: {
     tabs: ReadonlyArray<{
@@ -126,6 +142,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     isCommissioner: boolean;
     isMember: boolean;
     onTabChange: (id: string) => void;
+    onInvite?: () => void;
     children?: React.ReactNode;
     [key: string]: unknown;
   }) => (
@@ -146,6 +163,11 @@ jest.mock('@legacy-sports/shared-components', () => {
             </TouchableOpacity>
           ))}
       </View>
+      {onInvite ? (
+        <TouchableOpacity testID="invite-share-button" onPress={onInvite}>
+          <Text>Invite</Text>
+        </TouchableOpacity>
+      ) : null}
       {children}
     </View>
   );
@@ -1066,6 +1088,44 @@ describe('FootballLeagueId', () => {
       expect(mockCapturedWaiverSubscribeRefresh).toHaveLength(2);
       expect(mockCapturedWaiverSubscribeRefresh[0]).not.toBe(
         mockCapturedWaiverSubscribeRefresh[1],
+      );
+    });
+  });
+
+  // LS-6329 (FLD-006): the invite link previously had no UTM/source params,
+  // so growth analytics couldn't attribute a join to the share sheet vs. a
+  // copied code vs. a deep link. The handler now appends `src`/`platform`.
+  describe('share invite (LS-6329)', () => {
+    beforeEach(() => {
+      jest
+        .requireMock<{
+          useAuthorizedUserInfo: jest.Mock;
+        }>('../../../../common/auth/AuthorizedUserContext')
+        .useAuthorizedUserInfo.mockReturnValue({ id: 99, isAdmin: false });
+    });
+
+    it('appends src=share and the current platform to the shared invite URL', async () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('invite-share-button'));
+
+      await waitFor(() => expect(mockShareFn).toHaveBeenCalledTimes(1));
+      expect(mockShareFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://legacysports.app/football/league/join/TESTCODE?src=share&platform=ios',
+        }),
+      );
+    });
+
+    it('shares an invite without a URL when the league has no invite code', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, inviteCode: '' } },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('invite-share-button'));
+
+      expect(mockShareFn).toHaveBeenCalledWith(
+        expect.objectContaining({ url: undefined }),
       );
     });
   });
