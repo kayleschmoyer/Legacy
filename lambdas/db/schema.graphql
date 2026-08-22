@@ -3836,6 +3836,7 @@ type Query {
   getTiebreakerRules(leagueId: Int!): TiebreakerRule
   getUnreadNotificationCount: Int
   getUserDeviceTokens: [DeviceToken!]
+  getUserLeagueStandings: [UserLeagueStandings!]!
   getUserLeagueSummaries: [UserLeagueSummary!]!
   getUserNotificationPreferences: NotificationPreference
   getUserPreferences: UserPreference
@@ -5346,7 +5347,19 @@ type UserIdentity {
 }
 
 """
-Dashboard summary combining league phase, draft state, standings, and current matchup for a single league.
+The caller's standings line in a single league, keyed by `leagueId` so clients can merge it into a `UserLeagueSummary`.
+"""
+type UserLeagueStandings {
+  leagueId: Int
+  losses: Int
+  rank: Int
+  ties: Int
+  totalTeams: Int
+  wins: Int
+}
+
+"""
+Dashboard summary combining league phase, draft state, and current matchup for a single league. The standings fields (wins/losses/ties/rank/totalTeams) are only populated by `getArchivedUserLeagueSummaries`; `getUserLeagueSummaries` leaves them null and they are served separately by `getUserLeagueStandings` (LS-9528).
 """
 type UserLeagueSummary {
   currentWeekNumber: Int
@@ -5366,7 +5379,6 @@ type UserLeagueSummary {
   matchupStatus: String
   opponentScore: Float
   opponentTeamName: String
-  pointsFor: Float
   rank: Int
   seasonNumber: Int
   selectionMethod: String

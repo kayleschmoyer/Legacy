@@ -3,9 +3,12 @@ import {
   aggregateActiveRecord,
   computePrimarySport,
   deriveHomeUserStats,
+  hasKnownRecord,
   type HomeLeagueSummary,
   isLiveMatchup,
   isPreDraft,
+  mergeLeagueStandings,
+  recordLabel,
   recordOf,
   safeScore,
   sortByUrgency,
@@ -86,15 +89,83 @@ describe('phase predicates', () => {
   });
 });
 
-describe('recordOf', () => {
-  it('formats wins and losses, defaulting missing values to zero', () => {
+describe('recordOf (LS-9528 tri-state)', () => {
+  it('formats wins and losses, defaulting the missing half to zero', () => {
     expect(recordOf({ wins: 6, losses: 2 })).toBe('6-2');
-    expect(recordOf({})).toBe('0-0');
+    expect(recordOf({ wins: 6 })).toBe('6-0');
   });
 
   it('includes ties only when there are any', () => {
     expect(recordOf({ wins: 6, losses: 2, ties: 1 })).toBe('6-2-1');
     expect(recordOf({ wins: 6, losses: 2, ties: 0 })).toBe('6-2');
+  });
+
+  it('returns null while standings are unknown, not a fabricated 0-0', () => {
+    expect(recordOf({})).toBeNull();
+    expect(recordOf({ wins: null, losses: null, ties: null })).toBeNull();
+  });
+
+  it('distinguishes a real 0-0 league from an unloaded one', () => {
+    expect(recordOf({ wins: 0, losses: 0, ties: 0 })).toBe('0-0');
+    expect(recordOf({})).toBeNull();
+  });
+
+  it('renders unknown records as an em dash via recordLabel', () => {
+    expect(recordLabel({})).toBe('—');
+    expect(recordLabel({ wins: 6, losses: 2 })).toBe('6-2');
+    expect(recordLabel({ wins: 0, losses: 0 })).toBe('0-0');
+  });
+});
+
+describe('hasKnownRecord', () => {
+  it('is true as soon as any of wins/losses/ties is present', () => {
+    expect(hasKnownRecord({ wins: 0 })).toBe(true);
+    expect(hasKnownRecord({ losses: 0 })).toBe(true);
+    expect(hasKnownRecord({ ties: 0 })).toBe(true);
+  });
+
+  it('is false when all three are absent or null', () => {
+    expect(hasKnownRecord({})).toBe(false);
+    expect(hasKnownRecord({ wins: null, losses: null, ties: null })).toBe(
+      false,
+    );
+  });
+});
+
+describe('mergeLeagueStandings (LS-9528)', () => {
+  it('merges standings onto the matching league by leagueId', () => {
+    const merged = mergeLeagueStandings(
+      [
+        { leagueId: 1, leagueName: 'A' },
+        { leagueId: 2, leagueName: 'B' },
+      ],
+      [{ leagueId: 2, wins: 6, losses: 2, ties: 0, rank: 1, totalTeams: 10 }],
+    );
+    expect(merged[0]).toEqual({ leagueId: 1, leagueName: 'A' });
+    expect(merged[1]).toMatchObject({
+      leagueName: 'B',
+      wins: 6,
+      losses: 2,
+      rank: 1,
+      totalTeams: 10,
+    });
+  });
+
+  it('leaves summaries untouched when standings have not arrived', () => {
+    const summaries: HomeLeagueSummary[] = [{ leagueId: 1 }];
+    expect(mergeLeagueStandings(summaries, undefined)).toBe(summaries);
+    expect(mergeLeagueStandings(summaries, [])).toBe(summaries);
+  });
+
+  it('ignores standings rows with no leagueId', () => {
+    const summaries: HomeLeagueSummary[] = [{ leagueId: 1 }];
+    expect(mergeLeagueStandings(summaries, [{ wins: 9 }])).toBe(summaries);
+  });
+
+  it('does not mutate the input summaries', () => {
+    const summaries: HomeLeagueSummary[] = [{ leagueId: 1 }];
+    mergeLeagueStandings(summaries, [{ leagueId: 1, wins: 3, losses: 1 }]);
+    expect(summaries[0].wins).toBeUndefined();
   });
 });
 
@@ -134,6 +205,20 @@ describe('aggregateActiveRecord', () => {
     expect(aggregateActiveRecord([])).toBeNull();
     expect(aggregateActiveRecord([{ leaguePhase: 'pre-draft' }])).toBeNull();
   });
+
+  it('returns null until every active league has standings (LS-9528)', () => {
+    // Summing only the leagues that have arrived would show a real-looking
+    // total that then grows — the flash this ticket exists to prevent.
+    expect(
+      aggregateActiveRecord([active, { leaguePhase: 'active' }]),
+    ).toBeNull();
+    expect(
+      aggregateActiveRecord([
+        active,
+        { leaguePhase: 'active', wins: 8, losses: 7 },
+      ]),
+    ).toBe('14-9');
+  });
 });
 
 describe('deriveHomeUserStats', () => {
@@ -157,6 +242,28 @@ describe('deriveHomeUserStats', () => {
       aggregateRecord: null,
       firstPlaceCount: 0,
     });
+  });
+
+  it('leaves firstPlaceCount undefined until standings land (LS-9528)', () => {
+    // The header hides the "N first place" badge on a falsy count, so an
+    // undefined count keeps it hidden rather than asserting "0 first place".
+    expect(
+      deriveHomeUserStats([{ leagueId: 1, leaguePhase: 'active' }]),
+    ).toEqual({
+      leagueCount: 1,
+      aggregateRecord: null,
+      firstPlaceCount: undefined,
+    });
+  });
+
+  it('still counts firsts when a ranked league reports no rank', () => {
+    // rank: null with a known record means genuinely unranked, not unloaded.
+    expect(
+      deriveHomeUserStats([
+        { leaguePhase: 'active', wins: 1, losses: 1, rank: null },
+        { leaguePhase: 'active', wins: 5, losses: 0, rank: 1 },
+      ]).firstPlaceCount,
+    ).toBe(1);
   });
 });
 

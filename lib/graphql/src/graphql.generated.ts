@@ -3335,6 +3335,7 @@ export type Query = {
   getTiebreakerRules?: Maybe<TiebreakerRule>;
   getUnreadNotificationCount?: Maybe<Scalars['Int']['output']>;
   getUserDeviceTokens?: Maybe<Array<DeviceToken>>;
+  getUserLeagueStandings: Array<UserLeagueStandings>;
   getUserLeagueSummaries: Array<UserLeagueSummary>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
   getUserPreferences?: Maybe<UserPreference>;
@@ -5080,7 +5081,18 @@ export type UserIdentity = {
   userId: Scalars['Int']['output'];
 };
 
-/** Dashboard summary combining league phase, draft state, standings, and current matchup for a single league. */
+/** The caller's standings line in a single league, keyed by `leagueId` so clients can merge it into a `UserLeagueSummary`. */
+export type UserLeagueStandings = {
+  __typename?: 'UserLeagueStandings';
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  losses?: Maybe<Scalars['Int']['output']>;
+  rank?: Maybe<Scalars['Int']['output']>;
+  ties?: Maybe<Scalars['Int']['output']>;
+  totalTeams?: Maybe<Scalars['Int']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Dashboard summary combining league phase, draft state, and current matchup for a single league. The standings fields (wins/losses/ties/rank/totalTeams) are only populated by `getArchivedUserLeagueSummaries`; `getUserLeagueSummaries` leaves them null and they are served separately by `getUserLeagueStandings` (LS-9528). */
 export type UserLeagueSummary = {
   __typename?: 'UserLeagueSummary';
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
@@ -5100,7 +5112,6 @@ export type UserLeagueSummary = {
   matchupStatus?: Maybe<Scalars['String']['output']>;
   opponentScore?: Maybe<Scalars['Float']['output']>;
   opponentTeamName?: Maybe<Scalars['String']['output']>;
-  pointsFor?: Maybe<Scalars['Float']['output']>;
   rank?: Maybe<Scalars['Int']['output']>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;
@@ -6311,12 +6322,37 @@ export type UserLeagueSummaryFragment = {
   draftMode?: string | null;
   selectionMethod?: string | null;
   teamCount?: number | null;
+  currentWeekNumber?: number | null;
+  totalMatchups?: number | null;
+  matchupId?: number | null;
+  matchupStatus?: string | null;
+  matchupEndTime?: string | null;
+  userScore?: number | null;
+  opponentScore?: number | null;
+  opponentTeamName?: string | null;
+  eraFilter?: string | null;
+  customEraStartYear?: number | null;
+  customEraEndYear?: number | null;
+  isCommissioner?: boolean | null;
+};
+
+export type ArchivedUserLeagueSummaryFragment = {
+  __typename?: 'UserLeagueSummary';
   wins?: number | null;
   losses?: number | null;
   ties?: number | null;
   rank?: number | null;
   totalTeams?: number | null;
-  pointsFor?: number | null;
+  leagueId?: number | null;
+  leagueName?: string | null;
+  sport?: string | null;
+  leaguePhase?: string | null;
+  seasonNumber?: number | null;
+  draftStatus?: string | null;
+  draftScheduledAt?: string | null;
+  draftMode?: string | null;
+  selectionMethod?: string | null;
+  teamCount?: number | null;
   currentWeekNumber?: number | null;
   totalMatchups?: number | null;
   matchupId?: number | null;
@@ -6349,12 +6385,6 @@ export type GetUserLeagueSummariesQuery = {
     draftMode?: string | null;
     selectionMethod?: string | null;
     teamCount?: number | null;
-    wins?: number | null;
-    losses?: number | null;
-    ties?: number | null;
-    rank?: number | null;
-    totalTeams?: number | null;
-    pointsFor?: number | null;
     currentWeekNumber?: number | null;
     totalMatchups?: number | null;
     matchupId?: number | null;
@@ -6378,6 +6408,11 @@ export type GetArchivedUserLeagueSummariesQuery = {
   __typename?: 'Query';
   getArchivedUserLeagueSummaries: Array<{
     __typename?: 'UserLeagueSummary';
+    wins?: number | null;
+    losses?: number | null;
+    ties?: number | null;
+    rank?: number | null;
+    totalTeams?: number | null;
     leagueId?: number | null;
     leagueName?: string | null;
     sport?: string | null;
@@ -6388,12 +6423,6 @@ export type GetArchivedUserLeagueSummariesQuery = {
     draftMode?: string | null;
     selectionMethod?: string | null;
     teamCount?: number | null;
-    wins?: number | null;
-    losses?: number | null;
-    ties?: number | null;
-    rank?: number | null;
-    totalTeams?: number | null;
-    pointsFor?: number | null;
     currentWeekNumber?: number | null;
     totalMatchups?: number | null;
     matchupId?: number | null;
@@ -6406,6 +6435,23 @@ export type GetArchivedUserLeagueSummariesQuery = {
     customEraStartYear?: number | null;
     customEraEndYear?: number | null;
     isCommissioner?: boolean | null;
+  }>;
+};
+
+export type GetUserLeagueStandingsQueryVariables = Exact<{
+  [key: string]: never;
+}>;
+
+export type GetUserLeagueStandingsQuery = {
+  __typename?: 'Query';
+  getUserLeagueStandings: Array<{
+    __typename?: 'UserLeagueStandings';
+    leagueId?: number | null;
+    wins?: number | null;
+    losses?: number | null;
+    ties?: number | null;
+    rank?: number | null;
+    totalTeams?: number | null;
   }>;
 };
 
@@ -14817,12 +14863,6 @@ export const UserLeagueSummaryFragmentDoc = gql`
     draftMode
     selectionMethod
     teamCount
-    wins
-    losses
-    ties
-    rank
-    totalTeams
-    pointsFor
     currentWeekNumber
     totalMatchups
     matchupId
@@ -14836,6 +14876,17 @@ export const UserLeagueSummaryFragmentDoc = gql`
     customEraEndYear
     isCommissioner
   }
+`;
+export const ArchivedUserLeagueSummaryFragmentDoc = gql`
+  fragment ArchivedUserLeagueSummary on UserLeagueSummary {
+    ...UserLeagueSummary
+    wins
+    losses
+    ties
+    rank
+    totalTeams
+  }
+  ${UserLeagueSummaryFragmentDoc}
 `;
 export const LeaguePositionFragmentDoc = gql`
   fragment LeaguePosition on LeaguePosition {
@@ -18707,10 +18758,10 @@ export type GetUserLeagueSummariesQueryResult = Apollo.QueryResult<
 export const GetArchivedUserLeagueSummaries = gql`
   query GetArchivedUserLeagueSummaries {
     getArchivedUserLeagueSummaries {
-      ...UserLeagueSummary
+      ...ArchivedUserLeagueSummary
     }
   }
-  ${UserLeagueSummaryFragmentDoc}
+  ${ArchivedUserLeagueSummaryFragmentDoc}
 `;
 
 /**
@@ -18789,6 +18840,96 @@ export type GetArchivedUserLeagueSummariesSuspenseQueryHookResult = ReturnType<
 export type GetArchivedUserLeagueSummariesQueryResult = Apollo.QueryResult<
   GetArchivedUserLeagueSummariesQuery,
   GetArchivedUserLeagueSummariesQueryVariables
+>;
+export const GetUserLeagueStandings = gql`
+  query GetUserLeagueStandings {
+    getUserLeagueStandings {
+      leagueId
+      wins
+      losses
+      ties
+      rank
+      totalTeams
+    }
+  }
+`;
+
+/**
+ * __useGetUserLeagueStandingsQuery__
+ *
+ * To run a query within a React component, call `useGetUserLeagueStandingsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetUserLeagueStandingsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetUserLeagueStandingsQuery({
+ *   variables: {
+ *   },
+ * });
+ */
+export function useGetUserLeagueStandingsQuery(
+  baseOptions?: Apollo.QueryHookOptions<
+    GetUserLeagueStandingsQuery,
+    GetUserLeagueStandingsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetUserLeagueStandingsQuery,
+    GetUserLeagueStandingsQueryVariables
+  >(GetUserLeagueStandings, options);
+}
+export function useGetUserLeagueStandingsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetUserLeagueStandingsQuery,
+    GetUserLeagueStandingsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetUserLeagueStandingsQuery,
+    GetUserLeagueStandingsQueryVariables
+  >(GetUserLeagueStandings, options);
+}
+export function useGetUserLeagueStandingsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetUserLeagueStandingsQuery,
+        GetUserLeagueStandingsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetUserLeagueStandingsQuery,
+    GetUserLeagueStandingsQueryVariables
+  >(
+    GetUserLeagueStandings,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetUserLeagueStandingsQuery,
+          GetUserLeagueStandingsQueryVariables
+        >,
+  );
+}
+export type GetUserLeagueStandingsQueryHookResult = ReturnType<
+  typeof useGetUserLeagueStandingsQuery
+>;
+export type GetUserLeagueStandingsLazyQueryHookResult = ReturnType<
+  typeof useGetUserLeagueStandingsLazyQuery
+>;
+export type GetUserLeagueStandingsSuspenseQueryHookResult = ReturnType<
+  typeof useGetUserLeagueStandingsSuspenseQuery
+>;
+export type GetUserLeagueStandingsQueryResult = Apollo.QueryResult<
+  GetUserLeagueStandingsQuery,
+  GetUserLeagueStandingsQueryVariables
 >;
 export const GetLeagueTeamsForDm = gql`
   query GetLeagueTeamsForDM($leagueId: Int!) {

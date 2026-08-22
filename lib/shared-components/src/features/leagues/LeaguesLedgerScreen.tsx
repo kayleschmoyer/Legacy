@@ -12,7 +12,7 @@ import {
   type HomeLeagueSummary,
   isLiveMatchup,
   isPreDraft,
-  recordOf,
+  recordLabel,
   safeScore,
   urgencyKey,
 } from '../home/leagueSummaryStats';
@@ -82,6 +82,16 @@ export interface LeaguesLedgerScreenProps {
  * Ledger order: live matchups first, then by urgency (live draft, active,
  * pre-draft, everything else), then by rank within a tier. `Array.sort` is
  * stable, so leagues that tie on all three keep their incoming order.
+ *
+ * Standings now arrive after the summaries (LS-9528), so `rank` is null on the
+ * first render and rows re-order once within their urgency tier when it lands.
+ * That re-order is **accepted**, not deferred: the tier boundaries (live, draft,
+ * active, pre-draft) never move, both stat columns are fixed-width
+ * (`RECORD_COL_WIDTH`, `RANK_COL_WIDTH`) and rows are a fixed `ROW_MIN_HEIGHT`,
+ * so nothing reflows — and holding the tiebreak back would only postpone the
+ * same single re-order while permanently degrading the order for the rest of the
+ * session. Nulls sort last, so unranked leagues sit below ranked ones instead of
+ * jumping to the top.
  */
 function sortLedgerRows(summaries: HomeLeagueSummary[]): HomeLeagueSummary[] {
   return [...summaries].sort((a, b) => {
@@ -347,7 +357,7 @@ function LedgerRow({
           color={leadingLive ? BRAND_GOLD_LIGHT : TEXT_PRIMARY}
           fontVariant={['tabular-nums']}
         >
-          {recordOf(summary)}
+          {recordLabel(summary)}
         </Text>
       )}
 

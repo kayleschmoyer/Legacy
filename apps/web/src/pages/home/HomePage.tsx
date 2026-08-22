@@ -1,16 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@legacy-sports/shared-components/auth';
+import {
+  hasStoredSession,
+  useAuth,
+} from '@legacy-sports/shared-components/auth';
 import {
   computePrimarySport,
   type HomeLeagueSummary,
   HomeScreen,
+  mergeLeagueStandings,
 } from '@legacy-sports/shared-components';
 import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
 import {
   useGetArchivedUserLeagueSummariesLazyQuery,
   useGetArchivedUserLeagueSummariesQuery,
   useGetMyMockDraftUsageQuery,
+  useGetUserLeagueStandingsQuery,
   useGetUserLeagueSummariesQuery,
   type UserLeagueSummaryFragment,
 } from '@legacy-sports/graphql';
@@ -100,13 +105,29 @@ export function HomePage(): React.JSX.Element {
 
   const defaultSport = useMemo(() => readDefaultSport(), []);
 
+  // Both dashboard queries take no arguments — the server derives the caller
+  // from the HttpOnly JWT cookie. Gating them on `auth.user` meant the page's
+  // slowest query was also the last to start, waiting out AuthProvider's
+  // bootstrap (and, on an expired cached token, a `/refresh-jwt` round trip)
+  // before it could dispatch. A synchronous read of the persisted session is
+  // all the gate they actually need (LS-9528).
+  const sessionPresent = useMemo(() => hasStoredSession(), []);
+
   const {
     data: summaryData,
     loading: summariesLoading,
     error: summariesError,
     refetch: refetchSummaries,
   } = useGetUserLeagueSummariesQuery({
-    skip: !auth?.user,
+    skip: !sessionPresent,
+    fetchPolicy: 'cache-and-network',
+  });
+
+  // Standings are intentionally a separate, parallel request: they are the slow
+  // half of the old combined resolver, and the league cards render without them.
+  // It must NOT inherit the summaries' gate, or it lands behind the same wait.
+  const { data: standingsData } = useGetUserLeagueStandingsQuery({
+    skip: !sessionPresent,
     fetchPolicy: 'cache-and-network',
   });
 
@@ -143,8 +164,15 @@ export function HomePage(): React.JSX.Element {
   }, []);
 
   const summaries = useMemo<HomeLeagueSummary[]>(
-    () => summaryData?.getUserLeagueSummaries ?? [],
-    [summaryData?.getUserLeagueSummaries],
+    () =>
+      mergeLeagueStandings(
+        summaryData?.getUserLeagueSummaries ?? [],
+        standingsData?.getUserLeagueStandings,
+      ),
+    [
+      summaryData?.getUserLeagueSummaries,
+      standingsData?.getUserLeagueStandings,
+    ],
   );
   const archivedSummaries = useMemo<HomeLeagueSummary[]>(
     () => archivedData?.getArchivedUserLeagueSummaries ?? [],
@@ -198,9 +226,11 @@ export function HomePage(): React.JSX.Element {
     }
   };
 
+  // Deliberately does not wait on the standings query — that is the whole point
+  // of splitting it out. League cards render as soon as the summaries land.
   const loading =
     auth.isLoading ||
-    (!!auth.user && (summariesLoading || (!summaryData && !summariesError)));
+    (sessionPresent && (summariesLoading || (!summaryData && !summariesError)));
   const error = Boolean(
     summariesError && !summariesLoading && !summaryData?.getUserLeagueSummaries,
   );

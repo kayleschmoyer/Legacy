@@ -3,8 +3,16 @@ import { useCallback, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { HomeLeagueSummary } from '@legacy-sports/shared-components';
-import { LeaguesLedgerScreen } from '@legacy-sports/shared-components/leagues';
-import { useGetUserLeagueSummariesQuery } from '@legacy-sports/graphql';
+// Value imports come from the `/leagues` entry, not the root barrel: the root
+// barrel drags in the native OAuth provider and breaks this screen's jest suite.
+import {
+  LeaguesLedgerScreen,
+  mergeLeagueStandings,
+} from '@legacy-sports/shared-components/leagues';
+import {
+  useGetUserLeagueStandingsQuery,
+  useGetUserLeagueSummariesQuery,
+} from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../../../common/auth/AuthorizedUserContext';
 import { usePullToRefresh } from '../../../common/hooks/usePullToRefresh';
 
@@ -16,7 +24,9 @@ import { usePullToRefresh } from '../../../common/hooks/usePullToRefresh';
  *
  * Data comes from `getUserLeagueSummaries`, the same query the Home tab uses:
  * the plain `userLeagues` query returns only id/name/sport, which cannot fill
- * the ledger's record, rank, live-matchup, and draft columns.
+ * the ledger's live-matchup and draft columns. The record and rank columns come
+ * from the parallel `getUserLeagueStandings` query and are merged in on
+ * `leagueId` (LS-9528) — they render as an em dash until it resolves.
  */
 export default function LeaguesTab() {
   const router = useRouter();
@@ -28,11 +38,24 @@ export default function LeaguesTab() {
     skip: !userInfo?.id,
   });
 
-  const { refreshControl } = usePullToRefresh([() => refetch()]);
+  const { data: standingsData, refetch: refetchStandings } =
+    useGetUserLeagueStandingsQuery({
+      fetchPolicy: 'cache-and-network',
+      skip: !userInfo?.id,
+    });
+
+  const { refreshControl } = usePullToRefresh([
+    () => refetch(),
+    () => refetchStandings(),
+  ]);
 
   const leagues = useMemo<HomeLeagueSummary[]>(
-    () => data?.getUserLeagueSummaries ?? [],
-    [data?.getUserLeagueSummaries],
+    () =>
+      mergeLeagueStandings(
+        data?.getUserLeagueSummaries ?? [],
+        standingsData?.getUserLeagueStandings,
+      ),
+    [data?.getUserLeagueSummaries, standingsData?.getUserLeagueStandings],
   );
 
   const viewLeague = useCallback(

@@ -2,6 +2,15 @@
 // Import from this entry point for league creation, activity, and scoring components.
 // Usage: import { LeagueScoringSummary } from '@legacy-sports/shared-components/leagues'
 export * from '../config/sports';
+// Re-exported here so the Leagues ledger's data layer can merge standings into
+// its summaries without importing the root barrel — that barrel pulls in the
+// native OAuth provider, which the mobile jest environment cannot transform
+// (LS-9528).
+export {
+  type HomeLeagueSummary,
+  type LeagueStandingsEntry,
+  mergeLeagueStandings,
+} from '../features/home/leagueSummaryStats';
 export * from '../features/leagues/AwardVotingPanel';
 export * from '../features/leagues/create-wizard';
 export * from '../features/leagues/CreateLeagueModal';

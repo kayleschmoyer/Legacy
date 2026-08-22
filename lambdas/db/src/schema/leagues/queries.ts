@@ -1566,7 +1566,6 @@ type UserLeagueSummaryShape = {
   ties: number | null;
   rank: number | null;
   totalTeams: number | null;
-  pointsFor: number | null;
   currentWeekNumber: number | null;
   totalMatchups: number | null;
   matchupId: number | null;
@@ -1586,7 +1585,7 @@ const UserLeagueSummary =
 
 builder.objectType(UserLeagueSummary, {
   description:
-    'Dashboard summary combining league phase, draft state, standings, and current matchup for a single league.',
+    'Dashboard summary combining league phase, draft state, and current matchup for a single league. The standings fields (wins/losses/ties/rank/totalTeams) are only populated by `getArchivedUserLeagueSummaries`; `getUserLeagueSummaries` leaves them null and they are served separately by `getUserLeagueStandings` (LS-9528).',
   fields: (t) => ({
     leagueId: t.exposeInt('leagueId'),
     leagueName: t.exposeString('leagueName'),
@@ -1603,7 +1602,6 @@ builder.objectType(UserLeagueSummary, {
     ties: t.exposeInt('ties', { nullable: true }),
     rank: t.exposeInt('rank', { nullable: true }),
     totalTeams: t.exposeInt('totalTeams', { nullable: true }),
-    pointsFor: t.exposeFloat('pointsFor', { nullable: true }),
     currentWeekNumber: t.exposeInt('currentWeekNumber', { nullable: true }),
     totalMatchups: t.exposeInt('totalMatchups', { nullable: true }),
     matchupId: t.exposeInt('matchupId', { nullable: true }),
@@ -1684,13 +1682,14 @@ builder.queryField('getUserLeagueSummaries', (t) =>
         teamCountRows.map((r) => [r.leagueId, Number(r.cnt)]),
       );
 
-      // 3. Batch secondary data: drafts, matchups, and standings
-      const { StandingsService } =
-        await import('../../services/standings-service');
-
-      const activeLeagueIds = leagues
-        .filter((l) => l.leaguePhase === 'active')
-        .map((l) => l.id);
+      // 3. Batch secondary data: drafts and matchups.
+      //
+      // Standings are deliberately NOT computed here (LS-9528). The
+      // StandingsService fan-out dominated this resolver's latency — it recomputes
+      // every league's full standings table — while the reads below finish in tens
+      // of milliseconds. Blocking the whole dashboard on it left the home page on
+      // skeleton placeholders. Clients now fetch `getUserLeagueStandings` in
+      // parallel and merge on `leagueId`.
       const draftLeagueIds = leagues
         .filter((l) => l.draftStatus !== 'completed')
         .map((l) => l.id);
@@ -1700,7 +1699,7 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           : [],
       );
 
-      const [draftRows, matchupRows, standingsResults] = await Promise.all([
+      const [draftRows, matchupRows] = await Promise.all([
         draftLeagueIds.length > 0
           ? context.db
               .select()
@@ -1713,21 +1712,10 @@ builder.queryField('getUserLeagueSummaries', (t) =>
               .from(PublicSchema.matchups)
               .where(inArray(PublicSchema.matchups.id, matchupIdsToFetch))
           : Promise.resolve([]),
-        Promise.all(
-          activeLeagueIds.map(async (leagueId) => ({
-            leagueId,
-            standings: await StandingsService.getStandings(context.db, {
-              leagueId,
-            }),
-          })),
-        ),
       ]);
 
       const draftMap = new Map(draftRows.map((d) => [d.leagueId, d]));
       const matchupMap = new Map(matchupRows.map((m) => [m.id, m]));
-      const standingsMap = new Map(
-        standingsResults.map((s) => [s.leagueId, s.standings]),
-      );
 
       // First pass: compute scores and collect all opponent team IDs
       type PartialSummary = {
@@ -1818,9 +1806,6 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           matchupEndTime,
         } = partial;
         const draftRow = draftMap.get(league.id) ?? null;
-        const standings = standingsMap.get(league.id) ?? null;
-        const userStanding =
-          standings?.find((s) => s.teamId === league.userTeamId) ?? null;
         const opponentTeamName =
           opponentTeamId != null
             ? (teamNameMap.get(opponentTeamId) ?? null)
@@ -1840,12 +1825,12 @@ builder.queryField('getUserLeagueSummaries', (t) =>
           draftMode: draftRow?.draftMode ?? null,
           selectionMethod: draftRow?.selectionMethod ?? null,
           teamCount: teamCountMap.get(league.id) ?? 0,
-          wins: userStanding?.wins ?? null,
-          losses: userStanding?.losses ?? null,
-          ties: userStanding?.ties ?? null,
-          rank: userStanding?.rank ?? null,
-          totalTeams: standings?.length ?? null,
-          pointsFor: userStanding?.pointsFor ?? null,
+          // Served by `getUserLeagueStandings` instead — see the note above (LS-9528).
+          wins: null,
+          losses: null,
+          ties: null,
+          rank: null,
+          totalTeams: null,
           currentWeekNumber: league.currentWeek,
           totalMatchups: league.totalMatchups,
           matchupId,
@@ -1954,7 +1939,6 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
             ties: userStanding?.ties ?? null,
             rank: userStanding?.rank ?? null,
             totalTeams: standings.length,
-            pointsFor: userStanding?.pointsFor ?? null,
             currentWeekNumber: league.currentWeek,
             totalMatchups: league.totalMatchups,
             matchupId: null,
@@ -1968,6 +1952,106 @@ builder.queryField('getArchivedUserLeagueSummaries', (t) =>
             customEraEndYear: league.customEraEndYear,
             isCommissioner: deriveIsCommissioner(league.permissionLevel),
           } satisfies UserLeagueSummaryShape;
+        }),
+      );
+    },
+  }),
+);
+
+// ── getUserLeagueStandings ────────────────────────────────────────────────────
+
+type UserLeagueStandingsShape = {
+  leagueId: number;
+  wins: number | null;
+  losses: number | null;
+  ties: number | null;
+  rank: number | null;
+  totalTeams: number | null;
+};
+
+const UserLeagueStandings = builder.objectRef<UserLeagueStandingsShape>(
+  'UserLeagueStandings',
+);
+
+builder.objectType(UserLeagueStandings, {
+  description:
+    "The caller's standings line in a single league, keyed by `leagueId` so clients can merge it into a `UserLeagueSummary`.",
+  fields: (t) => ({
+    leagueId: t.exposeInt('leagueId'),
+    wins: t.exposeInt('wins', { nullable: true }),
+    losses: t.exposeInt('losses', { nullable: true }),
+    ties: t.exposeInt('ties', { nullable: true }),
+    rank: t.exposeInt('rank', { nullable: true }),
+    totalTeams: t.exposeInt('totalTeams', { nullable: true }),
+  }),
+});
+
+/**
+ * Bulk standings for every active league the caller belongs to (LS-9528).
+ *
+ * Split out of `getUserLeagueSummaries` so the dashboard's cheap batched reads
+ * are not held behind the StandingsService fan-out. Deliberately ONE bulk query
+ * rather than a per-card field: the server still parallelises internally, while
+ * a per-card resolver would turn one request into N.
+ *
+ * Selects exactly the leagues `getUserLeagueSummaries` used to compute standings
+ * for: non-mock leagues the caller is a member of, in the `active` phase. That
+ * resolver filtered its non-offseason set down to `active` before fanning out;
+ * this one filters in SQL, which is equivalent and cheaper.
+ */
+builder.queryField('getUserLeagueStandings', (t) =>
+  t.field({
+    type: [UserLeagueStandings],
+    nullable: false,
+    resolve: async (_parent, _args, context) => {
+      if (!context.user) {
+        throw AuthenticationError(
+          'Authentication required to fetch league standings',
+        );
+      }
+
+      const userId = context.user.id;
+
+      const leagues = await context.db
+        .select({
+          id: PublicSchema.leagues.id,
+          userTeamId: PublicSchema.leagueMembers.teamId,
+        })
+        .from(PublicSchema.leagues)
+        .innerJoin(
+          PublicSchema.leagueMembers,
+          eq(PublicSchema.leagues.id, PublicSchema.leagueMembers.leagueId),
+        )
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.userId, userId),
+            eq(PublicSchema.leagues.leaguePhase, 'active'),
+            eq(PublicSchema.leagues.isMockDraft, false),
+          ),
+        )
+        .orderBy(PublicSchema.leagues.id);
+
+      if (leagues.length === 0) return [];
+
+      const { StandingsService } =
+        await import('../../services/standings-service');
+
+      return Promise.all(
+        leagues.map(async (league) => {
+          const standings = await StandingsService.getStandings(context.db, {
+            leagueId: league.id,
+          });
+          const userStanding =
+            standings.find((s) => s.teamId === league.userTeamId) ?? null;
+
+          return {
+            leagueId: league.id,
+            wins: userStanding?.wins ?? null,
+            losses: userStanding?.losses ?? null,
+            ties: userStanding?.ties ?? null,
+            rank: userStanding?.rank ?? null,
+            totalTeams: standings.length,
+          } satisfies UserLeagueStandingsShape;
         }),
       );
     },

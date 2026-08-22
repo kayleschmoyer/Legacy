@@ -3329,6 +3329,7 @@ export type Query = {
   getTiebreakerRules?: Maybe<TiebreakerRule>;
   getUnreadNotificationCount?: Maybe<Scalars['Int']['output']>;
   getUserDeviceTokens?: Maybe<Array<DeviceToken>>;
+  getUserLeagueStandings: Array<UserLeagueStandings>;
   getUserLeagueSummaries: Array<UserLeagueSummary>;
   getUserNotificationPreferences?: Maybe<NotificationPreference>;
   getUserPreferences?: Maybe<UserPreference>;
@@ -5074,7 +5075,18 @@ export type UserIdentity = {
   userId: Scalars['Int']['output'];
 };
 
-/** Dashboard summary combining league phase, draft state, standings, and current matchup for a single league. */
+/** The caller's standings line in a single league, keyed by `leagueId` so clients can merge it into a `UserLeagueSummary`. */
+export type UserLeagueStandings = {
+  __typename?: 'UserLeagueStandings';
+  leagueId?: Maybe<Scalars['Int']['output']>;
+  losses?: Maybe<Scalars['Int']['output']>;
+  rank?: Maybe<Scalars['Int']['output']>;
+  ties?: Maybe<Scalars['Int']['output']>;
+  totalTeams?: Maybe<Scalars['Int']['output']>;
+  wins?: Maybe<Scalars['Int']['output']>;
+};
+
+/** Dashboard summary combining league phase, draft state, and current matchup for a single league. The standings fields (wins/losses/ties/rank/totalTeams) are only populated by `getArchivedUserLeagueSummaries`; `getUserLeagueSummaries` leaves them null and they are served separately by `getUserLeagueStandings` (LS-9528). */
 export type UserLeagueSummary = {
   __typename?: 'UserLeagueSummary';
   currentWeekNumber?: Maybe<Scalars['Int']['output']>;
@@ -5094,7 +5106,6 @@ export type UserLeagueSummary = {
   matchupStatus?: Maybe<Scalars['String']['output']>;
   opponentScore?: Maybe<Scalars['Float']['output']>;
   opponentTeamName?: Maybe<Scalars['String']['output']>;
-  pointsFor?: Maybe<Scalars['Float']['output']>;
   rank?: Maybe<Scalars['Int']['output']>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   selectionMethod?: Maybe<Scalars['String']['output']>;

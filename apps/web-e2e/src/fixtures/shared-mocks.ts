@@ -197,6 +197,9 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
 
   // ── Home page ─────────────────────────────────────────────────────
   getuserleaguesummaries: { data: { getUserLeagueSummaries: [] } },
+  // Standings split off the summaries query (LS-9528) — the home and leagues
+  // screens now fire this in parallel on every load, so it needs a baseline.
+  getuserleaguestandings: { data: { getUserLeagueStandings: [] } },
   getarchiveduserleaguesummaries: {
     data: { getArchivedUserLeagueSummaries: [] },
   },

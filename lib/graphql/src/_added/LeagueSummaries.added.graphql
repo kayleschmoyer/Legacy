@@ -1,3 +1,7 @@
+# The dashboard summary fragment deliberately omits the standings fields
+# (wins/losses/ties/rank/totalTeams). `getUserLeagueSummaries` no longer computes
+# them — they are fetched in parallel by `GetUserLeagueStandings` and merged on
+# `leagueId` client-side (LS-9528).
 fragment UserLeagueSummary on UserLeagueSummary {
   leagueId
   leagueName
@@ -9,12 +13,6 @@ fragment UserLeagueSummary on UserLeagueSummary {
   draftMode
   selectionMethod
   teamCount
-  wins
-  losses
-  ties
-  rank
-  totalTeams
-  pointsFor
   currentWeekNumber
   totalMatchups
   matchupId
@@ -29,6 +27,17 @@ fragment UserLeagueSummary on UserLeagueSummary {
   isCommissioner
 }
 
+# Archived (offseason) leagues are loaded lazily, off the first-render critical
+# path, so `getArchivedUserLeagueSummaries` still returns standings inline.
+fragment ArchivedUserLeagueSummary on UserLeagueSummary {
+  ...UserLeagueSummary
+  wins
+  losses
+  ties
+  rank
+  totalTeams
+}
+
 query GetUserLeagueSummaries {
   getUserLeagueSummaries {
     ...UserLeagueSummary
@@ -37,6 +46,17 @@ query GetUserLeagueSummaries {
 
 query GetArchivedUserLeagueSummaries {
   getArchivedUserLeagueSummaries {
-    ...UserLeagueSummary
+    ...ArchivedUserLeagueSummary
+  }
+}
+
+query GetUserLeagueStandings {
+  getUserLeagueStandings {
+    leagueId
+    wins
+    losses
+    ties
+    rank
+    totalTeams
   }
 }

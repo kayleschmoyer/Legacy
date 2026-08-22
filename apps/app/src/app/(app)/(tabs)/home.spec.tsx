@@ -119,7 +119,8 @@ type HomeScreenMockProps = {
 };
 
 // Capture the refreshControl element so pull-to-refresh tests can assert it's
-// wired to the screen's refetch (LS-8847).
+// wired to the screen's refetches — both the summaries and the standings query
+// it was split from (LS-8847, LS-9528).
 let capturedRefreshControl: HomeScreenMockProps['refreshControl'] | null = null;
 // Capture the scroll handle the tab passes down (LS-9248).
 let capturedScrollRef: HomeScreenMockProps['scrollRef'] | null = null;
@@ -143,6 +144,19 @@ jest.mock('@legacy-sports/shared-components', () => ({
       ) => 'baseball' | 'football' | null;
     }
   ).computePrimarySport,
+  // Same reasoning for the standings merge (LS-9528): the tab wires the two
+  // parallel queries together with it, so the real implementation is what these
+  // tests should exercise.
+  mergeLeagueStandings: (
+    jest.requireActual(
+      '../../../../../../lib/shared-components/src/features/home/leagueSummaryStats',
+    ) as unknown as {
+      mergeLeagueStandings: (
+        summaries: unknown[],
+        standings: unknown[] | null | undefined,
+      ) => unknown[];
+    }
+  ).mergeLeagueStandings,
   HomeScreen: ({
     onViewSport,
     scrollRef,
@@ -203,10 +217,18 @@ const mockGetArchivedLazy = jest.fn(() => [
   { data: null, loading: false },
 ]);
 const mockGetArchivedCached = jest.fn(() => ({ data: null }));
+// Standings ride a second, parallel query since LS-9528.
+const mockRefetchStandings = jest.fn();
+const mockGetUserLeagueStandings = jest.fn(() => ({
+  data: null,
+  refetch: mockRefetchStandings,
+}));
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeagueSummariesQuery: (...args: unknown[]) =>
     mockGetUserLeagueSummaries(...args),
+  useGetUserLeagueStandingsQuery: (...args: unknown[]) =>
+    mockGetUserLeagueStandings(...args),
   useGetArchivedUserLeagueSummariesLazyQuery: (...args: unknown[]) =>
     mockGetArchivedLazy(...args),
   useGetArchivedUserLeagueSummariesQuery: (...args: unknown[]) =>
@@ -677,7 +699,7 @@ describe('HomeTab pull-to-refresh (LS-8847)', () => {
     mockGetArchivedCached.mockReturnValue({ data: null });
   });
 
-  it('passes HomeScreen a refreshControl wired to the leagues refetch', async () => {
+  it('passes HomeScreen a refreshControl wired to both league refetches', async () => {
     render(<HomeTab />);
 
     expect(capturedRefreshControl).toBeTruthy();
@@ -689,6 +711,9 @@ describe('HomeTab pull-to-refresh (LS-8847)', () => {
     });
 
     expect(mockRefetch).toHaveBeenCalledTimes(1);
+    // Standings ride a second query since LS-9528 — a pull-to-refresh that
+    // only refreshed the summaries would leave a stale record on screen.
+    expect(mockRefetchStandings).toHaveBeenCalledTimes(1);
   });
 });
 

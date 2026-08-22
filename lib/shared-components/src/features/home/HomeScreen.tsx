@@ -35,7 +35,7 @@ import {
   deriveHomeUserStats,
   type HomeLeagueSummary,
   type HomeUserStats,
-  recordOf,
+  recordLabel,
   safeScore,
   sortByUrgency,
 } from './leagueSummaryStats';
@@ -77,8 +77,15 @@ export { formatDisplayName } from './homeSummaryFormatters';
 // The league-summary types moved to `leagueSummaryStats` (LS-8795) so the
 // Leagues ledger can consume them without importing this component module.
 // Re-exported here to keep `@legacy-sports/shared-components` imports stable.
-export type { HomeLeagueSummary, HomeUserStats } from './leagueSummaryStats';
-export { computePrimarySport } from './leagueSummaryStats';
+export type {
+  HomeLeagueSummary,
+  HomeUserStats,
+  LeagueStandingsEntry,
+} from './leagueSummaryStats';
+export {
+  computePrimarySport,
+  mergeLeagueStandings,
+} from './leagueSummaryStats';
 
 /* ─── Public types ─── */
 
@@ -624,7 +631,7 @@ function TicketHeroScoreZone({
               fontVariant={['tabular-nums']}
               marginTop={2}
             >
-              {recordOf(summary)}
+              {recordLabel(summary)}
               {summary.rank != null ? ` · Rank #${summary.rank}` : ''}
             </Text>
             <Text
@@ -727,7 +734,7 @@ function TicketHeroScoreZone({
   // of the head-to-head score block.
   return (
     <XStack justifyContent="flex-end">
-      <TicketStandingStat big={recordOf(summary)} label="Record" />
+      <TicketStandingStat big={recordLabel(summary)} label="Record" />
       {summary.rank != null && summary.totalTeams != null ? (
         <XStack
           borderWidth={0}
@@ -1307,7 +1314,7 @@ function PlayboardBug({
       <>
         <BugPlate
           abbr="You"
-          sub={recordOf(summary)}
+          sub={recordLabel(summary)}
           points={userScore.toFixed(1)}
           leading={isLeading}
         />
@@ -1336,7 +1343,7 @@ function PlayboardBug({
     // row instead of an opponent score.
     body = (
       <>
-        <BugPlate abbr="You" points={recordOf(summary)} leading={false} />
+        <BugPlate abbr="You" points={recordLabel(summary)} leading={false} />
         <BugPlate
           abbr="Standing"
           points={summary.rank != null ? `#${summary.rank}` : '—'}
@@ -1351,7 +1358,7 @@ function PlayboardBug({
         : 'This week';
     bottomRight = 'Bye';
   } else {
-    body = <BugStatusPlate label={recordOf(summary)} />;
+    body = <BugStatusPlate label={recordLabel(summary)} />;
     bottomLeft =
       summary.rank != null && summary.totalTeams != null
         ? `Rank #${summary.rank} of ${summary.totalTeams}`
@@ -1686,7 +1693,7 @@ export function LeagueListRow({
     scoreLabel = 'Draft scheduled';
     scoreColor = BRAND_GOLD_LIGHT;
   } else {
-    scoreBig = recordOf(summary);
+    scoreBig = recordLabel(summary);
     scoreLabel =
       summary.rank != null && summary.totalTeams != null
         ? `Rank #${summary.rank} of ${summary.totalTeams}`

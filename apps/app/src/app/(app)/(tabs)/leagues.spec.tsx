@@ -73,6 +73,20 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
         </View>
       );
     },
+    // The tab merges its two parallel queries with this before handing the
+    // result to the ledger (LS-9528), so the real implementation is what this
+    // suite should exercise. Scoped to the single module — requiring the entry
+    // point itself would defeat the purpose of mocking it.
+    mergeLeagueStandings: (
+      jest.requireActual(
+        '../../../../../../lib/shared-components/src/features/home/leagueSummaryStats',
+      ) as unknown as {
+        mergeLeagueStandings: (
+          summaries: unknown[],
+          standings: unknown[] | null | undefined,
+        ) => unknown[];
+      }
+    ).mergeLeagueStandings,
   };
 });
 
@@ -81,9 +95,17 @@ const mockUseGetUserLeagueSummariesQuery = jest.fn(() => ({
   loading: false,
 }));
 
+// Standings ride a second, parallel query since LS-9528.
+const mockUseGetUserLeagueStandingsQuery = jest.fn(() => ({
+  data: null,
+  refetch: jest.fn(),
+}));
+
 jest.mock('@legacy-sports/graphql', () => ({
   useGetUserLeagueSummariesQuery: (...args: unknown[]) =>
     mockUseGetUserLeagueSummariesQuery(...args),
+  useGetUserLeagueStandingsQuery: (...args: unknown[]) =>
+    mockUseGetUserLeagueStandingsQuery(...args),
 }));
 
 const mockUseAuthorizedUserInfo = jest.fn(() => ({ id: 1, name: 'Test User' }));

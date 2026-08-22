@@ -14,11 +14,13 @@ import {
   formatDisplayName,
   type HomeLeagueSummary,
   HomeScreen,
+  mergeLeagueStandings,
 } from '@legacy-sports/shared-components';
 import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
 import {
   useGetArchivedUserLeagueSummariesLazyQuery,
   useGetArchivedUserLeagueSummariesQuery,
+  useGetUserLeagueStandingsQuery,
   useGetUserLeagueSummariesQuery,
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
@@ -96,6 +98,14 @@ export default function HomeTab() {
     fetchPolicy: 'cache-and-network',
   });
 
+  // Standings ride a separate, parallel query so the league cards are not held
+  // behind the StandingsService fan-out (LS-9528). `loading` above deliberately
+  // ignores it — the dashboard renders as soon as the summaries land.
+  const { data: standingsData, refetch: refetchStandings } =
+    useGetUserLeagueStandingsQuery({
+      fetchPolicy: 'cache-and-network',
+    });
+
   const [fetchArchived, { data: archivedData, loading: archivedLoading }] =
     useGetArchivedUserLeagueSummariesLazyQuery({
       fetchPolicy: 'cache-and-network',
@@ -107,11 +117,18 @@ export default function HomeTab() {
   const archivedCount =
     archivedCachedData?.getArchivedUserLeagueSummaries?.length ?? null;
 
-  const { refreshControl } = usePullToRefresh([() => refetch()]);
+  const { refreshControl } = usePullToRefresh([
+    () => refetch(),
+    () => refetchStandings(),
+  ]);
 
   const leagues = useMemo<HomeLeagueSummary[]>(
-    () => data?.getUserLeagueSummaries ?? [],
-    [data?.getUserLeagueSummaries],
+    () =>
+      mergeLeagueStandings(
+        data?.getUserLeagueSummaries ?? [],
+        standingsData?.getUserLeagueStandings,
+      ),
+    [data?.getUserLeagueSummaries, standingsData?.getUserLeagueStandings],
   );
   const archivedLeagues = useMemo<HomeLeagueSummary[]>(
     () => archivedData?.getArchivedUserLeagueSummaries ?? [],

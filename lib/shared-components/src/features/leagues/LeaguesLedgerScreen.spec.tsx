@@ -205,14 +205,38 @@ describe('LeaguesLedgerScreen', () => {
     });
 
     it('falls back to the record when a pre-draft league has no scheduled date', () => {
-      const { getByText } = render(
+      const { getByTestId, queryByText, getByText } = render(
         <LeaguesLedgerScreen
           {...baseProps}
           leagues={[{ ...preDraftLeague, draftScheduledAt: null }]}
         />,
       );
-      expect(getByText('0-0')).toBeTruthy();
+      // An em dash, not "0-0": this league carries no standings, and inventing
+      // a zeroed record is the wrong-then-corrected flash LS-9528 removes.
+      // Scoped to the row — the aggregate footer renders its own dash, so a
+      // document-wide count would be asserting on unrelated markup.
+      const row = within(getByTestId('league-row-3'));
+      expect(row.getAllByText('—')).toHaveLength(2); // record + rank
+      expect(queryByText('0-0')).toBeNull();
       expect(getByText('10 teams · pre-draft')).toBeTruthy();
+    });
+
+    it('shows a real 0-0 record rather than an em dash once standings land', () => {
+      const { getByText } = render(
+        <LeaguesLedgerScreen
+          {...baseProps}
+          leagues={[
+            {
+              ...preDraftLeague,
+              draftScheduledAt: null,
+              wins: 0,
+              losses: 0,
+              ties: 0,
+            },
+          ]}
+        />,
+      );
+      expect(getByText('0-0')).toBeTruthy();
     });
 
     it('renders the COMM chip only for leagues the user commissions', () => {

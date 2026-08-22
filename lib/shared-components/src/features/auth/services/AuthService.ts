@@ -36,6 +36,30 @@ const ADMIN_PROFILE_KEY = 'ls_admin_profile';
 const IMPERSONATED_USER_KEY = 'ls_impersonated_user';
 
 /**
+ * Whether a session was persisted on this device, read **synchronously** from
+ * localStorage.
+ *
+ * `AuthProvider` only publishes `user` after its async bootstrap effect has run
+ * — which, when the cached token has expired, includes awaiting a `/refresh-jwt`
+ * round trip. Queries gated on `auth.user` therefore cannot dispatch until that
+ * finishes, even when they take no arguments and authenticate off the HttpOnly
+ * cookie anyway. This gives such queries a gate they can satisfy on the very
+ * first render instead (LS-9528).
+ *
+ * A stale profile (cookie already revoked) simply means the request 401s and the
+ * existing error link tears the session down — the same path any stale-session
+ * request already takes.
+ */
+export function hasStoredSession(): boolean {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    return localStorage.getItem(USER_PROFILE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Thrown by `refreshJwt()` when the server returns HTTP 401 or 403, indicating
  * that the session cookie is absent, invalid, revoked, or failed CSRF
  * validation — not a transient network error. Callers should log the user out
