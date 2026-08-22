@@ -364,6 +364,7 @@ const mockUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
 
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
+  DefensiveFormat: { Dst: 'dst', Idp: 'idp' },
   useGetLeagueByIdQuery: (...args: unknown[]) =>
     mockGetLeagueByIdQuery(...args),
   useGetPositionsForLeagueQuery: (...args: unknown[]) =>

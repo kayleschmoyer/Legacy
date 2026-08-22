@@ -15,9 +15,11 @@ import {
   BRAND_SEAM_RED_LIGHT,
   withAlpha,
 } from '@legacy-sports/shared-components/utils';
-import { Sport } from '@legacy-sports/graphql';
+import { DefensiveFormat, Sport } from '@legacy-sports/graphql';
 import { LeagueDuesPaymentStatus } from '../commissioner/LeagueDuesPaymentStatus';
 import type { ScoringSettings } from '../../common/scoring';
+import { LeagueScoringReadOnly } from '../scoring/LeagueScoringReadOnly';
+import type { LeagueScoringProfile } from '../scoring/LeagueScoringEditor';
 
 interface RankedStanding {
   rank: number;
@@ -60,6 +62,16 @@ interface LeagueOverviewTabProps {
   scoringError?: Error | null;
   scoringProfileName?: string;
   scoringSettings?: ScoringSettings;
+  /**
+   * Football-only read-only scoring rules card (LS-6327). Football's
+   * multiplier groups (passing/rushing/receiving/etc.) don't fit the
+   * baseball-shaped `ScoringSettings` above, so football passes the raw
+   * profile through to {@link LeagueScoringReadOnly} instead.
+   */
+  footballScoringProfile?: LeagueScoringProfile | null;
+  footballScoringLoading?: boolean;
+  footballScoringError?: Error | null;
+  footballDefensiveFormat?: DefensiveFormat | string | null;
   onJoinDraft: () => void;
   onViewAllStandings: () => void;
   onInviteShare: () => void;
@@ -172,6 +184,10 @@ export function LeagueOverviewTab({
   scoringError,
   scoringProfileName,
   scoringSettings,
+  footballScoringProfile,
+  footballScoringLoading,
+  footballScoringError,
+  footballDefensiveFormat,
   onJoinDraft,
   onViewAllStandings,
   onInviteShare,
@@ -357,6 +373,25 @@ export function LeagueOverviewTab({
               error={scoringError ?? null}
               profileName={scoringProfileName ?? 'Default'}
               settings={scoringSettings}
+            />
+          </OverviewSection>
+        ) : null}
+
+        {/* Scoring Rules (football) — read-only card for every member, not
+            just the commissioner (LS-6327). Football's scoring editor was
+            previously commissioner-only, leaving non-commissioner members
+            with no way to see how points are calculated on native. */}
+        {isFootball && footballScoringProfile !== undefined ? (
+          <OverviewSection
+            title="Scoring Rules"
+            sub="How points are calculated"
+          >
+            <LeagueScoringReadOnly
+              profile={footballScoringProfile}
+              loading={footballScoringLoading ?? false}
+              error={footballScoringError ?? null}
+              sport={Sport.Football}
+              defensiveFormat={footballDefensiveFormat}
             />
           </OverviewSection>
         ) : null}

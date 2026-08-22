@@ -536,6 +536,10 @@ export default function FootballLeagueId(): React.JSX.Element {
               rankedStandings={rankedStandings}
               startersCount={startersCount}
               inviteCode={inviteCode}
+              footballScoringProfile={scoring.profile}
+              footballScoringLoading={scoring.loading}
+              footballScoringError={scoring.error ?? null}
+              footballDefensiveFormat={league.defensiveFormat}
               onJoinDraft={() =>
                 router.navigate({
                   pathname: '/DraftBoardPage',

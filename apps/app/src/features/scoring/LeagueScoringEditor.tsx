@@ -53,7 +53,7 @@ import { useKeyboardActivation } from '../../common/hooks/useKeyboardActivation'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type LeagueScoringProfile = NonNullable<
+export type LeagueScoringProfile = NonNullable<
   GetLeagueScoringProfileQuery['leagueScoringProfile']
 >;
 

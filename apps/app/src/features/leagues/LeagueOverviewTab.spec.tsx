@@ -36,6 +36,13 @@ jest.mock('../commissioner/LeagueDuesPaymentStatus', () => {
   };
 });
 
+jest.mock('../scoring/LeagueScoringReadOnly', () => {
+  const { View } = jest.requireActual<RNComponents>('react-native');
+  return {
+    LeagueScoringReadOnly: () => <View testID="league-scoring-read-only" />,
+  };
+});
+
 jest.mock('tamagui', () => {
   const { View, Text } = jest.requireActual<typeof import('react-native')>(
     'react-native',
@@ -216,6 +223,34 @@ describe('LeagueOverviewTab', () => {
     );
     expect(screen.getByText('Scoring Rules')).toBeTruthy();
     expect(screen.getByTestId('league-scoring-summary')).toBeTruthy();
+  });
+
+  it('omits the football Scoring Rules section on the baseball screen', () => {
+    render(<LeagueOverviewTab {...BASE_PROPS} footballScoringProfile={null} />);
+    expect(screen.queryByTestId('league-scoring-read-only')).toBeNull();
+  });
+
+  it('renders a read-only Scoring Rules card for football members (LS-6327)', () => {
+    render(
+      <LeagueOverviewTab
+        {...BASE_PROPS}
+        league={{ ...BASE_PROPS.league, sport: Sport.Football }}
+        isCommissioner={false}
+        footballScoringProfile={null}
+      />,
+    );
+    expect(screen.getByText('Scoring Rules')).toBeTruthy();
+    expect(screen.getByTestId('league-scoring-read-only')).toBeTruthy();
+  });
+
+  it('omits the football Scoring Rules section when no scoring profile prop is passed', () => {
+    render(
+      <LeagueOverviewTab
+        {...BASE_PROPS}
+        league={{ ...BASE_PROPS.league, sport: Sport.Football }}
+      />,
+    );
+    expect(screen.queryByTestId('league-scoring-read-only')).toBeNull();
   });
 
   it('omits the Invite Friends section for non-commissioners', () => {
