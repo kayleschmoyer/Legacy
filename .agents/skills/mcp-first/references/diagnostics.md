@@ -175,6 +175,25 @@ Distinct from a one-time absence at session start (LS-9154, Check 1 above) or a 
 
 This flapping pattern itself (why multiple independent servers cycle rather than staying connected once established in a CCR container) is a platform/bootstrap investigation outside this repo's scope — the recovery pattern above is the actionable mitigation available to an agent mid-session.
 
+## Mid-Session Auth-Server Incompatibility ("does not support dynamic client registration") (LS-9439)
+
+Distinct from the plain 401 above: this failure mode surfaces as an explicit error string, not a Zod parse failure, and can hit multiple hosted connectors identically and simultaneously after a long session working normally:
+
+```
+Incompatible auth server: does not support dynamic client registration
+```
+
+Observed once so far: `legacy-sports-github`, `legacy-sports-jira`, and `legacy-sports-ci` all began failing identically, mid-session, after 8+ hours of normal operation (LS-9439, during the LS-9346/PR #7072 merge drive). All three failed on both reads and writes (e.g. `github_pr_why_blocked`, `jira_view`, `ci_rerun_failed_jobs`), not just mutations.
+
+**`auth_check_all` will not catch this.** It is a credential/token-_presence_ check (env vars, cache files — see [Pre-flight Auth Check](#pre-flight-auth-check-separate-from-load-failures) below), not a live OAuth-session probe, so it kept reporting `allAuthenticated: true` for the whole outage. A green `auth_check_all` is not proof the hosted connectors are actually reachable if a real tool call is throwing this error string.
+
+**Suspected cause (unconfirmed):** three independently-hosted servers failing with the identical OAuth-registration error at the same moment points toward a shared auth-proxy/gateway issue upstream of the individual connectors, rather than three coincidental token expirations. Root cause is not yet confirmed — if you hit this, add the timestamp and affected servers as a comment on LS-9439 rather than re-investigating from scratch.
+
+### Recovery
+
+1. **Attended session:** treat like [Mid-Session 401](#mid-session-401--token-expiry-ls-4874) above — stop, surface the recovery prompt, ask the user to re-consent via `/mcp`, wait.
+2. **Unattended/autonomous session already driving an approved, CI-green PR to merge** (the CCR exception pattern — see [cloud-agent-mode: hosted OAuth expires mid-session](../../cloud-agent-mode/SKILL.md#known-failure-mode-hosted-legacy-sports-githublegacy-sports-jira-oauth-expires-mid-session-on-long-running-watch-to-merge-loops-ls-8924)): if no generic `mcp__github__*`/`mcp__Atlassian__*` built-in fallback is available either, and no user response arrives within a reasonable wait, falling back to already-authenticated CLI tools for the remaining mechanical steps only (PR status checks, CI reruns, merge via `gh`; Jira view/transition/comment via `acli jira workitem`) is the documented recovery — both are separately authenticated outside the MCP OAuth path. **Report the fallback explicitly** (which servers, which error string, which steps used the CLI) so it lands in the MCP gap audit instead of being silently absorbed. This is a last resort for unattended sessions, not a first response — always attempt step 1 first if there is any chance a user is present to re-consent.
+
 ## Pre-flight Auth Check (Separate from Load Failures)
 
 Call `auth_check_all()` (worktree MCP server) at the start of any workflow requiring GitHub,
@@ -184,8 +203,11 @@ failing service and stop. When the worktree stdio server is absent (degraded CC-
 use the per-service checks instead: `github_auth_status`, `jira_auth_status`, `ci_auth_status`,
 `rollbar_auth_status`, `aws_sso_status`. See [SKILL.md — Pre-flight Auth Check](../SKILL.md#pre-flight-auth-check).
 
+**This check is credential-presence only — it cannot detect a live-session failure** like [Mid-Session Auth-Server Incompatibility](#mid-session-auth-server-incompatibility-does-not-support-dynamic-client-registration-ls-9439) above, which reported `allAuthenticated: true` throughout a real outage (LS-9439). Trust an actual tool-call error over a green `auth_check_all` result.
+
 ## See Also
 
+- [LS-9439](https://bkrupa.atlassian.net/browse/LS-9439) — tracking ticket for the auth-server-incompatibility failure mode above; root cause still open
 - `docs/dev-process/session-startup.md` — sequence diagram + orientation for the SessionStart hook chain that produces `[MCP WARNING]` output (LS-4505)
 - [`../SKILL.md`](../SKILL.md) — tool surfaces, server load order, per-server tool substitution tables, and the auth model (absorbed the former `credentials` skill 2026-07-02)
 - `docs/authentication/mcp-machine-credential-lifecycle.md` — rotation, revocation, and blast-radius runbook for the long-lived Cognito `client_credentials` machine secret (epic LS-5089, Track A)
