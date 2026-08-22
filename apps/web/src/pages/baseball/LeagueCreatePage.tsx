@@ -49,6 +49,7 @@ import {
   FaabBudgetField,
   FREE_ERA_IDS_BY_SPORT,
   getSubmitErrorMessage,
+  isUpstreamUnreachableError,
   KEEPER_COUNT_MAX,
   KEEPER_COUNT_MIN,
   type KeeperCostModel,
@@ -2486,11 +2487,25 @@ export function LeagueCreatePage(): React.JSX.Element {
           ? String(error.statusCode)
           : undefined;
 
-      LOGGER.error(
-        'Error creating league:',
-        error instanceof Error ? error : new Error(String(error)),
-        { code, correlationId },
-      );
+      const loggedError =
+        error instanceof Error ? error : new Error(String(error));
+      // Transient upstream-gateway timeouts (502/503/504) are infra noise,
+      // not actionable bugs — the shared apollo-client errorLink already
+      // skips Rollbar capture for them, but this mutation bypasses that
+      // link, so mirror the same policy here by logging at `warn` instead
+      // of `error` (RollbarOutputDestination only forwards error/fatal
+      // logs) (LS-9492).
+      if (isUpstreamUnreachableError(error)) {
+        LOGGER.warn('Error creating league:', loggedError, {
+          code,
+          correlationId,
+        });
+      } else {
+        LOGGER.error('Error creating league:', loggedError, {
+          code,
+          correlationId,
+        });
+      }
       setSubmitError(getSubmitErrorMessage(error));
       setSubmitErrorMeta({ code, correlationId });
     } finally {

@@ -4,15 +4,25 @@
 // last two are new, covering an allowlisted code with an empty message and the
 // INTERNAL_SERVER_ERROR exclusion that the mirroring in submitError.ts claims.
 
-import { CombinedGraphQLErrors } from '@apollo/client';
+import { CombinedGraphQLErrors, ServerError } from '@apollo/client';
 
 import {
   getSubmitErrorMessage,
   isLeagueCapError,
   isPremiumRequiredError,
+  isUpstreamUnreachableError,
   LEAGUE_SUBMIT_ERROR_FALLBACK,
   SAFE_TO_DISPLAY_CODES,
 } from './submitError';
+
+function makeServerError(statusCode: number): ServerError {
+  // The jest env here has no global `Response`; ServerError only reads
+  // `response.status`, so a minimal stand-in is sufficient.
+  return new ServerError('Response not successful', {
+    response: { status: statusCode } as Response,
+    bodyText: '',
+  });
+}
 
 describe('getSubmitErrorMessage (LS-6069)', () => {
   it('does not leak a raw internal-server GraphQL error message', () => {
@@ -141,5 +151,41 @@ describe('isLeagueCapError (CLF-012)', () => {
 
   it('rejects a non-GraphQL error', () => {
     expect(isLeagueCapError(new Error('network error'))).toBe(false);
+  });
+});
+
+// LS-9492 — mirrors apollo-client.ts's errorLink upstream-unreachable check
+// so the league-create submit handlers (which bypass that shared link) can
+// apply the same "don't report transient gateway blips to Rollbar" policy.
+describe('isUpstreamUnreachableError (LS-9492)', () => {
+  it.each([502, 503, 504])(
+    'is true for a ServerError with status %d',
+    (statusCode) => {
+      expect(isUpstreamUnreachableError(makeServerError(statusCode))).toBe(
+        true,
+      );
+    },
+  );
+
+  it.each([400, 401, 500])(
+    'is false for a ServerError with status %d',
+    (statusCode) => {
+      expect(isUpstreamUnreachableError(makeServerError(statusCode))).toBe(
+        false,
+      );
+    },
+  );
+
+  it('is false for a GraphQL error', () => {
+    const error = new CombinedGraphQLErrors({
+      errors: [
+        { message: 'Bad input', extensions: { code: 'BAD_USER_INPUT' } },
+      ],
+    });
+    expect(isUpstreamUnreachableError(error)).toBe(false);
+  });
+
+  it('is false for a plain non-GraphQL Error', () => {
+    expect(isUpstreamUnreachableError(new Error('network error'))).toBe(false);
   });
 });

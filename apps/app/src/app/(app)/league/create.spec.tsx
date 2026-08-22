@@ -2,7 +2,7 @@ import React from 'react';
 import { act, render, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import type { View as RNView } from 'react-native';
-import { CombinedGraphQLErrors } from '@apollo/client';
+import { CombinedGraphQLErrors, ServerError } from '@apollo/client';
 
 import CreateLeagueScreen, { buildCreateLeagueInput } from './create';
 
@@ -427,6 +427,50 @@ describe('CreateLeagueScreen — wizard wiring (LS-8809)', () => {
         'Error creating league:',
         error,
       );
+    });
+
+    // LS-9492 — transient upstream-gateway timeouts (502/503/504) should not
+    // reach Rollbar the way an actionable bug would; LOGGER.warn isn't
+    // forwarded to Rollbar (only error/fatal are), unlike LOGGER.error.
+    it.each([502, 503, 504])(
+      'logs a %d ServerError at warn (not error)',
+      (statusCode) => {
+        const { LOGGER } = jest.requireMock<{
+          LOGGER: { error: jest.Mock; warn: jest.Mock };
+        }>('@legacy-sports/logging');
+        renderScreen();
+        const error = new ServerError('Server error', {
+          response: { status: statusCode } as Response,
+          bodyText: '',
+        });
+
+        mutationOptions?.onError?.(error);
+
+        expect(LOGGER.warn).toHaveBeenCalledWith(
+          'Error creating league:',
+          error,
+        );
+        expect(LOGGER.error).not.toHaveBeenCalled();
+      },
+    );
+
+    it('still logs a 500 ServerError at error (not warn)', () => {
+      const { LOGGER } = jest.requireMock<{
+        LOGGER: { error: jest.Mock; warn: jest.Mock };
+      }>('@legacy-sports/logging');
+      renderScreen();
+      const error = new ServerError('Server error', {
+        response: { status: 500 } as Response,
+        bodyText: '',
+      });
+
+      mutationOptions?.onError?.(error);
+
+      expect(LOGGER.error).toHaveBeenCalledWith(
+        'Error creating league:',
+        error,
+      );
+      expect(LOGGER.warn).not.toHaveBeenCalled();
     });
 
     // CLF-013 — a PremiumRequiredError used to hit the same generic red

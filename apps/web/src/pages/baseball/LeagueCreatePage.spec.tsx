@@ -51,14 +51,15 @@ Element.prototype.scrollIntoView = jest.fn();
 // ---------------------------------------------------------------------------
 
 const mockLoggerError = jest.fn();
+const mockLoggerWarn = jest.fn();
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
-    warn: jest.fn(),
-    // Wrapped in an arrow function (rather than passing mockLoggerError
-    // directly) so this eagerly-evaluated factory doesn't read the const's
-    // value before its declaration runs — jest hoists jest.mock() above
-    // other top-level statements, and this file's own eager (non-lazy)
-    // import of ./LeagueCreatePage triggers the factory immediately.
+    // Wrapped in arrow functions (rather than passing the mocks directly)
+    // so this eagerly-evaluated factory doesn't read the consts' values
+    // before their declarations run — jest hoists jest.mock() above other
+    // top-level statements, and this file's own eager (non-lazy) import of
+    // ./LeagueCreatePage triggers the factory immediately.
+    warn: (...args: unknown[]) => mockLoggerWarn(...args),
     error: (...args: unknown[]) => mockLoggerError(...args),
     info: jest.fn(),
   },
@@ -119,7 +120,13 @@ jest.mock('../../components/UpgradeModal', () => ({
 // unaffected.
 let mockWaiverFaabSelectable = false;
 jest.mock('@legacy-sports/shared-components/leagues', () => {
-  const actual = jest.requireActual('@legacy-sports/shared-components/leagues');
+  // Requiring the package entry point here can resolve to a stale copy of
+  // lib/shared-components from a different worktree's node_modules-pool slot
+  // (LS-9530) — go straight to source by relative path instead, matching the
+  // pattern already used by apps/app's equivalent mock.
+  const actual = jest.requireActual(
+    '../../../../../lib/shared-components/src/entry/leagues',
+  );
   return {
     ...actual,
     SalaryCapField: ({ onUpgrade }: any) => (
@@ -2582,6 +2589,45 @@ describe('LeagueCreatePage — submit error code + correlation token (LS-6065)',
       code: 'BAD_USER_INPUT',
       correlationId: expect.stringMatching(/^[0-9a-f]{8}$/),
     });
+  });
+
+  // LS-9492 — a transient upstream-gateway timeout (502/503/504) should not
+  // be reported to Rollbar the way an actionable bug would be. LOGGER.warn
+  // is not forwarded to Rollbar (only error/fatal are), unlike LOGGER.error.
+  it.each([502, 503, 504])(
+    'logs a %d ServerError at warn (not error), keeping the user-facing message unchanged',
+    async (statusCode) => {
+      const { ServerError } = require('@apollo/client');
+      const serverError = new ServerError('Server error', {
+        response: { status: statusCode } as Response,
+        bodyText: '',
+      });
+      mockCreateLeague.mockRejectedValue(serverError);
+
+      submitForm();
+
+      await waitFor(() => expect(mockLoggerWarn).toHaveBeenCalled());
+      expect(mockLoggerError).not.toHaveBeenCalled();
+      expect(mockLoggerWarn.mock.calls[0][2]).toEqual({
+        code: String(statusCode),
+        correlationId: expect.stringMatching(/^[0-9a-f]{8}$/),
+      });
+      expect(screen.getByText(/Error code: \d{3}/)).toBeInTheDocument();
+    },
+  );
+
+  it('still logs a 500 ServerError at error (not warn) — only 502/503/504 are transient', async () => {
+    const { ServerError } = require('@apollo/client');
+    const serverError = new ServerError('Server error', {
+      response: { status: 500 } as Response,
+      bodyText: '',
+    });
+    mockCreateLeague.mockRejectedValue(serverError);
+
+    submitForm();
+
+    await waitFor(() => expect(mockLoggerError).toHaveBeenCalled());
+    expect(mockLoggerWarn).not.toHaveBeenCalled();
   });
 });
 

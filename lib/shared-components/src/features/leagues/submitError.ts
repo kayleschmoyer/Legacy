@@ -4,7 +4,7 @@
 // both platforms apply the same allowlist instead of each re-deriving it —
 // mobile previously showed the raw `error.message` (LS-8814).
 
-import { CombinedGraphQLErrors } from '@apollo/client';
+import { CombinedGraphQLErrors, ServerError } from '@apollo/client';
 
 /**
  * Generic copy shown whenever the server's message is not trusted for display.
@@ -64,6 +64,23 @@ export function isPremiumRequiredError(error: unknown): boolean {
       (e) =>
         (e.extensions?.['code'] as string | undefined) === 'PREMIUM_REQUIRED',
     )
+  );
+}
+
+/**
+ * True for the upstream-gateway-unreachable family (502/503/504) — mirrors
+ * the `isUpstreamUnreachable` check in apollo-client.ts's shared `errorLink`,
+ * which deliberately does not report these to Rollbar since they're transient
+ * infra blips rather than actionable bugs. The league-create submit handlers
+ * bypass that shared link (`errorPolicy: 'none'` + `suppressGlobalError`), so
+ * callers here must apply the same policy themselves (LS-9492).
+ */
+export function isUpstreamUnreachableError(error: unknown): boolean {
+  return (
+    ServerError.is(error) &&
+    (error.statusCode === 502 ||
+      error.statusCode === 503 ||
+      error.statusCode === 504)
   );
 }
 
