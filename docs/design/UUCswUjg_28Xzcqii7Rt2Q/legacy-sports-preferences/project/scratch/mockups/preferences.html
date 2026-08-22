@@ -5,29 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Preferences — Legacy Sports</title>
 
-<!--
-  PREFERENCES — Mobile + Desktop breakpoints
-  ===========================================
-  Per page reference doc: /preferences. Sections collapsible, auto-save
-  banner appears on change for 2s, notifications shown only when authed.
+<!-- HANDOFF
+  Final file: this one (scratch/mockups/preferences.html). Re-run of the
+  original Preferences design (LS-4576) to close LS-8965 (source audit:
+  LS-8954) — palette/font/focus/breakpoint mechanical fixes at the design
+  source, plus the desktop ($xxl / 1280px) layout that was entirely
+  missing before this pass.
 
-  Editorial decision: this page is settings, not a scoreboard — so the
-  scoreboard-condensed display face is reserved for section *headers*
-  and ON/OFF state labels. Body copy and the actual setting names sit
-  in Literata, where they read like an encyclopedia of toggles, not a
-  control panel. We use seam-red ONLY for destructive (none here) and
-  errors; gold ONLY for the save-confirmation tick (a positive outcome).
+  Key decisions:
+    · Desktop is NOT a scaled-up phone. It gets its own template
+      (tpl-app-desktop): persistent top nav + sticky sub-nav rail (jump
+      anchors) + single content column. Sections never collapse on
+      desktop — there's room to show everything at once, so the
+      accordion affordance (and its chevron) is dropped entirely rather
+      than kept-but-disabled.
+    · xs/sm/md/lg/xl are NOT separate frames — see BREAKPOINTS below for
+      why, and where the reflow actually happens.
+    · Toggle controls remain the `<div role="switch">` + `.toggle-pad`
+      hit-area pattern already established by the shared design system
+      (see docs/design/.../legacy-sports-design-system/project/preview/components-toggle.html)
+      rather than switching to native `<input type="checkbox">` — that's
+      a design-system-wide convention decision, out of scope for a
+      single-page re-run. Flagging per PROMPT.md's "semantic HTML for
+      every control": this is a known gap in the *shared* toggle
+      component, not specific to this page.
 
-  We render THREE mobile breakpoints plus the $xxl desktop band in one
-  canvas:
-    · 360px (small Android)
-    · 375px (iPhone primary, per PROMPT)
-    · 414px (iPhone Plus / Pro Max)
-    · 1280px (desktop / $xxl — top nav + sidebar sub-nav + content column,
-      per docs/design .../legacy-sports-design-system/project/preview/breakpoints.html)
-  Toggle the four conditional states with the tabs at the very top.
+  Open questions for the implementer: none — every conditional state
+  and both fully-designed breakpoints render cleanly; the
+  band-sharing rationale below should be enough to reflow the
+  three unshown desktop-adjacent bands (md/lg/xl) without new guidance.
+-->
 
-  No build step. Open file directly. -->
+<!-- BREAKPOINTS: xxs (this file's 360/375/414 frames) through sm (800–859px)
+     all share the mobile drill-down layout unchanged — single column,
+     collapsible sections, bottom-anchored save banner. md (860–979px)
+     through xl (1120–1279px) share the desktop sidebar+content shell shown
+     at 1280px ($xxl): the sub-nav rail and content column both narrow
+     fluidly and sections stay expanded down to 860px, the same point the
+     shipped app's primary nav switches from a hamburger drawer to a top
+     bar (see breakpoints.html's nav-pattern row). Reflow happens at the
+     canonical 860px threshold only — nothing invented in between. -->
+
+<!-- COMPONENT: settings-row (.row / .row-l / .row-label / .row-help) —
+     reused across all three sections (Appearance, Sports & Stats,
+     Notifications) and both mobile + desktop templates -->
+<!-- COMPONENT: toggle (.toggle-pad > .toggle[role=switch]) — reused for
+     every boolean setting; segmented control (.seg) is its sibling for
+     the qualitative (non-boolean) choices -->
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

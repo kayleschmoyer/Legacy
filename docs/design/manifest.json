@@ -112,8 +112,8 @@
       "title": "Preferences",
       "slug": "legacy-sports-preferences",
       "status": "active",
-      "lastSyncedHash": "a63af6bae01ebb7669c2fd2b55368eca3eb95a0144ac669e19edc44c35d95aad",
-      "lastSyncedAt": "2026-08-04T00:00:00.000Z",
+      "lastSyncedHash": "c4a39b74a1dbbf879929286ae47a7232645f237ad8cf927c9b8df252deb62b37",
+      "lastSyncedAt": "2026-08-04T00:10:00.000Z",
       "jiraKey": "LS-8965",
       "source": "designsync-local"
     },

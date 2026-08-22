@@ -4,7 +4,7 @@
 **Source**: `DesignSync` (projectId `019de99b-c7df-7e9d-9f09-20f8b65fcf1d`) — local pull, `designsync-local`
 **Synced at**: 2026-08-04T00:00:00.000Z
 **Previous hash**: `64096434e764584a0a1940aa2c5b9800ece0bc71f14c46afa4722ba54c0c3dae`
-**Bundle hash**: `a63af6bae01ebb7669c2fd2b55368eca3eb95a0144ac669e19edc44c35d95aad`
+**Bundle hash**: `c4a39b74a1dbbf879929286ae47a7232645f237ad8cf927c9b8df252deb62b37`
 **Files**: 42
 **Sync ticket**: LS-8965
 
@@ -19,6 +19,8 @@ Source-level fix for LS-8965 (LS-8954 audit, HIGH/MED findings) applied directly
 - **Raw hex → tokens**: 5× `#fff` → `var(--fg-on-accent)`; `#1a1408` (save-banner check-mark ink) → a new page-scoped `--ink-on-gold` token declared in the mockup's own `:root` block (no existing global token matches this exact contrast pairing).
 - **Desktop layout (design ADDITION)**: added a 4th frame, **Desktop · 1280px ($xxl)**, with its own template (`tpl-app-desktop`) — persistent top nav + sticky sub-nav rail + single content column (not a scaled-up phone clone); sections stay open (no collapse affordance) since there's room to show everything. Matches the `$xxl` "Top + sidebar" nav pattern and 1280 content-max from the design system's `breakpoints.html`. This closes the previously-missing desktop layout AC.
 - **Preserved** (per audit note): the full 4-state switcher with geometry-mirroring skeletons, `role="switch"` toggles with `aria-label`s, and `tabular-nums` on stat values — untouched.
+- **Updated-brief compliance** (`docs/agents/pages/PROMPT.md`'s Deliverable Checklist changed after the original LS-8954 audit ran — this pass targets the current version): added a `<!-- HANDOFF -->` block, a `<!-- BREAKPOINTS -->` annotation claiming `xs`/`sm` (mobile-shares-`xxs`) and `md`/`lg`/`xl` (desktop-shares-`$xxl`) instead of new frames, and `<!-- COMPONENT -->` annotations for the reused settings-row and toggle patterns.
+- **Known remaining gap, flagged not fixed**: the `.toggle-pad > .toggle[role=switch]` control is a styled `<div>`, not a native `<input type="checkbox">` — the checklist's "no `<div>` styled to look like a control" item isn't met. This is a shared design-system-wide toggle convention (also used by `components-toggle.html`), not specific to this page; changing it here alone would fork the pattern. Left as-is with a `<!-- HANDOFF -->` note; a design-system-level fix should be its own ticket if desired.
 
 ## Post-sync fix: LS-9086 (2026-08-09)
 
