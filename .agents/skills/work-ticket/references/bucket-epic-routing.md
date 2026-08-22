@@ -52,7 +52,7 @@ The established workaround (see LS-7607 → LS-7657/LS-7658): parent the GAP bug
 Skip a child during fan-out when **any** of these are true:
 
 - Status is `In Progress`, `In Review`, or `Done` (not `To Do`)
-- `jira_check_blockers` shows unresolved blockers (surface in the user prompt rather than silently dispatching)
+- blocker state shows unresolved blockers (surface in the user prompt rather than silently dispatching) — read it inline from the listing call (`includeBlockers: true`) or batch it with `jira_check_blockers({ keys: [...] })`
 - A PR already exists for the ticket (`github_pr_dashboard(state: "all", limit: 50)` + filter by key)
 
 A ticket skipped for any of these reasons remains visible in the user's pre-dispatch prompt (annotated) — it is not silently dropped.

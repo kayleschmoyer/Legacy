@@ -9,10 +9,10 @@ Pick up and implement MCP tooling gap tickets from the **current MCP gaps bucket
 List child tickets of the current MCP gaps bucket epic filtered to "To Do". First call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` to get the current key, then:
 
 ```
-jira_list_children(key: <currentKey>, status: "To Do")
+jira_list_children(key: <currentKey>, status: "To Do", includeBlockers: true)
 ```
 
-Select the first unblocked ticket. Check blockers with `jira_check_blockers`.
+`includeBlockers` annotates every row with `blocked` / `blockers` in the same request — select the first row with `blocked = no`. Do not follow up with per-ticket `jira_check_blockers` calls, and never delegate the blocker sweep to a subagent. When you have keys but no listing, batch them: `jira_check_blockers({ keys: [...] })`.
 
 ### 2. Understand the gap type
 

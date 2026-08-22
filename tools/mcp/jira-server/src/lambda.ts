@@ -26,6 +26,12 @@ import { addComment } from './tools/add-comment.js';
 import { COMMON_STATUSES, consolidatedTransition } from './tools/transition.js';
 import { view } from './tools/view.js';
 import { bulkCreate } from './tools/bulk-create.js';
+import { bulkEdit } from './tools/bulk-edit.js';
+import { bulkLinkIssues } from './tools/bulk-link-issues.js';
+import { bulkListChildren } from './tools/bulk-list-children.js';
+import { getAllDescendants } from './tools/get-all-descendants.js';
+import { rolloverSync } from './tools/rollover-sync.js';
+import { startWork } from './tools/start-work.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { claimTicket } from './tools/claim-ticket.js';
 import { jiraKeysSchema, openPrsSchema } from './schemas.js';
@@ -119,8 +125,16 @@ export function createMcpServer(): McpServer {
 
   server.tool(
     'jira_check_blockers',
-    '3-way dependency check for a ticket.',
-    { key: z.string() },
+    '3-way dependency check: STOP if a blocker is not ready, use the blocker branch if In Review, base off main if Done/no blockers. ' +
+      'Accepts up to 50 keys in one call — pass `keys` (or a comma-separated `key`) when filtering a dispatch batch, ' +
+      'so one JQL round-trip replaces N per-ticket calls and no sub-agent is needed to sweep blockers. ' +
+      'Batch form returns { total, unblocked, blocked, results, notFound? }; a single `key` returns the flat ' +
+      '{ canProceed, blockers, recommendation }. When you are already listing tickets, prefer jira_search / ' +
+      'jira_list_children with includeBlockers: true — those annotate blockers with no extra request at all.',
+    {
+      key: z.union([z.string(), z.array(z.string())]).optional(),
+      keys: z.union([z.string(), z.array(z.string())]).optional(),
+    },
     async (p) => checkBlockers(p),
   );
   server.tool(
@@ -187,23 +201,29 @@ export function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_list_children',
-    'List child tickets of an epic or story.',
+    'List child tickets of an epic or story. Set includeBlockers=true to annotate every child with blocker state inline ' +
+      '(no extra Jira request) instead of following up with per-ticket jira_check_blockers calls.',
     {
       key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
       status: z.string().optional(),
       limit: z.coerce.number().int().positive().max(100).default(25),
       pageToken: z.string().optional(),
+      paginate: z.boolean().optional(),
+      includeBlockers: z.boolean().default(false),
     },
     async (p) => listChildren(p),
   );
   server.tool(
     'jira_search',
-    'Search Jira issues using JQL. Returns compact results — no metadata blobs. Use compact=true for large result sets to get { issues: [{key, summary, status}], nextPageToken? }. When the response includes nextPageToken, pass it as pageToken to fetch the next page.',
+    'Search Jira issues using JQL. Returns compact results — no metadata blobs. Use compact=true for large result sets to get { issues: [{key, summary, status}], nextPageToken? }. When the response includes nextPageToken, pass it as pageToken to fetch the next page. ' +
+      'Set includeBlockers=true to add `blocked` (yes/no) and `blockers` (LS-123(Status)) columns to every row — costs no extra Jira request, and replaces looping jira_check_blockers over the results when filtering a dispatch batch.',
     {
       jql: z.string(),
       maxResults: z.coerce.number().int().positive().max(50).default(15),
       compact: z.boolean().default(false),
       pageToken: z.string().min(1).optional(),
+      fields: z.array(z.string()).min(1).optional(),
+      includeBlockers: z.boolean().default(false),
     },
     async (p) => search(p),
   );
@@ -374,6 +394,105 @@ export function createMcpServer(): McpServer {
       epicKey: z.string(),
     },
     async (p) => setBucketEpic(p),
+  );
+  server.tool(
+    'jira_get_all_descendants',
+    'Recursively traverse the ticket tree rooted at `key` and return all leaf-typed descendants ' +
+      '(Task / Bug / Sub-task) in a single call. Container-typed tickets (Epic / Story) are traversal ' +
+      'nodes only. Blocker status is annotated inline on every result (blocked / blockers[]) — no separate ' +
+      'jira_check_blockers calls needed. Use `status: "To Do"` plus `unblockedOnly: true` to get exactly the ' +
+      'workable tickets for a chip-dispatch batch in one call.',
+    {
+      key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
+      status: z.string().optional(),
+      unblockedOnly: z.boolean().default(false),
+      maxDepth: z.coerce.number().int().positive().max(20).default(10),
+    },
+    async (p) => getAllDescendants(p),
+  );
+  server.tool(
+    'jira_bulk_list_children',
+    'List children of up to 50 parent tickets in one call — replaces N serial jira_list_children round-trips. ' +
+      'Returns only the first page per parent; a returned nextPageToken is a truncation signal for that parent.',
+    {
+      keys: z
+        .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
+        .min(1)
+        .max(50),
+      status: z.string().optional(),
+      limit: z.coerce.number().int().positive().max(100).default(25),
+    },
+    async (p) => bulkListChildren(p),
+  );
+  server.tool(
+    'jira_bulk_edit',
+    'Edit up to 50 Jira tickets in one call. Each ticket must specify `key` plus at least one field. ' +
+      'Returns { total, succeeded, failed } — one ticket erroring never fails the whole batch.',
+    {
+      tickets: z
+        .array(
+          z.object({
+            key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
+            summary: z.string().optional(),
+            description: z.string().optional(),
+            type: z.enum(['Task', 'Bug', 'Story', 'Epic']).optional(),
+            sprint: z
+              .string()
+              .regex(/^(?:current|\d+)$/)
+              .optional(),
+            parent: z
+              .string()
+              .regex(/^[A-Z][A-Z0-9_]+-\d+$/)
+              .optional(),
+          }),
+        )
+        .min(1)
+        .max(50),
+    },
+    async (p) => bulkEdit(p),
+  );
+  server.tool(
+    'jira_bulk_link_issues',
+    'Create up to 50 issue links in one call. Same per-link contract as jira_link_issues — for "Blocks", ' +
+      'inwardKey is blocked by outwardKey. Returns { total, succeeded, failed }.',
+    {
+      links: z
+        .array(
+          z.object({
+            inwardKey: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
+            outwardKey: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
+            linkType: z.string().min(1),
+          }),
+        )
+        .min(1)
+        .max(50),
+    },
+    async (p) => bulkLinkIssues(p),
+  );
+  server.tool(
+    'jira_start_work',
+    'Semantic one-shot for "Jira → In Progress": verifies state, resolves the transition, transitions the ticket, ' +
+      'and sets the assignee in one call. Idempotent on already-In-Progress tickets; refuses Done tickets. ' +
+      'Prefer `assigneeAccountId` — email-based lookup always 401s under the hosted Lambda (LS-7891). ' +
+      'Use jira_transition({ action: "claim" }) when you also need blocker checks or the open-PR guard.',
+    {
+      key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
+      assignee: z.string().email().optional(),
+      assigneeAccountId: z.string().optional(),
+    },
+    async (p) => startWork(p),
+  );
+  server.tool(
+    'jira_rollover_sync',
+    'Manage Jira bucket-epic rollovers at sprint boundaries. mode="check" (default) reports drift and stranded ' +
+      'tickets read-only; "sync" updates bucket properties, re-parents stranded children, and closes the previous ' +
+      'epic; "rollover" creates the new sprint epics (requires sprintName) then syncs; "fix" re-parents only. ' +
+      'Write modes require project-admin credentials.',
+    {
+      mode: z.enum(['check', 'sync', 'rollover', 'fix']).default('check'),
+      sprintName: z.string().optional(),
+    },
+    async (p) => rolloverSync(p),
   );
 
   return server;

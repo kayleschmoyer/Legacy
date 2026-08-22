@@ -83,9 +83,24 @@ server.tool(
 // --- jira_check_blockers ---
 server.tool(
   'jira_check_blockers',
-  '3-way dependency check: STOP if blocker not ready, use blocker branch if In Review, base off main if Done/no blockers.',
+  '3-way dependency check: STOP if blocker not ready, use blocker branch if In Review, base off main if Done/no blockers. ' +
+    'Accepts up to 50 keys in one call — pass `keys` (or a comma-separated `key`) when filtering a dispatch batch, ' +
+    'so one JQL round-trip replaces N per-ticket calls and no sub-agent is needed to sweep blockers. ' +
+    'Batch form returns { total, unblocked: [key], blocked: [key], results: [{key, canProceed, blockers, recommendation}], notFound? }; ' +
+    'a single `key` still returns the flat { canProceed, blockers, recommendation }. ' +
+    'When you are already listing tickets, prefer jira_search / jira_list_children with includeBlockers: true — ' +
+    'those annotate blockers with no extra request at all.',
   {
-    key: z.string().describe('Ticket key to check'),
+    key: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .describe(
+        'Ticket key to check. Also accepts an array or a comma-separated list (treated as a batch).',
+      ),
+    keys: z
+      .union([z.string(), z.array(z.string())])
+      .optional()
+      .describe('Ticket keys to check in one call (1-50).'),
   },
   async (params) => checkBlockers(params),
 );
@@ -425,6 +440,12 @@ server.tool(
       .describe(
         'When true, fetches all children across all pages automatically. Returns compact JSON { parent, total, children: [{key, summary, status}], truncated? }. Hard-capped at 500 children.',
       ),
+    includeBlockers: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Annotate every child with blocker state — `blocked` / `blockers` columns in table mode, `blocked` / `blockers[]` fields in paginate mode. Costs no extra Jira request. Use this instead of looping jira_check_blockers over the children.',
+      ),
   },
   async (params) => listChildren(params),
 );
@@ -478,7 +499,7 @@ server.tool(
 // --- jira_search ---
 server.tool(
   'jira_search',
-  "Search Jira issues using JQL. Returns compact results (key, summary, status, type, assignee, priority) — no metadata blobs. Prefer this over Atlassian plugin search tools to avoid context overflow. Default maxResults is 15; raise only when you know the result set is small. Use compact=true for large result sets (e.g. listing all children of an epic) to get a minimal flat array of {key, summary, status} — typically under 2 KB for 50 issues. Pass fields to restrict the response to exactly those Jira fields (plus key) instead of the default/compact column set — unlike the Atlassian plugin's searchJiraIssuesUsingJql, this fields param is actually honored. When more pages exist, the response includes nextPageToken — pass it as pageToken to fetch the next page.",
+  "Search Jira issues using JQL. Returns compact results (key, summary, status, type, assignee, priority) — no metadata blobs. Prefer this over Atlassian plugin search tools to avoid context overflow. Default maxResults is 15; raise only when you know the result set is small. Use compact=true for large result sets (e.g. listing all children of an epic) to get a minimal flat array of {key, summary, status} — typically under 2 KB for 50 issues. Pass fields to restrict the response to exactly those Jira fields (plus key) instead of the default/compact column set — unlike the Atlassian plugin's searchJiraIssuesUsingJql, this fields param is actually honored. When more pages exist, the response includes nextPageToken — pass it as pageToken to fetch the next page. Set includeBlockers=true to get blocker state inline instead of following up with per-ticket jira_check_blockers calls.",
   {
     jql: z.string().describe('JQL query string'),
     maxResults: z.coerce
@@ -507,6 +528,12 @@ server.tool(
       .optional()
       .describe(
         'Restrict the response to exactly these Jira field names (plus key), overriding the default/compact column set. Each row renders one column per requested field.',
+      ),
+    includeBlockers: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Annotate every row with blocker state: a `blocked` column (yes/no — yes when a blocker is neither Done nor In Review) and a `blockers` column listing non-Done blockers as LS-123(Status). Costs no extra Jira request — issuelinks rides along in the same search response. Use this instead of looping jira_check_blockers when filtering a dispatch batch. A row with blocked=no that still names an LS-x(In Review) blocker means: base the branch off LS-x, not main.',
       ),
   },
   async (params) => search(params),

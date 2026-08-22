@@ -45,7 +45,9 @@ Wraps Jira operations with guardrails using the Jira REST API (with env var / ne
 - **jira_delete_ticket** — Close tickets by transitioning to "Won't Do" with a comment
 - **jira_transition** — Transition ticket status with validation
 - **jira_view** — Structured ticket details (base fields by default; pass `include: ['comments','transitions','blockers','children']` to fetch sub-resources in one call — replaces former `jira_get_comments` and `jira_get_transitions`)
-- **jira_check_blockers** — Automates the 3-way dependency check
+- **jira_check_blockers** — Automates the 3-way dependency check; pass `keys: [...]` (1-50) to resolve a whole dispatch batch in one JQL call
+- **jira_get_all_descendants** — Full-tree leaf descendants of an epic/story with blocker state annotated inline
+- **jira_search** / **jira_list_children** — Pass `includeBlockers: true` to annotate rows with `blocked` / `blockers` at no extra Jira request
 - **jira_set_parent** — Set parent epic via Jira REST API
 
 #### OAuth 2.0 Setup

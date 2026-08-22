@@ -1,5 +1,15 @@
-import { markdownTable, pickFields } from '@legacy-sports/mcp-format';
+import {
+  markdownTable,
+  pickFields,
+  type FlatRecord,
+} from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  BLOCKER_COLUMNS,
+  BLOCKER_FIELD,
+  blockerColumns,
+  type JiraIssueLink,
+} from '../blockers.js';
 import { searchJql } from '../jql-search.js';
 import {
   SEARCH_COLUMNS,
@@ -13,6 +23,7 @@ interface SearchParams {
   compact?: boolean;
   pageToken?: string;
   fields?: string[];
+  includeBlockers?: boolean;
 }
 
 interface SearchFields {
@@ -21,6 +32,7 @@ interface SearchFields {
   issuetype: { name: string };
   assignee: { displayName: string; emailAddress?: string } | null;
   priority: { name: string } | null;
+  issuelinks?: JiraIssueLink[];
 }
 
 const DEFAULT_FIELDS = [
@@ -52,26 +64,42 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
     compact = false,
     pageToken,
     fields: customFields,
+    includeBlockers = false,
   } = params;
   const maxResults = Math.max(1, Math.min(50, Math.floor(rawMax)));
+
+  // `issuelinks` rides along in the same JQL response, so blocker annotation
+  // costs no extra request — see ../blockers.ts.
+  const withBlockers = (
+    row: FlatRecord,
+    issuelinks?: JiraIssueLink[],
+  ): FlatRecord =>
+    includeBlockers ? { ...row, ...blockerColumns(issuelinks) } : row;
+  const columnsWith = (base: readonly string[]): string[] =>
+    includeBlockers ? [...base, ...BLOCKER_COLUMNS] : [...base];
+  const requestFields = (base: string[]): string[] =>
+    includeBlockers ? [...base, BLOCKER_FIELD] : base;
 
   try {
     if (customFields && customFields.length > 0) {
       const result = await searchJql<Record<string, unknown>>({
         jql,
-        fields: customFields,
+        fields: requestFields(customFields),
         maxResults,
         pageToken,
       });
 
-      const issues = result.issues.map((issue) => {
+      const issues: FlatRecord[] = result.issues.map((issue) => {
         const row: Record<string, unknown> = { key: issue.key };
         for (const field of customFields) {
           row[field] = renderFieldValue(issue.fields[field]);
         }
-        return row;
+        return withBlockers(
+          row,
+          issue.fields[BLOCKER_FIELD] as JiraIssueLink[] | undefined,
+        );
       });
-      const columns = ['key', ...customFields];
+      const columns = columnsWith(['key', ...customFields]);
       const text =
         issues.length === 0
           ? 'No issues match this query.'
@@ -84,45 +112,53 @@ export async function search(params: SearchParams): Promise<CallToolResult> {
 
     const result = await searchJql<SearchFields>({
       jql,
-      fields: compact ? COMPACT_FIELDS : DEFAULT_FIELDS,
+      fields: requestFields(compact ? COMPACT_FIELDS : DEFAULT_FIELDS),
       maxResults,
       pageToken,
     });
 
     if (compact) {
-      const issues = result.issues.map((issue) => ({
-        key: issue.key,
-        summary: issue.fields.summary,
-        status: issue.fields.status.name,
-      }));
+      const columns = columnsWith(SEARCH_COMPACT_COLUMNS);
+      const issues = result.issues.map((issue) =>
+        withBlockers(
+          {
+            key: issue.key,
+            summary: issue.fields.summary,
+            status: issue.fields.status.name,
+          },
+          issue.fields.issuelinks,
+        ),
+      );
       const text =
         issues.length === 0
           ? 'No issues match this query.'
           : withNextPageHint(
-              markdownTable(pickFields(issues, SEARCH_COMPACT_COLUMNS), {
-                columns: SEARCH_COMPACT_COLUMNS,
-              }),
+              markdownTable(pickFields(issues, columns), { columns }),
               result.nextPageToken,
             );
       return { content: [{ type: 'text', text }] };
     }
 
-    const issues = result.issues.map((issue) => ({
-      key: issue.key,
-      summary: issue.fields.summary,
-      status: issue.fields.status.name,
-      type: issue.fields.issuetype.name,
-      assignee: issue.fields.assignee?.displayName ?? '',
-      priority: issue.fields.priority?.name ?? '',
-    }));
+    const columns = columnsWith(SEARCH_COLUMNS);
+    const issues: FlatRecord[] = result.issues.map((issue) =>
+      withBlockers(
+        {
+          key: issue.key,
+          summary: issue.fields.summary,
+          status: issue.fields.status.name,
+          type: issue.fields.issuetype.name,
+          assignee: issue.fields.assignee?.displayName ?? '',
+          priority: issue.fields.priority?.name ?? '',
+        },
+        issue.fields.issuelinks,
+      ),
+    );
 
     const text =
       issues.length === 0
         ? 'No issues match this query.'
         : withNextPageHint(
-            markdownTable(pickFields(issues, SEARCH_COLUMNS), {
-              columns: SEARCH_COLUMNS,
-            }),
+            markdownTable(pickFields(issues, columns), { columns }),
             result.nextPageToken,
           );
 

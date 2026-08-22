@@ -149,4 +149,117 @@ describe('listChildren', () => {
       );
     });
   });
+  describe('includeBlockers', () => {
+    const blockedBy = (key: string, status: string) => ({
+      type: { name: 'Blocks', inward: 'is blocked by' },
+      inwardIssue: { key, fields: { status: { name: status } } },
+    });
+
+    it('adds blocker columns without spending a second Jira request', async () => {
+      mockSearchJql.mockResolvedValueOnce({
+        issues: [
+          {
+            ...children[0],
+            fields: {
+              ...children[0].fields,
+              issuelinks: [blockedBy('LS-8000', 'To Do')],
+            },
+          },
+          {
+            ...children[1],
+            fields: { ...children[1].fields, issuelinks: [] },
+          },
+        ],
+      });
+
+      const out = text(
+        await listChildren({ key: 'LS-1', includeBlockers: true }),
+      );
+
+      expect(mockSearchJql).toHaveBeenCalledTimes(1);
+      expect(mockSearchJql).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: [
+            'summary',
+            'status',
+            'issuetype',
+            'priority',
+            'created',
+            'issuelinks',
+          ],
+        }),
+      );
+      expect(out).toContain(
+        'key|summary|status|type|priority|created|blocked|blockers',
+      );
+      expect(out).toContain('|yes|LS-8000(To Do)');
+    });
+
+    it('annotates blocked / blockers[] in paginate mode', async () => {
+      mockSearchJql.mockResolvedValueOnce({
+        issues: [
+          {
+            key: 'LS-100',
+            fields: {
+              summary: 'Child one',
+              status: { name: 'To Do' },
+              issuelinks: [blockedBy('LS-8000', 'To Do')],
+            },
+          },
+          {
+            key: 'LS-101',
+            fields: {
+              summary: 'Child two',
+              status: { name: 'To Do' },
+              issuelinks: [blockedBy('LS-8001', 'Done')],
+            },
+          },
+        ],
+      });
+
+      const payload = JSON.parse(
+        text(
+          await listChildren({
+            key: 'LS-1',
+            paginate: true,
+            includeBlockers: true,
+          }),
+        ),
+      ) as {
+        children: Array<{
+          key: string;
+          blocked: boolean;
+          blockers: Array<{ key: string; status: string }>;
+        }>;
+      };
+
+      expect(payload.children[0]).toEqual(
+        expect.objectContaining({
+          key: 'LS-100',
+          blocked: true,
+          blockers: [{ key: 'LS-8000', status: 'To Do' }],
+        }),
+      );
+      expect(payload.children[1]).toEqual(
+        expect.objectContaining({
+          key: 'LS-101',
+          blocked: false,
+          blockers: [],
+        }),
+      );
+    });
+
+    it('is off by default — no issuelinks requested, no extra columns', async () => {
+      mockSearchJql.mockResolvedValueOnce({ issues: children });
+
+      const out = text(await listChildren({ key: 'LS-1' }));
+
+      expect(mockSearchJql).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          fields: expect.arrayContaining(['issuelinks']),
+        }),
+      );
+      expect(out).not.toContain('blocked');
+    });
+  });
 });

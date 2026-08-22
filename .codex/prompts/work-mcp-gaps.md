@@ -16,8 +16,8 @@ You are a **ticket dispatcher** for MCP tooling gaps. Pick up unworked tickets f
 
 ## Procedure
 
-1. **List candidates**: `jira_list_children(key: <bucketEpicKey>)` (or JQL `parent = <bucketEpicKey> AND status = "To Do" ORDER BY priority DESC, created ASC`).
-2. **Filter blocked**: drop tickets with open blockers via `jira_check_blockers`. Prefer `missing-tool` / `missing-feature` tickets over `missing-awareness` (doc-only).
+1. **List candidates with blockers inline**: `jira_list_children({ key: <bucketEpicKey>, status: "To Do", includeBlockers: true })` (or `jira_search({ jql: 'parent = <bucketEpicKey> AND status = "To Do" ORDER BY priority DESC, created ASC', includeBlockers: true })`). `includeBlockers` annotates every row with `blocked` / `blockers` at no extra Jira request.
+2. **Filter blocked**: drop every row with `blocked = yes`. Prefer `missing-tool` / `missing-feature` tickets over `missing-awareness` (doc-only). **Do not loop `jira_check_blockers` per ticket and do not delegate the blocker sweep to a subagent** — step 1 already returned blocker state. If you arrive with a bare list of keys, batch it: `jira_check_blockers({ keys: [...] })` resolves up to 50 in one call.
 3. **Re-verify status** for each candidate with `jira_view` immediately before dispatch (skip anything no longer "To Do" — another orchestrator's chip already claimed it).
 4. **Dispatch one chip per ticket** using `mcp__ccd_session__spawn_task` with the template below. Do this for every "To Do" ticket — don't batch into a single chip. **Do NOT transition the ticket to "In Progress" yourself** — the chip claims it atomically via `jira_claim_ticket` as its first action (see "Lazy claim" below).
 5. **Report**: print a summary listing each ticket key, its Jira link, and the chip title used. Then stop. **Do not** open worktrees, run `make pc`, or drive PRs to merge yourself — each spawned session owns its ticket's drive-to-merge lifecycle.

@@ -92,15 +92,15 @@ specific skills · **P2** occasional batching benefit.
 | `jira_edit_ticket`                              | 🔴 needs-batch | **P0.** Bulk field edits (labels, sprint, parent).                          |
 | `jira_set_parent`                               | 🔴 needs-batch | P1 — fold into `jira_edit_batch`.                                           |
 | `jira_link_issues`                              | 🔴 needs-batch | P1 — link N blockers in slice/define.                                       |
-| `jira_list_children`                            | 🔴 needs-batch | P1 — accept multiple parent keys.                                           |
+| `jira_list_children`                            | ✅ batched     | Multi-parent via jira_bulk_list_children; `includeBlockers: true` inline.   |
 | `jira_view`                                     | 🔴 needs-batch | P2 — triage reads many tickets.                                             |
 | `jira_add_comment`                              | 🔴 needs-batch | P2 — status-stamp N tickets.                                                |
 | `jira_bulk_create_tickets`                      | ✅ batched     | Reference implementation.                                                   |
 | `jira_create_ticket`                            | ⚪ single-use  | Single creation retained for one-offs.                                      |
-| `jira_search`                                   | ⚪ single-use  | Returns a list already (JQL).                                               |
+| `jira_search`                                   | ✅ batched     | Returns a list already (JQL); `includeBlockers: true` adds blocker state.   |
 | `jira_view` (`include: ['transitions']`)        | ⚪ single-use  | Lookup — use jira_view with include instead of former jira_get_transitions. |
 | `jira_view` (`include: ['comments']`)           | ⚪ single-use  | Read — use jira_view with include instead of former jira_get_comments.      |
-| `jira_check_blockers`                           | ⚪ single-use  | Read.                                                                       |
+| `jira_check_blockers`                           | ✅ batched     | `keys` accepts 1-50 in one JQL call (LS-9509).                              |
 | `jira_claim_ticket`                             | ⚪ single-use  | One claim per session.                                                      |
 | `jira_delete_ticket`                            | ⚪ single-use  | Rare; could batch later if needed.                                          |
 | `jira_get_bucket_epic` / `jira_set_bucket_epic` | ⚪ single-use  | Config.                                                                     |

@@ -32,8 +32,11 @@ REPEAT:
         - unresolved bot review threads → fetch threads, apply FIX:/JUSTIFY: replies per author-agent contract, fix in worktree, push, apply `bot:ready-for-review` label; increment reviewRounds for that PR once per complete response cycle (respond to all threads + push + label), regardless of whether the bot has re-reviewed yet
         - reviewRounds >= 2 OR an unresolvable failure (genuinely needs the user) → move to all_escalated, drop from in_flight_prs, surface in the final report
      d. After draining, recompute in_flight_prs by filtering out merged/escalated PRs while preserving per-PR reviewRounds for still-pending entries (do not rebuild from scratch — that resets reviewRounds to 0 and defeats the escalation cap).
-  2. List children: jira_list_children (or JQL parent = <currentBucketEpicKey> AND status = "To Do" ORDER BY priority DESC, created ASC)
-  3. Filter: skip blocked tickets (jira_check_blockers).
+  2. List children with blocker state inline: jira_list_children({ key: <currentBucketEpicKey>, status: "To Do", includeBlockers: true })
+     (or jira_search({ jql: 'parent = <currentBucketEpicKey> AND status = "To Do" ORDER BY priority DESC, created ASC', includeBlockers: true }))
+  3. Filter: skip rows where blocked = yes. Do NOT loop jira_check_blockers per ticket and do NOT
+     dispatch a subagent to sweep blockers — step 2 already returned them at no extra Jira request.
+     Given only a bare list of keys, batch it instead: jira_check_blockers({ keys: [...] }) (up to 50 per call).
      [client-bugs] Prefer high-priority bugs first.
      [mcp-gaps]    Prefer missing-tool / missing-feature over missing-awareness (doc-only).
   4. Exit check (both conditions must hold):

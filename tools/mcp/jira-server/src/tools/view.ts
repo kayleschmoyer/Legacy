@@ -4,6 +4,7 @@ import {
   pickFields,
 } from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { isBlockerLink } from '../blockers.js';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
@@ -103,22 +104,12 @@ interface Ticket {
 
 /** Extract blocker keys (and, when expanded, summary/status) from issue links. */
 function extractBlockers(links: JiraIssueLink[]): BlockerInfo[] {
-  return links
-    .filter(
-      (
-        link,
-      ): link is JiraIssueLink & {
-        inwardIssue: NonNullable<JiraIssueLink['inwardIssue']>;
-      } =>
-        Boolean(link.inwardIssue) &&
-        link.type.inward.toLowerCase().includes('is blocked by'),
-    )
-    .map((link) => ({
-      key: link.inwardIssue.key,
-      type: 'blocked-by',
-      summary: link.inwardIssue.fields?.summary,
-      status: link.inwardIssue.fields?.status?.name,
-    }));
+  return links.filter(isBlockerLink).map((link) => ({
+    key: link.inwardIssue.key,
+    type: 'blocked-by',
+    summary: link.inwardIssue.fields?.summary,
+    status: link.inwardIssue.fields?.status?.name,
+  }));
 }
 
 /** Bucket children by status for the JSON shape. */

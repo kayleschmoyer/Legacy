@@ -25,7 +25,7 @@ List child tickets of the current client bugs bucket epic filtered to "To Do". F
 jira_list_children(key: <currentKey>, status: "To Do")
 ```
 
-Select the first unblocked ticket. Check blockers with `jira_check_blockers`.
+Select the first unblocked ticket. Pass `includeBlockers: true` on the listing call above so blocker state comes back inline — only fall back to `jira_check_blockers` when you have keys but no listing, and batch them with `keys: [...]` rather than looping or spawning a subagent.
 
 ### 1b. Claim the ticket (MANDATORY)
 

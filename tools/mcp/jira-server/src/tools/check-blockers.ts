@@ -1,141 +1,137 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { jiraRequest } from '../jira-api.js';
-import { matchesStatus } from '../locale.js';
+import {
+  BLOCKER_FIELD,
+  evaluateBlockers,
+  type BlockerVerdict,
+  type JiraIssueLink,
+} from '../blockers.js';
+import { searchJqlAll } from '../jql-search.js';
 
 interface CheckBlockersParams {
+  key?: string | string[];
+  keys?: string | string[];
+}
+
+interface BlockerFields {
+  issuelinks?: JiraIssueLink[];
+}
+
+interface KeyedVerdict extends BlockerVerdict {
   key: string;
 }
 
-interface BlockerInfo {
-  key: string;
-  status: string;
-  reason: string;
-}
-
-interface CheckBlockersResult {
-  canProceed: boolean;
-  blockers: BlockerInfo[];
-  recommendation: string;
-}
-
-interface JiraIssueLink {
-  type: { name: string; inward: string };
-  inwardIssue?: { key: string; fields: { status: { name: string } } };
-}
-
-interface JiraIssueResponse {
-  fields: {
-    issuelinks: JiraIssueLink[];
-  };
-}
+const JIRA_KEY_RE = /^[A-Z][A-Z0-9_]+-\d+$/;
+const MAX_KEYS = 50;
 
 /**
- * Check if a ticket's blockers are resolved.
- * Implements the 3-way dependency check from copilot-instructions.md Step 3:
- * - Blocker not In Review/Done → STOP
- * - Blocker In Review → base off blocker's branch
- * - Blocker Done (or no blockers) → base off main
+ * Check whether a ticket's blockers are resolved, for one ticket or up to 50 in
+ * a single call.
+ *
+ * A single key returns the flat { canProceed, blockers, recommendation } shape
+ * callers have always received. Multiple keys resolve through one `key IN (...)`
+ * JQL search rather than N per-issue GETs, so batch dispatch flows can filter
+ * blocked tickets inline instead of delegating the sweep to a sub-agent.
  */
 export async function checkBlockers(
   params: CheckBlockersParams,
 ): Promise<CallToolResult> {
-  const { key } = params;
+  const requested = normalizeKeys(params);
+
+  if (requested.length === 0) {
+    return errorResult('No ticket key provided. Pass key or keys (1-50).');
+  }
+  if (requested.length > MAX_KEYS) {
+    return errorResult(
+      `Too many keys: ${requested.length}. Pass at most ${MAX_KEYS} per call.`,
+    );
+  }
+
+  const invalid = requested.filter((key) => !JIRA_KEY_RE.test(key));
+  if (invalid.length > 0) {
+    return errorResult(
+      `Invalid Jira issue key(s): ${invalid.join(', ')}. Expected format like LS-123.`,
+    );
+  }
+
+  const single = isSingleKey(params) ? requested[0] : null;
 
   try {
-    const issue = await jiraRequest<JiraIssueResponse>({
-      method: 'GET',
-      path: `/rest/api/3/issue/${key}`,
-      query: { fields: 'issuelinks' },
+    const issues = await searchJqlAll<BlockerFields>({
+      jql: `key IN (${requested.join(', ')})`,
+      fields: [BLOCKER_FIELD],
     });
 
-    // Extract "is blocked by" links with their statuses
-    const blockerLinks = issue.fields.issuelinks.filter(
-      (
-        link,
-      ): link is JiraIssueLink & {
-        inwardIssue: NonNullable<JiraIssueLink['inwardIssue']>;
-      } =>
-        Boolean(link.inwardIssue) &&
-        link.type.inward.toLowerCase().includes('is blocked by'),
+    const verdicts = new Map<string, BlockerVerdict>(
+      issues.map((issue) => [
+        issue.key,
+        evaluateBlockers(issue.fields.issuelinks),
+      ]),
     );
 
-    if (blockerLinks.length === 0) {
-      return makeResult({
-        canProceed: true,
-        blockers: [],
-        recommendation: 'base off main',
-      });
-    }
-
-    const blockers: BlockerInfo[] = blockerLinks.map((link) => {
-      const blockerKey = link.inwardIssue.key;
-      const status = link.inwardIssue.fields.status.name;
-
-      let reason: string;
-      if (matchesStatus(status, 'Done')) {
-        reason = 'Resolved — no longer blocking';
-      } else if (matchesStatus(status, 'In Review')) {
-        reason = 'In Review — use its branch as parent';
-      } else {
-        reason = `Status is "${status}" — must reach at least "In Review" before proceeding`;
+    if (single) {
+      const verdict = verdicts.get(single);
+      if (!verdict) {
+        return errorResult(
+          `Failed to check blockers for ${single}: not found.`,
+        );
       }
-
-      return { key: blockerKey, status, reason };
-    });
-
-    // Determine recommendation based on blocker statuses
-    const unresolvedBlockers = blockers.filter(
-      (b) =>
-        !matchesStatus(b.status, 'Done') &&
-        !matchesStatus(b.status, 'In Review'),
-    );
-    const inReviewBlockers = blockers.filter((b) =>
-      matchesStatus(b.status, 'In Review'),
-    );
-
-    let canProceed: boolean;
-    let recommendation: string;
-
-    if (unresolvedBlockers.length > 0) {
-      canProceed = false;
-      recommendation = `STOP — blocker(s) not ready: ${unresolvedBlockers.map((b) => `${b.key} (${b.status})`).join(', ')}`;
-    } else if (inReviewBlockers.length === 1) {
-      canProceed = true;
-      const parentKey = inReviewBlockers[0].key;
-      recommendation = `base off ${parentKey} branch`;
-    } else if (inReviewBlockers.length > 1) {
-      canProceed = false;
-      const inReviewList = inReviewBlockers.map((b) => b.key).join(', ');
-      recommendation = `STOP — multiple blockers are In Review; a human must choose the parent branch from: ${inReviewList}`;
-    } else {
-      canProceed = true;
-      recommendation = 'base off main';
+      return { content: [{ type: 'text', text: minifiedJson(verdict) }] };
     }
 
-    return makeResult({ canProceed, blockers, recommendation });
+    const results: KeyedVerdict[] = [];
+    const notFound: string[] = [];
+
+    for (const key of requested) {
+      const verdict = verdicts.get(key);
+      if (verdict) results.push({ key, ...verdict });
+      else notFound.push(key);
+    }
+
+    const payload: Record<string, unknown> = {
+      total: results.length,
+      unblocked: results.filter((r) => r.canProceed).map((r) => r.key),
+      blocked: results.filter((r) => !r.canProceed).map((r) => r.key),
+      results,
+    };
+    if (notFound.length > 0) payload.notFound = notFound;
+
+    return { content: [{ type: 'text', text: minifiedJson(payload) }] };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `Failed to check blockers for ${key}: ${message}`,
-        },
-      ],
-    };
+    return errorResult(
+      `Failed to check blockers for ${requested.join(', ')}: ${message}`,
+    );
   }
 }
 
-function makeResult(result: CheckBlockersResult): CallToolResult {
+/** Accept key/keys as a single string, a comma-separated string, or an array. */
+function normalizeKeys(params: CheckBlockersParams): string[] {
+  const raw = [params.key, params.keys].flatMap((value) => {
+    if (value === undefined) return [];
+    return Array.isArray(value) ? value : value.split(',');
+  });
+
+  const seen = new Set<string>();
+  for (const value of raw) {
+    const key = value.trim();
+    if (key.length > 0) seen.add(key);
+  }
+  return [...seen];
+}
+
+/** Only the legacy single-`key` form gets the flat, unwrapped response. */
+function isSingleKey(params: CheckBlockersParams): boolean {
+  return (
+    params.keys === undefined &&
+    typeof params.key === 'string' &&
+    !params.key.includes(',')
+  );
+}
+
+function errorResult(message: string): CallToolResult {
   return {
-    content: [
-      {
-        type: 'text',
-        text: minifiedJson(result),
-      },
-    ],
+    isError: true,
+    content: [{ type: 'text', text: message }],
   };
 }

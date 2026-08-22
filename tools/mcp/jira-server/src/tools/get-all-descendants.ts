@@ -1,4 +1,9 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import {
+  activeBlockers,
+  BLOCKER_FIELD,
+  type JiraIssueLink,
+} from '../blockers.js';
 import { searchJqlAll } from '../jql-search.js';
 import { matchesStatus } from '../locale.js';
 
@@ -15,14 +20,6 @@ interface DescendantFields {
   issuetype: { name: string };
   priority: { name: string } | null;
   issuelinks?: JiraIssueLink[];
-}
-
-interface JiraIssueLink {
-  type: { name: string; inward: string };
-  inwardIssue?: {
-    key: string;
-    fields: { status: { name: string } };
-  };
 }
 
 interface RawChild {
@@ -104,8 +101,8 @@ export async function getAllDescendants(
           }
 
           // Compute active blockers (not yet Done or In Review)
-          const activeBlockers = computeActiveBlockers(child.issuelinks);
-          const blocked = activeBlockers.length > 0;
+          const blockers = activeBlockers(child.issuelinks);
+          const blocked = blockers.length > 0;
 
           if (unblockedOnly && blocked) {
             skippedByBlockers++;
@@ -119,7 +116,7 @@ export async function getAllDescendants(
             type: child.type,
             priority: child.priority,
             blocked,
-            blockers: activeBlockers,
+            blockers,
           });
         }
       }
@@ -152,7 +149,7 @@ async function fetchChildren(
   try {
     const issues = await searchJqlAll<DescendantFields>({
       jql: `parent = ${JSON.stringify(parentKey)} ORDER BY created DESC`,
-      fields: ['summary', 'status', 'issuetype', 'priority', 'issuelinks'],
+      fields: ['summary', 'status', 'issuetype', 'priority', BLOCKER_FIELD],
     });
     return issues.map((issue) => ({
       key: issue.key,
@@ -167,30 +164,6 @@ async function fetchChildren(
     errors.push({ key: parentKey, error: message });
     return [];
   }
-}
-
-function computeActiveBlockers(
-  issuelinks: JiraIssueLink[],
-): Array<{ key: string; status: string }> {
-  return issuelinks
-    .filter(
-      (
-        link,
-      ): link is JiraIssueLink & {
-        inwardIssue: NonNullable<JiraIssueLink['inwardIssue']>;
-      } =>
-        link.inwardIssue !== undefined &&
-        link.type.inward.toLowerCase().includes('is blocked by'),
-    )
-    .map((link) => ({
-      key: link.inwardIssue.key,
-      status: link.inwardIssue.fields.status.name,
-    }))
-    .filter(
-      (b) =>
-        !matchesStatus(b.status, 'Done') &&
-        !matchesStatus(b.status, 'In Review'),
-    );
 }
 
 function errorResult(message: string): CallToolResult {

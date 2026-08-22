@@ -1,5 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { isBlockerLink } from '../blockers.js';
 import { jiraRequest } from '../jira-api.js';
 import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
@@ -54,16 +55,6 @@ interface JiraIssueResponse {
     created: string;
     updated: string;
   };
-}
-
-/** Narrow issue links down to blocker links with a resolved `inwardIssue`. */
-function isBlockerLink(link: JiraIssueLink): link is JiraIssueLink & {
-  inwardIssue: NonNullable<JiraIssueLink['inwardIssue']>;
-} {
-  return (
-    Boolean(link.inwardIssue) &&
-    link.type.inward.toLowerCase().includes('is blocked by')
-  );
 }
 
 /**

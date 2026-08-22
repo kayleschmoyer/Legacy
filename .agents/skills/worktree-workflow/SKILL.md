@@ -35,7 +35,7 @@ The Claude Code session was spawned with the launcher `worktree` checkbox checke
 
 1. **Jira auth** — `jira_auth_status()`. Stop if not configured.
 2. **Inspect ticket** — `jira_view(key: "LS-####")` / `jira_list_children(key: "LS-####")` for parents.
-3. **Blocker check** — `jira_check_blockers(key: "LS-####")`. Stop if blockers are not In Review/Done.
+3. **Blocker check** — `jira_check_blockers(key: "LS-####")`. Stop if blockers are not In Review/Done. Checking several tickets at once? Pass `keys: [...]` (1-50, one JQL call), or get the state inline from `jira_search` / `jira_list_children` / `jira_get_all_descendants` with `includeBlockers` — never loop or spawn a subagent for it.
 4. **Jira → In Progress** — `jira_transition(key: "LS-####", status: "In Progress")`.
 5. **Precondition for any branch operation: leave the auto-generated branch name (`claude/<random>`) as-is.** Claude Code caches the branch name at session start and never refreshes it, so a rename permanently disables PR detection and "Create PR" (anthropics/claude-code#18690). Jira linking flows through PR title and commit messages containing `LS-####`, not the branch name. See [references/branch-naming.md](references/branch-naming.md).
 6. **Register the active worktree** — so MCP tools target the right tree:

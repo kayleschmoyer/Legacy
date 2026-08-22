@@ -148,4 +148,140 @@ describe('search', () => {
     );
     expect(out).toContain('key|summary|status|type|assignee|priority');
   });
+  describe('includeBlockers', () => {
+    const blockedBy = (key: string, status: string) => ({
+      type: { name: 'Blocks', inward: 'is blocked by' },
+      inwardIssue: { key, fields: { status: { name: status } } },
+    });
+
+    it('adds blocker columns without spending a second Jira request', async () => {
+      mockSearchJql.mockResolvedValueOnce({
+        issues: [
+          { ...issues[0], fields: { ...issues[0].fields, issuelinks: [] } },
+          {
+            ...issues[1],
+            fields: {
+              ...issues[1].fields,
+              issuelinks: [blockedBy('LS-8000', 'In Progress')],
+            },
+          },
+        ],
+      });
+
+      const out = text(
+        await search({ jql: 'project = LS', includeBlockers: true }),
+      );
+
+      // One call, with issuelinks riding along in the same field list.
+      expect(mockSearchJql).toHaveBeenCalledTimes(1);
+      expect(mockSearchJql).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: [
+            'summary',
+            'status',
+            'issuetype',
+            'assignee',
+            'priority',
+            'issuelinks',
+          ],
+        }),
+      );
+      expect(out).toContain(
+        'key|summary|status|type|assignee|priority|blocked|blockers',
+      );
+      expect(out).toContain('|no|');
+      expect(out).toContain('|yes|LS-8000(In Progress)');
+    });
+
+    it('keeps an In Review blocker visible on an unblocked row as a branch hint', async () => {
+      mockSearchJql.mockResolvedValueOnce({
+        issues: [
+          {
+            ...issues[0],
+            fields: {
+              ...issues[0].fields,
+              issuelinks: [
+                blockedBy('LS-7000', 'Done'),
+                blockedBy('LS-8000', 'In Review'),
+              ],
+            },
+          },
+        ],
+      });
+
+      const out = text(
+        await search({ jql: 'project = LS', includeBlockers: true }),
+      );
+
+      expect(out).toContain('|no|LS-8000(In Review)');
+      // Done blockers are noise once resolved.
+      expect(out).not.toContain('LS-7000');
+    });
+
+    it('works in compact mode', async () => {
+      mockSearchJql.mockResolvedValueOnce({
+        issues: [
+          {
+            ...issues[1],
+            fields: {
+              ...issues[1].fields,
+              issuelinks: [blockedBy('LS-8000', 'To Do')],
+            },
+          },
+        ],
+      });
+
+      const out = text(
+        await search({
+          jql: 'project = LS',
+          compact: true,
+          includeBlockers: true,
+        }),
+      );
+
+      expect(out).toContain('key|summary|status|blocked|blockers');
+      expect(out).toContain('LS-9001|Second issue|To Do|yes|LS-8000(To Do)');
+    });
+
+    it('works alongside a custom fields list', async () => {
+      mockSearchJql.mockResolvedValueOnce({
+        issues: [
+          {
+            key: 'LS-9000',
+            fields: {
+              summary: 'First issue',
+              issuelinks: [blockedBy('LS-8000', 'To Do')],
+            },
+          },
+        ],
+      });
+
+      const out = text(
+        await search({
+          jql: 'project = LS',
+          fields: ['summary'],
+          includeBlockers: true,
+        }),
+      );
+
+      expect(mockSearchJql).toHaveBeenCalledWith(
+        expect.objectContaining({ fields: ['summary', 'issuelinks'] }),
+      );
+      expect(out).toContain('key|summary|blocked|blockers');
+      expect(out).toContain('LS-9000|First issue|yes|LS-8000(To Do)');
+    });
+
+    it('is off by default — no issuelinks requested, no extra columns', async () => {
+      mockSearchJql.mockResolvedValueOnce({ issues });
+
+      const out = text(await search({ jql: 'project = LS' }));
+
+      expect(mockSearchJql).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          fields: expect.arrayContaining(['issuelinks']),
+        }),
+      );
+      expect(out).not.toContain('blocked');
+    });
+  });
 });
