@@ -157,6 +157,11 @@ jest.mock('@legacy-sports/shared-components', () => {
     Chip: ({ label }: { label: string }) => <Text>{label}</Text>,
     CommissionerAuditLog: () => <View testID="commissioner-audit-log" />,
     CommissionerNoteControl: () => <View testID="commissioner-note-control" />,
+    Chip: ({ label }: { label: string; tone?: string }) => (
+      <View testID={`chip-${label}`}>
+        <Text>{label}</Text>
+      </View>
+    ),
     DeleteLeagueControl: () => <View testID="delete-league-control" />,
     LeagueActivityFeed: () => <View testID="league-activity-feed" />,
     LeagueDuesPaymentStatus: () => <View testID="league-dues-payment-status" />,
