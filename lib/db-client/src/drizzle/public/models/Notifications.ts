@@ -33,6 +33,9 @@ export const notificationPreferences = pgTable(
     matchupReminderEnabled: boolean('matchup_reminder_enabled')
       .notNull()
       .default(true),
+    touchdownAlertEnabled: boolean('touchdown_alert_enabled')
+      .notNull()
+      .default(false),
     pushEnabled: boolean('push_enabled').notNull().default(true),
     emailEnabled: boolean('email_enabled').notNull().default(false),
     closeGameThreshold: integer('close_game_threshold').notNull().default(50),

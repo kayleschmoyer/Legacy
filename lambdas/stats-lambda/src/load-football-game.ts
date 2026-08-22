@@ -8,6 +8,7 @@ import {
   PublicSchema,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
+import { createNotificationPublisher } from '@legacy-sports/aws-utils';
 import { CareerStats, IDPStats, TeamDefense } from '@legacy-sports/pfr-client';
 import type {
   LoadFootballMatchupStatsMessage,
@@ -21,6 +22,7 @@ import {
   updateMatchupStatus,
 } from './game-state-manager';
 import { calculateAndUpdateFootballMatchupScores } from './handlers/calculate-football-matchup-scores';
+import { publishFootballGameAlerts } from './football-notification-triggers';
 import { IDP_POSITIONS, validateNflTeam, validatePfrId } from './constants';
 import { emitFootballFailure, emitFootballSuccess } from './football-metrics';
 
@@ -421,6 +423,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     `Processing ${event.Records.length} football game stats SQS records`,
   );
 
+  const notificationPublisher = createNotificationPublisher();
+
   return await runWithPublicClient(getDbOptions(), async (db) => {
     const batchItemFailures: { itemIdentifier: string }[] = [];
 
@@ -571,6 +575,12 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
                   team1Score: scoreResult.team1Score,
                   team2Score: scoreResult.team2Score,
                 },
+              );
+
+              await publishFootballGameAlerts(
+                db,
+                notificationPublisher,
+                message.matchupId,
               );
             } catch (scoreError) {
               const scoreErr =

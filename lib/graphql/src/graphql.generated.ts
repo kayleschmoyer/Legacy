@@ -2967,6 +2967,7 @@ export type NotificationPreference = {
   matchupReminderEnabled?: Maybe<Scalars['Boolean']['output']>;
   matchupStartedEnabled?: Maybe<Scalars['Boolean']['output']>;
   pushEnabled?: Maybe<Scalars['Boolean']['output']>;
+  touchdownAlertEnabled?: Maybe<Scalars['Boolean']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
 };
@@ -2979,6 +2980,7 @@ export type NotificationPreferenceInput = {
   matchupReminderEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   matchupStartedEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   pushEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  touchdownAlertEnabled?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 /** A historically notable game-log performance on a specific calendar date */
@@ -12811,6 +12813,7 @@ export type NotificationPreferenceFragment = {
   matchupEndedEnabled?: boolean | null;
   matchupCloseGameEnabled?: boolean | null;
   matchupReminderEnabled?: boolean | null;
+  touchdownAlertEnabled?: boolean | null;
   pushEnabled?: boolean | null;
   emailEnabled?: boolean | null;
   closeGameThreshold?: number | null;
@@ -12862,6 +12865,7 @@ export type GetUserNotificationPreferencesQuery = {
     matchupEndedEnabled?: boolean | null;
     matchupCloseGameEnabled?: boolean | null;
     matchupReminderEnabled?: boolean | null;
+    touchdownAlertEnabled?: boolean | null;
     pushEnabled?: boolean | null;
     emailEnabled?: boolean | null;
     closeGameThreshold?: number | null;
@@ -12936,6 +12940,7 @@ export type UpdateNotificationPreferencesMutation = {
     matchupEndedEnabled?: boolean | null;
     matchupCloseGameEnabled?: boolean | null;
     matchupReminderEnabled?: boolean | null;
+    touchdownAlertEnabled?: boolean | null;
     pushEnabled?: boolean | null;
     emailEnabled?: boolean | null;
     closeGameThreshold?: number | null;
@@ -16124,6 +16129,7 @@ export const NotificationPreferenceFragmentDoc = gql`
     matchupEndedEnabled
     matchupCloseGameEnabled
     matchupReminderEnabled
+    touchdownAlertEnabled
     pushEnabled
     emailEnabled
     closeGameThreshold

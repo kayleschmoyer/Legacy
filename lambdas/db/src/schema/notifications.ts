@@ -15,6 +15,7 @@ const NotificationPreferenceInput = builder.inputType(
       matchupEndedEnabled: t.boolean({ required: false }),
       matchupCloseGameEnabled: t.boolean({ required: false }),
       matchupReminderEnabled: t.boolean({ required: false }),
+      touchdownAlertEnabled: t.boolean({ required: false }),
       pushEnabled: t.boolean({ required: false }),
       emailEnabled: t.boolean({ required: false }),
       closeGameThreshold: t.int({ required: false }),
@@ -37,6 +38,7 @@ const NotificationPreferenceRef = builder.objectRef<{
   matchupEndedEnabled: boolean;
   matchupCloseGameEnabled: boolean;
   matchupReminderEnabled: boolean;
+  touchdownAlertEnabled: boolean;
   pushEnabled: boolean;
   emailEnabled: boolean;
   closeGameThreshold: number;
@@ -52,6 +54,7 @@ NotificationPreferenceRef.implement({
     matchupEndedEnabled: t.exposeBoolean('matchupEndedEnabled'),
     matchupCloseGameEnabled: t.exposeBoolean('matchupCloseGameEnabled'),
     matchupReminderEnabled: t.exposeBoolean('matchupReminderEnabled'),
+    touchdownAlertEnabled: t.exposeBoolean('touchdownAlertEnabled'),
     pushEnabled: t.exposeBoolean('pushEnabled'),
     emailEnabled: t.exposeBoolean('emailEnabled'),
     closeGameThreshold: t.exposeInt('closeGameThreshold'),
@@ -192,6 +195,7 @@ builder.queryField('getUserNotificationPreferences', (t) =>
         matchupEndedEnabled: prefs.matchupEndedEnabled,
         matchupCloseGameEnabled: prefs.matchupCloseGameEnabled,
         matchupReminderEnabled: prefs.matchupReminderEnabled,
+        touchdownAlertEnabled: prefs.touchdownAlertEnabled,
         pushEnabled: prefs.pushEnabled,
         emailEnabled: prefs.emailEnabled,
         closeGameThreshold: prefs.closeGameThreshold,
@@ -304,6 +308,7 @@ builder.mutationField('updateNotificationPreferences', (t) =>
         matchupEndedEnabled: prefs.matchupEndedEnabled,
         matchupCloseGameEnabled: prefs.matchupCloseGameEnabled,
         matchupReminderEnabled: prefs.matchupReminderEnabled,
+        touchdownAlertEnabled: prefs.touchdownAlertEnabled,
         pushEnabled: prefs.pushEnabled,
         emailEnabled: prefs.emailEnabled,
         closeGameThreshold: prefs.closeGameThreshold,

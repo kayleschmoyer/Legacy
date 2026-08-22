@@ -11,6 +11,7 @@ export interface NotificationPreference {
   matchupEndedEnabled: boolean;
   matchupCloseGameEnabled: boolean;
   matchupReminderEnabled: boolean;
+  touchdownAlertEnabled: boolean;
   pushEnabled: boolean;
   emailEnabled: boolean;
   closeGameThreshold: number;
@@ -47,6 +48,7 @@ export interface NotificationPreferenceUpdate {
   matchupEndedEnabled?: boolean;
   matchupCloseGameEnabled?: boolean;
   matchupReminderEnabled?: boolean;
+  touchdownAlertEnabled?: boolean;
   pushEnabled?: boolean;
   emailEnabled?: boolean;
   closeGameThreshold?: number;
@@ -81,6 +83,7 @@ export class NotificationService {
         matchupEndedEnabled: pref.matchupEndedEnabled,
         matchupCloseGameEnabled: pref.matchupCloseGameEnabled,
         matchupReminderEnabled: pref.matchupReminderEnabled,
+        touchdownAlertEnabled: pref.touchdownAlertEnabled,
         pushEnabled: pref.pushEnabled,
         emailEnabled: pref.emailEnabled,
         closeGameThreshold: pref.closeGameThreshold,
@@ -134,6 +137,7 @@ export class NotificationService {
         matchupEndedEnabled: result.matchupEndedEnabled,
         matchupCloseGameEnabled: result.matchupCloseGameEnabled,
         matchupReminderEnabled: result.matchupReminderEnabled,
+        touchdownAlertEnabled: result.touchdownAlertEnabled,
         pushEnabled: result.pushEnabled,
         emailEnabled: result.emailEnabled,
         closeGameThreshold: result.closeGameThreshold,

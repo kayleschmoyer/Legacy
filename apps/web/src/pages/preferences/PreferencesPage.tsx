@@ -897,6 +897,7 @@ function NotificationPreferencesSection({
         matchupEndedEnabled: boolean;
         matchupCloseGameEnabled: boolean;
         matchupReminderEnabled: boolean;
+        touchdownAlertEnabled: boolean;
         pushEnabled: boolean;
         emailEnabled: boolean;
         closeGameThreshold: number;
@@ -909,6 +910,7 @@ function NotificationPreferencesSection({
       matchupEndedEnabled: prefs?.matchupEndedEnabled ?? true,
       matchupCloseGameEnabled: prefs?.matchupCloseGameEnabled ?? true,
       matchupReminderEnabled: prefs?.matchupReminderEnabled ?? true,
+      touchdownAlertEnabled: prefs?.touchdownAlertEnabled ?? false,
       pushEnabled: prefs?.pushEnabled ?? true,
       emailEnabled: prefs?.emailEnabled ?? false,
       closeGameThreshold: prefs?.closeGameThreshold ?? CLOSE_GAME_DEFAULT,
@@ -924,6 +926,7 @@ function NotificationPreferencesSection({
     | 'matchupEndedEnabled'
     | 'matchupCloseGameEnabled'
     | 'matchupReminderEnabled'
+    | 'touchdownAlertEnabled'
     | 'pushEnabled'
     | 'emailEnabled';
 
@@ -1088,6 +1091,7 @@ function NotificationPreferencesSection({
   const matchupEndedEnabled = prefs?.matchupEndedEnabled ?? true;
   const matchupCloseGameEnabled = prefs?.matchupCloseGameEnabled ?? true;
   const matchupReminderEnabled = prefs?.matchupReminderEnabled ?? true;
+  const touchdownAlertEnabled = prefs?.touchdownAlertEnabled ?? false;
   const closeGameThreshold = prefs?.closeGameThreshold ?? CLOSE_GAME_DEFAULT;
 
   return (
@@ -1139,7 +1143,7 @@ function NotificationPreferencesSection({
             value={matchupCloseGameEnabled}
             onChange={(v) => handleToggle('matchupCloseGameEnabled', v)}
             label="Close game alerts"
-            description="Ping me when a matchup is within the threshold below."
+            description="Premium: ping me when a matchup is within the threshold below."
           />
 
           {matchupCloseGameEnabled ? (
@@ -1157,6 +1161,15 @@ function NotificationPreferencesSection({
               />
             </YStack>
           ) : null}
+
+          <Separator />
+
+          <PrefToggle
+            value={touchdownAlertEnabled}
+            onChange={(v) => handleToggle('touchdownAlertEnabled', v)}
+            label="Touchdown alerts"
+            description="Premium: ping me when my player scores a touchdown."
+          />
 
           <Separator />
 

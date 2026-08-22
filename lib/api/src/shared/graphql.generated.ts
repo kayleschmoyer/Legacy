@@ -2961,6 +2961,7 @@ export type NotificationPreference = {
   matchupReminderEnabled?: Maybe<Scalars['Boolean']['output']>;
   matchupStartedEnabled?: Maybe<Scalars['Boolean']['output']>;
   pushEnabled?: Maybe<Scalars['Boolean']['output']>;
+  touchdownAlertEnabled?: Maybe<Scalars['Boolean']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   userId?: Maybe<Scalars['Int']['output']>;
 };
@@ -2973,6 +2974,7 @@ export type NotificationPreferenceInput = {
   matchupReminderEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   matchupStartedEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   pushEnabled?: InputMaybe<Scalars['Boolean']['input']>;
+  touchdownAlertEnabled?: InputMaybe<Scalars['Boolean']['input']>;
 };
 
 /** A historically notable game-log performance on a specific calendar date */

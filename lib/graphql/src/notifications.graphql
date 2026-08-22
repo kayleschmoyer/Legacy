@@ -5,6 +5,7 @@ fragment NotificationPreference on NotificationPreference {
   matchupEndedEnabled
   matchupCloseGameEnabled
   matchupReminderEnabled
+  touchdownAlertEnabled
   pushEnabled
   emailEnabled
   closeGameThreshold

@@ -3196,6 +3196,7 @@ type NotificationPreference {
   matchupReminderEnabled: Boolean
   matchupStartedEnabled: Boolean
   pushEnabled: Boolean
+  touchdownAlertEnabled: Boolean
   updatedAt: String
   userId: Int
 }
@@ -3208,6 +3209,7 @@ input NotificationPreferenceInput {
   matchupReminderEnabled: Boolean
   matchupStartedEnabled: Boolean
   pushEnabled: Boolean
+  touchdownAlertEnabled: Boolean
 }
 
 """

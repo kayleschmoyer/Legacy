@@ -11,6 +11,7 @@ import {
   runWithPublicClient,
   updateMatchupScore,
 } from '@legacy-sports/db-client';
+import { createNotificationPublisher } from '@legacy-sports/aws-utils';
 import {
   computeDefenseScore,
   computeIDPScore,
@@ -25,6 +26,7 @@ import {
 } from '@legacy-sports/scoring';
 import type { CalculateFootballScoresMessage } from '../load-game-types';
 import { emitFootballFailure, emitFootballSuccess } from '../football-metrics';
+import { publishFootballGameAlerts } from '../football-notification-triggers';
 
 export function isFootballScoreMessage(
   value: unknown,
@@ -217,6 +219,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
     `Processing ${event.Records.length} football score SQS records`,
   );
 
+  const notificationPublisher = createNotificationPublisher();
+
   return await runWithPublicClient(getDbOptions(), async (db) => {
     const batchItemFailures: { itemIdentifier: string }[] = [];
 
@@ -257,6 +261,13 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
             team2Score: result.team2Score,
           },
         );
+
+        await publishFootballGameAlerts(
+          db,
+          notificationPublisher,
+          message.matchupId,
+        );
+
         await emitFootballSuccess('matchup_score');
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));

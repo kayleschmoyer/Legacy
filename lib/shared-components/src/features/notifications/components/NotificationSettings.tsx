@@ -22,6 +22,7 @@ type UpdatableNotificationKey = Extract<
   | 'matchupEndedEnabled'
   | 'matchupCloseGameEnabled'
   | 'matchupReminderEnabled'
+  | 'touchdownAlertEnabled'
   | 'pushEnabled'
   | 'emailEnabled'
 >;
@@ -114,7 +115,7 @@ export function NotificationSettings({
             <Label htmlFor="close-game" flex={1}>
               <Text>Close Game Alerts</Text>
               <Text fontSize="$2" color="$gray11">
-                Get notified when matchup is close
+                Premium: get notified when your matchup is close
               </Text>
             </Label>
             <Switch
@@ -122,6 +123,27 @@ export function NotificationSettings({
               checked={preferences.matchupCloseGameEnabled ?? false}
               onCheckedChange={(checked) => {
                 void handleToggle('matchupCloseGameEnabled', checked);
+              }}
+              disabled={loading}
+            />
+          </XStack>
+
+          <XStack
+            justifyContent="space-between"
+            alignItems="center"
+            paddingVertical="$2"
+          >
+            <Label htmlFor="touchdown-alerts" flex={1}>
+              <Text>Touchdown Alerts</Text>
+              <Text fontSize="$2" color="$gray11">
+                Premium: get notified when your player scores a touchdown
+              </Text>
+            </Label>
+            <Switch
+              id="touchdown-alerts"
+              checked={preferences.touchdownAlertEnabled ?? false}
+              onCheckedChange={(checked) => {
+                void handleToggle('touchdownAlertEnabled', checked);
               }}
               disabled={loading}
             />

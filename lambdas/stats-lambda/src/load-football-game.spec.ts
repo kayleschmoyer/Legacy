@@ -77,6 +77,17 @@ jest.mock('./football-metrics', () => ({
     mockEmitFailure(...args),
 }));
 
+jest.mock('@legacy-sports/aws-utils', () => ({
+  createNotificationPublisher: jest.fn(() => null),
+}));
+
+const mockPublishFootballGameAlerts = jest.fn();
+
+jest.mock('./football-notification-triggers', () => ({
+  publishFootballGameAlerts: (...args: unknown[]): unknown =>
+    mockPublishFootballGameAlerts(...args),
+}));
+
 // ── Import under test ───────────────────────────────────────────────────────
 
 import { handler, isFootballGameMessage } from './load-football-game';
