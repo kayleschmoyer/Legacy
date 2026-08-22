@@ -65,4 +65,11 @@ export const CLIENT_FACING_CODES = new Set([
   // producing a less-useful Rollbar item that obscured the real cause
   // (LS-4409, mirroring LS-8287/LS-8397).
   'SCOREBOARD_FETCH_FAILED',
+  // getCurrentDraftPick surfaces "no teams configured" with this stable code
+  // instead of letting the formatter mask it as "Internal server error". This
+  // is the expected state between league creation and initializeDraft running
+  // (which populates draft_teams) — the client already renders a friendly
+  // "draft order not generated yet" message for it, but only works off the
+  // real error message, so it must reach the client unscrubbed (LS-4853).
+  'DRAFT_TEAMS_NOT_CONFIGURED',
 ]);

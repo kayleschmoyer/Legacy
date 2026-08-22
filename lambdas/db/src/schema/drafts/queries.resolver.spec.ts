@@ -437,6 +437,185 @@ describe('getDraftTeamAutoPickStatuses resolver — LS-8287 resilience', () => {
 });
 
 /**
+ * Resolver-level tests for `getCurrentDraftPick` (LS-4853).
+ *
+ * `getCurrentDraftPickInfo` throws a plain `Error('No teams configured for
+ * this draft')` while a draft exists but hasn't been initialized yet (the
+ * window between league creation and `initializeDraft` populating
+ * `draft_teams`) — an expected, client-visible state, not a system failure.
+ * Because a plain `Error` carries no client-facing `extensions.code`, Apollo's
+ * `formatError` was scrubbing the message to a generic "Internal server
+ * error" and reporting it to Rollbar. These tests assert the resolver
+ * converts that specific message into a `DRAFT_TEAMS_NOT_CONFIGURED`
+ * `GraphQLError` (message preserved, so the client's existing
+ * `draftOrderMissing` handling keeps working) while any other error from the
+ * helper is re-thrown unchanged.
+ */
+describe('getCurrentDraftPick resolver — LS-4853', () => {
+  let schema: GraphQLSchema;
+  let mockDb: {
+    select: jest.Mock;
+    from: jest.Mock;
+    where: jest.Mock;
+    limit: jest.Mock;
+  };
+  let mockContext: {
+    user: { id: number; isAdmin: boolean } | null;
+    db: typeof mockDb;
+  };
+  let mockGetCurrentDraftPickInfo: jest.Mock;
+
+  beforeEach(() => {
+    jest.resetModules();
+
+    mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+    };
+
+    mockGetCurrentDraftPickInfo = jest.fn();
+
+    jest.doMock('@legacy-sports/utils/node', () => ({
+      ...jest.requireActual('@legacy-sports/utils/node'),
+      getDbOptions: jest.fn(() => ({})),
+    }));
+
+    jest.doMock('@legacy-sports/db-client', () => ({
+      createDatabaseService: jest.fn(),
+      runWithPublicClient: jest.fn(
+        async (_opts: unknown, cb: (db: unknown) => unknown) => cb(mockDb),
+      ),
+      createLeagueService: jest.fn(() => ({ createLeague: jest.fn() })),
+      createDraftForLeague: jest.fn(),
+      DraftService: jest.fn().mockImplementation(() => ({
+        startDraft: jest.fn(),
+        getDraftStatus: jest.fn(),
+      })),
+      PublicSchema: {
+        drafts: { id: 'id', leagueId: 'leagueId' },
+        leagueMembers: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          teamId: 'teamId',
+          permissionLevel: 'permissionLevel',
+        },
+      },
+      InternalSchema: {
+        usersInAppInternal: {
+          id: 'app_internal.users.id',
+          subscriptionTier: 'app_internal.users.subscription_tier',
+        },
+      },
+      BADGE_DEFINITIONS: [],
+      createBadgeService: jest.fn(() => ({
+        getUserBadges: jest.fn().mockResolvedValue([]),
+        getTeamBadges: jest.fn().mockResolvedValue([]),
+        getUserBadgeProgress: jest.fn().mockResolvedValue([]),
+        evaluateDraftBadges: jest.fn().mockResolvedValue([]),
+        evaluateMatchupBadges: jest.fn().mockResolvedValue([]),
+        awardLeagueChampion: jest.fn().mockResolvedValue(undefined),
+        awardPlayoffAppearances: jest.fn().mockResolvedValue(undefined),
+      })),
+    }));
+
+    jest.doMock('./helpers', () => ({
+      ...jest.requireActual('./helpers'),
+      getCurrentDraftPickInfo: mockGetCurrentDraftPickInfo,
+    }));
+
+    const schemaModule = require('../../schema') as { schema: GraphQLSchema };
+    schema = schemaModule.schema;
+
+    mockContext = {
+      user: { id: 42, isAdmin: false },
+      db: mockDb,
+    };
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function getResolver() {
+    const queryType = schema.getQueryType();
+    const field = queryType?.getFields().getCurrentDraftPick;
+    if (!field?.resolve) {
+      throw new Error('getCurrentDraftPick resolver not found');
+    }
+    return field.resolve;
+  }
+
+  it('converts the "no teams configured" Error into a client-facing GraphQLError', async () => {
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 11 },
+      ]);
+    mockGetCurrentDraftPickInfo.mockRejectedValueOnce(
+      new Error('No teams configured for this draft'),
+    );
+
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { draftId: 100 }, mockContext, undefined as never),
+    ).rejects.toMatchObject({
+      message: 'No teams configured for this draft',
+      extensions: { code: 'DRAFT_TEAMS_NOT_CONFIGURED' },
+    });
+  });
+
+  it('re-throws any other helper error unchanged', async () => {
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 11 },
+      ]);
+    mockGetCurrentDraftPickInfo.mockRejectedValueOnce(
+      new Error('Could not determine team for current pick'),
+    );
+
+    const resolve = getResolver();
+
+    await expect(
+      resolve({}, { draftId: 100 }, mockContext, undefined as never),
+    ).rejects.toMatchObject({
+      message: 'Could not determine team for current pick',
+    });
+  });
+
+  it('returns the pick info unchanged on the happy path', async () => {
+    const pickInfo = {
+      draftId: 100,
+      teamId: 11,
+      round: 1,
+      pickNumber: 1,
+      overallPick: 1,
+      isComplete: false,
+    };
+    mockDb.limit
+      .mockResolvedValueOnce([{ leagueId: 7 }])
+      .mockResolvedValueOnce([
+        { permissionLevel: 'general_manager', teamId: 11 },
+      ]);
+    mockGetCurrentDraftPickInfo.mockResolvedValueOnce(pickInfo);
+
+    const resolve = getResolver();
+
+    const result = await resolve(
+      {},
+      { draftId: 100 },
+      mockContext,
+      undefined as never,
+    );
+
+    expect(result).toEqual(pickInfo);
+  });
+});
+
+/**
  * Resolver-level tests for `getDraftPicks` resilience (LS-8397).
  *
  * This query refetches after every pick event on the live draft board, so it

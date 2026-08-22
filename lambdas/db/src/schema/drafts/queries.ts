@@ -181,7 +181,28 @@ builder.queryField('getCurrentDraftPick', (t) =>
         context.user.isAdmin,
       );
 
-      return getCurrentDraftPickInfo(context.db, args.draftId);
+      try {
+        return await getCurrentDraftPickInfo(context.db, args.draftId);
+      } catch (error) {
+        // draft_teams is empty between league creation (which creates the
+        // drafts row) and initializeDraft running (which populates
+        // draft_teams) — an expected transient state while the commissioner
+        // hasn't started the draft yet, not a system failure. The client
+        // already renders a friendly "draft order not generated yet" message
+        // for this exact case (useDraftEffects), but only if it can read the
+        // real message off the error — a plain Error has no client-facing
+        // extensions.code, so formatError was scrubbing it to a generic
+        // "Internal server error" and reporting it to Rollbar (LS-4853).
+        if (
+          error instanceof Error &&
+          error.message === 'No teams configured for this draft'
+        ) {
+          throw new GraphQLError(error.message, {
+            extensions: { code: 'DRAFT_TEAMS_NOT_CONFIGURED' },
+          });
+        }
+        throw error;
+      }
     },
   }),
 );
