@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-jest.mock('../logs.js', () => ({
-  fetchRunLogs: jest.fn(),
-}));
+// Real stripAnsiCodes implementation (duplicated, not jest.requireActual'd):
+// requireActual('../logs.js') transitively pulls in github-api.js ->
+// repo-root.js, which uses import.meta.url and breaks under ts-jest's CJS
+// transform for specs (LS-8322).
+jest.mock('../logs.js', () => {
+  const ESC = String.fromCharCode(27);
+  const ANSI_ESCAPE_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
+  return {
+    fetchRunLogs: jest.fn(),
+    stripAnsiCodes: (text: string) => text.replace(ANSI_ESCAPE_SEQUENCE, ''),
+  };
+});
 
 import { searchLogs } from './search-logs.js';
 import { fetchRunLogs, type FetchRunLogsResult } from '../logs.js';
@@ -232,5 +241,55 @@ describe('searchLogs zero-scope visibility (LS-8301)', () => {
     expect(parsed.totalMatches).toBe(1);
     expect(parsed.jobsSearched).toBe(3);
     expect(parsed.scopeNote).toBeUndefined();
+  });
+});
+
+describe('searchLogs ANSI stripping (LS-9557)', () => {
+  // Built from String.fromCharCode rather than a \x1b literal — same
+  // no-control-regex rationale as get-logs.ts.
+  const ESC = String.fromCharCode(27);
+
+  beforeEach(() => {
+    mockFetchRunLogs.mockReset();
+  });
+
+  it('matches a literal pattern that previously required a wildcard around the ANSI codes (AC4)', async () => {
+    // Reproduces the sample from LS-9557's description (run 32586634982,
+    // job 97065111167): raw text splits "●" from "FootballLeagueId" with
+    // escape codes, so the natural literal pattern used to 0-match.
+    const rawLine =
+      `2026-08-22T17:38:02.9319059Z ${ESC}[1m${ESC}[31m  ${ESC}[1m● ${ESC}[22m${ESC}[1m` +
+      'FootballLeagueId › matchups tab playoff bracket toggle (FLD-017)';
+    mockFetchRunLogs.mockResolvedValue(fetchResult(rawLine));
+
+    const result = await searchLogs({
+      runId: 1,
+      pattern: '● FootballLeagueId',
+    });
+
+    expect(result.isError).toBeUndefined();
+    const parsed = parseSearchResult(textOf(result));
+    expect(parsed.totalMatches).toBe(1);
+    expect(parsed.matches[0].line).toContain('● FootballLeagueId');
+  });
+
+  it('returns matched and context lines with no ANSI escape sequences (AC2)', async () => {
+    const before = `${ESC}[36mbefore line${ESC}[0m`;
+    const match = `${ESC}[31mFAIL${ESC}[39m src/foo.spec.ts`;
+    const after = `${ESC}[36mafter line${ESC}[0m`;
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult([before, match, after].join('\n')),
+    );
+
+    const result = await searchLogs({ runId: 1, pattern: 'FAIL' });
+
+    expect(result.isError).toBeUndefined();
+    const parsed = parseSearchResult(textOf(result));
+    expect(parsed.matches).toHaveLength(1);
+    const [hit] = parsed.matches;
+    expect(hit.line).toBe('FAIL src/foo.spec.ts');
+    expect(hit.before).toEqual(['before line']);
+    expect(hit.after).toEqual(['after line']);
+    expect(textOf(result).includes(ESC)).toBe(false);
   });
 });

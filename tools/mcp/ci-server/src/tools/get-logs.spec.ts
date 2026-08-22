@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-jest.mock('../logs.js', () => ({
-  fetchRunLogsRing: jest.fn(),
-}));
+// Real stripAnsiCodes implementation (duplicated, not jest.requireActual'd):
+// requireActual('../logs.js') transitively pulls in github-api.js ->
+// repo-root.js, which uses import.meta.url and breaks under ts-jest's CJS
+// transform for specs (LS-8322).
+jest.mock('../logs.js', () => {
+  const ESC = String.fromCharCode(27);
+  const ANSI_ESCAPE_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
+  return {
+    fetchRunLogsRing: jest.fn(),
+    stripAnsiCodes: (text: string) => text.replace(ANSI_ESCAPE_SEQUENCE, ''),
+  };
+});
 
 import {
   getLogs,
@@ -537,6 +546,60 @@ describe('getLogs', () => {
       // The header line is still valid JSON.
       expect(() => parseHeader(text)).not.toThrow();
       expect(parseLogs(text)).toBe('short line');
+    });
+  });
+
+  describe('ANSI stripping (LS-9557)', () => {
+    // Built from String.fromCharCode rather than a \x1b literal — same
+    // no-control-regex rationale as get-logs.ts.
+    const ESC = String.fromCharCode(27);
+
+    it('returns log text with no ANSI escape sequences (AC1)', async () => {
+      const coloredLine = `${ESC}[1m${ESC}[31mFAIL${ESC}[39m${ESC}[22m src/foo.spec.ts`;
+      mockFetch.mockResolvedValue({
+        lines: [coloredLine],
+        totalLines: 1,
+      });
+
+      const result = await getLogs({ runId: 1 });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText.includes(ESC)).toBe(false);
+      expect(logsText).toBe('FAIL src/foo.spec.ts');
+    });
+
+    it('strips ANSI codes from the errorSummary path too', async () => {
+      const coloredLine = `${ESC}[1m##[error]${ESC}[22m Process completed with exit code 1.`;
+      mockFetch.mockResolvedValue({
+        lines: [coloredLine],
+        totalLines: 1,
+        priorityLines: [coloredLine],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText.includes(ESC)).toBe(false);
+      expect(logsText).toContain(
+        '##[error] Process completed with exit code 1.',
+      );
+    });
+
+    it('strips before truncateLineLength so a truncated line is not mostly escape codes (AC3/AC5)', async () => {
+      // Visible content is short, but wrapping ANSI codes push the raw length
+      // well past a 20-char truncateLineLength — truncation must be judged on
+      // the stripped (visible) length, not the raw one.
+      const line = `${ESC}[1m${ESC}[31m${ESC}[4mshort${ESC}[24m${ESC}[39m${ESC}[22m visible text`;
+      expect(line.length).toBeGreaterThan(20);
+
+      mockFetch.mockResolvedValue({ lines: [line], totalLines: 1 });
+
+      const result = await getLogs({ runId: 1, truncateLineLength: 40 });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText.includes(ESC)).toBe(false);
+      expect(logsText).not.toContain('[line truncated]');
+      expect(logsText).toBe('short visible text');
     });
   });
 });

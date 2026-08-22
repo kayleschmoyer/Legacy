@@ -1,5 +1,5 @@
 import { formatLogSearch, type LogMatch } from '../format.js';
-import { fetchRunLogs } from '../logs.js';
+import { fetchRunLogs, stripAnsiCodes } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
 /** Deadline for a single ci_search_logs call — leaves ~5 s buffer before Lambda 30 s timeout. */
@@ -110,7 +110,11 @@ export async function searchLogs(
       ...params,
       signal: AbortSignal.timeout(SEARCH_FETCH_TIMEOUT_MS),
     });
-    const lines = rawLogs.text.split(/\r?\n/);
+    // Strip ANSI escape sequences before matching (LS-9557) — both so
+    // returned matches/context are clean and so a literal pattern like
+    // "● FootballLeagueId" matches text that would otherwise have escape
+    // codes sitting between the bullet and the name.
+    const lines = rawLogs.text.split(/\r?\n/).map(stripAnsiCodes);
     const matches: LogMatch[] = [];
     let totalMatches = 0;
 

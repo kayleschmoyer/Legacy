@@ -18,6 +18,30 @@ const CENTRAL_DIR_SIG = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
  */
 const FLAG_DATA_DESCRIPTOR = 0x0008;
 
+// Built from String.fromCharCode rather than a \x1b regex literal: a literal
+// ESC control character trips no-control-regex even though it is the exact,
+// intentional byte GitHub Actions emits for these escape sequences.
+const ESC = String.fromCharCode(27);
+/**
+ * Matches ANSI CSI escape sequences (LS-9557) — colour/style codes (ending in
+ * `m`, e.g. `\x1b[31m`) and cursor-movement sequences some progress renderers
+ * emit (ending in other letters, e.g. `\x1b[2K`). Broader than an SGR-only
+ * `[0-9;]*m` match so both classes are stripped.
+ */
+const ANSI_ESCAPE_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
+
+/**
+ * Strip ANSI escape sequences from log text (LS-9557). GitHub Actions log
+ * output is heavily colourised — jest/nx output routinely has escape codes
+ * adding 40-80% to a line's character length — which both inflates the
+ * maxChars budget with non-content bytes and breaks literal pattern matching
+ * in ci_search_logs (codes sit between semantically adjacent characters, e.g.
+ * splitting "● FootballLeagueId" into "●" + escapes + "FootballLeagueId").
+ */
+export function stripAnsiCodes(text: string): string {
+  return text.replace(ANSI_ESCAPE_SEQUENCE, '');
+}
+
 export interface FetchRunLogsParams {
   runId?: number;
   jobId?: number;

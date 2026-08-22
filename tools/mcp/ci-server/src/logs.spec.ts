@@ -10,6 +10,7 @@ import {
   fetchRunLogs,
   fetchRunLogsRing,
   JOB_NEVER_STARTED_MESSAGE,
+  stripAnsiCodes,
 } from './logs.js';
 import * as githubApi from './github-api.js';
 
@@ -78,6 +79,37 @@ function buildStreamedDeflateZipEntry(name: string, text: string): Buffer {
 
   return Buffer.concat([header, nameBuf, compressed, dataDescriptor]);
 }
+
+describe('stripAnsiCodes (LS-9557)', () => {
+  // Built from String.fromCharCode rather than a \x1b literal — same
+  // no-control-regex rationale as logs.ts / get-logs.ts.
+  const ESC = String.fromCharCode(27);
+
+  it('strips colour codes and cursor-movement sequences, leaving content intact', () => {
+    // Reproduces the sample from LS-9557's description (a ci_search_logs
+    // result this fix regression-tests: run 32586634982, job 97065111167).
+    const raw = [
+      '2026-08-22T17:38:02.9319059Z ',
+      `${ESC}[1m${ESC}[31m  ${ESC}[1m● ${ESC}[22m${ESC}[1m`,
+      'FootballLeagueId › matchups tab playoff bracket toggle (FLD-017) › does not render the view toggle when the bracket has no seeded matchups',
+      `${ESC}[39m${ESC}[22m`,
+    ].join('');
+
+    const stripped = stripAnsiCodes(raw);
+
+    expect(stripped.includes(ESC)).toBe(false);
+    expect(stripped).toContain('● FootballLeagueId');
+  });
+
+  it('strips a broader set than SGR-only color codes (e.g. cursor-movement sequences)', () => {
+    const raw = `${ESC}[2K${ESC}[1Gprogress: 50%`;
+    expect(stripAnsiCodes(raw)).toBe('progress: 50%');
+  });
+
+  it('is a no-op on text with no escape sequences', () => {
+    expect(stripAnsiCodes('plain log line')).toBe('plain log line');
+  });
+});
 
 describe('fetchRunLogsRing', () => {
   beforeEach(() => {

@@ -1,4 +1,4 @@
-import { fetchRunLogsRing } from '../logs.js';
+import { fetchRunLogsRing, stripAnsiCodes } from '../logs.js';
 import { formatBatchLogPayload, formatLogPayload } from '../format.js';
 import type { ToolResult } from '../types.js';
 
@@ -75,13 +75,6 @@ const GIT_FETCH_NOISE =
 // intentional byte GitHub Actions emits for these escape sequences.
 const ESC = String.fromCharCode(27);
 const ANSI_ESCAPE_PREFIX = new RegExp(`^${ESC}\\[`);
-
-/** Matches any ANSI color/style escape sequence, anywhere in a line. */
-const ANSI_ESCAPE_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*m`, 'g');
-
-function stripAnsiCodes(line: string): string {
-  return line.replace(ANSI_ESCAPE_SEQUENCE, '');
-}
 
 /**
  * Jest's own failure markers (LS-8391). errorSummary's generic ERROR_PATTERNS
@@ -328,8 +321,14 @@ async function buildRunPayload(
 
   if (params.errorSummary) {
     const summary = extractErrorSummary(lines, priorityLines);
+    // Strip ANSI escape sequences (LS-9557) after line selection — the
+    // selection heuristics above (##[group] blocks, command-echo detection
+    // via ANSI_ESCAPE_PREFIX) rely on the raw escape codes — but before the
+    // char-based caps below, so truncateLineLength/maxChars budget real
+    // content instead of escape bytes.
+    const strippedSummary = summary.map(stripAnsiCodes);
     const { processedLines, charTruncated } = applyCharLimits(
-      summary,
+      strippedSummary,
       params.truncateLineLength,
       maxChars,
     );
@@ -351,8 +350,11 @@ async function buildRunPayload(
     };
   }
 
+  // Strip ANSI escape sequences (LS-9557) after the ring-buffer's maxLines
+  // selection but before the char-based caps below.
+  const strippedLines = lines.map(stripAnsiCodes);
   const { processedLines, charTruncated } = applyCharLimits(
-    lines,
+    strippedLines,
     params.truncateLineLength,
     maxChars,
   );
