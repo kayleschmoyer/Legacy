@@ -42,8 +42,20 @@
     />
     <meta name="twitter:image" content="https://legacy.sports/logo-512.png" />
 
+    <!--
+      LS-9529: there is deliberately no rel=icon link of type image/svg+xml
+      here. The former favicon.svg was a 9.6 MB full-detail Inkscape export,
+      and Chrome prefers an SVG icon over the .ico when both are declared — so
+      it pulled all 9.6 MB on every cold navigation just to draw a 16x16 tab
+      icon. SVGO bottoms out at ~1.35 MB even at lossy integer precision, so
+      the 3 KB .ico below is the icon for every browser. Recover the vector
+      source from git if it is ever needed:
+        git show 48fb4b3df:apps/web/public/favicon.svg
+      Do not write an example link tag in this comment — Vite's HTML parser
+      lifts a literal tag out of a comment into the document head as a real
+      element, which is how a href-less icon link first shipped here.
+    -->
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="stylesheet" href="/src/styles.css" />
 
