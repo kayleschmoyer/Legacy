@@ -37,6 +37,15 @@ export { DraftQueueTab, type DraftQueueTabProps } from './DraftQueueTab';
 // Chat overlay types for render prop
 export type { DraftChatProps, DraftChatRenderer } from './DraftChatOverlay';
 
+// Chat tab (LS-9401): presentational bubble/input UI + its data-source render prop
+export { DraftChatTab } from './DraftChatTab';
+export type {
+  DraftChatBubbleMessage,
+  DraftChatTabProps,
+  DraftChatTabRenderProps,
+  DraftChatTabRenderer,
+} from './DraftChatTab';
+
 // Shared types (prefixed to avoid collisions with existing exports)
 export type {
   AvailableDraftPlayer,

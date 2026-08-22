@@ -39,6 +39,26 @@ describe('DraftBottomNav', () => {
     expect(onChangeTab).toHaveBeenCalledWith('team');
   });
 
+  it('shows the unread-chat dot on the Chat tab icon when unreadChat is true', () => {
+    render(
+      <DraftBottomNav activeTab="board" onChangeTab={jest.fn()} unreadChat />,
+    );
+
+    expect(screen.getByTestId('draft-bottom-nav-chat-unread-dot')).toBeTruthy();
+  });
+
+  it('hides the unread-chat dot when unreadChat is false', () => {
+    render(
+      <DraftBottomNav
+        activeTab="board"
+        onChangeTab={jest.fn()}
+        unreadChat={false}
+      />,
+    );
+
+    expect(screen.queryByTestId('draft-bottom-nav-chat-unread-dot')).toBeNull();
+  });
+
   it('still renders every tab when a safe-area inset is applied', () => {
     render(
       <DraftBottomNav

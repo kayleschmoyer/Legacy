@@ -212,15 +212,18 @@ jest.mock('./DraftBottomNav', () => ({
   DraftBottomNav: ({
     activeTab,
     onChangeTab,
+    unreadChat,
     bottomInset,
   }: {
     activeTab: string;
     onChangeTab: (tab: string) => void;
+    unreadChat?: boolean;
     bottomInset?: number;
   }) => (
     <button
       data-testid="draft-bottom-nav"
       data-active-tab={activeTab}
+      data-unread-chat={String(!!unreadChat)}
       data-bottom-inset={String(bottomInset)}
       onClick={() => onChangeTab('players')}
     />
@@ -1862,6 +1865,103 @@ describe('EliteDraftBoardScreen — Draft Room v2 shell (LS-9397)', () => {
         .getByTestId('draft-header-band')
         .getAttribute('data-top-queued-player'),
     ).toBe('');
+  });
+});
+
+describe('EliteDraftBoardScreen — Chat tab (LS-9401)', () => {
+  it('shows the "coming soon" placeholder on the Chat tab when renderChatTab is omitted', () => {
+    setupCompactLiveDraft({ ui: { activeTab: 'chat' } });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(screen.getByText('Chat tab is coming soon.')).toBeTruthy();
+  });
+
+  it('calls renderChatTab with leagueId/userId and renders its output on the Chat tab', () => {
+    setupCompactLiveDraft({ ui: { activeTab: 'chat' } });
+    const renderChatTab = jest.fn(() => <div data-testid="chat-tab-body" />);
+
+    render(
+      <EliteDraftBoardScreen {...defaultProps} renderChatTab={renderChatTab} />,
+    );
+
+    expect(screen.getByTestId('chat-tab-body')).toBeTruthy();
+    expect(screen.queryByText('Chat tab is coming soon.')).toBeNull();
+    expect(renderChatTab).toHaveBeenCalledWith(
+      expect.objectContaining({ leagueId: 1, userId: 1 }),
+    );
+  });
+
+  it('keeps the chat renderer mounted (display:none) rather than unmounted when another tab is active', () => {
+    setupCompactLiveDraft({ ui: { activeTab: 'players' } });
+    const renderChatTab = jest.fn(() => <div data-testid="chat-tab-body" />);
+
+    render(
+      <EliteDraftBoardScreen {...defaultProps} renderChatTab={renderChatTab} />,
+    );
+
+    expect(renderChatTab).toHaveBeenCalled();
+    const slot = screen.getByTestId('draft-chat-tab-slot');
+    expect(slot.style.display).toBe('none');
+    expect(screen.getByTestId('draft-players-tab')).toBeTruthy();
+  });
+
+  it('forwards ui.unreadChat to DraftBottomNav', () => {
+    setupCompactLiveDraft({ ui: { activeTab: 'board', unreadChat: true } });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(
+      screen.getByTestId('draft-bottom-nav').getAttribute('data-unread-chat'),
+    ).toBe('true');
+  });
+
+  it('sets the unread-chat flag when a new message arrives while another tab is active', () => {
+    const setUnreadChat = jest.fn();
+    setupCompactLiveDraft({
+      ui: { activeTab: 'players', setUnreadChat },
+    });
+    let onNewMessage: () => void = jest.fn();
+    const renderChatTab = jest.fn((props: { onNewMessage: () => void }) => {
+      onNewMessage = props.onNewMessage;
+      return <div data-testid="chat-tab-body" />;
+    });
+
+    render(
+      <EliteDraftBoardScreen {...defaultProps} renderChatTab={renderChatTab} />,
+    );
+    onNewMessage();
+
+    expect(setUnreadChat).toHaveBeenCalledWith(true);
+  });
+
+  it('does not set the unread-chat flag for a new message while the Chat tab is already active', () => {
+    const setUnreadChat = jest.fn();
+    setupCompactLiveDraft({
+      ui: { activeTab: 'chat', setUnreadChat },
+    });
+    let onNewMessage: () => void = jest.fn();
+    const renderChatTab = jest.fn((props: { onNewMessage: () => void }) => {
+      onNewMessage = props.onNewMessage;
+      return <div data-testid="chat-tab-body" />;
+    });
+
+    render(
+      <EliteDraftBoardScreen {...defaultProps} renderChatTab={renderChatTab} />,
+    );
+    setUnreadChat.mockClear(); // clear the mount-time clear-on-open call
+    onNewMessage();
+
+    expect(setUnreadChat).not.toHaveBeenCalledWith(true);
+  });
+
+  it('clears the unread-chat flag when the Chat tab becomes active', () => {
+    const setUnreadChat = jest.fn();
+    setupCompactLiveDraft({ ui: { activeTab: 'chat', setUnreadChat } });
+
+    render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(setUnreadChat).toHaveBeenCalledWith(false);
   });
 });
 

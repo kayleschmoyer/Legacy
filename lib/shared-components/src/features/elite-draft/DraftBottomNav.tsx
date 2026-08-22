@@ -12,6 +12,9 @@ import type { DraftRoomTab } from './hooks/useDraftUIState';
 export interface DraftBottomNavProps {
   activeTab: DraftRoomTab;
   onChangeTab: (tab: DraftRoomTab) => void;
+  /** Shows a 7px seam-red dot on the Chat tab icon (LS-9401, README "Chat
+   *  tab" / "Bottom nav"). Driven by `useDraftUIState`'s unread-chat flag. */
+  unreadChat?: boolean;
   /**
    * Bottom safe-area inset (e.g. from `useSafeAreaInsets().bottom`), reserved
    * below the tab row. The Draft Room is pushed on top of the root Stack, so —
@@ -57,6 +60,7 @@ const TABS: ReadonlyArray<{
 export function DraftBottomNav({
   activeTab,
   onChangeTab,
+  unreadChat,
   bottomInset = 0,
 }: DraftBottomNavProps): React.JSX.Element {
   // Clamped once so the padding and the height it is subtracted from can never
@@ -92,7 +96,21 @@ export function DraftBottomNav({
             accessibilityState={{ selected: active }}
           >
             <YStack alignItems="center" justifyContent="center" gap={2}>
-              <Icon size={16} color={active ? '$brandGoldLight' : '$fg4'} />
+              <YStack>
+                <Icon size={16} color={active ? '$brandGoldLight' : '$fg4'} />
+                {tab === 'chat' && unreadChat && (
+                  <YStack
+                    testID="draft-bottom-nav-chat-unread-dot"
+                    position="absolute"
+                    top={-2}
+                    right={-4}
+                    width={7}
+                    height={7}
+                    borderRadius={4}
+                    backgroundColor="$brandSeamRed"
+                  />
+                )}
+              </YStack>
               <Text
                 fontSize={9.5}
                 fontWeight="700"

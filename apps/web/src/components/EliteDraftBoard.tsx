@@ -6,9 +6,16 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { EliteDraftBoardScreen } from '@legacy-sports/shared-components/elite-draft';
-import type { DraftChatProps } from '@legacy-sports/shared-components/elite-draft';
+import {
+  DraftChatTab,
+  EliteDraftBoardScreen,
+} from '@legacy-sports/shared-components/elite-draft';
+import type {
+  DraftChatProps,
+  DraftChatTabRenderProps,
+} from '@legacy-sports/shared-components/elite-draft';
 import { LeagueChatTab } from '../features/baseball/LeagueChatTab';
+import { useLeagueChat } from '../hooks/useLeagueChat';
 import { env } from '../config/environment';
 import { trackPlayerSelected } from '../utils/analytics';
 
@@ -18,6 +25,70 @@ function renderChat({ leagueId, userId, mentionableTeams }: DraftChatProps) {
       leagueId={leagueId}
       userId={userId}
       mentionableTeams={mentionableTeams}
+    />
+  );
+}
+
+/**
+ * Chat tab data connector (LS-9401) — calls the same `useLeagueChat` data
+ * source `LeagueChatTab`/`renderChat` above use, and hands the raw messages
+ * to the v2-styled `DraftChatTab` presentational component. Kept mounted by
+ * the caller regardless of which tab is active (see
+ * EliteDraftBoardScreen's display:none rendering) so `onNewMessage` can
+ * still fire while the viewer is on another tab.
+ *
+ * Deliberately not shared with `apps/app`'s near-identical connector: each
+ * platform's `useLeagueChat` hook has a different `userId` type (web:
+ * `number | null`; native: `number`), so the message-mapping step would
+ * need a platform-supplied transform either way — collapsing two ~15-line
+ * components behind an indirection layer isn't a net simplification here.
+ */
+function renderChatTab({
+  leagueId,
+  userId,
+  onNewMessage,
+}: DraftChatTabRenderProps) {
+  return (
+    <ChatTabConnector
+      leagueId={leagueId}
+      userId={userId}
+      onNewMessage={onNewMessage}
+    />
+  );
+}
+
+function ChatTabConnector({
+  leagueId,
+  userId,
+  onNewMessage,
+}: DraftChatTabRenderProps): React.JSX.Element {
+  const { messages, loading, sending, sendMessage } = useLeagueChat(leagueId);
+  // null until the first sync so loading the existing message history never
+  // counts as a "new" message for the unread dot — only counts up from there.
+  const prevCountRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (
+      prevCountRef.current !== null &&
+      messages.length > prevCountRef.current
+    ) {
+      onNewMessage();
+    }
+    prevCountRef.current = messages.length;
+  }, [messages.length, onNewMessage]);
+
+  return (
+    <DraftChatTab
+      currentUserId={userId}
+      loading={loading}
+      sending={sending}
+      messages={messages.map((m) => ({
+        id: m.id,
+        userId: m.userId ?? 0,
+        username: m.username,
+        messageText: m.messageText,
+      }))}
+      onSend={(text) => void sendMessage(text)}
     />
   );
 }
@@ -112,6 +183,7 @@ export function EliteDraftBoardScreenWrapper(): React.JSX.Element {
         onNavigate={(path) => navigate(path)}
         websocketUrl={env.websocketUrl}
         renderChat={renderChat}
+        renderChatTab={renderChatTab}
         onPlayerDrafted={trackPlayerSelected}
         onActiveDraftChange={setIsDraftActive}
       />

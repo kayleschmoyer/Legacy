@@ -45,8 +45,8 @@ import {
 import { DraftChatOverlay } from './DraftChatOverlay';
 import { DEFAULT_NUM_TEAMS } from './constants';
 import type { DraftChatRenderer } from './DraftChatOverlay';
+import type { DraftChatTabRenderer } from './DraftChatTab';
 import type { DraftPickRecord, DraftPlayer } from './types';
-import type { DraftRoomTab } from './hooks/useDraftUIState';
 import { PositionBadge } from '../../components/PositionBadge';
 import { useAuth } from '../../features/auth';
 import type { SportKind } from '../../config/sports';
@@ -63,6 +63,13 @@ export interface EliteDraftBoardScreenProps {
   token?: string;
   /** Optional render prop for the chat overlay. If omitted, chat is disabled (compact/narrow viewports never render it — the mobile UX uses a separate chat screen accessible from the league tab). */
   renderChat?: DraftChatRenderer;
+  /**
+   * Optional data-source render prop for the Chat tab body (LS-9401,
+   * compact/narrow-viewport shell only). If omitted, the Chat tab shows the
+   * "coming soon" placeholder like the other not-yet-built tabs. Kept
+   * separate from `renderChat` — see `DraftChatTabRenderer`.
+   */
+  renderChatTab?: DraftChatTabRenderer;
   /** Optional callback fired when a player is drafted (for analytics). */
   onPlayerDrafted?: (playerId: number, position: string) => void;
   /**
@@ -114,16 +121,11 @@ type SortKey = 'adp' | 'pts';
 
 /**
  * Draft Room v2 shell (LS-9397) + Players tab (LS-9399) + Queue/Team tabs
- * (LS-9400): the Board tab keeps this file's existing compact-board content;
- * Players, Queue, and Team render their real bodies below. Chat remains a
- * placeholder until sibling 5 builds it (Out of Scope for this ticket).
+ * (LS-9400) + Chat tab (LS-9401): the Board tab keeps this file's existing
+ * compact-board content; Players, Queue, Team, and Chat all render their
+ * real bodies below — every tab now has a body, so no placeholder copy is
+ * needed.
  */
-const TAB_PLACEHOLDER_COPY: Record<
-  Exclude<DraftRoomTab, 'board' | 'players' | 'queue' | 'team'>,
-  string
-> = {
-  chat: 'Chat tab is coming soon.',
-};
 
 // ---------------------------------------------------------------------------
 // Compact-branch chrome (narrow-viewport only — folded in from the former
@@ -323,6 +325,12 @@ interface CompactLiveDraftBoardProps {
   onDraftPlayer: (id: number) => void;
   onCommissionerPick: (id: number) => void;
   onLoadMore: () => void;
+  /** League id passed to `renderChatTab`'s data connector (LS-9401); null
+   *  before the league has loaded, matching `EliteDraftBoardScreenProps`. */
+  leagueId: number | null;
+  /** Viewer's user id, passed to `renderChatTab` as the "mine" bubble check. */
+  userId: number;
+  renderChatTab?: DraftChatTabRenderer;
 }
 
 function CompactLiveDraftBoard({
@@ -343,8 +351,25 @@ function CompactLiveDraftBoard({
   onDraftPlayer,
   onCommissionerPick,
   onLoadMore,
+  leagueId,
+  userId,
+  renderChatTab,
 }: CompactLiveDraftBoardProps): React.JSX.Element {
   const palette = useDraftPalette();
+  const hasChatTab = leagueId !== null && !!renderChatTab;
+
+  // Unread-chat dot (LS-9401, README "Chat tab"): clears the moment the
+  // Chat tab is opened, and is set only when a new message arrives while a
+  // *different* tab is active. The renderChatTab data connector stays
+  // mounted regardless of activeTab (display:none when hidden) specifically
+  // so this can fire while the viewer is elsewhere.
+  const handleNewChatMessage = useCallback(() => {
+    if (ui.activeTab !== 'chat') ui.setUnreadChat(true);
+  }, [ui]);
+
+  useEffect(() => {
+    if (ui.activeTab === 'chat') ui.setUnreadChat(false);
+  }, [ui]);
   const [sortKey, setSortKey] = useState<SortKey>('adp');
 
   // AC3 (LS-9402): the same `celebrate` flag the pre-v2 full-screen
@@ -491,6 +516,25 @@ function CompactLiveDraftBoard({
         teamName={lastPick ? queries.teamNameById(lastPick.teamId) : ''}
       />
 
+      {/* Mounted regardless of activeTab (display:none when hidden) so the
+          connector's live subscription keeps running and can still report
+          "message arrives while another tab is open" for the unread dot.
+          Narrowing leagueId/renderChatTab inline (rather than via the
+          `hasChatTab` boolean) so TypeScript proves both are defined here
+          without a non-null assertion. */}
+      {leagueId !== null && renderChatTab && (
+        <YStack
+          flex={1}
+          testID="draft-chat-tab-slot"
+          style={{ display: ui.activeTab === 'chat' ? 'flex' : 'none' }}
+        >
+          {renderChatTab({
+            leagueId,
+            userId,
+            onNewMessage: handleNewChatMessage,
+          })}
+        </YStack>
+      )}
       {ui.activeTab === 'players' ? (
         <DraftPlayersTab
           players={playerData.enrichedPlayers}
@@ -534,7 +578,7 @@ function CompactLiveDraftBoard({
           sport={sport}
           maxRosterSize={queries.league?.maxRosterSize ?? null}
         />
-      ) : ui.activeTab !== 'board' ? (
+      ) : ui.activeTab === 'chat' && !hasChatTab ? (
         <YStack
           flex={1}
           alignItems="center"
@@ -542,10 +586,11 @@ function CompactLiveDraftBoard({
           padding="$6"
         >
           <Text color="$fg4" textAlign="center">
-            {TAB_PLACEHOLDER_COPY[ui.activeTab]}
+            Chat tab is coming soon.
           </Text>
         </YStack>
-      ) : (
+      ) : null}
+      {ui.activeTab === 'board' && (
         <>
           <DraftBoardGrid
             teams={boardTeams}
@@ -824,6 +869,7 @@ function CompactLiveDraftBoard({
       <DraftBottomNav
         activeTab={ui.activeTab}
         onChangeTab={ui.setActiveTab}
+        unreadChat={ui.unreadChat}
         bottomInset={bottomInset}
       />
     </YStack>
@@ -836,6 +882,7 @@ export function EliteDraftBoardScreen({
   websocketUrl,
   token,
   renderChat,
+  renderChatTab,
   onPlayerDrafted,
   sport: sportOverride,
   onActiveDraftChange,
@@ -1355,6 +1402,9 @@ export function EliteDraftBoardScreen({
         onDraftPlayer={handleDraftPlayer}
         onCommissionerPick={handleCommissionerPick}
         onLoadMore={handleLoadMore}
+        leagueId={leagueId}
+        userId={userId}
+        renderChatTab={renderChatTab}
       />
     );
   }
