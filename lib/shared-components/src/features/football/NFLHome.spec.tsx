@@ -345,6 +345,48 @@ describe('NFLHome — Join League CTA (LS-6288)', () => {
   });
 });
 
+describe('NFLHome — join-still-free reassurance (LS-6289 / FBH-035)', () => {
+  it('shows the reassurance note and keeps Join enabled when at the owned-league cap', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onJoinLeague={noop}
+        leagueCap={{ count: 3, limit: 3, atLimit: true, onUpgrade: noop }}
+      />,
+    );
+    expect(
+      screen.getByTestId('football-join-still-free-notice'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/you can still join leagues for free/i),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('join-league-button')).toBeEnabled();
+  });
+
+  it('omits the reassurance note when under the owned-league cap', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        leagueCap={{ count: 1, limit: 3, atLimit: false, onUpgrade: noop }}
+      />,
+    );
+    expect(
+      screen.queryByTestId('football-join-still-free-notice'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('omits the reassurance note when leagueCap is not provided', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(
+      screen.queryByTestId('football-join-still-free-notice'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — empty-state upgrade on-ramp (LS-6272)', () => {
   it('keeps the neutral copy and Create CTA when leagueCap is not provided', () => {
     render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);

@@ -659,6 +659,22 @@ function NFLHome({
           </XStack>
         ) : null}
 
+        {/* Proactive "you can still join for free" reassurance (LS-6289 /
+            FBH-035). The league cap only gates creating/owning leagues — the
+            Join CTA above stays enabled at the cap either way (LS-5413), but
+            without this note a free user at their owned-league limit has no
+            signal that joining leagues by invite code remains unlimited. */}
+        {leagueCap?.atLimit ? (
+          <Text
+            color="$gray10"
+            fontSize="$3"
+            testID="football-join-still-free-notice"
+          >
+            You're at your owned-league limit, but you can still join leagues
+            for free with an invite code.
+          </Text>
+        ) : null}
+
         {/* Your Football Leagues */}
         <YStack gap="$4">
           <H2 color="$color" fontSize="$7" fontWeight="700">
