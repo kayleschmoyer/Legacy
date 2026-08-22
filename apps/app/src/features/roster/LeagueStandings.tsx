@@ -26,7 +26,9 @@ export function LeagueStandings({
   const router = useRouter();
 
   const teamRoute =
-    sport === 'football' ? '/football/team/[teamId]' : '/baseball/team/[teamId]';
+    sport === 'football'
+      ? '/football/team/[teamId]'
+      : '/baseball/team/[teamId]';
 
   const handleTeamPress = (teamId: number) => {
     router.push({ pathname: teamRoute, params: { teamId: String(teamId) } });

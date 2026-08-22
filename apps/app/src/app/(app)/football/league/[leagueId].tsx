@@ -364,18 +364,34 @@ export default function FootballLeagueId(): React.JSX.Element {
         return;
       }
 
+      // Optimistically reflect the new position immediately — on slow
+      // networks the round-trip can take ~1s, which reads as an unresponsive
+      // drag-and-drop otherwise (LS-6336). Apollo rolls the cache patch back
+      // automatically if the mutation errors.
+      const existingMember = teamMembersData?.teamMembers?.find(
+        (member) => member?.id === player.id,
+      );
+
       try {
         await updateTeamMemberPosition({
           variables: {
             teamMemberId: player.id,
             positionId: position.id,
           },
+          optimisticResponse: existingMember
+            ? {
+                updateTeamMemberPosition: {
+                  ...existingMember,
+                  positionId: position.id,
+                },
+              }
+            : undefined,
         });
       } catch (error) {
         handleError(error);
       }
     },
-    [updateTeamMemberPosition],
+    [updateTeamMemberPosition, teamMembersData],
   );
 
   const handlePlayerRemove = useCallback(
@@ -390,6 +406,12 @@ export default function FootballLeagueId(): React.JSX.Element {
             variables: {
               teamMemberId: assignedPlayer.id,
               positionId: null,
+            },
+            optimisticResponse: {
+              updateTeamMemberPosition: {
+                ...assignedPlayer,
+                positionId: null,
+              },
             },
           });
         }

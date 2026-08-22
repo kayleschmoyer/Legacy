@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import FootballLeagueId from './[leagueId]';
@@ -21,6 +21,11 @@ let mockCapturedTradesSubscribeRefresh:
 const mockCapturedWaiverSubscribeRefresh: Array<
   ((refetch: () => void) => (() => void) | void) | null
 > = [];
+
+// Captures LeagueRosterManagement's onPlayerAssign/onPlayerRemove so the
+// optimistic-response wiring can be exercised (LS-6336).
+let mockCapturedOnPlayerAssign: ((...args: unknown[]) => void) | null = null;
+let mockCapturedOnPlayerRemove: ((...args: unknown[]) => void) | null = null;
 
 const mockNavigate = jest.fn();
 const mockPush = jest.fn();
@@ -220,7 +225,14 @@ jest.mock('../../../../hooks/useLeagueWebSocketLifecycle', () => ({
 jest.mock('../../../../features/roster/LeagueRosterManagement', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
-    LeagueRosterManagement: () => <View testID="league-roster-management" />,
+    LeagueRosterManagement: (props: {
+      onPlayerAssign?: (...args: unknown[]) => void;
+      onPlayerRemove?: (...args: unknown[]) => void;
+    }) => {
+      mockCapturedOnPlayerAssign = props.onPlayerAssign ?? null;
+      mockCapturedOnPlayerRemove = props.onPlayerRemove ?? null;
+      return <View testID="league-roster-management" />;
+    },
   };
 });
 
@@ -375,10 +387,12 @@ const mockGetPositionsForLeagueQuery = jest.fn(() => ({
   data: { leaguePositions: [] },
   loading: false,
 }));
-const mockGetTeamMembersQuery = jest.fn(() => ({
-  data: { teamMembers: [] },
-  loading: false,
-}));
+const mockGetTeamMembersQuery = jest.fn(
+  (): { data: { teamMembers: unknown[] }; loading: boolean } => ({
+    data: { teamMembers: [] },
+    loading: false,
+  }),
+);
 const mockGetUserTeamIdLazyQuery = jest.fn(() => [
   jest.fn(),
   { data: { userTeamId: 10 }, loading: false },
@@ -414,6 +428,8 @@ describe('FootballLeagueId', () => {
     jest.clearAllMocks();
     mockCapturedTradesSubscribeRefresh = null;
     mockCapturedWaiverSubscribeRefresh.length = 0;
+    mockCapturedOnPlayerAssign = null;
+    mockCapturedOnPlayerRemove = null;
     jest
       .requireMock<{
         useLocalSearchParams: jest.Mock;
@@ -737,6 +753,90 @@ describe('FootballLeagueId', () => {
     it('defaults to the Overview tab when initialTab is absent', () => {
       render(<FootballLeagueId />);
       expect(screen.queryByTestId('league-roster-management')).toBeNull();
+    });
+  });
+
+  // LS-6336 — roster position mutations must carry an optimisticResponse so
+  // drag-and-drop reflects immediately instead of waiting for the round-trip.
+  describe('roster mutation optimistic UI (LS-6336)', () => {
+    const mockTeamMember = {
+      __typename: 'TeamMember',
+      id: 501,
+      playerId: 7,
+      positionId: 1,
+      teamId: 10,
+      leagueId: 42,
+      onTradeBlock: false,
+      salary: null,
+      askingPrice: null,
+      nickname: null,
+      isLocked: false,
+      player: {
+        __typename: 'Player',
+        id: 7,
+        firstName: 'Josh',
+        lastName: 'Allen',
+        brefId: null,
+        eligiblePositions: ['QB'],
+      },
+    };
+    const mockPosition = { id: 2, leagueId: 42, positionType: 'RB' };
+    // Matches mockTeamMember.positionId so handlePlayerRemove's lookup finds it.
+    const mockOccupiedPosition = { id: 1, leagueId: 42, positionType: 'QB' };
+
+    function renderRosterTab() {
+      const { useLocalSearchParams } = jest.requireMock<{
+        useLocalSearchParams: jest.Mock;
+      }>('expo-router');
+      useLocalSearchParams.mockReturnValue({
+        leagueId: '42',
+        initialTab: 'roster',
+      });
+      mockGetTeamMembersQuery.mockReturnValue({
+        data: { teamMembers: [mockTeamMember] },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+    }
+
+    it('passes an optimisticResponse built from the cached team member on assign', () => {
+      const mockMutate = jest.fn().mockResolvedValue({});
+      mockUpdateTeamMemberPositionMutation.mockReturnValue([mockMutate]);
+      renderRosterTab();
+
+      void act(() => {
+        mockCapturedOnPlayerAssign?.(mockTeamMember, mockPosition);
+      });
+
+      expect(mockMutate).toHaveBeenCalledWith({
+        variables: {
+          teamMemberId: mockTeamMember.id,
+          positionId: mockPosition.id,
+        },
+        optimisticResponse: {
+          updateTeamMemberPosition: {
+            ...mockTeamMember,
+            positionId: mockPosition.id,
+          },
+        },
+      });
+    });
+
+    it('passes an optimisticResponse with a null positionId on remove', () => {
+      const mockMutate = jest.fn().mockResolvedValue({});
+      mockUpdateTeamMemberPositionMutation.mockReturnValue([mockMutate]);
+      renderRosterTab();
+
+      void act(() => {
+        mockCapturedOnPlayerRemove?.(mockOccupiedPosition);
+      });
+
+      expect(mockMutate).toHaveBeenCalledWith({
+        variables: { teamMemberId: mockTeamMember.id, positionId: null },
+        optimisticResponse: {
+          updateTeamMemberPosition: { ...mockTeamMember, positionId: null },
+        },
+      });
     });
   });
 
