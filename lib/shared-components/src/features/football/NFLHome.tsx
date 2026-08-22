@@ -410,8 +410,12 @@ function NFLHome({
       >
         {/* Hero — stacked on phones, reflows to side-by-side (copy + side panel)
             on desktop, with padding scaling up by tier. Mirrors the canonical
-            FootballLandingPage hero breakpoints (LS-7819). */}
+            FootballLandingPage hero breakpoints (LS-7819).
+            Fixed shape regardless of loading/hasLeagues state — only the copy
+            and quick-wins text vary — so the query resolving never swaps in a
+            differently-sized hero and shifts the page (LS-6277 / FBH-023). */}
         <XStack
+          testID="football-hero"
           backgroundColor="$glassSurface"
           borderRadius="$8"
           borderWidth={1}

@@ -402,6 +402,52 @@ describe('NFLHome — empty-state upgrade on-ramp (LS-6272)', () => {
   });
 });
 
+describe('NFLHome — hero layout stability (LS-6277 / FBH-023)', () => {
+  // The hero previously swapped between a full ~600px variant (zero leagues)
+  // and a compact ~80px variant (≥1 league) once the leagues query resolved,
+  // causing a violent CLS-triggering layout shift. The hero is now a single
+  // fixed-shape element — only its copy varies by hasLeagues/loading — so
+  // these assert the side panel (the structural piece that used to
+  // disappear in the compact variant) is always present, in every
+  // loading/hasLeagues combination.
+  it('renders the same hero shape while the leagues query is loading', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        loading
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+
+    expect(screen.getByTestId('football-hero')).toBeInTheDocument();
+    expect(screen.getByText('Getting Started')).toBeInTheDocument();
+    expect(screen.getByText('Quick Wins')).toBeInTheDocument();
+  });
+
+  it('renders the same hero shape once resolved with zero leagues', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+
+    expect(screen.getByTestId('football-hero')).toBeInTheDocument();
+    expect(screen.getByText('Getting Started')).toBeInTheDocument();
+    expect(screen.getByText('Quick Wins')).toBeInTheDocument();
+  });
+
+  it('renders the same hero shape once resolved with one or more leagues', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(2)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+
+    expect(screen.getByTestId('football-hero')).toBeInTheDocument();
+    expect(screen.getByText('Getting Started')).toBeInTheDocument();
+    expect(screen.getByText('Quick Wins')).toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — matchup highlight card (LS-5407)', () => {
   it('renders the highlight card with both team names and the week when a matchup is scheduled', () => {
     const league: NFLHomeLeague = {
