@@ -4,12 +4,15 @@
 
 import {
   buildEligibilityConditions,
+  type PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { and, asc, desc, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { LOGGER } from '@legacy-sports/logging';
+import { DEFAULT_FOOTBALL_ROSTER_POSITIONS } from '@legacy-sports/utils';
 
+import type { PlayerDraftInfo } from './candidate-pool';
 import {
   countRecentMockDrafts,
   eligibleStatPositionsForUnfilledSlots,
@@ -17,6 +20,7 @@ import {
   getUnfilledPositionTypes,
   MOCK_DRAFT_FREE_WEEKLY_LIMIT,
 } from './helpers';
+import { effectiveFootballFpg } from './strategies/football';
 import {
   CurrentDraftPick,
   Draft,
@@ -1069,6 +1073,195 @@ builder.queryField('getDraftTeamAutoPickStatuses', (t) =>
   }),
 );
 
+type DraftRecommendationOutput = {
+  playerId: number;
+  playerName: string;
+  position: string;
+  score: number;
+  reason: string;
+  topStats: Array<{ label: string; value: string }>;
+};
+
+/**
+ * Football branch of getDraftRecommendations (LS-9482).
+ *
+ * `player_eligible_positions` has zero football rows (LS-9474 postmortem) —
+ * football positions live in the `football_player_eligible_positions` view
+ * instead, and (unlike baseball) it carries at most one row per player, so
+ * no games-played tiebreak is needed to pick a "primary" position.
+ *
+ * No football scoring cache exists yet (LS-9484 tracks that), so ranking
+ * reuses the same `effectiveFootballFpg` baseline the auto-pick strategy
+ * already uses (strategies/football.ts): a served `projected_fantasy_points`
+ * value when present, else a position-archetype baseline + per-player
+ * jitter. The baseline is for ORDERING only — `topStats`/`reason` must never
+ * quote it as though it were a real projection (LS-9476 postmortem).
+ */
+
+/**
+ * Roster-slot quotas derived from DEFAULT_FOOTBALL_ROSTER_POSITIONS
+ * (@legacy-sports/utils) rather than duplicated as a literal, so this can't
+ * drift from the actual default roster. DST is included for parity with
+ * today's DST-default leagues even though career_football_defense is empty
+ * (LS-9475) — this never matches a candidate today, a safe no-op rather than
+ * a new failure mode.
+ */
+const ROSTER_SLOTS_FOOTBALL: Readonly<Record<string, number>> = Object.freeze(
+  DEFAULT_FOOTBALL_ROSTER_POSITIONS.reduce<Record<string, number>>(
+    (quotas, slot) => {
+      quotas[slot] = (quotas[slot] ?? 0) + 1;
+      return quotas;
+    },
+    {},
+  ),
+);
+
+export async function getFootballDraftRecommendations(
+  db: PublicDb,
+  draftId: number,
+  leagueId: number,
+  teamPickedIds: number[],
+): Promise<DraftRecommendationOutput[]> {
+  const excludeClause = sql`AND NOT EXISTS (
+    SELECT 1 FROM public.draft_picks dp
+    WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
+  ) AND NOT EXISTS (
+    SELECT 1 FROM public.team_members tm
+    WHERE tm.league_id = ${leagueId} AND tm.player_id = p.id
+  )`;
+
+  const statsResult = await db.execute(sql`
+    SELECT
+      p.id AS player_id,
+      p.first_name,
+      p.last_name,
+      fpep.position AS primary_position,
+      p.projected_fantasy_points
+    FROM public.players p
+    JOIN public.football_player_eligible_positions fpep ON fpep.player_id = p.id
+    WHERE p.sport = 'football'
+    ${excludeClause}
+  `);
+
+  const positionCount: Record<string, number> = {};
+  if (teamPickedIds.length > 0) {
+    const pickedIdParams = sql.join(
+      teamPickedIds.map((id) => sql`${id}`),
+      sql`, `,
+    );
+    const rosterPositionsResult = await db.execute(sql`
+      SELECT fpep.player_id, fpep.position
+      FROM public.football_player_eligible_positions fpep
+      WHERE fpep.player_id IN (${pickedIdParams})
+    `);
+    for (const row of rosterPositionsResult.rows as {
+      player_id: number;
+      position: string;
+    }[]) {
+      positionCount[row.position] = (positionCount[row.position] ?? 0) + 1;
+    }
+  }
+
+  type FootballPlayerRow = {
+    player_id: number;
+    first_name: string;
+    last_name: string;
+    primary_position: string;
+    projected_fantasy_points: number | null;
+  };
+
+  type Candidate = {
+    id: number;
+    name: string;
+    position: string;
+    fpg: number;
+    projected: boolean;
+  };
+
+  const candidates: Candidate[] = [];
+  for (const row of statsResult.rows as unknown as FootballPlayerRow[]) {
+    const info: PlayerDraftInfo = {
+      fpg: row.projected_fantasy_points ?? 0,
+      positions: [row.primary_position],
+    };
+    candidates.push({
+      id: row.player_id,
+      name: `${row.first_name} ${row.last_name}`.trim(),
+      position: row.primary_position,
+      fpg: effectiveFootballFpg(info, row.player_id),
+      projected: info.fpg > 0,
+    });
+  }
+
+  if (candidates.length === 0) return [];
+
+  const minMaxNorm =
+    (values: number[]) =>
+    (v: number): number => {
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min;
+      if (range === 0) return 0.5;
+      return (v - min) / range;
+    };
+  const normFpg = minMaxNorm(candidates.map((c) => c.fpg));
+
+  const getPositionalNeed = (position: string): number => {
+    const quota = ROSTER_SLOTS_FOOTBALL[position] ?? 1;
+    const have = positionCount[position] ?? 0;
+    if (have === 0) return 1.0;
+    if (have < quota) return 0.5;
+    return 0.0;
+  };
+
+  const availableByPos: Record<string, number> = {};
+  for (const c of candidates) {
+    availableByPos[c.position] = (availableByPos[c.position] ?? 0) + 1;
+  }
+  const maxCountAnyPos = Math.max(...Object.values(availableByPos), 1);
+  const getScarcity = (position: string): number => {
+    const count = availableByPos[position] ?? 0;
+    return 1 - count / maxCountAnyPos;
+  };
+
+  return candidates
+    .map((c) => {
+      const statScore = normFpg(c.fpg);
+      const posNeed = getPositionalNeed(c.position);
+      const scarcity = getScarcity(c.position);
+      const score = statScore * 0.5 + posNeed * 0.3 + scarcity * 0.2;
+
+      const topStats: Array<{ label: string; value: string }> = [
+        { label: 'Position', value: c.position },
+      ];
+      if (c.projected) {
+        topStats.push({ label: 'Proj FPG', value: c.fpg.toFixed(1) });
+      }
+
+      let reason: string;
+      if (posNeed === 1.0) {
+        reason = `Fills your empty ${c.position} slot`;
+      } else if (posNeed === 0.5) {
+        reason = `Adds depth at ${c.position}`;
+      } else if (scarcity > 0.7) {
+        reason = `Only ${availableByPos[c.position] ?? 0} ${c.position}s left`;
+      } else {
+        reason = `Top rated ${c.position} available`;
+      }
+
+      return {
+        playerId: c.id,
+        playerName: c.name,
+        position: c.position,
+        score,
+        reason,
+        topStats,
+      };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 5);
+}
+
 /**
  * Query: Get draft intelligence recommendations for a team (LS-467)
  *
@@ -1128,6 +1321,38 @@ builder.queryField('getDraftRecommendations', (t) =>
       const teamPickedIds = allPicks
         .filter((p) => p.teamId === teamId)
         .map((p) => p.playerId);
+
+      // Football reads a disjoint set of tables (LS-9482) — the baseball
+      // pool query below unconditionally gates on player_eligible_positions,
+      // which has zero football rows (LS-9474 postmortem), so branch before
+      // any of it runs rather than let the query silently return nothing.
+      const [league] = await context.db
+        .select({ sport: PublicSchema.leagues.sport })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, draft.leagueId))
+        .limit(1);
+      if (!league) {
+        // draft.leagueId is a foreign key into leagues — a draft that
+        // resolved above can never legitimately point at a missing league,
+        // so this is a data-integrity failure to alert on, not a client
+        // mistake (UserInputError would misreport it as bad user input).
+        LOGGER.error(
+          'getDraftRecommendations: league not found for draft',
+          new Error('League not found for draft'),
+          { draftId, leagueId: draft.leagueId },
+        );
+        throw new GraphQLError('An internal server error occurred', {
+          extensions: { code: 'INTERNAL_SERVER_ERROR' },
+        });
+      }
+      if (league.sport === 'football') {
+        return getFootballDraftRecommendations(
+          context.db,
+          draftId,
+          draft.leagueId,
+          teamPickedIds,
+        );
+      }
 
       // --- Normalize position (LF/CF/RF G�� OF) ---
       const normPos = (pos: string): string => {
