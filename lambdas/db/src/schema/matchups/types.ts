@@ -47,6 +47,11 @@ export const MatchupStatus = builder.enumType('MatchupStatus', {
   values: ['scheduled', 'in_progress', 'completed', 'cancelled'] as const,
 });
 
+// Playoff clinch/seeding status enum (LS-6345)
+export const PlayoffClinchStatus = builder.enumType('PlayoffClinchStatus', {
+  values: ['CLINCHED', 'IN', 'OUT'] as const,
+});
+
 // Stats loading status enum
 export const StatsLoadingStatus = builder.enumType('StatsLoadingStatus', {
   values: [
@@ -457,6 +462,8 @@ export const TeamStanding = builder.objectRef<{
   divisionId?: number | null;
   /** Human-readable division label (e.g. "Division 1"); null when no divisions */
   divisionName?: string | null;
+  /** Playoff seeding indicator (LS-6345); null outside the late-season window */
+  clinchStatus?: 'CLINCHED' | 'IN' | 'OUT' | null;
 }>('TeamStanding');
 
 builder.objectType(TeamStanding, {
@@ -479,6 +486,10 @@ builder.objectType(TeamStanding, {
     secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
     divisionId: t.exposeInt('divisionId', { nullable: true }),
     divisionName: t.exposeString('divisionName', { nullable: true }),
+    clinchStatus: t.expose('clinchStatus', {
+      type: PlayoffClinchStatus,
+      nullable: true,
+    }),
   }),
 });
 

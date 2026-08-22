@@ -3437,6 +3437,12 @@ type PlayoffBracket {
   updatedAt: String
 }
 
+enum PlayoffClinchStatus {
+  CLINCHED
+  IN
+  OUT
+}
+
 """
 Individual playoff matchup within a bracket
 """
@@ -4949,6 +4955,7 @@ type TeamStanding {
   avatarUrl: String
   averagePointsAgainst: Float
   averagePointsFor: Float
+  clinchStatus: PlayoffClinchStatus
   divisionId: Int
   divisionName: String
   losses: Int

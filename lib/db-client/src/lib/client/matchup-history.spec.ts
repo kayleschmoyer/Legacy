@@ -7,6 +7,7 @@
 
 import {
   calculateStandings,
+  computeClinchStatuses,
   getHeadToHeadRecord,
   getMatchupStatusCounts,
   getPlayoffQualifications,
@@ -876,6 +877,74 @@ describe('Matchup History', () => {
       const notQualified = qualifications.filter((q) => !q.isQualified);
       expect(notQualified).toHaveLength(2);
       expect(notQualified[0].seedNumber).toBeNull();
+    });
+  });
+
+  describe('computeClinchStatuses', () => {
+    it('marks a playoff-spot team CLINCHED once no chaser can catch it', () => {
+      // Playoff line = top 2. Team A leads with 10 wins and no games left;
+      // the best any chaser (Team C, currently 3rd) can reach is 4 + 3 = 7.
+      const standings = [
+        { teamId: 1, wins: 10, rank: 1 },
+        { teamId: 2, wins: 6, rank: 2 },
+        { teamId: 3, wins: 4, rank: 3 },
+        { teamId: 4, wins: 2, rank: 4 },
+      ];
+      const remaining = new Map([
+        [1, 0],
+        [2, 3],
+        [3, 3],
+        [4, 3],
+      ]);
+
+      const result = computeClinchStatuses(standings, remaining, 2);
+
+      expect(result.get(1)).toBe('CLINCHED');
+      expect(result.get(2)).toBe('IN'); // 6 wins, chaser could reach 7 — not clinched
+      expect(result.get(3)).toBe('OUT');
+      expect(result.get(4)).toBe('OUT');
+    });
+
+    it('keeps a playoff-spot team IN when a chaser could still catch it', () => {
+      const standings = [
+        { teamId: 1, wins: 8, rank: 1 },
+        { teamId: 2, wins: 7, rank: 2 },
+        { teamId: 3, wins: 5, rank: 3 },
+      ];
+      // Team 3 could reach 5 + 3 = 8, tying/passing team 2 (7 wins, 2 left -> max 9).
+      const remaining = new Map([
+        [1, 1],
+        [2, 2],
+        [3, 3],
+      ]);
+
+      const result = computeClinchStatuses(standings, remaining, 2);
+
+      expect(result.get(1)).toBe('IN');
+      expect(result.get(2)).toBe('IN');
+      expect(result.get(3)).toBe('OUT');
+    });
+
+    it('treats every team as CLINCHED when there are no teams outside the playoff line', () => {
+      const standings = [
+        { teamId: 1, wins: 5, rank: 1 },
+        { teamId: 2, wins: 3, rank: 2 },
+      ];
+      const remaining = new Map([
+        [1, 2],
+        [2, 2],
+      ]);
+
+      const result = computeClinchStatuses(standings, remaining, 2);
+
+      expect(result.get(1)).toBe('CLINCHED');
+      expect(result.get(2)).toBe('CLINCHED');
+    });
+
+    it('returns an empty map when playoffs are not configured', () => {
+      const standings = [{ teamId: 1, wins: 5, rank: 1 }];
+      const result = computeClinchStatuses(standings, new Map(), 0);
+      expect(result.size).toBe(0);
     });
   });
 

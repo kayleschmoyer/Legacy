@@ -3119,6 +3119,12 @@ export type PlayoffBracket = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+export enum PlayoffClinchStatus {
+  Clinched = 'CLINCHED',
+  In = 'IN',
+  Out = 'OUT',
+}
+
 /** Individual playoff matchup within a bracket */
 export type PlayoffMatchup = {
   __typename?: 'PlayoffMatchup';
@@ -4724,6 +4730,7 @@ export type TeamStanding = {
   avatarUrl?: Maybe<Scalars['String']['output']>;
   averagePointsAgainst?: Maybe<Scalars['Float']['output']>;
   averagePointsFor?: Maybe<Scalars['Float']['output']>;
+  clinchStatus?: Maybe<PlayoffClinchStatus>;
   divisionId?: Maybe<Scalars['Int']['output']>;
   divisionName?: Maybe<Scalars['String']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
@@ -10837,6 +10844,7 @@ export type GetLeagueStandingsQuery = {
     secondaryColor?: string | null;
     divisionId?: number | null;
     divisionName?: string | null;
+    clinchStatus?: PlayoffClinchStatus | null;
   }> | null;
 };
 
@@ -26803,6 +26811,7 @@ export const GetLeagueStandings = gql`
       secondaryColor
       divisionId
       divisionName
+      clinchStatus
     }
   }
 `;

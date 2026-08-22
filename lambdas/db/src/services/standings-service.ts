@@ -7,6 +7,8 @@
 
 import {
   calculateStandings,
+  type ClinchStatus,
+  computeClinchStatuses,
   type GenericDatabase,
   getHeadToHeadRecord,
   getMatchupStatusCounts,
@@ -23,6 +25,15 @@ import {
   type SeasonResults,
   type TeamStanding,
 } from '@legacy-sports/db-client';
+import { eq } from 'drizzle-orm';
+
+/**
+ * A team's playoff seeding badge only renders once its remaining
+ * regular-season matchups drop to this count or fewer — the "late season"
+ * window the ticket (LS-6345) asks for. Chosen so the badge appears in each
+ * league's final stretch regardless of its configured season length.
+ */
+const LATE_SEASON_REMAINING_MATCHUPS_THRESHOLD = 3;
 
 export interface GetStandingsParams {
   leagueId: number;
@@ -92,7 +103,60 @@ export class StandingsService {
       });
     }
 
+    await StandingsService.attachClinchStatuses(db, leagueId, standings);
+
     return standings;
+  }
+
+  /**
+   * Mutates `standings` in place, setting `clinchStatus` once the league is
+   * playoff-enabled and in its late-season window. Leaves `clinchStatus`
+   * unset (undefined) otherwise, so callers/serializers treat it as null.
+   */
+  private static async attachClinchStatuses(
+    db: GenericDatabase<typeof PublicSchema>,
+    leagueId: number,
+    standings: TeamStanding[],
+  ): Promise<void> {
+    if (standings.length === 0) return;
+
+    const [league] = await db
+      .select({
+        playoffEnabled: PublicSchema.leagues.playoffEnabled,
+        playoffFormat: PublicSchema.leagues.playoffFormat,
+        totalMatchups: PublicSchema.leagues.totalMatchups,
+      })
+      .from(PublicSchema.leagues)
+      .where(eq(PublicSchema.leagues.id, leagueId))
+      .limit(1);
+
+    if (!league?.playoffEnabled) return;
+
+    const playoffSpots = parseInt(league.playoffFormat.split('-')[0], 10);
+    if (!Number.isFinite(playoffSpots) || playoffSpots <= 0) return;
+
+    const remainingMatchupsByTeam = new Map<number, number>();
+    let isLateSeason = false;
+    for (const standing of standings) {
+      const remaining = Math.max(
+        0,
+        league.totalMatchups - standing.totalMatchups,
+      );
+      remainingMatchupsByTeam.set(standing.teamId, remaining);
+      if (remaining <= LATE_SEASON_REMAINING_MATCHUPS_THRESHOLD) {
+        isLateSeason = true;
+      }
+    }
+    if (!isLateSeason) return;
+
+    const clinchStatuses: Map<number, ClinchStatus> = computeClinchStatuses(
+      standings,
+      remainingMatchupsByTeam,
+      playoffSpots,
+    );
+    for (const standing of standings) {
+      standing.clinchStatus = clinchStatuses.get(standing.teamId) ?? null;
+    }
   }
 
   /**

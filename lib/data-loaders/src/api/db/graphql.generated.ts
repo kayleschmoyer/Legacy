@@ -3113,6 +3113,12 @@ export type PlayoffBracket = {
   updatedAt?: Maybe<Scalars['String']['output']>;
 };
 
+export enum PlayoffClinchStatus {
+  Clinched = 'CLINCHED',
+  In = 'IN',
+  Out = 'OUT',
+}
+
 /** Individual playoff matchup within a bracket */
 export type PlayoffMatchup = {
   __typename?: 'PlayoffMatchup';
@@ -3222,6 +3228,8 @@ export type PublicLeagueInfo = {
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
+  /** Sport for this league (baseball or football). (LS-6290) */
+  sport?: Maybe<Sport>;
   totalSpots?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -4716,6 +4724,7 @@ export type TeamStanding = {
   avatarUrl?: Maybe<Scalars['String']['output']>;
   averagePointsAgainst?: Maybe<Scalars['Float']['output']>;
   averagePointsFor?: Maybe<Scalars['Float']['output']>;
+  clinchStatus?: Maybe<PlayoffClinchStatus>;
   divisionId?: Maybe<Scalars['Int']['output']>;
   divisionName?: Maybe<Scalars['String']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;

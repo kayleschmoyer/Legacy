@@ -6,7 +6,9 @@ import {
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
   GRAY,
+  GREEN,
   RANK_SILVER,
+  SLATE_400,
   withAlpha,
 } from '../../utils/colors';
 import { AvatarImage } from '../../components/AvatarImage';
@@ -15,6 +17,33 @@ function rankBadgeColor(rank: number): string {
   if (rank === 1 || rank === 3) return BRAND_GOLD;
   if (rank === 2) return RANK_SILVER;
   return GRAY;
+}
+
+/** Playoff seeding badge shown late in the season (LS-6345). */
+const CLINCH_BADGE_CONFIG = {
+  CLINCHED: { label: 'CLINCHED', color: GREEN },
+  IN: { label: 'IN', color: BRAND_GOLD_LIGHT },
+  OUT: { label: 'OUT', color: SLATE_400 },
+} as const;
+
+function ClinchBadge({ status }: { status: keyof typeof CLINCH_BADGE_CONFIG }) {
+  const { label, color } = CLINCH_BADGE_CONFIG[status];
+  return (
+    <Text
+      flexShrink={0}
+      fontSize={10}
+      fontWeight="800"
+      color={color}
+      borderColor={color}
+      borderWidth={1}
+      borderRadius="$2"
+      paddingHorizontal="$1.5"
+      paddingVertical={1}
+      letterSpacing={0.4}
+    >
+      {label}
+    </Text>
+  );
 }
 
 type StandingRecord = NonNullable<
@@ -246,6 +275,9 @@ function StandingsRow({
           >
             {standing.teamName ?? `Team ${standing.teamId}`}
           </Text>
+          {standing.clinchStatus ? (
+            <ClinchBadge status={standing.clinchStatus} />
+          ) : null}
           {isCurrentUser ? (
             <Text
               flexShrink={0}

@@ -44,6 +44,12 @@ export interface TeamStanding {
   divisionId?: number | null;
   /** Human-readable division label (e.g. "Division 1"); null when no divisions */
   divisionName?: string | null;
+  /**
+   * Playoff seeding indicator (LS-6345). Null until the league is in its
+   * late-season window (see `computeClinchStatuses`) — no badge should
+   * render for a null value.
+   */
+  clinchStatus?: ClinchStatus | null;
 }
 
 /**
@@ -622,6 +628,59 @@ export interface PlayoffQualification {
   isQualified: boolean;
   seedNumber: number | null;
   standing: TeamStanding;
+}
+
+/**
+ * Playoff seeding indicator shown on the standings table (LS-6345).
+ * `CLINCHED` — mathematically guaranteed a playoff spot; `IN` — currently
+ * holds a playoff spot but could still be caught; `OUT` — currently outside
+ * the playoff line.
+ */
+export type ClinchStatus = 'CLINCHED' | 'IN' | 'OUT';
+
+/**
+ * Deterministic (non-probabilistic) playoff clinch computation.
+ *
+ * A team holding a playoff spot is `CLINCHED` once no team currently outside
+ * the playoff line could catch it even by winning every one of its remaining
+ * matchups; every other playoff-spot team is `IN`, and every team below the
+ * cutoff is `OUT`. Ties are resolved the same way `calculateStandings` ranks
+ * them (win percentage, then points for), so `rank` alone determines the
+ * cutoff line — no separate tiebreak logic is needed here.
+ *
+ * @param standings Teams with their current `rank` (1-based, best first) and
+ *   `wins`, as produced by `calculateStandings`.
+ * @param remainingMatchupsByTeam Regular-season matchups each team has left
+ *   to play.
+ * @param playoffSpots Number of teams that make the playoffs.
+ */
+export function computeClinchStatuses(
+  standings: Array<Pick<TeamStanding, 'teamId' | 'wins' | 'rank'>>,
+  remainingMatchupsByTeam: Map<number, number>,
+  playoffSpots: number,
+): Map<number, ClinchStatus> {
+  const result = new Map<number, ClinchStatus>();
+  if (playoffSpots <= 0 || standings.length === 0) return result;
+
+  const chasers = standings.filter(
+    (s) => s.rank == null || s.rank > playoffSpots,
+  );
+  const maxChaserPossibleWins = chasers.reduce(
+    (max, s) =>
+      Math.max(max, s.wins + (remainingMatchupsByTeam.get(s.teamId) ?? 0)),
+    -Infinity,
+  );
+
+  for (const team of standings) {
+    if (team.rank == null || team.rank > playoffSpots) {
+      result.set(team.teamId, 'OUT');
+      continue;
+    }
+    const clinched = chasers.length === 0 || team.wins > maxChaserPossibleWins;
+    result.set(team.teamId, clinched ? 'CLINCHED' : 'IN');
+  }
+
+  return result;
 }
 
 export async function getPlayoffQualifications(
