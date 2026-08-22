@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Button, Spinner, Text, YStack } from 'tamagui';
+import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { ShoppingCart } from '@tamagui/lucide-icons/icons/ShoppingCart';
 import { Alert, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
@@ -20,6 +20,7 @@ import {
   PendingTradeOfferBanner,
   PendingWaiverClaims,
   PlayoffBracket,
+  SegmentedControl,
   StandingsTable,
   TradingCenter,
   usePlayoffBracket,
@@ -88,6 +89,10 @@ export default function FootballLeagueId(): React.JSX.Element {
   const initialTab =
     typeof params.initialTab === 'string' ? params.initialTab : undefined;
   const [selectedTab, setSelectedTab] = useState(initialTab ?? 'overview');
+  // Matchups tab list/bracket toggle (FLD-017): the flat matchup list gives
+  // no visibility into the premium playoff bracket structure during playoff
+  // weeks, so a bracket view is offered alongside it once one exists.
+  const [matchupsView, setMatchupsView] = useState<'list' | 'bracket'>('list');
   // View-as role preference (in-memory; mirrors web v2's derive-from-perms
   // logic). `null` means "follow the user's actual highest role".
   const [rolePref, setRolePref] = useState<LeagueRole | null>(null);
@@ -210,6 +215,12 @@ export default function FootballLeagueId(): React.JSX.Element {
   }, [leagueData?.league, userInfo]);
 
   const league = leagueData?.league;
+
+  // FLD-017: the premium 6/8-team playoff format is otherwise invisible in
+  // the Matchups tab — only offer the bracket view once the league has a
+  // format configured and the bracket has actually seeded matchups.
+  const hasPlayoffBracket =
+    !!league?.playoffFormat && (playoffBracket?.matchups?.length ?? 0) > 0;
 
   // Bridge native's league WebSocket to TradingCenter's refetch. TradingCenter
   // registers its refetch via `onSubscribeRefresh`; we stash it in a ref and
@@ -592,24 +603,50 @@ export default function FootballLeagueId(): React.JSX.Element {
 
         {selectedTab === 'matchups' && (
           <YStack flex={1}>
-            <MatchupList
-              matchups={matchups}
-              loading={matchupsLoading}
-              emptyMessage="No matchups found for this league"
-              onMatchupPress={(matchup) => {
-                if (matchup.id != null) {
-                  router.navigate({
-                    pathname: '/football/matchup',
-                    params: {
-                      matchupId: String(matchup.id),
-                      leagueId: String(numLeagueId),
-                    },
-                  });
-                }
-              }}
-              refreshing={matchupsRefresh.refreshing}
-              onRefresh={matchupsRefresh.onRefresh}
-            />
+            {hasPlayoffBracket && (
+              <XStack paddingHorizontal="$3" paddingTop="$3" paddingBottom="$1">
+                <SegmentedControl
+                  size="sm"
+                  options={[
+                    { value: 'list', label: 'List' },
+                    { value: 'bracket', label: 'Bracket' },
+                  ]}
+                  value={matchupsView}
+                  onValueChange={(value) =>
+                    setMatchupsView(value === 'bracket' ? 'bracket' : 'list')
+                  }
+                />
+              </XStack>
+            )}
+            {hasPlayoffBracket &&
+            matchupsView === 'bracket' &&
+            playoffBracket ? (
+              <ScrollView
+                contentContainerStyle={{ padding: 8 }}
+                refreshControl={matchupsRefresh.refreshControl}
+              >
+                <PlayoffBracket bracket={playoffBracket} />
+              </ScrollView>
+            ) : (
+              <MatchupList
+                matchups={matchups}
+                loading={matchupsLoading}
+                emptyMessage="No matchups found for this league"
+                onMatchupPress={(matchup) => {
+                  if (matchup.id != null) {
+                    router.navigate({
+                      pathname: '/football/matchup',
+                      params: {
+                        matchupId: String(matchup.id),
+                        leagueId: String(numLeagueId),
+                      },
+                    });
+                  }
+                }}
+                refreshing={matchupsRefresh.refreshing}
+                onRefresh={matchupsRefresh.onRefresh}
+              />
+            )}
           </YStack>
         )}
 

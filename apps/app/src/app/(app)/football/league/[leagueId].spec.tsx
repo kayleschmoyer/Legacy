@@ -172,6 +172,28 @@ jest.mock('@legacy-sports/shared-components', () => {
       return <View testID="pending-waiver-claims" />;
     },
     PlayoffBracket: () => <View testID="playoff-bracket" />,
+    SegmentedControl: ({
+      options,
+      value,
+      onValueChange,
+    }: {
+      options: Array<{ value: string; label: string }>;
+      value: string;
+      onValueChange: (value: string) => void;
+    }) => (
+      <View testID="matchups-view-toggle">
+        {options.map((opt) => (
+          <TouchableOpacity
+            key={opt.value}
+            testID={`matchups-view-toggle-${opt.value}`}
+            onPress={() => onValueChange(opt.value)}
+          >
+            <Text>{opt.label}</Text>
+          </TouchableOpacity>
+        ))}
+        <Text testID="matchups-view-toggle-value">{value}</Text>
+      </View>
+    ),
     StandingsTable: () => <View testID="standings-table" />,
     TradingCenter: (props: {
       onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
@@ -725,6 +747,73 @@ describe('FootballLeagueId', () => {
       expect(mockNavigate).toHaveBeenCalledWith(
         expect.objectContaining({ pathname: '/FreeAgents' }),
       );
+    });
+  });
+
+  describe('matchups tab playoff bracket toggle (FLD-017)', () => {
+    const mockPlayoffBracket = {
+      season: 2026,
+      format: '6-team',
+      matchups: [{ id: 1, round: 'semifinals', matchupNumber: 1 }],
+    };
+
+    function mockUsePlayoffBracket(bracket: typeof mockPlayoffBracket | null) {
+      jest
+        .requireMock<{
+          usePlayoffBracket: jest.Mock;
+        }>('@legacy-sports/shared-components')
+        .usePlayoffBracket.mockReturnValue({
+          bracket,
+          loading: false,
+          error: undefined,
+          refetch: jest.fn(),
+        });
+    }
+
+    it('does not render the view toggle when the league has no playoff format', () => {
+      mockUsePlayoffBracket(mockPlayoffBracket);
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      expect(screen.queryByTestId('matchups-view-toggle')).toBeNull();
+      expect(screen.getByTestId('matchup-list')).toBeTruthy();
+    });
+
+    it('does not render the view toggle when the bracket has no seeded matchups', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, playoffFormat: '6-team' } },
+        loading: false,
+      });
+      mockUsePlayoffBracket({ ...mockPlayoffBracket, matchups: [] });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      expect(screen.queryByTestId('matchups-view-toggle')).toBeNull();
+      expect(screen.getByTestId('matchup-list')).toBeTruthy();
+    });
+
+    it('renders the view toggle, defaulting to the flat list, once the league has a seeded playoff bracket', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, playoffFormat: '6-team' } },
+        loading: false,
+      });
+      mockUsePlayoffBracket(mockPlayoffBracket);
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      expect(screen.getByTestId('matchups-view-toggle')).toBeTruthy();
+      expect(screen.getByTestId('matchup-list')).toBeTruthy();
+      expect(screen.queryByTestId('playoff-bracket')).toBeNull();
+    });
+
+    it('switches to the bracket view on toggle, replacing the flat list', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, playoffFormat: '6-team' } },
+        loading: false,
+      });
+      mockUsePlayoffBracket(mockPlayoffBracket);
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      fireEvent.press(screen.getByTestId('matchups-view-toggle-bracket'));
+      expect(screen.getByTestId('playoff-bracket')).toBeTruthy();
+      expect(screen.queryByTestId('matchup-list')).toBeNull();
     });
   });
 
