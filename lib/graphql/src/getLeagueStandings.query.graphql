@@ -1,5 +1,5 @@
-query GetLeagueStandings($leagueId: Int!) {
-  getLeagueStandings(leagueId: $leagueId) {
+query GetLeagueStandings($leagueId: Int!, $throughWeek: Int) {
+  getLeagueStandings(leagueId: $leagueId, throughWeek: $throughWeek) {
     teamId
     teamName
     wins

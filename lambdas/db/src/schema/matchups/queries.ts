@@ -167,6 +167,9 @@ builder.queryField('getLeagueStandings', (t) =>
     args: {
       leagueId: t.arg.int({ required: true }),
       season: t.arg.int({ required: false }),
+      // Historical standings: when set, only matchups through this week
+      // (inclusive) count toward the record — "standings as of Week N" (LS-6341).
+      throughWeek: t.arg.int({ required: false }),
     },
     resolve: async (parent, args, context) => {
       if (!context.user) {
@@ -179,6 +182,7 @@ builder.queryField('getLeagueStandings', (t) =>
       const standings = await StandingsService.getStandings(context.db, {
         leagueId: args.leagueId,
         season: args.season,
+        throughWeek: args.throughWeek,
       });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return -- GraphQL builder type inference issue with optional rank field

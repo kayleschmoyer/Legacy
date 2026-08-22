@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   PlayoffBracket,
   StandingsTable,
@@ -7,9 +7,10 @@ import {
   type LeagueFragment,
   Sport,
   type TeamFragment,
-  useGetLeagueStandingsQuery,
   useGetPlayoffBracketQuery,
 } from '@legacy-sports/graphql';
+import { useCurrentWeek } from '../../../../hooks/useMatchup';
+import { useStandings } from '../../../../hooks/useStandings';
 
 export interface StandingsTabProps {
   league: LeagueFragment;
@@ -25,15 +26,23 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
   onTeam,
 }) => {
   const isFootball = league.sport === Sport.Football;
-  const { data: standingsData, loading: standingsLoading } =
-    useGetLeagueStandingsQuery({
-      variables: { leagueId: league.id ?? 0 },
-      skip: !league.id,
-      errorPolicy: 'all',
-    });
-  const standings = useMemo(
-    () => standingsData?.getLeagueStandings ?? [],
-    [standingsData?.getLeagueStandings],
+  const { currentWeek } = useCurrentWeek(league.id ?? null);
+
+  // null = current (live) standings; a number pins the view to "as of Week N".
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+
+  const weekOptions = useMemo(
+    () =>
+      currentWeek != null && currentWeek > 0
+        ? Array.from({ length: currentWeek }, (_, i) => i + 1)
+        : [],
+    [currentWeek],
+  );
+
+  const { standings, loading: standingsLoading } = useStandings(
+    league.id,
+    selectedWeek,
+    { errorPolicy: 'all' },
   );
 
   const { data: bracketData } = useGetPlayoffBracketQuery({
@@ -78,14 +87,48 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
     return map;
   }, [showWaiverOrder, teams]);
 
+  const asOfSuffix =
+    selectedWeek != null ? ` · As of Week ${selectedWeek}` : '';
   const subtitle = standingsLoading
     ? 'Loading…'
     : isFootball
-      ? `${standingsForTable.length} teams · Sorted by W, then PF`
-      : `${standingsForTable.length} teams · Sorted by win percentage`;
+      ? `${standingsForTable.length} teams · Sorted by W, then PF${asOfSuffix}`
+      : `${standingsForTable.length} teams · Sorted by win percentage${asOfSuffix}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {weekOptions.length > 0 ? (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 8,
+          }}
+        >
+          <label htmlFor="standings-week-selector" style={{ fontSize: 13 }}>
+            Standings as of
+          </label>
+          <select
+            id="standings-week-selector"
+            className="ls-select"
+            aria-label="Select week for historical standings"
+            value={selectedWeek ?? 'current'}
+            onChange={(e) => {
+              const { value } = e.target;
+              setSelectedWeek(value === 'current' ? null : Number(value));
+            }}
+          >
+            <option value="current">Current</option>
+            {weekOptions.map((week) => (
+              <option key={week} value={week}>
+                Week {week}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
       <StandingsTable
         standings={standingsForTable}
         loading={standingsLoading}

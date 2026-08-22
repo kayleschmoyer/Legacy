@@ -10,15 +10,15 @@
  * All GraphQL queries are mocked (route.fulfill only — no route.continue()),
  * so this spec runs without a live backend.
  *
- * Two feature.md-listed behaviors are NOT covered here because the
- * underlying functionality does not exist yet:
+ * One feature.md-listed behavior is NOT covered here because the underlying
+ * functionality does not exist yet:
  *   - "click team to view roster": Standings.tsx hardcodes
  *     `getTeamUrl={(teamId) => \`/baseball/teams/${teamId}\`}` for every
  *     sport, and no `/football/teams/:teamId` route is registered in
  *     app.tsx — filed as a bug under LS-5268.
- *   - "week selector for historical standings": no such control exists
- *     anywhere in the Standings tab or its shared StandingsTable component —
- *     filed as a bug under LS-5268.
+ *
+ * The week selector for historical ("as of Week N") standings is covered
+ * below (LS-6341).
  */
 
 import { expect, test } from '../fixtures/pages';
@@ -156,6 +156,7 @@ const MOCK_POSITIONS = [
 interface MockOverrides {
   league?: Record<string, unknown>;
   standings?: typeof MOCK_STANDINGS;
+  currentWeek?: number | null;
 }
 
 async function mockFootballStandings(
@@ -164,6 +165,8 @@ async function mockFootballStandings(
 ) {
   const league = makeFootballLeague(overrides.league);
   const standings = overrides.standings ?? MOCK_STANDINGS;
+  const currentWeek =
+    overrides.currentWeek === undefined ? 5 : overrides.currentWeek;
 
   await createGraphQLRouter(page, {
     getleaguebyid: (route) => fulfillJson(route, { data: { league } }),
@@ -174,6 +177,8 @@ async function mockFootballStandings(
       fulfillJson(route, { data: { getLeagueStandings: standings } }),
     leaguestandings: (route) =>
       fulfillJson(route, { data: { getLeagueStandings: standings } }),
+    getcurrentweekforleague: (route) =>
+      fulfillJson(route, { data: { getCurrentWeekForLeague: currentWeek } }),
     getpositionsforleague: (route) =>
       fulfillJson(route, { data: { leaguePositions: MOCK_POSITIONS } }),
     getuserteamid: (route) => fulfillJson(route, { data: { userTeamId: 1 } }),
@@ -277,5 +282,65 @@ test.describe('Football Standings Tab — division grouping @regression', () => 
 
     // Each division's own teams render (spot-check the AFC East member).
     await standingsPage.team('Southgate Marauders').expectVisible();
+  });
+});
+
+// ── Standings Tab — historical week selector (LS-6341) ────────────────────────
+
+test.describe('Football Standings Tab — week selector @regression', () => {
+  test('renders a week selector once the league has a current week', async ({
+    page,
+    standingsPage,
+  }) => {
+    await mockFootballStandings(page, { currentWeek: 4 });
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    const selector = page.getByLabel('Select week for historical standings');
+    await expect(selector).toBeVisible();
+    await expect(selector.locator('option')).toHaveText([
+      'Current',
+      'Week 1',
+      'Week 2',
+      'Week 3',
+      'Week 4',
+    ]);
+  });
+
+  test('does not render a week selector before the league has a current week', async ({
+    page,
+    standingsPage,
+  }) => {
+    await mockFootballStandings(page, { currentWeek: null });
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    await expect(
+      page.getByLabel('Select week for historical standings'),
+    ).toHaveCount(0);
+  });
+
+  test('re-fetches standings scoped to the selected week and labels the subtitle', async ({
+    page,
+    standingsPage,
+  }) => {
+    await mockFootballStandings(page, { currentWeek: 4 });
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    const requestPromise = page.waitForRequest((req) => {
+      if (!req.url().includes('/graphql')) return false;
+      const body = req.postDataJSON() as {
+        variables?: { throughWeek?: number | null };
+      } | null;
+      return (body?.variables?.throughWeek ?? null) === 2;
+    });
+
+    await page
+      .getByLabel('Select week for historical standings')
+      .selectOption('2');
+
+    await requestPromise;
+    await expect(page.getByText(/As of Week 2/)).toBeVisible();
   });
 });

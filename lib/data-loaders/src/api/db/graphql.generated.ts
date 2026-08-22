@@ -3669,6 +3669,7 @@ export type QueryGetLeagueMessagesArgs = {
 export type QueryGetLeagueStandingsArgs = {
   leagueId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
+  throughWeek?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetMatchupByIdArgs = {

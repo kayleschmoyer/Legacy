@@ -40,6 +40,8 @@ export interface GetStandingsParams {
   season?: number | null;
   sortBy?: 'winPercentage' | 'pointsFor' | 'pointsAgainst';
   ascending?: boolean;
+  /** When set, only matchups through this week (inclusive) count — "standings as of Week N". */
+  throughWeek?: number | null;
 }
 
 export interface GetHeadToHeadParams {
@@ -78,11 +80,12 @@ export class StandingsService {
       season: _season,
       sortBy = 'winPercentage',
       ascending = false,
+      throughWeek,
     } = params;
 
     // Note: Season parameter preserved for API compatibility but ignored
     // Standings are now calculated across all seasons
-    const standings = await calculateStandings(db, leagueId);
+    const standings = await calculateStandings(db, leagueId, { throughWeek });
 
     // Apply custom sorting if needed
     if (sortBy !== 'winPercentage') {

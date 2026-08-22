@@ -203,6 +203,42 @@ function buildStandingsMockDb(
   ]);
 }
 
+/**
+ * Recursively check whether a drizzle SQL condition object references a
+ * given DB column name (e.g. "week_number"). Walks queryChunks/column
+ * structures directly rather than JSON.stringify-ing, since drizzle's SQL
+ * objects contain circular references (Column -> Table -> Column).
+ */
+function sqlConditionMentionsColumn(
+  value: unknown,
+  columnName: string,
+  seen = new Set<unknown>(),
+): boolean {
+  if (value == null || typeof value !== 'object') return false;
+  if (seen.has(value)) return false;
+  seen.add(value);
+
+  if ((value as { name?: unknown }).name === columnName) return true;
+
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    // Skip the Column -> Table back-reference: every column on the table
+    // (including unrelated ones) is reachable through it, which would make
+    // this check match columns that aren't actually part of the condition.
+    if (key === 'table') continue;
+    if (Array.isArray(child)) {
+      if (child.some((c) => sqlConditionMentionsColumn(c, columnName, seen)))
+        return true;
+    } else if (
+      child != null &&
+      typeof child === 'object' &&
+      sqlConditionMentionsColumn(child, columnName, seen)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 describe('Matchup History', () => {
   let mockDb: any;
 
@@ -559,6 +595,64 @@ describe('Matchup History', () => {
       expect(standings).toHaveLength(2);
       const teamA = standings.find((s) => s.teamId === 1);
       expect(teamA?.winPercentage).toBe(0.5); // 1 win, 1 loss = 50%
+    });
+
+    // LS-6341: historical "standings as of Week N".
+    it('scopes the matchups query to weekNumber <= throughWeek when provided', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+      ];
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
+      await calculateStandings(mockDb, 1, { throughWeek: 3 });
+
+      // The matchups query is the second `.where(...)` call (after teams).
+      const matchupsWhereArg =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- test mock is typed any
+        mockDb.select.mock.results[1].value.where.mock.calls[0][0];
+      expect(sqlConditionMentionsColumn(matchupsWhereArg, 'week_number')).toBe(
+        true,
+      );
+    });
+
+    it('does not scope by week when throughWeek is omitted', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+      ];
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
+      await calculateStandings(mockDb, 1);
+
+      const matchupsWhereArg =
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- test mock is typed any
+        mockDb.select.mock.results[1].value.where.mock.calls[0][0];
+      expect(sqlConditionMentionsColumn(matchupsWhereArg, 'week_number')).toBe(
+        false,
+      );
     });
 
     it('should handle ties in win percentage calculation', async () => {

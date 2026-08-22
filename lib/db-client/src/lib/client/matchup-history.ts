@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, lte, or, sql } from 'drizzle-orm';
 import { applyScoring } from '@legacy-sports/utils';
 import { getScoringMultipliersForLeague, PublicDb } from './PublicDbClient';
 import * as Schema from '../../drizzle/public/schema';
@@ -224,7 +224,9 @@ function camelCaseMultipliers(
 }
 
 /**
- * In-flight promise cache for calculateStandings, keyed by db instance → leagueId.
+ * In-flight promise cache for calculateStandings, keyed by db instance →
+ * leagueId → cache key (leagueId alone for current standings, or
+ * `${leagueId}:${throughWeek}` for a historical "as of Week N" view).
  *
  * Purpose: deduplicate concurrent calls within the same request lifecycle
  * (e.g. multiple GraphQL resolvers asking for the same league's standings).
@@ -233,16 +235,21 @@ function camelCaseMultipliers(
  */
 const standingsInFlight = new WeakMap<
   object,
-  Map<number, Promise<TeamStanding[]>>
+  Map<string, Promise<TeamStanding[]>>
 >();
 
-function getInFlightCache(db: object): Map<number, Promise<TeamStanding[]>> {
+function getInFlightCache(db: object): Map<string, Promise<TeamStanding[]>> {
   let cache = standingsInFlight.get(db);
   if (!cache) {
     cache = new Map();
     standingsInFlight.set(db, cache);
   }
   return cache;
+}
+
+export interface CalculateStandingsOptions {
+  /** When set, only matchups through this week (inclusive) count — "standings as of Week N". */
+  throughWeek?: number | null;
 }
 
 /**
@@ -253,23 +260,30 @@ function getInFlightCache(db: object): Map<number, Promise<TeamStanding[]>> {
  * Points accumulate from BOTH completed AND in-progress matchups.
  * Win/loss/tie record is determined only from completed matchups.
  *
- * Concurrent calls with the same db + leagueId share a single in-flight
- * promise, eliminating redundant DB queries within a single request.
+ * When `throughWeek` is set, only matchups with `weekNumber <= throughWeek`
+ * are considered, producing historical standings as of that week.
+ *
+ * Concurrent calls with the same db + leagueId + throughWeek share a single
+ * in-flight promise, eliminating redundant DB queries within a single request.
  */
 export function calculateStandings(
   db: PublicDb,
   leagueId: number,
+  options?: CalculateStandingsOptions,
 ): Promise<TeamStanding[]> {
+  const throughWeek = options?.throughWeek ?? null;
   const cache = getInFlightCache(db);
-  const existing = cache.get(leagueId);
+  const cacheKey =
+    throughWeek != null ? `${leagueId}:${throughWeek}` : `${leagueId}`;
+  const existing = cache.get(cacheKey);
   if (existing) return existing;
 
-  const promise = _computeStandings(db, leagueId);
-  cache.set(leagueId, promise);
+  const promise = _computeStandings(db, leagueId, throughWeek);
+  cache.set(cacheKey, promise);
   // Remove from cache once settled so the next request always fetches fresh data.
   promise.then(
-    () => cache.delete(leagueId),
-    () => cache.delete(leagueId),
+    () => cache.delete(cacheKey),
+    () => cache.delete(cacheKey),
   );
   return promise;
 }
@@ -277,6 +291,7 @@ export function calculateStandings(
 async function _computeStandings(
   db: PublicDb,
   leagueId: number,
+  throughWeek: number | null,
 ): Promise<TeamStanding[]> {
   // Get all teams in the league
   const teams = await db
@@ -339,19 +354,22 @@ async function _computeStandings(
     fielding: camelCaseMultipliers(rawMultipliers.fielding),
   };
 
-  // Get all completed + in_progress matchups for the league
+  // Get all completed + in_progress matchups for the league, optionally
+  // bounded to weeks through `throughWeek` for a historical "as of" view.
+  const matchupConditions = [
+    eq(Schema.matchups.leagueId, leagueId),
+    or(
+      eq(Schema.matchups.status, 'completed'),
+      eq(Schema.matchups.status, 'in_progress'),
+    ),
+  ];
+  if (throughWeek != null) {
+    matchupConditions.push(lte(Schema.matchups.weekNumber, throughWeek));
+  }
   const matchups = await db
     .select()
     .from(Schema.matchups)
-    .where(
-      and(
-        eq(Schema.matchups.leagueId, leagueId),
-        or(
-          eq(Schema.matchups.status, 'completed'),
-          eq(Schema.matchups.status, 'in_progress'),
-        ),
-      ),
-    );
+    .where(and(...matchupConditions));
 
   const matchupIds = matchups.map((m) => m.id);
   if (matchupIds.length === 0) {

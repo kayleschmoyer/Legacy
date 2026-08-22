@@ -7,12 +7,13 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- test mocks use any */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { StandingsTab } from './Standings';
 
 let mockStandings: ReadonlyArray<Record<string, unknown>> = [];
 let mockBracket: Record<string, unknown> | null = null;
+let mockCurrentWeek: number | null = null;
 
 const mockStandingsTable = jest.fn(() => null);
 jest.mock('@legacy-sports/shared-components', () => ({
@@ -20,15 +21,21 @@ jest.mock('@legacy-sports/shared-components', () => ({
   PlayoffBracket: jest.fn(() => <div data-testid="playoff-bracket" />),
 }));
 
+const mockUseGetLeagueStandingsQuery = jest.fn((_args?: unknown) => ({
+  data: { getLeagueStandings: mockStandings },
+  loading: false,
+}));
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
-  useGetLeagueStandingsQuery: jest.fn(() => ({
-    data: { getLeagueStandings: mockStandings },
-    loading: false,
-  })),
+  useGetLeagueStandingsQuery: (args?: unknown) =>
+    mockUseGetLeagueStandingsQuery(args),
   useGetPlayoffBracketQuery: jest.fn(() => ({
     data: { getPlayoffBracket: mockBracket },
   })),
+}));
+
+jest.mock('../../../../hooks/useMatchup', () => ({
+  useCurrentWeek: () => ({ currentWeek: mockCurrentWeek }),
 }));
 
 const league = {
@@ -58,7 +65,9 @@ const makeRow = (overrides: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   mockStandings = [];
   mockBracket = null;
+  mockCurrentWeek = null;
   mockStandingsTable.mockClear();
+  mockUseGetLeagueStandingsQuery.mockClear();
 });
 
 describe('StandingsTab', () => {
@@ -233,5 +242,109 @@ describe('StandingsTab', () => {
     );
     const subtitle = mockStandingsTable.mock.calls[0][0].subtitle as string;
     expect(subtitle).not.toContain('Single elimination');
+  });
+
+  // LS-6341: historical "as of Week N" standings via a week selector.
+  describe('week selector', () => {
+    it('does not render a week selector when the league has no current week yet', () => {
+      mockCurrentWeek = null;
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={league}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      expect(
+        screen.queryByLabelText('Select week for historical standings'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('renders a week selector with options 1..currentWeek plus Current', () => {
+      mockCurrentWeek = 3;
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={league}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      const select = screen.getByLabelText(
+        'Select week for historical standings',
+      );
+      const optionValues = Array.from(select.querySelectorAll('option')).map(
+        (o) => o.value,
+      );
+      expect(optionValues).toEqual(['current', '1', '2', '3']);
+    });
+
+    it('defaults to current standings (throughWeek: null)', () => {
+      mockCurrentWeek = 3;
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={league}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      expect(mockUseGetLeagueStandingsQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variables: expect.objectContaining({ throughWeek: null }),
+        }),
+      );
+    });
+
+    it('re-queries standings with the selected week as throughWeek', () => {
+      mockCurrentWeek = 5;
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={league}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+
+      const select = screen.getByLabelText(
+        'Select week for historical standings',
+      );
+      fireEvent.change(select, { target: { value: '2' } });
+
+      expect(mockUseGetLeagueStandingsQuery).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          variables: expect.objectContaining({ throughWeek: 2 }),
+        }),
+      );
+    });
+
+    it('includes "As of Week N" in the subtitle once a historical week is selected', () => {
+      mockCurrentWeek = 5;
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={league}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+
+      const select = screen.getByLabelText(
+        'Select week for historical standings',
+      );
+      fireEvent.change(select, { target: { value: '4' } });
+
+      const subtitle = mockStandingsTable.mock.calls[
+        mockStandingsTable.mock.calls.length - 1
+      ][0].subtitle as string;
+      expect(subtitle).toContain('As of Week 4');
+    });
   });
 });

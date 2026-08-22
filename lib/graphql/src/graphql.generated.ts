@@ -3675,6 +3675,7 @@ export type QueryGetLeagueMessagesArgs = {
 export type QueryGetLeagueStandingsArgs = {
   leagueId: Scalars['Int']['input'];
   season?: InputMaybe<Scalars['Int']['input']>;
+  throughWeek?: InputMaybe<Scalars['Int']['input']>;
 };
 
 export type QueryGetMatchupByIdArgs = {
@@ -10909,6 +10910,7 @@ export type GetLeagueByIdQuery = {
 
 export type GetLeagueStandingsQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
+  throughWeek?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type GetLeagueStandingsQuery = {
@@ -27138,8 +27140,8 @@ export type GetLeagueByIdQueryResult = Apollo.QueryResult<
   GetLeagueByIdQueryVariables
 >;
 export const GetLeagueStandings = gql`
-  query GetLeagueStandings($leagueId: Int!) {
-    getLeagueStandings(leagueId: $leagueId) {
+  query GetLeagueStandings($leagueId: Int!, $throughWeek: Int) {
+    getLeagueStandings(leagueId: $leagueId, throughWeek: $throughWeek) {
       teamId
       teamName
       wins
@@ -27171,6 +27173,7 @@ export const GetLeagueStandings = gql`
  * const { data, loading, error } = useGetLeagueStandingsQuery({
  *   variables: {
  *      leagueId: // value for 'leagueId'
+ *      throughWeek: // value for 'throughWeek'
  *   },
  * });
  */
