@@ -6787,7 +6787,6 @@ export type ValidateInviteCodeQuery = {
 export type GetPublicLeaguesQueryVariables = Exact<{
   sport?: InputMaybe<Sport>;
   search?: InputMaybe<Scalars['String']['input']>;
-  sport?: InputMaybe<Sport>;
   draftStatus?: InputMaybe<Scalars['String']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -19350,7 +19349,6 @@ export const GetPublicLeagues = gql`
   query GetPublicLeagues(
     $sport: Sport
     $search: String
-    $sport: Sport
     $draftStatus: String
     $playerPool: String
     $limit: Int
@@ -19359,7 +19357,6 @@ export const GetPublicLeagues = gql`
     publicLeagues(
       sport: $sport
       search: $search
-      sport: $sport
       draftStatus: $draftStatus
       playerPool: $playerPool
       limit: $limit
@@ -19395,7 +19392,6 @@ export const GetPublicLeagues = gql`
  *   variables: {
  *      sport: // value for 'sport'
  *      search: // value for 'search'
- *      sport: // value for 'sport'
  *      draftStatus: // value for 'draftStatus'
  *      playerPool: // value for 'playerPool'
  *      limit: // value for 'limit'

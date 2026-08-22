@@ -100,9 +100,21 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Alpha League').first()).toBeVisible();
-    await expect(page.getByText('Beta League').first()).toBeVisible();
-    await expect(page.getByText('Gamma League').first()).toBeVisible();
+    // getByText('Alpha League') is ambiguous — the same name also appears in
+    // the header's "Current league" switcher (hidden behind the collapsed
+    // mobile nav menu at this viewport), and .first() picks whichever DOM
+    // node happens to exist first, which is a race unrelated to this test's
+    // intent. Scope to the heading role — only the league card renders an
+    // <h3>, so this reliably targets the visible card (LS-6284 review).
+    await expect(
+      page.getByRole('heading', { name: 'Alpha League' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Beta League' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Gamma League' }),
+    ).toBeVisible();
   });
 
   test('"Your Leagues" section heading is visible for a free-tier user with three leagues', async ({
@@ -144,9 +156,17 @@ test.describe('Baseball Home — league slots context (LS-5339) @regression', ()
     await page.goto('/baseball');
     await page.waitForLoadState('load');
 
-    await expect(page.getByText('Alpha League').first()).toBeVisible();
-    await expect(page.getByText('Beta League').first()).toBeVisible();
-    await expect(page.getByText('Gamma League').first()).toBeVisible();
+    // See the free-tier variant of this test above for why the heading role
+    // (not getByText().first()) is required here.
+    await expect(
+      page.getByRole('heading', { name: 'Alpha League' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Beta League' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Gamma League' }),
+    ).toBeVisible();
   });
 
   test('premium user sees "Unlimited leagues" badge on the baseball home page', async ({

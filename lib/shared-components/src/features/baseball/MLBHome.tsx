@@ -19,6 +19,12 @@ import {
   type QuickCreateLeagueInput,
 } from './CreateLeagueDialog';
 import {
+  readBaseballHomeSearch,
+  readBaseballHomeShowArchived,
+  writeBaseballHomeSearch,
+  writeBaseballHomeShowArchived,
+} from './baseballHomeSessionState';
+import {
   AMBER_LIGHT,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -290,15 +296,28 @@ export function MLBHome({
   refreshControl,
 }: MLBHomeProps) {
   const [showCreateDialog, setShowCreateDialog] = React.useState(false);
-  const [search, setSearch] = React.useState('');
-  const [debouncedSearch, setDebouncedSearch] = React.useState('');
-  const [showArchived, setShowArchived] = React.useState(false);
+  // Seeded from sessionStorage so switching sport and back (a full unmount —
+  // LS-5815's onSwitchSport routes to /football) restores what the user had
+  // typed/toggled instead of silently resetting it (LS-6284 / FBH-030).
+  const [search, setSearch] = React.useState(readBaseballHomeSearch);
+  const [debouncedSearch, setDebouncedSearch] = React.useState(search);
+  const [showArchived, setShowArchived] = React.useState(
+    readBaseballHomeShowArchived,
+  );
   const [roleFilter, setRoleFilter] = React.useState<RoleFilter>('all');
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 200);
     return () => clearTimeout(timer);
   }, [search]);
+
+  React.useEffect(() => {
+    writeBaseballHomeSearch(search);
+  }, [search]);
+
+  React.useEffect(() => {
+    writeBaseballHomeShowArchived(showArchived);
+  }, [showArchived]);
 
   const activeLeagues = leagues.filter((l) => !l.tierFrozenAt && !l.frozenAt);
   const archivedLeagues = leagues.filter(

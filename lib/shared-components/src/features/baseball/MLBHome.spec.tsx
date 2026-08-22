@@ -152,6 +152,10 @@ const baseProps = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // MLBHome seeds search/showArchived from sessionStorage (LS-6284) so state
+  // survives a sport-switch remount — clear it between tests so one test's
+  // typed search doesn't leak into the next as an initial value.
+  sessionStorage.clear();
 });
 
 describe('MLBHome', () => {
@@ -269,6 +273,42 @@ describe('MLBHome', () => {
     expect(screen.getByText('Saturday Sluggers')).toBeInTheDocument();
     expect(screen.queryByText('Sunday Stars')).not.toBeInTheDocument();
     jest.useRealTimers();
+  });
+
+  it('restores a previously entered search term across a remount (LS-6284 / FBH-030)', () => {
+    // Simulates switching sport and back: MLBHome unmounts (LS-5815's
+    // onSwitchSport routes to /football) and remounts fresh.
+    jest.useFakeTimers();
+    const { unmount } = render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
+      target: { value: 'Saturday' },
+    });
+    unmount();
+
+    render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    expect(screen.getByPlaceholderText(/Search leagues/i)).toHaveValue(
+      'Saturday',
+    );
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    expect(screen.getByText('Saturday Sluggers')).toBeInTheDocument();
+    expect(screen.queryByText('Sunday Stars')).not.toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  it('clears the persisted search once the field is emptied', () => {
+    const { unmount } = render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
+      target: { value: 'Saturday' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
+      target: { value: '' },
+    });
+    unmount();
+
+    render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    expect(screen.getByPlaceholderText(/Search leagues/i)).toHaveValue('');
   });
 
   it('shows the error notice (not the empty state) when error is set', () => {
@@ -755,6 +795,18 @@ describe('MLBHome', () => {
     it('does not render the archived section when all leagues are active', () => {
       render(<MLBHome {...baseProps} leagues={LEAGUES} />);
       expect(screen.queryByText(/Archived leagues/)).not.toBeInTheDocument();
+    });
+
+    it('restores an expanded archived section across a remount (LS-6284 / FBH-030)', () => {
+      const { unmount } = render(
+        <MLBHome {...baseProps} leagues={[...LEAGUES, FROZEN_LEAGUE]} />,
+      );
+      fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+      expect(screen.getByText('Frozen Fossils')).toBeInTheDocument();
+      unmount();
+
+      render(<MLBHome {...baseProps} leagues={[...LEAGUES, FROZEN_LEAGUE]} />);
+      expect(screen.getByText('Frozen Fossils')).toBeInTheDocument();
     });
 
     it('does not show frozen leagues in the active league grid', () => {
