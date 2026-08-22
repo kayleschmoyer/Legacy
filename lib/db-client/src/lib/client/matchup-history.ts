@@ -1,4 +1,15 @@
-import { and, desc, eq, inArray, lte, or, sql } from 'drizzle-orm';
+import {
+  and,
+  desc,
+  eq,
+  getTableColumns,
+  inArray,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
+import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { applyScoring } from '@legacy-sports/utils';
 import { getScoringMultipliersForLeague, PublicDb } from './PublicDbClient';
 import * as Schema from '../../drizzle/public/schema';
@@ -224,6 +235,136 @@ function camelCaseMultipliers(
 }
 
 /**
+ * A game-stats table that can be joined on (player_id, game_identifier).
+ * game_batting, game_pitching and game_fielding each carry a composite index
+ * on that pair.
+ */
+type PairJoinableStatsTable = PgTable & {
+  playerId: PgColumn;
+  gameIdentifier: PgColumn;
+};
+
+/**
+ * Project a table's columns under their camelCase property names, so rows from
+ * a raw `db.execute` are shaped exactly like rows from `db.select().from(table)`.
+ *
+ * Derived from the Drizzle schema rather than hardcoded because the underlying
+ * column names diverge between the stats tables (game_batting.game_number vs
+ * game_pitching.game_num), and because `applyScoring` reads camelCase keys.
+ */
+function camelCasedProjection(
+  table: PairJoinableStatsTable,
+  alias: string,
+): SQL {
+  return sql.join(
+    Object.entries(getTableColumns(table)).map(
+      ([property, column]) =>
+        sql`${sql.identifier(alias)}.${sql.identifier(column.name)} AS ${sql.identifier(property)}`,
+    ),
+    sql`, `,
+  );
+}
+
+/**
+ * Fetch every stats row for the (player_id, game_identifier) pairs actually
+ * referenced by a league's completed + in-progress matchups, optionally bounded
+ * to weeks through `throughWeek` for a historical "as of Week N" view.
+ *
+ * LS-9525: the pair list is built in a MATERIALIZED CTE and probed with a
+ * CROSS JOIN LATERAL so the planner drives a nested loop over the existing
+ * `<table>_player_id_game_identifier_idx` index, instead of scanning the whole
+ * stats table as the previous two-independent-IN-lists shape did.
+ *
+ * `OFFSET 0` is the load-bearing part and must not be removed. It is an
+ * optimisation fence that stops the lateral subquery being pulled up and
+ * flattened back into a plain join; it is a semantic no-op (skipping zero
+ * rows). Measured on dev RDS: without it, game_batting still plans as an index
+ * scan, but the smaller game_pitching (148k rows) flattens into a Hash Join
+ * over a full `Seq Scan on game_pitching`.
+ *
+ * MATERIALIZED is kept alongside it deliberately. The two guard different
+ * failure modes -- the fence prevents pull-up, while materialising the CTE
+ * makes the outer join cost against the pair set's own cardinality rather than
+ * an estimate re-derived inside the correlation. On the current dev dataset the
+ * fence alone is enough (a NOT MATERIALIZED variant still plans as an index
+ * scan, though it under-estimates the pair set by ~3.5x); the belt-and-braces
+ * form is what the ticket specified and what is verified below.
+ *
+ * Verified on dev RDS, league 819: `Index Scan using
+ * game_batting_player_id_game_identifier_idx` and `Index Scan using
+ * game_pitching_player_id_game_identifier_idx`, no Seq Scan on either stats
+ * table.
+ */
+async function fetchStatsForLeaguePairs<T extends PairJoinableStatsTable>(
+  db: PublicDb,
+  table: T,
+  leagueId: number,
+  throughWeek: number | null,
+): Promise<T['$inferSelect'][]> {
+  // Must mirror the matchup filter in _computeStandings exactly. If the two
+  // drift, the pair set stops matching the matchups actually being scored and
+  // the fetch silently goes back to over-reading rows the lookups discard.
+  const weekFilter =
+    throughWeek != null
+      ? sql`AND m.${sql.identifier(Schema.matchups.weekNumber.name)} <= ${throughWeek}`
+      : sql``;
+
+  const result = await db.execute<T['$inferSelect']>(sql`
+    WITH pairs AS MATERIALIZED (
+      SELECT DISTINCT mp.player_id, mpg.game_identifier
+      FROM matchups m
+      JOIN matchup_players mp ON mp.matchup_id = m.id
+      JOIN matchup_player_games mpg ON mpg.matchup_player_id = mp.id
+      WHERE m.league_id = ${leagueId}
+        AND m.status IN ('completed', 'in_progress')
+        AND mpg.game_identifier IS NOT NULL
+        ${weekFilter}
+    )
+    SELECT ${camelCasedProjection(table, 'stats')}
+    FROM pairs p
+    CROSS JOIN LATERAL (
+      SELECT *
+      FROM ${table}
+      WHERE ${table.playerId} = p.player_id
+        AND ${table.gameIdentifier} = p.game_identifier
+      OFFSET 0
+    ) stats
+  `);
+
+  return result.rows;
+}
+
+/**
+ * Fetch fielding stats only when game_fielding actually holds data.
+ *
+ * game_fielding is empty in every environment today, so the unconditional
+ * fetch it replaced was pure overhead on every standings computation. The
+ * scoring path in computeTeamMatchupScore is deliberately left in place --
+ * leagues still carry fielding multipliers in their scoring profile, so the
+ * moment fielding rows are ingested they flow through the same pair-join path
+ * with no further code change. The guard is a zero-page existence probe
+ * (game_fielding has relpages = 0), issued in parallel with the batting and
+ * pitching fetches.
+ */
+async function fetchFieldingStatsIfPopulated(
+  db: PublicDb,
+  leagueId: number,
+  throughWeek: number | null,
+): Promise<(typeof Schema.gameFielding)['$inferSelect'][]> {
+  const probe = await db.execute(
+    sql`SELECT 1 FROM ${Schema.gameFielding} LIMIT 1`,
+  );
+  if (probe.rows.length === 0) return [];
+
+  return fetchStatsForLeaguePairs(
+    db,
+    Schema.gameFielding,
+    leagueId,
+    throughWeek,
+  );
+}
+
+/**
  * In-flight promise cache for calculateStandings, keyed by db instance →
  * leagueId → cache key (leagueId alone for current standings, or
  * `${leagueId}:${throughWeek}` for a historical "as of Week N" view).
@@ -395,49 +536,30 @@ async function _computeStandings(
           .where(inArray(Schema.matchupPlayerGames.matchupPlayerId, mpIds))
       : [];
 
-  // Collect unique game identifiers and player IDs for batch stat queries
-  const gameIdentifiers = [
-    ...new Set(
-      mpGameRows
-        .map((g) => g.gameIdentifier)
-        .filter((g): g is string => g != null),
-    ),
-  ];
-  const playerIds = [...new Set(matchupPlayerRows.map((mp) => mp.playerId))];
+  // Batch query game stats (batting, pitching) in parallel.
+  //
+  // LS-9525: these used to filter on two independent IN lists
+  // (`player_id IN (...) AND game_identifier IN (...)`). That shape cannot use
+  // the composite (player_id, game_identifier) index — Postgres has to
+  // materialise the cross-product predicate and falls back to scanning the
+  // whole stats table — and it over-fetches rows for players who happened to
+  // appear in a game selected for a *different* player's matchup, which the
+  // `playerId_gameIdentifier` lookups below silently discard. Feeding the
+  // query the actual (player_id, game_identifier) pairs fixes both.
+  const hasGamePairs = mpGameRows.some((g) => g.gameIdentifier != null);
 
-  // Batch query game stats (batting, pitching, fielding) in parallel
-  const [battingRows, pitchingRows, fieldingRows] =
-    gameIdentifiers.length > 0 && playerIds.length > 0
-      ? await Promise.all([
-          db
-            .select()
-            .from(Schema.gameBatting)
-            .where(
-              and(
-                inArray(Schema.gameBatting.playerId, playerIds),
-                inArray(Schema.gameBatting.gameIdentifier, gameIdentifiers),
-              ),
-            ),
-          db
-            .select()
-            .from(Schema.gamePitching)
-            .where(
-              and(
-                inArray(Schema.gamePitching.playerId, playerIds),
-                inArray(Schema.gamePitching.gameIdentifier, gameIdentifiers),
-              ),
-            ),
-          db
-            .select()
-            .from(Schema.gameFielding)
-            .where(
-              and(
-                inArray(Schema.gameFielding.playerId, playerIds),
-                inArray(Schema.gameFielding.gameIdentifier, gameIdentifiers),
-              ),
-            ),
-        ])
-      : [[], [], []];
+  const [battingRows, pitchingRows, fieldingRows] = hasGamePairs
+    ? await Promise.all([
+        fetchStatsForLeaguePairs(db, Schema.gameBatting, leagueId, throughWeek),
+        fetchStatsForLeaguePairs(
+          db,
+          Schema.gamePitching,
+          leagueId,
+          throughWeek,
+        ),
+        fetchFieldingStatsIfPopulated(db, leagueId, throughWeek),
+      ])
+    : [[], [], []];
 
   // Build lookups keyed by "playerId_gameIdentifier"
   const battingLookup = new Map<string, (typeof battingRows)[0]>();
