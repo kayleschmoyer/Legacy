@@ -283,6 +283,63 @@ describe('NFLHome — league-cap indicator (LS-8928)', () => {
   });
 });
 
+describe('NFLHome — empty-state upgrade on-ramp (LS-6272)', () => {
+  it('keeps the neutral copy and Create CTA when leagueCap is not provided', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(
+      screen.getByText('Create your first football league to get started.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('create-first-league-button'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('upgrade-from-empty-state-button'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('mentions the free-tier league limit when under cap', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        leagueCap={{ count: 1, limit: 3, atLimit: false, onUpgrade: noop }}
+      />,
+    );
+    expect(
+      screen.getByText(
+        'Create your first football league to get started. Free plan includes 3 leagues across every sport.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('create-first-league-button'),
+    ).toBeInTheDocument();
+  });
+
+  it('swaps to the upgrade CTA and at-limit copy when the free tier is maxed out', () => {
+    const onUpgrade = jest.fn();
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        leagueCap={{ count: 3, limit: 3, atLimit: true, onUpgrade }}
+      />,
+    );
+    expect(
+      screen.getByText(
+        "You've reached the free plan's limit of 3 leagues across every sport. Upgrade to Premium to create more.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('create-first-league-button'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('upgrade-from-empty-state-button'));
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('NFLHome — matchup highlight card (LS-5407)', () => {
   it('renders the highlight card with both team names and the week when a matchup is scheduled', () => {
     const league: NFLHomeLeague = {

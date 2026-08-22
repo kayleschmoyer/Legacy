@@ -695,19 +695,39 @@ function NFLHome({
                   No football leagues yet
                 </Text>
                 <Text color="$gray10" fontSize="$3" textAlign="center">
-                  Create your first football league to get started.
+                  {/* Free-tier on-ramp: name the cap and point to the upgrade
+                      path instead of staying neutral about it (LS-6272). */}
+                  {leagueCap
+                    ? leagueCap.atLimit
+                      ? `You've reached the free plan's limit of ${leagueCap.limit} league${leagueCap.limit === 1 ? '' : 's'} across every sport. Upgrade to Premium to create more.`
+                      : `Create your first football league to get started. Free plan includes ${leagueCap.limit} league${leagueCap.limit === 1 ? '' : 's'} across every sport.`
+                    : 'Create your first football league to get started.'}
                 </Text>
-                <Button
-                  backgroundColor="$orange9"
-                  borderRadius="$3"
-                  onPress={onCreateLeague}
-                  data-testid="create-first-league-button"
-                  accessibilityLabel="Create your first football league"
-                >
-                  <Text color="white" fontWeight="700">
-                    Create your first football league
-                  </Text>
-                </Button>
+                {leagueCap?.atLimit ? (
+                  <Button
+                    backgroundColor="$orange9"
+                    borderRadius="$3"
+                    onPress={leagueCap.onUpgrade}
+                    data-testid="upgrade-from-empty-state-button"
+                    accessibilityLabel="Upgrade to add more leagues"
+                  >
+                    <Text color="white" fontWeight="700">
+                      Upgrade to add more leagues
+                    </Text>
+                  </Button>
+                ) : (
+                  <Button
+                    backgroundColor="$orange9"
+                    borderRadius="$3"
+                    onPress={onCreateLeague}
+                    data-testid="create-first-league-button"
+                    accessibilityLabel="Create your first football league"
+                  >
+                    <Text color="white" fontWeight="700">
+                      Create your first football league
+                    </Text>
+                  </Button>
+                )}
               </YStack>
             ) : (
               <LeaguesList leagues={leagues} onViewLeague={onViewLeague} />
