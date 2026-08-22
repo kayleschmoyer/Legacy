@@ -456,9 +456,13 @@ export function LeagueOverviewTab({
           <LeagueActivityFeed leagueId={leagueId} limit={15} />
         </OverviewSection>
 
-        {/* On This Day — already renders its own bordered surface + header,
-            so it is not re-wrapped in an OverviewSection here. */}
-        <OnThisDayFeed onPlayerPress={onPlayerPress} />
+        {/* On This Day — baseball-only content (game-log stats keyed to MLB
+            player rows in the shared `players` table); omitted on football
+            leagues so a football player never gets routed to a mismatched
+            baseball player id (LS-6326). Already renders its own bordered
+            surface + header, so it is not re-wrapped in an OverviewSection
+            here. */}
+        {!isFootball && <OnThisDayFeed onPlayerPress={onPlayerPress} />}
 
         {/* Premium Configuration — chip summary of active paid features so a
             premium league has a visible anchor for its "what I'm paying for"

@@ -106,12 +106,26 @@ const STANDINGS = Array.from({ length: 8 }, (_, i) => ({
 }));
 
 describe('LeagueOverviewTab', () => {
-  it('always renders the activity, dues, and on-this-day panels', () => {
+  it('always renders the activity and dues panels', () => {
     render(<LeagueOverviewTab {...BASE_PROPS} />);
     expect(screen.getByText('Recent Activity')).toBeTruthy();
     expect(screen.getByTestId('league-activity-feed')).toBeTruthy();
     expect(screen.getByTestId('league-dues-payment-status')).toBeTruthy();
+  });
+
+  it('renders the on-this-day panel for baseball leagues', () => {
+    render(<LeagueOverviewTab {...BASE_PROPS} />);
     expect(screen.getByTestId('on-this-day-feed')).toBeTruthy();
+  });
+
+  it('omits the on-this-day panel for football leagues — its content is baseball-only, so a tap would route to a mismatched player id (LS-6326)', () => {
+    render(
+      <LeagueOverviewTab
+        {...BASE_PROPS}
+        league={{ ...BASE_PROPS.league, sport: Sport.Football }}
+      />,
+    );
+    expect(screen.queryByTestId('on-this-day-feed')).toBeNull();
   });
 
   it('does not render the dues payment panel for non-member spectators (LS-6325)', () => {

@@ -559,12 +559,7 @@ export default function FootballLeagueId(): React.JSX.Element {
               }
               onViewAllStandings={() => setSelectedTab('standings')}
               onInviteShare={() => void handleInviteShare()}
-              onPlayerPress={(playerId) =>
-                router.push({
-                  pathname: '/PlayerDetail',
-                  params: { playerId: String(playerId), playerName: '' },
-                })
-              }
+              onPlayerPress={(playerId) => handlePlayerPress({ playerId })}
               refreshControl={overviewRefresh.refreshControl}
             />
           </YStack>
