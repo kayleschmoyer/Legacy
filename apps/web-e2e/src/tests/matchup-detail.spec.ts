@@ -54,6 +54,7 @@ const MOCK_MATCHUP = {
   selectedGamesCount: 4,
   startTime: null,
   endTime: null,
+  winProbability: null,
 };
 
 const MOCK_TEAMS = [
@@ -435,6 +436,25 @@ test.describe('Matchup Detail – stale-scores warning @regression', () => {
           contentType: 'application/json',
           body: JSON.stringify({ data: { userTeamId: 1 } }),
         });
+      } else if (op === 'GetMatchupWinProbability') {
+        // Without __typename here, this write isn't normalizable to the
+        // same `Matchup:{id}` cache entity as GetMatchupById's response —
+        // Apollo instead replaces the whole `getMatchupById` ROOT_QUERY
+        // field with this sparse object, permanently starving GetMatchupById
+        // of its other fields and leaving the page stuck loading.
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              getMatchupById: {
+                __typename: 'Matchup',
+                id: MATCHUP_ID,
+                winProbability: null,
+              },
+            },
+          }),
+        });
       } else {
         await unmockedGraphQLFallback(route);
       }
@@ -442,8 +462,13 @@ test.describe('Matchup Detail – stale-scores warning @regression', () => {
 
     await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
 
+    // The banner only paints after GetMatchupById, GetMatchupPlayers (error),
+    // and the scoreboard's own re-render have all settled — three chained
+    // round trips. The suite's global 3s expect timeout is tight for that
+    // chain under load; give this one assertion more headroom, matching the
+    // loading-skeleton test above.
     await matchupPage
       .text(/live stats unavailable.*last saved scores/i)
-      .expectVisible();
+      .expectVisible({ timeout: 10_000 });
   });
 });

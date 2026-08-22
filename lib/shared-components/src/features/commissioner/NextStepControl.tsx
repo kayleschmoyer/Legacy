@@ -12,7 +12,7 @@ import {
 } from 'tamagui';
 import {
   type LeagueFragment,
-  type Matchup,
+  type MatchupFragment,
   MatchupStatus,
   StatsLoadingStatus,
   useAutoAdvanceMatchupsMutation,
@@ -32,7 +32,7 @@ import {
 
 export interface NextStepControlProps {
   leagueId: number;
-  currentMatchup?: Matchup | null;
+  currentMatchup?: MatchupFragment | null;
   gamesPerMatchup: number;
   draftStatus?: string | null;
   /** When true, the "Start Draft" button is blocked because draft settings

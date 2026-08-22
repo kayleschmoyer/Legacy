@@ -22,4 +22,12 @@ fragment Matchup on Matchup {
     id
     name
   }
+
+  # LS-6323: premium projected-points signal for list rows. Server-gated by
+  # ENTITLEMENTS.matchup_projections — null for non-entitled/completed
+  # matchups (see MatchupWinProbability resolver).
+  winProbability {
+    team1ProjectedScore
+    team2ProjectedScore
+  }
 }

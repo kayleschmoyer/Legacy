@@ -160,4 +160,25 @@ describe('MatchupCard', () => {
     expect(screen.getByText('Team 1')).toBeTruthy();
     expect(screen.getByText('Team 2')).toBeTruthy();
   });
+
+  it('displays projected scores when winProbability is present (LS-6323)', () => {
+    render(
+      <MatchupCard
+        matchup={createMatchup({
+          winProbability: {
+            __typename: 'MatchupWinProbability',
+            team1ProjectedScore: 124.5,
+            team2ProjectedScore: 118.2,
+          },
+        })}
+      />,
+    );
+    expect(screen.getByText('Proj 124.50')).toBeTruthy();
+    expect(screen.getByText('Proj 118.20')).toBeTruthy();
+  });
+
+  it('omits projected scores when winProbability is absent', () => {
+    render(<MatchupCard matchup={createMatchup({ winProbability: null })} />);
+    expect(screen.queryByText(/^Proj /)).toBeNull();
+  });
 });

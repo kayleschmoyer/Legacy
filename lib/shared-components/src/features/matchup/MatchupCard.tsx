@@ -13,6 +13,7 @@ import {
 } from '../../utils/colors';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
 import { AvatarImage } from '../../components/AvatarImage';
+import { formatScore } from '../../utils/scoreFormatting';
 
 export interface MatchupCardProps {
   matchup: MatchupFragment | null | undefined;
@@ -124,11 +125,18 @@ function getStatusPresentation(
 interface TeamRowProps {
   name: string;
   score: number | null | undefined;
+  projectedScore: number | null | undefined;
   logoUrl: string | null | undefined;
   isWinner: boolean;
 }
 
-function TeamRow({ name, score, logoUrl, isWinner }: TeamRowProps) {
+function TeamRow({
+  name,
+  score,
+  projectedScore,
+  logoUrl,
+  isWinner,
+}: TeamRowProps) {
   return (
     <XStack justifyContent="space-between" alignItems="center">
       <XStack alignItems="center" gap="$2" flex={1}>
@@ -143,9 +151,16 @@ function TeamRow({ name, score, logoUrl, isWinner }: TeamRowProps) {
           {name}
         </Text>
       </XStack>
-      <ScoreValue fontSize="$6" color={isWinner ? '$color' : '$textMuted'}>
-        {score?.toFixed(2) ?? '-'}
-      </ScoreValue>
+      <YStack alignItems="flex-end">
+        <ScoreValue fontSize="$6" color={isWinner ? '$color' : '$textMuted'}>
+          {score?.toFixed(2) ?? '-'}
+        </ScoreValue>
+        {projectedScore != null && (
+          <Text fontSize="$1" color="$textMuted">
+            Proj {formatScore(projectedScore)}
+          </Text>
+        )}
+      </YStack>
     </XStack>
   );
 }
@@ -171,11 +186,25 @@ export function MatchupCard({
     return null;
   }
 
-  const { weekNumber, team1Score, team2Score, status, team1, team2 } = matchup;
+  const {
+    weekNumber,
+    team1Score,
+    team2Score,
+    status,
+    team1,
+    team2,
+    winProbability,
+  } = matchup;
 
   const isCompleted = status === MatchupStatus.Completed;
   const team1Wins = isCompleted && (team1Score ?? 0) > (team2Score ?? 0);
   const team2Wins = isCompleted && (team2Score ?? 0) > (team1Score ?? 0);
+
+  // Server-gated by ENTITLEMENTS.matchup_projections (LS-5907) — null for
+  // completed matchups and non-entitled callers, so no client-side status
+  // check is needed here (LS-6323).
+  const team1Projected = winProbability?.team1ProjectedScore ?? null;
+  const team2Projected = winProbability?.team2ProjectedScore ?? null;
 
   const statusConfig = getStatusPresentation(status);
 
@@ -231,6 +260,7 @@ export function MatchupCard({
         <TeamRow
           name={team1?.name ?? 'Team 1'}
           score={team1Score}
+          projectedScore={team1Projected}
           logoUrl={team1LogoUrl}
           isWinner={team1Wins}
         />
@@ -241,6 +271,7 @@ export function MatchupCard({
         <TeamRow
           name={team2?.name ?? 'Team 2'}
           score={team2Score}
+          projectedScore={team2Projected}
           logoUrl={team2LogoUrl}
           isWinner={team2Wins}
         />

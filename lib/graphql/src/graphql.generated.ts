@@ -7168,6 +7168,11 @@ export type GetMatchupByIdQuery = {
       id?: number | null;
       name?: string | null;
     } | null;
+    winProbability?: {
+      __typename?: 'MatchupWinProbability';
+      team1ProjectedScore: number;
+      team2ProjectedScore: number;
+    } | null;
   } | null;
 };
 
@@ -7216,6 +7221,11 @@ export type GetMatchupHistoryQuery = {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+    } | null;
+    winProbability?: {
+      __typename?: 'MatchupWinProbability';
+      team1ProjectedScore: number;
+      team2ProjectedScore: number;
     } | null;
   }> | null;
 };
@@ -7423,6 +7433,11 @@ export type GetTeamMatchupHistoryQuery = {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+    } | null;
+    winProbability?: {
+      __typename?: 'MatchupWinProbability';
+      team1ProjectedScore: number;
+      team2ProjectedScore: number;
     } | null;
   }> | null;
 };
@@ -11243,6 +11258,11 @@ export type GetMatchupsByWeekQuery = {
       id?: number | null;
       name?: string | null;
     } | null;
+    winProbability?: {
+      __typename?: 'MatchupWinProbability';
+      team1ProjectedScore: number;
+      team2ProjectedScore: number;
+    } | null;
   }> | null;
 };
 
@@ -11279,6 +11299,11 @@ export type GetMatchupsForLeagueQuery = {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+    } | null;
+    winProbability?: {
+      __typename?: 'MatchupWinProbability';
+      team1ProjectedScore: number;
+      team2ProjectedScore: number;
     } | null;
   }> | null;
 };
@@ -12576,6 +12601,11 @@ export type MatchupFragment = {
     __typename?: 'Team';
     id?: number | null;
     name?: string | null;
+  } | null;
+  winProbability?: {
+    __typename?: 'MatchupWinProbability';
+    team1ProjectedScore: number;
+    team2ProjectedScore: number;
   } | null;
 };
 
@@ -15948,6 +15978,10 @@ export const MatchupFragmentDoc = gql`
     team2 {
       id
       name
+    }
+    winProbability {
+      team1ProjectedScore
+      team2ProjectedScore
     }
   }
 `;

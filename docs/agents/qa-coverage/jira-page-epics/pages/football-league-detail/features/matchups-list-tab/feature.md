@@ -25,6 +25,11 @@ Key behaviours:
   server order for observers with no team in the league.
 - **Status badge** — each card shows Live (in-progress), Final (completed),
   Scheduled, or Cancelled, sourced from `MatchupCard`'s status presentation.
+- **Projected score (Premium)** — each team row shows "Proj <score>" beneath
+  its actual score when the matchup has a server-computed projection
+  (`Matchup.winProbability`, gated by `ENTITLEMENTS.matchup_projections`);
+  hidden for completed matchups and non-entitled viewers, for whom the
+  field resolves to `null` (LS-6323).
 - **Tap to open detail** — tapping a card selects that matchup as the
   active "browse" matchup, rendering its scoreboard hero and roster
   comparison below the list (reusing the tab's existing browse mechanism).
@@ -57,13 +62,20 @@ does not render for baseball or when there are no matchups, pins the
 viewer's matchup to the top, leaves ordering unchanged for observers, and
 browses to a tapped matchup's detail view.
 
+File: `lib/shared-components/src/features/matchup/MatchupCard.spec.tsx`
+
+Covers `MatchupCard`'s projected-score row (LS-6323): renders "Proj
+<score>" for both teams when `matchup.winProbability` is present, omits it
+when absent (completed matchup / non-entitled viewer).
+
 ### E2E tests (hermetic)
 
 File: `apps/web-e2e/src/tests/football-matchups-list.spec.ts`
 
 `describe('Football Matchups List — pinned ordering & status @regression')`
 — renders a card per matchup, pins the viewer's matchup to the top even
-when the API returns it second, shows Live/Scheduled status badges, and
+when the API returns it second, shows Live/Scheduled status badges, shows
+the projected score for a matchup with premium projections (LS-6323), and
 opens a tapped matchup's detail view.
 
 ## Related

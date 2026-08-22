@@ -169,6 +169,13 @@ const OTHER_MATCHUP = makeMatchup({
   status: 'scheduled',
   team1: { __typename: 'Team', id: 3, name: 'Gamma Rays' },
   team2: { __typename: 'Team', id: 4, name: 'Delta Hawks' },
+  // Premium projection engine output (LS-6323) — server-gated by
+  // ENTITLEMENTS.matchup_projections, null for completed matchups.
+  winProbability: {
+    __typename: 'MatchupWinProbability',
+    team1ProjectedScore: 124.5,
+    team2ProjectedScore: 118.2,
+  },
 });
 
 const WEEK_MATCHUPS = [OTHER_MATCHUP, USER_MATCHUP];
@@ -271,6 +278,17 @@ test.describe('Football Matchups List — pinned ordering & status @regression',
     const list = page.getByTestId('matchups-list');
     await expect(list.getByText('Live', { exact: true })).toBeVisible();
     await expect(list.getByText('Scheduled', { exact: true })).toBeVisible();
+  });
+
+  test('shows the projected score for a matchup with premium projections (LS-6323)', async ({
+    page,
+  }) => {
+    const card = page
+      .getByTestId('matchups-list')
+      .getByTestId('matchup-card')
+      .filter({ hasText: 'Gamma Rays' });
+    await expect(card.getByText('Proj 124.50')).toBeVisible();
+    await expect(card.getByText('Proj 118.20')).toBeVisible();
   });
 
   test("tapping another matchup's card opens its detail view", async ({
