@@ -26,6 +26,12 @@
  * This lives in `@legacy-sports/utils` (a platform-shared library) so both the
  * `lambdas/db` feature-gating code and the `seed-stripe` CLI command import a
  * single catalog — Stripe provisioning and in-app gating cannot drift.
+ *
+ * There is intentionally no `players_access`-style key here: browsing/searching
+ * the football player pool (the "Browse Players" CTA on Football Home and the
+ * `/football/players` list it navigates to) is a Free-tier feature, not premium
+ * gated (FBH-027 / LS-6281). See the Free features table in
+ * `docs/product/subscription-tiers.md`.
  */
 export const ENTITLEMENTS = {
   salary_cap_leagues: 'salary_cap_leagues',
