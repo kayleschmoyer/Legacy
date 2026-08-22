@@ -306,6 +306,45 @@ describe('NFLHome — league-cap indicator (LS-8928)', () => {
   });
 });
 
+describe('NFLHome — Join League CTA (LS-6288)', () => {
+  it('does not render the Join League CTA when onJoinLeague is omitted', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(screen.queryByTestId('join-league-button')).not.toBeInTheDocument();
+  });
+
+  it('renders the Join League CTA and invokes onJoinLeague when pressed', () => {
+    const onJoinLeague = jest.fn();
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onJoinLeague={onJoinLeague}
+      />,
+    );
+
+    const joinBtn = screen.getByTestId('join-league-button');
+    expect(joinBtn).toBeInTheDocument();
+    expect(screen.getByText('Join League')).toBeInTheDocument();
+
+    fireEvent.click(joinBtn);
+    expect(onJoinLeague).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the Join League CTA in the empty-state layout, matching native parity', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onJoinLeague={noop}
+      />,
+    );
+    expect(screen.getByText('No football leagues yet')).toBeInTheDocument();
+    expect(screen.getByTestId('join-league-button')).toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — empty-state upgrade on-ramp (LS-6272)', () => {
   it('keeps the neutral copy and Create CTA when leagueCap is not provided', () => {
     render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
