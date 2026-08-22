@@ -88,6 +88,7 @@ export const Matchup = builder.objectRef<{
   startTime: string | null;
   endTime: string | null;
   recapJson: Record<string, unknown> | null;
+  updatedAt: Date;
 }>('Matchup');
 
 // MatchupRecap ref — declared here so the Matchup.recap field can reference it.
@@ -132,6 +133,13 @@ builder.objectType(Matchup, {
     }),
     startTime: t.exposeString('startTime', { nullable: true }),
     endTime: t.exposeString('endTime', { nullable: true }),
+    // Server-authoritative freshness marker (LS-6359): clients compare this
+    // against their cached value to reject a refetch response that's older
+    // than what they already have — e.g. a CDN/Apollo-router cache serving a
+    // stale snapshot after a mobile network switch.
+    updatedAt: t.string({
+      resolve: (matchup) => matchup.updatedAt.toISOString(),
+    }),
     // Relational fields - using Team type imported from leagues.ts
     team1: t.field({
       type: Team,
@@ -425,6 +433,7 @@ export const AdvanceLeagueWeekResponse = builder.objectRef<{
     startTime: string | null;
     endTime: string | null;
     recapJson: Record<string, unknown> | null;
+    updatedAt: Date;
   }>;
   currentMatchupId: number | null;
 }>('AdvanceLeagueWeekResponse');

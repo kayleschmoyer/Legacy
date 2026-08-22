@@ -13,6 +13,7 @@ fragment Matchup on Matchup {
   selectedGamesCount
   startTime
   endTime
+  updatedAt
   team1 {
     id
     name

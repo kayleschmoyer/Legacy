@@ -4,10 +4,18 @@
  * apps/web/src/lib/apollo-client.spec.ts.
  */
 
-import { CombinedGraphQLErrors, Observable } from '@apollo/client';
+import {
+  CombinedGraphQLErrors,
+  InMemoryCache,
+  Observable,
+} from '@apollo/client';
 import type { ApolloLink } from '@apollo/client/link';
+import {
+  GetCurrentWeekForLeague,
+  GetMatchupById,
+} from '@legacy-sports/graphql';
 
-import { errorLink } from './DbClient';
+import { createStaleMatchupGuardLink, errorLink } from './DbClient';
 
 const mockSilentlyRefreshJwt = jest.fn<Promise<string | null>, []>();
 jest.mock('./jwtRefresh', () => ({
@@ -272,5 +280,139 @@ describe('errorLink ENTITLEMENTS_STALE bounded retry', () => {
     expect(mockEmitSessionExpired).toHaveBeenCalledTimes(1);
 
     setTimeoutSpy.mockRestore();
+  });
+});
+
+// LS-6359: after a mobile network switch (e.g. WiFi -> cellular), a forced
+// refetch can land on a CDN/Apollo-router-cached response that's older than
+// what's already in the client cache. Matchup.updatedAt is a
+// server-authoritative freshness marker; createStaleMatchupGuardLink must
+// drop a GetMatchupById response whose updatedAt is older than what's
+// already cached, instead of letting the write roll a displayed score
+// backwards.
+describe('createStaleMatchupGuardLink (LS-6359)', () => {
+  function makeMatchupData(overrides: {
+    team1Score: number;
+    updatedAt: string;
+  }) {
+    return {
+      __typename: 'Matchup',
+      id: '1',
+      weekNumber: 4,
+      leagueId: 10,
+      team1Id: 100,
+      team2Id: 200,
+      team1Score: overrides.team1Score,
+      team2Score: 30.1,
+      status: 'in_progress',
+      statsLoadingStatus: 'completed',
+      gamesPerMatchup: 1,
+      pitcherStartsPerMatchup: null,
+      selectedGamesCount: 1,
+      startTime: null,
+      endTime: null,
+      updatedAt: overrides.updatedAt,
+      team1: { __typename: 'Team', id: '100', name: 'Team One' },
+      team2: { __typename: 'Team', id: '200', name: 'Team Two' },
+    };
+  }
+
+  function seedCache(
+    cache: InMemoryCache,
+    overrides: { team1Score: number; updatedAt: string },
+  ) {
+    cache.writeQuery({
+      query: GetMatchupById,
+      variables: { id: 1 },
+      data: { getMatchupById: makeMatchupData(overrides) },
+    });
+  }
+
+  function runLink(
+    cache: InMemoryCache,
+    overrides: { team1Score: number; updatedAt: string },
+  ) {
+    const link = createStaleMatchupGuardLink(cache);
+    const operation = {
+      operationName: 'GetMatchupById',
+      query: GetMatchupById,
+      variables: { id: 1 },
+      extensions: {},
+      getContext: () => ({}),
+      setContext: jest.fn(),
+    };
+    const forward = () =>
+      new Observable<ApolloLink.Result>((observer) => {
+        observer.next({ data: { getMatchupById: makeMatchupData(overrides) } });
+        observer.complete();
+      });
+
+    return new Promise<ApolloLink.Result>((resolve) => {
+      const result = link.request(operation as never, forward as never);
+      result?.subscribe({ next: (v) => resolve(v) });
+    });
+  }
+
+  it('drops an older refetch response and keeps the cached score', async () => {
+    const cache = new InMemoryCache();
+    seedCache(cache, {
+      team1Score: 45.2,
+      updatedAt: '2026-08-22T20:00:00.000Z',
+    });
+
+    // Simulates a CDN-cached refetch response older than what's cached.
+    const result = await runLink(cache, {
+      team1Score: 38.5,
+      updatedAt: '2026-08-22T19:00:00.000Z',
+    });
+
+    const data = result.data as {
+      getMatchupById: { team1Score: number; updatedAt: string };
+    };
+    expect(data.getMatchupById.team1Score).toBe(45.2);
+    expect(data.getMatchupById.updatedAt).toBe('2026-08-22T20:00:00.000Z');
+  });
+
+  it('passes through a newer refetch response', async () => {
+    const cache = new InMemoryCache();
+    seedCache(cache, {
+      team1Score: 45.2,
+      updatedAt: '2026-08-22T20:00:00.000Z',
+    });
+
+    const result = await runLink(cache, {
+      team1Score: 52.0,
+      updatedAt: '2026-08-22T21:00:00.000Z',
+    });
+
+    const data = result.data as {
+      getMatchupById: { team1Score: number; updatedAt: string };
+    };
+    expect(data.getMatchupById.team1Score).toBe(52.0);
+  });
+
+  it('passes through the response for other operations untouched', async () => {
+    const cache = new InMemoryCache();
+    const link = createStaleMatchupGuardLink(cache);
+    const operation = {
+      operationName: 'GetCurrentWeekForLeague',
+      query: GetCurrentWeekForLeague,
+      variables: { leagueId: 1 },
+      extensions: {},
+      getContext: () => ({}),
+      setContext: jest.fn(),
+    };
+    const forward = () =>
+      new Observable<ApolloLink.Result>((observer) => {
+        observer.next({ data: { getCurrentWeekForLeague: 3 } });
+        observer.complete();
+      });
+
+    const value = await new Promise<unknown>((resolve) => {
+      const result = link.request(operation as never, forward as never);
+      result?.subscribe({ next: (v) => resolve(v) });
+    });
+
+    expect(value).toEqual({ data: { getCurrentWeekForLeague: 3 } });
   });
 });

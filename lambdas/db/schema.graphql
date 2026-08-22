@@ -1985,6 +1985,7 @@ type Matchup {
   team2: Team
   team2Id: Int
   team2Score: Float
+  updatedAt: String
   weekNumber: Int
 
   """

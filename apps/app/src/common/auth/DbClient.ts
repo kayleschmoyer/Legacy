@@ -7,7 +7,7 @@ import {
   Observable,
   ServerError,
 } from '@apollo/client';
-import type { ApolloLink } from '@apollo/client/link';
+import { ApolloLink } from '@apollo/client/link';
 import { ErrorLink } from '@apollo/client/link/error';
 import { RetryLink } from '@apollo/client/link/retry';
 import { setContext } from '@apollo/client/link/context';
@@ -137,6 +137,85 @@ export const errorLink = new ErrorLink(({ error, operation, forward }) => {
   return;
 });
 
+interface GetMatchupByIdData {
+  getMatchupById?: { id: number; updatedAt?: string | null } | null;
+}
+
+// A GraphQL response can be served from a CDN/Apollo-router cache. After a
+// mobile network switch (e.g. WiFi → cellular mid-game), a forced refetch can
+// land on a CDN-cached response that's older than what's already in the
+// Apollo cache, rolling a displayed score backwards. Matchup.updatedAt is a
+// server-authoritative freshness marker (auto-maintained by a DB trigger on
+// every row update); this link compares it against what's already cached
+// and drops an incoming response that's older, instead of letting Apollo's
+// default cache write blindly overwrite the newer data with the stale
+// snapshot (LS-6359).
+//
+// This can't be done as an InMemoryCache typePolicy `merge` function: by the
+// time the (outer) Query.getMatchupById field's merge runs, the (inner)
+// Matchup entity's own scalar fields have already been written into the
+// same normalized cache slot the "existing" reference resolves to, so
+// `existing` and `incoming` are indistinguishable — the comparison has to
+// happen before the write, at the link level.
+export function createStaleMatchupGuardLink(cache: InMemoryCache) {
+  return new ApolloLink((operation, forward) => {
+    if (operation.operationName !== 'GetMatchupById') {
+      return forward(operation);
+    }
+
+    return new Observable<ApolloLink.Result>((observer) => {
+      forward(operation).subscribe({
+        next: (result) => {
+          observer.next(dropStaleMatchupResult(result, cache, operation));
+        },
+        error: (err: unknown) => observer.error(err),
+        complete: () => observer.complete(),
+      });
+    });
+  });
+}
+
+function dropStaleMatchupResult(
+  result: ApolloLink.Result,
+  cache: InMemoryCache,
+  operation: ApolloLink.Operation,
+): ApolloLink.Result {
+  const incoming = (result.data as GetMatchupByIdData | null | undefined)
+    ?.getMatchupById;
+  if (!incoming?.updatedAt) {
+    return result;
+  }
+
+  let previous: GetMatchupByIdData | null;
+  try {
+    previous = cache.readQuery<GetMatchupByIdData>({
+      query: operation.query,
+      variables: operation.variables,
+    });
+  } catch {
+    return result;
+  }
+
+  const previousMatchup = previous?.getMatchupById;
+  if (
+    !previousMatchup?.updatedAt ||
+    incoming.updatedAt >= previousMatchup.updatedAt
+  ) {
+    return result;
+  }
+
+  LOGGER.warn('Dropped stale matchup refetch response', {
+    matchupId: incoming.id,
+    incomingUpdatedAt: incoming.updatedAt,
+    cachedUpdatedAt: previousMatchup.updatedAt,
+  });
+
+  return {
+    ...result,
+    data: { ...result.data, getMatchupById: previousMatchup },
+  };
+}
+
 export class DbClient {
   public readonly apolloClient: ApolloClient;
 
@@ -173,9 +252,18 @@ export class DbClient {
       },
     });
 
+    const cache = new InMemoryCache();
+    const staleMatchupGuardLink = createStaleMatchupGuardLink(cache);
+
     this.apolloClient = new ApolloClient({
-      cache: new InMemoryCache(),
-      link: from([retryLink, errorLink, authLink, httpLink]),
+      cache,
+      link: from([
+        staleMatchupGuardLink,
+        retryLink,
+        errorLink,
+        authLink,
+        httpLink,
+      ]),
     });
   }
 

@@ -1693,6 +1693,7 @@ export type Matchup = {
   team2?: Maybe<Team>;
   team2Id?: Maybe<Scalars['Int']['output']>;
   team2Score?: Maybe<Scalars['Float']['output']>;
+  updatedAt?: Maybe<Scalars['String']['output']>;
   weekNumber?: Maybe<Scalars['Int']['output']>;
   /** Server-computed Monte Carlo win probability, gated by ENTITLEMENTS.matchup_projections. Null for completed matchups, unauthenticated callers, and non-entitled users (LS-5907). */
   winProbability?: Maybe<MatchupWinProbability>;
@@ -7126,6 +7127,7 @@ export type GetMatchupByIdQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -7174,6 +7176,7 @@ export type GetMatchupHistoryQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -7380,6 +7383,7 @@ export type GetTeamMatchupHistoryQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -11197,6 +11201,7 @@ export type GetMatchupsByWeekQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -11233,6 +11238,7 @@ export type GetMatchupsForLeagueQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
       id?: number | null;
@@ -12529,6 +12535,7 @@ export type MatchupFragment = {
   selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
+  updatedAt?: string | null;
   team1?: {
     __typename?: 'Team';
     id?: number | null;
@@ -15764,6 +15771,7 @@ export const MatchupFragmentDoc = gql`
     selectedGamesCount
     startTime
     endTime
+    updatedAt
     team1 {
       id
       name
