@@ -3933,6 +3933,7 @@ export type QueryPublicLeaguesArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
 };
 
 export type QueryScoreboardArgs = {
@@ -6782,6 +6783,7 @@ export type ValidateInviteCodeQuery = {
 };
 
 export type GetPublicLeaguesQueryVariables = Exact<{
+  sport?: InputMaybe<Sport>;
   search?: InputMaybe<Scalars['String']['input']>;
   draftStatus?: InputMaybe<Scalars['String']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
@@ -19342,6 +19344,7 @@ export type ValidateInviteCodeQueryResult = Apollo.QueryResult<
 >;
 export const GetPublicLeagues = gql`
   query GetPublicLeagues(
+    $sport: Sport
     $search: String
     $draftStatus: String
     $playerPool: String
@@ -19349,6 +19352,7 @@ export const GetPublicLeagues = gql`
     $offset: Int
   ) {
     publicLeagues(
+      sport: $sport
       search: $search
       draftStatus: $draftStatus
       playerPool: $playerPool
@@ -19382,6 +19386,7 @@ export const GetPublicLeagues = gql`
  * @example
  * const { data, loading, error } = useGetPublicLeaguesQuery({
  *   variables: {
+ *      sport: // value for 'sport'
  *      search: // value for 'search'
  *      draftStatus: // value for 'draftStatus'
  *      playerPool: // value for 'playerPool'

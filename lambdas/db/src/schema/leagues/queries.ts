@@ -1247,6 +1247,7 @@ builder.queryField('publicLeagues', (t) =>
     type: [PublicLeagueInfo],
     nullable: false,
     args: {
+      sport: t.arg({ type: SportKindEnum, required: false }),
       search: t.arg.string({ required: false }),
       draftStatus: t.arg.string({ required: false }),
       playerPool: t.arg.string({ required: false }),
@@ -1267,6 +1268,10 @@ builder.queryField('publicLeagues', (t) =>
       try {
         // Build WHERE conditions
         const conditions: SQL[] = [eq(PublicSchema.leagues.isPublic, true)];
+
+        if (args.sport) {
+          conditions.push(eq(PublicSchema.leagues.sport, args.sport));
+        }
 
         if (args.draftStatus) {
           conditions.push(

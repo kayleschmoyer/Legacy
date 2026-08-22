@@ -10,6 +10,7 @@ import { Search } from '@tamagui/lucide-icons/icons/Search';
 import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
 import {
   GetPublicLeagues,
+  Sport,
   useGetPublicLeaguesQuery,
   useJoinPublicLeagueMutation,
 } from '@legacy-sports/graphql';
@@ -88,6 +89,29 @@ const PLAYER_POOL_FILTERS: { label: string; value: PlayerPoolFilter }[] = [
   { label: 'NL Only', value: 'nl' },
   { label: 'AL Only', value: 'al' },
 ];
+
+// ── Sport-specific copy ─────────────────────────────────────────────────────
+// This page is shared by /baseball/leagues and /football/leagues. The player
+// pool filter (NL/AL) is a baseball-only concept, so it's hidden for football
+// rather than built out for the nfl/afc/nfc pools the backend already
+// supports but no football UI surface exposes yet.
+const SPORT_DISCOVERY_META: Record<
+  'baseball' | 'football',
+  { label: string; description: string; showPlayerPoolFilter: boolean }
+> = {
+  baseball: {
+    label: 'Baseball · Public Leagues',
+    description:
+      'Find a public fantasy baseball league to join — browse open leagues across every era of the game.',
+    showPlayerPoolFilter: true,
+  },
+  football: {
+    label: 'Football · Public Leagues',
+    description:
+      'Find a public fantasy football league to join — browse open leagues and jump into the season.',
+    showPlayerPoolFilter: false,
+  },
+};
 
 // ── Pill ─────────────────────────────────────────────────────────────────────
 
@@ -857,8 +881,17 @@ function LeagueCard({
 
 // ── Main page ────────────────────────────────────────────────────────────────
 
-export function LeagueDiscoveryPage(): React.JSX.Element {
+export interface LeagueDiscoveryPageProps {
+  /** Which sport's public leagues to browse. Defaults to baseball for backward compatibility. */
+  sport?: 'baseball' | 'football';
+}
+
+export function LeagueDiscoveryPage({
+  sport = 'baseball',
+}: LeagueDiscoveryPageProps = {}): React.JSX.Element {
   const navigate = useNavigate();
+  const meta = SPORT_DISCOVERY_META[sport];
+  const sportEnum = sport === 'football' ? Sport.Football : Sport.Baseball;
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -884,6 +917,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
 
   const { data, loading, error, refetch } = useGetPublicLeaguesQuery({
     variables: {
+      sport: sportEnum,
       search: debouncedSearch || undefined,
       draftStatus:
         draftFilter !== 'all'
@@ -938,7 +972,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
         setJoiningLeagueId(null);
         if (navTimerRef.current != null) clearTimeout(navTimerRef.current);
         navTimerRef.current = setTimeout(() => {
-          navigate(`/baseball/league/${joinedId}`);
+          navigate(`/${sport}/league/${joinedId}`);
         }, 1200);
       } else {
         setJoinError(
@@ -993,10 +1027,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
       marginHorizontal="auto"
       width="100%"
     >
-      <PageMeta
-        title="Browse Public Leagues"
-        description="Find a public fantasy baseball league to join — browse open leagues across every era of the game."
-      />
+      <PageMeta title="Browse Public Leagues" description={meta.description} />
 
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div
@@ -1036,7 +1067,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                 color: 'var(--brandGoldLight)',
               }}
             >
-              Baseball · Public Leagues
+              {meta.label}
             </span>
           </div>
           <h1
@@ -1067,7 +1098,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
           </p>
         </div>
         <button
-          onClick={() => navigate('/baseball/league/create')}
+          onClick={() => navigate(`/${sport}/league/create`)}
           className="ls-discovery-btn-lift"
           style={{
             fontFamily: FONT_DISPLAY,
@@ -1168,31 +1199,33 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             </div>
           </div>
 
-          {/* Player Pool */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <span
-              style={{
-                fontFamily: FONT_DISPLAY,
-                fontWeight: 700,
-                fontSize: 10,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                color: 'var(--textMuted)',
-              }}
-            >
-              Player Pool
-            </span>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {PLAYER_POOL_FILTERS.map((opt) => (
-                <FilterPill
-                  key={opt.value}
-                  label={opt.label}
-                  active={poolFilter === opt.value}
-                  onClick={() => setPoolFilter(opt.value)}
-                />
-              ))}
+          {/* Player Pool — baseball only (NL/AL); football has no equivalent UI yet */}
+          {meta.showPlayerPoolFilter && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <span
+                style={{
+                  fontFamily: FONT_DISPLAY,
+                  fontWeight: 700,
+                  fontSize: 10,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  color: 'var(--textMuted)',
+                }}
+              >
+                Player Pool
+              </span>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {PLAYER_POOL_FILTERS.map((opt) => (
+                  <FilterPill
+                    key={opt.value}
+                    label={opt.label}
+                    active={poolFilter === opt.value}
+                    onClick={() => setPoolFilter(opt.value)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -1503,7 +1536,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
             invite the public — you&rsquo;ll be first at bat.
           </p>
           <button
-            onClick={() => navigate('/baseball/league/create')}
+            onClick={() => navigate(`/${sport}/league/create`)}
             className="ls-discovery-btn-lift"
             style={{
               marginTop: 8,
@@ -1648,7 +1681,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               Clear Filters
             </button>
             <button
-              onClick={() => navigate('/baseball/league/create')}
+              onClick={() => navigate(`/${sport}/league/create`)}
               className="ls-discovery-btn-lift"
               style={{
                 fontFamily: FONT_DISPLAY,
@@ -1714,7 +1747,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
                     }
                     onViewLeague={() => {
                       if (leagueId != null)
-                        navigate(`/baseball/league/${leagueId}`);
+                        navigate(`/${sport}/league/${leagueId}`);
                     }}
                     submitting={submitting}
                   />
@@ -1765,7 +1798,7 @@ export function LeagueDiscoveryPage(): React.JSX.Element {
               </p>
             </div>
             <button
-              onClick={() => navigate('/baseball/league/create')}
+              onClick={() => navigate(`/${sport}/league/create`)}
               className="ls-discovery-btn-lift"
               style={{
                 fontFamily: FONT_DISPLAY,

@@ -694,7 +694,7 @@ function App() {
               path="/football/leagues"
               element={
                 <FootballGate>
-                  <LeagueDiscoveryPage />
+                  <LeagueDiscoveryPage sport="football" />
                 </FootballGate>
               }
             />
@@ -781,7 +781,10 @@ function App() {
               path="/baseball/league/join/:inviteCode"
               element={<JoinLeagueByCodePage />}
             />
-            <Route path="/baseball/leagues" element={<LeagueDiscoveryPage />} />
+            <Route
+              path="/baseball/leagues"
+              element={<LeagueDiscoveryPage sport="baseball" />}
+            />
             <Route path="/baseball/league/:id" element={<LeagueDetailPage />} />
             <Route
               path="/baseball/league/:id/:tab"

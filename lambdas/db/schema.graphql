@@ -4034,6 +4034,7 @@ type Query {
     offset: Int
     playerPool: String
     search: String
+    sport: Sport
   ): [PublicLeagueInfo!]!
 
   """

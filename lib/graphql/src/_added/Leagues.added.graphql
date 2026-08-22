@@ -63,6 +63,7 @@ query ValidateInviteCode($code: String!) {
 }
 
 query GetPublicLeagues(
+  $sport: Sport
   $search: String
   $draftStatus: String
   $playerPool: String
@@ -70,6 +71,7 @@ query GetPublicLeagues(
   $offset: Int
 ) {
   publicLeagues(
+    sport: $sport
     search: $search
     draftStatus: $draftStatus
     playerPool: $playerPool

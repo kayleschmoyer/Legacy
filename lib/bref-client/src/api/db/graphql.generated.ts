@@ -3927,6 +3927,7 @@ export type QueryPublicLeaguesArgs = {
   offset?: InputMaybe<Scalars['Int']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
 };
 
 export type QueryScoreboardArgs = {
