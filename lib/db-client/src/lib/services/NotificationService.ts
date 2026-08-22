@@ -2,7 +2,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { sql } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithPublicClient } from '../client/Helpers';
-import { PublicSchema } from '../client/PublicDbClient';
+import { type PublicDb, PublicSchema } from '../client/PublicDbClient';
 
 export interface NotificationPreference {
   id: number;
@@ -221,46 +221,40 @@ export class NotificationService {
   }
 
   /**
-   * Register a new device token
+   * Register (or reactivate) a device token.
+   *
+   * Pass `db` when the caller already holds a connection — a GraphQL resolver
+   * has one on `context.db`. Without it this opens a second client for the
+   * request, which also re-resolves credentials from Secrets Manager (LS-9541).
    */
   async registerDeviceToken(
     userId: number,
     deviceToken: string,
     platform: string,
+    db?: PublicDb,
   ): Promise<DeviceToken> {
-    return runWithPublicClient(this.options, async (db) => {
-      // Check if token already exists
-      const existing = await db
-        .select()
-        .from(PublicSchema.deviceTokens)
-        .where(eq(PublicSchema.deviceTokens.deviceToken, deviceToken))
-        .limit(1);
-
-      let result;
-      if (existing.length > 0) {
-        // Reactivate existing token
-        [result] = await db
-          .update(PublicSchema.deviceTokens)
-          .set({
+    const upsert = async (client: PublicDb): Promise<DeviceToken> => {
+      // One statement instead of SELECT-then-UPDATE-or-INSERT: the
+      // device_tokens_device_token_unique index makes this atomic, so the
+      // check-then-write race disappears along with a round trip (LS-9541).
+      const [result] = await client
+        .insert(PublicSchema.deviceTokens)
+        .values({
+          userId,
+          deviceToken,
+          platform,
+          isActive: true,
+        })
+        .onConflictDoUpdate({
+          target: PublicSchema.deviceTokens.deviceToken,
+          set: {
             userId,
             platform,
             isActive: true,
             updatedAt: new Date(),
-          })
-          .where(eq(PublicSchema.deviceTokens.deviceToken, deviceToken))
-          .returning();
-      } else {
-        // Insert new token
-        [result] = await db
-          .insert(PublicSchema.deviceTokens)
-          .values({
-            userId,
-            deviceToken,
-            platform,
-            isActive: true,
-          })
-          .returning();
-      }
+          },
+        })
+        .returning();
 
       return {
         id: Number(result.id),
@@ -271,7 +265,9 @@ export class NotificationService {
         createdAt: result.createdAt,
         updatedAt: result.updatedAt,
       };
-    });
+    };
+
+    return db ? upsert(db) : runWithPublicClient(this.options, upsert);
   }
 
   /**

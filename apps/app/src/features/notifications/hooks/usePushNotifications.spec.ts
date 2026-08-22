@@ -1,5 +1,6 @@
 import type { NotificationResponse } from 'expo-notifications';
 import { renderHook, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ── Import under test (after mocks) ──────────────────────────────────────────
 
@@ -126,7 +127,11 @@ async function setupColdStart(data: Record<string, unknown>) {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-beforeEach(() => {
+beforeEach(async () => {
+  // The LS-9541 registration fingerprint lives in AsyncStorage and survives
+  // between tests in this file, which would make later registrations skip.
+  await AsyncStorage.clear();
+
   jest.clearAllMocks();
 });
 

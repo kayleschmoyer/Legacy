@@ -1,4 +1,5 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { usePushNotifications } from './usePushNotifications';
 
@@ -85,7 +86,11 @@ jest.mock('@legacy-sports/logging', () => ({
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-beforeEach(() => {
+beforeEach(async () => {
+  // The LS-9541 registration fingerprint lives in AsyncStorage and survives
+  // between tests in this file, which would make later registrations skip.
+  await AsyncStorage.clear();
+
   jest.clearAllMocks();
   mockGetPermissionsAsync.mockResolvedValue({ status: 'granted' });
   mockRequestPermissionsAsync.mockResolvedValue({ status: 'granted' });

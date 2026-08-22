@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { usePushNotifications } from './usePushNotifications';
 
@@ -102,7 +103,11 @@ jest.mock('@legacy-sports/logging', () => ({
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-beforeEach(() => {
+beforeEach(async () => {
+  // The LS-9541 registration fingerprint lives in AsyncStorage and survives
+  // between tests in this file, which would make later registrations skip.
+  await AsyncStorage.clear();
+
   jest.clearAllMocks();
   mockExtra = {};
   appStateListeners = [];
@@ -209,5 +214,93 @@ describe('usePushNotifications — token rotation', () => {
     unmount();
 
     expect(mockRemove).toHaveBeenCalled();
+  });
+});
+
+describe('usePushNotifications — unchanged-token skip (LS-9541)', () => {
+  beforeEach(() => {
+    mockExtra = { eas: { projectId: 'proj-9999' } };
+  });
+
+  it('does not re-register an unchanged token when the app returns to foreground', async () => {
+    renderHook(() => usePushNotifications(1));
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(1),
+    );
+
+    void act(() => {
+      appStateListeners.forEach((handler) => handler('active'));
+    });
+
+    // The token is fetched again, but the mutation is skipped because the
+    // fingerprint still matches.
+    await waitFor(() =>
+      expect(mockGetExpoPushTokenAsync).toHaveBeenCalledTimes(2),
+    );
+    await waitFor(() =>
+      expect(mockLoggerInfo).toHaveBeenCalledWith(
+        expect.stringContaining('unchanged since last registration'),
+      ),
+    );
+    expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers a genuinely rotated token on foreground', async () => {
+    renderHook(() => usePushNotifications(1));
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(1),
+    );
+
+    mockGetExpoPushTokenAsync.mockResolvedValue({ data: 'expo-token-v2' });
+    void act(() => {
+      appStateListeners.forEach((handler) => handler('active'));
+    });
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledWith({
+        variables: { input: { deviceToken: 'expo-token-v2', platform: 'ios' } },
+      }),
+    );
+
+    mockGetExpoPushTokenAsync.mockResolvedValue({ data: 'expo-token' });
+  });
+
+  it('registers again when a different user signs in', async () => {
+    const initialProps: { id: number | null } = { id: 1 };
+    const { rerender } = renderHook(
+      ({ id }: { id: number | null }) => usePushNotifications(id),
+      { initialProps },
+    );
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(1),
+    );
+
+    rerender({ id: 2 });
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(2),
+    );
+  });
+
+  it('clears the fingerprint on sign-out so the next sign-in re-registers', async () => {
+    const initialProps: { id: number | null } = { id: 1 };
+    const { rerender } = renderHook(
+      ({ id }: { id: number | null }) => usePushNotifications(id),
+      { initialProps },
+    );
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(1),
+    );
+
+    rerender({ id: null });
+    rerender({ id: 1 });
+
+    await waitFor(() =>
+      expect(mockRegisterDeviceToken).toHaveBeenCalledTimes(2),
+    );
   });
 });

@@ -327,10 +327,13 @@ builder.mutationField('registerDeviceToken', (t) =>
       }
       const userId = context.user.id;
       const { deviceToken, platform } = input;
+      // Reuse the request's existing connection rather than opening a second
+      // client (and re-resolving Secrets Manager credentials) — LS-9541.
       const token = await dbService.notifications.registerDeviceToken(
         userId,
         deviceToken,
         platform,
+        context.db,
       );
       return {
         id: Number(token.id),

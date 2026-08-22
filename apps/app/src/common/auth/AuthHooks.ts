@@ -27,6 +27,7 @@ import { AsyncHookResult, useAsyncHook } from '../utilities/HookHelpers';
 import { EnvironmentVariable } from '../EnvironmentVariables';
 import { clearApolloCache } from '../ApolloClientContext';
 import { trackGoogleSignInFailure } from '../../utils/analytics';
+import { clearPushTokenRegistration } from '../../features/notifications/pushRegistrationFingerprint';
 
 declare const __DEV__: boolean;
 
@@ -274,6 +275,12 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     } catch (error) {
       LOGGER.warn('Error clearing Apollo cache on logout:', String(error));
     }
+
+    // The You tab deactivates the device token server-side on logout, so the
+    // registration fingerprint must go with it — otherwise the next sign-in
+    // sees an unchanged token, skips registration, and push stays silently
+    // disabled (LS-9541).
+    await clearPushTokenRegistration();
 
     router.replace('/');
   }, [router]);

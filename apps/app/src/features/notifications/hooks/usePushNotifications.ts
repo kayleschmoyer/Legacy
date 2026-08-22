@@ -20,6 +20,11 @@ import { PermissionStatus } from 'expo-modules-core';
 import { useRegisterDeviceTokenMutation } from '@legacy-sports/graphql';
 import { isPhysicalDevice } from '../../../common/utilities/DeviceUtils';
 import { getEasProjectId } from '../getEasProjectId';
+import {
+  clearPushTokenRegistration,
+  isPushTokenAlreadyRegistered,
+  recordPushTokenRegistration,
+} from '../pushRegistrationFingerprint';
 
 // Configure how notifications appear when app is in foreground
 setNotificationHandler({
@@ -64,82 +69,115 @@ export function usePushNotifications(userId: number | null | undefined) {
   const notificationListener = useRef<EventSubscription | undefined>(undefined);
   const responseListener = useRef<EventSubscription | undefined>(undefined);
   const lastHandledNotificationId = useRef<string | null>(null);
+  const wasSignedInRef = useRef(false);
 
-  const registerToken = useCallback(async () => {
-    if (!userId) return;
+  /**
+   * `force` bypasses the unchanged-token skip. The OS token-rotation listener
+   * is the one caller that must always tell the backend, mirroring the web
+   * hook's pushsubscriptionchange path.
+   */
+  const registerToken = useCallback(
+    async (force = false) => {
+      if (!userId) return;
 
-    // Push notifications only work on physical devices
-    if (!isPhysicalDevice) {
-      LOGGER.info('Skipping push registration on simulator/emulator');
-      return;
-    }
+      // Push notifications only work on physical devices
+      if (!isPhysicalDevice) {
+        LOGGER.info('Skipping push registration on simulator/emulator');
+        return;
+      }
 
-    // Request permission
-    const existingPermission = await getPermissionsAsync();
-    const existingStatus = existingPermission.status;
-    let finalStatus = existingStatus;
+      // Request permission
+      const existingPermission = await getPermissionsAsync();
+      const existingStatus = existingPermission.status;
+      let finalStatus = existingStatus;
 
-    if (existingStatus !== PermissionStatus.GRANTED) {
-      const updatedPermission = await requestPermissionsAsync();
-      finalStatus = updatedPermission.status;
-    }
+      if (existingStatus !== PermissionStatus.GRANTED) {
+        const updatedPermission = await requestPermissionsAsync();
+        finalStatus = updatedPermission.status;
+      }
 
-    if (finalStatus !== PermissionStatus.GRANTED) {
-      LOGGER.info('Push notification permission denied by user');
-      return;
-    }
+      if (finalStatus !== PermissionStatus.GRANTED) {
+        LOGGER.info('Push notification permission denied by user');
+        return;
+      }
 
-    // Additional Android channel setup
-    if (Platform.OS === 'android') {
-      await setNotificationChannelAsync('default', {
-        name: 'Default',
-        importance: AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-    }
+      // Additional Android channel setup
+      if (Platform.OS === 'android') {
+        await setNotificationChannelAsync('default', {
+          name: 'Default',
+          importance: AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+      }
 
-    // The Expo projectId is required to mint a valid push token on EAS builds
-    // and Expo SDK 54+. Without it getExpoPushTokenAsync throws
-    // `No "projectId" found` (LS-7955), so skip registration cleanly rather than
-    // logging an error on dev builds that have no EAS project configured.
-    const projectId = getEasProjectId();
-    if (!projectId) {
-      LOGGER.info(
-        'Skipping push registration: no EAS projectId configured (set EAS_PROJECT_ID)',
-      );
-      return;
-    }
+      // The Expo projectId is required to mint a valid push token on EAS builds
+      // and Expo SDK 54+. Without it getExpoPushTokenAsync throws
+      // `No "projectId" found` (LS-7955), so skip registration cleanly rather than
+      // logging an error on dev builds that have no EAS project configured.
+      const projectId = getEasProjectId();
+      if (!projectId) {
+        LOGGER.info(
+          'Skipping push registration: no EAS projectId configured (set EAS_PROJECT_ID)',
+        );
+        return;
+      }
 
-    try {
-      const tokenData = await getExpoPushTokenAsync({ projectId });
-      const token = tokenData.data;
-      LOGGER.info('Registering Expo push token', { platform: Platform.OS });
+      try {
+        const tokenData = await getExpoPushTokenAsync({ projectId });
+        const token = tokenData.data;
 
-      await registerDeviceToken({
-        variables: {
-          input: {
-            deviceToken: token,
-            platform: Platform.OS, // 'ios' | 'android'
+        if (!force && (await isPushTokenAlreadyRegistered(userId, token))) {
+          LOGGER.info('Expo push token unchanged since last registration');
+          return;
+        }
+
+        LOGGER.info('Registering Expo push token', { platform: Platform.OS });
+
+        await registerDeviceToken({
+          variables: {
+            input: {
+              deviceToken: token,
+              platform: Platform.OS, // 'ios' | 'android'
+            },
           },
-        },
-      });
-    } catch (error) {
-      LOGGER.error('Failed to register push token', error as Error);
-    }
-  }, [userId, registerDeviceToken]);
+        });
+
+        await recordPushTokenRegistration(userId, token);
+      } catch (error) {
+        LOGGER.error('Failed to register push token', error as Error);
+      }
+    },
+    [userId, registerDeviceToken],
+  );
 
   // Register on mount / when userId becomes available
   useEffect(() => {
     void registerToken();
   }, [registerToken]);
 
+  // Drop the fingerprint on logout so the next sign-in re-registers, matching
+  // the web hook. `wasSignedInRef` keeps a cold start (userId null until auth
+  // resolves) from being mistaken for a sign-out.
+  useEffect(() => {
+    if (userId) {
+      wasSignedInRef.current = true;
+      return;
+    }
+    if (wasSignedInRef.current) {
+      wasSignedInRef.current = false;
+      void clearPushTokenRegistration();
+    }
+  }, [userId]);
+
   // Re-register whenever the OS rolls a new device push token (e.g. after an
   // app update or credential rotation). Without this, the old token stays in
   // the backend and push delivery silently fails until the next cold start.
   useEffect(() => {
     const subscription = addPushTokenListener(() => {
-      void registerToken();
+      // A rotated token must always reach the backend, even if the fingerprint
+      // somehow still matches — this is the path that keeps delivery working.
+      void registerToken(true);
     });
     return () => subscription.remove();
   }, [registerToken]);

@@ -42,6 +42,7 @@ import {
 } from './context/ThemeContext';
 import { GrowthBookProvider } from './context/GrowthBookProvider';
 import { LoginPage } from './pages/login/LoginPage';
+import { clearWebPushRegistration } from './hooks/useWebPushRegistration';
 
 if (envConfigErrors.length > 0) {
   LOGGER.error(
@@ -247,6 +248,9 @@ try {
               onLogout={() => {
                 store.dispatch(resetLeagueState());
                 void apolloClient.clearStore();
+                // Forget the push-subscription fingerprint so the next sign-in
+                // re-registers rather than skipping as unchanged (LS-9541).
+                clearWebPushRegistration();
               }}
             >
               <EnhancedAuthGuard

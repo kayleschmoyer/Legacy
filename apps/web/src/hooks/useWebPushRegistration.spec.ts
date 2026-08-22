@@ -5,7 +5,11 @@ import { useWebPushRegistration } from './useWebPushRegistration';
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 const mockRegisterToken = jest.fn().mockResolvedValue({});
-const mockUseAuth = jest.fn(() => ({ isAuthenticated: true }));
+const AUTHED_USER = { id: 42 };
+const mockUseAuth = jest.fn<
+  { isAuthenticated: boolean; user: { id: number } | null },
+  []
+>(() => ({ isAuthenticated: true, user: AUTHED_USER }));
 
 jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: (...args: unknown[]) => mockUseAuth(...args),
@@ -15,11 +19,15 @@ jest.mock('@legacy-sports/graphql', () => ({
   useRegisterDeviceTokenMutation: () => [mockRegisterToken],
 }));
 
+const mockLoggerDebug = jest.fn();
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
     warn: jest.fn(),
-    debug: jest.fn(),
+    debug: (...args: unknown[]) => {
+      mockLoggerDebug(...args);
+    },
     error: jest.fn(),
   },
 }));
@@ -89,8 +97,9 @@ beforeAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  window.localStorage.clear();
   swMessageListeners.length = 0;
-  mockUseAuth.mockReturnValue({ isAuthenticated: true });
+  mockUseAuth.mockReturnValue({ isAuthenticated: true, user: AUTHED_USER });
   mockSwRegister.mockResolvedValue(mockRegistration);
   mockGetSubscription.mockResolvedValue(null);
   mockSubscribe.mockResolvedValue(mockPushSubscription);
@@ -172,13 +181,188 @@ describe('useWebPushRegistration — token refresh / invalidation', () => {
     await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(1));
 
     // Simulate logout
-    mockUseAuth.mockReturnValue({ isAuthenticated: false });
+    mockUseAuth.mockReturnValue({ isAuthenticated: false, user: null });
     rerender();
 
     // Simulate re-login
-    mockUseAuth.mockReturnValue({ isAuthenticated: true });
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, user: AUTHED_USER });
     rerender();
 
     await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('useWebPushRegistration — unchanged-subscription skip (LS-9541)', () => {
+  const STORAGE_KEY = 'ls.webpush.lastRegistration';
+
+  it('issues no mutation on a second page load when the subscription is unchanged', async () => {
+    mockGetSubscription.mockResolvedValue(mockPushSubscription);
+
+    // First page load: registers and persists the fingerprint.
+    const first = renderHook(() => useWebPushRegistration());
+    await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(1));
+    first.unmount();
+
+    // Second page load: a fresh hook instance (in-memory refs gone) but the
+    // same localStorage — exactly what a browser reload looks like.
+    mockRegisterToken.mockClear();
+    mockLoggerDebug.mockClear();
+    const second = renderHook(() => useWebPushRegistration());
+
+    await waitFor(() =>
+      expect(mockLoggerDebug).toHaveBeenCalledWith(
+        expect.stringContaining('Subscription unchanged'),
+      ),
+    );
+    expect(mockRegisterToken).not.toHaveBeenCalled();
+    second.unmount();
+
+    // Third load, still unchanged — still silent.
+    mockLoggerDebug.mockClear();
+    renderHook(() => useWebPushRegistration());
+    await waitFor(() =>
+      expect(mockLoggerDebug).toHaveBeenCalledWith(
+        expect.stringContaining('Subscription unchanged'),
+      ),
+    );
+    expect(mockRegisterToken).not.toHaveBeenCalled();
+  });
+
+  it('registers again when the stored subscription differs', async () => {
+    mockGetSubscription.mockResolvedValue(mockPushSubscription);
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        userId: AUTHED_USER.id,
+        subscription: JSON.stringify({
+          endpoint: 'https://push.example.com/old',
+        }),
+        registeredAt: Date.now(),
+      }),
+    );
+
+    renderHook(() => useWebPushRegistration());
+
+    await waitFor(() =>
+      expect(mockRegisterToken).toHaveBeenCalledWith({
+        variables: {
+          input: { deviceToken: mockSubscriptionJson, platform: 'web' },
+        },
+      }),
+    );
+  });
+
+  it('registers again when the fingerprint belongs to a different user', async () => {
+    mockGetSubscription.mockResolvedValue(mockPushSubscription);
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        userId: AUTHED_USER.id + 1,
+        subscription: mockSubscriptionJson,
+        registeredAt: Date.now(),
+      }),
+    );
+
+    renderHook(() => useWebPushRegistration());
+
+    await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(1));
+  });
+
+  it('re-asserts the registration once the stored fingerprint ages past its TTL', async () => {
+    mockGetSubscription.mockResolvedValue(mockPushSubscription);
+    const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000;
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        userId: AUTHED_USER.id,
+        subscription: mockSubscriptionJson,
+        registeredAt: eightDaysAgo,
+      }),
+    );
+
+    renderHook(() => useWebPushRegistration());
+
+    await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(1));
+  });
+
+  it('registers when the stored fingerprint is corrupt', async () => {
+    mockGetSubscription.mockResolvedValue(mockPushSubscription);
+    window.localStorage.setItem(STORAGE_KEY, 'not-json');
+
+    renderHook(() => useWebPushRegistration());
+
+    await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(1));
+  });
+
+  it('clears the fingerprint on logout so re-login re-registers on a later load', async () => {
+    mockGetSubscription.mockResolvedValue(mockPushSubscription);
+
+    const { rerender, unmount } = renderHook(() => useWebPushRegistration());
+    await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(1));
+    expect(window.localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+
+    mockUseAuth.mockReturnValue({ isAuthenticated: false, user: null });
+    rerender();
+
+    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
+    unmount();
+
+    // A fresh load while signed in registers again, because the fingerprint
+    // went away with the logout.
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, user: AUTHED_USER });
+    mockRegisterToken.mockClear();
+    renderHook(() => useWebPushRegistration());
+    await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(1));
+  });
+
+  it('does not clear the fingerprint on the unauthenticated first paint of a page load', async () => {
+    mockGetSubscription.mockResolvedValue(mockPushSubscription);
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        userId: AUTHED_USER.id,
+        subscription: mockSubscriptionJson,
+        registeredAt: Date.now(),
+      }),
+    );
+
+    // Auth resolves asynchronously, so the hook first renders signed out.
+    mockUseAuth.mockReturnValue({ isAuthenticated: false, user: null });
+    const { rerender } = renderHook(() => useWebPushRegistration());
+
+    expect(window.localStorage.getItem(STORAGE_KEY)).not.toBeNull();
+
+    mockUseAuth.mockReturnValue({ isAuthenticated: true, user: AUTHED_USER });
+    rerender();
+
+    await waitFor(() =>
+      expect(mockLoggerDebug).toHaveBeenCalledWith(
+        expect.stringContaining('Subscription unchanged'),
+      ),
+    );
+    expect(mockRegisterToken).not.toHaveBeenCalled();
+  });
+
+  it('records the rotated subscription after a PUSH_SUBSCRIPTION_CHANGED re-register', async () => {
+    mockGetSubscription.mockResolvedValue(mockPushSubscription);
+
+    renderHook(() => useWebPushRegistration());
+    await waitFor(() => expect(mockRegisterToken).toHaveBeenCalledTimes(1));
+
+    const newSubscriptionJson = JSON.stringify({
+      endpoint: 'https://push.example.com/rotated',
+    });
+
+    await act(async () => {
+      fireSwMessage({
+        type: 'PUSH_SUBSCRIPTION_CHANGED',
+        subscription: newSubscriptionJson,
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(window.localStorage.getItem(STORAGE_KEY)).toContain('rotated'),
+    );
   });
 });

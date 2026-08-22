@@ -434,10 +434,13 @@ describe('notifications resolver', () => {
       undefined as never,
     );
     expect(result).toMatchObject({ id: 5, deviceToken: 'abc123' });
+    // The request's own connection is threaded through instead of the service
+    // opening a second client (LS-9541).
     expect(mockNotificationsService.registerDeviceToken).toHaveBeenCalledWith(
       10,
       'abc123',
       'ios',
+      mockContext.db,
     );
   });
 
