@@ -66,7 +66,15 @@ if [ -z "$APK" ] || [ ! -f "$APK" ]; then
 fi
 
 echo "🔧 Installing $APK (variant=$VARIANT)"
-adb install -r "$APK"
+# Uninstall first rather than `install -r`: the AVD cache key
+# (avd-api34-x86_64-google_apis) is shared with run-maestro-sweep.yml and
+# build-android-app.yml's smoke-android job, so the restored userdata image can
+# already have the real app installed at a much higher versionCode than this
+# benchmark's static app.json versionCode — `install -r` then fails with
+# INSTALL_FAILED_VERSION_DOWNGRADE. Uninstalling first also guarantees a truly
+# clean app-data state per run, which matters for an accurate cold-start number.
+adb uninstall "$PKG" >/dev/null 2>&1 || true
+adb install "$APK"
 
 LOGCAT_FILE="./artifacts/logcat-startup-${VARIANT}.txt"
 mkdir -p "$(dirname "$LOGCAT_FILE")" "$(dirname "$OUT_JSON")"
