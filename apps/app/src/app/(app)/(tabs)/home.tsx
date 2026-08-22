@@ -10,6 +10,7 @@ import type { ScrollView } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  computePrimarySport,
   formatDisplayName,
   type HomeLeagueSummary,
   HomeScreen,
@@ -116,6 +117,7 @@ export default function HomeTab() {
     () => archivedData?.getArchivedUserLeagueSummaries ?? [],
     [archivedData?.getArchivedUserLeagueSummaries],
   );
+  const primarySport = useMemo(() => computePrimarySport(leagues), [leagues]);
 
   const handleShowArchived = useCallback(() => {
     setShowArchived(true);
@@ -248,6 +250,7 @@ export default function HomeTab() {
           leagues={leagues}
           archivedLeagues={archivedLeagues}
           archivedCount={archivedCount}
+          primarySport={primarySport}
           showArchived={showArchived}
           archivedLoading={archivedLoading}
           loading={loading}

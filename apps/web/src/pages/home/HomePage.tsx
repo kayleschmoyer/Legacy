@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
+  computePrimarySport,
   type HomeLeagueSummary,
   HomeScreen,
 } from '@legacy-sports/shared-components';
@@ -150,6 +151,10 @@ export function HomePage(): React.JSX.Element {
     [archivedData?.getArchivedUserLeagueSummaries],
   );
   const hasLeagues = summaries.length > 0;
+  const primarySport = useMemo(
+    () => computePrimarySport(summaries),
+    [summaries],
+  );
 
   const userName = formatDisplayName(auth?.user?.username || 'Manager');
 
@@ -217,6 +222,7 @@ export function HomePage(): React.JSX.Element {
           leagues={summaries}
           archivedLeagues={archivedSummaries}
           archivedCount={cachedArchivedCount}
+          primarySport={primarySport}
           showArchived={showArchived}
           archivedLoading={archivedLoading}
           loading={loading}

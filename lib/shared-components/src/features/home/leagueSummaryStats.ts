@@ -47,6 +47,25 @@ export interface HomeUserStats {
   firstPlaceCount?: number;
 }
 
+/**
+ * The sport the user is most engaged in, derived from league counts (LS-6285)
+ * so the returning-user dashboard can badge that sport's card without a new
+ * backend field. `null` when the user has no leagues yet, or leagues are
+ * split evenly between sports — a tie carries no reliable signal.
+ */
+export function computePrimarySport(
+  leagues: HomeLeagueSummary[],
+): 'baseball' | 'football' | null {
+  let baseballCount = 0;
+  let footballCount = 0;
+  for (const league of leagues) {
+    if (league.sport === 'baseball') baseballCount += 1;
+    else if (league.sport === 'football') footballCount += 1;
+  }
+  if (baseballCount === footballCount) return null;
+  return baseballCount > footballCount ? 'baseball' : 'football';
+}
+
 /* ─── Urgency sort ─── */
 
 /** Lower is more urgent: live draft, then active season, then pre-draft. */

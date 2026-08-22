@@ -78,6 +78,7 @@ export { formatDisplayName } from './homeSummaryFormatters';
 // Leagues ledger can consume them without importing this component module.
 // Re-exported here to keep `@legacy-sports/shared-components` imports stable.
 export type { HomeLeagueSummary, HomeUserStats } from './leagueSummaryStats';
+export { computePrimarySport } from './leagueSummaryStats';
 
 /* ─── Public types ─── */
 
@@ -96,6 +97,8 @@ export interface HomeScreenProps {
   onThisDay?: React.ReactNode;
   /** Default sport, controls ordering + On This Day visibility for new users. */
   defaultSport?: 'baseball' | 'football';
+  /** Sport the user is most engaged in (most leagues), used to badge the returning-user "Pick your sport" cards. `null`/absent when tied or no leagues yet. */
+  primarySport?: 'baseball' | 'football' | null;
   /** Light theme variant for sport-card backgrounds. */
   isLight?: boolean;
   /** Whether the current user has an active premium subscription. Controls premium-only CTAs in the empty state. */
@@ -1917,6 +1920,7 @@ function SportCard({
   isLight,
   full,
   showBadge,
+  isPrimary,
   onView,
   onCreate,
 }: {
@@ -1924,6 +1928,7 @@ function SportCard({
   isLight?: boolean;
   full?: boolean;
   showBadge?: boolean;
+  isPrimary?: boolean;
   onView: () => void;
   onCreate: () => void;
 }) {
@@ -1992,6 +1997,30 @@ function SportCard({
       </XStack>
 
       <YStack gap="$1">
+        {isPrimary ? (
+          <XStack
+            testID={`sport-card-primary-${sport.key}`}
+            alignSelf="flex-start"
+            backgroundColor={withAlpha(BRAND_GOLD_LIGHT, 0.14)}
+            borderWidth={1}
+            borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.4)}
+            borderRadius={9999}
+            paddingVertical={4}
+            paddingHorizontal={10}
+            marginBottom="$1"
+          >
+            <Text
+              fontFamily={DISPLAY_FONT}
+              fontWeight="700"
+              fontSize={10.5}
+              letterSpacing={1.3}
+              textTransform="uppercase"
+              color={BRAND_GOLD_LIGHT}
+            >
+              Your Sport
+            </Text>
+          </XStack>
+        ) : null}
         <Text
           testID={`sport-card-title-${sport.key}`}
           fontFamily={DISPLAY_FONT}
@@ -2795,6 +2824,7 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
     userStats,
     onThisDay,
     defaultSport = 'baseball',
+    primarySport = null,
     isLight = false,
     isPremium = false,
     topInset = 0,
@@ -3320,6 +3350,9 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                       sport={sport}
                       isLight={isLight}
                       showBadge
+                      isPrimary={
+                        primarySport != null && sport.key === primarySport
+                      }
                       onView={() => onViewSport(sport.key)}
                       onCreate={() => onCreateLeague(sport.key)}
                     />

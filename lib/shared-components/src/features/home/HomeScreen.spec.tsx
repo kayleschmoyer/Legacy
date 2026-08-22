@@ -271,6 +271,47 @@ describe('HomeScreen', () => {
     });
   });
 
+  describe('"currently in" sport indicator (LS-6285)', () => {
+    const footballLeague: HomeLeagueSummary = {
+      leagueId: 46,
+      leagueName: 'Gridiron Dynasty',
+      sport: 'football',
+      leaguePhase: 'active',
+    };
+
+    it("badges the majority sport's card and not the other, on the returning-user dashboard", () => {
+      const { getByTestId, queryByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          primarySport="baseball"
+        />,
+      );
+      expect(getByTestId('sport-card-primary-baseball')).toBeTruthy();
+      expect(queryByTestId('sport-card-primary-football')).toBeNull();
+    });
+
+    it('shows no indicator on either card when primarySport is null (tie)', () => {
+      const { queryByTestId } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league, footballLeague]}
+          primarySport={null}
+        />,
+      );
+      expect(queryByTestId('sport-card-primary-baseball')).toBeNull();
+      expect(queryByTestId('sport-card-primary-football')).toBeNull();
+    });
+
+    it('shows no indicator on either card in the new-user empty state, even if primarySport were passed', () => {
+      const { queryByTestId } = render(
+        <HomeScreen {...baseProps} leagues={[]} primarySport="baseball" />,
+      );
+      expect(queryByTestId('sport-card-primary-baseball')).toBeNull();
+      expect(queryByTestId('sport-card-primary-football')).toBeNull();
+    });
+  });
+
   describe('keyboard accessibility (LS-8916)', () => {
     it('fires onPress on the hero league card when Enter or Space is pressed', () => {
       const onViewLeague = jest.fn();

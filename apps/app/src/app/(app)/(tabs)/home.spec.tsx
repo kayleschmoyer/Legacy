@@ -115,6 +115,7 @@ type HomeScreenMockProps = {
   onBrowseStats?: () => void;
   onSetLineup?: (summary: Record<string, unknown>) => void;
   refreshControl?: PullToRefreshControlElement;
+  primarySport?: 'baseball' | 'football' | null;
 };
 
 // Capture the refreshControl element so pull-to-refresh tests can assert it's
@@ -122,8 +123,26 @@ type HomeScreenMockProps = {
 let capturedRefreshControl: HomeScreenMockProps['refreshControl'] | null = null;
 // Capture the scroll handle the tab passes down (LS-9248).
 let capturedScrollRef: HomeScreenMockProps['scrollRef'] | null = null;
+// Capture the computed primarySport prop so tests can assert it (LS-6285).
+let capturedPrimarySport: HomeScreenMockProps['primarySport'] | undefined;
 
 jest.mock('@legacy-sports/shared-components', () => ({
+  // Use the real `computePrimarySport` rather than a local
+  // re-implementation, so these tests verify actual integration with the
+  // shared library — only its unit behavior belongs in
+  // leagueSummaryStats.spec.ts (LS-6285 review finding). requireActual is
+  // scoped to this single module (not the `@legacy-sports/shared-components`
+  // barrel, which transitively pulls in native-only SDKs this jest project
+  // doesn't transform) so only the function under integration is real.
+  computePrimarySport: (
+    jest.requireActual(
+      '../../../../../../lib/shared-components/src/features/home/leagueSummaryStats',
+    ) as unknown as {
+      computePrimarySport: (
+        leagues: Array<{ sport?: string | null }>,
+      ) => 'baseball' | 'football' | null;
+    }
+  ).computePrimarySport,
   HomeScreen: ({
     onViewSport,
     scrollRef,
@@ -139,6 +158,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     onBrowseStats,
     onSetLineup,
     refreshControl,
+    primarySport,
   }: HomeScreenMockProps) => {
     capturedOnViewSport = onViewSport;
     capturedTopInset = topInset;
@@ -152,6 +172,7 @@ jest.mock('@legacy-sports/shared-components', () => ({
     capturedOnSetLineup = onSetLineup ?? null;
     capturedRefreshControl = refreshControl ?? null;
     capturedScrollRef = scrollRef ?? null;
+    capturedPrimarySport = primarySport;
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { View } = require('react-native') as RNComponents;
     return <View testID={testID ?? 'home-screen'}>{onThisDay}</View>;
@@ -668,6 +689,69 @@ describe('HomeTab pull-to-refresh (LS-8847)', () => {
     });
 
     expect(mockRefetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('HomeTab primarySport (LS-6285)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSearchParams = {};
+    capturedPrimarySport = undefined;
+    mockGetArchivedLazy.mockReturnValue([
+      jest.fn(),
+      { data: null, loading: false },
+    ]);
+    mockGetArchivedCached.mockReturnValue({ data: null });
+  });
+
+  it('passes null when the user has no leagues yet', () => {
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: { getUserLeagueSummaries: [] },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<HomeTab />);
+
+    expect(capturedPrimarySport).toBeNull();
+  });
+
+  it('passes the majority sport when leagues are concentrated in one sport', () => {
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: {
+        getUserLeagueSummaries: [
+          { leagueId: 1, sport: 'football' },
+          { leagueId: 2, sport: 'football' },
+          { leagueId: 3, sport: 'baseball' },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<HomeTab />);
+
+    expect(capturedPrimarySport).toBe('football');
+  });
+
+  it('passes null on a tie between sports', () => {
+    mockGetUserLeagueSummaries.mockReturnValue({
+      data: {
+        getUserLeagueSummaries: [
+          { leagueId: 1, sport: 'football' },
+          { leagueId: 2, sport: 'baseball' },
+        ],
+      },
+      loading: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<HomeTab />);
+
+    expect(capturedPrimarySport).toBeNull();
   });
 });
 

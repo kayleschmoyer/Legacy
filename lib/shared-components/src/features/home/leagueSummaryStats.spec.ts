@@ -1,6 +1,7 @@
 import { formatDraftDayShort, formatEraName } from './homeSummaryFormatters';
 import {
   aggregateActiveRecord,
+  computePrimarySport,
   deriveHomeUserStats,
   type HomeLeagueSummary,
   isLiveMatchup,
@@ -35,6 +36,34 @@ describe('urgencyKey / sortByUrgency', () => {
     ];
     expect(sortByUrgency(input).map((s) => s.leagueId)).toEqual([3, 4, 1, 2]);
     expect(input.map((s) => s.leagueId)).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe('computePrimarySport (LS-6285)', () => {
+  it('returns the only sport when leagues exist in exactly one sport', () => {
+    expect(
+      computePrimarySport([{ sport: 'baseball' }, { sport: 'baseball' }]),
+    ).toBe('baseball');
+  });
+
+  it('returns the sport with more leagues when leagues are split across both', () => {
+    expect(
+      computePrimarySport([
+        { sport: 'baseball' },
+        { sport: 'football' },
+        { sport: 'football' },
+      ]),
+    ).toBe('football');
+  });
+
+  it('returns null on a tie between sports', () => {
+    expect(
+      computePrimarySport([{ sport: 'baseball' }, { sport: 'football' }]),
+    ).toBeNull();
+  });
+
+  it('returns null when there are no leagues yet', () => {
+    expect(computePrimarySport([])).toBeNull();
   });
 });
 
