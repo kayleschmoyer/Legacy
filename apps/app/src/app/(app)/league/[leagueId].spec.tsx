@@ -211,6 +211,10 @@ const mockUseGetLeagueTeamsQuery = jest.fn(() => ({
   data: { leagueTeams: [] },
   loading: false,
 }));
+const mockUseGetUserTeamIdLazyQuery = jest.fn(() => [
+  jest.fn(),
+  { data: null, loading: false, error: null },
+]);
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetLeagueByIdQuery: (...args: unknown[]) =>
@@ -220,10 +224,8 @@ jest.mock('@legacy-sports/graphql', () => ({
   useGetPositionsForLeagueQuery: (...args: unknown[]) =>
     mockUseGetPositionsForLeagueQuery(...args),
   useGetTeamMembersQuery: () => ({ data: null, loading: false, error: null }),
-  useGetUserTeamIdLazyQuery: () => [
-    jest.fn(),
-    { data: null, loading: false, error: null },
-  ],
+  useGetUserTeamIdLazyQuery: (...args: unknown[]) =>
+    mockUseGetUserTeamIdLazyQuery(...args),
   useUpdateTeamMemberPositionMutation: () => [jest.fn()],
   useSwapTeamMemberPositionsMutation: () => [jest.fn()],
 }));
@@ -248,6 +250,10 @@ describe('LeagueContext', () => {
       loading: false,
     });
     mockUseAuthorizedUserInfo.mockReturnValue({ id: 2, isAdmin: false });
+    mockUseGetUserTeamIdLazyQuery.mockReturnValue([
+      jest.fn(),
+      { data: null, loading: false, error: null },
+    ]);
   });
 
   describe('loading state', () => {
@@ -284,6 +290,24 @@ describe('LeagueContext', () => {
     it('hides the Manage tab for non-commissioners', () => {
       render(<LeagueContext />);
       expect(screen.queryByTestId('tab-manage')).toBeNull();
+    });
+  });
+
+  describe('trades tab — waiver claims heading', () => {
+    it('renders a "Pending Waiver Claims" heading above the component (LS-6347)', () => {
+      mockUseGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: 5 }, loading: false, error: null },
+      ]);
+      render(<LeagueContext />);
+      expect(screen.getByText('Trade Block')).toBeTruthy();
+      expect(screen.getByText('Pending Trade Offers')).toBeTruthy();
+      expect(screen.getByText('Pending Waiver Claims')).toBeTruthy();
+    });
+
+    it('does not render the waiver claims section without a user team', () => {
+      render(<LeagueContext />);
+      expect(screen.queryByText('Pending Waiver Claims')).toBeNull();
     });
   });
 

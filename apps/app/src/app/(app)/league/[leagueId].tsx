@@ -436,7 +436,14 @@ export default function LeagueContext(): React.JSX.Element {
                     <PendingTradeOffers teamId={userTeamId} />
                   </YStack>
                 )}
-                {userTeamId && <PendingWaiverClaims teamId={userTeamId} />}
+                {userTeamId && (
+                  <YStack>
+                    <Text fontSize="$5" fontWeight="600" marginBottom="$2">
+                      Pending Waiver Claims
+                    </Text>
+                    <PendingWaiverClaims teamId={userTeamId} />
+                  </YStack>
+                )}
               </YStack>
             </ScrollView>
           </Tabs.Content>
