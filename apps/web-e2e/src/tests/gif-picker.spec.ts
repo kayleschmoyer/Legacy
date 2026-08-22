@@ -376,17 +376,23 @@ test.describe('GIF Picker — open and close @regression', () => {
     await page.getByRole('button', { name: /open gif picker/i }).click();
     await expect(page.getByText('GIF Search')).toBeVisible();
 
-    // G and PG rating buttons are in the header row
-    const buttons = page.locator('button');
-    await expect(buttons.filter({ hasText: 'G' }).first()).toBeVisible();
+    // G and PG rating buttons are in the header row. exact:true avoids
+    // substring collisions with unrelated buttons whose accessible name
+    // contains "G" (e.g. a league-switcher chip labeled "Test GIF League"),
+    // which .filter({hasText: 'G'}).first() picked up depending on DOM
+    // order at narrower viewports (LS-9493).
+    await expect(
+      page.getByRole('button', { name: 'G', exact: true }),
+    ).toBeVisible();
   });
 
   test('GIF picker shows PG rating button', async ({ page }) => {
     await page.getByRole('button', { name: /open gif picker/i }).click();
     await expect(page.getByText('GIF Search')).toBeVisible();
 
-    const buttons = page.locator('button');
-    await expect(buttons.filter({ hasText: 'PG' }).first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'PG', exact: true }),
+    ).toBeVisible();
   });
 
   test('close button dismisses the GIF picker', async ({ page }) => {

@@ -210,7 +210,17 @@ test.describe('Football Standings Tab — data rendering @regression', () => {
     page,
     leaguePage,
     standingsPage,
-  }) => {
+  }, testInfo) => {
+    // T/Win% columns hide below the `$sm` breakpoint and PF/PA hide below
+    // `$md` (StandingsTable's responsive column hiding) — both thresholds
+    // sit above the mobile projects' 375px viewport, so this desktop-only
+    // column set never renders there (LS-9493).
+    test.skip(
+      testInfo.project.name === 'Mobile Chrome' ||
+        testInfo.project.name === 'Mobile Safari',
+      'T/PF/PA columns are hidden below the $sm/$md breakpoints on narrow viewports',
+    );
+
     await mockFootballStandings(page);
     await standingsPage.goto(1, 'football');
     await standingsPage.expectNoAppError();

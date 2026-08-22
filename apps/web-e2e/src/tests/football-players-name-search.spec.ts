@@ -259,7 +259,15 @@ test.describe('NFL player name search @regression', () => {
 
   test('clearing search via clear button restores all players', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    // The mobile card feed's SearchField (LS-8832) has no clear button —
+    // only the canonical desktop grid's search box does (LS-9493).
+    test.skip(
+      testInfo.project.name === 'Mobile Chrome' ||
+        testInfo.project.name === 'Mobile Safari',
+      'PlayersCardFeed SearchField has no "Clear search" button',
+    );
+
     const search = page.getByRole('textbox', { name: 'Search players' });
     await search.fill('Mahomes');
 
@@ -323,7 +331,16 @@ test.describe('NFL player name search — debounce and cursor-reset (LS-7641) @r
 
   test('changing the search term resets the pagination cursor and discards the current page', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    // The mobile card feed uses infinite scroll, not the desktop grid's
+    // numbered "Page X of Y" pager, so this pager-cursor assertion is
+    // desktop-only (LS-9493).
+    test.skip(
+      testInfo.project.name === 'Mobile Chrome' ||
+        testInfo.project.name === 'Mobile Safari',
+      'PlayersCardFeed uses infinite scroll — no numbered pager to assert',
+    );
+
     // Paginated grid mock (LS-9366 — the desktop grid pages with a numbered
     // pager over an offset cursor: page 2 requests after: '25' at the default
     // page size of 25). Unsearched pool: 26 players → 2 pages, page 1 =

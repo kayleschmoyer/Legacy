@@ -41,6 +41,13 @@ const E2E_PORT = Number(process.env.E2E_PORT) || 4280;
  * picker, the team-filter `<select>`, Hitters/Pitchers/Combined view tabs,
  * and category tabs with header-driven sort — so they only make sense
  * against the desktop `chromium`/`firefox`/`webkit` projects (LS-9471).
+ *
+ * LS-9493: the four specs below assert the same canonical-surface-only
+ * affordances (the `select[name="team-filter"]` dropdown and the granular
+ * 10-position `FootballPositionPillGroup`, both from footballStatsConfig.tsx)
+ * but were missed when the list above was built, so they deterministically
+ * timed out on Mobile Chrome — 500+ Playwright TimeoutErrors misread as CI
+ * resource contention were actually this same viewport/UI mismatch.
  */
 const DESKTOP_GRID_ONLY_SPECS = [
   /nfl-player-stats-category-tabs\.spec\.ts$/,
@@ -48,6 +55,11 @@ const DESKTOP_GRID_ONLY_SPECS = [
   /player-stats-format-preference\.spec\.ts$/,
   /player-stats-search-and-filters\.spec\.ts$/,
   /sport-aware-player-list\.spec\.ts$/,
+  /football-availability-filter\.spec\.ts$/,
+  /football-players-team-filter\.spec\.ts$/,
+  /football-team-filter\.spec\.ts$/,
+  /football-players-position-url\.spec\.ts$/,
+  /football-position-filter-a11y\.spec\.ts$/,
 ];
 
 /**

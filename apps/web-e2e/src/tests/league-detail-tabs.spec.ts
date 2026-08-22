@@ -752,7 +752,16 @@ test.describe('Pending Waivers — with claims @regression', () => {
   test('shows pending waiver claim card when claims exist', async ({
     page,
     leaguePage,
-  }) => {
+  }, testInfo) => {
+    // Roster.tsx renders PendingWaiverClaims with compact={isNarrow} below
+    // the narrow-viewport breakpoint, which shows only a claim-count summary
+    // and never the per-claim player name asserted below (LS-9493).
+    test.skip(
+      testInfo.project.name === 'Mobile Chrome' ||
+        testInfo.project.name === 'Mobile Safari',
+      'PendingWaiverClaims renders in compact (summary-only) mode on narrow viewports',
+    );
+
     await mockLeagueDetailGraphQL(page, {
       waiverClaims: MOCK_WAIVER_CLAIMS,
       teamMembers: MOCK_TEAM_MEMBERS,
