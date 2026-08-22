@@ -423,10 +423,16 @@ export default function LeagueContext(): React.JSX.Element {
                   <Text fontSize="$5" fontWeight="600" marginBottom="$2">
                     Trade Block
                   </Text>
-                  <LeagueTradeBlock
-                    leagueId={numLeagueId}
-                    userTeamId={userTeamId}
-                  />
+                  {userTeamId ? (
+                    <LeagueTradeBlock
+                      leagueId={numLeagueId}
+                      userTeamId={userTeamId}
+                    />
+                  ) : (
+                    <Text color="$textMuted">
+                      Join this league to view the trade block.
+                    </Text>
+                  )}
                 </YStack>
                 {userTeamId && (
                   <YStack>

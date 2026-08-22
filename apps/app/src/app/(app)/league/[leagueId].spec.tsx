@@ -95,6 +95,8 @@ jest.mock('tamagui', () => {
   };
 });
 
+const mockLeagueTradeBlock = jest.fn(() => null);
+
 jest.mock('@legacy-sports/shared-components', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories can't reference hoisted top-level imports
   const { View } = require('react-native') as RNComponents;
@@ -127,7 +129,7 @@ jest.mock('@legacy-sports/shared-components', () => {
   );
   return {
     LeagueTabBar,
-    LeagueTradeBlock: () => null,
+    LeagueTradeBlock: (...args: unknown[]) => mockLeagueTradeBlock(...args),
     PendingTradeOffers: () => null,
     PendingWaiverClaims: () => null,
     StandingsTable: () => null,
@@ -323,6 +325,31 @@ describe('LeagueContext', () => {
       mockUseAuthorizedUserInfo.mockReturnValue({ id: 99, isAdmin: true });
       render(<LeagueContext />);
       expect(screen.getByTestId('tab-manage')).toBeTruthy();
+    });
+  });
+
+  describe('trades tab — trade block membership gate', () => {
+    it('shows a join prompt instead of the trade block for non-members', () => {
+      render(<LeagueContext />);
+      expect(
+        screen.getByText(/Join this league to view the trade block/),
+      ).toBeTruthy();
+      expect(mockLeagueTradeBlock).not.toHaveBeenCalled();
+    });
+
+    it('renders the trade block for members', () => {
+      mockUseGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: 42 }, loading: false, error: null },
+      ]);
+      render(<LeagueContext />);
+      expect(
+        screen.queryByText(/Join this league to view the trade block/),
+      ).toBeNull();
+      expect(mockLeagueTradeBlock).toHaveBeenCalledWith(
+        expect.objectContaining({ userTeamId: 42 }),
+        undefined,
+      );
     });
   });
 
