@@ -1209,6 +1209,7 @@ const PublicLeagueInfo = builder.objectRef<{
   id: number;
   name: string;
   owner: number;
+  sport: 'baseball' | 'football';
   maxRosterSize: number;
   draftStatus: string;
   playerPool: string;
@@ -1225,6 +1226,11 @@ PublicLeagueInfo.implement({
     id: t.exposeInt('id'),
     name: t.exposeString('name'),
     owner: t.exposeInt('owner'),
+    sport: t.field({
+      type: SportKindEnum,
+      description: 'Sport for this league (baseball or football). (LS-6290)',
+      resolve: (parent) => parent.sport,
+    }),
     maxRosterSize: t.exposeInt('maxRosterSize'),
     draftStatus: t.exposeString('draftStatus'),
     playerPool: t.exposeString('playerPool'),
@@ -1249,6 +1255,7 @@ builder.queryField('publicLeagues', (t) =>
     args: {
       sport: t.arg({ type: SportKindEnum, required: false }),
       search: t.arg.string({ required: false }),
+      sport: t.arg({ type: SportKindEnum, required: false }),
       draftStatus: t.arg.string({ required: false }),
       playerPool: t.arg.string({ required: false }),
       limit: t.arg.int({ required: false }),
@@ -1365,6 +1372,7 @@ builder.queryField('publicLeagues', (t) =>
             id: row.id,
             name: row.name,
             owner: row.owner,
+            sport: row.sport,
             maxRosterSize: row.maxRosterSize,
             draftStatus: row.draftStatus,
             playerPool: row.playerPool,

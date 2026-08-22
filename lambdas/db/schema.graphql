@@ -3554,6 +3554,11 @@ type PublicLeagueInfo {
   name: String
   owner: Int
   playerPool: String
+
+  """
+  Sport for this league (baseball or football). (LS-6290)
+  """
+  sport: Sport
   totalSpots: Int
 }
 

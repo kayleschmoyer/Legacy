@@ -3228,6 +3228,8 @@ export type PublicLeagueInfo = {
   name?: Maybe<Scalars['String']['output']>;
   owner?: Maybe<Scalars['Int']['output']>;
   playerPool?: Maybe<Scalars['String']['output']>;
+  /** Sport for this league (baseball or football). (LS-6290) */
+  sport?: Maybe<Sport>;
   totalSpots?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -6785,6 +6787,7 @@ export type ValidateInviteCodeQuery = {
 export type GetPublicLeaguesQueryVariables = Exact<{
   sport?: InputMaybe<Sport>;
   search?: InputMaybe<Scalars['String']['input']>;
+  sport?: InputMaybe<Sport>;
   draftStatus?: InputMaybe<Scalars['String']['input']>;
   playerPool?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -6798,6 +6801,7 @@ export type GetPublicLeaguesQuery = {
     id?: number | null;
     name?: string | null;
     owner?: number | null;
+    sport?: Sport | null;
     maxRosterSize?: number | null;
     draftStatus?: string | null;
     playerPool?: string | null;
@@ -19346,6 +19350,7 @@ export const GetPublicLeagues = gql`
   query GetPublicLeagues(
     $sport: Sport
     $search: String
+    $sport: Sport
     $draftStatus: String
     $playerPool: String
     $limit: Int
@@ -19354,6 +19359,7 @@ export const GetPublicLeagues = gql`
     publicLeagues(
       sport: $sport
       search: $search
+      sport: $sport
       draftStatus: $draftStatus
       playerPool: $playerPool
       limit: $limit
@@ -19362,6 +19368,7 @@ export const GetPublicLeagues = gql`
       id
       name
       owner
+      sport
       maxRosterSize
       draftStatus
       playerPool
@@ -19388,6 +19395,7 @@ export const GetPublicLeagues = gql`
  *   variables: {
  *      sport: // value for 'sport'
  *      search: // value for 'search'
+ *      sport: // value for 'sport'
  *      draftStatus: // value for 'draftStatus'
  *      playerPool: // value for 'playerPool'
  *      limit: // value for 'limit'

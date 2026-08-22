@@ -15,12 +15,161 @@ import {
   YStack,
 } from 'tamagui';
 import {
+  Sport,
+  useGetPublicLeaguesQuery,
   useJoinLeagueByCodeMutation,
+  useJoinPublicLeagueMutation,
   useValidateInviteCodeLazyQuery,
   type ValidateInviteCodeQuery,
 } from '@legacy-sports/graphql';
+import { useSubscription } from '../../../features/subscription/useSubscription';
 
 type SportChoice = 'baseball' | 'football';
+
+const QUICK_JOIN_LIMIT = 3;
+
+/**
+ * Premium-only shortcut to join an open public league without typing an
+ * invite code. Reuses the Team Name field already on the Join screen, so a
+ * premium user only has to name their team and tap Quick Join (LS-6290).
+ */
+function QuickJoinPanel({
+  sport,
+  teamName,
+  onRequireTeamName,
+  onJoined,
+}: {
+  sport: SportChoice;
+  teamName: string;
+  onRequireTeamName: () => void;
+  onJoined: (leagueId: number) => void;
+}): React.JSX.Element | null {
+  const { data, loading } = useGetPublicLeaguesQuery({
+    variables: {
+      sport: sport === 'football' ? Sport.Football : Sport.Baseball,
+      limit: QUICK_JOIN_LIMIT,
+    },
+    fetchPolicy: 'cache-and-network',
+  });
+  const [joinPublicLeague, { loading: joining }] =
+    useJoinPublicLeagueMutation();
+  const [joiningLeagueId, setJoiningLeagueId] = useState<number | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
+  const leagues = (data?.publicLeagues ?? []).filter(
+    (league): league is typeof league & { id: number } =>
+      league.id != null && !league.isFull && !league.isAlreadyMember,
+  );
+
+  const handleQuickJoin = async (leagueId: number): Promise<void> => {
+    if (!teamName.trim()) {
+      onRequireTeamName();
+      return;
+    }
+    setJoinError(null);
+    setJoiningLeagueId(leagueId);
+    try {
+      const result = await joinPublicLeague({
+        variables: { leagueId, teamName: teamName.trim() },
+      });
+      if (result.data?.joinPublicLeague?.success) {
+        onJoined(leagueId);
+      } else {
+        setJoinError(
+          result.data?.joinPublicLeague?.message ?? 'Failed to join league',
+        );
+      }
+    } catch (err) {
+      LOGGER.error(
+        'Quick Join failed',
+        err instanceof Error ? err : new Error(String(err)),
+      );
+      setJoinError(
+        err instanceof Error ? err.message : 'Failed to join league',
+      );
+    } finally {
+      setJoiningLeagueId(null);
+    }
+  };
+
+  if (loading || leagues.length === 0) return null;
+
+  return (
+    <Card
+      backgroundColor="$surfaceInteractive"
+      borderColor="$brandGoldLight"
+      borderWidth={1}
+      padding="$4"
+      testID="quick-join-panel"
+    >
+      <YStack space="$3">
+        <XStack alignItems="center" space="$2">
+          <Text
+            fontSize="$4"
+            accessibilityRole="image"
+            accessibilityLabel="lightning bolt"
+          >
+            ⚡
+          </Text>
+          <H2 size="$5" color="$brandGoldLight">
+            Quick Join
+          </H2>
+          <Text
+            color="$brandGold"
+            fontSize="$1"
+            fontWeight="700"
+            backgroundColor="$brandNavyLight"
+            paddingHorizontal="$2"
+            paddingVertical={2}
+            borderRadius="$2"
+          >
+            PREMIUM
+          </Text>
+        </XStack>
+        <Text color="$gray11" fontSize="$3">
+          Jump straight into an open public league — no invite code needed.
+        </Text>
+        {leagues.map((league) => (
+          <XStack
+            key={league.id}
+            justifyContent="space-between"
+            alignItems="center"
+            padding="$3"
+            backgroundColor="$background"
+            borderRadius="$3"
+            testID={`quick-join-league-${league.id}`}
+          >
+            <YStack flex={1} paddingRight="$2">
+              <Text fontWeight="600" fontSize="$4">
+                {league.name ?? 'Unknown League'}
+              </Text>
+              <Text color="$gray10" fontSize="$2">
+                {league.availableSpots ?? 0} of {league.totalSpots ?? 0} spots
+                available
+              </Text>
+            </YStack>
+            <Button
+              size="$3"
+              backgroundColor="$brandNavyLight"
+              color="white"
+              disabled={joining && joiningLeagueId === league.id}
+              onPress={() => void handleQuickJoin(league.id)}
+            >
+              {joining && joiningLeagueId === league.id
+                ? 'Joining...'
+                : 'Quick Join'}
+            </Button>
+          </XStack>
+        ))}
+        {joinError && (
+          <Text color="$red10" fontSize="$2" fontWeight="600">
+            ❌ {joinError}
+          </Text>
+        )}
+      </YStack>
+    </Card>
+  );
+}
 
 function SportSelector({
   value,
@@ -94,6 +243,7 @@ export default function JoinLeagueScreen(): React.JSX.Element {
   const [joinLeague, { loading }] = useJoinLeagueByCodeMutation();
   const [validateCode, { loading: validating }] =
     useValidateInviteCodeLazyQuery();
+  const { isPremium } = useSubscription();
 
   const validationVersionRef = useRef(0);
   const [leagueInfo, setLeagueInfo] =
@@ -219,6 +369,23 @@ export default function JoinLeagueScreen(): React.JSX.Element {
               </Text>
             </XStack>
           </Card>
+        )}
+
+        {isPremium && (
+          <QuickJoinPanel
+            sport={sport}
+            teamName={teamName}
+            onRequireTeamName={() =>
+              setError('Please enter a team name to Quick Join')
+            }
+            onJoined={(leagueId) => {
+              router.navigate(
+                sport === 'football'
+                  ? `/football/league/${leagueId}`
+                  : `/baseball/league/${leagueId}`,
+              );
+            }}
+          />
         )}
 
         <Card

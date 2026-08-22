@@ -10,11 +10,15 @@ import {
 import { H1, H2, Input, Spinner, Text } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  Sport,
+  useGetPublicLeaguesQuery,
   useJoinLeagueByCodeMutation,
+  useJoinPublicLeagueMutation,
   useValidateInviteCodeLazyQuery,
 } from '@legacy-sports/graphql';
 import { PageMeta } from '../../components/PageMeta';
 import { storeCameFrom } from '../../lib/came-from';
+import { useIsPremium } from '../../hooks/useIsPremium';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
@@ -24,6 +28,147 @@ import {
 /** Read the sport from a pathname (`/football/...` → football, otherwise baseball). */
 function sportFromPathname(pathname: string): 'baseball' | 'football' {
   return pathname.startsWith('/football') ? 'football' : 'baseball';
+}
+
+const QUICK_JOIN_LIMIT = 3;
+
+/**
+ * Premium-only shortcut to join an open public league without typing an
+ * invite code. Reuses the Team Name field already on the Join page, so a
+ * premium user only has to name their team and click Quick Join (LS-6290).
+ */
+function QuickJoinPanel({
+  sport,
+  teamName,
+  onRequireTeamName,
+  onJoined,
+}: {
+  sport: 'baseball' | 'football';
+  teamName: string;
+  onRequireTeamName: () => void;
+  onJoined: (leagueId: number) => void;
+}): React.JSX.Element | null {
+  const { data, loading } = useGetPublicLeaguesQuery({
+    variables: {
+      sport: sport === 'football' ? Sport.Football : Sport.Baseball,
+      limit: QUICK_JOIN_LIMIT,
+    },
+    fetchPolicy: 'cache-and-network',
+  });
+  const [joinPublicLeague, { loading: joining }] =
+    useJoinPublicLeagueMutation();
+  const [joiningLeagueId, setJoiningLeagueId] = useState<number | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
+  const leagues = (data?.publicLeagues ?? []).filter(
+    (league): league is typeof league & { id: number } =>
+      league.id != null && !league.isFull && !league.isAlreadyMember,
+  );
+
+  const handleQuickJoin = async (leagueId: number): Promise<void> => {
+    if (!teamName.trim()) {
+      onRequireTeamName();
+      return;
+    }
+    setJoinError(null);
+    setJoiningLeagueId(leagueId);
+    try {
+      const result = await joinPublicLeague({
+        variables: { leagueId, teamName: teamName.trim() },
+      });
+      if (result.data?.joinPublicLeague?.success) {
+        onJoined(leagueId);
+      } else {
+        setJoinError(
+          result.data?.joinPublicLeague?.message ?? 'Failed to join league',
+        );
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      setJoinError(error.message || 'Failed to join league');
+      LOGGER.error('Quick Join failed', error);
+    } finally {
+      setJoiningLeagueId(null);
+    }
+  };
+
+  if (loading || leagues.length === 0) return null;
+
+  return (
+    <Card
+      backgroundColor={withAlpha(BRAND_GOLD_LIGHT, 0.1)}
+      borderColor={withAlpha(BRAND_GOLD_LIGHT, 0.4)}
+      padding="$4"
+      width="100%"
+      data-testid="quick-join-panel"
+    >
+      <YStack space="$3">
+        <XStack gap="$2" alignItems="center">
+          <Text fontSize="$4">
+            <span role="img" aria-label="lightning">
+              ⚡
+            </span>
+          </Text>
+          <H2 size="$5" color={BRAND_GOLD_LIGHT}>
+            Quick Join
+          </H2>
+          <Text
+            color={BRAND_GOLD_LIGHT}
+            fontSize="$1"
+            fontWeight="700"
+            backgroundColor={withAlpha(BRAND_NAVY_LIGHT, 0.5)}
+            paddingHorizontal="$2"
+            paddingVertical={2}
+            borderRadius="$2"
+          >
+            PREMIUM
+          </Text>
+        </XStack>
+        <Text color="$gray11" fontSize="$3">
+          Jump straight into an open public league — no invite code needed.
+        </Text>
+        {leagues.map((league) => (
+          <XStack
+            key={league.id}
+            justifyContent="space-between"
+            alignItems="center"
+            padding="$3"
+            backgroundColor="$background"
+            borderRadius="$3"
+            data-testid={`quick-join-league-${league.id}`}
+          >
+            <YStack flex={1} paddingRight="$2">
+              <Text fontWeight="600" fontSize="$4">
+                {league.name ?? 'Unknown League'}
+              </Text>
+              <Text color="$gray10" fontSize="$2">
+                {league.availableSpots ?? 0} of {league.totalSpots ?? 0} spots
+                available
+              </Text>
+            </YStack>
+            <Button
+              backgroundColor={BRAND_NAVY_LIGHT}
+              color="white"
+              disabled={joining && joiningLeagueId === league.id}
+              onPress={() => void handleQuickJoin(league.id)}
+            >
+              {joining && joiningLeagueId === league.id
+                ? 'Joining...'
+                : 'Quick Join'}
+            </Button>
+          </XStack>
+        ))}
+        {joinError && (
+          <Text color="$red10" fontSize="$2" fontWeight="600">
+            <span role="img" aria-label="error">
+              ❌
+            </span>{' '}
+            {joinError}
+          </Text>
+        )}
+      </YStack>
+    </Card>
+  );
 }
 
 export function JoinLeagueByCodePage(): React.JSX.Element {
@@ -52,6 +197,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
     validateCode,
     { data: validateData, loading: validating, error: validateError },
   ] = useValidateInviteCodeLazyQuery();
+  const isPremium = useIsPremium();
 
   const codePattern = /^[A-Z0-9]{8}$/;
   const trimmedCode = inviteCode.trim().toUpperCase();
@@ -214,6 +360,17 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
             </Text>
           </XStack>
         </Card>
+      )}
+
+      {isPremium && (
+        <QuickJoinPanel
+          sport={sport}
+          teamName={teamName}
+          onRequireTeamName={() =>
+            setError('Please enter a team name to Quick Join')
+          }
+          onJoined={(leagueId) => navigate(`/${sport}/league/${leagueId}`)}
+        />
       )}
 
       <Card

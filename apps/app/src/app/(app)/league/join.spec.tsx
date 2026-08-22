@@ -36,9 +36,22 @@ jest.mock('tamagui', () => {
 
 const mockJoinLeague = jest.fn();
 const mockValidateCode = jest.fn();
+const mockJoinPublicLeague = jest.fn();
+let mockPublicLeaguesData: unknown[] = [];
 jest.mock('@legacy-sports/graphql', () => ({
+  Sport: { Baseball: 'baseball', Football: 'football' },
   useJoinLeagueByCodeMutation: () => [mockJoinLeague, { loading: false }],
   useValidateInviteCodeLazyQuery: () => [mockValidateCode, { loading: false }],
+  useGetPublicLeaguesQuery: () => ({
+    data: { publicLeagues: mockPublicLeaguesData },
+    loading: false,
+  }),
+  useJoinPublicLeagueMutation: () => [mockJoinPublicLeague, { loading: false }],
+}));
+
+let mockIsPremium = false;
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useSubscription: () => ({ isPremium: mockIsPremium }),
 }));
 
 jest.mock('../_screenErrorBoundary', () => ({ ScreenErrorBoundary: null }));
@@ -49,6 +62,8 @@ describe('JoinLeagueScreen (unified)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockValidateCode.mockResolvedValue({ data: null });
+    mockIsPremium = false;
+    mockPublicLeaguesData = [];
   });
 
   describe('rendering', () => {
@@ -320,6 +335,123 @@ describe('JoinLeagueScreen (unified)', () => {
       fireEvent.press(screen.getByRole('button', { name: 'Sign In' }));
 
       expect(mockNavigate).toHaveBeenCalledWith('/login');
+    });
+  });
+
+  // LS-6290: premium users get a Quick Join shortcut to open public leagues;
+  // free users see the same invite-code-only experience as before.
+  describe('Quick Join (premium differentiation, LS-6290)', () => {
+    const quickJoinLeague = {
+      id: 42,
+      name: 'Sunday Ballers',
+      totalSpots: 10,
+      availableSpots: 3,
+      isFull: false,
+      isAlreadyMember: false,
+    };
+
+    it('does not render Quick Join for free users', () => {
+      mockIsPremium = false;
+      mockPublicLeaguesData = [quickJoinLeague];
+      render(<JoinLeagueScreen />);
+      expect(screen.queryByTestId('quick-join-panel')).toBeNull();
+    });
+
+    it('renders Quick Join with open public leagues for premium users', () => {
+      mockIsPremium = true;
+      mockPublicLeaguesData = [quickJoinLeague];
+      render(<JoinLeagueScreen />);
+      expect(screen.getByTestId('quick-join-panel')).toBeTruthy();
+      expect(screen.getByText('Sunday Ballers')).toBeTruthy();
+    });
+
+    it('hides Quick Join for premium users when no open public leagues exist', () => {
+      mockIsPremium = true;
+      mockPublicLeaguesData = [];
+      render(<JoinLeagueScreen />);
+      expect(screen.queryByTestId('quick-join-panel')).toBeNull();
+    });
+
+    it('excludes full and already-joined leagues from Quick Join', () => {
+      mockIsPremium = true;
+      mockPublicLeaguesData = [
+        { ...quickJoinLeague, id: 1, name: 'Full League', isFull: true },
+        {
+          ...quickJoinLeague,
+          id: 2,
+          name: 'Already Joined',
+          isAlreadyMember: true,
+        },
+      ];
+      render(<JoinLeagueScreen />);
+      expect(screen.queryByTestId('quick-join-panel')).toBeNull();
+    });
+
+    it('prompts for a team name before quick-joining', () => {
+      mockIsPremium = true;
+      mockPublicLeaguesData = [quickJoinLeague];
+      render(<JoinLeagueScreen />);
+      fireEvent.press(screen.getByRole('button', { name: /Quick Join/ }));
+      expect(mockJoinPublicLeague).not.toHaveBeenCalled();
+      expect(
+        screen.getByText(/Please enter a team name to Quick Join/),
+      ).toBeTruthy();
+    });
+
+    it('quick-joins the league and navigates on success', async () => {
+      mockIsPremium = true;
+      mockPublicLeaguesData = [quickJoinLeague];
+      mockJoinPublicLeague.mockResolvedValue({
+        data: { joinPublicLeague: { success: true, leagueId: 42 } },
+      });
+
+      render(<JoinLeagueScreen />);
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Enter your team name'),
+        'My Team',
+      );
+      fireEvent.press(screen.getByRole('button', { name: /Quick Join/ }));
+
+      await waitFor(() => {
+        expect(mockJoinPublicLeague).toHaveBeenCalledWith({
+          variables: { leagueId: 42, teamName: 'My Team' },
+        });
+      });
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42');
+      });
+    });
+
+    // Project rule: every mutation call site needs coverage for an
+    // UNAUTHENTICATED error — the UI must surface it gracefully, not crash
+    // or silently no-op.
+    it('surfaces an error without crashing when quick-join returns UNAUTHENTICATED', async () => {
+      mockIsPremium = true;
+      mockPublicLeaguesData = [quickJoinLeague];
+      mockJoinPublicLeague.mockRejectedValue(
+        new CombinedGraphQLErrors({
+          errors: [
+            {
+              message: 'Not authenticated',
+              extensions: { code: 'UNAUTHENTICATED' },
+            },
+          ],
+        }),
+      );
+
+      render(<JoinLeagueScreen />);
+      fireEvent.changeText(
+        screen.getByPlaceholderText('Enter your team name'),
+        'My Team',
+      );
+      fireEvent.press(screen.getByRole('button', { name: /Quick Join/ }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Not authenticated/)).toBeTruthy();
+      });
+      expect(mockNavigate).not.toHaveBeenCalledWith(
+        expect.stringContaining('/league/'),
+      );
     });
   });
 });

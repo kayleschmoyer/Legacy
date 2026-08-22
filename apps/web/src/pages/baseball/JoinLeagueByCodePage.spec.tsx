@@ -104,8 +104,10 @@ jest.mock('tamagui', () => ({
 
 const mockJoinLeague = jest.fn();
 const mockValidateCode = jest.fn();
+const mockJoinPublicLeague = jest.fn();
 
 jest.mock('@legacy-sports/graphql', () => ({
+  Sport: { Baseball: 'baseball', Football: 'football' },
   useJoinLeagueByCodeMutation: jest.fn(() => [
     mockJoinLeague,
     { loading: false },
@@ -114,6 +116,19 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockValidateCode,
     { data: undefined, loading: false },
   ]),
+  useGetPublicLeaguesQuery: jest.fn(() => ({
+    data: { publicLeagues: [] },
+    loading: false,
+  })),
+  useJoinPublicLeagueMutation: jest.fn(() => [
+    mockJoinPublicLeague,
+    { loading: false },
+  ]),
+}));
+
+const mockUseIsPremium = jest.fn(() => false);
+jest.mock('../../hooks/useIsPremium', () => ({
+  useIsPremium: () => mockUseIsPremium(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -157,9 +172,14 @@ describe('JoinLeagueByCodePage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockJoinLeague.mockResolvedValue({ data: undefined });
+    mockUseIsPremium.mockReturnValue(false);
 
-    const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
-      gqlMock;
+    const {
+      useJoinLeagueByCodeMutation,
+      useValidateInviteCodeLazyQuery,
+      useGetPublicLeaguesQuery,
+      useJoinPublicLeagueMutation,
+    } = gqlMock;
 
     useJoinLeagueByCodeMutation.mockReturnValue([
       mockJoinLeague,
@@ -168,6 +188,14 @@ describe('JoinLeagueByCodePage', () => {
     useValidateInviteCodeLazyQuery.mockReturnValue([
       mockValidateCode,
       { data: undefined, loading: false },
+    ]);
+    useGetPublicLeaguesQuery.mockReturnValue({
+      data: { publicLeagues: [] },
+      loading: false,
+    });
+    useJoinPublicLeagueMutation.mockReturnValue([
+      mockJoinPublicLeague,
+      { loading: false },
     ]);
   });
 
@@ -873,6 +901,133 @@ describe('JoinLeagueByCodePage', () => {
     expect(submitButton?.closest('button')).toBeDisabled();
   });
 
+  // LS-6290: premium users get a Quick Join shortcut to open public leagues;
+  // free users see the same invite-code-only experience as before.
+  //
+  // NOTE: this describe block must run before the "must be last" LS-1295 test
+  // below — that test calls jest.resetModules(), which would otherwise leave
+  // these tests rendering against a stale module registry (see its comment).
+  describe('Quick Join (premium differentiation, LS-6290)', () => {
+    const quickJoinLeague = {
+      id: 42,
+      name: 'Sunday Ballers',
+      totalSpots: 10,
+      availableSpots: 3,
+      isFull: false,
+      isAlreadyMember: false,
+    };
+
+    it('does not render Quick Join for free users', () => {
+      mockUseIsPremium.mockReturnValue(false);
+      gqlMock.useGetPublicLeaguesQuery.mockReturnValue({
+        data: { publicLeagues: [quickJoinLeague] },
+        loading: false,
+      });
+
+      renderPage();
+      expect(screen.queryByTestId('quick-join-panel')).not.toBeInTheDocument();
+    });
+
+    it('renders Quick Join with open public leagues for premium users', () => {
+      mockUseIsPremium.mockReturnValue(true);
+      gqlMock.useGetPublicLeaguesQuery.mockReturnValue({
+        data: { publicLeagues: [quickJoinLeague] },
+        loading: false,
+      });
+
+      renderPage();
+      expect(screen.getByTestId('quick-join-panel')).toBeInTheDocument();
+      expect(screen.getByText('Sunday Ballers')).toBeInTheDocument();
+    });
+
+    it('hides Quick Join for premium users when no open public leagues exist', () => {
+      mockUseIsPremium.mockReturnValue(true);
+      gqlMock.useGetPublicLeaguesQuery.mockReturnValue({
+        data: { publicLeagues: [] },
+        loading: false,
+      });
+
+      renderPage();
+      expect(screen.queryByTestId('quick-join-panel')).not.toBeInTheDocument();
+    });
+
+    it('prompts for a team name before quick-joining', () => {
+      mockUseIsPremium.mockReturnValue(true);
+      gqlMock.useGetPublicLeaguesQuery.mockReturnValue({
+        data: { publicLeagues: [quickJoinLeague] },
+        loading: false,
+      });
+
+      renderPage();
+      fireEvent.click(screen.getByRole('button', { name: /Quick Join/ }));
+
+      expect(mockJoinPublicLeague).not.toHaveBeenCalled();
+      expect(
+        screen.getByText(/Please enter a team name to Quick Join/),
+      ).toBeInTheDocument();
+    });
+
+    it('quick-joins the league and navigates on success', async () => {
+      mockUseIsPremium.mockReturnValue(true);
+      gqlMock.useGetPublicLeaguesQuery.mockReturnValue({
+        data: { publicLeagues: [quickJoinLeague] },
+        loading: false,
+      });
+      mockJoinPublicLeague.mockResolvedValue({
+        data: { joinPublicLeague: { success: true, leagueId: 42 } },
+      });
+
+      renderPage();
+      fireEvent.change(screen.getByPlaceholderText(/Enter your team name/i), {
+        target: { value: 'My Team' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Quick Join/ }));
+
+      await waitFor(() => {
+        expect(mockJoinPublicLeague).toHaveBeenCalledWith({
+          variables: { leagueId: 42, teamName: 'My Team' },
+        });
+      });
+      await waitFor(() => {
+        expect(mockNavigate).toHaveBeenCalledWith('/baseball/league/42');
+      });
+    });
+
+    // Project rule: every mutation call site needs coverage for an
+    // UNAUTHENTICATED error — the UI must surface it gracefully, not crash
+    // or silently no-op.
+    it('surfaces an error without crashing when quick-join returns UNAUTHENTICATED', async () => {
+      mockUseIsPremium.mockReturnValue(true);
+      gqlMock.useGetPublicLeaguesQuery.mockReturnValue({
+        data: { publicLeagues: [quickJoinLeague] },
+        loading: false,
+      });
+      mockJoinPublicLeague.mockRejectedValue(
+        new CombinedGraphQLErrors({
+          errors: [
+            {
+              message: 'Not authenticated',
+              extensions: { code: 'UNAUTHENTICATED' },
+            },
+          ],
+        }),
+      );
+
+      renderPage();
+      fireEvent.change(screen.getByPlaceholderText(/Enter your team name/i), {
+        target: { value: 'My Team' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Quick Join/ }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Not authenticated/)).toBeInTheDocument();
+      });
+      expect(mockNavigate).not.toHaveBeenCalledWith(
+        expect.stringContaining('/league/'),
+      );
+    });
+  });
+
   /**
    * Regression: LS-1295 — deep-link banner must not show for an unvalidated URL param
    *
@@ -886,6 +1041,7 @@ describe('JoinLeagueByCodePage', () => {
    */
   it('does not show deep-link banner when invite code from URL is not yet validated (LS-1295 regression)', () => {
     jest.doMock('@legacy-sports/graphql', () => ({
+      Sport: { Baseball: 'baseball', Football: 'football' },
       useJoinLeagueByCodeMutation: jest.fn(() => [
         mockJoinLeague,
         { loading: false },
@@ -894,6 +1050,14 @@ describe('JoinLeagueByCodePage', () => {
       useValidateInviteCodeLazyQuery: jest.fn(() => [
         mockValidateCode,
         { data: undefined, loading: false },
+      ]),
+      useGetPublicLeaguesQuery: jest.fn(() => ({
+        data: { publicLeagues: [] },
+        loading: false,
+      })),
+      useJoinPublicLeagueMutation: jest.fn(() => [
+        mockJoinPublicLeague,
+        { loading: false },
       ]),
     }));
     jest.doMock('react-router-dom', () => ({
