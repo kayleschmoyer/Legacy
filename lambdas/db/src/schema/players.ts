@@ -49,6 +49,7 @@ interface PlayerShape {
   scoring?: PlayerCareerScore | null;
   mlbTeam?: string | null;
   jerseyNumber?: number | null;
+  nflTeam?: string | null;
   // Career achievement fields (from DB columns)
   allStarSelections?: number | null;
   goldGloves?: number | null;
@@ -195,6 +196,11 @@ PlayerRef.implement({
       nullable: true,
       description:
         'Jersey number (LS-8597 for baseball players, sourced from the MLB Stats API). Null until synced.',
+    }),
+    nflTeam: t.exposeString('nflTeam', {
+      nullable: true,
+      description:
+        'Current NFL team abbreviation for football players (LS-6334). Null for non-football players.',
     }),
     careerBatting: t.field({
       description: 'Career batting statistics for the player',

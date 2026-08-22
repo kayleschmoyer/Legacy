@@ -392,4 +392,93 @@ describe('RosterBoard', () => {
     expect(screen.queryByRole('button', { name: /Quick swap/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
   });
+
+  describe('bye-week warning (LS-6334)', () => {
+    const FOOTBALL_POSITIONS: RosterBoardPosition[] = [
+      { id: 1, positionType: 'QB' },
+      { id: 2, positionType: 'RB' },
+    ];
+    const mkFootball = (
+      id: number,
+      firstName: string,
+      lastName: string,
+      nflTeam: string,
+      positionId: number | null,
+    ): RosterBoardPlayer => ({
+      id,
+      positionId,
+      player: { firstName, lastName, eligiblePositions: ['QB'], nflTeam },
+    });
+    const FOOTBALL_PLAYERS: RosterBoardPlayer[] = [
+      mkFootball(201, 'Pat', 'Mahomes', 'KC', 1), // starter, team on bye
+      mkFootball(202, 'Josh', 'Allen', 'BUF', 2), // starter, team not on bye
+      mkFootball(203, 'Bench', 'Guy', 'KC', null), // bench, team on bye
+    ];
+
+    it('shows the "On Bye Week" chip next to a starter whose team is on bye', () => {
+      render(
+        <RosterBoard
+          sport="football"
+          positions={FOOTBALL_POSITIONS}
+          teamPlayers={FOOTBALL_PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+          currentWeek={6}
+          byeWeeksByTeam={{ KC: 6, BUF: 12 }}
+        />,
+      );
+      expect(screen.getByText('On Bye Week')).toBeTruthy();
+      expect(
+        screen.getByRole('button', {
+          name: 'Pat Mahomes at QB — on bye week',
+        }),
+      ).toBeTruthy();
+    });
+
+    it('does not show the chip for a starter whose team is not on bye this week', () => {
+      render(
+        <RosterBoard
+          sport="football"
+          positions={FOOTBALL_POSITIONS}
+          teamPlayers={FOOTBALL_PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+          currentWeek={6}
+          byeWeeksByTeam={{ KC: 6, BUF: 12 }}
+        />,
+      );
+      expect(
+        screen.getByRole('button', { name: 'Josh Allen at RB' }),
+      ).toBeTruthy();
+    });
+
+    it('does not show the chip when sport is baseball, even with matching bye data', () => {
+      render(
+        <RosterBoard
+          positions={FOOTBALL_POSITIONS}
+          teamPlayers={FOOTBALL_PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+          currentWeek={6}
+          byeWeeksByTeam={{ KC: 6, BUF: 12 }}
+        />,
+      );
+      expect(screen.queryByText('On Bye Week')).toBeNull();
+    });
+
+    it('only warns on the starter slot, not the bench copy of a bye-week player', () => {
+      render(
+        <RosterBoard
+          sport="football"
+          positions={FOOTBALL_POSITIONS}
+          teamPlayers={FOOTBALL_PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+          currentWeek={6}
+          byeWeeksByTeam={{ KC: 6 }}
+        />,
+      );
+      expect(screen.getAllByText('On Bye Week')).toHaveLength(1);
+    });
+  });
 });

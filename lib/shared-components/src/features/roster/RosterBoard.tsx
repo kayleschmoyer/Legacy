@@ -70,6 +70,8 @@ export interface RosterBoardPlayer {
     mlbTeam?: string | null;
     /** Jersey number (LS-8597 for baseball players). */
     jerseyNumber?: number | null;
+    /** Current NFL team abbreviation for football players (LS-6334). */
+    nflTeam?: string | null;
   } | null;
 }
 
@@ -145,6 +147,18 @@ export interface RosterBoardProps<
    * render the pre-redesign eligibility sub-lines.
    */
   getPlayerStats?: (player: P) => RosterPlayerStats | null;
+  /**
+   * Per-NFL-team bye week for the league's active season, keyed by team
+   * abbreviation (LS-6334). Football-only — omit for baseball, which has no
+   * bye-week concept in a historical-data platform. Paired with `currentWeek`
+   * to flag starters whose team is on bye with a red warning chip.
+   */
+  byeWeeksByTeam?: Readonly<Record<string, number>>;
+  /**
+   * The league's active/viewed week. Compared against `byeWeeksByTeam` to
+   * determine bye-week starters (LS-6334).
+   */
+  currentWeek?: number | null;
 }
 
 // ── Position accents ────────────────────────────────────────────────────────
@@ -166,6 +180,29 @@ function positionAccent(
 /** Chip label color: white where it clears contrast, dark ink otherwise. */
 function chipTextColor(background: string): string {
   return contrastRatio(WHITE, background) >= 3 ? WHITE : ACCENT_INK;
+}
+
+/** Red "On Bye Week" warning chip for a starter whose NFL team has no game this week (LS-6334). */
+function ByeWeekChip(): React.JSX.Element {
+  return (
+    <XStack
+      paddingHorizontal={6}
+      paddingVertical={2}
+      borderRadius="$10"
+      backgroundColor={SCORE_LOSS}
+    >
+      <Text
+        fontFamily={FONT_DISPLAY}
+        fontWeight="700"
+        fontSize={8}
+        letterSpacing={0.6}
+        textTransform="uppercase"
+        color={WHITE}
+      >
+        On Bye Week
+      </Text>
+    </XStack>
+  );
 }
 
 function PositionChip({
@@ -383,6 +420,8 @@ interface SlotRowProps {
   readOnly: boolean;
   disabled?: boolean;
   isLocked?: boolean;
+  /** True when the assigned player's team is on a bye this week (LS-6334). */
+  onBye?: boolean;
   onPress: () => void;
   onPlayerPress?: () => void;
   actions?: React.ReactNode;
@@ -402,6 +441,7 @@ function SlotRow({
   readOnly,
   disabled = false,
   isLocked = false,
+  onBye = false,
   onPress,
   onPlayerPress,
   actions,
@@ -416,7 +456,9 @@ function SlotRow({
       ? `${assignedName} at ${posType} — locked`
       : state === 'eligible-swap' && selectedName
         ? `Swap ${selectedName} into ${posType}`
-        : `${assignedName} at ${posType}`
+        : onBye
+          ? `${assignedName} at ${posType} — on bye week`
+          : `${assignedName} at ${posType}`
     : state === 'eligible-empty' && selectedName
       ? `Assign ${selectedName} to ${posType}`
       : `${getPositionLabel(posType)} — open slot`;
@@ -506,6 +548,7 @@ function SlotRow({
           {assignedName && isLocked && (
             <Lock size={11} color={TEXT_MUTED} aria-label="Locked" />
           )}
+          {assignedName && onBye && <ByeWeekChip />}
           {eligible && !isLocked && selectedName && (
             <XStack
               paddingHorizontal={6}
@@ -780,6 +823,8 @@ export function RosterBoard<
   disabledPositionIds,
   sport = 'baseball',
   getPlayerStats,
+  byeWeeksByTeam,
+  currentWeek,
 }: RosterBoardProps<P, Pos>): React.JSX.Element {
   const [selected, setSelected] = useState<P | null>(null);
   /** Position id whose quick-swap menu is open. */
@@ -997,6 +1042,12 @@ export function RosterBoard<
     const slotDisabled =
       position.id != null && (disabledPositionIds?.has(position.id) ?? false);
     const stats = assigned && getPlayerStats ? getPlayerStats(assigned) : null;
+    const assignedTeam = assigned?.player?.nflTeam;
+    const onBye =
+      isFootball &&
+      currentWeek != null &&
+      assignedTeam != null &&
+      byeWeeksByTeam?.[assignedTeam] === currentWeek;
 
     // Quick-swap candidates: unlocked bench players eligible for this slot.
     const swapCandidates = benchPlayers.filter(
@@ -1060,6 +1111,7 @@ export function RosterBoard<
           readOnly={readOnly}
           disabled={slotDisabled}
           isLocked={assigned?.isLocked ?? false}
+          onBye={onBye}
           onPress={() => handleSlotPress(position)}
           onPlayerPress={
             assigned && onPlayerPress

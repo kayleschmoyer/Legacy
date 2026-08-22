@@ -29,6 +29,7 @@ import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
   useGetLeagueByIdQuery,
+  useGetNflTeamSeasonMetadataQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
@@ -304,6 +305,21 @@ export default function FootballLeagueId(): React.JSX.Element {
     ],
     [league?.seasonNumber, league?.frozenAt],
   );
+
+  // Bye-week warning data (LS-6334) — IR-slot enforcement was scoped out of
+  // this ticket (product decision: no injury/IR concept on a historical-data
+  // platform). Season is numeric here, unlike web's string `season` state.
+  const { data: nflByeWeekData } = useGetNflTeamSeasonMetadataQuery({
+    variables: { season: league?.seasonNumber ?? undefined },
+    skip: !league?.seasonNumber,
+  });
+  const byeWeeksByTeam = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const meta of nflByeWeekData?.nflTeamSeasonMetadata ?? []) {
+      if (meta?.teamAbbreviation) map[meta.teamAbbreviation] = meta.byeWeek;
+    }
+    return map;
+  }, [nflByeWeekData?.nflTeamSeasonMetadata]);
 
   const wsUrl = config.websocketUrl;
   const { client: wsClient, connected: wsConnected } =
@@ -594,6 +610,8 @@ export default function FootballLeagueId(): React.JSX.Element {
                 totalWeeks={league?.totalMatchups}
                 myTeamId={userTeamId}
                 refreshControl={rosterRefresh.refreshControl}
+                sport="football"
+                byeWeeksByTeam={byeWeeksByTeam}
               />
             ) : (
               <YStack flex={1} padding="$3">

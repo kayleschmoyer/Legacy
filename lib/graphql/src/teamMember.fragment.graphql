@@ -16,6 +16,7 @@ fragment TeamMember on TeamMember {
     brefId
     eligiblePositions
     mlbTeam
+    nflTeam
     jerseyNumber
     careerBatting {
       games

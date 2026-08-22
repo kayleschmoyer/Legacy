@@ -383,6 +383,10 @@ const mockGetUserTeamIdLazyQuery = jest.fn(() => [
   { data: { userTeamId: 10 }, loading: false },
 ]);
 const mockUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
+const mockGetNflTeamSeasonMetadataQuery = jest.fn(() => ({
+  data: { nflTeamSeasonMetadata: [] },
+  loading: false,
+}));
 
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
@@ -398,6 +402,8 @@ jest.mock('@legacy-sports/graphql', () => ({
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
     mockUpdateTeamMemberPositionMutation(...args),
   useSwapTeamMemberPositionsMutation: () => [jest.fn()],
+  useGetNflTeamSeasonMetadataQuery: (...args: unknown[]) =>
+    mockGetNflTeamSeasonMetadataQuery(...args),
 }));
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -429,6 +435,10 @@ describe('FootballLeagueId', () => {
       { data: { userTeamId: 10 }, loading: false },
     ]);
     mockUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
+    mockGetNflTeamSeasonMetadataQuery.mockReturnValue({
+      data: { nflTeamSeasonMetadata: [] },
+      loading: false,
+    });
 
     jest
       .requireMock<{

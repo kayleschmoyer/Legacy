@@ -17,6 +17,7 @@ import {
   Sport,
   type TeamMemberFragment,
   useGetMatchupPlayersQuery,
+  useGetNflTeamSeasonMetadataQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamMembersQuery,
   useSwapTeamMemberPositionsMutation,
@@ -207,6 +208,22 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
   const isFuture = week > currentWeek;
   const isCurrent = week === currentWeek;
   const readOnly = isPast || isFuture;
+  const isFootball = league.sport === Sport.Football;
+
+  // Bye-week warning data (LS-6334) — football only. IR-slot enforcement was
+  // scoped out of this ticket (product decision: no injury/IR concept on a
+  // historical-data platform).
+  const { data: nflByeWeekData } = useGetNflTeamSeasonMetadataQuery({
+    variables: { season: league.seasonNumber ?? undefined },
+    skip: !isFootball,
+  });
+  const byeWeeksByTeam = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const meta of nflByeWeekData?.nflTeamSeasonMetadata ?? []) {
+      if (meta?.teamAbbreviation) map[meta.teamAbbreviation] = meta.byeWeek;
+    }
+    return map;
+  }, [nflByeWeekData?.nflTeamSeasonMetadata]);
 
   // ── Matchup scoreline + per-player stats (LS-9355) ────────────────────────
   // Mirrors the Matchup tab's client-side scoring pipeline: my matchup for the
@@ -460,6 +477,8 @@ export const RosterTab: React.FC<RosterTabProps> = ({ league, myTeamId }) => {
         readOnly={readOnly}
         disabledPositionIds={inFlightPositionIds}
         getPlayerStats={getPlayerStats}
+        currentWeek={isFootball ? week : undefined}
+        byeWeeksByTeam={byeWeeksByTeam}
       />
 
       {isNarrow && isCurrent && (

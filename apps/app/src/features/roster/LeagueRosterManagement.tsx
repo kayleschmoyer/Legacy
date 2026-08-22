@@ -46,6 +46,13 @@ export interface LeagueRosterManagementProps {
   myTeamId?: number | null;
   /** Pull-to-refresh control for the tab's `ScrollView` (LS-8847). */
   refreshControl?: React.ReactElement<RefreshControlProps>;
+  /** League sport — controls the board's starter grouping and football-specific constraints. Defaults to `'baseball'`. */
+  sport?: 'baseball' | 'football';
+  /**
+   * Per-NFL-team bye week for the league's active season, keyed by team
+   * abbreviation (LS-6334). Football-only; ignored for baseball.
+   */
+  byeWeeksByTeam?: Readonly<Record<string, number>>;
 }
 
 /**
@@ -73,6 +80,8 @@ export function LeagueRosterManagement({
   totalWeeks,
   myTeamId,
   refreshControl,
+  sport = 'baseball',
+  byeWeeksByTeam,
 }: LeagueRosterManagementProps): React.JSX.Element {
   const effectiveCurrent = currentWeek ?? 1;
   const effectiveTotal = totalWeeks ?? effectiveCurrent;
@@ -152,6 +161,9 @@ export function LeagueRosterManagement({
             onPlayerPress={onPlayerPress}
             loading={loading}
             readOnly={isPast || isFuture}
+            sport={sport}
+            currentWeek={sport === 'football' ? activeWeek : undefined}
+            byeWeeksByTeam={byeWeeksByTeam}
           />
         </YStack>
       </ScrollView>
