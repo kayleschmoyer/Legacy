@@ -28,6 +28,20 @@ const MAX_CONSECUTIVE_PINGS = 3;
 // is what actually stops the infinite loop. Finite by default; callers that
 // genuinely want unbounded retries can still pass Infinity explicitly.
 const DEFAULT_MAX_RECONNECT_ATTEMPTS = 10;
+// After the attempt budget is spent, `reconnectNow()` already covers the
+// cases where something external tells us the world changed (app
+// foregrounded — LS-8985; browser `online`/`visibilitychange` — LS-9220).
+// But a backend/gateway blip that outlasts the budget while the tab stays
+// visible and the browser's own connectivity never drops triggers none of
+// those signals, so the client stayed dead until a manual page reload
+// (LS-9489). Give it exactly one unprompted retry with a fresh budget after
+// a long cooldown — long enough to not meaningfully add to the
+// permanently-rejected-connection load LS-8881 was written to bound, but
+// enough to recover from a blip that resolves within a couple of minutes.
+// If that retry cycle also exhausts its budget, give up for good; a
+// permanently-rejected connection (bad origin, revoked user) still only
+// ever retries twice as long as before, never forever.
+const GIVE_UP_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
 
 /**
  * Framework-agnostic WebSocket Client
@@ -64,6 +78,8 @@ export class WebSocketClient {
   private options: RequiredWebSocketClientOptions;
   private reconnectAttempts = 0;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private giveUpCooldownTimeout: ReturnType<typeof setTimeout> | null = null;
+  private hasRetriedAfterGiveUp = false;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private heartbeatMs = DEFAULT_HEARTBEAT_MS;
   private lastMessageTime = 0;
@@ -424,6 +440,7 @@ export class WebSocketClient {
       LOGGER.info('WebSocket connected (initial)');
     }
     this.reconnectAttempts = 0;
+    this.hasRetriedAfterGiveUp = false;
     this.consecutivePings = 0;
     this.lastMessageTime = Date.now();
     this.startHeartbeat();
@@ -593,6 +610,7 @@ export class WebSocketClient {
       });
       this.emitConnectionState('error');
       this.emitError(new Error('Max reconnection attempts reached'));
+      this.scheduleGiveUpCooldownRetry();
       return;
     }
 
@@ -640,6 +658,7 @@ export class WebSocketClient {
 
     this.cancelReconnect();
     this.reconnectAttempts = 0;
+    this.hasRetriedAfterGiveUp = false;
     this.connect();
   }
 
@@ -651,6 +670,37 @@ export class WebSocketClient {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
+    if (this.giveUpCooldownTimeout) {
+      clearTimeout(this.giveUpCooldownTimeout);
+      this.giveUpCooldownTimeout = null;
+    }
+  }
+
+  /**
+   * After the reconnect attempt budget is exhausted, wait out a long
+   * cooldown and try once more with a fresh budget — see the
+   * `GIVE_UP_COOLDOWN_MS` comment for why this exists. Only ever fires once
+   * per give-up; if the retried cycle also exhausts its budget, this is not
+   * called again and the client stays given-up until something external
+   * (`reconnectNow`) tries again.
+   */
+  private scheduleGiveUpCooldownRetry(): void {
+    if (this.hasRetriedAfterGiveUp) {
+      return;
+    }
+    this.hasRetriedAfterGiveUp = true;
+
+    this.giveUpCooldownTimeout = setTimeout(() => {
+      this.giveUpCooldownTimeout = null;
+      if (this.disposed || this.ws?.readyState === WebSocket.OPEN) {
+        return;
+      }
+      LOGGER.info('Retrying connection after give-up cooldown', {
+        cooldownMs: GIVE_UP_COOLDOWN_MS,
+      });
+      this.reconnectAttempts = 0;
+      this.connect();
+    }, GIVE_UP_COOLDOWN_MS);
   }
 
   /**

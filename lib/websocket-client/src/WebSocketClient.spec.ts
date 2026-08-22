@@ -665,6 +665,77 @@ describe('WebSocketClient', () => {
       client.dispose();
     });
 
+    it('automatically retries once with a fresh budget after a cooldown once the attempt budget is exhausted (LS-9489)', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        reconnect: true,
+        reconnectDelay: 100,
+        maxReconnectAttempts: 2,
+        autoConnect: false,
+      });
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      // Exhaust the reconnect budget the same way as the LS-8881 test above —
+      // this simulates a backend/gateway blip where nothing external (no
+      // `online` toggle, no tab visibility change) ever signals recovery.
+      client.connect();
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(200);
+
+      expect(errorHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: 'Max reconnection attempts reached',
+        }),
+      );
+
+      // The blip resolves before the cooldown elapses — the client should
+      // retry on its own, without any `reconnectNow()` call from a consumer.
+      mockServer = new Server(mockUrl);
+      jest.advanceTimersByTime(2 * 60 * 1000);
+
+      expect(client.getState()).toBe('connected');
+      client.dispose();
+    });
+
+    it('gives up for good if the cooldown retry also exhausts its budget', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        reconnect: true,
+        reconnectDelay: 100,
+        maxReconnectAttempts: 2,
+        autoConnect: false,
+      });
+
+      const errorHandler = jest.fn();
+      client.on('error', errorHandler);
+
+      // Exhaust the budget, then let the cooldown retry also fail because no
+      // server ever comes up — a permanently-rejected connection.
+      client.connect();
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(200);
+      expect(errorHandler).toHaveBeenCalledTimes(1);
+
+      jest.advanceTimersByTime(2 * 60 * 1000); // cooldown retry fires, fails immediately
+      jest.advanceTimersByTime(100); // reconnect attempt 1 fails
+      jest.advanceTimersByTime(200); // reconnect attempt 2 fails — budget spent again
+      expect(errorHandler).toHaveBeenCalledTimes(2);
+
+      // No further cooldown is scheduled — it only ever fires once per give-up.
+      jest.advanceTimersByTime(10 * 60 * 1000);
+      expect(errorHandler).toHaveBeenCalledTimes(2);
+
+      client.dispose();
+    });
+
     it('reconnectNow is a no-op when already connected', () => {
       mockServer = new Server(mockUrl);
 
