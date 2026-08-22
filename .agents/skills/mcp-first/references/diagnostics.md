@@ -160,6 +160,21 @@ HTTP 401 ... ZodError: expected string, received undefined
 
 > **CCR exception (LS-8924)**: this "stop and wait for the user" protocol assumes a human is attending the session. In a Claude Code Remote (CCR) watch-to-merge loop, the session is deliberately unattended for the multi-hour-to-multi-day spans that make this expiry likely, so waiting is not actionable. Do not stop — switch to the generic `mcp__github__*`/`mcp__Atlassian__*` fallback and keep driving the PR to merge instead. Full fallback mapping (mark-ready, re-trigger review, Jira transitions): [cloud-agent-mode — hosted github/jira OAuth expires mid-session](../../cloud-agent-mode/SKILL.md#known-failure-mode-hosted-legacy-sports-githublegacy-sports-jira-oauth-expires-mid-session-on-long-running-watch-to-merge-loops-ls-8924).
 
+## Repeated Cyclic Flapping During Long-Running Sessions (LS-9431)
+
+Distinct from a one-time absence at session start (LS-9154, Check 1 above) or a persistent mid-session 401 (above): a **long-running session (multi-hour to multi-day, e.g. a CCR watch-to-merge loop) can see multiple independent stdio/hosted servers repeatedly disconnect and reconnect throughout its lifetime**, with no single restart event that stabilizes them — `worktree`, `nx`, `aws`, `browser`, `dev-process`, `ci-local`, `make`, and hosted connectors like `stripe` have all been observed flapping independently and asynchronously from each other, sometimes several within the same minute.
+
+**Symptom:** a tool that was working minutes ago now shows as absent from the deferred-tools list, or a hosted connector that never loaded at session start still hasn't after a long wait — while other, unrelated servers remain healthy the whole time.
+
+**Recovery — brief retry-with-backoff before falling back to Bash:**
+
+1. Re-run `ToolSearch` for the specific tool once. Server reconnects on this kind of transient flap are typically sub-minute.
+2. If still absent, wait roughly 30–60 seconds and retry once more.
+3. If the tool is still unavailable after two retries, treat it as a genuine outage for this operation: report which server is down (per the Reporting Protocol above) and use the documented Bash/`gh`/`git` fallback for that one operation — do not block the whole session on it, since a sibling server flapping back in a minute doesn't mean this one will.
+4. Do not build a persistent polling loop around this — a couple of short retries is the right amount of patience for a transient flap; anything longer is better spent proceeding with a reported fallback than blocking.
+
+This flapping pattern itself (why multiple independent servers cycle rather than staying connected once established in a CCR container) is a platform/bootstrap investigation outside this repo's scope — the recovery pattern above is the actionable mitigation available to an agent mid-session.
+
 ## Pre-flight Auth Check (Separate from Load Failures)
 
 Call `auth_check_all()` (worktree MCP server) at the start of any workflow requiring GitHub,
