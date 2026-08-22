@@ -200,6 +200,19 @@ export async function syncCurrentMatchupPositions(
 
 // ── Mutation resolvers ─────────────────────────────────────────────────────
 
+// `positionId: null` on this mutation only ever clears the `team_members`
+// row's positional slot ("bench"); it never touches `teamId`, so the player
+// always stays owned by the team, for every sport. Releasing a player to
+// free agency is a distinct, deliberate flow: a waiver claim's
+// `dropPlayerId` (`claimFreeAgent`), processed by the waiver processor,
+// which `DELETE`s the `team_members` row outright — this mutation has no
+// path to that outcome (confirmed for LS-6333 / FLD-020).
+//
+// Note: today the schema has no dedicated "IR" slot distinct from "bench" —
+// both collapse to `positionId: null` (the `position_slot` enum has no IR
+// value, and `team_members` has no injury-reserve flag). Football's
+// bye-week/IR handling is currently client-side display only; adding a real
+// server-side distinction is a product decision out of scope for this fix.
 builder.mutationField('updateTeamMemberPosition', (t) =>
   t.field({
     type: TeamMember,
