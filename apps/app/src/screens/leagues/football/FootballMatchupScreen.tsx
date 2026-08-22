@@ -14,6 +14,8 @@ import {
 import { config } from '@legacy-sports/app-config/native';
 import { LOGGER } from '@legacy-sports/logging';
 import { useWebSocket } from '@legacy-sports/shared-components';
+import { MatchupRecapPanel } from '@legacy-sports/shared-components/matchup';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   type GetMatchupByIdQuery,
   type GetMatchupPlayersQuery,
@@ -22,6 +24,8 @@ import {
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
+import { PremiumGate } from '../../../features/subscription/PremiumGate';
+import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 
 type Matchup = NonNullable<GetMatchupByIdQuery['getMatchupById']>;
 type MatchupPlayer = NonNullable<
@@ -310,6 +314,7 @@ export function FootballMatchupScreen(
 ): React.JSX.Element {
   const { matchupId, defensiveFormat } = props;
   const router = useRouter();
+  const canSeeRecap = useHasEntitlement(ENTITLEMENTS.ai_matchup_recap);
 
   const onPlayerPress = (player: MatchupPlayer) => {
     if (player.playerId) {
@@ -479,6 +484,16 @@ export function FootballMatchupScreen(
             />
           </>
         )}
+
+        {matchup.status === MatchupStatus.Completed && matchupId != null ? (
+          <PremiumGate
+            isPremium={canSeeRecap}
+            featureName="AI Matchup Recap"
+            featureDescription="Get AI-generated narrative recaps that summarize your matchup story, highlights, and standout performances."
+          >
+            <MatchupRecapPanel matchupId={matchupId} />
+          </PremiumGate>
+        ) : null}
       </YStack>
     </ScrollView>
   );

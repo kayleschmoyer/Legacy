@@ -21,6 +21,22 @@ jest.mock('../../../common/auth/AuthHooks', () => ({
   Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
 }));
 
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useHasEntitlement: jest.fn(() => true),
+}));
+
+jest.mock('../../../features/subscription/PremiumGate', () => ({
+  PremiumGate: ({ children }: { children: unknown }) => children,
+}));
+
+jest.mock('@legacy-sports/shared-components/matchup', () => ({
+  MatchupRecapPanel: () => null,
+}));
+
+jest.mock('@legacy-sports/utils', () => ({
+  ENTITLEMENTS: { ai_matchup_recap: 'ai_matchup_recap' },
+}));
+
 describe('getPositionOrder', () => {
   it('returns DST position order when defensiveFormat is dst', () => {
     const order = getPositionOrder('dst');

@@ -51,6 +51,11 @@ const mockMatchup = {
   weekNumber: 7,
 };
 
+const COMPLETED_MATCHUP = {
+  ...mockMatchup,
+  status: 'completed',
+};
+
 const mockPlayer = {
   id: 5,
   firstName: 'Patrick',
@@ -69,7 +74,11 @@ const mockRefetchMatchup = jest.fn().mockResolvedValue(undefined);
 const mockRefetchPlayers = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('@legacy-sports/graphql', () => ({
-  MatchupStatus: { InProgress: 'in_progress', Final: 'final' },
+  MatchupStatus: {
+    InProgress: 'in_progress',
+    Final: 'final',
+    Completed: 'completed',
+  },
   useGetMatchupByIdQuery: jest.fn(() => ({
     data: { getMatchupById: mockMatchup },
     loading: false,
@@ -95,6 +104,44 @@ jest.mock('@legacy-sports/app-config/native', () => ({
 jest.mock('../../../common/auth/AuthHooks', () => ({
   readKeychainValue: jest.fn().mockResolvedValue('mock-token'),
   Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
+}));
+
+const mockUseHasEntitlement = jest.fn<boolean, [string]>();
+jest.mock('../../../features/subscription/useSubscription', () => ({
+  useHasEntitlement: (key: string) => mockUseHasEntitlement(key),
+}));
+
+// Pass-through gate: render children for premium users, otherwise an upgrade
+// marker so tests can assert the locked state without the real overlay.
+jest.mock('../../../features/subscription/PremiumGate', () => ({
+  PremiumGate: ({
+    isPremium,
+    children,
+  }: {
+    isPremium: boolean;
+    children: React.ReactNode;
+  }) => {
+    const ReactActual = jest.requireActual<typeof import('react')>('react');
+    const { Text } =
+      jest.requireActual<typeof import('react-native')>('react-native');
+    return isPremium
+      ? (children as React.JSX.Element)
+      : ReactActual.createElement(Text, null, 'UPGRADE_TO_PREMIUM');
+  },
+}));
+
+jest.mock('@legacy-sports/shared-components/matchup', () => {
+  const { View } = jest.requireActual<RNComponents>('react-native');
+  return {
+    MatchupRecapPanel: () =>
+      jest
+        .requireActual<typeof import('react')>('react')
+        .createElement(View, { testID: 'recap-panel' }),
+  };
+});
+
+jest.mock('@legacy-sports/utils', () => ({
+  ENTITLEMENTS: { ai_matchup_recap: 'ai_matchup_recap' },
 }));
 
 jest.mock('tamagui', () => {
@@ -158,6 +205,9 @@ describe('FootballMatchupScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     appStateListeners = [];
+    // Re-establish the implementation after clearAllMocks so the gate reads
+    // the current mocked-per-test premium state at call time.
+    mockUseHasEntitlement.mockImplementation(() => true);
     jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
       data: { getMatchupById: mockMatchup },
       loading: false,
@@ -312,5 +362,67 @@ describe('FootballMatchupScreen', () => {
 
     expect(matchupRefetch).toHaveBeenCalled();
     expect(playersRefetch).toHaveBeenCalled();
+  });
+});
+
+// ── AI Matchup Recap PremiumGate wiring (LS-6354) ────────────────────────────
+// Football parity with baseball's MatchupDetailScreen recap panel gating.
+
+describe('FootballMatchupScreen — AI Matchup Recap wiring (LS-6354)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    appStateListeners = [];
+    mockUseHasEntitlement.mockImplementation(() => true);
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: mockMatchup },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: mockRefetchMatchup,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+    jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
+      data: { getMatchupPlayers: [mockMatchupPlayer] },
+      loading: false,
+      refetch: mockRefetchPlayers,
+    } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+  });
+
+  it('shows the recap panel for premium users when the matchup is completed', () => {
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: COMPLETED_MATCHUP },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: mockRefetchMatchup,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+    mockUseHasEntitlement.mockImplementation(() => true);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    expect(screen.getByTestId('recap-panel')).toBeTruthy();
+    expect(mockUseHasEntitlement).toHaveBeenCalledWith('ai_matchup_recap');
+  });
+
+  it('gates the recap panel behind the upgrade prompt for free users when the matchup is completed', () => {
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: COMPLETED_MATCHUP },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: mockRefetchMatchup,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+    mockUseHasEntitlement.mockImplementation(() => false);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    expect(screen.getByText('UPGRADE_TO_PREMIUM')).toBeTruthy();
+    expect(screen.queryByTestId('recap-panel')).toBeNull();
+  });
+
+  it('omits the recap panel entirely when the matchup is not yet completed', () => {
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    expect(screen.queryByTestId('recap-panel')).toBeNull();
+    expect(screen.queryByText('UPGRADE_TO_PREMIUM')).toBeNull();
   });
 });
