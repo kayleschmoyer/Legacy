@@ -57,10 +57,26 @@ jobs:
 
       - name: Bootstrap pnpm
         run: |
+          # Self-hosted runners bake pnpm as a standalone binary at
+          # /usr/local/bin/pnpm (LS-4949) rather than via corepack, precisely
+          # to avoid corepack version drift. That binary precedes /usr/bin on
+          # PATH, so it's already the right version here — skip corepack
+          # entirely when it's present. Running `corepack enable` anyway
+          # fails on self-hosted runners: node is apt-installed as root, so
+          # /usr/bin is root-owned and the non-root runner user gets EACCES
+          # trying to symlink a corepack shim into it. This mirrors the same
+          # guard in .github/actions/setup/action.yml's "Bootstrap pnpm for
+          # setup-node cache" step.
+          if command -v pnpm >/dev/null 2>&1; then
+            echo "pnpm already available at $(command -v pnpm) ($(pnpm --version))"
+            exit 0
+          fi
+
           PNPM_VERSION=$(node -pe "(require('./package.json').packageManager || '').split('@')[1] || '9.12.1'")
           echo "Installing pnpm@${PNPM_VERSION}"
           corepack enable
-          corepack prepare "pnpm@${PNPM_VERSION}" --activate
+          QUOTED_PNPM_VERSION=$(printf %q "${PNPM_VERSION}")
+          corepack prepare "pnpm@${QUOTED_PNPM_VERSION}" --activate
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
