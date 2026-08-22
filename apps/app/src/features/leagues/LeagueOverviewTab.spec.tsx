@@ -78,6 +78,7 @@ const BASE_PROPS = {
   },
   leagueId: 42,
   isCommissioner: false,
+  isMember: true,
   isDrafting: false,
   rankedStandings: [],
   startersCount: 9,
@@ -103,6 +104,11 @@ describe('LeagueOverviewTab', () => {
     expect(screen.getByTestId('league-activity-feed')).toBeTruthy();
     expect(screen.getByTestId('league-dues-payment-status')).toBeTruthy();
     expect(screen.getByTestId('on-this-day-feed')).toBeTruthy();
+  });
+
+  it('does not render the dues payment panel for non-member spectators (LS-6325)', () => {
+    render(<LeagueOverviewTab {...BASE_PROPS} isMember={false} />);
+    expect(screen.queryByTestId('league-dues-payment-status')).toBeNull();
   });
 
   it('does not render the Draft Is Live banner when a draft is not in progress', () => {

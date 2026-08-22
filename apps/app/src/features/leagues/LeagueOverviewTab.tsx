@@ -40,6 +40,9 @@ interface LeagueOverviewTabProps {
   league: OverviewLeague;
   leagueId: number;
   isCommissioner: boolean;
+  /** True when the viewer is a league member (or commissioner) rather than a
+   *  spectator — gates member-only billing UI like the dues panel (LS-6325). */
+  isMember: boolean;
   isDrafting: boolean;
   /** True when the reachable draft room is currently paused rather than
    *  actively live — swaps the join-banner copy and action label (LS-8843). */
@@ -159,6 +162,7 @@ export function LeagueOverviewTab({
   league,
   leagueId,
   isCommissioner,
+  isMember,
   isDrafting,
   isPaused = false,
   rankedStandings,
@@ -366,13 +370,17 @@ export function LeagueOverviewTab({
             native already exposes Chat from the league tab bar. (LS-7812) */}
 
         {/* League Dues Payment Status — already renders its own bordered
-            surface, so it is not re-wrapped in an OverviewSection here. */}
-        <LeagueDuesPaymentStatus
-          leagueId={leagueId}
-          isCommissioner={isCommissioner}
-          onSuccess={(msg) => Alert.alert('Success', msg)}
-          onError={(err) => Alert.alert('Error', err.message)}
-        />
+            surface, so it is not re-wrapped in an OverviewSection here.
+            Members-only: dues totals and payment CTAs are billing data that
+            spectators (non-members) must not see (LS-6325). */}
+        {isMember ? (
+          <LeagueDuesPaymentStatus
+            leagueId={leagueId}
+            isCommissioner={isCommissioner}
+            onSuccess={(msg) => Alert.alert('Success', msg)}
+            onError={(err) => Alert.alert('Error', err.message)}
+          />
+        ) : null}
 
         {/* Activity Feed */}
         <OverviewSection
