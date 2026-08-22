@@ -342,7 +342,18 @@ jobs:
             # whole pipeline even though prettier (the rightmost stage) succeeded
             # (LS-8207). Real prettier formatting errors still surface — they come
             # from the `xargs ... prettier` stage, which is unaffected by this guard.
-            git diff --name-only --diff-filter=ACMR -z "$BASE_SHA" "$HEAD_SHA" \
+            #
+            # Three-dot (merge-base) diff, not two-dot: BASE_SHA can be stale
+            # relative to the base branch's current tip — either because the
+            # orchestrator-resolved `inputs.base-sha` was captured at dispatch
+            # time and main has since moved, or because a stacked PR's own
+            # branch predates a later unrelated main commit. A two-dot diff
+            # between BASE_SHA and HEAD_SHA surfaces every difference between
+            # those two commits, including main-only changes the PR never
+            # touched, and falsely flags them as part of this PR's diff. A
+            # three-dot diff is anchored to the merge-base of the two refs, so
+            # it only shows what HEAD_SHA actually changed since it diverged.
+            git diff --name-only --diff-filter=ACMR -z "$BASE_SHA...$HEAD_SHA" \
               | (while IFS= read -r -d '' f; do [ -f "$f" ] && printf '%s\0' "$f"; done; true) \
               | xargs -0 -r pnpm exec prettier --check --ignore-unknown
           }
