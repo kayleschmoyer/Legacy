@@ -1,4 +1,5 @@
 import React from 'react';
+import { fireEvent } from '@testing-library/react';
 import { useGetLeagueActivityQuery } from '@legacy-sports/graphql';
 import { LeagueActivityFeed } from './LeagueActivityFeed';
 import { render } from '../../test-utils';
@@ -90,6 +91,35 @@ describe('LeagueActivityFeed', () => {
     expect(useGetLeagueActivityQuery).toHaveBeenCalledWith(
       expect.objectContaining({
         variables: { leagueId: 1, limit: 5 },
+      }),
+    );
+  });
+
+  it('shows a "Load more" affordance when the server returns a full page', () => {
+    setupMock();
+    render(<LeagueActivityFeed leagueId={1} limit={3} />);
+    expect(useGetLeagueActivityQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: { leagueId: 1, limit: 3 },
+      }),
+    );
+    // mockEvents.length (3) >= limit (3) — there may be older events.
+    expect(document.body.textContent).toContain('Load more');
+  });
+
+  it('does not show "Load more" when fewer events than the limit are returned', () => {
+    setupMock();
+    render(<LeagueActivityFeed leagueId={1} limit={15} />);
+    expect(document.body.textContent).not.toContain('Load more');
+  });
+
+  it('widens the query limit when "Load more" is pressed', () => {
+    setupMock();
+    const { getByText } = render(<LeagueActivityFeed leagueId={1} limit={3} />);
+    fireEvent.click(getByText('Load more'));
+    expect(useGetLeagueActivityQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        variables: { leagueId: 1, limit: 6 },
       }),
     );
   });

@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Card, Spinner, Text, XStack, YStack } from 'tamagui';
+import React, { useMemo, useState } from 'react';
+import { Button, Card, Spinner, Text, XStack, YStack } from 'tamagui';
 import { useGetLeagueActivityQuery } from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 
@@ -37,13 +37,17 @@ const EVENT_LABELS: Record<string, string> = {
 /**
  * LeagueActivityFeed - Cross-platform activity timeline for a league.
  * Shows recent trades, waiver claims, draft picks, lineup changes, etc.
+ * Activity older than the initial page is reachable via "Load more" rather
+ * than silently truncated (LS-6328) — each press widens the query limit by
+ * another page, mirroring the web feed's `fetchLimit` pattern (LS-5950).
  */
 export function LeagueActivityFeed({
   leagueId,
   limit = 20,
 }: LeagueActivityFeedProps) {
+  const [fetchLimit, setFetchLimit] = useState(limit);
   const { data, loading, error } = useGetLeagueActivityQuery({
-    variables: { leagueId, limit },
+    variables: { leagueId, limit: fetchLimit },
     fetchPolicy: 'cache-and-network',
   });
 
@@ -51,6 +55,10 @@ export function LeagueActivityFeed({
     () => data?.leagueActivity ?? [],
     [data?.leagueActivity],
   );
+
+  // The server returns exactly `fetchLimit` items when there may be more.
+  const hasMore =
+    data?.leagueActivity != null && data.leagueActivity.length >= fetchLimit;
 
   if (loading && events.length === 0) {
     return (
@@ -112,6 +120,22 @@ export function LeagueActivityFeed({
           </XStack>
         </Card>
       ))}
+      {hasMore ? (
+        <XStack justifyContent="center" paddingTop="$2">
+          <Button
+            size="$2"
+            borderRadius="$10"
+            paddingHorizontal="$4"
+            backgroundColor="$gray2"
+            disabled={loading}
+            onPress={() => setFetchLimit((n) => n + limit)}
+          >
+            <Text fontSize="$2" fontWeight="600" color="$gray11">
+              {loading ? 'Loading…' : 'Load more'}
+            </Text>
+          </Button>
+        </XStack>
+      ) : null}
     </YStack>
   );
 }
