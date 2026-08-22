@@ -149,6 +149,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     isDraftRoomReachable: (status: string | null | undefined) =>
       status === 'in-progress' || status === 'drafting' || status === 'paused',
     LeagueDetailShell,
+    Chip: ({ label }: { label: string }) => <Text>{label}</Text>,
     CommissionerAuditLog: () => <View testID="commissioner-audit-log" />,
     CommissionerNoteControl: () => <View testID="commissioner-note-control" />,
     DeleteLeagueControl: () => <View testID="delete-league-control" />,
@@ -643,6 +644,39 @@ describe('FootballLeagueId', () => {
     it('does not render quick standings section when standings is empty', () => {
       render(<FootballLeagueId />);
       expect(screen.queryByText('View All →')).toBeNull();
+    });
+
+    // Directly exercises the Premium Configuration chip row (LS-6330). Without
+    // this, the row is only ever reached incidentally — via bracket-toggle
+    // tests that happen to set a premium playoffFormat — so a `Chip` missing
+    // from the shared-components mock surfaces as a confusing "Element type is
+    // invalid" failure in an unrelated describe rather than here (LS-9545).
+    it('renders a Premium Configuration chip for each active paid feature', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: {
+          league: {
+            ...mockLeague,
+            waiverEnabled: true,
+            waiverType: 'faab',
+            salaryCapEnabled: true,
+            playoffFormat: '6-team',
+            defensiveFormat: 'idp',
+          },
+        },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+
+      expect(screen.getByText('Premium Configuration')).toBeTruthy();
+      expect(screen.getByText('FAAB')).toBeTruthy();
+      expect(screen.getByText('Salary Cap')).toBeTruthy();
+      expect(screen.getByText('6-Team Playoff')).toBeTruthy();
+      expect(screen.getByText('IDP')).toBeTruthy();
+    });
+
+    it('omits the Premium Configuration section when no paid feature is active', () => {
+      render(<FootballLeagueId />);
+      expect(screen.queryByText('Premium Configuration')).toBeNull();
     });
   });
 
