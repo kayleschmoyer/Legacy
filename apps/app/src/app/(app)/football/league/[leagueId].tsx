@@ -548,6 +548,7 @@ export default function FootballLeagueId(): React.JSX.Element {
             <PendingTradeOfferBanner
               teamId={userTeamId}
               onReview={() => setSelectedTab('trades')}
+              isPremium={isPremium}
             />
           </YStack>
         )}

@@ -75,7 +75,7 @@ export function tradeValue(
 
 // ── Verdict ───────────────────────────────────────────────────────────────────
 
-type Verdict =
+export type Verdict =
   | 'fair'
   | 'slight-edge-you'
   | 'strong-edge-you'
@@ -91,7 +91,7 @@ export function getVerdict(youGiveValue: number, youGetValue: number): Verdict {
   return pct > 0.2 ? 'strong-edge-them' : 'slight-edge-them';
 }
 
-const VERDICT_CONFIG: Record<
+export const VERDICT_CONFIG: Record<
   Verdict,
   {
     label: string;

@@ -19,6 +19,11 @@ import {
 } from '@legacy-sports/graphql';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 import { Button } from '../../Button';
+import {
+  getVerdict,
+  tradeValue,
+  VERDICT_CONFIG,
+} from '../leagues/PremiumTradeTools';
 
 export interface PendingTradeOfferBannerProps {
   /** The viewer's team id; incoming offers are those received by this team. */
@@ -30,6 +35,12 @@ export interface PendingTradeOfferBannerProps {
   onReview: (tradeId: number) => void;
   /** Increment this value to trigger a refetch (e.g. on WebSocket events). */
   refetchTrigger?: number;
+  /**
+   * Whether the current user/league has the `premium` entitlement. When true,
+   * each offer shows a fairness verdict computed from positional trade value
+   * (LS-6350). Defaults to false so existing non-premium callers are unaffected.
+   */
+  isPremium?: boolean;
 }
 
 const playerNames = (
@@ -45,6 +56,7 @@ export function PendingTradeOfferBanner({
   teamId,
   onReview,
   refetchTrigger,
+  isPremium = false,
 }: PendingTradeOfferBannerProps) {
   const { data, refetch } = useGetTeamTradeOffersQuery({
     variables: { teamId, status: 'pending' },
@@ -95,6 +107,10 @@ export function PendingTradeOfferBanner({
         const requesting = (trade.players ?? []).filter(
           (p) => p.fromTeamId === trade.receivingTeamId,
         );
+        const youGiveValue = tradeValue(requesting);
+        const youGetValue = tradeValue(offering);
+        const verdict = getVerdict(youGiveValue, youGetValue);
+        const verdictConfig = VERDICT_CONFIG[verdict];
         return (
           <Card
             key={tradeId}
@@ -114,6 +130,25 @@ export function PendingTradeOfferBanner({
                   They offer: {playerNames(offering)} → You send:{' '}
                   {playerNames(requesting)}
                 </Text>
+                {isPremium && (
+                  <XStack
+                    alignItems="center"
+                    gap="$1.5"
+                    data-testid={`trade-fairness-${tradeId}`}
+                  >
+                    <Text
+                      fontSize="$1"
+                      color={verdictConfig.color}
+                      fontWeight="700"
+                    >
+                      {verdictConfig.label}
+                    </Text>
+                    <Text fontSize="$1" color="$textMuted">
+                      (you give {youGiveValue.toFixed(1)} · receive{' '}
+                      {youGetValue.toFixed(1)})
+                    </Text>
+                  </XStack>
+                )}
               </YStack>
               <XStack gap="$2" alignItems="center">
                 <Button

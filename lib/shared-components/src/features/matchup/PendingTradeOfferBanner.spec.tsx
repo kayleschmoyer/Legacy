@@ -184,4 +184,28 @@ describe('PendingTradeOfferBanner', () => {
     expect(getByText('Pending Trade Offer from Team A')).toBeTruthy();
     expect(getByText('Pending Trade Offer from Team B')).toBeTruthy();
   });
+
+  it('does not show a fairness verdict when isPremium is not set', () => {
+    mockTradeOffers = [makeIncomingOffer({ id: 4004 })];
+    const { queryByTestId } = render(
+      <PendingTradeOfferBanner teamId={MY_TEAM_ID} onReview={jest.fn()} />,
+    );
+    expect(queryByTestId('trade-fairness-4004')).toBeNull();
+  });
+
+  it('shows a fairness verdict on each offer when isPremium is true', () => {
+    mockTradeOffers = [
+      makeIncomingOffer({ id: 5005 }),
+      makeIncomingOffer({ id: 5006, proposingTeamName: 'Team B' }),
+    ];
+    const { getByTestId } = render(
+      <PendingTradeOfferBanner
+        teamId={MY_TEAM_ID}
+        onReview={jest.fn()}
+        isPremium
+      />,
+    );
+    expect(getByTestId('trade-fairness-5005')).toBeTruthy();
+    expect(getByTestId('trade-fairness-5006')).toBeTruthy();
+  });
 });
