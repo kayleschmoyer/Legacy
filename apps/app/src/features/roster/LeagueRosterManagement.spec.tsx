@@ -26,6 +26,9 @@ jest.mock('tamagui', () => {
     YStack: ({ children }: { children: React.ReactNode }) => (
       <View>{children}</View>
     ),
+    XStack: ({ children }: { children: React.ReactNode }) => (
+      <View>{children}</View>
+    ),
     Text: ({ children }: { children: React.ReactNode }) => (
       <RNText>{children}</RNText>
     ),
@@ -136,5 +139,35 @@ describe('LeagueRosterManagement', () => {
     expect(screen.getByText('board-readonly-true')).toBeTruthy();
     // Pending banners only show on the current week.
     expect(screen.queryByText('pending-trades')).toBeNull();
+  });
+
+  // ── Cap-remaining summary (LS-6338) ────────────────────────────────────────
+
+  it('shows the cap-remaining summary for salary-cap leagues', () => {
+    render(
+      <LeagueRosterManagement
+        {...baseProps}
+        salaryCapEnabled
+        capSpace={12500}
+      />,
+    );
+    expect(screen.getByText('Cap Remaining')).toBeTruthy();
+    expect(screen.getByText('$12,500')).toBeTruthy();
+  });
+
+  it('hides the cap-remaining summary for non-cap leagues', () => {
+    render(
+      <LeagueRosterManagement
+        {...baseProps}
+        salaryCapEnabled={false}
+        capSpace={12500}
+      />,
+    );
+    expect(screen.queryByText('Cap Remaining')).toBeNull();
+  });
+
+  it('hides the cap-remaining summary when capSpace is unknown', () => {
+    render(<LeagueRosterManagement {...baseProps} salaryCapEnabled />);
+    expect(screen.queryByText('Cap Remaining')).toBeNull();
   });
 });

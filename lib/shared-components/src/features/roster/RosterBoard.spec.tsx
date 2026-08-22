@@ -393,6 +393,41 @@ describe('RosterBoard', () => {
     expect(screen.queryByRole('button', { name: /More actions/ })).toBeNull();
   });
 
+  // ── Salary cap column (LS-6338) ──────────────────────────────────────────
+
+  it('renders each player salary when salaryCapEnabled is true', () => {
+    const playersWithSalary: RosterBoardPlayer[] = [
+      { ...mk(101, 'Mike', 'Johnson', ['C'], 1), salary: 4500000 },
+      { ...mk(102, 'Wade', 'Boggs', ['1B'], null), salary: 1200000 },
+    ];
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={playersWithSalary}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+        salaryCapEnabled
+      />,
+    );
+    expect(screen.getByText('$4,500,000')).toBeTruthy();
+    expect(screen.getByText('$1,200,000')).toBeTruthy();
+  });
+
+  it('hides player salary when salaryCapEnabled is false or omitted', () => {
+    const playersWithSalary: RosterBoardPlayer[] = [
+      { ...mk(101, 'Mike', 'Johnson', ['C'], 1), salary: 4500000 },
+    ];
+    render(
+      <RosterBoard
+        positions={POSITIONS}
+        teamPlayers={playersWithSalary}
+        onPlayerAssign={noop}
+        onPlayerRemove={noop}
+      />,
+    );
+    expect(screen.queryByText('$4,500,000')).toBeNull();
+  });
+
   describe('bye-week warning (LS-6334)', () => {
     const FOOTBALL_POSITIONS: RosterBoardPosition[] = [
       { id: 1, positionType: 'QB' },

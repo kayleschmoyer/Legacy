@@ -170,6 +170,7 @@ jest.mock('@legacy-sports/shared-components', () => {
     PanelCard: ({ children }: { children?: React.ReactNode }) => (
       <View>{children}</View>
     ),
+    Chip: ({ label }: { label: string }) => <Text>{label}</Text>,
     PendingTradeOfferBanner: () => <View testID="pending-trade-offer-banner" />,
     PendingWaiverClaims: (props: {
       onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
@@ -403,6 +404,10 @@ const mockGetUserTeamIdLazyQuery = jest.fn(() => [
   { data: { userTeamId: 10 }, loading: false },
 ]);
 const mockUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
+const mockGetTeamByIdQuery = jest.fn(() => ({
+  data: undefined,
+  loading: false,
+}));
 const mockGetNflTeamSeasonMetadataQuery = jest.fn(() => ({
   data: { nflTeamSeasonMetadata: [] },
   loading: false,
@@ -422,6 +427,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
     mockUpdateTeamMemberPositionMutation(...args),
   useSwapTeamMemberPositionsMutation: () => [jest.fn()],
+  useGetTeamByIdQuery: (...args: unknown[]) => mockGetTeamByIdQuery(...args),
   useGetNflTeamSeasonMetadataQuery: (...args: unknown[]) =>
     mockGetNflTeamSeasonMetadataQuery(...args),
 }));
@@ -457,6 +463,7 @@ describe('FootballLeagueId', () => {
       { data: { userTeamId: 10 }, loading: false },
     ]);
     mockUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
+    mockGetTeamByIdQuery.mockReturnValue({ data: undefined, loading: false });
     mockGetNflTeamSeasonMetadataQuery.mockReturnValue({
       data: { nflTeamSeasonMetadata: [] },
       loading: false,
@@ -531,6 +538,45 @@ describe('FootballLeagueId', () => {
     it('renders Chat tab', () => {
       render(<FootballLeagueId />);
       expect(screen.getByText('Chat')).toBeTruthy();
+    });
+  });
+
+  describe('cap-remaining data fetch (LS-6338)', () => {
+    it('skips useGetTeamByIdQuery when the league is not a salary-cap league', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, salaryCapEnabled: false } },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(mockGetTeamByIdQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: true }),
+      );
+    });
+
+    it('skips useGetTeamByIdQuery when there is no user team', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, salaryCapEnabled: true } },
+        loading: false,
+      });
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: null }, loading: false },
+      ]);
+      render(<FootballLeagueId />);
+      expect(mockGetTeamByIdQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: true }),
+      );
+    });
+
+    it('fetches useGetTeamByIdQuery when the league is a salary-cap league and a user team exists', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, salaryCapEnabled: true } },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(mockGetTeamByIdQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: false, variables: { teamId: 10 } }),
+      );
     });
   });
 

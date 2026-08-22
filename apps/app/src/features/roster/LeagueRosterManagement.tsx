@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { YStack } from 'tamagui';
+import { Text, XStack, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
 import type { RefreshControlProps } from 'react-native';
 import {
@@ -46,6 +46,15 @@ export interface LeagueRosterManagementProps {
   myTeamId?: number | null;
   /** Pull-to-refresh control for the tab's `ScrollView` (LS-8847). */
   refreshControl?: React.ReactElement<RefreshControlProps>;
+  /**
+   * Whether this league has a salary cap enabled (gated by
+   * `ENTITLEMENTS.salary_cap_leagues`). Drives the per-player salary column
+   * and the team cap-remaining summary — invisible in non-cap leagues
+   * (LS-6338).
+   */
+  salaryCapEnabled?: boolean | null;
+  /** The viewer's team's remaining salary cap space (dollars), when known. */
+  capSpace?: number | null;
   /** League sport — controls the board's starter grouping and football-specific constraints. Defaults to `'baseball'`. */
   sport?: 'baseball' | 'football';
   /**
@@ -80,6 +89,8 @@ export function LeagueRosterManagement({
   totalWeeks,
   myTeamId,
   refreshControl,
+  salaryCapEnabled = false,
+  capSpace,
   sport = 'baseball',
   byeWeeksByTeam,
 }: LeagueRosterManagementProps): React.JSX.Element {
@@ -140,6 +151,30 @@ export function LeagueRosterManagement({
 
       <ScrollView ref={scrollRef} refreshControl={refreshControl}>
         <YStack padding="$4" gap="$4">
+          {salaryCapEnabled && capSpace != null && (
+            <XStack
+              justifyContent="space-between"
+              alignItems="center"
+              paddingHorizontal="$3"
+              paddingVertical="$2.5"
+              borderRadius="$4"
+              borderWidth={1}
+              borderColor="$outlineSubtle"
+              backgroundColor="$surfaceSubtle"
+            >
+              <Text fontSize="$2" fontWeight="600" color="$gray10">
+                Cap Remaining
+              </Text>
+              <Text
+                fontSize="$5"
+                fontWeight="800"
+                color={capSpace < 0 ? '$red10' : '$brandGoldLight'}
+              >
+                ${capSpace.toLocaleString()}
+              </Text>
+            </XStack>
+          )}
+
           <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
 
           {isCurrent && myTeamId != null && (
@@ -161,6 +196,7 @@ export function LeagueRosterManagement({
             onPlayerPress={onPlayerPress}
             loading={loading}
             readOnly={isPast || isFuture}
+            salaryCapEnabled={!!salaryCapEnabled}
             sport={sport}
             currentWeek={sport === 'football' ? activeWeek : undefined}
             byeWeeksByTeam={byeWeeksByTeam}

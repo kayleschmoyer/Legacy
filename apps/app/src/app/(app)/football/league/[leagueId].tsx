@@ -31,6 +31,7 @@ import {
   useGetLeagueByIdQuery,
   useGetNflTeamSeasonMetadataQuery,
   useGetPositionsForLeagueQuery,
+  useGetTeamByIdQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
   useSwapTeamMemberPositionsMutation,
@@ -164,6 +165,17 @@ export default function FootballLeagueId(): React.JSX.Element {
   }, [numLeagueId, userInfo?.id, getUserTeamId]);
 
   const userTeamId = userTeamData?.userTeamId;
+
+  // Cap-remaining summary for the roster tab (LS-6338) — only needed in
+  // salary-cap leagues, so skip the fetch otherwise.
+  const { data: capTeamData, error: capTeamError } = useGetTeamByIdQuery({
+    skip: userTeamId == null || !leagueData?.league?.salaryCapEnabled,
+    variables: { teamId: userTeamId ?? 0 },
+  });
+
+  useEffect(() => {
+    if (capTeamError) LOGGER.error('Team cap space query error:', capTeamError);
+  }, [capTeamError]);
 
   const matchups = useMemo(() => {
     if (!userTeamId) return rawMatchups;
@@ -633,6 +645,8 @@ export default function FootballLeagueId(): React.JSX.Element {
                 totalWeeks={league?.totalMatchups}
                 myTeamId={userTeamId}
                 refreshControl={rosterRefresh.refreshControl}
+                salaryCapEnabled={league?.salaryCapEnabled}
+                capSpace={capTeamData?.team?.capSpace}
                 sport="football"
                 byeWeeksByTeam={byeWeeksByTeam}
               />

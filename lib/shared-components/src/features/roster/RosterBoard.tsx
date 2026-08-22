@@ -61,6 +61,8 @@ export interface RosterBoardPlayer {
   positionId?: number | null;
   nickname?: string | null;
   isLocked?: boolean | null;
+  /** Cap hit (dollars) for this roster slot in salary-cap leagues. Null/absent otherwise (LS-6338). */
+  salary?: number | null;
   player?: {
     id?: number | null;
     firstName?: string | null;
@@ -73,6 +75,11 @@ export interface RosterBoardPlayer {
     /** Current NFL team abbreviation for football players (LS-6334). */
     nflTeam?: string | null;
   } | null;
+}
+
+/** Formats a salary cap hit as a compact dollar string, e.g. "$4,500,000". */
+function formatSalary(salary: number): string {
+  return `$${salary.toLocaleString()}`;
 }
 
 /**
@@ -147,6 +154,13 @@ export interface RosterBoardProps<
    * render the pre-redesign eligibility sub-lines.
    */
   getPlayerStats?: (player: P) => RosterPlayerStats | null;
+  /**
+   * When true, renders each assigned/bench player's salary cap hit
+   * (`player.salary`) — premium salary-cap leagues need this visible on the
+   * roster, otherwise the cap is the most critical roster signal and it's
+   * invisible (LS-6338). No-op for non-cap leagues, which should pass false.
+   */
+  salaryCapEnabled?: boolean;
   /**
    * Per-NFL-team bye week for the league's active season, keyed by team
    * abbreviation (LS-6334). Football-only — omit for baseball, which has no
@@ -414,6 +428,8 @@ interface SlotRowProps {
   assignedMlbTeam?: string | null;
   assignedJerseyNumber?: number | null;
   assignedPrimaryPosition?: string | null;
+  assignedSalary?: number | null;
+  showSalary?: boolean;
   stats?: RosterPlayerStats | null;
   selectedName: string | null;
   state: SlotState;
@@ -435,6 +451,8 @@ function SlotRow({
   assignedMlbTeam,
   assignedJerseyNumber,
   assignedPrimaryPosition,
+  assignedSalary,
+  showSalary = false,
   stats,
   selectedName,
   state,
@@ -595,6 +613,17 @@ function SlotRow({
           </Text>
         )}
       {assignedName && stats != null && <ScoreCell stats={stats} />}
+      {assignedName && showSalary && assignedSalary != null && (
+        <Text
+          fontFamily={FONT_MONO}
+          fontSize={11}
+          fontWeight="700"
+          color={TEXT_MUTED}
+          numberOfLines={1}
+        >
+          {formatSalary(assignedSalary)}
+        </Text>
+      )}
       {actions}
       {assignedName && onPlayerPress && (
         <YStack
@@ -620,6 +649,8 @@ interface BenchRowProps {
   primaryPosition: string;
   mlbTeam?: string | null;
   jerseyNumber?: number | null;
+  salary?: number | null;
+  showSalary?: boolean;
   stats?: RosterPlayerStats | null;
   selected: boolean;
   readOnly: boolean;
@@ -635,6 +666,8 @@ function BenchRow({
   primaryPosition,
   mlbTeam,
   jerseyNumber,
+  salary,
+  showSalary = false,
   stats,
   selected,
   readOnly,
@@ -715,6 +748,17 @@ function BenchRow({
         </Text>
       )}
       {stats != null && <ScoreCell stats={stats} compact />}
+      {showSalary && salary != null && (
+        <Text
+          fontFamily={FONT_MONO}
+          fontSize={11}
+          fontWeight="700"
+          color={TEXT_MUTED}
+          numberOfLines={1}
+        >
+          {formatSalary(salary)}
+        </Text>
+      )}
       {!effectiveReadOnly && (
         <ArrowLeftRight size={13} color={TEXT_TERTIARY} aria-hidden />
       )}
@@ -823,6 +867,7 @@ export function RosterBoard<
   disabledPositionIds,
   sport = 'baseball',
   getPlayerStats,
+  salaryCapEnabled = false,
   byeWeeksByTeam,
   currentWeek,
 }: RosterBoardProps<P, Pos>): React.JSX.Element {
@@ -1105,6 +1150,8 @@ export function RosterBoard<
           assignedMlbTeam={assigned?.player?.mlbTeam}
           assignedJerseyNumber={assigned?.player?.jerseyNumber}
           assignedPrimaryPosition={assigned?.player?.eligiblePositions?.[0]}
+          assignedSalary={assigned?.salary}
+          showSalary={salaryCapEnabled}
           stats={stats}
           selectedName={selectedName}
           state={state}
@@ -1199,6 +1246,8 @@ export function RosterBoard<
       primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
       mlbTeam={p.player?.mlbTeam}
       jerseyNumber={p.player?.jerseyNumber}
+      salary={p.salary}
+      showSalary={salaryCapEnabled}
       stats={getPlayerStats ? getPlayerStats(p) : null}
       selected={selected?.id === p.id}
       readOnly={readOnly}
