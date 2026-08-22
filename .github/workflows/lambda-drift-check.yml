@@ -81,12 +81,22 @@ name: "Lambda Drift Check"
 # =============================================================================
 
 on:
-  # Anchored on Apply Lambda Infrastructure (not Deploy): the terraform apply
-  # itself only starts AFTER Deploy completes (see lambda-terraform-apply.yml's
-  # workflow_run trigger), so auditing on Deploy completion would race the
-  # apply and report transient SSM-vs-Description drift.
+  # Two paths, both covering a completed apply (LS-9374/LS-9369 restructure):
+  #   - "Deploy": the umbrella workflow now runs Apply Lambda Infrastructure
+  #     SYNCHRONOUSLY (via workflow_call) before Deploy Web, so by the time
+  #     "Deploy" completes the apply has already finished — this is the
+  #     common case for every normal push to main.
+  #   - "Apply Lambda Infrastructure": still fires as its own top-level
+  #     workflow run for the standalone path — a manual one-off
+  #     workflow_dispatch of upload-lambdas.yml, which triggers this
+  #     workflow via workflow_run rather than the embedded workflow_call.
+  # (Previously this only listened on "Apply Lambda Infrastructure" because
+  # the apply used to start only AFTER "Deploy" completed, so auditing on
+  # Deploy completion would have raced the apply and reported transient
+  # SSM-vs-Description drift. That race no longer exists for the synchronous
+  # path, and "Deploy" is now the trigger that actually reflects it.)
   workflow_run:
-    workflows: ["Apply Lambda Infrastructure"]
+    workflows: ["Deploy", "Apply Lambda Infrastructure"]
     types: [completed]
     branches: [main]
   workflow_dispatch:

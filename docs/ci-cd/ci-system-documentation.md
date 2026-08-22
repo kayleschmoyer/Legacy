@@ -47,12 +47,14 @@ Review (bot) and CI run in **parallel**. Branch protection requires both before 
 
 ## Deployment Architecture
 
-| Target           | Workflow                                            | Trigger                                                           |
-| ---------------- | --------------------------------------------------- | ----------------------------------------------------------------- |
-| Web app          | `deploy-web.yml`                                    | Push to `main` (paths: `apps/web/**`, `lib/shared-components/**`) |
-| Lambda functions | `upload-lambdas.yml` → `lambda-terraform-apply.yml` | Push to `main` (paths: `lambdas/**`)                              |
-| Mobile (iOS)     | `build-ios-app.yml`                                 | Manual / tag                                                      |
-| Mobile (Android) | `build-android-app.yml`                             | Manual / tag                                                      |
+| Target           | Workflow                                            | Trigger                                                                                                             |
+| ---------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Web app          | `deploy-web.yml`                                    | Push to `main` (paths: `apps/web/**`, `lib/shared-components/**`), gated on Lambda infra applying first (see below) |
+| Lambda functions | `upload-lambdas.yml` → `lambda-terraform-apply.yml` | Push to `main` (paths: `lambdas/**`)                                                                                |
+| Mobile (iOS)     | `build-ios-app.yml`                                 | Manual / tag                                                                                                        |
+| Mobile (Android) | `build-android-app.yml`                             | Manual / tag                                                                                                        |
+
+Both Lambda and Web deploys are children of the umbrella `deploy.yml`. `lambda-terraform-apply.yml` runs synchronously (`workflow_call`) after `upload-lambdas.yml` and before `deploy-web.yml`, so a client build never ships ahead of a server schema change it depends on (LS-9374/LS-9369) — `deploy-web` only starts once the Lambda apply succeeds or is skipped (no Lambda changes in that push).
 
 ## Common Operations
 

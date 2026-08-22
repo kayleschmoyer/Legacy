@@ -51,8 +51,21 @@ on:
   # Fire whenever a workflow that can hold the terraform state lock completes.
   # Must stay in lockstep with the WORKFLOWS array in the active-run check
   # below.
+  #
+  # "Deploy" was added (LS-9374/LS-9369 restructure): Apply Lambda
+  # Infrastructure now runs synchronously inside the umbrella Deploy workflow
+  # via workflow_call for the common (push-to-main) path, and a reusable
+  # workflow invoked via workflow_call never emits its own top-level
+  # "workflow_run" completion event — only "Deploy" completing is visible to
+  # this trigger for that path. "Apply Lambda Infrastructure" is kept
+  # alongside it for the standalone path (a manual workflow_dispatch of
+  # upload-lambdas.yml still triggers a top-level Apply Lambda Infrastructure
+  # run of its own). The 0-minute stale threshold below still holds either
+  # way: by the time either "Deploy" or a standalone "Apply Lambda
+  # Infrastructure" run completes, its apply step has already finished.
   workflow_run:
     workflows:
+      - "Deploy"
       - "Apply Lambda Infrastructure"
       - "Apply Runner Infrastructure"
       - "Deployment Rollback"
@@ -112,8 +125,18 @@ jobs:
           # Workflows that legitimately hold the terraform state lock. If any
           # are in_progress or queued, the watchdog must NOT touch the lock —
           # the active run will release it on completion or its own cleanup step.
+          #
+          # "deploy.yml" is included (LS-9374/LS-9369 restructure) because
+          # Apply Lambda Infrastructure now also runs as an embedded job
+          # inside a Deploy run (workflow_call) rather than always as its own
+          # top-level run. `gh run list --workflow lambda-terraform-apply.yml`
+          # cannot see that embedded execution — a reusable workflow invoked
+          # via workflow_call never appears as its own run in that listing —
+          # so an in-progress Deploy run must be checked directly to catch a
+          # concurrent apply happening inside it.
           WORKFLOWS=(
             "lambda-terraform-apply.yml"
+            "deploy.yml"
             "runner-terraform-apply.yml"
             "rollback.yml"
           )

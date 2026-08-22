@@ -1,24 +1,39 @@
 name: Apply Lambda Infrastructure
 
 # Central Terraform workflow - applies ALL pending Lambda changes.
-# Triggered by the umbrella Deploy workflow completing. Reusable workflows
-# invoked via workflow_call (Upload Lambdas) do NOT emit their own workflow_run
-# events, so we must trigger off the parent Deploy workflow.
+#
+# Triggering (LS-9374/LS-9369 restructure):
+#   - Primary: called SYNCHRONOUSLY from the umbrella Deploy workflow via
+#     workflow_call, before Deploy Web runs — see deploy.yml's
+#     apply-lambda-infrastructure job. This closes a deploy-ordering race:
+#     previously this workflow only started once the ENTIRE Deploy run
+#     (including Deploy Web) had already completed, so a commit shipping a
+#     client change alongside a required server schema change could put the
+#     new client live for minutes-to-hours before the matching Lambda code
+#     actually went live, producing transient GraphQL "Unknown argument" /
+#     "Cannot query field" errors (Rollbar #232/#233). Deploy Web now
+#     `needs` this job and only proceeds once it succeeds or is skipped
+#     (lambdas not targeted).
+#   - Standalone: workflow_run off "Upload Lambdas" completing directly —
+#     covers a manual one-off workflow_dispatch of upload-lambdas.yml, which
+#     runs as its own top-level workflow run (unlike the workflow_call
+#     embedding above, which never emits a separate "Upload Lambdas" run).
+#   - Manual: workflow_dispatch for targeted one-off applies.
 #
 # Apply gate intentionally runs on BOTH success and failure conclusions of the
-# parent Deploy workflow: if Upload Lambdas succeeded but a sibling child (web,
-# storybook) failed, the umbrella's overall conclusion is failure — but the
-# lambda SSM versions have already been bumped and infra still needs to be
-# reconciled. The existing SSM no-op check (Plan Infrastructure Changes) makes
-# this safe: if no lambda versions changed, terraform plan returns "No changes"
-# and the apply step is skipped. Cancelled umbrella runs are excluded.
+# triggering "Upload Lambdas" run: if a sibling child of that run's own caller
+# failed, the lambda SSM versions may still have already been bumped and infra
+# still needs to be reconciled. The existing SSM no-op check (Plan
+# Infrastructure Changes) makes this safe: if no lambda versions changed,
+# terraform plan returns "No changes" and the apply step is skipped.
+# Cancelled runs are excluded.
 #
 # Uses cancel-in-progress to batch multiple Lambda updates into one apply.
 
 on:
+  workflow_call:
   workflow_run:
     workflows:
-      - "Deploy"
       - "Upload Lambdas"
     types: [completed]
     branches: [main]
@@ -62,19 +77,22 @@ jobs:
     name: Apply Lambda Infrastructure
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
-    # Run for manual dispatches and for completed parent Deploy workflow runs
-    # unless the umbrella run was cancelled or skipped. This preserves apply
-    # behavior when Upload Lambdas has already bumped SSM versions but the
-    # parent workflow ultimately concludes with a non-success terminal state
-    # such as failure, timed_out, action_required, neutral, or stale — all of
-    # those leave SSM parameters in a state that still needs reconciling.
-    # Only cancelled/skipped umbrella runs are excluded, since those can
+    # Run for manual dispatches, for the synchronous workflow_call from the
+    # umbrella Deploy workflow (always — Deploy's own detect-changes gate
+    # already decided lambdas were targeted), and for completed standalone
+    # "Upload Lambdas" runs unless that run was cancelled or skipped. This
+    # preserves apply behavior when Upload Lambdas has already bumped SSM
+    # versions but concludes with a non-success terminal state such as
+    # failure, timed_out, action_required, neutral, or stale — all of those
+    # leave SSM parameters in a state that still needs reconciling. Only
+    # cancelled/skipped Upload Lambdas runs are excluded, since those can
     # terminate mid-upload and leave partial state that the plan step should
     # not attempt to act on. The SSM no-op check in the plan step ensures we
     # exit cleanly if no lambda versions actually changed.
     if: >-
       ${{
         github.event_name == 'workflow_dispatch' ||
+        github.event_name == 'workflow_call' ||
         (
           github.event_name == 'workflow_run' &&
           github.event.workflow_run.conclusion != 'cancelled' &&

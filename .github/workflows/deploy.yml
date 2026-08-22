@@ -10,16 +10,27 @@ name: Deploy
 # message instead of multiple independent workflow runs racing for attention.
 #
 # Children:
-#   - Upload Lambdas   (.github/workflows/upload-lambdas.yml)
-#   - Deploy Web       (.github/workflows/deploy-web.yml)
-#   - Deploy Storybook (.github/workflows/deploy-storybook.yml)
+#   - Upload Lambdas               (.github/workflows/upload-lambdas.yml)
+#   - Apply Lambda Infrastructure  (.github/workflows/lambda-terraform-apply.yml)
+#   - Deploy Web                   (.github/workflows/deploy-web.yml)
+#   - Deploy Storybook             (.github/workflows/deploy-storybook.yml)
 #
-# Downstream (still standalone for concurrency/batching reasons):
-#   - Apply Lambda Infrastructure triggers on this workflow's completion via
-#     workflow_run and reconciles terraform state with the SSM version
-#     parameters that the Upload Lambdas child writes. It keeps its own
-#     cancel-in-progress concurrency group so back-to-back deploys still
-#     batch into a single terraform apply.
+# Apply Lambda Infrastructure runs synchronously, right after Upload Lambdas
+# and before Deploy Web (LS-9374/LS-9369 restructure). Previously it ran as a
+# fully independent workflow triggered by THIS workflow's completion — so
+# Deploy Web (GitHub Pages, fast) could go live with a client change well
+# before the matching required server schema change actually reached the
+# live Lambda, producing transient GraphQL "Unknown argument" / "Cannot query
+# field" errors for real users during the gap (Rollbar #232/#233, up to ~19h
+# in one incident). Deploy Web now `needs` Apply Lambda Infrastructure and
+# only proceeds once it succeeds or is skipped (lambdas not targeted this
+# push), so a schema-dependent client build can never ship ahead of the
+# server code it depends on. Apply Lambda Infrastructure keeps its own
+# cancel-in-progress-false concurrency group so back-to-back deploys still
+# batch into a single terraform apply; it is also still independently
+# triggerable via workflow_run off "Upload Lambdas" completing, for manual
+# one-off upload-lambdas.yml dispatches. See lambda-terraform-apply.yml's own
+# header for the full trigger inventory.
 # =============================================================================
 
 on:
@@ -110,6 +121,7 @@ jobs:
               - 'tools/mcp/**'
               - 'tools/vite-configs/**'
               - '.github/workflows/upload-lambdas.yml'
+              - '.github/workflows/lambda-terraform-apply.yml'
               - '.github/workflows/deploy.yml'
             web:
               - 'apps/web/**'
@@ -177,12 +189,37 @@ jobs:
     secrets: inherit
 
   # ---------------------------------------------------------------------------
+  # Child: Apply Lambda Infrastructure
+  # ---------------------------------------------------------------------------
+  # Runs synchronously between Upload Lambdas and Deploy Web (LS-9374/LS-9369):
+  # Deploy Web depends on this completing so a client build that requires a
+  # new/changed server schema can never go live before that schema does.
+  apply-lambda-infrastructure:
+    name: Apply Lambda Infrastructure
+    needs: [detect-changes, upload-lambdas]
+    if: needs.detect-changes.outputs.lambdas == 'true'
+    permissions:
+      id-token: write # AWS OIDC
+      contents: read
+      actions: read # workflow_run/workflow_dispatch context reads inside the callee
+    uses: ./.github/workflows/lambda-terraform-apply.yml
+    secrets: inherit
+
+  # ---------------------------------------------------------------------------
   # Child: Deploy Web
   # ---------------------------------------------------------------------------
   deploy-web:
     name: Deploy Web
-    needs: detect-changes
-    if: needs.detect-changes.outputs.web == 'true'
+    needs: [detect-changes, apply-lambda-infrastructure]
+    # Gate on Apply Lambda Infrastructure's result, not just detect-changes:
+    # 'success' (lambdas targeted and applied) or 'skipped' (lambdas not
+    # targeted this push — the dependency's own `if` didn't run it) both mean
+    # it's safe to proceed. 'failure'/'cancelled' block Deploy Web entirely —
+    # see the umbrella header comment for why this ordering exists.
+    if: >-
+      needs.detect-changes.outputs.web == 'true' &&
+      (needs.apply-lambda-infrastructure.result == 'success' ||
+      needs.apply-lambda-infrastructure.result == 'skipped')
     permissions:
       actions: read # nx-set-shas base SHA resolution
       contents: write # create-release
@@ -214,7 +251,7 @@ jobs:
   # ---------------------------------------------------------------------------
   rollup-status:
     name: Rollup Status
-    needs: [detect-changes, upload-lambdas, deploy-web, deploy-storybook]
+    needs: [detect-changes, upload-lambdas, apply-lambda-infrastructure, deploy-web, deploy-storybook]
     if: always()
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
@@ -232,7 +269,8 @@ jobs:
           LAMBDAS_TARGETED: ${{ needs.detect-changes.outputs.lambdas }}
           WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
           STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
-          LAMBDAS_RESULT: ${{ needs.upload-lambdas.result }}
+          LAMBDAS_UPLOAD_RESULT: ${{ needs.upload-lambdas.result }}
+          LAMBDAS_APPLY_RESULT: ${{ needs.apply-lambda-infrastructure.result }}
           WEB_RESULT: ${{ needs.deploy-web.result }}
           STORYBOOK_RESULT: ${{ needs.deploy-storybook.result }}
         run: |
@@ -256,7 +294,24 @@ jobs:
             esac
           }
 
-          LAMBDAS_STATE=$(translate "$LAMBDAS_TARGETED" "$LAMBDAS_RESULT")
+          # Lambdas covers two sequential jobs (Upload Lambdas, then Apply
+          # Lambda Infrastructure) — the rollup reports the worse of the two,
+          # since either one failing/cancelling means the Lambda side of this
+          # deploy did not fully complete.
+          worse_of() {
+            local a="$1" b="$2"
+            for state in failure cancelled skipped; do
+              if [ "$a" = "$state" ] || [ "$b" = "$state" ]; then
+                echo "$state"
+                return
+              fi
+            done
+            echo "success"
+          }
+
+          LAMBDAS_UPLOAD_STATE=$(translate "$LAMBDAS_TARGETED" "$LAMBDAS_UPLOAD_RESULT")
+          LAMBDAS_APPLY_STATE=$(translate "$LAMBDAS_TARGETED" "$LAMBDAS_APPLY_RESULT")
+          LAMBDAS_STATE=$(worse_of "$LAMBDAS_UPLOAD_STATE" "$LAMBDAS_APPLY_STATE")
           WEB_STATE=$(translate "$WEB_TARGETED" "$WEB_RESULT")
           STORYBOOK_STATE=$(translate "$STORYBOOK_TARGETED" "$STORYBOOK_RESULT")
 
@@ -352,8 +407,8 @@ jobs:
             echo "**Overall:** $OVERALL"
             echo ""
             if [ "$LAMBDAS_STATE" = "success" ]; then
-              echo "> ℹ️ Terraform apply runs as a separate downstream workflow."
-              echo "> See the **Apply Lambda Infrastructure** run triggered by this Deploy."
+              echo "> ℹ️ Terraform apply already ran synchronously as part of this Deploy run"
+              echo "> (**Apply Lambda Infrastructure** job, before Deploy Web started)."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -425,7 +480,7 @@ jobs:
             LINES+=("**Web** deployed")
           fi
           if [ "$LAMBDAS_TARGETED" = "true" ]; then
-            LINES+=("**Lambdas** uploaded — Terraform applying")
+            LINES+=("**Lambdas** uploaded — Terraform applied")
           fi
           if [ "$STORYBOOK_TARGETED" = "true" ]; then
             LINES+=("**Storybook** deployed")
