@@ -3,6 +3,7 @@ import { Text, XStack, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
 import type { RefreshControlProps } from 'react-native';
 import {
+  OtherTeamViewingBanner,
   PendingTradeOffers,
   PendingWaiverClaims,
   RosterActionBar,
@@ -17,7 +18,7 @@ import {
   useGetMatchupsByWeekQuery,
 } from '@legacy-sports/graphql';
 
-export interface LeagueRosterManagementProps {
+export type LeagueRosterManagementProps = {
   positions: readonly LeaguePositionFragment[];
   teamPlayers: readonly AppTeamMemberFragment[];
   onPlayerAssign: (
@@ -47,6 +48,16 @@ export interface LeagueRosterManagementProps {
   /** Pull-to-refresh control for the tab's `ScrollView` (LS-8847). */
   refreshControl?: React.ReactElement<RefreshControlProps>;
   /**
+   * Set when viewing another team's roster (via standings or matchup
+   * click). Renders the "Other Team Viewing" banner, forces the board
+   * read-only, and hides the viewer's own trade/waiver banners (LS-6335).
+   * Only takes effect once `onBackToMyRoster` is also set — see the
+   * `viewingTeamName != null && onBackToMyRoster != null` guard below.
+   */
+  viewingTeamName?: string | null;
+  /** "Back to My Roster" handler — required for `viewingTeamName` to take effect. */
+  onBackToMyRoster?: () => void;
+  /**
    * Whether this league has a salary cap enabled (gated by
    * `ENTITLEMENTS.salary_cap_leagues`). Drives the per-player salary column
    * and the team cap-remaining summary — invisible in non-cap leagues
@@ -62,7 +73,7 @@ export interface LeagueRosterManagementProps {
    * abbreviation (LS-6334). Football-only; ignored for baseball.
    */
   byeWeeksByTeam?: Readonly<Record<string, number>>;
-}
+};
 
 /**
  * LeagueRosterManagement — native roster tab.
@@ -88,12 +99,15 @@ export function LeagueRosterManagement({
   currentWeek,
   totalWeeks,
   myTeamId,
+  viewingTeamName,
+  onBackToMyRoster,
   refreshControl,
   salaryCapEnabled = false,
   capSpace,
   sport = 'baseball',
   byeWeeksByTeam,
 }: LeagueRosterManagementProps): React.JSX.Element {
+  const isViewingOther = viewingTeamName != null;
   const effectiveCurrent = currentWeek ?? 1;
   const effectiveTotal = totalWeeks ?? effectiveCurrent;
   // `week === null` tracks the live week until the user navigates, so the view
@@ -104,8 +118,9 @@ export function LeagueRosterManagement({
 
   const isPast = activeWeek < effectiveCurrent;
   const isFuture = activeWeek > effectiveCurrent;
-  const isCurrent = activeWeek === effectiveCurrent;
-  const showWeekNav = currentWeek != null && effectiveTotal > 1;
+  const isCurrent = activeWeek === effectiveCurrent && !isViewingOther;
+  const showWeekNav =
+    currentWeek != null && effectiveTotal > 1 && !isViewingOther;
 
   // Matchup scoreline for the viewed week (LS-9355). Server-stored scores —
   // native does not recompute live scores client-side, so projections are
@@ -175,7 +190,14 @@ export function LeagueRosterManagement({
             </XStack>
           )}
 
-          <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
+          {viewingTeamName != null && onBackToMyRoster != null ? (
+            <OtherTeamViewingBanner
+              teamName={viewingTeamName}
+              onBackToMyRoster={onBackToMyRoster}
+            />
+          ) : (
+            <RosterStatusBanners isPast={isPast} isFuture={isFuture} />
+          )}
 
           {isCurrent && myTeamId != null && (
             <PendingTradeOffers
@@ -195,7 +217,7 @@ export function LeagueRosterManagement({
             onPlayerSwap={onPlayerSwap}
             onPlayerPress={onPlayerPress}
             loading={loading}
-            readOnly={isPast || isFuture}
+            readOnly={isViewingOther || isPast || isFuture}
             salaryCapEnabled={!!salaryCapEnabled}
             sport={sport}
             currentWeek={sport === 'football' ? activeWeek : undefined}

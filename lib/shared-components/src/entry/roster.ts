@@ -8,6 +8,7 @@ export * from '../features/roster/RosterScoreboard';
 export * from '../features/roster/RosterActionBar';
 export * from '../features/roster/RosterWeekNavigation';
 export * from '../features/roster/RosterStatusBanners';
+export * from '../features/roster/OtherTeamViewingBanner';
 export * from '../features/roster/LineupEditor';
 export * from '../features/roster/MatchupRosterComparison';
 export * from '../features/roster/MatchupRosterEditorView';

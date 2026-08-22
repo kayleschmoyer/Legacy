@@ -176,7 +176,6 @@ jest.mock('@legacy-sports/shared-components', () => {
     isDraftRoomReachable: (status: string | null | undefined) =>
       status === 'in-progress' || status === 'drafting' || status === 'paused',
     LeagueDetailShell,
-    Chip: ({ label }: { label: string }) => <Text>{label}</Text>,
     CommissionerAuditLog: () => <View testID="commissioner-audit-log" />,
     CommissionerNoteControl: () => <View testID="commissioner-note-control" />,
     Chip: ({ label }: { label: string; tone?: string }) => (
@@ -192,7 +191,6 @@ jest.mock('@legacy-sports/shared-components', () => {
     PanelCard: ({ children }: { children?: React.ReactNode }) => (
       <View>{children}</View>
     ),
-    Chip: ({ label }: { label: string }) => <Text>{label}</Text>,
     PendingTradeOfferBanner: () => <View testID="pending-trade-offer-banner" />,
     PendingWaiverClaims: (props: {
       onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
@@ -228,7 +226,28 @@ jest.mock('@legacy-sports/shared-components', () => {
         <Text testID="matchups-view-toggle-value">{value}</Text>
       </View>
     ),
-    StandingsTable: () => <View testID="standings-table" />,
+    StandingsTable: ({
+      standings,
+      onTeamPress,
+    }: {
+      standings: ReadonlyArray<{
+        teamId?: number | string | null;
+        teamName?: string | null;
+      }>;
+      onTeamPress?: (teamId: number) => void;
+    }) => (
+      <View testID="standings-table">
+        {standings.map((s) => (
+          <TouchableOpacity
+            key={String(s.teamId)}
+            testID={`standings-team-${String(s.teamId)}`}
+            onPress={() => onTeamPress?.(Number(s.teamId))}
+          >
+            <Text>{s.teamName}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    ),
     TradingCenter: (props: {
       onSubscribeRefresh?: (refetch: () => void) => (() => void) | void;
     }) => {
@@ -251,15 +270,34 @@ jest.mock('../../../../hooks/useLeagueWebSocketLifecycle', () => ({
 }));
 
 jest.mock('../../../../features/roster/LeagueRosterManagement', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
+  const { View, Text, TouchableOpacity } =
+    jest.requireActual<typeof import('react-native')>('react-native');
   return {
     LeagueRosterManagement: (props: {
+      viewingTeamName?: string | null;
+      onBackToMyRoster?: () => void;
       onPlayerAssign?: (...args: unknown[]) => void;
       onPlayerRemove?: (...args: unknown[]) => void;
     }) => {
       mockCapturedOnPlayerAssign = props.onPlayerAssign ?? null;
       mockCapturedOnPlayerRemove = props.onPlayerRemove ?? null;
-      return <View testID="league-roster-management" />;
+      return (
+        <View testID="league-roster-management">
+          {props.viewingTeamName != null && (
+            <Text testID="league-roster-viewing-team-name">
+              {props.viewingTeamName}
+            </Text>
+          )}
+          {props.onBackToMyRoster && (
+            <TouchableOpacity
+              testID="back-to-my-roster-button"
+              onPress={props.onBackToMyRoster}
+            >
+              <Text>Back to My Roster</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      );
     },
   };
 });
@@ -425,6 +463,10 @@ const mockGetUserTeamIdLazyQuery = jest.fn(() => [
   jest.fn(),
   { data: { userTeamId: 10 }, loading: false },
 ]);
+const mockGetTeamMembersLazyQuery = jest.fn(() => [
+  jest.fn().mockResolvedValue({ data: { teamMembers: [] } }),
+  { data: { teamMembers: [] }, loading: false },
+]);
 const mockUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
 const mockGetTeamByIdQuery = jest.fn(() => ({
   data: undefined,
@@ -444,6 +486,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockGetPositionsForLeagueQuery(...args),
   useGetTeamMembersQuery: (...args: unknown[]) =>
     mockGetTeamMembersQuery(...args),
+  useGetTeamMembersLazyQuery: (...args: unknown[]) =>
+    mockGetTeamMembersLazyQuery(...args),
   useGetUserTeamIdLazyQuery: (...args: unknown[]) =>
     mockGetUserTeamIdLazyQuery(...args),
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
@@ -936,6 +980,81 @@ describe('FootballLeagueId', () => {
       expect(
         screen.getByText('Join this league to manage a roster.'),
       ).toBeTruthy();
+    });
+  });
+
+  // LS-6335 (FLD-022) — tapping an opponent's team in Standings switches to
+  // the Roster tab in "viewing another team" mode; navigating to Roster
+  // directly, or pressing "Back to My Roster", always returns to the
+  // viewer's own roster.
+  describe('other team viewing (LS-6335)', () => {
+    beforeEach(() => {
+      jest
+        .requireMock<{
+          useStandings: jest.Mock;
+        }>('../../../../features/matchup/hooks/useStandings')
+        .useStandings.mockReturnValue({
+          standings: [
+            { teamId: 10, teamName: 'My Team' },
+            { teamId: 20, teamName: 'Opponent Team' },
+          ],
+          loading: false,
+          error: undefined,
+          refetch: jest.fn(),
+        });
+    });
+
+    it('tapping an opponent team in Standings switches to Roster and passes viewingTeamName/onBackToMyRoster', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-standings'));
+      fireEvent.press(screen.getByTestId('standings-team-20'));
+
+      expect(screen.getByTestId('league-roster-management')).toBeTruthy();
+      expect(
+        screen.getByTestId('league-roster-viewing-team-name'),
+      ).toHaveTextContent('Opponent Team');
+      expect(screen.getByTestId('back-to-my-roster-button')).toBeTruthy();
+    });
+
+    it('tapping your own team in Standings switches to Roster without viewingTeamName', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-standings'));
+      fireEvent.press(screen.getByTestId('standings-team-10'));
+
+      expect(screen.getByTestId('league-roster-management')).toBeTruthy();
+      expect(
+        screen.queryByTestId('league-roster-viewing-team-name'),
+      ).toBeNull();
+    });
+
+    it('pressing "Back to My Roster" clears the viewed opponent', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-standings'));
+      fireEvent.press(screen.getByTestId('standings-team-20'));
+      expect(
+        screen.getByTestId('league-roster-viewing-team-name'),
+      ).toHaveTextContent('Opponent Team');
+
+      fireEvent.press(screen.getByTestId('back-to-my-roster-button'));
+
+      expect(
+        screen.queryByTestId('league-roster-viewing-team-name'),
+      ).toBeNull();
+    });
+
+    it('selecting the Roster tab directly always resets to the viewer’s own roster', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-standings'));
+      fireEvent.press(screen.getByTestId('standings-team-20'));
+      expect(
+        screen.getByTestId('league-roster-viewing-team-name'),
+      ).toHaveTextContent('Opponent Team');
+
+      fireEvent.press(screen.getByTestId('tab-roster'));
+
+      expect(
+        screen.queryByTestId('league-roster-viewing-team-name'),
+      ).toBeNull();
     });
   });
 

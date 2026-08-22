@@ -69,6 +69,18 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
     ),
     PendingTradeOffers: () => <RNText>pending-trades</RNText>,
     PendingWaiverClaims: () => <RNText>pending-waivers</RNText>,
+    OtherTeamViewingBanner: ({
+      teamName,
+      onBackToMyRoster,
+    }: {
+      teamName: string;
+      onBackToMyRoster: () => void;
+    }) => (
+      <View>
+        <RNText>{`viewing-${teamName}`}</RNText>
+        <RNText onPress={onBackToMyRoster}>back-to-my-roster</RNText>
+      </View>
+    ),
   };
 });
 
@@ -139,6 +151,29 @@ describe('LeagueRosterManagement', () => {
     expect(screen.getByText('board-readonly-true')).toBeTruthy();
     // Pending banners only show on the current week.
     expect(screen.queryByText('pending-trades')).toBeNull();
+  });
+
+  it('shows the other-team-viewing banner, hides week nav/pending banners, and forces the board read-only', () => {
+    const onBackToMyRoster = jest.fn();
+    render(
+      <LeagueRosterManagement
+        {...baseProps}
+        currentWeek={3}
+        totalWeeks={10}
+        viewingTeamName="Rival Squad"
+        onBackToMyRoster={onBackToMyRoster}
+      />,
+    );
+    expect(screen.getByText('viewing-Rival Squad')).toBeTruthy();
+    expect(screen.getByText('board-readonly-true')).toBeTruthy();
+    expect(screen.queryByText('week-nav')).toBeNull();
+    expect(screen.queryByText('banner-current')).toBeNull();
+    expect(screen.queryByText('pending-trades')).toBeNull();
+    expect(screen.queryByText('pending-waivers')).toBeNull();
+    expect(screen.queryByText('action-bar')).toBeNull();
+
+    fireEvent.press(screen.getByText('back-to-my-roster'));
+    expect(onBackToMyRoster).toHaveBeenCalledTimes(1);
   });
 
   // ── Cap-remaining summary (LS-6338) ────────────────────────────────────────

@@ -32,6 +32,7 @@ import {
   useGetNflTeamSeasonMetadataQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
+  useGetTeamMembersLazyQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdLazyQuery,
   useSwapTeamMemberPositionsMutation,
@@ -211,6 +212,57 @@ export default function FootballLeagueId(): React.JSX.Element {
     error: standingsError,
     refetch: refetchStandings,
   } = useStandings(isNaN(numLeagueId) ? null : numLeagueId);
+
+  // Other Team Viewing (LS-6335): lazy-fetch an opponent's roster when the
+  // user taps their team in standings. Roster tab renders read-only with a
+  // "Back to My Roster" banner while `opponentTeamId` is set.
+  const [opponentTeamId, setOpponentTeamId] = useState<number | null>(null);
+  const [
+    fetchOpponentTeamMembers,
+    { data: opponentTeamMembersData, loading: opponentTeamMembersLoading },
+  ] = useGetTeamMembersLazyQuery();
+
+  useEffect(() => {
+    if (opponentTeamId != null) {
+      void fetchOpponentTeamMembers({
+        variables: { teamId: opponentTeamId },
+      }).catch((fetchError: unknown) => {
+        const error =
+          fetchError instanceof Error
+            ? fetchError
+            : new Error(String(fetchError));
+        LOGGER.error('Failed to fetch opponent team members', error, {
+          teamId: opponentTeamId,
+        });
+      });
+    }
+  }, [opponentTeamId, fetchOpponentTeamMembers]);
+
+  const opponentTeamName = useMemo(() => {
+    if (opponentTeamId == null) return null;
+    const standing = standings.find((s) => Number(s.teamId) === opponentTeamId);
+    return standing?.teamName ?? 'Team';
+  }, [opponentTeamId, standings]);
+
+  const handleViewTeamRoster = useCallback(
+    (teamId: number) => {
+      if (isNaN(teamId)) return;
+      setOpponentTeamId(teamId === userTeamId ? null : teamId);
+      setSelectedTab('roster');
+    },
+    [userTeamId],
+  );
+
+  const handleBackToMyRoster = useCallback(() => {
+    setOpponentTeamId(null);
+  }, []);
+
+  const handleTabChange = useCallback((tabId: string) => {
+    // Selecting the roster tab directly (not via a standings row press)
+    // always returns to the viewer's own roster.
+    if (tabId === 'roster') setOpponentTeamId(null);
+    setSelectedTab(tabId);
+  }, []);
 
   const { bracket: playoffBracket, refetch: refetchPlayoffBracket } =
     usePlayoffBracket(isNaN(numLeagueId) ? null : numLeagueId);
@@ -574,7 +626,7 @@ export default function FootballLeagueId(): React.JSX.Element {
         isMember={isMember}
         tabs={leagueTabs}
         activeTab={selectedTab}
-        onTabChange={setSelectedTab}
+        onTabChange={handleTabChange}
         onInvite={() => void handleInviteShare()}
       >
         {userTeamId != null && (
@@ -622,10 +674,15 @@ export default function FootballLeagueId(): React.JSX.Element {
               <LeagueRosterManagement
                 positions={positionsData?.leaguePositions || []}
                 teamPlayers={
-                  teamMembersData?.teamMembers?.filter(
-                    (member): member is AppTeamMemberFragment =>
-                      member !== null,
-                  ) ?? []
+                  opponentTeamId != null
+                    ? (opponentTeamMembersData?.teamMembers?.filter(
+                        (member): member is AppTeamMemberFragment =>
+                          member !== null,
+                      ) ?? [])
+                    : (teamMembersData?.teamMembers?.filter(
+                        (member): member is AppTeamMemberFragment =>
+                          member !== null,
+                      ) ?? [])
                 }
                 onPlayerAssign={(player, position) => {
                   void handlePlayerAssign(player, position);
@@ -638,12 +695,16 @@ export default function FootballLeagueId(): React.JSX.Element {
                 }}
                 onPlayerPress={handlePlayerPress}
                 loading={
-                  positionsLoading || teamMembersLoading || userTeamLoading
+                  opponentTeamId != null
+                    ? positionsLoading || opponentTeamMembersLoading
+                    : positionsLoading || teamMembersLoading || userTeamLoading
                 }
                 leagueId={numLeagueId}
                 currentWeek={league?.currentWeekNumber}
                 totalWeeks={league?.totalMatchups}
                 myTeamId={userTeamId}
+                viewingTeamName={opponentTeamName}
+                onBackToMyRoster={handleBackToMyRoster}
                 refreshControl={rosterRefresh.refreshControl}
                 salaryCapEnabled={league?.salaryCapEnabled}
                 capSpace={capTeamData?.team?.capSpace}
@@ -787,6 +848,7 @@ export default function FootballLeagueId(): React.JSX.Element {
                   loading={standingsLoading}
                   error={standingsError}
                   currentUserTeamId={userTeamId ?? null}
+                  onTeamPress={handleViewTeamRoster}
                 />
                 {playoffBracket ? (
                   <PlayoffBracket bracket={playoffBracket} />
