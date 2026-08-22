@@ -26,6 +26,7 @@ import { notifyDiscordTradeEvent } from '../../services/discord-league';
 import {
   AuthenticationError,
   ForbiddenError,
+  NotFoundError,
   UserInputError,
 } from '../graphql-errors';
 import { assertSportCompatibility } from '../sport-eligibility';
@@ -55,7 +56,12 @@ async function enrichTrade(tradeId: number, context: Context) {
     .where(eq(PublicSchema.tradeOffers.id, tradeId))
     .limit(1);
 
-  if (!trade) throw new Error('Trade offer not found');
+  // The trade can legitimately vanish between a mutation's write and this
+  // re-fetch — e.g. it was concurrently resolved and its cascade-deleted
+  // team was removed from the league (trade_offers.team_id ON DELETE
+  // CASCADE) — so this is an expected, client-facing condition rather than
+  // a server bug (LS-9487).
+  if (!trade) throw NotFoundError('Trade offer not found');
 
   const [proposingTeam] = await context.db
     .select({ name: PublicSchema.teams.name })
@@ -834,11 +840,11 @@ builder.mutationField('acceptTrade', (t) =>
         .limit(1);
 
       if (!trade) {
-        throw new Error('Trade offer not found');
+        throw NotFoundError('Trade offer not found');
       }
 
       if (trade.status !== 'pending') {
-        throw new Error(
+        throw UserInputError(
           `This trade offer has already been ${trade.status} and cannot be accepted`,
         );
       }
@@ -857,7 +863,7 @@ builder.mutationField('acceptTrade', (t) =>
         .limit(1);
 
       if (!membership?.teamId || membership.teamId !== receivingTeamId) {
-        throw new Error(
+        throw ForbiddenError(
           'Only the receiving team manager can accept this trade',
         );
       }
@@ -1162,9 +1168,11 @@ builder.mutationField('rejectTrade', (t) =>
         .where(eq(PublicSchema.tradeOffers.id, args.tradeId))
         .limit(1);
 
-      if (!trade) throw new Error('Trade offer not found');
+      if (!trade) throw NotFoundError('Trade offer not found');
       if (trade.status !== 'pending') {
-        throw new Error(`This trade offer has already been ${trade.status}`);
+        throw UserInputError(
+          `This trade offer has already been ${trade.status}`,
+        );
       }
 
       // Verify the caller is the receiving team manager
@@ -1180,15 +1188,30 @@ builder.mutationField('rejectTrade', (t) =>
         .limit(1);
 
       if (!membership?.teamId || membership.teamId !== trade.receivingTeamId) {
-        throw new Error(
+        throw ForbiddenError(
           'Only the receiving team manager can reject this trade',
         );
       }
 
-      await db
+      // Gate the update on status='pending' so a concurrent reject/cancel/
+      // accept on the same offer can only win once — the loser sees
+      // rowCount=0 and reports a conflict instead of silently overwriting
+      // the other resolution (LS-9487).
+      const rejectResult = await db
         .update(PublicSchema.tradeOffers)
         .set({ status: 'rejected', respondedAt: new Date() })
-        .where(eq(PublicSchema.tradeOffers.id, args.tradeId));
+        .where(
+          and(
+            eq(PublicSchema.tradeOffers.id, args.tradeId),
+            eq(PublicSchema.tradeOffers.status, 'pending'),
+          ),
+        );
+
+      if ((rejectResult.rowCount ?? 0) === 0) {
+        throw UserInputError(
+          'This trade offer has already been processed and cannot be rejected',
+        );
+      }
 
       LOGGER.info('Trade rejected', {
         tradeId: args.tradeId,
@@ -1236,9 +1259,9 @@ builder.mutationField('cancelTrade', (t) =>
         .where(eq(PublicSchema.tradeOffers.id, args.tradeId))
         .limit(1);
 
-      if (!trade) throw new Error('Trade offer not found');
+      if (!trade) throw NotFoundError('Trade offer not found');
       if (trade.status !== 'pending') {
-        throw new Error(
+        throw UserInputError(
           `This trade offer has already been ${trade.status} and cannot be cancelled`,
         );
       }
@@ -1261,10 +1284,25 @@ builder.mutationField('cancelTrade', (t) =>
         );
       }
 
-      await db
+      // Gate the update on status='pending' so a concurrent reject/cancel/
+      // accept on the same offer can only win once — the loser sees
+      // rowCount=0 and reports a conflict instead of silently overwriting
+      // the other resolution (LS-9487).
+      const cancelResult = await db
         .update(PublicSchema.tradeOffers)
         .set({ status: 'cancelled', respondedAt: new Date() })
-        .where(eq(PublicSchema.tradeOffers.id, args.tradeId));
+        .where(
+          and(
+            eq(PublicSchema.tradeOffers.id, args.tradeId),
+            eq(PublicSchema.tradeOffers.status, 'pending'),
+          ),
+        );
+
+      if ((cancelResult.rowCount ?? 0) === 0) {
+        throw UserInputError(
+          'This trade offer has already been processed and cannot be cancelled',
+        );
+      }
 
       LOGGER.info('Trade cancelled by proposer', {
         tradeId: args.tradeId,
@@ -1313,9 +1351,9 @@ builder.mutationField('vetoTrade', (t) =>
         .where(eq(PublicSchema.tradeOffers.id, args.tradeId))
         .limit(1);
 
-      if (!trade) throw new Error('Trade offer not found');
+      if (!trade) throw NotFoundError('Trade offer not found');
       if (trade.status !== 'accepted') {
-        throw new Error('Only accepted trades can be vetoed');
+        throw UserInputError('Only accepted trades can be vetoed');
       }
 
       // Verify commissioner/owner of the league
@@ -1338,7 +1376,7 @@ builder.mutationField('vetoTrade', (t) =>
           membership.permissionLevel ?? '',
         )
       ) {
-        throw new Error(
+        throw ForbiddenError(
           'Only the league General Manager or commissioner can veto a trade',
         );
       }

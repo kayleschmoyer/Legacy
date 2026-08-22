@@ -1051,13 +1051,16 @@ describe('Trades Resolver', () => {
       ).rejects.toThrow('Authentication required');
     });
 
-    it('throws when trade not found', async () => {
+    it('throws NOT_FOUND when trade not found', async () => {
       mockDb.limit.mockResolvedValueOnce([]);
 
       const resolver = getResolver('mutation', 'acceptTrade');
       await expect(
         resolver({}, { tradeId: 999 }, mockContext, undefined as never),
-      ).rejects.toThrow('Trade offer not found');
+      ).rejects.toMatchObject({
+        extensions: { code: 'NOT_FOUND' },
+        message: expect.stringContaining('Trade offer not found'),
+      });
     });
 
     it('throws when a concurrent request already accepted the trade (rowCount=0 on status claim)', async () => {
@@ -1339,16 +1342,19 @@ describe('Trades Resolver', () => {
       ).rejects.toThrow('Authentication required');
     });
 
-    it('throws when trade not found', async () => {
+    it('throws NOT_FOUND when trade not found', async () => {
       mockDb.limit.mockResolvedValueOnce([]);
 
       const resolver = getResolver('mutation', 'rejectTrade');
       await expect(
         resolver({}, { tradeId: 999 }, mockContext, undefined as never),
-      ).rejects.toThrow('Trade offer not found');
+      ).rejects.toMatchObject({
+        extensions: { code: 'NOT_FOUND' },
+        message: expect.stringContaining('Trade offer not found'),
+      });
     });
 
-    it('throws when trade is not pending', async () => {
+    it('throws BAD_USER_INPUT when trade is not pending', async () => {
       mockDb.limit.mockResolvedValueOnce([
         {
           id: 5,
@@ -1362,7 +1368,40 @@ describe('Trades Resolver', () => {
       const resolver = getResolver('mutation', 'rejectTrade');
       await expect(
         resolver({}, { tradeId: 5 }, mockContext, undefined as never),
-      ).rejects.toThrow('already been accepted');
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('already been accepted'),
+      });
+    });
+
+    // LS-9487: a concurrent reject/cancel/accept on the same offer must lose
+    // this race gracefully (BAD_USER_INPUT), not crash `enrichTrade` with a
+    // raw "Trade offer not found" once the other resolution wins.
+    it('throws BAD_USER_INPUT when a concurrent request already resolved the trade (rowCount=0 on status update)', async () => {
+      const trade = {
+        id: 5,
+        status: 'pending',
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+      };
+
+      // trade fetch
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      // membership fetch — caller is the receiving team manager
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ teamId: 2 }]);
+      // status-gated update loses the race
+      mockDb.where.mockResolvedValueOnce({ rowCount: 0 });
+
+      const resolver = getResolver('mutation', 'rejectTrade');
+      await expect(
+        resolver({}, { tradeId: 5 }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('already been processed'),
+      });
     });
 
     // LS-9217: a rejected trade must post a system message into league chat
@@ -1378,9 +1417,13 @@ describe('Trades Resolver', () => {
       };
 
       // rejectTrade: trade fetch
+      mockDb.where.mockReturnValueOnce(mockDb);
       mockDb.limit.mockResolvedValueOnce([trade]);
       // rejectTrade: membership fetch — caller is the receiving team manager
+      mockDb.where.mockReturnValueOnce(mockDb);
       mockDb.limit.mockResolvedValueOnce([{ teamId: 2 }]);
+      // rejectTrade: status-gated update claims the row
+      mockDb.where.mockResolvedValueOnce({ rowCount: 1 });
       // postTradeSystemMessage: proposing/receiving team name lookups
       mockDb.limit.mockResolvedValueOnce([{ name: 'Proposing Team' }]);
       mockDb.limit.mockResolvedValueOnce([{ name: 'Receiving Team' }]);
@@ -1426,16 +1469,19 @@ describe('Trades Resolver', () => {
       ).rejects.toThrow('Authentication required');
     });
 
-    it('throws when trade not found', async () => {
+    it('throws NOT_FOUND when trade not found', async () => {
       mockDb.limit.mockResolvedValueOnce([]);
 
       const resolver = getResolver('mutation', 'cancelTrade');
       await expect(
         resolver({}, { tradeId: 999 }, mockContext, undefined as never),
-      ).rejects.toThrow('Trade offer not found');
+      ).rejects.toMatchObject({
+        extensions: { code: 'NOT_FOUND' },
+        message: expect.stringContaining('Trade offer not found'),
+      });
     });
 
-    it('throws when trade is not pending', async () => {
+    it('throws BAD_USER_INPUT when trade is not pending', async () => {
       mockDb.limit.mockResolvedValueOnce([
         {
           id: 5,
@@ -1449,7 +1495,40 @@ describe('Trades Resolver', () => {
       const resolver = getResolver('mutation', 'cancelTrade');
       await expect(
         resolver({}, { tradeId: 5 }, mockContext, undefined as never),
-      ).rejects.toThrow('already been rejected');
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('already been rejected'),
+      });
+    });
+
+    // LS-9487: a concurrent reject/cancel/accept on the same offer must lose
+    // this race gracefully (BAD_USER_INPUT), not crash `enrichTrade` with a
+    // raw "Trade offer not found" once the other resolution wins.
+    it('throws BAD_USER_INPUT when a concurrent request already resolved the trade (rowCount=0 on status update)', async () => {
+      const trade = {
+        id: 5,
+        status: 'pending',
+        leagueId: 1,
+        proposingTeamId: 1,
+        receivingTeamId: 2,
+      };
+
+      // trade fetch
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([trade]);
+      // membership fetch — caller is the proposing team manager
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ teamId: 1 }]);
+      // status-gated update loses the race
+      mockDb.where.mockResolvedValueOnce({ rowCount: 0 });
+
+      const resolver = getResolver('mutation', 'cancelTrade');
+      await expect(
+        resolver({}, { tradeId: 5 }, mockContext, undefined as never),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('already been processed'),
+      });
     });
   });
 
@@ -1463,16 +1542,19 @@ describe('Trades Resolver', () => {
       ).rejects.toThrow('Authentication required');
     });
 
-    it('throws when trade not found', async () => {
+    it('throws NOT_FOUND when trade not found', async () => {
       mockDb.limit.mockResolvedValueOnce([]);
 
       const resolver = getResolver('mutation', 'vetoTrade');
       await expect(
         resolver({}, { tradeId: 999 }, mockContext, undefined as never),
-      ).rejects.toThrow('Trade offer not found');
+      ).rejects.toMatchObject({
+        extensions: { code: 'NOT_FOUND' },
+        message: expect.stringContaining('Trade offer not found'),
+      });
     });
 
-    it('throws when trade is not accepted', async () => {
+    it('throws BAD_USER_INPUT when trade is not accepted', async () => {
       mockDb.limit.mockResolvedValueOnce([
         {
           id: 5,
@@ -1486,7 +1568,10 @@ describe('Trades Resolver', () => {
       const resolver = getResolver('mutation', 'vetoTrade');
       await expect(
         resolver({}, { tradeId: 5 }, mockContext, undefined as never),
-      ).rejects.toThrow('Only accepted trades can be vetoed');
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining('Only accepted trades can be vetoed'),
+      });
     });
   });
 });
