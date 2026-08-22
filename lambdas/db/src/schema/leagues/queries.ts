@@ -1255,7 +1255,6 @@ builder.queryField('publicLeagues', (t) =>
     args: {
       sport: t.arg({ type: SportKindEnum, required: false }),
       search: t.arg.string({ required: false }),
-      sport: t.arg({ type: SportKindEnum, required: false }),
       draftStatus: t.arg.string({ required: false }),
       playerPool: t.arg.string({ required: false }),
       limit: t.arg.int({ required: false }),
