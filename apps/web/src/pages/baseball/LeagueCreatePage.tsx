@@ -1675,6 +1675,7 @@ export function LeagueCreatePage(): React.JSX.Element {
   const [showSlotTradingUpgradeModal, setShowSlotTradingUpgradeModal] =
     useState(false);
   const [showKeeperUpgradeModal, setShowKeeperUpgradeModal] = useState(false);
+  const [showRosterUpgradeModal, setShowRosterUpgradeModal] = useState(false);
   const [showLeagueLimitModal, setShowLeagueLimitModal] = useState(false);
   const [createdLeague, setCreatedLeague] = useState<{
     id: number;
@@ -3202,6 +3203,8 @@ export function LeagueCreatePage(): React.JSX.Element {
                         defensiveFormat={formData.defensiveFormat}
                         rosterSlots={formData.rosterSlots}
                         onChange={handleRosterSlotsChange}
+                        isPremium={!!isPremium && !premiumLoading}
+                        onUpgrade={() => setShowRosterUpgradeModal(true)}
                       />
                     </div>
                   )}
@@ -4478,6 +4481,12 @@ export function LeagueCreatePage(): React.JSX.Element {
         onOpenChange={setShowKeeperUpgradeModal}
         featureName="Roster Continuity"
         featureDescription="Run a keeper league — commissioners choose how many players each team retains season-over-season, and how kept players are costed."
+      />
+      <UpgradeModal
+        open={showRosterUpgradeModal}
+        onOpenChange={setShowRosterUpgradeModal}
+        featureName="Custom Roster Positions"
+        featureDescription="Add a Superflex or Kicker/Punter slot to your roster configuration."
       />
       <UpgradeModal
         open={showLeagueLimitModal}

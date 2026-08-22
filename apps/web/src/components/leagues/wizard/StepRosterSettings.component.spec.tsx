@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { DST_ROSTER_DEFAULTS, StepRosterSettings } from './StepRosterSettings';
 
 jest.mock('tamagui', () => ({
@@ -7,30 +7,75 @@ jest.mock('tamagui', () => ({
   Text: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),
-  XStack: ({
-    children,
-    onPress,
-  }: {
-    children: React.ReactNode;
-    onPress?: () => void;
-  }) => <div onClick={onPress}>{children}</div>,
+  XStack: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
   YStack: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
 }));
 
-jest.mock('@tamagui/lucide-icons', () => ({
-  Minus: () => <span>-</span>,
-  Plus: () => <span>+</span>,
+// RosterPositionsEditor's own behavior (slot rows, premium locking, live
+// totals) is unit-tested in lib/shared-components — this file only tests
+// what StepRosterSettings itself is responsible for: wiring isPremium/
+// onUpgrade through, and the web-specific roster-floor guard (LS-6149).
+jest.mock('@legacy-sports/shared-components/leagues', () => ({
+  RosterPositionsEditor: ({
+    rosterSlots,
+    onChange,
+    isPremium,
+    onUpgrade,
+  }: {
+    rosterSlots: Record<string, number>;
+    onChange: (slots: Record<string, number>) => void;
+    isPremium: boolean;
+    onUpgrade: () => void;
+  }) => (
+    <div>
+      <span>
+        Total: {Object.values(rosterSlots).reduce((s, n) => s + n, 0)}
+      </span>
+      <span>isPremium: {String(isPremium)}</span>
+      <button
+        type="button"
+        onClick={() =>
+          onChange({ ...rosterSlots, QB: (rosterSlots.QB ?? 0) + 1 })
+        }
+      >
+        Increment QB
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          onChange({ ...rosterSlots, QB: (rosterSlots.QB ?? 0) - 1 })
+        }
+      >
+        Decrement QB
+      </button>
+      <button type="button" onClick={onUpgrade}>
+        Upgrade SFLEX
+      </button>
+    </div>
+  ),
 }));
 
-function Controlled({ initial }: { initial: Record<string, number> }) {
+function Controlled({
+  initial,
+  isPremium = false,
+  onUpgrade = () => undefined,
+}: {
+  initial: Record<string, number>;
+  isPremium?: boolean;
+  onUpgrade?: () => void;
+}) {
   const [rosterSlots, setRosterSlots] = React.useState(initial);
   return (
     <StepRosterSettings
       defensiveFormat="dst"
       rosterSlots={rosterSlots}
       onChange={setRosterSlots}
+      isPremium={isPremium}
+      onUpgrade={onUpgrade}
     />
   );
 }
@@ -42,7 +87,7 @@ describe('StepRosterSettings', () => {
       (sum, n) => sum + n,
       0,
     );
-    expect(screen.getByText(String(defaultTotal))).toBeInTheDocument();
+    expect(screen.getByText(`Total: ${defaultTotal}`)).toBeInTheDocument();
   });
 
   it('never lets the roster total drop below the server minimum of 10 via decrement (LS-6149)', () => {
@@ -54,16 +99,11 @@ describe('StepRosterSettings', () => {
       />,
     );
 
-    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByText('Total: 10')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Decrement QB'));
 
-    const qbRow = screen.getByText('QB').closest('div')!.parentElement!;
-    const decrementButton = within(qbRow).getByText('-').closest('div')!;
-    fireEvent.click(decrementButton);
-
-    // Total must remain 10 and QB's individual count must remain unchanged —
-    // the click must have been a no-op, not silently swallowed after mutating state.
-    expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getAllByText('1').length).toBeGreaterThan(0);
+    // Must be a no-op — total remains 10.
+    expect(screen.getByText('Total: 10')).toBeInTheDocument();
   });
 
   it('allows decrementing a slot when the total is above the floor', () => {
@@ -72,12 +112,32 @@ describe('StepRosterSettings', () => {
       (sum, n) => sum + n,
       0,
     );
-    expect(screen.getByText(String(defaultTotal))).toBeInTheDocument();
+    expect(screen.getByText(`Total: ${defaultTotal}`)).toBeInTheDocument();
 
-    const rbRow = screen.getByText('RB').closest('div')!.parentElement!;
-    const decrementButton = within(rbRow).getByText('-').closest('div')!;
-    fireEvent.click(decrementButton);
+    fireEvent.click(screen.getByText('Decrement QB'));
 
-    expect(screen.getByText(String(defaultTotal - 1))).toBeInTheDocument();
+    expect(screen.getByText(`Total: ${defaultTotal - 1}`)).toBeInTheDocument();
+  });
+
+  it('passes isPremium through to RosterPositionsEditor (LS-6151)', () => {
+    render(
+      <Controlled initial={{ ...DST_ROSTER_DEFAULTS }} isPremium={true} />,
+    );
+    expect(screen.getByText('isPremium: true')).toBeInTheDocument();
+  });
+
+  it('forwards onUpgrade for a non-premium viewer interacting with a gated slot (LS-6151)', () => {
+    const onUpgrade = jest.fn();
+    render(
+      <Controlled
+        initial={{ ...DST_ROSTER_DEFAULTS }}
+        isPremium={false}
+        onUpgrade={onUpgrade}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Upgrade SFLEX'));
+
+    expect(onUpgrade).toHaveBeenCalledTimes(1);
   });
 });

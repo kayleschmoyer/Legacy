@@ -1,9 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, XStack, YStack } from 'tamagui';
-import { Minus } from '@tamagui/lucide-icons/icons/Minus';
-import { Plus } from '@tamagui/lucide-icons/icons/Plus';
+import { ScrollView, Text, YStack } from 'tamagui';
 import {
-  WIZARD_TAP_TARGET,
   WizardBottomBar,
   WizardChipGroup,
   type WizardChipOption,
@@ -24,13 +21,10 @@ import {
   AUCTION_MIN_BID_RANGE,
   createInitialWizardForm,
   DEFENSIVE_FORMAT_OPTIONS,
-  type DefensiveFormatChoice,
   DIVISION_COUNT_OPTIONS,
   divisionsHint,
   DRAFT_MODE_OPTIONS,
   DRAFT_ORDER_OPTIONS,
-  FOOTBALL_ROSTER_SLOT_LABELS,
-  FOOTBALL_ROSTER_SLOTS_BY_DEFENSIVE_FORMAT,
   FREE_LEAGUE_LIMIT,
   LEAGUE_NAME_MAX_LENGTH,
   LEAGUE_NAME_MIN_LENGTH,
@@ -52,18 +46,14 @@ import {
   validateWizardStep,
   type WizardErrors,
 } from './validation';
+import { RosterPositionsEditor } from './RosterPositionsEditor';
 import { DateTimePicker } from '../../../components/DateTimePicker';
 import { Skeleton } from '../../../components/Skeleton';
 import {
   BG_DARK,
-  BRAND_GOLD,
-  BRAND_NAVY_LIGHT,
   INLINE_ERROR,
-  PANEL_BORDER,
-  SURFACE_CARD,
   TEXT_MUTED,
   TEXT_PRIMARY,
-  TEXT_TERTIARY,
   withAlpha,
 } from '../../../utils/colors';
 import { CustomEraRange } from '../premium/CustomEraRange';
@@ -278,6 +268,9 @@ export function LeagueCreateWizard({
               errors={errors}
               disabled={disabled}
               setField={setField}
+              isPremium={isPremium}
+              premiumLoading={premiumLoading}
+              onUpgrade={onUpgrade}
             />
           )}
           {step === 'draft' && (
@@ -468,13 +461,22 @@ function BasicsStep({
 
 // ── Step 2: Roster & Schedule ────────────────────────────────────────────────
 
+interface RosterStepProps extends SportStepProps {
+  isPremium: boolean;
+  premiumLoading: boolean;
+  onUpgrade: (featureName: string) => void;
+}
+
 function RosterStep({
   form,
   sport,
   errors,
   disabled,
   setField,
-}: SportStepProps): React.JSX.Element {
+  isPremium,
+  premiumLoading,
+  onUpgrade,
+}: RosterStepProps): React.JSX.Element {
   const singleDivision = form.numberOfDivisions === 1;
   return (
     <>
@@ -501,12 +503,14 @@ function RosterStep({
       </WizardFieldRow>
 
       {sport === 'football' ? (
-        <FootballRosterSlotsField
+        <RosterPositionsEditor
           rosterSlots={form.rosterSlots}
           defensiveFormat={form.defensiveFormat}
           error={errors.maxRosterSize}
           disabled={disabled}
           onChange={(next) => setField('rosterSlots', next)}
+          isPremium={isPremium && !premiumLoading}
+          onUpgrade={() => onUpgrade('Custom Roster Positions')}
         />
       ) : (
         <WizardFieldRow
@@ -542,180 +546,6 @@ function RosterStep({
         />
       </WizardFieldRow>
     </>
-  );
-}
-
-interface FootballRosterSlotsFieldProps {
-  rosterSlots: Record<string, number>;
-  defensiveFormat: DefensiveFormatChoice;
-  error?: string;
-  disabled: boolean;
-  onChange: (rosterSlots: Record<string, number>) => void;
-}
-
-/**
- * Per-position roster config for football (LS-6146) — lets a manager say "3
- * WRs, not 2" instead of only picking a total roster size. Slot order and
- * defaults switch with the defensive format (D/ST vs IDP), which is why this
- * reads `form.defensiveFormat` even though that field is chosen later, on the
- * Rules step — the wizard keeps all fields in one form object, so revisiting
- * this step after changing format shows the right slots.
- */
-function FootballRosterSlotsField({
-  rosterSlots,
-  defensiveFormat,
-  error,
-  disabled,
-  onChange,
-}: FootballRosterSlotsFieldProps): React.JSX.Element {
-  const slotOrder = FOOTBALL_ROSTER_SLOTS_BY_DEFENSIVE_FORMAT[defensiveFormat];
-  const totalStarters = slotOrder
-    .filter((slot) => slot !== 'BN')
-    .reduce((sum, slot) => sum + (rosterSlots[slot] ?? 0), 0);
-  const bench = rosterSlots.BN ?? 0;
-
-  function adjust(slot: string, delta: number) {
-    const next = Math.max(0, (rosterSlots[slot] ?? 0) + delta);
-    onChange({ ...rosterSlots, [slot]: next });
-  }
-
-  return (
-    <WizardFieldRow
-      label="Roster Positions"
-      testID="field-rosterSlots"
-      hint="Number of players at each position. Roster size is the total."
-      error={error}
-    >
-      <YStack gap={8}>
-        <XStack
-          testID="roster-slots-totals"
-          justifyContent="space-between"
-          paddingHorizontal={4}
-        >
-          <Text fontFamily="$body" fontSize={12} color={TEXT_TERTIARY}>
-            Starters: {totalStarters}
-          </Text>
-          <Text fontFamily="$body" fontSize={12} color={TEXT_TERTIARY}>
-            Bench: {bench}
-          </Text>
-          <Text
-            fontFamily="$body"
-            fontWeight="700"
-            fontSize={12}
-            color={BRAND_GOLD}
-          >
-            Total: {totalStarters + bench}
-          </Text>
-        </XStack>
-        {slotOrder.map((slot) => (
-          <RosterSlotRow
-            key={slot}
-            testID={`roster-slot-${slot}`}
-            slot={slot}
-            count={rosterSlots[slot] ?? 0}
-            disabled={disabled}
-            onIncrement={() => adjust(slot, 1)}
-            onDecrement={() => adjust(slot, -1)}
-          />
-        ))}
-      </YStack>
-    </WizardFieldRow>
-  );
-}
-
-function RosterSlotRow({
-  testID,
-  slot,
-  count,
-  disabled,
-  onIncrement,
-  onDecrement,
-}: {
-  testID: string;
-  slot: string;
-  count: number;
-  disabled: boolean;
-  onIncrement: () => void;
-  onDecrement: () => void;
-}): React.JSX.Element {
-  const canDecrement = !disabled && count > 0;
-  const canIncrement = !disabled;
-  return (
-    <XStack
-      testID={testID}
-      alignItems="center"
-      justifyContent="space-between"
-      padding={12}
-      backgroundColor={SURFACE_CARD}
-      borderWidth={1}
-      borderColor={PANEL_BORDER}
-      borderRadius={10}
-    >
-      <YStack flex={1}>
-        <Text
-          fontFamily="$body"
-          fontWeight="700"
-          fontSize={13}
-          color={TEXT_PRIMARY}
-        >
-          {slot}
-        </Text>
-        <Text fontFamily="$body" fontSize={11} color={TEXT_TERTIARY}>
-          {FOOTBALL_ROSTER_SLOT_LABELS[slot] ?? slot}
-        </Text>
-      </YStack>
-      <XStack alignItems="center" gap={12}>
-        <XStack
-          testID={`${testID}-decrement`}
-          accessibilityRole="button"
-          accessibilityLabel={`Decrease ${slot}`}
-          aria-label={`Decrease ${slot}`}
-          accessibilityState={{ disabled: !canDecrement }}
-          aria-disabled={!canDecrement}
-          onPress={() => canDecrement && onDecrement()}
-          width={WIZARD_TAP_TARGET}
-          height={WIZARD_TAP_TARGET}
-          borderRadius={WIZARD_TAP_TARGET / 2}
-          alignItems="center"
-          justifyContent="center"
-          backgroundColor={canDecrement ? BRAND_NAVY_LIGHT : PANEL_BORDER}
-          cursor={canDecrement ? 'pointer' : 'default'}
-          pressStyle={canDecrement ? { opacity: 0.7 } : undefined}
-        >
-          <Minus size={12} color={canDecrement ? BG_DARK : TEXT_TERTIARY} />
-        </XStack>
-        <Text
-          fontFamily="$body"
-          fontWeight="700"
-          fontSize={16}
-          fontVariant={['tabular-nums']}
-          color={BRAND_GOLD}
-          minWidth={20}
-          textAlign="center"
-        >
-          {count}
-        </Text>
-        <XStack
-          testID={`${testID}-increment`}
-          accessibilityRole="button"
-          accessibilityLabel={`Increase ${slot}`}
-          aria-label={`Increase ${slot}`}
-          accessibilityState={{ disabled: !canIncrement }}
-          aria-disabled={!canIncrement}
-          onPress={() => canIncrement && onIncrement()}
-          width={WIZARD_TAP_TARGET}
-          height={WIZARD_TAP_TARGET}
-          borderRadius={WIZARD_TAP_TARGET / 2}
-          alignItems="center"
-          justifyContent="center"
-          backgroundColor={canIncrement ? BRAND_NAVY_LIGHT : PANEL_BORDER}
-          cursor={canIncrement ? 'pointer' : 'default'}
-          pressStyle={canIncrement ? { opacity: 0.7 } : undefined}
-        >
-          <Plus size={12} color={canIncrement ? BG_DARK : TEXT_TERTIARY} />
-        </XStack>
-      </XStack>
-    </XStack>
   );
 }
 

@@ -194,9 +194,9 @@ describe('LeagueCreateWizard — roster step (LS-6146)', () => {
     });
     pressNext(getByTestId);
     expect(queryByTestId('field-maxRosterSize')).toBeNull();
-    expect(getByTestId('field-rosterSlots')).toBeTruthy();
+    expect(getByTestId('roster-positions-editor')).toBeTruthy();
     expect(getByTestId('roster-slot-WR')).toBeTruthy();
-    expect(getByTestId('roster-slots-totals').textContent).toContain(
+    expect(getByTestId('roster-positions-totals').textContent).toContain(
       'Total: 16',
     );
   });
@@ -208,7 +208,7 @@ describe('LeagueCreateWizard — roster step (LS-6146)', () => {
     });
     pressNext(getByTestId);
     fireEvent.click(getByTestId('roster-slot-WR-increment'));
-    expect(getByTestId('roster-slots-totals').textContent).toContain(
+    expect(getByTestId('roster-positions-totals').textContent).toContain(
       'Total: 17',
     );
   });
@@ -222,12 +222,40 @@ describe('LeagueCreateWizard — roster step (LS-6146)', () => {
     // DST defaults to 1 — one decrement reaches zero, the next is inert.
     const decrement = getByTestId('roster-slot-DST-decrement');
     fireEvent.click(decrement);
-    expect(getByTestId('roster-slots-totals').textContent).toContain(
+    expect(getByTestId('roster-positions-totals').textContent).toContain(
       'Total: 15',
     );
     fireEvent.click(decrement);
-    expect(getByTestId('roster-slots-totals').textContent).toContain(
+    expect(getByTestId('roster-positions-totals').textContent).toContain(
       'Total: 15',
+    );
+  });
+
+  it('shows SFLEX/K-P as premium-gated and routes a free user to upgrade (LS-6151)', () => {
+    const onUpgrade = jest.fn();
+    const { getByTestId } = renderWizard({
+      sport: 'football',
+      initialLeagueName: VALID_NAME,
+      onUpgrade,
+    });
+    pressNext(getByTestId);
+    expect(getByTestId('roster-premium-slot-SFLEX')).toBeTruthy();
+    expect(getByTestId('roster-premium-slot-KP')).toBeTruthy();
+
+    fireEvent.click(getByTestId('roster-premium-slot-SFLEX-increment'));
+    expect(onUpgrade).toHaveBeenCalledWith('Custom Roster Positions');
+  });
+
+  it('lets a premium user add an SFLEX slot', () => {
+    const { getByTestId } = renderWizard({
+      sport: 'football',
+      initialLeagueName: VALID_NAME,
+      isPremium: true,
+    });
+    pressNext(getByTestId);
+    fireEvent.click(getByTestId('roster-premium-slot-SFLEX-increment'));
+    expect(getByTestId('roster-positions-totals').textContent).toContain(
+      'Total: 17',
     );
   });
 });

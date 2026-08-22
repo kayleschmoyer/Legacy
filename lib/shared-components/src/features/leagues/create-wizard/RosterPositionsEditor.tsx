@@ -96,10 +96,26 @@ export function RosterPositionsEditor({
           paddingHorizontal={4}
         >
           <Text fontFamily="$body" fontSize={12} color={TEXT_TERTIARY}>
-            Starters: {totalStarters}
+            Starters:{' '}
+            <Text
+              testID="roster-positions-totals-starters"
+              fontFamily="$body"
+              fontSize={12}
+              color={TEXT_TERTIARY}
+            >
+              {totalStarters}
+            </Text>
           </Text>
           <Text fontFamily="$body" fontSize={12} color={TEXT_TERTIARY}>
-            Bench: {bench}
+            Bench:{' '}
+            <Text
+              testID="roster-positions-totals-bench"
+              fontFamily="$body"
+              fontSize={12}
+              color={TEXT_TERTIARY}
+            >
+              {bench}
+            </Text>
           </Text>
           <Text
             fontFamily="$body"
@@ -107,7 +123,16 @@ export function RosterPositionsEditor({
             fontSize={12}
             color={BRAND_GOLD}
           >
-            Total: {total}
+            Total:{' '}
+            <Text
+              testID="roster-positions-totals-total"
+              fontFamily="$body"
+              fontWeight="700"
+              fontSize={12}
+              color={BRAND_GOLD}
+            >
+              {total}
+            </Text>
           </Text>
         </XStack>
 
@@ -239,6 +264,7 @@ function RosterSlotRow({
           <Minus size={12} color={canDecrement ? BG_DARK : TEXT_TERTIARY} />
         </XStack>
         <Text
+          testID={`${testID}-count`}
           fontFamily="$body"
           fontWeight="700"
           fontSize={16}

@@ -36,6 +36,16 @@ jest.mock('../PageMeta', () => ({
   PageMeta: () => null,
 }));
 
+jest.mock('../UpgradeModal', () => ({
+  UpgradeModal: ({
+    open,
+    featureName,
+  }: {
+    open: boolean;
+    featureName: string;
+  }) => (open ? <div>Upgrade Modal: {featureName}</div> : null),
+}));
+
 const mockUseIsPremiumStatus = jest.fn(() => ({
   isPremium: false,
   isLoading: false,
@@ -62,6 +72,10 @@ jest.mock('tamagui', () => ({
   Text: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),
+  // Needed only because StepRosterSettings' `requireActual` below pulls in
+  // the full shared-components `leagues` barrel (which includes OnThisDayFeed,
+  // a `styled()` consumer never actually rendered in this test).
+  styled: () => () => null,
 }));
 
 jest.mock('@tamagui/lucide-icons', () => ({

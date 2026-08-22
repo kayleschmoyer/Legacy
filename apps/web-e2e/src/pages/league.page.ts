@@ -214,6 +214,15 @@ export class LeaguePage extends BaseScreen {
     return this.driver.byTestId(`roster-slot-${slot}`);
   }
 
+  /**
+   * A premium-gated roster-slot row (`SFLEX`, `KP` — LS-6151) by its position
+   * key. Rendered by `RosterPositionsEditor`'s "Premium Positions" section,
+   * always visible (never hidden), gated on interaction rather than display.
+   */
+  rosterPremiumSlotRow(slot: string): UIElement {
+    return this.driver.byTestId(`roster-premium-slot-${slot}`);
+  }
+
   /** The Starters / Bench / Total summary card above the roster-slot rows. */
   get rosterPositionsTotals(): UIElement {
     return this.driver.byTestId('roster-positions-totals');
@@ -604,6 +613,24 @@ export class LeaguePage extends BaseScreen {
         before,
       );
     }
+  }
+
+  /** The current count for a premium roster slot (`SFLEX`, `KP` — LS-6151). */
+  async rosterPremiumSlotCount(slot: string): Promise<number> {
+    const text = await this.driver
+      .byTestId(`roster-premium-slot-${slot}-count`)
+      .text();
+    return Number(text);
+  }
+
+  /**
+   * Tap the `+` control for a premium roster slot. For a premium viewer this
+   * increments the count exactly like a base slot; for a non-premium viewer
+   * the component routes the tap to `onUpgrade` instead, so the count never
+   * changes — callers assert on the upgrade modal in that case, not the count.
+   */
+  async tapRosterPremiumSlotIncrement(slot: string): Promise<void> {
+    await this.driver.byTestId(`roster-premium-slot-${slot}-increment`).tap();
   }
 
   /**

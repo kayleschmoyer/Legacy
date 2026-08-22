@@ -31,6 +31,7 @@ import {
 } from './wizard/StepRosterSettings';
 import { type SportChoice, StepSportSelect } from './wizard/StepSportSelect';
 import { PageMeta } from '../PageMeta';
+import { UpgradeModal } from '../UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 
 // Mirrors the bounds/defaults in wizard/StepPremiumOptions.tsx (and the
@@ -254,6 +255,7 @@ export function CreateLeagueWizard() {
 
   const [stepError, setStepError] = React.useState<string | null>(null);
   const [mutationError, setMutationError] = React.useState<string | null>(null);
+  const [rosterUpgradeOpen, setRosterUpgradeOpen] = React.useState(false);
 
   // Warn dialog ref when defensive format changes with customized roster
   const prevDefensiveFormat = useRef<DefensiveFormat>(state.defensiveFormat);
@@ -563,6 +565,8 @@ export function CreateLeagueWizard() {
               onChange={(slots) =>
                 dispatch({ type: 'SET_ROSTER_SLOTS', slots })
               }
+              isPremium={isPremium && !premiumLoading}
+              onUpgrade={() => setRosterUpgradeOpen(true)}
             />
           )}
 
@@ -683,6 +687,13 @@ export function CreateLeagueWizard() {
         cancelLabel="Cancel"
         onConfirm={confirmDefensiveFormatChange}
         onCancel={cancelDefensiveFormatChange}
+      />
+
+      <UpgradeModal
+        open={rosterUpgradeOpen}
+        onOpenChange={setRosterUpgradeOpen}
+        featureName="Custom Roster Positions"
+        featureDescription="Add a Superflex or Kicker/Punter slot to your roster configuration."
       />
     </ScrollView>
   );

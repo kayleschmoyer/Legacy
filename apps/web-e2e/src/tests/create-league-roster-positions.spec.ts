@@ -21,6 +21,7 @@ import { expect, leagueTest as test } from '../fixtures/pages';
 import {
   extractOperationName,
   unmockedGraphQLFallback,
+  useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -204,5 +205,76 @@ test.describe('Create League (Football) – Roster Positions Configuration @regr
     expect(bySlot.BN).toBeUndefined();
     expect(bySlot.K).toBeUndefined();
     expect(captured[0].maxRosterSize).toBe(15);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Custom roster positions (Superflex / K-P) — LS-6151
+//
+// The premium tier is this suite's ambient default (BASELINE_GRAPHQL_RESPONSES),
+// so the tests above already exercise a premium viewer without an explicit
+// `useTier` call. These add: a premium user submitting an SFLEX slot, and a
+// free user hitting the gate (never a silently-hidden or inert control).
+// ---------------------------------------------------------------------------
+
+test.describe('Create League (Football) – Custom Roster Positions @regression', () => {
+  test.beforeEach(async ({ leaguePage }) => {
+    await leaguePage.gotoCreate('football');
+    await leaguePage.leagueNameInput.expectVisible();
+    await leaguePage.expandSection('roster-schedule');
+    await leaguePage.rosterPositionsConfig.expectVisible();
+  });
+
+  test('a premium user can add a Superflex slot and it is submitted', async ({
+    page,
+    leaguePage,
+  }) => {
+    const captured: CapturedCreateLeagueInput[] = [];
+    await mockCreateLeagueSuccess(page, captured);
+
+    await leaguePage.rosterPremiumSlotRow('SFLEX').expectVisible();
+    expect(await leaguePage.rosterPremiumSlotCount('SFLEX')).toBe(0);
+
+    await leaguePage.tapRosterPremiumSlotIncrement('SFLEX');
+    expect(await leaguePage.rosterPremiumSlotCount('SFLEX')).toBe(1);
+    await leaguePage
+      .testId('roster-positions-totals-total')
+      .expectContainsText('16');
+
+    await leaguePage.fillLeagueName('Superflex League');
+    await leaguePage.submitCreate();
+    await leaguePage.continueToLeague();
+    await expect(page).toHaveURL(/\/football\/league\/\d+/);
+
+    expect(captured).toHaveLength(1);
+    const submittedSlots = captured[0].rosterSlots ?? [];
+    expect(
+      submittedSlots.some((s) => s.positionType === 'SFLEX' && s.count === 1),
+    ).toBe(true);
+  });
+
+  test('a non-premium user sees Superflex/K-P as visibly gated, never hidden, and interacting routes to upgrade', async ({
+    page,
+    leaguePage,
+  }) => {
+    await useTier(page, 'free');
+    await leaguePage.gotoCreate('football');
+    await leaguePage.leagueNameInput.expectVisible();
+    await leaguePage.expandSection('roster-schedule');
+    await leaguePage.rosterPositionsConfig.expectVisible();
+
+    // Present but gated — never hidden (LS-6151 no-silent-no-op rule).
+    await leaguePage.rosterPremiumSlotRow('SFLEX').expectVisible();
+    await leaguePage.rosterPremiumSlotRow('KP').expectVisible();
+    expect(await leaguePage.rosterPremiumSlotCount('SFLEX')).toBe(0);
+
+    await leaguePage.tapRosterPremiumSlotIncrement('SFLEX');
+
+    // The tap must not silently no-op — it opens the upgrade modal — and the
+    // count must stay at 0 rather than incrementing behind the gate.
+    await expect(
+      page.getByRole('dialog', { name: /upgrade to premium/i }),
+    ).toBeVisible();
+    expect(await leaguePage.rosterPremiumSlotCount('SFLEX')).toBe(0);
   });
 });
