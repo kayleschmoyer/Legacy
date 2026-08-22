@@ -6,11 +6,22 @@ import {
   describe,
   expect,
   it,
+  jest,
 } from '@jest/globals';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findClaudeProjectsDir, resolveProjectSlug } from './session-files.js';
+
+// Wraps the real implementation by default so every existing assertion keeps
+// exercising real homedir() behavior; only the LS-9458 test below overrides
+// it, to deterministically neutralize the "real homedir()/.claude/projects
+// exists" fallback (true whenever this suite itself runs inside a live
+// Claude Code session) without touching every other test's environment.
+jest.mock('node:os', () => {
+  const actual: typeof import('node:os') = jest.requireActual('node:os');
+  return { ...actual, homedir: jest.fn(actual.homedir) };
+});
 
 describe('findClaudeProjectsDir', () => {
   let tmpDir: string;
@@ -95,6 +106,47 @@ describe('findClaudeProjectsDir', () => {
     } finally {
       rmSync(fakeAppData, { recursive: true, force: true });
     }
+  });
+
+  it('resolves ~/.claude/projects for the CCR path shape (/root/.claude/projects/-home-user-<repo>/) via $HOME (LS-9458)', () => {
+    // Regression coverage for the LS-9458 recurrence report: a CCR container
+    // whose real home is /root, holding a project dir slugged from
+    // /home/user/<repo>. As long as $HOME is inherited correctly, resolution
+    // must not require any sbx_user1051-style literal.
+    const rootHome = join(tmpDir, 'root-home');
+    const ccrProjects = join(rootHome, '.claude', 'projects');
+    const ccrProjectDir = join(ccrProjects, '-home-user-legacy-sports');
+    mkdirSync(ccrProjectDir, { recursive: true });
+    try {
+      process.env['HOME'] = rootHome;
+      expect(findClaudeProjectsDir()).toBe(ccrProjects);
+    } finally {
+      rmSync(rootHome, { recursive: true, force: true });
+    }
+  });
+
+  it('gives an actionable error — not the generic message — when an explicit projectsDir override is not readable (LS-9458)', () => {
+    // Simulates the second LS-9458 defect: the caller supplies projectsDir
+    // (e.g. confirmed present via their own Bash tool), but the MCP server
+    // process still can't see it — the failure must name that as the likely
+    // cause instead of repeating the bare "Could not find" message, so the
+    // caller doesn't retry the same override expecting a different result.
+    (homedir as jest.Mock).mockReturnValueOnce(join(tmpDir, 'no-such-homedir'));
+    const unreadable = join(tmpDir, 'not-visible-to-server');
+    let thrown: Error | undefined;
+    try {
+      findClaudeProjectsDir(unreadable);
+    } catch (err) {
+      thrown = err as Error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown?.message).toMatch(
+      /not readable \*from the MCP server process\*/,
+    );
+    expect(thrown?.message).toContain('LS-9458');
+    expect(thrown?.message).toContain(
+      "manual review of the session's Bash history",
+    );
   });
 
   it('throws with all candidate paths listed when none exist', () => {

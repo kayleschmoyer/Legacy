@@ -106,6 +106,35 @@ Summarize to the user:
 - Overflows/failures classified
 - Noise auto-filtered
 
+## Manual fallback when the server cannot see the transcript
+
+`ci_audit_session_bash` resolves the Claude projects directory from `$HOME`
+(falling back to `node:os` `homedir()`, then an explicit `projectsDir`
+override) — see `findClaudeProjectsDir` in
+`tools/mcp/ci-server/src/session-files.ts`. In some Claude Code Remote (CCR)
+topologies the MCP server process runs under a different user/mount
+namespace than the agent's own Bash tool: a transcript path the agent can
+`ls` directly is still invisible to the server, so even an explicit
+`projectsDir` override fails (LS-9458, a recurrence of LS-8867). The tool
+detects this case and raises an actionable error naming it, rather than the
+generic "Could not find" message — but there is no code-level fix for a
+transcript the server process genuinely cannot read.
+
+When you hit that error:
+
+1. Confirm the transcript exists from the agent's own Bash tool (`ls -la
+~/.claude/projects/<slug>/`) — if it's actually absent, that's a
+   different bug, not this one.
+2. If it exists but the tool still can't see it, do the Phase 1 gap review
+   by hand: read back through the session's own Bash tool-call history
+   (visible in the transcript already loaded into context) and classify
+   commands per the [Steps](#steps) above, instead of via the automated
+   report.
+3. File (or comment on) an MCP gap ticket for the specific recurrence —
+   check `jira_list_children` on the current MCP gaps bucket epic first so
+   repeat CCR-namespace occurrences land as comments on one ticket rather
+   than duplicates.
+
 ## Gotchas
 
 - **Don't create duplicate tickets** — always search the bucket epic's children first

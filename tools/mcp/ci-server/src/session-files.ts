@@ -59,6 +59,28 @@ export function findClaudeProjectsDir(explicit?: string): string {
     }
   }
 
+  // An explicit override that still can't be read is a distinct failure mode
+  // from "nothing was configured": the caller (often a human, quoting the
+  // path from their own Bash tool) has confirmed the directory exists and is
+  // readable from their side. If the MCP server still can't see it, the
+  // server process is most likely running under a different user/mount
+  // namespace than the agent's shell — a known limitation in some CCR
+  // topologies (LS-9458) that no path-resolution change here can work
+  // around. Say so explicitly instead of repeating the generic
+  // "could not find" message, so the caller doesn't retry the same override
+  // expecting a different result.
+  if (explicit) {
+    throw new Error(
+      `Could not find Claude projects directory. The explicit override ` +
+        `"${explicit}" does not exist or is not readable *from the MCP server process* ` +
+        `(it may be visible from your Bash tool but not from the server, if they run in ` +
+        `different containers/mount namespaces — a known CCR limitation, LS-9458). ` +
+        `Fall back to a manual review of the session's Bash history for the gap audit ` +
+        `(see .agents/skills/mcp-first/references/audit-workflow.md#manual-fallback-when-the-server-cannot-see-the-transcript). ` +
+        `All candidates tried: ${candidates.join(', ')}`,
+    );
+  }
+
   throw new Error(
     `Could not find Claude projects directory. Tried: ${candidates.join(', ')}`,
   );
