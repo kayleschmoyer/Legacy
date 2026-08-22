@@ -572,32 +572,41 @@ export default function FootballLeagueId(): React.JSX.Element {
 
         {selectedTab === 'roster' && (
           <YStack flex={1}>
-            <LeagueRosterManagement
-              positions={positionsData?.leaguePositions || []}
-              teamPlayers={
-                teamMembersData?.teamMembers?.filter(
-                  (member): member is AppTeamMemberFragment => member !== null,
-                ) ?? []
-              }
-              onPlayerAssign={(player, position) => {
-                void handlePlayerAssign(player, position);
-              }}
-              onPlayerRemove={(position) => {
-                void handlePlayerRemove(position);
-              }}
-              onPlayerSwap={(incoming, target, displaced) => {
-                void handlePlayerSwap(incoming, target, displaced);
-              }}
-              onPlayerPress={handlePlayerPress}
-              loading={
-                positionsLoading || teamMembersLoading || userTeamLoading
-              }
-              leagueId={numLeagueId}
-              currentWeek={league?.currentWeekNumber}
-              totalWeeks={league?.totalMatchups}
-              myTeamId={userTeamId}
-              refreshControl={rosterRefresh.refreshControl}
-            />
+            {userTeamId != null ? (
+              <LeagueRosterManagement
+                positions={positionsData?.leaguePositions || []}
+                teamPlayers={
+                  teamMembersData?.teamMembers?.filter(
+                    (member): member is AppTeamMemberFragment =>
+                      member !== null,
+                  ) ?? []
+                }
+                onPlayerAssign={(player, position) => {
+                  void handlePlayerAssign(player, position);
+                }}
+                onPlayerRemove={(position) => {
+                  void handlePlayerRemove(position);
+                }}
+                onPlayerSwap={(incoming, target, displaced) => {
+                  void handlePlayerSwap(incoming, target, displaced);
+                }}
+                onPlayerPress={handlePlayerPress}
+                loading={
+                  positionsLoading || teamMembersLoading || userTeamLoading
+                }
+                leagueId={numLeagueId}
+                currentWeek={league?.currentWeekNumber}
+                totalWeeks={league?.totalMatchups}
+                myTeamId={userTeamId}
+                refreshControl={rosterRefresh.refreshControl}
+              />
+            ) : (
+              <YStack flex={1} padding="$3">
+                <Text color="$textMuted">
+                  Join this league to manage a roster.
+                </Text>
+              </YStack>
+            )}
           </YStack>
         )}
 

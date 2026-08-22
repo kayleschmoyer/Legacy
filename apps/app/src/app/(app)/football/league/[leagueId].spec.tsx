@@ -696,6 +696,32 @@ describe('FootballLeagueId', () => {
     });
   });
 
+  // LS-6332 (FLD-019) — spectators / non-members have no userTeamId; the
+  // roster tab must not render the management UI (with its assign/remove/swap
+  // affordances) for them.
+  describe('roster tab for non-members (LS-6332)', () => {
+    it('shows a join prompt instead of roster management when userTeamId is null', () => {
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: null }, loading: false },
+      ]);
+      const { useLocalSearchParams } = jest.requireMock<{
+        useLocalSearchParams: jest.Mock;
+      }>('expo-router');
+      useLocalSearchParams.mockReturnValue({
+        leagueId: '42',
+        initialTab: 'roster',
+      });
+
+      render(<FootballLeagueId />);
+
+      expect(screen.queryByTestId('league-roster-management')).toBeNull();
+      expect(
+        screen.getByText('Join this league to manage a roster.'),
+      ).toBeTruthy();
+    });
+  });
+
   describe('waivers tab', () => {
     it('does not render Waivers tab when waiverEnabled is false', () => {
       mockGetLeagueByIdQuery.mockReturnValue({
