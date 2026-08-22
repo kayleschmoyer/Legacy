@@ -35,7 +35,9 @@ test.describe('Football No-Leagues Empty State (LS-5409) @critical', () => {
   }) => {
     await expect(page.getByText('No football leagues yet')).toBeVisible();
     await expect(
-      page.getByText('Create your first football league to get started.'),
+      page.getByText(
+        'Create your first football league, or join one with an invite code.',
+      ),
     ).toBeVisible();
   });
 

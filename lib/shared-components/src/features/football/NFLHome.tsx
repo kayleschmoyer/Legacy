@@ -763,8 +763,8 @@ function NFLHome({
                   {leagueCap
                     ? leagueCap.atLimit
                       ? `You've reached the free plan's limit of ${leagueCap.limit} league${leagueCap.limit === 1 ? '' : 's'} across every sport. Upgrade to Premium to create more.`
-                      : `Create your first football league to get started. Free plan includes ${leagueCap.limit} league${leagueCap.limit === 1 ? '' : 's'} across every sport.`
-                    : 'Create your first football league to get started.'}
+                      : `Create your first football league, or join one with an invite code. Free plan includes ${leagueCap.limit} league${leagueCap.limit === 1 ? '' : 's'} across every sport.`
+                    : 'Create your first football league, or join one with an invite code.'}
                 </Text>
                 {leagueCap?.atLimit ? (
                   <Button
@@ -779,17 +779,34 @@ function NFLHome({
                     </Text>
                   </Button>
                 ) : (
-                  <Button
-                    backgroundColor="$orange9"
-                    borderRadius="$3"
-                    onPress={onCreateLeague}
-                    data-testid="create-first-league-button"
-                    accessibilityLabel="Create your first football league"
-                  >
-                    <Text color="white" fontWeight="700">
-                      Create your first football league
-                    </Text>
-                  </Button>
+                  <XStack gap="$3" flexWrap="wrap" justifyContent="center">
+                    <Button
+                      backgroundColor="$orange9"
+                      borderRadius="$3"
+                      onPress={onCreateLeague}
+                      data-testid="create-first-league-button"
+                      accessibilityLabel="Create your first football league"
+                    >
+                      <Text color="white" fontWeight="700">
+                        Create your first football league
+                      </Text>
+                    </Button>
+                    {onJoinLeague && (
+                      <Button
+                        backgroundColor="$glassSurface"
+                        borderRadius="$3"
+                        borderWidth={1}
+                        borderColor="$glassBorder"
+                        onPress={onJoinLeague}
+                        data-testid="join-league-empty-state-button"
+                        accessibilityLabel="Join an existing football league using an invite code"
+                      >
+                        <Text color="$color" fontWeight="700">
+                          Join with invite code
+                        </Text>
+                      </Button>
+                    )}
+                  </XStack>
                 )}
               </YStack>
             ) : (

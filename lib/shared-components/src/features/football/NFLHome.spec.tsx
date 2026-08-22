@@ -112,6 +112,31 @@ describe('NFLHome — leagues list virtualization (LS-6257)', () => {
 
     expect(screen.getByText('No football leagues yet')).toBeInTheDocument();
   });
+
+  it('renders a Join with invite code button in the empty state when onJoinLeague is provided (LS-6271)', () => {
+    const onJoinLeague = jest.fn();
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onJoinLeague={onJoinLeague}
+      />,
+    );
+
+    const joinButton = screen.getByTestId('join-league-empty-state-button');
+    expect(joinButton).toBeInTheDocument();
+    fireEvent.click(joinButton);
+    expect(onJoinLeague).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the empty-state Join button when onJoinLeague is not provided (LS-6271)', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+
+    expect(
+      screen.queryByTestId('join-league-empty-state-button'),
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('NFLHome — CTA copy consistency (LS-6268, FBH-014)', () => {
@@ -391,7 +416,9 @@ describe('NFLHome — empty-state upgrade on-ramp (LS-6272)', () => {
   it('keeps the neutral copy and Create CTA when leagueCap is not provided', () => {
     render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
     expect(
-      screen.getByText('Create your first football league to get started.'),
+      screen.getByText(
+        'Create your first football league, or join one with an invite code.',
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByTestId('create-first-league-button'),
@@ -412,7 +439,7 @@ describe('NFLHome — empty-state upgrade on-ramp (LS-6272)', () => {
     );
     expect(
       screen.getByText(
-        'Create your first football league to get started. Free plan includes 3 leagues across every sport.',
+        'Create your first football league, or join one with an invite code. Free plan includes 3 leagues across every sport.',
       ),
     ).toBeInTheDocument();
     expect(
