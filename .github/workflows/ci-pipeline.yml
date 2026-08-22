@@ -199,6 +199,23 @@ jobs:
             cat /tmp/e2e-select.err || true
           fi
 
+          # LS-9449: an over-selected "narrow" run is strictly worse than the
+          # run-all path — the same (or more) specs on ONE shard with a
+          # 30-minute budget instead of three, plus a full mobile re-run of the
+          # list against a 20-minute budget. 203 affected spec files (~1888
+          # tests) ran 26-31 minutes and got cancelled at the job timeout on
+          # three consecutive runs. Promote to the full-suite sharded path
+          # (which also skips the mobile duplication, per the broad-change
+          # design) once the selection is too large for the single-shard
+          # budgets. 100 files ≈ ~930 tests ≈ ~12 min/shard — comfortable
+          # margin under both timeouts.
+          SPEC_COUNT=$(printf '%s\n' "$SPECS" | grep -c . || true)
+          if [ "$RUN_ALL" != "true" ] && [ "${SPEC_COUNT:-0}" -ge 100 ]; then
+            echo "::notice::Affected spec count ${SPEC_COUNT} >= 100 — promoting to the full-suite sharded run (single-shard timeout protection, LS-9449)"
+            RUN_ALL=true
+            SPECS=""
+          fi
+
           # Default grep (narrow change): @critical safety net, exclude @slow.
           GREP="$GREP_NARROW"
           if [ "$RUN_ALL" = "true" ]; then

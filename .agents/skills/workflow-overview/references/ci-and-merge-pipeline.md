@@ -75,7 +75,7 @@ Every one of these jobs (and `summarize`) skips when the PR carries the `skip-ci
 
 **Stage 3 -- E2E Tests:** Playwright, sharded matrix from detect-changes.
 
-- PRs: `@critical` (excluding `@slow`) **plus** the affected specs mapped from changed files; a broad-surface change escalates to the full hermetic suite, sharded
+- PRs: `@critical` (excluding `@slow`) **plus** the affected specs mapped from changed files; a broad-surface change escalates to the full hermetic suite, sharded. A "narrow" selection of **≥100 spec files also promotes to the full-suite sharded run** (LS-9449): an over-selected narrow run would put the whole list on ONE shard against the 30-minute job timeout (plus a full mobile re-run against 20 minutes) — 203 files ran 26–31 min and got timeout-cancelled on three consecutive runs before this guard existed. Promotion also skips the mobile duplication, same as any broad change.
 - Downloads the web build artifact from the `build` job
 - Uploads blob reports for the merged Playwright report
 - **`e2e-mobile` (LS-9411):** re-runs the _same_ narrow selection (same `e2e-grep`/`e2e-affected-specs` outputs, no second selection computed) a second time on the Mobile Chrome project (375×667 device-emulated viewport), so a viewport-gated regression (`useMedia()`/breakpoint branches invisible at chromium's fixed 1280×720) can't merge silently. Gated on the same condition as the chromium affected-specs step (`run-all != true && affected-specs != ''`) — skips entirely on no-op PRs, and a broad/run-all change still only gets the full suite on chromium, never duplicated onto mobile. Mobile Safari stays nightly-only (own flake history, LS-9328/LS-9409).
