@@ -179,9 +179,9 @@ single-shot. **No batch variant warranted** beyond the existing `terraform_state
 `nx_run_affected` / `nx_affected` already fan out across affected projects (the natural "batch"). `nx_run`,
 `nx_show_project(s)`, `nx_dep_graph`, `nx_check_package_health`, `nx_install_package` are single-shot. **No gap.**
 
-### browser-server (7 tools) — no ticket
+### browser-server (8 tools) — no ticket
 
-`browser_dev_*`, `browser_navigate`, `browser_screenshot(_upload)`, `browser_cleanup` are inherently sequential
+`browser_dev_*`, `browser_navigate`, `browser_screenshot(_upload)`, `browser_dev_login`, `browser_cleanup` are inherently sequential
 single-session operations. **No gap.**
 
 ### db-admin-server (3 tools) — no ticket

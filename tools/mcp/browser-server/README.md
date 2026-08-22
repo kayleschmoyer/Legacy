@@ -14,6 +14,7 @@ MCP server giving agents the ability to start dev servers, navigate pages, captu
 | `browser_navigate`          | Open a page in headless Chromium                                                                                          |
 | `browser_screenshot`        | Capture page/element screenshot as PNG                                                                                    |
 | `browser_screenshot_upload` | Upload PNG to GitHub draft release for PR embed                                                                           |
+| `browser_dev_login`         | Authenticate the session against a local dev server from the cached e2e JWT — never exposes the token to the caller       |
 | `browser_cleanup`           | Close browser + kill all dev servers                                                                                      |
 
 ## Non-Blocking Start
@@ -55,6 +56,28 @@ browser_screenshot({ name: "after" })      → saves .screenshots/after.png
 browser_screenshot_upload({ screenshotPath }) → upload to GitHub, get markdown URL
 browser_cleanup()                          → close browser, kill servers
 ```
+
+## Authenticated QA (`browser_dev_login`)
+
+For screenshots against a route that requires login, use the cached e2e token
+instead of typing a real password into the sign-in form or trying to set the
+`ls_jwt` HttpOnly cookie via page-context JS (`document.cookie` can't see or
+set httpOnly cookies):
+
+```
+browser_dev_start({ worktreePath })
+browser_dev_login({ port })                → navigates + sets ls_jwt/ls_csrf cookies + localStorage
+browser_screenshot({ name: "dashboard" })
+```
+
+`browser_dev_login` reads `~/.legacy-sports/e2e-token.json` (minted by
+`make e2e-auth`, which the human must run interactively — agents cannot
+complete the device-flow handshake) server-side and applies it via
+Playwright's `context.addCookies`, so the JWT is never included in the tool
+result or logged. If no valid cached token exists, the call fails with a
+remedy pointing at `make e2e-auth`. Mirrors
+`apps/web-e2e/src/integration/fixtures/ui.ts`'s
+`buildIntegrationStorageState`.
 
 ## GitHub Image Upload
 

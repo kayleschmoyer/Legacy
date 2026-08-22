@@ -8,6 +8,7 @@ import { navigate } from './tools/navigate.js';
 import { screenshot } from './tools/screenshot.js';
 import { screenshotUpload } from './tools/screenshot-upload.js';
 import { cleanup } from './tools/cleanup.js';
+import { devLogin } from './tools/dev-login.js';
 
 const server = new McpServer({
   name: 'legacy-sports-browser',
@@ -157,7 +158,35 @@ server.tool(
   async (params) => screenshotUpload(params),
 );
 
-// Tool 7: browser_cleanup
+// Tool 7: browser_dev_login
+server.tool(
+  'browser_dev_login',
+  "Authenticate the current browser session against a local dev server using the cached e2e JWT (~/.legacy-sports/e2e-token.json, minted by `make e2e-auth`) — sets the ls_jwt HttpOnly cookie plus ls_user_profile/ls_token_expiry/ls_csrf_token localStorage, mirroring apps/web-e2e's buildIntegrationStorageState. The token is read and applied server-side; it is never included in the tool result. Pass url or port to navigate first (required if no page has been loaded yet via browser_navigate); otherwise applies to the currently loaded page and reloads it. Errors with a remedy if no cached token is valid — the human must run `make e2e-auth` interactively.",
+  {
+    identity: z
+      .literal('e2e-cached')
+      .optional()
+      .describe(
+        'Which cached identity to use. Only "e2e-cached" (the make e2e-auth token) is supported today.',
+      ),
+    url: z
+      .string()
+      .optional()
+      .describe(
+        'URL to navigate to before authenticating. Can be absolute (http://...) or relative (/dashboard) if port is provided.',
+      ),
+    port: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        'Dev server port — used to build full URL from relative paths, or alone to navigate to http://localhost:{port}/.',
+      ),
+  },
+  async (params) => devLogin(params),
+);
+
+// Tool 8: browser_cleanup
 server.tool(
   'browser_cleanup',
   'Close the browser and stop all tracked dev servers. Call this before ending your workflow to free resources. Equivalent to browser_dev_stop({ all: true }) plus closing Playwright.',
