@@ -246,9 +246,51 @@ jest.mock('../../../../features/commissioner/CommissionerScreen', () => {
 });
 
 jest.mock('../../../../features/matchup/components/MatchupList', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
+  const { View, Text, TouchableOpacity } =
+    jest.requireActual<typeof import('react-native')>('react-native');
   return {
-    MatchupList: () => <View testID="matchup-list" />,
+    // Reflects the loading/empty/list branches so the page spec can assert
+    // it wires useMatchupsForLeague and onMatchupPress through correctly
+    // (LS-6321) without duplicating MatchupList's own branch coverage.
+    MatchupList: ({
+      matchups,
+      loading,
+      emptyMessage,
+      onMatchupPress,
+    }: {
+      matchups: ReadonlyArray<{ id?: string | number | null }>;
+      loading?: boolean;
+      emptyMessage?: string;
+      onMatchupPress?: (matchup: { id?: string | number | null }) => void;
+    }) => {
+      if (loading) {
+        return (
+          <View testID="matchup-list">
+            <Text>Loading matchups...</Text>
+          </View>
+        );
+      }
+      if (matchups.length === 0) {
+        return (
+          <View testID="matchup-list">
+            <Text>{emptyMessage ?? 'No matchups found'}</Text>
+          </View>
+        );
+      }
+      return (
+        <View testID="matchup-list">
+          {matchups.map((matchup) => (
+            <TouchableOpacity
+              key={String(matchup.id)}
+              testID={`matchup-row-${matchup.id}`}
+              onPress={() => onMatchupPress?.(matchup)}
+            >
+              <Text>{`Matchup ${matchup.id}`}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      );
+    },
   };
 });
 
@@ -713,6 +755,73 @@ describe('FootballLeagueId', () => {
       expect(mockCapturedWaiverSubscribeRefresh).toHaveLength(2);
       expect(mockCapturedWaiverSubscribeRefresh[0]).not.toBe(
         mockCapturedWaiverSubscribeRefresh[1],
+      );
+    });
+  });
+
+  // FLD-016 (LS-6321) — the Matchups tab previously had only a single
+  // assertion that the "Matchups" tab label rendered. These tests cover the
+  // page's wiring of useMatchupsForLeague into MatchupList across its
+  // loading, empty, and populated-list branches, plus row-press navigation.
+  describe('matchups tab (LS-6321)', () => {
+    const { useMatchupsForLeague } = jest.requireMock<{
+      useMatchupsForLeague: jest.Mock;
+    }>('../../../../features/matchup/hooks/useMatchup');
+
+    beforeEach(() => {
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [],
+        loading: false,
+        refetch: jest.fn(),
+      });
+    });
+
+    it('shows the loading state while matchups are loading', () => {
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [],
+        loading: true,
+        refetch: jest.fn(),
+      });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      expect(screen.getByText('Loading matchups...')).toBeTruthy();
+    });
+
+    it('shows the empty message when there are no matchups', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      expect(
+        screen.getByText('No matchups found for this league'),
+      ).toBeTruthy();
+    });
+
+    it('renders a row per matchup returned for the league', () => {
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [{ id: 1 }, { id: 2 }, { id: 3 }],
+        loading: false,
+        refetch: jest.fn(),
+      });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      expect(screen.getByTestId('matchup-row-1')).toBeTruthy();
+      expect(screen.getByTestId('matchup-row-2')).toBeTruthy();
+      expect(screen.getByTestId('matchup-row-3')).toBeTruthy();
+    });
+
+    it('navigates to the matchup detail screen when a row is pressed', () => {
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [{ id: 7 }],
+        loading: false,
+        refetch: jest.fn(),
+      });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      fireEvent.press(screen.getByTestId('matchup-row-7'));
+      expect(mockNavigate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/football/matchup',
+          params: { matchupId: '7', leagueId: '42' },
+        }),
       );
     });
   });
