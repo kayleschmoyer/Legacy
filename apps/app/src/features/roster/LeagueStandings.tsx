@@ -2,7 +2,6 @@ import React from 'react';
 import { Card, H4, ScrollView, Text, XStack, YStack } from 'tamagui';
 import { Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
-import type { Href } from 'expo-router';
 
 interface Team {
   id: number;
@@ -14,19 +13,23 @@ export interface LeagueStandingsProps {
   teams: readonly Team[];
   loading?: boolean;
   userTeamId?: number | null;
+  /** Defaults to 'baseball' for backward-compat with existing callers. */
+  sport?: string | null;
 }
 
 export function LeagueStandings({
   teams,
   loading = false,
   userTeamId,
+  sport,
 }: LeagueStandingsProps): React.JSX.Element {
-  // expo-router types cannot be resolved in this project's TS config
-
   const router = useRouter();
 
+  const teamRoute =
+    sport === 'football' ? '/football/team/[teamId]' : '/baseball/team/[teamId]';
+
   const handleTeamPress = (teamId: number) => {
-    router.push(`/baseball/team/${teamId}` as Href);
+    router.push({ pathname: teamRoute, params: { teamId: String(teamId) } });
   };
 
   if (loading) {

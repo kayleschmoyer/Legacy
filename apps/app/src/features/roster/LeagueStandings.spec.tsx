@@ -101,11 +101,23 @@ describe('LeagueStandings', () => {
   });
 
   describe('navigation', () => {
-    it('navigates to team detail when team row is pressed', () => {
+    it('navigates to the baseball team route by default', () => {
       render(<LeagueStandings teams={MOCK_TEAMS} />);
       // Press the Pressable wrapper, not the Text child (press events don't bubble in RNTL)
       fireEvent.press(screen.getByTestId('team-row-1'));
-      expect(mockPush).toHaveBeenCalledWith('/baseball/team/1');
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/baseball/team/[teamId]',
+        params: { teamId: '1' },
+      });
+    });
+
+    it('navigates to the football team route when sport is football', () => {
+      render(<LeagueStandings teams={MOCK_TEAMS} sport="football" />);
+      fireEvent.press(screen.getByTestId('team-row-1'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/football/team/[teamId]',
+        params: { teamId: '1' },
+      });
     });
   });
 });
