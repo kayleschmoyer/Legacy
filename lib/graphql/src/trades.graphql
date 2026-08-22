@@ -73,3 +73,9 @@ mutation VetoTrade($tradeId: Int!) {
     ...TradeOffer
   }
 }
+
+mutation VoteOnTrade($tradeId: Int!, $vote: TradeVoteChoice!) {
+  voteOnTrade(tradeId: $tradeId, vote: $vote) {
+    ...TradeOffer
+  }
+}

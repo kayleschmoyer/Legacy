@@ -2192,6 +2192,8 @@ export type Mutation = {
   verifyGooglePurchase?: Maybe<GoogleVerifyResult>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
+  /** Premium-league feature: cast a league member's vote (approve/veto) on an accepted trade during commissioner review. A strict majority of eligible teams voting to veto automatically reverses the trade, alongside the commissioner’s standalone veto power. */
+  voteOnTrade?: Maybe<TradeOffer>;
 };
 
 export type MutationAcceptTradeArgs = {
@@ -2893,6 +2895,11 @@ export type MutationVerifyGooglePurchaseArgs = {
 
 export type MutationVetoTradeArgs = {
   tradeId: Scalars['Int']['input'];
+};
+
+export type MutationVoteOnTradeArgs = {
+  tradeId: Scalars['Int']['input'];
+  vote: TradeVoteChoice;
 };
 
 /** The current user's vote for a specific award type */
@@ -4819,6 +4826,8 @@ export type TiebreakerRule = {
 export type TradeOffer = {
   __typename?: 'TradeOffer';
   createdAt?: Maybe<Scalars['String']['output']>;
+  /** The number of league teams eligible to vote on this trade (all teams except the trade's two participants). Null when the league does not support trade voting. */
+  eligibleVoterCount?: Maybe<Scalars['Int']['output']>;
   expiresAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
@@ -4832,6 +4841,8 @@ export type TradeOffer = {
   status?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   vetoedAt?: Maybe<Scalars['String']['output']>;
+  /** League-member votes cast on this trade during commissioner review (premium leagues). */
+  votes?: Maybe<Array<TradeOfferVote>>;
 };
 
 /** A single player leg of a trade offer */
@@ -4846,6 +4857,22 @@ export type TradeOfferPlayer = {
   salary?: Maybe<Scalars['Int']['output']>;
   tradeOfferId?: Maybe<Scalars['Int']['output']>;
 };
+
+/** A league member team's vote (approve/veto) on an accepted trade */
+export type TradeOfferVote = {
+  __typename?: 'TradeOfferVote';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  tradeOfferId?: Maybe<Scalars['Int']['output']>;
+  vote?: Maybe<Scalars['String']['output']>;
+};
+
+export enum TradeVoteChoice {
+  Approve = 'approve',
+  Veto = 'veto',
+}
 
 export type TwentyQuestionsAskInput = {
   category: TwentyQuestionsCategory;
@@ -14085,6 +14112,16 @@ export type TradeOfferPlayerFragment = {
   salary?: number | null;
 };
 
+export type TradeOfferVoteFragment = {
+  __typename?: 'TradeOfferVote';
+  id?: number | null;
+  tradeOfferId?: number | null;
+  teamId?: number | null;
+  teamName?: string | null;
+  vote?: string | null;
+  createdAt?: string | null;
+};
+
 export type TradeOfferFragment = {
   __typename?: 'TradeOffer';
   id?: number | null;
@@ -14100,6 +14137,7 @@ export type TradeOfferFragment = {
   updatedAt?: string | null;
   proposingTeamName?: string | null;
   receivingTeamName?: string | null;
+  eligibleVoterCount?: number | null;
   players?: Array<{
     __typename?: 'TradeOfferPlayer';
     id?: number | null;
@@ -14109,6 +14147,15 @@ export type TradeOfferFragment = {
     playerName?: string | null;
     playerPosition?: string | null;
     salary?: number | null;
+  }> | null;
+  votes?: Array<{
+    __typename?: 'TradeOfferVote';
+    id?: number | null;
+    tradeOfferId?: number | null;
+    teamId?: number | null;
+    teamName?: string | null;
+    vote?: string | null;
+    createdAt?: string | null;
   }> | null;
 };
 
@@ -14136,6 +14183,7 @@ export type GetTeamTradeOffersQuery = {
     updatedAt?: string | null;
     proposingTeamName?: string | null;
     receivingTeamName?: string | null;
+    eligibleVoterCount?: number | null;
     players?: Array<{
       __typename?: 'TradeOfferPlayer';
       id?: number | null;
@@ -14145,6 +14193,15 @@ export type GetTeamTradeOffersQuery = {
       playerName?: string | null;
       playerPosition?: string | null;
       salary?: number | null;
+    }> | null;
+    votes?: Array<{
+      __typename?: 'TradeOfferVote';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      vote?: string | null;
+      createdAt?: string | null;
     }> | null;
   }> | null;
 };
@@ -14173,6 +14230,7 @@ export type GetLeagueTradeOffersQuery = {
     updatedAt?: string | null;
     proposingTeamName?: string | null;
     receivingTeamName?: string | null;
+    eligibleVoterCount?: number | null;
     players?: Array<{
       __typename?: 'TradeOfferPlayer';
       id?: number | null;
@@ -14182,6 +14240,15 @@ export type GetLeagueTradeOffersQuery = {
       playerName?: string | null;
       playerPosition?: string | null;
       salary?: number | null;
+    }> | null;
+    votes?: Array<{
+      __typename?: 'TradeOfferVote';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      vote?: string | null;
+      createdAt?: string | null;
     }> | null;
   }> | null;
 };
@@ -14212,6 +14279,7 @@ export type ProposeTradeMutation = {
     updatedAt?: string | null;
     proposingTeamName?: string | null;
     receivingTeamName?: string | null;
+    eligibleVoterCount?: number | null;
     players?: Array<{
       __typename?: 'TradeOfferPlayer';
       id?: number | null;
@@ -14221,6 +14289,15 @@ export type ProposeTradeMutation = {
       playerName?: string | null;
       playerPosition?: string | null;
       salary?: number | null;
+    }> | null;
+    votes?: Array<{
+      __typename?: 'TradeOfferVote';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      vote?: string | null;
+      createdAt?: string | null;
     }> | null;
   } | null;
 };
@@ -14246,6 +14323,7 @@ export type AcceptTradeMutation = {
     updatedAt?: string | null;
     proposingTeamName?: string | null;
     receivingTeamName?: string | null;
+    eligibleVoterCount?: number | null;
     players?: Array<{
       __typename?: 'TradeOfferPlayer';
       id?: number | null;
@@ -14255,6 +14333,15 @@ export type AcceptTradeMutation = {
       playerName?: string | null;
       playerPosition?: string | null;
       salary?: number | null;
+    }> | null;
+    votes?: Array<{
+      __typename?: 'TradeOfferVote';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      vote?: string | null;
+      createdAt?: string | null;
     }> | null;
   } | null;
 };
@@ -14280,6 +14367,7 @@ export type RejectTradeMutation = {
     updatedAt?: string | null;
     proposingTeamName?: string | null;
     receivingTeamName?: string | null;
+    eligibleVoterCount?: number | null;
     players?: Array<{
       __typename?: 'TradeOfferPlayer';
       id?: number | null;
@@ -14289,6 +14377,15 @@ export type RejectTradeMutation = {
       playerName?: string | null;
       playerPosition?: string | null;
       salary?: number | null;
+    }> | null;
+    votes?: Array<{
+      __typename?: 'TradeOfferVote';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      vote?: string | null;
+      createdAt?: string | null;
     }> | null;
   } | null;
 };
@@ -14314,6 +14411,7 @@ export type CancelTradeMutation = {
     updatedAt?: string | null;
     proposingTeamName?: string | null;
     receivingTeamName?: string | null;
+    eligibleVoterCount?: number | null;
     players?: Array<{
       __typename?: 'TradeOfferPlayer';
       id?: number | null;
@@ -14323,6 +14421,15 @@ export type CancelTradeMutation = {
       playerName?: string | null;
       playerPosition?: string | null;
       salary?: number | null;
+    }> | null;
+    votes?: Array<{
+      __typename?: 'TradeOfferVote';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      vote?: string | null;
+      createdAt?: string | null;
     }> | null;
   } | null;
 };
@@ -14348,6 +14455,7 @@ export type VetoTradeMutation = {
     updatedAt?: string | null;
     proposingTeamName?: string | null;
     receivingTeamName?: string | null;
+    eligibleVoterCount?: number | null;
     players?: Array<{
       __typename?: 'TradeOfferPlayer';
       id?: number | null;
@@ -14357,6 +14465,60 @@ export type VetoTradeMutation = {
       playerName?: string | null;
       playerPosition?: string | null;
       salary?: number | null;
+    }> | null;
+    votes?: Array<{
+      __typename?: 'TradeOfferVote';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      vote?: string | null;
+      createdAt?: string | null;
+    }> | null;
+  } | null;
+};
+
+export type VoteOnTradeMutationVariables = Exact<{
+  tradeId: Scalars['Int']['input'];
+  vote: TradeVoteChoice;
+}>;
+
+export type VoteOnTradeMutation = {
+  __typename?: 'Mutation';
+  voteOnTrade?: {
+    __typename?: 'TradeOffer';
+    id?: number | null;
+    leagueId?: number | null;
+    proposingTeamId?: number | null;
+    receivingTeamId?: number | null;
+    status?: string | null;
+    message?: string | null;
+    expiresAt?: string | null;
+    respondedAt?: string | null;
+    vetoedAt?: string | null;
+    createdAt?: string | null;
+    updatedAt?: string | null;
+    proposingTeamName?: string | null;
+    receivingTeamName?: string | null;
+    eligibleVoterCount?: number | null;
+    players?: Array<{
+      __typename?: 'TradeOfferPlayer';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      playerId?: number | null;
+      fromTeamId?: number | null;
+      playerName?: string | null;
+      playerPosition?: string | null;
+      salary?: number | null;
+    }> | null;
+    votes?: Array<{
+      __typename?: 'TradeOfferVote';
+      id?: number | null;
+      tradeOfferId?: number | null;
+      teamId?: number | null;
+      teamName?: string | null;
+      vote?: string | null;
+      createdAt?: string | null;
     }> | null;
   } | null;
 };
@@ -16222,6 +16384,16 @@ export const TradeOfferPlayerFragmentDoc = gql`
     salary
   }
 `;
+export const TradeOfferVoteFragmentDoc = gql`
+  fragment TradeOfferVote on TradeOfferVote {
+    id
+    tradeOfferId
+    teamId
+    teamName
+    vote
+    createdAt
+  }
+`;
 export const TradeOfferFragmentDoc = gql`
   fragment TradeOffer on TradeOffer {
     id
@@ -16237,11 +16409,16 @@ export const TradeOfferFragmentDoc = gql`
     updatedAt
     proposingTeamName
     receivingTeamName
+    eligibleVoterCount
     players {
       ...TradeOfferPlayer
     }
+    votes {
+      ...TradeOfferVote
+    }
   }
   ${TradeOfferPlayerFragmentDoc}
+  ${TradeOfferVoteFragmentDoc}
 `;
 export const UserPreferenceFragmentDoc = gql`
   fragment UserPreference on UserPreference {
@@ -36071,6 +36248,58 @@ export type VetoTradeMutationResult = Apollo.MutationResult<VetoTradeMutation>;
 export type VetoTradeMutationOptions = BaseMutationOptions<
   VetoTradeMutation,
   VetoTradeMutationVariables
+>;
+export const VoteOnTrade = gql`
+  mutation VoteOnTrade($tradeId: Int!, $vote: TradeVoteChoice!) {
+    voteOnTrade(tradeId: $tradeId, vote: $vote) {
+      ...TradeOffer
+    }
+  }
+  ${TradeOfferFragmentDoc}
+`;
+export type VoteOnTradeMutationFn = MutationFunction<
+  VoteOnTradeMutation,
+  VoteOnTradeMutationVariables
+>;
+
+/**
+ * __useVoteOnTradeMutation__
+ *
+ * To run a mutation, you first call `useVoteOnTradeMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useVoteOnTradeMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [voteOnTradeMutation, { data, loading, error }] = useVoteOnTradeMutation({
+ *   variables: {
+ *      tradeId: // value for 'tradeId'
+ *      vote: // value for 'vote'
+ *   },
+ * });
+ */
+export function useVoteOnTradeMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    VoteOnTradeMutation,
+    VoteOnTradeMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<VoteOnTradeMutation, VoteOnTradeMutationVariables>(
+    VoteOnTrade,
+    options,
+  );
+}
+export type VoteOnTradeMutationHookResult = ReturnType<
+  typeof useVoteOnTradeMutation
+>;
+export type VoteOnTradeMutationResult =
+  Apollo.MutationResult<VoteOnTradeMutation>;
+export type VoteOnTradeMutationOptions = BaseMutationOptions<
+  VoteOnTradeMutation,
+  VoteOnTradeMutationVariables
 >;
 export const TriggerSeasonDraftStatLoading = gql`
   mutation TriggerSeasonDraftStatLoading($playerId: Int!) {

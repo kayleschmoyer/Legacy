@@ -216,6 +216,12 @@ export const tradeOfferStatus = pgEnum('trade_offer_status', [
   'expired',
 ]);
 
+// League-member vote on an accepted trade during commissioner review (LS-6349)
+export const tradeOfferVoteChoice = pgEnum('trade_offer_vote_choice', [
+  'approve',
+  'veto',
+]);
+
 // Draft slot trading (LS-8675) — lifecycle mutations land in a follow-up ticket
 export const draftSlotTradeStatus = pgEnum('draft_slot_trade_status', [
   'proposed',

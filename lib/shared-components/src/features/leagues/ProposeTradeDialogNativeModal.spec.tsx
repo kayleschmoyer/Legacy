@@ -77,6 +77,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   useRejectTradeMutation: jest.fn(() => [jest.fn()]),
   useCancelTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useVetoTradeMutation: () => [jest.fn().mockResolvedValue({})],
+  useVoteOnTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useProposeTradeMutation: jest.fn(() => [jest.fn().mockResolvedValue({})]),
   useGetLeagueTradeBlockQuery: jest.fn(() => ({
     data: { leagueTradeBlock: [] },
@@ -90,6 +91,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   GetTeamTradeOffers: 'GetTeamTradeOffers',
   GetLeagueTradeOffers: 'GetLeagueTradeOffers',
   TradeOfferFragment: 'TradeOfferFragment',
+  TradeVoteChoice: { Approve: 'approve', Veto: 'veto' },
 }));
 
 describe('TradingCenter — ProposeTradeDialog native Modal mount (LS-8852)', () => {

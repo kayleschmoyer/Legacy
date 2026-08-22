@@ -39,6 +39,8 @@ import { History } from '@tamagui/lucide-icons/icons/History';
 import { MessageSquare } from '@tamagui/lucide-icons/icons/MessageSquare';
 import { Send } from '@tamagui/lucide-icons/icons/Send';
 import { Shield } from '@tamagui/lucide-icons/icons/Shield';
+import { ThumbsDown } from '@tamagui/lucide-icons/icons/ThumbsDown';
+import { ThumbsUp } from '@tamagui/lucide-icons/icons/ThumbsUp';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { X } from '@tamagui/lucide-icons/icons/X';
 import { Zap } from '@tamagui/lucide-icons/icons/Zap';
@@ -51,6 +53,7 @@ import {
   type GetTeamTradeOffersQuery,
   type GetTeamTradeOffersQueryVariables,
   TradeOfferFragment,
+  TradeVoteChoice,
   useAcceptTradeMutation,
   useCancelTradeMutation,
   useGetLeagueByIdQuery,
@@ -62,6 +65,7 @@ import {
   useProposeTradeMutation,
   useRejectTradeMutation,
   useVetoTradeMutation,
+  useVoteOnTradeMutation,
 } from '@legacy-sports/graphql';
 import { PremiumTradeTools } from './PremiumTradeTools';
 import {
@@ -223,6 +227,8 @@ interface TradeOfferCardProps {
   onReject?: (id: number) => void;
   onCancel?: (id: number) => void;
   onVeto?: (id: number) => void;
+  /** League-member vote on an accepted trade during commissioner review (LS-6349, premium leagues). */
+  onVote?: (id: number, vote: TradeVoteChoice) => void;
   actionLoading?: number | null;
   /** Whether the league enforces a salary cap (premium). Enables the cap preview. */
   salaryCapEnabled?: boolean;
@@ -230,6 +236,8 @@ interface TradeOfferCardProps {
   salaryCap?: number | null;
   /** The viewing team's current total payroll in dollars, for the over-cap warning. */
   viewerCurrentPayroll?: number | null;
+  /** Whether the viewer/league has the `premium` entitlement — gates the league-vote panel. */
+  isPremium?: boolean;
 }
 
 function TradeOfferCard({
@@ -241,10 +249,12 @@ function TradeOfferCard({
   onReject,
   onCancel,
   onVeto,
+  onVote,
   actionLoading,
   salaryCapEnabled = false,
   salaryCap,
   viewerCurrentPayroll,
+  isPremium = false,
 }: TradeOfferCardProps) {
   const badge = statusBadge(trade.status ?? 'pending');
   const isIncoming =
@@ -272,6 +282,18 @@ function TradeOfferCard({
     : null;
 
   const isLoading = actionLoading === trade.id;
+
+  // League-member vote tally (LS-6349) — premium leagues let non-participating
+  // teams weigh in on an accepted trade alongside the commissioner's veto.
+  const votes = trade.votes ?? [];
+  const voteApproveCount = votes.filter((v) => v.vote === 'approve').length;
+  const voteVetoCount = votes.filter((v) => v.vote === 'veto').length;
+  const viewerVote = votes.find((v) => v.teamId === userTeamId)?.vote ?? null;
+  const isVoteEligible =
+    isPremium &&
+    trade.status === 'accepted' &&
+    userTeamId !== trade.proposingTeamId &&
+    userTeamId !== trade.receivingTeamId;
 
   // For incoming pending trades, cross-reference the offering team's current roster
   // to detect players who were dropped after the trade was proposed.
@@ -612,6 +634,86 @@ function TradeOfferCard({
             Accepting will fail.
           </Text>
         </XStack>
+      )}
+
+      {/* League-member vote panel (LS-6349) — premium leagues: non-participating
+          teams can vote approve/veto on an accepted trade during commissioner
+          review, alongside the commissioner's standalone veto power. */}
+      {isPremium && trade.status === 'accepted' && (
+        <YStack
+          data-testid={`trade-vote-panel-${trade.id}`}
+          borderTopWidth={1}
+          borderTopColor="$outlineSubtle"
+          paddingHorizontal="$3"
+          paddingVertical="$2"
+          gap="$1.5"
+        >
+          <XStack alignItems="center" justifyContent="space-between" gap="$2">
+            <XStack alignItems="center" gap="$1.5">
+              <Users size={12} color="$textMuted" />
+              <Text fontSize="$1" color="$textMuted" fontWeight="600">
+                League vote
+              </Text>
+              <Text fontSize="$2" color="$green11" fontWeight="700">
+                {voteApproveCount} approve
+              </Text>
+              <Text fontSize="$1" color="$textMuted">
+                ·
+              </Text>
+              <Text fontSize="$2" color="$statusAccentFg" fontWeight="700">
+                {voteVetoCount} veto
+              </Text>
+              {trade.eligibleVoterCount != null && (
+                <Text fontSize="$1" color="$textMuted">
+                  (of {trade.eligibleVoterCount} eligible)
+                </Text>
+              )}
+            </XStack>
+
+            {isVoteEligible && (
+              <XStack gap="$2" alignItems="center">
+                <Button
+                  size="$2"
+                  backgroundColor={
+                    viewerVote === 'approve' ? '$green4' : 'transparent'
+                  }
+                  borderColor="$green7"
+                  borderWidth={1}
+                  data-testid={`trade-vote-approve-${trade.id}`}
+                  onPress={() => {
+                    if (trade.id == null) return;
+                    onVote?.(trade.id, TradeVoteChoice.Approve);
+                  }}
+                  disabled={isLoading || trade.id == null}
+                  icon={<ThumbsUp size={12} color="$green11" />}
+                >
+                  <Text fontSize="$2" color="$green11" fontWeight="700">
+                    Approve
+                  </Text>
+                </Button>
+                <Button
+                  size="$2"
+                  backgroundColor={
+                    viewerVote === 'veto' ? '$statusAccentBg' : 'transparent'
+                  }
+                  borderColor="$statusAccentBorder"
+                  borderWidth={1}
+                  data-testid={`trade-vote-veto-${trade.id}`}
+                  onPress={() => {
+                    if (trade.id == null) return;
+                    onVote?.(trade.id, TradeVoteChoice.Veto);
+                  }}
+                  disabled={isLoading || trade.id == null}
+                  icon={<ThumbsDown size={12} color="$statusAccentFg" />}
+                >
+                  <Text fontSize="$2" color="$statusAccentFg" fontWeight="700">
+                    Veto
+                  </Text>
+                </Button>
+              </XStack>
+            )}
+          </XStack>
+        </YStack>
       )}
 
       {/* Footer: date + actions */}
@@ -1544,7 +1646,9 @@ export function TradingCenter({
   } = useGetLeagueTradeOffersQuery({
     variables: { leagueId, limit: HISTORY_PAGE_SIZE, offset: 0 },
     fetchPolicy: 'cache-and-network',
-    skip: !isCommissioner && !showHistory,
+    // Premium leagues also fetch eagerly so the "Under Review" vote panel
+    // (LS-6349) is visible to every league member without opening history.
+    skip: !isCommissioner && !isPremium && !showHistory,
   });
 
   // Deep-link lookup: fetch all statuses for the user's team when an offerId is
@@ -1561,13 +1665,16 @@ export function TradingCenter({
   const [rejectTrade] = useRejectTradeMutation();
   const [cancelTrade] = useCancelTradeMutation();
   const [vetoTrade] = useVetoTradeMutation();
+  const [voteOnTrade] = useVoteOnTradeMutation();
 
   const handleRefetch = useCallback(async () => {
     await Promise.all([
       refetchPending(),
-      isCommissioner || showHistory ? refetchAll() : Promise.resolve(),
+      isCommissioner || isPremium || showHistory
+        ? refetchAll()
+        : Promise.resolve(),
     ]);
-  }, [refetchPending, refetchAll, isCommissioner, showHistory]);
+  }, [refetchPending, refetchAll, isCommissioner, isPremium, showHistory]);
 
   const handleAction = useCallback(
     async (id: number, fn: (id: number) => Promise<unknown>) => {
@@ -1628,6 +1735,14 @@ export function TradingCenter({
   const historyAllTrades = useMemo(() => {
     return allHistoryTrades.filter((t) => t.status !== 'pending');
   }, [allHistoryTrades]);
+
+  // Accepted trades still open for commissioner review / league vote
+  // (LS-6349) — surfaced separately from the collapsed history so premium
+  // league members see them without opening "Show History".
+  const underReviewTrades = useMemo(() => {
+    if (!isPremium) return [];
+    return allHistoryTrades.filter((t) => t.status === 'accepted');
+  }, [allHistoryTrades, isPremium]);
 
   // Unique teams that appear in any history trade (for the team filter dropdown)
   const historyTeamOptions = useMemo(() => {
@@ -1972,6 +2087,66 @@ export function TradingCenter({
         )}
       </YStack>
 
+      {/* Under Review — accepted trades open for commissioner veto / league
+          vote (LS-6349, premium leagues). Surfaced outside the collapsed
+          history so every member sees active review without extra clicks. */}
+      {isPremium && underReviewTrades.length > 0 && (
+        <>
+          <Separator borderColor="$outlineSubtle" />
+          <YStack data-testid="trade-tab-under-review" gap="$3">
+            <XStack alignItems="center" gap="$2">
+              <Shield size={16} color="$statusAccentFg" />
+              <Text fontSize="$4" fontWeight="700" color="$color">
+                Under Review
+              </Text>
+              <XStack
+                backgroundColor="$statusAccentBg"
+                borderColor="$statusAccentBorder"
+                borderWidth={1}
+                borderRadius="$10"
+                paddingHorizontal="$2"
+                paddingVertical={2}
+              >
+                <Text fontSize="$1" fontWeight="700" color="$statusAccentFg">
+                  {underReviewTrades.length}
+                </Text>
+              </XStack>
+            </XStack>
+            <Text fontSize="$2" color="$textMuted">
+              These trades were accepted and are open for commissioner veto and
+              league vote before they're final.
+            </Text>
+
+            {underReviewTrades.map((trade) => (
+              <TradeOfferCard
+                key={trade.id}
+                trade={trade}
+                userTeamId={userTeamId}
+                isCommissioner={isCommissioner}
+                isPremium={isPremium}
+                onVeto={
+                  isCommissioner
+                    ? (id) =>
+                        void handleAction(id, (tradeId) =>
+                          vetoTrade({ variables: { tradeId } }),
+                        )
+                    : undefined
+                }
+                onVote={(id, vote) =>
+                  void handleAction(id, (tradeId) =>
+                    voteOnTrade({ variables: { tradeId, vote } }),
+                  )
+                }
+                actionLoading={actionLoading}
+                salaryCapEnabled={salaryCapEnabled}
+                salaryCap={salaryCap}
+                viewerCurrentPayroll={viewerCurrentPayroll}
+              />
+            ))}
+          </YStack>
+        </>
+      )}
+
       {/* Trade History */}
       <YStack gap="$3">
         <Button
@@ -2201,6 +2376,7 @@ export function TradingCenter({
                     trade={trade}
                     userTeamId={userTeamId}
                     isCommissioner={isCommissioner}
+                    isPremium={isPremium}
                     highlighted={
                       deepLinkOfferId != null && trade.id === deepLinkOfferId
                     }
@@ -2211,6 +2387,11 @@ export function TradingCenter({
                               vetoTrade({ variables: { tradeId } }),
                             )
                         : undefined
+                    }
+                    onVote={(id, vote) =>
+                      void handleAction(id, (tradeId) =>
+                        voteOnTrade({ variables: { tradeId, vote } }),
+                      )
                     }
                     actionLoading={actionLoading}
                     salaryCapEnabled={salaryCapEnabled}

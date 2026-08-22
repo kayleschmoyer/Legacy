@@ -44,6 +44,41 @@ TradeOfferPlayer.implement({
   }),
 });
 
+// ── TradeOfferVote type ───────────────────────────────────────────────────
+// A league member's (non-participating team's) vote on an accepted trade
+// during premium-league commissioner review (LS-6349).
+
+export const TradeVoteChoice = builder.enumType('TradeVoteChoice', {
+  values: ['approve', 'veto'] as const,
+});
+
+export const TradeOfferVote = builder.objectRef<{
+  id: number;
+  tradeOfferId: number;
+  teamId: number;
+  teamName?: string | null;
+  vote: 'approve' | 'veto';
+  createdAt: Date;
+}>('TradeOfferVote');
+
+TradeOfferVote.implement({
+  description:
+    "A league member team's vote (approve/veto) on an accepted trade",
+  fields: (t) => ({
+    id: t.exposeInt('id'),
+    tradeOfferId: t.exposeInt('tradeOfferId'),
+    teamId: t.exposeInt('teamId'),
+    teamName: t.string({
+      nullable: true,
+      resolve: (parent) => parent.teamName ?? null,
+    }),
+    vote: t.exposeString('vote'),
+    createdAt: t.string({
+      resolve: (parent) => parent.createdAt.toISOString(),
+    }),
+  }),
+});
+
 // ── TradeOffer type ───────────────────────────────────────────────────────
 
 export const TradeOffer = builder.objectRef<{
@@ -75,6 +110,15 @@ export const TradeOffer = builder.objectRef<{
     playerPosition?: string | null;
     salary?: number | null;
   }>;
+  votes?: Array<{
+    id: number;
+    tradeOfferId: number;
+    teamId: number;
+    teamName?: string | null;
+    vote: 'approve' | 'veto';
+    createdAt: Date;
+  }>;
+  eligibleVoterCount?: number | null;
 }>('TradeOffer');
 
 TradeOffer.implement({
@@ -119,6 +163,19 @@ TradeOffer.implement({
     }),
     updatedAt: t.string({
       resolve: (parent) => parent.updatedAt.toISOString(),
+    }),
+    votes: t.field({
+      type: [TradeOfferVote],
+      nullable: true,
+      description:
+        'League-member votes cast on this trade during commissioner review (premium leagues).',
+      resolve: (parent) => parent.votes ?? null,
+    }),
+    eligibleVoterCount: t.int({
+      nullable: true,
+      description:
+        "The number of league teams eligible to vote on this trade (all teams except the trade's two participants). Null when the league does not support trade voting.",
+      resolve: (parent) => parent.eligibleVoterCount ?? null,
     }),
   }),
 });

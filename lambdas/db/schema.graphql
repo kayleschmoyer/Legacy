@@ -3111,6 +3111,11 @@ type Mutation {
   Commissioner-only: veto an accepted trade, reversing the player swap.
   """
   vetoTrade(tradeId: Int!): TradeOffer
+
+  """
+  Premium-league feature: cast a league member's vote (approve/veto) on an accepted trade during commissioner review. A strict majority of eligible teams voting to veto automatically reverses the trade, alongside the commissioner’s standalone veto power.
+  """
+  voteOnTrade(tradeId: Int!, vote: TradeVoteChoice!): TradeOffer
 }
 
 """
@@ -5052,6 +5057,11 @@ A trade proposal between two teams in a fantasy league
 """
 type TradeOffer {
   createdAt: String
+
+  """
+  The number of league teams eligible to vote on this trade (all teams except the trade's two participants). Null when the league does not support trade voting.
+  """
+  eligibleVoterCount: Int
   expiresAt: String
   id: Int
   leagueId: Int
@@ -5065,6 +5075,11 @@ type TradeOffer {
   status: String
   updatedAt: String
   vetoedAt: String
+
+  """
+  League-member votes cast on this trade during commissioner review (premium leagues).
+  """
+  votes: [TradeOfferVote!]
 }
 
 """
@@ -5082,6 +5097,23 @@ type TradeOfferPlayer {
   """
   salary: Int
   tradeOfferId: Int
+}
+
+"""
+A league member team's vote (approve/veto) on an accepted trade
+"""
+type TradeOfferVote {
+  createdAt: String
+  id: Int
+  teamId: Int
+  teamName: String
+  tradeOfferId: Int
+  vote: String
+}
+
+enum TradeVoteChoice {
+  approve
+  veto
 }
 
 input TwentyQuestionsAskInput {

@@ -34,6 +34,7 @@ import {
   waiverType,
   weekAdvanceStatus,
   tradeOfferStatus,
+  tradeOfferVoteChoice,
   draftSlotTradeStatus,
   sportKind,
 } from './Enums';
@@ -887,6 +888,46 @@ export const tradeOfferPlayers = pgTable(
       uniquePlayerPerOffer: unique('trade_offer_players_unique').on(
         table.tradeOfferId,
         table.playerId,
+      ),
+    };
+  },
+);
+
+/**
+ * A league member's (non-participating team's) vote on an accepted trade
+ * during premium-league commissioner review (LS-6349). One vote per team per
+ * trade; a majority `veto` vote among eligible teams auto-vetoes the trade
+ * alongside the commissioner's manual veto power.
+ */
+export const tradeOfferVotes = pgTable(
+  'trade_offer_votes',
+  {
+    id: serial('id').primaryKey().notNull(),
+    tradeOfferId: integer('trade_offer_id').notNull(),
+    teamId: integer('team_id').notNull(),
+    vote: tradeOfferVoteChoice('vote').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => {
+    return {
+      tradeOfferVotesTradeFk: foreignKey({
+        columns: [table.tradeOfferId],
+        foreignColumns: [tradeOffers.id],
+        name: 'trade_offer_votes_trade_fk',
+      }).onDelete('cascade'),
+      tradeOfferVotesTeamFk: foreignKey({
+        columns: [table.teamId],
+        foreignColumns: [teams.id],
+        name: 'trade_offer_votes_team_fk',
+      }).onDelete('cascade'),
+      tradeIdIdx: index('trade_offer_votes_trade_id_idx').on(
+        table.tradeOfferId,
+      ),
+      uniqueVotePerTeam: unique('trade_offer_votes_unique').on(
+        table.tradeOfferId,
+        table.teamId,
       ),
     };
   },

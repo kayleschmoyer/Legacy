@@ -78,6 +78,7 @@ let mockProposeTradeFn: jest.Mock;
 // promises they resolve manually to observe the in-flight disabled state.
 let mockAcceptTradeFn: jest.Mock = jest.fn().mockResolvedValue({});
 let mockRejectTradeFn: jest.Mock = jest.fn().mockResolvedValue({});
+let mockVoteOnTradeFn: jest.Mock = jest.fn().mockResolvedValue({});
 
 const mockLoadProposerRoster = jest.fn();
 const mockRefetch = jest.fn().mockResolvedValue({});
@@ -110,6 +111,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   useRejectTradeMutation: jest.fn(() => [mockRejectTradeFn]),
   useCancelTradeMutation: () => [jest.fn().mockResolvedValue({})],
   useVetoTradeMutation: () => [jest.fn().mockResolvedValue({})],
+  useVoteOnTradeMutation: jest.fn(() => [mockVoteOnTradeFn]),
   useProposeTradeMutation: jest.fn(() => [mockProposeTradeFn]),
   useGetLeagueTradeBlockQuery: jest.fn(() => mockTradeBlockReturn),
   useSetTradeBlockMutation: () => [
@@ -119,6 +121,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   GetTeamTradeOffers: 'GetTeamTradeOffers',
   GetLeagueTradeOffers: 'GetLeagueTradeOffers',
   TradeOfferFragment: 'TradeOfferFragment',
+  TradeVoteChoice: { Approve: 'approve', Veto: 'veto' },
 }));
 
 // ---------------------------------------------------------------------------
@@ -2134,3 +2137,142 @@ describe('TradingCenter — ProposeTradeDialog (LS-5678)', () => {
 // NOTE: The duplicate "Trade History Filters" describe block that was added
 // here (LS-7526) was removed — all filter scenarios are covered by the block
 // above (LS-7529) which uses the Dropdown-based team filter implementation.
+
+// ---------------------------------------------------------------------------
+// League Vote panel (LS-6349)
+// ---------------------------------------------------------------------------
+
+describe('TradingCenter — League Vote panel (LS-6349)', () => {
+  const NON_PARTICIPANT_TEAM_ID = 99;
+
+  function setLeagueTrades(offers: ReturnType<typeof makeOffer>[]) {
+    mockLeagueTradesReturn = {
+      data: { leagueTradeOffers: offers },
+      loading: false,
+      refetch: jest.fn(),
+    };
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockPendingReturn = {
+      data: { teamTradeOffers: [] },
+      loading: false,
+      refetch: mockRefetch,
+    };
+    mockProposerRosterReturn = { data: undefined };
+    mockTradeBlockReturn = {
+      data: { leagueTradeBlock: [] },
+      loading: false,
+      error: undefined,
+    };
+    mockLeagueTeamsReturn = { data: undefined };
+    mockLeagueByIdReturn = { data: undefined };
+    mockProposeTradeFn = jest.fn().mockResolvedValue({});
+    mockVoteOnTradeFn = jest.fn().mockResolvedValue({});
+  });
+
+  it('does not render the Under Review section when the league is not premium', async () => {
+    setLeagueTrades([makeOffer({ id: 500, status: 'accepted' })]);
+    const { findByText, queryByText } = render(
+      <TradingCenter leagueId={LEAGUE_ID} userTeamId={USER_TEAM_ID} />,
+    );
+    // Wait for something stable to render first so the assertion below isn't racing initial mount.
+    await findByText('Trading Center');
+    expect(queryByText('Under Review')).toBeNull();
+  });
+
+  it('renders the Under Review section with a vote tally for an accepted trade when premium', async () => {
+    setLeagueTrades([
+      makeOffer({
+        id: 501,
+        status: 'accepted',
+        votes: [
+          {
+            __typename: 'TradeOfferVote' as const,
+            id: 1,
+            tradeOfferId: 501,
+            teamId: 50,
+            teamName: 'Team Fifty',
+            vote: 'approve',
+            createdAt: '2026-03-18T14:30:00Z',
+          },
+          {
+            __typename: 'TradeOfferVote' as const,
+            id: 2,
+            tradeOfferId: 501,
+            teamId: 51,
+            teamName: 'Team Fifty-One',
+            vote: 'veto',
+            createdAt: '2026-03-18T14:30:00Z',
+          },
+        ],
+        eligibleVoterCount: 3,
+      }),
+    ]);
+    const { findByText, getByTestId } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={NON_PARTICIPANT_TEAM_ID}
+        isPremium
+      />,
+    );
+
+    expect(await findByText('Under Review')).toBeTruthy();
+    const panel = getByTestId('trade-vote-panel-501');
+    expect(panel.textContent).toContain('1 approve');
+    expect(panel.textContent).toContain('1 veto');
+    expect(panel.textContent).toContain('of 3 eligible');
+  });
+
+  it('lets a non-participant team cast a vote', async () => {
+    setLeagueTrades([
+      makeOffer({
+        id: 502,
+        status: 'accepted',
+        votes: [],
+        eligibleVoterCount: 3,
+      }),
+    ]);
+    const { findByTestId } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={NON_PARTICIPANT_TEAM_ID}
+        isPremium
+      />,
+    );
+
+    const approveButton = await findByTestId('trade-vote-approve-502');
+    fireEvent.click(approveButton);
+
+    await waitFor(() => {
+      expect(mockVoteOnTradeFn).toHaveBeenCalledWith({
+        variables: { tradeId: 502, vote: 'approve' },
+      });
+    });
+  });
+
+  it('hides vote buttons for a team that is party to the trade', async () => {
+    // Default makeOffer() participants are PROPOSING_TEAM_ID and USER_TEAM_ID —
+    // rendering as USER_TEAM_ID makes the viewer a trade participant.
+    setLeagueTrades([
+      makeOffer({
+        id: 503,
+        status: 'accepted',
+        votes: [],
+        eligibleVoterCount: 3,
+      }),
+    ]);
+    const { findByText, queryByTestId } = render(
+      <TradingCenter
+        leagueId={LEAGUE_ID}
+        userTeamId={USER_TEAM_ID}
+        isPremium
+      />,
+    );
+
+    expect(await findByText('Under Review')).toBeTruthy();
+    expect(queryByTestId('trade-vote-approve-503')).toBeNull();
+    expect(queryByTestId('trade-vote-veto-503')).toBeNull();
+  });
+});

@@ -22,6 +22,7 @@ describe('Trades Resolver', () => {
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
       returning: jest.fn().mockReturnThis(),
+      onConflictDoUpdate: jest.fn().mockReturnThis(),
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       // awaiting the chain directly (when no .limit / .returning terminator)
@@ -76,6 +77,13 @@ describe('Trades Resolver', () => {
           playerId: 'playerId',
           fromTeamId: 'fromTeamId',
           playerName: 'playerName',
+        },
+        tradeOfferVotes: {
+          id: 'id',
+          tradeOfferId: 'tradeOfferId',
+          teamId: 'teamId',
+          vote: 'vote',
+          createdAt: 'createdAt',
         },
         teams: {
           id: 'id',
@@ -1572,6 +1580,302 @@ describe('Trades Resolver', () => {
         extensions: { code: 'BAD_USER_INPUT' },
         message: expect.stringContaining('Only accepted trades can be vetoed'),
       });
+    });
+  });
+
+  // ── voteOnTrade ────────────────────────────────────────────────────────────
+
+  describe('voteOnTrade mutation', () => {
+    const acceptedTrade = {
+      id: 5,
+      leagueId: 1,
+      proposingTeamId: 1,
+      receivingTeamId: 2,
+      status: 'accepted',
+      message: null,
+      expiresAt: null,
+      respondedAt: null,
+      vetoedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('throws when unauthenticated', async () => {
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      await expect(
+        resolver(
+          {},
+          { tradeId: 5, vote: 'approve' },
+          unauthCtx,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('throws PremiumRequired when the caller is not premium', async () => {
+      // requirePremium's subscriptionTier lookup
+      mockDb.limit.mockResolvedValueOnce([{ tier: 'free' }]);
+
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      await expect(
+        resolver(
+          {},
+          { tradeId: 5, vote: 'approve' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('premium subscription');
+    });
+
+    it('throws NOT_FOUND when trade not found', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]); // requirePremium
+      mockDb.limit.mockResolvedValueOnce([]); // trade fetch
+
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      await expect(
+        resolver(
+          {},
+          { tradeId: 999, vote: 'approve' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'NOT_FOUND' },
+        message: expect.stringContaining('Trade offer not found'),
+      });
+    });
+
+    it('throws BAD_USER_INPUT when the trade is not accepted', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]); // requirePremium
+      mockDb.limit.mockResolvedValueOnce([
+        { ...acceptedTrade, status: 'pending' },
+      ]); // trade fetch
+
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      await expect(
+        resolver(
+          {},
+          { tradeId: 5, vote: 'approve' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'BAD_USER_INPUT' },
+        message: expect.stringContaining(
+          'Only accepted trades under commissioner review can be voted on',
+        ),
+      });
+    });
+
+    it('throws Forbidden when the caller has no active team in the league', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]); // requirePremium
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]); // trade fetch
+      mockDb.limit.mockResolvedValueOnce([]); // membership lookup — no row
+
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      await expect(
+        resolver(
+          {},
+          { tradeId: 5, vote: 'approve' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('throws Forbidden when the caller is a spectator (no manager permission)', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]); // requirePremium
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]); // trade fetch
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 3, permissionLevel: 'spectator' },
+      ]); // membership lookup
+
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      await expect(
+        resolver(
+          {},
+          { tradeId: 5, vote: 'approve' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    });
+
+    it('throws Forbidden when the caller is a party to the trade', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]); // requirePremium
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]); // trade fetch
+      mockDb.limit.mockResolvedValueOnce([
+        {
+          teamId: acceptedTrade.proposingTeamId,
+          permissionLevel: 'general_manager',
+        },
+      ]); // membership lookup — caller's team is the proposing team
+
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      await expect(
+        resolver(
+          {},
+          { tradeId: 5, vote: 'veto' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toMatchObject({
+        extensions: { code: 'FORBIDDEN' },
+        message: expect.stringContaining('cannot vote'),
+      });
+    });
+
+    it('records a vote and does not auto-veto when the majority threshold is not met', async () => {
+      const voteRow = {
+        id: 1,
+        tradeOfferId: 5,
+        teamId: 3,
+        teamName: 'Team C',
+        vote: 'veto',
+        createdAt: new Date(),
+      };
+
+      // 1. requirePremium — .where() passthrough, .limit() terminal
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]);
+      // 2. trade fetch
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]);
+      // 3. membership lookup — caller's team (3) is not a party to the trade
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 3, permissionLevel: 'general_manager' },
+      ]);
+      // 4. insert vote → onConflictDoUpdate is the terminal call (mockReturnThis),
+      // falls back to `.then` default resolving [] — no queue consumption
+
+      // 5. re-fetch current trade — still accepted
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]);
+      // 6a. fetchTradeVotesData (post-vote tally): one veto vote so far — .where() terminal
+      mockDb.where.mockResolvedValueOnce([voteRow]);
+      // 6b. team counts — .where() passthrough, .groupBy() terminal.
+      // 4 teams in the league → eligibleVoterCount = 2; 1 veto does not exceed 1
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.groupBy.mockResolvedValueOnce([{ leagueId: 1, total: 4 }]);
+
+      // enrichTrade re-fetch chain
+      mockDb.where.mockReturnValueOnce(mockDb); // trade
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]);
+      mockDb.where.mockReturnValueOnce(mockDb); // proposing team
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Team A' }]);
+      mockDb.where.mockReturnValueOnce(mockDb); // receiving team
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Team B' }]);
+      mockDb.where.mockResolvedValueOnce([]); // rawPlayers — terminal
+      mockDb.where.mockResolvedValueOnce([voteRow]); // votes (enrichTrade's own fetchTradeVotesData call) — terminal
+      mockDb.where.mockReturnValueOnce(mockDb); // team counts passthrough
+      mockDb.groupBy.mockResolvedValueOnce([{ leagueId: 1, total: 4 }]); // team counts terminal
+
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      const result = (await resolver(
+        {},
+        { tradeId: 5, vote: 'veto' },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(mockDb.insert).toHaveBeenCalled();
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({ tradeOfferId: 5, teamId: 3, vote: 'veto' }),
+      );
+      // No auto-veto: the transaction path (reverseTradeSwapAndMarkVetoed) is
+      // never entered, so mockDb.transaction is never assigned in this test.
+      expect(mockDb.transaction).toBeUndefined();
+      expect(result.id).toBe(5);
+      expect(result.status).toBe('accepted');
+    });
+
+    it('auto-vetoes the trade when a strict majority of eligible teams vote to veto', async () => {
+      const vetoVotes = [
+        {
+          id: 1,
+          tradeOfferId: 5,
+          teamId: 3,
+          teamName: 'Team C',
+          vote: 'veto',
+          createdAt: new Date(),
+        },
+        {
+          id: 2,
+          tradeOfferId: 5,
+          teamId: 4,
+          teamName: 'Team D',
+          vote: 'veto',
+          createdAt: new Date(),
+        },
+      ];
+
+      // 1. requirePremium
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ tier: 'premium' }]);
+      // 2. trade fetch
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]);
+      // 3. membership lookup — caller's team (3) is not a party to the trade
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([
+        { teamId: 3, permissionLevel: 'general_manager' },
+      ]);
+      // 4. insert vote → no queue consumption (see above)
+
+      // 5. re-fetch current trade — still accepted
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]);
+      // 6a. fetchTradeVotesData: 2 veto votes — .where() terminal
+      mockDb.where.mockResolvedValueOnce(vetoVotes);
+      // 6b. team counts — .where() passthrough, .groupBy() terminal.
+      // 4 teams in the league → eligibleVoterCount = 2; 2 vetoes exceeds 1 → auto-veto
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.groupBy.mockResolvedValueOnce([{ leagueId: 1, total: 4 }]);
+
+      // reverseTradeSwapAndMarkVetoed: no player legs → skips the roster/matchup
+      // reversal work entirely, isolating this test to the majority-vote trigger.
+      mockDb.where.mockResolvedValueOnce([]);
+      const mockTx = {
+        update: jest.fn().mockReturnThis(),
+        set: jest.fn().mockReturnThis(),
+        where: jest.fn().mockResolvedValue(undefined),
+      };
+      mockDb.transaction = jest.fn(
+        async (cb: (tx: unknown) => Promise<unknown>) => cb(mockTx),
+      );
+
+      // postTradeSystemMessage (non-fatal, wrapped in try/catch) looks up both
+      // team names before inserting the league chat message.
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Team A' }]);
+      mockDb.where.mockReturnValueOnce(mockDb);
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Team B' }]);
+
+      // enrichTrade re-fetch chain
+      mockDb.where.mockReturnValueOnce(mockDb); // trade
+      mockDb.limit.mockResolvedValueOnce([acceptedTrade]);
+      mockDb.where.mockReturnValueOnce(mockDb); // proposing team
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Team A' }]);
+      mockDb.where.mockReturnValueOnce(mockDb); // receiving team
+      mockDb.limit.mockResolvedValueOnce([{ name: 'Team B' }]);
+      mockDb.where.mockResolvedValueOnce([]); // rawPlayers — terminal
+      mockDb.where.mockResolvedValueOnce([]); // votes (enrichTrade's own fetch) — terminal
+      mockDb.where.mockReturnValueOnce(mockDb); // team counts passthrough
+      mockDb.groupBy.mockResolvedValueOnce([{ leagueId: 1, total: 4 }]); // team counts terminal
+
+      const resolver = getResolver('mutation', 'voteOnTrade');
+      await resolver(
+        {},
+        { tradeId: 5, vote: 'veto' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.transaction).toHaveBeenCalled();
+      expect(mockTx.set).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'vetoed' }),
+      );
     });
   });
 });

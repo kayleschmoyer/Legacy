@@ -8,6 +8,15 @@ fragment TradeOfferPlayer on TradeOfferPlayer {
   salary
 }
 
+fragment TradeOfferVote on TradeOfferVote {
+  id
+  tradeOfferId
+  teamId
+  teamName
+  vote
+  createdAt
+}
+
 fragment TradeOffer on TradeOffer {
   id
   leagueId
@@ -22,7 +31,11 @@ fragment TradeOffer on TradeOffer {
   updatedAt
   proposingTeamName
   receivingTeamName
+  eligibleVoterCount
   players {
     ...TradeOfferPlayer
+  }
+  votes {
+    ...TradeOfferVote
   }
 }

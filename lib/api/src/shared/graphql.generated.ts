@@ -2186,6 +2186,8 @@ export type Mutation = {
   verifyGooglePurchase?: Maybe<GoogleVerifyResult>;
   /** Commissioner-only: veto an accepted trade, reversing the player swap. */
   vetoTrade?: Maybe<TradeOffer>;
+  /** Premium-league feature: cast a league member's vote (approve/veto) on an accepted trade during commissioner review. A strict majority of eligible teams voting to veto automatically reverses the trade, alongside the commissioner’s standalone veto power. */
+  voteOnTrade?: Maybe<TradeOffer>;
 };
 
 export type MutationAcceptTradeArgs = {
@@ -2887,6 +2889,11 @@ export type MutationVerifyGooglePurchaseArgs = {
 
 export type MutationVetoTradeArgs = {
   tradeId: Scalars['Int']['input'];
+};
+
+export type MutationVoteOnTradeArgs = {
+  tradeId: Scalars['Int']['input'];
+  vote: TradeVoteChoice;
 };
 
 /** The current user's vote for a specific award type */
@@ -4813,6 +4820,8 @@ export type TiebreakerRule = {
 export type TradeOffer = {
   __typename?: 'TradeOffer';
   createdAt?: Maybe<Scalars['String']['output']>;
+  /** The number of league teams eligible to vote on this trade (all teams except the trade's two participants). Null when the league does not support trade voting. */
+  eligibleVoterCount?: Maybe<Scalars['Int']['output']>;
   expiresAt?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
@@ -4826,6 +4835,8 @@ export type TradeOffer = {
   status?: Maybe<Scalars['String']['output']>;
   updatedAt?: Maybe<Scalars['String']['output']>;
   vetoedAt?: Maybe<Scalars['String']['output']>;
+  /** League-member votes cast on this trade during commissioner review (premium leagues). */
+  votes?: Maybe<Array<TradeOfferVote>>;
 };
 
 /** A single player leg of a trade offer */
@@ -4840,6 +4851,22 @@ export type TradeOfferPlayer = {
   salary?: Maybe<Scalars['Int']['output']>;
   tradeOfferId?: Maybe<Scalars['Int']['output']>;
 };
+
+/** A league member team's vote (approve/veto) on an accepted trade */
+export type TradeOfferVote = {
+  __typename?: 'TradeOfferVote';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['Int']['output']>;
+  teamId?: Maybe<Scalars['Int']['output']>;
+  teamName?: Maybe<Scalars['String']['output']>;
+  tradeOfferId?: Maybe<Scalars['Int']['output']>;
+  vote?: Maybe<Scalars['String']['output']>;
+};
+
+export enum TradeVoteChoice {
+  Approve = 'approve',
+  Veto = 'veto',
+}
 
 export type TwentyQuestionsAskInput = {
   category: TwentyQuestionsCategory;

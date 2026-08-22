@@ -12,7 +12,8 @@ import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, count, eq, gte, inArray, ne, or } from 'drizzle-orm';
 
-import { TradeOffer } from './types';
+import { TradeOffer, TradeVoteChoice } from './types';
+import { fetchTradeVotesData } from './votes';
 import {
   assertCapSpace,
   computeTeamPayroll,
@@ -30,7 +31,11 @@ import {
   UserInputError,
 } from '../graphql-errors';
 import { assertSportCompatibility } from '../sport-eligibility';
-import { requireEntitlement } from '../authorization';
+import {
+  requireAuth,
+  requireEntitlement,
+  requirePremium,
+} from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
 
 const TRADE_EXPIRATION_MIN_DAYS = 1;
@@ -100,12 +105,19 @@ async function enrichTrade(tradeId: number, context: Context) {
     rawPlayers.map((p) => p.playerId),
   );
 
+  const { votesByTrade, eligibleVoterCountByTrade } = await fetchTradeVotesData(
+    context.db,
+    [trade],
+  );
+
   return {
     ...trade,
     // Use snapshot captured at proposal time; fall back to current name for
     // older rows that predate these columns.
     proposingTeamName: trade.proposingTeamName ?? proposingTeam?.name ?? null,
     receivingTeamName: trade.receivingTeamName ?? receivingTeam?.name ?? null,
+    votes: votesByTrade.get(tradeId) ?? [],
+    eligibleVoterCount: eligibleVoterCountByTrade.get(tradeId) ?? null,
     players: rawPlayers.map(
       (p: {
         id: number;
@@ -1327,6 +1339,84 @@ builder.mutationField('cancelTrade', (t) =>
   }),
 );
 
+// ── Helper: reverse an accepted trade's player swap and mark it vetoed ────
+
+/**
+ * Reverses the roster swap performed by `acceptTrade` and flips the trade to
+ * `vetoed`. Shared by the commissioner's manual `vetoTrade` mutation and the
+ * automatic league-vote veto path in `voteOnTrade` (LS-6349) so both routes
+ * to a veto perform the identical atomic reversal.
+ */
+async function reverseTradeSwapAndMarkVetoed(
+  trade: typeof PublicSchema.tradeOffers.$inferSelect,
+  context: Context,
+): Promise<void> {
+  const db = context.db;
+
+  // Reverse the player swap: group legs by their original fromTeamId and
+  // bulk-update each group in one query.
+  const playerLegs = await db
+    .select()
+    .from(PublicSchema.tradeOfferPlayers)
+    .where(eq(PublicSchema.tradeOfferPlayers.tradeOfferId, trade.id));
+
+  const legsByFromTeam = new Map<number, number[]>();
+  for (const leg of playerLegs) {
+    let teamLegs = legsByFromTeam.get(leg.fromTeamId);
+    if (!teamLegs) {
+      teamLegs = [];
+      legsByFromTeam.set(leg.fromTeamId, teamLegs);
+    }
+    teamLegs.push(leg.playerId);
+  }
+
+  // Reverse roster swap + reverse matchup_players sync + trade status
+  // flip must be atomic so a partial failure cannot leave the trade
+  // marked accepted with rosters already reverted (or vice versa).
+  const tradeTeamIds = [trade.proposingTeamId, trade.receivingTeamId];
+  await db.transaction(async (tx) => {
+    await Promise.all(
+      [...legsByFromTeam.entries()].map(([fromTeamId, playerIds]) =>
+        tx
+          .update(PublicSchema.teamMembers)
+          .set({ teamId: fromTeamId, positionId: null })
+          .where(
+            and(
+              eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
+              inArray(PublicSchema.teamMembers.playerId, playerIds),
+            ),
+          ),
+      ),
+    );
+
+    // Reverse-propagate the swap into scheduled matchup_players so
+    // future-week lineups match the pre-trade rosters. The players were
+    // previously moved to the *opposite* team by acceptTrade; locate
+    // that team from the trade's two sides and hand each group back to
+    // its original owner. Locked matchups remain immutable.
+    await Promise.all(
+      [...legsByFromTeam.entries()].map(([originalFromTeamId, playerIds]) => {
+        const previousToTeamId = tradeTeamIds.find(
+          (id) => id !== originalFromTeamId,
+        );
+        if (previousToTeamId == null) return Promise.resolve();
+        return syncMatchupPlayersForTradeLeg(
+          tx,
+          trade.leagueId,
+          previousToTeamId,
+          originalFromTeamId,
+          playerIds,
+        );
+      }),
+    );
+
+    await tx
+      .update(PublicSchema.tradeOffers)
+      .set({ status: 'vetoed', vetoedAt: new Date() })
+      .where(eq(PublicSchema.tradeOffers.id, trade.id));
+  });
+}
+
 // ── Mutation: vetoTrade ───────────────────────────────────────────────────
 
 builder.mutationField('vetoTrade', (t) =>
@@ -1381,70 +1471,7 @@ builder.mutationField('vetoTrade', (t) =>
         );
       }
 
-      // Reverse the player swap: group legs by their original fromTeamId and
-      // bulk-update each group in one query.
-      const playerLegs = await db
-        .select()
-        .from(PublicSchema.tradeOfferPlayers)
-        .where(eq(PublicSchema.tradeOfferPlayers.tradeOfferId, args.tradeId));
-
-      const legsByFromTeam = new Map<number, number[]>();
-      for (const leg of playerLegs) {
-        let teamLegs = legsByFromTeam.get(leg.fromTeamId);
-        if (!teamLegs) {
-          teamLegs = [];
-          legsByFromTeam.set(leg.fromTeamId, teamLegs);
-        }
-        teamLegs.push(leg.playerId);
-      }
-
-      // Reverse roster swap + reverse matchup_players sync + trade status
-      // flip must be atomic so a partial failure cannot leave the trade
-      // marked accepted with rosters already reverted (or vice versa).
-      const tradeTeamIds = [trade.proposingTeamId, trade.receivingTeamId];
-      await db.transaction(async (tx) => {
-        await Promise.all(
-          [...legsByFromTeam.entries()].map(([fromTeamId, playerIds]) =>
-            tx
-              .update(PublicSchema.teamMembers)
-              .set({ teamId: fromTeamId, positionId: null })
-              .where(
-                and(
-                  eq(PublicSchema.teamMembers.leagueId, trade.leagueId),
-                  inArray(PublicSchema.teamMembers.playerId, playerIds),
-                ),
-              ),
-          ),
-        );
-
-        // Reverse-propagate the swap into scheduled matchup_players so
-        // future-week lineups match the pre-trade rosters. The players were
-        // previously moved to the *opposite* team by acceptTrade; locate
-        // that team from the trade's two sides and hand each group back to
-        // its original owner. Locked matchups remain immutable.
-        await Promise.all(
-          [...legsByFromTeam.entries()].map(
-            ([originalFromTeamId, playerIds]) => {
-              const previousToTeamId = tradeTeamIds.find(
-                (id) => id !== originalFromTeamId,
-              );
-              if (previousToTeamId == null) return Promise.resolve();
-              return syncMatchupPlayersForTradeLeg(
-                tx,
-                trade.leagueId,
-                previousToTeamId,
-                originalFromTeamId,
-                playerIds,
-              );
-            },
-          ),
-        );
-
-        await tx
-          .update(PublicSchema.tradeOffers)
-          .set({ status: 'vetoed', vetoedAt: new Date() })
-          .where(eq(PublicSchema.tradeOffers.id, args.tradeId));
-      });
+      await reverseTradeSwapAndMarkVetoed(trade, context);
 
       LOGGER.info('Trade vetoed by commissioner', {
         tradeId: args.tradeId,
@@ -1465,6 +1492,144 @@ builder.mutationField('vetoTrade', (t) =>
       );
 
       return enrichTrade(args.tradeId, context);
+    },
+  }),
+);
+
+// ── Mutation: voteOnTrade ──────────────────────────────────────────────────
+
+const TRADE_VOTE_VETO_MAJORITY_RATIO = 0.5;
+
+builder.mutationField('voteOnTrade', (t) =>
+  t.field({
+    type: TradeOffer,
+    description:
+      "Premium-league feature: cast a league member's vote (approve/veto) on " +
+      'an accepted trade during commissioner review. A strict majority of ' +
+      'eligible teams voting to veto automatically reverses the trade, ' +
+      'alongside the commissioner’s standalone veto power.',
+    args: {
+      tradeId: t.arg.int({ required: true }),
+      vote: t.arg({ type: TradeVoteChoice, required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      await requirePremium(context, 'League trade voting');
+
+      const userId = requireAuth(context).id;
+      const db = context.db;
+
+      const [trade] = await db
+        .select()
+        .from(PublicSchema.tradeOffers)
+        .where(eq(PublicSchema.tradeOffers.id, args.tradeId))
+        .limit(1);
+
+      if (!trade) throw NotFoundError('Trade offer not found');
+      if (trade.status !== 'accepted') {
+        throw UserInputError(
+          'Only accepted trades under commissioner review can be voted on',
+        );
+      }
+
+      // Verify the caller has an active team in this league.
+      const [membership] = await db
+        .select({
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, trade.leagueId),
+            eq(PublicSchema.leagueMembers.userId, userId),
+          ),
+        )
+        .limit(1);
+
+      if (
+        !membership?.teamId ||
+        !['general_manager', 'assistant_manager', 'commissioner'].includes(
+          membership.permissionLevel ?? '',
+        )
+      ) {
+        throw ForbiddenError(
+          'Only an active team manager in this league can vote on a trade',
+        );
+      }
+
+      // The two trade participants already made their decision by
+      // proposing/accepting — voting is for the rest of the league.
+      if (
+        membership.teamId === trade.proposingTeamId ||
+        membership.teamId === trade.receivingTeamId
+      ) {
+        throw ForbiddenError('Teams party to the trade cannot vote on it');
+      }
+
+      await db
+        .insert(PublicSchema.tradeOfferVotes)
+        .values({
+          tradeOfferId: trade.id,
+          teamId: membership.teamId,
+          vote: args.vote,
+        })
+        .onConflictDoUpdate({
+          target: [
+            PublicSchema.tradeOfferVotes.tradeOfferId,
+            PublicSchema.tradeOfferVotes.teamId,
+          ],
+          set: { vote: args.vote },
+        });
+
+      LOGGER.info('League member voted on trade', {
+        tradeId: trade.id,
+        teamId: membership.teamId,
+        vote: args.vote,
+        leagueId: trade.leagueId,
+      });
+
+      // Re-fetch the trade in case a concurrent vote already resolved it.
+      const [currentTrade] = await db
+        .select()
+        .from(PublicSchema.tradeOffers)
+        .where(eq(PublicSchema.tradeOffers.id, trade.id))
+        .limit(1);
+
+      if (currentTrade?.status === 'accepted') {
+        const { votesByTrade, eligibleVoterCountByTrade } =
+          await fetchTradeVotesData(db, [currentTrade]);
+        const votes = votesByTrade.get(trade.id) ?? [];
+        const eligibleVoterCount = eligibleVoterCountByTrade.get(trade.id) ?? 0;
+        const vetoVotes = votes.filter((v) => v.vote === 'veto').length;
+
+        if (
+          eligibleVoterCount > 0 &&
+          vetoVotes > eligibleVoterCount * TRADE_VOTE_VETO_MAJORITY_RATIO
+        ) {
+          await reverseTradeSwapAndMarkVetoed(currentTrade, context);
+
+          LOGGER.info('Trade auto-vetoed by league majority vote', {
+            tradeId: trade.id,
+            leagueId: trade.leagueId,
+            vetoVotes,
+            eligibleVoterCount,
+          });
+
+          await postTradeSystemMessage(
+            'vetoed',
+            {
+              leagueId: trade.leagueId,
+              tradeId: trade.id,
+              proposingTeamId: trade.proposingTeamId,
+              receivingTeamId: trade.receivingTeamId,
+              actingUserId: userId,
+            },
+            context,
+          );
+        }
+      }
+
+      return enrichTrade(trade.id, context);
     },
   }),
 );

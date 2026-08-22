@@ -10,6 +10,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
 
 import { TradeOffer } from './types';
+import { fetchTradeVotesData } from './votes';
 import { requireAuth, verifyLeagueMembership } from '../authorization';
 import { builder, type Context } from '../builder';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
@@ -121,6 +122,11 @@ async function hydrateTrades(
     });
   }
 
+  const { votesByTrade, eligibleVoterCountByTrade } = await fetchTradeVotesData(
+    context.db,
+    rawTrades,
+  );
+
   return rawTrades.map((trade) => ({
     ...trade,
     // Use snapshot captured at proposal time; fall back to current team name
@@ -134,6 +140,8 @@ async function hydrateTrades(
       (teamNameMap[trade.receivingTeamId] as string | undefined) ??
       null,
     players: playersByTrade[trade.id] ?? [],
+    votes: votesByTrade.get(trade.id) ?? [],
+    eligibleVoterCount: eligibleVoterCountByTrade.get(trade.id) ?? null,
   }));
 }
 

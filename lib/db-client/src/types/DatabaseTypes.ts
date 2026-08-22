@@ -48,6 +48,7 @@ import {
   teams,
   tradeOfferPlayers,
   tradeOffers,
+  tradeOfferVotes,
   userIdentities,
   users,
 } from '../drizzle/public/schema';
@@ -111,6 +112,8 @@ export type TradeOffer = typeof tradeOffers.$inferSelect;
 export type TradeOfferPlayer = typeof tradeOfferPlayers.$inferSelect;
 export type CreateTradeOfferInput = typeof tradeOffers.$inferInsert;
 export type CreateTradeOfferPlayerInput = typeof tradeOfferPlayers.$inferInsert;
+export type TradeOfferVote = typeof tradeOfferVotes.$inferSelect;
+export type CreateTradeOfferVoteInput = typeof tradeOfferVotes.$inferInsert;
 export type DraftSlotTrade = typeof draftSlotTrades.$inferSelect;
 export type CreateDraftSlotTradeInput = typeof draftSlotTrades.$inferInsert;
 export type LeagueMember = typeof leagueMembers.$inferSelect;
