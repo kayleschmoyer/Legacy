@@ -12,10 +12,8 @@ import {
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { lastVisitedLeaguePath } from '@legacy-sports/shared-components/utils';
-import {
-  LoginPage as AuthCard,
-  BrandLogo,
-} from '@legacy-sports/shared-components';
+import { LoginPage as AuthCard } from '@legacy-sports/shared-components/auth';
+import { BrandLogo } from '@legacy-sports/shared-components/ui';
 import {
   useGetOnThisDayQuery,
   useGetPlayerCountQuery,

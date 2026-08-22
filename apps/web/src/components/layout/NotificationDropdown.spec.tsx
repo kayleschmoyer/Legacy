@@ -67,10 +67,6 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({ isAuthenticated: true, token: 'test-token' }),
 }));
 
-jest.mock('@legacy-sports/shared-components', () => ({
-  useWebSocket: (opts: UseWebSocketOptions): unknown => mockUseWebSocket(opts),
-}));
-
 jest.mock('../../config/environment', () => ({
   env: { websocketUrl: 'wss://test.example.com' },
 }));
@@ -115,12 +111,16 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
   const Passthrough = ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   );
-  return new Proxy(
-    {},
-    {
-      get: () => Passthrough,
-    },
-  );
+  // useWebSocket (LS-9421) moved into this subpath — route it to the mock
+  // instead of falling through to the Passthrough component stub below.
+  const target = {
+    useWebSocket: (opts: UseWebSocketOptions): unknown =>
+      mockUseWebSocket(opts),
+  };
+  return new Proxy(target, {
+    get: (obj, prop) =>
+      prop in obj ? obj[prop as keyof typeof obj] : Passthrough,
+  });
 });
 
 jest.mock('./NavDropdownShared', () => ({

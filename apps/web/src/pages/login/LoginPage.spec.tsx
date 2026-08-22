@@ -40,6 +40,13 @@ jest.mock('@legacy-sports/logging', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/ui', () => ({
+  // BrandLogo (LS-9421) is used for real by both this page and the shared
+  // AuthCard — preserve the real implementation via requireActual rather
+  // than stub it, matching this suite's prior behaviour when it came from
+  // the (unmocked) root barrel.
+  ...jest.requireActual<typeof import('@legacy-sports/shared-components/ui')>(
+    '@legacy-sports/shared-components/ui',
+  ),
   OAuthProvider: {
     configure: jest.fn(() => Promise.resolve()),
     signIn: jest.fn(),
@@ -58,6 +65,11 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
 // throws synchronously to model a hot-swapped config — see LS-6687).
 let mockAuthConfig: Record<string, unknown> = {};
 jest.mock('@legacy-sports/shared-components/auth', () => ({
+  // AuthCard (the real shared LoginPage, LS-9421) is rendered for real by
+  // this suite — preserve it via requireActual, same rationale as /ui above.
+  ...jest.requireActual<typeof import('@legacy-sports/shared-components/auth')>(
+    '@legacy-sports/shared-components/auth',
+  ),
   useAuth: () => ({
     config: mockAuthConfig,
     login: mockLogin,

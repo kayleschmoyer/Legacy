@@ -27,6 +27,8 @@ export * from '../components/MatchupCard';
 export * from '../components/Table';
 export * from '../features/common/SearchBar';
 export * from '../hooks/useThemeTokens';
+export * from '../hooks/useWebSocket';
+export * from '../components/branding';
 export {
   OAuthProvider,
   SecureStorageProvider,

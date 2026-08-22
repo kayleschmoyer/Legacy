@@ -4,7 +4,7 @@ import { useApolloClient } from '@apollo/client/react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { useWebSocket } from '@legacy-sports/shared-components';
+import { useWebSocket } from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import { Button, Spinner, styled } from 'tamagui';
 import { Bell } from '@tamagui/lucide-icons/icons/Bell';
