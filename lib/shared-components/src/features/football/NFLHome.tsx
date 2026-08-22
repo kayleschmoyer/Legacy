@@ -576,7 +576,13 @@ function NFLHome({
         </XStack>
 
         {/* This week's matchup highlight (LS-5407) — shown only when a
-            league has an active/upcoming matchup scheduled. */}
+            league has an active/upcoming matchup scheduled.
+            LS-6266 / FBH-012: if a premium-only sub-feature is ever added
+            here (e.g. live scoring vs. a cached score), gate it with
+            `useHasEntitlement` from `../../hooks/useEntitlement` right in
+            this component. Do not resolve `isPremium` per platform in
+            apps/web and apps/app and pass it down as a prop — that's the
+            duplication already seen with `MLBHome.isPremium`. */}
         {matchupHighlight ? (
           <YStack gap="$3" testID="matchup-highlight-card">
             <H2 color="$color" fontSize="$7" fontWeight="700">

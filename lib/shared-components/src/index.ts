@@ -172,6 +172,10 @@ export * from './hooks/useWebSocket';
 // Reduced-motion detection (web: matchMedia; native/SSR: always false)
 export * from './hooks/useReducedMotion';
 
+// Shared entitlement gate (LS-6266 / FBH-012) — checks premium entitlements
+// inside shared components instead of duplicating the check per platform.
+export * from './hooks/useEntitlement';
+
 // Tamagui config - should be imported directly by consumers
 // export { tamaguiConfig } from '@legacy-sports/tamagui-config';
 

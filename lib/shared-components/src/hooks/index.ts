@@ -1,4 +1,5 @@
 export * from './useDraftData';
+export * from './useEntitlement';
 export * from './useAISuggestions';
 export * from './useVoiceCommands';
 export * from './useDragAndDrop';
