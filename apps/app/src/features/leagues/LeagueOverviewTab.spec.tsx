@@ -18,8 +18,9 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
+  const { View, Text } = jest.requireActual<RNComponents>('react-native');
   return {
+    Chip: ({ label }: { label: string }) => <Text>{label}</Text>,
     LeagueActivityFeed: () => <View testID="league-activity-feed" />,
     LeagueScoringSummary: () => <View testID="league-scoring-summary" />,
     OnThisDayFeed: () => <View testID="on-this-day-feed" />,
@@ -272,5 +273,61 @@ describe('LeagueOverviewTab', () => {
 
     fireEvent.press(screen.getByText('Share'));
     expect(onInviteShare).toHaveBeenCalledTimes(1);
+  });
+
+  it('omits the Premium Configuration section for a plain league', () => {
+    render(<LeagueOverviewTab {...BASE_PROPS} />);
+    expect(screen.queryByText('Premium Configuration')).toBeNull();
+  });
+
+  it('renders a chip for each active premium feature (LS-6330)', () => {
+    render(
+      <LeagueOverviewTab
+        {...BASE_PROPS}
+        league={{
+          ...BASE_PROPS.league,
+          sport: Sport.Football,
+          waiverEnabled: true,
+          waiverType: 'faab',
+          salaryCapEnabled: true,
+          playoffFormat: '6-team',
+          defensiveFormat: 'idp',
+        }}
+      />,
+    );
+    expect(screen.getByText('Premium Configuration')).toBeTruthy();
+    expect(screen.getByText('FAAB')).toBeTruthy();
+    expect(screen.getByText('Salary Cap')).toBeTruthy();
+    expect(screen.getByText('6-Team Playoff')).toBeTruthy();
+    expect(screen.getByText('IDP')).toBeTruthy();
+  });
+
+  it('omits the IDP chip for a baseball league (defensiveFormat is football-only)', () => {
+    render(
+      <LeagueOverviewTab
+        {...BASE_PROPS}
+        league={{
+          ...BASE_PROPS.league,
+          sport: Sport.Baseball,
+          defensiveFormat: 'idp',
+        }}
+      />,
+    );
+    expect(screen.queryByText('Premium Configuration')).toBeNull();
+    expect(screen.queryByText('IDP')).toBeNull();
+  });
+
+  it('does not render a FAAB chip when waivers are disabled', () => {
+    render(
+      <LeagueOverviewTab
+        {...BASE_PROPS}
+        league={{
+          ...BASE_PROPS.league,
+          waiverEnabled: false,
+          waiverType: 'faab',
+        }}
+      />,
+    );
+    expect(screen.queryByText('FAAB')).toBeNull();
   });
 });

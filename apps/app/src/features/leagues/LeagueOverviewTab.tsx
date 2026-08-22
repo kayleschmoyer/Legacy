@@ -3,6 +3,7 @@ import { Alert, type RefreshControlProps, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
+  Chip,
   LeagueActivityFeed,
   LeagueScoringSummary,
   OnThisDayFeed,
@@ -36,6 +37,35 @@ interface OverviewLeague {
   currentWeekNumber?: number | null;
   inviteCode?: string | null;
   sport?: string | null;
+  waiverEnabled?: boolean | null;
+  waiverType?: string | null;
+  salaryCapEnabled?: boolean | null;
+  playoffFormat?: string | null;
+  defensiveFormat?: string | null;
+}
+
+/**
+ * Premium league-configuration chips (FLD-007) — the Overview tab otherwise
+ * gives a premium user no visual anchor for which paid features are active
+ * on the league (FAAB waivers, salary cap, an advanced playoff bracket, IDP
+ * defense). Returns an empty array for a plain/free-tier league so the card
+ * stays hidden rather than rendering an empty shell.
+ */
+function buildLeagueConfigChips(league: OverviewLeague): string[] {
+  const chips: string[] = [];
+  if (league.waiverEnabled && league.waiverType === 'faab') {
+    chips.push('FAAB');
+  }
+  if (league.salaryCapEnabled) {
+    chips.push('Salary Cap');
+  }
+  if (league.playoffFormat === '6-team' || league.playoffFormat === '8-team') {
+    chips.push(`${league.playoffFormat === '6-team' ? '6' : '8'}-Team Playoff`);
+  }
+  if (league.sport === Sport.Football && league.defensiveFormat === 'idp') {
+    chips.push('IDP');
+  }
+  return chips;
 }
 
 interface LeagueOverviewTabProps {
@@ -196,6 +226,7 @@ export function LeagueOverviewTab({
 }: LeagueOverviewTabProps): React.JSX.Element {
   const { bottom: bottomInset } = useSafeAreaInsets();
   const isFootball = league.sport === Sport.Football;
+  const configChips = buildLeagueConfigChips(league);
 
   const stats = [
     { label: 'Teams', value: String(rankedStandings.length || '—') },
@@ -428,6 +459,23 @@ export function LeagueOverviewTab({
         {/* On This Day — already renders its own bordered surface + header,
             so it is not re-wrapped in an OverviewSection here. */}
         <OnThisDayFeed onPlayerPress={onPlayerPress} />
+
+        {/* Premium Configuration — chip summary of active paid features so a
+            premium league has a visible anchor for its "what I'm paying for"
+            value prop (FLD-007). Placed alongside Invite Friends since both
+            are ownership-flavored, low-frequency-interaction cards. */}
+        {configChips.length > 0 ? (
+          <OverviewSection
+            title="Premium Configuration"
+            sub="Paid features active in this league"
+          >
+            <XStack flexWrap="wrap" gap="$2">
+              {configChips.map((label) => (
+                <Chip key={label} label={label} tone="gold" />
+              ))}
+            </XStack>
+          </OverviewSection>
+        ) : null}
 
         {/* Invite (commissioner only) */}
         {isCommissioner ? (
