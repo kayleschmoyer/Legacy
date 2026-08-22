@@ -193,6 +193,16 @@ const NULL_SPORT_LEAGUE = {
   weekAdvanceStatus: null,
 };
 
+const MOCK_DRAFT_LEAGUE = {
+  id: 30,
+  name: 'Mock Draft Sandbox',
+  sport: 'football',
+  isMockDraft: true,
+  draftStatus: null,
+  currentWeekNumber: null,
+  weekAdvanceStatus: null,
+};
+
 describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -256,6 +266,21 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
         'leagues:Grid Iron Legends,Touchdown Club,Legacy League',
       ),
     ).toBeTruthy();
+  });
+
+  it('excludes mock-draft leagues client-side as defence in depth (FBH-007)', () => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [...FOOTBALL_LEAGUES, MOCK_DRAFT_LEAGUE],
+        userLeagueCount: FOOTBALL_LEAGUES.length + 1,
+      },
+      loading: false,
+    });
+    render(<FootballHomeScreen />);
+    expect(
+      screen.getByText('leagues:Grid Iron Legends,Touchdown Club'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Mock Draft Sandbox/)).toBeNull();
   });
 
   describe('create league — free-tier cap enforcement (LS-5025)', () => {
