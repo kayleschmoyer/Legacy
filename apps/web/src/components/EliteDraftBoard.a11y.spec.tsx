@@ -81,22 +81,35 @@ jest.mock('tamagui', () => {
 
 // ---------------------------------------------------------------------------
 // EliteDraftBoardScreen (in shared-components) calls useAuth() internally via
-// a relative import.  Mock the auth barrel so the component gets a fake user
-// without requiring a full AuthProvider tree.
+// a *relative* import (`../../features/auth`), not the public
+// `@legacy-sports/shared-components/auth` entry point — so neither a
+// hardcoded relative filesystem path (workspace package resolution can point
+// at a different physical `lib/shared-components` checkout than this repo's
+// own, per-worktree — LS-9518) nor mocking the public entry point (a
+// *different* file that merely re-exports the barrel) actually intercepts
+// it: Jest only mocks the exact resolved file it's given. Derive the
+// barrel's absolute path the same way Node/Jest would — relative to the
+// public entry point's own resolved location — so the mock always targets
+// whichever physical copy of shared-components is actually in play.
 // ---------------------------------------------------------------------------
-jest.mock('../../../../lib/shared-components/src/features/auth', () => ({
-  useAuth: () => ({
-    isAuthenticated: true,
-    isLoading: false,
-    user: {
-      id: 1,
-      username: 'testuser',
-      email: 'test@test.com',
-      accessLevel: 'none',
-    },
-    logout: jest.fn(),
+jest.mock(
+  require
+    .resolve('@legacy-sports/shared-components/auth')
+    .replace(/([\\/])entry\1auth\.ts$/, '$1features$1auth'),
+  () => ({
+    useAuth: () => ({
+      isAuthenticated: true,
+      isLoading: false,
+      user: {
+        id: 1,
+        username: 'testuser',
+        email: 'test@test.com',
+        accessLevel: 'none',
+      },
+      logout: jest.fn(),
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Apollo mock — every useQuery returns all possible top-level fields so the
