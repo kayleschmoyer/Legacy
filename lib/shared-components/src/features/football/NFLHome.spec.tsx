@@ -114,6 +114,29 @@ describe('NFLHome — leagues list virtualization (LS-6257)', () => {
   });
 });
 
+describe('NFLHome — CTA copy consistency (LS-6268, FBH-014)', () => {
+  // Native, web full hero, and web compact hero all render through this one
+  // shared hero — there is no separate compact variant to diverge from "Create
+  // League" the way the pre-LS-7819 web-only FootballLandingPage could.
+  it('renders "Create League" on the hero CTA for a returning user with leagues', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(2)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    const button = screen.getByTestId('create-league-button');
+    expect(within(button).getByText('Create League')).toBeInTheDocument();
+  });
+
+  it('renders "Create League" on the hero CTA for a first-time user with no leagues', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    const button = screen.getByTestId('create-league-button');
+    expect(within(button).getByText('Create League')).toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — league row metadata (LS-6256)', () => {
   it('renders the roster size under the league name when maxRosterSize is present', () => {
     const league: NFLHomeLeague = {
