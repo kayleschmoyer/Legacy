@@ -59,28 +59,11 @@ const MOCK_MATCHUP = {
   selectedGamesCount: 1,
   startTime: null,
   endTime: null,
+  // getMatchupById returns team1/team2 directly (LS-6265) — the highlight
+  // hook reads team names from here, no separate leagueTeams query.
+  team1: { __typename: 'Team', id: 1, name: 'Highlight Home Team' },
+  team2: { __typename: 'Team', id: 2, name: 'Highlight Away Team' },
 };
-
-const MOCK_TEAMS = [
-  {
-    __typename: 'Team',
-    id: 1,
-    name: 'Highlight Home Team',
-    owner: 1,
-    leagueId: FOOTBALL_LEAGUE_ID,
-    waiverOrder: 1,
-    faabBudget: 100,
-  },
-  {
-    __typename: 'Team',
-    id: 2,
-    name: 'Highlight Away Team',
-    owner: 2,
-    leagueId: FOOTBALL_LEAGUE_ID,
-    waiverOrder: 2,
-    faabBudget: 100,
-  },
-];
 
 async function mockFootballHome(
   page: import('@playwright/test').Page,
@@ -99,8 +82,6 @@ async function mockFootballHome(
       fulfillJson(route, {
         data: { getMatchupById: withMatchup ? MOCK_MATCHUP : null },
       }),
-    getleagueteams: (route) =>
-      fulfillJson(route, { data: { leagueTeams: MOCK_TEAMS } }),
   });
 }
 
@@ -112,7 +93,9 @@ test.describe('Football Home — matchup highlight card @regression', () => {
     await page.goto('/football');
     await page.waitForLoadState('load');
 
-    const card = page.getByTestId('matchup-highlight-card');
+    const card = page.getByTestId(
+      `matchup-highlight-card-${FOOTBALL_LEAGUE_ID}`,
+    );
     await expect(card).toBeVisible({ timeout: 10_000 });
     await expect(card).toContainText('Highlight Home Team');
     await expect(card).toContainText('Highlight Away Team');
@@ -129,6 +112,6 @@ test.describe('Football Home — matchup highlight card @regression', () => {
     await expect(page.getByTestId('football-screen')).toBeVisible({
       timeout: 10_000,
     });
-    await expect(page.getByTestId('matchup-highlight-card')).toHaveCount(0);
+    await expect(page.getByTestId('matchup-highlight-section')).toHaveCount(0);
   });
 });

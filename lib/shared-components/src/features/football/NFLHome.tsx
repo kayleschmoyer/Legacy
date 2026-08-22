@@ -47,10 +47,13 @@ interface LeaguesListProps {
 }
 
 /**
- * This week's highlighted matchup for a football league (LS-5407). Surfaced
- * on Football Home so a manager mid-season can see who they're playing
- * without opening the league. Omitted/undefined when no league has an
- * active or upcoming matchup scheduled.
+ * A single league's highlighted matchup for this week (LS-5407). Surfaced on
+ * Football Home so a manager mid-season can see who they're playing without
+ * opening the league. `NFLHomeProps.matchupHighlights` carries one of these
+ * per league that has an active/upcoming matchup — previously only the
+ * first such league (in whatever order the API happened to return leagues)
+ * was ever shown, silently hiding matchups for a multi-league user's other
+ * leagues with no rule governing which one "won" (LS-6265 / FBH-011).
  */
 export interface NFLHomeMatchupHighlight {
   leagueId: string | number;
@@ -92,8 +95,11 @@ export interface NFLHomeProps {
   /** Top/trending players preview (LS-5411). Omit to hide the section entirely. */
   trendingPlayers?: FootballPlayerCardPlayer[];
   trendingPlayersLoading?: boolean;
-  /** This week's matchup to highlight (LS-5407). Hidden when absent. */
-  matchupHighlight?: NFLHomeMatchupHighlight | null;
+  /**
+   * This week's matchup highlights (LS-5407), one per league that has an
+   * active/upcoming matchup (LS-6265). Section is hidden when empty.
+   */
+  matchupHighlights?: NFLHomeMatchupHighlight[];
   /**
    * When provided, renders a compact in-page sport switcher (LS-5412),
    * mirroring the Baseball -> Football switcher (LS-5815). Called with the
@@ -370,7 +376,7 @@ function NFLHome({
   onSignIn,
   trendingPlayers,
   trendingPlayersLoading = false,
-  matchupHighlight,
+  matchupHighlights = [],
   onSwitchSport,
   refreshControl,
   leagueCap,
@@ -575,26 +581,45 @@ function NFLHome({
           </YStack>
         </XStack>
 
-        {/* This week's matchup highlight (LS-5407) — shown only when a
-            league has an active/upcoming matchup scheduled.
+        {/* This week's matchup highlights (LS-5407) — one card per league
+            with an active/upcoming matchup, so a multi-league manager sees
+            every matchup that needs them this week instead of an
+            arbitrarily-chosen single one (LS-6265 / FBH-011).
             LS-6266 / FBH-012: if a premium-only sub-feature is ever added
             here (e.g. live scoring vs. a cached score), gate it with
             `useHasEntitlement` from `../../hooks/useEntitlement` right in
             this component. Do not resolve `isPremium` per platform in
             apps/web and apps/app and pass it down as a prop — that's the
             duplication already seen with `MLBHome.isPremium`. */}
-        {matchupHighlight ? (
-          <YStack gap="$3" testID="matchup-highlight-card">
+        {matchupHighlights.length > 0 ? (
+          <YStack gap="$3" testID="matchup-highlight-section">
             <H2 color="$color" fontSize="$7" fontWeight="700">
-              This Week's Matchup
+              {matchupHighlights.length > 1
+                ? "This Week's Matchups"
+                : "This Week's Matchup"}
             </H2>
-            <MatchupCard
-              away={{ name: matchupHighlight.awayTeamName }}
-              home={{ name: matchupHighlight.homeTeamName }}
-              status={matchupHighlight.status ?? 'pre'}
-              week={`Week ${matchupHighlight.weekNumber}`}
-              onPress={matchupHighlight.onPress}
-            />
+            <YStack gap="$3">
+              {matchupHighlights.map((highlight) => (
+                <YStack
+                  key={highlight.leagueId}
+                  gap="$2"
+                  testID={`matchup-highlight-card-${highlight.leagueId}`}
+                >
+                  {matchupHighlights.length > 1 && highlight.leagueName ? (
+                    <Text color="$gray10" fontSize="$3" fontWeight="600">
+                      {highlight.leagueName}
+                    </Text>
+                  ) : null}
+                  <MatchupCard
+                    away={{ name: highlight.awayTeamName }}
+                    home={{ name: highlight.homeTeamName }}
+                    status={highlight.status ?? 'pre'}
+                    week={`Week ${highlight.weekNumber}`}
+                    onPress={highlight.onPress}
+                  />
+                </YStack>
+              ))}
+            </YStack>
           </YStack>
         ) : null}
 

@@ -10,14 +10,13 @@
  *   5. The cap counts leagues across all sports (not just football).
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useNavigate } from 'react-router-dom';
+import { useApolloClient } from '@apollo/client/react';
 import { NFLHome } from '@legacy-sports/shared-components/football';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   useFootballPlayersQuery,
-  useGetLeagueTeamsQuery,
-  useGetMatchupByIdQuery,
   useGetUserLeaguesQuery,
 } from '@legacy-sports/graphql';
 import { FootballHubPage } from './FootballHubPage';
@@ -40,6 +39,7 @@ jest.mock('../../components/UpgradeModal', () => ({ UpgradeModal: jest.fn() }));
 jest.mock('../../hooks/useIsPremium', () => ({
   useIsPremiumStatus: jest.fn(),
 }));
+jest.mock('@apollo/client/react', () => ({ useApolloClient: jest.fn() }));
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
   MatchupStatus: {
@@ -48,10 +48,9 @@ jest.mock('@legacy-sports/graphql', () => ({
     InProgress: 'in_progress',
     Scheduled: 'scheduled',
   },
+  GetMatchupById: 'GetMatchupById-document',
   useGetUserLeaguesQuery: jest.fn(),
   useFootballPlayersQuery: jest.fn(),
-  useGetMatchupByIdQuery: jest.fn(),
-  useGetLeagueTeamsQuery: jest.fn(),
 }));
 
 const mockNavigate = useNavigate as jest.MockedFunction<typeof useNavigate>;
@@ -69,10 +68,23 @@ const mockUseFootballPlayersQuery =
   useFootballPlayersQuery as jest.MockedFunction<
     typeof useFootballPlayersQuery
   >;
-const mockUseGetMatchupByIdQuery =
-  useGetMatchupByIdQuery as jest.MockedFunction<typeof useGetMatchupByIdQuery>;
-const mockUseGetLeagueTeamsQuery =
-  useGetLeagueTeamsQuery as jest.MockedFunction<typeof useGetLeagueTeamsQuery>;
+const mockUseApolloClient = useApolloClient as jest.MockedFunction<
+  typeof useApolloClient
+>;
+
+// Maps a matchup id (the `variables.id` passed to `client.query`) to the
+// `getMatchupById` payload to resolve with. Configured per-test.
+let matchupsById: Record<number, unknown>;
+
+function mockClientQuery({
+  variables,
+}: {
+  variables: { id: number };
+}): Promise<{ data: { getMatchupById: unknown } }> {
+  return Promise.resolve({
+    data: { getMatchupById: matchupsById[variables.id] ?? null },
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -137,16 +149,10 @@ beforeEach(() => {
     isPremium: false,
     isLoading: false,
   });
-  mockUseGetMatchupByIdQuery.mockReturnValue({
-    data: undefined,
-    loading: false,
-    error: undefined,
-  } as ReturnType<typeof useGetMatchupByIdQuery>);
-  mockUseGetLeagueTeamsQuery.mockReturnValue({
-    data: undefined,
-    loading: false,
-    error: undefined,
-  } as ReturnType<typeof useGetLeagueTeamsQuery>);
+  matchupsById = {};
+  mockUseApolloClient.mockReturnValue({
+    query: jest.fn(mockClientQuery),
+  } as unknown as ReturnType<typeof useApolloClient>);
   setLeagues([]);
   mockUseFootballPlayersQuery.mockReturnValue({
     data: { footballPlayers: { nodes: [], pageInfo: {} } },
@@ -316,38 +322,31 @@ describe('FootballHubPage — null-sport league handling (FBH-001)', () => {
   });
 });
 
-describe('FootballHubPage — matchup highlight wiring (LS-5407)', () => {
-  it('passes a matchupHighlight with both team names and the week when the league has a scheduled matchup', () => {
+describe('FootballHubPage — matchup highlight wiring (LS-5407, LS-6265)', () => {
+  it('passes a matchupHighlights entry with both team names and the week when the league has a scheduled matchup', async () => {
     setLeagues([{ ...leaguesOfCount(1)[0], id: 1, currentMatchup: 10 }]);
-    mockUseGetMatchupByIdQuery.mockReturnValue({
-      data: {
-        getMatchupById: {
-          id: 10,
-          leagueId: 1,
-          weekNumber: 3,
-          team1Id: 1,
-          team2Id: 2,
-          status: 'scheduled',
-        },
+    matchupsById = {
+      10: {
+        id: 10,
+        leagueId: 1,
+        weekNumber: 3,
+        status: 'scheduled',
+        team1: { id: 1, name: 'Alpha Offense' },
+        team2: { id: 2, name: 'Beta Defense' },
       },
-      loading: false,
-      error: undefined,
-    } as ReturnType<typeof useGetMatchupByIdQuery>);
-    mockUseGetLeagueTeamsQuery.mockReturnValue({
-      data: {
-        leagueTeams: [
-          { id: 1, name: 'Alpha Offense' },
-          { id: 2, name: 'Beta Defense' },
-        ],
-      },
-      loading: false,
-      error: undefined,
-    } as ReturnType<typeof useGetLeagueTeamsQuery>);
+    };
 
     render(<FootballHubPage />);
 
-    const highlight = mockNFLHome.mock.calls[0][0].matchupHighlight;
+    await waitFor(() => {
+      const calls = mockNFLHome.mock.calls;
+      expect(calls[calls.length - 1][0].matchupHighlights).toHaveLength(1);
+    });
+    const highlight =
+      mockNFLHome.mock.calls[mockNFLHome.mock.calls.length - 1][0]
+        .matchupHighlights?.[0];
     expect(highlight).toMatchObject({
+      leagueId: 1,
       weekNumber: 3,
       awayTeamName: 'Beta Defense',
       homeTeamName: 'Alpha Offense',
@@ -355,12 +354,56 @@ describe('FootballHubPage — matchup highlight wiring (LS-5407)', () => {
     });
   });
 
-  it('passes null matchupHighlight when no league has a current matchup', () => {
+  it('passes an empty matchupHighlights array when no league has a current matchup', () => {
     setLeagues([{ ...leaguesOfCount(1)[0], id: 1, currentMatchup: null }]);
 
     render(<FootballHubPage />);
 
-    const highlight = mockNFLHome.mock.calls[0][0].matchupHighlight;
-    expect(highlight).toBeNull();
+    const highlights = mockNFLHome.mock.calls[0][0].matchupHighlights;
+    expect(highlights).toEqual([]);
+  });
+
+  it('passes one matchupHighlights entry per league that has a scheduled matchup (LS-6265)', async () => {
+    setLeagues([
+      { ...leaguesOfCount(1)[0], id: 1, name: 'League 1', currentMatchup: 10 },
+      { ...leaguesOfCount(1)[0], id: 2, name: 'League 2', currentMatchup: 11 },
+    ]);
+    matchupsById = {
+      10: {
+        id: 10,
+        leagueId: 1,
+        weekNumber: 3,
+        status: 'scheduled',
+        team1: { id: 1, name: 'Alpha Offense' },
+        team2: { id: 2, name: 'Beta Defense' },
+      },
+      11: {
+        id: 11,
+        leagueId: 2,
+        weekNumber: 3,
+        status: 'in_progress',
+        team1: { id: 3, name: 'Gamma Squad' },
+        team2: { id: 4, name: 'Delta Crew' },
+      },
+    };
+
+    render(<FootballHubPage />);
+
+    await waitFor(() => {
+      const calls = mockNFLHome.mock.calls;
+      expect(calls[calls.length - 1][0].matchupHighlights).toHaveLength(2);
+    });
+    const highlights =
+      mockNFLHome.mock.calls[mockNFLHome.mock.calls.length - 1][0]
+        .matchupHighlights ?? [];
+    expect(highlights.map((h) => h.leagueId)).toEqual(
+      expect.arrayContaining([1, 2]),
+    );
+    const secondLeagueHighlight = highlights.find((h) => h.leagueId === 2);
+    expect(secondLeagueHighlight).toMatchObject({
+      status: 'live',
+      awayTeamName: 'Delta Crew',
+      homeTeamName: 'Gamma Squad',
+    });
   });
 });

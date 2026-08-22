@@ -490,7 +490,7 @@ describe('NFLHome — hero layout stability (LS-6277 / FBH-023)', () => {
   });
 });
 
-describe('NFLHome — matchup highlight card (LS-5407)', () => {
+describe('NFLHome — matchup highlight cards (LS-5407, LS-6265)', () => {
   it('renders the highlight card with both team names and the week when a matchup is scheduled', () => {
     const league: NFLHomeLeague = {
       id: 1,
@@ -503,25 +503,29 @@ describe('NFLHome — matchup highlight card (LS-5407)', () => {
         leagues={[league]}
         onCreateLeague={noop}
         onViewLeague={noop}
-        matchupHighlight={{
-          leagueId: 1,
-          leagueName: 'Test Football League',
-          weekNumber: 3,
-          awayTeamName: 'Alpha Offense',
-          homeTeamName: 'Beta Defense',
-          status: 'pre',
-        }}
+        matchupHighlights={[
+          {
+            leagueId: 1,
+            leagueName: 'Test Football League',
+            weekNumber: 3,
+            awayTeamName: 'Alpha Offense',
+            homeTeamName: 'Beta Defense',
+            status: 'pre',
+          },
+        ]}
       />,
     );
 
-    const card = screen.getByTestId('matchup-highlight-card');
-    expect(card).toBeInTheDocument();
+    const section = screen.getByTestId('matchup-highlight-section');
+    expect(section).toBeInTheDocument();
+    expect(screen.getByText("This Week's Matchup")).toBeInTheDocument();
+    const card = screen.getByTestId('matchup-highlight-card-1');
     expect(within(card).getByText('Alpha Offense')).toBeInTheDocument();
     expect(within(card).getByText('Beta Defense')).toBeInTheDocument();
     expect(within(card).getByText(/Week 3/)).toBeInTheDocument();
   });
 
-  it('omits the highlight card when no matchup is scheduled', () => {
+  it('omits the highlight section when no matchup is scheduled', () => {
     const league: NFLHomeLeague = {
       id: 1,
       name: 'Test Football League',
@@ -533,12 +537,52 @@ describe('NFLHome — matchup highlight card (LS-5407)', () => {
         leagues={[league]}
         onCreateLeague={noop}
         onViewLeague={noop}
-        matchupHighlight={null}
+        matchupHighlights={[]}
       />,
     );
 
     expect(
-      screen.queryByTestId('matchup-highlight-card'),
+      screen.queryByTestId('matchup-highlight-section'),
     ).not.toBeInTheDocument();
+  });
+
+  it('renders one card per league when multiple leagues have a scheduled matchup (LS-6265)', () => {
+    const leagues: NFLHomeLeague[] = [
+      { id: 1, name: 'League One', draftStatus: 'completed' },
+      { id: 2, name: 'League Two', draftStatus: 'completed' },
+    ];
+    render(
+      <NFLHome
+        leagues={leagues}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        matchupHighlights={[
+          {
+            leagueId: 1,
+            leagueName: 'League One',
+            weekNumber: 3,
+            awayTeamName: 'Alpha Offense',
+            homeTeamName: 'Beta Defense',
+            status: 'pre',
+          },
+          {
+            leagueId: 2,
+            leagueName: 'League Two',
+            weekNumber: 3,
+            awayTeamName: 'Gamma Squad',
+            homeTeamName: 'Delta Crew',
+            status: 'live',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("This Week's Matchups")).toBeInTheDocument();
+    const firstCard = screen.getByTestId('matchup-highlight-card-1');
+    const secondCard = screen.getByTestId('matchup-highlight-card-2');
+    expect(within(firstCard).getByText('League One')).toBeInTheDocument();
+    expect(within(firstCard).getByText('Alpha Offense')).toBeInTheDocument();
+    expect(within(secondCard).getByText('League Two')).toBeInTheDocument();
+    expect(within(secondCard).getByText('Gamma Squad')).toBeInTheDocument();
   });
 });
