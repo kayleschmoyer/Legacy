@@ -134,6 +134,10 @@ export const leagues = pgTable(
       .notNull()
       .default('4-team'),
     playoffMultiWeek: boolean('playoff_multi_week').notNull().default(false),
+    /** Premium scoring option (LS-6344): each week a team also plays the
+     *  league median score in addition to its normal head-to-head matchup.
+     *  Standings expose a separate median W-L record when this is true. */
+    medianGameEnabled: boolean('median_game_enabled').notNull().default(false),
     /** Persistent commissioner notes visible to all league members */
     lmNotes: text('lm_notes'),
     /** True for ephemeral mock drafts created via initializeMockDraft (LS-470).

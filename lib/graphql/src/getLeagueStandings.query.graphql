@@ -5,6 +5,9 @@ query GetLeagueStandings($leagueId: Int!, $throughWeek: Int) {
     wins
     losses
     ties
+    medianWins
+    medianLosses
+    medianTies
     winPercentage
     pointsFor
     pointsAgainst

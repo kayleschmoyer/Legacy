@@ -21,6 +21,9 @@ function makeTeam(
     primaryColor: null,
     secondaryColor: null,
     divisionId: null,
+    medianWins: null,
+    medianLosses: null,
+    medianTies: null,
     ...overrides,
   };
 }
@@ -329,6 +332,50 @@ describe('StandingsTable', () => {
     expect(getByText('15')).toBeTruthy();
     expect(getByText('11')).toBeTruthy();
     expect(getByText('13')).toBeTruthy();
+  });
+
+  it('renders Median column header when showMedianRecord is true', () => {
+    const { getByText } = render(
+      <StandingsTable standings={mockStandings} showMedianRecord />,
+    );
+    expect(getByText('Median')).toBeTruthy();
+  });
+
+  it('does not render Median column header when showMedianRecord is false', () => {
+    const { queryByText } = render(
+      <StandingsTable standings={mockStandings} showMedianRecord={false} />,
+    );
+    expect(queryByText('Median')).toBeNull();
+  });
+
+  it('renders median W-L values from standing.medianWins/medianLosses', () => {
+    const standingsWithMedian: StandingRecord[] = [
+      makeTeam({
+        teamId: '1',
+        teamName: 'Thunder',
+        medianWins: 8,
+        medianLosses: 6,
+      }),
+      makeTeam({
+        teamId: '2',
+        teamName: 'Lightning',
+        medianWins: 5,
+        medianLosses: 9,
+      }),
+    ];
+    const { getByText } = render(
+      <StandingsTable standings={standingsWithMedian} showMedianRecord />,
+    );
+    expect(getByText('8-6')).toBeTruthy();
+    expect(getByText('5-9')).toBeTruthy();
+  });
+
+  it('renders a dash for median W-L when the record is unset', () => {
+    const { getAllByText } = render(
+      <StandingsTable standings={mockStandings} showMedianRecord />,
+    );
+    // All three mockStandings entries default medianWins/medianLosses to null.
+    expect(getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
 
   it('sorts by waiver priority and toggles direction — LS-9119', () => {

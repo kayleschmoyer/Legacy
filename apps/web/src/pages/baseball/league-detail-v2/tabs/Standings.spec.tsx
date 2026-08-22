@@ -244,6 +244,38 @@ describe('StandingsTab', () => {
     expect(subtitle).not.toContain('Single elimination');
   });
 
+  // LS-6344: median-game / "all-play" standings column visibility follows
+  // league.medianGameEnabled.
+  it('passes showMedianRecord=true when league.medianGameEnabled is true', () => {
+    mockStandings = [makeRow()];
+    render(
+      <StandingsTab
+        league={{ ...league, medianGameEnabled: true }}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    expect(mockStandingsTable).toHaveBeenCalledWith(
+      expect.objectContaining({ showMedianRecord: true }),
+    );
+  });
+
+  it('passes showMedianRecord=false when league.medianGameEnabled is false or unset', () => {
+    mockStandings = [makeRow()];
+    render(
+      <StandingsTab
+        league={league}
+        teams={[]}
+        myTeamId={null}
+        onTeam={jest.fn()}
+      />,
+    );
+    expect(mockStandingsTable).toHaveBeenCalledWith(
+      expect.objectContaining({ showMedianRecord: false }),
+    );
+  });
+
   // LS-6341: historical "as of Week N" standings via a week selector.
   describe('week selector', () => {
     it('does not render a week selector when the league has no current week yet', () => {

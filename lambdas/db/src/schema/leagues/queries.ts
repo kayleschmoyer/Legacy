@@ -122,6 +122,7 @@ builder.queryField('league', (t) =>
             playoffEnabled: PublicSchema.leagues.playoffEnabled,
             playoffFormat: PublicSchema.leagues.playoffFormat,
             playoffMultiWeek: PublicSchema.leagues.playoffMultiWeek,
+            medianGameEnabled: PublicSchema.leagues.medianGameEnabled,
             // Branding
             logoUrl: PublicSchema.leagues.logoUrl,
             bannerUrl: PublicSchema.leagues.bannerUrl,
@@ -232,6 +233,7 @@ builder.queryField('league', (t) =>
           playoffEnabled: league.playoffEnabled,
           playoffFormat: league.playoffFormat ?? undefined,
           playoffMultiWeek: league.playoffMultiWeek,
+          medianGameEnabled: league.medianGameEnabled,
           // Branding
           logoUrl: league.logoUrl,
           bannerUrl: league.bannerUrl,

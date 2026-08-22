@@ -132,6 +132,7 @@ function executeCallsOf(db: unknown): SQL[] {
 interface SimpleMatchup {
   id: number;
   leagueId: number;
+  weekNumber?: number;
   team1Id: number;
   team2Id: number;
   team1Score: number;
@@ -225,7 +226,8 @@ function buildStandingsGameData(matchups: SimpleMatchup[]) {
  * Build mock DB for calculateStandings with game-stat-based scoring.
  *
  * db.select() order:
- *  [0] teams, [1] matchups, [2] matchupPlayers, [3] matchupPlayerGames
+ *  [0] teams, [1] league (medianGameEnabled, LS-6344), [2] matchups,
+ *  [3] matchupPlayers, [4] matchupPlayerGames
  *
  * db.execute() order (LS-9525 pair-join fetches):
  *  [0] gameBatting, [1] gamePitching, [2] gameFielding existence probe,
@@ -235,6 +237,7 @@ function buildStandingsMockDb(
   teams: { id: number; name: string }[],
   matchups: SimpleMatchup[],
   extraPrefix: any[] = [],
+  medianGameEnabled = false,
   executeOverrides?: unknown[][],
 ) {
   const { matchupPlayers, matchupPlayerGames, gameBatting } =
@@ -245,7 +248,8 @@ function buildStandingsMockDb(
     [
       ...extraPrefix,
       teams,
-      matchups, // the function only reads id, team1Id, team2Id, status
+      [{ medianGameEnabled }], // league.medianGameEnabled lookup (LS-6344)
+      matchups, // the function only reads id, weekNumber, team1Id, team2Id, status
       matchupPlayers,
       matchupPlayerGames,
     ],
@@ -672,10 +676,11 @@ describe('Matchup History', () => {
       mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
       await calculateStandings(mockDb, 1, { throughWeek: 3 });
 
-      // The matchups query is the second `.where(...)` call (after teams).
+      // The matchups query is the third `.where(...)` call (after teams and
+      // the league.medianGameEnabled lookup, LS-6344).
       const matchupsWhereArg =
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- test mock is typed any
-        mockDb.select.mock.results[1].value.where.mock.calls[0][0];
+        mockDb.select.mock.results[2].value.where.mock.calls[0][0];
       expect(sqlConditionMentionsColumn(matchupsWhereArg, 'week_number')).toBe(
         true,
       );
@@ -703,7 +708,7 @@ describe('Matchup History', () => {
 
       const matchupsWhereArg =
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- test mock is typed any
-        mockDb.select.mock.results[1].value.where.mock.calls[0][0];
+        mockDb.select.mock.results[2].value.where.mock.calls[0][0];
       expect(sqlConditionMentionsColumn(matchupsWhereArg, 'week_number')).toBe(
         false,
       );
@@ -850,6 +855,124 @@ describe('Matchup History', () => {
       expect(teamA?.pointsFor).toBe(150);
       expect(teamA?.pointsAgainst).toBe(150);
     });
+
+    it('leaves medianWins/medianLosses/medianTies undefined when medianGameEnabled is false', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+      ];
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          weekNumber: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups, [], false);
+
+      const standings = await calculateStandings(mockDb, 1);
+
+      for (const s of standings) {
+        expect(s.medianWins).toBeUndefined();
+        expect(s.medianLosses).toBeUndefined();
+        expect(s.medianTies).toBeUndefined();
+      }
+    });
+
+    it('computes median W-L against the weekly league median when medianGameEnabled', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+        { id: 3, name: 'Team C' },
+        { id: 4, name: 'Team D' },
+      ];
+
+      // Week 1 scores across all 4 teams: 100, 90, 80, 70 → median = (90+80)/2 = 85
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          weekNumber: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+        {
+          id: 2,
+          leagueId: 1,
+          weekNumber: 1,
+          team1Id: 3,
+          team2Id: 4,
+          team1Score: 80,
+          team2Score: 70,
+          status: 'completed',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups, [], true);
+
+      const standings = await calculateStandings(mockDb, 1);
+
+      const byTeam = new Map(standings.map((s) => [s.teamId, s]));
+      // 100 and 90 beat the 85 median; 80 and 70 fall below it.
+      expect(byTeam.get(1)?.medianWins).toBe(1);
+      expect(byTeam.get(1)?.medianLosses).toBe(0);
+      expect(byTeam.get(2)?.medianWins).toBe(1);
+      expect(byTeam.get(2)?.medianLosses).toBe(0);
+      expect(byTeam.get(3)?.medianWins).toBe(0);
+      expect(byTeam.get(3)?.medianLosses).toBe(1);
+      expect(byTeam.get(4)?.medianWins).toBe(0);
+      expect(byTeam.get(4)?.medianLosses).toBe(1);
+    });
+
+    it('ties the median-game record for a team scoring exactly the weekly median', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+        { id: 3, name: 'Team C' },
+      ];
+
+      // Week 1 scores: 100, 90, 80 → median = 90 (Team B ties its own median)
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          weekNumber: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+        {
+          id: 2,
+          leagueId: 1,
+          weekNumber: 1,
+          team1Id: 3,
+          team2Id: 2,
+          team1Score: 80,
+          team2Score: 90,
+          status: 'completed',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups, [], true);
+
+      const standings = await calculateStandings(mockDb, 1);
+
+      const byTeam = new Map(standings.map((s) => [s.teamId, s]));
+      expect(byTeam.get(2)?.medianTies).toBe(2);
+      expect(byTeam.get(1)?.medianWins).toBe(1);
+      expect(byTeam.get(3)?.medianLosses).toBe(1);
+    });
   });
 
   // LS-9525: the game-stat fetches moved from two independent IN lists
@@ -950,6 +1073,7 @@ describe('Matchup History', () => {
         mockTeams,
         mockMatchups,
         [],
+        false,
         [[...gameBatting, ...overFetched], [], []],
       );
       // New behaviour: only the paired rows.
@@ -957,6 +1081,7 @@ describe('Matchup History', () => {
         mockTeams,
         mockMatchups,
         [],
+        false,
         [gameBatting, [], []],
       );
 
@@ -1078,6 +1203,7 @@ describe('Matchup History', () => {
         mockTeams,
         mockMatchups,
         [],
+        false,
         [
           gameBatting,
           [],
@@ -1193,8 +1319,9 @@ describe('Matchup History', () => {
       // db.select() order (calculateStandings + COUNT GROUP BY run concurrently):
       //  [0] teams        - calculateStandings first db.select()
       //  [1] count rows   - COUNT GROUP BY query (second db.select(), evaluated before first await)
-      //  [2] matchups     - calculateStandings second db.select()
-      //  [3] matchupPlayers, [4] matchupPlayerGames
+      //  [2] league       - calculateStandings medianGameEnabled lookup (LS-6344)
+      //  [3] matchups     - calculateStandings second db.select()
+      //  [4] matchupPlayers, [5] matchupPlayerGames
       // db.execute() order: [0] batting, [1] pitching, [2] fielding probe
       const { matchupPlayers, matchupPlayerGames, gameBatting } =
         buildStandingsGameData(standingsMatchups);
@@ -1206,9 +1333,10 @@ describe('Matchup History', () => {
         [
           mockTeams, // [0] calculateStandings: teams
           countRows, // [1] COUNT GROUP BY
-          standingsMatchups, // [2] calculateStandings: matchups
-          matchupPlayers, // [3]
-          matchupPlayerGames, // [4]
+          [{ medianGameEnabled: false }], // [2] calculateStandings: league lookup
+          standingsMatchups, // [3] calculateStandings: matchups
+          matchupPlayers, // [4]
+          matchupPlayerGames, // [5]
         ],
         [
           gameBatting, // execute [0] batting

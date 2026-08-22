@@ -848,6 +848,7 @@ export default function FootballLeagueId(): React.JSX.Element {
                   loading={standingsLoading}
                   error={standingsError}
                   currentUserTeamId={userTeamId ?? null}
+                  showMedianRecord={league?.medianGameEnabled === true}
                   onTeamPress={handleViewTeamRoster}
                 />
                 {playoffBracket ? (

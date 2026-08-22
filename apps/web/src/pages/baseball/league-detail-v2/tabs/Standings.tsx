@@ -66,6 +66,9 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         wins: null,
         losses: null,
         ties: null,
+        medianWins: null,
+        medianLosses: null,
+        medianTies: null,
         winPercentage: null,
         pointsFor: null,
         pointsAgainst: null,
@@ -75,6 +78,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
   }, [standings, teams]);
 
   const showWaiverOrder = league.waiverEnabled === true;
+  const showMedianRecord = league.medianGameEnabled === true;
 
   const waiverOrders = useMemo(() => {
     if (!showWaiverOrder) return undefined;
@@ -139,6 +143,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         subtitle={subtitle}
         showWaiverOrder={showWaiverOrder}
         waiverOrders={waiverOrders}
+        showMedianRecord={showMedianRecord}
       />
 
       {bracketData?.getPlayoffBracket ? (

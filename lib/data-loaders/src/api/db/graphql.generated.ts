@@ -1494,6 +1494,7 @@ export type League = {
   logoUrl?: Maybe<Scalars['String']['output']>;
   luxuryTaxThreshold?: Maybe<Scalars['Int']['output']>;
   maxRosterSize?: Maybe<Scalars['Int']['output']>;
+  medianGameEnabled?: Maybe<Scalars['Boolean']['output']>;
   minCareerGames?: Maybe<Scalars['Int']['output']>;
   minCareerSeasons?: Maybe<Scalars['Int']['output']>;
   minSalary?: Maybe<Scalars['Int']['output']>;
@@ -4742,6 +4743,9 @@ export type TeamStanding = {
   divisionId?: Maybe<Scalars['Int']['output']>;
   divisionName?: Maybe<Scalars['String']['output']>;
   losses?: Maybe<Scalars['Int']['output']>;
+  medianLosses?: Maybe<Scalars['Int']['output']>;
+  medianTies?: Maybe<Scalars['Int']['output']>;
+  medianWins?: Maybe<Scalars['Int']['output']>;
   pointsAgainst?: Maybe<Scalars['Float']['output']>;
   pointsFor?: Maybe<Scalars['Float']['output']>;
   primaryColor?: Maybe<Scalars['String']['output']>;
@@ -4997,6 +5001,7 @@ export type UpdateLeagueSettingsInput = {
   leagueId: Scalars['Int']['input'];
   logoUrl?: InputMaybe<Scalars['String']['input']>;
   luxuryTaxThreshold?: InputMaybe<Scalars['Int']['input']>;
+  medianGameEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   minCareerGames?: InputMaybe<Scalars['Int']['input']>;
   minCareerSeasons?: InputMaybe<Scalars['Int']['input']>;
   minSalary?: InputMaybe<Scalars['Int']['input']>;

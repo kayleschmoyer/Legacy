@@ -966,6 +966,60 @@ describe('League Mutations', () => {
       );
     });
 
+    it('should require a premium subscription to enable median game standings (LS-6344)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      // 1) membership lookup → commissioner, 2) subscription tier lookup → free
+      mockDb.limit
+        .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }])
+        .mockResolvedValueOnce([{ tier: 'free' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      await expect(
+        field.resolve(
+          {},
+          { input: { leagueId: 1, medianGameEnabled: true } },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow(/premium subscription/);
+    });
+
+    it('should NOT require a premium subscription to disable median game standings (LS-6344)', async () => {
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.update = jest.fn().mockReturnThis();
+      mockDb.set = jest.fn().mockReturnThis();
+      // 1) membership lookup → commissioner (no tier lookup expected — the
+      // gate only fires when enabling, not disabling)
+      mockDb.limit.mockResolvedValueOnce([{ permissionLevel: 'commissioner' }]);
+      mockDb.returning
+        .mockResolvedValueOnce([{ id: 1, medianGameEnabled: false }])
+        .mockResolvedValueOnce([{ id: 10, timestamp: 't' }]);
+
+      const mutationType = schema.getMutationType();
+      const field = mutationType?.getFields().updateLeagueSettings;
+      if (!field?.resolve) {
+        throw new Error('updateLeagueSettings resolver not found');
+      }
+
+      const result = await field.resolve(
+        {},
+        { input: { leagueId: 1, medianGameEnabled: false } },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual({ id: 1, medianGameEnabled: false });
+    });
+
     it('should NOT require entitlement to change cap sub-fields when the league cap is disabled (LS-5197)', async () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);

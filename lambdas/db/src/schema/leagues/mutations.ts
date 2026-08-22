@@ -73,7 +73,11 @@ import {
   PremiumRequiredError,
   UserInputError,
 } from '../graphql-errors';
-import { checkAdminInDb, hasEntitlement } from '../authorization';
+import {
+  checkAdminInDb,
+  hasEntitlement,
+  requirePremium,
+} from '../authorization';
 import { requireFreshEntitlement } from '../fresh-entitlements';
 import { ENTITLEMENTS } from '../entitlements';
 import { applyDecay, applyEscalation } from '../../services/salary-rollover';
@@ -2463,6 +2467,8 @@ const UpdateLeagueSettingsInput = builder.inputType(
       playoffEnabled: t.boolean({ required: false }),
       playoffFormat: t.string({ required: false }),
       playoffMultiWeek: t.boolean({ required: false }),
+      // Premium scoring option (LS-6344): median W-L / "all-play" record.
+      medianGameEnabled: t.boolean({ required: false }),
       logoUrl: t.string({ required: false }),
       bannerUrl: t.string({ required: false }),
       primaryColor: t.string({ required: false }),
@@ -2508,6 +2514,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
         playoffEnabled,
         playoffFormat,
         playoffMultiWeek,
+        medianGameEnabled,
         logoUrl,
         bannerUrl,
         primaryColor,
@@ -2563,6 +2570,7 @@ builder.mutationField('updateLeagueSettings', (t) =>
         playoffEnabled?: boolean;
         playoffFormat?: string;
         playoffMultiWeek?: boolean;
+        medianGameEnabled?: boolean;
         logoUrl?: string | null;
         bannerUrl?: string | null;
         primaryColor?: string | null;
@@ -2792,6 +2800,17 @@ builder.mutationField('updateLeagueSettings', (t) =>
         leagueUpdate.playoffMultiWeek = playoffMultiWeek;
         changeDescriptions.push(
           `Playoff multi-week matchups: ${playoffMultiWeek ? 'enabled' : 'disabled'}`,
+        );
+      }
+
+      // Median game / "all-play" standings (LS-6344) — premium scoring option.
+      if (medianGameEnabled !== null && medianGameEnabled !== undefined) {
+        if (medianGameEnabled) {
+          await requirePremium(context, 'Median-game / "all-play" standings');
+        }
+        leagueUpdate.medianGameEnabled = medianGameEnabled;
+        changeDescriptions.push(
+          `Median game standings: ${medianGameEnabled ? 'enabled' : 'disabled'}`,
         );
       }
 

@@ -75,6 +75,11 @@ export interface StandingsTableProps {
   showWaiverOrder?: boolean;
   /** Map of teamId (string) → waiver order position. */
   waiverOrders?: Record<string, number>;
+  /**
+   * When true, renders the Median W-L column (premium "all-play" scoring
+   * option — LS-6344). Sourced from `standing.medianWins`/`medianLosses`.
+   */
+  showMedianRecord?: boolean;
 }
 
 type SortKey =
@@ -87,7 +92,8 @@ type SortKey =
   | 'pointsFor'
   | 'pointsAgainst'
   | 'diff'
-  | 'waiverOrder';
+  | 'waiverOrder'
+  | 'medianRecord';
 type SortDirection = 'asc' | 'desc';
 
 const diffOf = (s: StandingRecord): number | null =>
@@ -147,6 +153,10 @@ function sortStandings(
           (b.teamId != null ? waiverOrders?.[b.teamId] : undefined) ??
           Number.MAX_SAFE_INTEGER;
         break;
+      case 'medianRecord':
+        aValue = a.medianWins ?? 0;
+        bValue = b.medianWins ?? 0;
+        break;
       default:
         return 0;
     }
@@ -166,6 +176,7 @@ interface StandingsRowProps {
   getTeamUrl?: (teamId: number) => string;
   waiverOrder?: number | null;
   showWaiverOrder?: boolean;
+  showMedianRecord?: boolean;
 }
 
 function StandingsRow({
@@ -177,6 +188,7 @@ function StandingsRow({
   getTeamUrl,
   waiverOrder,
   showWaiverOrder,
+  showMedianRecord,
 }: StandingsRowProps) {
   const [hovered, setHovered] = useState(false);
   const teamId = standing.teamId != null ? Number(standing.teamId) : null;
@@ -391,6 +403,23 @@ function StandingsRow({
           </Text>
         </YStack>
       ) : null}
+      {showMedianRecord ? (
+        <YStack
+          tag="td"
+          role="cell"
+          width={70}
+          alignItems="center"
+          justifyContent="center"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
+          <Text fontSize="$3" color="$gray11">
+            {standing.medianWins != null && standing.medianLosses != null
+              ? `${standing.medianWins}-${standing.medianLosses}`
+              : '—'}
+          </Text>
+        </YStack>
+      ) : null}
     </XStack>
   );
 }
@@ -416,6 +445,7 @@ export function StandingsTable({
   subtitle,
   showWaiverOrder = false,
   waiverOrders,
+  showMedianRecord = false,
 }: StandingsTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('winPct');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -629,6 +659,19 @@ export function StandingsTable({
             <SortButton label="Waiver" sortKeyValue="waiverOrder" />
           </YStack>
         ) : null}
+        {showMedianRecord ? (
+          <YStack
+            tag="th"
+            {...{ scope: 'col' }}
+            role="columnheader"
+            width={70}
+            alignItems="center"
+            display="none"
+            $gtMd={{ display: 'flex' }}
+          >
+            <SortButton label="Median" sortKeyValue="medianRecord" />
+          </YStack>
+        ) : null}
       </XStack>
     </YStack>
   );
@@ -680,6 +723,7 @@ export function StandingsTable({
                           ? waiverOrders?.[standing.teamId]
                           : undefined
                       }
+                      showMedianRecord={showMedianRecord}
                     />
                   ))}
                 </YStack>
@@ -705,6 +749,7 @@ export function StandingsTable({
                     ? waiverOrders?.[standing.teamId]
                     : undefined
                 }
+                showMedianRecord={showMedianRecord}
               />
             ))}
           </YStack>

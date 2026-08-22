@@ -471,6 +471,11 @@ export const TeamStanding = builder.objectRef<{
   divisionId?: number | null;
   /** Human-readable division label (e.g. "Division 1"); null when no divisions */
   divisionName?: string | null;
+  /** Median-game / "all-play" record (LS-6344); undefined/null unless the
+   *  league has medianGameEnabled. */
+  medianWins?: number;
+  medianLosses?: number;
+  medianTies?: number;
   /** Playoff seeding indicator (LS-6345); null outside the late-season window */
   clinchStatus?: 'CLINCHED' | 'IN' | 'OUT' | null;
 }>('TeamStanding');
@@ -495,6 +500,9 @@ builder.objectType(TeamStanding, {
     secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
     divisionId: t.exposeInt('divisionId', { nullable: true }),
     divisionName: t.exposeString('divisionName', { nullable: true }),
+    medianWins: t.exposeInt('medianWins', { nullable: true }),
+    medianLosses: t.exposeInt('medianLosses', { nullable: true }),
+    medianTies: t.exposeInt('medianTies', { nullable: true }),
     clinchStatus: t.expose('clinchStatus', {
       type: PlayoffClinchStatus,
       nullable: true,

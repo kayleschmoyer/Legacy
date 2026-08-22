@@ -1755,6 +1755,7 @@ type League {
   logoUrl: String
   luxuryTaxThreshold: Int
   maxRosterSize: Int
+  medianGameEnabled: Boolean
   minCareerGames: Int
   minCareerSeasons: Int
   minSalary: Int
@@ -4977,6 +4978,9 @@ type TeamStanding {
   divisionId: Int
   divisionName: String
   losses: Int
+  medianLosses: Int
+  medianTies: Int
+  medianWins: Int
   pointsAgainst: Float
   pointsFor: Float
   primaryColor: String
@@ -5263,6 +5267,7 @@ input UpdateLeagueSettingsInput {
   leagueId: Int!
   logoUrl: String
   luxuryTaxThreshold: Int
+  medianGameEnabled: Boolean
   minCareerGames: Int
   minCareerSeasons: Int
   minSalary: Int

@@ -110,6 +110,9 @@ export const League = builder.objectRef<{
   playoffEnabled?: boolean;
   playoffFormat?: string;
   playoffMultiWeek?: boolean;
+  /** Premium scoring option (LS-6344): standings expose a median W-L record
+   *  alongside head-to-head, computed against each week's league median. */
+  medianGameEnabled?: boolean;
   lmNotes?: string | null;
   /** True for ephemeral mock-draft leagues (LS-470) */
   isMockDraft?: boolean;
@@ -223,6 +226,9 @@ League.implement({
     playoffEnabled: t.exposeBoolean('playoffEnabled', { nullable: true }),
     playoffFormat: t.exposeString('playoffFormat', { nullable: true }),
     playoffMultiWeek: t.exposeBoolean('playoffMultiWeek', { nullable: true }),
+    medianGameEnabled: t.exposeBoolean('medianGameEnabled', {
+      nullable: true,
+    }),
     lmNotes: t.exposeString('lmNotes', { nullable: true }),
     isMockDraft: t.exposeBoolean('isMockDraft', { nullable: true }),
     isOfflineDraft: t.exposeBoolean('isOfflineDraft', { nullable: true }),

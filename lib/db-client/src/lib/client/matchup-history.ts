@@ -56,6 +56,14 @@ export interface TeamStanding {
   /** Human-readable division label (e.g. "Division 1"); null when no divisions */
   divisionName?: string | null;
   /**
+   * Median-game / "all-play" record (LS-6344): each completed week, a win if
+   * the team's score beat that week's league median, a loss if below, a tie
+   * if equal. Undefined when the league does not have median_game_enabled.
+   */
+  medianWins?: number;
+  medianLosses?: number;
+  medianTies?: number;
+  /**
    * Playoff seeding indicator (LS-6345). Null until the league is in its
    * late-season window (see `computeClinchStatuses`) — no badge should
    * render for a null value.
@@ -451,6 +459,16 @@ async function _computeStandings(
     return [];
   }
 
+  // Median-game / "all-play" scoring option (LS-6344) — only computed when
+  // the league has it enabled, to avoid the extra per-week grouping work for
+  // the common (disabled) case.
+  const [leagueRow] = await db
+    .select({ medianGameEnabled: Schema.leagues.medianGameEnabled })
+    .from(Schema.leagues)
+    .where(eq(Schema.leagues.id, leagueId))
+    .limit(1);
+  const medianGameEnabled = leagueRow?.medianGameEnabled ?? false;
+
   // Build a sorted ordinal map so division labels read "Division 1", "Division 2", …
   // regardless of the raw integer IDs stored in the DB.
   const sortedDivisionIds = Array.from(
@@ -637,6 +655,14 @@ async function _computeStandings(
     return totalScore;
   }
 
+  // Per-week team scores for the median-game / "all-play" option (LS-6344),
+  // populated below only when medianGameEnabled. Keyed by weekNumber →
+  // team's completed-matchup score that week.
+  const weeklyScoresByWeek = new Map<
+    number,
+    { teamId: number; score: number }[]
+  >();
+
   // Process each matchup
   for (const matchup of matchups) {
     if (!matchup.team1Id || !matchup.team2Id) continue;
@@ -668,6 +694,49 @@ async function _computeStandings(
       } else {
         team1Standing.ties++;
         team2Standing.ties++;
+      }
+
+      if (medianGameEnabled) {
+        const weekScores = weeklyScoresByWeek.get(matchup.weekNumber) ?? [];
+        weekScores.push(
+          { teamId: matchup.team1Id, score: score1 },
+          { teamId: matchup.team2Id, score: score2 },
+        );
+        weeklyScoresByWeek.set(matchup.weekNumber, weekScores);
+      }
+    }
+  }
+
+  // Tally the median-game record: each week, a team beats/loses to/ties the
+  // median of every team's score that week (the "all-play" comparison).
+  if (medianGameEnabled) {
+    for (const standing of standingsMap.values()) {
+      standing.medianWins = 0;
+      standing.medianLosses = 0;
+      standing.medianTies = 0;
+    }
+
+    for (const weekScores of weeklyScoresByWeek.values()) {
+      if (weekScores.length === 0) continue;
+
+      const sorted = [...weekScores].map((s) => s.score).sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      const median =
+        sorted.length % 2 === 0
+          ? (sorted[mid - 1] + sorted[mid]) / 2
+          : sorted[mid];
+
+      for (const { teamId, score } of weekScores) {
+        const standing = standingsMap.get(teamId);
+        if (!standing) continue;
+
+        if (score > median) {
+          standing.medianWins = (standing.medianWins ?? 0) + 1;
+        } else if (score < median) {
+          standing.medianLosses = (standing.medianLosses ?? 0) + 1;
+        } else {
+          standing.medianTies = (standing.medianTies ?? 0) + 1;
+        }
       }
     }
   }

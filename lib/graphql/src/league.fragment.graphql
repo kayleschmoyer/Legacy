@@ -32,6 +32,7 @@ fragment League on League {
   playoffEnabled
   playoffFormat
   playoffMultiWeek
+  medianGameEnabled
   lmNotes
   isMockDraft
   isOfflineDraft
