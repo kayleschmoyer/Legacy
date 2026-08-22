@@ -1,0 +1,126 @@
+name: "Detect Runner Shutdown"
+description: "Classify a failed workflow run as self-hosted-runner churn (spot interruption) rather than a genuine job failure."
+
+# ---------------------------------------------------------------------------
+# Every runner in this repo's pool is instanceLifecycle=spot (LS-1660), so a
+# run can go red purely because EC2 reclaimed the instance mid-job. GitHub
+# emits a fixed message on the dying job's log when that happens, and that
+# message is the only reliable discriminator between infrastructure churn and
+# a real failure.
+#
+# This action reads the tail of every failed/cancelled job's log in a run and
+# reports whether that marker is present. It only classifies — labelling,
+# commenting, and retrying are the caller's decision, because they differ per
+# workflow (a PR workflow labels the PR; a main-branch deploy workflow has no
+# PR to label and re-dispatches itself instead).
+#
+# ci-orchestrator.yml still carries its own inline copy of this detection
+# (PR-comment flavoured). Migrating it onto this action is LS-9451 — kept out
+# of LS-9438 so a main-CI change does not ride along with a deploy fix.
+# ---------------------------------------------------------------------------
+
+inputs:
+  github-token:
+    description: "Token with actions:read on this repository — used to list jobs and download job logs."
+    required: true
+  run-id:
+    description: "Workflow run ID to inspect. Defaults to the current run."
+    required: false
+    default: ""
+
+outputs:
+  shutdown-detected:
+    description: '"true" when at least one failed or cancelled job logged the runner shutdown signal, otherwise "false".'
+    value: ${{ steps.detect.outputs.shutdown-detected }}
+  job-names:
+    description: "Comma-separated names of the jobs that logged the shutdown signal. Empty when none did."
+    value: ${{ steps.detect.outputs.job-names }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Scan run jobs for a runner shutdown signal"
+      id: detect
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+      env:
+        DETECT_TOKEN: ${{ inputs.github-token }}
+        DETECT_RUN_ID: ${{ inputs.run-id }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { owner, repo } = context.repo;
+          const runId = Number(process.env.DETECT_RUN_ID || context.runId);
+          const token = process.env.DETECT_TOKEN;
+
+          // Emitted verbatim by GitHub when the runner service is torn down
+          // under a running job. Matching the full sentence would be brittle
+          // (the tail varies), so match the stable clause only.
+          const SHUTDOWN_SIGNATURE = 'runner has received a shutdown signal';
+
+          let allJobs = [];
+          let page = 1;
+          while (true) {
+            const { data } = await github.rest.actions.listJobsForWorkflowRun({
+              owner, repo, run_id: runId, per_page: 100, page,
+            });
+            allJobs = allJobs.concat(data.jobs);
+            if (data.jobs.length < 100) break;
+            page += 1;
+          }
+
+          // A spot-killed job surfaces as `failure` on lambda-terraform-apply
+          // (observed on runs 31684987464 and 31721455767) but as `cancelled`
+          // on ci-orchestrator, so both conclusions have to be scanned. The
+          // log marker — not the conclusion — is what actually classifies it.
+          const candidates = allJobs.filter(
+            (j) => j.conclusion === 'failure' || j.conclusion === 'cancelled',
+          );
+
+          if (candidates.length === 0) {
+            core.info('No failed or cancelled jobs in this run — nothing to classify.');
+            core.setOutput('shutdown-detected', 'false');
+            core.setOutput('job-names', '');
+            return;
+          }
+
+          const shutdownJobs = [];
+          for (const job of candidates) {
+            try {
+              const redirectRes = await fetch(
+                `https://api.github.com/repos/${owner}/${repo}/actions/jobs/${job.id}/logs`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    'User-Agent': 'github-actions',
+                    Accept: 'application/vnd.github+json',
+                  },
+                  redirect: 'manual',
+                },
+              );
+              const logUrl = redirectRes.headers.get('location');
+              if (!logUrl) {
+                core.info(`No redirect URL for job "${job.name}" — skipping log check`);
+                continue;
+              }
+              // The shutdown notice is the last thing written to the log, so
+              // the trailing 8 KB is enough and keeps this fast on big logs.
+              const logRes = await fetch(logUrl, { headers: { Range: 'bytes=-8192' } });
+              const logText = await logRes.text();
+              if (logText.includes(SHUTDOWN_SIGNATURE)) {
+                shutdownJobs.push(job.name);
+              }
+            } catch (e) {
+              core.warning(`Could not fetch logs for job "${job.name}" (${job.id}): ${e.message}`);
+            }
+          }
+
+          // Absence of the marker is deliberately treated as a genuine failure:
+          // a false "runner flake" verdict would hide a real terraform break.
+          core.setOutput('shutdown-detected', shutdownJobs.length > 0 ? 'true' : 'false');
+          core.setOutput('job-names', shutdownJobs.join(', '));
+
+          if (shutdownJobs.length > 0) {
+            core.info(`Runner shutdown signal found in: ${shutdownJobs.join(', ')}`);
+          } else {
+            core.info('No shutdown signal found in failed job logs — genuine failure.');
+          }

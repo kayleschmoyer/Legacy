@@ -29,6 +29,13 @@ on:
         required: false
         default: false
         type: boolean
+      is-retry:
+        # Set only by the Report Runner Shutdown job's re-dispatch. Caps automatic
+        # retries at one per failure: a retry that dies again is reported, not re-dispatched.
+        description: "Internal — marks this run as an automatic retry of a spot-killed apply"
+        required: false
+        default: false
+        type: boolean
 
 # cancel-in-progress is intentionally FALSE: cancelling a running apply
 # mid-destroy+create cycle can leave Terraform state inconsistent (resource
@@ -851,3 +858,112 @@ jobs:
           deployment-status: ${{ job.status }}
           workflow-run-id: ${{ github.run_id }}
           branch: ${{ github.ref_name }}
+
+  # ==========================================================================
+  # Classify a red apply as runner churn, and retry it
+  # ==========================================================================
+  # Every runner in the pool is instanceLifecycle=spot (LS-1660), so an apply
+  # can go red without terraform ever failing — EC2 simply reclaims the
+  # instance mid-job. Two of the last eight applies died that way (runs
+  # 31684987464 and 31721455767); one of them had already applied
+  # successfully and still reported red. Without this job the run carries a
+  # single job and no signal, so a spot death is indistinguishable from a
+  # genuine IAM/terraform failure to anyone — or anything — triaging it.
+  #
+  # This job does NOT try to prevent spot interruption. That is the accepted
+  # cost of the spot pool and was closed Won't Do under LS-8261. It only makes
+  # the resulting failure legible and self-healing.
+  #
+  # Unlike ci-orchestrator.yml's equivalent, there is no PR here to label or
+  # comment on: this workflow runs on main via workflow_run/workflow_dispatch.
+  # The signal is therefore the presence and conclusion of this job itself
+  # (visible to ci_view_run_jobs), plus a step-summary verdict and an
+  # annotation on the run.
+  #
+  # Retrying is safe: terraform apply is idempotent, and the retried run's
+  # "Clear Stale Locks" step removes any .tflock the killed run left behind
+  # before init. (The workflow's own lock-release steps cannot be relied on
+  # here — when the runner dies mid-step, no later step executes at all.)
+  # ==========================================================================
+  report-runner-shutdown:
+    name: "⚡ Report Runner Shutdown"
+    needs: [apply-infrastructure]
+    if: >-
+      always() &&
+      (needs.apply-infrastructure.result == 'failure' ||
+      needs.apply-infrastructure.result == 'cancelled')
+    runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      # Required to re-dispatch this workflow after a confirmed runner death.
+      actions: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+
+      - name: Detect runner shutdown
+        id: detect
+        uses: ./.github/actions/detect-runner-shutdown
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.run_id }}
+
+      - name: Report genuine failure
+        if: steps.detect.outputs.shutdown-detected != 'true'
+        run: |
+          echo "::notice::No runner-shutdown signal found — treat this as a real terraform/IAM failure."
+          {
+            echo "## ❌ Apply failed — genuine failure"
+            echo ""
+            echo "No \`runner has received a shutdown signal\` marker was found in the failed job's log."
+            echo "This run failed on its own merits — read the apply log before retrying."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report runner shutdown
+        if: steps.detect.outputs.shutdown-detected == 'true'
+        env:
+          SHUTDOWN_JOBS: ${{ steps.detect.outputs.job-names }}
+        run: |
+          echo "::warning::CI: Runner Flake — the apply runner was reclaimed mid-job (spot interruption), not a terraform failure."
+          {
+            echo "## ⚡ Apply interrupted by a runner shutdown"
+            echo ""
+            echo "The following job(s) logged \`runner has received a shutdown signal\`: **${SHUTDOWN_JOBS}**"
+            echo ""
+            echo "This is spot-instance churn on the self-hosted runner pool (LS-1660), **not** a terraform"
+            echo "or IAM failure. Infrastructure may be fully applied, partially applied, or untouched —"
+            echo "the retry below reconciles whichever it is."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Retry apply after runner shutdown
+        # inputs['is-retry'] is null for workflow_run triggers, so the first death
+        # always retries; the retry carries the flag and stops here. Tested as a
+        # truthiness check rather than `== true` because createWorkflowDispatch
+        # sends inputs as strings — same idiom as skip-debounce above.
+        if: steps.detect.outputs.shutdown-detected == 'true' && !inputs['is-retry']
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'lambda-terraform-apply.yml',
+              ref: 'main',
+              inputs: { 'skip-debounce': 'true', 'is-retry': 'true' },
+            });
+            core.info('Re-dispatched lambda-terraform-apply.yml to reconcile infrastructure.');
+            core.summary.addRaw('\n🔁 Automatic retry dispatched.\n');
+            await core.summary.write();
+
+      - name: Note retry cap reached
+        if: steps.detect.outputs.shutdown-detected == 'true' && inputs['is-retry']
+        run: |
+          echo "::warning::This run was already an automatic retry — not re-dispatching again."
+          {
+            echo ""
+            echo "🛑 This run was itself the automatic retry, so no further retry was dispatched."
+            echo "Repeated spot deaths in a row need a human look at the runner pool."
+          } >> "$GITHUB_STEP_SUMMARY"
