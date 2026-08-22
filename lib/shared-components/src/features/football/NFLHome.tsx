@@ -482,6 +482,11 @@ function NFLHome({
                   </Text>
                 </Button>
               )}
+              {/* Never condition this CTA's visibility on subscription tier
+                  (FBH-028 / LS-6282). If a premium-only filter (e.g.
+                  historical_era_filters) is ever added to /football/players,
+                  gate the filter control there — free users must still be
+                  able to reach the players list with the default filter set. */}
               {onBrowsePlayers && (
                 <Button
                   backgroundColor="$orange9"

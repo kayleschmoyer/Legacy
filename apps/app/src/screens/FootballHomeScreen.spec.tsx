@@ -512,6 +512,21 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       fireEvent.press(screen.getByTestId('browse-players'));
       expect(mockPush).toHaveBeenCalledWith('/football/players');
     });
+
+    // FBH-028 (LS-6282): the Browse Players entry point must stay tier-agnostic
+    // even after premium-only filters (e.g. historical_era_filters) reach
+    // /football/players — only the filter itself may be gated, never this CTA.
+    it.each([
+      ['free', false],
+      ['premium', true],
+    ] as const)(
+      'renders the Browse Players CTA for %s-tier users',
+      (_label, isPremium) => {
+        mockUseSubscription.mockReturnValue({ isPremium, loading: false });
+        render(<FootballHomeScreen />);
+        expect(screen.getByTestId('browse-players')).toBeTruthy();
+      },
+    );
   });
 
   describe('unauthenticated state (LS-5806)', () => {

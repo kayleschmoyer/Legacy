@@ -11,7 +11,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { enableFootball } from '../fixtures/shared-mocks';
+import { enableFootball, useTier } from '../fixtures/shared-mocks';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -120,4 +120,21 @@ test.describe('Football Home — player discovery entry point @regression', () =
     // merged players route with NFL pre-selected (LS-9077).
     await expect(page).toHaveURL(/\/players\?sport=nfl$/);
   });
+
+  // FBH-028 (LS-6282), preventive: if a premium-only filter (e.g.
+  // historical_era_filters) is ever added to /football/players, only the
+  // filter may be gated — this entry CTA must stay visible on every tier.
+  for (const tier of ['free', 'premium'] as const) {
+    test(`shows the Browse Players CTA for ${tier}-tier users`, async ({
+      page,
+    }) => {
+      await useTier(page, tier);
+      await mockTrendingFootballPlayers(page);
+      await page.goto(FOOTBALL_HOME_URL);
+
+      await expect(page.getByTestId('browse-players-button')).toBeVisible({
+        timeout: 10000,
+      });
+    });
+  }
 });
