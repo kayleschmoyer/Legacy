@@ -1,5 +1,6 @@
 import {
   createSubscriptionService,
+  getSubscriptionByUserId,
   InternalDb,
   runWithInternalClient,
 } from '@legacy-sports/db-client';
@@ -33,10 +34,23 @@ export async function withDbClient<T>(
  *
  * Consumed by the JWT-mint slice (LS-8644) to look up the Stripe customer whose
  * live entitlements are minted into the token.
+ *
+ * Pass `db` whenever the caller already holds a client. Every JWT mint happens
+ * inside a handler that has already opened one, and without threading it here
+ * this lookup opened a *second* connection per request — a full
+ * credentials-resolve + TCP/TLS connect cycle for a single indexed SELECT
+ * (LS-9530). Omitting `db` preserves the original self-connecting behaviour for
+ * callers that genuinely have no client in scope.
  */
 export async function getStripeCustomerId(
   userId: number,
+  db?: InternalDb,
 ): Promise<string | null> {
+  if (db) {
+    const subscription = await getSubscriptionByUserId(db, userId);
+    return subscription?.stripeCustomerId ?? null;
+  }
+
   const subscription =
     await createSubscriptionService(getDbOptions()).getSubscriptionByUserId(
       userId,

@@ -8,6 +8,7 @@ import {
   initRollbar,
   withRollbar,
 } from '@legacy-sports/rollbar';
+import { prefetchSecret } from '@legacy-sports/aws-utils';
 import { formatVersionInfo, getVersionInfo } from '@legacy-sports/utils/node';
 import {
   handleGoogleAuth,
@@ -70,11 +71,62 @@ const AUTH_RATE_LIMIT = { limit: 5, windowMs: 60 * 1000 };
 const DOWNLOAD_RATE_LIMIT = { limit: 20, windowMs: 60 * 1000 };
 const DEVICE_POLL_RATE_LIMIT = { limit: 30, windowMs: 60 * 1000 };
 
-// Initialize Rollbar
+/**
+ * Whether to dump the environment-variable audit and sanitized request headers
+ * on every invocation.
+ *
+ * These are diagnostic aids for a misconfigured deployment, not something the
+ * hot path needs. LOG_LEVEL is pinned to `debug` in the deployed environment,
+ * so they ran on every request — building the objects, and paying CloudWatch
+ * ingest — for output nobody reads outside an investigation. Gated behind an
+ * explicit opt-in so turning them on is a deliberate act (LS-9530).
+ */
+const REQUEST_DUMP_ENABLED = process.env.OAUTH_DEBUG_REQUEST_DUMP === 'true';
+
+// Initialize Rollbar. This is module scope, so it runs during the Lambda INIT
+// phase, not per request — despite CloudWatch tagging the "Rollbar initialized"
+// line with the first request id. `rollbar.init` resolves its access token from
+// Secrets Manager asynchronously (a plaintext token in a Lambda env var failed
+// security review in LS-2790), and on a cold VPC container that first outbound
+// call outlives INIT and lands mid-invocation. See warmSecrets below for why
+// that no longer costs the request anything (LS-9530).
 const rollbarConfig = getRollbarConfigFromEnv();
 if (rollbarConfig) {
   initRollbar(rollbarConfig);
 }
+
+/**
+ * Start resolving every secret this lambda reads on an auth path, at module
+ * scope and all at once.
+ *
+ * Two things made secret reads expensive on the request path before LS-9530:
+ * they were re-read on every invocation, and they were issued one at a time.
+ * The JWT signing key alone cost 333 ms on a warm container because it queued
+ * behind Rollbar's still-in-flight token fetch on a cold HTTPS agent.
+ *
+ * Kicking them off together here means they share one TLS handshake to the
+ * Secrets Manager VPC endpoint and resolve concurrently during INIT, and
+ * `retrieveSecretParameterValue` caches each result (with a TTL) so warm
+ * invocations read none of them. A request that arrives before a prefetch
+ * settles joins the in-flight promise rather than issuing a duplicate.
+ *
+ * Failures are deliberately ignored: the real read on the request path is what
+ * surfaces them, with its existing error handling.
+ */
+function warmSecrets(): void {
+  const secretNames = [
+    process.env.JWT_SECRET_KEY_PATH,
+    process.env.COOKIE_SECRET_KEY_PATH,
+    process.env.DB_SECRET_NAME,
+    process.env.STRIPE_SECRET_KEY_SECRET_NAME,
+  ];
+
+  for (const name of secretNames) {
+    if (name) prefetchSecret(name);
+  }
+}
+
+warmSecrets();
 
 // Startup self-check: surface a misconfigured Discord redirect URI at cold
 // start (LGN-015 / LS-6670) instead of as a generic exchange failure later.
@@ -192,25 +244,28 @@ const baseOAuthHandler = async (
   );
   addBreadcrumb(`OAuth request: ${event.httpMethod} ${event.path}`);
 
-  LOGGER.debug('Environment Variables Check:', {
-    CLIENT_ID: process.env.CLIENT_ID ? '[SET]' : '[MISSING]',
-    GOOGLE_OAUTH_CLIENT_SECRET_PATH: process.env.GOOGLE_OAUTH_CLIENT_SECRET_PATH
-      ? '[SET]'
-      : '[MISSING]',
-    JWT_SECRET_KEY_PATH: process.env.JWT_SECRET_KEY_PATH
-      ? '[SET]'
-      : '[MISSING]',
-    COOKIE_SECRET_KEY_PATH: process.env.COOKIE_SECRET_KEY_PATH
-      ? '[SET]'
-      : '[MISSING]',
-    NODE_ENV: process.env.NODE_ENV,
-    AWS_REGION: process.env.AWS_REGION,
-  });
-  LOGGER.debug('Request Details:', {
-    headers: sanitizeHeaders(event.headers),
-    body: event.body ? '[BODY_PRESENT]' : '[NO_BODY]',
-    queryStringParameters: event.queryStringParameters,
-  });
+  if (REQUEST_DUMP_ENABLED) {
+    LOGGER.debug('Environment Variables Check:', {
+      CLIENT_ID: process.env.CLIENT_ID ? '[SET]' : '[MISSING]',
+      GOOGLE_OAUTH_CLIENT_SECRET_PATH: process.env
+        .GOOGLE_OAUTH_CLIENT_SECRET_PATH
+        ? '[SET]'
+        : '[MISSING]',
+      JWT_SECRET_KEY_PATH: process.env.JWT_SECRET_KEY_PATH
+        ? '[SET]'
+        : '[MISSING]',
+      COOKIE_SECRET_KEY_PATH: process.env.COOKIE_SECRET_KEY_PATH
+        ? '[SET]'
+        : '[MISSING]',
+      NODE_ENV: process.env.NODE_ENV,
+      AWS_REGION: process.env.AWS_REGION,
+    });
+    LOGGER.debug('Request Details:', {
+      headers: sanitizeHeaders(event.headers),
+      body: event.body ? '[BODY_PRESENT]' : '[NO_BODY]',
+      queryStringParameters: event.queryStringParameters,
+    });
+  }
 
   try {
     // Handle OPTIONS preflight requests

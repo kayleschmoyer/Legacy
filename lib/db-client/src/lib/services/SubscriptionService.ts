@@ -1,7 +1,6 @@
-import { desc, eq } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import { runWithInternalClient } from '../client/Helpers';
-import * as InternalSchema from '../../drizzle/internal/schema';
+import { getSubscriptionByUserId } from '../client/InternalDbClient';
 
 export interface UserSubscription {
   id: number;
@@ -40,19 +39,9 @@ export class SubscriptionService {
   async getSubscriptionByUserId(
     userId: number,
   ): Promise<UserSubscription | null> {
-    return runWithInternalClient(this.options, async (db) => {
-      const results = await db
-        .select()
-        .from(InternalSchema.subscriptions)
-        .where(eq(InternalSchema.subscriptions.userId, userId))
-        .orderBy(
-          desc(InternalSchema.subscriptions.createdAt),
-          desc(InternalSchema.subscriptions.id),
-        )
-        .limit(1);
-
-      return results[0] ?? null;
-    });
+    return runWithInternalClient(this.options, (db) =>
+      getSubscriptionByUserId(db, userId),
+    );
   }
 }
 

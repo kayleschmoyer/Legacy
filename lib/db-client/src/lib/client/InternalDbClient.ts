@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, isNull } from 'drizzle-orm';
 import { TakeUniqueOrNull, TakeUniqueOrThrow } from './utils/TakeUniqueOrThrow';
 import { GenericDatabase } from './abstract/BaseDbClient';
 import { InternalUser } from '../../types/DatabaseTypes';
@@ -415,8 +415,16 @@ export type InternalSubscription = typeof Schema.subscriptions.$inferSelect;
  * Fetch the subscription row for a user, or null if they have none.
  *
  * `userId` is indexed but not unique on the subscriptions table, so this
- * intentionally takes the first row (via LIMIT 1) rather than asserting
- * uniqueness — mirroring SubscriptionService.getSubscriptionByUserId.
+ * takes a single row (via LIMIT 1) rather than asserting uniqueness. It is
+ * ordered by `created_at DESC` (with `id DESC` as tiebreaker) so a user with
+ * more than one row — e.g. a canceled Apple row plus a newer Stripe row —
+ * always resolves to the most recent one. Without the ordering, `.limit(1)`
+ * can return an arbitrary row, including a stale canceled one, which leaves
+ * paying users' JWT-minted entitlements empty (the LS-5201 class of bug).
+ *
+ * This is the single implementation behind both the connection-owning
+ * `SubscriptionService.getSubscriptionByUserId` and the callers that already
+ * hold a client and must not open a second connection (LS-9530).
  */
 export async function getSubscriptionByUserId(
   db: InternalDb,
@@ -426,6 +434,10 @@ export async function getSubscriptionByUserId(
     .select()
     .from(Schema.subscriptions)
     .where(() => eq(Schema.subscriptions.userId, userId))
+    .orderBy(
+      desc(Schema.subscriptions.createdAt),
+      desc(Schema.subscriptions.id),
+    )
     .limit(1);
   return results[0] ?? null;
 }

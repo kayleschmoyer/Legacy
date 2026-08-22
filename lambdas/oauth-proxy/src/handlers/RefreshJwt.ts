@@ -206,6 +206,11 @@ export const handleRefreshJwt = async (
     const newJwt = await createJwt(user, {
       picture: payload.picture,
       fallbackEntitlements: parsePriorEntitlements(payload.entitlements),
+      // Reuse this handler's client and the key already read above so the
+      // mint costs neither a second connection nor a second Secrets Manager
+      // round trip (LS-9530).
+      db,
+      jwtKey,
     });
 
     LOGGER.info('handleRefreshJwt: issued fresh JWT', { userId: user.id });

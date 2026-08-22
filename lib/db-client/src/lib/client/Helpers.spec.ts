@@ -13,6 +13,10 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+jest.mock('@legacy-sports/aws-utils', () => ({
+  invalidateSecretCache: jest.fn(),
+}));
+
 const mockClose = jest.fn();
 const mockExecute = jest.fn();
 const mockInitialize = jest.fn();

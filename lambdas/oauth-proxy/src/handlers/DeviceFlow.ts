@@ -641,7 +641,7 @@ export const handleDeviceCompleteLocal = async (
         };
       }
 
-      const internalJwt = await createJwt(user);
+      const internalJwt = await createJwt(user, { db });
 
       const tokenResponse: TokenResponse = {
         jwt: internalJwt,

@@ -257,7 +257,13 @@ resource "aws_lambda_function" "oauth_proxy" {
   handler       = "index.handler"
   runtime       = "nodejs20.x"
   timeout       = var.lambda_timeout
-  memory_size   = var.environment == "dev" ? 512 : 1024 # Increased for combined functionality
+  # Lambda CPU scales with memory, and this function's cost is dominated by
+  # CPU-bound work (JSON marshalling, drizzle query building, JWT signing)
+  # rather than heap — Max Memory Used sits at ~140 MB against 512 MB. At
+  # 512 MB the container gets roughly a third of a vCPU, which stretched that
+  # work out enough that billed duration more than paid for the higher rate.
+  # Raised to 1024 MB so dev matches prod; measured before/after in LS-9530.
+  memory_size = 1024
 
   source_code_hash = data.aws_ssm_parameter.oauth_proxy_lambda_version.value
   # Deployed version marker read by the drift-check auditor (LS-8434)

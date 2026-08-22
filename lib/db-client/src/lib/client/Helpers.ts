@@ -1,4 +1,5 @@
 import { LOGGER } from '@legacy-sports/logging';
+import { invalidateSecretCache } from '@legacy-sports/aws-utils';
 import { sql } from 'drizzle-orm';
 import { DbOptions } from '@legacy-sports/utils/node';
 import { PgDbConnection } from './abstract/PgDbConnection';
@@ -11,10 +12,31 @@ import * as InternalSchema from '../../drizzle/internal/schema';
 // Export GenericDatabase type for external use
 export type { GenericDatabase } from './abstract/BaseDbClient';
 
-// Connection cache for development mode to prevent exhaustion during hot reload
+// Connection cache. Two environments reuse connections rather than opening one
+// per call:
+//
+//  - development: prevents pool exhaustion during hot reload.
+//  - AWS Lambda: an execution environment serves many invocations, and opening
+//    a fresh pool for each one meant every request paid a Secrets Manager
+//    credential resolve plus a TCP/TLS connect — 625 ms on the oauth-proxy hot
+//    path (LS-9530). Reusing the module-scope connection is the standard Lambda
+//    pattern; correctness across freeze/thaw rests on the `select 1 + 1` health
+//    check below, which evicts and retries on a connection severed while the
+//    container was frozen.
+//
+// Everywhere else (CLI, scripts, migrations, jest) keeps the original
+// open-and-close behaviour, so no long-lived handle can keep a process alive.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Generic cache for any schema type
 const connectionCache = new Map<string, BaseDbConnection<any>>();
 const isDevelopment = process.env.NODE_ENV === 'development';
+const isLambda = Boolean(
+  process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT,
+);
+
+/** Whether this process should keep connections open between calls. */
+function shouldReuseConnection(): boolean {
+  return isDevelopment || isLambda;
+}
 
 // Log pool stats periodically in development
 if (isDevelopment) {
@@ -47,11 +69,31 @@ if (isDevelopment) {
   process.on('SIGINT', () => void cleanup());
 }
 
-function getCacheKey(options: DbOptions): string {
-  if (options.type === 'pg-local') {
-    return `${options.type}-${options.dbCertPath}`;
+// Stable per-schema ids for the cache key. The connection carries the drizzle
+// `schema` that powers the relational query API (`db.query.<table>`), so a
+// cache keyed on connection type alone would hand an internal-schema caller the
+// public-schema connection that happened to be created first — leaving
+// `db.query` without the requested tables. Only development ever reused
+// connections before LS-9530, and it rarely touches both schemas in one
+// process; Lambda does, so the schema has to be part of the key.
+const schemaIds = new WeakMap<object, number>();
+let nextSchemaId = 0;
+
+function getSchemaId(schema: object): number {
+  let id = schemaIds.get(schema);
+  if (id === undefined) {
+    id = nextSchemaId++;
+    schemaIds.set(schema, id);
   }
-  return options.type;
+  return id;
+}
+
+function getCacheKey(options: DbOptions, schema: object): string {
+  const base =
+    options.type === 'pg-local'
+      ? `${options.type}-${options.dbCertPath}`
+      : options.type;
+  return `${base}#${getSchemaId(schema)}`;
 }
 
 export function getPublicDbConnection(
@@ -60,37 +102,10 @@ export function getPublicDbConnection(
   return getDbConnection(options, PublicSchema);
 }
 
-export function getDbConnection<TSchema extends Record<string, unknown>>(
+function createConnection<TSchema extends Record<string, unknown>>(
   options: DbOptions,
   schema: TSchema,
 ): BaseDbConnection<TSchema> {
-  // In development, use cached connection to prevent exhaustion
-  if (isDevelopment) {
-    const cacheKey = getCacheKey(options);
-    let connection = connectionCache.get(cacheKey);
-
-    if (!connection) {
-      LOGGER.debug(`Creating new cached connection: ${cacheKey}`);
-      switch (options.type) {
-        case 'pg-local':
-          connection = new PgDbConnection(options.dbCertPath, schema);
-          break;
-        case 'pg-remote':
-          connection = new PgDbConnection(undefined, schema);
-          break;
-        default:
-          throw new Error('Invalid connection type');
-      }
-      connectionCache.set(cacheKey, connection);
-    } else {
-      LOGGER.debug(`Reusing cached connection: ${cacheKey}`);
-    }
-
-    // Safe cast: we know the connection uses the same schema type
-    return connection as BaseDbConnection<TSchema>;
-  }
-
-  // In Lambda, create new connection each time (will use module-level singleton)
   switch (options.type) {
     case 'pg-local':
       return new PgDbConnection(options.dbCertPath, schema);
@@ -99,6 +114,32 @@ export function getDbConnection<TSchema extends Record<string, unknown>>(
     default:
       throw new Error('Invalid connection type');
   }
+}
+
+export function getDbConnection<TSchema extends Record<string, unknown>>(
+  options: DbOptions,
+  schema: TSchema,
+): BaseDbConnection<TSchema> {
+  // Development and Lambda reuse a cached connection; see connectionCache.
+  if (shouldReuseConnection()) {
+    const cacheKey = getCacheKey(options, schema);
+    let connection = connectionCache.get(cacheKey);
+
+    if (!connection) {
+      LOGGER.debug(`Creating new cached connection: ${cacheKey}`);
+      connection = createConnection(options, schema);
+      connectionCache.set(cacheKey, connection);
+    } else {
+      LOGGER.debug(`Reusing cached connection: ${cacheKey}`);
+    }
+
+    // Safe cast: the cache key includes the schema identity, so an entry is
+    // only ever returned to a caller that asked for that same schema object.
+    return connection as BaseDbConnection<TSchema>;
+  }
+
+  // Everywhere else: a fresh connection per call, closed when the call ends.
+  return createConnection(options, schema);
 }
 
 // Postgres SQLSTATE codes that indicate a transient connection failure safe to
@@ -115,20 +156,87 @@ const TRANSIENT_PG_CODES = new Set([
   '57P03', // cannot_connect_now — Aurora cold-resume
 ]);
 
+// Socket-level failures that carry no SQLSTATE. A pooled connection reused
+// across Lambda freeze/thaw can be severed while the container is suspended —
+// by the RDS idle timeout, a NAT idle timeout, or a failover — and node-postgres
+// surfaces that as a plain Error or a libuv errno rather than a Postgres code.
+// The `select 1 + 1` health check in runWithClient is what trips these, before
+// the caller's query runs, so they are safe to recover from by discarding the
+// connection and reconnecting. See LS-9530.
+const TRANSIENT_ERROR_CODES = new Set(['ECONNRESET', 'EPIPE', 'ETIMEDOUT']);
+const TRANSIENT_ERROR_MESSAGES = [
+  'Connection terminated unexpectedly',
+  'Connection terminated',
+  'Client has encountered a connection error and is not queryable',
+  'server closed the connection unexpectedly',
+  'read ECONNRESET',
+];
+
+// Postgres rejects the *credentials*, not the connection. Distinguished from
+// the transient codes because recovery needs the cached secret dropped as well
+// as the connection: it is what a credential rotation looks like from here when
+// the rotated value is still inside the secret cache's TTL (LS-9530).
+const AUTH_FAILURE_PG_CODES = new Set([
+  '28P01', // invalid_password
+  '28000', // invalid_authorization_specification
+]);
+
 const MAX_QUERY_RETRIES = 2;
 const RETRY_DELAY_BASE_MS = 100;
 
-// Walk err → err.cause → … and return the first transient SQLSTATE code found.
-function extractTransientPgCode(err: unknown): string | undefined {
+/** Walk the err → err.cause chain, applying `predicate` to each link. */
+function findInCauseChain<T>(
+  err: unknown,
+  predicate: (error: Error) => T | undefined,
+): T | undefined {
   let current: unknown = err;
   const seen = new Set<unknown>();
   while (current instanceof Error && !seen.has(current)) {
     seen.add(current);
-    const code = (current as Error & { code?: unknown }).code;
-    if (typeof code === 'string' && TRANSIENT_PG_CODES.has(code)) return code;
+    const hit = predicate(current);
+    if (hit !== undefined) return hit;
     current = (current as Error & { cause?: unknown }).cause;
   }
   return undefined;
+}
+
+// Walk err → err.cause → … and return the first transient SQLSTATE code found.
+function extractTransientPgCode(err: unknown): string | undefined {
+  return findInCauseChain(err, (error) => {
+    const code = (error as Error & { code?: unknown }).code;
+    return typeof code === 'string' && TRANSIENT_PG_CODES.has(code)
+      ? code
+      : undefined;
+  });
+}
+
+/** True when the error is a severed/unusable socket rather than a query fault. */
+function isTransientConnectionError(err: unknown): boolean {
+  return (
+    findInCauseChain(err, (error) => {
+      const code = (error as Error & { code?: unknown }).code;
+      if (typeof code === 'string' && TRANSIENT_ERROR_CODES.has(code)) {
+        return true;
+      }
+      return TRANSIENT_ERROR_MESSAGES.some((message) =>
+        error.message.includes(message),
+      )
+        ? true
+        : undefined;
+    }) ?? false
+  );
+}
+
+/** True when Postgres rejected the credentials we connected with. */
+function isAuthFailure(err: unknown): boolean {
+  return (
+    findInCauseChain(err, (error) => {
+      const code = (error as Error & { code?: unknown }).code;
+      return typeof code === 'string' && AUTH_FAILURE_PG_CODES.has(code)
+        ? true
+        : undefined;
+    }) ?? false
+  );
 }
 
 /**
@@ -150,6 +258,8 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
   schema: TSchema,
   callback: (client: GenericDatabase<TSchema>) => Promise<T>,
 ): Promise<T> {
+  const reuseConnection = shouldReuseConnection();
+
   for (let attempt = 0; attempt <= MAX_QUERY_RETRIES; attempt++) {
     const connection: BaseDbConnection<TSchema> = getDbConnection(
       options,
@@ -157,7 +267,7 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
     );
 
     let initializationFailed = false;
-    let transientError = false;
+    let recoverableError = false;
 
     try {
       // Only initialize if not already initialized (important for cached connections)
@@ -170,22 +280,43 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
 
       LOGGER.debug('authorizing...');
 
+      // Health check. On a reused connection this is also what detects a socket
+      // that died while the container was frozen, before the caller's query
+      // runs — which is why recovery below is safe (LS-9530).
       await connection.db.execute(sql`select 1 + 1`);
 
       LOGGER.debug('initializing models');
 
       return await callback(connection.db);
     } catch (err) {
-      // If initialization failed, mark it so we clean up even in dev mode
+      // If initialization failed, mark it so we clean up even when reusing
       if (!connection.isInitialized) {
         initializationFailed = true;
       }
       const pgCode = extractTransientPgCode(err);
-      transientError = pgCode !== undefined;
-      if (transientError && attempt < MAX_QUERY_RETRIES) {
+      const authFailure = isAuthFailure(err);
+      recoverableError =
+        pgCode !== undefined || isTransientConnectionError(err) || authFailure;
+
+      if (authFailure) {
+        // Almost certainly a credential rotation that happened inside the
+        // secret cache's TTL: drop the cached value so the reconnect below
+        // resolves the rotated credentials instead of replaying the stale ones.
+        // Scoped to the database secret — other cached secrets are unrelated to
+        // a Postgres auth rejection and should keep their TTL.
+        const dbSecretName =
+          process.env.DB_SECRET_NAME ?? process.env.DB_CREDS_PATH;
+        LOGGER.warn(
+          'DB authentication failed — invalidating cached credentials and reconnecting',
+          err instanceof Error ? err : new Error(String(err)),
+        );
+        invalidateSecretCache(dbSecretName);
+      }
+
+      if (recoverableError && attempt < MAX_QUERY_RETRIES) {
         const delayMs = RETRY_DELAY_BASE_MS * (attempt + 1);
         LOGGER.warn(
-          `Transient DB connection error (pgCode=${pgCode}), retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_QUERY_RETRIES})`,
+          `Recoverable DB connection error (pgCode=${pgCode ?? 'none'}), retrying in ${delayMs}ms (attempt ${attempt + 1}/${MAX_QUERY_RETRIES})`,
           err instanceof Error ? err : new Error(String(err)),
         );
         await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
@@ -194,15 +325,16 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
         throw err;
       }
     } finally {
-      // Force-close (and evict from dev-mode cache) on any transient error so
-      // the next iteration always starts with a fresh connection.
-      if (!isDevelopment || initializationFailed || transientError) {
+      // Close (and evict from the cache) whenever the connection cannot be
+      // trusted for the next call, so the following iteration — or the next
+      // invocation — always starts from a fresh one.
+      if (!reuseConnection || initializationFailed || recoverableError) {
         try {
           LOGGER.debug('Disconnecting client');
-          await connection.close();
-          if (isDevelopment && transientError) {
-            connectionCache.delete(getCacheKey(options));
+          if (reuseConnection) {
+            connectionCache.delete(getCacheKey(options, schema));
           }
+          await connection.close();
           LOGGER.debug('Client disconnected');
         } catch (err) {
           LOGGER.debug('Could not disconnect client');
@@ -211,10 +343,10 @@ export async function runWithClient<T, TSchema extends Record<string, unknown>>(
           }
         }
       } else {
-        LOGGER.debug('Keeping connection open (dev mode)');
+        LOGGER.debug('Keeping connection open for reuse');
       }
     }
-    // Reaches here only when: transientError=true AND attempt < MAX_QUERY_RETRIES
+    // Reaches here only when: recoverableError=true AND attempt < MAX_QUERY_RETRIES
     // Next loop iteration fetches a fresh connection via getDbConnection
   }
 

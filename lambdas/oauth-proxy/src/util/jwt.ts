@@ -1,6 +1,6 @@
 import { sign } from 'jsonwebtoken';
 import { readSecret } from '@legacy-sports/aws-utils';
-import { InternalUser } from '@legacy-sports/db-client';
+import { InternalDb, InternalUser } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import type { EntitlementKey } from '@legacy-sports/utils';
 import { randomBytes } from 'node:crypto';
@@ -76,15 +76,20 @@ function withTimeout<T>(
  *
  * Every fallback path is logged. Enforcement of the claim is out of scope here
  * (LS-8643) — this only mints it.
+ *
+ * `db` is the caller's already-open client. Supplying it keeps the Stripe
+ * customer lookup on the connection the handler already holds instead of
+ * opening a second one per request (LS-9530).
  */
 export async function resolveEntitlements(
   user: InternalUser,
   fallbackEntitlements?: readonly EntitlementKey[],
+  db?: InternalDb,
 ): Promise<EntitlementKey[]> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= STRIPE_FETCH_MAX_ATTEMPTS; attempt++) {
     try {
-      const customerId = await getStripeCustomerId(user.id);
+      const customerId = await getStripeCustomerId(user.id, db);
       if (!customerId) {
         // Free user / no Stripe customer → empty claim, no Stripe round-trip.
         return [];
@@ -142,13 +147,28 @@ export async function createJwt(
      * failure fails closed to an empty claim. See {@link resolveEntitlements}.
      */
     fallbackEntitlements?: readonly EntitlementKey[];
+    /**
+     * The caller's already-open database client. Threaded down to the Stripe
+     * customer lookup so minting a token does not open a second connection on
+     * top of the one the handler is already inside (LS-9530).
+     */
+    db?: InternalDb;
+    /**
+     * The JWT signing secret, when the caller has already read it. Handlers
+     * that verify an inbound token (e.g. refresh) hold the key already; passing
+     * it keeps the secret read to at most one per invocation (LS-9530).
+     */
+    jwtKey?: string;
   },
 ): Promise<string> {
-  const jwtKey = await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]);
+  const jwtKey =
+    additionalFields?.jwtKey ??
+    (await readSecret(SECRET_CONFIG[Secret.JWT_SECRET]));
 
   const entitlements = await resolveEntitlements(
     user,
     additionalFields?.fallbackEntitlements,
+    additionalFields?.db,
   );
 
   const picture = user.avatarUrl ?? additionalFields?.picture;

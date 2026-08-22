@@ -410,7 +410,7 @@ async function completeDiscordSignIn(
       user = { ...user, avatarUrl: providerAvatar };
     }
 
-    const internalJwt = await createJwt(user);
+    const internalJwt = await createJwt(user, { db });
 
     const cookies = { [JWT_COOKIE_NAME]: internalJwt };
     const encryptedCookies = await encryptCookies(cookies);

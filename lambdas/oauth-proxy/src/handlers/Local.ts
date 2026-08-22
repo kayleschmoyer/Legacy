@@ -198,7 +198,7 @@ export const handleLogin = async (
       ip,
     });
 
-    const internalJwt = await createJwt(user);
+    const internalJwt = await createJwt(user, { db });
 
     // Advisory billing-standing hint so the client can route past-due premium
     // users to billing after login (LGN-029). This never gates login — a

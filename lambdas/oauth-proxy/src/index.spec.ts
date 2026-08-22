@@ -31,6 +31,18 @@ jest.mock('@legacy-sports/rollbar', () => ({
   ),
 }));
 
+// The handler warms its Secrets Manager reads at module scope (LS-9530).
+// Only the secret-reading functions are stubbed — the rest of aws-utils is kept
+// real because db-client pulls DraftSqsService from the same module.
+jest.mock('@legacy-sports/aws-utils', () => ({
+  ...jest.requireActual<typeof import('@legacy-sports/aws-utils')>(
+    '@legacy-sports/aws-utils',
+  ),
+  prefetchSecret: jest.fn(),
+  readSecret: jest.fn().mockResolvedValue('test-secret'),
+  retrieveSecretParameterValue: jest.fn().mockResolvedValue('test-secret'),
+}));
+
 jest.mock('@legacy-sports/utils/node', () => ({
   getVersionInfo: jest.fn().mockReturnValue({
     service: 'oauth-proxy',

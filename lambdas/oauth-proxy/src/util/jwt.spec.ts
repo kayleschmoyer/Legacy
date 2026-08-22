@@ -22,10 +22,13 @@ jest.mock('./entitlements', () => ({
 }));
 
 import { type EntitlementKey, ENTITLEMENTS } from '@legacy-sports/utils';
-import type { InternalUser } from '@legacy-sports/db-client';
+import type { InternalDb, InternalUser } from '@legacy-sports/db-client';
+import { readSecret } from '@legacy-sports/aws-utils';
 import { createJwt, resolveEntitlements } from './jwt';
 import { getStripeCustomerId } from './db';
 import { fetchActiveEntitlements } from './entitlements';
+
+const mockedReadSecret = readSecret as jest.MockedFunction<typeof readSecret>;
 
 const mockedGetStripeCustomerId = getStripeCustomerId as jest.MockedFunction<
   typeof getStripeCustomerId
@@ -204,5 +207,52 @@ describe('resolveEntitlements — retry + fallback (LS-8644, LS-8638 RD#1)', () 
     const result = await resolveEntitlements(user);
     expect(result).toEqual([]);
     expect(mockedFetchActiveEntitlements).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('reusing a caller-supplied connection and secret (LS-9530)', () => {
+  const user = { id: 11 } as unknown as InternalUser;
+  // Stands in for the caller's open client; only its identity matters here.
+  const callerDb = { marker: 'caller-db' } as unknown as InternalDb;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetStripeCustomerId.mockResolvedValue(null);
+    mockedFetchActiveEntitlements.mockResolvedValue([]);
+    mockedReadSecret.mockResolvedValue('test-secret');
+  });
+
+  it('resolveEntitlements passes the supplied db to the customer lookup', async () => {
+    await resolveEntitlements(user, undefined, callerDb);
+
+    expect(mockedGetStripeCustomerId).toHaveBeenCalledWith(user.id, callerDb);
+  });
+
+  it('resolveEntitlements still self-connects when no db is supplied', async () => {
+    await resolveEntitlements(user);
+
+    expect(mockedGetStripeCustomerId).toHaveBeenCalledWith(user.id, undefined);
+  });
+
+  it('createJwt threads the supplied db down to the customer lookup', async () => {
+    await createJwt(user, { db: callerDb });
+
+    expect(mockedGetStripeCustomerId).toHaveBeenCalledWith(user.id, callerDb);
+  });
+
+  it('createJwt reuses a supplied jwtKey instead of re-reading the secret', async () => {
+    const token = await createJwt(user, { jwtKey: 'caller-provided-secret' });
+
+    expect(mockedReadSecret).not.toHaveBeenCalled();
+    // The supplied key really is the one signing the token.
+    expect(() =>
+      verify(token, 'caller-provided-secret', { algorithms: ['HS256'] }),
+    ).not.toThrow();
+  });
+
+  it('createJwt reads the secret itself when the caller supplies none', async () => {
+    await createJwt(user);
+
+    expect(mockedReadSecret).toHaveBeenCalledTimes(1);
   });
 });
