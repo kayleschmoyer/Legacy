@@ -7,9 +7,14 @@ import {
   PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { ALLOWED_POSITIONS, shuffleArray } from '@legacy-sports/utils';
+import {
+  ALLOWED_POSITIONS,
+  ALLOWED_POSITIONS_BY_SPORT,
+  shuffleArray,
+} from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, count, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
+import type { SportKind } from './strategies';
 import { ForbiddenError } from '../graphql-errors';
 import { addPlayerToRoster } from '../../services/roster-service';
 
@@ -114,12 +119,22 @@ export const ALLOWED_POSITIONS_FOR_AUTO_PICK = ALLOWED_POSITIONS;
  *
  * Shared by autoProcessDraftPicks (scheduled-mutations.ts) and the
  * makeDraftPick auto-pick chain (mutations.ts).
+ *
+ * `sport` defaults to 'baseball' for backward compatibility with callers
+ * that haven't yet been updated to pass it (LS-9523 tracks the scheduled
+ * auto-pick path, which still doesn't). Football reads eligibility from
+ * `football_player_eligible_positions` (LS-9479) — the baseball-only
+ * `playerEligiblePositions` table has zero football rows (LS-9474
+ * postmortem), so without this branch a football team's drafted players
+ * were never detected as filling any slot, and every slot type stayed
+ * "unfilled" for the whole draft regardless of what was actually picked.
  */
 export async function getUnfilledPositionTypes(
   tx: PublicDb,
   draftId: number,
   teamId: number,
   leagueId: number,
+  sport: SportKind = 'baseball',
 ): Promise<string[]> {
   // 1. League position requirements
   const leaguePositions = await tx
@@ -150,22 +165,42 @@ export async function getUnfilledPositionTypes(
   }
 
   // 3. Position eligibility for already-drafted players from the mat view
-  const eligiblePositionRows = await tx
-    .select({
-      playerId: PublicSchema.playerEligiblePositions.playerId,
-      position: PublicSchema.playerEligiblePositions.position,
-    })
-    .from(PublicSchema.playerEligiblePositions)
-    .where(
-      inArray(PublicSchema.playerEligiblePositions.playerId, teamPlayerIds),
-    );
+  // (football reads a disjoint relation — see the doc comment above).
+  const eligiblePositionRows =
+    sport === 'football'
+      ? await tx
+          .select({
+            playerId: PublicSchema.footballPlayerEligiblePositions.playerId,
+            position: PublicSchema.footballPlayerEligiblePositions.position,
+          })
+          .from(PublicSchema.footballPlayerEligiblePositions)
+          .where(
+            inArray(
+              PublicSchema.footballPlayerEligiblePositions.playerId,
+              teamPlayerIds,
+            ),
+          )
+      : await tx
+          .select({
+            playerId: PublicSchema.playerEligiblePositions.playerId,
+            position: PublicSchema.playerEligiblePositions.position,
+          })
+          .from(PublicSchema.playerEligiblePositions)
+          .where(
+            inArray(
+              PublicSchema.playerEligiblePositions.playerId,
+              teamPlayerIds,
+            ),
+          );
+
+  const allowedPositions = ALLOWED_POSITIONS_BY_SPORT[sport];
 
   // Build map: playerId → set of slot types the player can fill
   const playerSlotMap = new Map<number, Set<string>>();
   for (const row of eligiblePositionRows) {
     const existing = playerSlotMap.get(row.playerId) ?? new Set<string>();
     for (const [slotType, allowedStatPositions] of Object.entries(
-      ALLOWED_POSITIONS,
+      allowedPositions,
     )) {
       if (allowedStatPositions.includes(row.position)) {
         existing.add(slotType);
@@ -176,7 +211,12 @@ export async function getUnfilledPositionTypes(
 
   // 4-5. Maximum bipartite matching between drafted players and slot
   // instances determines which slot types remain genuinely unfilled.
-  return computeUnfilledSlotTypes(slotsNeeded, playerSlotMap, teamPlayerIds);
+  return computeUnfilledSlotTypes(
+    slotsNeeded,
+    playerSlotMap,
+    teamPlayerIds,
+    allowedPositions,
+  );
 }
 
 /**
@@ -199,10 +239,13 @@ export function computeUnfilledSlotTypes(
   slotsNeeded: Map<string, number>,
   playerSlotMap: Map<number, Set<string>>,
   teamPlayerIds: number[],
+  allowedPositions: Readonly<
+    Record<string, readonly string[]>
+  > = ALLOWED_POSITIONS,
 ): string[] {
   const orderedSlotTypes = [...slotsNeeded.keys()].sort(
     (a, b) =>
-      (ALLOWED_POSITIONS[a]?.length ?? 1) - (ALLOWED_POSITIONS[b]?.length ?? 1),
+      (allowedPositions[a]?.length ?? 1) - (allowedPositions[b]?.length ?? 1),
   );
 
   const slotInstanceTypes: string[] = [];
@@ -261,22 +304,33 @@ export function computeUnfilledSlotTypes(
  * Map a set of still-unfilled league position slot types to the set of player
  * stat positions that could fill at least one of them (LS-8065).
  *
- * Uses the same {@link ALLOWED_POSITIONS} table that {@link getUnfilledPositionTypes}
- * uses to decide which slots a player covers, so the two stay consistent: a
- * player whose `player_eligible_positions` intersect this set is exactly a
- * player that meets a still-open roster requirement for the team.
+ * Uses the same {@link ALLOWED_POSITIONS_BY_SPORT} table that
+ * {@link getUnfilledPositionTypes} uses to decide which slots a player
+ * covers, so the two stay consistent: a player whose eligible positions
+ * intersect this set is exactly a player that meets a still-open roster
+ * requirement for the team.
+ *
+ * `sport` defaults to 'baseball' for backward compatibility. Previously this
+ * always read the baseball-only {@link ALLOWED_POSITIONS} table regardless of
+ * sport, so a football board's unfilled slots (QB/RB/WR/etc.) never matched
+ * any key and the LS-8065 constraint silently didn't apply to football
+ * (LS-9479 postmortem).
  *
  * Unknown slot types contribute no positions (mirrors the auto-pick helper,
- * which can never fill a slot type absent from the mapping). Returns a
- * de-duplicated list; an empty `unfilledPositionTypes` yields an empty list.
+ * which can never fill a slot type absent from the mapping) — this is the
+ * safe failure mode: an unrecognized slot type yields no predicate rather
+ * than an empty board. Returns a de-duplicated list; an empty
+ * `unfilledPositionTypes` yields an empty list.
  */
 export function eligibleStatPositionsForUnfilledSlots(
   unfilledPositionTypes: string[],
+  sport: SportKind = 'baseball',
 ): string[] {
+  const allowedPositions = ALLOWED_POSITIONS_BY_SPORT[sport];
   return [
     ...new Set(
       unfilledPositionTypes.flatMap(
-        (slotType) => ALLOWED_POSITIONS[slotType] ?? [],
+        (slotType) => allowedPositions[slotType] ?? [],
       ),
     ),
   ];

@@ -186,9 +186,19 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
 
     await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
 
-    // Unfilled positions are computed for the caller's own team.
-    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(db, 100, 11, 7);
-    expect(eligibleStatPositionsForUnfilledSlots).toHaveBeenCalledWith(['SP']);
+    // Unfilled positions are computed for the caller's own team, sport-aware
+    // (LS-9479).
+    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
+      db,
+      100,
+      11,
+      7,
+      'baseball',
+    );
+    expect(eligibleStatPositionsForUnfilledSlots).toHaveBeenCalledWith(
+      ['SP'],
+      'baseball',
+    );
 
     const { sql: text, params } = serializeExecutedQuery(db);
     expect(text).toContain('player_eligible_positions');
@@ -232,9 +242,48 @@ describe('getAvailableDraftPlayers — position-requirement filter (LS-8065)', (
 
     await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
 
-    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(db, 100, 11, 7);
+    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
+      db,
+      100,
+      11,
+      7,
+      'baseball',
+    );
     const { sql: text } = serializeExecutedQuery(db);
     expect(text).not.toContain('player_eligible_positions');
+  });
+
+  // LS-9479: the board's LS-8065 constraint must apply to football too — it
+  // previously mapped slot types through the baseball-only ALLOWED_POSITIONS,
+  // which has no football keys, so the predicate was always a silent no-op.
+  it('restricts a football board to players eligible for an unfilled slot, using the football relation', async () => {
+    const resolve = await captureResolver();
+    verifyLeagueMembership.mockResolvedValue({ teamId: 11 });
+    getUnfilledPositionTypes.mockResolvedValue(['QB']);
+    eligibleStatPositionsForUnfilledSlots.mockReturnValue(['QB']);
+    const db = makeDb({ ...LEAGUE_ROW, sport: 'football' });
+
+    await resolve({}, { draftId: 100 }, { user: { id: 7 }, db });
+
+    // Sport threaded through to both helpers.
+    expect(getUnfilledPositionTypes).toHaveBeenCalledWith(
+      db,
+      100,
+      11,
+      7,
+      'football',
+    );
+    expect(eligibleStatPositionsForUnfilledSlots).toHaveBeenCalledWith(
+      ['QB'],
+      'football',
+    );
+
+    const { sql: text, params } = serializeExecutedQuery(db);
+    // Exclusive assertion (LS-9474 substring-trap postmortem): the literal
+    // baseball table name must never appear, not just "football is mentioned".
+    expect(text).toContain('public.football_player_eligible_positions');
+    expect(text).not.toContain('public.player_eligible_positions');
+    expect(params).toEqual(expect.arrayContaining(['QB']));
   });
 });
 

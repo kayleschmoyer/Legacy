@@ -391,6 +391,7 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // draftable. Baseball leagues are unaffected: every baseball player
       // carries sport='baseball'.
       const leagueSport = league?.sport ?? 'baseball';
+      const isFootball = leagueSport === 'football';
       const sportCondition = sql`p.sport = ${leagueSport}`;
       sqlConditions.push(sportCondition);
 
@@ -431,7 +432,6 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // stat position directly.
       if (position && position.trim().length > 0) {
         const pos = position.trim().toUpperCase();
-        const isFootball = leagueSport === 'football';
         const expandedPositions = isFootball
           ? POSITION_FILTER_EXPANSIONS_FOOTBALL[pos]
           : POSITION_FILTER_EXPANSIONS_BASEBALL[pos];
@@ -489,30 +489,38 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // the league defines no position requirements, or every slot is already
       // filled, getUnfilledPositionTypes returns an empty list, the eligible
       // stat-position set is empty, and no positional predicate is added —
-      // preserving the prior unfiltered behaviour. Football leagues land on
-      // that same no-op path today: eligibleStatPositionsForUnfilledSlots maps
-      // slot types through the baseball-only ALLOWED_POSITIONS, which has no
-      // QB/RB/WR/TE/K/DEF keys, so a football board is narrowed by sport and
-      // pool but not by remaining roster needs.
+      // preserving the prior unfiltered behaviour (the safe failure mode).
+      // Both helpers are sport-aware (LS-9479) — football reads
+      // football_player_eligible_positions and ALLOWED_POSITIONS_BY_SPORT.football
+      // instead of the baseball-only equivalents, matching the EXISTS clause below.
       if (membership.teamId != null) {
         const unfilledPositionTypes = await getUnfilledPositionTypes(
           context.db,
           draftId,
           membership.teamId,
           draft.leagueId,
+          leagueSport,
         );
         const eligibleStatPositions = eligibleStatPositionsForUnfilledSlots(
           unfilledPositionTypes,
+          leagueSport,
         );
         if (eligibleStatPositions.length > 0) {
           const positionValues = sql.join(
             eligibleStatPositions.map((pos) => sql`${pos}`),
             sql`, `,
           );
-          sqlConditions.push(sql`EXISTS (
-            SELECT 1 FROM public.player_eligible_positions pep
-            WHERE pep.player_id = p.id AND pep.position IN (${positionValues})
-          )`);
+          sqlConditions.push(
+            isFootball
+              ? sql`EXISTS (
+                SELECT 1 FROM public.football_player_eligible_positions fpep
+                WHERE fpep.player_id = p.id AND fpep.position IN (${positionValues})
+              )`
+              : sql`EXISTS (
+                SELECT 1 FROM public.player_eligible_positions pep
+                WHERE pep.player_id = p.id AND pep.position IN (${positionValues})
+              )`,
+          );
         }
       }
 
