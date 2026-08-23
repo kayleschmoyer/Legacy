@@ -201,7 +201,18 @@ jobs:
     permissions:
       id-token: write # AWS OIDC
       contents: read
-      actions: read # workflow_run/workflow_dispatch context reads inside the callee
+      # Covers workflow_run/workflow_dispatch context reads inside the callee,
+      # and MUST be `write`, not `read` (LS-9585): the callee's
+      # `report-runner-shutdown` job declares `actions: write` to re-dispatch
+      # the workflow after a confirmed runner death. A callee may only DOWNGRADE
+      # the caller's permissions, never upgrade them, and GitHub rejects the
+      # violation at workflow-parse time -- so `read` here killed the WHOLE
+      # Deploy run at startup with zero jobs and no logs (same failure mode as
+      # LS-9380, above). Neither gate catches this: `make lint-workflows` passes,
+      # because the escalation rule is a GitHub runtime constraint the JSON
+      # schema does not model, and deploy.yml runs only on push to main, so PR
+      # CI never starts it.
+      actions: write
     uses: ./.github/workflows/lambda-terraform-apply.yml
     secrets: inherit
 
