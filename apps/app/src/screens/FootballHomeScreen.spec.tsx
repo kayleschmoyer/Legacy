@@ -52,6 +52,7 @@ jest.mock('@legacy-sports/shared-components/football', () => {
       onBrowsePlayers?: () => void;
       onViewLeague: (id: string | number) => void;
       onSignIn?: () => void;
+      onRetry?: () => void;
       refreshControl?: import('../common/hooks/usePullToRefresh').PullToRefreshControlElement;
       leagueCap?: {
         count: number;
@@ -93,6 +94,9 @@ jest.mock('@legacy-sports/shared-components/football', () => {
             onPress={() => props.onBrowsePlayers?.()}
           >
             <Text>browse-players</Text>
+          </Pressable>
+          <Pressable testID="retry" onPress={() => props.onRetry?.()}>
+            <Text>retry</Text>
           </Pressable>
         </View>
       );
@@ -573,6 +577,14 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
     it('skips the leagues query when unauthenticated', () => {
       render(<FootballHomeScreen />);
       expect(mockUseGetUserLeaguesQuery).toHaveBeenCalledWith({ skip: true });
+    });
+  });
+
+  describe('error retry (LS-6260)', () => {
+    it('wires onRetry to refetch the leagues query', () => {
+      render(<FootballHomeScreen />);
+      fireEvent.press(screen.getByTestId('retry'));
+      expect(mockRefetchLeagues).toHaveBeenCalledTimes(1);
     });
   });
 

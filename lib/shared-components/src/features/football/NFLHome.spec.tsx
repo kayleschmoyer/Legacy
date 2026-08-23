@@ -107,6 +107,39 @@ describe('NFLHome — leagues list virtualization (LS-6257)', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('omits the Retry button when onRetry is not provided (LS-6260)', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(5)}
+        error
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+
+    expect(
+      screen.queryByTestId('football-leagues-retry-button'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders a Retry button in the error state and invokes onRetry when pressed (LS-6260)', () => {
+    const onRetry = jest.fn();
+    render(
+      <NFLHome
+        leagues={makeLeagues(5)}
+        error
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onRetry={onRetry}
+      />,
+    );
+
+    const retryButton = screen.getByTestId('football-leagues-retry-button');
+    expect(retryButton).toBeInTheDocument();
+    fireEvent.click(retryButton);
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
   it('renders the empty state when there are no leagues', () => {
     render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
 

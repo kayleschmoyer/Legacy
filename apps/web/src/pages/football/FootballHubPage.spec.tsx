@@ -117,6 +117,8 @@ function leaguesOfCount(n: number, sport = 'football'): StubLeague[] {
 // helper (which pass fewer leagues than the page size) keep working
 // unchanged; tests exercising pagination pass an explicit `userLeagueCount`
 // that diverges from `userLeagues.length` (LS-9101).
+const refetchSpy = jest.fn();
+
 function setLeagues(userLeagues: StubLeague[], userLeagueCount?: number) {
   mockUseGetUserLeaguesQuery.mockReturnValue({
     data: {
@@ -125,7 +127,8 @@ function setLeagues(userLeagues: StubLeague[], userLeagueCount?: number) {
     },
     loading: false,
     error: undefined,
-  } as ReturnType<typeof useGetUserLeaguesQuery>);
+    refetch: refetchSpy,
+  } as unknown as ReturnType<typeof useGetUserLeaguesQuery>);
 }
 
 const navigateSpy = jest.fn();
@@ -334,6 +337,17 @@ describe('FootballHubPage — unlimited-leagues badge wiring (LS-6270/FBH-016)',
     render(<FootballHubPage />);
 
     expect(mockNFLHome.mock.calls[0][0].hasUnlimitedLeagues).toBe(false);
+  });
+});
+
+describe('FootballHubPage — error retry (LS-6260)', () => {
+  it("wires onRetry to the leagues query's refetch", () => {
+    setLeagues(leaguesOfCount(2));
+
+    render(<FootballHubPage />);
+    mockNFLHome.mock.calls[0][0].onRetry?.();
+
+    expect(refetchSpy).toHaveBeenCalledTimes(1);
   });
 });
 

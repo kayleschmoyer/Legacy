@@ -128,6 +128,7 @@ export default function FootballHomeScreen({
       error={!!error}
       isAuthenticated={!!userInfo?.id}
       onSignIn={() => router.navigate('/login')}
+      onRetry={() => void refetchLeagues()}
       onCreateLeague={handleCreateLeague}
       onJoinLeague={() => router.push('/football/league/join')}
       onBrowseLeagues={() => router.push('/league-discovery')}

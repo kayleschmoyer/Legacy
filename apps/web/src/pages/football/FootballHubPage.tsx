@@ -25,7 +25,7 @@ export function FootballHubPage() {
   const { isPremium, isLoading: premiumLoading } = useIsPremiumStatus();
   const [showUpgradeModal, setShowUpgradeModal] = React.useState(false);
 
-  const { data, loading, error } = useGetUserLeaguesQuery({
+  const { data, loading, error, refetch } = useGetUserLeaguesQuery({
     skip: !auth?.user,
     fetchPolicy: 'cache-and-network',
   });
@@ -147,6 +147,7 @@ export function FootballHubPage() {
           matchupHighlights={matchupHighlights}
           onSwitchSport={(sport) => navigate(`/${sport}`)}
           onSignIn={() => navigate('/')}
+          onRetry={() => void refetch()}
           leagueCap={leagueCap}
           hasUnlimitedLeagues={!!auth?.user && !premiumLoading && isPremium}
         />

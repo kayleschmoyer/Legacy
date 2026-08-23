@@ -98,6 +98,8 @@ export interface NFLHomeProps {
   onViewLeague: (leagueId: string | number) => void;
   /** Navigate to sign-in from the unauthenticated notice. */
   onSignIn?: () => void;
+  /** Retry the leagues query from the error notice. Omitted → no Retry button. */
+  onRetry?: () => void;
   /** Top/trending players preview (LS-5411). Omit to hide the section entirely. */
   trendingPlayers?: FootballPlayerCardPlayer[];
   trendingPlayersLoading?: boolean;
@@ -388,6 +390,7 @@ function NFLHome({
   onBrowsePlayers,
   onViewLeague,
   onSignIn,
+  onRetry,
   trendingPlayers,
   trendingPlayersLoading = false,
   matchupHighlights = [],
@@ -783,6 +786,20 @@ function NFLHome({
                 <Text color="$gray10" fontSize="$3" textAlign="center">
                   There was a problem fetching your league data.
                 </Text>
+                {onRetry ? (
+                  <Button
+                    backgroundColor="$orange9"
+                    borderRadius="$3"
+                    onPress={onRetry}
+                    data-testid="football-leagues-retry-button"
+                    accessibilityLabel="Retry loading leagues"
+                    aria-label="Retry loading leagues"
+                  >
+                    <Text color="white" fontWeight="700">
+                      Retry
+                    </Text>
+                  </Button>
+                ) : null}
               </YStack>
             ) : leagues.length === 0 ? (
               <YStack alignItems="center" padding="$5" gap="$3">
