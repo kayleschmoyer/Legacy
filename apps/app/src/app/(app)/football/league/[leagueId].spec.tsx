@@ -176,6 +176,9 @@ jest.mock('@legacy-sports/shared-components', () => {
     isDraftRoomReachable: (status: string | null | undefined) =>
       status === 'in-progress' || status === 'drafting' || status === 'paused',
     LeagueDetailShell,
+    Chip: ({ label }: { label: string }) => (
+      <Text testID="league-config-chip">{label}</Text>
+    ),
     CommissionerAuditLog: () => <View testID="commissioner-audit-log" />,
     CommissionerNoteControl: () => <View testID="commissioner-note-control" />,
     Chip: ({ label }: { label: string; tone?: string }) => (

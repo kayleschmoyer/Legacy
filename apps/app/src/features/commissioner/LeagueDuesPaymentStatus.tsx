@@ -140,6 +140,11 @@ export function LeagueDuesPaymentStatus({
           <Text color="$gray11" fontSize="$3">
             {`$${amountDollars} per member`}
           </Text>
+          {isCommissioner && members.length > 0 && (
+            <Text color="$gray11" fontSize="$3" fontWeight="600">
+              {`${paidCount} of ${members.length} paid · ${unpaidCount} outstanding`}
+            </Text>
+          )}
         </YStack>
 
         {/* Summary Stats */}
