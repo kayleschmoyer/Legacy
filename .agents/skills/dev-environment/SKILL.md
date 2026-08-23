@@ -94,6 +94,10 @@ Quick service health check: `make check-services` (probes `/health` on 5000–50
 | `scripts/db-query.ps1`                | ✅      | ⛔          | Data queries against dev RDS; cross-platform alternative: `ls-cli query-db` or the hosted `db_query` MCP tool ([database](../database/SKILL.md))     |
 | `pnpm run dev:web` wrapper            | ✅      | ⛔          | Plain `make dev-web` works everywhere                                                                                                                |
 
+## Android native builds on Windows (long-path limitation)
+
+`node scripts/run-android-dev.mjs [--check]` (`make dev-mobile` equivalent for native builds — see [mobile-qa](../mobile-qa/SKILL.md) for emulator sweeps) preflights `LongPathsEnabled` on Windows and warns with the remediation command whenever it's `0`. **This is a warning, not a hard failure** — it can't reliably tell whether the current checkout is short enough to succeed anyway. If a native build (`expo run:android`, `./gradlew assembleDebug|assembleRelease`) then fails with a CMake `CMAKE_OBJECT_PATH_MAX` warning or a cascading `ninja: error: manifest 'build.ninja' still dirty after 100 tries`, this is the cause — see [worktree-workflow's full writeup](../worktree-workflow/SKILL.md#known-limitation-native-android-builds-and-windows-max_path) for the root cause, why `subst`/junction workarounds don't fix it, and the one-time fix.
+
 ## The Legacy Sports CLI
 
 Admin, data-loading, and debugging commands live in one Commander program: `apps/cli/src/main.ts`. Full catalog (all commands, grouped by task, with options): [references/cli-commands.md](references/cli-commands.md).

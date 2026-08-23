@@ -83,6 +83,18 @@ export function parseAvdList(listAvdsOutput) {
 }
 
 /**
+ * Parse `reg query HKLM\...\FileSystem /v LongPathsEnabled` output.
+ * Returns the DWORD value (0 or 1), or null if the value/key doesn't exist
+ * (reg query exits non-zero and its stdout is unusable — treat as "0").
+ */
+export function parseLongPathsEnabled(regQueryOutput) {
+  const match = regQueryOutput.match(
+    /LongPathsEnabled\s+REG_DWORD\s+0x([0-9a-fA-F]+)/,
+  );
+  return match ? parseInt(match[1], 16) : null;
+}
+
+/**
  * Build the argv for launching expo without a shell: `node <expo/bin/cli>
  * run:android ...`. Resolving the CLI entry from apps/app and executing it
  * with the current node binary avoids `npx`/`shell: true`, so `extraArgs`
@@ -102,6 +114,34 @@ export function buildExpoCommand(appDir, extraArgs) {
 function fail(...lines) {
   for (const line of lines) console.error(line);
   process.exit(1);
+}
+
+const LONG_PATH_REMEDIATION = [
+  'Windows long paths are not enabled — native Android builds (CMake/ninja) from',
+  'a .claude/worktrees/ checkout can fail with MAX_PATH / CMAKE_OBJECT_PATH_MAX',
+  'errors (LS-8811, LS-9443). One-time fix (elevated PowerShell, then reboot):',
+  "  New-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\FileSystem' -Name LongPathsEnabled -Value 1 -PropertyType DWORD -Force",
+  'See .agents/skills/worktree-workflow/SKILL.md#known-limitation-native-android-builds-and-windows-max_path.',
+];
+
+/** Windows-only: warn (never fail) if LongPathsEnabled isn't set to 1. */
+function checkWindowsLongPaths() {
+  if (process.platform !== 'win32') return;
+  let enabled = null;
+  try {
+    const output = run('reg', [
+      'query',
+      'HKLM\\SYSTEM\\CurrentControlSet\\Control\\FileSystem',
+      '/v',
+      'LongPathsEnabled',
+    ]);
+    enabled = parseLongPathsEnabled(output);
+  } catch {
+    // reg query exits non-zero when the value is missing — treat as disabled.
+  }
+  if (enabled !== 1) {
+    for (const line of LONG_PATH_REMEDIATION) console.warn(line);
+  }
 }
 
 function run(file, args) {
@@ -152,6 +192,8 @@ function startExpo(checkMode, expoArgs) {
 async function main() {
   const { checkMode, expoArgs } = splitArgs(process.argv.slice(2));
   const exe = process.platform === 'win32' ? '.exe' : '';
+
+  checkWindowsLongPaths();
 
   const sdk = sdkCandidates(process.env, process.platform, os.homedir()).find(
     (dir) => existsSync(dir),

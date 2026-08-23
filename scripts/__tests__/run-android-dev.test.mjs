@@ -20,6 +20,7 @@ import process from 'node:process';
 import {
   buildExpoCommand,
   parseAvdList,
+  parseLongPathsEnabled,
   parseOnlineDevices,
   sdkCandidates,
   splitArgs,
@@ -111,6 +112,32 @@ test('parseAvdList: names kept, INFO noise and blanks dropped', () => {
 
 test('parseAvdList: empty output yields no AVDs', () => {
   assert.deepEqual(parseAvdList(''), []);
+});
+
+// --- parseLongPathsEnabled (LS-9443/LS-8811) ---------------------------------
+
+test('parseLongPathsEnabled: enabled (0x1)', () => {
+  const output = [
+    'HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\FileSystem',
+    '    LongPathsEnabled    REG_DWORD    0x1',
+    '',
+  ].join('\r\n');
+  assert.equal(parseLongPathsEnabled(output), 1);
+});
+
+test('parseLongPathsEnabled: disabled (0x0)', () => {
+  const output = [
+    'HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\FileSystem',
+    '    LongPathsEnabled    REG_DWORD    0x0',
+    '',
+  ].join('\r\n');
+  assert.equal(parseLongPathsEnabled(output), 0);
+});
+
+test('parseLongPathsEnabled: value missing (reg query error text)', () => {
+  const output =
+    'ERROR: The system was unable to find the specified registry key or value.\r\n';
+  assert.equal(parseLongPathsEnabled(output), null);
 });
 
 // --- buildExpoCommand (command-injection hardening) --------------------------
