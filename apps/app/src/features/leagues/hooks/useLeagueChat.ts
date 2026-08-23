@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery } from '@apollo/client/react';
+import { useApolloClient, useQuery } from '@apollo/client/react';
 import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
@@ -99,6 +99,13 @@ function localIdToPendingId(localId: string): number {
   return -Math.abs(hash) - 1;
 }
 
+/**
+ * Page size for both the initial history load and each older-history fetch
+ * (LS-6302). `getLeagueMessages` returns newest-first; a page shorter than
+ * this is the signal that there is no older history left to page through.
+ */
+const MESSAGE_PAGE_SIZE = 50;
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -109,12 +116,21 @@ export function useLeagueChat(leagueId: number): {
   wsError: Error | null;
   sendMessage: (text: string, gifUrl?: string) => Promise<void>;
   mentionCandidates: MentionCandidate[];
+  /** True while there is still older chat history to reverse-paginate. */
+  hasMoreHistory: boolean;
+  /** True while a `loadOlderMessages` fetch is in flight. */
+  loadingOlder: boolean;
+  /** Fetch and prepend the next page of history older than what's loaded. */
+  loadOlderMessages: () => Promise<void>;
   announcements: ChatAnnouncement[];
   postingAnnouncement: boolean;
   postAnnouncement: (text: string) => Promise<void>;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [wsError, setWsError] = useState<Error | null>(null);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const apolloClient = useApolloClient();
   // Consumed by LeagueChatTab, always rendered inside a league screen's
   // LeagueWebSocketContext.Provider — reuse that shared socket instead of
   // opening a dedicated 'chat' connection (LS-8885).
@@ -124,7 +140,7 @@ export function useLeagueChat(leagueId: number): {
   const { loading, data: historyData } = useQuery<GetLeagueMessagesQuery>(
     GetLeagueMessages,
     {
-      variables: { leagueId, limit: 50 },
+      variables: { leagueId, limit: MESSAGE_PAGE_SIZE },
       skip: isNaN(leagueId),
     },
   );
@@ -173,26 +189,71 @@ export function useLeagueChat(leagueId: number): {
     [postAnnouncementMutation, leagueId],
   );
 
-  // Sync history into local state; merge with any WS-appended messages
+  // Sync history into local state; merge with any WS-appended messages.
+  // `getLeagueMessages` returns newest-first — reverse to oldest-first so
+  // history lines up with WS/sent messages, which are always appended to
+  // the end of `messages` as they arrive (LS-6302).
   const [historySynced, setHistorySynced] = useState(false);
   useEffect(() => {
     if (historyData && !historySynced) {
-      setMessages((historyData.getLeagueMessages ?? []).map(toMessage));
+      const page = historyData.getLeagueMessages ?? [];
+      setMessages([...page].reverse().map(toMessage));
+      setHasMoreHistory(page.length === MESSAGE_PAGE_SIZE);
       setHistorySynced(true);
     }
   }, [historyData, historySynced]);
+
+  // Fetch and prepend the next page of history older than the oldest
+  // currently-loaded message (LS-6302). `messages` is oldest-first, so the
+  // cursor is the id of the first entry.
+  const loadOlderMessages = useCallback(async () => {
+    if (!hasMoreHistory || loadingOlder) return;
+    const oldest = messages[0];
+    if (!oldest || oldest.id <= 0) return;
+
+    setLoadingOlder(true);
+    try {
+      const { data } = await apolloClient.query<GetLeagueMessagesQuery>({
+        query: GetLeagueMessages,
+        variables: { leagueId, limit: MESSAGE_PAGE_SIZE, before: oldest.id },
+        fetchPolicy: 'network-only',
+      });
+      const page = data?.getLeagueMessages ?? [];
+      if (page.length > 0) {
+        const older = [...page].reverse().map(toMessage);
+        setMessages((prev) => [...older, ...prev]);
+      }
+      setHasMoreHistory(page.length === MESSAGE_PAGE_SIZE);
+    } catch (error) {
+      captureError(error instanceof Error ? error : new Error(String(error)));
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [apolloClient, hasMoreHistory, loadingOlder, messages, leagueId]);
 
   // Offline send queue (LS-9097): messages sent while the league socket is
   // disconnected are persisted per-league and retried once `connected`
   // flips back to true, instead of failing outright.
   const [queue, setQueue] = useState<QueuedChatMessage[]>([]);
 
-  // Reset when leagueId changes
+  // Reset when leagueId changes. Skip the very first run: this effect and
+  // the history-sync effect above both fire in the same pass on mount, and
+  // since this one runs second, an unconditional reset would clobber
+  // history the sync effect just applied — most visibly when `historyData`
+  // is already warm in the Apollo cache and resolves synchronously on
+  // mount (LS-6302).
+  const isMountRef = useRef(true);
   useEffect(() => {
+    if (isMountRef.current) {
+      isMountRef.current = false;
+      return;
+    }
     setMessages([]);
     setHistorySynced(false);
     setWsError(null);
     setQueue([]);
+    setHasMoreHistory(true);
+    setLoadingOlder(false);
   }, [leagueId]);
 
   // Restore any queue persisted from a previous session for this league.
@@ -377,6 +438,9 @@ export function useLeagueChat(leagueId: number): {
     wsError,
     sendMessage,
     mentionCandidates,
+    hasMoreHistory,
+    loadingOlder,
+    loadOlderMessages,
     announcements,
     postingAnnouncement,
     postAnnouncement,

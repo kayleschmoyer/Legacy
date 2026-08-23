@@ -3669,6 +3669,7 @@ export type QueryGetLeagueHistoryArgs = {
 };
 
 export type QueryGetLeagueMessagesArgs = {
+  before?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
 };
@@ -8026,6 +8027,7 @@ export type DirectMessageFieldsFragment = {
 export type GetLeagueMessagesQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
+  before?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 export type GetLeagueMessagesQuery = {
@@ -20960,8 +20962,8 @@ export type SwapMatchupPlayerPositionsMutationOptions = BaseMutationOptions<
   SwapMatchupPlayerPositionsMutationVariables
 >;
 export const GetLeagueMessages = gql`
-  query GetLeagueMessages($leagueId: Int!, $limit: Int) {
-    getLeagueMessages(leagueId: $leagueId, limit: $limit) {
+  query GetLeagueMessages($leagueId: Int!, $limit: Int, $before: Int) {
+    getLeagueMessages(leagueId: $leagueId, limit: $limit, before: $before) {
       ...LeagueChatMessageFields
     }
   }
@@ -20982,6 +20984,7 @@ export const GetLeagueMessages = gql`
  *   variables: {
  *      leagueId: // value for 'leagueId'
  *      limit: // value for 'limit'
+ *      before: // value for 'before'
  *   },
  * });
  */

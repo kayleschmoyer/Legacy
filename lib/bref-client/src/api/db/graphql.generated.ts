@@ -3663,6 +3663,7 @@ export type QueryGetLeagueHistoryArgs = {
 };
 
 export type QueryGetLeagueMessagesArgs = {
+  before?: InputMaybe<Scalars['Int']['input']>;
   leagueId: Scalars['Int']['input'];
   limit?: InputMaybe<Scalars['Int']['input']>;
 };

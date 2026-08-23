@@ -383,6 +383,47 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({ leagueId: 1 });
     });
+
+    // LS-6302: reverse-pagination cursor for "load older messages".
+    it('accepts a before cursor and returns the older page', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ id: 1 }]) // membership
+        .mockResolvedValueOnce([
+          makeLeagueMsg({ id: 49, messageText: 'older message' }),
+        ]);
+
+      const resolver = getQuery('getLeagueMessages');
+      const result = (await resolver(
+        {},
+        { leagueId: 1, limit: 50, before: 50 },
+        mockContext,
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ id: 49 });
+      // The cursor condition is folded into the same `where` call as the
+      // leagueId scope, not a second filter — assert the query was built
+      // with a single combined where clause rather than skipped entirely.
+      expect(mockDb.where).toHaveBeenCalledTimes(2); // membership + messages
+    });
+
+    it('still returns the newest page when before is omitted', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ id: 1 }]) // membership
+        .mockResolvedValueOnce([makeLeagueMsg({ id: 100 })]);
+
+      const resolver = getQuery('getLeagueMessages');
+      const result = (await resolver(
+        {},
+        { leagueId: 1, limit: 50 },
+        mockContext,
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ id: 100 });
+    });
   });
 
   // ── getDirectMessages ─────────────────────────────────────────────────────
@@ -570,6 +611,18 @@ describe('Chat and Tiebreakers Resolver', () => {
           undefined as never,
         ),
       ).rejects.toThrow('Not a member of this league');
+    });
+
+    it('rejects a non-https gifUrl', async () => {
+      const resolver = getMutation('sendLeagueMessage');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, messageText: '', gifUrl: 'javascript:alert(1)' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('gifUrl must be an https URL');
     });
 
     it('sends league message successfully', async () => {

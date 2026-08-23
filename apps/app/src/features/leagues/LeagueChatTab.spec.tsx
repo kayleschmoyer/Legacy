@@ -20,6 +20,7 @@ type RNComponents = {
 
 // Mock the useLeagueChat hook
 const mockSendMessage = jest.fn().mockResolvedValue(undefined);
+const mockLoadOlderMessages = jest.fn().mockResolvedValue(undefined);
 const mockPostAnnouncement = jest.fn().mockResolvedValue(undefined);
 const mockUseLeagueChat = jest.fn(() => ({
   messages: [],
@@ -28,6 +29,9 @@ const mockUseLeagueChat = jest.fn(() => ({
   wsError: null,
   sendMessage: mockSendMessage,
   mentionCandidates: [],
+  hasMoreHistory: false,
+  loadingOlder: false,
+  loadOlderMessages: mockLoadOlderMessages,
   announcements: [],
   postingAnnouncement: false,
   postAnnouncement: mockPostAnnouncement,
@@ -201,6 +205,7 @@ describe('LeagueChatTab', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLoadOlderMessages.mockResolvedValue(undefined);
     mockUseLeagueChat.mockReturnValue({
       messages: [],
       loading: false,
@@ -208,6 +213,9 @@ describe('LeagueChatTab', () => {
       wsError: null,
       sendMessage: mockSendMessage,
       mentionCandidates: [],
+      hasMoreHistory: false,
+      loadingOlder: false,
+      loadOlderMessages: mockLoadOlderMessages,
       announcements: [],
       postingAnnouncement: false,
       postAnnouncement: mockPostAnnouncement,
@@ -549,6 +557,94 @@ describe('LeagueChatTab', () => {
       render(<LeagueChatTab {...defaultProps} />);
       expect(screen.getByText('sent while offline')).toBeTruthy();
       expect(screen.getByText(/Sending…/)).toBeTruthy();
+    });
+  });
+
+  describe('reverse infinite scroll (LS-6302)', () => {
+    it('loads older messages when scrolled near the top', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: mockMessages,
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+        hasMoreHistory: true,
+        loadingOlder: false,
+        loadOlderMessages: mockLoadOlderMessages,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      const scrollView = screen.getByTestId('chat-scroll-view');
+
+      fireEvent.scroll(scrollView, {
+        nativeEvent: { contentOffset: { y: 10 } },
+      });
+
+      expect(mockLoadOlderMessages).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fetch again while already scrolled far from the top', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: mockMessages,
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+        hasMoreHistory: true,
+        loadingOlder: false,
+        loadOlderMessages: mockLoadOlderMessages,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      const scrollView = screen.getByTestId('chat-scroll-view');
+
+      fireEvent.scroll(scrollView, {
+        nativeEvent: { contentOffset: { y: 400 } },
+      });
+
+      expect(mockLoadOlderMessages).not.toHaveBeenCalled();
+    });
+
+    it('does not fetch when there is no more history to load', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: mockMessages,
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+        hasMoreHistory: false,
+        loadingOlder: false,
+        loadOlderMessages: mockLoadOlderMessages,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      const scrollView = screen.getByTestId('chat-scroll-view');
+
+      fireEvent.scroll(scrollView, {
+        nativeEvent: { contentOffset: { y: 10 } },
+      });
+
+      expect(mockLoadOlderMessages).not.toHaveBeenCalled();
+    });
+
+    it('shows a loading indicator at the top while fetching older history', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: mockMessages,
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+        hasMoreHistory: true,
+        loadingOlder: true,
+        loadOlderMessages: mockLoadOlderMessages,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.getByTestId('loading-older-messages')).toBeTruthy();
     });
   });
 

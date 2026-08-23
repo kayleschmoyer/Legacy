@@ -32,8 +32,8 @@ fragment DirectMessageFields on DirectMessage {
   }
 }
 
-query GetLeagueMessages($leagueId: Int!, $limit: Int) {
-  getLeagueMessages(leagueId: $leagueId, limit: $limit) {
+query GetLeagueMessages($leagueId: Int!, $limit: Int, $before: Int) {
+  getLeagueMessages(leagueId: $leagueId, limit: $limit, before: $before) {
     ...LeagueChatMessageFields
   }
 }

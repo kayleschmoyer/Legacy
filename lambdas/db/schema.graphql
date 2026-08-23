@@ -3792,7 +3792,11 @@ type Query {
   Get the full season history for a league by traversing the previousLeagueId lineage chain. Returns seasons in reverse chronological order (current first).
   """
   getLeagueHistory(leagueId: Int!): [LeagueSeasonSummary!]
-  getLeagueMessages(leagueId: Int!, limit: Int): [LeagueChatMessage!]
+  getLeagueMessages(
+    before: Int
+    leagueId: Int!
+    limit: Int
+  ): [LeagueChatMessage!]
   getLeagueStandings(
     leagueId: Int!
     season: Int

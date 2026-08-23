@@ -1,6 +1,6 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, or } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues/types';
 import {
@@ -669,13 +669,19 @@ builder.queryField('getTiebreakerHistory', (t) =>
   }),
 );
 
-// Query: getLeagueMessages — fetch recent messages in the league chat room
+// Query: getLeagueMessages — fetch recent messages in the league chat room.
+// `before` is a reverse-pagination cursor (LS-6302): pass the smallest `id`
+// already loaded to fetch the page of messages immediately older than it.
+// Ordered by `id` (not `timestamp`) so the cursor comparison is a stable,
+// monotonic integer keyset — `id` and `timestamp` are 1:1 since messages are
+// only ever inserted, never reordered.
 builder.queryField('getLeagueMessages', (t) =>
   t.field({
     type: [LeagueChatMessage],
     args: {
       leagueId: t.arg.int({ required: true }),
       limit: t.arg.int({ required: false }),
+      before: t.arg.int({ required: false }),
     },
     resolve: async (_parent, args, context) => {
       if (!context.user) {
@@ -701,8 +707,15 @@ builder.queryField('getLeagueMessages', (t) =>
       const query = context.db
         .select()
         .from(PublicSchema.leagueMessages)
-        .where(eq(PublicSchema.leagueMessages.leagueId, args.leagueId))
-        .orderBy(desc(PublicSchema.leagueMessages.timestamp));
+        .where(
+          and(
+            eq(PublicSchema.leagueMessages.leagueId, args.leagueId),
+            args.before != null
+              ? lt(PublicSchema.leagueMessages.id, args.before)
+              : undefined,
+          ),
+        )
+        .orderBy(desc(PublicSchema.leagueMessages.id));
 
       const results = args.limit ? await query.limit(args.limit) : await query;
 
@@ -896,6 +909,12 @@ builder.mutationField('sendLeagueMessage', (t) =>
       }
       if (rawText.length > 2000) {
         throw UserInputError('Message cannot exceed 2000 characters');
+      }
+      // Reject non-https URLs so a stored gifUrl can never be a javascript:
+      // or other unsafe scheme — clients open it directly (e.g. window.open
+      // on web), so the server must not trust the client-supplied scheme.
+      if (gifUrl && !/^https:\/\//i.test(gifUrl)) {
+        throw UserInputError('gifUrl must be an https URL');
       }
       const text = escapeHtml(rawText);
 

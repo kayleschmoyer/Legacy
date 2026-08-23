@@ -16,8 +16,13 @@ jest.mock('@legacy-sports/utils', () => ({
 }));
 
 const mockUseQuery = jest.fn();
+const mockApolloClientQuery = jest.fn<
+  Promise<{ data: unknown }>,
+  [{ variables: { leagueId: number; limit?: number; before?: number } }]
+>();
 jest.mock('@apollo/client/react', () => ({
   useQuery: (...args: unknown[]): unknown => mockUseQuery(...args),
+  useApolloClient: () => ({ query: mockApolloClientQuery }),
 }));
 
 const mockUseSendLeagueMessageMutation = jest.fn();
@@ -128,6 +133,116 @@ describe('useLeagueChat — WS notifications are scoped to the viewed league (LS
     expect(result.current.messages.map((m) => m.messageText)).toEqual([
       'message from this league',
     ]);
+  });
+});
+
+describe('useLeagueChat — history ordering + reverse pagination (LS-6302)', () => {
+  const rawMsg = (id: number, text: string) => ({
+    id,
+    userId: 1,
+    sender: { id: 1, username: 'someone' },
+    messageText: text,
+    messageType: 'text',
+    gifUrl: null,
+    timestamp: `2026-01-01T00:00:0${id}Z`,
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRegisteredHandlers.clear();
+    mockConnected = true;
+    mockUseGetLeagueTeamsQuery.mockReturnValue({ data: undefined });
+    mockUseSendLeagueMessageMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
+  });
+
+  it('reverses the newest-first history page into oldest-first order', async () => {
+    // getLeagueMessages returns newest-first; message 3 was sent last.
+    mockUseQuery.mockReturnValue({
+      loading: false,
+      data: {
+        getLeagueMessages: [
+          rawMsg(3, 'third'),
+          rawMsg(2, 'second'),
+          rawMsg(1, 'first'),
+        ],
+      },
+    });
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    await waitFor(() => {
+      expect(result.current.messages.map((m) => m.messageText)).toEqual([
+        'first',
+        'second',
+        'third',
+      ]);
+    });
+  });
+
+  it('sets hasMoreHistory=false when the initial page is shorter than the page size', async () => {
+    mockUseQuery.mockReturnValue({
+      loading: false,
+      data: { getLeagueMessages: [rawMsg(1, 'only message')] },
+    });
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    await waitFor(() => {
+      expect(result.current.hasMoreHistory).toBe(false);
+    });
+  });
+
+  it('fetches and prepends the older page using the oldest loaded message id as the cursor', async () => {
+    const fullPage = Array.from({ length: 50 }, (_, i) =>
+      rawMsg(51 - i, `msg-${51 - i}`),
+    ); // ids 51..2, newest-first
+    mockUseQuery.mockReturnValue({
+      loading: false,
+      data: { getLeagueMessages: fullPage },
+    });
+    mockApolloClientQuery.mockResolvedValue({
+      data: { getLeagueMessages: [rawMsg(1, 'oldest')] },
+    });
+
+    const { result } = renderHook(() => useLeagueChat(1));
+    await waitFor(() => {
+      expect(result.current.hasMoreHistory).toBe(true);
+      expect(result.current.messages[0]?.id).toBe(2); // oldest of the initial page
+    });
+
+    await act(async () => {
+      await result.current.loadOlderMessages();
+    });
+
+    expect(mockApolloClientQuery.mock.calls[0]?.[0]?.variables).toMatchObject({
+      leagueId: 1,
+      before: 2,
+    });
+    expect(result.current.messages[0].id).toBe(1);
+    expect(result.current.messages[0].messageText).toBe('oldest');
+    // Fewer than a full page came back, so there's nothing older left.
+    expect(result.current.hasMoreHistory).toBe(false);
+  });
+
+  it('does not fetch another page once hasMoreHistory is false', async () => {
+    mockUseQuery.mockReturnValue({
+      loading: false,
+      data: { getLeagueMessages: [rawMsg(1, 'only message')] },
+    });
+
+    const { result } = renderHook(() => useLeagueChat(1));
+    await waitFor(() => {
+      expect(result.current.hasMoreHistory).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.loadOlderMessages();
+    });
+
+    expect(mockApolloClientQuery).not.toHaveBeenCalled();
   });
 });
 
