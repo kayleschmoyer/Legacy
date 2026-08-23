@@ -252,6 +252,7 @@ interface RosterSectionProps {
   readonly positionOrder: readonly string[];
   readonly label: string;
   readonly onPlayerPress: (player: MatchupPlayer) => void;
+  readonly onEmptySlotPress: (teamId: number | null | undefined) => void;
 }
 
 function RosterSection({
@@ -260,6 +261,7 @@ function RosterSection({
   positionOrder,
   label,
   onPlayerPress,
+  onEmptySlotPress,
 }: RosterSectionProps) {
   const teamPlayers = players.filter((p) => p.teamId === teamId);
 
@@ -315,12 +317,12 @@ function RosterSection({
             paddingVertical="$2"
             alignItems="center"
             gap="$2"
-            {...(player
-              ? {
-                  onPress: () => onPlayerPress(player),
-                  pressStyle: { opacity: 0.6 },
-                }
-              : {})}
+            {...{
+              onPress: player
+                ? () => onPlayerPress(player)
+                : () => onEmptySlotPress(teamId),
+              pressStyle: { opacity: 0.6 },
+            }}
           >
             <YStack width={36} alignItems="flex-end">
               <Text fontSize="$2" fontWeight="700" color="$gray9">
@@ -390,6 +392,14 @@ export function FootballMatchupScreen(
   const onPlayerPress = (player: MatchupPlayer) => {
     if (player.playerId) {
       router.push(`/football/players/${player.playerId}`);
+    }
+  };
+
+  // Empty starter slots have no player to view — route to the team's roster
+  // page instead, where the slot can be filled from bench or free agents (LS-6382).
+  const onEmptySlotPress = (teamId: number | null | undefined) => {
+    if (teamId != null) {
+      router.push(`/football/team/${teamId}`);
     }
   };
 
@@ -658,6 +668,7 @@ export function FootballMatchupScreen(
               positionOrder={positionOrder}
               label={matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`}
               onPlayerPress={onPlayerPress}
+              onEmptySlotPress={onEmptySlotPress}
             />
             <RosterSection
               teamId={matchup.team2Id}
@@ -665,6 +676,7 @@ export function FootballMatchupScreen(
               positionOrder={positionOrder}
               label={matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`}
               onPlayerPress={onPlayerPress}
+              onEmptySlotPress={onEmptySlotPress}
             />
           </>
         )}

@@ -600,6 +600,20 @@ describe('FootballMatchupScreen', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/football/players/5');
   });
 
+  it('navigates to the team roster route when an empty starter slot is pressed (LS-6382)', () => {
+    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+
+    // team1 (id 10) has only QB filled — its first 'Empty' row is the next
+    // starter slot (RB); team2 (id 20) has no players, so all its slots read
+    // 'Empty' and follow team1's in DOM order.
+    const emptySlots = screen.getAllByText('Empty');
+    fireEvent.press(emptySlots[0]);
+    expect(mockRouterPush).toHaveBeenCalledWith('/football/team/10');
+
+    fireEvent.press(emptySlots[emptySlots.length - 1]);
+    expect(mockRouterPush).toHaveBeenCalledWith('/football/team/20');
+  });
+
   it('renders DST position slot in DST format', () => {
     render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
     // Both team rosters render the slot label; at least one must be present
