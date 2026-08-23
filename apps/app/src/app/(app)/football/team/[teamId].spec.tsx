@@ -111,9 +111,13 @@ jest.mock(
 );
 
 jest.mock('../../../../features/roster/LineupEditor', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
+  const { Text, View } = jest.requireActual<RNComponents>('react-native');
   return {
-    LineupEditor: () => <View testID="lineup-editor" />,
+    LineupEditor: ({ actual }: { actual: Record<number, number> }) => (
+      <View testID="lineup-editor">
+        <Text testID="lineup-editor-actual">{JSON.stringify(actual)}</Text>
+      </View>
+    ),
   };
 });
 
@@ -159,7 +163,43 @@ const mockLeague = {
   id: 10,
   name: 'Test League',
   defensiveFormat: 'dst',
+  currentWeekNumber: 5,
   currentMatchup: 77,
+};
+
+const mockMatchupScores = {
+  matchupScores: [
+    {
+      __typename: 'FootballMatchupStats',
+      teamId: 42,
+      teamName: 'Test Team',
+      totalPoints: 24.7,
+      players: [
+        {
+          __typename: 'FootballMatchupPlayer',
+          playerId: 1,
+          playerName: 'Josh Allen',
+          position: 'QB',
+          totalPoints: 24.7,
+        },
+      ],
+    },
+    {
+      __typename: 'FootballMatchupStats',
+      teamId: 99,
+      teamName: 'Opponent Team',
+      totalPoints: 10.5,
+      players: [
+        {
+          __typename: 'FootballMatchupPlayer',
+          playerId: 2,
+          playerName: 'Someone Else',
+          position: 'RB',
+          totalPoints: 10.5,
+        },
+      ],
+    },
+  ],
 };
 
 const mockPositions = [{ id: 1, leagueId: 10, positionType: 'QB' }];
@@ -206,6 +246,10 @@ const mockUseUpdateTeamBrandingMutation = jest.fn(() => [
   jest.fn(),
   { loading: false },
 ]);
+const mockUseMatchupScoresQuery = jest.fn(() => ({
+  loading: false,
+  data: undefined,
+}));
 const mockMatchup = {
   id: 77,
   weekNumber: 3,
@@ -234,6 +278,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetPositionsForLeagueQuery(...args),
   useGetTeamMembersQuery: (...args: unknown[]) =>
     mockUseGetTeamMembersQuery(...args),
+  useMatchupScoresQuery: (...args: unknown[]) =>
+    mockUseMatchupScoresQuery(...args),
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
     mockUseUpdateTeamMemberPositionMutation(...args),
   useUpdateTeamBrandingMutation: (...args: unknown[]) =>
@@ -271,6 +317,10 @@ describe('FootballTeam route', () => {
       jest.fn(),
       { loading: false },
     ]);
+    mockUseMatchupScoresQuery.mockReturnValue({
+      loading: false,
+      data: undefined,
+    });
   });
 
   it('shows loading panel while data is loading', () => {
@@ -399,5 +449,71 @@ describe('FootballTeam route', () => {
     expect(screen.getByText('Could not load matchup.')).toBeTruthy();
     expect(screen.queryByText('No matchup scheduled this week.')).toBeNull();
     expect(screen.queryByTestId('matchup-card')).toBeNull();
+  });
+
+  it("passes the current team's matchup scores to LineupEditor's actual prop", () => {
+    mockUseMatchupScoresQuery.mockReturnValue({
+      loading: false,
+      data: mockMatchupScores,
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.getByTestId('lineup-editor-actual')).toHaveTextContent(
+      JSON.stringify({ 1: 24.7 }),
+    );
+  });
+
+  it('falls back to empty actual scores when the league has no current week', () => {
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { ...mockLeague, currentWeekNumber: null } },
+    });
+    mockUseMatchupScoresQuery.mockReturnValue({
+      loading: false,
+      data: undefined,
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.getByTestId('lineup-editor-actual')).toHaveTextContent('{}');
+  });
+
+  it('falls back to empty actual scores while the matchup scores query is loading', () => {
+    mockUseMatchupScoresQuery.mockReturnValue({
+      loading: true,
+      data: undefined,
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.getByTestId('lineup-editor-actual')).toHaveTextContent('{}');
+  });
+
+  it('falls back to empty actual scores when the matchup scores query errors', () => {
+    mockUseMatchupScoresQuery.mockReturnValue({
+      loading: false,
+      data: undefined,
+      error: new Error('network error'),
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.getByTestId('lineup-editor-actual')).toHaveTextContent('{}');
+  });
+
+  it('skips the matchup scores query when currentWeekNumber is unavailable', () => {
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { ...mockLeague, currentWeekNumber: null } },
+    });
+    render(<FootballTeam />);
+    expect(mockUseMatchupScoresQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
+  it('queries matchup scores once leagueId and currentWeekNumber are available', () => {
+    render(<FootballTeam />);
+    expect(mockUseMatchupScoresQuery).toHaveBeenCalledWith({
+      skip: false,
+      variables: { leagueId: 10, weekNum: 5 },
+    });
   });
 });

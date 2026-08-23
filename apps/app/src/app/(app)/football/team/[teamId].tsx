@@ -16,12 +16,14 @@ import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
   MatchupFragment,
+  MatchupScoresQuery,
   useGetLeagueByIdQuery,
   useGetMatchupByIdQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
   useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
+  useMatchupScoresQuery,
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
@@ -38,6 +40,36 @@ const ALL_TABS = Object.freeze([
   'Settings',
 ] as const);
 type Tab = (typeof ALL_TABS)[number];
+
+type MatchupScoreEntry = MatchupScoresQuery['matchupScores'][number];
+type FootballMatchupScoreEntry = Extract<
+  MatchupScoreEntry,
+  { __typename?: 'FootballMatchupStats' }
+>;
+
+function isFootballMatchupStats(
+  stats: MatchupScoreEntry,
+): stats is FootballMatchupScoreEntry {
+  return stats.__typename === 'FootballMatchupStats';
+}
+
+function buildActualScores(
+  matchupScores: readonly MatchupScoreEntry[] | undefined,
+  teamId: number,
+): Record<number, number> {
+  const teamStats = matchupScores
+    ?.filter(isFootballMatchupStats)
+    .find((stats) => stats.teamId === teamId);
+
+  if (!teamStats) {
+    return {};
+  }
+
+  return teamStats.players.reduce<Record<number, number>>((acc, player) => {
+    acc[player.playerId] = player.totalPoints;
+    return acc;
+  }, {});
+}
 
 interface BrandingSettingsProps {
   teamId: number;
@@ -175,6 +207,7 @@ interface TabContentProps {
   avatarUrl: string | null | undefined;
   bannerUrl: string | null | undefined;
   defensiveFormat: string | null | undefined;
+  actualScores: Record<number, number>;
   matchup: MatchupFragment | null | undefined;
   matchupId: number;
   matchupLoading: boolean;
@@ -195,6 +228,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     avatarUrl,
     bannerUrl,
     defensiveFormat,
+    actualScores,
     matchup,
     matchupId,
     matchupLoading,
@@ -234,7 +268,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
           projections={{}}
           team={team.filter((m): m is AppTeamMemberFragment => m != null)}
-          actual={{}}
+          actual={actualScores}
         />
       );
     case 'Settings':
@@ -299,6 +333,21 @@ export default function FootballTeam(): React.JSX.Element {
         teamId: numTeamId ?? 0,
       },
     },
+  );
+
+  const currentWeekNumber = leagueData?.league?.currentWeekNumber;
+
+  const { data: matchupScoresData } = useMatchupScoresQuery({
+    skip: team?.team?.leagueId === undefined || currentWeekNumber == null,
+    variables: {
+      leagueId: team?.team?.leagueId ?? 0,
+      weekNum: currentWeekNumber ?? 0,
+    },
+  });
+
+  const actualScores = buildActualScores(
+    matchupScoresData?.matchupScores,
+    numTeamId ?? 0,
   );
 
   const currentMatchupId = leagueData?.league?.currentMatchup;
@@ -409,6 +458,7 @@ export default function FootballTeam(): React.JSX.Element {
           avatarUrl={team.team.avatarUrl}
           bannerUrl={team.team.bannerUrl}
           defensiveFormat={leagueData?.league?.defensiveFormat}
+          actualScores={actualScores}
           matchup={matchupData?.getMatchupById}
           matchupId={currentMatchupId ?? 0}
           matchupLoading={loadingMatchup}
