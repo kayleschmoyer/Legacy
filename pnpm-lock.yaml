@@ -1818,6 +1818,8 @@ importers:
 
   lib/mcp-bearer-auth: {}
 
+  lib/mcp-docs: {}
+
   lib/mcp-format: {}
 
   lib/mcp-jobs: {}
