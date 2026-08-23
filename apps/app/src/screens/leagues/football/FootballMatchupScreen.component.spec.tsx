@@ -547,6 +547,32 @@ describe('FootballMatchupScreen', () => {
     expect(matchupRefetch).toHaveBeenCalled();
     expect(playersRefetch).toHaveBeenCalled();
   });
+
+  it('refetches matchup and player data when the websocket reconnects (LS-5425)', () => {
+    const matchupRefetch = jest.fn();
+    const playersRefetch = jest.fn();
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: mockMatchup },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: matchupRefetch,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+    jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
+      data: { getMatchupPlayers: [mockMatchupPlayer] },
+      loading: false,
+      refetch: playersRefetch,
+    } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    const wsOptions = jest.mocked(sharedComponentsLib.useWebSocket).mock
+      .calls[0][0];
+    wsOptions?.onReconnect?.();
+
+    expect(matchupRefetch).toHaveBeenCalled();
+    expect(playersRefetch).toHaveBeenCalled();
+  });
 });
 
 // ── AI Matchup Recap PremiumGate wiring (LS-6354) ────────────────────────────

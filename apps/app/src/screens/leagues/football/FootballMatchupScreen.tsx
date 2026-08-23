@@ -465,6 +465,13 @@ export function FootballMatchupScreen(
       void refetchMatchup();
       void refetchPlayers();
     },
+    // Force a refetch immediately on reconnect, not just on the next
+    // matchup-stats-complete push — a user who drops offline mid-game
+    // otherwise sees stale scores until the next push (LS-5425).
+    onReconnect: () => {
+      void refetchMatchup();
+      void refetchPlayers();
+    },
   });
 
   const [refreshing, setRefreshing] = useState(false);

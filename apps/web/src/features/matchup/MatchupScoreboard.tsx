@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   calculateMatchupProjection,
@@ -307,6 +307,14 @@ export interface MatchupScoreboardProps {
   gamesRemaining?: number;
   /** When provided, team names become clickable links to view that team's roster */
   onTeamClick?: (teamId: number) => void;
+  /**
+   * Bumped by the parent page's WebSocket subscription (MATCHUP_STATS_COMPLETE
+   * for this matchup, or a reconnect) to signal that player data should be
+   * refetched (LS-5425). MatchupDetailPage owns the single real WebSocket
+   * connection for this route — see its own doc comment for why this
+   * component can't establish its own via `useLeagueWebSocket`.
+   */
+  liveUpdateSignal?: number;
 }
 
 /**
@@ -323,6 +331,7 @@ export function MatchupScoreboard({
   matchup,
   gamesRemaining = 0,
   onTeamClick,
+  liveUpdateSignal,
 }: MatchupScoreboardProps) {
   // Extract IDs before early return to use in hooks
   const matchupIdStr = matchup?.id;
@@ -330,10 +339,30 @@ export function MatchupScoreboard({
   const matchupIdNum = matchupIdStr ? parseInt(matchupIdStr, 10) : 0;
 
   // Fetch matchup players to calculate actual scores (hooks must come before early return)
-  const { data: playersData, error: playersError } = useGetMatchupPlayersQuery({
+  const {
+    data: playersData,
+    error: playersError,
+    refetch: refetchPlayers,
+  } = useGetMatchupPlayersQuery({
     variables: { matchupId: matchupIdNum },
     skip: !matchupIdNum,
   });
+
+  // This wrapper previously had no live-update mechanism at all — the score
+  // never refreshed without a manual page reload (LS-5425). Refetch players
+  // whenever the parent's `liveUpdateSignal` changes (MATCHUP_STATS_COMPLETE
+  // for this matchup, or a websocket reconnect) — skip the initial mount so
+  // this doesn't double-fire the query useGetMatchupPlayersQuery already ran.
+  const refetchPlayersRef = useRef(refetchPlayers);
+  refetchPlayersRef.current = refetchPlayers;
+  const isFirstLiveUpdateRender = useRef(true);
+  useEffect(() => {
+    if (isFirstLiveUpdateRender.current) {
+      isFirstLiveUpdateRender.current = false;
+      return;
+    }
+    void refetchPlayersRef.current();
+  }, [liveUpdateSignal]);
 
   // Fetch scoring settings
   const { settings: scoringSettings } = useLeagueScoringSettings(leagueIdNum);

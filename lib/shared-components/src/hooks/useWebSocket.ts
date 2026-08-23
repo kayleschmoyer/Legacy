@@ -118,6 +118,13 @@ interface UseWebSocketOptions {
   onUserList?: (notification: UserListNotification) => void;
   onMessage?: (message: WebSocketMessage) => void;
   onError?: (error: Error) => void;
+  /**
+   * Fired when the socket reconnects after a drop (i.e. *not* the initial
+   * connection). Useful for refetching any data that may have changed while
+   * the socket was down — mirrors `useLeagueWebSocket`'s web-only
+   * `onReconnect` option (LS-5425).
+   */
+  onReconnect?: () => void;
 }
 
 /**
@@ -164,6 +171,7 @@ export function useWebSocket({
   onUserList,
   onMessage,
   onError,
+  onReconnect,
 }: UseWebSocketOptions = {}) {
   const clientRef = useRef<WebSocketClient | null>(null);
   const hasLoggedInit = useRef(false);
@@ -192,6 +200,7 @@ export function useWebSocket({
   const onUserListRef = useLatestRef(onUserList);
   const onMessageRef = useLatestRef(onMessage);
   const onErrorRef = useLatestRef(onError);
+  const onReconnectRef = useLatestRef(onReconnect);
 
   // Get WebSocket URL from the passed prop.
   // Callers on web should pass `url={config.websocketUrl}` from
@@ -367,6 +376,7 @@ export function useWebSocket({
           'leagueId:',
           leagueId,
         );
+        onReconnectRef.current?.();
       } else {
         LOGGER.info(
           '[useWebSocket] connected ✓',
@@ -569,6 +579,7 @@ export function useWebSocket({
     onUserListRef,
     onMessageRef,
     onErrorRef,
+    onReconnectRef,
   ]);
 
   return {

@@ -16,12 +16,14 @@
  * from raw per-player stats — recomputing is both a heavy hot path and a
  * second source of truth that can diverge from the server.
  */
+import React from 'react';
+import { render } from '@testing-library/react';
 import type {
   MatchupFragment,
   MatchupPlayerFragment,
 } from '@legacy-sports/graphql';
 import { MatchupStatus, StatsLoadingStatus } from '@legacy-sports/graphql';
-import { computeMatchupScores } from './MatchupScoreboard';
+import { computeMatchupScores, MatchupScoreboard } from './MatchupScoreboard';
 import type { ScoringSettings } from '../../lib/scoring';
 
 import { getEnvironmentConfig } from '../../config/environment';
@@ -32,6 +34,38 @@ jest.mock('@legacy-sports/logging', () => ({
 
 jest.mock('../../config/environment', () => ({
   getEnvironmentConfig: jest.fn(() => ({ isDev: false })),
+}));
+
+// --- websocket wiring (LS-5425: live score updates + reconnect refetch) ----
+// Only exercised by the dedicated describe block below — every other test in
+// this file uses the real (mocked-elsewhere) GraphQL/scoring hooks are not
+// touched, and MatchupStatus/StatsLoadingStatus stay the real enum values via
+// jest.requireActual, so computeMatchupScores' equality checks are unaffected.
+const mockUseGetMatchupPlayersQuery = jest.fn();
+const mockUseGetLeagueTeamsQuery = jest.fn();
+jest.mock('@legacy-sports/graphql', () => {
+  const actual = jest.requireActual<typeof import('@legacy-sports/graphql')>(
+    '@legacy-sports/graphql',
+  );
+  return {
+    ...actual,
+    useGetMatchupPlayersQuery: (opts: unknown): unknown =>
+      mockUseGetMatchupPlayersQuery(opts),
+    useGetLeagueTeamsQuery: (opts: unknown): unknown =>
+      mockUseGetLeagueTeamsQuery(opts),
+  };
+});
+
+const mockUseLeagueScoringSettings = jest.fn(() => ({
+  settings: { batting: {}, pitching: {}, fielding: {} },
+}));
+jest.mock('../../lib/scoring', () => ({
+  useLeagueScoringSettings: (id: unknown): unknown =>
+    mockUseLeagueScoringSettings(id),
+}));
+
+jest.mock('@legacy-sports/shared-components/matchup', () => ({
+  MatchupScoreboardView: () => <div data-testid="scoreboard-view" />,
 }));
 
 // Typing warn as jest.Mock (not the original method) sidesteps
@@ -534,5 +568,76 @@ describe('computeMatchupScores', () => {
 
       expect(LOGGER.warn).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('MatchupScoreboard — live score updates via liveUpdateSignal (LS-5425)', () => {
+  // MatchupDetailPage owns the real WebSocket connection and per-matchup
+  // filtering for this route (see its own doc comment — this component has
+  // no LeagueWebSocketContext.Provider ancestor to subscribe through) and
+  // bumps `liveUpdateSignal` on every MATCHUP_STATS_COMPLETE/reconnect event
+  // for the displayed matchup. This component's own responsibility is just:
+  // refetch players when that signal changes, and not on initial mount.
+  let refetchPlayers: jest.Mock;
+
+  beforeEach(() => {
+    refetchPlayers = jest.fn();
+    mockUseGetMatchupPlayersQuery.mockReturnValue({
+      data: { getMatchupPlayers: [] },
+      error: undefined,
+      refetch: refetchPlayers,
+    });
+    mockUseGetLeagueTeamsQuery.mockReturnValue({
+      data: { leagueTeams: [] },
+    });
+    mockUseLeagueScoringSettings.mockReturnValue({
+      settings: { batting: {}, pitching: {}, fielding: {} },
+    });
+  });
+
+  const matchup = {
+    __typename: 'Matchup',
+    id: '1',
+    weekNumber: 3,
+    leagueId: 10,
+    team1Id: 101,
+    team2Id: 102,
+    team1Score: 0,
+    team2Score: 0,
+    status: MatchupStatus.InProgress,
+    statsLoadingStatus: StatsLoadingStatus.Completed,
+    gamesPerMatchup: 5,
+    pitcherStartsPerMatchup: 1,
+    selectedGamesCount: 2,
+    startTime: null,
+    endTime: null,
+    team1: { __typename: 'Team', id: 101, name: 'Aces' },
+    team2: { __typename: 'Team', id: 102, name: 'Bolts' },
+  } as unknown as MatchupFragment;
+
+  it('does not refetch players on initial mount', () => {
+    render(<MatchupScoreboard matchup={matchup} liveUpdateSignal={0} />);
+
+    expect(refetchPlayers).not.toHaveBeenCalled();
+  });
+
+  it('refetches players when liveUpdateSignal changes', () => {
+    const { rerender } = render(
+      <MatchupScoreboard matchup={matchup} liveUpdateSignal={0} />,
+    );
+
+    rerender(<MatchupScoreboard matchup={matchup} liveUpdateSignal={1} />);
+
+    expect(refetchPlayers).toHaveBeenCalledTimes(1);
+  });
+
+  it('refetches again on each subsequent liveUpdateSignal bump', () => {
+    const { rerender } = render(
+      <MatchupScoreboard matchup={matchup} liveUpdateSignal={1} />,
+    );
+
+    rerender(<MatchupScoreboard matchup={matchup} liveUpdateSignal={2} />);
+
+    expect(refetchPlayers).toHaveBeenCalledTimes(1);
   });
 });

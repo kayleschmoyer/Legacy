@@ -391,6 +391,39 @@ describe('useWebSocket', () => {
     expect(handler2).toHaveBeenCalledWith(notification);
   });
 
+  // ── Reconnect (LS-5425) ─────────────────────────────────────────────────
+
+  it('does not call onReconnect on the initial connect', () => {
+    const onReconnect = jest.fn();
+    renderHook(() =>
+      useWebSocket({
+        url: 'wss://example.com',
+        token: 'jwt-token',
+        onReconnect,
+      }),
+    );
+
+    act(() => mockInstance._emit('connected'));
+
+    expect(onReconnect).not.toHaveBeenCalled();
+  });
+
+  it('calls onReconnect when the socket reconnects (connected after a prior connect)', () => {
+    const onReconnect = jest.fn();
+    renderHook(() =>
+      useWebSocket({
+        url: 'wss://example.com',
+        token: 'jwt-token',
+        onReconnect,
+      }),
+    );
+
+    act(() => mockInstance._emit('connected')); // initial connect — no reconnect
+    act(() => mockInstance._emit('connected')); // reconnect after a drop
+
+    expect(onReconnect).toHaveBeenCalledTimes(1);
+  });
+
   // ── Cleanup ─────────────────────────────────────────────────────────────
 
   it('disposes client on unmount', () => {

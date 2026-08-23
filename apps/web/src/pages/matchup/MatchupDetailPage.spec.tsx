@@ -10,7 +10,7 @@
  *   5. Error state: does not leak the raw error message to the user.
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { MatchupDetailPage } from './MatchupDetailPage';
 import { trackMatchupViewed } from '../../utils/analytics';
@@ -48,6 +48,7 @@ interface MockMatchupByIdResult {
   matchup: typeof baseMatchup | undefined;
   loading: boolean;
   error: Error | undefined;
+  refetch?: jest.Mock;
 }
 
 const mockUseMatchupById = jest.fn<MockMatchupByIdResult, [number | null]>(
@@ -58,14 +59,36 @@ const mockUseMatchupById = jest.fn<MockMatchupByIdResult, [number | null]>(
   }),
 );
 
+const mockUseMatchupsForLeague = jest.fn<
+  { matchups: object[]; refetch?: jest.Mock },
+  [number | null]
+>(() => ({ matchups: [] }));
+
 const mockUseCurrentWeek = jest.fn<{ currentWeek: number }, [number | null]>(
   () => ({ currentWeek: 3 }),
 );
 
 jest.mock('../../hooks/useMatchup', () => ({
   useMatchupById: (matchupId: number | null) => mockUseMatchupById(matchupId),
-  useMatchupsForLeague: jest.fn(() => ({ matchups: [] })),
+  useMatchupsForLeague: (leagueId: number | null) =>
+    mockUseMatchupsForLeague(leagueId),
   useCurrentWeek: (leagueId: number | null) => mockUseCurrentWeek(leagueId),
+}));
+
+// --- websocket (LS-5425: live score updates + reconnect refetch) -----------
+// This route has no LeagueWebSocketContext.Provider ancestor (it isn't
+// nested under LeagueDetailPage/LeagueDetailPageV2 — see MatchupDetailPage's
+// own doc comment), so the page opens its own connection via the raw
+// shared-components `useWebSocket` hook directly instead of `useLeagueWebSocket`.
+const mockUseWebSocket = jest.fn<{ connected: boolean }, [unknown]>(() => ({
+  connected: true,
+}));
+jest.mock('@legacy-sports/shared-components/ui', () => ({
+  useWebSocket: (options: unknown) => mockUseWebSocket(options),
+}));
+
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useAuth: () => ({ user: { id: 1 }, token: 'test-token' }),
 }));
 
 jest.mock('../../hooks/useIsPremium', () => ({
@@ -102,7 +125,9 @@ jest.mock('../../components/PremiumGate', () => ({
   PremiumGate: ({ children }: { children: React.ReactNode }) => children,
 }));
 jest.mock('../../features/matchup/MatchupScoreboard', () => ({
-  MatchupScoreboard: () => <div data-testid="scoreboard" />,
+  MatchupScoreboard: ({ liveUpdateSignal }: { liveUpdateSignal?: number }) => (
+    <div data-testid="scoreboard" data-live-update-signal={liveUpdateSignal} />
+  ),
 }));
 jest.mock('../../features/matchup/MatchupWinProbabilityPanel', () => ({
   MatchupWinProbabilityPanel: () => <div data-testid="win-probability" />,
@@ -369,5 +394,120 @@ describe('MatchupDetailPage – GA4 matchup_viewed tracking (LS-7628)', () => {
 
     expect(mockTrackMatchupViewed).toHaveBeenCalledTimes(2);
     expect(mockTrackMatchupViewed).toHaveBeenLastCalledWith(1, 100, 4);
+  });
+});
+
+describe('MatchupDetailPage — live score updates + reconnect refetch (LS-5425)', () => {
+  let matchupRefetch: jest.Mock;
+  let matchupsRefetch: jest.Mock;
+
+  beforeEach(() => {
+    mockUseWebSocket.mockClear();
+    matchupRefetch = jest.fn();
+    matchupsRefetch = jest.fn();
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: undefined,
+      refetch: matchupRefetch,
+    });
+    mockUseMatchupsForLeague.mockReturnValue({
+      matchups: [],
+      refetch: matchupsRefetch,
+    });
+  });
+
+  afterEach(() => {
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: undefined,
+    });
+    mockUseMatchupsForLeague.mockReturnValue({ matchups: [] });
+  });
+
+  function getWebSocketOptions() {
+    const options = mockUseWebSocket.mock.calls[0]?.[0] as {
+      onMatchupStatsComplete?: (n: { matchupId: number }) => void;
+      onReconnect?: () => void;
+    };
+    if (!options) throw new Error('useWebSocket was not called');
+    return options;
+  }
+
+  it('connects with the matchup viewContext and this matchup/league ids', () => {
+    render(<MatchupDetailPage />);
+
+    const options = mockUseWebSocket.mock.calls[0]?.[0] as {
+      viewContext?: string;
+      leagueId?: number;
+      matchupId?: number;
+      autoConnect?: boolean;
+    };
+    expect(options.viewContext).toBe('matchup');
+    expect(options.leagueId).toBe(100);
+    expect(options.matchupId).toBe(1);
+    expect(options.autoConnect).toBe(true);
+  });
+
+  it('refetches the matchup and league matchups when a stats-complete notification arrives for this matchup', () => {
+    render(<MatchupDetailPage />);
+
+    act(() => {
+      getWebSocketOptions().onMatchupStatsComplete?.({ matchupId: 1 });
+    });
+
+    expect(matchupRefetch).toHaveBeenCalled();
+    expect(matchupsRefetch).toHaveBeenCalled();
+  });
+
+  it('does not refetch when a stats-complete notification arrives for a different matchup', () => {
+    render(<MatchupDetailPage />);
+
+    act(() => {
+      getWebSocketOptions().onMatchupStatsComplete?.({ matchupId: 999 });
+    });
+
+    expect(matchupRefetch).not.toHaveBeenCalled();
+    expect(matchupsRefetch).not.toHaveBeenCalled();
+  });
+
+  it('refetches the matchup and league matchups when the websocket reconnects', () => {
+    render(<MatchupDetailPage />);
+
+    act(() => {
+      getWebSocketOptions().onReconnect?.();
+    });
+
+    expect(matchupRefetch).toHaveBeenCalled();
+    expect(matchupsRefetch).toHaveBeenCalled();
+  });
+
+  it('bumps liveUpdateSignal passed to MatchupScoreboard when a stats-complete notification arrives for this matchup', () => {
+    const { getByTestId } = render(<MatchupDetailPage />);
+
+    expect(
+      getByTestId('scoreboard').getAttribute('data-live-update-signal'),
+    ).toBe('0');
+
+    act(() => {
+      getWebSocketOptions().onMatchupStatsComplete?.({ matchupId: 1 });
+    });
+
+    expect(
+      getByTestId('scoreboard').getAttribute('data-live-update-signal'),
+    ).toBe('1');
+  });
+
+  it('bumps liveUpdateSignal passed to MatchupScoreboard on reconnect', () => {
+    const { getByTestId } = render(<MatchupDetailPage />);
+
+    act(() => {
+      getWebSocketOptions().onReconnect?.();
+    });
+
+    expect(
+      getByTestId('scoreboard').getAttribute('data-live-update-signal'),
+    ).toBe('1');
   });
 });

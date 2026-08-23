@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { Button, H2, Text, XStack, YStack } from 'tamagui';
@@ -7,6 +7,8 @@ import {
   MatchupDetailSkeleton,
   MatchupRecapPanel,
 } from '@legacy-sports/shared-components/matchup';
+import { useAuth } from '@legacy-sports/shared-components/auth';
+import { useWebSocket } from '@legacy-sports/shared-components/ui';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   MatchupStatus,
@@ -14,6 +16,7 @@ import {
   useGetLeagueByIdQuery,
   useGetUserTeamIdQuery,
 } from '@legacy-sports/graphql';
+import { env } from '../../config/environment';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
 import { MatchupAdditionalSections } from '../../features/matchup/MatchupAdditionalSections';
@@ -51,10 +54,59 @@ export function MatchupDetailPage() {
 
   const matchupIdNum = matchupId ? parseInt(matchupId, 10) : null;
   const leagueIdNum = leagueId ? parseInt(leagueId, 10) : null;
-  const { matchup, loading, error } = useMatchupById(matchupIdNum);
+  const {
+    matchup,
+    loading,
+    error,
+    refetch: refetchMatchup,
+  } = useMatchupById(matchupIdNum);
 
-  const { matchups: allLeagueMatchups } = useMatchupsForLeague(leagueIdNum);
+  const { matchups: allLeagueMatchups, refetch: refetchMatchups } =
+    useMatchupsForLeague(leagueIdNum);
   const { currentWeek } = useCurrentWeek(leagueIdNum);
+
+  // Refetch matchup + league-matchups state when the server signals stats
+  // have been recalculated for this matchup, or when the websocket
+  // reconnects after a drop — this page previously had no live-update
+  // mechanism at all (LS-5425).
+  //
+  // This route (/football/league/:leagueId/matchups/:matchupId) is NOT
+  // nested under LeagueDetailPage/LeagueDetailPageV2 (see app.tsx's route
+  // table), so there is no LeagueWebSocketContext.Provider ancestor here —
+  // `useLeagueWebSocket` would silently no-op (client: null), the same
+  // documented gap SubscriptionPage.tsx's fallback works around for LS-7384.
+  // This page instead opens its own connection via the shared-components
+  // `useWebSocket` hook directly, mirroring that precedent.
+  const { user, token: authToken } = useAuth();
+  const matchupIdRef = useRef(matchupIdNum);
+  matchupIdRef.current = matchupIdNum;
+  const refetchMatchupRef = useRef(refetchMatchup);
+  refetchMatchupRef.current = refetchMatchup;
+  const refetchMatchupsRef = useRef(refetchMatchups);
+  refetchMatchupsRef.current = refetchMatchups;
+  // Bumped on every live-update event so MatchupScoreboard (which owns its
+  // own separate players query) knows to refetch too, without this page
+  // opening a second WebSocket connection on its behalf.
+  const [liveUpdateSignal, setLiveUpdateSignal] = useState(0);
+  useWebSocket({
+    url: env.websocketUrl,
+    token: authToken ?? undefined,
+    leagueId: leagueIdNum ?? undefined,
+    matchupId: matchupIdNum ?? undefined,
+    viewContext: 'matchup',
+    autoConnect: !!user && !!authToken,
+    onMatchupStatsComplete: (notification) => {
+      if (notification.matchupId !== matchupIdRef.current) return;
+      void refetchMatchupRef.current();
+      void refetchMatchupsRef.current();
+      setLiveUpdateSignal((n) => n + 1);
+    },
+    onReconnect: () => {
+      void refetchMatchupRef.current();
+      void refetchMatchupsRef.current();
+      setLiveUpdateSignal((n) => n + 1);
+    },
+  });
 
   const { data: userTeamData } = useGetUserTeamIdQuery({
     variables: { leagueId: leagueIdNum ?? 0 },
@@ -250,6 +302,7 @@ export function MatchupDetailPage() {
           <MatchupScoreboard
             matchup={matchup}
             gamesRemaining={gamesRemaining}
+            liveUpdateSignal={liveUpdateSignal}
           />
         }
         winProbabilityPanel={
