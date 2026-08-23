@@ -13,6 +13,10 @@
  *  - LS-9359: createCommitStatus retries transient rate-limit/5xx errors and
  *    degrades to a no-op (rather than throwing) once retries are exhausted, so
  *    a rate-limit blip can never fail the summarize job outright.
+ *  - LS-9565: the run-recency guard also inspects the superseding run's
+ *    `🚀 CI Pipeline` JOB. A run that concluded `success` overall but whose
+ *    pipeline job was short-circuited by check-prior-success posts no verdict
+ *    and must not silence the run that actually ran CI.
  *
  * Run via: node --test .github/scripts/__tests__/ci-gate.test.mjs
  */
@@ -20,13 +24,16 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const {
   CI_GATE_CONTEXT,
+  CI_PIPELINE_JOB_NAME,
   GATE_INPUT_JOBS,
+  MAX_SUPERSEDING_RUN_INSPECTIONS,
   computeGateConclusion,
   runIdFromTargetUrl,
   isRetryableStatusError,
@@ -56,6 +63,49 @@ function gateStatus(state, runId) {
   };
 }
 
+/**
+ * LS-9565: the job rows of a run whose `🚀 CI Pipeline` job was short-circuited
+ * by the `check-prior-success` guard. Mirrors the real shape of run
+ * 32586165378 on PR #7212 — every other job succeeded, so the RUN concluded
+ * `success` while no CI executed.
+ */
+function skippedPipelineJobs() {
+  return [
+    {
+      name: '🔍 Determine Workflow Scope',
+      status: 'completed',
+      conclusion: 'success',
+    },
+    { name: CI_PIPELINE_JOB_NAME, status: 'completed', conclusion: 'skipped' },
+    {
+      name: '🔐 Security Scanning / Security Gate',
+      status: 'completed',
+      conclusion: 'success',
+    },
+  ];
+}
+
+/** The job rows of a run that actually ran the pipeline (nested job names). */
+function ranPipelineJobs() {
+  return [
+    {
+      name: '🔍 Determine Workflow Scope',
+      status: 'completed',
+      conclusion: 'success',
+    },
+    {
+      name: `${CI_PIPELINE_JOB_NAME} / lint & format`,
+      status: 'completed',
+      conclusion: 'success',
+    },
+    {
+      name: `${CI_PIPELINE_JOB_NAME} / Summarize & Report`,
+      status: 'completed',
+      conclusion: 'success',
+    },
+  ];
+}
+
 // All folded jobs passing.
 function allPass() {
   return Object.fromEntries(GATE_INPUT_JOBS.map((j) => [j, 'success']));
@@ -79,11 +129,22 @@ function makeGithub({
   existingStatuses = [],
   runsError = null,
   statusesError = null,
+  // LS-9565: per-run job listings, keyed by run id. A run absent from this map
+  // resolves to `[]` — no `🚀 CI Pipeline` job row, which reads as "this run
+  // runs the pipeline and will post", the pre-LS-9565 behaviour.
+  jobsByRunId = {},
+  jobsError = null,
   // LS-9359: queue of errors createCommitStatus throws on successive calls,
   // consumed one per attempt (shift). Once empty, calls succeed normally.
   createStatusErrors = [],
 } = {}) {
-  const calls = { statuses: [], get: 0, listRuns: 0, listStatuses: 0 };
+  const calls = {
+    statuses: [],
+    get: 0,
+    listRuns: 0,
+    listStatuses: 0,
+    listJobs: [],
+  };
   const github = {
     rest: {
       pulls: {
@@ -97,6 +158,11 @@ function makeGithub({
           calls.listRuns++;
           if (runsError) throw new Error(runsError);
           return { data: { workflow_runs: runs } };
+        },
+        listJobsForWorkflowRun: async ({ run_id }) => {
+          calls.listJobs.push(run_id);
+          if (jobsError) throw new Error(jobsError);
+          return { data: { jobs: jobsByRunId[run_id] || [] } };
         },
       },
       repos: {
@@ -663,6 +729,260 @@ describe('ci-gate — a success verdict must be current (LS-9378)', () => {
     } finally {
       process.env.GITHUB_RUN_ID = saved;
     }
+  });
+});
+
+// ── LS-9565: a superseding run whose CI Pipeline JOB was skipped ──────────────
+
+describe('ci-gate — a newer run that skipped its pipeline does not supersede (LS-9565)', () => {
+  it('regression: PR #7212 — posts success when the newer run SKIPPED its CI Pipeline job', async () => {
+    // The exact production sequence on 42f31fc. Run 32585173510
+    // (workflow_dispatch) ran the full pipeline green. Run 32586165378
+    // (pull_request_review: approved) was created 20 minutes later, its
+    // check-prior-success guard short-circuited `🚀 CI Pipeline`, and the run
+    // still concluded `success` overall. The run-level filter therefore let it
+    // supersede, the green run withheld, and 42f31fc ended up with NO CI Gate.
+    const GREEN_RUN = 32585173510;
+    const SKIPPED_PIPELINE_RUN = 32586165378;
+    const saved = process.env.GITHUB_RUN_ID;
+    process.env.GITHUB_RUN_ID = String(GREEN_RUN);
+    try {
+      const { github, calls } = makeGithub({
+        runs: [
+          { id: GREEN_RUN, name: CI_WORKFLOW, conclusion: 'success' },
+          {
+            id: SKIPPED_PIPELINE_RUN,
+            name: CI_WORKFLOW,
+            conclusion: 'success',
+          },
+        ],
+        jobsByRunId: { [SKIPPED_PIPELINE_RUN]: skippedPipelineJobs() },
+      });
+      const res = await postCiGate({
+        github,
+        context: makeContext(),
+        core,
+        results: allPass(),
+      });
+
+      assert.strictEqual(
+        res.posted,
+        true,
+        'the run that actually ran CI must post its verdict',
+      );
+      assert.strictEqual(calls.statuses[0].state, 'success');
+      assert.deepStrictEqual(
+        calls.listJobs,
+        [SKIPPED_PIPELINE_RUN],
+        'the superseding candidate must be probed at the job level',
+      );
+    } finally {
+      process.env.GITHUB_RUN_ID = saved;
+    }
+  });
+
+  it('STILL withholds when the newer run actually RAN its pipeline', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        { id: NEWER_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+      ],
+      jobsByRunId: { [NEWER_RUN_ID]: ranPipelineJobs() },
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('withholds for an in-flight newer run whose pipeline job has not resolved yet', async () => {
+    // The `🚀 CI Pipeline` row exists but is still queued — determine-scope has
+    // not decided whether to short-circuit. It may yet run CI and post, so the
+    // guard must keep deferring to it.
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          status: 'in_progress',
+          conclusion: null,
+        },
+      ],
+      jobsByRunId: {
+        [NEWER_RUN_ID]: [
+          { name: CI_PIPELINE_JOB_NAME, status: 'queued', conclusion: null },
+        ],
+      },
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('walks past several skipped-pipeline runs to the newest real one', async () => {
+    // Label churn plus an approval can stack multiple non-posting runs above the
+    // gating run. Only the first candidate that will actually speak counts.
+    const REAL_NEWER = SELF_RUN_ID + 10;
+    const SKIPPED_A = SELF_RUN_ID + 20;
+    const SKIPPED_B = SELF_RUN_ID + 30;
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        { id: REAL_NEWER, name: CI_WORKFLOW, conclusion: 'success' },
+        { id: SKIPPED_A, name: CI_WORKFLOW, conclusion: 'success' },
+        { id: SKIPPED_B, name: CI_WORKFLOW, conclusion: 'success' },
+      ],
+      jobsByRunId: {
+        [SKIPPED_A]: skippedPipelineJobs(),
+        [SKIPPED_B]: skippedPipelineJobs(),
+        [REAL_NEWER]: ranPipelineJobs(),
+      },
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.supersededBy, REAL_NEWER);
+    assert.deepStrictEqual(
+      calls.listJobs,
+      [SKIPPED_B, SKIPPED_A, REAL_NEWER],
+      'candidates are probed newest-first and the walk stops at the real run',
+    );
+  });
+
+  it('posts success when EVERY newer run skipped its pipeline', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        { id: NEWER_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+      ],
+      jobsByRunId: { [NEWER_RUN_ID]: skippedPipelineJobs() },
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it('fails CLOSED — a newer run whose jobs lookup errors still supersedes', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        { id: NEWER_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+      ],
+      jobsError: 'API is down',
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(
+      calls.statuses.length,
+      0,
+      'an unreadable newer run must not be assumed silent',
+    );
+  });
+
+  it('fails CLOSED — stops probing past the inspection cap', async () => {
+    const extras = Array.from(
+      { length: MAX_SUPERSEDING_RUN_INSPECTIONS + 2 },
+      (_, i) => ({
+        id: SELF_RUN_ID + 10 * (i + 1),
+        name: CI_WORKFLOW,
+        conclusion: 'success',
+      }),
+    );
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        ...extras,
+      ],
+      // Every candidate skipped its pipeline — without the cap the guard would
+      // probe all of them and post.
+      jobsByRunId: Object.fromEntries(
+        extras.map((r) => [r.id, skippedPipelineJobs()]),
+      ),
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(
+      calls.listJobs.length,
+      MAX_SUPERSEDING_RUN_INSPECTIONS,
+      'the guard must not probe more candidates than the cap allows',
+    );
+  });
+
+  it('does not spend a jobs lookup when the run-level filter already excludes the run', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        { id: NEWER_RUN_ID, name: CI_WORKFLOW, conclusion: 'cancelled' },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.deepStrictEqual(calls.listJobs, []);
+  });
+
+  it('the CI Pipeline job name matches ci-orchestrator.yml (drift guard)', async () => {
+    // CI_PIPELINE_JOB_NAME is matched against the live Actions jobs listing, so
+    // renaming the orchestrator job without updating the constant would silently
+    // reopen LS-9565: no job would match and every skipped-pipeline run would go
+    // back to superseding.
+    const orchestrator = await readFile(
+      path.join(
+        path.dirname(fileURLToPath(import.meta.url)),
+        '../../workflows/ci-orchestrator.yml',
+      ),
+      'utf8',
+    );
+    assert.match(
+      orchestrator,
+      new RegExp(`^\\s+name:\\s*"${CI_PIPELINE_JOB_NAME}"\\s*$`, 'm'),
+      `ci-orchestrator.yml no longer declares a job named "${CI_PIPELINE_JOB_NAME}"`,
+    );
   });
 });
 

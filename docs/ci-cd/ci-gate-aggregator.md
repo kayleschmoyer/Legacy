@@ -88,6 +88,28 @@ its own, so withholding is the safe direction):
   run withhold while the label run posts nothing — stranding the SHA with **no**
   gate at all. An in-flight run (`conclusion: null`) does supersede; it has not
   finished and is still expected to post.
+
+  **The run conclusion alone is not enough (LS-9565).** A
+  `pull_request_review: approved` run whose `check-prior-success` guard
+  short-circuits the pipeline still concludes **`success` at the run level** —
+  its scope, secret-scan and Security Gate jobs all pass — while only its
+  `🚀 CI Pipeline` **job** is `skipped`. It therefore slipped past the
+  conclusion filter, superseded the run that had actually done the work, and
+  posted nothing. Guard (A) now probes each candidate's job list
+  (`CI_PIPELINE_JOB_NAME`) newest-first and walks past any whose pipeline job
+  was skipped, stopping at the first run that will really speak. The probe fails
+  **closed**: an unreadable candidate, or more than
+  `MAX_SUPERSEDING_RUN_INSPECTIONS` of them, still supersedes.
+
+  > Observed on PR #7212 (`42f31fc`): run `32585173510` ran the full pipeline
+  > green and withheld in favour of run `32586165378`, whose `🚀 CI Pipeline`
+  > job had concluded `skipped` 55 minutes earlier. Neither posted, and
+  > `github_pr_why_blocked` reported `CI_PENDING` with
+  > `CI Gate (not yet registered)` as the sole remaining blocker. The manual
+  > unblock is a `workflow_dispatch` of `ci-orchestrator.yml` with `pr_number`
+  > set — that trigger bypasses the review-gated prior-success guard, so it both
+  > runs CI and posts the gate under the highest run id.
+
 - **(B) newer-failure-posted** — refuse if an existing `CI Gate` failure status on
   the SHA was posted by a newer run (run id parsed from `target_url`). Redundant
   with (A) when the runs listing is complete, but survives pagination and API lag.

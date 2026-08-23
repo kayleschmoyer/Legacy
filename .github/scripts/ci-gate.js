@@ -131,12 +131,89 @@ const CI_RUN_WORKFLOW_NAMES = Object.freeze([
  *
  * An in-flight run has `conclusion: null`, which is deliberately NOT in this set
  * — it has not finished and is still expected to post.
+ *
+ * This filter is necessary but not sufficient — see `CI_PIPELINE_JOB_NAME` for
+ * the job-level counterpart (LS-9565).
  */
 const CONCLUSIONS_THAT_POST_NO_VERDICT = Object.freeze([
   'skipped',
   'cancelled',
   'neutral',
 ]);
+
+/**
+ * The orchestrator's `ci-pipeline` job name (`name:` in ci-orchestrator.yml) —
+ * the caller job for the reusable `.github/workflows/ci-pipeline.yml`, and the
+ * only job in a run that can reach the `summarize` post step.
+ *
+ * The run-level `CONCLUSIONS_THAT_POST_NO_VERDICT` filter above is necessary but
+ * NOT sufficient (LS-9565). A `pull_request_review: approved` run whose
+ * `check-prior-success` idempotency guard short-circuits the pipeline still
+ * concludes `success` at the RUN level — its `Determine Workflow Scope`,
+ * `Secret Detection Scan`, `Security Scan Summary` and `Security Gate` jobs all
+ * succeed — while only this ONE job is `skipped`. So the run passes the
+ * run-conclusion filter, is treated as superseding, and the older run that
+ * actually ran CI withholds its green — leaving the SHA with NO `CI Gate` at
+ * all. Exactly what LS-9378's filter was written to prevent, one level down.
+ *
+ * Observed on PR #7212 (`42f31fc`): run 32585173510 ran the full pipeline green
+ * and withheld in favour of run 32586165378, whose `🚀 CI Pipeline` job had
+ * concluded `skipped` 55 minutes earlier. Neither posted.
+ *
+ * A run that invokes the pipeline DIRECTLY (workflow name
+ * `Legacy Sports CI Pipeline`) has no such caller job — only the nested
+ * `🚀 CI Pipeline / <job>` rows — so the absence of this exact name correctly
+ * reads as "this run runs the pipeline".
+ *
+ * Kept in sync with ci-orchestrator.yml by a unit test that greps the workflow.
+ */
+const CI_PIPELINE_JOB_NAME = '🚀 CI Pipeline';
+
+/**
+ * How many superseding-run candidates may be probed with a jobs lookup before
+ * the guard gives up and fails CLOSED on the next one. Real SHAs carry at most
+ * a handful of newer runs (label churn, an approval, a manual dispatch); the cap
+ * only bounds the API spend in a pathological case.
+ */
+const MAX_SUPERSEDING_RUN_INSPECTIONS = 10;
+
+/**
+ * Whether `runId`'s CI Pipeline job was skipped — i.e. that run performed no CI
+ * and will therefore never post a `CI Gate` verdict (LS-9565).
+ *
+ * Fails CLOSED: on any API error this returns `false` ("assume it will post"),
+ * which makes the caller withhold its own success. Withholding is the safe
+ * direction — a missing `CI Gate` blocks the merge, whereas wrongly posting
+ * green over a newer run's verdict lands a red PR (the LS-9378 invariant).
+ *
+ * @returns {Promise<boolean>}
+ */
+async function pipelineJobWasSkipped({ github, core, owner, repo, runId }) {
+  try {
+    const { data } = await github.rest.actions.listJobsForWorkflowRun({
+      owner,
+      repo,
+      run_id: runId,
+      per_page: 100,
+    });
+    const pipelineJob = (data.jobs || []).find(
+      (job) => job.name === CI_PIPELINE_JOB_NAME,
+    );
+    // `status: 'completed'` matters: a job GitHub has created but not yet
+    // resolved carries a null conclusion and is still expected to run.
+    return Boolean(
+      pipelineJob &&
+      pipelineJob.status === 'completed' &&
+      pipelineJob.conclusion === 'skipped',
+    );
+  } catch (e) {
+    core.warning(
+      `CI Gate: could not list jobs for run ${runId} (${e.message}) — assuming ` +
+        'it runs the pipeline and will post its own verdict.',
+    );
+    return false;
+  }
+}
 
 /**
  * Extract the Actions run id from a commit status `target_url` of the shape
@@ -198,8 +275,9 @@ async function assertSuccessIsCurrent({
 
   // (A) Does a NEWER CI run exist for this SHA that will post its own verdict?
   // If so we are a superseded re-run and our verdict is stale by construction.
-  // Runs that can never post (see CONCLUSIONS_THAT_POST_NO_VERDICT) are ignored
-  // so we do not withhold in favour of a run that will never speak.
+  // Runs that can never post are ignored so we do not withhold in favour of a
+  // run that will never speak — at the run level (CONCLUSIONS_THAT_POST_NO_VERDICT)
+  // and, since LS-9565, at the job level too (CI_PIPELINE_JOB_NAME skipped).
   try {
     const { data } = await github.rest.actions.listWorkflowRunsForRepo({
       owner,
@@ -207,19 +285,51 @@ async function assertSuccessIsCurrent({
       head_sha: sha,
       per_page: 100,
     });
-    const newer = (data.workflow_runs || [])
+    const candidates = (data.workflow_runs || [])
       .filter(
         (run) =>
           CI_RUN_WORKFLOW_NAMES.includes(run.name) &&
           run.id > selfRunId &&
           !CONCLUSIONS_THAT_POST_NO_VERDICT.includes(run.conclusion),
       )
-      .sort((a, b) => b.id - a.id)[0];
-    if (newer) {
+      .sort((a, b) => b.id - a.id);
+
+    // LS-9565: the run-level filter above misses a run that concluded `success`
+    // overall but whose CI Pipeline JOB was short-circuited by the
+    // check-prior-success guard. Such a run performs no CI and posts no verdict,
+    // so it must not silence this one. Walk newest-first and stop at the first
+    // candidate that will actually speak.
+    for (const [index, candidate] of candidates.entries()) {
+      if (index >= MAX_SUPERSEDING_RUN_INSPECTIONS) {
+        core.warning(
+          `CI Gate: more than ${MAX_SUPERSEDING_RUN_INSPECTIONS} newer CI runs ` +
+            `for ${sha} — withholding success rather than probing further.`,
+        );
+        return {
+          allowed: false,
+          reason: 'superseded-run',
+          supersededBy: candidate.id,
+        };
+      }
+      const skipped = await pipelineJobWasSkipped({
+        github,
+        core,
+        owner,
+        repo,
+        runId: candidate.id,
+      });
+      if (skipped) {
+        core.info(
+          `CI Gate: ignoring newer run ${candidate.id} for ${sha} — its ` +
+            `'${CI_PIPELINE_JOB_NAME}' job was skipped (prior-success ` +
+            'short-circuit), so it runs no CI and posts no verdict.',
+        );
+        continue;
+      }
       return {
         allowed: false,
         reason: 'superseded-run',
-        supersededBy: newer.id,
+        supersededBy: candidate.id,
       };
     }
   } catch (e) {
@@ -471,9 +581,12 @@ async function postCiGate({
 
 module.exports = {
   CI_GATE_CONTEXT,
+  CI_PIPELINE_JOB_NAME,
   CI_RUN_WORKFLOW_NAMES,
   GATE_INPUT_JOBS,
+  MAX_SUPERSEDING_RUN_INSPECTIONS,
   computeGateConclusion,
+  pipelineJobWasSkipped,
   runIdFromTargetUrl,
   assertSuccessIsCurrent,
   isRetryableStatusError,
