@@ -203,11 +203,11 @@ jobs:
           # LS-9449: an over-selected "narrow" run is strictly worse than the
           # run-all path — the same (or more) specs on ONE shard with a
           # 30-minute budget instead of three, plus a full mobile re-run of the
-          # list against a 20-minute budget. 203 affected spec files (~1888
+          # same list on one shard. 203 affected spec files (~1888
           # tests) ran 26-31 minutes and got cancelled at the job timeout on
           # three consecutive runs. Promote to the full-suite sharded path
-          # (which also skips the mobile duplication, per the broad-change
-          # design) once the selection is too large for the single-shard
+          # (both the chromium and — since LS-9658 — the Mobile Chrome jobs
+          # shard it) once the selection is too large for the single-shard
           # budgets. 100 files ≈ ~930 tests ≈ ~12 min/shard — comfortable
           # margin under both timeouts.
           SPEC_COUNT=$(printf '%s\n' "$SPECS" | grep -c . || true)
@@ -808,13 +808,10 @@ jobs:
   # were only visible on the post-deploy nightly's mobile matrix
   # (run-playwright-tests.yml), hours after merge and non-blocking.
   #
-  # This job closes that gap WITHOUT undoing the cost discipline LS-8920 built
-  # into the affected-spec selection (LS-8905 measured 79% of E2E-triggering
-  # PRs escalating to the full 182-spec suite before that narrowing; bolting a
-  # second full mobile sweep onto PR CI would repeat that mistake). Instead it
-  # re-runs the EXACT SAME LS-7846 selection the chromium affected-spec pass
-  # already computed — same e2e-grep, same e2e-affected-specs — a second time
-  # on one mobile project. No second selection is computed here.
+  # This job re-runs the EXACT SAME LS-7846 selection the chromium pass
+  # already computed — same e2e-grep, same e2e-affected-specs, same shard
+  # matrix — a second time on one mobile project. No second selection is
+  # computed here.
   #
   # Scope decisions:
   #   - Mobile Chrome only. It shares the chromium engine (and therefore the
@@ -828,23 +825,38 @@ jobs:
   #     missed-regression problem for a stuck-PR problem. It keeps running
   #     nightly-only in run-playwright-tests.yml until that flake history
   #     clears; revisit adding it here once it does.
-  #   - Gated on the identical condition the chromium "E2E Tests (affected
-  #     specs)" step above uses (run-all != true && affected-specs != ''): a
-  #     broad change still only gets the full chromium sweep (no mobile
-  #     duplication of the 182-spec suite), and a PR with no e2e-relevant
-  #     changes skips this job entirely, same as it already skips the e2e job
-  #     (preserves the ~30% skip rate measured in LS-8905).
+  #   - LS-9658 (supersedes LS-9411's original gating decision): runs at FULL
+  #     PARITY with the chromium e2e job — same job-level condition, same
+  #     detect-changes outputs, same shard matrix. The original gate skipped
+  #     this job whenever the selection escalated to run-all, which inverted
+  #     the intent: the broadest changes (app shell, shared-components — the
+  #     exact surfaces behind LS-9572/LS-9496, LS-9408 and LS-9326) got ZERO
+  #     mobile-viewport coverage at PR time. Maintainer accepted the runner
+  #     cost of the sharded mobile full suite on run-all PRs (2026-08-23).
+  #     A PR with no e2e-relevant changes still skips this job entirely, same
+  #     as it skips the e2e job.
   e2e-mobile:
-    name: "E2E Tests (Mobile Chrome — affected)"
+    name: "E2E Tests (Mobile Chrome — Shard ${{ matrix.shard }})"
     needs: [detect-changes, lint, test, build]
     if: >-
       needs.lint.result == 'success' &&
       needs.test.result == 'success' &&
       needs.build.result == 'success' &&
-      needs.detect-changes.outputs.e2e-affected-run-all != 'true' &&
-      needs.detect-changes.outputs.e2e-affected-specs != ''
+      (needs.detect-changes.outputs.web == 'true' ||
+      needs.detect-changes.outputs.e2e == 'true' ||
+      needs.detect-changes.outputs.api-surface == 'true' ||
+      needs.detect-changes.outputs.requires-full-build == 'true')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    # 45 (not the previous 20): the run-all path now runs full-suite shards
+    # here — same budget rationale as the chromium e2e job above (LS-9467).
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # Identical shard matrix to the chromium e2e job (LS-9658): 1 shard
+        # for a narrow change (@critical + affected specs), 3 shards when a
+        # broad surface changed and the full suite runs.
+        shard: ${{ fromJSON(needs.detect-changes.outputs.e2e-shard-matrix) }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -878,6 +890,7 @@ jobs:
         uses: ./.github/actions/e2e-testing
         with:
           should-run-e2e: ${{ needs.build.outputs.artifacts-ready }}
+          shard: ${{ matrix.shard }}
           # browser stays "chromium" — Mobile Chrome runs on the chromium
           # engine (LS-8739), so this shares the desktop chromium job's
           # browser-binary cache key instead of triggering a redundant
@@ -895,13 +908,18 @@ jobs:
           e2e-manager-3-email: ${{ secrets.E2E_MANAGER_3_EMAIL }}
           e2e-manager-3-password: ${{ secrets.E2E_MANAGER_3_PASSWORD }}
 
-      # LS-7846/LS-9411: the same affected-spec list the chromium step above
-      # runs, re-run at Mobile Chrome's viewport. Reuses
-      # needs.detect-changes.outputs.e2e-affected-specs verbatim — the job-
-      # level `if` above already guarantees this is non-empty and we are not
-      # in the run-all (full-suite) case.
+      # LS-7846/LS-9411: the same affected-spec list the chromium job's
+      # equivalent step runs, re-run at Mobile Chrome's viewport. Reuses
+      # needs.detect-changes.outputs.e2e-affected-specs verbatim. Skipped in
+      # the run-all case (the sharded step above already ran the full suite)
+      # and when nothing mapped — the same step-level guard the chromium
+      # "E2E Tests (affected specs)" step uses (LS-9658: the job-level `if`
+      # no longer excludes run-all, so the guard lives here now).
       - name: "E2E Tests (Mobile Chrome — affected specs)"
-        if: needs.build.outputs.artifacts-ready == 'true'
+        if: >-
+          needs.build.outputs.artifacts-ready == 'true' &&
+          needs.detect-changes.outputs.e2e-affected-run-all != 'true' &&
+          needs.detect-changes.outputs.e2e-affected-specs != ''
         shell: bash
         env:
           CI: "true"
@@ -930,7 +948,10 @@ jobs:
         uses: ./.github/actions/s3-artifact
         with:
           mode: upload
-          name: playwright-blobs/mobile
+          # mobile-<shard index> so the (now sharded, LS-9658) mobile
+          # instances never clobber each other or the chromium shards'
+          # playwright-blobs/<index> prefixes.
+          name: playwright-blobs/mobile-${{ strategy.job-index }}
           path: blob-report/
           if-no-files-found: warn
 
@@ -948,8 +969,8 @@ jobs:
   #
   # Always runs (if: always()) so it never sits "Expected" and never blocks a
   # PR that legitimately skipped e2e. Passes when e2e/e2e-mobile succeeded OR
-  # were skipped (no web/e2e/api change, or e2e-mobile's narrower affected-spec
-  # gate); fails when any e2e shard OR the mobile pass failed.
+  # were skipped (no web/e2e/api change — since LS-9658 both jobs share the
+  # same gate); fails when any e2e OR e2e-mobile shard failed.
   e2e-affected:
     name: "e2e-affected"
     needs: [detect-changes, e2e, e2e-mobile]
