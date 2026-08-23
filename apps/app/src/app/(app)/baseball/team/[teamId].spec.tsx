@@ -86,17 +86,20 @@ jest.mock('../../../../common/utilities/RouteUtils', () => ({
   toIntId: (v: unknown) => (typeof v === 'string' ? parseInt(v, 10) : null),
 }));
 
-// Captures the projections prop from the most recent LineupEditor render.
+// Captures the projections/sport props from the most recent LineupEditor render.
 let lastProjections: Record<number, number> | undefined;
+let lastLineupEditorSport: string | undefined;
 
 jest.mock('../../../../features/roster/LineupEditor', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
     LineupEditor: (props: {
       projections?: Record<number, number>;
+      sport?: string;
       [key: string]: unknown;
     }) => {
       lastProjections = props.projections;
+      lastLineupEditorSport = props.sport;
       return <View testID="lineup-editor" />;
     },
   };
@@ -229,6 +232,7 @@ describe('BaseballTeam route — projection gating', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     lastProjections = undefined;
+    lastLineupEditorSport = undefined;
 
     mockUseGetTeamByIdQuery.mockReturnValue({
       loading: false,
@@ -269,6 +273,13 @@ describe('BaseballTeam route — projection gating', () => {
     expect(lastProjections).toEqual({});
   });
 
+  it("passes sport='baseball' to LineupEditor on both the Lineup and Rotation tabs (LS-6436)", () => {
+    render(<BaseballTeam />);
+    expect(lastLineupEditorSport).toBe('baseball');
+    fireEvent.press(screen.getByTestId('tab-Rotation'));
+    expect(lastLineupEditorSport).toBe('baseball');
+  });
+
   it('passes empty projections for premium users too (matchup feature dormant — team=[] produces no stats)', () => {
     mockUseSubscription.mockReturnValue({ isPremium: true });
     render(<BaseballTeam />);
@@ -282,6 +293,7 @@ describe('BaseballTeam route — team identity header (LS-8313)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     lastProjections = undefined;
+    lastLineupEditorSport = undefined;
 
     mockUseGetTeamByIdQuery.mockReturnValue({
       loading: false,
@@ -434,6 +446,7 @@ describe('BaseballTeam route — assistant manager settings parity (LS-6029, AC1
   beforeEach(() => {
     jest.clearAllMocks();
     lastProjections = undefined;
+    lastLineupEditorSport = undefined;
 
     mockUseGetTeamByIdQuery.mockReturnValue({
       loading: false,

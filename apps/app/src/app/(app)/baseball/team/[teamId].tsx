@@ -271,6 +271,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           projections={isPremium ? hitterProjections : {}}
           team={hitters}
           actual={hittersActual}
+          sport="baseball"
         />
       );
     case 'Rotation':
@@ -283,6 +284,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           projections={isPremium ? pitcherProjections : {}}
           team={pitchers}
           actual={pitchersActual}
+          sport="baseball"
         />
       );
     case 'Settings':

@@ -5,6 +5,7 @@ import { ScrollView } from 'react-native';
 import {
   ALLOWED_POSITIONS,
   PITCHING_POSITIONS,
+  type SportKind,
 } from '@legacy-sports/shared-components';
 import {
   AppTeamMemberFragment,
@@ -103,6 +104,7 @@ interface PlayerRowProps {
   selectedPlayer: AppTeamMemberFragment | undefined;
   selectedPositionMapping: LeaguePositionFragment | undefined;
   onClick: (item: PlayerData) => void;
+  sport: SportKind;
 }
 
 const PlayerRow = memo(
@@ -116,6 +118,7 @@ const PlayerRow = memo(
     selectedPlayer,
     selectedPositionMapping,
     onClick,
+    sport,
   }: PlayerRowProps): React.JSX.Element => {
     const scoreColor = computeScoreColor(actualValue, projValue);
     const scoreDisplay = formatScoreDisplay(actualValue, projValue);
@@ -145,7 +148,8 @@ const PlayerRow = memo(
             ? humanizeString(positionSlot.positionType)
                 .toUpperCase()
                 .replace(' ', '')
-            : teamMember &&
+            : sport === 'baseball' &&
+                teamMember &&
                 isPlayerPitcher(teamMember) &&
                 !isPlayerBatter(teamMember)
               ? 'BP'
@@ -169,7 +173,8 @@ const PlayerRow = memo(
     prev.actualValue === next.actualValue &&
     prev.selectedPlayer === next.selectedPlayer &&
     prev.selectedPositionMapping === next.selectedPositionMapping &&
-    prev.onClick === next.onClick,
+    prev.onClick === next.onClick &&
+    prev.sport === next.sport,
 );
 
 export interface LineupEditorProps {
@@ -186,6 +191,9 @@ export interface LineupEditorProps {
   team: readonly AppTeamMemberFragment[];
   projections: Record<number, number>;
   actual: Record<number, number>;
+  /** Selects sport-specific display rules (e.g. the baseball-only bench
+   *  'BP' pitcher badge) — see LS-6436. */
+  sport: SportKind;
 }
 
 interface EmptySlotData {
@@ -214,6 +222,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
     onPlayerRemoved,
     actual,
     team,
+    sport,
   } = props;
 
   const [selectedPlayerData, setSelectedPlayerData] = useState<
@@ -509,6 +518,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
           selectedPlayer={selectedPlayer}
           selectedPositionMapping={selectedPositionMapping}
           onClick={onClick}
+          sport={sport}
         />
       );
     },
@@ -521,6 +531,7 @@ export function LineupEditor(props: LineupEditorProps): React.JSX.Element {
       selectedPlayer,
       selectedPlayerData,
       selectedPositionMapping,
+      sport,
     ],
   );
 
