@@ -152,6 +152,12 @@ describe('MatchupList', () => {
     expect(screen.getByText('85.00')).toBeTruthy();
   });
 
+  it('displays a status badge per matchup (LS-6320)', () => {
+    render(<MatchupList matchups={MOCK_MATCHUPS} />);
+    expect(screen.getByText('Final')).toBeTruthy();
+    expect(screen.getByText('Live')).toBeTruthy();
+  });
+
   it('calls onMatchupPress with the correct matchup when pressed', () => {
     const onMatchupPress = jest.fn();
     render(
