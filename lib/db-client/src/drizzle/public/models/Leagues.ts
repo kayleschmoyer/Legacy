@@ -1104,7 +1104,14 @@ export const commissionerAuditLog = pgTable(
   'commissioner_audit_log',
   {
     id: serial('id').primaryKey().notNull(),
-    leagueId: integer('league_id').notNull(),
+    /**
+     * Nullable (LS-6308): the delete_league audit entry is written for a
+     * league that is about to be deleted, and commissioner_audit_log_league_fk
+     * is ON DELETE SET NULL rather than CASCADE so that entry — and the
+     * deleted league's identifying info, preserved in `details` — survives
+     * the delete instead of being cascaded away with it.
+     */
+    leagueId: integer('league_id'),
     userId: integer('user_id').notNull(),
     /** Action performed, e.g. 'force_add', 'force_drop', 'edit_score' */
     action: varchar('action', { length: 100 }).notNull(),
@@ -1124,7 +1131,7 @@ export const commissionerAuditLog = pgTable(
         columns: [table.leagueId],
         foreignColumns: [leagues.id],
         name: 'commissioner_audit_log_league_fk',
-      }).onDelete('cascade'),
+      }).onDelete('set null'),
       calLeagueIdIdx: index('commissioner_audit_log_league_id_idx').on(
         table.leagueId,
       ),

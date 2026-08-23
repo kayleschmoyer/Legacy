@@ -29,6 +29,7 @@ import { builder } from './builder';
 import { checkAdminInDb, verifyCommissionerAccess } from './authorization';
 import { CommissionerAuditLog } from './leagues';
 import { AuthenticationError, UserInputError } from './graphql-errors';
+import { writeAuditLog } from './audit-log';
 import { addPlayerToRoster } from '../services/roster-service';
 
 /**
@@ -41,34 +42,11 @@ const RECALCULATABLE_MATCHUP_STATUSES = ['completed', 'in_progress'] as const;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-/** Insert a row into commissioner_audit_log. Never throws — errors are logged. */
-export async function writeAuditLog(
-  db: Parameters<typeof verifyCommissionerAccess>[0],
-  params: {
-    leagueId: number;
-    userId: number;
-    action: string;
-    targetType?: string;
-    targetId?: number;
-    details?: Record<string, unknown>;
-    reason?: string | null;
-  },
-): Promise<void> {
-  try {
-    await db.insert(PublicSchema.commissionerAuditLog).values({
-      leagueId: params.leagueId,
-      userId: params.userId,
-      action: params.action,
-      targetType: params.targetType ?? null,
-      targetId: params.targetId ?? null,
-      details: params.details ?? null,
-      reason: params.reason ?? null,
-    });
-  } catch (err) {
-    const error = err instanceof Error ? err : new Error(String(err));
-    LOGGER.error('Failed to write commissioner audit log', error, { params });
-  }
-}
+// Re-exported for existing importers (matchups/mutations.ts,
+// drafts/mutations/pause-resume-draft.ts) — the implementation lives in
+// ./audit-log so leagues/mutations.ts can use it without a leagues <->
+// commissioner-tools import cycle (LS-6308).
+export { writeAuditLog };
 
 // ── Input Types ────────────────────────────────────────────────────────────
 

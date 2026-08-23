@@ -23,6 +23,9 @@ describe('League Mutations', () => {
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
       returning: jest.fn().mockReturnThis(),
+      // deleteLeague runs the audit-log write + delete inside a transaction
+      // (LS-6308) — the callback receives the same mock db as its `tx`.
+      transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(mockDb)),
     };
 
     // Mock database utilities. Spread the real module so entitlement constants
@@ -85,6 +88,16 @@ describe('League Mutations', () => {
           id: 'id',
           accessLevel: 'accessLevel',
         },
+        // Needed by writeAuditLog, called from deleteLeague (LS-6308).
+        commissionerAuditLog: {
+          leagueId: 'leagueId',
+          userId: 'userId',
+          action: 'action',
+          targetType: 'targetType',
+          targetId: 'targetId',
+          details: 'details',
+          reason: 'reason',
+        },
       },
       InternalSchema: {
         usersInAppInternal: {
@@ -145,7 +158,7 @@ describe('League Mutations', () => {
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
-      mockDb.limit.mockResolvedValue([{ id: 1, owner: 1 }]);
+      mockDb.limit.mockResolvedValue([{ id: 1, owner: 1, name: 'My League' }]);
 
       // Mock delete operations
       mockDb.delete.mockReturnValue(mockDb);
@@ -169,16 +182,35 @@ describe('League Mutations', () => {
 
       // Verify delete was called once (CASCADE DELETE handles the rest)
       expect(mockDb.delete).toHaveBeenCalledTimes(1);
+
+      // LS-6308: the delete is audit-logged, inside the same transaction,
+      // with adminOverride false for an owner deleting their own league.
+      expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+      expect(mockDb.insert).toHaveBeenCalledWith(
+        expect.objectContaining({ leagueId: 'leagueId' }),
+      );
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leagueId: 1,
+          userId: 1,
+          action: 'delete_league',
+          targetType: 'league',
+          targetId: 1,
+          details: { leagueName: 'My League', adminOverride: false },
+        }),
+      );
     });
 
-    it('should successfully delete a league when user is admin', async () => {
+    it('should successfully delete a league when user is admin, flagging adminOverride', async () => {
       // Mock league exists but user is not the owner, but is admin
       mockDb.select.mockReturnValue(mockDb);
       mockDb.from.mockReturnValue(mockDb);
       mockDb.where.mockReturnValue(mockDb);
       // 1) league lookup, 2) checkAdminInDb's accessLevel lookup
       mockDb.limit
-        .mockResolvedValueOnce([{ id: 1, owner: 999 }])
+        .mockResolvedValueOnce([
+          { id: 1, owner: 999, name: "Someone Else's League" },
+        ])
         .mockResolvedValueOnce([{ accessLevel: 'admin' }]);
 
       // Mock delete operations
@@ -208,6 +240,56 @@ describe('League Mutations', () => {
       expect(result).toBe(
         'Successfully deleted league 1 and all associated data',
       );
+
+      // LS-6308: an admin deleting a league they don't own is the
+      // highest-risk path — the audit entry must flag it.
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'delete_league',
+          userId: 1,
+          details: {
+            leagueName: "Someone Else's League",
+            adminOverride: true,
+          },
+        }),
+      );
+    });
+
+    it('audit-logs before deleting, both inside the same transaction', async () => {
+      // The write order matters: writeAuditLog must be called before the
+      // delete so a real Postgres transaction (unlike this mock) aborts and
+      // rolls back the delete too if the audit-log insert itself fails —
+      // the trail can never lie by recording a delete that didn't happen.
+      mockDb.select.mockReturnValue(mockDb);
+      mockDb.from.mockReturnValue(mockDb);
+      mockDb.where.mockReturnValue(mockDb);
+      mockDb.limit.mockResolvedValue([{ id: 1, owner: 1, name: 'My League' }]);
+      mockDb.delete.mockReturnValue(mockDb);
+
+      const callOrder: string[] = [];
+      mockDb.insert.mockImplementation(() => {
+        callOrder.push('insert');
+        return mockDb;
+      });
+      mockDb.delete.mockImplementation(() => {
+        callOrder.push('delete');
+        return mockDb;
+      });
+
+      const mutationType = schema.getMutationType();
+      const deleteLeagueField = mutationType?.getFields().deleteLeague;
+      if (!deleteLeagueField?.resolve) {
+        throw new Error('deleteLeague resolver not found');
+      }
+
+      await deleteLeagueField.resolve(
+        {},
+        { leagueId: 1 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(callOrder).toEqual(['insert', 'delete']);
     });
 
     it('should fail when user is not authenticated', async () => {

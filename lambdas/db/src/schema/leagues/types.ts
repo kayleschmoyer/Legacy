@@ -545,7 +545,10 @@ TeamMember.implement({
 });
 export const CommissionerAuditLog = builder.objectRef<{
   id: number;
-  leagueId: number;
+  /** Null once the audited league has since been deleted (LS-6308) — the
+   *  FK is ON DELETE SET NULL so the entry survives, but no longer points
+   *  at a live league. */
+  leagueId: number | null;
   userId: number;
   action: string;
   targetType: string | null;
@@ -559,7 +562,7 @@ CommissionerAuditLog.implement({
   description: 'An audit-trail entry for a commissioner action',
   fields: (t) => ({
     id: t.exposeInt('id'),
-    leagueId: t.exposeInt('leagueId'),
+    leagueId: t.exposeInt('leagueId', { nullable: true }),
     userId: t.exposeInt('userId'),
     action: t.exposeString('action'),
     targetType: t.exposeString('targetType', { nullable: true }),

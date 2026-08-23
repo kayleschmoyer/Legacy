@@ -78,6 +78,7 @@ import {
   hasEntitlement,
   requirePremium,
 } from '../authorization';
+import { writeAuditLog } from '../audit-log';
 import { requireFreshEntitlement } from '../fresh-entitlements';
 import { ENTITLEMENTS } from '../entitlements';
 import { applyDecay, applyEscalation } from '../../services/salary-rollover';
@@ -2150,6 +2151,7 @@ builder.mutationField('deleteLeague', (t) =>
           .select({
             id: PublicSchema.leagues.id,
             owner: PublicSchema.leagues.owner,
+            name: PublicSchema.leagues.name,
           })
           .from(PublicSchema.leagues)
           .where(eq(PublicSchema.leagues.id, args.leagueId))
@@ -2160,19 +2162,40 @@ builder.mutationField('deleteLeague', (t) =>
         }
 
         const isAdmin = await checkAdminInDb(context);
-        if (league[0].owner !== context.user.id && !isAdmin) {
+        const isOwner = league[0].owner === context.user.id;
+        if (!isOwner && !isAdmin) {
           throw ForbiddenError(
             'Only the league owner or admin can delete this league',
           );
         }
+        // An admin deleting a league they don't own is the highest-risk path
+        // (LS-6308) — flagged in the audit entry's details so it stands out
+        // from an owner deleting their own league.
+        const adminOverride = isAdmin && !isOwner;
+        // Narrowing context.user to non-null doesn't survive into the nested
+        // transaction closure below, so alias it to a const here.
+        const deleterId = context.user.id;
 
-        // Delete the league - CASCADE DELETE constraints handle the rest.
-        // Retry transient deadlock / lock-timeout failures (LS-8100).
+        // Audit-log the delete and perform it in the same transaction so the
+        // trail can never lie: if the delete fails, the audit entry is rolled
+        // back with it (LS-6308). CASCADE DELETE constraints handle the rest
+        // of the league's data. Retry transient deadlock / lock-timeout
+        // failures (LS-8100).
         await withTransientRetry(
           () =>
-            context.db
-              .delete(PublicSchema.leagues)
-              .where(eq(PublicSchema.leagues.id, args.leagueId)),
+            context.db.transaction(async (tx) => {
+              await writeAuditLog(tx, {
+                leagueId: args.leagueId,
+                userId: deleterId,
+                action: 'delete_league',
+                targetType: 'league',
+                targetId: args.leagueId,
+                details: { leagueName: league[0].name, adminOverride },
+              });
+              await tx
+                .delete(PublicSchema.leagues)
+                .where(eq(PublicSchema.leagues.id, args.leagueId));
+            }),
           {
             onRetry: (attempt, detail) =>
               LOGGER.warn('Retrying league delete after transient DB error', {
