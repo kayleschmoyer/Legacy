@@ -22,6 +22,7 @@ import {
 import { FootballHubPage } from './FootballHubPage';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
+import { getLastVisitedLeague } from '../../lib/last-visited-league';
 
 // ---------------------------------------------------------------------------
 // Module mocks (factories must not reference outer scope — configured per-test)
@@ -38,6 +39,9 @@ jest.mock('@legacy-sports/shared-components/auth', () => ({
 jest.mock('../../components/UpgradeModal', () => ({ UpgradeModal: jest.fn() }));
 jest.mock('../../hooks/useIsPremium', () => ({
   useIsPremiumStatus: jest.fn(),
+}));
+jest.mock('../../lib/last-visited-league', () => ({
+  getLastVisitedLeague: jest.fn(),
 }));
 jest.mock('@apollo/client/react', () => ({ useApolloClient: jest.fn() }));
 jest.mock('@legacy-sports/graphql', () => ({
@@ -61,6 +65,9 @@ const mockUpgradeModal = UpgradeModal as jest.MockedFunction<
 >;
 const mockUseIsPremiumStatus = useIsPremiumStatus as jest.MockedFunction<
   typeof useIsPremiumStatus
+>;
+const mockGetLastVisitedLeague = getLastVisitedLeague as jest.MockedFunction<
+  typeof getLastVisitedLeague
 >;
 const mockUseGetUserLeaguesQuery =
   useGetUserLeaguesQuery as jest.MockedFunction<typeof useGetUserLeaguesQuery>;
@@ -154,6 +161,7 @@ beforeEach(() => {
     isPremium: false,
     isLoading: false,
   });
+  mockGetLastVisitedLeague.mockReturnValue(null);
   matchupsById = {};
   mockUseApolloClient.mockReturnValue({
     query: jest.fn(mockClientQuery),
@@ -500,5 +508,68 @@ describe('FootballHubPage — bye-week empty state (FBH-010)', () => {
 
     const highlights = mockNFLHome.mock.calls[0][0].matchupHighlights;
     expect(highlights).toEqual([]);
+  });
+});
+
+describe('FootballHubPage — resume last league shortcut wiring (LS-6294 / FBH-040)', () => {
+  it('omits resumeLeague when no last-visited league is stored', () => {
+    mockGetLastVisitedLeague.mockReturnValue(null);
+    setLeagues(leaguesOfCount(2));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].resumeLeague).toBeUndefined();
+  });
+
+  it('omits resumeLeague when the last-visited league is baseball', () => {
+    mockGetLastVisitedLeague.mockReturnValue({
+      leagueId: 1,
+      sport: 'baseball',
+    });
+    setLeagues(leaguesOfCount(2));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].resumeLeague).toBeUndefined();
+  });
+
+  it('omits resumeLeague when the last-visited football league is not in the fetched leagues', () => {
+    mockGetLastVisitedLeague.mockReturnValue({
+      leagueId: 99,
+      sport: 'football',
+    });
+    setLeagues(leaguesOfCount(2));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].resumeLeague).toBeUndefined();
+  });
+
+  it('passes resumeLeague with the resolved league name when the last-visited league is football and still owned', () => {
+    mockGetLastVisitedLeague.mockReturnValue({
+      leagueId: 2,
+      sport: 'football',
+    });
+    setLeagues(leaguesOfCount(3));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].resumeLeague).toMatchObject({
+      id: 2,
+      name: 'League 2',
+    });
+  });
+
+  it("resumeLeague's onPress navigates to the same route onViewLeague uses", () => {
+    mockGetLastVisitedLeague.mockReturnValue({
+      leagueId: 2,
+      sport: 'football',
+    });
+    setLeagues(leaguesOfCount(3));
+
+    render(<FootballHubPage />);
+
+    mockNFLHome.mock.calls[0][0].resumeLeague?.onPress();
+    expect(navigateSpy).toHaveBeenCalledWith('/football/league/2');
   });
 });

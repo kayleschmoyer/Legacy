@@ -11,6 +11,7 @@ import { PageMeta } from '../../components/PageMeta';
 import { UpgradeModal } from '../../components/UpgradeModal';
 import { useIsPremiumStatus } from '../../hooks/useIsPremium';
 import { useFootballMatchupHighlights } from '../../hooks/useFootballMatchupHighlights';
+import { getLastVisitedLeague } from '../../lib/last-visited-league';
 
 // Free accounts may participate in at most this many non-mock leagues before a
 // premium subscription is required. Mirrors FREE_TIER_LEAGUE_LIMIT in the db
@@ -107,6 +108,28 @@ export function FootballHubPage() {
     handlePressMatchupLeague,
   );
 
+  const handleViewLeague = React.useCallback(
+    (leagueId: string | number) => navigate(`/football/league/${leagueId}`),
+    [navigate],
+  );
+
+  // Resume-last-league shortcut (LS-6294 / FBH-040): only shown when the
+  // last-visited league (LS-6694) is football and still among the leagues
+  // this user belongs to, so the card never points at a league they left.
+  const resumeLeague = React.useMemo(() => {
+    const lastLeague = getLastVisitedLeague();
+    if (!lastLeague || lastLeague.sport !== 'football') return undefined;
+    const match = leagues.find(
+      (l) => String(l.id) === String(lastLeague.leagueId),
+    );
+    if (!match) return undefined;
+    return {
+      id: match.id,
+      name: match.name,
+      onPress: () => handleViewLeague(match.id),
+    };
+  }, [leagues, handleViewLeague]);
+
   const handleCreateLeague = () => {
     // Proactively gate free users who are already at the league cap so they see
     // the upgrade path before filling out the form instead of a backend error.
@@ -139,9 +162,7 @@ export function FootballHubPage() {
           onJoinLeague={() => navigate('/football/league/join')}
           onBrowseLeagues={() => navigate('/football/leagues')}
           onBrowsePlayers={() => navigate('/players?sport=nfl')}
-          onViewLeague={(id: string | number) =>
-            navigate(`/football/league/${id}`)
-          }
+          onViewLeague={handleViewLeague}
           trendingPlayers={trendingPlayers}
           trendingPlayersLoading={trendingPlayersLoading}
           matchupHighlights={matchupHighlights}
@@ -150,6 +171,7 @@ export function FootballHubPage() {
           onRetry={() => void refetch()}
           leagueCap={leagueCap}
           hasUnlimitedLeagues={!!auth?.user && !premiumLoading && isPremium}
+          resumeLeague={resumeLeague}
         />
       </div>
       <UpgradeModal

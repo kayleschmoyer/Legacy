@@ -483,6 +483,57 @@ describe('NFLHome — join-still-free reassurance (LS-6289 / FBH-035)', () => {
   });
 });
 
+describe('NFLHome — resume last league shortcut (LS-6294 / FBH-040)', () => {
+  it('omits the shortcut card when resumeLeague is not provided', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(
+      screen.queryByTestId('football-resume-league-card'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the shortcut card with the league name when resumeLeague is provided', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        resumeLeague={{ id: 5, name: 'Dynasty Warriors', onPress: noop }}
+      />,
+    );
+    expect(
+      screen.getByTestId('football-resume-league-card'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Dynasty Warriors')).toBeInTheDocument();
+    expect(screen.getByText('Resume last league')).toBeInTheDocument();
+  });
+
+  it('falls back to a generic label when the league has no name', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        resumeLeague={{ id: 5, name: null, onPress: noop }}
+      />,
+    );
+    expect(screen.getByText('Unnamed League')).toBeInTheDocument();
+  });
+
+  it('invokes onPress when the shortcut card is activated', () => {
+    const onPress = jest.fn();
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        resumeLeague={{ id: 5, name: 'Dynasty Warriors', onPress }}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('football-resume-league-card'));
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('NFLHome — empty-state upgrade on-ramp (LS-6272)', () => {
   it('keeps the neutral copy and Create CTA when leagueCap is not provided', () => {
     render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);

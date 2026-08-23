@@ -61,6 +61,11 @@ jest.mock('@legacy-sports/shared-components/football', () => {
         onUpgrade: () => void;
       };
       hasUnlimitedLeagues?: boolean;
+      resumeLeague?: {
+        id: string | number;
+        name?: string | null;
+        onPress: () => void;
+      };
       matchupHighlights?: { leagueId: string | number }[];
     }) => {
       capturedRefreshControl = props.refreshControl ?? null;
@@ -72,12 +77,19 @@ jest.mock('@legacy-sports/shared-components/football', () => {
           <Text>{`isAuthenticated:${String(props.isAuthenticated)}`}</Text>
           <Text>{`leagueCap:${props.leagueCap ? `${props.leagueCap.count}/${props.leagueCap.limit}:${props.leagueCap.atLimit}` : 'undefined'}`}</Text>
           <Text>{`hasUnlimitedLeagues:${String(props.hasUnlimitedLeagues)}`}</Text>
+          <Text>{`resumeLeague:${props.resumeLeague ? `${props.resumeLeague.id}:${props.resumeLeague.name ?? ''}` : 'undefined'}`}</Text>
           <Text>{`matchupHighlights:${props.matchupHighlights?.map((h) => h.leagueId).join(',') ?? 'none'}`}</Text>
           <Pressable
             testID="league-cap-upgrade"
             onPress={() => props.leagueCap?.onUpgrade()}
           >
             <Text>league-cap-upgrade</Text>
+          </Pressable>
+          <Pressable
+            testID="resume-league"
+            onPress={() => props.resumeLeague?.onPress()}
+          >
+            <Text>resume-league</Text>
           </Pressable>
           <Pressable testID="create" onPress={() => props.onCreateLeague()}>
             <Text>create</Text>
@@ -179,6 +191,14 @@ jest.mock('../utils/analytics', () => ({
   },
 }));
 
+const mockGetLastVisitedLeague = jest.fn<
+  Promise<{ leagueId: number; sport: string } | null>,
+  []
+>();
+jest.mock('../common/utilities/lastVisitedLeague', () => ({
+  getLastVisitedLeague: () => mockGetLastVisitedLeague(),
+}));
+
 // ── Test data ────────────────────────────────────────────────────────────────
 
 const FOOTBALL_LEAGUES = [
@@ -247,6 +267,7 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       loading: false,
       refetch: mockRefetchTrendingPlayers,
     });
+    mockGetLastVisitedLeague.mockResolvedValue(null);
     mockUseFootballMatchupHighlights.mockReturnValue({
       highlights: [],
       loading: false,
@@ -681,6 +702,69 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       await waitFor(() => {
         expect(mockRefetchLeagues).toHaveBeenCalledTimes(1);
         expect(mockRefetchTrendingPlayers).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('resume last league shortcut (LS-6294 / FBH-040)', () => {
+    it('omits resumeLeague when no last-visited league is stored', async () => {
+      mockGetLastVisitedLeague.mockResolvedValue(null);
+      render(<FootballHomeScreen />);
+      await waitFor(() => {
+        expect(mockGetLastVisitedLeague).toHaveBeenCalled();
+      });
+      expect(screen.getByText('resumeLeague:undefined')).toBeTruthy();
+    });
+
+    it('omits resumeLeague when the last-visited league is baseball', async () => {
+      mockGetLastVisitedLeague.mockResolvedValue({
+        leagueId: 1,
+        sport: 'baseball',
+      });
+      render(<FootballHomeScreen />);
+      await waitFor(() => {
+        expect(mockGetLastVisitedLeague).toHaveBeenCalled();
+      });
+      expect(screen.getByText('resumeLeague:undefined')).toBeTruthy();
+    });
+
+    it('omits resumeLeague when the last-visited football league is not among the fetched leagues', async () => {
+      mockGetLastVisitedLeague.mockResolvedValue({
+        leagueId: 99,
+        sport: 'football',
+      });
+      render(<FootballHomeScreen />);
+      await waitFor(() => {
+        expect(mockGetLastVisitedLeague).toHaveBeenCalled();
+      });
+      expect(screen.getByText('resumeLeague:undefined')).toBeTruthy();
+    });
+
+    it('passes resumeLeague with the resolved league name when the last-visited league is football and still owned', async () => {
+      mockGetLastVisitedLeague.mockResolvedValue({
+        leagueId: 2,
+        sport: 'football',
+      });
+      render(<FootballHomeScreen />);
+      await waitFor(() => {
+        expect(screen.getByText('resumeLeague:2:Touchdown Club')).toBeTruthy();
+      });
+    });
+
+    it("resumeLeague's onPress navigates to the same route onViewLeague uses", async () => {
+      mockGetLastVisitedLeague.mockResolvedValue({
+        leagueId: 2,
+        sport: 'football',
+      });
+      render(<FootballHomeScreen />);
+      await waitFor(() => {
+        expect(screen.getByText('resumeLeague:2:Touchdown Club')).toBeTruthy();
+      });
+
+      fireEvent.press(screen.getByTestId('resume-league'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/football/league/[leagueId]',
+        params: { leagueId: 2 },
       });
     });
   });

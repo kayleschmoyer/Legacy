@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { NFLHome } from '@legacy-sports/shared-components/football';
+import type { LastVisitedLeague } from '@legacy-sports/shared-components/utils';
 import {
   Sport,
   useFootballPlayersQuery,
@@ -11,6 +12,7 @@ import { usePullToRefresh } from '../common/hooks/usePullToRefresh';
 import { useSubscription } from '../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../features/subscription/constants';
 import { trackPremiumFeatureClick } from '../utils/analytics';
+import { getLastVisitedLeague } from '../common/utilities/lastVisitedLeague';
 import { useFootballMatchupHighlights } from '../hooks/useFootballMatchupHighlights';
 
 // Analytics label for the upgrade prompt fired from the league-cap gate (LS-5025).
@@ -150,6 +152,50 @@ export default function FootballHomeScreen({
     router.push('/football/league/create');
   }, [atFreeLeagueLimit, goToUpgrade, router]);
 
+  const handleViewLeague = useCallback(
+    (leagueId: string | number) =>
+      router.push({
+        pathname: '/football/league/[leagueId]',
+        params: { leagueId },
+      }),
+    [router],
+  );
+
+  // Resume-last-league shortcut (LS-6294 / FBH-040), reading the last-visited
+  // league from the async native storage wrapper (LS-6694). Resolved via
+  // effect since AsyncStorage reads are Promise-based, unlike the web
+  // wrapper's synchronous localStorage read.
+  const [lastVisitedLeague, setLastVisitedLeague] =
+    useState<LastVisitedLeague | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const league = await getLastVisitedLeague();
+      if (!cancelled) setLastVisitedLeague(league);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Only shown when the last-visited league is football and still among the
+  // leagues this user belongs to, so the card never points at a league they
+  // left.
+  const resumeLeague = useMemo(() => {
+    if (!lastVisitedLeague || lastVisitedLeague.sport !== 'football') {
+      return undefined;
+    }
+    const match = leagues.find(
+      (l) => String(l.id) === String(lastVisitedLeague.leagueId),
+    );
+    if (!match) return undefined;
+    return {
+      id: match.id,
+      name: match.name,
+      onPress: () => handleViewLeague(match.id),
+    };
+  }, [lastVisitedLeague, leagues, handleViewLeague]);
+
   return (
     <NFLHome
       refreshControl={refreshControl}
@@ -163,12 +209,7 @@ export default function FootballHomeScreen({
       onJoinLeague={() => router.push('/football/league/join')}
       onBrowseLeagues={() => router.push('/league-discovery')}
       onBrowsePlayers={() => router.push('/football/players')}
-      onViewLeague={(id) =>
-        router.push({
-          pathname: '/football/league/[leagueId]',
-          params: { leagueId: id },
-        })
-      }
+      onViewLeague={handleViewLeague}
       trendingPlayers={trendingPlayers}
       trendingPlayersLoading={trendingPlayersLoading}
       matchupHighlights={matchupHighlights}
@@ -184,6 +225,7 @@ export default function FootballHomeScreen({
           : undefined
       }
       hasUnlimitedLeagues={!subscriptionLoading && isPremium}
+      resumeLeague={resumeLeague}
     />
   );
 }

@@ -85,6 +85,17 @@ export interface NFLHomeLeagueCap {
   onUpgrade: () => void;
 }
 
+/**
+ * "Resume last league" shortcut wiring (LS-6294 / FBH-040). The container
+ * resolves the last-visited league from existing storage (LS-6694) and its
+ * display name; `NFLHome` only renders it. Omit to hide the shortcut.
+ */
+export interface NFLHomeResumeLeague {
+  id: string | number;
+  name?: string | null;
+  onPress: () => void;
+}
+
 export interface NFLHomeProps {
   leagues?: NFLHomeLeague[];
   loading?: boolean;
@@ -126,6 +137,13 @@ export interface NFLHomeProps {
    * Omit/false to hide.
    */
   hasUnlimitedLeagues?: boolean;
+  /**
+   * "Resume last league" shortcut (LS-6294 / FBH-040): fast re-entry into the
+   * league the user was last viewing. Omit to hide the shortcut (e.g. no
+   * last-visited football league is stored, or it belongs to a league the
+   * user no longer has).
+   */
+  resumeLeague?: NFLHomeResumeLeague;
 }
 
 function getLeagueStatusLabel(league: NFLHomeLeague): string {
@@ -398,6 +416,7 @@ function NFLHome({
   refreshControl,
   leagueCap,
   hasUnlimitedLeagues = false,
+  resumeLeague,
 }: NFLHomeProps) {
   const hasLeagues = leagues.length > 0;
 
@@ -740,6 +759,47 @@ function NFLHome({
             You're at your owned-league limit, but you can still join leagues
             for free with an invite code.
           </Text>
+        ) : null}
+
+        {/* Resume last league shortcut (LS-6294 / FBH-040): fast re-entry
+            into the league the user was last viewing, reusing the existing
+            last-visited-league storage from LS-6694 rather than a new
+            "recently viewed" list. */}
+        {resumeLeague ? (
+          <XStack
+            backgroundColor="$glassSurface"
+            borderRadius="$4"
+            borderWidth={1}
+            borderColor="$glassBorder"
+            padding="$4"
+            alignItems="center"
+            justifyContent="space-between"
+            gap="$3"
+            cursor="pointer"
+            onPress={resumeLeague.onPress}
+            accessibilityLabel={`Resume ${resumeLeague.name ?? 'your last league'}`}
+            role="link"
+            testID="football-resume-league-card"
+            pressStyle={{ opacity: 0.8, scale: 0.99 }}
+          >
+            <YStack gap="$1">
+              <Text
+                color="$gray10"
+                fontSize="$2"
+                fontWeight="600"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Resume last league
+              </Text>
+              <Text color="$color" fontSize="$6" fontWeight="700">
+                {resumeLeague.name ?? 'Unnamed League'}
+              </Text>
+            </YStack>
+            <Text color="$orange9" fontSize="$4" fontWeight="700">
+              Jump back in →
+            </Text>
+          </XStack>
         ) : null}
 
         {/* Your Football Leagues */}
