@@ -42,25 +42,13 @@ export function MatchupList({
   onRefresh,
   listHeaderComponent,
 }: MatchupListProps) {
-  if (loading) {
-    return (
-      <YStack padding="$4" alignItems="center">
-        <Text color="$gray11">Loading matchups...</Text>
-      </YStack>
-    );
-  }
-
-  if (matchups.length === 0) {
-    return (
-      <YStack padding="$4" alignItems="center">
-        <Text color="$gray11">{emptyMessage}</Text>
-      </YStack>
-    );
-  }
-
+  // Always render a single FlatList (loading/empty states go through
+  // ListEmptyComponent) so the tab's rendering strategy — and its
+  // virtualization behavior — stays consistent across every state instead of
+  // swapping between a plain YStack and a virtualized list (LS-6319).
   return (
     <FlatList
-      data={matchups}
+      data={loading ? [] : matchups}
       keyExtractor={(item) => item.id?.toString() ?? ''}
       renderItem={({ item }) => (
         <MatchupCard
@@ -70,6 +58,13 @@ export function MatchupList({
         />
       )}
       ListHeaderComponent={listHeaderComponent}
+      ListEmptyComponent={
+        <YStack padding="$4" alignItems="center">
+          <Text color="$gray11">
+            {loading ? 'Loading matchups...' : emptyMessage}
+          </Text>
+        </YStack>
+      }
       contentContainerStyle={{ padding: 8 }}
       refreshing={refreshing}
       onRefresh={onRefresh}
