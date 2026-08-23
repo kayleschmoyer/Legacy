@@ -202,13 +202,16 @@ export default function FootballLeagueId(): React.JSX.Element {
 
   const matchups = useMemo(() => {
     if (!userTeamId) return rawMatchups;
-    return [...rawMatchups].sort((a, b) => {
-      const aIsUser =
-        a.team1Id === userTeamId || a.team2Id === userTeamId ? 1 : 0;
-      const bIsUser =
-        b.team1Id === userTeamId || b.team2Id === userTeamId ? 1 : 0;
-      return bIsUser - aIsUser;
-    });
+    const userMatchupIndex = rawMatchups.findIndex(
+      (m) => m.team1Id === userTeamId || m.team2Id === userTeamId,
+    );
+    if (userMatchupIndex <= 0) return rawMatchups;
+    const userMatchup = rawMatchups[userMatchupIndex];
+    return [
+      userMatchup,
+      ...rawMatchups.slice(0, userMatchupIndex),
+      ...rawMatchups.slice(userMatchupIndex + 1),
+    ];
   }, [rawMatchups, userTeamId]);
 
   const {

@@ -1434,6 +1434,28 @@ describe('FootballLeagueId', () => {
       expect(screen.getByTestId('matchup-row-3')).toBeTruthy();
     });
 
+    it('moves the user matchup to the front without reordering the rest (LS-6317)', () => {
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [
+          { id: 1, team1Id: 100, team2Id: 200 },
+          { id: 2, team1Id: 300, team2Id: 400 },
+          { id: 3, team1Id: 10, team2Id: 500 },
+          { id: 4, team1Id: 600, team2Id: 700 },
+        ],
+        loading: false,
+        refetch: jest.fn(),
+      });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      const rows = screen.getAllByText(/^Matchup \d+$/);
+      expect(rows.map((row) => row.children[0])).toEqual([
+        'Matchup 3',
+        'Matchup 1',
+        'Matchup 2',
+        'Matchup 4',
+      ]);
+    });
+
     it('navigates to the matchup detail screen when a row is pressed', () => {
       useMatchupsForLeague.mockReturnValue({
         matchups: [{ id: 7 }],
