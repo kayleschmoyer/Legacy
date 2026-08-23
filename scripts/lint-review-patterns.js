@@ -32,6 +32,10 @@ const CONSOLE_EXEMPT_PATTERNS = [
   /^apps\/cli\//,
   /^scripts\//,
   /^tools\//,
+  // Build-time GitHub Actions scripts run in the runner's Node sandbox and
+  // cannot import workspace packages like @legacy-sports/logging — an explicit
+  // exception in AGENTS.md (Code Quality → No console.*).
+  /^\.github\/scripts\//,
   /migrations?\//,
   /\.config\.(js|ts|mjs|cjs)$/,
   /jest\.(config|preset|helpers)\./,

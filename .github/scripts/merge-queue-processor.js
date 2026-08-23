@@ -14,6 +14,10 @@
 
 const fs = require('fs');
 const path = require('path');
+const { pathToFileURL } = require('url');
+// Shared with the CI Gate poster (LS-7991) — the gate's target_url is the
+// staleness guard's pointer to the run that validated the head SHA (LS-9662).
+const { CI_GATE_CONTEXT, runIdFromTargetUrl } = require('./ci-gate.js');
 
 // Excluded from merge-blocking: process-merge-queue (circular — would block itself) and
 // delayed-recheck (a 3-minute housekeeping job that is not a quality gate).
@@ -127,6 +131,40 @@ const MAX_CI_RERUNS_PER_RUN = 3;
 // seconds.
 const STUCK_RUN_MS = 10 * 60 * 1000;
 
+// ── LS-9662: surface-intersection staleness guard ───────────────────────────
+// LS-4183 lets behind-base PRs merge directly on the premise that post-merge
+// CI on main catches semantic conflicts — but no per-commit E2E exists on main
+// (the post-deploy full-suite run is debounced ~20h), so two individually
+// green PRs can combine into a red main unnoticed. Before merging a
+// behind-base PR the guard compares the files that landed on main since the
+// PR's last-validated merge-base against the PR's own files, mapping both
+// through the shared e2e spec selector: an empty intersection of selected-spec
+// sets merges exactly as today; an overlap triggers revalidation
+// (update-branch → synchronize re-fires CI → the existing workflow_run
+// re-entry picks the PR back up). The guard only ever TIGHTENS: any error in
+// it fails open to today's behavior (log + merge) — it must never wedge the
+// queue (see the LS-9053 deadlock history).
+//
+// Hermetic e2e surface manifest consumed by the shared selector engine
+// (.github/scripts/integration-select/select-specs.mjs — same engine CI's
+// e2e-affected selection uses; no fork of the glob logic).
+const SURFACE_MAP_RELATIVE_PATH = path.join(
+  'apps',
+  'web-e2e',
+  'src',
+  'e2e-surface-map.json',
+);
+const SPEC_SELECTOR_PATH = path.join(
+  __dirname,
+  'integration-select',
+  'select-specs.mjs',
+);
+// The compare API returns at most this many files (first page only); a gap
+// whose file list hits the cap cannot be proven disjoint from the manifest.
+const COMPARE_FILES_CAP = 300;
+// Cap the specs/commits enumerated in the revalidation PR comment.
+const MAX_GUARD_LISTED_ITEMS = 10;
+
 module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
@@ -226,7 +264,10 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         console.log(`✅ PR #${pr.number} is ready for merge`);
 
         if (!isDryRun) {
-          await performMerge(validationResult.pr);
+          await performMerge(
+            validationResult.pr,
+            validationResult.stalenessVerdict,
+          );
         } else {
           console.log(`🏃 DRY RUN: Would merge PR #${pr.number}`);
         }
@@ -422,7 +463,27 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       };
     }
 
-    return { canMerge: true, pr };
+    // LS-9662: all gates are green — last stop before the merge. Check whether
+    // commits that landed on the base since this PR's last-validated
+    // merge-base share e2e surfaces with the PR; overlap → revalidate instead
+    // of merging. Fails open (block: false) on any guard error.
+    const staleness = await evaluateStalenessGuard(
+      pr,
+      checksResult.commitStatuses,
+    );
+    if (staleness.block) {
+      return {
+        canMerge: false,
+        reason:
+          `${staleness.totalGapCommits} commit(s) landed on \`${pr.base.ref}\` after this PR was ` +
+          `last validated (base ${staleness.validatedBase.sha.slice(0, 7)}), touching surfaces ` +
+          `this PR also affects (${staleness.overlap.length} overlapping e2e spec(s)) — ` +
+          `revalidation triggered automatically (LS-9662)`,
+        stalenessGuard: staleness,
+      };
+    }
+
+    return { canMerge: true, pr, stalenessVerdict: staleness.verdict };
   }
 
   async function getPRReviewDecision(prNumber) {
@@ -715,7 +776,234 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       failingChecks,
       inProgress: pendingChecks.length > 0,
       pendingChecks,
+      // Raw head-SHA statuses, already paginated — the LS-9662 staleness guard
+      // reads the successful CI Gate's target_url from these to locate the run
+      // that validated this SHA, without a second paginated fetch.
+      commitStatuses: statuses.data,
     };
+  }
+
+  // ── LS-9662 staleness guard helpers ─────────────────────────────────────────
+
+  // De-duplicated path list from compare-API / pulls.listFiles entries. Renames
+  // contribute both sides — over-selection is safe, under-selection is the risk
+  // the selector's manifest is designed against.
+  function collectFileNames(files) {
+    const names = new Set();
+    for (const f of files ?? []) {
+      if (f && f.filename) names.add(f.filename);
+      if (f && f.previous_filename) names.add(f.previous_filename);
+    }
+    return [...names];
+  }
+
+  // The base-branch SHA this PR was last validated against, preferring the
+  // exact value over approximation (no new state added):
+  //   1. exact — the successful `CI Gate` status on the head SHA carries a
+  //      target_url pointing at the run that posted it (ci-gate.js). That
+  //      run's pull_requests[].base.sha is the base tip captured when the run
+  //      was created, i.e. what refs/pull/N/merge merged against. A re-run
+  //      keeps the original value, which only widens the gap (conservative).
+  //   2. fallback — the merge-base of head and base via the compare API: the
+  //      point the branch last diverged from base. Over-approximates the gap
+  //      (commits the validated merge ref already contained get re-counted),
+  //      which errs toward revalidation, never toward a missed one.
+  async function resolveLastValidatedBaseSha(pr, commitStatuses) {
+    let latestGate = null;
+    for (const s of commitStatuses ?? []) {
+      if (s.context !== CI_GATE_CONTEXT || s.state !== 'success') continue;
+      if (
+        !latestGate ||
+        new Date(s.created_at) > new Date(latestGate.created_at)
+      ) {
+        latestGate = s;
+      }
+    }
+    const runId = latestGate ? runIdFromTargetUrl(latestGate.target_url) : null;
+    if (runId !== null) {
+      try {
+        const { data: run } = await github.rest.actions.getWorkflowRun({
+          owner,
+          repo,
+          run_id: runId,
+        });
+        const runPr = (run.pull_requests ?? []).find(
+          (p) => p.number === pr.number,
+        );
+        if (runPr?.base?.sha && runPr.base.ref === pr.base.ref) {
+          return { sha: runPr.base.sha, source: `ci-gate-run-${runId}` };
+        }
+        console.log(
+          `ℹ️ PR #${pr.number}: CI Gate run ${runId} carries no usable base for this PR — ` +
+            `falling back to merge-base`,
+        );
+      } catch (e) {
+        console.log(
+          `ℹ️ PR #${pr.number}: could not fetch CI Gate run ${runId} (${e.message}) — ` +
+            `falling back to merge-base`,
+        );
+      }
+    }
+    const { data } = await github.rest.repos.compareCommitsWithBasehead({
+      owner,
+      repo,
+      basehead: `${pr.base.ref}...${pr.head.sha}`,
+    });
+    if (!data.merge_base_commit?.sha) {
+      throw new Error(`could not resolve a merge-base for PR #${pr.number}`);
+    }
+    return { sha: data.merge_base_commit.sha, source: 'merge-base' };
+  }
+
+  // Evaluate the surface-intersection staleness guard for a PR whose gates are
+  // otherwise all green (see the LS-9662 block comment at the constants).
+  // Returns { verdict, block, ... }: block=true means "do not merge —
+  // revalidation has been triggered". Every path logs its verdict so the
+  // real-world overlap rate is measurable from queue-run logs (AC6).
+  // FAIL-OPEN CONTRACT (AC4): any error inside the guard — manifest missing,
+  // compare API failure, selector failure, update-branch failure — logs and
+  // returns block: false so the merge proceeds exactly as before LS-9662. The
+  // guard tightens; it must never wedge the queue (LS-9053 history).
+  async function evaluateStalenessGuard(pr, commitStatuses) {
+    const logVerdict = (verdict, detail) => {
+      console.log(
+        `🛡️ Staleness guard [PR #${pr.number}]: verdict=${verdict}` +
+          (detail ? ` — ${sanitizeLog(detail)}` : ''),
+      );
+    };
+
+    try {
+      if (pr.base.ref !== 'main') {
+        // The surface manifest maps main-branch code; non-main (stacked
+        // merge-to-parent) merges are a deliberate manual escape hatch.
+        logVerdict('skipped:non-main-base');
+        return { verdict: 'skipped:non-main-base', block: false };
+      }
+
+      const workspace = process.env.GITHUB_WORKSPACE;
+      const manifestPath = workspace
+        ? path.join(workspace, SURFACE_MAP_RELATIVE_PATH)
+        : null;
+      if (!manifestPath || !fs.existsSync(manifestPath)) {
+        logVerdict(
+          'fail-open:manifest-unavailable',
+          `no surface map at ${manifestPath ?? '<GITHUB_WORKSPACE unset>'} — merging as today`,
+        );
+        return { verdict: 'fail-open:manifest-unavailable', block: false };
+      }
+
+      const validatedBase = await resolveLastValidatedBaseSha(
+        pr,
+        commitStatuses,
+      );
+
+      const { data: compare } =
+        await github.rest.repos.compareCommitsWithBasehead({
+          owner,
+          repo,
+          basehead: `${validatedBase.sha}...${pr.base.ref}`,
+        });
+      const totalGapCommits =
+        compare.total_commits ?? (compare.commits ?? []).length;
+      if (totalGapCommits === 0) {
+        logVerdict(
+          'no-gap',
+          `validated base ${validatedBase.sha.slice(0, 7)} (${validatedBase.source}) is current`,
+        );
+        return { verdict: 'no-gap', block: false };
+      }
+      const gapCommits = (compare.commits ?? []).map((c) => c.sha);
+      const gapFiles = collectFileNames(compare.files);
+      const gapFilesTruncated =
+        (compare.files ?? []).length >= COMPARE_FILES_CAP;
+
+      const prFiles = collectFileNames(
+        await github.paginate(github.rest.pulls.listFiles, {
+          owner,
+          repo,
+          pull_number: pr.number,
+          per_page: 100,
+        }),
+      );
+
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const { selectSpecs } = await import(
+        pathToFileURL(SPEC_SELECTOR_PATH).href
+      );
+      const prSelection = selectSpecs({ changedFiles: prFiles, manifest });
+      const gapSelection = selectSpecs({ changedFiles: gapFiles, manifest });
+
+      const gapSpecSet = new Set(gapSelection.specs);
+      let overlap = prSelection.specs.filter((s) => gapSpecSet.has(s));
+      let verdict = 'overlap';
+      if (
+        overlap.length === 0 &&
+        gapFilesTruncated &&
+        prSelection.specs.length > 0
+      ) {
+        // The gap's file list hit the compare-API cap, so gapSelection may
+        // under-select — disjointness cannot be proven. Revalidating is the
+        // tightening direction and cannot deadlock (the updated branch
+        // re-enters via workflow_run), unlike merging on incomplete data.
+        overlap = prSelection.specs;
+        verdict = 'overlap:gap-files-truncated';
+      }
+
+      const gapSummary =
+        `${totalGapCommits} gap commit(s) since ${validatedBase.sha.slice(0, 7)} ` +
+        `(${validatedBase.source}); prSpecs=${prSelection.specs.length} ` +
+        `gapSpecs=${gapSelection.specs.length} overlap=${overlap.length}`;
+
+      if (overlap.length === 0) {
+        logVerdict('disjoint', gapSummary);
+        return { verdict: 'disjoint', block: false };
+      }
+
+      logVerdict(verdict, gapSummary);
+      const blockedResult = {
+        verdict,
+        block: true,
+        overlap,
+        gapCommits,
+        totalGapCommits,
+        validatedBase,
+      };
+
+      if (isDryRun) {
+        console.log(
+          `🏃 DRY RUN: Would update branch on PR #${pr.number} to revalidate against current ` +
+            `${pr.base.ref} (${overlap.length} overlapping spec(s))`,
+        );
+        return blockedResult;
+      }
+      try {
+        await github.rest.pulls.updateBranch({
+          owner,
+          repo,
+          pull_number: pr.number,
+          expected_head_sha: pr.head.sha,
+        });
+        console.log(
+          `🔁 PR #${pr.number}: branch updated with current ${pr.base.ref} — the synchronize ` +
+            `push re-fires CI and the queue re-enters on its workflow_run completion`,
+        );
+        return blockedResult;
+      } catch (updateError) {
+        // Never wedge: an overlap we cannot revalidate merges as today (the
+        // pre-LS-9662 behavior), loudly.
+        logVerdict(
+          'fail-open:update-branch-failed',
+          `${updateError.message} — merging as today rather than wedging the queue`,
+        );
+        return { verdict: 'fail-open:update-branch-failed', block: false };
+      }
+    } catch (error) {
+      logVerdict(
+        'fail-open:error',
+        `${error.message} — merging as today (the guard must never wedge the queue)`,
+      );
+      return { verdict: 'fail-open:error', block: false };
+    }
   }
 
   // Self-heal the "bot-review never registers" deadlock (see
@@ -1165,7 +1453,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     }
   }
 
-  async function performMerge(pr) {
+  async function performMerge(pr, stalenessVerdict) {
     try {
       console.log(`🚀 Merging PR #${pr.number}...`);
 
@@ -1223,7 +1511,12 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         '`\n' +
         '- Merged at: ' +
         new Date().toISOString() +
-        '\n\n' +
+        '\n' +
+        // LS-9662 AC6: record the staleness-guard verdict on every merge so
+        // the real-world overlap rate is measurable from PR comments too.
+        '- Staleness guard: `' +
+        (stalenessVerdict ?? 'not-evaluated') +
+        '`\n\n' +
         'Thank you for your contribution! 🚀\n\n' +
         '---\n*Automated message from merge queue system*';
 
@@ -1489,6 +1782,33 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
         '` directly (before the parent lands), add the `merge-to-parent` label — it is a deliberate ' +
         'manual escape hatch and is never applied by automation, so both `merge-when-ready` and ' +
         '`merge-to-parent` must be present';
+    } else if (validation.stalenessGuard) {
+      const guard = validation.stalenessGuard;
+      const specLines = (guard.overlap ?? [])
+        .slice(0, MAX_GUARD_LISTED_ITEMS)
+        .map((spec) => '   - `' + spec + '`');
+      const extraSpecs = (guard.overlap?.length ?? 0) - specLines.length;
+      if (extraSpecs > 0) {
+        specLines.push(`   - …and ${extraSpecs} more`);
+      }
+      const commitList = (guard.gapCommits ?? [])
+        .slice(0, MAX_GUARD_LISTED_ITEMS)
+        .map((sha) => '`' + sha.slice(0, 7) + '`');
+      const extraCommits =
+        (guard.totalGapCommits ?? guard.gapCommits?.length ?? 0) -
+        commitList.length;
+      comment +=
+        '\n1. **Nothing to do** — this branch was updated with the latest `' +
+        pr.base.ref +
+        '` automatically, so CI re-runs against a current merge of the base\n' +
+        '2. The merge queue re-evaluates this PR when that CI run completes\n\n' +
+        'Overlapping e2e spec(s) shared by this PR and the new base commits:\n' +
+        specLines.join('\n') +
+        '\n\nCommit(s) on `' +
+        pr.base.ref +
+        '` since this PR was last validated: ' +
+        commitList.join(', ') +
+        (extraCommits > 0 ? ` …and ${extraCommits} more` : '');
     } else if (validation.unresolvedThreads) {
       comment +=
         '\n1. Resolve all open review comment threads on the PR\n' +

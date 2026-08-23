@@ -1,0 +1,8 @@
+{
+  "$comment": "Minimal e2e surface map fixture for the LS-9662 staleness-guard tests. Mirrors the shape of apps/web-e2e/src/e2e-surface-map.json: alpha and beta specs cover disjoint page surfaces; runAllWhenChanged carries one broad backend surface.",
+  "runAllWhenChanged": ["lambdas/db/schema.graphql"],
+  "specs": {
+    "apps/web-e2e/src/tests/alpha.spec.ts": ["apps/web/src/pages/alpha/**"],
+    "apps/web-e2e/src/tests/beta.spec.ts": ["apps/web/src/pages/beta/**"]
+  }
+}

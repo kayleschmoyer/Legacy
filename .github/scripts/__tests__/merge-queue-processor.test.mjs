@@ -104,6 +104,16 @@ function makeGithub({
   // listJobsForWorkflowRun(run_id). A run with no entry (or an explicit 0)
   // reports zero jobs — the "dead, zero-job run" signature.
   jobCountsByRunId = {},
+  // LS-9662: workflow-run details per run id, served to getWorkflowRun (the
+  // staleness guard resolves the last-validated base SHA from the CI Gate
+  // run's pull_requests[].base.sha). Missing id → run with no pull_requests.
+  workflowRunDetails = {},
+  // LS-9662: compare-API responses keyed by the `basehead` string passed to
+  // compareCommitsWithBasehead. An Error value throws; a missing key returns
+  // an empty comparison (0 commits, no merge_base_commit).
+  compareResults = {},
+  // LS-9662: rows served to pulls.listFiles (the PR's own changed files).
+  prListFiles = [],
 } = {}) {
   const calls = {
     merges: [],
@@ -115,6 +125,7 @@ function makeGithub({
     dispatches: [],
     reruns: [],
     cancels: [],
+    compares: [],
   };
 
   const github = {
@@ -124,6 +135,7 @@ function makeGithub({
     paginate: async (fn, args) => {
       if (fn === github.rest.pulls.listReviews) return reviews;
       if (fn === github.rest.pulls.list) return sweepPRs;
+      if (fn === github.rest.pulls.listFiles) return prListFiles;
       if (fn === github.rest.checks.listForRef) {
         const res = await github.rest.checks.listForRef(args);
         return res.data.check_runs;
@@ -181,6 +193,8 @@ function makeGithub({
         list: async () => ({ data: [] }),
         update: async () => {},
         dismissReview: async () => {},
+        // LS-9662: the PR's own changed files (staleness guard)
+        listFiles: async () => ({ data: prListFiles }),
       },
       repos: {
         // 404 → no classic branch protection. Required checks (if any) come
@@ -192,6 +206,23 @@ function makeGithub({
         createCommitStatus: async (args) => {
           calls.statuses.push(args);
           return { data: {} };
+        },
+        // LS-9662: gap comparison + merge-base fallback (staleness guard)
+        compareCommitsWithBasehead: async (args) => {
+          calls.compares.push(args.basehead);
+          const entry = compareResults[args.basehead];
+          if (entry instanceof Error) throw entry;
+          if (!entry) {
+            return {
+              data: {
+                total_commits: 0,
+                commits: [],
+                files: [],
+                merge_base_commit: null,
+              },
+            };
+          }
+          return { data: entry };
         },
       },
       checks: {
@@ -234,6 +265,10 @@ function makeGithub({
           calls.cancels.push(args);
           return {};
         },
+        // LS-9662: CI Gate run lookup (staleness guard base-SHA resolution)
+        getWorkflowRun: async (args) => ({
+          data: workflowRunDetails[args.run_id] ?? { pull_requests: [] },
+        }),
       },
     },
 
@@ -2535,4 +2570,363 @@ describe('merge-queue-processor — dead zero-job orchestrator run self-heal (LS
     assert.strictEqual(calls.cancels.length, 0, 'dry run must not cancel');
     assert.strictEqual(calls.reruns.length, 0, 'dry run must not re-run');
   });
+});
+
+// ── LS-9662 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — surface-intersection staleness guard (LS-9662)', () => {
+  const GUARD_WORKSPACE = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'fixtures',
+    'ls-9662-surface-map',
+  );
+
+  const VALIDATED_BASE = 'validbase111validbase222validbase333vali';
+  const GATE_RUN_ID = 555;
+  const CI_GATE_SUCCESS = {
+    context: 'CI Gate',
+    state: 'success',
+    created_at: '2026-01-01T00:03:00Z',
+    target_url: `https://github.com/test-owner/test-repo/actions/runs/${GATE_RUN_ID}`,
+  };
+  const GATE_RUN_DETAILS = {
+    [GATE_RUN_ID]: {
+      pull_requests: [
+        {
+          number: 1,
+          base: { ref: 'main', sha: VALIDATED_BASE },
+          head: { ref: 'feature/test', sha: HEAD_SHA },
+        },
+      ],
+    },
+  };
+  const GAP_BASEHEAD = `${VALIDATED_BASE}...main`;
+
+  const gapCommit = (sha) => ({ sha });
+  const gapFile = (filename) => ({ filename });
+
+  // Fully-green PR whose head carries a successful CI Gate pointing at the
+  // validated run — the state in which the guard is the last stop before merge.
+  function makeGuardGithub(overrides = {}) {
+    return makeGithub({
+      reviews: [
+        { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+      ],
+      unresolvedThreads: [],
+      commitStatuses: [CI_GATE_SUCCESS],
+      workflowRunDetails: GATE_RUN_DETAILS,
+      ...overrides,
+    });
+  }
+
+  function withGuardWorkspace(fn) {
+    return async () => {
+      const original = process.env.GITHUB_WORKSPACE;
+      process.env.GITHUB_WORKSPACE = GUARD_WORKSPACE;
+      try {
+        await fn();
+      } finally {
+        if (original === undefined) delete process.env.GITHUB_WORKSPACE;
+        else process.env.GITHUB_WORKSPACE = original;
+      }
+    };
+  }
+
+  async function runCapturingLogs(github, { isDryRun = false } = {}) {
+    const captured = [];
+    const originalLog = console.log;
+    console.log = (...args) => {
+      captured.push(args.map((a) => String(a)).join(' '));
+    };
+    try {
+      await processor({
+        github,
+        context,
+        isDryRun,
+        forceCheck: false,
+        isRetry: false,
+      });
+    } finally {
+      console.log = originalLog;
+    }
+    return captured.join('\n');
+  }
+
+  it(
+    'merges directly when the validated base is current (no gap, zero added latency)',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: { total_commits: 0, commits: [], files: [] },
+        },
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(calls.merges.length, 1, 'should merge directly');
+      assert.strictEqual(calls.updateBranch.length, 0);
+      assert.deepStrictEqual(
+        calls.compares,
+        [GAP_BASEHEAD],
+        'gap comparison must use the CI-Gate-run base SHA (exact, not merge-base)',
+      );
+      assert.match(
+        logs,
+        /Staleness guard \[PR #1\]: verdict=no-gap/,
+        'verdict must be logged for overlap-rate measurement (AC6)',
+      );
+      assert.ok(
+        calls.comments.some((c) =>
+          c.body?.includes('Staleness guard: `no-gap`'),
+        ),
+        'merge success comment should record the guard verdict (AC6)',
+      );
+    }),
+  );
+
+  it(
+    'merges a behind-base PR directly when the gap and the PR share no spec surface',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 2,
+            commits: [gapCommit('gap0001aaa'), gapCommit('gap0002bbb')],
+            files: [gapFile('apps/web/src/pages/beta/BetaPage.tsx')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        1,
+        'disjoint spec sets must merge exactly as today (AC2)',
+      );
+      assert.strictEqual(calls.updateBranch.length, 0);
+      assert.match(logs, /verdict=disjoint/);
+    }),
+  );
+
+  it(
+    'blocks the merge and triggers update-branch when gap and PR surfaces overlap',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        pr: makePR({ mergeable_state: 'behind' }),
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0001aaa2222bbb3333ccc4444ddd5555eee66')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        0,
+        'overlap must not merge (AC3)',
+      );
+      assert.strictEqual(
+        calls.updateBranch.length,
+        1,
+        'revalidation must be triggered via update-branch',
+      );
+      assert.strictEqual(
+        calls.updateBranch[0].expected_head_sha,
+        HEAD_SHA,
+        'update-branch must pin the validated head SHA',
+      );
+      assert.match(logs, /verdict=overlap/);
+      const blocker = calls.comments.find((c) =>
+        c.body?.includes('Cannot Merge'),
+      );
+      assert.ok(blocker, 'should post an explanatory PR comment');
+      assert.ok(
+        blocker.body.includes('apps/web-e2e/src/tests/alpha.spec.ts'),
+        'comment must name the overlapping spec(s)',
+      );
+      assert.ok(
+        blocker.body.includes('`gap0001`'),
+        'comment must name the gap commit(s)',
+      );
+    }),
+  );
+
+  it(
+    'treats a runAllWhenChanged gap file as overlapping any PR with affected specs',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0003ccc')],
+            files: [gapFile('lambdas/db/schema.graphql')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+      });
+
+      await runCapturingLogs(github);
+
+      assert.strictEqual(calls.merges.length, 0, 'must not merge');
+      assert.strictEqual(calls.updateBranch.length, 1);
+    }),
+  );
+
+  it(
+    'falls back to the compare-API merge-base when the CI Gate carries no run URL',
+    withGuardWorkspace(async () => {
+      const MERGE_BASE_BASEHEAD = `main...${HEAD_SHA}`;
+      const { github, calls } = makeGuardGithub({
+        commitStatuses: [{ ...CI_GATE_SUCCESS, target_url: undefined }],
+        compareResults: {
+          [MERGE_BASE_BASEHEAD]: {
+            merge_base_commit: { sha: VALIDATED_BASE },
+            total_commits: 3,
+            commits: [],
+            files: [],
+          },
+          [GAP_BASEHEAD]: { total_commits: 0, commits: [], files: [] },
+        },
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.deepStrictEqual(
+        calls.compares,
+        [MERGE_BASE_BASEHEAD, GAP_BASEHEAD],
+        'should resolve the merge-base first, then compare it against main',
+      );
+      assert.strictEqual(calls.merges.length, 1, 'no-gap → merge');
+      assert.match(logs, /verdict=no-gap.*merge-base/);
+    }),
+  );
+
+  it(
+    'fails open (merges as today) when the compare API errors',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: Object.assign(new Error('boom'), { status: 500 }),
+        },
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        1,
+        'guard errors must fall back to merging (AC4 — never wedge the queue)',
+      );
+      assert.strictEqual(calls.updateBranch.length, 0);
+      assert.match(logs, /verdict=fail-open:error/);
+    }),
+  );
+
+  it(
+    'fails open (merges as today) when update-branch itself fails on an overlap',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0004ddd')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+      });
+      github.rest.pulls.updateBranch = async () => {
+        throw Object.assign(new Error('update failed'), { status: 403 });
+      };
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        1,
+        'an overlap the queue cannot revalidate merges as today, loudly (AC4)',
+      );
+      assert.match(logs, /verdict=fail-open:update-branch-failed/);
+    }),
+  );
+
+  it(
+    'revalidates conservatively when the gap file list hits the compare-API cap',
+    withGuardWorkspace(async () => {
+      const truncatedFiles = Array.from({ length: 300 }, (_, i) =>
+        gapFile(`docs/unrelated-${i}.md`),
+      );
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 5,
+            commits: [gapCommit('gap0005eee')],
+            files: truncatedFiles,
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+      });
+
+      const logs = await runCapturingLogs(github);
+
+      assert.strictEqual(
+        calls.merges.length,
+        0,
+        'a truncated gap cannot be proven disjoint — revalidate, do not merge',
+      );
+      assert.strictEqual(calls.updateBranch.length, 1);
+      assert.match(logs, /verdict=overlap:gap-files-truncated/);
+    }),
+  );
+
+  it('fails open when no surface manifest exists in the workspace (unit-test default)', async () => {
+    delete process.env.GITHUB_WORKSPACE;
+    const { github, calls } = makeGuardGithub({
+      pr: makePR({ mergeable_state: 'behind' }),
+    });
+
+    const logs = await runCapturingLogs(github);
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'without a manifest the guard must not change LS-4183 behavior',
+    );
+    assert.strictEqual(calls.compares.length, 0, 'no API spend when skipped');
+    assert.match(logs, /verdict=fail-open:manifest-unavailable/);
+  });
+
+  it(
+    'dry run reports the overlap verdict without calling update-branch',
+    withGuardWorkspace(async () => {
+      const { github, calls } = makeGuardGithub({
+        compareResults: {
+          [GAP_BASEHEAD]: {
+            total_commits: 1,
+            commits: [gapCommit('gap0006fff')],
+            files: [gapFile('apps/web/src/pages/alpha/AlphaService.ts')],
+          },
+        },
+        prListFiles: [gapFile('apps/web/src/pages/alpha/AlphaPage.tsx')],
+      });
+
+      const logs = await runCapturingLogs(github, { isDryRun: true });
+
+      assert.strictEqual(calls.merges.length, 0);
+      assert.strictEqual(
+        calls.updateBranch.length,
+        0,
+        'dry run must not mutate the branch',
+      );
+      assert.match(logs, /DRY RUN: Would update branch on PR #1/);
+    }),
+  );
 });
