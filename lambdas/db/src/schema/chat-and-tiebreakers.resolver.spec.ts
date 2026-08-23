@@ -641,6 +641,57 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(result).toMatchObject({ leagueId: 1, userId: 1 });
     });
 
+    // ── gifUrl allowlist (LS-6299 / FLD-047) ────────────────────────────
+
+    it('rejects a gifUrl not hosted on giphy.com or tenor.com', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+
+      const resolver = getMutation('sendLeagueMessage');
+      await expect(
+        resolver(
+          {},
+          {
+            leagueId: 1,
+            messageText: '',
+            gifUrl: 'https://malicious.example/track.gif',
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('gifUrl must be hosted on giphy.com or tenor.com');
+
+      expect(mockDb.values).not.toHaveBeenCalled();
+    });
+
+    it('sends a league message with an allowlisted giphy.com gifUrl', async () => {
+      const msg = makeLeagueMsg({
+        messageType: 'gif',
+        gifUrl: 'https://media0.giphy.com/media/abc/giphy.gif',
+      });
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.returning.mockResolvedValueOnce([msg]);
+
+      const resolver = getMutation('sendLeagueMessage');
+      const result = (await resolver(
+        {},
+        {
+          leagueId: 1,
+          messageText: '',
+          gifUrl: 'https://media0.giphy.com/media/abc/giphy.gif',
+        },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageType: 'gif',
+          gifUrl: 'https://media0.giphy.com/media/abc/giphy.gif',
+        }),
+      );
+      expect(result).toMatchObject({ gifUrl: msg.gifUrl });
+    });
+
     it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
       mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
       mockDb.returning.mockResolvedValueOnce([makeLeagueMsg()]);

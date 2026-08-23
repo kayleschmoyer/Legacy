@@ -8,6 +8,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from './graphql-errors';
+import { validateGifUrl } from './validate-gif-url';
 import { insertActivityLog } from '../services/activity-log';
 
 /**
@@ -902,7 +903,7 @@ builder.mutationField('sendLeagueMessage', (t) =>
         throw AuthenticationError();
       }
 
-      const gifUrl = args.gifUrl?.trim() ?? null;
+      const gifUrl = validateGifUrl(args.gifUrl);
       const rawText = args.messageText.trim();
       if (!gifUrl && rawText.length === 0) {
         throw UserInputError('Message cannot be empty');
