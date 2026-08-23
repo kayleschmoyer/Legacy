@@ -23,6 +23,8 @@ jest.mock('@legacy-sports/utils', () => ({
 }));
 
 const mockGetMatchupPlayerGameStats = jest.fn().mockResolvedValue([]);
+// Stands in for getCamelCaseScoringMultipliersForLeague — the camelCased form
+// every scoring caller must use (LS-9532).
 const mockGetScoringMultipliersForLeague = jest.fn().mockResolvedValue({
   batting: {},
   pitching: {},
@@ -33,7 +35,7 @@ const mockUpdateMatchupScore = jest.fn().mockResolvedValue(undefined);
 jest.mock('@legacy-sports/db-client', () => ({
   getMatchupPlayerGameStats: (...args: unknown[]) =>
     mockGetMatchupPlayerGameStats(...args) as unknown,
-  getScoringMultipliersForLeague: (...args: unknown[]) =>
+  getCamelCaseScoringMultipliersForLeague: (...args: unknown[]) =>
     mockGetScoringMultipliersForLeague(...args) as unknown,
   updateMatchupScore: (...args: unknown[]) =>
     mockUpdateMatchupScore(...args) as unknown,
@@ -91,6 +93,7 @@ const mockGetDefaultScoringSettings = jest.fn().mockReturnValue({
 });
 
 jest.mock('@legacy-sports/scoring', () => ({
+  ...jest.requireActual<object>('@legacy-sports/scoring'),
   calculateMatchupScore: (...args: unknown[]) =>
     mockCalculateMatchupScore(...args) as unknown,
   getDefaultScoringSettings: (...args: unknown[]) =>

@@ -1,6 +1,6 @@
 import {
+  getCamelCaseScoringMultipliersForLeague,
   getMatchupPlayerGameStats,
-  getScoringMultipliersForLeague,
   PublicDb,
   PublicSchema,
   updateMatchupScore,
@@ -9,7 +9,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   calculateMatchupScore,
   getDefaultScoringSettings,
-  type PlayerGameStats,
+  partitionMatchupPlayerGameStats,
   type ScoringSettings,
 } from '@legacy-sports/scoring';
 import {
@@ -60,98 +60,23 @@ async function computeAndPersistMatchupScores(
   gamesPerMatchup: number | null,
 ): Promise<void> {
   try {
-    const rawMultipliers = await getScoringMultipliersForLeague(db, leagueId);
-    const toCamelCase = (
-      record: Record<string, number>,
-    ): Record<string, number> => {
-      const out: Record<string, number> = {};
-      for (const [k, v] of Object.entries(record)) {
-        out[k.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())] = v;
-      }
-      return out;
-    };
-    const scoringSettings: ScoringSettings = rawMultipliers
+    // Multipliers must be camelCased before they reach the scoring engine —
+    // the raw form is keyed by snake_case source_column (LS-9532).
+    const multipliers = await getCamelCaseScoringMultipliersForLeague(
+      db,
+      leagueId,
+    );
+    const scoringSettings: ScoringSettings = multipliers
       ? {
-          batting: toCamelCase(rawMultipliers.batting),
-          pitching: toCamelCase(rawMultipliers.pitching),
-          fielding: toCamelCase(rawMultipliers.fielding),
+          batting: multipliers.batting,
+          pitching: multipliers.pitching,
+          fielding: multipliers.fielding,
         }
       : getDefaultScoringSettings();
 
     const statsRows = await getMatchupPlayerGameStats(db, matchupId);
-    const team1Stats = new Map<number, PlayerGameStats[]>();
-    const team2Stats = new Map<number, PlayerGameStats[]>();
-
-    for (const stat of statsRows) {
-      const entry: PlayerGameStats = {
-        playerId: stat.playerId,
-        season: stat.season,
-        gameNum: stat.gameNum,
-        batting: stat.battingStats
-          ? {
-              pa: stat.battingStats.pa,
-              ab: stat.battingStats.ab,
-              r: stat.battingStats.r,
-              h: stat.battingStats.h,
-              doubles: stat.battingStats.doubles,
-              triples: stat.battingStats.triples,
-              hr: stat.battingStats.hr,
-              rbi: stat.battingStats.rbi,
-              sb: stat.battingStats.sb,
-              cs: stat.battingStats.cs,
-              bb: stat.battingStats.bb,
-              so: stat.battingStats.so,
-              gidp: stat.battingStats.gidp,
-              hbp: stat.battingStats.hbp,
-              sh: stat.battingStats.sh,
-              sf: stat.battingStats.sf,
-              ibb: stat.battingStats.ibb,
-            }
-          : undefined,
-        pitching: stat.pitchingStats
-          ? {
-              w: stat.pitchingStats.w,
-              l: stat.pitchingStats.l,
-              gs: stat.pitchingStats.gs,
-              gf: stat.pitchingStats.gf,
-              cg: stat.pitchingStats.cg,
-              sho: stat.pitchingStats.sho,
-              sv: stat.pitchingStats.sv,
-              ip: stat.pitchingStats.ip,
-              h: stat.pitchingStats.h,
-              r: stat.pitchingStats.r,
-              er: stat.pitchingStats.er,
-              hr: stat.pitchingStats.hr,
-              bb: stat.pitchingStats.bb,
-              ibb: stat.pitchingStats.ibb,
-              so: stat.pitchingStats.so,
-              hbp: stat.pitchingStats.hbp,
-              battersFaced: stat.pitchingStats.battersFaced,
-              outsRecorded: stat.pitchingStats.outsRecorded,
-            }
-          : undefined,
-        fielding: stat.fieldingStats
-          ? {
-              innDef: stat.fieldingStats.innDef,
-              chances: stat.fieldingStats.chances,
-              po: stat.fieldingStats.po,
-              a: stat.fieldingStats.a,
-              eDef: stat.fieldingStats.eDef,
-              dpDef: stat.fieldingStats.dpDef,
-            }
-          : undefined,
-      };
-
-      if (stat.teamId === team1Id) {
-        const existing = team1Stats.get(stat.playerId);
-        if (existing) existing.push(entry);
-        else team1Stats.set(stat.playerId, [entry]);
-      } else if (stat.teamId === team2Id) {
-        const existing = team2Stats.get(stat.playerId);
-        if (existing) existing.push(entry);
-        else team2Stats.set(stat.playerId, [entry]);
-      }
-    }
+    const { team1PlayerStats: team1Stats, team2PlayerStats: team2Stats } =
+      partitionMatchupPlayerGameStats(statsRows, team1Id, team2Id);
 
     const scores = calculateMatchupScore(
       matchupId,

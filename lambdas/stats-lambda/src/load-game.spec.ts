@@ -45,6 +45,7 @@ jest.mock('@legacy-sports/bref-client', () => ({
 
 const mockRunWithPublicClient = jest.fn();
 const mockGetScoringMultipliersForLeague = jest.fn();
+const mockGetCamelCaseScoringMultipliersForLeague = jest.fn();
 
 // Track the mock db's select/from/where chain for leagueId lookup
 const mockSelectFrom = {
@@ -80,6 +81,8 @@ jest.mock('@legacy-sports/db-client', () => ({
     mockRunWithPublicClient(...args),
   getScoringMultipliersForLeague: (...args: unknown[]): unknown =>
     mockGetScoringMultipliersForLeague(...args),
+  getCamelCaseScoringMultipliersForLeague: (...args: unknown[]): unknown =>
+    mockGetCamelCaseScoringMultipliersForLeague(...args),
   PublicSchema: {
     matchups: { id: 'matchups.id', leagueId: 'matchups.league_id' },
     matchupPlayers: { matchupId: 'matchup_players.matchup_id' },
@@ -179,7 +182,9 @@ describe('load-game score calculation trigger (LS-1762)', () => {
       },
     );
 
-    // Default: scoring multipliers for league (snake_case keys from DB)
+    // Default: scoring multipliers for league. The raw accessor returns the DB's
+    // snake_case source_column keys; load-game must read through the camelCasing
+    // accessor instead, or outs_recorded / e_def silently score 0 (LS-9532).
     mockGetScoringMultipliersForLeague.mockResolvedValue({
       batting: {
         h: 1,
@@ -205,6 +210,9 @@ describe('load-game score calculation trigger (LS-1762)', () => {
       },
       fielding: { e_def: -1 },
     });
+    mockGetCamelCaseScoringMultipliersForLeague.mockResolvedValue(
+      expectedScoringSettings,
+    );
 
     // Default: all games complete
     mockCheckMatchupCompletion.mockResolvedValue('completed');
@@ -259,6 +267,9 @@ describe('load-game score calculation trigger (LS-1762)', () => {
       expectedScoringSettings,
       true, // forceRecalculation
     );
+    // The raw accessor keys weights by snake_case source_column, which the
+    // scoring engine never matches (LS-9532).
+    expect(mockGetScoringMultipliersForLeague).not.toHaveBeenCalled();
   });
 
   it('calculates scores when last batch of multi-batch message completes', async () => {

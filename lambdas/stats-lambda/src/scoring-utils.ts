@@ -13,7 +13,7 @@ import {
 } from '@legacy-sports/db-client';
 import {
   calculateMatchupScore,
-  type PlayerGameStats,
+  partitionMatchupPlayerGameStats,
   type ScoringSettings,
 } from '@legacy-sports/scoring';
 
@@ -69,85 +69,8 @@ export async function calculateAndUpdateMatchupScores(
   const playerGameStatsResult = await getMatchupPlayerGameStats(db, matchupId);
 
   // 3. Organize stats by team
-  const team1PlayerStats = new Map<number, PlayerGameStats[]>();
-  const team2PlayerStats = new Map<number, PlayerGameStats[]>();
-
-  for (const stat of playerGameStatsResult) {
-    const playerGameStat: PlayerGameStats = {
-      playerId: stat.playerId,
-      season: stat.season,
-      gameNum: stat.gameNum,
-      batting: stat.battingStats
-        ? {
-            pa: stat.battingStats.pa,
-            ab: stat.battingStats.ab,
-            r: stat.battingStats.r,
-            h: stat.battingStats.h,
-            doubles: stat.battingStats.doubles,
-            triples: stat.battingStats.triples,
-            hr: stat.battingStats.hr,
-            rbi: stat.battingStats.rbi,
-            sb: stat.battingStats.sb,
-            cs: stat.battingStats.cs,
-            bb: stat.battingStats.bb,
-            so: stat.battingStats.so,
-            gidp: stat.battingStats.gidp,
-            hbp: stat.battingStats.hbp,
-            sh: stat.battingStats.sh,
-            sf: stat.battingStats.sf,
-            ibb: stat.battingStats.ibb,
-          }
-        : undefined,
-      pitching: stat.pitchingStats
-        ? {
-            w: stat.pitchingStats.w,
-            l: stat.pitchingStats.l,
-            gs: stat.pitchingStats.gs,
-            gf: stat.pitchingStats.gf,
-            cg: stat.pitchingStats.cg,
-            sho: stat.pitchingStats.sho,
-            sv: stat.pitchingStats.sv,
-            ip: stat.pitchingStats.ip,
-            h: stat.pitchingStats.h,
-            r: stat.pitchingStats.r,
-            er: stat.pitchingStats.er,
-            hr: stat.pitchingStats.hr,
-            bb: stat.pitchingStats.bb,
-            ibb: stat.pitchingStats.ibb,
-            so: stat.pitchingStats.so,
-            hbp: stat.pitchingStats.hbp,
-            battersFaced: stat.pitchingStats.battersFaced,
-            outsRecorded: stat.pitchingStats.outsRecorded,
-          }
-        : undefined,
-      fielding: stat.fieldingStats
-        ? {
-            innDef: stat.fieldingStats.innDef,
-            chances: stat.fieldingStats.chances,
-            po: stat.fieldingStats.po,
-            a: stat.fieldingStats.a,
-            eDef: stat.fieldingStats.eDef,
-            dpDef: stat.fieldingStats.dpDef,
-          }
-        : undefined,
-    };
-
-    if (stat.teamId === team1Id) {
-      const playerStats = team1PlayerStats.get(stat.playerId);
-      if (playerStats) {
-        playerStats.push(playerGameStat);
-      } else {
-        team1PlayerStats.set(stat.playerId, [playerGameStat]);
-      }
-    } else if (stat.teamId === team2Id) {
-      const playerStats = team2PlayerStats.get(stat.playerId);
-      if (playerStats) {
-        playerStats.push(playerGameStat);
-      } else {
-        team2PlayerStats.set(stat.playerId, [playerGameStat]);
-      }
-    }
-  }
+  const { team1PlayerStats, team2PlayerStats } =
+    partitionMatchupPlayerGameStats(playerGameStatsResult, team1Id, team2Id);
 
   // 4. Calculate matchup scores
   const matchupScore = calculateMatchupScore(

@@ -13,6 +13,7 @@ jest.mock('@legacy-sports/db-client', () => ({
 const mockCalculateMatchupScore = jest.fn();
 
 jest.mock('@legacy-sports/scoring', () => ({
+  ...jest.requireActual<object>('@legacy-sports/scoring'),
   calculateMatchupScore: (...args: unknown[]): unknown =>
     mockCalculateMatchupScore(...args),
 }));

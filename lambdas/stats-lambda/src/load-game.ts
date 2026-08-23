@@ -11,7 +11,7 @@ import {
 } from '@legacy-sports/rollbar';
 import { createNotificationService } from '@legacy-sports/aws-utils';
 import {
-  getScoringMultipliersForLeague,
+  getCamelCaseScoringMultipliersForLeague,
   PublicSchema,
   runWithPublicClient,
 } from '@legacy-sports/db-client';
@@ -346,27 +346,17 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
                 throw new Error(leagueIdUnavailableMessage);
               }
 
-              // Fetch league-specific scoring multipliers (snake_case keys from DB)
-              // and convert to camelCase for the scoring engine
-              const rawMultipliers = await getScoringMultipliersForLeague(
+              // Fetch league-specific scoring multipliers, already converted
+              // from the DB's snake_case source_column keys to the camelCase
+              // keys the scoring engine looks weights up by (LS-9532).
+              const multipliers = await getCamelCaseScoringMultipliersForLeague(
                 db,
                 leagueId,
               );
-              const toCamelCase = (
-                record: Record<string, number>,
-              ): Record<string, number> => {
-                const result: Record<string, number> = {};
-                for (const [key, value] of Object.entries(record)) {
-                  result[
-                    key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
-                  ] = value;
-                }
-                return result;
-              };
               const scoringSettings: ScoringSettings = {
-                batting: toCamelCase(rawMultipliers.batting),
-                pitching: toCamelCase(rawMultipliers.pitching),
-                fielding: toCamelCase(rawMultipliers.fielding),
+                batting: multipliers.batting,
+                pitching: multipliers.pitching,
+                fielding: multipliers.fielding,
               };
 
               const scoreResult = await calculateAndUpdateMatchupScores(

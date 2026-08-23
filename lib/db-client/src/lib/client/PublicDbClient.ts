@@ -1560,6 +1560,77 @@ export async function getScoringMultipliersForLeague(
   return multipliers;
 }
 
+/**
+ * Scoring multiplier groups that `assignMultiplier` never populates today but
+ * that `LeagueScoringMultipliers` carries for the football profiles.
+ */
+const OPTIONAL_SCORING_MULTIPLIER_GROUPS = [
+  'passing',
+  'rushing',
+  'receiving',
+  'kicking',
+  'defense',
+  'idp',
+] as const;
+
+function camelCaseWeights(
+  weights: Record<string, number>,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const [key, value] of Object.entries(weights)) {
+    result[key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())] = value;
+  }
+  return result;
+}
+
+/**
+ * Re-key scoring multipliers from snake_case to camelCase.
+ *
+ * `getScoringMultipliersForLeague` keys its output by
+ * `scoring_stat_definitions.source_column`, which is snake_case
+ * (`outs_recorded`, `e_def`, `dp_def`). Everything downstream of it is
+ * camelCase: Drizzle stat rows, the aggregates built from them, and therefore
+ * the keys `computeScoring` looks weights up by. Feeding raw multipliers into
+ * scoring resolves those stats to weight 0 *silently* — `outs_recorded` alone
+ * carries the dominant pitching weight, so the result is a plausible-looking
+ * but materially under-scored matchup rather than an error (LS-9532).
+ *
+ * Anything that scores must convert first. The raw
+ * `getScoringMultipliersForLeague` is for displaying or editing the profile
+ * itself, where the DB column names are the identifiers.
+ */
+export function camelCaseScoringMultipliers(
+  multipliers: LeagueScoringMultipliers,
+): LeagueScoringMultipliers {
+  const result: LeagueScoringMultipliers = {
+    batting: camelCaseWeights(multipliers.batting),
+    pitching: camelCaseWeights(multipliers.pitching),
+    fielding: camelCaseWeights(multipliers.fielding),
+  };
+
+  for (const group of OPTIONAL_SCORING_MULTIPLIER_GROUPS) {
+    const weights = multipliers[group];
+    if (weights) {
+      result[group] = camelCaseWeights(weights);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * `getScoringMultipliersForLeague` with the keys already converted to camelCase
+ * — the form every scoring caller needs. See {@link camelCaseScoringMultipliers}.
+ */
+export async function getCamelCaseScoringMultipliersForLeague(
+  db: PublicDb,
+  leagueId?: number | null,
+): Promise<LeagueScoringMultipliers> {
+  return camelCaseScoringMultipliers(
+    await getScoringMultipliersForLeague(db, leagueId),
+  );
+}
+
 // Re-export matchup history utilities
 export {
   queryHistoricalMatchups,

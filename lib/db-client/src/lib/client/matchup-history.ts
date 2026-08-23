@@ -11,7 +11,11 @@ import {
 } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { applyScoring } from '@legacy-sports/utils';
-import { getScoringMultipliersForLeague, PublicDb } from './PublicDbClient';
+import {
+  camelCaseScoringMultipliers,
+  getScoringMultipliersForLeague,
+  PublicDb,
+} from './PublicDbClient';
 import * as Schema from '../../drizzle/public/schema';
 import { Matchup } from '../../types/DatabaseTypes';
 import { LeagueScoringMultipliers } from '../../types/ScoringTypes';
@@ -220,28 +224,6 @@ export async function getHeadToHeadRecord(
     averageTeam1Score: totalMatchups > 0 ? team1TotalPoints / totalMatchups : 0,
     averageTeam2Score: totalMatchups > 0 ? team2TotalPoints / totalMatchups : 0,
   };
-}
-
-/**
- * Convert snake_case to camelCase.
- * Scoring stat definitions store source_column in snake_case (e.g. "outs_recorded", "e_def")
- * but Drizzle returns rows with camelCase properties (e.g. "outsRecorded", "eDef").
- */
-function snakeToCamel(s: string): string {
-  return s.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
-}
-
-/**
- * Convert scoring multiplier keys from snake_case (DB column names) to camelCase (Drizzle property names).
- */
-function camelCaseMultipliers(
-  multipliers: Record<string, number>,
-): Record<string, number> {
-  const result: Record<string, number> = {};
-  for (const [key, value] of Object.entries(multipliers)) {
-    result[snakeToCamel(key)] = value;
-  }
-  return result;
 }
 
 /**
@@ -581,12 +563,9 @@ async function _computeStandings(
   }
 
   // Get scoring multipliers for this league (converted to camelCase for Drizzle rows)
-  const rawMultipliers = await getScoringMultipliersForLeague(db, leagueId);
-  const scoringWeights: LeagueScoringMultipliers = {
-    batting: camelCaseMultipliers(rawMultipliers.batting),
-    pitching: camelCaseMultipliers(rawMultipliers.pitching),
-    fielding: camelCaseMultipliers(rawMultipliers.fielding),
-  };
+  const scoringWeights: LeagueScoringMultipliers = camelCaseScoringMultipliers(
+    await getScoringMultipliersForLeague(db, leagueId),
+  );
 
   // Get all completed + in_progress matchups for the league, optionally
   // bounded to weeks through `throughWeek` for a historical "as of" view.

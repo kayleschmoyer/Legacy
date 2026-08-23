@@ -8,6 +8,7 @@ export * from './football/ScoringSettings';
 export * from './football/FootballFantasyScoring';
 export * from './ComputeScoring';
 export * from './matchup-scoring';
+export * from './matchup-player-stats';
 export * from './matchup-projections';
 export * from './scoring-profile-utils';
 export * from './multiplier-groups';
