@@ -37,6 +37,8 @@ jest.mock('tamagui', () => {
   return mocks.tamaguiMocks;
 });
 
+const mockDraftSettingsControl = jest.fn<void, [Record<string, unknown>]>();
+
 // LS-9423: deep icon imports resolve through moduleNameMapper to the
 // '@tamagui/lucide-icons' barrel, so mock that specifier, not the deep path.
 jest.mock('@tamagui/lucide-icons', () => ({
@@ -55,7 +57,10 @@ jest.mock('@legacy-sports/shared-components/commissioner', () => {
     CommissionerNoteControl: () => <View testID="commissioner-note-control" />,
     DeleteLeagueControl: () => <View testID="delete-league-control" />,
     DraftOrderControl: () => <View testID="draft-order-control" />,
-    DraftSettingsControl: () => <View testID="draft-settings-control" />,
+    DraftSettingsControl: (props: Record<string, unknown>) => {
+      mockDraftSettingsControl(props);
+      return <View testID="draft-settings-control" />;
+    },
     LeagueBrandingControl: () => <View testID="league-branding-control" />,
     LeagueSettingsControl: () => <View testID="league-settings-control" />,
     NextStepControl: () => <View testID="next-step-control" />,
@@ -266,7 +271,7 @@ describe('CommissionerScreen', () => {
   });
 
   describe('football league', () => {
-    it('does not render DraftSettingsControl for football', () => {
+    it('renders DraftSettingsControl for football too (LS-6307)', () => {
       render(
         <CommissionerScreen
           leagueId={1}
@@ -274,9 +279,11 @@ describe('CommissionerScreen', () => {
           onLeagueDeleted={mockOnLeagueDeleted}
         />,
       );
-      expect(
-        screen.queryByTestId('commissioner-accordion-header-draft-settings'),
-      ).toBeNull();
+      openSection('draft-settings');
+      expect(screen.getByTestId('draft-settings-control')).toBeTruthy();
+      expect(mockDraftSettingsControl).toHaveBeenCalledWith(
+        expect.objectContaining({ sport: 'football' }),
+      );
     });
 
     it('renders RosterRequirementsControl for football (LS-9099)', () => {

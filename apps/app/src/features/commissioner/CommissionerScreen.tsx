@@ -184,29 +184,26 @@ export function CommissionerScreen({
         />
       ),
     },
-    ...(!isFootball
-      ? [
-          {
-            id: 'draft-settings',
-            label: 'Draft Settings',
-            content: (
-              <DraftSettingsControl
-                leagueId={leagueId}
-                draftStatus={league.draftStatus}
-                playerPool={league.playerPool ?? undefined}
-                rosterContinuity={league.rosterContinuity}
-                eraFilter={league.eraFilter ?? undefined}
-                baseballHofOnly={league.baseballHofOnly ?? undefined}
-                customEraStartYear={league.customEraStartYear ?? undefined}
-                customEraEndYear={league.customEraEndYear ?? undefined}
-                isPremium={isPremium}
-                onSuccess={handleAlert('Success')}
-                onError={handleError}
-              />
-            ),
-          },
-        ]
-      : []),
+    {
+      id: 'draft-settings',
+      label: 'Draft Settings',
+      content: (
+        <DraftSettingsControl
+          leagueId={leagueId}
+          draftStatus={league.draftStatus}
+          playerPool={league.playerPool ?? undefined}
+          sport={isFootball ? 'football' : 'baseball'}
+          rosterContinuity={league.rosterContinuity}
+          eraFilter={league.eraFilter ?? undefined}
+          baseballHofOnly={league.baseballHofOnly ?? undefined}
+          customEraStartYear={league.customEraStartYear ?? undefined}
+          customEraEndYear={league.customEraEndYear ?? undefined}
+          isPremium={isPremium}
+          onSuccess={handleAlert('Success')}
+          onError={handleError}
+        />
+      ),
+    },
     ...(isFootball
       ? [
           {
