@@ -211,6 +211,14 @@
   color: "d4c5f9"
   description: "Held: E2E broken on main, not by this PR — see e2e-hold marker comment for blocker ticket"
 
+# Applied by .github/workflows/e2e-red-merge-guard.yml (LS-9467) when a PR
+# touching apps/web-e2e/src/tests/** merges to main while still carrying "CI:
+# E2E Failure" — main has likely inherited a deterministic E2E failure that
+# will block the e2e-affected CI Gate on every subsequent affected PR.
+- name: "main:red-e2e-merged"
+  color: "b60205"
+  description: "A PR merged to main with a red E2E spec still failing — fix or revert immediately (LS-9467)"
+
 # ---------------------------------------------------------------------------
 # Review State Labels
 # ---------------------------------------------------------------------------

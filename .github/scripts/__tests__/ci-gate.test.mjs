@@ -37,6 +37,7 @@ const {
   computeGateConclusion,
   runIdFromTargetUrl,
   isRetryableStatusError,
+  cancelledJobHadRealFailure,
   postCiGate,
 } = require(
   path.join(path.dirname(fileURLToPath(import.meta.url)), '../ci-gate.js'),
@@ -131,7 +132,9 @@ function makeGithub({
   statusesError = null,
   // LS-9565: per-run job listings, keyed by run id. A run absent from this map
   // resolves to `[]` — no `🚀 CI Pipeline` job row, which reads as "this run
-  // runs the pipeline and will post", the pre-LS-9565 behaviour.
+  // runs the pipeline and will post", the pre-LS-9565 behaviour. Also serves
+  // LS-9467's e2e/e2e-mobile job (with steps[]) lookups on the SAME run —
+  // e.g. { [SELF_RUN_ID]: [{ name: 'E2E Tests (Shard 1/1)', conclusion: 'cancelled', steps: [...] }] }.
   jobsByRunId = {},
   jobsError = null,
   // LS-9359: queue of errors createCommitStatus throws on successive calls,
@@ -265,6 +268,117 @@ describe('ci-gate — computeGateConclusion folds inputs', () => {
   it('treats an unknown/empty status as failure', () => {
     const results = { ...allPass(), lint: '' };
     assert.strictEqual(computeGateConclusion(results).conclusion, 'failure');
+  });
+});
+
+// ── LS-9467: cancelledJobHadRealFailure ─────────────────────────────────────
+
+describe('ci-gate — cancelledJobHadRealFailure (LS-9467)', () => {
+  it('returns false for a job key with no CANCELLABLE_TEST_JOB_NAME_PREFIX entry', async () => {
+    const { github } = makeGithub();
+    const result = await cancelledJobHadRealFailure({
+      github,
+      core,
+      owner: 'test-owner',
+      repo: 'test-repo',
+      runId: SELF_RUN_ID,
+      jobKey: 'lint',
+    });
+    assert.strictEqual(result, false);
+  });
+
+  it('detects a real failing step behind a cancelled e2e job (PR #6909 shape)', async () => {
+    const { github } = makeGithub({
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            name: '🚀 CI Pipeline / E2E Tests (Shard 1/1)',
+            conclusion: 'cancelled',
+            steps: [
+              { name: 'E2E Testing', conclusion: 'success' },
+              { name: 'E2E Tests (affected specs)', conclusion: 'failure' },
+              { name: 'Upload Blob Report to S3', conclusion: 'success' },
+            ],
+          },
+        ],
+      },
+    });
+    const result = await cancelledJobHadRealFailure({
+      github,
+      core,
+      owner: 'test-owner',
+      repo: 'test-repo',
+      runId: SELF_RUN_ID,
+      jobKey: 'e2e',
+    });
+    assert.strictEqual(result, true);
+  });
+
+  it('returns false for a cancelled job whose steps never recorded a failure (LS-8219 shape)', async () => {
+    const { github } = makeGithub({
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            name: '🚀 CI Pipeline / E2E Tests (Shard 1/1)',
+            conclusion: 'cancelled',
+            steps: [
+              { name: 'E2E Testing', conclusion: 'success' },
+              { name: 'Upload Blob Report to S3', conclusion: 'success' },
+            ],
+          },
+        ],
+      },
+    });
+    const result = await cancelledJobHadRealFailure({
+      github,
+      core,
+      owner: 'test-owner',
+      repo: 'test-repo',
+      runId: SELF_RUN_ID,
+      jobKey: 'e2e',
+    });
+    assert.strictEqual(result, false);
+  });
+
+  it('checks every matrix shard, not just the first', async () => {
+    const { github } = makeGithub({
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            name: '🚀 CI Pipeline / E2E Tests (Shard 1/3)',
+            conclusion: 'success',
+            steps: [{ name: 'E2E Testing', conclusion: 'success' }],
+          },
+          {
+            name: '🚀 CI Pipeline / E2E Tests (Shard 2/3)',
+            conclusion: 'cancelled',
+            steps: [{ name: 'E2E Testing', conclusion: 'failure' }],
+          },
+        ],
+      },
+    });
+    const result = await cancelledJobHadRealFailure({
+      github,
+      core,
+      owner: 'test-owner',
+      repo: 'test-repo',
+      runId: SELF_RUN_ID,
+      jobKey: 'e2e',
+    });
+    assert.strictEqual(result, true);
+  });
+
+  it('fails OPEN (false) when the Jobs API errors', async () => {
+    const { github } = makeGithub({ jobsError: 'API is down' });
+    const result = await cancelledJobHadRealFailure({
+      github,
+      core,
+      owner: 'test-owner',
+      repo: 'test-repo',
+      runId: SELF_RUN_ID,
+      jobKey: 'e2e',
+    });
+    assert.strictEqual(result, false);
   });
 });
 
@@ -428,6 +542,73 @@ describe('ci-gate — postCiGate posts the aggregate status', () => {
     assert.strictEqual(res.posted, false);
     assert.strictEqual(res.reason, 'stale');
     assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('regression: PR #6909 — posts FAILURE when a cancelled e2e job actually had a failing step (LS-9467)', async () => {
+    // Reproduces the exact production sequence: the gating run's own e2e job
+    // hit its job timeout in the narrow window after "E2E Tests (affected
+    // specs)" had already recorded `failure`, so needs.e2e.result rolled up
+    // to `cancelled`. Pre-fix, the LS-8219 exclusion folded that as "not a
+    // failure" and CI Gate posted `success`, letting the broken spec merge.
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            name: '🚀 CI Pipeline / E2E Tests (Shard 1/1)',
+            conclusion: 'cancelled',
+            steps: [
+              { name: 'E2E Testing', conclusion: 'success' },
+              { name: 'E2E Tests (affected specs)', conclusion: 'failure' },
+              { name: 'Upload Blob Report to S3', conclusion: 'success' },
+              { name: 'Complete job', conclusion: 'success' },
+            ],
+          },
+        ],
+      },
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), e2e: 'cancelled' },
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(
+      calls.statuses[0].state,
+      'failure',
+      'a cancelled job that actually failed a step must still fail the gate',
+    );
+    assert.match(calls.statuses[0].description, /e2e/);
+  });
+
+  it('still excludes a cleanly-cancelled job with no failing step (LS-8219 preserved alongside LS-9467)', async () => {
+    const { github, calls } = makeGithub({
+      currentSha: HEAD_SHA,
+      jobsByRunId: {
+        [SELF_RUN_ID]: [
+          {
+            name: '🚀 CI Pipeline / E2E Tests (Shard 1/1)',
+            conclusion: 'cancelled',
+            steps: [{ name: 'E2E Testing', conclusion: 'success' }],
+          },
+        ],
+      },
+    });
+
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: { ...allPass(), e2e: 'cancelled' },
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+    assert.deepStrictEqual(res.ignored, ['e2e']);
   });
 
   it('truncates the failure description to the 140-char status limit', async () => {

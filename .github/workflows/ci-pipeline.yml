@@ -685,7 +685,14 @@ jobs:
       needs.detect-changes.outputs.api-surface == 'true' ||
       needs.detect-changes.outputs.requires-full-build == 'true')
     runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 30
+    # LS-9467: PR #6909's gating run completed in 30m06s — 6 seconds past the
+    # old 30-minute ceiling — which raced GitHub's own timeout-cancellation
+    # against a step that had already recorded a real failure, rolling the
+    # job's conclusion up to `cancelled` instead of `failure` and letting a
+    # deterministically-broken spec merge to main (see ci-gate.js's
+    # cancelledJobHadRealFailure for the belt-and-suspenders fix on the gate
+    # side). More headroom makes hitting that exact race far less likely.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:

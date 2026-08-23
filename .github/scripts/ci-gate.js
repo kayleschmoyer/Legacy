@@ -216,6 +216,92 @@ async function pipelineJobWasSkipped({ github, core, owner, repo, runId }) {
 }
 
 /**
+ * Job-name substrings identifying, in the Jobs API within THIS run, the two
+ * GATE_INPUT_JOBS entries that can mask a real failure behind a `cancelled`
+ * rollup (LS-9467). Matched via `.includes()`, not an anchor, because the
+ * reusable-workflow call prefixes the job name with its calling job label —
+ * the real name is "🚀 CI Pipeline / E2E Tests (Shard 1/1)", not a bare
+ * "E2E Tests (Shard 1/1)". `e2e` is a matrix job (one instance per shard);
+ * GitHub folds every matrix instance's result into one `needs.e2e.result` for
+ * the summarize job, so a genuine test failure in one shard and an external
+ * cancellation of the SAME shard can both surface as
+ * `needs.e2e.result == 'cancelled'` if the cancellation is what the job rolls
+ * up to. Only these two keys can matrix/mask this way — lint/test/build/
+ * custom-checks/lockfile-check are single, non-matrix jobs.
+ */
+const CANCELLABLE_TEST_JOB_NAME_PREFIX = Object.freeze({
+  e2e: 'E2E Tests (Shard',
+  'e2e-mobile': 'E2E Tests (Mobile Chrome',
+});
+
+/**
+ * Whether a GATE_INPUT_JOBS entry reported `cancelled` even though one of its
+ * underlying job instances (within THIS run) actually recorded a real
+ * `failure` step before the cancellation landed (LS-9467).
+ *
+ * WHY THIS EXISTS: PR #6909 merged with a deterministically-broken e2e spec
+ * because its gating run's own `e2e` job hit its 30-minute `timeout-minutes`
+ * in the narrow window after the "E2E Tests (affected specs)" step had
+ * already recorded `conclusion: failure` — GitHub rolled the JOB's overall
+ * conclusion up to `cancelled` even though every step (including the one that
+ * failed) had already completed normally. The LS-8219 exclusion then folded
+ * that `cancelled` result as "not a failure" — its evidence (PR #5540 et al.)
+ * was jobs that were SIGINT'd cleanly with every step having already
+ * PASSED, a materially different case. This check discriminates the two: a
+ * `cancelled` job whose steps contain no `failure` is still excluded (LS-8219
+ * intent preserved); a `cancelled` job with a genuinely failed step is
+ * promoted to `failure` before folding.
+ *
+ * Fails OPEN (returns `false`, i.e. "no real failure detected") on a lookup
+ * error — this check is additive on top of the pre-existing LS-8219 default,
+ * so an API hiccup here degrades to that prior behavior rather than newly
+ * blocking a merge the lookup couldn't confirm.
+ *
+ * @returns {Promise<boolean>}
+ */
+async function cancelledJobHadRealFailure({
+  github,
+  core,
+  owner,
+  repo,
+  runId,
+  jobKey,
+}) {
+  const prefix = CANCELLABLE_TEST_JOB_NAME_PREFIX[jobKey];
+  if (!prefix) return false;
+  try {
+    let jobs = [];
+    let page = 1;
+    while (true) {
+      const { data } = await github.rest.actions.listJobsForWorkflowRun({
+        owner,
+        repo,
+        run_id: runId,
+        per_page: 100,
+        page,
+      });
+      jobs = jobs.concat(data.jobs);
+      if (data.jobs.length < 100) break;
+      page++;
+    }
+    return jobs
+      .filter((j) => typeof j.name === 'string' && j.name.includes(prefix))
+      .some(
+        (j) =>
+          j.conclusion === 'cancelled' &&
+          (j.steps || []).some((s) => s.conclusion === 'failure'),
+      );
+  } catch (e) {
+    core.warning(
+      `CI Gate: could not inspect jobs for run ${runId} to check whether the ` +
+        `cancelled "${jobKey}" job actually had a failing step (${e.message}) ` +
+        '— treating it as excluded per the pre-existing LS-8219 default.',
+    );
+    return false;
+  }
+}
+
+/**
  * Extract the Actions run id from a commit status `target_url` of the shape
  * `https://github.com/<owner>/<repo>/actions/runs/<id>`.
  *
@@ -492,7 +578,40 @@ async function postCiGate({
     return { posted: false, reason: 'stale', sha: targetSha, currentSha };
   }
 
-  const { conclusion, failing, ignored } = computeGateConclusion(results);
+  // LS-9467: a `cancelled` e2e/e2e-mobile result can mask a real test failure
+  // that already completed before the job's rollup landed on `cancelled` (see
+  // cancelledJobHadRealFailure). Promote those before folding so the LS-8219
+  // exclusion only ever applies to jobs that were genuinely cancelled clean.
+  const selfRunIdForJobCheck = Number(process.env.GITHUB_RUN_ID);
+  let effectiveResults = results;
+  if (Number.isSafeInteger(selfRunIdForJobCheck)) {
+    for (const jobKey of Object.keys(CANCELLABLE_TEST_JOB_NAME_PREFIX)) {
+      if (results && results[jobKey] === 'cancelled') {
+        // Sequential is fine: at most 2 keys, each a single (paginated)
+        // same-run Jobs API lookup.
+        const hadRealFailure = await cancelledJobHadRealFailure({
+          github,
+          core,
+          owner,
+          repo,
+          runId: selfRunIdForJobCheck,
+          jobKey,
+        });
+        if (hadRealFailure) {
+          if (effectiveResults === results) effectiveResults = { ...results };
+          effectiveResults[jobKey] = 'failure';
+          core.warning(
+            `CI Gate: "${jobKey}" rolled up to 'cancelled' but a matching job ` +
+              `instance had a real failing step — treating it as 'failure' ` +
+              `(LS-9467).`,
+          );
+        }
+      }
+    }
+  }
+
+  const { conclusion, failing, ignored } =
+    computeGateConclusion(effectiveResults);
   const state = conclusion === 'success' ? 'success' : 'failure';
 
   if (ignored.length > 0) {
@@ -583,11 +702,13 @@ module.exports = {
   CI_GATE_CONTEXT,
   CI_PIPELINE_JOB_NAME,
   CI_RUN_WORKFLOW_NAMES,
+  CANCELLABLE_TEST_JOB_NAME_PREFIX,
   GATE_INPUT_JOBS,
   MAX_SUPERSEDING_RUN_INSPECTIONS,
   computeGateConclusion,
   pipelineJobWasSkipped,
   runIdFromTargetUrl,
+  cancelledJobHadRealFailure,
   assertSuccessIsCurrent,
   isRetryableStatusError,
   postCiGate,
