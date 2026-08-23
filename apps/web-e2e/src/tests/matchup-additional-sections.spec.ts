@@ -182,7 +182,7 @@ const LEAGUE_STANDINGS_WITH_DATA = [
 
 /**
  * Route matchup GraphQL operations to fixtures. `additionalSectionsData`
- * controls what the three Additional Sections queries return, letting a
+ * controls what the four Additional Sections queries return, letting a
  * test swap between "with data" and "empty" fixtures while reusing the
  * same catch-all wiring for every other query the page fires.
  */
@@ -192,6 +192,7 @@ async function mockMatchupGraphQL(
     matchupScores: unknown[];
     teamMatchupHistory: unknown[];
     leagueStandings: unknown[];
+    playoffProjections?: unknown[];
   },
 ) {
   await page.route(
@@ -281,6 +282,18 @@ async function mockMatchupGraphQL(
             }),
           });
           break;
+        case 'GetPlayoffProjections':
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              data: {
+                getPlayoffProjections:
+                  additionalSectionsData.playoffProjections ?? [],
+              },
+            }),
+          });
+          break;
         default:
           await unmockedGraphQLFallback(route);
       }
@@ -332,6 +345,66 @@ test.describe('Matchup Additional Sections – with data @regression', () => {
       .text(/Beta Force/)
       .first()
       .expectVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — League Context playoff implication banner (LS-6353)
+// ---------------------------------------------------------------------------
+
+test.describe('Matchup Additional Sections – playoff implications @regression', () => {
+  test('shows a "Win to clinch playoffs" banner when a team can clinch by winning this matchup', async ({
+    page,
+    matchupPage,
+  }) => {
+    await mockMatchupGraphQL(page, {
+      matchupScores: [],
+      teamMatchupHistory: [],
+      leagueStandings: LEAGUE_STANDINGS_WITH_DATA,
+      playoffProjections: [
+        { teamId: TEAM1_ID, magicNumber: 1, eliminationNumber: null },
+      ],
+    });
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID, 'football');
+
+    await matchupPage.text('Win to clinch playoffs').expectVisible();
+  });
+
+  test('shows a "Lose and you are eliminated" banner when a team is eliminated by losing this matchup', async ({
+    page,
+    matchupPage,
+  }) => {
+    await mockMatchupGraphQL(page, {
+      matchupScores: [],
+      teamMatchupHistory: [],
+      leagueStandings: LEAGUE_STANDINGS_WITH_DATA,
+      playoffProjections: [
+        { teamId: TEAM2_ID, magicNumber: null, eliminationNumber: 1 },
+      ],
+    });
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID, 'football');
+
+    await matchupPage.text('Lose and you are eliminated').expectVisible();
+  });
+
+  test('shows no playoff implication banner when neither team is at a clinch/elimination edge', async ({
+    page,
+    matchupPage,
+  }) => {
+    await mockMatchupGraphQL(page, {
+      matchupScores: [],
+      teamMatchupHistory: [],
+      leagueStandings: LEAGUE_STANDINGS_WITH_DATA,
+      playoffProjections: [
+        { teamId: TEAM1_ID, magicNumber: 3, eliminationNumber: null },
+        { teamId: TEAM2_ID, magicNumber: null, eliminationNumber: 4 },
+      ],
+    });
+    await matchupPage.goto(LEAGUE_ID, MATCHUP_ID, 'football');
+
+    await matchupPage.testId('league-context-section').expectVisible();
+    await matchupPage.text('Win to clinch playoffs').expectHidden();
+    await matchupPage.text('Lose and you are eliminated').expectHidden();
   });
 });
 

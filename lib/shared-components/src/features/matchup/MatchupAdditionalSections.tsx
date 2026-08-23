@@ -28,6 +28,13 @@ export interface TeamStandingContext {
   pointsFor: number;
 }
 
+export interface PlayoffImplication {
+  teamId: number;
+  teamName: string;
+  /** 'clinch' = a win in this matchup clinches a playoff spot; 'eliminated' = a loss eliminates the team. */
+  kind: 'clinch' | 'eliminated';
+}
+
 export interface MatchupAdditionalSectionsProps {
   /** Top fantasy-point scorers across both teams in this matchup. Empty = no stats loaded yet. */
   keyPlayers: KeyPlayerToWatch[];
@@ -35,6 +42,47 @@ export interface MatchupAdditionalSectionsProps {
   headToHead: HeadToHeadResult[];
   /** Current standings context for the two teams in this matchup. */
   standings: TeamStandingContext[];
+  /** Playoff stakes for either team in this matchup, when this matchup's result would clinch or eliminate. Empty = no playoff implication this week. */
+  playoffImplications: PlayoffImplication[];
+}
+
+const PLAYOFF_IMPLICATION_MESSAGES: Record<PlayoffImplication['kind'], string> =
+  {
+    clinch: 'Win to clinch playoffs',
+    eliminated: 'Lose and you are eliminated',
+  };
+
+export interface PlayoffProjectionLike {
+  teamId?: number | null;
+  magicNumber?: number | null;
+  eliminationNumber?: number | null;
+}
+
+/**
+ * Derives the League Context playoff-implication banner for the two teams in
+ * a matchup. A team's magicNumber of 1 means a win in any remaining matchup
+ * — including this one — clinches a playoff spot; an eliminationNumber of 1
+ * means a loss eliminates them. Both are only ever 1 near the actual playoff
+ * cutoff, so this naturally gates the banner to weeks where it's actionable.
+ */
+export function derivePlayoffImplications(
+  teams: Array<{ teamId: number | null | undefined; teamName: string }>,
+  projections: PlayoffProjectionLike[],
+): PlayoffImplication[] {
+  const projectionsByTeamId = new Map(
+    projections.map((projection) => [projection.teamId, projection]),
+  );
+  return teams.flatMap(({ teamId, teamName }): PlayoffImplication[] => {
+    const projection = teamId != null ? projectionsByTeamId.get(teamId) : null;
+    if (!projection || teamId == null) return [];
+    if (projection.magicNumber === 1) {
+      return [{ teamId, teamName, kind: 'clinch' }];
+    }
+    if (projection.eliminationNumber === 1) {
+      return [{ teamId, teamName, kind: 'eliminated' }];
+    }
+    return [];
+  });
 }
 
 function SectionCard({
@@ -81,6 +129,7 @@ export function MatchupAdditionalSections({
   keyPlayers,
   headToHead,
   standings,
+  playoffImplications,
 }: MatchupAdditionalSectionsProps) {
   return (
     <YStack space="$4" testID="matchup-additional-sections">
@@ -142,6 +191,35 @@ export function MatchupAdditionalSections({
       </SectionCard>
 
       <SectionCard title="League Context" testId="league-context-section">
+        {playoffImplications.length > 0 ? (
+          <YStack space="$2" marginBottom="$2">
+            {playoffImplications.map((implication) => (
+              <XStack
+                key={implication.teamId}
+                testID={`playoff-implication-banner-${implication.teamId}`}
+                backgroundColor={
+                  implication.kind === 'clinch' ? '$green3' : '$red3'
+                }
+                borderRadius="$3"
+                paddingHorizontal="$3"
+                paddingVertical="$2"
+                alignItems="center"
+                justifyContent="space-between"
+              >
+                <Text fontSize="$3" fontWeight="bold">
+                  {implication.teamName}
+                </Text>
+                <Text
+                  fontSize="$3"
+                  fontWeight="bold"
+                  color={implication.kind === 'clinch' ? '$green11' : '$red11'}
+                >
+                  {PLAYOFF_IMPLICATION_MESSAGES[implication.kind]}
+                </Text>
+              </XStack>
+            ))}
+          </YStack>
+        ) : null}
         {standings.length === 0 ? (
           <EmptyState message="Standings not yet available." />
         ) : (

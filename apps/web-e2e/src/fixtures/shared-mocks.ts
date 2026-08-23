@@ -256,6 +256,7 @@ export const BASELINE_GRAPHQL_RESPONSES: Record<
   }),
   getcurrentmatchup: { data: { currentMatchup: null } },
   getleaguestandings: { data: { getLeagueStandings: [] } },
+  getplayoffprojections: { data: { getPlayoffProjections: [] } },
   getleaguescoringprofile: leagueScoringProfileResponse(),
   getleagueactivity: { data: { leagueActivity: [] } },
   getleaguechatmessages: { data: { leagueChatMessages: [] } },

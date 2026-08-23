@@ -15,6 +15,8 @@ import { config } from '@legacy-sports/app-config/native';
 import { LOGGER } from '@legacy-sports/logging';
 import { Chip, useWebSocket } from '@legacy-sports/shared-components';
 import {
+  derivePlayoffImplications,
+  MatchupAdditionalSections,
   MatchupRecapPanel,
   MatchupScoreboardHero,
 } from '@legacy-sports/shared-components/matchup';
@@ -25,8 +27,10 @@ import {
   type GetMatchupPlayersQuery,
   MatchupStatus,
   useGetHeadToHeadRecordQuery,
+  useGetLeagueStandingsQuery,
   useGetMatchupByIdQuery,
   useGetMatchupPlayersQuery,
+  useGetPlayoffProjectionsQuery,
   useMatchupScoresQuery,
 } from '@legacy-sports/graphql';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
@@ -531,6 +535,50 @@ export function FootballMatchupScreen(
   const team1Projection = teamProjectedScore(matchup?.team1Id);
   const team2Projection = teamProjectedScore(matchup?.team2Id);
 
+  // Playoff stakes only matter for a matchup still to be decided — skip the
+  // query once the matchup is Completed or has no weekNumber to gate on.
+  const showsPlayoffStakes =
+    matchup?.weekNumber != null && matchup?.status !== MatchupStatus.Completed;
+  const { data: standingsData } = useGetLeagueStandingsQuery({
+    variables: { leagueId: matchup?.leagueId ?? 0 },
+    skip: !matchup?.leagueId,
+  });
+  const { data: playoffProjectionsData } = useGetPlayoffProjectionsQuery({
+    variables: { leagueId: matchup?.leagueId ?? 0 },
+    skip: !matchup?.leagueId || !showsPlayoffStakes,
+  });
+
+  const team1Id = matchup?.team1Id ?? null;
+  const team2Id = matchup?.team2Id ?? null;
+  const team1Name = matchup?.team1?.name ?? `Team ${team1Id ?? '1'}`;
+  const team2Name = matchup?.team2?.name ?? `Team ${team2Id ?? '2'}`;
+
+  const allStandings = standingsData?.getLeagueStandings ?? [];
+  const leagueContextStandings = allStandings
+    .map((standing, index) => ({ standing, rank: index + 1 }))
+    .filter(
+      ({ standing }) =>
+        String(standing.teamId) === String(team1Id) ||
+        String(standing.teamId) === String(team2Id),
+    )
+    .map(({ standing, rank }) => ({
+      teamId: Number(standing.teamId),
+      teamName: standing.teamName ?? `Team ${standing.teamId ?? ''}`,
+      rank,
+      wins: standing.wins ?? 0,
+      losses: standing.losses ?? 0,
+      ties: standing.ties ?? 0,
+      pointsFor: standing.pointsFor ?? 0,
+    }));
+
+  const playoffImplications = derivePlayoffImplications(
+    [
+      { teamId: team1Id, teamName: team1Name },
+      { teamId: team2Id, teamName: team2Name },
+    ],
+    playoffProjectionsData?.getPlayoffProjections ?? [],
+  );
+
   if (matchupError) {
     return (
       <Card
@@ -630,6 +678,13 @@ export function FootballMatchupScreen(
             <MatchupRecapPanel matchupId={matchupId} />
           </PremiumGate>
         ) : null}
+
+        <MatchupAdditionalSections
+          keyPlayers={[]}
+          headToHead={[]}
+          standings={leagueContextStandings}
+          playoffImplications={playoffImplications}
+        />
       </YStack>
     </ScrollView>
   );

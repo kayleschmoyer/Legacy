@@ -1,10 +1,14 @@
 import React from 'react';
-import { MatchupAdditionalSections as MatchupAdditionalSectionsView } from '@legacy-sports/shared-components/matchup';
+import {
+  derivePlayoffImplications,
+  MatchupAdditionalSections as MatchupAdditionalSectionsView,
+} from '@legacy-sports/shared-components/matchup';
 import {
   type MatchupFragment,
   type MatchupScoresQuery,
   MatchupStatus,
   useGetLeagueStandingsQuery,
+  useGetPlayoffProjectionsQuery,
   useGetTeamMatchupHistoryQuery,
   useMatchupScoresQuery,
 } from '@legacy-sports/graphql';
@@ -66,6 +70,15 @@ export function MatchupAdditionalSections({
     variables: { leagueId },
   });
 
+  // Playoff stakes only matter for a matchup still to be decided — skip the
+  // query once the matchup is Completed or has no weekNumber to gate on.
+  const showsPlayoffStakes =
+    matchup.weekNumber != null && matchup.status !== MatchupStatus.Completed;
+  const { data: playoffProjectionsData } = useGetPlayoffProjectionsQuery({
+    variables: { leagueId },
+    skip: !showsPlayoffStakes,
+  });
+
   const keyPlayers = (scoresData?.matchupScores ?? [])
     .filter(isFootballMatchupStats)
     .filter((stats) => stats.teamId === team1Id || stats.teamId === team2Id)
@@ -118,11 +131,20 @@ export function MatchupAdditionalSections({
       pointsFor: standing.pointsFor ?? 0,
     }));
 
+  const playoffImplications = derivePlayoffImplications(
+    [
+      { teamId: team1Id, teamName: team1Name },
+      { teamId: team2Id, teamName: team2Name },
+    ],
+    playoffProjectionsData?.getPlayoffProjections ?? [],
+  );
+
   return (
     <MatchupAdditionalSectionsView
       keyPlayers={keyPlayers}
       headToHead={headToHead}
       standings={standings}
+      playoffImplications={playoffImplications}
     />
   );
 }

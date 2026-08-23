@@ -11583,6 +11583,20 @@ export type GetPlayersWithStatsQuery = {
   }> | null;
 };
 
+export type GetPlayoffProjectionsQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type GetPlayoffProjectionsQuery = {
+  __typename?: 'Query';
+  getPlayoffProjections?: Array<{
+    __typename?: 'PlayoffProjection';
+    teamId?: number | null;
+    magicNumber?: number | null;
+    eliminationNumber?: number | null;
+  }> | null;
+};
+
 export type GetPositionsForLeagueQueryVariables = Exact<{
   leagueId: Scalars['Int']['input'];
 }>;
@@ -28723,6 +28737,98 @@ export type GetPlayersWithStatsSuspenseQueryHookResult = ReturnType<
 export type GetPlayersWithStatsQueryResult = Apollo.QueryResult<
   GetPlayersWithStatsQuery,
   GetPlayersWithStatsQueryVariables
+>;
+export const GetPlayoffProjections = gql`
+  query GetPlayoffProjections($leagueId: Int!) {
+    getPlayoffProjections(leagueId: $leagueId) {
+      teamId
+      magicNumber
+      eliminationNumber
+    }
+  }
+`;
+
+/**
+ * __useGetPlayoffProjectionsQuery__
+ *
+ * To run a query within a React component, call `useGetPlayoffProjectionsQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetPlayoffProjectionsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetPlayoffProjectionsQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useGetPlayoffProjectionsQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetPlayoffProjectionsQuery,
+    GetPlayoffProjectionsQueryVariables
+  > &
+    (
+      | { variables: GetPlayoffProjectionsQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetPlayoffProjectionsQuery,
+    GetPlayoffProjectionsQueryVariables
+  >(GetPlayoffProjections, options);
+}
+export function useGetPlayoffProjectionsLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetPlayoffProjectionsQuery,
+    GetPlayoffProjectionsQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetPlayoffProjectionsQuery,
+    GetPlayoffProjectionsQueryVariables
+  >(GetPlayoffProjections, options);
+}
+export function useGetPlayoffProjectionsSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetPlayoffProjectionsQuery,
+        GetPlayoffProjectionsQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetPlayoffProjectionsQuery,
+    GetPlayoffProjectionsQueryVariables
+  >(
+    GetPlayoffProjections,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetPlayoffProjectionsQuery,
+          GetPlayoffProjectionsQueryVariables
+        >,
+  );
+}
+export type GetPlayoffProjectionsQueryHookResult = ReturnType<
+  typeof useGetPlayoffProjectionsQuery
+>;
+export type GetPlayoffProjectionsLazyQueryHookResult = ReturnType<
+  typeof useGetPlayoffProjectionsLazyQuery
+>;
+export type GetPlayoffProjectionsSuspenseQueryHookResult = ReturnType<
+  typeof useGetPlayoffProjectionsSuspenseQuery
+>;
+export type GetPlayoffProjectionsQueryResult = Apollo.QueryResult<
+  GetPlayoffProjectionsQuery,
+  GetPlayoffProjectionsQueryVariables
 >;
 export const GetPositionsForLeague = gql`
   query GetPositionsForLeague($leagueId: Int!) {
