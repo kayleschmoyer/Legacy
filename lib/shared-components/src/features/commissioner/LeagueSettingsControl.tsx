@@ -18,6 +18,11 @@ import { useUpdateLeagueSettingsMutation } from '@legacy-sports/graphql';
 import { GAMES_PER_MATCHUP_BY_SPORT } from '../../config/sports';
 import { BRAND_NAVY_LIGHT, withAlpha } from '../../utils/colors';
 import { PremiumGate } from '../../components/PremiumGate';
+import {
+  FaabBudgetField,
+  WaiverSystemField,
+} from '../leagues/premium/WaiverFields';
+import type { WaiverType } from '../leagues/premium/constants';
 
 export interface LeagueSettingsControlProps {
   leagueId: number;
@@ -35,6 +40,9 @@ export interface LeagueSettingsControlProps {
   // Salary cap settings (LS-646)
   currentSalaryCapEnabled?: boolean;
   currentSalaryCap?: number | null;
+  // Waiver settings (LS-6305)
+  currentWaiverType?: WaiverType;
+  currentFaabBudgetDefault?: number;
   /** Whether the current user has premium access. Passed down from the host app. */
   isPremium?: boolean;
   /** Optional upgrade callback forwarded to the PremiumGate. Callers supply platform-specific navigation. */
@@ -100,6 +108,8 @@ export function LeagueSettingsControl({
   currentPlayoffMultiWeek = false,
   currentSalaryCapEnabled = false,
   currentSalaryCap = null,
+  currentWaiverType = 'standard',
+  currentFaabBudgetDefault = 100,
   isPremium = false,
   onUpgrade,
   onSuccess,
@@ -140,6 +150,17 @@ export function LeagueSettingsControl({
     currentSalaryCapEnabled,
   );
   const [salaryCap, setSalaryCap] = useState<number | null>(currentSalaryCap);
+  // Same downgrade-safe clamp as effectiveCurrentPlayoffFormat above: a
+  // grandfathered FAAB league whose commissioner has since lost premium must
+  // not silently resubmit 'faab' on save (LS-5912-class ForbiddenError).
+  const effectiveCurrentWaiverType: WaiverType =
+    !isPremium && currentWaiverType === 'faab' ? 'standard' : currentWaiverType;
+  const [waiverType, setWaiverType] = useState<WaiverType>(
+    effectiveCurrentWaiverType,
+  );
+  const [faabBudgetDefault, setFaabBudgetDefault] = useState(
+    currentFaabBudgetDefault,
+  );
   const [hasChanges, setHasChanges] = useState(false);
 
   const resolvedSport = sport === 'football' ? 'football' : 'baseball';
@@ -171,6 +192,8 @@ export function LeagueSettingsControl({
       poMultiWeek: boolean,
       scEnabled: boolean = salaryCapEnabled,
       sc: number | null = salaryCap ?? null,
+      wType: WaiverType = waiverType,
+      faabBudget: number = faabBudgetDefault,
     ) => {
       setHasChanges(
         games !== currentGamesPerMatchup ||
@@ -182,7 +205,9 @@ export function LeagueSettingsControl({
           poFormat !== effectiveCurrentPlayoffFormat ||
           poMultiWeek !== currentPlayoffMultiWeek ||
           scEnabled !== currentSalaryCapEnabled ||
-          sc !== currentSalaryCap,
+          sc !== currentSalaryCap ||
+          wType !== effectiveCurrentWaiverType ||
+          (wType === 'faab' && faabBudget !== currentFaabBudgetDefault),
       );
     },
     [
@@ -196,8 +221,12 @@ export function LeagueSettingsControl({
       currentPlayoffMultiWeek,
       currentSalaryCapEnabled,
       currentSalaryCap,
+      effectiveCurrentWaiverType,
+      currentFaabBudgetDefault,
       salaryCapEnabled,
       salaryCap,
+      waiverType,
+      faabBudgetDefault,
     ],
   );
 
@@ -412,6 +441,74 @@ export function LeagueSettingsControl({
     ],
   );
 
+  const handleWaiverTypeChange = useCallback(
+    (value: WaiverType) => {
+      setWaiverType(value);
+      checkChanges(
+        gamesPerMatchup,
+        spStarts,
+        minCareerGames,
+        minCareerSeasons,
+        totalMatchups,
+        playoffEnabled,
+        playoffFormat,
+        playoffMultiWeek,
+        salaryCapEnabled,
+        salaryCap,
+        value,
+        faabBudgetDefault,
+      );
+    },
+    [
+      gamesPerMatchup,
+      spStarts,
+      minCareerGames,
+      minCareerSeasons,
+      totalMatchups,
+      playoffEnabled,
+      playoffFormat,
+      playoffMultiWeek,
+      salaryCapEnabled,
+      salaryCap,
+      faabBudgetDefault,
+      checkChanges,
+    ],
+  );
+
+  const handleFaabBudgetChange = useCallback(
+    (value: number) => {
+      setFaabBudgetDefault(value);
+      checkChanges(
+        gamesPerMatchup,
+        spStarts,
+        minCareerGames,
+        minCareerSeasons,
+        totalMatchups,
+        playoffEnabled,
+        playoffFormat,
+        playoffMultiWeek,
+        salaryCapEnabled,
+        salaryCap,
+        waiverType,
+        value,
+      );
+    },
+    [
+      gamesPerMatchup,
+      spStarts,
+      minCareerGames,
+      minCareerSeasons,
+      totalMatchups,
+      playoffEnabled,
+      playoffFormat,
+      playoffMultiWeek,
+      salaryCapEnabled,
+      salaryCap,
+      waiverType,
+      checkChanges,
+    ],
+  );
+
   const validationError =
     gamesPerMatchup < sportBounds.min || gamesPerMatchup > sportBounds.max
       ? `Games per matchup must be between ${sportBounds.min} and ${sportBounds.max}`
@@ -439,6 +536,8 @@ export function LeagueSettingsControl({
             playoffMultiWeek,
             salaryCapEnabled,
             salaryCap: salaryCapEnabled ? salaryCap : null,
+            waiverType,
+            ...(waiverType === 'faab' ? { faabBudgetDefault } : {}),
           },
         },
       });
@@ -463,6 +562,8 @@ export function LeagueSettingsControl({
     setPlayoffMultiWeek(currentPlayoffMultiWeek);
     setSalaryCapEnabled(currentSalaryCapEnabled);
     setSalaryCap(currentSalaryCap);
+    setWaiverType(effectiveCurrentWaiverType);
+    setFaabBudgetDefault(currentFaabBudgetDefault);
     setHasChanges(false);
   };
 
@@ -986,6 +1087,35 @@ export function LeagueSettingsControl({
               </YStack>
             </>
           )}
+
+          {/* Waiver Settings (LS-6305) */}
+          <Separator />
+          <YStack gap="$3">
+            <Text fontWeight="600" fontSize="$4">
+              Waiver System
+            </Text>
+            <WaiverSystemField
+              value={waiverType}
+              onChange={handleWaiverTypeChange}
+              isPremium={isPremium}
+              disabled={saving}
+              onUpgrade={() => onUpgrade?.()}
+            />
+            {waiverType === 'faab' && (
+              <PremiumGate
+                isPremium={isPremium}
+                featureName="FAAB Waiver Settings"
+                featureDescription="Configure Free Agent Acquisition Budget (FAAB) bidding — the most competitive waiver system for serious leagues."
+                onUpgrade={onUpgrade}
+              >
+                <FaabBudgetField
+                  value={faabBudgetDefault}
+                  onChange={handleFaabBudgetChange}
+                  disabled={saving}
+                />
+              </PremiumGate>
+            )}
+          </YStack>
 
           {/* Salary Cap Settings (LS-646) */}
           <Separator />

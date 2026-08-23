@@ -123,6 +123,7 @@ fragment AppLeague on League {
   playerPool
   waiverEnabled
   waiverType
+  faabBudgetDefault
   weekAdvanceStatus
   sport
   defensiveFormat

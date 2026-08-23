@@ -11,8 +11,19 @@ import React from 'react';
 import { LeagueSettingsControl } from './LeagueSettingsControl';
 import { fireEvent, render, screen } from '../../test-utils';
 
+interface UpdateLeagueSettingsCallArgs {
+  variables: { input: Record<string, unknown> };
+}
+
+const mockUpdateLeagueSettings = jest
+  .fn<Promise<unknown>, [UpdateLeagueSettingsCallArgs]>()
+  .mockResolvedValue({});
+
 jest.mock('@legacy-sports/graphql', () => ({
-  useUpdateLeagueSettingsMutation: () => [jest.fn(), { loading: false }],
+  useUpdateLeagueSettingsMutation: () => [
+    mockUpdateLeagueSettings,
+    { loading: false },
+  ],
 }));
 
 type Children = { children?: React.ReactNode };
@@ -29,6 +40,10 @@ type InputProps = {
   disabled?: boolean;
   'aria-label'?: string;
   placeholder?: string;
+};
+type XStackProps = ButtonProps & {
+  accessibilityRole?: string;
+  testID?: string;
 };
 
 jest.mock('tamagui', () => {
@@ -54,6 +69,20 @@ jest.mock('tamagui', () => {
       placeholder={rest.placeholder}
     />
   );
+  // XStack doubles as a pressable in OptionButtonGroup (used by
+  // WaiverSystemField/FaabBudgetField) — forward onPress/aria-label/role so
+  // those buttons are queryable and clickable in tests, same treatment
+  // StepPremiumOptions.spec.tsx gives it.
+  const XStack = ({ children, onPress, ...rest }: XStackProps) => (
+    <div
+      onClick={onPress}
+      role={rest.accessibilityRole}
+      aria-label={rest['aria-label']}
+      data-testid={rest.testID ?? rest['data-testid']}
+    >
+      {children}
+    </div>
+  );
   return {
     createTokens: (tokens: unknown) => tokens,
     Button,
@@ -63,7 +92,7 @@ jest.mock('tamagui', () => {
     Separator: () => null,
     Spinner: () => <span>spinner</span>,
     Text: PassThrough,
-    XStack: PassThrough,
+    XStack,
     YStack: PassThrough,
   };
 });
@@ -299,5 +328,109 @@ describe('LeagueSettingsControl — renders for a football league with every oth
 
     expect(screen.getByLabelText('Games per matchup')).toHaveValue('1');
     expect(screen.getByLabelText('SP starts per matchup')).toHaveValue('1');
+  });
+});
+
+/**
+ * LS-6305: the Settings tab had no way to edit waiver type (FAAB) or the
+ * FAAB budget after league creation — those fields exist on the backend
+ * (updateLeagueSettings) and are collected at league-create time, but no
+ * commissioner control exposed them post-creation. Covers the new Waiver
+ * System section: default rendering, premium gating (mirrors the FAAB
+ * league-create gating), the downgrade-safe clamp (mirrors LS-5912's
+ * playoff-format clamp so a resave never resubmits a forbidden value), and
+ * that Save only sends faabBudgetDefault when waiverType is 'faab'.
+ */
+describe('LeagueSettingsControl — Waiver System (LS-6305)', () => {
+  beforeEach(() => {
+    mockUpdateLeagueSettings.mockClear();
+  });
+
+  it('defaults to Standard selected and hides the FAAB budget field when no waiver props are passed', () => {
+    render(<LeagueSettingsControl {...defaultProps} isPremium={false} />);
+
+    expect(screen.getByRole('button', { name: 'Standard' })).toHaveAttribute(
+      'aria-label',
+      'Standard',
+    );
+    expect(
+      screen.queryByRole('button', { name: '$100' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('routes a free user tapping FAAB to onUpgrade instead of switching', () => {
+    const onUpgrade = jest.fn();
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        isPremium={false}
+        onUpgrade={onUpgrade}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /FAAB.*Premium/ }));
+
+    expect(onUpgrade).toHaveBeenCalled();
+    // Still standard — no budget field revealed.
+    expect(
+      screen.queryByRole('button', { name: '$100' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lets a premium user switch to FAAB, reveals the budget field, and saves both fields', async () => {
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        leagueId={42}
+        isPremium={true}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /FAAB.*Premium/ }));
+    expect(screen.getByRole('button', { name: '$150' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '$150' }));
+
+    const saveButton = screen.getByRole('button', { name: 'Save Settings' });
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    await screen.findByRole('button', { name: 'Save Settings' });
+    const call = mockUpdateLeagueSettings.mock.calls[0][0];
+    expect(call.variables.input.leagueId).toBe(42);
+    expect(call.variables.input.waiverType).toBe('faab');
+    expect(call.variables.input.faabBudgetDefault).toBe(150);
+  });
+
+  it('omits faabBudgetDefault from Save when waiverType is standard', async () => {
+    render(
+      <LeagueSettingsControl {...defaultProps} leagueId={7} isPremium={true} />,
+    );
+
+    // Trigger a change so Save is enabled without touching waiver settings.
+    fireEvent.change(screen.getByLabelText('Games per matchup'), {
+      target: { value: '3' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save Settings' }));
+
+    await screen.findByRole('button', { name: 'Save Settings' });
+    const call = mockUpdateLeagueSettings.mock.calls[0][0];
+    expect(call.variables.input.waiverType).toBe('standard');
+    expect(call.variables.input).not.toHaveProperty('faabBudgetDefault');
+  });
+
+  it('clamps a grandfathered FAAB league to Standard for a now-downgraded user (prevents ForbiddenError)', () => {
+    render(
+      <LeagueSettingsControl
+        {...defaultProps}
+        currentWaiverType="faab"
+        isPremium={false}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: '$100' }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -175,6 +175,8 @@ export function CommissionerScreen({
           currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
           currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
           currentSalaryCap={league.salaryCap ?? null}
+          currentWaiverType={league.waiverType === 'faab' ? 'faab' : 'standard'}
+          currentFaabBudgetDefault={league.faabBudgetDefault ?? 100}
           isPremium={isPremium}
           onUpgrade={() => router.navigate('/subscription-settings')}
           onSuccess={handleAlert('Success')}

@@ -7020,6 +7020,7 @@ export type AppLeagueFragment = {
   playerPool?: string | null;
   waiverEnabled?: boolean | null;
   waiverType?: string | null;
+  faabBudgetDefault?: number | null;
   weekAdvanceStatus?: string | null;
   sport?: Sport | null;
   defensiveFormat?: DefensiveFormat | null;
@@ -7085,6 +7086,7 @@ export type CreateLeagueMutation = {
       playerPool?: string | null;
       waiverEnabled?: boolean | null;
       waiverType?: string | null;
+      faabBudgetDefault?: number | null;
       weekAdvanceStatus?: string | null;
       sport?: Sport | null;
       defensiveFormat?: DefensiveFormat | null;
@@ -15164,6 +15166,7 @@ export const AppLeagueFragmentDoc = gql`
     playerPool
     waiverEnabled
     waiverType
+    faabBudgetDefault
     weekAdvanceStatus
     sport
     defensiveFormat

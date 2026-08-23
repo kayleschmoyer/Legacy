@@ -335,6 +335,8 @@ export const CommishTab: React.FC<CommishTabProps> = ({
           currentPlayoffMultiWeek={league.playoffMultiWeek ?? false}
           currentSalaryCapEnabled={league.salaryCapEnabled ?? false}
           currentSalaryCap={league.salaryCap ?? null}
+          currentWaiverType={league.waiverType === 'faab' ? 'faab' : 'standard'}
+          currentFaabBudgetDefault={league.faabBudgetDefault ?? 100}
           isPremium={isPremium}
           onUpgrade={() => navigate('/profile/subscription')}
           onSuccess={(msg) => {
