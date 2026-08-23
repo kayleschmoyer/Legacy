@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Button,
   H1,
@@ -28,6 +28,7 @@ import {
   getDraftStatusColors,
 } from '../../utils/draftStatus';
 import { MatchupCard } from '../../components/MatchupCard';
+import { Dialog } from '../../components/Dialog';
 
 export interface NFLHomeLeague {
   id: string | number;
@@ -36,6 +37,12 @@ export interface NFLHomeLeague {
   currentWeekNumber?: number | null;
   weekAdvanceStatus?: string | null;
   maxRosterSize?: number | null;
+  /**
+   * Set when a free-tier downgrade froze this league (LS-5193). A frozen
+   * league is read-only until the owner re-upgrades — FBH-039: the row must
+   * warn before navigating in, since the destination league detail may only
+   * be partially usable.
+   */
   tierFrozenAt?: string | null;
   frozenAt?: string | null;
   /** The current user's permission level in this league (e.g. 'commissioner', 'general_manager'). */
@@ -183,113 +190,168 @@ interface LeagueRowProps {
 function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
   const statusColors = getDraftStatusColors(league.draftStatus);
   const statusLabel = getLeagueStatusLabel(league);
+  const isFrozen = !!league.tierFrozenAt;
+  const [showFrozenNotice, setShowFrozenNotice] = useState(false);
+
+  const handlePress = () => {
+    if (isFrozen) {
+      setShowFrozenNotice(true);
+      return;
+    }
+    onViewLeague(league.id);
+  };
+
   return (
-    <XStack
-      backgroundColor="$glassSurface"
-      borderRadius="$3"
-      padding="$3"
-      borderWidth={1}
-      borderColor="$glassBorder"
-      marginBottom="$2"
-      flexDirection="column"
-      alignItems="flex-start"
-      gap="$2"
-      cursor="pointer"
-      onPress={() => onViewLeague(league.id)}
-      accessibilityLabel={`View ${league.name ?? 'league'}`}
-      role="link"
-      testID={`football-league-row-${league.id}`}
-      pressStyle={{ opacity: 0.8, scale: 0.99 }}
-      // League rows stack name over badges on phones and lay out in
-      // a single centered row on wider viewports (LS-7819).
-      $gtSm={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}
-    >
-      <YStack gap="$1" flex={1} minWidth={160}>
-        <Text color="$color" fontSize="$6" fontWeight="600">
-          {league.name ?? 'Unnamed League'}
-        </Text>
-        {league.maxRosterSize ? (
-          <Text color="$gray10" fontSize="$2">
-            {league.maxRosterSize}-slot roster
+    <>
+      <XStack
+        backgroundColor="$glassSurface"
+        borderRadius="$3"
+        padding="$3"
+        borderWidth={1}
+        borderColor="$glassBorder"
+        marginBottom="$2"
+        flexDirection="column"
+        alignItems="flex-start"
+        gap="$2"
+        cursor="pointer"
+        onPress={handlePress}
+        accessibilityLabel={
+          isFrozen
+            ? `View ${league.name ?? 'league'} (read-only)`
+            : `View ${league.name ?? 'league'}`
+        }
+        role="link"
+        testID={`football-league-row-${league.id}`}
+        pressStyle={{ opacity: 0.8, scale: 0.99 }}
+        // League rows stack name over badges on phones and lay out in
+        // a single centered row on wider viewports (LS-7819).
+        $gtSm={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <YStack gap="$1" flex={1} minWidth={160}>
+          <Text color="$color" fontSize="$6" fontWeight="600">
+            {league.name ?? 'Unnamed League'}
           </Text>
-        ) : null}
-      </YStack>
-      <XStack gap="$2" flexWrap="wrap">
-        <YStack
-          backgroundColor="$glassSurface"
-          borderRadius="$3"
-          paddingHorizontal="$2"
-          paddingVertical="$1"
-          borderWidth={1}
-          borderColor="$glassBorder"
-        >
-          <Text
-            color="$orange9"
-            fontSize="$2"
-            fontWeight="700"
-            textTransform="uppercase"
-            letterSpacing={0.5}
-          >
-            Football
-          </Text>
+          {league.maxRosterSize ? (
+            <Text color="$gray10" fontSize="$2">
+              {league.maxRosterSize}-slot roster
+            </Text>
+          ) : null}
         </YStack>
-        {statusLabel ? (
+        <XStack gap="$2" flexWrap="wrap">
           <YStack
-            backgroundColor={statusColors.bg}
+            backgroundColor="$glassSurface"
             borderRadius="$3"
             paddingHorizontal="$2"
             paddingVertical="$1"
             borderWidth={1}
-            borderColor={statusColors.border}
+            borderColor="$glassBorder"
           >
             <Text
-              color={statusColors.text}
+              color="$orange9"
               fontSize="$2"
               fontWeight="700"
               textTransform="uppercase"
               letterSpacing={0.5}
             >
-              {statusLabel}
+              Football
             </Text>
           </YStack>
-        ) : null}
-        {(league.weekAdvanceStatus === 'processing' ||
-          league.weekAdvanceStatus === 'queued') && (
-          <YStack
-            backgroundColor="$yellow3"
-            borderRadius="$3"
-            paddingHorizontal="$2"
-            paddingVertical="$1"
-            borderWidth={1}
-            borderColor="$yellow7"
-            accessibilityLabel="League week advancing"
-          >
-            <Text color="$yellow11" fontSize="$2" fontWeight="600">
-              Advancing
-            </Text>
-          </YStack>
-        )}
-        {league.weekAdvanceStatus === 'failed' && (
-          <YStack
-            backgroundColor="$red3"
-            borderRadius="$3"
-            paddingHorizontal="$2"
-            paddingVertical="$1"
-            borderWidth={1}
-            borderColor="$red7"
-            accessibilityLabel="League week advance failed"
-          >
-            <Text color="$red11" fontSize="$2" fontWeight="600">
-              Advance failed
-            </Text>
-          </YStack>
-        )}
+          {isFrozen ? (
+            <YStack
+              backgroundColor="$gray3"
+              borderRadius="$3"
+              paddingHorizontal="$2"
+              paddingVertical="$1"
+              borderWidth={1}
+              borderColor="$gray7"
+            >
+              <Text
+                color="$gray11"
+                fontSize="$2"
+                fontWeight="700"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                Read-only
+              </Text>
+            </YStack>
+          ) : null}
+          {statusLabel ? (
+            <YStack
+              backgroundColor={statusColors.bg}
+              borderRadius="$3"
+              paddingHorizontal="$2"
+              paddingVertical="$1"
+              borderWidth={1}
+              borderColor={statusColors.border}
+            >
+              <Text
+                color={statusColors.text}
+                fontSize="$2"
+                fontWeight="700"
+                textTransform="uppercase"
+                letterSpacing={0.5}
+              >
+                {statusLabel}
+              </Text>
+            </YStack>
+          ) : null}
+          {(league.weekAdvanceStatus === 'processing' ||
+            league.weekAdvanceStatus === 'queued') && (
+            <YStack
+              backgroundColor="$yellow3"
+              borderRadius="$3"
+              paddingHorizontal="$2"
+              paddingVertical="$1"
+              borderWidth={1}
+              borderColor="$yellow7"
+              accessibilityLabel="League week advancing"
+            >
+              <Text color="$yellow11" fontSize="$2" fontWeight="600">
+                Advancing
+              </Text>
+            </YStack>
+          )}
+          {league.weekAdvanceStatus === 'failed' && (
+            <YStack
+              backgroundColor="$red3"
+              borderRadius="$3"
+              paddingHorizontal="$2"
+              paddingVertical="$1"
+              borderWidth={1}
+              borderColor="$red7"
+              accessibilityLabel="League week advance failed"
+            >
+              <Text color="$red11" fontSize="$2" fontWeight="600">
+                Advance failed
+              </Text>
+            </YStack>
+          )}
+        </XStack>
       </XStack>
-    </XStack>
+      {isFrozen ? (
+        <Dialog
+          open={showFrozenNotice}
+          onOpenChange={setShowFrozenNotice}
+          title="Read-only league"
+          // Not an XSS vector: Dialog renders `description` as a JSX text
+          // child (not dangerouslySetInnerHTML/innerHTML), so React/RN
+          // auto-escapes this interpolation.
+          description={`"${league.name ?? 'This league'}" is read-only — upgrade to reactivate it. You can still view it, but some actions may be unavailable.`}
+          confirmLabel="View anyway"
+          cancelLabel="Cancel"
+          onCancel={() => setShowFrozenNotice(false)}
+          onConfirm={() => {
+            setShowFrozenNotice(false);
+            onViewLeague(league.id);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

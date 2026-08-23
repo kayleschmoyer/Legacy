@@ -209,6 +209,115 @@ describe('NFLHome — leagues list virtualization (LS-6257)', () => {
   });
 });
 
+describe('NFLHome — frozen league navigation warning (LS-6293, FBH-039)', () => {
+  function makeFrozenLeague(): NFLHomeLeague {
+    return {
+      id: 1,
+      name: 'Frozen League',
+      draftStatus: 'completed',
+      currentWeekNumber: 4,
+      weekAdvanceStatus: null,
+      tierFrozenAt: '2026-08-01T00:00:00.000Z',
+    };
+  }
+
+  it('renders a Read-only badge on a frozen league row', () => {
+    render(
+      <NFLHome
+        leagues={[makeFrozenLeague()]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+
+    // A tierFrozenAt league is archived (LS-6262 / FBH-008), collapsed by
+    // default — expand it to reach the row.
+    fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+
+    expect(screen.getByText('Read-only')).toBeInTheDocument();
+  });
+
+  it('does not render the Read-only badge for an active league', () => {
+    const leagues = makeLeagues(1);
+    render(
+      <NFLHome leagues={leagues} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+
+    expect(screen.queryByText('Read-only')).not.toBeInTheDocument();
+  });
+
+  it('warns before navigating into a frozen league instead of navigating immediately', () => {
+    const onViewLeague = jest.fn();
+    render(
+      <NFLHome
+        leagues={[makeFrozenLeague()]}
+        onCreateLeague={noop}
+        onViewLeague={onViewLeague}
+      />,
+    );
+
+    // A tierFrozenAt league is archived (LS-6262 / FBH-008), collapsed by
+    // default — expand it to reach the row.
+    fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+    fireEvent.click(screen.getByTestId('football-league-row-1'));
+
+    expect(onViewLeague).not.toHaveBeenCalled();
+    expect(screen.getByText('Read-only league')).toBeInTheDocument();
+  });
+
+  it('navigates only after the user confirms "View anyway"', () => {
+    const onViewLeague = jest.fn();
+    render(
+      <NFLHome
+        leagues={[makeFrozenLeague()]}
+        onCreateLeague={noop}
+        onViewLeague={onViewLeague}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+    fireEvent.click(screen.getByTestId('football-league-row-1'));
+    fireEvent.click(screen.getByText('View anyway'));
+
+    expect(onViewLeague).toHaveBeenCalledWith(1);
+  });
+
+  it('does not navigate when the frozen-league warning is cancelled', () => {
+    const onViewLeague = jest.fn();
+    render(
+      <NFLHome
+        leagues={[makeFrozenLeague()]}
+        onCreateLeague={noop}
+        onViewLeague={onViewLeague}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+    fireEvent.click(screen.getByTestId('football-league-row-1'));
+    fireEvent.click(screen.getByText('Cancel'));
+
+    expect(onViewLeague).not.toHaveBeenCalled();
+    expect(screen.queryByText('Read-only league')).not.toBeInTheDocument();
+  });
+
+  it('does not warn for an active (non-frozen) league row', () => {
+    const leagues = makeLeagues(1);
+    const onViewLeague = jest.fn();
+    render(
+      <NFLHome
+        leagues={leagues}
+        onCreateLeague={noop}
+        onViewLeague={onViewLeague}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('football-league-row-1'));
+
+    expect(onViewLeague).toHaveBeenCalledWith(1);
+    expect(screen.queryByText('Read-only league')).not.toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — CTA copy consistency (LS-6268, FBH-014)', () => {
   // Native, web full hero, and web compact hero all render through this one
   // shared hero — there is no separate compact variant to diverge from "Create
