@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { render, screen, within } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import * as graphqlLib from '@legacy-sports/graphql';
@@ -139,5 +139,69 @@ describe('FootballLeagueRosterScreen', () => {
   it('renders player name in roster', () => {
     render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
     expect(screen.getByText('Josh Allen')).toBeTruthy();
+  });
+
+  it('groups a member by assigned positionId, not by first eligible position', () => {
+    const wrInFlex = {
+      id: 201,
+      playerId: 2,
+      positionId: 55,
+      player: {
+        id: 2,
+        firstName: 'CeeDee',
+        lastName: 'Lamb',
+        eligiblePositions: ['WR'],
+      },
+    };
+    jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+      data: { teamMembers: [wrInFlex] },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+
+    render(
+      <FootballLeagueRosterScreen
+        teamId={1}
+        defensiveFormat="dst"
+        rosterSlots={[{ id: 55, leagueId: 1, positionType: 'FLEX' }]}
+      />,
+    );
+
+    const flexCard = screen.getByTestId('flex-card');
+    expect(within(flexCard).getByText('CeeDee Lamb')).toBeTruthy();
+    const wrCard = screen.getByTestId('wr-card');
+    expect(within(wrCard).queryByText('CeeDee Lamb')).toBeNull();
+  });
+
+  it('benches a member with positionId=null even when eligible at a starting slot', () => {
+    const benchedQb = {
+      id: 202,
+      playerId: 3,
+      positionId: null,
+      player: {
+        id: 3,
+        firstName: 'Bench',
+        lastName: 'Guy',
+        eligiblePositions: ['QB'],
+      },
+    };
+    jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+      data: { teamMembers: [benchedQb] },
+      loading: false,
+      error: undefined,
+    } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+
+    render(
+      <FootballLeagueRosterScreen
+        teamId={1}
+        defensiveFormat="dst"
+        rosterSlots={[{ id: 9, leagueId: 1, positionType: 'QB' }]}
+      />,
+    );
+
+    const bnCard = screen.getByTestId('bn-card');
+    expect(within(bnCard).getByText('Bench Guy')).toBeTruthy();
+    const qbCard = screen.getByTestId('qb-card');
+    expect(within(qbCard).queryByText('Bench Guy')).toBeNull();
   });
 });

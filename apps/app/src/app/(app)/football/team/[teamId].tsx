@@ -246,6 +246,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
         <FootballLeagueRosterScreen
           teamId={teamId}
           defensiveFormat={defensiveFormat}
+          rosterSlots={rosterSlots}
         />
       );
     case 'Matchup':

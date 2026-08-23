@@ -11,6 +11,7 @@ import {
 import { LOGGER } from '@legacy-sports/logging';
 import {
   type GetTeamMembersQuery,
+  type LeaguePositionFragment,
   useGetTeamMembersQuery,
 } from '@legacy-sports/graphql';
 
@@ -59,6 +60,23 @@ const SLOT_LABELS: Record<string, string> = {
 interface FootballLeagueRosterScreenProps {
   readonly teamId: number;
   readonly defensiveFormat?: string | null;
+  readonly rosterSlots?: readonly (LeaguePositionFragment | null)[];
+}
+
+/**
+ * Builds a lookup from a league's roster-slot id to its position type (e.g. 'QB', 'FLEX').
+ * Used to resolve a team member's assigned `positionId` to a display slot.
+ */
+function buildPositionIdToSlot(
+  rosterSlots: readonly (LeaguePositionFragment | null)[],
+): Map<number, string> {
+  const map = new Map<number, string>();
+  for (const slot of rosterSlots) {
+    if (slot?.id != null && slot.positionType) {
+      map.set(slot.id, slot.positionType);
+    }
+  }
+  return map;
 }
 
 /**
@@ -105,11 +123,16 @@ export function getPositionBadge(member: Pick<TeamMember, 'player'>): string {
 export function FootballLeagueRosterScreen(
   props: FootballLeagueRosterScreenProps,
 ): React.JSX.Element {
-  const { teamId, defensiveFormat } = props;
+  const { teamId, defensiveFormat, rosterSlots = [] } = props;
 
   const { data, loading, error } = useGetTeamMembersQuery({
     variables: { teamId },
   });
+
+  const positionIdToSlot = useMemo(
+    () => buildPositionIdToSlot(rosterSlots),
+    [rosterSlots],
+  );
 
   useEffect(() => {
     if (error) {
@@ -128,22 +151,20 @@ export function FootballLeagueRosterScreen(
     for (const slot of slotOrder) groups[slot] = [];
 
     for (const member of members) {
-      const positions = member.player?.eligiblePositions ?? [];
-      let assigned = false;
-      for (const slot of slotOrder) {
-        if (slot !== 'BN' && positions.includes(slot)) {
-          groups[slot]?.push(member);
-          assigned = true;
-          break;
-        }
-      }
-      if (!assigned) {
+      const assignedSlot =
+        member.positionId != null
+          ? positionIdToSlot.get(member.positionId)
+          : undefined;
+
+      if (assignedSlot && groups[assignedSlot]) {
+        groups[assignedSlot]?.push(member);
+      } else {
         groups['BN']?.push(member);
       }
     }
 
     return groups;
-  }, [data, slotOrder]);
+  }, [data, slotOrder, positionIdToSlot]);
 
   if (error) {
     return (
@@ -180,6 +201,7 @@ export function FootballLeagueRosterScreen(
           return (
             <Card
               key={slot}
+              testID={`${slot.toLowerCase()}-card`}
               bordered
               backgroundColor="$background"
               borderRadius="$4"

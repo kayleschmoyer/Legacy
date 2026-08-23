@@ -100,11 +100,17 @@ jest.mock(
       FootballLeagueRosterScreen: ({
         teamId,
         defensiveFormat,
+        rosterSlots,
       }: {
         teamId: number;
         defensiveFormat?: string | null;
+        rosterSlots?: readonly unknown[];
       }) => (
-        <View testID={`roster-screen-${teamId}-${defensiveFormat ?? 'dst'}`} />
+        <View
+          testID={`roster-screen-${teamId}-${defensiveFormat ?? 'dst'}-slots-${
+            rosterSlots?.length ?? 0
+          }`}
+        />
       ),
     };
   },
@@ -476,7 +482,21 @@ describe('FootballTeam route', () => {
 
   it('shows roster screen on Roster tab by default', () => {
     render(<FootballTeam />);
-    expect(screen.getByTestId('roster-screen-42-dst')).toBeTruthy();
+    expect(screen.getByTestId('roster-screen-42-dst-slots-1')).toBeTruthy();
+  });
+
+  it('passes rosterSlots (league positions) to FootballLeagueRosterScreen', () => {
+    mockUseGetPositionsForLeagueQuery.mockReturnValue({
+      loading: false,
+      data: {
+        leaguePositions: [
+          { id: 1, leagueId: 10, positionType: 'QB' },
+          { id: 2, leagueId: 10, positionType: 'FLEX' },
+        ],
+      },
+    });
+    render(<FootballTeam />);
+    expect(screen.getByTestId('roster-screen-42-dst-slots-2')).toBeTruthy();
   });
 
   it('renders the shared RosterBoard for football on the Lineup tab', () => {
@@ -575,7 +595,7 @@ describe('FootballTeam route', () => {
       data: { league: { ...mockLeague, defensiveFormat: 'idp' } },
     });
     render(<FootballTeam />);
-    expect(screen.getByTestId('roster-screen-42-idp')).toBeTruthy();
+    expect(screen.getByTestId('roster-screen-42-idp-slots-1')).toBeTruthy();
   });
 
   it('shows the current matchup card when the Matchup tab is selected', () => {
