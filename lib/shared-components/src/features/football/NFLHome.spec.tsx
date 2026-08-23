@@ -331,6 +331,44 @@ describe('NFLHome — league-cap indicator (LS-8928)', () => {
   });
 });
 
+describe('NFLHome — unlimited-leagues badge (LS-6270/FBH-016)', () => {
+  it('omits the badge when hasUnlimitedLeagues is not provided', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(
+      screen.queryByTestId('football-unlimited-leagues-badge'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('omits the badge when hasUnlimitedLeagues is false', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        hasUnlimitedLeagues={false}
+      />,
+    );
+    expect(
+      screen.queryByTestId('football-unlimited-leagues-badge'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the badge near the Create CTA when hasUnlimitedLeagues is true', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        hasUnlimitedLeagues
+      />,
+    );
+    expect(
+      screen.getByTestId('football-unlimited-leagues-badge'),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Unlimited leagues unlocked/)).toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — Join League CTA (LS-6288)', () => {
   it('does not render the Join League CTA when onJoinLeague is omitted', () => {
     render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);

@@ -109,7 +109,16 @@ test.describe('Home standings lazy-load @critical', () => {
 
   test('shows an em dash, never a fabricated 0-0, until standings arrive', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    // The "· Overall 6-2" aggregate only renders in GreetingHeader, which is
+    // used by the wide-viewport dashboard branch; the narrow ("Scoreboard
+    // First") branch renders GreetingRow instead and has no aggregate stat
+    // (HomeScreen.tsx isNarrow branch, LS-8794/LS-9055) — so it never appears
+    // on the mobile projects (LS-9493).
+    const isNarrowProject =
+      testInfo.project.name === 'Mobile Chrome' ||
+      testInfo.project.name === 'Mobile Safari';
+
     await page.goto('/');
     const heroCard = page.getByTestId('home-hero-card');
     await expect(page.getByText('Iron Glove Dynasty')).toBeVisible();
@@ -125,7 +134,9 @@ test.describe('Home standings lazy-load @critical', () => {
     await expect(heroCard.getByText('6-2')).toBeVisible({
       timeout: STANDINGS_DELAY_MS + 5000,
     });
-    await expect(page.getByText('· Overall 6-2')).toBeVisible();
+    if (!isNarrowProject) {
+      await expect(page.getByText('· Overall 6-2')).toBeVisible();
+    }
     await expect(page.getByText('Rank #1')).toBeVisible();
     await expect(page.getByText('0-0')).toHaveCount(0);
   });

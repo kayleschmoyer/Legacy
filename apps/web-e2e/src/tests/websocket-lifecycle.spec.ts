@@ -155,8 +155,16 @@ test.describe('WebSocket lifecycle — disabled URL (LS-7625) @regression', () =
     await leaguePage.gotoDetail(LEAGUE_ID, 'overview');
 
     // The page must load fully (settling signal) and not crash.
+    // Scoped to the page's `league-title` heading rather than a bare
+    // `getByText(name)` — the nav bar mounts a desktop AND a mobile
+    // `LeagueSwitcherChip` simultaneously (toggled via CSS `display`, not
+    // conditional render), each rendering the league name as text. On a
+    // mobile viewport `getByText(name).first()` resolves the CSS-hidden
+    // desktop chip's copy in DOM order and fails `.toBeVisible()` (LS-9494).
+    // See LS-3728 for the same collision fixed elsewhere via this pattern.
     await expect(page).toHaveURL(new RegExp(`/baseball/league/${LEAGUE_ID}`));
-    await expect(page.getByText(MOCK_LEAGUE.name).first()).toBeVisible();
+    await leaguePage.leagueTitle.expectVisible();
+    await leaguePage.leagueTitle.expectContainsText(MOCK_LEAGUE.name);
     await leaguePage.expectNoAppError();
 
     // No socket should have been opened — the disabled/misconfigured path.

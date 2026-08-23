@@ -151,6 +151,7 @@ export default function FootballHomeScreen({
             }
           : undefined
       }
+      hasUnlimitedLeagues={!subscriptionLoading && isPremium}
     />
   );
 }

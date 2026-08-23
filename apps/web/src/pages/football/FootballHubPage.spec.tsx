@@ -303,6 +303,40 @@ describe('FootballHubPage — league-cap indicator wiring (LS-8928)', () => {
   });
 });
 
+describe('FootballHubPage — unlimited-leagues badge wiring (LS-6270/FBH-016)', () => {
+  it('passes hasUnlimitedLeagues=true for a signed-in premium user', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: false,
+    });
+    setLeagues(leaguesOfCount(5));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].hasUnlimitedLeagues).toBe(true);
+  });
+
+  it('passes hasUnlimitedLeagues=false for a free user', () => {
+    setLeagues(leaguesOfCount(2));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].hasUnlimitedLeagues).toBe(false);
+  });
+
+  it('passes hasUnlimitedLeagues=false while premium status is still resolving', () => {
+    mockUseIsPremiumStatus.mockReturnValue({
+      isPremium: true,
+      isLoading: true,
+    });
+    setLeagues(leaguesOfCount(2));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].hasUnlimitedLeagues).toBe(false);
+  });
+});
+
 describe('FootballHubPage — null-sport league handling (FBH-001)', () => {
   it('includes null-sport (legacy/un-migrated) leagues alongside football leagues', () => {
     setLeagues([

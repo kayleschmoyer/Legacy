@@ -116,6 +116,14 @@ export interface NFLHomeProps {
   refreshControl?: React.ReactElement<RefreshControlProps>;
   /** Free-tier league-cap context (LS-8928). Mirrors `MLBHome`'s `leagueCap`. */
   leagueCap?: NFLHomeLeagueCap;
+  /**
+   * True for premium users, who have no league-creation cap. Surfaces a
+   * subtle "Unlimited leagues unlocked" badge near the Create CTA so premium
+   * users get positive reinforcement of the benefit they're already paying
+   * for, mirroring the free-tier `leagueCap` indicator (LS-6270/FBH-016).
+   * Omit/false to hide.
+   */
+  hasUnlimitedLeagues?: boolean;
 }
 
 function getLeagueStatusLabel(league: NFLHomeLeague): string {
@@ -386,6 +394,7 @@ function NFLHome({
   onSwitchSport,
   refreshControl,
   leagueCap,
+  hasUnlimitedLeagues = false,
 }: NFLHomeProps) {
   const hasLeagues = leagues.length > 0;
 
@@ -518,6 +527,29 @@ function NFLHome({
                 </Button>
               )}
             </XStack>
+            {/* Premium unlimited-leagues badge: positive reinforcement of the
+                benefit next to the Create CTA, mirroring the free-tier
+                leagueCap indicator further down the page (LS-6270/FBH-016). */}
+            {hasUnlimitedLeagues ? (
+              <XStack
+                alignItems="center"
+                testID="football-unlimited-leagues-badge"
+              >
+                <Text
+                  backgroundColor="$green3"
+                  color="$green11"
+                  fontSize="$2"
+                  fontWeight="700"
+                  borderRadius="$10"
+                  paddingHorizontal="$3"
+                  paddingVertical="$1.5"
+                  accessibilityLabel="Unlimited leagues unlocked"
+                  aria-label="Unlimited leagues unlocked"
+                >
+                  ✓ Unlimited leagues unlocked
+                </Text>
+              </XStack>
+            ) : null}
           </YStack>
 
           {/* Getting-started side panel: full-width above the copy on phones,

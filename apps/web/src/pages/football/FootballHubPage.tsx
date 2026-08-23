@@ -148,6 +148,7 @@ export function FootballHubPage() {
           onSwitchSport={(sport) => navigate(`/${sport}`)}
           onSignIn={() => navigate('/')}
           leagueCap={leagueCap}
+          hasUnlimitedLeagues={!!auth?.user && !premiumLoading && isPremium}
         />
       </div>
       <UpgradeModal

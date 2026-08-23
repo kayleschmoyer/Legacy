@@ -59,6 +59,7 @@ jest.mock('@legacy-sports/shared-components/football', () => {
         atLimit: boolean;
         onUpgrade: () => void;
       };
+      hasUnlimitedLeagues?: boolean;
     }) => {
       capturedRefreshControl = props.refreshControl ?? null;
       return (
@@ -68,6 +69,7 @@ jest.mock('@legacy-sports/shared-components/football', () => {
           <Text>{`error:${String(props.error)}`}</Text>
           <Text>{`isAuthenticated:${String(props.isAuthenticated)}`}</Text>
           <Text>{`leagueCap:${props.leagueCap ? `${props.leagueCap.count}/${props.leagueCap.limit}:${props.leagueCap.atLimit}` : 'undefined'}`}</Text>
+          <Text>{`hasUnlimitedLeagues:${String(props.hasUnlimitedLeagues)}`}</Text>
           <Pressable
             testID="league-cap-upgrade"
             onPress={() => props.leagueCap?.onUpgrade()}
@@ -488,6 +490,25 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       expect(mockTrackPremiumFeatureClick).toHaveBeenCalledWith(
         'Unlimited Leagues',
       );
+    });
+  });
+
+  describe('unlimited-leagues badge wiring (LS-6270/FBH-016)', () => {
+    it('passes hasUnlimitedLeagues=true for a premium user', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: true, loading: false });
+      render(<FootballHomeScreen />);
+      expect(screen.getByText('hasUnlimitedLeagues:true')).toBeTruthy();
+    });
+
+    it('passes hasUnlimitedLeagues=false for a free user', () => {
+      render(<FootballHomeScreen />);
+      expect(screen.getByText('hasUnlimitedLeagues:false')).toBeTruthy();
+    });
+
+    it('passes hasUnlimitedLeagues=false while subscription status is still resolving', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: true, loading: true });
+      render(<FootballHomeScreen />);
+      expect(screen.getByText('hasUnlimitedLeagues:false')).toBeTruthy();
     });
   });
 
