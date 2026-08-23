@@ -2,17 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Share } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Button, H3, ScrollView, Spinner, Text, YStack } from 'tamagui';
-import {
-  MLBHome,
-  type QuickCreateLeagueInput,
-} from '@legacy-sports/shared-components/baseball';
+import { MLBHome } from '@legacy-sports/shared-components/baseball';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
-import {
-  Sport,
-  useCreateLeagueMutation,
-  useGetMyLeaguesQuery,
-} from '@legacy-sports/graphql';
+import { Sport, useGetMyLeaguesQuery } from '@legacy-sports/graphql';
 import { useAuthorizedUserInfo } from '../common/auth/AuthorizedUserContext';
 import { usePullToRefresh } from '../common/hooks/usePullToRefresh';
 import { useSubscription } from '../features/subscription/useSubscription';
@@ -79,8 +72,6 @@ export default function BaseballHomeScreen({
   });
 
   const { refreshControl } = usePullToRefresh([() => refetchLeagues()]);
-
-  const [createLeague] = useCreateLeagueMutation();
 
   const { isPremium, loading: subscriptionLoading } = useSubscription();
 
@@ -176,38 +167,17 @@ export default function BaseballHomeScreen({
   const atFreeLeagueLimit =
     showLeagueCap && activeLeagueCount >= FREE_TIER_LEAGUE_LIMIT;
 
-  const handleCreateLeague = async (input: QuickCreateLeagueInput) => {
+  // Push to the full-screen create wizard rather than opening MLBHome's
+  // in-place quick-create dialog — matches NFLHome's push-route pattern for a
+  // real back stack (LS-6269 / FBH-015). The wizard (`/league/create`) owns
+  // the create mutation itself, same as the football flow.
+  const handleCreatePress = useCallback(() => {
     if (atFreeLeagueLimit) {
       goToUpgrade();
       return;
     }
-    const result = await createLeague({
-      variables: {
-        input: {
-          leagueName: input.leagueName,
-          numberOfTeams: input.numberOfTeams,
-          numberOfDivisions: input.numberOfDivisions,
-          playerPool: input.playerPool,
-          draftMode: input.draftMode,
-          selectionMethod: input.selectionMethod,
-          draftOrder: input.draftOrder,
-          maxRosterSize: input.maxRosterSize,
-          isPublic: input.isPublic,
-          tradingEnabled: true,
-          waiverEnabled: true,
-        },
-      },
-    });
-    const id = result.data?.createLeagueAndTeams?.league?.id;
-    if (id != null) {
-      router.push({
-        pathname: '/baseball/league/[leagueId]',
-        params: { leagueId: id },
-      });
-      return;
-    }
-    throw new Error('Failed to create league. Please try again.');
-  };
+    router.push('/baseball/league/create');
+  }, [atFreeLeagueLimit, goToUpgrade, router]);
 
   return (
     <>
@@ -224,7 +194,7 @@ export default function BaseballHomeScreen({
         isAuthenticated={isAuthenticated}
         onSignIn={() => router.navigate('/login')}
         userName={userInfo?.username ?? 'Manager'}
-        onCreateLeague={handleCreateLeague}
+        onCreatePress={handleCreatePress}
         onAdvancedCreate={(leagueName) => {
           const params = leagueName.trim()
             ? `?name=${encodeURIComponent(leagueName.trim())}`

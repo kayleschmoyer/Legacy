@@ -77,9 +77,18 @@ export interface MLBHomeProps {
   /**
    * Create a league from the quick-create dialog. Resolving closes the dialog;
    * rejecting surfaces the error inline. This is the only data-bound callback —
-   * the component itself performs no fetching (LS-7716, AC1).
+   * the component itself performs no fetching (LS-7716, AC1). Required unless
+   * `onCreatePress` is supplied, since that prop takes over the "Create" CTAs
+   * entirely and the in-place dialog never opens.
    */
-  onCreateLeague: (input: QuickCreateLeagueInput) => Promise<void>;
+  onCreateLeague?: (input: QuickCreateLeagueInput) => Promise<void>;
+  /**
+   * When provided, every "Create" CTA calls this directly instead of opening
+   * the in-place quick-create dialog (LS-6269 / FBH-015) — e.g. to push to a
+   * full-screen create route for parity with `NFLHome`'s accessible back-stack
+   * navigation. Omit to keep the default in-place dialog behavior.
+   */
+  onCreatePress?: () => void;
   onJoinLeague: () => void;
   onMockDraft?: () => void;
   /** Called when the free-tier "Unlimited with Premium" mock-draft upsell link is pressed. */
@@ -278,6 +287,7 @@ export function MLBHome({
   userName = 'Manager',
   isAuthenticated = true,
   onCreateLeague,
+  onCreatePress,
   onJoinLeague,
   onMockDraft,
   onMockDraftUpgrade,
@@ -394,6 +404,10 @@ export function MLBHome({
   const handleCreatePress = () => {
     if (atCap) {
       leagueCap?.onUpgrade();
+      return;
+    }
+    if (onCreatePress) {
+      onCreatePress();
       return;
     }
     setShowCreateDialog(true);
@@ -1382,14 +1396,24 @@ export function MLBHome({
         </YStack>
       </YStack>
 
-      <CreateLeagueDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        onSubmit={onCreateLeague}
-        onAdvanced={onAdvancedCreate}
-        isPremium={isPremium}
-        onUpgrade={onUpgrade}
-      />
+      {onCreatePress ? null : (
+        <CreateLeagueDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          onSubmit={
+            onCreateLeague ??
+            (() =>
+              Promise.reject(
+                new Error(
+                  'MLBHome: onCreateLeague is required when onCreatePress is not provided',
+                ),
+              ))
+          }
+          onAdvanced={onAdvancedCreate}
+          isPremium={isPremium}
+          onUpgrade={onUpgrade}
+        />
+      )}
     </ScrollView>
   );
 }

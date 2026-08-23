@@ -87,7 +87,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
         atLimit: boolean;
         onUpgrade: () => void;
       };
-      onCreateLeague: (input: unknown) => Promise<void>;
+      onCreatePress?: () => void;
       onJoinLeague: () => void;
       onMockDraft?: () => void;
       onViewLeague: (id: number) => void;
@@ -150,22 +150,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
           >
             <Text>browse-players</Text>
           </Pressable>
-          <Pressable
-            testID="create"
-            onPress={() =>
-              void props.onCreateLeague({
-                leagueName: 'My League',
-                numberOfTeams: 8,
-                numberOfDivisions: 2,
-                playerPool: 'all',
-                draftMode: 'live',
-                selectionMethod: 'standard',
-                draftOrder: 'snake',
-                maxRosterSize: 25,
-                isPublic: false,
-              })
-            }
-          >
+          <Pressable testID="create" onPress={() => props.onCreatePress?.()}>
             <Text>create</Text>
           </Pressable>
         </View>
@@ -190,13 +175,11 @@ const mockUseGetMyLeaguesQuery: jest.MockedFunction<
     refetch?: jest.Mock;
   }
 > = jest.fn();
-const mockCreateLeague = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   useGetMyLeaguesQuery: (options?: {
     variables?: { sport?: string };
     skip?: boolean;
   }) => mockUseGetMyLeaguesQuery(options),
-  useCreateLeagueMutation: () => [mockCreateLeague, { loading: false }],
   Sport: { Baseball: 'baseball', Football: 'football' },
 }));
 
@@ -248,9 +231,6 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
       refetch: mockRefetch,
     });
     mockUseSubscription.mockReturnValue({ isPremium: false, loading: false });
-    mockCreateLeague.mockResolvedValue({
-      data: { createLeagueAndTeams: { league: { id: 99 } } },
-    });
   });
 
   it('maps query leagues into MLBHome', () => {
@@ -413,27 +393,16 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
       await waitFor(() =>
         expect(mockNavigate).toHaveBeenCalledWith('subscription-settings'),
       );
-      expect(mockCreateLeague).not.toHaveBeenCalled();
+      expect(mockPush).not.toHaveBeenCalledWith('/baseball/league/create');
     });
 
-    it('runs the create mutation and navigates to the new league', async () => {
+    // LS-6269 / FBH-015 — Baseball Home now pushes to the full-screen create
+    // wizard instead of opening MLBHome's in-place quick-create dialog,
+    // matching Football Home's push-route pattern.
+    it('pushes to the create wizard instead of opening the in-place dialog', () => {
       render(<BaseballHomeScreen />);
       fireEvent.press(screen.getByTestId('create'));
-      expect(mockCreateLeague).toHaveBeenCalledTimes(1);
-      const [firstCall] = mockCreateLeague.mock.calls as [
-        [{ variables: { input: Record<string, unknown> } }],
-      ];
-      expect(firstCall[0].variables.input).toMatchObject({
-        leagueName: 'My League',
-        tradingEnabled: true,
-        waiverEnabled: true,
-      });
-      await waitFor(() =>
-        expect(mockPush).toHaveBeenCalledWith({
-          pathname: '/baseball/league/[leagueId]',
-          params: { leagueId: 99 },
-        }),
-      );
+      expect(mockPush).toHaveBeenCalledWith('/baseball/league/create');
     });
 
     it('navigates to the advanced LeagueCreatePage when onAdvancedCreate is called (LS-5818)', () => {
