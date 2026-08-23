@@ -13,6 +13,7 @@ let mockLeague: unknown;
 let mockTeamMembers: unknown;
 let mockClaim: jest.Mock;
 let mockSearchParams: { leagueId?: string };
+let mockUserTeamId: number | null;
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
@@ -44,7 +45,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   }),
   useGetLeagueByIdQuery: () => ({ data: mockLeague }),
   useGetTeamMembersQuery: () => ({ data: mockTeamMembers }),
-  useGetUserTeamIdQuery: () => ({ data: { userTeamId: 42 } }),
+  useGetUserTeamIdQuery: () => ({ data: { userTeamId: mockUserTeamId } }),
   useClaimFreeAgentMutation: () => [mockClaim, { loading: false }],
 }));
 
@@ -53,30 +54,38 @@ jest.mock('@legacy-sports/graphql', () => ({
 // claim cluster so the FAAB claim-flow logic in the wrapper is exercised. The
 // tab only renders the claim action for a member on a team, mirroring the real
 // component's gating.
-jest.mock('@legacy-sports/shared-components', () => ({
-  LeagueDetailFreeAgentsTab: ({
-    renderClaimAction,
-    myTeamId,
-    isMember,
-  }: {
-    renderClaimAction?: (p: {
-      id: number;
-      firstName?: string | null;
-      lastName?: string | null;
-      eligiblePositions?: string[] | null;
-    }) => React.ReactNode;
-    myTeamId: number | null;
-    isMember: boolean;
-  }) =>
-    isMember && myTeamId != null && renderClaimAction
-      ? renderClaimAction({
-          id: 99,
-          firstName: 'Mike',
-          lastName: 'Trout',
-          eligiblePositions: ['OF'],
-        })
-      : null,
-}));
+jest.mock('@legacy-sports/shared-components', () => {
+  const { Text } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    LeagueDetailFreeAgentsTab: ({
+      renderClaimAction,
+      myTeamId,
+      isMember,
+    }: {
+      renderClaimAction?: (p: {
+        id: number;
+        firstName?: string | null;
+        lastName?: string | null;
+        eligiblePositions?: string[] | null;
+      }) => React.ReactNode;
+      myTeamId: number | null;
+      isMember: boolean;
+    }) => (
+      <>
+        <Text testID="is-member">{String(isMember)}</Text>
+        {isMember && myTeamId != null && renderClaimAction
+          ? renderClaimAction({
+              id: 99,
+              firstName: 'Mike',
+              lastName: 'Trout',
+              eligiblePositions: ['OF'],
+            })
+          : null}
+      </>
+    ),
+  };
+});
 
 jest.mock('tamagui', () => {
   const { View, Text, TextInput, Pressable } =
@@ -176,6 +185,7 @@ beforeEach(() => {
   mockTeamMembers = { teamMembers: [] };
   mockClaim = jest.fn();
   mockSearchParams = {};
+  mockUserTeamId = 42;
   jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
 });
 
@@ -327,6 +337,64 @@ describe('FreeAgentsScreen — FAAB waiver bidding', () => {
     expect(mockClaim).toHaveBeenCalledWith({
       variables: { leagueId: 1, playerId: 99, faabBid: undefined },
     });
+  });
+});
+
+describe('FreeAgentsScreen — membership gate (LS-6310 / FLD-027)', () => {
+  beforeEach(() => {
+    mockUserLeagues = { userLeagues: [{ id: 1, name: 'Test League' }] };
+  });
+
+  it('does not treat a spectator (no team, not the owner) as a member', () => {
+    mockLeague = {
+      league: {
+        id: 1,
+        owner: 2,
+        waiverEnabled: true,
+        waiverType: 'standard',
+        maxRosterSize: 10,
+      },
+    };
+    mockUserTeamId = null;
+    render(<FreeAgentsScreen />);
+    selectLeague();
+
+    expect(screen.getByTestId('is-member')).toHaveTextContent('false');
+    expect(screen.queryByText('Claim')).toBeNull();
+  });
+
+  it('treats the league owner as a member even without a team', () => {
+    mockLeague = {
+      league: {
+        id: 1,
+        owner: 1,
+        waiverEnabled: true,
+        waiverType: 'standard',
+        maxRosterSize: 10,
+      },
+    };
+    mockUserTeamId = null;
+    render(<FreeAgentsScreen />);
+    selectLeague();
+
+    expect(screen.getByTestId('is-member')).toHaveTextContent('true');
+  });
+
+  it('treats a rostered team member as a member', () => {
+    mockLeague = {
+      league: {
+        id: 1,
+        owner: 2,
+        waiverEnabled: true,
+        waiverType: 'standard',
+        maxRosterSize: 10,
+      },
+    };
+    mockUserTeamId = 42;
+    render(<FreeAgentsScreen />);
+    selectLeague();
+
+    expect(screen.getByTestId('is-member')).toHaveTextContent('true');
   });
 });
 

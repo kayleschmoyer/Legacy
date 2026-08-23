@@ -37,6 +37,8 @@ export function LeagueFreeAgents({ leagueId }: { leagueId: number }) {
   const [claimingPlayerId, setClaimingPlayerId] = useState<number | null>(null);
   const [faabBid, setFaabBid] = useState('');
 
+  const userInfo = useAuthorizedUserInfo();
+
   const { data: teamData } = useGetUserTeamIdQuery({
     variables: { leagueId },
   });
@@ -46,6 +48,18 @@ export function LeagueFreeAgents({ leagueId }: { leagueId: number }) {
     variables: { id: leagueId },
   });
   const league = leagueData?.league;
+
+  // Membership gate (LS-6310 / FLD-027): claim CTAs must only render for a
+  // viewer who is actually in the league, not unconditionally. Mirrors the
+  // isCommissioner/isMember derivation used by the league-detail screens
+  // (e.g. apps/app/src/app/(app)/football/league/[leagueId].tsx).
+  const isCommissioner = !!(
+    userInfo &&
+    league &&
+    (league.owner === userInfo.id || userInfo.isAdmin)
+  );
+  const isMember = isCommissioner || userTeamId != null;
+
   const waiverEnabled = league?.waiverEnabled ?? false;
   const maxRosterSize = league?.maxRosterSize ?? Infinity;
   // FAAB (Free Agent Acquisition Budget) leagues require a bid amount on every
@@ -229,7 +243,7 @@ export function LeagueFreeAgents({ leagueId }: { leagueId: number }) {
           gamesPerMatchup: league?.gamesPerMatchup,
           defensiveFormat: league?.defensiveFormat,
         }}
-        isMember
+        isMember={isMember}
         myTeamId={userTeamId}
         renderClaimAction={renderClaimAction}
       />
