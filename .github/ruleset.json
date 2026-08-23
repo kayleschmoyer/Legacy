@@ -45,7 +45,8 @@
             "context": "bot-review"
           },
           {
-            "_comment": "Fails if the PR branch has merge conflicts with the base branch (check-conflicts.yml).",
+            "_comment": "Fails if the PR branch has merge conflicts with the base branch. Posted as a commit status (LS-9604) by check-conflicts.yml and check-conflicts-sweep.yml — not a check run, so it cannot accrue the cancelled-duplicate-name pile-up that a concurrency-cancelled check-run can (the same rationale as bot-review/CI Gate below). Not a check-run: no matching workflow job name.",
+            "_commitStatus": true,
             "context": "No Merge Conflicts"
           },
           {

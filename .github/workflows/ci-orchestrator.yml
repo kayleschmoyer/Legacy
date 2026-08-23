@@ -345,9 +345,9 @@ jobs:
       # bot re-approval — the only events that reach this guard, since the
       # workflow fires on `submitted` + `state == approved`) must not spawn a
       # duplicate pipeline or let a flaky re-run flip a green CI Gate status.
-      # Post-LS-8014 the required set mixes check-RUN contexts (No Merge
-      # Conflicts, Verify All Migrations Applied) and commit-STATUS contexts
-      # (bot-review, CI Gate — marked _commitStatus in ruleset.json), so the
+      # The required set mixes a check-RUN context (Verify All Migrations
+      # Applied) and commit-STATUS contexts (bot-review, No Merge Conflicts
+      # since LS-9604, CI Gate — marked _commitStatus in ruleset.json), so the
       # guard evaluates each kind against its own API. Fail-safe direction: on
       # any read error or doubt, re-run CI.
       #
@@ -402,9 +402,9 @@ jobs:
 
             // Load required contexts dynamically from .github/ruleset.json so this
             // guard stays automatically in sync with branch protection config.
-            // Post-LS-8014 the required set mixes check-RUN contexts and
-            // commit-STATUS contexts (marked _commitStatus); each kind is
-            // evaluated against its own API below. An empty set is tolerated
+            // The required set mixes check-RUN contexts and commit-STATUS
+            // contexts (marked _commitStatus); each kind is evaluated against
+            // its own API below. An empty set is tolerated
             // without throwing (fail-safe: run CI). If the file cannot be read
             // or parsed, CI always runs (fail-safe).
             let checkRunContexts = [];

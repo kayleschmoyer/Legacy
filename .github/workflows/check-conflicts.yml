@@ -6,8 +6,16 @@ name: "Check Merge Conflicts"
 # GitHub's lazy mergeability API (which used to leave PRs with a stuck
 # "Mergeability could not be determined" failure — LS-4479).
 #
-# The "No Merge Conflicts" job name is registered as a required status check
-# in .github/ruleset.json. Apply changes with scripts/apply-ruleset.sh.
+# The "No Merge Conflicts" required status check (.github/ruleset.json) is
+# posted as a commit status (LS-9604), not this job's own check-run — mirrors
+# `bot-review`/`CI Gate`. This job's check-run (name below) is informational
+# only. WHY: `concurrency: cancel-in-progress` + firing on every push means a
+# rapid succession of pushes spawns a new check-run per push and cancels the
+# prior one; GitHub's merge-API evaluator can require every same-named run on
+# a SHA to resolve, so cancelled/superseded runs pile up as permanently
+# "expected" (duplicate rows in the merge box). A commit status is immune —
+# GitHub evaluates only the latest status per context. Apply ruleset changes
+# with scripts/apply-ruleset.sh.
 
 on:
   pull_request:
@@ -16,9 +24,10 @@ on:
     # 'edited'-triggered jobs below (check-runner-access, sha-sanity) are
     # guarded to actually run only when github.event.changes.base is present
     # (LS-8898) — every other 'edited' event (e.g. a bot description update)
-    # short-circuits to a skipped job, which still satisfies the "No Merge
-    # Conflicts" required status check (skipped counts as passing) without
-    # spinning the ~5min self-hosted check-conflicts job.
+    # short-circuits to a skipped job without spinning the ~5min self-hosted
+    # check-conflicts job. That skip is routed to its own concurrency group
+    # below (LS-9604) so it can never cancel a real in-flight run — see that
+    # comment for why a skip posting nothing would otherwise strand the SHA.
     # 'ready_for_review' omitted: synchronize already fires on every commit
     # (even while draft), so the result is always current when a PR goes live.
     types: [opened, synchronize, reopened, edited]
@@ -37,12 +46,25 @@ on:
         type: number
 
 concurrency:
-  group: check-conflicts-${{ github.event.pull_request.number || inputs.pr_number }}
+  # LS-9604: a no-op 'edited' event (no base change — see the skip-guard
+  # comment above) gets its own concurrency-group suffix so it can never
+  # cancel a REAL in-flight run for this PR. Before this split, a body/label
+  # edit landing mid-run (e.g. right after 'opened', while a fix-up push is
+  # in flight) would cancel the run that was actually going to post the
+  # "No Merge Conflicts" commit status, then itself skip and post nothing —
+  # stranding the SHA at "Expected — Waiting for status to be reported" until
+  # the next real PR event or the base-push sweep. (Under the old check-run
+  # design a skip's own check-run stood in as a passing signal, masking this
+  # race; a commit status has no such stand-in, so the race had to be fixed
+  # at the source instead.) No-op edits still cancel each other — harmless,
+  # since none of them do anything — but never touch the real group.
+  group: check-conflicts-${{ github.event.pull_request.number || inputs.pr_number }}-${{ (github.event.action == 'edited' && github.event.changes.base == null) && 'noop-edit' || 'real' }}
   cancel-in-progress: true
 
 permissions:
   contents: read
   pull-requests: write
+  statuses: write # Required to post the "No Merge Conflicts" commit status (LS-9604)
 
 jobs:
   # LS-1652: Restrict self-hosted runners to PR authors with write permission
@@ -108,7 +130,11 @@ jobs:
           echo "SHA still current; proceeding"
 
   check-conflicts:
-    name: "No Merge Conflicts"
+    # Informational check-run name — deliberately NOT "No Merge Conflicts".
+    # That name is the required status check, posted as a commit status by the
+    # last step below (LS-9604); giving this job's own check-run the same name
+    # would recreate the duplicate-required-name ambiguity this change fixes.
+    name: "🔀 Merge Conflict Test (job)"
     needs: [sha-sanity, check-runner-access]
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 5
@@ -219,7 +245,36 @@ jobs:
           # cleanly without --no-commit recording, but harmless).
           git merge --abort 2>/dev/null || git reset --hard HEAD
 
-      - name: Sync conflict label and set status
+      - name: Post "No Merge Conflicts" required status
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        env:
+          MERGEABLE: ${{ steps.test-merge.outputs.mergeable }}
+        with:
+          # The default GITHUB_TOKEN, not the app-installation token: this
+          # workflow's own `statuses: write` permission grant covers it, and
+          # that's the same token CI Gate posts through (ci-pipeline.yml).
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const mergeable = process.env.MERGEABLE === 'true';
+            // The required status check (LS-9604). Posted as a commit status,
+            // not this job's own check-run — see the job-name comment above
+            // for why. Latest-status-per-context-wins makes this immune to
+            // the duplicate-required-name ambiguity a check-run has under
+            // concurrency cancellation.
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: '${{ steps.pr-info.outputs.head_sha }}',
+              state: mergeable ? 'success' : 'failure',
+              context: 'No Merge Conflicts',
+              description: mergeable
+                ? 'No merge conflicts detected'
+                : 'Merge conflicts with the base branch',
+              target_url: `https://github.com/${owner}/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+            });
+
+      - name: Sync conflict label and comment
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           MERGEABLE: ${{ steps.test-merge.outputs.mergeable }}

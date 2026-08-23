@@ -13,11 +13,11 @@ The single home for the merge-gate truth: which contexts block merge, who writes
 | Context                         | Kind              | Written by                                                                                                               | Debug entry point                                                            |
 | ------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
 | `bot-review`                    | **commit status** | Reviewer Bot — `review.yml` (W1) → `.github/scripts/reviewer/index.mjs` (`setCommitStatus` in `reviewer/lib/github.mjs`) | `github_list_commit_statuses({ prNumber })` + `github_get_review_threads`    |
-| `No Merge Conflicts`            | check run         | `check-conflicts.yml` job `check-conflicts` (and `check-conflicts-sweep.yml` on main pushes)                             | `github_pr_why_blocked(prNumber)`; sticky `<!-- conflict-notice -->` comment |
+| `No Merge Conflicts`            | **commit status** | `check-conflicts.yml` job `check-conflicts` (and `check-conflicts-sweep.yml` on main pushes)                             | `github_pr_why_blocked(prNumber)`; sticky `<!-- conflict-notice -->` comment |
 | `Verify All Migrations Applied` | check run         | `check-migrations-applied.yml` job `check`                                                                               | `db_migration_status` (hosted DB MCP)                                        |
 | `CI Gate`                       | **commit status** | `ci-pipeline.yml` `summarize` job → `.github/scripts/ci-gate.js` (`postCiGate`)                                          | `ci_get_logs(runId, failedOnly: true)` on the CI Pipeline run                |
 
-Two of the four are **commit statuses**, not check runs. Practical consequences:
+Three of the four are **commit statuses**, not check runs. Practical consequences:
 
 - `github_retrigger_check` cannot find them — inspect with `github_list_commit_statuses({ prNumber: PR# })` (or `sha`).
 - GitHub evaluates the **latest** status per context; there is no `cancelled` status state, so duplicate-run ambiguity (the LS-7988 405 class) cannot recur for them.
@@ -67,7 +67,7 @@ Two consumers already bridge the config/live gap — useful when debugging:
 
 ### `No Merge Conflicts`
 
-**Writer:** `check-conflicts.yml` job `check-conflicts` on PR events (`opened`/`synchronize`/`reopened`/`edited`). It runs a real local `git merge --no-commit --no-ff` test against the base — deterministic, no dependency on GitHub's lazy mergeability API (which caused stuck "Mergeability could not be determined" states, LS-4479). `check-conflicts-sweep.yml` re-evaluates **all open PRs** whenever `main` advances; when the recorded check-run state disagrees with its fresh test-merge it re-dispatches `check-conflicts.yml` on the PR's head branch (GitHub forbids updating Actions-created check runs via the API, which is why the earlier LS-7992 PATCH-in-place design silently no-opped — the required check went stale whenever main introduced a conflict).
+**Writer:** `check-conflicts.yml` job `check-conflicts` on PR events (`opened`/`synchronize`/`reopened`/`edited`). It runs a real local `git merge --no-commit --no-ff` test against the base — deterministic, no dependency on GitHub's lazy mergeability API (which caused stuck "Mergeability could not be determined" states, LS-4479). The result is posted as a **commit status**, mirroring `bot-review`/`CI Gate` (LS-9604) — not the job's own check-run, which is named separately and is informational only. This avoids the duplicate-required-name pile-up a check-run accrues under `concurrency: cancel-in-progress` (rapid pushes each spawn and cancel a same-named run; GitHub's merge evaluator can require every one of them to resolve). `check-conflicts-sweep.yml` re-evaluates **all open PRs** whenever `main` advances and POSTs a fresh status when its own test-merge disagrees with the recorded one — a plain POST, no PATCH-restriction workaround needed (an earlier LS-7992 design worked around GitHub forbidding PATCHes to Actions-owned check runs; that whole class of problem doesn't apply to commit statuses).
 
 **Why it fails:** `main` moved ahead with commits that textually conflict with this branch. Side effects: `CI: Conflicts` label + one sticky comment keyed on the `<!-- conflict-notice -->` marker (LS-8229).
 

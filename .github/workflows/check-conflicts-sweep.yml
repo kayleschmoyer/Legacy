@@ -9,44 +9,30 @@ name: "Check Merge Conflicts (Base Push Sweep)"
 # pull_request: opened event to check-conflicts.yml (observed on PRs where
 # only push-triggered workflows ran on open, e.g. LS-7717).
 #
-# HOW THE CHECK RUN GETS REFRESHED (LS-7992 / LS-8277 lineage): the "No Merge
-# Conflicts" required check is normally the check-conflicts.yml JOB run, and
-# GitHub forbids updating Actions-created check runs through the Checks API
-# ("Check run status and conclusions can only be updated internally by GitHub
-# Actions", changelog 2025-02-12). So this sweep cannot PATCH that job run — an
-# earlier design tried and silently no-opped, leaving the check stale.
+# HOW THE STATUS GETS REFRESHED (LS-9604, superseding the LS-7992 / LS-8277
+# check-run lineage): "No Merge Conflicts" is posted as a commit status by
+# both this sweep and check-conflicts.yml — a status is POST-only and
+# evaluated latest-created_at-per-context by both GitHub's merge gate and the
+# MCP triage tooling, so there is no PATCH restriction to work around and no
+# duplicate-required-name pile-up. (An earlier design POSTed a fresh
+# API-owned check RUN instead, because GitHub forbids PATCHing an
+# Actions-owned run; that workaround — and the DISPATCH-the-PR-branch design
+# before it, reverted for stamping false-green results from a stale
+# pr.base.sha — is obsolete now that the check is a status, not a run.)
 #
-# A subsequent design DISPATCHED check-conflicts.yml on each stale PR's head
-# branch so its job run would re-report. That is fundamentally broken and was
-# reverted: `gh workflow run --ref <head-branch>` executes the workflow file
-# FROM that branch, so a PR that predates any fix runs its own stale copy of
-# check-conflicts.yml — and it cannot be dispatched on `main` instead, because a
-# job check run auto-attaches to the triggering ref's SHA and would then land on
-# main's HEAD, not the PR head. The dispatched stale-branch run test-merged
-# against a lagging pr.base.sha, stamped a FALSE GREEN on the required check,
-# and cleared the CI: Conflicts label — actively erasing a real conflict signal.
-#
-# This sweep instead does the deterministic test-merge itself (against the
-# just-pushed main = live base) and POSTs the result as a fresh API-owned check
-# run on the PR head SHA. POST is permitted (unlike PATCH of the job run); the
-# sweep always runs current code from `main`, so no stale-branch-code path
-# exists. GitHub's merge gate and the MCP triage tooling evaluate the newest run
-# per name (highest id), so the POSTed run supersedes any older job run. To
-# avoid stacking a duplicate on every push, the POST is gated on the recorded
-# newest run DISAGREEING with the fresh result (LS-7992 duplicate concern):
-# once the correct result is recorded, later sweeps see a match and skip. So at
-# most one API run is added per conclusion transition, and it self-clears on the
-# PR's next push (new head SHA). Verified in practice: a POSTed failure over a
-# pre-existing stale job-run success left the required check evaluating as
-# failure (newest-wins) at both the merge gate and github_pr_why_blocked.
+# This sweep does the deterministic test-merge itself (against the
+# just-pushed main = live base) and POSTs the result as a commit status on the
+# PR head SHA. To avoid a redundant POST on every push, it's gated on the
+# recorded status DISAGREEING with the fresh result (still the LS-7992
+# duplicate-avoidance concern, now applied to statuses): once the correct
+# result is recorded, later sweeps see a match and skip.
 #
 # The label + sticky-comment sync uses the same fresh result, so the label can
 # never contradict the check, and label drift from other writers (e.g.
 # ci-pipeline's read-modify-write labels PUT) heals on the next sweep.
 #
 # Update failures are COUNTED and fail this job — a sweep that cannot refresh
-# check runs must be red, not green with buried ::warning lines (that is
-# exactly how the PATCH regression went unnoticed).
+# the status must be red, not green with buried ::warning lines.
 
 on:
   push:
@@ -58,7 +44,7 @@ concurrency:
 
 permissions:
   contents: read
-  checks: write
+  statuses: write
   pull-requests: write
 
 jobs:
@@ -90,11 +76,11 @@ jobs:
       - name: Check all open PRs for conflicts
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
-          # Check-run POSTs use GITHUB_TOKEN specifically: it is the github-actions
-          # app identity that owns the `checks: write` grant on this workflow, and
-          # the created run is attributed to it. (The Agent Author app token used
-          # for the read-heavy calls above is not granted the checks scope.)
-          CHECKS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Status POSTs use GITHUB_TOKEN specifically: it is covered by this
+          # workflow's own `statuses: write` grant, the same token CI Gate
+          # posts through (ci-pipeline.yml). (The Agent Author app token used
+          # for the read-heavy calls above is not granted the statuses scope.)
+          STATUS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           BASE_SHA: ${{ github.sha }}
           BASE_REF: ${{ github.ref_name }}
@@ -135,7 +121,6 @@ jobs:
             fi
 
             echo "--- PR #${PR_NUM} (head: ${HEAD_SHA:0:7}) ---"
-            STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
             # Detach to the pushed base so each PR starts from the same base.
             git checkout --detach "${BASE_SHA}" --quiet
@@ -151,12 +136,10 @@ jobs:
             # Test merge — non-interactive, leaves workspace dirty on conflict.
             if git merge --no-commit --no-ff "refs/remotes/origin/pr/${PR_NUM}" 2>/dev/null; then
               CONCLUSION="success"
-              OUT_TITLE="No merge conflicts"
-              OUT_SUMMARY="No merge conflicts detected between PR #${PR_NUM} and ${BASE_REF} (base: ${BASE_SHA:0:7})."
+              OUT_TITLE="No merge conflicts detected"
             else
               CONCLUSION="failure"
-              OUT_TITLE="Merge conflicts detected"
-              OUT_SUMMARY="PR #${PR_NUM} has merge conflicts with ${BASE_REF} after ${BASE_SHA:0:7} landed. Rebase or merge ${BASE_REF} into your branch to resolve them."
+              OUT_TITLE="Merge conflicts with the base branch"
             fi
             # Always abort/clean regardless of outcome.
             git merge --abort 2>/dev/null || git reset --hard HEAD
@@ -164,48 +147,46 @@ jobs:
 
             echo "PR #${PR_NUM}: ${CONCLUSION}"
 
-            # Compare against the recorded "No Merge Conflicts" check-run state
-            # on the head SHA (newest run per name — the one the ruleset
-            # evaluator and MCP triage tooling read). `status:conclusion`, e.g.
-            # "completed:success"; "absent:" when no run exists yet. An API
-            # failure here yields an empty string, which falls through to the
-            # refresh path — fail open toward re-checking, never toward stale.
-            RECORDED=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/check-runs" \
-              -X GET -f check_name="No Merge Conflicts" -f per_page=100 \
-              --jq '.check_runs | max_by(.id) | "\(.status // "absent"):\(.conclusion // "")"' \
+            # Compare against the recorded "No Merge Conflicts" commit-status
+            # state on the head SHA. The combined-status endpoint already
+            # returns the latest status per context, so no id/timestamp
+            # comparison is needed (unlike the check-run world this replaced).
+            # An API failure or absent status yields an empty string, which
+            # falls through to the refresh path — fail open toward
+            # re-checking, never toward stale.
+            RECORDED_STATE=$(gh api "repos/${GH_REPO}/commits/${HEAD_SHA}/status" \
+              --jq '.statuses[] | select(.context == "No Merge Conflicts") | .state' \
               2>/dev/null || true)
-            RECORDED_STATUS="${RECORDED%%:*}"
-            RECORDED_CONCLUSION="${RECORDED#*:}"
+            if [ -n "$RECORDED_STATE" ]; then
+              RECORDED_STATUS="completed"
+            else
+              RECORDED_STATUS="absent"
+            fi
+            RECORDED_CONCLUSION="$RECORDED_STATE"
 
-            # Decide whether to write the check run. Logic lives in a unit-tested
+            # Decide whether to (re)post the status. Logic lives in a unit-tested
             # helper (.github/scripts/__tests__/conflict-sweep-decision.test.mjs)
-            # so the false-green regression — stale completed:success under a
-            # fresh failure → must POST — is pinned by a test, not just review.
+            # so the false-green regression — stale success under a fresh
+            # failure → must POST — is pinned by a test, not just review.
             ACTION=$(node .github/scripts/conflict-sweep-decision.mjs \
               "$CONCLUSION" "$RECORDED_STATUS" "$RECORDED_CONCLUSION")
 
             if [ "$ACTION" = "in-sync" ]; then
-              echo "Check run already in sync (${RECORDED}); no refresh needed"
-            elif [ "$ACTION" = "defer-to-live" ]; then
-              # A live check-conflicts.yml run (the PR was just pushed) is already
-              # recomputing against the current base and will post the authoritative
-              # result with a newer id. Don't race it with a POST that it would then
-              # supersede anyway (or vice-versa).
-              echo "Check run currently ${RECORDED_STATUS}; letting the live run report"
+              echo "Status already in sync (${RECORDED_STATE:-<none>}); no refresh needed"
             else
-              # ACTION=post — recorded newest run is stale, wrong, or absent. POST
-              # a fresh API-owned completed run carrying this sweep's own live-main
-              # test result. POST is permitted (unlike PATCH of the Actions-owned
-              # job run); the newest run per name wins at the merge gate, so this
-              # supersedes the stale run. Gated on disagreement above, so steady
-              # state posts nothing and no duplicates accrue.
-              COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-              if printf '{"name":"No Merge Conflicts","head_sha":"%s","status":"completed","conclusion":"%s","started_at":"%s","completed_at":"%s","output":{"title":"%s","summary":"%s"}}' \
-                  "$HEAD_SHA" "$CONCLUSION" "$STARTED_AT" "$COMPLETED_AT" "$OUT_TITLE" "$OUT_SUMMARY" \
-                  | GH_TOKEN="$CHECKS_TOKEN" gh api "repos/${GH_REPO}/check-runs" -X POST --input - > /dev/null; then
-                echo "Recorded state '${RECORDED:-<none>}' was stale; posted 'No Merge Conflicts' run (${CONCLUSION}) for PR #${PR_NUM} on ${HEAD_SHA:0:7}"
+              # ACTION=post (or the unreachable-for-statuses defer-to-live,
+              # since decideSweepAction() is shared with the retired check-run
+              # caller — see its docstring). Recorded status is stale, wrong,
+              # or absent. POST this sweep's own live-main test result as a
+              # commit status; latest-created_at-per-context wins at the merge
+              # gate, so this supersedes any stale status. Gated on
+              # disagreement above, so steady state posts nothing.
+              if printf '{"state":"%s","context":"No Merge Conflicts","description":"%s","target_url":"https://github.com/%s/actions/runs/%s"}' \
+                  "$CONCLUSION" "$OUT_TITLE" "$GH_REPO" "$GITHUB_RUN_ID" \
+                  | GH_TOKEN="$STATUS_TOKEN" gh api "repos/${GH_REPO}/statuses/${HEAD_SHA}" -X POST --input - > /dev/null; then
+                echo "Recorded state '${RECORDED_STATE:-<none>}' was stale; posted 'No Merge Conflicts' status (${CONCLUSION}) for PR #${PR_NUM} on ${HEAD_SHA:0:7}"
               else
-                echo "::error::Failed to post 'No Merge Conflicts' run for PR #${PR_NUM}"
+                echo "::error::Failed to post 'No Merge Conflicts' status for PR #${PR_NUM}"
                 FAILED_UPDATES=$((FAILED_UPDATES + 1))
               fi
             fi
