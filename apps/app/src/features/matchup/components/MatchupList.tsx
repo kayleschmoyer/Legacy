@@ -12,11 +12,26 @@ export interface MatchupListProps {
   /** Pull-to-refresh state for the list (LS-8847). */
   refreshing?: boolean;
   onRefresh?: () => void;
+  /**
+   * Content (e.g. a week selector) rendered above the matchup rows.
+   * Passed straight through to FlatList's `ListHeaderComponent` (LS-6319)
+   * so callers never need to wrap this list in an outer ScrollView to add
+   * a header — doing so would nest a VirtualizedList inside a plain
+   * ScrollView, which React Native warns against and which breaks scroll
+   * performance on Android.
+   */
+  listHeaderComponent?: React.ComponentType | React.ReactElement | null;
 }
 
 /**
  * MatchupList - Displays a scrollable list of matchups
  * Used for viewing all matchups in a week or league
+ *
+ * This list owns its own scrolling. Do not wrap it in a ScrollView — RN
+ * warns when a VirtualizedList (FlatList) is nested inside a plain
+ * ScrollView, and it breaks Android scroll performance. Any header content
+ * (e.g. a week selector) belongs in `listHeaderComponent`, not an outer
+ * wrapper (LS-6319).
  */
 export function MatchupList({
   matchups,
@@ -25,6 +40,7 @@ export function MatchupList({
   emptyMessage = 'No matchups found',
   refreshing,
   onRefresh,
+  listHeaderComponent,
 }: MatchupListProps) {
   if (loading) {
     return (
@@ -53,6 +69,7 @@ export function MatchupList({
           showWeek={true}
         />
       )}
+      ListHeaderComponent={listHeaderComponent}
       contentContainerStyle={{ padding: 8 }}
       refreshing={refreshing}
       onRefresh={onRefresh}

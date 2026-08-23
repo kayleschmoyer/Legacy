@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Text as RNTextComponent } from 'react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import { MatchupStatus } from '@legacy-sports/graphql';
@@ -159,5 +160,15 @@ describe('MatchupList', () => {
     const cards = screen.getAllByTestId('matchup-card');
     fireEvent.press(cards[0]);
     expect(onMatchupPress).toHaveBeenCalledWith(MOCK_MATCHUPS[0]);
+  });
+
+  it('renders listHeaderComponent inside the list instead of requiring an outer wrapper (LS-6319)', () => {
+    render(
+      <MatchupList
+        matchups={MOCK_MATCHUPS}
+        listHeaderComponent={<RNTextComponent>Week Selector</RNTextComponent>}
+      />,
+    );
+    expect(screen.getByText('Week Selector')).toBeTruthy();
   });
 });
