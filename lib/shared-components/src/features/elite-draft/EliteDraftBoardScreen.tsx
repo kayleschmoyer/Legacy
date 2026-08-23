@@ -119,6 +119,11 @@ const POSITION_FILTERS = [
 
 type SortKey = 'adp' | 'pts';
 
+/** Type guard narrowing an unknown value to a known defensiveFormat literal. */
+function isDefensiveFormatLiteral(value: unknown): value is 'dst' | 'idp' {
+  return value === 'dst' || value === 'idp';
+}
+
 /**
  * Draft Room v2 shell (LS-9397) + Players tab (LS-9399) + Queue/Team tabs
  * (LS-9400) + Chat tab (LS-9401): the Board tab keeps this file's existing
@@ -313,6 +318,9 @@ interface CompactLiveDraftBoardProps {
   currentPick: number;
   /** Active league sport — drives Queue/Team tab position colors (LS-9400). */
   sport: SportKind;
+  /** League's defensive format ('dst' | 'idp') — drives which football
+   *  position chips the Players tab offers (LS-9475). */
+  defensiveFormat: 'dst' | 'idp' | null;
   /** Mock drafts only — no real teammates to leave hanging (LS-9238). */
   isMockDraft: boolean;
   /** Premium (LS-9253): every team's turn is pickable, routed through the
@@ -344,6 +352,7 @@ function CompactLiveDraftBoard({
   round,
   currentPick,
   sport,
+  defensiveFormat,
   isMockDraft,
   controlAllTeams,
   bottomInset,
@@ -540,6 +549,7 @@ function CompactLiveDraftBoard({
           players={playerData.enrichedPlayers}
           myTeam={playerData.myTeam}
           leaguePositions={queries.leaguePositions}
+          defensiveFormat={defensiveFormat}
           maxRosterSize={queries.league?.maxRosterSize ?? null}
           selectedPosition={ui.selectedPosition}
           searchTerm={ui.searchTerm}
@@ -925,6 +935,26 @@ export function EliteDraftBoardScreen({
   const sport: SportKind =
     sportOverride ??
     (queries.league?.sport === Sport.Football ? 'football' : 'baseball');
+
+  // Football's position-filter pills depend on the league's defensive format
+  // (LS-9475) — `leaguePositions` can't be used for this (empty for mock
+  // drafts, which never seed league_positions), so this reads directly off
+  // the league row, which always carries a defensiveFormat value. Converted
+  // to a plain literal (mirroring the `sport` derivation above) rather than
+  // passed through as the generated `DefensiveFormat` enum — shared-component
+  // props take plain strings, not GraphQL-generated types. Narrowed via a
+  // type guard (rather than comparing the `DefensiveFormat` enum directly)
+  // so this doesn't depend on that enum surviving test mocks of
+  // @legacy-sports/graphql, and so the comparison isn't flagged as an unsafe
+  // cross-enum comparison by lint. Any value other than the two known
+  // literals — including a mock/test double, an unrecognized future enum
+  // member, or a missing league row — safely falls through to `null`.
+  const rawDefensiveFormat: unknown = queries.league?.defensiveFormat;
+  const defensiveFormat: 'dst' | 'idp' | null = isDefensiveFormatLiteral(
+    rawDefensiveFormat,
+  )
+    ? rawDefensiveFormat
+    : null;
 
   const isMyPick = Boolean(
     queries.currentPickInfo &&
@@ -1395,6 +1425,7 @@ export function EliteDraftBoardScreen({
         round={round}
         currentPick={currentPick}
         sport={sport}
+        defensiveFormat={defensiveFormat}
         isMockDraft={isMockDraft}
         controlAllTeams={controlAllTeams}
         bottomInset={bottomInset}
@@ -1459,6 +1490,7 @@ export function EliteDraftBoardScreen({
         <DraftPlayerBoard
           viewMode={ui.viewMode}
           sport={sport}
+          defensiveFormat={defensiveFormat}
           selectedPosition={ui.selectedPosition}
           searchTerm={ui.searchTerm}
           availablePlayersLoading={queries.availablePlayersLoading}

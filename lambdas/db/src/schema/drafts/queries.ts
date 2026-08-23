@@ -10,7 +10,7 @@ import {
 import { and, asc, desc, eq, isNotNull, or, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 import { LOGGER } from '@legacy-sports/logging';
-import { DEFAULT_FOOTBALL_ROSTER_POSITIONS } from '@legacy-sports/utils';
+import { getDefaultRosterPositions } from '@legacy-sports/utils';
 
 import type { PlayerDraftInfo } from './candidate-pool';
 import {
@@ -1120,28 +1120,33 @@ type DraftRecommendationOutput = {
  */
 
 /**
- * Roster-slot quotas derived from DEFAULT_FOOTBALL_ROSTER_POSITIONS
- * (@legacy-sports/utils) rather than duplicated as a literal, so this can't
- * drift from the actual default roster. DST is included for parity with
- * today's DST-default leagues even though career_football_defense is empty
- * (LS-9475) — this never matches a candidate today, a safe no-op rather than
- * a new failure mode.
+ * Roster-slot quotas derived from getDefaultRosterPositions(sport,
+ * defensiveFormat) (@legacy-sports/utils) rather than duplicated as a
+ * literal, so this can't drift from the actual default roster. Format-aware
+ * (LS-9475): a 'dst' league gets the DST-shaped default (9 slots), an 'idp'
+ * league the DL/LB/DB-shaped default (14 slots) — using the wrong shape
+ * would silently misreport positional need for whichever format the league
+ * doesn't use.
  */
-const ROSTER_SLOTS_FOOTBALL: Readonly<Record<string, number>> = Object.freeze(
-  DEFAULT_FOOTBALL_ROSTER_POSITIONS.reduce<Record<string, number>>(
-    (quotas, slot) => {
+function getRosterSlotsFootball(
+  defensiveFormat: string | null,
+): Readonly<Record<string, number>> {
+  return Object.freeze(
+    getDefaultRosterPositions('football', defensiveFormat).reduce<
+      Record<string, number>
+    >((quotas, slot) => {
       quotas[slot] = (quotas[slot] ?? 0) + 1;
       return quotas;
-    },
-    {},
-  ),
-);
+    }, {}),
+  );
+}
 
 export async function getFootballDraftRecommendations(
   db: PublicDb,
   draftId: number,
   leagueId: number,
   teamPickedIds: number[],
+  defensiveFormat: string | null,
 ): Promise<DraftRecommendationOutput[]> {
   const excludeClause = sql`AND NOT EXISTS (
     SELECT 1 FROM public.draft_picks dp
@@ -1227,8 +1232,9 @@ export async function getFootballDraftRecommendations(
     };
   const normFpg = minMaxNorm(candidates.map((c) => c.fpg));
 
+  const rosterSlotsFootball = getRosterSlotsFootball(defensiveFormat);
   const getPositionalNeed = (position: string): number => {
-    const quota = ROSTER_SLOTS_FOOTBALL[position] ?? 1;
+    const quota = rosterSlotsFootball[position] ?? 1;
     const have = positionCount[position] ?? 0;
     if (have === 0) return 1.0;
     if (have < quota) return 0.5;
@@ -1348,7 +1354,10 @@ builder.queryField('getDraftRecommendations', (t) =>
       // which has zero football rows (LS-9474 postmortem), so branch before
       // any of it runs rather than let the query silently return nothing.
       const [league] = await context.db
-        .select({ sport: PublicSchema.leagues.sport })
+        .select({
+          sport: PublicSchema.leagues.sport,
+          defensiveFormat: PublicSchema.leagues.defensiveFormat,
+        })
         .from(PublicSchema.leagues)
         .where(eq(PublicSchema.leagues.id, draft.leagueId))
         .limit(1);
@@ -1372,6 +1381,7 @@ builder.queryField('getDraftRecommendations', (t) =>
           draftId,
           draft.leagueId,
           teamPickedIds,
+          league.defensiveFormat,
         );
       }
 

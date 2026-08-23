@@ -150,6 +150,7 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
       1,
       10,
       [],
+      'dst',
     );
 
     expect(result).toEqual([]);
@@ -166,7 +167,7 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
     const { getFootballDraftRecommendations } = await loadQueriesModule();
     const { db, calls } = makeDb([[]]);
 
-    await getFootballDraftRecommendations(db as never, 1, 10, []);
+    await getFootballDraftRecommendations(db as never, 1, 10, [], 'dst');
 
     const { sql: text } = renderQuery(calls[0]);
     expect(text).toContain('draft_picks');
@@ -177,7 +178,7 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
     const { getFootballDraftRecommendations } = await loadQueriesModule();
     const { db } = makeDb([[]]);
 
-    await getFootballDraftRecommendations(db as never, 1, 10, []);
+    await getFootballDraftRecommendations(db as never, 1, 10, [], 'dst');
 
     expect(db.execute).toHaveBeenCalledTimes(1);
   });
@@ -207,6 +208,7 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
       1,
       10,
       [],
+      'dst',
     );
 
     expect(result).toHaveLength(2);
@@ -230,6 +232,7 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
       1,
       10,
       [],
+      'dst',
     );
 
     expect(result[0].topStats.some((s) => s.label === 'Proj FPG')).toBe(false);
@@ -253,6 +256,7 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
       1,
       10,
       [],
+      'dst',
     );
 
     expect(result[0].topStats).toContainEqual({
@@ -280,9 +284,68 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
       1,
       10,
       [99],
+      'dst',
     );
 
     expect(result[0].reason).not.toMatch(/Fills your empty QB slot/);
+  });
+
+  // LS-9475: roster-slot quotas must reflect the league's actual
+  // defensiveFormat — a 'dst' league has no DL quota at all (falls back to
+  // 1), an 'idp' league expects 2 DL. The same roster state (one drafted DL)
+  // must therefore be scored differently by format.
+  it('scores positional need against the dst roster shape (no DL quota) for a dst league', async () => {
+    const { getFootballDraftRecommendations } = await loadQueriesModule();
+    const candidateRows: FootballRow[] = [
+      {
+        player_id: 2,
+        first_name: 'Backup',
+        last_name: 'DL',
+        primary_position: 'DL',
+        projected_fantasy_points: 20,
+      },
+    ];
+    const rosterRows: RosterRow[] = [{ player_id: 99, position: 'DL' }];
+    const { db } = makeDb([candidateRows, rosterRows]);
+
+    const result = await getFootballDraftRecommendations(
+      db as never,
+      1,
+      10,
+      [99],
+      'dst',
+    );
+
+    // dst's roster shape has no DL slot at all — quota falls back to 1, and
+    // the team already has 1, so this reads as fully covered, not "adds depth".
+    expect(result[0].reason).not.toMatch(/Adds depth/);
+  });
+
+  it('scores positional need against the idp roster shape (2x DL quota) for an idp league', async () => {
+    const { getFootballDraftRecommendations } = await loadQueriesModule();
+    const candidateRows: FootballRow[] = [
+      {
+        player_id: 2,
+        first_name: 'Backup',
+        last_name: 'DL',
+        primary_position: 'DL',
+        projected_fantasy_points: 20,
+      },
+    ];
+    const rosterRows: RosterRow[] = [{ player_id: 99, position: 'DL' }];
+    const { db } = makeDb([candidateRows, rosterRows]);
+
+    const result = await getFootballDraftRecommendations(
+      db as never,
+      1,
+      10,
+      [99],
+      'idp',
+    );
+
+    // idp's roster shape has 2 DL slots — the team has 1, so this is still
+    // an open need, and the same roster state scores differently than dst.
+    expect(result[0].reason).toMatch(/Adds depth at DL/);
   });
 
   it('returns at most 5 recommendations', async () => {
@@ -301,6 +364,7 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
       1,
       10,
       [],
+      'dst',
     );
 
     expect(result).toHaveLength(5);

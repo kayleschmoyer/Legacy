@@ -933,8 +933,13 @@ builder.mutationField('createLeagueAndTeams', (t) =>
           ownerId: userId,
           ownerUsername: username,
           sport: inputSport ?? 'baseball',
+          // Defaults to 'idp' when the caller doesn't specify one (LS-9475):
+          // career_football_defense is empty, so a 'dst' league's DST slot
+          // could never be filled. An explicit 'dst' selection is still
+          // honored — both formats remain first-class, this only changes
+          // which one a league lands on when unspecified.
           defensiveFormat:
-            inputDefensiveFormat === 'idp' ? 'idp' : ('dst' as const),
+            inputDefensiveFormat === 'dst' ? 'dst' : ('idp' as const),
           scoringFormat: resolvedScoringFormat,
           maxRosterSize:
             maxRosterSize ?? DEFAULT_ROSTER_SIZE_BY_SPORT[resolvedSport],

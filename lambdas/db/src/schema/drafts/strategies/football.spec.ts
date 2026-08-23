@@ -13,6 +13,7 @@ import {
   ALLOWED_POSITIONS_FOOTBALL,
   effectiveFootballFpg,
   footballStrategy,
+  MOCK_FPG_BY_POSITION,
 } from './football';
 import type { PlayerDraftInfo } from '../candidate-pool';
 
@@ -24,7 +25,7 @@ function buildMockFootballPool(): Map<number, PlayerDraftInfo> {
     { count: 18, position: 'WR' },
     { count: 8, position: 'TE' },
     { count: 4, position: 'K' },
-    { count: 4, position: 'DEF' },
+    { count: 4, position: 'DST' },
   ];
 
   let id = 100;
@@ -97,7 +98,7 @@ describe('footballStrategy.scoreForUnfilledPositions', () => {
       'WR',
       'TE',
       'K',
-      'DEF',
+      'DST',
       'FLEX',
     ];
     const picks = simulateDraft(buildMockFootballPool(), [...startingSlots]);
@@ -114,7 +115,7 @@ describe('footballStrategy.scoreForUnfilledPositions', () => {
       WR: 3,
       TE: 1,
       K: 1,
-      DEF: 1,
+      DST: 1,
       FLEX: 1,
     });
 
@@ -241,16 +242,17 @@ describe('footballStrategy.scoreForUnfilledPositions', () => {
 describe('ALLOWED_POSITIONS_FOOTBALL derives from shared map (LS-4763)', () => {
   const shared = ALLOWED_POSITIONS_BY_SPORT['football'];
 
-  it('all slots except DEF match the shared ALLOWED_POSITIONS_BY_SPORT.football', () => {
+  it('every slot matches the shared ALLOWED_POSITIONS_BY_SPORT.football', () => {
     for (const slot of Object.keys(shared)) {
-      if (slot === 'DEF') continue;
       expect(ALLOWED_POSITIONS_FOOTBALL[slot]).toEqual(shared[slot]);
     }
+    expect(Object.keys(ALLOWED_POSITIONS_FOOTBALL).sort()).toEqual(
+      Object.keys(shared).sort(),
+    );
   });
 
-  it('DEF slot retains DST alias for data-feed compatibility', () => {
-    expect(ALLOWED_POSITIONS_FOOTBALL['DEF']).toContain('DEF');
-    expect(ALLOWED_POSITIONS_FOOTBALL['DEF']).toContain('DST');
+  it('has no DEF key — the real roster slot type is DST, never DEF (LS-9475)', () => {
+    expect(ALLOWED_POSITIONS_FOOTBALL['DEF']).toBeUndefined();
   });
 
   it('FLEX slot accepts RB, WR, TE only (LS-4763 acceptance criteria)', () => {
@@ -260,6 +262,92 @@ describe('ALLOWED_POSITIONS_FOOTBALL derives from shared map (LS-4763)', () => {
     expect(flex).toContain('TE');
     expect(flex).not.toContain('QB');
     expect(flex).not.toContain('K');
-    expect(flex).not.toContain('DEF');
+    expect(flex).not.toContain('DST');
+    expect(flex).not.toContain('DL');
+    expect(flex).not.toContain('LB');
+    expect(flex).not.toContain('DB');
+  });
+});
+
+// ── LS-9475: an IDP league can draft and rank DB/LB/DL players ─────────────
+
+describe('IDP (individual defensive player) support', () => {
+  it('drafts a complete IDP starting lineup, including DL/LB/DB slots', () => {
+    const pool = buildMockFootballPool();
+    // Replace the DST archetype with IDP defenders — a real 'idp'-format
+    // league never has any DST-eligible candidates in its pool.
+    for (const id of [...pool.keys()]) {
+      if (pool.get(id)?.positions[0] === 'DST') pool.delete(id);
+    }
+    let id = 900;
+    for (const position of ['DL', 'DL', 'LB', 'LB', 'DB', 'DB']) {
+      pool.set(id, { fpg: 0, positions: [position] });
+      id++;
+    }
+
+    const startingSlots = [
+      'QB',
+      'RB',
+      'RB',
+      'WR',
+      'WR',
+      'TE',
+      'K',
+      'DL',
+      'LB',
+      'DB',
+      'FLEX',
+    ];
+    const picks = simulateDraft(pool, [...startingSlots]);
+
+    expect(picks).toHaveLength(startingSlots.length);
+    const filledSlots = new Set(picks.map((p) => p.slot));
+    expect(filledSlots.has('DL')).toBe(true);
+    expect(filledSlots.has('LB')).toBe(true);
+    expect(filledSlots.has('DB')).toBe(true);
+
+    // Ranked sensibly: every IDP pick's mock baseline is a real, distinct,
+    // non-zero weight — not a flat tie (the bug LS-9483 tracks separately
+    // for FPG-based ranking, but the archetype baseline itself must already
+    // be non-degenerate across IDP positions).
+    const idpPicks = picks.filter((p) => ['DL', 'LB', 'DB'].includes(p.slot));
+    for (const pick of idpPicks) {
+      const info = pool.get(pick.playerId);
+      expect(info).toBeDefined();
+      if (info)
+        expect(effectiveFootballFpg(info, pick.playerId)).toBeGreaterThan(0);
+    }
+  });
+
+  it('DL, LB, DB slots each accept only their own stat position', () => {
+    expect(ALLOWED_POSITIONS_FOOTBALL['DL']).toEqual(['DL']);
+    expect(ALLOWED_POSITIONS_FOOTBALL['LB']).toEqual(['LB']);
+    expect(ALLOWED_POSITIONS_FOOTBALL['DB']).toEqual(['DB']);
+  });
+});
+
+// ── LS-9475: vocabulary must match what the DB actually contains ───────────
+// Ground truth from dev RDS (queried during LS-9472/LS-9475 investigation):
+// `SELECT DISTINCT position FROM football_player_eligible_positions` returns
+// exactly {QB, RB, WR, TE, K, DL, LB, DB} — no DEF or DST row exists because
+// career_football_defense (backing the view's is_dst branch) is empty. A
+// vocabulary entry for a position the view can never emit is dead weight; a
+// missing entry for a position it does emit silently drops real players.
+describe('vocabulary matches real football_player_eligible_positions data (LS-9475)', () => {
+  const REAL_DB_POSITIONS = ['QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB'];
+
+  it('every real DB position has a slot in ALLOWED_POSITIONS_FOOTBALL', () => {
+    const allAllowedStatPositions = new Set(
+      Object.values(ALLOWED_POSITIONS_FOOTBALL).flat(),
+    );
+    for (const pos of REAL_DB_POSITIONS) {
+      expect(allAllowedStatPositions.has(pos)).toBe(true);
+    }
+  });
+
+  it('every real DB position has a mock FPG baseline', () => {
+    for (const pos of REAL_DB_POSITIONS) {
+      expect(MOCK_FPG_BY_POSITION[pos]).toBeGreaterThan(0);
+    }
   });
 });

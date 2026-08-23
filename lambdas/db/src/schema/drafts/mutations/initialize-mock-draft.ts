@@ -333,6 +333,11 @@ builder.mutationField('initializeMockDraft', (t) =>
           name: 'Mock Draft Practice',
           owner: userId,
           sport,
+          // Explicit rather than relying on the column's DEFAULT 'dst'
+          // (LS-9475): career_football_defense is empty, so a 'dst' mock
+          // draft's DST slot could never be filled. Only meaningful for
+          // football — baseball ignores this column.
+          defensiveFormat: 'idp' as const,
           playerPool,
           maxRosterSize: rosterSize,
           draftStatus: 'not-started' as const,

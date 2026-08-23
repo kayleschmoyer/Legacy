@@ -219,8 +219,9 @@ describe('LeagueCreateWizard — roster step (LS-6146)', () => {
       initialLeagueName: VALID_NAME,
     });
     pressNext(getByTestId);
-    // DST defaults to 1 — one decrement reaches zero, the next is inert.
-    const decrement = getByTestId('roster-slot-DST-decrement');
+    // K defaults to 1 in both defensive formats (LS-9475) — one decrement
+    // reaches zero, the next is inert.
+    const decrement = getByTestId('roster-slot-K-decrement');
     fireEvent.click(decrement);
     expect(getByTestId('roster-positions-totals').textContent).toContain(
       'Total: 15',

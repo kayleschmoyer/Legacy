@@ -55,12 +55,31 @@ describe('ALLOWED_POSITIONS_BY_SPORT.football', () => {
     expect(football['DEF']).toBeUndefined();
   });
 
+  // LS-9475: DL/LB/DB (individual defensive players) — only reachable for
+  // an 'idp'-format league; coexists with DST since a league only ever
+  // configures one format's slots.
+  it('DL/LB/DB slots each accept only their own position', () => {
+    expect(football['DL']).toEqual(['DL']);
+    expect(football['LB']).toEqual(['LB']);
+    expect(football['DB']).toEqual(['DB']);
+  });
+
   it('FLEX accepts RB, WR, TE', () => {
     expect(football['FLEX']).toEqual(['RB', 'WR', 'TE']);
   });
 
-  it('BENCH accepts all offensive + defensive position values', () => {
-    expect(football['BENCH']).toEqual(['QB', 'RB', 'WR', 'TE', 'K', 'DST']);
+  it('BENCH accepts all offensive + defensive position values (both formats)', () => {
+    expect(football['BENCH']).toEqual([
+      'QB',
+      'RB',
+      'WR',
+      'TE',
+      'K',
+      'DST',
+      'DL',
+      'LB',
+      'DB',
+    ]);
   });
 
   it('every football slot has a non-empty allowed list', () => {
@@ -113,6 +132,12 @@ describe('DEFENSIVE_POSITIONS (football)', () => {
 
   it('does not include DEF (renamed to DST in LS-245)', () => {
     expect(DEFENSIVE_POSITIONS.has('DEF')).toBe(false);
+  });
+
+  it('includes DL/LB/DB (individual defensive players, LS-9475)', () => {
+    expect(DEFENSIVE_POSITIONS.has('DL')).toBe(true);
+    expect(DEFENSIVE_POSITIONS.has('LB')).toBe(true);
+    expect(DEFENSIVE_POSITIONS.has('DB')).toBe(true);
   });
 
   it('does not include offensive positions', () => {

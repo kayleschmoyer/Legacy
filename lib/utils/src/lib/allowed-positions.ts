@@ -44,11 +44,20 @@ const FOOTBALL_ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
     WR: ['WR'],
     TE: ['TE'],
     K: ['K'],
-    /** DST slot maps to the synthetic DST team-defense player (LS-245). */
+    /** DST slot maps to the synthetic DST team-defense player (LS-245). Only
+     *  reachable for a 'dst'-format league. */
     DST: ['DST'],
+    /** IDP (individual defensive player) slots — only reachable for an
+     *  'idp'-format league (LS-9475). A league only ever configures one of
+     *  DST or DL/LB/DB, never both, so having both sets of keys here is
+     *  harmless: a given league's `leaguePositions` only ever looks up the
+     *  keys that format actually seeded. */
+    DL: ['DL'],
+    LB: ['LB'],
+    DB: ['DB'],
     /** FLEX accepts RB, WR, or TE — the canonical football flex eligibility rule. */
     FLEX: ['RB', 'WR', 'TE'],
-    BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DST'],
+    BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DST', 'DL', 'LB', 'DB'],
   });
 
 /**
@@ -84,7 +93,8 @@ export const OFFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
   new Set(['QB', 'RB', 'WR', 'TE', 'K', 'FLEX']),
 );
 
-/** Football positions that count as defense (DST = team defense/special teams, LS-245). */
+/** Football positions that count as defense: DST = team defense/special
+ *  teams (LS-245); DL/LB/DB = individual defensive players (LS-9475). */
 export const DEFENSIVE_POSITIONS: ReadonlySet<string> = Object.freeze(
-  new Set(['DST']),
+  new Set(['DST', 'DL', 'LB', 'DB']),
 );

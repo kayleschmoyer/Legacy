@@ -330,7 +330,10 @@ export function createInitialWizardForm(
     faabBudgetDefault: 100,
     salaryCapEnabled: false,
     scoringFormat: 'ppr',
-    defensiveFormat: 'dst',
+    // 'idp' rather than 'dst' (LS-9475): career_football_defense is empty,
+    // so a 'dst' league's DST roster slot could never be filled. A
+    // commissioner can still switch to 'dst' via the wizard step.
+    defensiveFormat: 'idp',
   };
 }
 

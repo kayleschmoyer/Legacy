@@ -29,22 +29,65 @@ const PlayerDetailModal: React.FC<{
   onOpenChange: React.Dispatch<React.SetStateAction<boolean>>;
 }> = () => null;
 
-// Position-filter pill sets, one per sport (LS-9241). The baseball list is
-// a curated display collapse of stat positions (not the full
-// ALLOWED_POSITIONS_BY_SPORT['baseball'] slot-type key set, which also
-// includes roster-only slots like DH/IF/XDH); the football list mirrors it
-// with the football stat positions from ALLOWED_POSITIONS_BY_SPORT.football,
-// excluding BENCH (not a meaningful filter value — its eligibility list is
-// every football position).
-const POSITIONS_BY_SPORT: Record<SportKind, readonly string[]> = {
-  baseball: ['ALL', 'C', '1B', '2B', '3B', 'SS', 'OF', 'P'],
-  football: [
-    'ALL',
-    ...Object.keys(ALLOWED_POSITIONS_BY_SPORT.football).filter(
-      (pos) => pos !== 'BENCH', // exclude the BENCH slot — not a meaningful filter value
-    ),
-  ],
-};
+// Baseball position-filter pills (LS-9241) — a curated display collapse of
+// stat positions (not the full ALLOWED_POSITIONS_BY_SPORT['baseball']
+// slot-type key set, which also includes roster-only slots like DH/IF/XDH).
+const BASEBALL_POSITIONS: readonly string[] = [
+  'ALL',
+  'C',
+  '1B',
+  '2B',
+  '3B',
+  'SS',
+  'OF',
+  'P',
+];
+
+// Football position-filter pills, keyed by the league's defensiveFormat
+// (LS-9475) — a 'dst' league can only ever return DST-slot players, an
+// 'idp' league only DL/LB/DB, so offering the other format's pill would
+// always return zero players. Derived from `defensiveFormat` directly
+// (rather than the league's `leaguePositions`) so this is correct for mock
+// drafts too — `initializeMockDraft` never seeds `league_positions`.
+const FOOTBALL_POSITIONS_DST: readonly string[] = [
+  'ALL',
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+  'DST',
+  'FLEX',
+];
+const FOOTBALL_POSITIONS_IDP: readonly string[] = [
+  'ALL',
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+  'DL',
+  'LB',
+  'DB',
+  'FLEX',
+];
+
+export function footballPositionPills(
+  defensiveFormat: string | null | undefined,
+): readonly string[] {
+  return defensiveFormat === 'idp'
+    ? FOOTBALL_POSITIONS_IDP
+    : FOOTBALL_POSITIONS_DST;
+}
+
+function positionPillsForSport(
+  sport: SportKind,
+  defensiveFormat: string | null | undefined,
+): readonly string[] {
+  return sport === 'football'
+    ? footballPositionPills(defensiveFormat)
+    : BASEBALL_POSITIONS;
+}
 
 // ── Styled primitives ───────────────────────────────────────────────────────
 // tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint;
@@ -246,6 +289,9 @@ interface DraftPlayerBoardProps {
   viewMode: ViewMode;
   /** Active league sport — drives data-table stat headers. Defaults to 'baseball' upstream. */
   sport: SportKind;
+  /** League's defensive format ('dst' | 'idp') — drives which football
+   *  position-filter pills are offered (LS-9475). Ignored for baseball. */
+  defensiveFormat?: string | null;
   selectedPosition: string;
   searchTerm: string;
   availablePlayersLoading: boolean;
@@ -355,6 +401,7 @@ const PANEL = 'var(--d-panel)';
 export function DraftPlayerBoard({
   viewMode,
   sport,
+  defensiveFormat,
   selectedPosition,
   searchTerm,
   availablePlayersLoading,
@@ -406,10 +453,14 @@ export function DraftPlayerBoard({
   // O(1) watchlist lookup — avoids O(n) Array.includes per card per render
   const watchlistSet = useMemo(() => new Set(watchlist), [watchlist]);
 
-  // Position-filter pill list, sport-driven (LS-9241 — previously a
-  // module-level baseball-only constant, so football drafts had no pill
-  // that ever matched a football player's position).
-  const positions = useMemo(() => POSITIONS_BY_SPORT[sport], [sport]);
+  // Position-filter pill list, sport- and defensiveFormat-driven (LS-9241,
+  // LS-9475 — previously a module-level baseball-only constant, so football
+  // drafts had no pill that ever matched a football player's position, and
+  // later a football-only-DST list that never matched an IDP league).
+  const positions = useMemo(
+    () => positionPillsForSport(sport, defensiveFormat),
+    [sport, defensiveFormat],
+  );
 
   // Guard against a stale selectedPosition surviving a sport change (e.g.
   // the MockDraftPage sport-toggle dev affordance) — reset to 'ALL' when

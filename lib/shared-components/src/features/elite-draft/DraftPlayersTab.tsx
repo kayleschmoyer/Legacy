@@ -1,7 +1,10 @@
 import React, { useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet } from 'react-native';
 import { Input, ScrollView, Text, XStack, YStack } from 'tamagui';
-import { buildDepthChartBuckets } from './DraftPlayerBoard';
+import {
+  buildDepthChartBuckets,
+  footballPositionPills,
+} from './DraftPlayerBoard';
 import { computeMyUpcomingPicks } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
 import { getPositionColor } from './utils';
@@ -10,20 +13,6 @@ import { withAlpha } from '../../utils/colors';
 import { PositionBadge } from '../../components/PositionBadge';
 
 const dash = '—';
-
-/** Chip order per the design handoff, README "Players tab" §4 — distinct
- *  from `ALLOWED_POSITIONS_BY_SPORT.football`'s key order (BENCH excluded
- *  entirely; FLEX moves before DST/K to match the mock). */
-const POSITION_CHIPS = [
-  'ALL',
-  'QB',
-  'RB',
-  'WR',
-  'TE',
-  'FLEX',
-  'DST',
-  'K',
-] as const;
 
 interface PlayerListRow {
   kind: 'player';
@@ -46,6 +35,9 @@ export interface DraftPlayersTabProps {
   players: DraftPlayer[];
   myTeam: DraftPlayer[];
   leaguePositions: ReadonlyArray<{ positionType: string }>;
+  /** League's defensive format ('dst' | 'idp') — drives which position chips
+   *  are offered (LS-9475). */
+  defensiveFormat?: string | null;
   maxRosterSize: number | null;
   selectedPosition: string;
   searchTerm: string;
@@ -72,6 +64,7 @@ export function DraftPlayersTab({
   players,
   myTeam,
   leaguePositions,
+  defensiveFormat,
   maxRosterSize,
   selectedPosition,
   searchTerm,
@@ -86,6 +79,10 @@ export function DraftPlayersTab({
   onDraftPlayer,
 }: DraftPlayersTabProps): React.JSX.Element {
   const palette = useDraftPalette();
+  const positionChips = useMemo(
+    () => footballPositionPills(defensiveFormat),
+    [defensiveFormat],
+  );
 
   const rosterBuckets = useMemo(
     () =>
@@ -205,7 +202,7 @@ export function DraftPlayersTab({
         flexShrink={0}
       >
         <XStack gap={4} paddingHorizontal="$3" paddingVertical={8}>
-          {POSITION_CHIPS.map((pos) => {
+          {positionChips.map((pos) => {
             const active = selectedPosition === pos;
             const tint =
               pos === 'ALL'

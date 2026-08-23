@@ -16,13 +16,20 @@ import type { AutoPickScore, AutoPickStrategy } from './types';
 import type { PlayerDraftInfo } from '../candidate-pool';
 
 /**
- * Football slot type → eligible stat positions. Mirrors the future
- * `ALLOWED_POSITIONS_BY_SPORT['football']` entry from ADR-0011 §3.
- * Kept local to this strategy until that shared map lands (slice [3/10]).
+ * Football slot type → eligible stat positions. Mirrors
+ * `ALLOWED_POSITIONS_BY_SPORT['football']` (@legacy-sports/utils).
+ * Kept local to this strategy for historical reasons (slice [3/10]) but must
+ * stay in sync with that shared map — see strategies/football.spec.ts's
+ * LS-4763 parity test.
  *
- * Note on DEF: most fantasy providers expose team defenses as a single 'DEF'
- * stat position; 'DST' is included to be compatible with feeds that use the
- * alternate label.
+ * DST (team defense) and DL/LB/DB (individual defensive players) are two
+ * mutually-exclusive slot vocabularies selected by a league's
+ * `defensiveFormat` (LS-9475) — a league only ever configures one, so having
+ * both sets of keys here is harmless: `pickBestForSlot` is only ever called
+ * with slot types the league's own `leaguePositions` actually contains. The
+ * real roster slot key is 'DST', never 'DEF' — a prior version of this map
+ * used 'DEF' as the canonical key, which no real league_positions row ever
+ * matches (LS-9475 postmortem: that branch was silently dead).
  */
 export const ALLOWED_POSITIONS_FOOTBALL: Readonly<
   Record<string, readonly string[]>
@@ -32,37 +39,53 @@ export const ALLOWED_POSITIONS_FOOTBALL: Readonly<
   WR: ['WR'],
   TE: ['TE'],
   K: ['K'],
-  DEF: ['DEF', 'DST'],
   DST: ['DST'],
+  DL: ['DL'],
+  LB: ['LB'],
+  DB: ['DB'],
   FLEX: ['RB', 'WR', 'TE'],
-  BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DST'],
+  BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DST', 'DL', 'LB', 'DB'],
 });
 
-/** Canonical fill order for unfilled slots — earlier entries are higher priority. */
+/**
+ * Canonical fill order for unfilled slots — earlier entries are higher
+ * priority. Includes both defensive-format vocabularies (see comment above);
+ * only the slot types present in a given league's unfilled set are ever
+ * walked, so an idp league never reaches 'DST' and vice versa.
+ */
 const FOOTBALL_FILL_ORDER: readonly string[] = [
   'QB',
   'RB',
   'WR',
   'TE',
   'K',
-  'DEF',
+  'DST',
+  'DL',
+  'LB',
+  'DB',
   'FLEX',
 ];
 
 /**
  * Position-archetype baseline used to ORDER candidates when no projection has
  * been served. These are ranking weights, not measurements — never surface one
- * to a user as a projected total (LS-9476).
+ * to a user as a projected total (LS-9476). IDP weights are lower than
+ * offensive skill positions, ordered LB > DL > DB per typical tackle-heavy
+ * IDP scoring (LS-9475) — real scoring settings will supersede this once a
+ * football scoring cache exists (LS-9484).
  */
-const MOCK_FPG_BY_POSITION: Readonly<Record<string, number>> = Object.freeze({
-  QB: 24,
-  RB: 16,
-  WR: 13,
-  TE: 10,
-  K: 8,
-  DEF: 9,
-  DST: 9,
-});
+export const MOCK_FPG_BY_POSITION: Readonly<Record<string, number>> =
+  Object.freeze({
+    QB: 24,
+    RB: 16,
+    WR: 13,
+    TE: 10,
+    K: 8,
+    DST: 9,
+    LB: 7,
+    DL: 6,
+    DB: 5,
+  });
 
 /**
  * Deterministic per-player jitter so equal-archetype players sort stably and
