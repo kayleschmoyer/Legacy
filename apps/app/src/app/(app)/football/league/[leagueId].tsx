@@ -800,6 +800,9 @@ export default function FootballLeagueId(): React.JSX.Element {
                       params: {
                         matchupId: String(matchup.id),
                         leagueId: String(numLeagueId),
+                        ...(matchup.weekNumber != null && {
+                          week: String(matchup.weekNumber),
+                        }),
                       },
                     });
                   }

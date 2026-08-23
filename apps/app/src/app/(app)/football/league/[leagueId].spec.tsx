@@ -374,10 +374,16 @@ jest.mock('../../../../features/matchup/components/MatchupList', () => {
       emptyMessage,
       onMatchupPress,
     }: {
-      matchups: ReadonlyArray<{ id?: string | number | null }>;
+      matchups: ReadonlyArray<{
+        id?: string | number | null;
+        weekNumber?: number | null;
+      }>;
       loading?: boolean;
       emptyMessage?: string;
-      onMatchupPress?: (matchup: { id?: string | number | null }) => void;
+      onMatchupPress?: (matchup: {
+        id?: string | number | null;
+        weekNumber?: number | null;
+      }) => void;
     }) => {
       if (loading) {
         return (
@@ -1458,7 +1464,7 @@ describe('FootballLeagueId', () => {
 
     it('navigates to the matchup detail screen when a row is pressed', () => {
       useMatchupsForLeague.mockReturnValue({
-        matchups: [{ id: 7 }],
+        matchups: [{ id: 7, weekNumber: 3 }],
         loading: false,
         refetch: jest.fn(),
       });
@@ -1468,7 +1474,24 @@ describe('FootballLeagueId', () => {
       expect(mockNavigate).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/football/matchup',
-          params: { matchupId: '7', leagueId: '42' },
+          params: { matchupId: '7', leagueId: '42', week: '3' },
+        }),
+      );
+    });
+
+    it('omits the week param when the matchup has no weekNumber (LS-6315)', () => {
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [{ id: 9, weekNumber: null }],
+        loading: false,
+        refetch: jest.fn(),
+      });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      fireEvent.press(screen.getByTestId('matchup-row-9'));
+      expect(mockNavigate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/football/matchup',
+          params: { matchupId: '9', leagueId: '42' },
         }),
       );
     });
