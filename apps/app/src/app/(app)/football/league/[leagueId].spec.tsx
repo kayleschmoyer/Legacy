@@ -265,6 +265,48 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
+// The real component's prev/next steppers are XStack `onPress` handlers,
+// which the shared tamagui mock above drops (its XStack mock forwards only
+// `children`) — stub with plain-RN controls that actually wire onWeekChange/
+// onResetToCurrent so LS-6318 tests can drive them.
+jest.mock('@legacy-sports/shared-components/roster', () => {
+  const { View, Text, TouchableOpacity } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    RosterWeekNavigation: (props: {
+      week: number;
+      currentWeek: number;
+      totalWeeks: number;
+      onWeekChange: (week: number) => void;
+      onResetToCurrent: () => void;
+    }) => (
+      <View testID="matchups-week-nav">
+        <Text testID="matchups-week-value">{`Week ${props.week}`}</Text>
+        <Text testID="matchups-week-current">{String(props.currentWeek)}</Text>
+        <Text testID="matchups-week-total">{String(props.totalWeeks)}</Text>
+        <TouchableOpacity
+          testID="matchups-week-prev"
+          onPress={() => props.onWeekChange(props.week - 1)}
+        >
+          <Text>Previous week</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="matchups-week-next"
+          onPress={() => props.onWeekChange(props.week + 1)}
+        >
+          <Text>Next week</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="matchups-week-reset"
+          onPress={props.onResetToCurrent}
+        >
+          <Text>Reset to Current</Text>
+        </TouchableOpacity>
+      </View>
+    ),
+  };
+});
+
 jest.mock('../../../../hooks/useLeagueWebSocketLifecycle', () => ({
   useLeagueWebSocketLifecycle: jest.fn(() => ({
     client: null,
@@ -1493,6 +1535,109 @@ describe('FootballLeagueId', () => {
           pathname: '/football/matchup',
           params: { matchupId: '9', leagueId: '42' },
         }),
+      );
+    });
+  });
+
+  // FLD-013 (LS-6318) — the Matchups tab list had no week scoping and no
+  // control to navigate between weeks: `useMatchupsForLeague` was called
+  // with no week argument, so every matchup ever scheduled rendered in one
+  // flat list. A `RosterWeekNavigation` selector now scopes the list to a
+  // week, defaulting to the league's current week.
+  describe('matchups tab week selector (LS-6318)', () => {
+    const { useMatchupsForLeague } = jest.requireMock<{
+      useMatchupsForLeague: jest.Mock;
+    }>('../../../../features/matchup/hooks/useMatchup');
+
+    beforeEach(() => {
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [],
+        loading: false,
+        refetch: jest.fn(),
+      });
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: {
+          league: { ...mockLeague, currentWeekNumber: 5, totalMatchups: 14 },
+        },
+        loading: false,
+      });
+    });
+
+    it('defaults the selector to the league current week and scopes useMatchupsForLeague to it', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+
+      expect(screen.getByTestId('matchups-week-value')).toHaveTextContent(
+        'Week 5',
+      );
+      expect(screen.getByTestId('matchups-week-current')).toHaveTextContent(
+        '5',
+      );
+      expect(screen.getByTestId('matchups-week-total')).toHaveTextContent('14');
+      expect(useMatchupsForLeague).toHaveBeenLastCalledWith(42, 5, 60_000);
+    });
+
+    it('steps to the next week and re-scopes useMatchupsForLeague', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      fireEvent.press(screen.getByTestId('matchups-week-next'));
+
+      expect(screen.getByTestId('matchups-week-value')).toHaveTextContent(
+        'Week 6',
+      );
+      expect(useMatchupsForLeague).toHaveBeenLastCalledWith(42, 6, 60_000);
+    });
+
+    it('steps to the previous week and re-scopes useMatchupsForLeague', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      fireEvent.press(screen.getByTestId('matchups-week-prev'));
+
+      expect(screen.getByTestId('matchups-week-value')).toHaveTextContent(
+        'Week 4',
+      );
+      expect(useMatchupsForLeague).toHaveBeenLastCalledWith(42, 4, 60_000);
+    });
+
+    it('resets back to the league current week', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+      fireEvent.press(screen.getByTestId('matchups-week-next'));
+      expect(screen.getByTestId('matchups-week-value')).toHaveTextContent(
+        'Week 6',
+      );
+
+      fireEvent.press(screen.getByTestId('matchups-week-reset'));
+      expect(screen.getByTestId('matchups-week-value')).toHaveTextContent(
+        'Week 5',
+      );
+      expect(useMatchupsForLeague).toHaveBeenLastCalledWith(42, 5, 60_000);
+    });
+
+    it('falls back to week 1 when the league has no current week set', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: {
+          league: {
+            ...mockLeague,
+            currentWeekNumber: null,
+            totalMatchups: null,
+          },
+        },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-matchups'));
+
+      expect(screen.getByTestId('matchups-week-value')).toHaveTextContent(
+        'Week 1',
+      );
+      // The league's real current week is unknown here, so the query stays
+      // unscoped (fetches all matchups) rather than guessing week 1 — only
+      // the selector's display falls back to 1.
+      expect(useMatchupsForLeague).toHaveBeenLastCalledWith(
+        42,
+        undefined,
+        60_000,
       );
     });
   });

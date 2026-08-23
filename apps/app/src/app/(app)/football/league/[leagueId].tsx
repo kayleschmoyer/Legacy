@@ -25,6 +25,7 @@ import {
   TradingCenter,
   usePlayoffBracket,
 } from '@legacy-sports/shared-components';
+import { RosterWeekNavigation } from '@legacy-sports/shared-components/roster';
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
@@ -108,6 +109,11 @@ export default function FootballLeagueId(): React.JSX.Element {
   // no visibility into the premium playoff bracket structure during playoff
   // weeks, so a bracket view is offered alongside it once one exists.
   const [matchupsView, setMatchupsView] = useState<'list' | 'bracket'>('list');
+  // Matchups tab week selector (LS-6318 / FLD-013): the list previously had
+  // no week scoping at all, so multi-week leagues saw every matchup ever
+  // scheduled stacked in one flat list. `null` means "follow the league's
+  // current week"; a number is an explicit user selection.
+  const [matchupsWeek, setMatchupsWeek] = useState<number | null>(null);
   // View-as role preference (in-memory; mirrors web v2's derive-from-perms
   // logic). `null` means "follow the user's actual highest role".
   const [rolePref, setRolePref] = useState<LeagueRole | null>(null);
@@ -139,16 +145,6 @@ export default function FootballLeagueId(): React.JSX.Element {
   // LeagueWSPageHandler below); free users fall back to 60s polling since
   // they don't get the live push.
   const {
-    matchups: rawMatchups,
-    loading: matchupsLoading,
-    refetch: refetchMatchups,
-  } = useMatchupsForLeague(
-    isNaN(numLeagueId) ? null : numLeagueId,
-    undefined,
-    isPremium ? undefined : 60_000,
-  );
-
-  const {
     data: leagueData,
     loading: leagueLoading,
     refetch: refetchLeague,
@@ -158,6 +154,25 @@ export default function FootballLeagueId(): React.JSX.Element {
       id: numLeagueId,
     },
   });
+
+  // Resolve to the user's explicit selection, falling back to the league's
+  // current week once it loads (LS-6318).
+  const selectedMatchupsWeek =
+    matchupsWeek ?? leagueData?.league?.currentWeekNumber ?? undefined;
+
+  // Live score updates (LS-6316 / FLD-011): premium users get an instant
+  // refetch on the WS MATCHUP_SCORE_UPDATED push (wired to
+  // LeagueWSPageHandler below); free users fall back to 60s polling since
+  // they don't get the live push.
+  const {
+    matchups: rawMatchups,
+    loading: matchupsLoading,
+    refetch: refetchMatchups,
+  } = useMatchupsForLeague(
+    isNaN(numLeagueId) ? null : numLeagueId,
+    selectedMatchupsWeek,
+    isPremium ? undefined : 60_000,
+  );
 
   const {
     data: positionsData,
@@ -776,6 +791,19 @@ export default function FootballLeagueId(): React.JSX.Element {
                   onValueChange={(value) =>
                     setMatchupsView(value === 'bracket' ? 'bracket' : 'list')
                   }
+                />
+              </XStack>
+            )}
+            {/* Week selector (LS-6318 / FLD-013) — the bracket spans every
+                playoff week at once, so only the flat list is week-scoped. */}
+            {(!hasPlayoffBracket || matchupsView === 'list') && (
+              <XStack paddingHorizontal="$3" paddingTop="$3" paddingBottom="$2">
+                <RosterWeekNavigation
+                  week={selectedMatchupsWeek ?? league.currentWeekNumber ?? 1}
+                  currentWeek={league.currentWeekNumber ?? 1}
+                  totalWeeks={league.totalMatchups ?? 1}
+                  onWeekChange={setMatchupsWeek}
+                  onResetToCurrent={() => setMatchupsWeek(null)}
                 />
               </XStack>
             )}
