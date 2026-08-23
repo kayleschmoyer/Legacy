@@ -120,6 +120,13 @@ const MAX_ORCHESTRATOR_RUN_ATTEMPTS = 3;
 // Per-queue-cycle cap, mirroring MAX_REVIEW_REMEDIATIONS_PER_RUN.
 const MAX_CI_RERUNS_PER_RUN = 3;
 
+// LS-9490: a non-completed orchestrator run stuck past this long with zero
+// jobs ever created is dead (the API-visible signature of a run blocked on a
+// manual "Approve and run workflow" gate), not "on its way" — see
+// remediateCancelledCiRun. A legitimate run posts its first job within
+// seconds.
+const STUCK_RUN_MS = 10 * 60 * 1000;
+
 module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
@@ -965,6 +972,38 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
   // pull_request-event runs (workflow_dispatch runs lack the pull_request
   // context and never post CI Gate), and gives up after
   // MAX_ORCHESTRATOR_RUN_ATTEMPTS so a repeatedly-cancelled run cannot loop.
+  //
+  // LS-9490: a non-completed run is not always "on its way" — a
+  // pull_request_review-triggered run can sit non-completed with zero jobs
+  // ever created (the API-visible signature of a run stuck on a manual
+  // "Approve and run workflow" gate) and never progress. Treating that as
+  // "CI is coming" makes this self-heal bail forever, since the very run it
+  // should be recovering from (the cancelled pull_request run) never gets
+  // re-run while the stuck run occupies the slot. A legitimate run posts its
+  // first job within seconds; a non-completed run past STUCK_RUN_MS with no
+  // jobs is dead, not in flight — cancel it (freeing the shared concurrency
+  // group, see ci-orchestrator.yml's `concurrency:` block) so the rerun below
+  // isn't queued behind it.
+  async function isDeadZeroJobRun(run) {
+    if (Date.now() - new Date(run.created_at).getTime() < STUCK_RUN_MS) {
+      return false;
+    }
+    try {
+      const { data } = await github.rest.actions.listJobsForWorkflowRun({
+        owner,
+        repo,
+        run_id: run.id,
+        per_page: 1,
+      });
+      return (data.jobs ?? []).length === 0;
+    } catch (e) {
+      console.warn(
+        `⚠️ could not list jobs for orchestrator run ${run.id}: ${e.message} — assuming it is still active`,
+      );
+      return false;
+    }
+  }
+
   async function remediateCancelledCiRun(pr, validation) {
     const unregistered = (validation.pendingChecks ?? []).filter(
       (c) =>
@@ -990,9 +1029,38 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
       return;
     }
 
-    if (runs.some((r) => r.status !== 'completed')) {
-      // An orchestrator run is queued or executing — CI is on its way.
-      return;
+    const activeRuns = runs.filter((r) => r.status !== 'completed');
+    if (activeRuns.length > 0) {
+      const deadRuns = [];
+      for (const r of activeRuns) {
+        if (await isDeadZeroJobRun(r)) deadRuns.push(r);
+      }
+      if (deadRuns.length < activeRuns.length) {
+        // At least one active run is not stuck — real CI is on its way.
+        return;
+      }
+      for (const r of deadRuns) {
+        if (isDryRun) {
+          console.log(
+            `🏃 DRY RUN: Would cancel dead zero-job orchestrator run ${r.id} for PR #${pr.number} (LS-9490)`,
+          );
+          continue;
+        }
+        try {
+          await github.rest.actions.cancelWorkflowRun({
+            owner,
+            repo,
+            run_id: r.id,
+          });
+          console.log(
+            `🛑 PR #${pr.number}: cancelled orchestrator run ${r.id} — non-completed with zero jobs for over ${STUCK_RUN_MS / 60000}m (LS-9490)`,
+          );
+        } catch (e) {
+          console.warn(
+            `⚠️ PR #${pr.number}: could not cancel dead orchestrator run ${r.id}: ${e.message}`,
+          );
+        }
+      }
     }
 
     const candidate = runs

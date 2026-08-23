@@ -100,6 +100,10 @@ function makeGithub({
   // detectSquashedStackedBase's second GraphQL query. Defaults to null (no
   // matching merged PR found for the retargeted-from ref).
   oldBasePR = null,
+  // LS-9490: job counts per workflow-run id, served to
+  // listJobsForWorkflowRun(run_id). A run with no entry (or an explicit 0)
+  // reports zero jobs — the "dead, zero-job run" signature.
+  jobCountsByRunId = {},
 } = {}) {
   const calls = {
     merges: [],
@@ -110,6 +114,7 @@ function makeGithub({
     statuses: [],
     dispatches: [],
     reruns: [],
+    cancels: [],
   };
 
   const github = {
@@ -214,6 +219,19 @@ function makeGithub({
         }),
         reRunWorkflow: async (args) => {
           calls.reruns.push(args);
+          return {};
+        },
+        // LS-9490: dead-run detection + cancellation
+        listJobsForWorkflowRun: async (args) => ({
+          data: {
+            jobs: Array.from(
+              { length: jobCountsByRunId[args.run_id] ?? 0 },
+              (_, i) => ({ id: i }),
+            ),
+          },
+        }),
+        cancelWorkflowRun: async (args) => {
+          calls.cancels.push(args);
           return {};
         },
       },
@@ -2290,6 +2308,8 @@ describe('merge-queue-processor — cancelled orchestrator run self-heal (LS-905
           created_at: '2026-01-01T00:06:00Z',
         },
       ],
+      // Has posted a job — genuinely in flight, not the LS-9490 dead-run case.
+      jobCountsByRunId: { 113: 1 },
     });
 
     await processor({
@@ -2373,5 +2393,146 @@ describe('merge-queue-processor — cancelled orchestrator run self-heal (LS-905
     });
 
     assert.strictEqual(calls.reruns.length, 0, 'dry run must not mutate');
+  });
+});
+
+// ── LS-9490 ──────────────────────────────────────────────────────────────────
+
+describe('merge-queue-processor — dead zero-job orchestrator run self-heal (LS-9490)', () => {
+  const CI_GATE_ONLY_RULES = [
+    {
+      type: 'required_status_checks',
+      parameters: {
+        required_status_checks: [{ context: 'CI Gate' }],
+      },
+    },
+  ];
+
+  const baseArgs = {
+    reviews: [
+      { user: { login: 'legacy-sports-review-bot[bot]' }, state: 'APPROVED' },
+    ],
+    unresolvedThreads: [],
+    branchRules: CI_GATE_ONLY_RULES,
+    checkRuns: [],
+    commitStatuses: [],
+  };
+
+  const cancelledPullRequestRun = (overrides = {}) => ({
+    id: 111,
+    event: 'pull_request',
+    status: 'completed',
+    conclusion: 'cancelled',
+    run_attempt: 1,
+    created_at: '2026-01-01T00:05:00Z',
+    ...overrides,
+  });
+
+  // A pull_request_review-triggered run that never produced a job and was
+  // created far enough in the past to clear STUCK_RUN_MS (10m) relative to
+  // the real clock the test runs under.
+  const deadReviewRun = (overrides = {}) => ({
+    id: 222,
+    event: 'pull_request_review',
+    status: 'pending',
+    conclusion: null,
+    run_attempt: 1,
+    created_at: '2026-01-01T00:06:00Z',
+    ...overrides,
+  });
+
+  it('cancels a dead zero-job run and re-runs the cancelled pull_request run', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [cancelledPullRequestRun(), deadReviewRun()],
+      jobCountsByRunId: { 222: 0 },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.deepStrictEqual(
+      calls.cancels.map((c) => c.run_id),
+      [222],
+      'should cancel the dead zero-job run',
+    );
+    assert.deepStrictEqual(
+      calls.reruns.map((r) => r.run_id),
+      [111],
+      'should re-run the cancelled pull_request run once the dead run is cleared',
+    );
+  });
+
+  it('does not cancel or re-run when the non-completed run has posted jobs', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [cancelledPullRequestRun(), deadReviewRun()],
+      jobCountsByRunId: { 222: 1 },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.cancels.length,
+      0,
+      'a run with jobs is genuinely in flight, not dead',
+    );
+    assert.strictEqual(calls.reruns.length, 0);
+  });
+
+  it('does not treat a young non-completed run as dead even with zero jobs', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [
+        cancelledPullRequestRun(),
+        deadReviewRun({ id: 223, created_at: new Date().toISOString() }),
+      ],
+      jobCountsByRunId: { 223: 0 },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.cancels.length,
+      0,
+      'a freshly-created run has not had time to post a job yet',
+    );
+    assert.strictEqual(calls.reruns.length, 0);
+  });
+
+  it('dry run logs cancellation but does not mutate', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [cancelledPullRequestRun(), deadReviewRun()],
+      jobCountsByRunId: { 222: 0 },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: true,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.cancels.length, 0, 'dry run must not cancel');
+    assert.strictEqual(calls.reruns.length, 0, 'dry run must not re-run');
   });
 });
