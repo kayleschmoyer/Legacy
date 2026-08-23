@@ -88,6 +88,7 @@ const BASE_PROPS = {
   isCommissioner: false,
   isMember: true,
   isDrafting: false,
+  isPremium: false,
   rankedStandings: [],
   startersCount: 9,
   inviteCode: 'ABC123',
@@ -343,5 +344,61 @@ describe('LeagueOverviewTab', () => {
       />,
     );
     expect(screen.queryByText('FAAB')).toBeNull();
+  });
+
+  describe('Premium Draft Settings indicator (FLD-052 / LS-6304)', () => {
+    const idpFootballLeague = {
+      ...BASE_PROPS.league,
+      sport: Sport.Football,
+      defensiveFormat: 'idp',
+    };
+
+    it('renders a "Premium Draft Settings" chip on the join-draft banner for a free viewer joining an IDP draft', () => {
+      render(
+        <LeagueOverviewTab
+          {...BASE_PROPS}
+          league={idpFootballLeague}
+          isDrafting
+          isPremium={false}
+        />,
+      );
+      expect(screen.getByText('Premium Draft Settings')).toBeTruthy();
+    });
+
+    it('omits the chip for a premium viewer', () => {
+      render(
+        <LeagueOverviewTab
+          {...BASE_PROPS}
+          league={idpFootballLeague}
+          isDrafting
+          isPremium
+        />,
+      );
+      expect(screen.queryByText('Premium Draft Settings')).toBeNull();
+    });
+
+    it('omits the chip when the league does not use IDP', () => {
+      render(
+        <LeagueOverviewTab
+          {...BASE_PROPS}
+          league={{ ...BASE_PROPS.league, sport: Sport.Football }}
+          isDrafting
+          isPremium={false}
+        />,
+      );
+      expect(screen.queryByText('Premium Draft Settings')).toBeNull();
+    });
+
+    it('omits the chip when no draft is in progress', () => {
+      render(
+        <LeagueOverviewTab
+          {...BASE_PROPS}
+          league={idpFootballLeague}
+          isDrafting={false}
+          isPremium={false}
+        />,
+      );
+      expect(screen.queryByText('Premium Draft Settings')).toBeNull();
+    });
   });
 });

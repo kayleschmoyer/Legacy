@@ -652,6 +652,7 @@ export default function FootballLeagueId(): React.JSX.Element {
               isMember={isMember}
               isDrafting={isDrafting}
               isPaused={isPausedDraft}
+              isPremium={isPremium}
               rankedStandings={rankedStandings}
               startersCount={startersCount}
               inviteCode={inviteCode}

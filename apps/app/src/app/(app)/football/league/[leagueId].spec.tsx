@@ -788,6 +788,33 @@ describe('FootballLeagueId', () => {
       expect(screen.queryByText('Draft Is Live')).toBeNull();
     });
 
+    // FLD-052 / LS-6304 — a free commissioner joining a live IDP draft gets no
+    // client-side signal that the draft uses a premium format. useSubscription
+    // is mocked to isPremium: false above.
+    it('renders a "Premium Draft Settings" chip on the join-draft banner for an IDP draft (FLD-052 / LS-6304)', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: {
+          league: {
+            ...mockLeague,
+            draftStatus: 'in-progress',
+            defensiveFormat: 'idp',
+          },
+        },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Premium Draft Settings')).toBeTruthy();
+    });
+
+    it('omits the "Premium Draft Settings" chip when the draft is not IDP (FLD-052 / LS-6304)', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, draftStatus: 'in-progress' } },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.queryByText('Premium Draft Settings')).toBeNull();
+    });
+
     it('renders commissioner announcement when lmNotes is set', () => {
       mockGetLeagueByIdQuery.mockReturnValue({
         data: {

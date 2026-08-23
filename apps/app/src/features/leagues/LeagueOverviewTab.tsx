@@ -79,6 +79,9 @@ interface LeagueOverviewTabProps {
   /** True when the reachable draft room is currently paused rather than
    *  actively live — swaps the join-banner copy and action label (LS-8843). */
   isPaused?: boolean;
+  /** True when the viewer's subscription is premium — gates the "Premium
+   *  Draft Settings" indicator on the join-draft banner (LS-6304/FLD-052). */
+  isPremium: boolean;
   rankedStandings: RankedStanding[];
   startersCount: number;
   inviteCode: string;
@@ -207,6 +210,7 @@ export function LeagueOverviewTab({
   isMember,
   isDrafting,
   isPaused = false,
+  isPremium,
   rankedStandings,
   startersCount,
   inviteCode,
@@ -227,6 +231,12 @@ export function LeagueOverviewTab({
   const { bottom: bottomInset } = useSafeAreaInsets();
   const isFootball = league.sport === Sport.Football;
   const configChips = buildLeagueConfigChips(league);
+  // IDP is a paid-tier draft setting (see the "IDP" Premium Configuration
+  // chip below) that directly changes the player pool at draft time, so a
+  // free viewer joining an IDP draft gets no client-side signal that the
+  // draft they're entering uses a premium format (FLD-052 / LS-6304).
+  const draftHasPremiumSettings =
+    isFootball && league.defensiveFormat === 'idp';
 
   const stats = [
     { label: 'Teams', value: String(rankedStandings.length || '—') },
@@ -263,14 +273,19 @@ export function LeagueOverviewTab({
                 : 'Join the draft room to make your picks.'
             }
             actions={
-              <Button
-                size="$3"
-                backgroundColor={isPaused ? BRAND_GOLD : BRAND_SEAM_RED}
-                color="white"
-                onPress={onJoinDraft}
-              >
-                {isPaused ? 'Return to Draft Room' : 'Join Draft'}
-              </Button>
+              <YStack alignItems="flex-end" gap="$2">
+                {!isPremium && draftHasPremiumSettings ? (
+                  <Chip label="Premium Draft Settings" tone="gold" size="sm" />
+                ) : null}
+                <Button
+                  size="$3"
+                  backgroundColor={isPaused ? BRAND_GOLD : BRAND_SEAM_RED}
+                  color="white"
+                  onPress={onJoinDraft}
+                >
+                  {isPaused ? 'Return to Draft Room' : 'Join Draft'}
+                </Button>
+              </YStack>
             }
           />
         ) : null}
