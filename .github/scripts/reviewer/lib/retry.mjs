@@ -1,9 +1,27 @@
+// Upper bound on the random jitter added on top of each base wait, as a
+// fraction of that wait (e.g. 0.3 → wait is stretched by up to +30%). Jitter
+// is what stops a fleet of concurrent runs that all hit the per-minute quota
+// in the same second from re-colliding on their retries (LS-9568).
+const JITTER_FACTOR = 0.3;
+
+/**
+ * Add a random amount of jitter (0 to `JITTER_FACTOR` × ms) on top of a base
+ * wait so concurrent callers don't retry in lockstep.
+ *
+ * @param {number} ms
+ * @returns {number}
+ */
+function addJitter(ms) {
+  if (ms <= 0) return ms;
+  return ms + Math.floor(Math.random() * ms * JITTER_FACTOR);
+}
+
 /**
  * Retry an async function with sequential delays between attempts.
  *
  * The function is called up to delays.length + 1 times. Between each failed
- * attempt, execution pauses for the corresponding delay in milliseconds.
- * If all attempts fail, the last error is re-thrown.
+ * attempt, execution pauses for the corresponding delay in milliseconds, plus
+ * jitter (see `addJitter`). If all attempts fail, the last error is re-thrown.
  *
  * Errors with `retryable === false` short-circuit the loop and re-throw
  * immediately — used by typed provider errors (auth, daily quota, invalid
@@ -32,7 +50,7 @@ export async function withRetry(fn, delays = [30_000, 90_000, 270_000]) {
           err && typeof err.retryAfterSeconds === 'number'
             ? Math.ceil(err.retryAfterSeconds * 1000)
             : 0;
-        const wait = Math.max(delays[attempt], retryAfterMs);
+        const wait = addJitter(Math.max(delays[attempt], retryAfterMs));
         process.stderr.write(
           `[reviewer] LLM attempt ${attempt + 1} failed (${err instanceof Error ? err.message : String(err)}), retrying in ${wait / 1000}s\n`,
         );

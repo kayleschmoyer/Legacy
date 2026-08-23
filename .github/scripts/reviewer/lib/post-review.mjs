@@ -539,9 +539,13 @@ export async function postRealReview(
 }
 
 /**
- * Post a REQUEST_CHANGES review indicating a persistent LLM API failure.
- * Uses the same GitHub App authentication as postRealReview so the review
- * appears from the bot account.
+ * Post a COMMENT review indicating a persistent LLM API failure. Uses the
+ * same GitHub App authentication as postRealReview so the review appears
+ * from the bot account.
+ *
+ * COMMENT (not REQUEST_CHANGES) is deliberate: nothing was actually read, so
+ * this must not set `reviewDecision` on the PR or block the merge-gate
+ * ruleset the way a real "changes required" verdict does (LS-9568).
  *
  * @param {number} prNumber
  */
@@ -574,7 +578,7 @@ export async function postInfraErrorReview(prNumber) {
 
   const payload = JSON.stringify({
     body,
-    event: 'REQUEST_CHANGES',
+    event: 'COMMENT',
     comments: [],
   });
 
@@ -606,10 +610,13 @@ export async function postInfraErrorReview(prNumber) {
  * context-too-large). Distinct from postInfraErrorReview, which is a
  * catch-all "we don't know what went wrong" message.
  *
- * All failure kinds post REQUEST_CHANGES so the outcome is unambiguous in the
- * automated workflow: a PR either has APPROVE or it needs attention. Re-apply
- * the `bot:ready-for-review` label to re-trigger after provider-side issues
- * resolve.
+ * Transient, non-author-actionable kinds (rate-limit, quota, auth) post
+ * COMMENT — nothing was actually read, so the review must not set
+ * `reviewDecision` or block the merge gate (LS-9568). Author-actionable kinds
+ * (cost-cap, context-too-large) post REQUEST_CHANGES because they describe a
+ * real property of the PR itself (too big / too expensive to review) that the
+ * author must act on. Re-apply the `bot:ready-for-review` label to re-trigger
+ * after provider-side issues resolve.
  *
  * @param {object} params
  * @param {number} params.prNumber
@@ -729,7 +736,7 @@ export async function postOverrideApproveReview(prNumber) {
 /**
  * @param {string} kind
  * @param {object} details
- * @returns {{ body: string, event: 'REQUEST_CHANGES' }}
+ * @returns {{ body: string, event: 'REQUEST_CHANGES'|'COMMENT' }}
  */
 export function buildKnownFailureBody(kind, details = {}) {
   switch (kind) {
@@ -738,17 +745,19 @@ export function buildKnownFailureBody(kind, details = {}) {
         ? `~${Math.ceil(details.retryAfterSeconds)}s`
         : 'a minute';
       return {
-        event: 'REQUEST_CHANGES',
+        // COMMENT, not REQUEST_CHANGES: nothing was read, so this must not
+        // set reviewDecision or block the merge gate (LS-9568).
+        event: 'COMMENT',
         body:
           '## Reviewer rate-limited\n\n' +
           '<!-- bot-infra-failure: true -->\n' +
-          `The Gemini API per-minute rate limit was hit on this run. Wait ${wait}, then re-apply the \`bot:ready-for-review\` label (remove and add it again) to retry. The reviewer workflow does not fire on plain pushes — only on \`opened\` / \`ready_for_review\` / \`labeled\` events.\n\n` +
+          `The Gemini API per-minute rate limit was hit on this run after exhausting in-job retries with backoff. Wait ${wait}, then re-apply the \`bot:ready-for-review\` label (remove and add it again) to retry. The reviewer workflow does not fire on plain pushes — only on \`opened\` / \`ready_for_review\` / \`labeled\` events.\n\n` +
           '_This is not a code issue — no review was posted because the LLM API throttled the request._',
       };
     }
     case 'quota':
       return {
-        event: 'REQUEST_CHANGES',
+        event: 'COMMENT',
         body:
           '## Reviewer daily quota exhausted\n\n' +
           '<!-- bot-infra-failure: true -->\n' +
@@ -760,7 +769,7 @@ export function buildKnownFailureBody(kind, details = {}) {
       };
     case 'auth':
       return {
-        event: 'REQUEST_CHANGES',
+        event: 'COMMENT',
         body:
           '## Reviewer authentication failed\n\n' +
           '<!-- bot-infra-failure: true -->\n' +
@@ -800,7 +809,7 @@ export function buildKnownFailureBody(kind, details = {}) {
       };
     default:
       return {
-        event: 'REQUEST_CHANGES',
+        event: 'COMMENT',
         body:
           '## Review bot infrastructure error\n\n' +
           '<!-- bot-infra-failure: true -->\n' +

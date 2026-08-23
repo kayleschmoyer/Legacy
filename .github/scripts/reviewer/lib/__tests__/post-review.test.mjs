@@ -289,19 +289,34 @@ describe('buildKnownFailureBody infra-failure marker', () => {
     );
   });
 
-  it('rate-limit uses REQUEST_CHANGES event', () => {
+  it('rate-limit uses COMMENT event (not a review verdict — nothing was read)', () => {
     const { event } = buildKnownFailureBody('rate-limit');
-    assert.strictEqual(event, 'REQUEST_CHANGES');
+    assert.strictEqual(event, 'COMMENT');
   });
 
-  it('quota uses REQUEST_CHANGES event', () => {
+  it('quota uses COMMENT event (not a review verdict — nothing was read)', () => {
     const { event } = buildKnownFailureBody('quota');
+    assert.strictEqual(event, 'COMMENT');
+  });
+
+  it('auth uses COMMENT event (not a review verdict — nothing was read)', () => {
+    const { event } = buildKnownFailureBody('auth');
+    assert.strictEqual(event, 'COMMENT');
+  });
+
+  it('cost-cap still uses REQUEST_CHANGES event (author-actionable, not infra)', () => {
+    const { event } = buildKnownFailureBody('cost-cap');
     assert.strictEqual(event, 'REQUEST_CHANGES');
   });
 
-  it('auth uses REQUEST_CHANGES event', () => {
-    const { event } = buildKnownFailureBody('auth');
+  it('context-too-large still uses REQUEST_CHANGES event (author-actionable, not infra)', () => {
+    const { event } = buildKnownFailureBody('context-too-large');
     assert.strictEqual(event, 'REQUEST_CHANGES');
+  });
+
+  it('default (unknown) uses COMMENT event', () => {
+    const { event } = buildKnownFailureBody('unknown-kind');
+    assert.strictEqual(event, 'COMMENT');
   });
 });
 

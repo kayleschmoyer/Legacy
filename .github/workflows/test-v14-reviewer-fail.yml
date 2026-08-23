@@ -1,8 +1,8 @@
 name: Test V14 Reviewer Failure Path
 
 # Manually trigger the reviewer with REVIEWER_FORCE_FAIL=true to exercise:
-#   - withRetry exhaustion (30s / 90s / 270s backoff)
-#   - postInfraErrorReview (REQUEST_CHANGES with "Review bot infrastructure error" body)
+#   - withRetry exhaustion (30s / 90s / 270s backoff, plus jitter)
+#   - postInfraErrorReview (COMMENT — not a review verdict — with "Review bot infrastructure error" body)
 #   - addLabelAsApp('review-bot-degraded')
 #   - W4 self-healing trigger (label application fires the real reviewer without force-fail)
 #
@@ -68,7 +68,7 @@ jobs:
           echo "[test-v14] Running reviewer with REVIEWER_FORCE_FAIL=true against PR #${{ inputs.pr_number }}"
           node .github/scripts/reviewer/index.mjs
       - name: Verify force-fail completed
-        run: echo '[test-v14] Reviewer force-fail run complete — verify REQUEST_CHANGES and review-bot-degraded label on PR #${{ inputs.pr_number }}'
+        run: echo '[test-v14] Reviewer force-fail run complete — verify COMMENT review and review-bot-degraded label on PR #${{ inputs.pr_number }}'
       - name: Verify review-bot-degraded label applied (AC3)
         env:
           GH_TOKEN: ${{ steps.reviewer-token.outputs.token }}

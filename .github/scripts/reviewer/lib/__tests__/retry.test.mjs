@@ -98,10 +98,16 @@ describe('withRetry', () => {
         { message: 'rate-limited' },
       );
       assert.strictEqual(calls, 3);
-      // First wait should be ceil(45 * 1000) = 45000, not 30000
-      assert.strictEqual(waits[0], 45_000);
-      // Second wait: max(90000, 45000) = 90000
-      assert.strictEqual(waits[1], 90_000);
+      // First wait should be at least ceil(45 * 1000) = 45000 (jitter only adds)
+      assert.ok(
+        waits[0] >= 45_000 && waits[0] <= 45_000 * 1.3,
+        `expected waits[0] in [45000, 58500], got ${waits[0]}`,
+      );
+      // Second wait: base is max(90000, 45000) = 90000, plus jitter
+      assert.ok(
+        waits[1] >= 90_000 && waits[1] <= 90_000 * 1.3,
+        `expected waits[1] in [90000, 117000], got ${waits[1]}`,
+      );
     } finally {
       global.setTimeout = realSetTimeout;
     }
@@ -125,7 +131,42 @@ describe('withRetry', () => {
           }, [30_000]),
         { message: 'rate-limited' },
       );
-      assert.strictEqual(waits[0], 30_000);
+      assert.ok(
+        waits[0] >= 30_000 && waits[0] <= 30_000 * 1.3,
+        `expected waits[0] in [30000, 39000], got ${waits[0]}`,
+      );
+    } finally {
+      global.setTimeout = realSetTimeout;
+    }
+  });
+
+  it('adds jitter on top of the base delay so concurrent retries do not land in lockstep', async () => {
+    const waits = [];
+    const realSetTimeout = global.setTimeout;
+    global.setTimeout = (fn, ms) => {
+      waits.push(ms);
+      return realSetTimeout(fn, 0);
+    };
+    try {
+      let calls = 0;
+      await assert.rejects(
+        () =>
+          withRetry(async () => {
+            calls++;
+            throw new Error('transient');
+          }, [1000, 1000, 1000, 1000, 1000]),
+        { message: 'transient' },
+      );
+      // With 5 identical base delays, jitter should produce at least one
+      // wait that differs from the base — a flat sequence would mean no
+      // jitter was applied at all.
+      assert.ok(
+        waits.some((w) => w !== 1000),
+        `expected some jittered wait among ${JSON.stringify(waits)}`,
+      );
+      for (const w of waits) {
+        assert.ok(w >= 1000 && w <= 1300, `wait ${w} outside [1000, 1300]`);
+      }
     } finally {
       global.setTimeout = realSetTimeout;
     }
