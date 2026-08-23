@@ -17,6 +17,7 @@ import { fireEvent, render, screen } from '../../test-utils';
 let mockPlayers: ReadonlyArray<Record<string, unknown>> = [];
 let mockFootballPlayers: ReadonlyArray<Record<string, unknown>> = [];
 let mockFootballHasNextPage = false;
+let mockLeagueTeams: ReadonlyArray<Record<string, unknown>> | null = null;
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetPlayersWithStatsQuery: jest.fn(() => ({
@@ -33,7 +34,7 @@ jest.mock('@legacy-sports/graphql', () => ({
     loading: false,
   })),
   useGetLeagueTeamsQuery: jest.fn(() => ({
-    data: { leagueTeams: null },
+    data: { leagueTeams: mockLeagueTeams },
     loading: false,
   })),
   GetTeamMembers: 'GetTeamMembers',
@@ -149,6 +150,7 @@ beforeEach(() => {
   mockPlayers = [];
   mockFootballPlayers = [];
   mockFootballHasNextPage = false;
+  mockLeagueTeams = null;
 });
 
 describe('LeagueDetailFreeAgentsTab', () => {
@@ -318,5 +320,58 @@ describe('LeagueDetailFreeAgentsTab', () => {
       .getAllByText(/Patrick (HighProj|LowProj)/)
       .map((el) => el.textContent);
     expect(names).toEqual(['Patrick HighProj', 'Patrick LowProj']);
+  });
+
+  describe('FAAB budget display (FLD-028)', () => {
+    const faabLeague: FreeAgentsTabLeague = {
+      ...league,
+      waiverEnabled: true,
+      waiverType: 'faab',
+      faabBudgetDefault: 100,
+    };
+
+    it('shows the remaining FAAB budget on a baseball FAAB league', () => {
+      mockLeagueTeams = [{ id: 42, faabBudget: 73 }];
+      render(
+        <LeagueDetailFreeAgentsTab
+          league={faabLeague}
+          isMember
+          myTeamId={42}
+        />,
+      );
+      expect(screen.getByText('My FAAB Budget: $73')).toBeInTheDocument();
+    });
+
+    it('shows the remaining FAAB budget on a football FAAB league', () => {
+      mockLeagueTeams = [{ id: 42, faabBudget: 55 }];
+      render(
+        <LeagueDetailFreeAgentsTab
+          league={{ ...faabLeague, sport: 'football' }}
+          isMember
+          myTeamId={42}
+        />,
+      );
+      expect(screen.getByText('My FAAB Budget: $55')).toBeInTheDocument();
+    });
+
+    it('does not show a FAAB budget badge for a non-FAAB league', () => {
+      mockLeagueTeams = [{ id: 42, faabBudget: 73 }];
+      render(
+        <LeagueDetailFreeAgentsTab league={league} isMember myTeamId={42} />,
+      );
+      expect(screen.queryByText(/My FAAB Budget/)).not.toBeInTheDocument();
+    });
+
+    it('does not show a FAAB budget badge when the viewer has no team on record', () => {
+      mockLeagueTeams = [{ id: 99, faabBudget: 73 }];
+      render(
+        <LeagueDetailFreeAgentsTab
+          league={faabLeague}
+          isMember
+          myTeamId={42}
+        />,
+      );
+      expect(screen.queryByText(/My FAAB Budget/)).not.toBeInTheDocument();
+    });
   });
 });

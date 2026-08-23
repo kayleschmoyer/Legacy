@@ -351,6 +351,37 @@ const Banner: React.FC<{
   );
 };
 
+/**
+ * The viewer's own remaining FAAB budget (FLD-028) — distinct from the
+ * league-wide starting default already surfaced in `subTitle`, which never
+ * reflects what a team has actually spent on processed claims.
+ */
+const FaabBudgetBadge: React.FC<{ budget: number }> = ({ budget }) => (
+  <XStack
+    alignSelf="flex-start"
+    alignItems="center"
+    paddingHorizontal="$2"
+    paddingVertical={3}
+    borderRadius="$10"
+    borderWidth={1}
+    borderColor={withAlpha(GREEN_LIGHT, 0.4)}
+    backgroundColor={withAlpha(GREEN_LIGHT, 0.12)}
+  >
+    <Text
+      fontSize={10}
+      fontWeight="700"
+      fontFamily="$heading"
+      letterSpacing={0.6}
+      textTransform="uppercase"
+      color={GREEN_LIGHT}
+      accessibilityRole="text"
+      accessibilityLabel={`Your remaining FAAB budget: $${budget}`}
+    >
+      My FAAB Budget: ${budget}
+    </Text>
+  </XStack>
+);
+
 const FilterPill: React.FC<{
   label: string;
   active: boolean;
@@ -783,6 +814,20 @@ export const LeagueDetailFreeAgentsTab: React.FC<
   const { takenPlayerIds, loading: takenLoading } =
     useLeagueTakenPlayers(leagueId);
 
+  // Powers the FLD-028 "My FAAB Budget" badge — same query + variables as
+  // useLeagueTakenPlayers's internal call above, so this reads from the
+  // Apollo cache rather than firing a second network request.
+  const { data: teamsData } = useGetLeagueTeamsQuery({
+    variables: { leagueId },
+    skip: !leagueId,
+  });
+  const myFaabBudget = useMemo(
+    () =>
+      teamsData?.leagueTeams?.find((t) => t?.id === myTeamId)?.faabBudget ??
+      null,
+    [teamsData, myTeamId],
+  );
+
   const hasNextPage = (data?.players ?? []).length > PAGE_SIZE;
   const footballHasNextPage =
     footballData?.footballPlayers?.pageInfo?.hasNextPage ?? false;
@@ -820,6 +865,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
   const isLoading = loading || takenLoading;
   const footballIsLoading = footballLoading || takenLoading;
   const canClaim = isMember && myTeamId != null;
+  const isFaabLeague = league.waiverType?.toLowerCase() === 'faab';
   const subTitle = league.waiverEnabled
     ? `${league.waiverType ?? 'Waivers'} active${
         league.faabBudgetDefault ? ` · FAAB ${league.faabBudgetDefault}` : ''
@@ -902,7 +948,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
                 <Text fontSize={12} color="$textMuted">
                   {subTitle}
                 </Text>
-                {league.waiverType?.toLowerCase() === 'faab' ? (
+                {isFaabLeague ? (
                   <XStack alignSelf="flex-start">
                     <Text
                       fontSize={10}
@@ -923,6 +969,9 @@ export const LeagueDetailFreeAgentsTab: React.FC<
                       Premium league
                     </Text>
                   </XStack>
+                ) : null}
+                {isFaabLeague && myFaabBudget != null ? (
+                  <FaabBudgetBadge budget={myFaabBudget} />
                 ) : null}
               </YStack>
               <ProjectionSortToggle
@@ -1124,7 +1173,7 @@ export const LeagueDetailFreeAgentsTab: React.FC<
               <Text fontSize={12} color="$textMuted">
                 {subTitle}
               </Text>
-              {league.waiverType?.toLowerCase() === 'faab' ? (
+              {isFaabLeague ? (
                 <XStack alignSelf="flex-start">
                   <Text
                     fontSize={10}
@@ -1145,6 +1194,9 @@ export const LeagueDetailFreeAgentsTab: React.FC<
                     Premium league
                   </Text>
                 </XStack>
+              ) : null}
+              {isFaabLeague && myFaabBudget != null ? (
+                <FaabBudgetBadge budget={myFaabBudget} />
               ) : null}
             </YStack>
             <XStack
