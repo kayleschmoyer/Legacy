@@ -3,10 +3,10 @@ import humanizeString from 'humanize-string';
 import { Button, Separator, Text, YStack } from 'tamagui';
 import { ScrollView } from 'react-native';
 import {
-  ALLOWED_POSITIONS,
   PITCHING_POSITIONS,
   type SportKind,
 } from '@legacy-sports/shared-components';
+import { canPlayerPlayPosition as canPlayerPlayPositionForSport } from '@legacy-sports/shared-components/roster';
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
@@ -25,13 +25,10 @@ const isPlayerBatter = (player: AppTeamMemberFragment): boolean =>
 const canPlayerPlayPosition = (
   player: AppTeamMemberFragment | undefined,
   position: LeaguePositionFragment | undefined,
+  sport: SportKind,
 ): boolean => {
   if (!player || !position) return true;
-  const eligible = getEligiblePositions(player);
-  if (eligible.length === 0) return true;
-  const allowed = ALLOWED_POSITIONS[position.positionType ?? ''];
-  if (!allowed) return false;
-  return eligible.some((pos) => allowed.includes(pos));
+  return canPlayerPlayPositionForSport(player, position.positionType, sport);
 };
 
 type MaybeNumber = number | null | undefined;
@@ -135,8 +132,12 @@ const PlayerRow = memo(
           size="$2"
           onPress={() => onClick(item)}
           disabled={
-            !canPlayerPlayPosition(selectedPlayer, positionSlot) ||
-            !canPlayerPlayPosition(teamMember, selectedPositionMapping) ||
+            !canPlayerPlayPosition(selectedPlayer, positionSlot, sport) ||
+            !canPlayerPlayPosition(
+              teamMember,
+              selectedPositionMapping,
+              sport,
+            ) ||
             (selectedPositionMapping === undefined &&
               positionSlot === undefined &&
               selectedPlayer !== undefined &&

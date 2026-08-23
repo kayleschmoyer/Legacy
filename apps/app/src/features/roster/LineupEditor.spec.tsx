@@ -1,12 +1,12 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import type { Text as RNText, View as RNView } from 'react-native';
 
 import type {
   AppTeamMemberFragment,
   LeaguePositionFragment,
 } from '@legacy-sports/graphql';
-import { LineupEditor } from './LineupEditor';
+import { LineupEditor, type LineupEditorProps } from './LineupEditor';
 
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
 
@@ -20,16 +20,45 @@ jest.mock('humanize-string', () => ({
 }));
 
 // requireActual isn't used here since the real barrel pulls in native OAuth
-// deps Jest can't parse; ALLOWED_POSITIONS/PITCHING_POSITIONS mirror the real
-// baseball-only constants from lib/utils/src/lib/allowed-positions.ts.
+// deps Jest can't parse; PITCHING_POSITIONS mirrors the real baseball-only
+// constant from lib/utils/src/lib/allowed-positions.ts.
 jest.mock('@legacy-sports/shared-components', () => ({
-  ALLOWED_POSITIONS: {
+  PITCHING_POSITIONS: new Set(['SP', 'RP', 'P']),
+}));
+
+// @legacy-sports/shared-components/roster re-exports RosterBoard and friends,
+// which pull in the same native/OAuth deps Jest can't parse — mock just the
+// sport-aware canPlayerPlayPosition, mirroring the real
+// ALLOWED_POSITIONS_BY_SPORT semantics (lib/utils/src/lib/allowed-positions.ts)
+// over a small controlled position set (LS-9688).
+const ALLOWED_POSITIONS_BY_SPORT: Record<
+  'baseball' | 'football',
+  Record<string, string[]>
+> = {
+  baseball: {
     C: ['C'],
     '1B': ['1B'],
     SP: ['SP', 'P'],
     RP: ['RP', 'P'],
   },
-  PITCHING_POSITIONS: new Set(['SP', 'RP', 'P']),
+  football: {
+    QB: ['QB'],
+    RB: ['RB'],
+  },
+};
+
+jest.mock('@legacy-sports/shared-components/roster', () => ({
+  canPlayerPlayPosition: (
+    player: { player?: { eligiblePositions?: string[] | null } | null },
+    positionType: string | null | undefined,
+    sport: 'baseball' | 'football',
+  ) => {
+    const eligible = player.player?.eligiblePositions ?? [];
+    if (eligible.length === 0) return true;
+    const allowed = ALLOWED_POSITIONS_BY_SPORT[sport][positionType ?? ''];
+    if (!allowed) return false;
+    return eligible.some((pos) => allowed.includes(pos));
+  },
 }));
 
 jest.mock('tamagui', () => {
@@ -52,11 +81,13 @@ jest.mock('tamagui', () => {
     Button: ({
       children,
       onPress,
+      disabled,
     }: {
       children: React.ReactNode;
       onPress?: () => void;
+      disabled?: boolean;
     }) => (
-      <Pressable onPress={onPress}>
+      <Pressable onPress={onPress} disabled={disabled}>
         {<RNTextComp>{children}</RNTextComp>}
       </Pressable>
     ),
@@ -89,6 +120,10 @@ function benchTeamMember(
   };
 }
 
+function starterSlot(id: number, positionType: string): LeaguePositionFragment {
+  return { id, leagueId: 1, positionType };
+}
+
 const NOOP = (): void => {
   /* not exercised in these tests */
 };
@@ -96,11 +131,13 @@ const NOOP = (): void => {
 function renderLineup(
   team: readonly AppTeamMemberFragment[],
   sport: 'baseball' | 'football',
+  availableRosterSlots: readonly LeaguePositionFragment[] = [],
+  onPlayerAdded: LineupEditorProps['onPlayerAdded'] = NOOP,
 ) {
   return render(
     <LineupEditor
-      availableRosterSlots={[] as readonly LeaguePositionFragment[]}
-      onPlayerAdded={NOOP}
+      availableRosterSlots={availableRosterSlots}
+      onPlayerAdded={onPlayerAdded}
       onPlayerMoved={NOOP}
       onPlayerRemoved={NOOP}
       team={team}
@@ -139,5 +176,52 @@ describe('LineupEditor bench badge — sport gating (LS-6436)', () => {
     renderLineup([benchTeamMember(4, ['1B'])], 'baseball');
     expect(screen.getByText('BE')).toBeTruthy();
     expect(screen.queryByText('BP')).toBeNull();
+  });
+});
+
+// ── Tests (LS-9688) ─────────────────────────────────────────────────────────
+//
+// canPlayerPlayPosition previously read the bare (baseball-only)
+// ALLOWED_POSITIONS map, so every football starter-slot button was always
+// disabled regardless of the selected player's eligibility. These tests
+// exercise the starter-slot Button's `disabled` gating directly, selecting a
+// bench player and asserting whether the resulting starter-slot button is
+// enabled — the same code path a manager hits when trying to start a player.
+
+describe('LineupEditor starter-slot eligibility — sport gating (LS-9688)', () => {
+  it('enables the starter slot for a football bench player eligible for that slot', () => {
+    renderLineup([benchTeamMember(10, ['QB'])], 'football', [
+      starterSlot(100, 'QB'),
+    ]);
+
+    fireEvent.press(screen.getByText('BE')); // select the bench player
+    expect(screen.getByText('QB')).not.toBeDisabled();
+  });
+
+  it('disables the starter slot for a football bench player NOT eligible for that slot', () => {
+    renderLineup([benchTeamMember(11, ['RB'])], 'football', [
+      starterSlot(101, 'QB'),
+    ]);
+
+    fireEvent.press(screen.getByText('BE')); // select the bench player
+    expect(screen.getByText('QB')).toBeDisabled();
+  });
+
+  it('enables the starter slot for a baseball bench player eligible for that slot', () => {
+    renderLineup([benchTeamMember(12, ['1B'])], 'baseball', [
+      starterSlot(102, '1B'),
+    ]);
+
+    fireEvent.press(screen.getByText('BE')); // select the bench player
+    expect(screen.getByText('1B')).not.toBeDisabled();
+  });
+
+  it('disables the starter slot for a baseball bench player NOT eligible for that slot', () => {
+    renderLineup([benchTeamMember(13, ['1B'])], 'baseball', [
+      starterSlot(103, 'C'),
+    ]);
+
+    fireEvent.press(screen.getByText('BE')); // select the bench player
+    expect(screen.getByText('C')).toBeDisabled();
   });
 });
