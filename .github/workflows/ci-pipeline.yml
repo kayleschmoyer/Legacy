@@ -112,7 +112,8 @@ jobs:
   detect-changes:
     name: "Detect Project Changes"
     # LS-3884: change detection is pure git + paths-filter — no build tooling needed
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # ubuntu-latest: install-dependencies: false — no self-hosted AMI benefit; runs on every push (LS-9450)
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip-ci') }}
     outputs:
@@ -634,7 +635,8 @@ jobs:
   lockfile-check:
     name: "lockfile-check"
     if: always() && !contains(github.event.pull_request.labels.*.name, 'skip-ci')
-    runs-on: ${{ inputs.runner-label || vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
+    # ubuntu-latest: --lockfile-only never writes node_modules — no self-hosted AMI benefit; runs on every push (LS-9450)
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: "Checkout Repository"
