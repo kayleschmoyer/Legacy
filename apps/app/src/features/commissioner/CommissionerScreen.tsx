@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Alert, ScrollView } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
-import { Card, H3, Separator, Text, YStack } from 'tamagui';
+import { Button, Card, H3, Text, YStack } from 'tamagui';
+import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
+import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
 import { useRouter } from 'expo-router';
 import {
   AchievementRestrictionsControl,
@@ -29,6 +31,51 @@ import {
 } from '../matchup/hooks/useMatchup';
 import { useSubscription } from '../subscription';
 import { useHasEntitlement } from '../subscription/useSubscription';
+
+interface CommissionerAccordionSection {
+  id: string;
+  label: string;
+  content: React.ReactNode;
+}
+
+/** "Next Step" is open by default; every other section starts collapsed. */
+const DEFAULT_OPEN_SECTION_ID = 'next-step';
+
+function CommissionerAccordionItem({
+  section,
+  open,
+  onToggle,
+}: {
+  section: CommissionerAccordionSection;
+  open: boolean;
+  onToggle: () => void;
+}): React.JSX.Element {
+  return (
+    <YStack>
+      <Button
+        testID={`commissioner-accordion-header-${section.id}`}
+        onPress={onToggle}
+        backgroundColor="$gray2"
+        justifyContent="space-between"
+        accessibilityState={{ expanded: open }}
+        chromeless
+      >
+        <Text fontSize="$4" fontWeight="600">
+          {section.label}
+        </Text>
+        {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+      </Button>
+      {open ? (
+        <YStack
+          testID={`commissioner-accordion-content-${section.id}`}
+          paddingTop="$3"
+        >
+          {section.content}
+        </YStack>
+      ) : null}
+    </YStack>
+  );
+}
 
 export interface CommissionerScreenProps {
   leagueId: number;
@@ -70,11 +117,15 @@ export function CommissionerScreen({
     Alert.alert('Error', err.message);
   };
 
-  return (
-    <ScrollView>
-      <YStack padding="$4" gap="$4">
-        <H3>Commissioner Settings</H3>
+  const [openSectionId, setOpenSectionId] = useState<string>(
+    DEFAULT_OPEN_SECTION_ID,
+  );
 
+  const sections: CommissionerAccordionSection[] = [
+    {
+      id: 'next-step',
+      label: 'Next Step',
+      content: (
         <NextStepControl
           leagueId={leagueId}
           currentMatchup={currentMatchup}
@@ -92,14 +143,24 @@ export function CommissionerScreen({
             })
           }
         />
-
+      ),
+    },
+    {
+      id: 'commissioner-note',
+      label: 'Commissioner Note',
+      content: (
         <CommissionerNoteControl
           leagueId={leagueId}
           currentNote={league.lmNotes ?? ''}
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />
-
+      ),
+    },
+    {
+      id: 'league-settings',
+      label: 'League Settings',
+      content: (
         <LeagueSettingsControl
           leagueId={leagueId}
           sport={league.sport ?? undefined}
@@ -119,39 +180,63 @@ export function CommissionerScreen({
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />
-
-        {!isFootball && (
-          <DraftSettingsControl
-            leagueId={leagueId}
-            draftStatus={league.draftStatus}
-            playerPool={league.playerPool ?? undefined}
-            rosterContinuity={league.rosterContinuity}
-            eraFilter={league.eraFilter ?? undefined}
-            baseballHofOnly={league.baseballHofOnly ?? undefined}
-            customEraStartYear={league.customEraStartYear ?? undefined}
-            customEraEndYear={league.customEraEndYear ?? undefined}
-            isPremium={isPremium}
-            onSuccess={handleAlert('Success')}
-            onError={handleError}
-          />
-        )}
-
-        {isFootball && (
-          <RosterRequirementsControl
-            leagueId={leagueId}
-            defensiveFormat={league.defensiveFormat}
-            onSuccess={handleAlert('Success')}
-            onError={handleError}
-          />
-        )}
-
+      ),
+    },
+    ...(!isFootball
+      ? [
+          {
+            id: 'draft-settings',
+            label: 'Draft Settings',
+            content: (
+              <DraftSettingsControl
+                leagueId={leagueId}
+                draftStatus={league.draftStatus}
+                playerPool={league.playerPool ?? undefined}
+                rosterContinuity={league.rosterContinuity}
+                eraFilter={league.eraFilter ?? undefined}
+                baseballHofOnly={league.baseballHofOnly ?? undefined}
+                customEraStartYear={league.customEraStartYear ?? undefined}
+                customEraEndYear={league.customEraEndYear ?? undefined}
+                isPremium={isPremium}
+                onSuccess={handleAlert('Success')}
+                onError={handleError}
+              />
+            ),
+          },
+        ]
+      : []),
+    ...(isFootball
+      ? [
+          {
+            id: 'roster-requirements',
+            label: 'Roster Requirements',
+            content: (
+              <RosterRequirementsControl
+                leagueId={leagueId}
+                defensiveFormat={league.defensiveFormat}
+                onSuccess={handleAlert('Success')}
+                onError={handleError}
+              />
+            ),
+          },
+        ]
+      : []),
+    {
+      id: 'draft-order',
+      label: 'Draft Pick Order',
+      content: (
         <DraftOrderControl
           leagueId={leagueId}
           draftStatus={league.draftStatus}
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />
-
+      ),
+    },
+    {
+      id: 'league-branding',
+      label: 'League Branding',
+      content: (
         <LeagueBrandingControl
           leagueId={leagueId}
           leagueName={league.name ?? ''}
@@ -162,20 +247,35 @@ export function CommissionerScreen({
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />
-
+      ),
+    },
+    {
+      id: 'league-dues',
+      label: 'League Dues',
+      content: (
         <LeagueDuesSetup
           leagueId={leagueId}
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />
-
+      ),
+    },
+    {
+      id: 'season-awards',
+      label: 'Season Awards',
+      content: (
         <SeasonAwardsControl
           leagueId={leagueId}
           currentSeason={league.seasonNumber ?? new Date().getFullYear()}
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />
-
+      ),
+    },
+    {
+      id: 'scoring',
+      label: 'Scoring',
+      content: (
         <LeagueScoringEditor
           leagueId={leagueId}
           profile={scoringProfile}
@@ -189,26 +289,36 @@ export function CommissionerScreen({
           isPremium={hasCustomScoringMultipliers}
           onUpgrade={() => router.navigate('/subscription-settings')}
         />
-
+      ),
+    },
+    {
+      id: 'achievement-restrictions',
+      label: 'Achievement Restrictions',
+      content: (
         <AchievementRestrictionsControl
           leagueId={leagueId}
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />
-
+      ),
+    },
+    {
+      id: 'waiver-processing',
+      label: 'Waiver Processing',
+      content: (
         <WaiverProcessControl
           leagueId={leagueId}
           onSuccess={handleAlert('Success')}
           onError={handleError}
         />
-
-        <Separator />
-
+      ),
+    },
+    {
+      id: 'danger-zone',
+      label: 'Danger Zone',
+      content: (
         <Card backgroundColor="$red2" borderColor="$red6" padding="$4">
           <YStack gap="$3">
-            <Text fontSize="$5" fontWeight="600" color="$red11">
-              Danger Zone
-            </Text>
             <DeleteLeagueControl
               leagueId={leagueId}
               leagueName={league.name ?? ''}
@@ -220,8 +330,34 @@ export function CommissionerScreen({
             />
           </YStack>
         </Card>
+      ),
+    },
+    {
+      id: 'audit-log',
+      label: 'Audit Log',
+      content: <CommissionerAuditLog leagueId={leagueId} />,
+    },
+  ];
 
-        <CommissionerAuditLog leagueId={leagueId} />
+  return (
+    <ScrollView>
+      <YStack padding="$4" gap="$4">
+        <H3>Commissioner Settings</H3>
+
+        <YStack gap="$2">
+          {sections.map((section) => (
+            <CommissionerAccordionItem
+              key={section.id}
+              section={section}
+              open={openSectionId === section.id}
+              onToggle={() =>
+                setOpenSectionId((current) =>
+                  current === section.id ? '' : section.id,
+                )
+              }
+            />
+          ))}
+        </YStack>
       </YStack>
     </ScrollView>
   );
