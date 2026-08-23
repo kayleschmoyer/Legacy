@@ -1,6 +1,10 @@
 import { and, count, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
-import { PublicDb, PublicSchema } from '@legacy-sports/db-client';
+import {
+  minResolvedCountPerMatchup,
+  PublicDb,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import { IDP_POSITIONS } from './constants';
 
 /**
@@ -500,7 +504,15 @@ export async function updateMatchupStatus(
 
 /**
  * Check if all games are complete for a matchup by comparing
- * gamesPerMatchup with the count of distinct game_num values.
+ * gamesPerMatchup with the MINIMUM per-player resolved-slot count across all
+ * of the matchup's rostered players — not a matchup-wide DISTINCT game_num
+ * count. The latter under-counts remaining work: as soon as ANY one player
+ * has a game_num resolved, that game_num counts as "selected" for the whole
+ * matchup even if the rest of the roster still has that slot unresolved,
+ * flipping the matchup to 'completed' prematurely (LS-9517, sibling of the
+ * LS-6367 fix for getSelectedGamesCountBatch). A slot counts as resolved
+ * when it has a real gameIdentifier assigned, or was intentionally skipped
+ * (pitcherStartSkipped).
  * Returns the appropriate matchup main status.
  */
 export async function checkMatchupCompletion(
@@ -518,22 +530,30 @@ export async function checkMatchupCompletion(
 
   const gamesPerMatchup = matchupResult[0]?.gamesPerMatchup ?? 0;
 
-  // Count distinct game_num values for this matchup
-  const selectedGamesResult = await db
+  // Count resolved game slots per rostered player, then take the minimum
+  // across the matchup's players.
+  const resolvedRows = await db
     .select({
-      count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
+      matchupId: PublicSchema.matchupPlayers.matchupId,
+      matchupPlayerId: PublicSchema.matchupPlayers.id,
+      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
     })
-    .from(PublicSchema.matchupPlayerGames)
-    .innerJoin(
-      PublicSchema.matchupPlayers,
+    .from(PublicSchema.matchupPlayers)
+    .leftJoin(
+      PublicSchema.matchupPlayerGames,
       eq(
         PublicSchema.matchupPlayerGames.matchupPlayerId,
         PublicSchema.matchupPlayers.id,
       ),
     )
-    .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId));
+    .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId))
+    .groupBy(
+      PublicSchema.matchupPlayers.matchupId,
+      PublicSchema.matchupPlayers.id,
+    );
 
-  const selectedGamesCount = selectedGamesResult[0]?.count ?? 0;
+  const selectedGamesCount =
+    minResolvedCountPerMatchup([matchupId], resolvedRows).get(matchupId) ?? 0;
 
   // If all games are selected and stats loaded, mark matchup as completed
   if (selectedGamesCount >= gamesPerMatchup && gamesPerMatchup > 0) {

@@ -62,8 +62,35 @@ const matchupPlayerGames = {
   pitcherStartSkipped: 'mpg.pitcherStartSkipped',
   noGameDataFound: 'mpg.noGameDataFound',
 };
+const matchupPlayers = {
+  id: 'mp.id',
+  matchupId: 'mp.matchupId',
+};
+const matchups = {
+  id: 'm.id',
+  gamesPerMatchup: 'm.gamesPerMatchup',
+};
 
 jest.mock('@legacy-sports/db-client', () => ({
+  minResolvedCountPerMatchup: (
+    matchupIds: number[],
+    rows: { matchupId: number; count: number | string }[],
+  ) => {
+    const minByMatchup = new Map<number, number>();
+    for (const row of rows) {
+      const rowCount = Number(row.count);
+      const current = minByMatchup.get(row.matchupId);
+      minByMatchup.set(
+        row.matchupId,
+        current === undefined ? rowCount : Math.min(current, rowCount),
+      );
+    }
+    const result = new Map<number, number>();
+    for (const id of matchupIds) {
+      result.set(id, minByMatchup.get(id) ?? 0);
+    }
+    return result;
+  },
   PublicSchema: {
     gameBatting,
     gamePitching,
@@ -74,10 +101,13 @@ jest.mock('@legacy-sports/db-client', () => ({
     gameFootballReceiving,
     gameFootballKicking,
     matchupPlayerGames,
+    matchupPlayers,
+    matchups,
   },
 }));
 
 import {
+  checkMatchupCompletion,
   selectAndAssignFootballGameIdentifiers,
   selectAndAssignGameIdentifiers,
 } from './game-state-manager';
@@ -155,5 +185,72 @@ describe('selectAndAssignFootballGameIdentifiers', () => {
       statsLoadingStatus: 'completed',
     });
     expect(updateSetCalls[0]).not.toHaveProperty('pitcherStartSkipped');
+  });
+});
+
+describe('checkMatchupCompletion', () => {
+  // LS-9517: checkMatchupCompletion must be gated on the least-resolved
+  // rostered player, not a matchup-wide DISTINCT game_num count — the same
+  // premature-completion bug pattern fixed for getSelectedGamesCountBatch in
+  // LS-6367.
+
+  function createCompletionMockDb(
+    gamesPerMatchup: number,
+    resolvedRows: Array<{
+      matchupId: number;
+      matchupPlayerId: number;
+      count: number;
+    }>,
+  ) {
+    let callCount = 0;
+    const db = {
+      select: jest.fn(() => {
+        callCount++;
+        if (callCount === 1) {
+          // First select(): matchups.gamesPerMatchup lookup
+          return {
+            from: jest.fn(() => ({
+              where: jest.fn(() => ({
+                limit: jest.fn(() => Promise.resolve([{ gamesPerMatchup }])),
+              })),
+            })),
+          };
+        }
+        // Second select(): per-player resolved-slot counts
+        return {
+          from: jest.fn(() => ({
+            leftJoin: jest.fn(() => ({
+              where: jest.fn(() => ({
+                groupBy: jest.fn(() => Promise.resolve(resolvedRows)),
+              })),
+            })),
+          })),
+        };
+      }),
+    };
+
+    return db;
+  }
+
+  it('returns in_progress when one rostered player still has an unresolved game slot', async () => {
+    const db = createCompletionMockDb(5, [
+      { matchupId: 42, matchupPlayerId: 101, count: 5 },
+      { matchupId: 42, matchupPlayerId: 102, count: 4 },
+    ]);
+
+    const result = await checkMatchupCompletion(db as never, 42);
+
+    expect(result).toBe('in_progress');
+  });
+
+  it('returns completed only once every rostered player has all slots resolved', async () => {
+    const db = createCompletionMockDb(5, [
+      { matchupId: 42, matchupPlayerId: 101, count: 5 },
+      { matchupId: 42, matchupPlayerId: 102, count: 5 },
+    ]);
+
+    const result = await checkMatchupCompletion(db as never, 42);
+
+    expect(result).toBe('completed');
   });
 });

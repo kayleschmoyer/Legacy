@@ -259,7 +259,16 @@ export async function batchInsertMatchupPlayers(
 // Uses the composite index (matchup_player_id, game_num) on matchup_player_games.
 
 /**
- * Count distinct game numbers already selected for a single matchup.
+ * Count "fully resolved" game slots for a single matchup.
+ *
+ * The count is the MINIMUM per-player resolved-slot count across all of the
+ * matchup's rostered players — not a matchup-wide DISTINCT game_num count.
+ * The latter under-counts remaining work: as soon as ANY one player has a
+ * game_num resolved, that game_num counts as "selected" for the whole
+ * matchup even if the rest of the roster still has that slot unresolved
+ * (LS-9517, sibling of the LS-6367 batch fix). A slot counts as resolved
+ * when it has a real gameIdentifier assigned, or was intentionally skipped
+ * (pitcherStartSkipped).
  */
 export async function getSelectedGamesCount(
   db: PublicDb,
@@ -267,19 +276,25 @@ export async function getSelectedGamesCount(
 ): Promise<number> {
   const rows = await db
     .select({
-      count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
+      matchupId: PublicSchema.matchupPlayers.matchupId,
+      matchupPlayerId: PublicSchema.matchupPlayers.id,
+      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
     })
-    .from(PublicSchema.matchupPlayerGames)
-    .innerJoin(
-      PublicSchema.matchupPlayers,
+    .from(PublicSchema.matchupPlayers)
+    .leftJoin(
+      PublicSchema.matchupPlayerGames,
       eq(
         PublicSchema.matchupPlayerGames.matchupPlayerId,
         PublicSchema.matchupPlayers.id,
       ),
     )
-    .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId));
+    .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId))
+    .groupBy(
+      PublicSchema.matchupPlayers.matchupId,
+      PublicSchema.matchupPlayers.id,
+    );
 
-  return Number(rows[0]?.count ?? 0);
+  return minResolvedCountPerMatchup([matchupId], rows).get(matchupId) ?? 0;
 }
 
 /**
@@ -318,6 +333,33 @@ export async function getSelectedGamesCountBatch(
   }
   for (const row of rows) {
     result.set(row.matchupId, Number(row.count));
+  }
+
+  return result;
+}
+
+/**
+ * Reduce per-player resolved-slot rows to the minimum count per matchup —
+ * the matchup is only as complete as its least-resolved rostered player.
+ * Exported separately so the reduction can be unit-tested without a DB.
+ */
+export function minResolvedCountPerMatchup(
+  matchupIds: number[],
+  rows: { matchupId: number; count: number | string }[],
+): Map<number, number> {
+  const minByMatchup = new Map<number, number>();
+  for (const row of rows) {
+    const rowCount = Number(row.count);
+    const current = minByMatchup.get(row.matchupId);
+    minByMatchup.set(
+      row.matchupId,
+      current === undefined ? rowCount : Math.min(current, rowCount),
+    );
+  }
+
+  const result = new Map<number, number>();
+  for (const id of matchupIds) {
+    result.set(id, minByMatchup.get(id) ?? 0);
   }
 
   return result;
