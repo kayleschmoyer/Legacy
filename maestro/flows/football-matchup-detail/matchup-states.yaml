@@ -1,0 +1,53 @@
+# Football Matchup Detail — Upcoming / Live / Final states (LS-5427).
+#
+# Drills into a matchup from the Matchups tab into the standalone matchup
+# detail screen and screenshots it so a QA run can judge whether the
+# Scheduled/InProgress/Completed status is visually distinguishable
+# (status badge, score display, Win Probability panel vs AI Recap panel).
+#
+# Data-dependent by nature (per the qa-coverage-model convention — see
+# .agents/skills/mobile-qa/SKILL.md): `open-first-league.yaml` opens
+# whichever league is first for the test account and is not football-sport
+# aware, so this flow only exercises the football-specific matchup detail
+# screen when that first league happens to be a football league. It
+# degrades gracefully (screenshots what it finds, never fails) otherwise —
+# there is no existing mechanism in this repo's Maestro subflows to select a
+# league by sport. A screenshot of a non-football matchup is still useful
+# signal that the shared drill-in flow itself works; the AI judging pass is
+# what ultimately confirms whether football-specific coverage was captured.
+appId: com.legacysports.app
+tags:
+  - football-matchup-detail
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- tapOn: "Matchups"
+# Mandatory landing: the matchup-list container renders on the Matchups tab
+# regardless of matchup data (pre-season shows an empty-state message inside
+# the same container), so a broken tab fails the flow. The matchup-card
+# drill-in below stays when:-guarded because card presence is genuinely
+# data-dependent (mirrors baseball-matchup-detail/matchups-tab.yaml).
+- extendedWaitUntil:
+    visible:
+      id: "matchup-list"
+    timeout: 20000
+- takeScreenshot: maestro/artifacts/football-matchup-detail/01-matchups-tab
+- runFlow:
+    when:
+      visible:
+        id: "matchup-card"
+    commands:
+      - takeScreenshot: maestro/artifacts/football-matchup-detail/02-before-open-matchup
+      - tapOn:
+          id: "matchup-card"
+          index: 0
+      - extendedWaitUntil:
+          visible: "Matchup"
+          timeout: 20000
+      - takeScreenshot: maestro/artifacts/football-matchup-detail/03-matchup-detail-state
+      - scroll
+      - takeScreenshot: maestro/artifacts/football-matchup-detail/04-matchup-detail-scrolled
+      - back
