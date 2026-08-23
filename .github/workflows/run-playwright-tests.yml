@@ -1366,6 +1366,40 @@ jobs:
           # Full report to the job summary.
           cat coverage-audit-report.md >> "$GITHUB_STEP_SUMMARY"
 
+      # LS-9661 SHADOW (observe-only): run the SAME under-selection audit
+      # against the GRAPH-DERIVED surface map. This is the flip gate the
+      # ticket's AC4 requires: the hand map may only be retired once these
+      # nightly shadow audits show no high-confidence under-selection from
+      # the derived map. Greppable log keys are prefixed `derived-` (e.g.
+      # `derived-has-under-selection=false`). The integration map is stubbed
+      # to match-everything so this pass audits ONLY the derived e2e map;
+      # dead-glob state is deliberately not persisted (exact-path maps are
+      # regenerated per run — miss counters would be meaningless). Never
+      # fails the job and never touches the live audit's outputs.
+      - name: "Shadow: Audit DERIVED Surface Map (LS-9661)"
+        shell: bash
+        run: |
+          set -uo pipefail
+          node .github/scripts/e2e-graph/derive-surface-map.mjs \
+            --out /tmp/derived-surface-map.json \
+            || { echo "::warning::LS-9661 derived-map generation failed — shadow audit skipped"; exit 0; }
+          printf '{ "runAllWhenChanged": ["**"], "specs": {} }\n' > /tmp/match-all-integration-map.json
+          node .github/scripts/coverage-audit/audit-coverage.mjs \
+            --fragments-dir all-coverage-fragments \
+            --e2e-map /tmp/derived-surface-map.json \
+            --integration-map /tmp/match-all-integration-map.json \
+            --state-out /tmp/derived-audit-state.json \
+            --k 3 \
+            --report-md derived-coverage-audit.md \
+            --github-output | sed 's/^\([a-z-]*=\)/derived-\1/' \
+            || { echo "::warning::LS-9661 derived-map shadow audit failed"; exit 0; }
+          {
+            echo ""
+            echo "## LS-9661 shadow — same audit against the GRAPH-DERIVED map (flip gate)"
+            echo ""
+            cat derived-coverage-audit.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: "Build Discord Description"
         id: discord
         if: always()

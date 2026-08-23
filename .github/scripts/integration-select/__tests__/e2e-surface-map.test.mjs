@@ -4,6 +4,14 @@
  * The selection ENGINE (globToRegExp / selectSpecs) is shared with the
  * integration surface map and is unit-tested in select-specs.test.mjs; this
  * file only guards the e2e manifest:
+ *
+ * ⚠️ LS-9661 transition: the hand-maintained e2e map is in SHADOW-MODE
+ * replacement by the graph-derived generator (.github/scripts/e2e-graph/).
+ * The generator's own tests carry the successor presence guarantee (every
+ * spec on disk mapped, derived from the module graph). This lint stays
+ * REQUIRED while the hand map is still the live selector; retire the e2e
+ * half of it (together with the map and the LS-7851 remediation bot's e2e
+ * targeting) in the flip PR once the shadow period clears.
  *   1. Coverage — every hermetic spec on disk is mapped, and the manifest
  *      references no specs that no longer exist (the gate that forces a NEW
  *      spec to get a map entry at PR time).

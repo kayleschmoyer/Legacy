@@ -61,7 +61,7 @@ lint  test build custom- lockfile-   (5 granular jobs, PARALLEL)
 
 When invoked via `workflow_call` from the orchestrator's `🚀 CI Pipeline` job, each job posts a check run named `🚀 CI Pipeline / <job-id>` — **informational** since the LS-8014 cutover; the merge gate reads the aggregate `CI Gate` commit status instead (see [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md)).
 
-**Stage 1 -- Detect Changes:** `dorny/paths-filter` + git to determine which surfaces changed (web, mobile, lambdas, terraform, e2e), plus hermetic affected-e2e spec selection (LS-7846) via `apps/web-e2e/src/e2e-surface-map.json` — emits the specs/grep/shard-matrix the e2e job consumes.
+**Stage 1 -- Detect Changes:** `dorny/paths-filter` + git to determine which surfaces changed (web, mobile, lambdas, terraform, e2e), plus hermetic affected-e2e spec selection (LS-7846) via `apps/web-e2e/src/e2e-surface-map.json` — emits the specs/grep/shard-matrix the e2e job consumes. A second, observe-only step (LS-9661 shadow mode) derives a graph-based surface map (`.github/scripts/e2e-graph/derive-surface-map.mjs`), runs the same selector over it, and logs the diff (`E2E-SELECT-SHADOW` line + job-summary table); it never affects the live selection — the flip to the derived map is LS-9689.
 
 **Stage 2 -- Five granular jobs, in parallel:**
 

@@ -260,6 +260,44 @@ jobs:
 
           echo "::notice::E2E selection — run-all=$RUN_ALL, affected specs=$(echo "$SPECS" | grep -c . || true), shards=$SHARD_MATRIX"
 
+      # LS-9661 SHADOW MODE (observe-only): derive a second surface map from
+      # the real module graph (spec imports ∪ app-shell closure ∪ visited-route
+      # page closures) and run the SAME selector over the SAME changed files,
+      # then log the diff. The live selection above is untouched — the flip to
+      # the derived map happens in a later PR, only after the shadow period
+      # shows no high-confidence under-selection (corroborated nightly by the
+      # LS-7850 auditor running against the derived map). The greppable
+      # `E2E-SELECT-SHADOW` line is the measurement record for the LS-8905
+      # 79% escalation-rate before/after. This step must never fail the job.
+      - name: "Shadow: graph-derived E2E selection (LS-9661)"
+        shell: bash
+        run: |
+          set -uo pipefail
+          warn_and_stop() {
+            echo "::warning::LS-9661 shadow selection: $1 (observe-only — no impact on live selection)"
+            exit 0
+          }
+          START=$(date +%s)
+          node .github/scripts/e2e-graph/derive-surface-map.mjs \
+            --out /tmp/derived-surface-map.json \
+            || warn_and_stop "derive-surface-map.mjs failed"
+          echo "::notice::LS-9661 derived map generated in $(( $(date +%s) - START ))s"
+          [ -f /tmp/e2e-changed.txt ] || : > /tmp/e2e-changed.txt
+          node .github/scripts/integration-select/select-specs.mjs \
+            --manifest /tmp/derived-surface-map.json \
+            --changed-from-stdin --json \
+            < /tmp/e2e-changed.txt > /tmp/e2e-select-derived.json \
+            || warn_and_stop "select-specs.mjs (derived manifest) failed"
+          [ -f /tmp/e2e-select.json ] \
+            || warn_and_stop "live selection JSON absent (selection error fallback) — shadow diff skipped"
+          node .github/scripts/e2e-graph/shadow-compare.mjs \
+            --live /tmp/e2e-select.json \
+            --derived /tmp/e2e-select-derived.json \
+            --promote-at 100 \
+            --md-out /tmp/e2e-shadow.md \
+            || warn_and_stop "shadow-compare.mjs failed"
+          cat /tmp/e2e-shadow.md >> "$GITHUB_STEP_SUMMARY" || true
+
   # ============================================================================
   # STAGE 2 — Granular CI jobs (run in parallel)
   #

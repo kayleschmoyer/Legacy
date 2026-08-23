@@ -215,6 +215,11 @@ export default [
       'dist/',
       'webpack.config.*',
       '**/.tamagui/**',
+      // Mini-repo FIXTURE for the e2e-graph generator tests (LS-9661): test
+      // DATA shaped like source files, resolved by the generator's own module
+      // walker — never compiled or linted. The root `**/*.tsx` react rule
+      // would otherwise hard-error here (no react plugin at root scope).
+      '.github/scripts/e2e-graph/__tests__/fixtures/**',
     ],
   },
   {

@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    // aliases (comment exercises the tolerant parser)
+    "paths": {
+      "@mini/lib": ["lib/mini-lib/src/index.ts"],
+      "@mini/lib/*": ["lib/mini-lib/src/*"],
+      "@external/thing": ["node_modules/@external/thing/index.ts"]
+    }
+  }
+}
