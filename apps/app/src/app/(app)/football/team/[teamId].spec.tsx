@@ -8,8 +8,10 @@ type RNComponents = { View: typeof RNView; Text: typeof RNText };
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
+const mockRouterPush = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: jest.fn(() => ({ teamId: '42' })),
+  useRouter: () => ({ push: mockRouterPush }),
 }));
 
 jest.mock('@legacy-sports/logging', () => ({
@@ -115,6 +117,26 @@ jest.mock('../../../../features/roster/LineupEditor', () => {
   };
 });
 
+jest.mock('../../../../features/matchup/components/MatchupCard', () => {
+  const { Pressable, Text } = jest.requireActual<
+    RNComponents & { Pressable: typeof import('react-native').Pressable }
+  >('react-native');
+  return {
+    MatchupCard: ({
+      matchup,
+      onPress,
+    }: {
+      matchup: { id: number } | null | undefined;
+      onPress?: () => void;
+    }) =>
+      matchup ? (
+        <Pressable testID="matchup-card" onPress={onPress}>
+          <Text>Matchup {matchup.id}</Text>
+        </Pressable>
+      ) : null,
+  };
+});
+
 jest.mock('../../../../common/utilities/ErrorHandler', () => ({
   handleError: jest.fn(),
 }));
@@ -137,6 +159,7 @@ const mockLeague = {
   id: 10,
   name: 'Test League',
   defensiveFormat: 'dst',
+  currentMatchup: 77,
 };
 
 const mockPositions = [{ id: 1, leagueId: 10, positionType: 'QB' }];
@@ -183,11 +206,28 @@ const mockUseUpdateTeamBrandingMutation = jest.fn(() => [
   jest.fn(),
   { loading: false },
 ]);
+const mockMatchup = {
+  id: 77,
+  weekNumber: 3,
+  team1Id: 42,
+  team2Id: 43,
+  team1Score: 10,
+  team2Score: 7,
+  status: 'in_progress',
+  team1: { id: 42, name: 'Test Team' },
+  team2: { id: 43, name: 'Rival Team' },
+};
+const mockUseGetMatchupByIdQuery = jest.fn(() => ({
+  loading: false,
+  data: { getMatchupById: mockMatchup },
+}));
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamByIdQuery: (...args: unknown[]) => mockUseGetTeamByIdQuery(...args),
   useGetUserTeamIdQuery: (...args: unknown[]) =>
     mockUseGetUserTeamIdQuery(...args),
+  useGetMatchupByIdQuery: (...args: unknown[]) =>
+    mockUseGetMatchupByIdQuery(...args),
   useGetLeagueByIdQuery: (...args: unknown[]) =>
     mockUseGetLeagueByIdQuery(...args),
   useGetPositionsForLeagueQuery: (...args: unknown[]) =>
@@ -222,6 +262,10 @@ describe('FootballTeam route', () => {
       loading: false,
       data: { teamMembers: mockMembers },
     });
+    mockUseGetMatchupByIdQuery.mockReturnValue({
+      loading: false,
+      data: { getMatchupById: mockMatchup },
+    });
     mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
     mockUseUpdateTeamBrandingMutation.mockReturnValue([
       jest.fn(),
@@ -255,10 +299,11 @@ describe('FootballTeam route', () => {
     ).toBeTruthy();
   });
 
-  it('renders Roster and Lineup tabs for non-owner', () => {
+  it('renders Roster, Matchup, and Lineup tabs for non-owner', () => {
     mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 99 } });
     render(<FootballTeam />);
     expect(screen.getByText('Roster')).toBeTruthy();
+    expect(screen.getByText('Matchup')).toBeTruthy();
     expect(screen.getByText('Lineup')).toBeTruthy();
     expect(screen.queryByText('Settings')).toBeNull();
   });
@@ -266,6 +311,7 @@ describe('FootballTeam route', () => {
   it('renders Settings tab for owner', () => {
     render(<FootballTeam />);
     expect(screen.getByText('Roster')).toBeTruthy();
+    expect(screen.getByText('Matchup')).toBeTruthy();
     expect(screen.getByText('Lineup')).toBeTruthy();
     expect(screen.getByText('Settings')).toBeTruthy();
   });
@@ -288,5 +334,70 @@ describe('FootballTeam route', () => {
     });
     render(<FootballTeam />);
     expect(screen.getByTestId('roster-screen-42-idp')).toBeTruthy();
+  });
+
+  it('shows the current matchup card when the Matchup tab is selected', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Matchup'));
+    expect(screen.getByTestId('matchup-card')).toBeTruthy();
+    expect(screen.getByText('Matchup 77')).toBeTruthy();
+  });
+
+  it('navigates to the full matchup screen when the matchup card is pressed', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Matchup'));
+    fireEvent.press(screen.getByTestId('matchup-card'));
+    expect(mockRouterPush).toHaveBeenCalledWith(
+      '/football/matchup?matchupId=77&leagueId=10',
+    );
+  });
+
+  it('shows an empty state on the Matchup tab when the league has no current matchup', () => {
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { ...mockLeague, currentMatchup: null } },
+    });
+    mockUseGetMatchupByIdQuery.mockReturnValue({
+      loading: false,
+      data: { getMatchupById: null },
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Matchup'));
+    expect(screen.getByText('No matchup scheduled this week.')).toBeTruthy();
+    expect(screen.queryByTestId('matchup-card')).toBeNull();
+  });
+
+  it('skips the matchup query when the league has no current matchup', () => {
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: { ...mockLeague, currentMatchup: null } },
+    });
+    render(<FootballTeam />);
+    expect(mockUseGetMatchupByIdQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: true }),
+    );
+  });
+
+  it('shows a spinner on the Matchup tab while the matchup is loading', () => {
+    mockUseGetMatchupByIdQuery.mockReturnValue({
+      loading: true,
+      data: undefined,
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Matchup'));
+    expect(screen.getByTestId('spinner')).toBeTruthy();
+  });
+
+  it('shows an error message on the Matchup tab when the query errors, not the empty state', () => {
+    mockUseGetMatchupByIdQuery.mockReturnValue({
+      loading: false,
+      data: undefined,
+      error: new Error('network error'),
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Matchup'));
+    expect(screen.getByText('Could not load matchup.')).toBeTruthy();
+    expect(screen.queryByText('No matchup scheduled this week.')).toBeNull();
+    expect(screen.queryByTestId('matchup-card')).toBeNull();
   });
 });

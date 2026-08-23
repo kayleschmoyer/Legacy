@@ -1,12 +1,23 @@
 import { useState } from 'react';
-import { Button, Input, Label, Separator, Tabs, Text, YStack } from 'tamagui';
+import {
+  Button,
+  Input,
+  Label,
+  Separator,
+  Spinner,
+  Tabs,
+  Text,
+  YStack,
+} from 'tamagui';
 import { Alert, ScrollView } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
+  MatchupFragment,
   useGetLeagueByIdQuery,
+  useGetMatchupByIdQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
   useGetTeamMembersQuery,
@@ -16,10 +27,16 @@ import {
 } from '@legacy-sports/graphql';
 import { FootballLeagueRosterScreen } from '../../../../screens/leagues/football/FootballLeagueRosterScreen';
 import { LineupEditor } from '../../../../features/roster/LineupEditor';
+import { MatchupCard } from '../../../../features/matchup/components/MatchupCard';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
 
-const ALL_TABS = Object.freeze(['Roster', 'Lineup', 'Settings'] as const);
+const ALL_TABS = Object.freeze([
+  'Roster',
+  'Matchup',
+  'Lineup',
+  'Settings',
+] as const);
 type Tab = (typeof ALL_TABS)[number];
 
 interface BrandingSettingsProps {
@@ -84,6 +101,61 @@ function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
   );
 }
 
+interface MatchupTabProps {
+  matchup: MatchupFragment | null | undefined;
+  matchupId: number;
+  loading: boolean;
+  error: unknown;
+  leagueId: number;
+}
+
+function MatchupTab({
+  matchup,
+  matchupId,
+  loading,
+  error,
+  leagueId,
+}: MatchupTabProps): React.JSX.Element {
+  const router = useRouter();
+
+  if (loading) {
+    return (
+      <YStack alignItems="center" padding="$6">
+        <Spinner size="small" color="$brandNavyLight" />
+      </YStack>
+    );
+  }
+
+  if (error) {
+    return (
+      <YStack padding="$4">
+        <Text color="$red10">Could not load matchup.</Text>
+      </YStack>
+    );
+  }
+
+  if (!matchup) {
+    return (
+      <YStack padding="$4">
+        <Text color="$gray10">No matchup scheduled this week.</Text>
+      </YStack>
+    );
+  }
+
+  return (
+    <YStack padding="$4">
+      <MatchupCard
+        matchup={matchup}
+        onPress={() =>
+          router.push(
+            `/football/matchup?matchupId=${matchupId}&leagueId=${leagueId}`,
+          )
+        }
+      />
+    </YStack>
+  );
+}
+
 interface TabContentProps {
   selectedTab: Tab;
   rosterSlots: readonly (LeaguePositionFragment | null)[];
@@ -103,6 +175,10 @@ interface TabContentProps {
   avatarUrl: string | null | undefined;
   bannerUrl: string | null | undefined;
   defensiveFormat: string | null | undefined;
+  matchup: MatchupFragment | null | undefined;
+  matchupId: number;
+  matchupLoading: boolean;
+  matchupError: unknown;
 }
 
 function TabContent(props: TabContentProps): React.JSX.Element | null {
@@ -119,6 +195,10 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     avatarUrl,
     bannerUrl,
     defensiveFormat,
+    matchup,
+    matchupId,
+    matchupLoading,
+    matchupError,
   } = props;
 
   const noOp = (): void => {
@@ -131,6 +211,16 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
         <FootballLeagueRosterScreen
           teamId={teamId}
           defensiveFormat={defensiveFormat}
+        />
+      );
+    case 'Matchup':
+      return (
+        <MatchupTab
+          matchup={matchup}
+          matchupId={matchupId}
+          loading={matchupLoading}
+          error={matchupError}
+          leagueId={leagueId}
         />
       );
     case 'Lineup':
@@ -210,6 +300,19 @@ export default function FootballTeam(): React.JSX.Element {
       },
     },
   );
+
+  const currentMatchupId = leagueData?.league?.currentMatchup;
+
+  const {
+    loading: loadingMatchup,
+    data: matchupData,
+    error: matchupError,
+  } = useGetMatchupByIdQuery({
+    skip: currentMatchupId == null,
+    variables: {
+      id: currentMatchupId ?? 0,
+    },
+  });
 
   const isOwner = userTeamData?.userTeamId === numTeamId;
 
@@ -306,6 +409,10 @@ export default function FootballTeam(): React.JSX.Element {
           avatarUrl={team.team.avatarUrl}
           bannerUrl={team.team.bannerUrl}
           defensiveFormat={leagueData?.league?.defensiveFormat}
+          matchup={matchupData?.getMatchupById}
+          matchupId={currentMatchupId ?? 0}
+          matchupLoading={loadingMatchup}
+          matchupError={matchupError}
         />
       </YStack>
     </ScrollView>
