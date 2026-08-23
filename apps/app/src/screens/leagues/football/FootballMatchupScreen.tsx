@@ -112,6 +112,35 @@ export function getPlayerPosition(player: MatchupPlayer['player']): string {
   return positions[0] ?? '—';
 }
 
+/**
+ * Returns the header status label for a matchup's current status.
+ * Distinguishes scheduled/live/final/cancelled matchups so a completed or
+ * cancelled game is never mistaken for an upcoming one.
+ *
+ * @param status - The matchup's current status.
+ * @returns Display label for the header status text.
+ */
+export function getMatchupStatusLabel(status: Matchup['status']): string {
+  if (status == null) return 'SCHEDULED';
+  switch (status) {
+    case MatchupStatus.InProgress:
+      return 'LIVE';
+    case MatchupStatus.Completed:
+      return 'FINAL';
+    case MatchupStatus.Cancelled:
+      return 'CANCELLED';
+    case MatchupStatus.Scheduled:
+      return 'SCHEDULED';
+    default: {
+      // Compile-time exhaustiveness: adding a new MatchupStatus without a case
+      // here will cause a TypeScript error.
+      const _exhaustive: never = status;
+      void _exhaustive;
+      return 'SCHEDULED';
+    }
+  }
+}
+
 function ScoreHeader({
   matchup,
   isRefreshing,
@@ -121,7 +150,7 @@ function ScoreHeader({
 }) {
   const team1Score = matchup.team1Score ?? 0;
   const team2Score = matchup.team2Score ?? 0;
-  const isLive = matchup.status === MatchupStatus.InProgress;
+  const statusLabel = getMatchupStatusLabel(matchup.status);
 
   return (
     <Card bordered backgroundColor="$background" borderRadius="$4" padding="$4">
@@ -147,7 +176,7 @@ function ScoreHeader({
             </YStack>
           ) : (
             <Text fontSize="$2" color="$gray7">
-              {isLive ? 'LIVE' : 'vs'}
+              {statusLabel}
             </Text>
           )}
           {matchup.weekNumber != null ? (

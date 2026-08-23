@@ -47,7 +47,7 @@ const mockMatchup = {
   team2Id: 20,
   team1Score: 102.5,
   team2Score: 87.3,
-  status: 'final',
+  status: 'scheduled',
   weekNumber: 7,
 };
 
@@ -75,9 +75,10 @@ const mockRefetchPlayers = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('@legacy-sports/graphql', () => ({
   MatchupStatus: {
+    Scheduled: 'scheduled',
     InProgress: 'in_progress',
-    Final: 'final',
     Completed: 'completed',
+    Cancelled: 'cancelled',
   },
   useGetMatchupByIdQuery: jest.fn(() => ({
     data: { getMatchupById: mockMatchup },
@@ -261,6 +262,25 @@ describe('FootballMatchupScreen', () => {
   it('renders week number', () => {
     render(<FootballMatchupScreen matchupId={1} />);
     expect(screen.getByText('Wk 7')).toBeTruthy();
+  });
+
+  it.each([
+    ['scheduled', 'SCHEDULED'],
+    ['in_progress', 'LIVE'],
+    ['completed', 'FINAL'],
+    ['cancelled', 'CANCELLED'],
+  ])('renders header status label %s as %s', (status, expectedLabel) => {
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: { ...mockMatchup, status } },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: mockRefetchMatchup,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} />);
+
+    expect(screen.getByText(expectedLabel)).toBeTruthy();
   });
 
   it('renders player name for team 1', () => {
