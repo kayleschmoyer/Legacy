@@ -85,7 +85,7 @@ primary: LS-####
 <!-- jira-link primary=LS-#### -->
 ```
 
-❌ Invalid — inline `key=value` syntax. This fails the "Jira Link Check" required CI check with `jira-link marker has no \`primary:\` line`, and is only caught after the fact by fetching CI job logs, forcing a follow-up `update_pull_request` body edit (per LS-8932/LS-6141).
+❌ Invalid — inline `key=value` syntax. Jira Link Check now **repairs** this form (and a missing marker) from the title key rather than failing the PR — see [below](#jira-link-check-repairs-the-marker-for-you-ls-9279) — but the repair costs a CI cycle and only fires when the title carries exactly one key, so still write the valid form. Before LS-9279 this failed the check with `jira-link marker has no \`primary:\` line`, caught only by fetching CI job logs and forcing a follow-up `update_pull_request` body edit (per LS-8932/LS-6141).
 
 Copy-pasteable example for a `mcp__github__create_pull_request` body (substitute the real ticket key):
 
@@ -103,22 +103,80 @@ primary: LS-1234
 
 If `legacy-sports-github` re-authenticates mid-session, prefer switching back to `github_open_pr({ jiraKey: "LS-####" })` for its auto-prepend convenience rather than continuing to hand-author the marker on the generic tool.
 
-#### CCR: verifying the jira-link marker landed
+**Always put the ticket key in the PR title on this path** — the title is the only linkage signal that survives every read path, it is what `jira-branch-sync` falls back to, and it is what Jira Link Check repairs the marker from when the body's marker is missing or malformed.
 
-**Do not verify a marker write by reading the PR body back.** The built-in `mcp__github__pull_request_read` strips `<!-- ... -->` HTML comments on the way _out_, so the marker is absent from every read-back whether or not the write succeeded. A read-back is a false negative 100% of the time, not evidence of anything (LS-9463).
+#### Seeing and fixing linkage on an open PR
 
-Evidence, PR #7128 (LS-9453): the marker was passed to `mcp__github__create_pull_request`, was absent from two subsequent `pull_request_read` calls, and was in the stored body the whole time — the Jira Link Check run echoed `PR_BODY` verbatim, starting with the marker block, and reported `✅ Jira Link Check passed (primary: LS-9453)`. Acting on the read-back cost a full turn and two escalations to the user over a marker that was never missing.
+**Every built-in GitHub read path strips `<!-- ... -->` HTML comments out of a
+PR body, so the jira-link marker is invisible to you no matter which tool you
+reach for.** Verified on `mcp__github__pull_request_read` (LS-9463, PR #7128)
+and on `mcp__github__list_pull_requests({ fields: ["body"] })` (LS-9279): the
+stored bodies of open PRs start with the marker block, and both tools return a
+body starting with the two blank lines where it used to be. A read-back is a
+false negative 100% of the time, not evidence of anything.
 
-This is easy to get wrong because the stripping is asymmetric: `mcp__github__add_issue_comment` round-trips HTML comments intact on both write and read, so testing the behaviour through comments suggests the body write path is the broken one. It isn't — or at least, that is not what a read-back demonstrates.
+Two consequences, and neither is optional:
 
-So:
+1. **Never verify a marker write by reading the body back.** Write it (in
+   `create_pull_request`'s initial body, or via `mcp__github__update_pull_request`),
+   then treat it as landed.
+2. **Never build a body edit out of a read-back.** Read → append → write
+   deletes the marker you never saw. Compose the new body from text you hold —
+   the body you sent, plus your edit — or accept that CI has to put the marker
+   back.
 
-1. Write the body via `create_pull_request` (preferred — put the marker in the initial body) or `mcp__github__update_pull_request`, as normal.
-2. Treat the write as having landed. Do not read the body back to check the marker; that read cannot see it.
-3. If you need positive confirmation before CI settles, read the **Jira Link Check job log** — it echoes the stored `PR_BODY` into the step env and prints the pass/fail verdict. That log is the authoritative reader; so is any other consumer that reads the raw body server-side.
-4. Escalate only when Jira Link Check actually fails on the marker. Then, in order: `github_edit_pr` via the `legacy-sports-github` connector if present, `gh pr edit --body-file` via Bash, or ask the user to paste the marker through the GitHub UI.
+To _see_ a PR's linkage, use a channel the sanitizer does not touch:
 
-Historical context, since the prior tickets read the other way: LS-9202 and LS-8934 concluded the _write_ path strips (LS-8934 attributing it to intermittency and prescribing the read-back-and-retry loop this section replaced), and LS-9227 / LS-9228 were both closed **Won't Do** on that basis. Whether the write path ever stripped is unresolved — the reports may have been accurate then, may have been this same misdiagnosis, or the platform may have changed since. What is verifiable now is above. LS-9279 remains open and its repro steps carry the same flaw (step 2 is "re-fetch the body and observe the comment is gone", which proves nothing).
+| What you need                            | Where to read it                                                                                                                                                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The primary ticket key                   | The **PR title** (Jira Link Check requires the key there) and the visible `**Jira:**` line in the body — neither is an HTML comment, so both survive every read path                                     |
+| Whether the marker itself is well-formed | The **`Jira Link Check` check-run conclusion** — `pull_request_read({ method: "get_check_runs" })`. `success` means: exactly one marker, one valid `primary:`, matching the title, ticket exists in Jira |
+| The parsed keys, verbatim                | The **Jira Link Check job log** — `mcp__github__get_job_logs` or `ci_get_logs`. It ends in `✅ Jira Link Check passed (primary: LS-####)`, plus `related:` keys when declared                            |
+| Why it failed, and what to change        | The same job log, which names every violation and prints a copy-pasteable marker block                                                                                                                   |
+
+To _add_ linkage to an existing PR, edit the body — `github_edit_pr({ number, body })`
+on the hosted connector (it re-injects the marker for you, LS-8017), or
+`mcp__github__update_pull_request({ pullNumber, body })` with the marker
+hand-authored as the first three lines. No push, no branch rename.
+
+#### Jira Link Check repairs the marker for you (LS-9279)
+
+Because agents cannot see the marker, they cannot reliably maintain it — so CI
+does. When a PR body's marker is **missing or malformed** and the PR title
+carries **exactly one** `LS-####` key, Jira Link Check rewrites the body with a
+well-formed marker (adding the visible `**Jira:**` line if the body has none)
+and passes. This covers the failure modes agents actually hit: a body written
+by `mcp__github__create_pull_request` with no marker at all, the inline
+`<!-- jira-link primary=LS-#### -->` form, a bare `<!-- jira-link -->`,
+duplicate markers, and a marker dropped by a read-modify-write body edit. Any
+well-formed `related:` keys are carried across. The rewrite uses `GITHUB_TOKEN`,
+whose events do not re-trigger workflows, so it never loops.
+
+It deliberately does **not** repair — these still fail, and are yours to fix:
+
+| Situation                                                 | Fix                                                                                                                |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| PR title carries no `LS-####` key                         | Retitle to `LS-#### type(scope): description` (or declare `primary: none` + the `no-jira` label)                   |
+| PR title carries two or more distinct keys                | Retitle so only the primary key is present; move the rest to `related:`                                            |
+| Marker declares a valid key that disagrees with the title | Decide which is right and edit the other — CI will not pick for you (this is what the `jira-mismatch` label flags) |
+| `primary: none` without the `no-jira` label               | Add the label, or declare the real key — an opt-out has to be deliberate                                           |
+| The primary key does not exist in Jira                    | Fix the typo in both title and marker                                                                              |
+
+So the practical rule on any session without the hosted connector: put the key
+in the title, put the marker in the body if you can, and let the check settle
+the rest. Escalate only when Jira Link Check itself fails.
+
+Historical context, since the prior tickets read the other way: LS-9202 and
+LS-8934 concluded the _write_ path strips (LS-8934 attributing it to
+intermittency and prescribing a read-back-and-retry loop), and LS-9227 /
+LS-9228 were both closed **Won't Do** on that basis. Whether the write path
+ever stripped is unresolved — the reports may have been accurate then, may have
+been this same misdiagnosis, or the platform may have changed since. What is
+verifiable now is above. The asymmetry is what makes it confusing:
+`mcp__github__add_issue_comment` round-trips HTML comments intact on both write
+and read, so testing the behaviour through comments suggests the body write
+path is the broken one. It isn't — or at least, that is not what a read-back
+demonstrates.
 
 ### PR Body Template
 

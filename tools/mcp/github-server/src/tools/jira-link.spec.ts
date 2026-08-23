@@ -355,6 +355,29 @@ describe('jira-link marker (LS-7895)', () => {
     });
   });
 
+  describe('CRLF bodies (LS-9279)', () => {
+    const crlfBody =
+      '<!-- jira-link\r\nprimary: LS-9999\r\n-->\r\n\r\n' +
+      '**Jira:** [LS-9999](https://bkrupa.atlassian.net/browse/LS-9999)' +
+      '\r\n\r\n## Summary';
+
+    it('strips the visible line along with the comment', () => {
+      expect(stripJiraLinkBlocks(crlfBody)).toBe('## Summary');
+    });
+
+    it('does not leave a stale visible link behind a re-emitted marker', () => {
+      const repaired = ensureJiraLinkMarker(
+        '<!-- jira-link -->\r\n\r\n' + crlfBody,
+        {
+          primary: 'LS-1234',
+        },
+      );
+      expect(repaired.match(/\*\*Jira:\*\*/g)).toHaveLength(1);
+      expect(repaired).toContain('**Jira:** [LS-1234]');
+      expect(validateJiraLinkMarker(repaired).valid).toBe(true);
+    });
+  });
+
   describe('ensureTitleHasPrimaryKey (LS-8679)', () => {
     it('prepends the primary key when the title lacks it', () => {
       expect(

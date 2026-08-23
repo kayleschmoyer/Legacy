@@ -2,10 +2,11 @@
 /**
  * jira-link-check.mjs
  *
- * Validates the declared jira-link marker on a PR (LS-7896, phase 3 of RFC
+ * Validates — and, where the intent is unambiguous, repairs — the declared
+ * jira-link marker on a PR (LS-7896, phase 3 of RFC
  * docs/rfcs/draft-declared-ticket-linkage.md). The marker is the single
  * source of truth for "which ticket is this PR for?" and is emitted by
- * github_create_pr / the PR-creation skills (LS-7895, phase 2):
+ * github_open_pr / the PR-creation skills (LS-7895, phase 2):
  *
  *   <!-- jira-link
  *   primary: LS-1234
@@ -23,10 +24,26 @@
  *     404-after-merge failure class, e.g. LS-7778 run 27070091990).
  *  6. `related:` keys, when present, are well-formed LS-#### keys.
  *
+ * Self-repair (LS-9463 class): the marker is an HTML comment, and every
+ * GitHub MCP tool that returns a PR body strips HTML comments on the way out
+ * — `pull_request_read` and `list_pull_requests` alike. An agent therefore
+ * cannot see the marker it is asked to maintain, and any read-modify-write
+ * body edit silently drops it. So when validation fails on structure alone
+ * and the PR title carries exactly one ticket key, this check rewrites the
+ * body with a well-formed marker and passes, instead of failing a PR whose
+ * linkage was never actually in doubt. It never overrules a declaration that
+ * disagrees with the title, and never invents a key the PR does not already
+ * assert — see planRepair in ./jira-link-marker.mjs.
+ *
  * Inputs (environment):
  *   PR_TITLE         — PR title
  *   PR_BODY          — PR body (may be empty)
  *   PR_LABELS        — JSON array of label names on the PR
+ *   PR_NUMBER        — PR number; required for self-repair
+ *   GITHUB_TOKEN     — token with `pull-requests: write`; required for
+ *                      self-repair (read-only on fork PRs, which then fail
+ *                      with the fix-it block as before)
+ *   GITHUB_REPOSITORY, GITHUB_API_URL — standard Actions values
  *   JIRA_CREDENTIALS — optional JSON {client_id, client_secret, cloud_id};
  *                      when absent (e.g. fork PRs have no secrets) the Jira
  *                      existence check is skipped with a warning.
@@ -38,15 +55,18 @@
  */
 
 import { appendFileSync } from 'fs';
-
-const KEY_RE = /^LS-\d+$/;
-const NO_JIRA_LABEL = 'no-jira';
+import {
+  NO_JIRA_LABEL,
+  extractKeys,
+  parseMarker,
+  planRepair,
+} from './jira-link-marker.mjs';
 
 const title = process.env.PR_TITLE ?? '';
-const body = process.env.PR_BODY ?? '';
+const eventBody = process.env.PR_BODY ?? '';
 
-/** @type {string[]} */
-const errors = [];
+/** Problems with the check's own inputs — always reported, never repairable. */
+const setupErrors = [];
 
 /** @type {string[]} */
 let labels = [];
@@ -55,107 +75,57 @@ try {
   if (Array.isArray(parsed)) {
     labels = parsed;
   } else {
-    errors.push('PR_LABELS environment variable is not a JSON array.');
+    setupErrors.push('PR_LABELS environment variable is not a JSON array.');
   }
 } catch (error) {
-  errors.push(
+  setupErrors.push(
     `Failed to parse PR_LABELS environment variable: ${error.message}`,
   );
 }
 
-// ── 1. Locate the marker block ───────────────────────────────────────────────
+// ── Validation ───────────────────────────────────────────────────────────────
 
-// Markers quoted in fenced code blocks or inline code spans are documentation,
-// not declarations — strip them before scanning. (Observed live on PR #5093:
-// the body's prose mentioned `<!-- jira-link -->` in backticks and the bare
-// regex counted it as the marker.)
-const scannableBody = body
-  .replace(/```[\s\S]*?```/g, '')
-  .replace(/`[^`\n]*`/g, '');
+/**
+ * Assertions 1, 2, 3, 4 and 6 against a candidate body. Assertion 5 (the Jira
+ * existence GET) runs once, later, against whichever body ends up standing.
+ *
+ * @returns {{ primary: string | null, related: string[], errors: string[] }}
+ */
+function validate(body) {
+  const marker = parseMarker(body);
+  const errors = [...marker.errors];
 
-const markerBlocks = [
-  ...scannableBody.matchAll(/<!--\s*jira-link\b([\s\S]*?)-->/gi),
-];
-
-let primary = null;
-
-if (markerBlocks.length === 0) {
-  errors.push(
-    'PR body has no `<!-- jira-link -->` marker. Every PR must declare its ' +
-      'Jira ticket linkage in the body (emitted automatically by ' +
-      '`github_create_pr` and the PR-creation skills).',
-  );
-} else if (markerBlocks.length > 1) {
-  errors.push(
-    `PR body has ${markerBlocks.length} jira-link markers — exactly one is ` +
-      'allowed. Remove the duplicates.',
-  );
-} else {
-  const content = markerBlocks[0][1];
-
-  // ── 2. Exactly one primary ────────────────────────────────────────────────
-  const primaryLines = [...content.matchAll(/^[ \t]*primary:[ \t]*(.*)$/gim)];
-  if (primaryLines.length === 0) {
+  // ── 3. primary: none requires the no-jira label ──────────────────────────
+  if (marker.primary === 'none' && !labels.includes(NO_JIRA_LABEL)) {
     errors.push(
-      'jira-link marker has no `primary:` line. Declare exactly one primary ' +
-        'key (LS-####) or `primary: none`.',
+      `jira-link declares \`primary: none\` but the PR does not have the ` +
+        `\`${NO_JIRA_LABEL}\` label. Opting out of Jira linkage must be ` +
+        'deliberate and visible — add the label or declare a real ticket key.',
     );
-  } else if (primaryLines.length > 1) {
-    errors.push(
-      `jira-link marker has ${primaryLines.length} \`primary:\` lines — ` +
-        'exactly one is allowed. One ticket = one PR; move extra keys to ' +
-        '`related:`.',
-    );
-  } else {
-    const value = primaryLines[0][1].trim();
-    if (value === 'none' || KEY_RE.test(value)) {
-      primary = value;
-    } else {
+  }
+
+  // ── 4. Primary key appears in the PR title ───────────────────────────────
+  if (marker.primary && marker.primary !== 'none') {
+    if (!extractKeys(title).includes(marker.primary)) {
       errors.push(
-        `jira-link \`primary: ${value}\` is not a valid value — expected an ` +
-          'uppercase LS-#### key or `none`.',
+        `PR title does not contain the primary key ${marker.primary}. ` +
+          `Prefix the title with it, e.g. "${marker.primary} ` +
+          `type(scope): description".`,
       );
     }
   }
 
-  // ── 6. Related keys are well-formed ───────────────────────────────────────
-  const relatedLines = [...content.matchAll(/^[ \t]*related:[ \t]*(.*)$/gim)];
-  for (const line of relatedLines) {
-    const tokens = line[1].split(/[,\s]+/).filter(Boolean);
-    for (const token of tokens) {
-      if (!KEY_RE.test(token)) {
-        errors.push(
-          `jira-link \`related:\` contains "${token}" — expected ` +
-            'comma/space-separated uppercase LS-#### keys.',
-        );
-      }
-    }
-  }
+  return { primary: marker.primary, related: marker.related, errors };
 }
 
-// ── 3. primary: none requires the no-jira label ──────────────────────────────
+// ── GitHub API (self-repair) ─────────────────────────────────────────────────
 
-if (primary === 'none' && !labels.includes(NO_JIRA_LABEL)) {
-  errors.push(
-    `jira-link declares \`primary: none\` but the PR does not have the ` +
-      `\`${NO_JIRA_LABEL}\` label. Opting out of Jira linkage must be ` +
-      'deliberate and visible — add the label or declare a real ticket key.',
-  );
-}
+const repo = process.env.GITHUB_REPOSITORY ?? '';
+const prNumber = process.env.PR_NUMBER ?? '';
+const githubToken = process.env.GITHUB_TOKEN ?? '';
+const githubApi = process.env.GITHUB_API_URL ?? 'https://api.github.com';
 
-// ── 4. Primary key appears in the PR title ───────────────────────────────────
-
-if (primary && primary !== 'none') {
-  const titleKeys = title.match(/\bLS-\d+\b/g) ?? [];
-  if (!titleKeys.includes(primary)) {
-    errors.push(
-      `PR title does not contain the primary key ${primary}. Prefix the ` +
-        `title with it, e.g. "${primary} type(scope): description".`,
-    );
-  }
-}
-
-// ── 5. Primary ticket exists in Jira ─────────────────────────────────────────
+const repairEnabled = Boolean(repo && prNumber && githubToken);
 
 /**
  * fetch() with up to 3 attempts; retries on 429/5xx and network errors with
@@ -179,7 +149,51 @@ async function fetchWithRetry(url, options) {
   throw lastError;
 }
 
-async function checkTicketExists(key) {
+function githubHeaders() {
+  return {
+    Accept: 'application/vnd.github+json',
+    Authorization: `Bearer ${githubToken}`,
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+}
+
+/**
+ * The PR body as stored right now, which can differ from the event payload's
+ * copy when an author edits during the run (the concurrency group cancels the
+ * older run, but a body edit that lands mid-run does not). Returns null when
+ * the read fails — the caller then works from the event payload.
+ */
+async function readCurrentBody() {
+  const response = await fetchWithRetry(
+    `${githubApi}/repos/${repo}/pulls/${prNumber}`,
+    { headers: githubHeaders() },
+  );
+  if (!response.ok) {
+    throw new Error(`GET /pulls/${prNumber} failed (HTTP ${response.status}).`);
+  }
+  const pull = await response.json();
+  return pull.body ?? '';
+}
+
+async function writeBody(body) {
+  const response = await fetchWithRetry(
+    `${githubApi}/repos/${repo}/pulls/${prNumber}`,
+    {
+      method: 'PATCH',
+      headers: { ...githubHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `PATCH /pulls/${prNumber} failed (HTTP ${response.status}).`,
+    );
+  }
+}
+
+// ── Jira existence check (assertion 5) ───────────────────────────────────────
+
+async function checkTicketExists(key, errors) {
   const rawCredentials = process.env.JIRA_CREDENTIALS;
   if (!rawCredentials) {
     console.warn(
@@ -246,10 +260,10 @@ async function checkTicketExists(key) {
   }
 }
 
-// ── Report ────────────────────────────────────────────────────────────────────
+// ── Report ───────────────────────────────────────────────────────────────────
 
 function buildFixitBlock() {
-  const suggestedKey = title.match(/\bLS-\d+\b/)?.[0] ?? 'LS-XXXX';
+  const suggestedKey = extractKeys(title)[0] ?? 'LS-XXXX';
   return [
     'To fix, edit the PR body (no push needed) so it starts with:',
     '',
@@ -271,9 +285,64 @@ function writeStepSummary(text) {
   }
 }
 
+// ── Main ─────────────────────────────────────────────────────────────────────
+
+/** Notes about the repair attempt — printed and echoed into the summary. */
+const notes = [];
+
+let body = eventBody;
+let result = validate(body);
+
+if (result.errors.length > 0) {
+  if (!repairEnabled) {
+    notes.push(
+      'Self-repair is unavailable (no PR number or write token in the ' +
+        'environment) — fix the marker by editing the PR body.',
+    );
+  } else {
+    // Work from the stored body, not the event payload's copy: an edit that
+    // landed after this run started would otherwise be clobbered by the PATCH.
+    try {
+      const current = await readCurrentBody();
+      if (current !== body) {
+        body = current;
+        result = validate(body);
+        if (result.errors.length === 0) {
+          notes.push(
+            'The PR body was edited after this check was triggered; the ' +
+              'stored body declares a valid marker.',
+          );
+        }
+      }
+    } catch (error) {
+      notes.push(`Could not re-read the PR body: ${error.message}`);
+    }
+  }
+
+  if (result.errors.length > 0 && repairEnabled) {
+    const plan = planRepair(body, title);
+    if (!plan.repairable) {
+      notes.push(`Could not repair the marker automatically — ${plan.reason}`);
+    } else {
+      try {
+        await writeBody(plan.body);
+        body = plan.body;
+        result = validate(body);
+        notes.push(
+          `🔧 Repaired the jira-link marker in the PR body — ${plan.reason}`,
+        );
+      } catch (error) {
+        notes.push(`Could not write the repaired PR body: ${error.message}`);
+      }
+    }
+  }
+}
+
+const errors = [...setupErrors, ...result.errors];
+
 try {
-  if (primary && primary !== 'none') {
-    await checkTicketExists(primary);
+  if (errors.length === 0 && result.primary && result.primary !== 'none') {
+    await checkTicketExists(result.primary, errors);
   }
 } catch (error) {
   // Infrastructure failure, not a linkage problem — distinct message so the
@@ -286,15 +355,33 @@ try {
   process.exit(1);
 }
 
+for (const note of notes) console.log(`ℹ️  ${note}`);
+
 if (errors.length > 0) {
   const fixit = buildFixitBlock();
   console.error('❌ Jira Link Check failed:\n');
   for (const error of errors) console.error(`  ✗ ${error}`);
   console.error(`\n${fixit}`);
   writeStepSummary(
-    `## ❌ Jira Link Check failed\n\n${errors.map((e) => `- ${e}`).join('\n')}\n\n${fixit}`,
+    `## ❌ Jira Link Check failed\n\n${errors.map((e) => `- ${e}`).join('\n')}\n\n${notes.map((n) => `> ${n}`).join('\n>\n')}\n\n${fixit}`,
   );
   process.exit(1);
 }
 
-console.log(`✅ Jira Link Check passed (primary: ${primary})`);
+// The success line is the marker's only agent-readable channel: every GitHub
+// MCP read path strips the HTML comment out of the body, but this job log is
+// fetchable verbatim (get_job_logs / ci_get_logs). Keep the shape stable —
+// `.agents/skills/pr-lifecycle/references/create-pr.md` tells agents to grep
+// for it.
+const relatedSuffix =
+  result.related.length > 0 ? `, related: ${result.related.join(', ')}` : '';
+console.log(
+  `✅ Jira Link Check passed (primary: ${result.primary}${relatedSuffix})`,
+);
+writeStepSummary(
+  `## ✅ Jira Link Check passed\n\n- primary: \`${result.primary}\`` +
+    (result.related.length > 0
+      ? `\n- related: ${result.related.map((k) => `\`${k}\``).join(', ')}`
+      : '') +
+    (notes.length > 0 ? `\n\n${notes.map((n) => `> ${n}`).join('\n>\n')}` : ''),
+);

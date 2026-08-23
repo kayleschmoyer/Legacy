@@ -109,15 +109,15 @@ Reports are published to `playwright-report/manual-<run_number>/` on GitHub Page
 
 These run independently from the orchestrator, triggered directly by PR events. PR-triggered workflows use a `check-runner-access` pre-job (Pattern A, LS-1652) that resolves the runner label — external contributors always get `ubuntu-latest`; internal team members get the self-hosted runner. `security-scanning.yml` is the exception: it is dispatched by the orchestrator via `workflow_call` and receives the already-resolved `runner-label` as an input rather than running its own pre-job.
 
-| Workflow                       | Trigger                          | Runner resolution                  | Purpose                                              |
-| ------------------------------ | -------------------------------- | ---------------------------------- | ---------------------------------------------------- |
-| `check-schema.yml`             | PR (GraphQL file changes)        | `check-runner-access` pre-job      | Schema drift detection + codegen compatibility       |
-| `check-migrations-applied.yml` | PR (migration file changes)      | `check-runner-access` pre-job      | Verifies all migrations are applied to production DB |
-| `check-conflicts.yml`          | PR (opened/sync/reopened/edited) | `check-runner-access` pre-job      | Merge conflict detection                             |
-| `integration-advisory.yml`     | PR (opened/sync/reopened)        | `check-runner-access` pre-job      | Advisory comment recommending integration specs      |
-| `jira-link-check.yml`          | PR (7 event types)               | `check-runner-access` pre-job      | Validates the `jira-link` marker in PR body          |
-| `review.yml`                   | PR (opened/ready/labeled/sync)   | `check-runner-access` pre-job      | Reviewer bot W1                                      |
-| `security-scanning.yml`        | Dispatched by orchestrator       | `runner-label` workflow_call input | Dependency audit, SAST, secret scanning              |
+| Workflow                       | Trigger                          | Runner resolution                  | Purpose                                                                                             |
+| ------------------------------ | -------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `check-schema.yml`             | PR (GraphQL file changes)        | `check-runner-access` pre-job      | Schema drift detection + codegen compatibility                                                      |
+| `check-migrations-applied.yml` | PR (migration file changes)      | `check-runner-access` pre-job      | Verifies all migrations are applied to production DB                                                |
+| `check-conflicts.yml`          | PR (opened/sync/reopened/edited) | `check-runner-access` pre-job      | Merge conflict detection                                                                            |
+| `integration-advisory.yml`     | PR (opened/sync/reopened)        | `check-runner-access` pre-job      | Advisory comment recommending integration specs                                                     |
+| `jira-link-check.yml`          | PR (7 event types)               | `check-runner-access` pre-job      | Validates the `jira-link` marker in PR body, and repairs a missing/malformed one from the title key |
+| `review.yml`                   | PR (opened/ready/labeled/sync)   | `check-runner-access` pre-job      | Reviewer bot W1                                                                                     |
+| `security-scanning.yml`        | Dispatched by orchestrator       | `runner-label` workflow_call input | Dependency audit, SAST, secret scanning                                                             |
 
 ### CI Failure Labels
 
@@ -168,6 +168,11 @@ with bare `node` from a sparse checkout of `main`.
 > **Ticket key selection (PR events):** the `jira-link` marker in the
 > PR body is the source of truth; when no marker exists, the sync falls back to
 > PR-title key parsing. `primary: none` and invalid markers transition nothing.
+> Since LS-9279 the gap between the two rarely lasts: `jira-link-check.yml`
+> rewrites a missing or malformed marker from the title key (never against a
+> declaration that disagrees with the title), because every GitHub MCP read
+> path strips the marker out of the body and agents therefore cannot maintain
+> it by hand.
 > **Commit-message key sweeping no longer exists** — it swept foreign keys from
 > main's commits after rebases (run 27291997543). Pushes to `claude/**` branches
 > with no key in the branch name are a no-op; the `work-ticket` skill already

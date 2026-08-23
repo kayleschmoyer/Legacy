@@ -1,8 +1,9 @@
 // Structured jira-link marker emission, location, and validation (LS-7895,
 // phase 2 of RFC docs/rfcs/draft-declared-ticket-linkage.md). The HTML comment
 // is the parse target for jira-branch-sync; the visible **Jira:** line is for
-// humans. Validation mirrors `.github/scripts/jira-link-check.mjs` so callers
-// can reject a bad marker before CI does (LS-8721).
+// humans. Validation mirrors `.github/scripts/jira-link-marker.mjs` — the same
+// rules, re-implemented for the bare `node` that Actions runs — so callers can
+// reject a bad marker before CI does (LS-8721). Keep the two in sync.
 
 export const JIRA_BROWSE_URL = 'https://bkrupa.atlassian.net/browse';
 
@@ -53,9 +54,15 @@ function maskQuotedCode(body: string): string {
   return body.replace(/```[\s\S]*?```/g, blank).replace(/`[^`\n]+`/g, blank);
 }
 
-/** The marker comment plus its optional trailing visible `**Jira:**` line. */
+/**
+ * The marker comment plus its optional trailing visible `**Jira:**` line.
+ * Line breaks are matched as `\r?\n`: GitHub stores PR bodies with CRLF, and
+ * an LF-only pattern stops capturing the visible line there — leaving a stale
+ * `**Jira:**` link behind whenever a marker is re-emitted (LS-9279).
+ */
 const JIRA_LINK_BLOCK_SOURCE =
-  /<!--\s*jira-link\b[\s\S]*?-->(?:\s*\n\n\*\*Jira:\*\*[^\n]*)?\n*/.source;
+  /<!--\s*jira-link\b[\s\S]*?-->(?:[ \t]*\r?\n[ \t]*\r?\n\*\*Jira:\*\*[^\r\n]*)?[\r\n]*/
+    .source;
 
 /** Half-open [start, end) spans of every declared marker block in `body`. */
 function findJiraLinkBlocks(body: string): { start: number; end: number }[] {

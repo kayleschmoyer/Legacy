@@ -18,6 +18,16 @@ name: "Jira Link Check"
 #   - the primary ticket exists in Jira (single GET — kills the
 #     404-after-merge failure class in jira-branch-sync).
 #
+# SELF-REPAIR (LS-9463 class): the marker is an HTML comment, and every GitHub
+# MCP read path strips HTML comments out of a PR body — so an agent can neither
+# see the marker nor preserve it through a read-modify-write body edit. When
+# validation fails on structure alone and the PR title carries exactly one
+# ticket key, the check rewrites the body with a well-formed marker (the same
+# title fallback github_open_pr uses) and passes, rather than failing a PR whose
+# linkage was never in doubt. A declaration that disagrees with the title, and a
+# deliberate `primary: none`, are left for the author. The rewrite uses
+# GITHUB_TOKEN, whose events do not re-trigger workflows, so it cannot loop.
+#
 # Failure output includes a copy-pasteable marker block; fix by editing the
 # PR body — no push needed.
 #
@@ -81,6 +91,13 @@ jobs:
     needs: [check-runner-access]
     runs-on: ${{ needs.check-runner-access.outputs.runner-label }}
     timeout-minutes: 5
+    # Job-level block replaces the workflow-level `contents: read` wholesale —
+    # both scopes have to be listed. `pull-requests: write` is what lets the
+    # self-repair step PATCH the body; fork PRs get a read-only token from the
+    # `pull_request` trigger regardless, and simply fail as before.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -89,5 +106,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
         run: node .github/scripts/jira-link-check.mjs
