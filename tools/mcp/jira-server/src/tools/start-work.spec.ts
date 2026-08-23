@@ -1,4 +1,5 @@
 import { startWork } from './start-work';
+import { _resetAssigneeCache } from '../assignee';
 
 jest.mock('@legacy-sports/logging/server', () => ({
   LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
@@ -34,6 +35,8 @@ const makeTransitions = () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Email -> accountId resolution is memoised for the process lifetime.
+  _resetAssigneeCache();
   delete process.env['JIRA_ASSIGNEE_EMAIL'];
   delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
 
@@ -418,5 +421,62 @@ describe('startWork', () => {
     const text = (result.content[0] as { text: string }).text;
     expect(text).toContain('LS-1');
     expect(text).toContain('404 Not Found');
+  });
+});
+
+describe('startWork — unowned In Progress repair (LS-9513)', () => {
+  beforeEach(() => {
+    mockJiraRequest.mockImplementation(
+      (opts: {
+        method: string;
+        path: string;
+        query?: Record<string, string>;
+      }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/user/search') {
+          return Promise.resolve([
+            { accountId: 'acct-1', displayName: 'Brad Krupa' },
+          ]);
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          return Promise.resolve({
+            key: 'LS-1',
+            fields: { status: { name: 'In Progress' }, assignee: null },
+          });
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+  });
+
+  it('assigns an In Progress ticket that nobody owns, without re-transitioning', async () => {
+    const result = await startWork({
+      key: 'LS-1',
+      assignee: 'agent@example.com',
+    });
+    const data = parse(result);
+
+    expect(data['idempotent']).toBe(true);
+    expect(data['status']).toBe('In Progress');
+    expect(data['assignee']).toBe('Brad Krupa');
+
+    const putAssignee = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+    expect(putAssignee).toHaveLength(1);
+    expect(putAssignee[0][0].body).toEqual({ accountId: 'acct-1' });
+
+    const transitionPosts = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) => opts.method === 'POST' && opts.path.endsWith('/transitions'),
+    );
+    expect(transitionPosts).toHaveLength(0);
   });
 });

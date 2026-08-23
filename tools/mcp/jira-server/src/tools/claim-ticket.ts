@@ -12,8 +12,9 @@ interface ClaimTicketParams {
   key: string;
   /**
    * See `resolveAndAssign` in `../assignee.ts` for the full precedence order.
-   * Prefer `assigneeAccountId` when known — the email-based paths always
-   * 401 under the Lambda's client-credentials scopes (LS-7891/LS-9049).
+   * `assigneeAccountId` is still the cheapest path (no lookup at all), but an
+   * email now resolves on the hosted Lambda too, via a JQL fallback that
+   * works under `read:jira-work` where `/user/search` 401s (LS-9513).
    */
   assignee?: string;
   assigneeAccountId?: string;
@@ -117,6 +118,31 @@ export async function claimTicket(
 
     // --- Guard: already in progress — warn but return ticket details so agent can decide ---
     if (matchesStatus(status, 'In Progress')) {
+      // Repair path (LS-9513): the ticket is In Progress but nobody owns it,
+      // which is the signature of an earlier claim whose assignee-set failed
+      // (LS-7891/LS-8773). Bailing here left those tickets permanently
+      // unassigned, since a re-claim never reached resolveAndAssign. Assign
+      // now — the transition is already where it needs to be, so this only
+      // fills in the missing owner and does not resume or re-claim the work.
+      if (!issue.fields.assignee) {
+        const repair = await resolveAndAssign({
+          key,
+          explicitAssignee: assignee,
+          explicitAssigneeAccountId: assigneeAccountId,
+          toolName: 'jira_claim_ticket',
+        });
+        warnings.push(...repair.warnings);
+        if (repair.accountId !== undefined) {
+          const owner = repair.displayName ?? repair.accountId;
+          warnings.push(
+            `Ticket was In Progress with no assignee — assigned to ${owner}.`,
+          );
+          // Reflect the repair in the returned ticket card, which is built
+          // from the issue snapshot fetched before the assignment.
+          issue.fields.assignee = { displayName: owner };
+        }
+      }
+
       return makeResult({
         action: 'ALREADY_CLAIMED',
         reason: `Ticket is already In Progress. Check for an existing PR before continuing to avoid duplicate work.`,

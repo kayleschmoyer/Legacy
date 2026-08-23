@@ -8,8 +8,9 @@ interface StartWorkParams {
   key: string;
   /**
    * See `resolveAndAssign` in `../assignee.ts` for the full precedence order.
-   * Prefer `assigneeAccountId` when known — the email-based paths always
-   * 401 under the Lambda's client-credentials scopes (LS-7891/LS-9049).
+   * `assigneeAccountId` is still the cheapest path (no lookup at all), but an
+   * email now resolves on the hosted Lambda too, via a JQL fallback that
+   * works under `read:jira-work` where `/user/search` 401s (LS-9513).
    */
   assignee?: string;
   assigneeAccountId?: string;
@@ -63,11 +64,32 @@ export async function startWork(
     }
 
     if (matchesStatus(previousStatus, 'In Progress')) {
+      // Idempotent on status, but not on ownership: an In Progress ticket
+      // with no assignee is the signature of an earlier claim whose
+      // assignee-set failed (LS-7891/LS-8773), and returning early left it
+      // permanently unowned. Fill in the missing assignee (LS-9513).
+      if (!issue.fields.assignee) {
+        const repair = await resolveAndAssign({
+          key,
+          explicitAssignee: assignee,
+          explicitAssigneeAccountId: assigneeAccountId,
+          toolName: 'jira_start_work',
+        });
+        return successResult({
+          key,
+          status: 'In Progress',
+          previousStatus,
+          assignee: repair.displayName ?? repair.accountId ?? null,
+          idempotent: true,
+          warnings: repair.warnings,
+        });
+      }
+
       return successResult({
         key,
         status: 'In Progress',
         previousStatus,
-        assignee: issue.fields.assignee?.displayName ?? null,
+        assignee: issue.fields.assignee.displayName,
         idempotent: true,
         warnings: [],
       });

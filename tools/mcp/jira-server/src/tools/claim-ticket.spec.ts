@@ -1,4 +1,5 @@
 import { claimTicket } from './claim-ticket';
+import { _resetAssigneeCache } from '../assignee';
 
 // claim-ticket.ts logs assignee warnings/errors via LOGGER. Mock the server
 // logging module so tests stay hermetic and don't pull the real logging chain.
@@ -12,15 +13,17 @@ jest.mock('../jira-api', () => ({
 
 jest.mock('../jql-search', () => ({
   searchJqlAll: jest.fn(),
+  searchJql: jest.fn(),
 }));
 
 const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
 }>('../jira-api');
 
-const { searchJqlAll: mockSearchJqlAll } = jest.requireMock<{
-  searchJqlAll: jest.Mock;
-}>('../jql-search');
+const { searchJqlAll: mockSearchJqlAll, searchJql: mockSearchJql } =
+  jest.requireMock<{ searchJqlAll: jest.Mock; searchJql: jest.Mock }>(
+    '../jql-search',
+  );
 
 function parse(result: { content: Array<{ type: string }> }) {
   const block = result.content[0] as { type: string; text: string };
@@ -54,6 +57,9 @@ const makeTransitions = () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // The email -> accountId resolution is memoised for the process lifetime;
+  // without this, a resolution from one test leaks into the next.
+  _resetAssigneeCache();
   delete process.env['JIRA_ASSIGNEE_EMAIL'];
   delete process.env['JIRA_ASSIGNEE_ACCOUNT_ID'];
 
@@ -78,6 +84,8 @@ beforeEach(() => {
   );
 
   mockSearchJqlAll.mockResolvedValue([]);
+  // Default: the JQL email-resolution fallback finds nobody.
+  mockSearchJql.mockResolvedValue({ issues: [] });
 });
 
 describe('claimTicket — auto-assign behaviour', () => {
@@ -480,5 +488,96 @@ describe('claimTicket — duplicate-work guard (LS-9289)', () => {
 
     expect(data['action']).toBe('PROCEED');
     expect(data['claimed']).toBe(true);
+  });
+});
+
+describe('claimTicket — ALREADY_CLAIMED assignee repair (LS-9513)', () => {
+  /** Mock sequence for a ticket already In Progress with the given assignee. */
+  function mockInProgress(assignee: { displayName: string } | null) {
+    mockJiraRequest.mockImplementation(
+      (opts: {
+        method: string;
+        path: string;
+        query?: Record<string, string>;
+      }) => {
+        if (opts.method === 'GET' && opts.path === '/rest/api/3/user/search') {
+          return Promise.resolve([{ accountId: 'acct-from-search' }]);
+        }
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          const issue = makeIssue('In Progress');
+          issue.fields.assignee = assignee as never;
+          return Promise.resolve(issue);
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+  }
+
+  const putAssigneeCalls = () =>
+    (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(
+      ([opts]) => opts.method === 'PUT' && opts.path.includes('/assignee'),
+    );
+
+  it('assigns an In Progress ticket that has no assignee', async () => {
+    mockInProgress(null);
+
+    const result = await claimTicket({
+      key: 'LS-1',
+      assignee: 'agent@example.com',
+    });
+    const data = parse(result);
+
+    // Still refuses to re-claim — this only fills in the missing owner.
+    expect(data['action']).toBe('ALREADY_CLAIMED');
+    expect(data['claimed']).toBe(false);
+
+    expect(putAssigneeCalls()).toHaveLength(1);
+    expect(putAssigneeCalls()[0][0].body).toEqual({
+      accountId: 'acct-from-search',
+    });
+    expect((data['warnings'] as string[]).join(' ')).toContain(
+      'In Progress with no assignee',
+    );
+
+    // The returned ticket card reflects the repair rather than the stale snapshot.
+    expect((data['ticket'] as { assignee: string }).assignee).toBe(
+      'agent@example.com',
+    );
+  });
+
+  it('leaves an already-assigned In Progress ticket alone', async () => {
+    mockInProgress({ displayName: 'Someone Else' });
+
+    const result = await claimTicket({
+      key: 'LS-1',
+      assignee: 'agent@example.com',
+    });
+    const data = parse(result);
+
+    expect(data['action']).toBe('ALREADY_CLAIMED');
+    expect(putAssigneeCalls()).toHaveLength(0);
+    expect((data['ticket'] as { assignee: string }).assignee).toBe(
+      'Someone Else',
+    );
+  });
+
+  it('does not transition the ticket while repairing the assignee', async () => {
+    mockInProgress(null);
+
+    await claimTicket({ key: 'LS-1', assignee: 'agent@example.com' });
+
+    const transitionPosts = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(
+      ([opts]) => opts.method === 'POST' && opts.path.endsWith('/transitions'),
+    );
+    expect(transitionPosts).toHaveLength(0);
   });
 });
