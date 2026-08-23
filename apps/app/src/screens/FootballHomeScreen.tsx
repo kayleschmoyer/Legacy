@@ -206,6 +206,7 @@ export default function FootballHomeScreen({
       loading={loading && !data}
       error={!!error}
       isAuthenticated={!!userInfo?.id}
+      isPremium={isPremium}
       onSignIn={() => router.navigate('/login')}
       onRetry={() => void refetchLeagues()}
       onCreateLeague={handleCreateLeague}

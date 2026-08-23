@@ -232,6 +232,77 @@ describe('NFLHome — CTA copy consistency (LS-6268, FBH-014)', () => {
   });
 });
 
+describe('NFLHome — premium welcome empty state (LS-6275/FBH-021)', () => {
+  it('renders a premium-welcome state instead of the generic empty state when isPremium is true and there are no leagues', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        isPremium
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+
+    expect(
+      screen.getByText('Welcome, premium subscriber!'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('No football leagues yet'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('football-premium-welcome-state'),
+    ).toBeInTheDocument();
+  });
+
+  it('still renders the "Create your first football league" CTA in the premium-welcome state', () => {
+    const onCreateLeague = jest.fn();
+    render(
+      <NFLHome
+        leagues={[]}
+        isPremium
+        onCreateLeague={onCreateLeague}
+        onViewLeague={noop}
+      />,
+    );
+
+    const cta = screen.getByTestId('create-first-league-button');
+    expect(cta).toBeInTheDocument();
+    fireEvent.click(cta);
+    expect(onCreateLeague).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the generic empty state (not the premium-welcome state) when isPremium is false or omitted', () => {
+    render(
+      <NFLHome
+        leagues={[]}
+        isPremium={false}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+
+    expect(screen.getByText('No football leagues yet')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Welcome, premium subscriber!'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not show the premium-welcome state when the user has leagues, even if isPremium is true', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(1)}
+        isPremium
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+
+    expect(
+      screen.queryByText('Welcome, premium subscriber!'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — league row metadata (LS-6256)', () => {
   it('renders the roster size under the league name when maxRosterSize is present', () => {
     const league: NFLHomeLeague = {

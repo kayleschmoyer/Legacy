@@ -113,6 +113,13 @@ export interface NFLHomeProps {
   error?: boolean;
   /** When false, renders a sign-in CTA instead of the leagues list. Defaults to true. */
   isAuthenticated?: boolean;
+  /**
+   * Whether the viewer has an active premium subscription (LS-6275/FBH-021).
+   * When true and the viewer has zero football leagues, the zero-leagues
+   * empty state is replaced with a premium-welcome state that reinforces the
+   * subscription's value instead of the generic free-user copy.
+   */
+  isPremium?: boolean;
   onCreateLeague: () => void;
   onJoinLeague?: () => void;
   onBrowseLeagues?: () => void;
@@ -426,6 +433,7 @@ function NFLHome({
   loading = false,
   error = false,
   isAuthenticated = true,
+  isPremium = false,
   onCreateLeague,
   onJoinLeague,
   onBrowseLeagues,
@@ -999,6 +1007,37 @@ function NFLHome({
                     </Text>
                   </Button>
                 ) : null}
+              </YStack>
+            ) : activeLeagues.length === 0 && isPremium ? (
+              <YStack
+                alignItems="center"
+                padding="$5"
+                gap="$3"
+                testID="football-premium-welcome-state"
+              >
+                <Text
+                  color="$color"
+                  fontSize="$5"
+                  fontWeight="700"
+                  textAlign="center"
+                >
+                  Welcome, premium subscriber!
+                </Text>
+                <Text color="$gray10" fontSize="$3" textAlign="center">
+                  Create your first league to unlock FAAB waivers, salary cap
+                  support, and advanced playoff formats.
+                </Text>
+                <Button
+                  backgroundColor="$orange9"
+                  borderRadius="$3"
+                  onPress={onCreateLeague}
+                  data-testid="create-first-league-button"
+                  accessibilityLabel="Create your first football league"
+                >
+                  <Text color="white" fontWeight="700">
+                    Create your first football league
+                  </Text>
+                </Button>
               </YStack>
             ) : activeLeagues.length === 0 ? (
               <YStack alignItems="center" padding="$5" gap="$3">

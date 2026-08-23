@@ -161,6 +161,7 @@ export function FootballHubPage() {
           loading={loading && !data}
           error={!!error}
           isAuthenticated={!!auth?.user}
+          isPremium={isPremium}
           onCreateLeague={handleCreateLeague}
           onJoinLeague={() => navigate('/football/league/join')}
           onBrowseLeagues={() => navigate('/football/leagues')}
