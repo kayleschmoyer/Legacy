@@ -150,7 +150,7 @@ For a structured handoff artifact instead of a chat message, follow [cloud-telep
 
 ## Claude Code Remote (CCR)
 
-A fourth configuration, distinct from the three in [Step 0](#step-0-identify-your-platform): the managed remote execution product described in this session's own system prompt ("Your current remote execution environment"), reached via a dedicated `mcp__Claude_Code_Remote__*` server (`create_trigger`, `list_repos`, `add_repo`, `send_later`, `subscribe_pr_activity`, etc.) — **not** the `ccd_session` server that hosted "chip dispatch" sessions use. Identify it by: `mcp__Claude_Code_Remote__*` tools present; `mcp__ccd_session__spawn_task` and `nx_run_pc_chunk` both absent (confirm with `ToolSearch`); hosted `legacy-sports-{jira,github,ci}` connectors and built-in `mcp__github__*` present (same as Connector CC web). Only the chip-dispatch gap below is verified for CCR — everything else in this file (spine bindings, validation, Jira transition IDs) is unconfirmed here. In particular, do **not** assume Connector CC web's `nx_run_pc_chunk` validation binding — that tool is absent by definition in CCR (see the Step 0 check above); until verified, the safer assumption is Default CC web's degraded validation path (Bash `make pc-<chunk>` in background, one chunk at a time). Verify each capability against the tools actually present in your session rather than assuming any platform's full binding, and update this section with what you find.
+A fourth configuration, distinct from the three in [Step 0](#step-0-identify-your-platform): the managed remote execution product described in this session's own system prompt ("Your current remote execution environment"), reached via a dedicated `mcp__Claude_Code_Remote__*` server (`create_session`, `create_trigger`, `list_repos`, `add_repo`, `send_later`, `subscribe_pr_activity`, etc.) — **not** the `ccd_session` server that hosted "chip dispatch" sessions use. Identify it by: `mcp__Claude_Code_Remote__*` tools present; `mcp__ccd_session__spawn_task` and `nx_run_pc_chunk` both absent (confirm with `ToolSearch`); hosted `legacy-sports-{jira,github,ci}` connectors and built-in `mcp__github__*` present (same as Connector CC web). Only the chip-dispatch gap below is verified for CCR — everything else in this file (spine bindings, validation, Jira transition IDs) is unconfirmed here. In particular, do **not** assume Connector CC web's `nx_run_pc_chunk` validation binding — that tool is absent by definition in CCR (see the Step 0 check above); until verified, the safer assumption is Default CC web's degraded validation path (Bash `make pc-<chunk>` in background, one chunk at a time). Verify each capability against the tools actually present in your session rather than assuming any platform's full binding, and update this section with what you find.
 
 ### Chip dispatch substitute (LS-8510)
 
@@ -158,7 +158,41 @@ A fourth configuration, distinct from the three in [Step 0](#step-0-identify-you
 
 **Current compliant behavior**: file the follow-up ticket and add a one-line note (description or `jira_add_comment`) that it needs manual pickup — do not stop the current ticket to work it. leaf-mode.md step 4 branches to this fallback for CCR sessions; it satisfies the "MANDATORY" contract without a dispatch primitive.
 
-**OPEN — untested substitute**: `mcp__Claude_Code_Remote__create_trigger({ name, prompt, create_new_session_on_fire: true, run_once_at: "<a minute or two from now, RFC3339>" })` spawns a fresh session in this environment once, then self-disables (`ended_reason: "run_once_fired"`) — structurally close to a one-shot `spawn_task`. It has **not** been verified end-to-end as a chip-dispatch substitute (does the fresh session pick up `prompt` the same way a chip's `prompt` does? does it need `environment_id` passed explicitly?). Firing one has a real side effect — a new billed session — so don't test it blind mid-ticket. Do not treat it as load-bearing until someone verifies it and updates this section plus the leaf-mode.md branch to prefer it over the file-only fallback.
+**VERIFIED substitute (LS-9597)**: `mcp__Claude_Code_Remote__create_session({ prompt, title, source_url })` spawns a real independent session in this environment. Confirmed end-to-end 2026-08-23: `session_01QxoS5F8SPKkL991oHP3sMX` was created from a CCR session, consumed its `prompt`, ran a turn, and reported back (`post_turn_summary`, `usage.output_tokens: 270`). `environment_id` is optional — it inherits the caller's environment; pass it only to target a different one.
+
+**`source_url` is mandatory.** Omitting it produces a session that dies before its first turn while the call still returns success — see the failure mode below. This is the single reason the earlier chip fan-outs appeared to "never work".
+
+Two caveats before relying on it. First, whether this satisfies [leaf-mode](../work-ticket/references/leaf-mode.md) step 4's dispatch contract is a separate decision — that file still branches CCR sessions to the file-a-ticket-and-note-it fallback, and changing that branch is its own change, not implied by this verification. Second, `create_session` can fail with `failed to create session: the service is temporarily unavailable — try again`, which is [VM allocation capacity](https://code.claude.com/docs/en/claude-code-on-the-web#session-creation-failed), not a caller error: it reproduces with any payload, in any environment, and with or without `source_url`. Retry rather than rewriting the call.
+
+**Also available, untested**: `create_trigger({ name, prompt, create_new_session_on_fire: true, run_once_at: "<RFC3339>" })` spawns a fresh session once and then self-disables (`ended_reason: "run_once_fired"`). Structurally close to a one-shot `spawn_task`, but unverified and now unnecessary — prefer `create_session`.
+
+### Known failure mode: `create_session` without `source_url` produces a dead session, reported as success (LS-9597)
+
+**Symptom**: the call returns a session ID and `SESSION_STATUS_PENDING` — indistinguishable from success — and the session then does nothing at all. It never runs a turn, never pushes a branch, never reports back.
+
+**Detection** (`get_session` / `list_sessions` on the spawned ID):
+
+| Field                         | Dead session                                                                                  | Healthy session                  |
+| ----------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------- |
+| `session_context.sources`     | key absent                                                                                    | `[{git_repository: {url: ...}}]` |
+| `updated_at - created_at`     | ~3 seconds                                                                                    | tens of seconds or more          |
+| `usage` / `post_turn_summary` | absent                                                                                        | populated                        |
+| `last_init_error`             | sometimes `{error_kind: "init_script", message: "Setup script failed", recoverable: "false"}` | absent                           |
+
+Note the `last_init_error` is only _sometimes_ retained — 2 of the 29 known-bad sessions carried it, the other 27 showed nothing but the 3-second lifetime. **Absence of an error is not evidence the session is alive**; check `sources` and the lifetime instead.
+
+**Mechanism**: the cloud environment's setup-script field invokes this repo's script by absolute path — `source "$HOME/legacy-sports/.claude/cloud-setup.sh"`. With no `source_url` no repo is cloned, so that path never exists and `source` fails immediately. The script is _sourced_, not executed, and sets `set -euo pipefail`, so the failure kills the setup shell rather than returning nonzero; the repo-root guard near the top of the script (`.git` + `package.json` present, else `exit 1`) would do the same for a partial checkout. Both guards are correct — the defect is that a missing parameter becomes an invisible death rather than a visible error.
+
+**Fix**: pass `source_url` on every spawn. To make the failure legible when someone forgets, the environment's setup-script field can be guarded (environment config UI, not a repo file — see LS-9597):
+
+```bash
+if [ -f "$HOME/legacy-sports/.claude/cloud-setup.sh" ]; then
+  source "$HOME/legacy-sports/.claude/cloud-setup.sh"
+else
+  echo "WARNING: no repo checkout at $HOME/legacy-sports — skipping cloud-setup.sh."
+  echo "This session was very likely created without source_url and cannot do repo work."
+fi
+```
 
 ### Known failure mode: hosted `legacy-sports-github`/`legacy-sports-jira` OAuth expires mid-session on long-running watch-to-merge loops (LS-8924)
 

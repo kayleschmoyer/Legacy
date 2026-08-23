@@ -65,7 +65,7 @@ No command fits → pick a dev-process entrypoint (`.agents/skills/dev-process/e
 ### Tool Usage (Tier 2)
 
 - **MCP-first, then Make**: prefer MCP tools over shell — `make_run` over `make`, `nx_run`/`nx_run_affected` over `pnpm exec nx`. See `.agents/skills/mcp-first/SKILL.md`.
-- **Chip dispatch via `mcp__ccd_session__spawn_task`, never `Agent`** — only `spawn_task` creates a real independent chip session. If unavailable, stop and inform the user.
+- **Chip dispatch via `mcp__ccd_session__spawn_task`, never `Agent`** — only `spawn_task` creates a real independent chip session. If unavailable, stop and inform the user. In CCR sessions use `mcp__Claude_Code_Remote__create_session` instead, and **always pass `source_url`** — without it the setup script has no repo to source, the session is reaped in ~3s, and the call still returns a session ID and `PENDING` as if it worked (LS-9597).
 - **Tool-first for file operations**: `Glob` (not `find`/`ls`), `Grep` (not `grep`/`rg`), `Read` (not `cat`/`head`/`tail`). For git refs: `worktree_show_file`.
 - **Jira operations** — `jira_auth_status` first; use `jira_*` MCP tools if `configured: true`. See `.agents/skills/mcp-first/SKILL.md`.
 

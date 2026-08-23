@@ -2,8 +2,21 @@
 # =============================================================================
 # Claude Code on the Web — Cloud Environment Setup Script
 # =============================================================================
-# Referenced from the cloud environment setup script UI via:
-#   source "$HOME/legacy-sports/.claude/cloud-setup.sh"
+# Referenced from the cloud environment setup script UI. Use the guarded form
+# so a session created WITHOUT a repo source fails loudly instead of silently
+# (LS-9597 — a bare `source` of a missing path kills the setup shell under the
+# `set -euo pipefail` below, and the session is reaped ~3s later with no error
+# surfaced to whoever spawned it):
+#
+#   if [ -f "$HOME/legacy-sports/.claude/cloud-setup.sh" ]; then
+#     source "$HOME/legacy-sports/.claude/cloud-setup.sh"
+#   else
+#     echo "WARNING: no repo checkout at $HOME/legacy-sports — skipping cloud-setup.sh."
+#     echo "This session was very likely created without source_url and cannot do repo work."
+#   fi
+#
+# Any session spawned via `mcp__Claude_Code_Remote__create_session` must pass
+# `source_url` for this script to have a repo to run against at all.
 #
 # This runs when a new cloud session is created, AND on every session
 # resume (it is registered as a SessionStart hook — see LS-8113). Steps
