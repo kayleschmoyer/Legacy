@@ -588,6 +588,25 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(result).toMatchObject({ leagueId: 1, userId: 1 });
     });
 
+    it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership check
+      mockDb.returning.mockResolvedValueOnce([makeLeagueMsg()]);
+
+      const resolver = getMutation('sendLeagueMessage');
+      await resolver(
+        {},
+        { leagueId: 1, messageText: '<img src=x onerror=alert(1)>' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageText: '&lt;img src=x onerror=alert(1)&gt;',
+        }),
+      );
+    });
+
     // ── @mentions (LS-9216) ──────────────────────────────────────────────
 
     it('resolves an @TeamName mention to the managing user id and persists it', async () => {
@@ -824,6 +843,27 @@ describe('Chat and Tiebreakers Resolver', () => {
 
       expect(result).toMatchObject({ messageType: 'announcement' });
     });
+
+    it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ owner: 1 }]); // is commissioner
+      mockDb.returning.mockResolvedValueOnce([
+        makeLeagueMsg({ messageType: 'announcement' }),
+      ]);
+
+      const resolver = getMutation('postLeagueAnnouncement');
+      await resolver(
+        {},
+        { leagueId: 1, messageText: '<img src=x onerror=alert(1)>' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageText: '&lt;img src=x onerror=alert(1)&gt;',
+        }),
+      );
+    });
   });
 
   // ── updateLeagueAnnouncement ───────────────────────────────────────────────
@@ -876,6 +916,25 @@ describe('Chat and Tiebreakers Resolver', () => {
       )) as Record<string, unknown>;
 
       expect(result.messageText).toBe('Updated');
+    });
+
+    it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ owner: 1 }]) // is commissioner
+        .mockResolvedValueOnce([makeLeagueMsg()]); // existing found
+      mockDb.returning.mockResolvedValueOnce([makeLeagueMsg()]);
+
+      const resolver = getMutation('updateLeagueAnnouncement');
+      await resolver(
+        {},
+        { id: 1, leagueId: 1, messageText: '<img src=x onerror=alert(1)>' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.set).toHaveBeenCalledWith({
+        messageText: '&lt;img src=x onerror=alert(1)&gt;',
+      });
     });
   });
 
@@ -968,6 +1027,24 @@ describe('Chat and Tiebreakers Resolver', () => {
       )) as Record<string, unknown>;
 
       expect(result).toMatchObject({ fromUserId: 1, toUserId: 2 });
+    });
+
+    it('HTML-escapes messageText before persisting it (LS-6300)', async () => {
+      mockDb.returning.mockResolvedValueOnce([makeDirectMsg()]);
+
+      const resolver = getMutation('sendDirectMessage');
+      await resolver(
+        {},
+        { toUserId: 2, messageText: '<img src=x onerror=alert(1)>' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageText: '&lt;img src=x onerror=alert(1)&gt;',
+        }),
+      );
     });
   });
 });

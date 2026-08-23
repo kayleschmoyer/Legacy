@@ -3,7 +3,11 @@ import { LOGGER } from '@legacy-sports/logging';
 import { and, asc, desc, eq, inArray, or } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues/types';
-import { AuthenticationError, ForbiddenError } from './graphql-errors';
+import {
+  AuthenticationError,
+  ForbiddenError,
+  UserInputError,
+} from './graphql-errors';
 import { insertActivityLog } from '../services/activity-log';
 
 /**
@@ -46,6 +50,22 @@ function toUtcIso(pgTs: string): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Escape HTML-significant characters before persisting user-supplied chat
+ * text (LS-6300). The web chat renders messageText through React's default
+ * text-node escaping today, but this stores a value that stays inert even if
+ * a future or non-React consumer (email digest, admin panel, etc.) ever
+ * interpolates it into HTML.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**
@@ -870,13 +890,14 @@ builder.mutationField('sendLeagueMessage', (t) =>
       }
 
       const gifUrl = args.gifUrl?.trim() ?? null;
-      const text = args.messageText.trim();
-      if (!gifUrl && text.length === 0) {
-        throw new Error('Message cannot be empty');
+      const rawText = args.messageText.trim();
+      if (!gifUrl && rawText.length === 0) {
+        throw UserInputError('Message cannot be empty');
       }
-      if (text.length > 2000) {
-        throw new Error('Message cannot exceed 2000 characters');
+      if (rawText.length > 2000) {
+        throw UserInputError('Message cannot exceed 2000 characters');
       }
+      const text = escapeHtml(rawText);
 
       // Verify the caller is a member of the league
       const membership = await context.db
@@ -1084,13 +1105,14 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
         throw AuthenticationError();
       }
 
-      const text = args.messageText.trim();
-      if (text.length === 0) {
-        throw new Error('Announcement cannot be empty');
+      const rawText = args.messageText.trim();
+      if (rawText.length === 0) {
+        throw UserInputError('Announcement cannot be empty');
       }
-      if (text.length > 2000) {
-        throw new Error('Announcement cannot exceed 2000 characters');
+      if (rawText.length > 2000) {
+        throw UserInputError('Announcement cannot exceed 2000 characters');
       }
+      const text = escapeHtml(rawText);
 
       // Verify caller is the commissioner of the league
       const leagueRows = await context.db
@@ -1182,13 +1204,14 @@ builder.mutationField('updateLeagueAnnouncement', (t) =>
         throw AuthenticationError();
       }
 
-      const text = args.messageText.trim();
-      if (text.length === 0) {
-        throw new Error('Announcement cannot be empty');
+      const rawText = args.messageText.trim();
+      if (rawText.length === 0) {
+        throw UserInputError('Announcement cannot be empty');
       }
-      if (text.length > 2000) {
-        throw new Error('Announcement cannot exceed 2000 characters');
+      if (rawText.length > 2000) {
+        throw UserInputError('Announcement cannot exceed 2000 characters');
       }
+      const text = escapeHtml(rawText);
 
       // Verify caller is the commissioner of the league
       const leagueRows = await context.db
@@ -1332,13 +1355,14 @@ builder.mutationField('sendDirectMessage', (t) =>
         throw new Error('Cannot send a direct message to yourself');
       }
 
-      const text = args.messageText.trim();
-      if (text.length === 0) {
-        throw new Error('Message cannot be empty');
+      const rawText = args.messageText.trim();
+      if (rawText.length === 0) {
+        throw UserInputError('Message cannot be empty');
       }
-      if (text.length > 2000) {
-        throw new Error('Message cannot exceed 2000 characters');
+      if (rawText.length > 2000) {
+        throw UserInputError('Message cannot exceed 2000 characters');
       }
+      const text = escapeHtml(rawText);
 
       // Persist the direct message
       const rows = await context.db
