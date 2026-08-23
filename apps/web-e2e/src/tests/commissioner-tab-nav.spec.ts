@@ -363,6 +363,21 @@ test.describe('Commissioner Tab — navigation @smoke', () => {
     ).toBeVisible();
   });
 
+  test('navigating via tab click preserves the /baseball/ URL prefix (LS-9257)', async ({
+    page,
+  }) => {
+    await setupGraphQL(page, { league: makeLeague({ owner: 1 }) });
+    await page.goto('/baseball/league/1/overview');
+    await page.waitForLoadState('load');
+
+    await page
+      .getByRole('tablist', { name: 'League sections' })
+      .getByRole('tab', { name: 'Commissioner' })
+      .click();
+
+    await expect(page).toHaveURL('/baseball/league/1/commish');
+  });
+
   test('shows the league name on the commissioner page', async ({ page }) => {
     await setupGraphQL(page, { league: makeLeague() });
     await page.goto('/baseball/league/1/commissioner');

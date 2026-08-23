@@ -241,12 +241,11 @@ test.describe('Commissioner Settings Tab — Football @critical', () => {
     const tablist = page.getByRole('tablist', { name: 'League sections' });
     await tablist.getByRole('tab', { name: 'Commissioner' }).click();
 
-    // LeagueDetailPageV2's tab-click handler hardcodes the `/baseball/`
-    // URL prefix regardless of the page's actual sport (LS-9257), and uses
-    // the internal tab id ("commish") rather than the "commissioner" route
-    // alias — so the URL check here only asserts the tab route segment and
-    // rendered content, not the sport prefix.
-    await expect(page).toHaveURL(/\/league\/1\/commish/);
+    // LeagueDetailPageV2's tab-change handler preserves the page's current
+    // sport in the URL (LS-9257) — clicking a tab on a football league must
+    // stay under /football/, not fall back to /baseball/. Uses the internal
+    // tab id ("commish") rather than the "commissioner" route alias.
+    await expect(page).toHaveURL('/football/league/1/commish');
     await expect(page.getByText('League Settings')).toBeVisible();
   });
 
@@ -316,9 +315,9 @@ test.describe('Commissioner Settings Tab — Football @critical', () => {
 
     // LeagueDetailPageV2 redirects tab === 'commish' back to overview when
     // the viewer is not the league owner. The redirect goes through the
-    // same setTab() helper that hardcodes /baseball/ (LS-9257), so this
-    // check is sport-agnostic on the same route segment.
-    await expect(page).toHaveURL(/\/league\/1\/overview/);
+    // same setTab() helper, which preserves the page's sport in the URL
+    // (LS-9257) — this must land on /football/, not /baseball/.
+    await expect(page).toHaveURL('/football/league/1/overview');
     await expect(page.getByText('League Settings')).not.toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Save Settings' }),
