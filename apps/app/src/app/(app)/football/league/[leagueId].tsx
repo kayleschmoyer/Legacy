@@ -861,7 +861,11 @@ export default function FootballLeagueId(): React.JSX.Element {
 
         {selectedTab === 'chat' && (
           <YStack flex={1}>
-            <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
+            <LeagueChatTab
+              leagueId={numLeagueId}
+              userInfo={userInfo}
+              isCommissioner={isCommissioner}
+            />
           </YStack>
         )}
 

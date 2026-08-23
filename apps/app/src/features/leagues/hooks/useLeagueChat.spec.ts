@@ -22,12 +22,19 @@ jest.mock('@apollo/client/react', () => ({
 
 const mockUseSendLeagueMessageMutation = jest.fn();
 const mockUseGetLeagueTeamsQuery = jest.fn();
+const mockUseGetLeagueAnnouncementsQuery = jest.fn();
+const mockUsePostLeagueAnnouncementMutation = jest.fn();
 jest.mock('@legacy-sports/graphql', () => ({
   GetLeagueMessages: 'GET_LEAGUE_MESSAGES',
+  GetLeagueAnnouncements: 'GET_LEAGUE_ANNOUNCEMENTS',
   useSendLeagueMessageMutation: (...args: unknown[]): unknown =>
     mockUseSendLeagueMessageMutation(...args),
   useGetLeagueTeamsQuery: (...args: unknown[]): unknown =>
     mockUseGetLeagueTeamsQuery(...args),
+  useGetLeagueAnnouncementsQuery: (...args: unknown[]): unknown =>
+    mockUseGetLeagueAnnouncementsQuery(...args),
+  usePostLeagueAnnouncementMutation: (...args: unknown[]): unknown =>
+    mockUsePostLeagueAnnouncementMutation(...args),
 }));
 
 jest.mock('@legacy-sports/rollbar/native', () => ({
@@ -61,6 +68,11 @@ describe('useLeagueChat — WS notifications are scoped to the viewed league (LS
     mockConnected = true;
     mockUseQuery.mockReturnValue({ loading: false, data: undefined });
     mockUseGetLeagueTeamsQuery.mockReturnValue({ data: undefined });
+    mockUseGetLeagueAnnouncementsQuery.mockReturnValue({ data: undefined });
+    mockUsePostLeagueAnnouncementMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
     mockUseSendLeagueMessageMutation.mockReturnValue([
       jest.fn(),
       { loading: false },
@@ -129,6 +141,11 @@ describe('useLeagueChat — @mention roster (LS-9097)', () => {
       jest.fn(),
       { loading: false },
     ]);
+    mockUseGetLeagueAnnouncementsQuery.mockReturnValue({ data: undefined });
+    mockUsePostLeagueAnnouncementMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
   });
 
   it('derives mention candidates from the league team roster', () => {
@@ -167,6 +184,11 @@ describe('useLeagueChat — offline queueing (LS-9097)', () => {
     mockConnected = true;
     mockUseQuery.mockReturnValue({ loading: false, data: undefined });
     mockUseGetLeagueTeamsQuery.mockReturnValue({ data: undefined });
+    mockUseGetLeagueAnnouncementsQuery.mockReturnValue({ data: undefined });
+    mockUsePostLeagueAnnouncementMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
     await AsyncStorage.clear();
   });
 
@@ -242,5 +264,99 @@ describe('useLeagueChat — offline queueing (LS-9097)', () => {
     expect(result.current.messages.map((m) => m.messageText)).toContain(
       'queued while offline',
     );
+  });
+});
+
+describe('useLeagueChat — commissioner announcements (LS-6303 / FLD-051)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRegisteredHandlers.clear();
+    mockConnected = true;
+    mockUseQuery.mockReturnValue({ loading: false, data: undefined });
+    mockUseGetLeagueTeamsQuery.mockReturnValue({ data: undefined });
+    mockUseSendLeagueMessageMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
+  });
+
+  it('maps getLeagueAnnouncements results to the flat announcement shape', () => {
+    mockUseGetLeagueAnnouncementsQuery.mockReturnValue({
+      data: {
+        getLeagueAnnouncements: [
+          {
+            id: 5,
+            messageText: 'Trade deadline is Friday!',
+            timestamp: '2026-03-31T10:00:00Z',
+            sender: { username: 'CommishBob' },
+          },
+        ],
+      },
+    });
+    mockUsePostLeagueAnnouncementMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    expect(result.current.announcements).toEqual([
+      {
+        id: 5,
+        username: 'CommishBob',
+        messageText: 'Trade deadline is Friday!',
+        createdAt: '2026-03-31T10:00:00Z',
+      },
+    ]);
+  });
+
+  it('returns no announcements when none have been posted', () => {
+    mockUseGetLeagueAnnouncementsQuery.mockReturnValue({ data: undefined });
+    mockUsePostLeagueAnnouncementMutation.mockReturnValue([
+      jest.fn(),
+      { loading: false },
+    ]);
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    expect(result.current.announcements).toEqual([]);
+  });
+
+  it('posts an announcement with the trimmed text', async () => {
+    mockUseGetLeagueAnnouncementsQuery.mockReturnValue({ data: undefined });
+    const postMutation = jest.fn().mockResolvedValue(undefined);
+    mockUsePostLeagueAnnouncementMutation.mockReturnValue([
+      postMutation,
+      { loading: false },
+    ]);
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    await act(async () => {
+      await result.current.postAnnouncement('  Fees due Monday  ');
+    });
+
+    expect(postMutation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: { leagueId: 1, messageText: 'Fees due Monday' },
+      }),
+    );
+  });
+
+  it('does not post an empty announcement', async () => {
+    mockUseGetLeagueAnnouncementsQuery.mockReturnValue({ data: undefined });
+    const postMutation = jest.fn().mockResolvedValue(undefined);
+    mockUsePostLeagueAnnouncementMutation.mockReturnValue([
+      postMutation,
+      { loading: false },
+    ]);
+
+    const { result } = renderHook(() => useLeagueChat(1));
+
+    await act(async () => {
+      await result.current.postAnnouncement('   ');
+    });
+
+    expect(postMutation).not.toHaveBeenCalled();
   });
 });

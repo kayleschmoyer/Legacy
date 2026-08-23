@@ -20,6 +20,7 @@ type RNComponents = {
 
 // Mock the useLeagueChat hook
 const mockSendMessage = jest.fn().mockResolvedValue(undefined);
+const mockPostAnnouncement = jest.fn().mockResolvedValue(undefined);
 const mockUseLeagueChat = jest.fn(() => ({
   messages: [],
   loading: false,
@@ -27,6 +28,9 @@ const mockUseLeagueChat = jest.fn(() => ({
   wsError: null,
   sendMessage: mockSendMessage,
   mentionCandidates: [],
+  announcements: [],
+  postingAnnouncement: false,
+  postAnnouncement: mockPostAnnouncement,
 }));
 
 jest.mock('./hooks/useLeagueChat', () => ({
@@ -65,6 +69,11 @@ jest.mock('@legacy-sports/logging', () => ({
     error: jest.fn(),
     debug: jest.fn(),
   },
+}));
+
+// Mock @legacy-sports/rollbar/native
+jest.mock('@legacy-sports/rollbar/native', () => ({
+  captureError: jest.fn(),
 }));
 
 // Mock tamagui
@@ -184,7 +193,11 @@ const mockGifMessage = {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 describe('LeagueChatTab', () => {
-  const defaultProps = { leagueId: 42, userInfo: mockUserInfo };
+  const defaultProps = {
+    leagueId: 42,
+    userInfo: mockUserInfo,
+    isCommissioner: false,
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -195,6 +208,9 @@ describe('LeagueChatTab', () => {
       wsError: null,
       sendMessage: mockSendMessage,
       mentionCandidates: [],
+      announcements: [],
+      postingAnnouncement: false,
+      postAnnouncement: mockPostAnnouncement,
     });
   });
 
@@ -341,7 +357,13 @@ describe('LeagueChatTab', () => {
 
     it('re-subscribes when leagueId changes', () => {
       const { rerender } = render(<LeagueChatTab {...defaultProps} />);
-      rerender(<LeagueChatTab leagueId={99} userInfo={mockUserInfo} />);
+      rerender(
+        <LeagueChatTab
+          leagueId={99}
+          userInfo={mockUserInfo}
+          isCommissioner={false}
+        />,
+      );
       expect(mockUseLeagueChat).toHaveBeenCalledWith(99);
     });
   });
@@ -527,6 +549,101 @@ describe('LeagueChatTab', () => {
       render(<LeagueChatTab {...defaultProps} />);
       expect(screen.getByText('sent while offline')).toBeTruthy();
       expect(screen.getByText(/Sending…/)).toBeTruthy();
+    });
+  });
+
+  describe('commissioner announcements (LS-6303 / FLD-051)', () => {
+    const mockAnnouncement = {
+      id: 5,
+      username: 'CommishBob',
+      messageText: 'Trade deadline is Friday!',
+      createdAt: '2026-03-31T10:00:00Z',
+    };
+
+    it('does not render a pinned banner when there are no announcements', () => {
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.queryByTestId('pinned-announcement-banner')).toBeNull();
+    });
+
+    it('pins the latest announcement at the top', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+        announcements: [mockAnnouncement],
+        postingAnnouncement: false,
+        postAnnouncement: mockPostAnnouncement,
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.getByTestId('pinned-announcement-banner')).toBeTruthy();
+      expect(screen.getByText('Trade deadline is Friday!')).toBeTruthy();
+    });
+
+    it('does not show the Announce toggle for non-commissioners', () => {
+      render(<LeagueChatTab {...defaultProps} isCommissioner={false} />);
+      expect(screen.queryByTestId('announce-toggle')).toBeNull();
+    });
+
+    it('shows the Announce toggle for commissioners', () => {
+      render(<LeagueChatTab {...defaultProps} isCommissioner={true} />);
+      expect(screen.getByTestId('announce-toggle')).toBeTruthy();
+    });
+
+    it('posts an announcement instead of a regular message while in announce mode', async () => {
+      render(<LeagueChatTab {...defaultProps} isCommissioner={true} />);
+
+      fireEvent.press(screen.getByTestId('announce-toggle'));
+      const input = screen.getByPlaceholderText(
+        'Write an announcement to the league…',
+      );
+      fireEvent.changeText(input, 'League fees due next week');
+      fireEvent.press(screen.getByText('Send'));
+
+      await waitFor(() => {
+        expect(mockPostAnnouncement).toHaveBeenCalledWith(
+          'League fees due next week',
+        );
+      });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('restores the draft instead of losing it when posting an announcement fails', async () => {
+      mockPostAnnouncement.mockRejectedValueOnce(new Error('network blip'));
+      mockUseLeagueChat.mockReturnValue({
+        messages: [],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+        announcements: [],
+        postingAnnouncement: false,
+        postAnnouncement: mockPostAnnouncement,
+      });
+
+      render(<LeagueChatTab {...defaultProps} isCommissioner={true} />);
+
+      fireEvent.press(screen.getByTestId('announce-toggle'));
+      const input = screen.getByPlaceholderText(
+        'Write an announcement to the league…',
+      );
+      fireEvent.changeText(input, 'League fees due next week');
+      fireEvent.press(screen.getByText('Send'));
+
+      await waitFor(() => {
+        expect(mockPostAnnouncement).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(
+          screen.getByDisplayValue('League fees due next week'),
+        ).toBeTruthy();
+      });
+      // Still in announce mode — the commissioner can retry the same send.
+      expect(screen.getByTestId('announce-mode-banner')).toBeTruthy();
     });
   });
 });

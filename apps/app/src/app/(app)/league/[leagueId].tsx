@@ -467,7 +467,11 @@ export default function LeagueContext(): React.JSX.Element {
           </Tabs.Content>
 
           <Tabs.Content value="chat" flex={1}>
-            <LeagueChatTab leagueId={numLeagueId} userInfo={userInfo} />
+            <LeagueChatTab
+              leagueId={numLeagueId}
+              userInfo={userInfo}
+              isCommissioner={isCommissioner}
+            />
           </Tabs.Content>
 
           {isCommissioner && (

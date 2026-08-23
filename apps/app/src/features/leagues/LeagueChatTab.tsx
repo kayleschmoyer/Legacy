@@ -14,6 +14,7 @@ import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
 import { GifPicker } from '@legacy-sports/shared-components';
 import { config } from '@legacy-sports/app-config/native';
 import { colors } from '@legacy-sports/design-tokens';
+import { captureError } from '@legacy-sports/rollbar/native';
 import { useLeagueChat } from './hooks/useLeagueChat';
 import { formatTime } from './formatTime';
 import { applyMention, getMentionQuery, splitMentions } from './mentions';
@@ -28,6 +29,8 @@ import type { LegacySportsJwt } from '../../common/auth/AuthHooks';
 interface LeagueChatTabProps {
   leagueId: number;
   userInfo: LegacySportsJwt;
+  /** Gates the pinned-announcement composer — posting is commissioner-only server-side, this only controls the UI affordance. */
+  isCommissioner: boolean;
 }
 
 /**
@@ -49,6 +52,7 @@ const SYSTEM_MESSAGE_TYPES = new Set([
 export function LeagueChatTab({
   leagueId,
   userInfo,
+  isCommissioner,
 }: LeagueChatTabProps): React.JSX.Element {
   const {
     messages,
@@ -57,6 +61,9 @@ export function LeagueChatTab({
     wsError,
     sendMessage,
     mentionCandidates = [],
+    announcements = [],
+    postingAnnouncement,
+    postAnnouncement,
   } = useLeagueChat(leagueId);
   // Raw RN <TextInput> styling can't consume Tamagui `$token` props, so pull
   // resolved values from the design-token package — the same source of
@@ -66,7 +73,12 @@ export function LeagueChatTab({
   const [inputText, setInputText] = useState('');
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [announceMode, setAnnounceMode] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+
+  // Newest announcement pins at the top of the tab (FLD-051) — the list is
+  // already newest-first from getLeagueAnnouncements' orderBy(desc(timestamp)).
+  const latestAnnouncement = announcements[0];
 
   const giphyApiKey = config.giphyApiKey ?? '';
   const mentionLabels = mentionCandidates.map((c) => c.label);
@@ -99,11 +111,30 @@ export function LeagueChatTab({
 
   const handleSend = useCallback(async () => {
     const text = inputText.trim();
-    if (!text || sending) return;
+    if (!text || sending || postingAnnouncement) return;
     setInputText('');
+    if (announceMode) {
+      try {
+        await postAnnouncement(text);
+        setAnnounceMode(false);
+      } catch (error) {
+        // Restore the draft so the commissioner can retry rather than
+        // silently losing the announcement to a network blip.
+        captureError(error instanceof Error ? error : new Error(String(error)));
+        setInputText(text);
+      }
+      return;
+    }
     await sendMessage(text);
     scrollViewRef.current?.scrollToEnd({ animated: true });
-  }, [inputText, sending, sendMessage]);
+  }, [
+    inputText,
+    sending,
+    postingAnnouncement,
+    announceMode,
+    postAnnouncement,
+    sendMessage,
+  ]);
 
   const handleSendGif = useCallback(
     async (gifUrl: string) => {
@@ -132,6 +163,31 @@ export function LeagueChatTab({
       keyboardVerticalOffset={80}
     >
       <YStack flex={1}>
+        {/* Pinned commissioner announcement (FLD-051) */}
+        {latestAnnouncement && (
+          <YStack
+            testID="pinned-announcement-banner"
+            backgroundColor="$yellow3"
+            borderBottomWidth={1}
+            borderBottomColor="$yellow6"
+            paddingHorizontal="$3"
+            paddingVertical="$2"
+          >
+            <Text
+              fontSize="$1"
+              fontWeight="700"
+              color="$yellow11"
+              textTransform="uppercase"
+              letterSpacing={0.6}
+            >
+              📌 {latestAnnouncement.username}
+            </Text>
+            <Text fontSize="$3" color="$yellow11" marginTop="$1">
+              {latestAnnouncement.messageText}
+            </Text>
+          </YStack>
+        )}
+
         {/* Real-time connection error banner */}
         {wsError && (
           <XStack
@@ -303,6 +359,29 @@ export function LeagueChatTab({
           </YStack>
         )}
 
+        {/* Announce-mode indicator (FLD-051) */}
+        {isCommissioner && announceMode && (
+          <XStack
+            testID="announce-mode-banner"
+            backgroundColor="$yellow3"
+            paddingHorizontal="$3"
+            paddingVertical="$1"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <Text fontSize="$1" color="$yellow11" fontWeight="700">
+              Posting a commissioner announcement
+            </Text>
+            <Text
+              fontSize="$1"
+              color="$yellow11"
+              onPress={() => setAnnounceMode(false)}
+            >
+              Cancel
+            </Text>
+          </XStack>
+        )}
+
         {/* Input row */}
         <XStack
           paddingHorizontal="$3"
@@ -313,6 +392,18 @@ export function LeagueChatTab({
           alignItems="flex-end"
           space="$2"
         >
+          {isCommissioner ? (
+            <Button
+              testID="announce-toggle"
+              size="$3"
+              chromeless
+              onPress={() => setAnnounceMode(!announceMode)}
+              opacity={announceMode ? 1 : 0.6}
+              paddingHorizontal="$2"
+            >
+              Announce
+            </Button>
+          ) : null}
           {giphyApiKey ? (
             <Button
               size="$3"
@@ -336,7 +427,11 @@ export function LeagueChatTab({
             value={inputText}
             onChangeText={setInputText}
             onSelectionChange={handleSelectionChange}
-            placeholder="Message the league…"
+            placeholder={
+              announceMode
+                ? 'Write an announcement to the league…'
+                : 'Message the league…'
+            }
             placeholderTextColor={palette.text.fg3}
             multiline
             maxLength={2000}
@@ -349,11 +444,13 @@ export function LeagueChatTab({
             backgroundColor="$brandNavyLight"
             color="white"
             onPress={() => void handleSend()}
-            disabled={!inputText.trim() || sending}
-            opacity={!inputText.trim() || sending ? 0.5 : 1}
+            disabled={!inputText.trim() || sending || postingAnnouncement}
+            opacity={
+              !inputText.trim() || sending || postingAnnouncement ? 0.5 : 1
+            }
             minWidth={64}
           >
-            {sending ? '…' : 'Send'}
+            {sending || postingAnnouncement ? '…' : 'Send'}
           </Button>
         </XStack>
       </YStack>

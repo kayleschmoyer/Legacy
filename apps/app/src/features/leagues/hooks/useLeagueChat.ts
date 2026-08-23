@@ -4,10 +4,14 @@ import type { NotificationData } from '@legacy-sports/websocket-client';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import { captureError } from '@legacy-sports/rollbar/native';
 import {
+  GetLeagueAnnouncements,
+  type GetLeagueAnnouncementsQuery,
   GetLeagueMessages,
   type GetLeagueMessagesQuery,
   type SendLeagueMessageMutation,
+  useGetLeagueAnnouncementsQuery,
   useGetLeagueTeamsQuery,
+  usePostLeagueAnnouncementMutation,
   useSendLeagueMessageMutation,
 } from '@legacy-sports/graphql';
 import { useLeagueWebSocketClient } from '../../../context/LeagueWebSocketContext';
@@ -65,6 +69,27 @@ function toSentMessage(
   };
 }
 
+export interface ChatAnnouncement {
+  id: number;
+  username: string;
+  messageText: string;
+  createdAt: string;
+}
+
+/** Map a generated LeagueChatMessage fragment to the flat ChatAnnouncement shape. */
+function toAnnouncement(
+  raw: NonNullable<
+    NonNullable<GetLeagueAnnouncementsQuery['getLeagueAnnouncements']>[number]
+  >,
+): ChatAnnouncement {
+  return {
+    id: Number(raw.id ?? 0),
+    username: raw.sender?.username ?? 'Commissioner',
+    messageText: raw.messageText ?? '',
+    createdAt: raw.timestamp ?? '',
+  };
+}
+
 /** Deterministic negative id for a queued message, so it never collides with a real (positive) message id. */
 function localIdToPendingId(localId: string): number {
   let hash = 0;
@@ -84,6 +109,9 @@ export function useLeagueChat(leagueId: number): {
   wsError: Error | null;
   sendMessage: (text: string, gifUrl?: string) => Promise<void>;
   mentionCandidates: MentionCandidate[];
+  announcements: ChatAnnouncement[];
+  postingAnnouncement: boolean;
+  postAnnouncement: (text: string) => Promise<void>;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [wsError, setWsError] = useState<Error | null>(null);
@@ -114,6 +142,36 @@ export function useLeagueChat(leagueId: number): {
         team.name != null && team.managerId != null,
     )
     .map((team) => ({ userId: team.managerId, label: team.name }));
+
+  // Commissioner announcements (LS-6303): a separate, pinned message stream
+  // — fetched and posted independently of the regular getLeagueMessages/
+  // sendLeagueMessage history above (LS-291 added the server side of this;
+  // LeagueChatTab never consumed it).
+  const { data: announcementsData } = useGetLeagueAnnouncementsQuery({
+    variables: { leagueId },
+    skip: isNaN(leagueId),
+    fetchPolicy: 'cache-and-network',
+  });
+  const announcements: ChatAnnouncement[] = (
+    announcementsData?.getLeagueAnnouncements ?? []
+  ).map(toAnnouncement);
+
+  const [postAnnouncementMutation, { loading: postingAnnouncement }] =
+    usePostLeagueAnnouncementMutation();
+
+  const postAnnouncement = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      await postAnnouncementMutation({
+        variables: { leagueId, messageText: trimmed },
+        refetchQueries: [
+          { query: GetLeagueAnnouncements, variables: { leagueId } },
+        ],
+      });
+    },
+    [postAnnouncementMutation, leagueId],
+  );
 
   // Sync history into local state; merge with any WS-appended messages
   const [historySynced, setHistorySynced] = useState(false);
@@ -319,5 +377,8 @@ export function useLeagueChat(leagueId: number): {
     wsError,
     sendMessage,
     mentionCandidates,
+    announcements,
+    postingAnnouncement,
+    postAnnouncement,
   };
 }
