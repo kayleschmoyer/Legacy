@@ -298,7 +298,19 @@ export async function getSelectedGamesCount(
 }
 
 /**
- * Batch-count distinct game numbers for multiple matchups in a single query.
+ * Batch-count "fully resolved" game slots for multiple matchups in a single
+ * query.
+ *
+ * A matchup's count is the MINIMUM per-player resolved-slot count across all
+ * of its rostered matchup players — not a matchup-wide DISTINCT game_num
+ * count. The latter under-counts remaining work: as soon as ANY one player
+ * has a game_num resolved (e.g. an early-window Sunday player), that
+ * game_num counts as "selected" for the whole matchup even if the rest of
+ * the roster (e.g. late-window/MNF players) still has that slot unresolved
+ * — flipping the matchup to 'completed' while teammates' games are still
+ * pending (LS-6367). A slot counts as resolved when it has a real
+ * gameIdentifier assigned, or was intentionally skipped
+ * (pitcherStartSkipped).
  *
  * Returns a Map<matchupId, count>. Matchups with zero games will have count 0.
  * Uses GROUP BY instead of N separate queries — O(1) round trips.
@@ -314,28 +326,24 @@ export async function getSelectedGamesCountBatch(
   const rows = await db
     .select({
       matchupId: PublicSchema.matchupPlayers.matchupId,
-      count: sql<number>`COUNT(DISTINCT ${PublicSchema.matchupPlayerGames.gameNum})`,
+      matchupPlayerId: PublicSchema.matchupPlayers.id,
+      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
     })
-    .from(PublicSchema.matchupPlayerGames)
-    .innerJoin(
-      PublicSchema.matchupPlayers,
+    .from(PublicSchema.matchupPlayers)
+    .leftJoin(
+      PublicSchema.matchupPlayerGames,
       eq(
         PublicSchema.matchupPlayerGames.matchupPlayerId,
         PublicSchema.matchupPlayers.id,
       ),
     )
     .where(inArray(PublicSchema.matchupPlayers.matchupId, matchupIds))
-    .groupBy(PublicSchema.matchupPlayers.matchupId);
+    .groupBy(
+      PublicSchema.matchupPlayers.matchupId,
+      PublicSchema.matchupPlayers.id,
+    );
 
-  const result = new Map<number, number>();
-  for (const id of matchupIds) {
-    result.set(id, 0);
-  }
-  for (const row of rows) {
-    result.set(row.matchupId, Number(row.count));
-  }
-
-  return result;
+  return minResolvedCountPerMatchup(matchupIds, rows);
 }
 
 /**

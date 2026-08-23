@@ -1,8 +1,8 @@
 /**
- * Unit tests for the LS-9517 fix: getSelectedGamesCount (singular) must be
+ * Unit tests for the LS-6367 / LS-9517 fix: matchup completion must be
  * gated on the least-resolved rostered player, not a matchup-wide DISTINCT
- * game_num count — the same premature-completion bug pattern fixed for
- * getSelectedGamesCountBatch in LS-6367.
+ * game_num count. LS-6367 fixed the batch path (getSelectedGamesCountBatch);
+ * LS-9517 fixed the same bug pattern in the singular getSelectedGamesCount.
  */
 
 import {
@@ -38,11 +38,11 @@ function createMockDbChain(finalResult: ResolvedCountRow[]): MockDbChain {
 
 describe('minResolvedCountPerMatchup', () => {
   it("takes the minimum resolved count across a matchup's players", () => {
-    // Matchup 1: player A has all 5 slots resolved (e.g. early-window
-    // players), player B is missing slot 5 (e.g. a still-pending game). The
-    // matchup must report 4, not 5 — a matchup-wide DISTINCT game_num count
-    // would incorrectly report 5 here because player A's resolved slot 5
-    // alone would satisfy the distinct check.
+    // Matchup 1: player A has all 5 slots resolved (e.g. early-window Sunday
+    // players), player B is missing slot 5 (e.g. a postponed/rescheduled MNF
+    // game still pending). The matchup must report 4, not 5 — a matchup-wide
+    // DISTINCT game_num count would incorrectly report 5 here because player
+    // A's resolved slot 5 alone would satisfy the distinct check.
     const rows = [
       { matchupId: 1, matchupPlayerId: 101, count: 5 },
       { matchupId: 1, matchupPlayerId: 102, count: 4 },
