@@ -68,6 +68,32 @@ describe('DraftPickToast', () => {
     expect(getByText('#7')).toBeTruthy();
   });
 
+  it('renders a pick-quality badge when the player has ADP data (LS-9465)', () => {
+    const { getByText } = render(
+      <DraftPickToast
+        queue={[makeItem({ player: makePlayer({ adp: 20 }), pickNumber: 7 })]}
+        onDismiss={jest.fn()}
+        sport="football"
+      />,
+    );
+
+    expect(getByText('Good Value')).toBeTruthy();
+  });
+
+  it('renders no pick-quality badge when the player has no ADP', () => {
+    const { queryByText } = render(
+      <DraftPickToast
+        queue={[makeItem()]}
+        onDismiss={jest.fn()}
+        sport="football"
+      />,
+    );
+
+    expect(queryByText('Good Value')).toBeNull();
+    expect(queryByText('Great Pick!')).toBeNull();
+    expect(queryByText('Reach')).toBeNull();
+  });
+
   it('renders "AUTO PICK ·" for an auto-pick', () => {
     const { getByText } = render(
       <DraftPickToast

@@ -24,6 +24,41 @@ export function getMlbHeadshotUrl(mlbPlayerId: number, width = 213): string {
 }
 
 // ---------------------------------------------------------------------------
+// Pick quality (LS-9465)
+// ---------------------------------------------------------------------------
+
+export type PickQualityTier = 'great' | 'good' | 'reached';
+
+export interface PickQuality {
+  tier: PickQualityTier;
+  label: string;
+  /** StatusBadge variant for this tier. */
+  variant: 'success' | 'info' | 'warning';
+}
+
+/**
+ * Classifies a pick as a value grab or a reach by comparing the slot it was
+ * made at (overallPick) against the player's ADP (average draft position —
+ * see DraftPlayer.adp/AvailableDraftPlayer.adp, a stack-rank fallback since
+ * real historical ADP isn't collected yet). Returns null when there's no ADP
+ * to compare against, or the pick landed close enough to it to be unremarkable.
+ */
+export function getPickQuality(
+  overallPick: number,
+  adp: number | null | undefined,
+): PickQuality | null {
+  if (adp == null) return null;
+
+  const diff = adp - overallPick;
+  if (diff >= 20)
+    return { tier: 'great', label: 'Great Pick!', variant: 'success' };
+  if (diff >= 8) return { tier: 'good', label: 'Good Value', variant: 'info' };
+  if (diff <= -15)
+    return { tier: 'reached', label: 'Reach', variant: 'warning' };
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Commentary
 // ---------------------------------------------------------------------------
 

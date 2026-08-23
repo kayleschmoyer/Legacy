@@ -60,4 +60,10 @@ export type {
 // getPositionColor already exported by utils/colors)
 export { DEFAULT_NUM_TEAMS, DEFAULT_PICK_TIME } from './constants';
 export { normalizeTeamId } from './utils';
-export { getDraftCommentary, getMlbHeadshotUrl } from './draftUtils';
+export {
+  getDraftCommentary,
+  getMlbHeadshotUrl,
+  getPickQuality,
+  type PickQuality,
+  type PickQualityTier,
+} from './draftUtils';

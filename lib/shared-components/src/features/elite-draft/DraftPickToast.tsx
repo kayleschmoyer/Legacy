@@ -7,7 +7,9 @@
 import React, { useEffect } from 'react';
 import { Text, XStack, YStack } from 'tamagui';
 import type { PickToastQueueItem } from './hooks/useDraftUIState';
+import { getPickQuality } from './draftUtils';
 import { PositionBadge } from '../../components/PositionBadge';
+import { StatusBadge } from '../../components/StatusBadge';
 import { getPositionColor } from '../../utils/colors';
 import type { SportKind } from '../../config/sports';
 
@@ -59,6 +61,7 @@ export function DraftPickToast({
   const eyebrow = item.isAuto
     ? 'AUTO PICK ·'
     : `PICK ${item.round}.${item.roundPickNumber} · ${item.teamName}`;
+  const pickQuality = getPickQuality(item.pickNumber, item.player.adp);
 
   return (
     <YStack
@@ -101,9 +104,23 @@ export function DraftPickToast({
           >
             {eyebrow}
           </Text>
-          <Text fontSize={14} fontWeight="700" color="$color" numberOfLines={1}>
-            {nameOf(item)}
-          </Text>
+          <XStack alignItems="center" gap={6}>
+            <Text
+              fontSize={14}
+              fontWeight="700"
+              color="$color"
+              numberOfLines={1}
+            >
+              {nameOf(item)}
+            </Text>
+            {pickQuality && (
+              <StatusBadge
+                label={pickQuality.label}
+                variant={pickQuality.variant}
+                size="xs"
+              />
+            )}
+          </XStack>
         </YStack>
         <Text
           fontFamily="$heading"

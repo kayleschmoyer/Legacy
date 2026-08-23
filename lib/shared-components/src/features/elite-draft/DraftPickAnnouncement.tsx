@@ -16,6 +16,8 @@ import { PickSplashStatGraphic } from './PickSplashStatGraphic';
 import { initialsOf, statLineFor } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
 import { getPositionColor } from './utils';
+import { getPickQuality } from './draftUtils';
+import { StatusBadge } from '../../components/StatusBadge';
 import { withAlpha } from '../../utils/colors';
 
 export interface DraftPickAnnouncementProps {
@@ -61,6 +63,8 @@ export function DraftPickAnnouncement({
     : announcement.isMyPick
       ? `WITH PICK #${announcement.pickNumber}, YOU SELECT`
       : `PICK #${announcement.pickNumber} · ${announcement.teamName}`;
+
+  const pickQuality = getPickQuality(announcement.pickNumber, player.adp);
 
   return (
     <YStack
@@ -140,6 +144,14 @@ export function DraftPickAnnouncement({
               {subtitle}
             </Text>
           </XStack>
+          {pickQuality && (
+            <XStack marginTop={8}>
+              <StatusBadge
+                label={pickQuality.label}
+                variant={pickQuality.variant}
+              />
+            </XStack>
+          )}
           <PickSplashStatGraphic play={notablePlay ?? null} />
         </YStack>
       </YStack>

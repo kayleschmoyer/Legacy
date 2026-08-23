@@ -16,7 +16,9 @@ import { PickSplashStatGraphic } from './PickSplashStatGraphic.native';
 import { initialsOf, statLineFor } from './nativeDraftBoard';
 import { useDraftPalette } from './nativeDraftPalette';
 import { getPositionColor } from './utils';
+import { getPickQuality } from './draftUtils';
 import { CONFETTI_COLORS } from './constants';
+import { StatusBadge } from '../../components/StatusBadge';
 import { withAlpha } from '../../utils/colors';
 
 const CONFETTI_PIECES = 28;
@@ -169,6 +171,8 @@ export function DraftPickAnnouncement({
       ? `WITH PICK #${announcement.pickNumber}, YOU SELECT`
       : `PICK #${announcement.pickNumber} · ${announcement.teamName}`;
 
+  const pickQuality = getPickQuality(announcement.pickNumber, player.adp);
+
   return (
     <>
       <Pressable
@@ -244,6 +248,14 @@ export function DraftPickAnnouncement({
                 {subtitle}
               </Text>
             </XStack>
+            {pickQuality && (
+              <XStack marginTop={8}>
+                <StatusBadge
+                  label={pickQuality.label}
+                  variant={pickQuality.variant}
+                />
+              </XStack>
+            )}
             <PickSplashStatGraphic play={notablePlay ?? null} />
           </YStack>
         </YStack>

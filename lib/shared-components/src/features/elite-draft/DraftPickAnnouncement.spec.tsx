@@ -49,6 +49,46 @@ describe('DraftPickAnnouncement (web)', () => {
     expect(getByText('Infielder One')).toBeTruthy();
   });
 
+  it('renders a pick-quality badge when the player has ADP data (LS-9465)', () => {
+    const { getByText } = render(
+      <DraftPickAnnouncement
+        announcement={{
+          player: { ...player, adp: 30 },
+          pickNumber: 5,
+          round: 1,
+          roundPickNumber: 5,
+          isMyPick: true,
+          isAuto: false,
+          teamName: 'Team One',
+        }}
+        celebrate={false}
+        onDismiss={jest.fn()}
+      />,
+    );
+    expect(getByText('Great Pick!')).toBeTruthy();
+  });
+
+  it('renders no pick-quality badge when the player has no ADP', () => {
+    const { queryByText } = render(
+      <DraftPickAnnouncement
+        announcement={{
+          player,
+          pickNumber: 5,
+          round: 1,
+          roundPickNumber: 5,
+          isMyPick: true,
+          isAuto: false,
+          teamName: 'Team One',
+        }}
+        celebrate={false}
+        onDismiss={jest.fn()}
+      />,
+    );
+    expect(queryByText('Great Pick!')).toBeNull();
+    expect(queryByText('Good Value')).toBeNull();
+    expect(queryByText('Reach')).toBeNull();
+  });
+
   it('calls onDismiss when tapped', () => {
     const onDismiss = jest.fn();
     const { getByRole } = render(
