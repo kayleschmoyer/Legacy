@@ -1,0 +1,78 @@
+# Football Roster Display (LS-5446): from the league Overview tab's Quick
+# Standings, drill into a team's Team Detail page, open its Roster tab, and
+# verify the football position-slot grouping renders (QB/RB/WR/TE/FLEX/K/DST,
+# or DL/LB/DB in place of DST for IDP leagues).
+#
+# The Overview → Quick Standings row is the only real navigation entry point
+# into Team Detail (added by LS-5446 — previously the page existed but had no
+# reachable UI path anywhere in the app). Team Detail has no per-tab testIDs
+# on its own tab bar, so "Roster" is tapped by visible text, matching the
+# league-detail tab-bar convention (see maestro/README.md). Slot cards are
+# selected by the `<slot>-card` testID convention (e.g. `qb-card`, `bn-card`)
+# added by LS-6433 (FootballLeagueRosterScreen.tsx).
+appId: com.legacysports.app
+tags:
+  - football-team-detail
+  - roster
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- takeScreenshot: maestro/artifacts/football-team-detail/01-league-overview
+# Quick Standings only renders once the league has ranked standings
+# (LeagueOverviewTab.tsx) — guard the drill-in so a standings-less test
+# account (e.g. a brand-new league with no teams seeded yet) skips the rest
+# of this flow instead of hard-failing on an environment/fixture gap.
+- runFlow:
+    when:
+      visible:
+        id: "overview-standings-row-.*"
+    commands:
+      - tapOn:
+          id: "overview-standings-row-.*"
+          index: 0
+      - extendedWaitUntil:
+          visible: "Roster"
+          timeout: 20000
+      - takeScreenshot: maestro/artifacts/football-team-detail/02-team-detail-overview
+      - tapOn: "Roster"
+      - extendedWaitUntil:
+          visible:
+            id: "qb-card"
+          timeout: 20000
+      - takeScreenshot: maestro/artifacts/football-team-detail/03-roster-qb-flex
+      - scrollUntilVisible:
+          element:
+            id: "k-card"
+          direction: DOWN
+          timeout: 15000
+      - takeScreenshot: maestro/artifacts/football-team-detail/04-roster-k-slot
+      # Defensive slot differs by league format (DefensiveFormat): DST for
+      # standard leagues, DL/LB/DB for IDP leagues (FootballLeagueRosterScreen
+      # getSlotOrder) — check for either rather than assuming one.
+      - runFlow:
+          when:
+            visible:
+              id: "dst-card"
+          commands:
+            - takeScreenshot: maestro/artifacts/football-team-detail/05-roster-dst-slot
+      - runFlow:
+          when:
+            visible:
+              id: "dl-card"
+          commands:
+            - scrollUntilVisible:
+                element:
+                  id: "db-card"
+                direction: DOWN
+                timeout: 15000
+            - takeScreenshot: maestro/artifacts/football-team-detail/05-roster-idp-slots
+      - scrollUntilVisible:
+          element:
+            id: "bn-card"
+          direction: DOWN
+          timeout: 15000
+      - takeScreenshot: maestro/artifacts/football-team-detail/06-roster-bench-slot
+      - back

@@ -675,6 +675,25 @@ describe('FootballLeagueId', () => {
       expect(screen.getByText('Free Agents')).toBeTruthy();
     });
 
+    it('navigates to Team Detail when a Quick Standings row on Overview is pressed (LS-5446)', () => {
+      jest
+        .requireMock<{
+          useStandings: jest.Mock;
+        }>('../../../../features/matchup/hooks/useStandings')
+        .useStandings.mockReturnValue({
+          standings: [{ teamId: 10, teamName: 'My Team' }],
+          loading: false,
+          error: undefined,
+          refetch: jest.fn(),
+        });
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('overview-standings-row-10'));
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/football/team/[teamId]',
+        params: { teamId: '10' },
+      });
+    });
+
     it('renders Matchups tab', () => {
       render(<FootballLeagueId />);
       expect(screen.getByText('Matchups')).toBeTruthy();

@@ -1,5 +1,10 @@
 import React from 'react';
-import { Alert, type RefreshControlProps, ScrollView } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  type RefreshControlProps,
+  ScrollView,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Text, XStack, YStack } from 'tamagui';
 import {
@@ -109,6 +114,12 @@ interface LeagueOverviewTabProps {
   onViewAllStandings: () => void;
   onInviteShare: () => void;
   onPlayerPress: (playerId: number) => void;
+  /**
+   * Navigates to a team's Team Detail page (LS-5446). Optional — a caller
+   * that doesn't supply it (or a row with no `teamId`) renders the Quick
+   * Standings row as plain, non-interactive text, matching prior behavior.
+   */
+  onTeamPress?: (teamId: number) => void;
   /** Pull-to-refresh control for the tab's `ScrollView` (LS-8847). */
   refreshControl?: React.ReactElement<RefreshControlProps>;
 }
@@ -226,6 +237,7 @@ export function LeagueOverviewTab({
   onViewAllStandings,
   onInviteShare,
   onPlayerPress,
+  onTeamPress,
   refreshControl,
 }: LeagueOverviewTabProps): React.JSX.Element {
   const { bottom: bottomInset } = useSafeAreaInsets();
@@ -360,44 +372,67 @@ export function LeagueOverviewTab({
             }
           >
             <YStack gap="$1">
-              {rankedStandings.slice(0, 6).map((row) => (
-                <XStack
-                  key={row.teamId ?? row.rank}
-                  paddingVertical="$2"
-                  paddingHorizontal="$2"
-                  alignItems="center"
-                  gap="$2"
-                  backgroundColor={
-                    row.isMine ? '$surfaceInteractive' : 'transparent'
-                  }
-                  borderRadius="$3"
-                >
-                  <Text
-                    fontSize="$2"
-                    fontWeight="700"
-                    color="$gray10"
-                    width={20}
-                    textAlign="center"
+              {rankedStandings.slice(0, 6).map((row) => {
+                const canPress = row.teamId != null && onTeamPress != null;
+                const rowContent = (
+                  <XStack
+                    paddingVertical="$2"
+                    paddingHorizontal="$2"
+                    alignItems="center"
+                    gap="$2"
+                    backgroundColor={
+                      row.isMine ? '$surfaceInteractive' : 'transparent'
+                    }
+                    borderRadius="$3"
+                    pressStyle={canPress ? { opacity: 0.7 } : undefined}
                   >
-                    {row.rank}
-                  </Text>
-                  <Text
-                    fontSize="$3"
-                    flex={1}
-                    fontWeight={row.isMine ? '700' : '400'}
-                    color="$color"
+                    <Text
+                      fontSize="$2"
+                      fontWeight="700"
+                      color="$gray10"
+                      width={20}
+                      textAlign="center"
+                    >
+                      {row.rank}
+                    </Text>
+                    <Text
+                      fontSize="$3"
+                      flex={1}
+                      fontWeight={row.isMine ? '700' : '400'}
+                      color="$color"
+                    >
+                      {row.name}
+                    </Text>
+                    <Text
+                      fontSize="$2"
+                      color="$gray11"
+                      fontVariant={['tabular-nums']}
+                    >
+                      {row.record}
+                    </Text>
+                  </XStack>
+                );
+                // Interaction lives on a plain RN Pressable, not the Tamagui
+                // XStack — matching the row-press pattern already
+                // established elsewhere in this app (LS-5446): onPress/
+                // testID/accessibility props on a bare styled Stack aren't
+                // reliably forwarded to the underlying host element.
+                return canPress ? (
+                  <Pressable
+                    key={row.teamId}
+                    testID={`overview-standings-row-${row.teamId}`}
+                    onPress={() => onTeamPress?.(row.teamId as number)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`View team ${row.name}`}
                   >
-                    {row.name}
-                  </Text>
-                  <Text
-                    fontSize="$2"
-                    color="$gray11"
-                    fontVariant={['tabular-nums']}
-                  >
-                    {row.record}
-                  </Text>
-                </XStack>
-              ))}
+                    {rowContent}
+                  </Pressable>
+                ) : (
+                  <React.Fragment key={row.teamId ?? row.rank}>
+                    {rowContent}
+                  </React.Fragment>
+                );
+              })}
             </YStack>
             {rankedStandings.length > 6 ? (
               <Text fontSize="$2" color="$textMuted" textAlign="center">

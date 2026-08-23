@@ -705,6 +705,12 @@ export default function FootballLeagueId(): React.JSX.Element {
               onViewAllStandings={() => setSelectedTab('standings')}
               onInviteShare={() => void handleInviteShare()}
               onPlayerPress={(playerId) => handlePlayerPress({ playerId })}
+              onTeamPress={(teamId) =>
+                router.push({
+                  pathname: '/football/team/[teamId]',
+                  params: { teamId: String(teamId) },
+                })
+              }
               refreshControl={overviewRefresh.refreshControl}
             />
           </YStack>

@@ -223,6 +223,25 @@ describe('LeagueOverviewTab', () => {
     expect(onViewAllStandings).toHaveBeenCalledTimes(1);
   });
 
+  it('fires onTeamPress with the row teamId when a Quick Standings row is pressed (LS-5446)', () => {
+    const onTeamPress = jest.fn();
+    render(
+      <LeagueOverviewTab
+        {...BASE_PROPS}
+        rankedStandings={STANDINGS}
+        onTeamPress={onTeamPress}
+      />,
+    );
+    fireEvent.press(screen.getByTestId('overview-standings-row-1'));
+    expect(onTeamPress).toHaveBeenCalledWith(1);
+  });
+
+  it('does not make Quick Standings rows pressable when onTeamPress is not provided', () => {
+    render(<LeagueOverviewTab {...BASE_PROPS} rankedStandings={STANDINGS} />);
+    expect(screen.queryByTestId('overview-standings-row-1')).toBeNull();
+    expect(screen.getByText('Team 1')).toBeTruthy();
+  });
+
   it('omits the Scoring Rules section when no scoring settings are provided', () => {
     render(<LeagueOverviewTab {...BASE_PROPS} />);
     expect(screen.queryByText('Scoring Rules')).toBeNull();
