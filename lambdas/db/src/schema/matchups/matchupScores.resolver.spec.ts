@@ -89,6 +89,12 @@ jest.mock('@legacy-sports/db-client', () => ({
       season: {},
     },
     matchupPlayerGames: { matchupPlayerId: {}, gameIdentifier: {} },
+    footballSeasonPassing: { playerId: {}, season: {} },
+    footballSeasonRushing: { playerId: {}, season: {} },
+    footballSeasonReceiving: { playerId: {}, season: {} },
+    footballSeasonKicking: { playerId: {}, season: {} },
+    footballSeasonDefense: { playerId: {}, season: {} },
+    footballSeasonDefenseIdp: { playerId: {}, season: {} },
   },
   getMatchupFootballPlayerGameStats: jest.fn(),
 }));
@@ -414,6 +420,60 @@ describe('resolveFootballMatchupScores', () => {
     // 1 sack × 1 = 1 + pts_allowed=0 band = 10 → total = 11
     expect(eaglesResult!.totalPoints).toBeCloseTo(11);
     expect(eaglesResult!.players[0].isDst).toBe(true);
+  });
+
+  it('projects an unplayed starter from their season average (LS-6364)', async () => {
+    const db = buildMockDb([
+      [{ id: 100, team1Id: 10, team2Id: 20 }], // matchupRows
+      [{ id: 10, name: 'Eagles' }], // teamRows
+      [
+        {
+          matchupPlayerId: 1,
+          matchupId: 100,
+          teamId: 10,
+          playerId: 99,
+          positionType: 'DST',
+        },
+      ], // matchupPlayerRows
+      [
+        {
+          id: 99,
+          firstName: 'Eagles',
+          lastName: 'DST',
+          isDst: true,
+          nflTeam: 'PHI',
+        },
+      ], // playerRows
+      [{ playerId: 99, season: 2024 }], // allSeasonRows
+      // getFootballPlayerSeasonAverage (DST branch, one select):
+      // pts_allowed averaged (160/8=20) lands in the pts_18_27 band (=0);
+      // sacks averaged (16/8=2) × 1 = 2 → projected fppg = 2.
+      [
+        {
+          g: 8,
+          sacks: 16,
+          int: 0,
+          fumRec: 0,
+          defTd: 0,
+          safeties: 0,
+          ptsAllowed: 160,
+          ydsAllowed: 0,
+        },
+      ],
+    ]);
+
+    // No game stats loaded yet this week — the starter hasn't played.
+    mockGetFootballStats.mockResolvedValueOnce([]);
+
+    const result = await resolveFootballMatchupScores(db as never, 1, 1);
+
+    const eaglesResult = result.find((r) => r.teamId === 10);
+    expect(eaglesResult).toBeDefined();
+    expect(eaglesResult!.totalPoints).toBe(0);
+    expect(eaglesResult!.projectedPoints).toBeCloseTo(2);
+    expect(eaglesResult!.players).toHaveLength(1);
+    expect(eaglesResult!.players[0].totalPoints).toBe(0);
+    expect(eaglesResult!.players[0].projectedPoints).toBeCloseTo(2);
   });
 
   it('emits both teams even when no game stats have loaded yet', async () => {

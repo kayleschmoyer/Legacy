@@ -1175,6 +1175,11 @@ type FootballMatchupPlayer {
   playerId: Int!
   playerName: String!
   position: String!
+
+  """
+  Actual points if this week’s game has been played, otherwise the average fantasy points per game for the assigned matchup season (LS-6364).
+  """
+  projectedPoints: Float!
   totalPoints: Float!
 }
 
@@ -1200,6 +1205,11 @@ Stats for one team in a football matchup
 """
 type FootballMatchupStats {
   players: [FootballMatchupPlayer!]!
+
+  """
+  Sum of each rostered starter's projectedPoints for this team (LS-6364).
+  """
+  projectedPoints: Float!
   teamId: Int!
   teamName: String!
   totalPoints: Float!

@@ -4,11 +4,16 @@ query MatchupScores($leagueId: Int!, $weekNum: Int!) {
       teamId
       teamName
       totalPoints
+      projectedPoints
       players {
         playerId
         playerName
         position
         totalPoints
+        projectedPoints
+        games {
+          gameNum
+        }
       }
     }
   }

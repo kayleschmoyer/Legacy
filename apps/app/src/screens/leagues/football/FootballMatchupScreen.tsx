@@ -27,6 +27,7 @@ import {
   useGetHeadToHeadRecordQuery,
   useGetMatchupByIdQuery,
   useGetMatchupPlayersQuery,
+  useMatchupScoresQuery,
 } from '@legacy-sports/graphql';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 import { PremiumGate } from '../../../features/subscription/PremiumGate';
@@ -154,11 +155,15 @@ function ScoreHeader({
   isRefreshing,
   standings,
   totalMatchups,
+  team1ProjectedScore,
+  team2ProjectedScore,
 }: {
   matchup: Matchup;
   isRefreshing: boolean;
   standings: readonly TeamStandingRecord[];
   totalMatchups?: number | null;
+  team1ProjectedScore?: number;
+  team2ProjectedScore?: number;
 }) {
   const team1Score = matchup.team1Score ?? 0;
   const team2Score = matchup.team2Score ?? 0;
@@ -187,6 +192,7 @@ function ScoreHeader({
           name: matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`,
           primaryColor: matchup.team1?.primaryColor,
           score: team1Score,
+          projectedScore: team1ProjectedScore,
           record: formatTeamRecord(matchup.team1Id, standings),
         }}
         team2={{
@@ -194,6 +200,7 @@ function ScoreHeader({
           name: matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`,
           primaryColor: matchup.team2?.primaryColor,
           score: team2Score,
+          projectedScore: team2ProjectedScore,
           record: formatTeamRecord(matchup.team2Id, standings),
         }}
         gamesPlayed={gamesPlayed}
@@ -498,6 +505,32 @@ export function FootballMatchupScreen(
     skip: !matchup?.leagueId || !matchup?.team1Id || !matchup?.team2Id,
   });
 
+  // Projected score parity with web (LS-6364) — MatchupScoreboardHero computes
+  // its own pace tint from these once wired into its team1/team2 props. Matchup
+  // scores are keyed by league week rather than matchupId, so this is a second
+  // query — skipped until both the league and the matchup's week number are known.
+  const weekNumber = matchup?.weekNumber ?? null;
+  const { data: matchupScoresData } = useMatchupScoresQuery({
+    variables: { leagueId: leagueId ?? 0, weekNum: weekNumber ?? 0 },
+    skip: leagueId == null || weekNumber == null,
+  });
+
+  const teamProjectedScore = (
+    teamId: number | null | undefined,
+  ): number | undefined => {
+    if (teamId == null) return undefined;
+    const stats = matchupScoresData?.matchupScores.find(
+      (s) => 'teamId' in s && s.teamId === teamId,
+    );
+    if (!stats || stats.__typename !== 'FootballMatchupStats') {
+      return undefined;
+    }
+    return stats.projectedPoints;
+  };
+
+  const team1Projection = teamProjectedScore(matchup?.team1Id);
+  const team2Projection = teamProjectedScore(matchup?.team2Id);
+
   if (matchupError) {
     return (
       <Card
@@ -554,6 +587,8 @@ export function FootballMatchupScreen(
           isRefreshing={isRefreshingScore}
           standings={standings}
           totalMatchups={totalMatchups}
+          team1ProjectedScore={team1Projection}
+          team2ProjectedScore={team2Projection}
         />
 
         <HeadToHeadChip

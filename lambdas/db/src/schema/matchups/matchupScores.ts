@@ -27,6 +27,7 @@ import {
 } from '@legacy-sports/scoring';
 
 import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
+import { getFootballPlayerSeasonAverage } from './football-season-projection';
 import { builder } from '../builder';
 import { FootballMatchupStatsRef } from '../football';
 import { AuthenticationError } from '../graphql-errors';
@@ -56,6 +57,7 @@ type FootballMatchupStatsShape = {
   teamId: number;
   teamName: string;
   totalPoints: number;
+  projectedPoints: number;
   players: FootballMatchupPlayerShape[];
 };
 
@@ -67,6 +69,7 @@ type FootballMatchupPlayerShape = {
   isDst: boolean;
   games: FootballMatchupPlayerGameShape[];
   totalPoints: number;
+  projectedPoints: number;
 };
 
 type FootballMatchupPlayerGameShape = {
@@ -437,36 +440,45 @@ export async function resolveFootballMatchupScores(
       : [];
   const playerDetailMap = new Map(allPlayerDetailRows.map((p) => [p.id, p]));
 
-  const result: FootballMatchupStatsShape[] = [];
+  // Per-player assigned season for this league week (LS-6364) — same source
+  // used by the actual-score game-selection path (leagueWeekPlayerSeasons).
+  // One query for all matchups, mirroring the baseball resolver below.
+  const allSeasonRows =
+    allFootballPlayerIds.length > 0
+      ? await db
+          .select({
+            playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+            season: PublicSchema.leagueWeekPlayerSeasons.season,
+          })
+          .from(PublicSchema.leagueWeekPlayerSeasons)
+          .where(
+            and(
+              eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+              eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNum),
+              inArray(
+                PublicSchema.leagueWeekPlayerSeasons.playerId,
+                allFootballPlayerIds,
+              ),
+            ),
+          )
+      : [];
+  const seasonMap = new Map(allSeasonRows.map((s) => [s.playerId, s.season]));
 
-  for (const matchup of matchupRows) {
-    const playerGameStats = playerGameStatsMap.get(matchup.id) ?? [];
+  // First pass: accumulate actual per-game fantasy points, keyed by
+  // matchupPlayerId, from the already-played games for the week.
+  const gamesByMatchupPlayerId = new Map<
+    number,
+    { games: FootballMatchupPlayerGameShape[]; totalPoints: number }
+  >();
 
-    const matchupPlayerRows = matchupPlayersByMatchupId.get(matchup.id) ?? [];
-
+  for (const [matchupId, playerGameStats] of playerGameStatsMap.entries()) {
+    const matchupPlayerRows = matchupPlayersByMatchupId.get(matchupId) ?? [];
     const matchupPlayerInfoMap = new Map(
       matchupPlayerRows.map((mp) => [
         mp.matchupPlayerId,
-        {
-          teamId: mp.teamId,
-          playerId: mp.playerId,
-          positionType: mp.positionType,
-        },
+        { playerId: mp.playerId, positionType: mp.positionType },
       ]),
     );
-
-    // teamId → (playerId → accumulated data)
-    const teamPlayerMap = new Map<
-      number,
-      Map<
-        number,
-        {
-          positionType: string | null;
-          games: FootballMatchupPlayerGameShape[];
-          totalPoints: number;
-        }
-      >
-    >();
 
     for (const gameStats of playerGameStats) {
       const mpInfo = matchupPlayerInfoMap.get(gameStats.matchupPlayerId);
@@ -513,65 +525,125 @@ export async function resolveFootballMatchupScores(
         fantasyPoints,
       };
 
-      let teamPlayers = teamPlayerMap.get(mpInfo.teamId);
-      if (!teamPlayers) {
-        teamPlayers = new Map();
-        teamPlayerMap.set(mpInfo.teamId, teamPlayers);
+      let entry = gamesByMatchupPlayerId.get(gameStats.matchupPlayerId);
+      if (!entry) {
+        entry = { games: [], totalPoints: 0 };
+        gamesByMatchupPlayerId.set(gameStats.matchupPlayerId, entry);
+      }
+      entry.games.push(gameShape);
+      entry.totalPoints += fantasyPoints;
+    }
+  }
+
+  // Second pass: for every rostered starter (bench/positionId=null excluded)
+  // who has not yet played this week, project their score as their average
+  // fantasy points per game for their assigned season (LS-6364). Batch all
+  // season-average lookups concurrently rather than one query per player.
+  const unplayedStarters = allMatchupPlayerRows.filter(
+    (mp) =>
+      mp.positionType !== null &&
+      !gamesByMatchupPlayerId.has(mp.matchupPlayerId),
+  );
+
+  const projectionEntries = await Promise.all(
+    unplayedStarters.map(async (mp) => {
+      const playerDetail = playerDetailMap.get(mp.playerId);
+      const season = seasonMap.get(mp.playerId);
+      if (!playerDetail || season == null) {
+        return [mp.matchupPlayerId, 0] as const;
       }
 
-      let playerEntry = teamPlayers.get(mpInfo.playerId);
-      if (!playerEntry) {
-        playerEntry = {
-          positionType: mpInfo.positionType,
-          games: [],
-          totalPoints: 0,
-        };
-        teamPlayers.set(mpInfo.playerId, playerEntry);
+      const isDst = playerDetail.isDst;
+      const posType = mp.positionType ?? '';
+      const isIdp =
+        posType === 'DL' ||
+        posType === 'LB' ||
+        posType === 'DB' ||
+        posType === 'DP';
+
+      const average = await getFootballPlayerSeasonAverage(
+        db,
+        mp.playerId,
+        season,
+        isDst,
+        isIdp,
+        scoringSettings,
+        posType,
+      );
+      return [mp.matchupPlayerId, average] as const;
+    }),
+  );
+  const projectedAverageByMatchupPlayerId = new Map(projectionEntries);
+
+  const result: FootballMatchupStatsShape[] = [];
+
+  for (const matchup of matchupRows) {
+    const matchupPlayerRows = matchupPlayersByMatchupId.get(matchup.id) ?? [];
+
+    // teamId → accumulated team data
+    const teamAgg = new Map<
+      number,
+      {
+        players: FootballMatchupPlayerShape[];
+        totalPoints: number;
+        projectedPoints: number;
+      }
+    >();
+
+    for (const mp of matchupPlayerRows) {
+      // Bench players (no roster slot) don't contribute to the team score.
+      if (mp.positionType === null) continue;
+
+      const playerDetail = playerDetailMap.get(mp.playerId);
+      if (!playerDetail) continue;
+
+      const played = gamesByMatchupPlayerId.get(mp.matchupPlayerId);
+      const actual = played?.totalPoints ?? 0;
+      const projected =
+        played != null
+          ? actual
+          : (projectedAverageByMatchupPlayerId.get(mp.matchupPlayerId) ?? 0);
+
+      let agg = teamAgg.get(mp.teamId);
+      if (!agg) {
+        agg = { players: [], totalPoints: 0, projectedPoints: 0 };
+        teamAgg.set(mp.teamId, agg);
       }
 
-      playerEntry.games.push(gameShape);
-      playerEntry.totalPoints += fantasyPoints;
+      agg.players.push({
+        playerId: mp.playerId,
+        playerName: `${playerDetail.firstName} ${playerDetail.lastName}`.trim(),
+        position: mp.positionType,
+        nflTeam: playerDetail.nflTeam ?? null,
+        isDst: playerDetail.isDst,
+        games: played?.games ?? [],
+        totalPoints: actual,
+        projectedPoints: projected,
+      });
+      agg.totalPoints += actual;
+      agg.projectedPoints += projected;
     }
 
-    // Emit one FootballMatchupStats per team that has players
-    for (const [teamId, playerEntries] of teamPlayerMap.entries()) {
-      const players: FootballMatchupPlayerShape[] = [];
-      let teamTotal = 0;
-
-      for (const [playerId, entry] of playerEntries.entries()) {
-        const playerDetail = playerDetailMap.get(playerId);
-        if (!playerDetail) continue;
-
-        players.push({
-          playerId,
-          playerName:
-            `${playerDetail.firstName} ${playerDetail.lastName}`.trim(),
-          position: entry.positionType ?? 'FLEX',
-          nflTeam: playerDetail.nflTeam ?? null,
-          isDst: playerDetail.isDst,
-          games: entry.games,
-          totalPoints: entry.totalPoints,
-        });
-        teamTotal += entry.totalPoints;
-      }
-
+    for (const [teamId, agg] of teamAgg.entries()) {
       result.push({
         _type: 'football',
         teamId,
         teamName: teamNameMap.get(teamId) ?? `Team ${teamId}`,
-        totalPoints: teamTotal,
-        players,
+        totalPoints: agg.totalPoints,
+        projectedPoints: agg.projectedPoints,
+        players: agg.players,
       });
     }
 
-    // Ensure both teams appear even when they have no game stats yet
+    // Ensure both teams appear even when they have no rostered starters yet
     for (const teamId of [matchup.team1Id, matchup.team2Id]) {
-      if (teamId === null || teamPlayerMap.has(teamId)) continue;
+      if (teamId === null || teamAgg.has(teamId)) continue;
       result.push({
         _type: 'football',
         teamId,
         teamName: teamNameMap.get(teamId) ?? `Team ${teamId}`,
         totalPoints: 0,
+        projectedPoints: 0,
         players: [],
       });
     }

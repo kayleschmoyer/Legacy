@@ -2791,6 +2791,12 @@ export interface FootballMatchupPlayerShape {
   isDst: boolean;
   games: FootballMatchupPlayerGameShape[];
   totalPoints: number;
+  /**
+   * Actual points if this week's game has been played, otherwise the
+   * player's average fantasy points per game for their assigned matchup
+   * season (LS-6364). Mirrors the baseball projection model.
+   */
+  projectedPoints: number;
 }
 
 export const FootballMatchupPlayerRef =
@@ -2810,6 +2816,11 @@ FootballMatchupPlayerRef.implement({
       resolve: (parent) => parent.games,
     }),
     totalPoints: t.exposeFloat('totalPoints', { nullable: false }),
+    projectedPoints: t.exposeFloat('projectedPoints', {
+      nullable: false,
+      description:
+        'Actual points if this week’s game has been played, otherwise the average fantasy points per game for the assigned matchup season (LS-6364).',
+    }),
   }),
 });
 
@@ -2933,6 +2944,8 @@ export interface FootballMatchupStatsShape {
   teamId: number;
   teamName: string;
   totalPoints: number;
+  /** Sum of each rostered starter's `projectedPoints` (LS-6364). */
+  projectedPoints: number;
   players: FootballMatchupPlayerShape[];
 }
 
@@ -2945,6 +2958,11 @@ FootballMatchupStatsRef.implement({
     teamId: t.exposeInt('teamId', { nullable: false }),
     teamName: t.exposeString('teamName', { nullable: false }),
     totalPoints: t.exposeFloat('totalPoints', { nullable: false }),
+    projectedPoints: t.exposeFloat('projectedPoints', {
+      nullable: false,
+      description:
+        "Sum of each rostered starter's projectedPoints for this team (LS-6364).",
+    }),
     players: t.field({
       type: [FootballMatchupPlayerRef],
       nullable: false,

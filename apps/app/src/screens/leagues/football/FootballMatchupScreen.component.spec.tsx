@@ -98,6 +98,10 @@ jest.mock('@legacy-sports/graphql', () => ({
     data: undefined,
     loading: false,
   })),
+  useMatchupScoresQuery: jest.fn(() => ({
+    data: { matchupScores: [] },
+    loading: false,
+  })),
 }));
 
 jest.mock('@legacy-sports/shared-components', () => {
@@ -123,9 +127,9 @@ jest.mock('@legacy-sports/shared-components', () => {
 
 // Render a minimal stand-in for the shared scoreboard hero so this suite
 // stays focused on FootballMatchupScreen's own logic (team/record/status/
-// counter wiring) rather than re-testing MatchupScoreboardHero's internals
-// (see its own spec). Mirrors MatchupDetailScreen.spec.tsx's approach for
-// the same shared-components/matchup boundary.
+// counter/projection wiring) rather than re-testing MatchupScoreboardHero's
+// internals (see its own spec). Mirrors MatchupDetailScreen.spec.tsx's
+// approach for the same shared-components/matchup boundary.
 jest.mock('@legacy-sports/shared-components/matchup', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
   const { Text, View } = jest.requireActual<RNComponents>('react-native');
@@ -140,8 +144,18 @@ jest.mock('@legacy-sports/shared-components/matchup', () => {
       weekNumber?: number | null;
       totalMatchups?: number | null;
       status?: string | null;
-      team1: { name?: string | null; record?: string | null; score?: number };
-      team2: { name?: string | null; record?: string | null; score?: number };
+      team1: {
+        name?: string | null;
+        record?: string | null;
+        score?: number;
+        projectedScore?: number;
+      };
+      team2: {
+        name?: string | null;
+        record?: string | null;
+        score?: number;
+        projectedScore?: number;
+      };
     }) =>
       ReactActual.createElement(
         View,
@@ -154,11 +168,25 @@ jest.mock('@legacy-sports/shared-components/matchup', () => {
           ? ReactActual.createElement(Text, null, team1.record)
           : null,
         ReactActual.createElement(Text, null, (team1.score ?? 0).toFixed(2)),
+        team1.projectedScore != null
+          ? ReactActual.createElement(
+              Text,
+              null,
+              `${team1.projectedScore.toFixed(2)} proj`,
+            )
+          : null,
         ReactActual.createElement(Text, null, team2.name),
         team2.record != null
           ? ReactActual.createElement(Text, null, team2.record)
           : null,
         ReactActual.createElement(Text, null, (team2.score ?? 0).toFixed(2)),
+        team2.projectedScore != null
+          ? ReactActual.createElement(
+              Text,
+              null,
+              `${team2.projectedScore.toFixed(2)} proj`,
+            )
+          : null,
         weekNumber != null
           ? ReactActual.createElement(
               Text,
@@ -446,6 +474,48 @@ describe('FootballMatchupScreen', () => {
       expect(screen.getByText(status)).toBeTruthy();
     },
   );
+
+  it('renders projected scores from matchupScores when available (LS-6364)', () => {
+    jest.mocked(graphqlLib.useMatchupScoresQuery).mockReturnValue({
+      data: {
+        matchupScores: [
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 10,
+            teamName: 'Team 10',
+            totalPoints: 102.5,
+            projectedPoints: 121.4,
+            players: [],
+          },
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 20,
+            teamName: 'Team 20',
+            totalPoints: 87.3,
+            projectedPoints: 95,
+            players: [],
+          },
+        ],
+      },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useMatchupScoresQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} leagueId={200} />);
+
+    expect(screen.getByText('121.40 proj')).toBeTruthy();
+    expect(screen.getByText('95.00 proj')).toBeTruthy();
+  });
+
+  it('renders no projection text when matchupScores has not resolved', () => {
+    jest.mocked(graphqlLib.useMatchupScoresQuery).mockReturnValue({
+      data: { matchupScores: [] },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useMatchupScoresQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} leagueId={200} />);
+
+    expect(screen.queryByText(/proj/)).toBeNull();
+  });
 
   it('renders player name for team 1', () => {
     render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);

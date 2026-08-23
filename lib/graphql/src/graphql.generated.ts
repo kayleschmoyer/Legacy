@@ -1000,6 +1000,8 @@ export type FootballMatchupPlayer = {
   playerId: Scalars['Int']['output'];
   playerName: Scalars['String']['output'];
   position: Scalars['String']['output'];
+  /** Actual points if this week’s game has been played, otherwise the average fantasy points per game for the assigned matchup season (LS-6364). */
+  projectedPoints: Scalars['Float']['output'];
   totalPoints: Scalars['Float']['output'];
 };
 
@@ -1023,6 +1025,8 @@ export type FootballMatchupPlayerGame = {
 export type FootballMatchupStats = {
   __typename?: 'FootballMatchupStats';
   players: Array<FootballMatchupPlayer>;
+  /** Sum of each rostered starter's projectedPoints for this team (LS-6364). */
+  projectedPoints: Scalars['Float']['output'];
   teamId: Scalars['Int']['output'];
   teamName: Scalars['String']['output'];
   totalPoints: Scalars['Float']['output'];
@@ -12847,12 +12851,18 @@ export type MatchupScoresQuery = {
         teamId: number;
         teamName: string;
         totalPoints: number;
+        projectedPoints: number;
         players: Array<{
           __typename?: 'FootballMatchupPlayer';
           playerId: number;
           playerName: string;
           position: string;
           totalPoints: number;
+          projectedPoints: number;
+          games: Array<{
+            __typename?: 'FootballMatchupPlayerGame';
+            gameNum: number;
+          }>;
         }>;
       }
   >;
@@ -32652,11 +32662,16 @@ export const MatchupScores = gql`
         teamId
         teamName
         totalPoints
+        projectedPoints
         players {
           playerId
           playerName
           position
           totalPoints
+          projectedPoints
+          games {
+            gameNum
+          }
         }
       }
     }
