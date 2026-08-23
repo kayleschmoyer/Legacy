@@ -61,6 +61,7 @@ jest.mock('@legacy-sports/shared-components/football', () => {
         onUpgrade: () => void;
       };
       hasUnlimitedLeagues?: boolean;
+      matchupHighlights?: { leagueId: string | number }[];
     }) => {
       capturedRefreshControl = props.refreshControl ?? null;
       return (
@@ -71,6 +72,7 @@ jest.mock('@legacy-sports/shared-components/football', () => {
           <Text>{`isAuthenticated:${String(props.isAuthenticated)}`}</Text>
           <Text>{`leagueCap:${props.leagueCap ? `${props.leagueCap.count}/${props.leagueCap.limit}:${props.leagueCap.atLimit}` : 'undefined'}`}</Text>
           <Text>{`hasUnlimitedLeagues:${String(props.hasUnlimitedLeagues)}`}</Text>
+          <Text>{`matchupHighlights:${props.matchupHighlights?.map((h) => h.leagueId).join(',') ?? 'none'}`}</Text>
           <Pressable
             testID="league-cap-upgrade"
             onPress={() => props.leagueCap?.onUpgrade()}
@@ -153,6 +155,23 @@ jest.mock('../features/subscription/constants', () => ({
   FREE_TIER_LEAGUE_LIMIT: 3,
 }));
 
+// LS-6263: FootballHomeScreen delegates all matchup-highlight resolution to
+// this hook (covered on its own in useFootballMatchupHighlights.spec.ts) —
+// mocked here so this file stays focused on the screen's own data wiring.
+type PressLeague = (leagueId: string | number, matchupId?: number) => void;
+const mockUseFootballMatchupHighlights: jest.MockedFunction<
+  (
+    leagues: unknown[],
+    onPressLeague: PressLeague,
+  ) => { highlights: { leagueId: string | number }[]; loading: boolean }
+> = jest.fn();
+jest.mock('../hooks/useFootballMatchupHighlights', () => ({
+  useFootballMatchupHighlights: (
+    leagues: unknown[],
+    onPressLeague: PressLeague,
+  ) => mockUseFootballMatchupHighlights(leagues, onPressLeague),
+}));
+
 const mockTrackPremiumFeatureClick = jest.fn();
 jest.mock('../utils/analytics', () => ({
   trackPremiumFeatureClick: (name: string): void => {
@@ -227,6 +246,10 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       data: { footballPlayers: { nodes: [], pageInfo: {} } },
       loading: false,
       refetch: mockRefetchTrendingPlayers,
+    });
+    mockUseFootballMatchupHighlights.mockReturnValue({
+      highlights: [],
+      loading: false,
     });
   });
 
@@ -585,6 +608,64 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       render(<FootballHomeScreen />);
       fireEvent.press(screen.getByTestId('retry'));
       expect(mockRefetchLeagues).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('matchup highlights (LS-6263 / FBH-009)', () => {
+    it('passes matchupHighlights from useFootballMatchupHighlights through to NFLHome', () => {
+      mockUseFootballMatchupHighlights.mockReturnValue({
+        highlights: [{ leagueId: 1 }, { leagueId: 2 }],
+        loading: false,
+      });
+      render(<FootballHomeScreen />);
+      expect(screen.getByText('matchupHighlights:1,2')).toBeTruthy();
+    });
+
+    it('passes league currentMatchup/leaguePhase through for the resolver hook', () => {
+      mockUseGetUserLeaguesQuery.mockReturnValue({
+        data: {
+          userLeagues: [
+            {
+              ...FOOTBALL_LEAGUES[0],
+              currentMatchup: 55,
+              leaguePhase: 'active',
+            },
+          ],
+          userLeagueCount: 1,
+        },
+        loading: false,
+      });
+      render(<FootballHomeScreen />);
+      expect(mockUseFootballMatchupHighlights).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({
+            id: 1,
+            currentMatchup: 55,
+            leaguePhase: 'active',
+          }),
+        ],
+        expect.any(Function),
+      );
+    });
+
+    it('navigates to the specific matchup when a resolved highlight is pressed', () => {
+      render(<FootballHomeScreen />);
+      const onPressLeague = mockUseFootballMatchupHighlights.mock.calls[0][1];
+      onPressLeague(1, 55);
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/football/matchup',
+        params: { matchupId: '55', leagueId: '1' },
+      });
+    });
+
+    it('navigates to the league Matchups tab for a bye-week highlight (no matchup id)', () => {
+      render(<FootballHomeScreen />);
+      const onPressLeague = mockUseFootballMatchupHighlights.mock.calls[0][1];
+      onPressLeague(1);
+      expect(mockNavigate).toHaveBeenCalledWith({
+        pathname: '/football/league/[leagueId]',
+        params: { leagueId: '1', initialTab: 'matchups' },
+      });
     });
   });
 

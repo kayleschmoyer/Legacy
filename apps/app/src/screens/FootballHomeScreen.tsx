@@ -11,6 +11,7 @@ import { usePullToRefresh } from '../common/hooks/usePullToRefresh';
 import { useSubscription } from '../features/subscription/useSubscription';
 import { FREE_TIER_LEAGUE_LIMIT } from '../features/subscription/constants';
 import { trackPremiumFeatureClick } from '../utils/analytics';
+import { useFootballMatchupHighlights } from '../hooks/useFootballMatchupHighlights';
 
 // Analytics label for the upgrade prompt fired from the league-cap gate (LS-5025).
 const LEAGUE_CAP_FEATURE_NAME = 'Unlimited Leagues';
@@ -103,8 +104,37 @@ export default function FootballHomeScreen({
           currentWeekNumber: l.currentWeekNumber,
           weekAdvanceStatus: l.weekAdvanceStatus,
           maxRosterSize: l.maxRosterSize,
+          currentMatchup: l.currentMatchup,
+          leaguePhase: l.leaguePhase,
         })),
     [data?.userLeagues],
+  );
+
+  // This week's matchup highlights (LS-6263 / FBH-009) — mirrors the web
+  // Football Home's matchup section (LS-5407), which `NFLHome` already
+  // supports via `matchupHighlights`; only the mobile data wiring was
+  // missing. Navigates straight to the specific matchup when one exists,
+  // or to the league's Matchups tab for a bye-week card with no matchup id.
+  const handlePressMatchupLeague = useCallback(
+    (leagueId: string | number, matchupId?: number) => {
+      if (matchupId != null) {
+        router.navigate({
+          pathname: '/football/matchup',
+          params: { matchupId: String(matchupId), leagueId: String(leagueId) },
+        });
+      } else {
+        router.navigate({
+          pathname: '/football/league/[leagueId]',
+          params: { leagueId: String(leagueId), initialTab: 'matchups' },
+        });
+      }
+    },
+    [router],
+  );
+
+  const { highlights: matchupHighlights } = useFootballMatchupHighlights(
+    leagues,
+    handlePressMatchupLeague,
   );
 
   const goToUpgrade = useCallback(() => {
@@ -141,6 +171,7 @@ export default function FootballHomeScreen({
       }
       trendingPlayers={trendingPlayers}
       trendingPlayersLoading={trendingPlayersLoading}
+      matchupHighlights={matchupHighlights}
       onSwitchSport={onSwitchSport}
       leagueCap={
         showLeagueCap
