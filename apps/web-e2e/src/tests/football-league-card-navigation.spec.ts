@@ -15,6 +15,7 @@ import { mockLeague } from '../mocks/graphql/league.mocks';
 const FOOTBALL_LEAGUE = mockLeague({
   id: 501,
   name: 'Gridiron Dynasty',
+  sport: 'football',
   draftStatus: 'completed',
   currentWeekNumber: 4,
 });

@@ -37,6 +37,7 @@ const FOOTBALL_LEAGUE_ID = 42;
 const MOCK_LEAGUE = mockLeague({
   id: FOOTBALL_LEAGUE_ID,
   name: 'Gridiron Dynasty',
+  sport: 'football',
   description: 'LS-5420 football overview-tab E2E league',
   draftStatus: 'completed',
   numberOfTeams: 8,

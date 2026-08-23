@@ -44,11 +44,13 @@ async function mockFootballHub(
             mockLeague({
               id: 1,
               name: 'Gridiron Giants',
+              sport: 'football',
               draftStatus: 'completed',
             }),
             mockLeague({
               id: 2,
               name: 'End Zone Elite',
+              sport: 'football',
               draftStatus: 'not-started',
             }),
           ]

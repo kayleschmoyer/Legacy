@@ -59,6 +59,7 @@ const FOOTBALL_LEAGUE = {
     playerPool: 'all',
     numberOfTeams: 10,
   }),
+  sport: 'football',
 };
 
 /** Football league with an active matchup (completed week 3). */
@@ -70,6 +71,7 @@ const FOOTBALL_LEAGUE_WITH_MATCHUP = {
     currentMatchup: 10,
     playerPool: 'all',
   }),
+  sport: 'football',
 };
 
 /** Football position slots returned by GetPositionsForLeague. */

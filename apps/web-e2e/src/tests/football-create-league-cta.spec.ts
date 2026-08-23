@@ -37,11 +37,13 @@ async function mockFootballHub(
             mockLeague({
               id: 1,
               name: 'Gridiron Legends',
+              sport: 'football',
               draftStatus: 'completed',
             }),
             mockLeague({
               id: 2,
               name: 'Turf Wars',
+              sport: 'football',
               draftStatus: 'not-started',
             }),
           ]
