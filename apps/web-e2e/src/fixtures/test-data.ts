@@ -1,6 +1,10 @@
 import type { Page } from '@playwright/test';
 
-import { extractOperationName, unmockedGraphQLFallback } from './shared-mocks';
+import {
+  extractOperationName,
+  extractOperationVariables,
+  unmockedGraphQLFallback,
+} from './shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 import {
   publicLeaguesEmptyResponse,
@@ -12,6 +16,7 @@ import {
   careerPitchingLeadersResponse,
   comparablePlayersResponse,
 } from '../mocks/graphql/player.mocks';
+import { createFootballLineupFixture } from '../mocks/graphql/roster.mocks';
 
 /**
  * TestData — the backend-agnostic data-precondition seam (ADR-0016).
@@ -43,6 +48,32 @@ export interface SeededPlayerPool {
 export interface SeededDiscoverySearch {
   /** A term guaranteed to match no public league on this backend. */
   unmatchedTerm: string;
+}
+
+/**
+ * A football league the viewer owns a team in, with one configured starting
+ * slot standing empty and one eligible player sitting on the bench — the
+ * precondition a lineup-editing spec needs before it can move anybody.
+ */
+export interface SeededFootballLineup {
+  /** League to navigate to (`/football/league/:leagueId/roster`). */
+  leagueId: number;
+  /** The viewer's team in that league. */
+  teamId: number;
+  /** The configured starting slot, empty until the spec fills it. */
+  openSlot: {
+    /** `LeaguePosition.id` the assignment mutation is fired with. */
+    positionId: number;
+    /** NFL position code rendered in the slot label, e.g. `QB`. */
+    positionType: string;
+  };
+  /** A rostered player on the bench, eligible for {@link openSlot}. */
+  benchPlayer: {
+    teamMemberId: number;
+    playerId: number;
+    /** Full display name rendered on the bench row. */
+    fullName: string;
+  };
 }
 
 export interface TestData {
@@ -79,6 +110,17 @@ export interface TestData {
    * premium).
    */
   comparablePlayer(): Promise<SeededPlayerPool>;
+
+  /**
+   * Ensure a football league exists with a team the viewer owns, one
+   * configured starting slot, and an eligible bench player. Mock: installs the
+   * shared football-lineup fixture, whose handler map keeps the roster mutable
+   * so an assignment round-trips through a refetch. Live: **throws** — seeding
+   * this precondition means creating a league, taking team ownership, seeding a
+   * roster and cleaning all of it up again, which no existing live verb does
+   * (see LS-9655 "Out of Scope").
+   */
+  footballLineup(): Promise<SeededFootballLineup>;
 }
 
 /** Hermetic implementation — preconditions become `route.fulfill()` mocks. */
@@ -196,7 +238,49 @@ export class MockTestData implements TestData {
     });
     return { fullName: 'Mike Trout', searchTerm: 'Trout' };
   }
+
+  async footballLineup(): Promise<SeededFootballLineup> {
+    // Every payload — and the stateful assignment logic behind the lineup
+    // mutations — comes from the shared fixture, so this handler is pure
+    // transport: look the operation up, serialise whatever it returns. The
+    // native implementation drives the SAME map through `server.override`
+    // (ADR-0017 AC2), which is what keeps the round-trip identical.
+    const fixture = createFootballLineupFixture();
+    await this.#page.route(isGraphQLEndpoint, async (route) => {
+      const handler =
+        fixture.handlers[extractOperationName(route).toLowerCase()];
+      if (!handler) {
+        await unmockedGraphQLFallback(route);
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(handler(extractOperationVariables(route))),
+      });
+    });
+
+    return {
+      leagueId: fixture.leagueId,
+      teamId: fixture.teamId,
+      openSlot: fixture.openSlot,
+      benchPlayer: fixture.benchPlayer,
+    };
+  }
 }
+
+/**
+ * Why {@link LiveTestData.footballLineup} throws — surfaced verbatim so a spec
+ * that reaches for the verb in live mode fails loudly with the reason, rather
+ * than passing against a precondition that was never established.
+ */
+export const FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON =
+  'TestData.footballLineup() has no live implementation: seeding a football ' +
+  'league with an owned team and a configured lineup requires real league ' +
+  'creation, team ownership, roster seeding and cleanup — no existing live ' +
+  'verb issues mutations. This precondition is mock-only (web-mock and ' +
+  'native-mock); run the spec on a mock backend, or see LS-9655 "Out of ' +
+  'Scope" for the follow-up that would make it live-capable.';
 
 /**
  * Live implementation — preconditions are satisfied against the real backend.
@@ -228,5 +312,16 @@ export class LiveTestData implements TestData {
   comparablePlayer(): Promise<SeededPlayerPool> {
     // Precedent live search target (player-compare-search.dual.spec.ts, LS-754).
     return Promise.resolve({ fullName: 'Barry Bonds', searchTerm: 'Bonds' });
+  }
+
+  footballLineup(): Promise<SeededFootballLineup> {
+    // Deliberately unimplemented, not a silent no-op (the interface contract
+    // above sanctions this). Every other live verb resolves because the MLB
+    // history dataset already satisfies its precondition; this one does not
+    // exist on the live backend, and conjuring it would make this the first
+    // TestData verb to issue real mutations — league creation, team ownership,
+    // roster seeding and teardown. That is its own ticket and its own design
+    // review (LS-9655 "Out of Scope").
+    throw new Error(FOOTBALL_LINEUP_LIVE_UNSUPPORTED_REASON);
   }
 }

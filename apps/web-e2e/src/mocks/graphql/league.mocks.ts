@@ -19,6 +19,11 @@ export interface MockLeague {
   id: number;
   name: string;
   description: string;
+  /**
+   * Multi-sport discriminator. The web Roster tab branches on it
+   * (`league.sport === Sport.Football`), so a football fixture must set it.
+   */
+  sport: 'baseball' | 'football';
   owner: number;
   maxRosterSize: number;
   draftStatus: 'not-started' | 'queued' | 'in-progress' | 'completed';
@@ -79,6 +84,7 @@ export function mockLeague(overrides: Partial<MockLeague> = {}): MockLeague {
     id: 1,
     name: 'Test League',
     description: 'A test league for E2E testing',
+    sport: 'baseball',
     owner: 1,
     maxRosterSize: 25,
     draftStatus: 'not-started',

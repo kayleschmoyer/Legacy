@@ -25,6 +25,7 @@ import { BASELINE_GRAPHQL_RESPONSES } from './shared-mocks';
 import type { BackendMode, PlatformMode } from './dual';
 import type {
   SeededDiscoverySearch,
+  SeededFootballLineup,
   SeededPlayerPool,
   TestData,
 } from './test-data';
@@ -38,6 +39,7 @@ import {
   careerPitchingLeadersResponse,
   comparablePlayersResponse,
 } from '../mocks/graphql/player.mocks';
+import { createFootballLineupFixture } from '../mocks/graphql/roster.mocks';
 import { GraphQLMockServer } from '../mocks/graphql/server/native-mock-server';
 
 const execFileAsync = promisify(execFile);
@@ -170,5 +172,21 @@ export class NativeMockTestData implements TestData {
     const payload = comparablePlayersResponse();
     this.#server.override('getplayerswithstats', () => payload);
     return Promise.resolve({ fullName: 'Mike Trout', searchTerm: 'Trout' });
+  }
+
+  footballLineup(): Promise<SeededFootballLineup> {
+    // Same fixture, same handler map, same mutable roster as the web verb —
+    // only the registration differs (`server.override` here, `page.route()`
+    // there). No forked payloads (ADR-0017 AC2).
+    const fixture = createFootballLineupFixture();
+    for (const [op, handler] of Object.entries(fixture.handlers)) {
+      this.#server.override(op, (request) => handler(request.variables));
+    }
+    return Promise.resolve({
+      leagueId: fixture.leagueId,
+      teamId: fixture.teamId,
+      openSlot: fixture.openSlot,
+      benchPlayer: fixture.benchPlayer,
+    });
   }
 }

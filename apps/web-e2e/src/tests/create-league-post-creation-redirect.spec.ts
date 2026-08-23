@@ -51,15 +51,15 @@ const OWNER_TEAM_NAME = "testuser's Team";
 const SECOND_TEAM_NAME = 'Blitz Brigade';
 
 /**
- * The league as the detail page reads it back after creation. `sport` and
- * `defensiveFormat` are on the `League` fragment but not on `MockLeague`, so
- * they are spread on — without `sport` the hero renders the league as
- * baseball.
+ * The league as the detail page reads it back after creation. Without `sport`
+ * the hero renders the league as baseball. `defensiveFormat` is on the
+ * `League` fragment but not on `MockLeague`, so it is spread on.
  */
 const CREATED_LEAGUE = {
   ...mockLeague({
     id: CREATED_LEAGUE_ID,
     name: LEAGUE_NAME,
+    sport: 'football',
     // `owner === user.id` is what the detail page derives `isCommissioner`
     // from; the hermetic user is id 1 (api-isolation's seeded profile).
     owner: 1,
@@ -69,7 +69,6 @@ const CREATED_LEAGUE = {
     draftStatus: 'not-started',
     inviteCode: INVITE_CODE,
   }),
-  sport: 'football',
   defensiveFormat: 'dst',
 };
 
