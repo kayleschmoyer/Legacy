@@ -81,6 +81,16 @@
  * Corruption recovery is otherwise automatic: an unhealthy slot (orphan pnpm
  * `*_tmp_*` dirs, packages missing package.json — the LS-8546/LS-8548 interrupted-
  * install signature) is quarantined and rebuilt on the next plain run.
+ *
+ * pnpmInstall() also self-heals the case where THIS session's own tsx-based MCP
+ * servers (`node --import tsx <server>`, per AGENTS.md) keep a native binary
+ * under node_modules (e.g. node_modules/tsx/node_modules/@esbuild/*\/esbuild.exe)
+ * mmap'd for the server's lifetime: pnpm's install-time unlink of that file
+ * EPERMs even though a rename of the same path succeeds (LS-9442). On an
+ * ERR_PNPM_EPERM naming a locked path under node_modules, the top-level package
+ * dir is renamed out of node_modules (so it can't pollute the pool slot) and the
+ * install is retried once, rather than surfacing a raw failure that requires a
+ * session restart to clear.
  */
 
 import {
@@ -745,19 +755,77 @@ function safeReaddirNames(p) {
   }
 }
 
-function pnpmInstall(cwdDir, noFrozen = false) {
+function pnpmInstall(cwdDir, noFrozen = false, retrying = false) {
   const lockfileFlag = noFrozen ? '--no-frozen-lockfile' : '--frozen-lockfile';
   const opts = {
     cwd: cwdDir,
-    stdio: 'inherit',
+    // Captured (not 'inherit') so a failure's output can be scanned for the
+    // EPERM self-heal below. Echoed to our own stdout/stderr either way so
+    // nothing is lost versus the previous inherit-based behaviour.
+    encoding: 'utf-8',
     timeout: 30 * 60_000,
     windowsHide: true,
   };
-  if (process.platform === 'win32') {
-    execFileSync('cmd', ['/c', 'pnpm', 'install', lockfileFlag], opts);
-  } else {
-    execFileSync('pnpm', ['install', lockfileFlag], opts);
+  try {
+    const out =
+      process.platform === 'win32'
+        ? execFileSync('cmd', ['/c', 'pnpm', 'install', lockfileFlag], opts)
+        : execFileSync('pnpm', ['install', lockfileFlag], opts);
+    if (out) process.stdout.write(out);
+  } catch (err) {
+    if (err.stdout) process.stdout.write(err.stdout);
+    if (err.stderr) process.stderr.write(err.stderr);
+    if (retrying) throw err; // already retried once — surface the failure.
+
+    const lockedPkg = extractEpermLockedTopLevelPackage(
+      `${err.stdout ?? ''}\n${err.stderr ?? ''}`,
+    );
+    const pkgDir = lockedPkg && join(cwdDir, 'node_modules', lockedPkg);
+    if (!pkgDir || !lstatExists(pkgDir)) throw err;
+
+    // Rename the locked package dir OUT of node_modules (not merely aside
+    // within it) — otherwise it would get swept into the pool slot on the
+    // next successful install and fail future health checks as a package
+    // dir missing package.json.
+    mkdirSync(poolRoot, { recursive: true });
+    const staleDir = join(
+      poolRoot,
+      `.stale-${lockedPkg.replace(/[\\/]/g, '_')}-${process.pid}-${Date.now()}`,
+    );
+    console.log(
+      `[install] ERR_PNPM_EPERM unlinking a file under node_modules/${lockedPkg} — ` +
+        "likely held open by this session's own tsx-based MCP servers (LS-9442). " +
+        `Renaming it out of node_modules and retrying once: ${pkgDir} -> ${staleDir}`,
+    );
+    try {
+      renameSync(pkgDir, staleDir);
+    } catch (renameErr) {
+      console.log(
+        `[install] could not rename ${pkgDir} aside: ${String(renameErr.message ?? renameErr)}`,
+      );
+      throw err;
+    }
+    pnpmInstall(cwdDir, noFrozen, true);
   }
+}
+
+/**
+ * Parse pnpm's `ERR_PNPM_EPERM ... unlink '<path>'` failure for the top-level
+ * (or `@scope/name`) node_modules package that owns the locked path, e.g.
+ * `node_modules\tsx\node_modules\@esbuild\win32-x64\esbuild.exe` -> `tsx`.
+ * Returns null when the output doesn't match this specific failure shape.
+ */
+function extractEpermLockedTopLevelPackage(output) {
+  const m = output.match(/ERR_PNPM_EPERM[\s\S]*?unlink '([^']+)'/);
+  if (!m) return null;
+  const raw = m[1].replace(/\\/g, '/');
+  const idx = raw.indexOf('node_modules/');
+  if (idx === -1) return null;
+  const rest = raw.slice(idx + 'node_modules/'.length).split('/');
+  if (rest.length === 0 || !rest[0]) return null;
+  return rest[0].startsWith('@') && rest.length > 1
+    ? `${rest[0]}/${rest[1]}`
+    : rest[0];
 }
 
 function removeNodeModulesEntry(p) {

@@ -1271,6 +1271,128 @@ test(
   },
 );
 
+// --- EPERM self-heal on a locked package dir (LS-9442) -----------------------
+// pnpm's install-time unlink of a native binary this session's own tsx-based
+// MCP servers hold open (e.g. node_modules/tsx/node_modules/@esbuild/*/
+// esbuild.exe) EPERMs even though renaming the same path succeeds. pnpmInstall()
+// must rename the locked top-level package dir OUT of node_modules and retry
+// once instead of surfacing the raw failure.
+
+/**
+ * Fake pnpm that fails the first invocation with pnpm's exact ERR_PNPM_EPERM
+ * shape after planting the locked file the error names (so the top-level
+ * package dir genuinely exists for the self-heal to find), then succeeds on
+ * the second invocation. Invocation count is tracked via COUNTER_FILE (env)
+ * since each attempt is a fresh process.
+ */
+function makeFakePnpmEpermThenSucceed(binDir) {
+  mkdirSync(binDir, { recursive: true });
+  if (process.platform === 'win32') {
+    writeFileSync(
+      join(binDir, 'pnpm.cmd'),
+      [
+        '@echo off',
+        'set /a c=0',
+        'if exist "%COUNTER_FILE%" set /p c=<"%COUNTER_FILE%"',
+        'set /a c+=1',
+        'echo %c% > "%COUNTER_FILE%"',
+        'if %c%==1 (',
+        '  mkdir node_modules\\tsx\\node_modules\\@esbuild\\win32-x64',
+        '  echo x > node_modules\\tsx\\node_modules\\@esbuild\\win32-x64\\esbuild.exe',
+        "  echo ERR_PNPM_EPERM  EPERM: operation not permitted, unlink 'node_modules\\tsx\\node_modules\\@esbuild\\win32-x64\\esbuild.exe' 1>&2",
+        '  exit /b 1',
+        ') else (',
+        '  mkdir node_modules\\nx',
+        '  echo {"name":"nx"} > node_modules\\nx\\package.json',
+        '  mkdir node_modules\\.bin',
+        '  echo x > node_modules\\.bin\\placeholder',
+        '  echo x > node_modules\\.bin\\nx',
+        '  echo hoistedDependencies: {} > node_modules\\.modules.yaml',
+        '  exit /b 0',
+        ')',
+      ].join('\r\n') + '\r\n',
+    );
+  } else {
+    const p = join(binDir, 'pnpm');
+    writeFileSync(
+      p,
+      [
+        '#!/bin/sh',
+        'c=0',
+        '[ -f "$COUNTER_FILE" ] && c=$(cat "$COUNTER_FILE")',
+        'c=$((c + 1))',
+        'echo $c > "$COUNTER_FILE"',
+        'if [ "$c" = "1" ]; then',
+        '  mkdir -p node_modules/tsx/node_modules/@esbuild/linux-x64',
+        '  touch node_modules/tsx/node_modules/@esbuild/linux-x64/esbuild',
+        '  echo "ERR_PNPM_EPERM  EPERM: operation not permitted, unlink \'node_modules/tsx/node_modules/@esbuild/linux-x64/esbuild\'" 1>&2',
+        '  exit 1',
+        'else',
+        '  mkdir -p node_modules/nx node_modules/.bin',
+        '  echo \'{"name":"nx"}\' > node_modules/nx/package.json',
+        '  echo x > node_modules/.bin/placeholder',
+        '  echo x > node_modules/.bin/nx',
+        '  echo "hoistedDependencies: {}" > node_modules/.modules.yaml',
+        'fi',
+      ].join('\n') + '\n',
+    );
+    chmodSync(p, 0o755);
+  }
+}
+
+test(
+  'materialise self-heals an ERR_PNPM_EPERM on a locked package dir by renaming it out of node_modules and retrying once (LS-9442)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt = makeWorktree(root, 'eperm-wt');
+      const shim = join(root, 'fake-bin');
+      makeFakePnpmEpermThenSucceed(shim);
+      const counterFile = join(root, 'attempt-count.txt');
+
+      const out = runLink([`--worktree=${wt}`, `--main-repo=${root}`], {
+        ...fakePnpmEnv(shim),
+        COUNTER_FILE: counterFile,
+      });
+
+      assert.match(
+        out,
+        /ERR_PNPM_EPERM unlinking a file under node_modules\/tsx/,
+      );
+      assert.match(out, /Renaming it out of node_modules and retrying once/);
+      assert.match(out, /slot materialised and linked/);
+      assert.equal(readFileSync(counterFile, 'utf-8').trim(), '2');
+
+      assert.ok(
+        lstatSync(join(wt, 'node_modules')).isSymbolicLink(),
+        'worktree node_modules must end up linked to the rebuilt slot',
+      );
+
+      const hash = runLink([
+        `--worktree=${wt}`,
+        `--main-repo=${root}`,
+        '--print-hash',
+      ]).trim();
+      const slotNm = join(root, '.modules-pool', hash, 'node_modules');
+      assert.ok(
+        !existsSync(join(slotNm, 'tsx')),
+        'the locked package dir must not be swept into the published slot',
+      );
+      const staleEntries = readdirSync(join(root, '.modules-pool')).filter(
+        (n) => n.startsWith('.stale-'),
+      );
+      assert.equal(
+        staleEntries.length,
+        1,
+        'the locked package dir must be renamed aside under the pool root, outside node_modules',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
 // --- install guards: no writes through a pool symlink (LS-8548) --------------
 
 const PNPMFILE = join(here, '..', '..', '.pnpmfile.cjs');
