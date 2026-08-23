@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import { TamaguiProvider, Theme } from 'tamagui';
 import { Slot } from 'expo-router';
 import { useFonts } from 'expo-font';
@@ -14,7 +15,11 @@ import {
   getRollbarConfigFromEnv,
   initRollbar,
 } from '@legacy-sports/rollbar/native';
-import { AuthProvider, ErrorBoundary } from '@legacy-sports/shared-components';
+import {
+  AnimatedLaunchScreen,
+  AuthProvider,
+  ErrorBoundary,
+} from '@legacy-sports/shared-components';
 import { tamaguiConfig } from '@legacy-sports/tamagui-config';
 import type { OAuthConfig } from '@legacy-sports/shared-components';
 import { LOGGER } from '@legacy-sports/logging';
@@ -207,6 +212,18 @@ export default function Layout() {
 
   const [fontsLoaded, fontError] = useFonts(BRAND_FONTS);
 
+  // Cold-start launch animation gate (LS-9464). First-mount state is
+  // inherently cold-start-only: this root Layout mounts exactly once per JS
+  // process (expo-router root layout), so a background → active resume never
+  // remounts it and never replays the animation. Deliberately NOT persisted
+  // (AsyncStorage/secure-store) — that would wrongly suppress the animation on
+  // later cold starts.
+  const [showLaunchAnimation, setShowLaunchAnimation] = React.useState(true);
+  const handleLaunchFinished = React.useCallback(
+    () => setShowLaunchAnimation(false),
+    [],
+  );
+
   useEffect(() => {
     if (!fontsLoaded && !fontError) return;
     if (fontError) {
@@ -235,14 +252,25 @@ export default function Layout() {
       config={tamaguiConfig}
       defaultTheme="light"
     >
-      <GrowthBookProvider growthbook={growthbook}>
-        <ErrorBoundary>
-          {/* ThemeProvider must live inside TamaguiProvider so the Theme component works */}
-          <ThemeProvider>
-            <ThemedApp />
-          </ThemeProvider>
-        </ErrorBoundary>
-      </GrowthBookProvider>
+      {/* Plain RN View (not a Tamagui stack) so the absolute-fill launch
+          overlay has a full-screen positioned ancestor without altering the
+          provider tree's layout semantics. */}
+      <View style={{ flex: 1 }}>
+        <GrowthBookProvider growthbook={growthbook}>
+          <ErrorBoundary>
+            {/* ThemeProvider must live inside TamaguiProvider so the Theme component works */}
+            <ThemeProvider>
+              <ThemedApp />
+            </ThemeProvider>
+          </ErrorBoundary>
+        </GrowthBookProvider>
+        {/* Rendered last so it stacks above the app UI; while visible it also
+            fully covers the auth-gate BrandedSplash (same field + lockup), so
+            cold start reads as one continuous branded surface. */}
+        {showLaunchAnimation ? (
+          <AnimatedLaunchScreen onFinished={handleLaunchFinished} />
+        ) : null}
+      </View>
     </TamaguiProvider>
   );
 }

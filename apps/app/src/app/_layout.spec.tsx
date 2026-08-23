@@ -62,10 +62,23 @@ jest.mock('@apollo/client/react', () => ({
   ApolloProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-jest.mock('@legacy-sports/shared-components', () => ({
-  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
-  ErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
-}));
+jest.mock('@legacy-sports/shared-components', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports, so modules must be required inside the factory
+  const { View } = require('react-native') as typeof import('react-native');
+  // Captures the latest onFinished prop so tests can drive the overlay's
+  // dismissal (defined inside the factory — see the hoisting note above).
+  const launchProps: { onFinished?: () => void } = {};
+  return {
+    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+    ErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
+    AnimatedLaunchScreen: ({ onFinished }: { onFinished?: () => void }) => {
+      launchProps.onFinished = onFinished;
+      return <View testID="animated-launch-screen" />;
+    },
+    // Non-standard export so tests can access the captured props
+    _launchProps: launchProps,
+  };
+});
 
 jest.mock('tamagui', () => ({
   createTokens: (tokens: unknown) => tokens,
@@ -129,6 +142,12 @@ function getGrowthBookSpies(): GrowthBookSpies {
     setAttributes: mod._setAttributesSpy,
     loadFeatures: mod._loadFeaturesSpy,
   };
+}
+
+function getLaunchProps(): { onFinished?: () => void } {
+  return jest.requireMock<{ _launchProps: { onFinished?: () => void } }>(
+    '@legacy-sports/shared-components',
+  )._launchProps;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -197,5 +216,43 @@ describe('_layout.tsx — AnalyticsIdentify GrowthBook attribute gating', () => 
     });
 
     expect(getGrowthBookSpies().setAttributes).not.toHaveBeenCalled();
+  });
+});
+
+describe('_layout.tsx — cold-start launch animation gating (LS-9464)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseCurrentUserInfo.mockReturnValue({ data: { id: 42, name: 'Test' } });
+    mockUserData = null;
+  });
+
+  it('renders the launch overlay on initial mount (cold start)', async () => {
+    let result!: ReturnType<typeof render>;
+    await act(() => {
+      result = render(<Layout />);
+    });
+
+    expect(result.queryByTestId('animated-launch-screen')).toBeTruthy();
+  });
+
+  it('dismisses the overlay after onFinished and does not replay on re-render', async () => {
+    let result!: ReturnType<typeof render>;
+    await act(() => {
+      result = render(<Layout />);
+    });
+    expect(result.queryByTestId('animated-launch-screen')).toBeTruthy();
+
+    await act(() => {
+      getLaunchProps().onFinished?.();
+    });
+    expect(result.queryByTestId('animated-launch-screen')).toBeNull();
+
+    // Re-rendering the mounted Layout (as any state or props update would —
+    // e.g. an AppState background → active transition) must not resurrect the
+    // overlay: it runs at most once per JS process.
+    await act(() => {
+      result.rerender(<Layout />);
+    });
+    expect(result.queryByTestId('animated-launch-screen')).toBeNull();
   });
 });
