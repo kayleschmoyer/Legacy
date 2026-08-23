@@ -348,6 +348,25 @@ describe('getFootballDraftRecommendations (LS-9482)', () => {
     expect(result[0].reason).toMatch(/Adds depth at DL/);
   });
 
+  // LS-9484: the candidate query must prefer the real football scoring cache
+  // over the always-NULL projected_fantasy_points placeholder, checking the
+  // league-specific cache row before the default one.
+  it('joins football_player_scoring_cache (league-specific before default) ahead of the raw projected_fantasy_points column', async () => {
+    const { getFootballDraftRecommendations } = await loadQueriesModule();
+    const { db, calls } = makeDb([[]]);
+
+    await getFootballDraftRecommendations(db as never, 1, 10, [], 'dst');
+
+    const { sql: text } = renderQuery(calls[0]);
+    expect(text).toContain('public.football_player_scoring_cache');
+    expect(text.indexOf('cs_league.avg_ppg')).toBeLessThan(
+      text.indexOf('cs_default.avg_ppg'),
+    );
+    expect(text.indexOf('cs_default.avg_ppg')).toBeLessThan(
+      text.indexOf('p.projected_fantasy_points'),
+    );
+  });
+
   it('returns at most 5 recommendations', async () => {
     const { getFootballDraftRecommendations } = await loadQueriesModule();
     const rows: FootballRow[] = Array.from({ length: 8 }, (_, i) => ({

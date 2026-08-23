@@ -546,13 +546,12 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
       // board falls back to a stack rank: each player's 1-based position when
       // the league's *entire* draftable pool is ordered by projected value,
       // using the league's own customized scoring settings when the league
-      // has ever edited them (player_scoring_cache row keyed by this
-      // league's id — LS-696), falling back to the default (league_id IS
-      // NULL) scoring profile otherwise. Football has no per-league scoring
-      // cache yet (LS-4568 follow-up — see the orderByKey branch above),
-      // so it ranks by the same projections/ADP pipeline column
-      // (players.projected_fantasy_points) candidate-pool.ts already uses
-      // for auto-pick.
+      // has ever edited them (scoring-cache row keyed by this league's id —
+      // LS-696), falling back to the default (league_id IS NULL) scoring
+      // profile otherwise, and finally to the projections/ADP pipeline
+      // column (players.projected_fantasy_points) for any player neither
+      // cache has computed yet. Football reads football_player_scoring_cache
+      // (LS-9484) instead of player_scoring_cache — same fallback shape.
       //
       // Computed as a window function over the pool-defining predicates only
       // (sport, rostered-players exclusion, static eligibility) — deliberately
@@ -575,9 +574,13 @@ builder.queryField('getAvailableDraftPlayers', (t) =>
         WITH draft_adp AS (
           SELECT p.id AS player_id,
             RANK() OVER (
-              ORDER BY COALESCE(p.projected_fantasy_points, 0) DESC
+              ORDER BY COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, p.projected_fantasy_points::numeric, 0) DESC
             ) AS adp
           FROM public.players p
+          LEFT JOIN public.football_player_scoring_cache cs_league
+            ON cs_league.player_id = p.id AND cs_league.league_id = ${draft.leagueId}
+          LEFT JOIN public.football_player_scoring_cache cs_default
+            ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
           ${poolWhereClause}
         )
       `
@@ -1119,12 +1122,13 @@ type DraftRecommendationOutput = {
  * instead, and (unlike baseball) it carries at most one row per player, so
  * no games-played tiebreak is needed to pick a "primary" position.
  *
- * No football scoring cache exists yet (LS-9484 tracks that), so ranking
- * reuses the same `effectiveFootballFpg` baseline the auto-pick strategy
- * already uses (strategies/football.ts): a served `projected_fantasy_points`
- * value when present, else a position-archetype baseline + per-player
- * jitter. The baseline is for ORDERING only — `topStats`/`reason` must never
- * quote it as though it were a real projection (LS-9476 postmortem).
+ * Ranking reuses the same `effectiveFootballFpg` fallback logic the auto-pick
+ * strategy uses (strategies/football.ts): a real per-player value — from
+ * football_player_scoring_cache (LS-9484) or, failing that, a served
+ * `projected_fantasy_points` — when present, else a position-archetype
+ * baseline + per-player jitter. The baseline is for ORDERING only —
+ * `topStats`/`reason` must never quote it as though it were a real
+ * projection (LS-9476 postmortem).
  */
 
 /**
@@ -1170,9 +1174,13 @@ export async function getFootballDraftRecommendations(
       p.first_name,
       p.last_name,
       fpep.position AS primary_position,
-      p.projected_fantasy_points
+      COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, p.projected_fantasy_points::numeric) AS projected_fantasy_points
     FROM public.players p
     JOIN public.football_player_eligible_positions fpep ON fpep.player_id = p.id
+    LEFT JOIN public.football_player_scoring_cache cs_league
+      ON cs_league.player_id = p.id AND cs_league.league_id = ${leagueId}
+    LEFT JOIN public.football_player_scoring_cache cs_default
+      ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
     WHERE p.sport = 'football'
     ${excludeClause}
   `);

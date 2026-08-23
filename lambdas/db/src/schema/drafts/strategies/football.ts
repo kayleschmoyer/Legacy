@@ -1,10 +1,12 @@
 /**
  * Football auto-pick strategy — positional-need fill order with mock FPG.
  *
- * Real football stats land in a separate follow-up outside epic LS-4568. Until
- * then, players with no projected FPG get a deterministic mock value seeded by
- * (position archetype + playerId) so the strategy produces sensible, stable
- * rosters against the mock player pool.
+ * Callers (candidate-pool.ts) now feed `PlayerDraftInfo.fpg` from the real
+ * football_player_scoring_cache when a player has one (LS-9484). Any player
+ * without a cache row yet — or without enough career stats to produce a
+ * nonzero score — still gets a deterministic mock value seeded by (position
+ * archetype + playerId) here, so the strategy always produces sensible,
+ * stable rosters even for thin data.
  *
  * Roster fill priority per the ADR-0011 §5 spec: QB → RB → WR → TE → K → DEF
  * → FLEX → BENCH. The strategy walks the unfilled slot types in this canonical

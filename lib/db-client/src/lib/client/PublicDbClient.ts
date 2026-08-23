@@ -254,6 +254,26 @@ export async function refreshPlayerScoringCache(
   );
 }
 
+/**
+ * Refresh the football_player_scoring_cache table for a given league (or the
+ * default NULL baseline). Football's analog of refreshPlayerScoringCache
+ * (LS-9484) — a separate table/function pair, not the same underlying cache;
+ * see the migration header for why they can't share one.
+ *
+ * Pass leagueId = null  → recompute default rows
+ * Pass leagueId = X     → recompute only rows for league X (used after a
+ *                         football league's scoring profile/position bonus
+ *                         update)
+ */
+export async function refreshFootballPlayerScoringCache(
+  db: PublicDb,
+  leagueId: number | null = null,
+): Promise<void> {
+  await db.execute(
+    sql`SELECT public.refresh_football_player_scoring_cache(${leagueId})`,
+  );
+}
+
 export async function bulkCreatePlayers(
   db: PublicDb,
   players: CreatePlayerInput[],

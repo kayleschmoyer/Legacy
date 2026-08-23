@@ -13,6 +13,7 @@ import {
   type PublicDb,
   PublicSchema,
 } from '@legacy-sports/db-client';
+import { ALLOWED_POSITIONS_BY_SPORT } from '@legacy-sports/utils';
 import { LOGGER } from '@legacy-sports/logging';
 import { eq, inArray, sql } from 'drizzle-orm';
 
@@ -152,6 +153,7 @@ export async function fetchCandidatePool(
     eligibleIds,
     settings,
     league.sport,
+    league.id,
   );
 
   // 3. Pre-compute bench versatility
@@ -160,6 +162,7 @@ export async function fetchCandidatePool(
     draftLeagueId,
     eligibleIds,
     playerDraftInfo,
+    league.sport,
   );
 
   return {
@@ -185,10 +188,10 @@ async function fetchUndraftedCandidates(
 ): Promise<number[]> {
   const { gamesPerMatchup, pitcherStartsPerMatchup } = settings;
 
-  // Football has no per-game scoring cache yet (real stat-based scoring is a
-  // separate follow-up outside epic LS-4568 — see strategies/football.ts):
-  // rank by the projections/ADP pipeline's `players.projected_fantasy_points`
-  // instead. Baseball ranks by projected FPG from player_scoring_cache
+  // Football ranks by projected FPG from football_player_scoring_cache
+  // (LS-9484), falling back to the projections/ADP pipeline's
+  // `players.projected_fantasy_points` for any player not yet cached.
+  // Baseball ranks by projected FPG from player_scoring_cache
   // (default/NULL league row). The cache stores per-game scoring components
   // (batting_ppg/pitching_ppg/fielding_ppg) precomputed from the default
   // scoring profile and refreshed by stats-lambda after each career stat
@@ -197,8 +200,13 @@ async function fetchUndraftedCandidates(
   const undraftedRows =
     league.sport === 'football'
       ? await db.execute(
-          sql`SELECT p.id, COALESCE(p.projected_fantasy_points, 0) AS fpg
+          sql`SELECT p.id,
+        COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, p.projected_fantasy_points::numeric, 0) AS fpg
       FROM players p
+      LEFT JOIN public.football_player_scoring_cache cs_league
+        ON cs_league.player_id = p.id AND cs_league.league_id = ${league.id}
+      LEFT JOIN public.football_player_scoring_cache cs_default
+        ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
       WHERE NOT EXISTS (
         SELECT 1 FROM draft_picks dp
         WHERE dp.draft_id = ${draftId} AND dp.player_id = p.id
@@ -268,20 +276,29 @@ async function computePlayerDraftInfo(
   eligibleIds: number[],
   settings: LeagueSettings,
   sport: 'baseball' | 'football',
+  leagueId: number,
 ): Promise<{
   playerDraftInfo: Map<number, PlayerDraftInfo>;
   rankedEligibleIds: number[];
 }> {
   const { gamesPerMatchup, pitcherStartsPerMatchup } = settings;
 
-  // Projected FPG — football reads the projections/ADP pipeline's
-  // `players.projected_fantasy_points` (no per-game scoring cache exists for
-  // football yet); baseball reads player_scoring_cache as before.
+  // Projected FPG — football reads football_player_scoring_cache (LS-9484:
+  // league-specific override falling back to default scoring, mirroring
+  // baseball's player_scoring_cache pattern below), falling back further to
+  // the projections/ADP pipeline's `players.projected_fantasy_points` for any
+  // player the cache hasn't computed yet. baseball reads player_scoring_cache
+  // as before.
   const statsRows =
     sport === 'football'
       ? await db.execute(
-          sql`SELECT p.id AS player_id, COALESCE(p.projected_fantasy_points, 0) AS projected_fpg
+          sql`SELECT p.id AS player_id,
+      COALESCE(cs_league.avg_ppg, cs_default.avg_ppg, p.projected_fantasy_points::numeric, 0) AS projected_fpg
     FROM players p
+    LEFT JOIN public.football_player_scoring_cache cs_league
+      ON cs_league.player_id = p.id AND cs_league.league_id = ${leagueId}
+    LEFT JOIN public.football_player_scoring_cache cs_default
+      ON cs_default.player_id = p.id AND cs_default.league_id IS NULL
     WHERE p.id = ANY(${sql.param(eligibleIds)}::integer[])
     ORDER BY projected_fpg DESC
     LIMIT 1000`,
@@ -368,6 +385,7 @@ async function computeBestBenchPick(
   draftLeagueId: number,
   eligibleIds: number[],
   playerDraftInfo: Map<number, PlayerDraftInfo>,
+  sport: 'baseball' | 'football',
 ): Promise<BestBenchPick | undefined> {
   // Step 1: total roster slots for this league (scalar)
   const totalSlotsResult = await db.execute(
@@ -377,29 +395,65 @@ async function computeBestBenchPick(
   );
   const benchTotalSlots = Number(totalSlotsResult.rows[0]?.total_slots ?? 0);
 
-  // Step 2: slots_coverable per eligible player. The slot/stat-position mapping
-  // lives in `public.position_slot_mapping` (seeded by migration) so the
-  // planner has statistics for join ordering — see LS-4694.
-  const benchVersatilityRows = await db.execute(
-    sql`WITH eligible_players AS (
-      SELECT player_id, position
-      FROM player_eligible_positions
-      WHERE player_id = ANY(${sql.param(eligibleIds)}::integer[])
-    )
-    SELECT
-      ep.player_id,
-      COUNT(DISTINCT lp.id)::int AS slots_coverable
-    FROM league_positions lp
-    JOIN position_slot_mapping pm ON pm.slot_type = lp.position_type::text
-    JOIN eligible_players ep ON ep.position = pm.stat_pos
-    WHERE lp.league_id = ${draftLeagueId}
-    GROUP BY ep.player_id`,
-  );
-
-  // Combine DB-computed slot counts with in-memory FPG to rank bench picks
+  // Step 2: slots_coverable per eligible player.
+  //
+  // Baseball: the slot/stat-position mapping lives in
+  // `public.position_slot_mapping` (seeded by migration) so the planner has
+  // statistics for join ordering — see LS-4694.
+  //
+  // Football: `position_slot_mapping` has never been seeded with football
+  // rows (its own migration's comment defers that to "a later football
+  // ticket" that never landed), so the SQL join below returns nothing for
+  // football regardless of position data — the exact LS-9474 bug class
+  // (baseball-only relation queried unconditionally), just one table over.
+  // Rather than add a second migration to seed a table whose whole reason
+  // to exist is query-planner statistics for a 31-row baseball constant,
+  // football computes slots_coverable in memory from data it already has:
+  // `playerDraftInfo`'s `.positions` (from football_player_eligible_positions,
+  // LS-9040) intersected against `ALLOWED_POSITIONS_BY_SPORT.football`
+  // (LS-9475 — already carries every currently-configurable slot type,
+  // DST and IDP alike) per league_positions row (LS-9483).
   const slotsCoverableMap = new Map<number, number>();
-  for (const row of benchVersatilityRows.rows) {
-    slotsCoverableMap.set(row.player_id as number, Number(row.slots_coverable));
+  if (sport === 'football') {
+    const leaguePositionRows = await db.execute(
+      sql`SELECT position_type::text AS position_type
+          FROM league_positions
+          WHERE league_id = ${draftLeagueId}`,
+    );
+    const allowedPositions = ALLOWED_POSITIONS_BY_SPORT.football;
+    for (const [id, info] of playerDraftInfo) {
+      let slotsCoverable = 0;
+      for (const row of leaguePositionRows.rows) {
+        const slotType = row.position_type as string;
+        const eligibleStatPositions = allowedPositions[slotType] ?? [];
+        if (eligibleStatPositions.some((pos) => info.positions.includes(pos))) {
+          slotsCoverable += 1;
+        }
+      }
+      slotsCoverableMap.set(id, slotsCoverable);
+    }
+  } else {
+    const benchVersatilityRows = await db.execute(
+      sql`WITH eligible_players AS (
+        SELECT player_id, position
+        FROM player_eligible_positions
+        WHERE player_id = ANY(${sql.param(eligibleIds)}::integer[])
+      )
+      SELECT
+        ep.player_id,
+        COUNT(DISTINCT lp.id)::int AS slots_coverable
+      FROM league_positions lp
+      JOIN position_slot_mapping pm ON pm.slot_type = lp.position_type::text
+      JOIN eligible_players ep ON ep.position = pm.stat_pos
+      WHERE lp.league_id = ${draftLeagueId}
+      GROUP BY ep.player_id`,
+    );
+    for (const row of benchVersatilityRows.rows) {
+      slotsCoverableMap.set(
+        row.player_id as number,
+        Number(row.slots_coverable),
+      );
+    }
   }
 
   let bestBenchPick: BestBenchPick | undefined;

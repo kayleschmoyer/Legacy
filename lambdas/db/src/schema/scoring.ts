@@ -3,6 +3,7 @@ import {
   createDatabaseService,
   PublicDb,
   PublicSchema,
+  refreshFootballPlayerScoringCache,
   refreshPlayerScoringCache,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
@@ -25,6 +26,48 @@ import {
 } from './graphql-errors';
 
 const dbService = createDatabaseService(getDbOptions());
+
+/**
+ * Invalidate the sport-appropriate player scoring cache for a league after a
+ * scoring profile or position-bonus edit (LS-696, extended football-aware by
+ * LS-9484). baseball/football keep entirely separate cache tables/functions
+ * (see the LS-9484 migration header), so the caller must be routed by sport
+ * rather than always hitting the baseball refresh.
+ *
+ * Not awaited by callers — recomputing every player can take up to ~115s
+ * (LS-9313), so this always runs fire-and-forget with its own error handling.
+ */
+export async function refreshLeagueScoringCacheBySport(
+  db: PublicDb,
+  leagueId: number,
+  logContext: string,
+): Promise<void> {
+  // Never rejects — callers invoke this fire-and-forget (no await, no
+  // .catch()), so an unhandled error here (including the league lookup
+  // itself) would surface as an unhandled promise rejection.
+  try {
+    const [league] = await db
+      .select({ sport: PublicSchema.leagues.sport })
+      .from(PublicSchema.leagues)
+      .where(eq(PublicSchema.leagues.id, leagueId))
+      .limit(1);
+
+    const refresh =
+      league?.sport === 'football'
+        ? refreshFootballPlayerScoringCache
+        : refreshPlayerScoringCache;
+
+    await refresh(db, leagueId);
+  } catch (err) {
+    // { err } is intentional, not a mistake: lib/logging's serializeArg walks
+    // plain-object args with an Error-aware replacer, so a nested Error still
+    // gets its name/message/stack extracted (see
+    // lib/logging/src/lib/types.ts errorReplacer).
+    LOGGER.warn(`Failed to refresh player scoring cache after ${logContext}`, {
+      err,
+    });
+  }
+}
 
 const SCORING_GROUPS: ScoringMultiplierGroup[] = [
   'batting',
@@ -633,24 +676,13 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
       );
 
       // Invalidate the player scoring cache for this league so the next
-      // player browse / draft pool request sees updated scores (LS-696).
-      // Not awaited: compute_career_scores() recomputes every player and can
-      // take up to ~115s (LS-9313) — blocking the mutation response on it
-      // risks request timeouts, so the refresh runs fire-and-forget.
-      refreshPlayerScoringCache(
-        context.db as unknown as PublicDb,
+      // player browse / draft pool request sees updated scores (LS-696;
+      // routed by sport since LS-9484 — see refreshLeagueScoringCacheBySport).
+      void refreshLeagueScoringCacheBySport(
+        context.db,
         args.leagueId,
-      ).catch((err: unknown) => {
-        // { err } is intentional, not a mistake: lib/logging's serializeArg
-        // walks plain-object args with an Error-aware replacer, so a nested
-        // Error still gets its name/message/stack extracted (see
-        // lib/logging/src/lib/types.ts errorReplacer). Matches the
-        // notificationService.catch() pattern below in this same file.
-        LOGGER.warn(
-          'Failed to refresh player scoring cache after scoring update',
-          { err },
-        );
-      });
+        'scoring update',
+      );
 
       const config = await loadLeagueScoringConfig(args.leagueId);
 
@@ -804,18 +836,12 @@ builder.mutationField('updateLeagueScoringPositionBonuses', (t) =>
 
       // Invalidate the player scoring cache for this league so the next
       // player browse / draft pool request sees the updated bonuses,
-      // mirroring updateLeagueScoringProfile (LS-696).
-      // Not awaited: see the equivalent call above (LS-9313).
-      refreshPlayerScoringCache(
-        context.db as unknown as PublicDb,
+      // mirroring updateLeagueScoringProfile (LS-696, sport-routed by LS-9484).
+      void refreshLeagueScoringCacheBySport(
+        context.db,
         args.leagueId,
-      ).catch((err: unknown) => {
-        // { err } is intentional — see the equivalent call above.
-        LOGGER.warn(
-          'Failed to refresh player scoring cache after position bonus update',
-          { err },
-        );
-      });
+        'position bonus update',
+      );
 
       return loadLeagueScoringConfig(args.leagueId);
     },
