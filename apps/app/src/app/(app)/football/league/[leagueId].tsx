@@ -63,7 +63,7 @@ const BASE_FOOTBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'matchups', label: 'Matchups' },
   { id: 'trades', label: 'Trades' },
   { id: 'standings', label: 'Standings' },
-  { id: 'chat', label: 'Chat' },
+  { id: 'chat', label: 'Chat', memberOnly: true },
   { id: 'commissioner', label: 'Settings', commishOnly: true },
 ];
 
@@ -859,7 +859,7 @@ export default function FootballLeagueId(): React.JSX.Element {
           </YStack>
         )}
 
-        {selectedTab === 'chat' && (
+        {selectedTab === 'chat' && isMember && (
           <YStack flex={1}>
             <LeagueChatTab
               leagueId={numLeagueId}

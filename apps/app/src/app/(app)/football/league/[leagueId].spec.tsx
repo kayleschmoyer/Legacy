@@ -682,6 +682,49 @@ describe('FootballLeagueId', () => {
     });
   });
 
+  describe('chat tab visibility for non-members (LS-6295 / FLD-043)', () => {
+    const asNonMember = () => {
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: null }, loading: false },
+      ]);
+    };
+
+    it('does not render the Chat tab for a non-member', () => {
+      asNonMember();
+      render(<FootballLeagueId />);
+      expect(screen.queryByText('Chat')).toBeNull();
+    });
+
+    it('does not mount LeagueChatTab (and its failing getLeagueMessages query) for a non-member even via deep link', () => {
+      asNonMember();
+      const { useLocalSearchParams } = jest.requireMock<{
+        useLocalSearchParams: jest.Mock;
+      }>('expo-router');
+      useLocalSearchParams.mockReturnValue({
+        leagueId: '42',
+        initialTab: 'chat',
+      });
+
+      render(<FootballLeagueId />);
+      expect(screen.queryByTestId('league-chat-tab')).toBeNull();
+    });
+
+    it('renders the Chat tab and mounts LeagueChatTab for a member', () => {
+      const { useLocalSearchParams } = jest.requireMock<{
+        useLocalSearchParams: jest.Mock;
+      }>('expo-router');
+      useLocalSearchParams.mockReturnValue({
+        leagueId: '42',
+        initialTab: 'chat',
+      });
+
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Chat')).toBeTruthy();
+      expect(screen.getByTestId('league-chat-tab')).toBeTruthy();
+    });
+  });
+
   describe('overview tab content', () => {
     it('renders the invite share section for commissioners', () => {
       const { useAuthorizedUserInfo } = jest.requireMock<{
