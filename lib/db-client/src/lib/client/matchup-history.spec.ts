@@ -162,12 +162,32 @@ interface MockBattingRow {
   h: number;
 }
 
+/** Row shape of the league_week_player_seasons fetch (LS-9533). */
+interface MockPlayerSeasonRow {
+  weekNumber: number;
+  playerId: number;
+  season: number;
+}
+
+/**
+ * Season every synthetic player is assigned for every week, matching the
+ * `season` on the synthetic game_batting rows below. Tests that care about
+ * season resolution build their own rows rather than using this default.
+ */
+const MOCK_SEASON = 2024;
+
+/** Week a SimpleMatchup falls in; the fixtures mostly leave it implicit. */
+function weekOf(m: SimpleMatchup): number {
+  return m.weekNumber ?? 1;
+}
+
 function buildStandingsGameData(matchups: SimpleMatchup[]) {
   let mpId = 1;
   let mpgId = 1;
   const matchupPlayers: MockMatchupPlayer[] = [];
   const matchupPlayerGames: MockMatchupPlayerGame[] = [];
   const gameBatting: MockBattingRow[] = [];
+  const playerSeasons: MockPlayerSeasonRow[] = [];
 
   for (const m of matchups) {
     // Team 1 player
@@ -188,10 +208,15 @@ function buildStandingsGameData(matchups: SimpleMatchup[]) {
     });
     gameBatting.push({
       playerId: t1PlayerId,
-      season: 2024,
+      season: MOCK_SEASON,
       gameNum: 1,
       gameIdentifier: t1GameId,
       h: m.team1Score,
+    });
+    playerSeasons.push({
+      weekNumber: weekOf(m),
+      playerId: t1PlayerId,
+      season: MOCK_SEASON,
     });
 
     // Team 2 player
@@ -212,14 +237,19 @@ function buildStandingsGameData(matchups: SimpleMatchup[]) {
     });
     gameBatting.push({
       playerId: t2PlayerId,
-      season: 2024,
+      season: MOCK_SEASON,
       gameNum: 1,
       gameIdentifier: t2GameId,
       h: m.team2Score,
     });
+    playerSeasons.push({
+      weekNumber: weekOf(m),
+      playerId: t2PlayerId,
+      season: MOCK_SEASON,
+    });
   }
 
-  return { matchupPlayers, matchupPlayerGames, gameBatting };
+  return { matchupPlayers, matchupPlayerGames, gameBatting, playerSeasons };
 }
 
 /**
@@ -227,7 +257,8 @@ function buildStandingsGameData(matchups: SimpleMatchup[]) {
  *
  * db.select() order:
  *  [0] teams, [1] league (medianGameEnabled, LS-6344), [2] matchups,
- *  [3] matchupPlayers, [4] matchupPlayerGames
+ *  [3] matchupPlayers, [4] matchupPlayerGames,
+ *  [5] leagueWeekPlayerSeasons (LS-9533)
  *
  * db.execute() order (LS-9525 pair-join fetches):
  *  [0] gameBatting, [1] gamePitching, [2] gameFielding existence probe,
@@ -239,9 +270,13 @@ function buildStandingsMockDb(
   extraPrefix: any[] = [],
   medianGameEnabled = false,
   executeOverrides?: unknown[][],
+  playerSeasonOverrides?: MockPlayerSeasonRow[],
 ) {
-  const { matchupPlayers, matchupPlayerGames, gameBatting } =
-    buildStandingsGameData(matchups);
+  // calculateStandings keys stats by the matchup's week, so the fixtures have
+  // to carry an explicit week rather than leaving it undefined (LS-9533).
+  const weekedMatchups = matchups.map((m) => ({ ...m, weekNumber: weekOf(m) }));
+  const { matchupPlayers, matchupPlayerGames, gameBatting, playerSeasons } =
+    buildStandingsGameData(weekedMatchups);
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- test mock
   return createMockDbWithMultipleQueries(
@@ -249,9 +284,10 @@ function buildStandingsMockDb(
       ...extraPrefix,
       teams,
       [{ medianGameEnabled }], // league.medianGameEnabled lookup (LS-6344)
-      matchups, // the function only reads id, weekNumber, team1Id, team2Id, status
+      weekedMatchups, // the function only reads id, weekNumber, team1Id, team2Id, status
       matchupPlayers,
       matchupPlayerGames,
+      playerSeasonOverrides ?? playerSeasons,
     ],
     executeOverrides ?? [
       gameBatting,
@@ -1258,9 +1294,20 @@ describe('Matchup History', () => {
         expect(text).toContain('WITH pairs AS MATERIALIZED');
         expect(text).toContain('CROSS JOIN LATERAL');
         expect(text).toContain('OFFSET 0');
-        // The pair predicate the composite index serves.
+        // The key predicate the composite index serves. LS-9533 added the
+        // season leg, moving the probe onto
+        // <table>_player_id_season_game_identifier_idx.
         expect(text).toContain('"player_id" = p.player_id');
+        expect(text).toContain('"season" = p.season');
         expect(text).toContain('"game_identifier" = p.game_identifier');
+        // Season comes from the matchup's league-week, never from the stats row.
+        expect(text).toContain('JOIN league_week_player_seasons lwps');
+        expect(text).toContain('lwps.league_id = m.league_id');
+        expect(text).toContain('lwps.week_number = m.week_number');
+        expect(text).toContain('lwps.player_id = mp.player_id');
+        // The documented tie-break (LS-9533 AC2), matching the write path.
+        expect(text).toMatch(/ORDER BY\s+"[a-z_]+"\."game_num(ber)?"\s+ASC/);
+        expect(text).toContain('LIMIT 1');
         // The two independent IN lists are gone.
         expect(text).not.toMatch(/"(player_id|game_identifier)"\s+in\s*\(/i);
       }
@@ -1307,7 +1354,9 @@ describe('Matchup History', () => {
         dialect.sqlToQuery(q),
       );
 
-      expect(batting.sql).not.toContain('week_number');
+      // week_number still appears in the season join (LS-9533); what must be
+      // absent is the `<=` upper bound and its bound parameter.
+      expect(batting.sql).not.toContain('"week_number" <= ');
       expect(batting.params).toEqual([1]);
     });
 
@@ -1361,6 +1410,200 @@ describe('Matchup History', () => {
       // Team A: 120 + 60 hits, plus 2 fielding points per game played (2 games).
       const teamA = standings.find((s) => s.teamId === 1);
       expect(teamA?.pointsFor).toBe(120 + 60 + 2 * 2);
+    });
+  });
+
+  // LS-9533: the stat fetches used to match on (player_id, game_identifier)
+  // alone, with no ORDER BY, so when a game_identifier existed under more than
+  // one season -- 8,201 batting and 1,298 pitching pairs on dev RDS -- whichever
+  // row Postgres returned last silently won. The season now comes from
+  // league_week_player_seasons for the matchup's own league-week, exactly as
+  // getMatchupPlayerGameStats resolves it on the write path.
+  //
+  // These tests deliberately feed the lookup rows from BOTH seasons. The SQL
+  // would return only the matching one; handing it both proves the scoring keys
+  // pick the right row rather than relying on the query to have filtered it.
+  describe('season resolution (LS-9533)', () => {
+    const twoTeams = [
+      { id: 1, name: 'Team A' },
+      { id: 2, name: 'Team B' },
+    ];
+
+    /**
+     * db.select() order: teams, league, matchups, matchupPlayers,
+     * matchupPlayerGames, leagueWeekPlayerSeasons.
+     */
+    function buildSeasonMockDb(
+      matchups: unknown[],
+      matchupPlayers: MockMatchupPlayer[],
+      matchupPlayerGames: Omit<MockMatchupPlayerGame, 'gameNum'>[],
+      playerSeasons: MockPlayerSeasonRow[],
+      battingRows: MockBattingRow[],
+    ) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- test mock
+      return createMockDbWithMultipleQueries(
+        [
+          twoTeams,
+          [{ medianGameEnabled: false }],
+          matchups,
+          matchupPlayers,
+          matchupPlayerGames,
+          playerSeasons,
+        ],
+        [battingRows, [], []],
+      );
+    }
+
+    const oneMatchup = [
+      {
+        id: 1,
+        leagueId: 1,
+        weekNumber: 1,
+        team1Id: 1,
+        team2Id: 2,
+        status: 'completed',
+      },
+    ];
+    const twoPlayers: MockMatchupPlayer[] = [
+      { id: 1, matchupId: 1, playerId: 100, teamId: 1 },
+      { id: 2, matchupId: 1, playerId: 200, teamId: 2 },
+    ];
+
+    it("scores the matchup's own season when one game_identifier spans two seasons", async () => {
+      const db = buildSeasonMockDb(
+        oneMatchup,
+        twoPlayers,
+        [
+          { id: 1, matchupPlayerId: 1, gameIdentifier: 'DUP1' },
+          { id: 2, matchupPlayerId: 2, gameIdentifier: 'OTHER' },
+        ],
+        [
+          { weekNumber: 1, playerId: 100, season: 2024 },
+          { weekNumber: 1, playerId: 200, season: 2024 },
+        ],
+        [
+          // Same player, same game, two seasons. Only the 2024 row belongs to
+          // this matchup. The 1999 decoy is deliberately LAST: the old
+          // season-blind lookup kept whichever row it saw last, so this
+          // ordering is what makes the assertion below discriminating.
+          {
+            playerId: 100,
+            season: 2024,
+            gameNum: 1,
+            gameIdentifier: 'DUP1',
+            h: 10,
+          },
+          {
+            playerId: 100,
+            season: 1999,
+            gameNum: 1,
+            gameIdentifier: 'DUP1',
+            h: 999,
+          },
+          {
+            playerId: 200,
+            season: 2024,
+            gameNum: 1,
+            gameIdentifier: 'OTHER',
+            h: 4,
+          },
+        ],
+      );
+
+      const standings = await calculateStandings(db, 1);
+
+      const teamA = standings.find((s) => s.teamId === 1);
+      const teamB = standings.find((s) => s.teamId === 2);
+      // 10, not 999 (wrong season) and not 1009 (both seasons summed).
+      expect(teamA?.pointsFor).toBe(10);
+      expect(teamB?.pointsFor).toBe(4);
+      expect(teamB?.wins).toBe(0);
+      expect(teamA?.wins).toBe(1);
+    });
+
+    it('resolves the season per league-week, not once per player', async () => {
+      const db = buildSeasonMockDb(
+        [
+          {
+            id: 1,
+            leagueId: 1,
+            weekNumber: 1,
+            team1Id: 1,
+            team2Id: 2,
+            status: 'completed',
+          },
+          {
+            id: 2,
+            leagueId: 1,
+            weekNumber: 2,
+            team1Id: 1,
+            team2Id: 2,
+            status: 'completed',
+          },
+        ],
+        [
+          { id: 1, matchupId: 1, playerId: 100, teamId: 1 },
+          { id: 2, matchupId: 1, playerId: 200, teamId: 2 },
+          { id: 3, matchupId: 2, playerId: 100, teamId: 1 },
+          { id: 4, matchupId: 2, playerId: 200, teamId: 2 },
+        ],
+        [
+          { id: 1, matchupPlayerId: 1, gameIdentifier: 'DUP1' },
+          { id: 2, matchupPlayerId: 3, gameIdentifier: 'DUP1' },
+        ],
+        [
+          // Same player, same game selected in both weeks -- different seasons.
+          { weekNumber: 1, playerId: 100, season: 1999 },
+          { weekNumber: 2, playerId: 100, season: 2024 },
+        ],
+        [
+          {
+            playerId: 100,
+            season: 1999,
+            gameNum: 1,
+            gameIdentifier: 'DUP1',
+            h: 3,
+          },
+          {
+            playerId: 100,
+            season: 2024,
+            gameNum: 1,
+            gameIdentifier: 'DUP1',
+            h: 7,
+          },
+        ],
+      );
+
+      const standings = await calculateStandings(db, 1);
+
+      // Week 1 scores the 1999 row (3), week 2 the 2024 row (7).
+      expect(standings.find((s) => s.teamId === 1)?.pointsFor).toBe(10);
+    });
+
+    it('skips a player with no season selected for that league-week', async () => {
+      const db = buildSeasonMockDb(
+        oneMatchup,
+        twoPlayers,
+        [{ id: 1, matchupPlayerId: 1, gameIdentifier: 'DUP1' }],
+        [], // no league_week_player_seasons row for either player
+        [
+          {
+            playerId: 100,
+            season: 2024,
+            gameNum: 1,
+            gameIdentifier: 'DUP1',
+            h: 10,
+          },
+        ],
+      );
+
+      const standings = await calculateStandings(db, 1);
+
+      // getMatchupPlayerGameStats does the same (`if (mp.season === null)
+      // continue`), so an unselected player scores nothing rather than pulling
+      // in an arbitrary season's stats.
+      expect(standings.find((s) => s.teamId === 1)?.pointsFor).toBe(0);
+      expect(standings.find((s) => s.teamId === 2)?.pointsFor).toBe(0);
     });
   });
 
@@ -1464,10 +1707,15 @@ describe('Matchup History', () => {
       //  [1] count rows   - COUNT GROUP BY query (second db.select(), evaluated before first await)
       //  [2] league       - calculateStandings medianGameEnabled lookup (LS-6344)
       //  [3] matchups     - calculateStandings second db.select()
-      //  [4] matchupPlayers, [5] matchupPlayerGames
+      //  [4] matchupPlayers, [5] matchupPlayerGames,
+      //  [6] leagueWeekPlayerSeasons (LS-9533)
       // db.execute() order: [0] batting, [1] pitching, [2] fielding probe
-      const { matchupPlayers, matchupPlayerGames, gameBatting } =
-        buildStandingsGameData(standingsMatchups);
+      const weekedMatchups = standingsMatchups.map((m) => ({
+        ...m,
+        weekNumber: weekOf(m),
+      }));
+      const { matchupPlayers, matchupPlayerGames, gameBatting, playerSeasons } =
+        buildStandingsGameData(weekedMatchups);
       const countRows = [
         { status: 'completed', count: 1 },
         { status: 'scheduled', count: 1 },
@@ -1477,9 +1725,10 @@ describe('Matchup History', () => {
           mockTeams, // [0] calculateStandings: teams
           countRows, // [1] COUNT GROUP BY
           [{ medianGameEnabled: false }], // [2] calculateStandings: league lookup
-          standingsMatchups, // [3] calculateStandings: matchups
+          weekedMatchups, // [3] calculateStandings: matchups
           matchupPlayers, // [4]
           matchupPlayerGames, // [5]
+          playerSeasons, // [6] leagueWeekPlayerSeasons (LS-9533)
         ],
         [
           gameBatting, // execute [0] batting

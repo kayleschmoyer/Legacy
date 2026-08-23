@@ -245,12 +245,14 @@ function camelCaseMultipliers(
 }
 
 /**
- * A game-stats table that can be joined on (player_id, game_identifier).
- * game_batting, game_pitching and game_fielding each carry a composite index
- * on that pair.
+ * A game-stats table that can be probed by (player_id, season,
+ * game_identifier). game_batting, game_pitching and game_fielding each carry a
+ * composite index on that triple, plus `game_num` for the tie-break.
  */
 type PairJoinableStatsTable = PgTable & {
   playerId: PgColumn;
+  season: PgColumn;
+  gameNum: PgColumn;
   gameIdentifier: PgColumn;
 };
 
@@ -276,21 +278,40 @@ function camelCasedProjection(
 }
 
 /**
- * Fetch every stats row for the (player_id, game_identifier) pairs actually
- * referenced by a league's completed + in-progress matchups, optionally bounded
- * to weeks through `throughWeek` for a historical "as of Week N" view.
+ * Fetch the single stats row that scores each (player_id, season,
+ * game_identifier) key actually referenced by a league's completed +
+ * in-progress matchups, optionally bounded to weeks through `throughWeek` for a
+ * historical "as of Week N" view.
  *
- * LS-9525: the pair list is built in a MATERIALIZED CTE and probed with a
+ * LS-9525: the key list is built in a MATERIALIZED CTE and probed with a
  * CROSS JOIN LATERAL so the planner drives a nested loop over the existing
- * `<table>_player_id_game_identifier_idx` index, instead of scanning the whole
- * stats table as the previous two-independent-IN-lists shape did.
+ * `<table>_player_id_[season_]game_identifier_idx` index, instead of scanning
+ * the whole stats table as the previous two-independent-IN-lists shape did.
+ *
+ * LS-9533: `season` is part of the key, resolved from
+ * `league_week_player_seasons` on (league_id, week_number, player_id) — the
+ * matchup's own season, exactly as `getMatchupPlayerGameStats` (the write path
+ * that persists matchup scores) resolves it. Without it the probe matched every
+ * season's copy of a game and the caller's Map kept whichever row Postgres
+ * happened to return last: on dev RDS, 635 of the 36,431 selected keys scored
+ * differently depending on physical row order (634 pitching, 1 batting), one of
+ * them by 21 points. The inner join also drops players with no season selected
+ * for that league-week, which is what the write path does
+ * (`if (mp.season === null) continue`).
+ *
+ * `ORDER BY <game_num> ASC LIMIT 1` is the documented tie-break, again matching
+ * the write path, for the residual case of two rows sharing (player_id, season,
+ * game_identifier). Together the two make the returned row a pure function of
+ * the key rather than of heap order.
  *
  * `OFFSET 0` is the load-bearing part and must not be removed. It is an
  * optimisation fence that stops the lateral subquery being pulled up and
  * flattened back into a plain join; it is a semantic no-op (skipping zero
  * rows). Measured on dev RDS: without it, game_batting still plans as an index
  * scan, but the smaller game_pitching (148k rows) flattens into a Hash Join
- * over a full `Seq Scan on game_pitching`.
+ * over a full `Seq Scan on game_pitching`. (The `LIMIT 1` added in LS-9533
+ * blocks pull-up on its own today, but the fence is kept explicit so the
+ * guarantee does not silently depend on the tie-break staying a LIMIT.)
  *
  * MATERIALIZED is kept alongside it deliberately. The two guard different
  * failure modes -- the fence prevents pull-up, while materialising the CTE
@@ -301,9 +322,13 @@ function camelCasedProjection(
  * form is what the ticket specified and what is verified below.
  *
  * Verified on dev RDS, league 819: `Index Scan using
- * game_batting_player_id_game_identifier_idx` and `Index Scan using
- * game_pitching_player_id_game_identifier_idx`, no Seq Scan on either stats
- * table.
+ * game_batting_player_id_season_game_identifier_idx` for batting and `Index
+ * Scan using game_pitching_player_id_season_idx` (with game_identifier as a
+ * recheck filter) for pitching -- the planner's pick between two
+ * near-identically-costed indexes. Neither is a Seq Scan, which is the property
+ * that matters. Warm timings: batting 144 ms -> 116 ms (it now returns one row
+ * per key instead of every season's copy), pitching 67 ms -> 99 ms (the CTE
+ * gained the league_week_player_seasons join and a per-key sort node).
  */
 async function fetchStatsForLeaguePairs<T extends PairJoinableStatsTable>(
   db: PublicDb,
@@ -314,6 +339,9 @@ async function fetchStatsForLeaguePairs<T extends PairJoinableStatsTable>(
   // Must mirror the matchup filter in _computeStandings exactly. If the two
   // drift, the pair set stops matching the matchups actually being scored and
   // the fetch silently goes back to over-reading rows the lookups discard.
+  // The league_week_player_seasons inner join below is the one extra
+  // restriction, and computeTeamMatchupScore applies the same one on the
+  // scoring side by skipping players absent from seasonByWeekPlayer.
   const weekFilter =
     throughWeek != null
       ? sql`AND m.${sql.identifier(Schema.matchups.weekNumber.name)} <= ${throughWeek}`
@@ -321,10 +349,14 @@ async function fetchStatsForLeaguePairs<T extends PairJoinableStatsTable>(
 
   const result = await db.execute<T['$inferSelect']>(sql`
     WITH pairs AS MATERIALIZED (
-      SELECT DISTINCT mp.player_id, mpg.game_identifier
+      SELECT DISTINCT mp.player_id, lwps.season, mpg.game_identifier
       FROM matchups m
       JOIN matchup_players mp ON mp.matchup_id = m.id
       JOIN matchup_player_games mpg ON mpg.matchup_player_id = mp.id
+      JOIN league_week_player_seasons lwps
+        ON lwps.league_id = m.league_id
+       AND lwps.week_number = m.week_number
+       AND lwps.player_id = mp.player_id
       WHERE m.league_id = ${leagueId}
         AND m.status IN ('completed', 'in_progress')
         AND mpg.game_identifier IS NOT NULL
@@ -336,7 +368,10 @@ async function fetchStatsForLeaguePairs<T extends PairJoinableStatsTable>(
       SELECT *
       FROM ${table}
       WHERE ${table.playerId} = p.player_id
+        AND ${table.season} = p.season
         AND ${table.gameIdentifier} = p.game_identifier
+      ORDER BY ${table.gameNum} ASC
+      LIMIT 1
       OFFSET 0
     ) stats
   `);
@@ -375,6 +410,38 @@ async function fetchFieldingStatsIfPopulated(
 }
 
 /**
+ * Season selected for each (weekNumber, playerId) in a league (LS-9533).
+ *
+ * This is the scoring-side half of the season resolution the stat fetch above
+ * applies in SQL: the fetch decides which row to return, this decides which key
+ * to look that row up under. Both read `league_week_player_seasons` on
+ * (league_id, week_number, player_id) — unique by constraint, so at most one
+ * season per key — the same lookup `getMatchupPlayerGameStats` performs for a
+ * single matchup.
+ */
+async function fetchPlayerSeasonsForLeague(
+  db: PublicDb,
+  leagueId: number,
+  throughWeek: number | null,
+): Promise<{ weekNumber: number; playerId: number; season: number }[]> {
+  const conditions = [eq(Schema.leagueWeekPlayerSeasons.leagueId, leagueId)];
+  if (throughWeek != null) {
+    conditions.push(
+      lte(Schema.leagueWeekPlayerSeasons.weekNumber, throughWeek),
+    );
+  }
+
+  return db
+    .select({
+      weekNumber: Schema.leagueWeekPlayerSeasons.weekNumber,
+      playerId: Schema.leagueWeekPlayerSeasons.playerId,
+      season: Schema.leagueWeekPlayerSeasons.season,
+    })
+    .from(Schema.leagueWeekPlayerSeasons)
+    .where(and(...conditions));
+}
+
+/**
  * In-flight promise cache for calculateStandings, keyed by db instance →
  * leagueId → cache key (leagueId alone for current standings, or
  * `${leagueId}:${throughWeek}` for a historical "as of Week N" view).
@@ -410,6 +477,11 @@ export interface CalculateStandingsOptions {
  * (batting, pitching, fielding) using the league's scoring profile.
  * Points accumulate from BOTH completed AND in-progress matchups.
  * Win/loss/tie record is determined only from completed matchups.
+ *
+ * Each player's stats are read from the season selected for them in that
+ * league-week (`league_week_player_seasons`), matching how the write path
+ * `getMatchupPlayerGameStats` resolves a season when it persists matchup
+ * scores. See `fetchStatsForLeaguePairs` for why (LS-9533).
  *
  * When `throughWeek` is set, only matchups with `weekNumber <= throughWeek`
  * are considered, producing historical standings as of that week.
@@ -565,12 +637,17 @@ async function _computeStandings(
   // materialise the cross-product predicate and falls back to scanning the
   // whole stats table — and it over-fetches rows for players who happened to
   // appear in a game selected for a *different* player's matchup, which the
-  // `playerId_gameIdentifier` lookups below silently discard. Feeding the
-  // query the actual (player_id, game_identifier) pairs fixes both.
+  // lookups below silently discard. Feeding the query the actual
+  // (player_id, game_identifier) pairs fixes both.
+  //
+  // LS-9533 then added `season` to that key, so the fetch returns exactly one
+  // row per (player, season, game) instead of one per matching (player, game)
+  // in any season. See fetchStatsForLeaguePairs.
   const hasGamePairs = mpGameRows.some((g) => g.gameIdentifier != null);
 
-  const [battingRows, pitchingRows, fieldingRows] = hasGamePairs
+  const [seasonRows, battingRows, pitchingRows, fieldingRows] = hasGamePairs
     ? await Promise.all([
+        fetchPlayerSeasonsForLeague(db, leagueId, throughWeek),
         fetchStatsForLeaguePairs(db, Schema.gameBatting, leagueId, throughWeek),
         fetchStatsForLeaguePairs(
           db,
@@ -580,20 +657,39 @@ async function _computeStandings(
         ),
         fetchFieldingStatsIfPopulated(db, leagueId, throughWeek),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
 
-  // Build lookups keyed by "playerId_gameIdentifier"
+  // Season selected per (weekNumber, playerId) — the key half of LS-9533's
+  // season resolution; see fetchPlayerSeasonsForLeague.
+  const seasonByWeekPlayer = new Map<string, number>();
+  for (const row of seasonRows) {
+    seasonByWeekPlayer.set(`${row.weekNumber}_${row.playerId}`, row.season);
+  }
+
+  // Build lookups keyed by "playerId_season_gameIdentifier". The season is part
+  // of the key because the same player can be scored from a different season in
+  // a different week of the same league, and the same game_identifier exists in
+  // more than one season's stat rows (LS-9533).
   const battingLookup = new Map<string, (typeof battingRows)[0]>();
   for (const row of battingRows) {
-    battingLookup.set(`${row.playerId}_${row.gameIdentifier}`, row);
+    battingLookup.set(
+      `${row.playerId}_${row.season}_${row.gameIdentifier}`,
+      row,
+    );
   }
   const pitchingLookup = new Map<string, (typeof pitchingRows)[0]>();
   for (const row of pitchingRows) {
-    pitchingLookup.set(`${row.playerId}_${row.gameIdentifier}`, row);
+    pitchingLookup.set(
+      `${row.playerId}_${row.season}_${row.gameIdentifier}`,
+      row,
+    );
   }
   const fieldingLookup = new Map<string, (typeof fieldingRows)[0]>();
   for (const row of fieldingRows) {
-    fieldingLookup.set(`${row.playerId}_${row.gameIdentifier}`, row);
+    fieldingLookup.set(
+      `${row.playerId}_${row.season}_${row.gameIdentifier}`,
+      row,
+    );
   }
 
   // Build matchup player lookup
@@ -625,7 +721,11 @@ async function _computeStandings(
   }
 
   // Compute a team's total fantasy score for a single matchup
-  function computeTeamMatchupScore(matchupId: number, teamId: number): number {
+  function computeTeamMatchupScore(
+    matchupId: number,
+    weekNumber: number,
+    teamId: number,
+  ): number {
     const teamMpIds = mpByMatchupAndTeam.get(matchupId)?.get(teamId) ?? [];
     let totalScore = 0;
 
@@ -633,10 +733,17 @@ async function _computeStandings(
       const mp = mpLookup.get(mpId);
       if (!mp) continue;
 
+      // No league_week_player_seasons row means no season was selected for
+      // this player in this week, so none of their stat rows can be attributed
+      // to this matchup. getMatchupPlayerGameStats skips the same case
+      // (`if (mp.season === null) continue`).
+      const season = seasonByWeekPlayer.get(`${weekNumber}_${mp.playerId}`);
+      if (season === undefined) continue;
+
       const games = mpGamesGrouped.get(mpId) ?? [];
       for (const game of games) {
         if (!game.gameIdentifier) continue;
-        const key = `${mp.playerId}_${game.gameIdentifier}`;
+        const key = `${mp.playerId}_${season}_${game.gameIdentifier}`;
 
         const batting = battingLookup.get(key);
         if (batting) {
@@ -688,8 +795,16 @@ async function _computeStandings(
   for (const matchup of chronologicalMatchups) {
     if (!matchup.team1Id || !matchup.team2Id) continue;
 
-    const score1 = computeTeamMatchupScore(matchup.id, matchup.team1Id);
-    const score2 = computeTeamMatchupScore(matchup.id, matchup.team2Id);
+    const score1 = computeTeamMatchupScore(
+      matchup.id,
+      matchup.weekNumber,
+      matchup.team1Id,
+    );
+    const score2 = computeTeamMatchupScore(
+      matchup.id,
+      matchup.weekNumber,
+      matchup.team2Id,
+    );
 
     const team1Standing = standingsMap.get(matchup.team1Id);
     const team2Standing = standingsMap.get(matchup.team2Id);
