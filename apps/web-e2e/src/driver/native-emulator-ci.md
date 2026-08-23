@@ -54,6 +54,30 @@ Schedule-free (LS-8487): `workflow_dispatch` + `workflow_run` after "Build
 Android App" on `main`. A failing job reddens the run (the "watched" red check).
 Screenshots/logs, the Appium log, and the Playwright report upload as artifacts.
 
+**Reading the run conclusion (LS-9652).** Automated runs are debounced to one
+real attempt per `ANDROID_E2E_MIN_INTERVAL_HOURS` (repo var, default 156h);
+manual dispatch always runs. A run that skips the real jobs still rolls up to
+**"success"** — GitHub offers no neutral conclusion for a job — so it grows a
+`skipped` job named _"Native E2E SKIPPED — no test ran"_, whose summary names the
+reason. Read the job list, not the tick: a green run with that job present
+verified nothing.
+
+The `gate` job owns the whole run/skip decision — both the debounce and the
+upstream "Build Android App" conclusion — so `should-run == 'true'` and the
+`skipped` job are exact complements and every run takes exactly one branch. The
+gate paginates the full `MIN_INTERVAL_HOURS` window; it previously read only the
+most recent 30 runs, which capped the real interval at roughly 7 hours on a busy
+`main`.
+
+**Emulator sizing.** The AVD's userdata partition is reserved up front at
+`disk-size` x 1.2, on the same filesystem as `node_modules` and the Android SDK.
+Over-reserving does not fail loudly: the emulator dies at launch with
+`FATAL | Not enough space to create userdata partition`, and
+`android-emulator-runner` then polls `adb` for its whole boot timeout and reports
+`Timeout waiting for emulator to boot` instead. The workflow reclaims the unused
+preinstalled toolchains before creating the AVD; if you raise `disk-size`, check
+`df -h /` in the "Free disk space for the AVD" step first.
+
 ## Hermetic backend (LS-8448 / ADR-0017)
 
 The native project runs `backend: 'mock'`: the `nativeMockServer` worker fixture

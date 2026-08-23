@@ -16,6 +16,11 @@ name: E2E Native (Android)
 # on the gate cadence rather than on every merge to main — the same tradeoff
 # already accepted for the sibling Maestro sweep.
 #
+# A run that skips the real jobs does NOT mean the native suite passed. It grows
+# a `skipped` job whose name says so outright, because GitHub rolls a run whose
+# jobs were all skipped up to "success" and nothing else in the checks UI
+# distinguishes "not attempted" from "verified" (LS-9652).
+#
 # ── Auth strategy (AC3) ───────────────────────────────────────────────
 # Real OAuth is not automatable on native (OAuth-only app, LS-6656). The
 # `build-bypass-apk` job builds a release APK with EXPO_PUBLIC_BYPASS_AUTH=true —
@@ -45,6 +50,14 @@ env:
   NODE_VERSION: "22"
   ANDROID_API_LEVEL: "35"
   NDK_VERSION: "27.1.12297006"
+  # Device-side port the bypass APK's baked EXPO_PUBLIC_GRAPHQL_HOST points at.
+  # The per-worker hermetic mock server is mapped onto it with
+  # `adb reverse tcp:<this> tcp:<dynamic host port>` — see
+  # NATIVE_GRAPHQL_DEVICE_PORT in apps/web-e2e/src/fixtures/native-mock.ts.
+  # Workflow-level env is exported into every step of every job, so this is the
+  # ONE place the port is declared: the build job derives the baked host from it
+  # and scripts/ci/native-e2e-run.sh reads it directly (ADR-0017, LS-9652).
+  E2E_NATIVE_GRAPHQL_PORT: "8083"
   GRADLE_OPTS: >-
     -Dorg.gradle.internal.http.connectionTimeout=120000
     -Dorg.gradle.internal.http.socketTimeout=120000
@@ -56,11 +69,13 @@ jobs:
   # in run-maestro-sweep.yml.
   # workflow_dispatch: always runs.
   # workflow_run (Build Android App completed on main): runs at most once per
-  # ANDROID_E2E_MIN_INTERVAL_HOURS. A debounced run skips every downstream job,
-  # so its own run conclusion is "success" with all jobs skipped; the debounce
-  # check therefore inspects the "Build Bypass APK" job of prior automated runs
-  # (non-skipped = real attempt) rather than run-level conclusions, which would
-  # re-arm the debounce forever on a busy repo.
+  # ANDROID_E2E_MIN_INTERVAL_HOURS. A debounced run skips both real jobs, so its
+  # run conclusion is still "success"; the debounce check therefore inspects the
+  # "Build Bypass APK" job of prior automated runs (non-skipped = real attempt)
+  # rather than run-level conclusions, which would re-arm the debounce forever on
+  # a busy repo. The `skipped` job below makes any such skip — debounced, or no
+  # successful upstream build — legible to a human reading the checks list
+  # (LS-9652).
   # ---------------------------------------------------------------------------
   gate:
     name: "Native Android E2E Gate"
@@ -68,6 +83,7 @@ jobs:
     timeout-minutes: 3
     outputs:
       should-run: ${{ steps.decide.outputs.should-run }}
+      skip-reason: ${{ steps.decide.outputs.skip-reason }}
     steps:
       - name: "Decide whether to run"
         id: decide
@@ -83,36 +99,142 @@ jobs:
             exit 0
           fi
 
-          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
-          # All automated runs of this workflow created since the cutoff,
-          # excluding this run itself.
-          RUN_IDS=$(gh api \
-            "repos/${{ github.repository }}/actions/workflows/e2e-native-android.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=30" \
-            --jq "[.workflow_runs[] | select(.id != ${{ github.run_id }})] | .[].id")
+          # Upstream-conclusion check lives HERE, not on build-bypass-apk's `if:`.
+          # When it sat on the build job, a run whose upstream "Build Android App"
+          # failed left should-run == 'true' while every real job skipped — so the
+          # skip marker below did not fire and the run was, once again, a bare
+          # green tick with nothing run. The gate is now the single decision point:
+          # should-run == 'true' and the skip marker are exactly complementary.
+          UPSTREAM="${{ github.event.workflow_run.conclusion }}"
+          if [ "$UPSTREAM" != "success" ]; then
+            echo "should-run=false" >> "$GITHUB_OUTPUT"
+            echo "skip-reason=Upstream 'Build Android App' concluded '${UPSTREAM}' — there is no build to test." >> "$GITHUB_OUTPUT"
+            {
+              echo "## Native Android E2E — SKIPPED (no upstream build)"
+              echo
+              echo "**No emulator test ran in this run.**"
+              echo
+              echo "Upstream \"Build Android App\" concluded \`${UPSTREAM}\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
 
-          for id in $RUN_IDS; do
-            # Non-skipped, completed "Build Bypass APK" = a real attempt.
-            PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
-              --jq '[.jobs[] | select(.name == "Build Bypass APK" and .conclusion != null and .conclusion != "skipped")] | length')
-            if [ "$PREPARED" -gt 0 ]; then
-              echo "should-run=false" >> "$GITHUB_OUTPUT"
-              echo "Debounced — automated native Android E2E (run ${id}) within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_STEP_SUMMARY"
-              exit 0
+          CUTOFF=$(date -u -d "-${MIN_INTERVAL_HOURS} hours" +%Y-%m-%dT%H:%M:%SZ)
+
+          # Walk automated runs of this workflow (newest first) across EVERY page
+          # of the created>CUTOFF window.
+          #
+          # LS-9652: this used to read a single per_page=30 page. On a busy main —
+          # where "Build Android App" completes every 10-20 minutes and creates a
+          # debounced run each time — the last real attempt scrolled off page 1
+          # within ~7 hours, the loop found nothing, and the debounce re-armed. The
+          # effective interval was "the most recent 30 runs", not
+          # MIN_INTERVAL_HOURS, which is what the comment above claims.
+          #
+          # A debounced run is gate-only and finishes in well under a minute; a real
+          # attempt builds an APK and boots an emulator (30+ min). Pre-filtering on
+          # elapsed wall time keeps job introspection to a handful of API calls
+          # rather than one per run in the window. Job introspection remains the
+          # authoritative check. An attempt that died before
+          # MIN_REAL_ATTEMPT_SECONDS is not counted as one, which fails OPEN: the
+          # lane retries sooner rather than debouncing against a run that never got
+          # off the ground.
+          MIN_REAL_ATTEMPT_SECONDS=300
+          PAGE=1
+          MAX_PAGES=10
+
+          while [ "$PAGE" -le "$MAX_PAGES" ]; do
+            RESP=$(gh api \
+              "repos/${{ github.repository }}/actions/workflows/e2e-native-android.yml/runs?event=workflow_run&created=%3E${CUTOFF}&per_page=100&page=${PAGE}")
+            COUNT=$(printf '%s' "$RESP" | jq '.workflow_runs | length')
+            if [ "$COUNT" -eq 0 ]; then
+              break
             fi
+
+            CANDIDATES=$(printf '%s' "$RESP" | jq -r \
+              --argjson self "${{ github.run_id }}" \
+              --argjson min "$MIN_REAL_ATTEMPT_SECONDS" '
+                [ .workflow_runs[]
+                  | select(.id != $self)
+                  | select(.run_started_at != null and .updated_at != null)
+                  | select(((.updated_at | fromdateiso8601)
+                            - (.run_started_at | fromdateiso8601)) >= $min)
+                ] | .[].id')
+
+            for id in $CANDIDATES; do
+              # Non-skipped, completed "Build Bypass APK" = a real attempt.
+              PREPARED=$(gh api "repos/${{ github.repository }}/actions/runs/${id}/jobs?per_page=30" \
+                --jq '[.jobs[] | select(.name == "Build Bypass APK" and .conclusion != null and .conclusion != "skipped")] | length')
+              if [ "$PREPARED" -gt 0 ]; then
+                echo "should-run=false" >> "$GITHUB_OUTPUT"
+                echo "skip-reason=Debounced — run ${id} already made a real attempt within the last ${MIN_INTERVAL_HOURS}h." >> "$GITHUB_OUTPUT"
+                {
+                  echo "## Native Android E2E — SKIPPED (debounced)"
+                  echo
+                  echo "**No emulator test ran in this run.**"
+                  echo
+                  echo "Run [\`${id}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${id}) already made a real attempt within the last ${MIN_INTERVAL_HOURS}h."
+                } >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+            done
+
+            if [ "$COUNT" -lt 100 ]; then
+              break
+            fi
+            PAGE=$((PAGE + 1))
           done
 
           echo "should-run=true" >> "$GITHUB_OUTPUT"
-          echo "No automated native Android E2E run in the last ${MIN_INTERVAL_HOURS}h — running." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "## Native Android E2E — RUNNING"
+            echo
+            echo "No automated run made a real attempt in the last ${MIN_INTERVAL_HOURS}h."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # AC1 (LS-9652): a debounced run used to be indistinguishable from a passing
+  # one — the gate went green, both real jobs reported "skipped", and GitHub
+  # rolled the run up to "success". Nothing in the checks UI said that no test had
+  # run, so ~15 consecutive green ticks on main were read as "native E2E is
+  # passing" when the suite had not executed since run #439 (which failed).
+  #
+  # A job has no way to end in a "neutral" conclusion, so the signal is the job
+  # NAME instead: a debounced run grows an extra, unmistakably-named job, and the
+  # checks list reads "Native E2E SKIPPED — no test ran (debounced)" beside the
+  # green tick rather than nothing at all.
+  # ---------------------------------------------------------------------------
+  skipped:
+    name: "Native E2E SKIPPED — no test ran"
+    needs: [gate]
+    if: needs.gate.outputs.should-run != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      SKIP_REASON: ${{ needs.gate.outputs.skip-reason }}
+    steps:
+      - name: "Announce the skip"
+        shell: bash
+        run: |
+          {
+            echo "## Native Android E2E — SKIPPED"
+            echo
+            echo "**No emulator test ran in this run. Nothing was verified.**"
+            echo
+            echo "Reason: ${SKIP_REASON:-see the gate job summary}"
+            echo
+            echo "A green tick on this run means \"not attempted\" — it does NOT mean"
+            echo "native E2E passed."
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # ── Build an automatable (bypass) APK ───────────────────────────────
   build-bypass-apk:
     name: Build Bypass APK
     needs: [gate]
-    if: >-
-      needs.gate.outputs.should-run == 'true' && (
-        github.event_name == 'workflow_dispatch' ||
-        github.event.workflow_run.conclusion == 'success'
-      )
+    # The gate owns the entire run/skip decision (including the upstream build's
+    # conclusion), so this stays a plain complement of the `skipped` job above —
+    # every run takes exactly one of the two branches (LS-9652).
+    if: needs.gate.outputs.should-run == 'true'
     # LS-8910: needs the Android SDK/NDK/Gradle wrapper — see the matching
     # comment on build-android-app.yml's build-android job for why the
     # fallback is 'ubuntu-latest' directly and not vars.CI_RUNNER_LABEL.
@@ -121,10 +243,14 @@ jobs:
     env:
       # AC3: test-only session injection — the automatable native auth strategy.
       EXPO_PUBLIC_BYPASS_AUTH: "true"
-      # Backend + integration config (mirrors build-android-app.yml so the
-      # bypass build reaches the real backend to load the league list).
+      # Integration config mirrors build-android-app.yml. The GraphQL host
+      # deliberately does NOT: hermetic native runs (ADR-0017) point the app at
+      # the per-worker mock server over `adb reverse`, so the baked host is
+      # derived from E2E_NATIVE_GRAPHQL_PORT by the step below. Baking
+      # secrets.GRAPHQL_HOST here contradicted both scripts/ci/native-e2e-run.sh
+      # and ADR-0017 and would have aimed the emulator at the real backend while
+      # the fixture forwarded a port the app never called (LS-9652).
       EXPO_PUBLIC_OAUTH_PROXY: ${{ secrets.OAUTH_PROXY_URL }}
-      EXPO_PUBLIC_GRAPHQL_HOST: ${{ secrets.GRAPHQL_HOST }}
       EXPO_PUBLIC_WEBSOCKET_URL: ${{ secrets.WEBSOCKET_URL }}
       EXPO_PUBLIC_GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       EXPO_PUBLIC_ROLLBAR_ACCESS_TOKEN: ${{ secrets.ROLLBAR_CLIENT_ACCESS_TOKEN }}
@@ -186,6 +312,18 @@ jobs:
           # Appium not needed to build; skip optional deps for a faster build job.
           include-optional-deps: false
 
+      - name: Point the bypass APK at the hermetic mock host (ADR-0017)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Written to $GITHUB_ENV rather than the job `env:` block because the
+          # `env` context is not available to job-level env keys — this keeps
+          # E2E_NATIVE_GRAPHQL_PORT the single declaration shared by the baked APK
+          # and scripts/ci/native-e2e-run.sh.
+          HOST="http://localhost:${E2E_NATIVE_GRAPHQL_PORT}/graphql"
+          echo "EXPO_PUBLIC_GRAPHQL_HOST=${HOST}" >> "$GITHUB_ENV"
+          echo "Bypass APK GraphQL host: ${HOST}"
+
       - name: Build Android APK (bypass release)
         id: build
         uses: ./.github/actions/build-android
@@ -223,6 +361,37 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # LS-9652 / run #439 root cause. The emulator never booted; it died at
+      # launch, instantly, with:
+      #   FATAL | Not enough space to create userdata partition.
+      #           Available: 4843.36 MB at ~/.android/avd/test.avd,
+      #           need 7372.80 MB.
+      # android-emulator-runner does not surface that FATAL as a failure — it
+      # polled `adb shell getprop sys.boot_completed` for its full 600s timeout
+      # and then reported the misleading "Timeout waiting for emulator to boot",
+      # which is why the failure read as an emulator-provisioning flake rather
+      # than an out-of-disk error. The AVD lives on / next to node_modules and the
+      # Android SDK, so reclaim the large preinstalled toolchains this job never
+      # uses, BEFORE the SDK install and AVD creation inside the runner action.
+      # Deliberately NOT removed: /opt/hostedtoolcache (holds the Node that
+      # "Setup Workspace" resolves) and /usr/local/lib/android (the SDK itself).
+      - name: Free disk space for the AVD
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "Free space before:"
+          df -h / | tail -1
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/share/swift \
+            /usr/local/.ghcup \
+            /opt/ghc \
+            /usr/local/share/powershell \
+            /usr/local/share/boost || true
+          sudo docker image prune -af >/dev/null 2>&1 || true
+          echo "Free space after:"
+          df -h / | tail -1
+
       - name: Download APK Artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -256,7 +425,11 @@ jobs:
           target: google_apis
           profile: pixel_6
           ram-size: 4096M
-          disk-size: 6G
+          # The emulator reserves disk-size x 1.2 up front, so 6G demanded
+          # 7372.80 MB and killed run #439 (LS-9652). 4G is ample for the bypass
+          # APK plus the UiAutomator2 server, and leaves headroom on top of the
+          # reclaim step above rather than spending all of it.
+          disk-size: 4G
           force-avd-creation: false
           emulator-options: -no-window -no-snapshot-save -no-boot-anim -gpu swiftshader_indirect -noaudio -accel on
           disable-animations: true
