@@ -11,6 +11,8 @@ import {
   handleOAuthMetadataRequest,
   MCP_SCOPE,
 } from '@legacy-sports/mcp-bearer-auth';
+import { handleMcpDocsRequest } from '@legacy-sports/mcp-docs';
+import { PAGE as DOCS_PAGE } from '@legacy-sports/mcp-docs/pages/jira';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
@@ -512,6 +514,13 @@ export const handler = async (
     requiredScope: MCP_SCOPE.jira,
   });
   if (authError) return authError;
+
+  // Human-readable tool reference for this server, served to a browser at
+  // GET /docs. Placed after the auth check on purpose: tool descriptions
+  // name internal buckets, workflows, and ticket keys, so the page needs the
+  // same bearer the tools do. Fetch it with `make mcp-docs SERVER=jira`.
+  const docsResponse = handleMcpDocsRequest(event, DOCS_PAGE);
+  if (docsResponse) return docsResponse;
 
   await ensureCredentials();
 

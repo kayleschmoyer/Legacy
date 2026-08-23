@@ -699,12 +699,12 @@ export function extractToolsFromFile(filePath) {
       } else if (method === 'registerTool' && args.length >= 2) {
         const name = evalLiteral(args[0]);
         if (typeof name === 'string') {
-          tools.push(readRegisterTool(name, args, ctx, sourceFile));
+          tools.push(readRegisterTool(name, args, ctx));
         }
       } else if (method === 'setRequestHandler') {
         const first = args[0]?.getText(sourceFile);
         if (first === 'ListToolsRequestSchema') {
-          tools.push(...readListToolsHandler(args[1], sourceFile));
+          tools.push(...readListToolsHandler(args[1]));
         }
       }
     }
@@ -719,7 +719,6 @@ export function extractToolsFromFile(filePath) {
 function readToolOverload(name, args, ctx, sourceFile) {
   // tool(name, description, shape, handler) | tool(name, description, handler)
   // | tool(name, shape, handler)
-  const line = sourceFile.getLineAndCharacterOfPosition(args[0].pos).line + 1;
   const describesTool =
     ts.isStringLiteralLike(args[1]) ||
     ts.isTemplateExpression(args[1]) ||
@@ -739,22 +738,15 @@ function readToolOverload(name, args, ctx, sourceFile) {
       name,
       description: second,
       inputs: isShape ? describeShape(third, ctx) : {},
-      line,
     };
   }
 
-  return {
-    name,
-    description: '',
-    inputs: describeShape(args[1], ctx),
-    line,
-  };
+  return { name, description: '', inputs: describeShape(args[1], ctx) };
 }
 
-function readRegisterTool(name, args, ctx, sourceFile) {
-  const line = sourceFile.getLineAndCharacterOfPosition(args[0].pos).line + 1;
+function readRegisterTool(name, args, ctx) {
   const config = args[1];
-  const tool = { name, description: '', inputs: {}, line };
+  const tool = { name, description: '', inputs: {} };
   if (!config || !ts.isObjectLiteralExpression(config)) return tool;
 
   for (const prop of config.properties) {
@@ -775,7 +767,7 @@ function readRegisterTool(name, args, ctx, sourceFile) {
   return tool;
 }
 
-function readListToolsHandler(handler, sourceFile) {
+function readListToolsHandler(handler) {
   if (!handler) return [];
   const tools = [];
 
@@ -790,7 +782,6 @@ function readListToolsHandler(handler, sourceFile) {
             name: entry.name,
             description: entry.description ?? '',
             inputs: schema.properties ?? {},
-            line: sourceFile.getLineAndCharacterOfPosition(node.pos).line + 1,
           });
         }
       }

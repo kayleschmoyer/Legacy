@@ -34,6 +34,45 @@ adding, removing, or re-describing a tool and commit the result — CI's
 `custom-checks` job fails on drift (check locally with
 `make lint-mcp-api-reference`).
 
+#### Stability of `api-reference.json`
+
+The JSON is a **generated artifact, not a published API**. Its shape follows
+whatever the page needs to render, and it changes without a deprecation period.
+Nothing outside this repo consumes it, and the only in-repo consumer is the
+generator's own `--check` drift comparison, which compares whole-file content
+and regenerates in the same commit.
+
+If you build automation on it, pin a copy or regenerate from source rather than
+depending on the shape staying put — and add yourself to this note so the next
+shape change accounts for you.
+
+Shape changes so far:
+
+| Change                           | Reason                                                                                                                 |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `tools[].line` removed (LS-9593) | Never rendered, and it made every generated file churn whenever an unrelated edit shifted a server source down a line. |
+
+### Served by the hosted servers
+
+Each hosted server also serves its **own** page from its API Gateway URL at
+`GET /docs` — the Swagger-UI equivalent for these JSON-RPC endpoints. The page
+is generated into `lib/mcp-docs/src/pages/<server>.generated.ts`, embedded in the
+Lambda bundle, and redeployed with the server, so it can never describe a
+version of the tools that is not the one running.
+
+The route sits **after** the bearer check, not before it: tool descriptions name
+internal buckets, workflow names, and ticket keys, so the page requires the same
+Cognito token the tools do. A browser cannot supply that on its own, so fetch it
+with:
+
+```bash
+make mcp-docs SERVER=ci     # ci | github | jira | db-admin | rollbar
+```
+
+That mints a short-lived scoped token, fetches the page, and writes it to
+`scratch/mcp-docs-<server>.html` to open locally. The offline copy covering every
+server — hosted and local — is `docs/mcp/api-reference.html` and needs no token.
+
 ## Servers
 
 ### ci-server

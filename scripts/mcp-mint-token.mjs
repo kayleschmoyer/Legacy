@@ -108,6 +108,18 @@ function readEnvFile(envPath) {
  * Resolve config from process.env first (keychain/Copilot/settings env), then
  * .env.local. Empty strings are treated as absent so a blank var falls through.
  */
+/**
+ * Read a single value from the same sources as readConfig — process.env first,
+ * then .env.local. Exported for scripts/mcp-docs.mjs, which needs the per-server
+ * API Gateway URLs (MCP_CI_URL, MCP_DB_URL, …) that mcp-auth.mjs writes there.
+ */
+export function readEnvValue(key) {
+  const fromProc = process.env[key];
+  if (fromProc !== undefined && fromProc !== '') return fromProc;
+  const fromFile = readEnvFile(ENV_LOCAL_PATH)[key];
+  return fromFile !== undefined && fromFile !== '' ? fromFile : undefined;
+}
+
 export function readConfig() {
   const fileEnv = readEnvFile(ENV_LOCAL_PATH);
   const get = (key) => {

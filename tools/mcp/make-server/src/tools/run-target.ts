@@ -98,6 +98,7 @@ const ALLOWED_TARGETS = new Set([
   'lint-skill-index',
   'mcp-api-reference',
   'lint-mcp-api-reference',
+  'mcp-docs',
   'lint-agent-prompts',
   // Generated-file resync targets (LS-9027) — AGENTS.md mandates running these whenever
   // skill frontmatter or .claude/commands/*.md change; without them agents

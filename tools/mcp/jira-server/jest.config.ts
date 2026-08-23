@@ -24,6 +24,9 @@ const config: Config = {
   transformIgnorePatterns: ['/node_modules/(?!jose/)'],
   moduleFileExtensions: ['ts', 'js'],
   moduleNameMapper: {
+    '^@legacy-sports/mcp-docs$': '<rootDir>/../../../lib/mcp-docs/src/index.ts',
+    '^@legacy-sports/mcp-docs/pages/jira$':
+      '<rootDir>/../../../lib/mcp-docs/src/pages/jira.generated.ts',
     // NodeNext resolution uses .js extensions in imports; strip them for @swc/jest
     '^(\\.{1,2}/.+)\\.js$': '$1',
     // Resolve the shared package path alias to source for @swc/jest.

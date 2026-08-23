@@ -40,3 +40,4 @@ apps/app/android/
 # scripts/generate-mcp-api-reference.mjs (source of truth: tools/mcp/*/src/);
 # reformatting it would break the sync drift check
 docs/mcp/
+lib/mcp-docs/src/pages/

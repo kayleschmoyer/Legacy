@@ -100,17 +100,18 @@ const TRANSPORT_SOURCES = [
 ];
 
 function mergeTool(existing, incoming, transport) {
-  const merged = existing ?? { ...incoming, transports: [] };
+  const tool = incoming;
+  const merged = existing ?? { ...tool, transports: [] };
   if (!merged.transports.includes(transport)) merged.transports.push(transport);
   // Prefer whichever source carries the richer description / schema.
-  if ((incoming.description?.length ?? 0) > (merged.description?.length ?? 0)) {
-    merged.description = incoming.description;
+  if ((tool.description?.length ?? 0) > (merged.description?.length ?? 0)) {
+    merged.description = tool.description;
   }
   if (
-    Object.keys(incoming.inputs ?? {}).length >
+    Object.keys(tool.inputs ?? {}).length >
     Object.keys(merged.inputs ?? {}).length
   ) {
-    merged.inputs = incoming.inputs;
+    merged.inputs = tool.inputs;
   }
   return merged;
 }

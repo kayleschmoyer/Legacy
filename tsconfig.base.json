@@ -34,6 +34,10 @@
       "@legacy-sports/logging": ["lib/logging/src/index.ts"],
       "@legacy-sports/logging/server": ["lib/logging/src/server.ts"],
       "@legacy-sports/mcp-bearer-auth": ["lib/mcp-bearer-auth/src/index.ts"],
+      "@legacy-sports/mcp-docs": ["lib/mcp-docs/src/index.ts"],
+      "@legacy-sports/mcp-docs/pages/*": [
+        "lib/mcp-docs/src/pages/*.generated.ts"
+      ],
       "@legacy-sports/mcp-format": ["lib/mcp-format/src/index.ts"],
       "@legacy-sports/mcp-jobs": ["lib/mcp-jobs/src/index.ts"],
       "@legacy-sports/mlb-client": ["lib/mlb-client/src/index.ts"],

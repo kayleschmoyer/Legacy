@@ -20,7 +20,6 @@
           "name": "auth_check_all",
           "description": "Check workspace auth token presence for all services (GitHub, Jira, AWS, CI). Returns per-service ok/method/hint. Call at the start of any workflow that requires credentials. Never initiates login flows — read-only token presence check only. If allAuthenticated is false, surface the hint for each failing service and stop; never attempt to generate tokens.",
           "inputs": {},
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -45,7 +44,6 @@
               "description": "If true, run `make wt-setup` after attaching to copy .env, create symlinks, and install git hooks (default: false). Windows-only — ignored on other platforms."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -69,7 +67,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -107,7 +104,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -132,7 +128,6 @@
               "description": "Fall back to `git worktree remove --force` if twig times out or fails. Removes symlinks first to avoid deleting through them. (default: false)"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -196,7 +191,6 @@
               "description": "When combined with amend: true and no explicit files, stages tracked-modified AND untracked files (git add -A) before amending, instead of the default tracked-only git add -u — use this to fold newly-added files into the amended commit without enumerating every path. Has no effect without amend: true, and is ignored whenever files is provided (files already stages exactly the given paths, tracked or untracked — use it instead of addAll for surgical control). Default: false, preserving today's tracked-only amend behavior."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -261,7 +255,6 @@
               }
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -281,7 +274,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -296,7 +288,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -316,7 +307,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -379,7 +369,6 @@
               "description": "Show staged changes only (git diff --cached / index vs HEAD). When true, the base ref is ignored."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -409,7 +398,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -433,7 +421,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree. Used as the root for relative paths."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -457,7 +444,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -472,7 +458,6 @@
               "description": "Path to check"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -492,7 +477,6 @@
               "description": "Start with pnpm install --force instead of a normal install. Useful when prior recovery attempts have already cleared orphan dirs."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -516,7 +500,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -525,7 +508,6 @@
           "name": "worktree_job_list",
           "description": "List recent background jobs (newest first), including jobs started by a previous MCP server process. Use after a session resume or lost tool result to recover a job handle instead of re-running the command.",
           "inputs": {},
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -540,7 +522,6 @@
               "description": "Job ID returned by a { status: \"running\" } result"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -565,7 +546,6 @@
               "description": "Max wait per call in ms (default and cap: 55000)"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -595,7 +575,6 @@
               "description": "Maximum number of remote branches to return (default: 50). Only used when remote=true."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -620,7 +599,6 @@
               "description": "Include local branches (default: true)."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -655,7 +633,6 @@
               "description": "Force-acquire even if another agent holds the lock (default: false)."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -720,7 +697,6 @@
               "description": "Include per-commit file change stats. Each entry in the `files` array has `path`, `status` (A=added, M=modified, D=deleted, R=renamed, C=copied), `insertions`, and `deletions`. Use maxCount=1 + stat=true as a replacement for `git show --stat HEAD` or `git diff HEAD~1 HEAD --name-status`."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -750,7 +726,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -775,7 +750,6 @@
               "description": "Timeout for git push in milliseconds (default: 120000)."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -811,7 +785,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -820,7 +793,6 @@
           "name": "worktree_ping",
           "description": "Check connectivity and state of the worktree server. Returns git version, main repo path, active worktree, and total worktree count. Use this to verify the server is running correctly before using other worktree_* tools.",
           "inputs": {},
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -865,7 +837,6 @@
               "description": "Timeout in milliseconds for the git push subprocess (default: 120000). Increase when pre-push hooks run slow checks (e.g. terraform validate, pnpm format) that exceed the default."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -907,7 +878,6 @@
               }
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -955,7 +925,6 @@
               "description": "Max number of matched lines to return when `grep` is provided (default: 50, max: 500)."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -990,7 +959,6 @@
               "description": "Disable rerere (reuse recorded resolution) for this rebase. Pass true when a bad rr-cache entry is causing conflict markers to be silently committed."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1024,7 +992,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1054,7 +1021,6 @@
               "description": "Timeout for git push in milliseconds (default: 120000)."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1074,7 +1040,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1098,7 +1063,6 @@
               "description": "Fall back to `git worktree remove --force` (with symlink removal first) when twig fails. Default: false."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1118,7 +1082,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1138,7 +1101,6 @@
               "description": "Ticket key or absolute path whose session to rename. Omit to use the active worktree (or main repo if none active)."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1173,7 +1135,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1203,7 +1164,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1243,7 +1203,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1268,7 +1227,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1302,7 +1260,6 @@
               "description": "Cap output to the last N lines. Use 0 for no truncation. A header showing the omitted line count is prepended."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1337,7 +1294,6 @@
               "description": "Override per-target timeout in seconds. Defaults: pc=600, install/build/test/codegen=900, others=300."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1375,7 +1331,6 @@
               "optional": true
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1400,7 +1355,6 @@
               "description": "Alias for key. Ticket key, number, branch name, directory name, or absolute path to a git worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1425,7 +1379,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1450,7 +1403,6 @@
               "description": "File path for filtered diff"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1485,7 +1437,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1543,7 +1494,6 @@
               "description": "Max number of matched lines to return when `grep` is provided (default: 50, max: 500)."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1583,7 +1533,6 @@
               "description": "Max number of matched lines to return when `grep` is provided (default: 50, max: 500)."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1598,7 +1547,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1618,7 +1566,6 @@
               "description": "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1633,7 +1580,6 @@
               "description": "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1653,7 +1599,6 @@
               "description": "Alias for worktree. Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1672,7 +1617,6 @@
               }
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1687,7 +1631,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1702,7 +1645,6 @@
               "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1736,7 +1678,6 @@
               "description": "Optional ticket key (e.g. 'LS-1134'). Uses active worktree if omitted."
             }
           },
-          "line": 1220,
           "transports": [
             "stdio"
           ]
@@ -1786,7 +1727,6 @@
               "description": "Per-script timeout in milliseconds (default: 120000)."
             }
           },
-          "line": 634,
           "transports": [
             "stdio"
           ]
@@ -1804,7 +1744,6 @@
               "description": "Worktree or working directory (default: repo root)"
             }
           },
-          "line": 666,
           "transports": [
             "stdio"
           ]
@@ -1860,7 +1799,6 @@
               "description": "When true, include the full raw output (up to 30k chars) in the response instead of the default compact summary. Default false: prettier per-file listings are collapsed to a count, and each step body is truncated to 20 lines with a note to run the step directly for the rest. Use verbose: true only when you need the complete output for debugging."
             }
           },
-          "line": 31,
           "transports": [
             "stdio"
           ]
@@ -1875,7 +1813,6 @@
               "description": "Job ID from a make_run / validate_pr result (status: \"running\")"
             }
           },
-          "line": 99,
           "transports": [
             "stdio"
           ]
@@ -1899,7 +1836,6 @@
               "description": "Maximum milliseconds to block (default: 50000, max: 55000). Capped at 55000 to stay under the ~60s MCP transport timeout in cloud sessions."
             }
           },
-          "line": 115,
           "transports": [
             "stdio"
           ]
@@ -1924,7 +1860,6 @@
               "description": "Parent branch to base off (e.g., \"LS-507/fix-scoring\" for stacked branches). Defaults to \"main\" if omitted."
             }
           },
-          "line": 141,
           "transports": [
             "stdio"
           ]
@@ -1954,7 +1889,6 @@
               "description": "Run pnpm install --no-frozen-lockfile first (for new workspace packages)"
             }
           },
-          "line": 172,
           "transports": [
             "stdio"
           ]
@@ -1987,7 +1921,6 @@
               "description": "Specific .tf files (relative to terraform/)"
             }
           },
-          "line": 281,
           "transports": [
             "stdio"
           ]
@@ -2011,7 +1944,6 @@
               "description": "Report missing vars without writing the file"
             }
           },
-          "line": 195,
           "transports": [
             "stdio"
           ]
@@ -2039,7 +1971,6 @@
               "description": "Repo or worktree root (default: repo root)."
             }
           },
-          "line": 508,
           "transports": [
             "stdio"
           ]
@@ -2097,7 +2028,6 @@
               "description": "Repo or worktree root (default: repo root)."
             }
           },
-          "line": 583,
           "transports": [
             "stdio"
           ]
@@ -2120,7 +2050,6 @@
               "description": "Repo or worktree root (default: repo root). Used to resolve relative `dir` values."
             }
           },
-          "line": 438,
           "transports": [
             "stdio"
           ]
@@ -2154,7 +2083,6 @@
               "description": "Repo or worktree root (default: repo root)."
             }
           },
-          "line": 467,
           "transports": [
             "stdio"
           ]
@@ -2188,7 +2116,6 @@
               "description": "Repo or worktree root (default: repo root)."
             }
           },
-          "line": 543,
           "transports": [
             "stdio"
           ]
@@ -2230,7 +2157,6 @@
               "description": "Spawn make pc as a background job and return immediately with a { jobId } instead of waiting out the ~45s sync budget. Use make_run_wait({ jobId }) to poll for completion. The default already backgrounds make pc safely — this flag just skips the initial bounded wait."
             }
           },
-          "line": 716,
           "transports": [
             "stdio"
           ]
@@ -2270,7 +2196,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 39,
           "transports": [
             "stdio"
           ]
@@ -2288,7 +2213,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 60,
           "transports": [
             "stdio"
           ]
@@ -2318,7 +2242,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 74,
           "transports": [
             "stdio"
           ]
@@ -2358,7 +2281,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 92,
           "transports": [
             "stdio"
           ]
@@ -2367,7 +2289,6 @@
           "name": "nx_job_list",
           "description": "List recent background jobs (newest first), including jobs started by a previous MCP server process. Use after a session resume or lost tool result to recover a job handle instead of re-running validation.",
           "inputs": {},
-          "line": 480,
           "transports": [
             "stdio"
           ]
@@ -2382,7 +2303,6 @@
               "description": "Job ID returned by a { status: \"running\" } result"
             }
           },
-          "line": 443,
           "transports": [
             "stdio"
           ]
@@ -2408,7 +2328,6 @@
               "description": "Max wait per call in ms (default and cap: 55000)"
             }
           },
-          "line": 458,
           "transports": [
             "stdio"
           ]
@@ -2478,7 +2397,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 119,
           "transports": [
             "stdio"
           ]
@@ -2510,7 +2428,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 199,
           "transports": [
             "stdio"
           ]
@@ -2558,7 +2475,6 @@
               "description": "When true (and integration: true), enables Playwright tracing (--trace=on). Trace zip paths are returned in traceArtifacts for post-run inspection."
             }
           },
-          "line": 255,
           "transports": [
             "stdio"
           ]
@@ -2598,7 +2514,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 404,
           "transports": [
             "stdio"
           ]
@@ -2647,7 +2562,6 @@
               "description": "Cap nx project-level parallelism for the pc-lint chunk by passing PARALLEL=<n>, which the pc-lint recipe forwards to `nx affected -t lint --fix` as `--parallel=<n>` (nx.json default: 5). Use on memory-constrained machines to avoid individual large projects (e.g. lambdas/db, cli) getting \"Killed\" (OOM) when several `eslint . --fix` processes run concurrently, each ballooning to 2-5GB RSS — nx may then mislabel the OOM-killed project \"flaky\" on retry, masking the real cause. E.g. parallel: 2. Ignored by chunks other than pc-lint."
             }
           },
-          "line": 311,
           "transports": [
             "stdio"
           ]
@@ -2687,7 +2601,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 372,
           "transports": [
             "stdio"
           ]
@@ -2729,7 +2642,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 157,
           "transports": [
             "stdio"
           ]
@@ -2749,7 +2661,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 219,
           "transports": [
             "stdio"
           ]
@@ -2780,7 +2691,6 @@
               "description": "Worktree path (default: repo root)"
             }
           },
-          "line": 233,
           "transports": [
             "stdio"
           ]
@@ -2854,7 +2764,6 @@
               "description": "Structured audit mode: returns a JSON report with pre-classified gaps, confidence scores (high/medium/low), draft Jira ticket summaries, noise filtering, and overflow/failure triage. Designed to minimize LLM reasoning — review and approve rather than classify from scratch. Implies includeMcp:true. Use this instead of gapsOnly for the full audit workflow."
             }
           },
-          "line": 745,
           "transports": [
             "stdio"
           ]
@@ -2863,7 +2772,6 @@
           "name": "ci_auth_status",
           "description": "Check if the CI server is authenticated with GitHub. Returns token source (GH_TOKEN, GITHUB_TOKEN, github-app, or gh-cli), authenticated user login, and rate limit info. Call this first to verify credentials are working before using other ci_* tools. Also see github_auth_status for basic GitHub auth status without rate limit info.",
           "inputs": {},
-          "line": 896,
           "transports": [
             "stdio"
           ]
@@ -2903,7 +2811,6 @@
               "description": "Attempt number"
             }
           },
-          "line": 47,
           "transports": [
             "stdio"
           ]
@@ -2923,7 +2830,6 @@
               "description": "Run ID. Use the \"id\" field from ci_list_runs output (\"databaseId\" is an alias for the same value)."
             }
           },
-          "line": 228,
           "transports": [
             "stdio"
           ]
@@ -2959,7 +2865,6 @@
               "description": "Branch name to scope the cancellation to"
             }
           },
-          "line": 245,
           "transports": [
             "stdio"
           ]
@@ -3020,7 +2925,6 @@
               "description": "Deprecated — the per-call wait is always clamped to ~20s (this Lambda-hosted server's own execution timeout, not the MCP transport deadline). Kept for backward compatibility; longer waits are re-armed via ci_wait_run."
             }
           },
-          "line": 503,
           "transports": [
             "stdio"
           ]
@@ -3061,7 +2965,6 @@
               "description": "Maximum number of matches to return (default: 50, max: 500). Older matches are dropped first."
             }
           },
-          "line": 821,
           "transports": [
             "stdio"
           ]
@@ -3169,7 +3072,6 @@
               "description": "Extract only error/failure lines with context (~200 lines max)."
             }
           },
-          "line": 68,
           "transports": [
             "stdio"
           ]
@@ -3205,7 +3107,6 @@
               "description": "GitHub Actions workflow run ID. Auto-expanded to nightly-{id} or manual-{id} fallbacks when not found directly."
             }
           },
-          "line": 583,
           "transports": [
             "stdio"
           ]
@@ -3276,7 +3177,6 @@
               "description": "Reserved for future use (default: 10000). Presigned URLs cannot be truncated (they would become invalid), so s3 mode always returns full artifact fields. In gh-pages mode a fixed 4000-char per-field cap (MAX_FIELD_CHARS) is applied instead."
             }
           },
-          "line": 642,
           "transports": [
             "stdio"
           ]
@@ -3338,7 +3238,6 @@
               "description": "Max results (default: 10, max: 100)"
             }
           },
-          "line": 138,
           "transports": [
             "stdio"
           ]
@@ -3380,7 +3279,6 @@
               "description": "Enable debug logging"
             }
           },
-          "line": 162,
           "transports": [
             "stdio"
           ]
@@ -3420,7 +3318,6 @@
               "description": "Enable debug logging"
             }
           },
-          "line": 204,
           "transports": [
             "stdio"
           ]
@@ -3446,7 +3343,6 @@
               "description": "Enable debug logging"
             }
           },
-          "line": 182,
           "transports": [
             "stdio"
           ]
@@ -3472,7 +3368,6 @@
               "description": "Include a follow-up hint in the response pointing at the ci_get_logs call that will fetch fresh failure logs once the new attempt completes."
             }
           },
-          "line": 265,
           "transports": [
             "stdio"
           ]
@@ -3492,7 +3387,6 @@
               "description": "PR number to check for the runner-shutdown flake signal and retry if detected."
             }
           },
-          "line": 291,
           "transports": [
             "stdio"
           ]
@@ -3616,7 +3510,6 @@
               "description": "Hard cap on total output characters (default: 50000). Prevents context overflow when limitMatches and context lines together still produce a large response — trailing matches are dropped until the response fits."
             }
           },
-          "line": 313,
           "transports": [
             "stdio"
           ]
@@ -3647,7 +3540,6 @@
               "description": "Aggregate subagent stats into the parent totals and return per-subagent breakdowns (default: false)."
             }
           },
-          "line": 858,
           "transports": [
             "stdio"
           ]
@@ -3693,7 +3585,6 @@
               "description": "Output format. \"markdown\" (default) returns a compact summary with a job table and a Failed Jobs section. \"json\" returns the full structured payload."
             }
           },
-          "line": 395,
           "transports": [
             "stdio"
           ]
@@ -3727,7 +3618,6 @@
               "description": "Include jobs for each run (default: true)"
             }
           },
-          "line": 419,
           "transports": [
             "stdio"
           ]
@@ -3775,7 +3665,6 @@
               "description": "Include per-step breakdown for each job (default: false)"
             }
           },
-          "line": 440,
           "transports": [
             "stdio"
           ]
@@ -3806,7 +3695,6 @@
               "description": "Max wait per call in seconds (default and cap: 20)"
             }
           },
-          "line": 562,
           "transports": [
             "stdio"
           ]
@@ -3840,7 +3728,6 @@
               "description": "Include GitHub App installation permissions (default: false)"
             }
           },
-          "line": 468,
           "transports": [
             "stdio"
           ]
@@ -3877,7 +3764,6 @@
               "description": "\"enable\" restores a disabled workflow; \"disable\" halts automatic runs"
             }
           },
-          "line": 486,
           "transports": [
             "stdio"
           ]
@@ -3966,7 +3852,6 @@
               "description": "Truncate individual lines longer than this many characters (e.g. 500). Useful when a log line is pathologically long (e.g. a single line of embedded ANSI or minified output), so it cannot alone consume the entire max_chars budget. Truncated lines are suffixed with ...[line truncated]."
             }
           },
-          "line": 2113,
           "transports": [
             "stdio"
           ]
@@ -3975,7 +3860,6 @@
           "name": "github_auth_status",
           "description": "Check GitHub API authentication status (passive check only — does not trigger interactive auth). Call this first in any GitHub workflow to verify API access is available. Also see ci_auth_status for GitHub rate limit info.",
           "inputs": {},
-          "line": 200,
           "transports": [
             "stdio"
           ]
@@ -4014,7 +3898,6 @@
               "description": "Per-call wait budget in seconds, capped at 55 (default 55)."
             }
           },
-          "line": 2003,
           "transports": [
             "stdio"
           ]
@@ -4055,7 +3938,6 @@
               "description": "Comments to post (1-50)."
             }
           },
-          "line": 887,
           "transports": [
             "stdio"
           ]
@@ -4101,7 +3983,6 @@
               "description": "PR edits (1-50). Each entry needs at least title or body."
             }
           },
-          "line": 867,
           "transports": [
             "stdio"
           ]
@@ -4143,7 +4024,6 @@
               "description": "PRs to merge (1-50)."
             }
           },
-          "line": 1064,
           "transports": [
             "stdio"
           ]
@@ -4169,7 +4049,6 @@
               "description": "PR numbers to rebase (1-50). Processed in order."
             }
           },
-          "line": 1291,
           "transports": [
             "stdio"
           ]
@@ -4237,7 +4116,6 @@
               "description": "Replies (1-50)."
             }
           },
-          "line": 910,
           "transports": [
             "stdio"
           ]
@@ -4271,7 +4149,6 @@
               "description": "Closing comment"
             }
           },
-          "line": 372,
           "transports": [
             "stdio"
           ]
@@ -4305,7 +4182,6 @@
               "description": "Markdown body of the comment"
             }
           },
-          "line": 645,
           "transports": [
             "stdio"
           ]
@@ -4336,7 +4212,6 @@
               "description": "Label description"
             }
           },
-          "line": 416,
           "transports": [
             "stdio"
           ]
@@ -4375,7 +4250,6 @@
               "description": "New PR body (markdown)"
             }
           },
-          "line": 834,
           "transports": [
             "stdio"
           ]
@@ -4384,7 +4258,6 @@
           "name": "github_ensure_sweep_labels",
           "description": "Idempotently ensure the sweep coordination labels (sweep-claimed, sweep-stale-claim) exist on the repository. Safe to call at sweep startup every time — creates missing labels and no-ops if they already exist.",
           "inputs": {},
-          "line": 1875,
           "transports": [
             "stdio"
           ]
@@ -4476,7 +4349,6 @@
               "description": "Label to apply after replying + resolving (default: bot:ready-for-review)"
             }
           },
-          "line": 1364,
           "transports": [
             "stdio"
           ]
@@ -4495,7 +4367,6 @@
               "description": "Branch name to query (default: \"main\")."
             }
           },
-          "line": 1988,
           "transports": [
             "stdio"
           ]
@@ -4562,7 +4433,6 @@
               "description": "When true, parse details_url/html_url on each check run to extract workflowRunId and jobId (GitHub Actions run and job IDs). Included in response only when resolvable. Use to feed ci_get_logs / ci_search_logs without a gh api fallback."
             }
           },
-          "line": 1713,
           "transports": [
             "stdio"
           ]
@@ -4585,7 +4455,6 @@
               "description": "Branch name, tag, or commit SHA (defaults to \"main\")."
             }
           },
-          "line": 1968,
           "transports": [
             "stdio"
           ]
@@ -4594,7 +4463,6 @@
           "name": "github_get_repo_info",
           "description": "Get repo info: owner, name, default branch, URL.",
           "inputs": {},
-          "line": 450,
           "transports": [
             "stdio"
           ]
@@ -4626,7 +4494,6 @@
               "description": "Include resolved threads in results (default: false — returns only unresolved threads, including outdated-but-unresolved threads that still block merge)"
             }
           },
-          "line": 458,
           "transports": [
             "stdio"
           ]
@@ -4635,7 +4502,6 @@
           "name": "github_job_list",
           "description": "List recent background jobs (newest first). In-memory only — jobs do not survive an MCP server restart.",
           "inputs": {},
-          "line": 2302,
           "transports": [
             "stdio"
           ]
@@ -4650,7 +4516,6 @@
               "description": "Job id from a { status: \"running\" } tool result"
             }
           },
-          "line": 2272,
           "transports": [
             "stdio"
           ]
@@ -4674,7 +4539,6 @@
               "description": "Max wait in ms (default and cap: 55000)"
             }
           },
-          "line": 2284,
           "transports": [
             "stdio"
           ]
@@ -4720,7 +4584,6 @@
               "description": "Filter to a specific status context (e.g. \"bot-review\", \"security-scan\"). Omit to return all contexts."
             }
           },
-          "line": 1818,
           "transports": [
             "stdio"
           ]
@@ -4735,7 +4598,6 @@
               "description": "Filter labels by name or description (case-insensitive substring match)"
             }
           },
-          "line": 435,
           "transports": [
             "stdio"
           ]
@@ -4799,7 +4661,6 @@
               "description": "ISO 8601 timestamp — only return comments posted at or after this time"
             }
           },
-          "line": 677,
           "transports": [
             "stdio"
           ]
@@ -4838,7 +4699,6 @@
               "description": "ISO 8601 timestamp — only return comments posted at or after this time"
             }
           },
-          "line": 746,
           "transports": [
             "stdio"
           ]
@@ -4892,7 +4752,6 @@
               "description": "Max total results across all pages (default: 500, auto-paginates)"
             }
           },
-          "line": 493,
           "transports": [
             "stdio"
           ]
@@ -4933,7 +4792,6 @@
               "description": "Filter to comments from a specific review submission (pull_request_review_id)"
             }
           },
-          "line": 789,
           "transports": [
             "stdio"
           ]
@@ -5012,7 +4870,6 @@
               "description": "Only applies when compact: false. Review bodies longer than this are truncated to this length with a trailing \"\\n[truncated]\" marker."
             }
           },
-          "line": 519,
           "transports": [
             "stdio"
           ]
@@ -5031,7 +4888,6 @@
               "description": "Filter by runner status. Omit to return all runners regardless of status."
             }
           },
-          "line": 1900,
           "transports": [
             "stdio"
           ]
@@ -5094,7 +4950,6 @@
               "description": "Glob pattern — labels matching this are removed (e.g. \"ci-failure-*\"). Composes with \"add\" and \"remove\"."
             }
           },
-          "line": 960,
           "transports": [
             "stdio"
           ]
@@ -5126,7 +4981,6 @@
               "description": "Apply the bot:ready-for-review label after marking ready (default true). Set false only when the caller manages the label itself (e.g. a remove-then-add re-trigger)."
             }
           },
-          "line": 1141,
           "transports": [
             "stdio"
           ]
@@ -5166,7 +5020,6 @@
               "description": "\"queue\" (default) or \"direct\" (--admin, requires authorization)"
             }
           },
-          "line": 1023,
           "transports": [
             "stdio"
           ]
@@ -5219,7 +5072,6 @@
               "description": "Push branch before creating PR (default: true). Pass false if already pushed."
             }
           },
-          "line": 2181,
           "transports": [
             "stdio"
           ]
@@ -5253,7 +5105,6 @@
               "description": "Return only essential fields (number, branch, mergeable, ciSummary, failedJobs, unresolvedThreads) to reduce token usage"
             }
           },
-          "line": 1176,
           "transports": [
             "stdio"
           ]
@@ -5291,7 +5142,6 @@
               "description": "Max commits to return (default: 30, max: 100)"
             }
           },
-          "line": 1510,
           "transports": [
             "stdio"
           ]
@@ -5351,7 +5201,6 @@
               "description": "Output format. \"markdown\" (default) returns a triage table with summary counts and a Blocked PRs section — ~40-60% fewer tokens than JSON. \"json\" returns the full structured payload (summary, prs[], recommendBatchStatus) for programmatic callers."
             }
           },
-          "line": 1224,
           "transports": [
             "stdio"
           ]
@@ -5377,7 +5226,6 @@
               "description": "Alias for \"number\" — use either, not both"
             }
           },
-          "line": 2235,
           "transports": [
             "stdio"
           ]
@@ -5413,7 +5261,6 @@
               "description": "Maximum bytes of diff to return (default: 500 000). Increase for large PRs."
             }
           },
-          "line": 1585,
           "transports": [
             "stdio"
           ]
@@ -5454,7 +5301,6 @@
               "description": "Merge method to use when auto-merging (default: SQUASH)"
             }
           },
-          "line": 1088,
           "transports": [
             "stdio"
           ]
@@ -5506,7 +5352,6 @@
               "description": "Exclude PRs that have any of these labels. Useful for filtering out sweep-claimed PRs. Default: no exclusions."
             }
           },
-          "line": 1257,
           "transports": [
             "stdio"
           ]
@@ -5532,7 +5377,6 @@
               "description": "Alias for \"number\" — use either, not both"
             }
           },
-          "line": 1195,
           "transports": [
             "stdio"
           ]
@@ -5560,7 +5404,6 @@
               "description": "Reopening comment"
             }
           },
-          "line": 400,
           "transports": [
             "stdio"
           ]
@@ -5613,7 +5456,6 @@
               "description": "Opt-in: also request copilot-pull-request-reviewer[bot] (default: false — not requested unless explicitly set)"
             }
           },
-          "line": 1305,
           "transports": [
             "stdio"
           ]
@@ -5647,7 +5489,6 @@
               "description": "Mutable tag to resolve (e.g. \"v4\" or \"v4.1.0\")."
             }
           },
-          "line": 2040,
           "transports": [
             "stdio"
           ]
@@ -5695,7 +5536,6 @@
               "description": "Array of actions to resolve. Each entry must have owner, repo, and tag."
             }
           },
-          "line": 2066,
           "transports": [
             "stdio"
           ]
@@ -5752,7 +5592,6 @@
               "description": "Alias for \"prNumber\" — use either, not both"
             }
           },
-          "line": 1446,
           "transports": [
             "stdio"
           ]
@@ -5796,7 +5635,6 @@
               "description": "When true, retrigger all failed checks. When false (default), retrigger only the named check or all failed checks if no checkName given."
             }
           },
-          "line": 1661,
           "transports": [
             "stdio"
           ]
@@ -5814,7 +5652,6 @@
               "description": "Secret name to delete"
             }
           },
-          "line": 1622,
           "transports": [
             "stdio"
           ]
@@ -5842,7 +5679,6 @@
               "description": "Path to file containing secret value"
             }
           },
-          "line": 1642,
           "transports": [
             "stdio"
           ]
@@ -5864,7 +5700,6 @@
               "description": "Specific secret names to check for existence. If omitted, lists all secret names."
             }
           },
-          "line": 1494,
           "transports": [
             "stdio"
           ]
@@ -5914,7 +5749,6 @@
               "description": "Human-readable description"
             }
           },
-          "line": 1773,
           "transports": [
             "stdio"
           ]
@@ -5935,7 +5769,6 @@
               "description": "Minimum age in minutes for a claim to be considered stale (default: 30)"
             }
           },
-          "line": 1883,
           "transports": [
             "stdio"
           ]
@@ -5981,7 +5814,6 @@
               "description": "Opt-in extra fields beyond the compact default. E.g. [\"body\",\"files\"] to include the PR description and changed-files list."
             }
           },
-          "line": 1544,
           "transports": [
             "stdio"
           ]
@@ -5990,7 +5822,6 @@
           "name": "github_webhook_list",
           "description": "List all webhooks configured on this repository. Returns id, active status, events, URL, and last response.",
           "inputs": {},
-          "line": 1915,
           "transports": [
             "stdio"
           ]
@@ -6010,7 +5841,6 @@
               "description": "Webhook ID (from github_webhook_list)."
             }
           },
-          "line": 1954,
           "transports": [
             "stdio"
           ]
@@ -6061,7 +5891,6 @@
               "description": "Payload content type (default: json)."
             }
           },
-          "line": 1923,
           "transports": [
             "stdio"
           ]
@@ -6099,7 +5928,6 @@
               "description": "Comment body as plain text. Param name is \"body\", not \"comment\"."
             }
           },
-          "line": 368,
           "transports": [
             "stdio",
             "hosted"
@@ -6109,7 +5937,6 @@
           "name": "jira_auth_status",
           "description": "Check if Jira API credentials are configured. Call first in any Jira workflow. If false, use mcp__claude_ai_Atlassian__* instead.",
           "inputs": {},
-          "line": 49,
           "transports": [
             "stdio",
             "hosted"
@@ -6195,7 +6022,6 @@
               "description": "Array of ticket objects to create. Each ticket must have a summary. Type defaults to Task. Pass sprint: \"current\" to add to the active sprint."
             }
           },
-          "line": 202,
           "transports": [
             "stdio",
             "hosted"
@@ -6266,7 +6092,6 @@
               "description": "Array of ticket edits (1-50)."
             }
           },
-          "line": 285,
           "transports": [
             "stdio",
             "hosted"
@@ -6316,7 +6141,6 @@
               "description": "Array of link specs (1-50)."
             }
           },
-          "line": 299,
           "transports": [
             "stdio",
             "hosted"
@@ -6360,7 +6184,6 @@
               "description": "Max results per parent (default: 25, max: 100)"
             }
           },
-          "line": 336,
           "transports": [
             "stdio",
             "hosted"
@@ -6393,7 +6216,6 @@
               ]
             }
           },
-          "line": 630,
           "transports": [
             "stdio",
             "hosted"
@@ -6442,7 +6264,6 @@
               "description": "Ticket keys to check in one call (1-50)."
             }
           },
-          "line": 84,
           "transports": [
             "stdio",
             "hosted"
@@ -6497,7 +6318,6 @@
               "description": "Only used when action='claim'. Open PRs the caller has already found to reference this ticket key — e.g. github_pr_dashboard(state: 'open') filtered by key. The jira server has no GitHub credentials of its own (LS-9289) and cannot check this itself. When non-empty, claim returns action: 'PR_EXISTS' (instead of 'PROCEED') with the PR list attached, to prevent duplicate work on a ticket someone else already opened a PR for. Omit (or pass []) when no open PR was found or the check was skipped."
             }
           },
-          "line": 655,
           "transports": [
             "stdio",
             "hosted"
@@ -6568,7 +6388,6 @@
               "description": "\"current\" for active sprint, or numeric sprint ID"
             }
           },
-          "line": 109,
           "transports": [
             "stdio",
             "hosted"
@@ -6597,7 +6416,6 @@
               "description": "Reason for closing. Defaults to \"Closed via automation — duplicate or no longer needed.\""
             }
           },
-          "line": 808,
           "transports": [
             "stdio",
             "hosted"
@@ -6663,7 +6481,6 @@
               "description": "Labels to remove (additive — other labels are preserved)"
             }
           },
-          "line": 227,
           "transports": [
             "stdio",
             "hosted"
@@ -6705,7 +6522,6 @@
               "description": "Maximum tree depth to traverse (default: 10, max: 20). Safety cap to prevent runaway traversal."
             }
           },
-          "line": 454,
           "transports": [
             "stdio",
             "hosted"
@@ -6726,7 +6542,6 @@
               "description": "Which bucket epic to look up"
             }
           },
-          "line": 827,
           "transports": [
             "stdio",
             "hosted"
@@ -6761,7 +6576,6 @@
               "description": "Link type: \"Blocks\", \"Relates\", \"Cloners\", \"Duplicate\""
             }
           },
-          "line": 384,
           "transports": [
             "stdio",
             "hosted"
@@ -6813,7 +6627,6 @@
               "description": "Annotate every child with blocker state — `blocked` / `blockers` columns in table mode, `blocked` / `blockers[]` fields in paginate mode. Costs no extra Jira request. Use this instead of looping jira_check_blockers over the children."
             }
           },
-          "line": 411,
           "transports": [
             "stdio",
             "hosted"
@@ -6841,7 +6654,6 @@
               "description": "Sprint name for mode=\"rollover\" (e.g. \"Sprint 8\"). Required for rollover."
             }
           },
-          "line": 850,
           "transports": [
             "stdio",
             "hosted"
@@ -6901,7 +6713,6 @@
               "description": "Annotate every row with blocker state: a `blocked` column (yes/no — yes when a blocker is neither Done nor In Review) and a `blockers` column listing non-Done blockers as LS-123(Status). Costs no extra Jira request — issuelinks rides along in the same search response. Use this instead of looping jira_check_blockers when filtering a dispatch batch. A row with blocked=no that still names an LS-x(In Review) blocker means: base the branch off LS-x, not main."
             }
           },
-          "line": 500,
           "transports": [
             "stdio",
             "hosted"
@@ -6926,7 +6737,6 @@
               "description": "Jira issue key, e.g. \"LS-2501\""
             }
           },
-          "line": 839,
           "transports": [
             "stdio",
             "hosted"
@@ -6947,7 +6757,6 @@
               "description": "Parent epic key"
             }
           },
-          "line": 543,
           "transports": [
             "stdio",
             "hosted"
@@ -6979,7 +6788,6 @@
               "description": "Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works where email-based assignment always 401s (LS-7891). Takes precedence over `assignee`."
             }
           },
-          "line": 693,
           "transports": [
             "stdio",
             "hosted"
@@ -7108,7 +6916,6 @@
               "description": "Auto-transition open subtasks to Done (default: false). Only applies to single-key transitions."
             }
           },
-          "line": 554,
           "transports": [
             "stdio",
             "hosted"
@@ -7161,7 +6968,6 @@
               "description": "Sub-resources to fetch alongside base fields. Omit for base fields only. \"blockers\": linked blockers. \"children\": child issues. \"comments\": all comments. \"transitions\": available workflow transitions."
             }
           },
-          "line": 742,
           "transports": [
             "stdio",
             "hosted"
@@ -7201,7 +7007,6 @@
               "description": "AWS environment (default: dev)"
             }
           },
-          "line": 42,
           "transports": [
             "stdio"
           ]
@@ -7234,7 +7039,6 @@
               "description": "Include each API's integrations (IntegrationType, IntegrationUri, IntegrationMethod, PayloadFormatVersion). Default: true."
             }
           },
-          "line": 61,
           "transports": [
             "stdio"
           ]
@@ -7274,7 +7078,6 @@
               "description": "\"events\" (default): returns compact events with { eventTime, eventName, username, instanceIds[], terminationReason }. \"death-verdict\": requires instanceId; runs two parallel lookups (ResourceName and BidEvictedEvent) and returns { verdict, events[] } where verdict is \"spot\" | \"scale-down\" | \"manual\" | \"unknown\"."
             }
           },
-          "line": 448,
           "transports": [
             "stdio"
           ]
@@ -7295,7 +7098,6 @@
               "description": "Retrieve the most recent 64 KB of console output (default: true). Set false to get the oldest available output."
             }
           },
-          "line": 512,
           "transports": [
             "stdio"
           ]
@@ -7315,7 +7117,6 @@
               "description": "If provided, return only the value of this specific tag (e.g. \"PlaywrightVersion\", \"PnpmVersion\"). Otherwise return the full image metadata with all tags."
             }
           },
-          "line": 614,
           "transports": [
             "stdio"
           ]
@@ -7366,7 +7167,6 @@
               "description": "Filter by VPC ID (must match vpc-[0-9a-f]{8,17}). Cannot be combined with groupIds."
             }
           },
-          "line": 530,
           "transports": [
             "stdio"
           ]
@@ -7402,7 +7202,6 @@
               "description": "Wildcard substring to match against the Name tag (e.g. \"runner\" matches \"*runner*\")."
             }
           },
-          "line": 487,
           "transports": [
             "stdio"
           ]
@@ -7427,7 +7226,6 @@
               "description": "Wildcard substring to match against the Name tag (e.g. \"runner\" matches \"*runner*\"). Optional."
             }
           },
-          "line": 576,
           "transports": [
             "stdio"
           ]
@@ -7458,7 +7256,6 @@
               "description": "Subnet category to return (default: all). \"public\" or \"private\" filter the response; \"all\" returns every category including database subnets."
             }
           },
-          "line": 595,
           "transports": [
             "stdio"
           ]
@@ -7479,7 +7276,6 @@
               "description": "Also return a summary of all policy versions (versionId, isDefault, createDate). Default: false."
             }
           },
-          "line": 630,
           "transports": [
             "stdio"
           ]
@@ -7517,7 +7313,6 @@
               "description": "AWS environment (default: dev)"
             }
           },
-          "line": 202,
           "transports": [
             "stdio"
           ]
@@ -7575,7 +7370,6 @@
               "description": "Output shape. `markdown` (default) renders a header block plus a timestamped code block — cheaper for the agent to read. `json` returns the full structured payload."
             }
           },
-          "line": 157,
           "transports": [
             "stdio"
           ]
@@ -7668,7 +7462,6 @@
               "description": "Output shape. `markdown` (default) groups extracted ERROR/WARN/Exception lines into a top `### Errors` section followed by a `### Recent` code-block with the last 50 log lines — far cheaper for the agent to read. `json` returns the original structured payload with the full `logs` string."
             }
           },
-          "line": 94,
           "transports": [
             "stdio"
           ]
@@ -7693,7 +7486,6 @@
               "description": "Environment prefix for short secret IDs (default: dev)"
             }
           },
-          "line": 299,
           "transports": [
             "stdio"
           ]
@@ -7723,7 +7515,6 @@
               "description": "Relative path within the repo (absolute paths are rejected for safety). Example: \"scratch/secret.tmp\""
             }
           },
-          "line": 317,
           "transports": [
             "stdio"
           ]
@@ -7748,7 +7539,6 @@
               "description": "Override the name filter. Default is \"{environment}/\" prefix."
             }
           },
-          "line": 340,
           "transports": [
             "stdio"
           ]
@@ -7779,7 +7569,6 @@
               "description": "Decrypt SecureString values (default: false). When false, SecureString values are redacted."
             }
           },
-          "line": 229,
           "transports": [
             "stdio"
           ]
@@ -7836,7 +7625,6 @@
               "description": "Max seconds this call polls before returning an in-progress snapshot with a re-arm hint (default and cap: 55)."
             }
           },
-          "line": 253,
           "transports": [
             "stdio"
           ]
@@ -7854,7 +7642,6 @@
               "description": "AWS profile name (default: \"default\" or $AWS_PROFILE env var)"
             }
           },
-          "line": 408,
           "transports": [
             "stdio"
           ]
@@ -7863,7 +7650,6 @@
           "name": "aws_sso_status",
           "description": "Prefer this over `aws sts get-caller-identity` via shell. Check AWS SSO session authentication. Returns caller identity or error with remedy.",
           "inputs": {},
-          "line": 400,
           "transports": [
             "stdio"
           ]
@@ -7887,7 +7673,6 @@
               "description": "Terraform directory relative to repo root (default: \"terraform/main\"). Use \"terraform/runners\" for runner state outputs."
             }
           },
-          "line": 427,
           "transports": [
             "stdio"
           ]
@@ -7934,7 +7719,6 @@
               "description": "Max seconds to wait for completion before returning a running snapshot (default: 45, cap: 55). Ignored when runInBackground=true."
             }
           },
-          "line": 650,
           "transports": [
             "stdio"
           ]
@@ -7949,7 +7733,6 @@
               "description": "The buildId returned by a previous packer_build call."
             }
           },
-          "line": 691,
           "transports": [
             "stdio"
           ]
@@ -7988,7 +7771,6 @@
               "description": "Max seconds this call waits before returning an in-progress snapshot with a re-arm hint (default and cap: 55)."
             }
           },
-          "line": 703,
           "transports": [
             "stdio"
           ]
@@ -8039,7 +7821,6 @@
               "description": "GitHub repository in \"owner/name\" form. Defaults to the current repo as resolved by the gh CLI."
             }
           },
-          "line": 359,
           "transports": [
             "stdio"
           ]
@@ -8089,7 +7870,6 @@
               "description": "Pending migrations to apply, ordered by timestamp."
             }
           },
-          "line": 74,
           "transports": [
             "hosted"
           ]
@@ -8114,7 +7894,6 @@
               "description": "Async db_migrate job id to poll instead of the applied/pending diff."
             }
           },
-          "line": 49,
           "transports": [
             "hosted"
           ]
@@ -8139,7 +7918,6 @@
               "description": "Output format (default: json)."
             }
           },
-          "line": 29,
           "transports": [
             "hosted"
           ]
@@ -8162,7 +7940,6 @@
           "name": "rollbar_auth_status",
           "description": "Check if the Rollbar read access token is configured. Call first in any Rollbar workflow; if not configured, the other rollbar_* tools will fail.",
           "inputs": {},
-          "line": 28,
           "transports": [
             "hosted"
           ]
@@ -8190,7 +7967,6 @@
               "description": "Per-project item counter (shown in the Rollbar item URL)"
             }
           },
-          "line": 83,
           "transports": [
             "hosted"
           ]
@@ -8218,7 +7994,6 @@
               "description": "Internal item id — fetches the most recent occurrence of this item"
             }
           },
-          "line": 123,
           "transports": [
             "hosted"
           ]
@@ -8270,7 +8045,6 @@
               "description": "Optional second environment to introspect and diff field names against (e.g. env: \"prod\", compareEnv: \"dev\" to check for deploy lag). Applies to both single and batch mode."
             }
           },
-          "line": 177,
           "transports": [
             "hosted"
           ]
@@ -8331,7 +8105,6 @@
               "description": "Results per page (Rollbar default 20, max 100)"
             }
           },
-          "line": 47,
           "transports": [
             "hosted"
           ]
@@ -8368,7 +8141,6 @@
               "description": "Results per page (Rollbar default 20, max 100)"
             }
           },
-          "line": 98,
           "transports": [
             "hosted"
           ]
@@ -8407,7 +8179,6 @@
               "description": "Target status for the item"
             }
           },
-          "line": 147,
           "transports": [
             "hosted"
           ]
@@ -8422,7 +8193,6 @@
               "description": "Filter by environment, e.g. \"production\""
             }
           },
-          "line": 165,
           "transports": [
             "hosted"
           ]
@@ -8445,7 +8215,6 @@
           "name": "browser_cleanup",
           "description": "Close the browser and stop all tracked dev servers. Call this before ending your workflow to free resources. Equivalent to browser_dev_stop({ all: true }) plus closing Playwright.",
           "inputs": {},
-          "line": 190,
           "transports": [
             "stdio"
           ]
@@ -8476,7 +8245,6 @@
               "description": "Dev server port — used to build full URL from relative paths, or alone to navigate to http://localhost:{port}/."
             }
           },
-          "line": 162,
           "transports": [
             "stdio"
           ]
@@ -8515,7 +8283,6 @@
               "description": "nx \"project:target\" to run instead of the default \"web:serve\", e.g. \"shared-components:storybook\". Runs via `nx run <target> --port=<port>`, so the target's executor must accept a --port flag; readiness is still probed by TCP-connecting to that port, so no further configuration is needed."
             }
           },
-          "line": 19,
           "transports": [
             "stdio"
           ]
@@ -8524,7 +8291,6 @@
           "name": "browser_dev_status",
           "description": "List dev servers and browser state. Includes MCP-managed servers (managed: true, with a live listening readiness probe) and pre-existing servers detected by scanning ports 4200-4399 (managed: false). Always call this before browser_dev_start to check if a server is already running, and poll it after a browser_dev_start that returned ready: false.",
           "inputs": {},
-          "line": 78,
           "transports": [
             "stdio"
           ]
@@ -8552,7 +8318,6 @@
               "description": "If true, stop all tracked dev servers."
             }
           },
-          "line": 56,
           "transports": [
             "stdio"
           ]
@@ -8598,7 +8363,6 @@
               "description": "Browser viewport size. Defaults to 1280x720. Changing this creates a new browser context."
             }
           },
-          "line": 86,
           "transports": [
             "stdio"
           ]
@@ -8628,7 +8392,6 @@
               "description": "Worktree path for .screenshots directory. If omitted, uses the first tracked dev server worktree."
             }
           },
-          "line": 116,
           "transports": [
             "stdio"
           ]
@@ -8643,7 +8406,6 @@
               "description": "Absolute path to the PNG file to upload (e.g. from browser_screenshot output)."
             }
           },
-          "line": 148,
           "transports": [
             "stdio"
           ]
@@ -8688,7 +8450,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 667,
           "transports": [
             "stdio"
           ]
@@ -8714,7 +8475,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 761,
           "transports": [
             "stdio"
           ]
@@ -8745,7 +8505,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 705,
           "transports": [
             "stdio"
           ]
@@ -8878,7 +8637,6 @@
               "description": "GitHub username of the new author (default: \"agent\")"
             }
           },
-          "line": 1207,
           "transports": [
             "stdio"
           ]
@@ -8897,7 +8655,6 @@
               "description": "GitHub PR number"
             }
           },
-          "line": 1289,
           "transports": [
             "stdio"
           ]
@@ -8917,7 +8674,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 1393,
           "transports": [
             "stdio"
           ]
@@ -8970,7 +8726,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 1349,
           "transports": [
             "stdio"
           ]
@@ -8994,7 +8749,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 1513,
           "transports": [
             "stdio"
           ]
@@ -9081,7 +8835,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 1050,
           "transports": [
             "stdio"
           ]
@@ -9130,7 +8883,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 1156,
           "transports": [
             "stdio"
           ]
@@ -9153,7 +8905,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 1127,
           "transports": [
             "stdio"
           ]
@@ -9181,7 +8932,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 600,
           "transports": [
             "stdio"
           ]
@@ -9217,7 +8967,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 470,
           "transports": [
             "stdio"
           ]
@@ -9232,7 +8981,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 564,
           "transports": [
             "stdio"
           ]
@@ -9252,7 +9000,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 511,
           "transports": [
             "stdio"
           ]
@@ -9281,7 +9028,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 884,
           "transports": [
             "stdio"
           ]
@@ -9321,7 +9067,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 954,
           "transports": [
             "stdio"
           ]
@@ -9350,7 +9095,6 @@
               "description": "Repo or worktree root (default: auto-detected)"
             }
           },
-          "line": 811,
           "transports": [
             "stdio"
           ]

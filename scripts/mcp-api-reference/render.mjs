@@ -37,8 +37,16 @@ const TRANSPORT_COPY = {
   },
 };
 
+/**
+ * Build the page.
+ *
+ * `meta.scope` switches to single-server mode: the page documents one hosted
+ * server, which is what that server serves from its own `GET /docs` route. The
+ * layout, filter, and schema tables are identical — only the framing changes.
+ */
 export function render(model, meta = {}) {
   const { servers } = model;
+  const scope = meta.scope;
   const localCount = servers.filter((s) =>
     s.transports.includes('stdio'),
   ).length;
@@ -55,15 +63,37 @@ export function render(model, meta = {}) {
     0,
   );
 
-  const stats = [
-    { value: model.serverCount, label: 'Servers' },
-    { value: model.toolCount, label: 'Tools' },
-    { value: paramCount, label: 'Parameters' },
-    { value: localCount, label: 'Run locally' },
-    { value: hostedCount, label: 'Hosted' },
-  ];
+  const stats = scope
+    ? [
+        { value: model.toolCount, label: 'Tools' },
+        { value: paramCount, label: 'Parameters' },
+        {
+          value: servers[0].transports.includes('stdio') ? 'Both' : 'Hosted',
+          label: 'Transport',
+        },
+      ]
+    : [
+        { value: model.serverCount, label: 'Servers' },
+        { value: model.toolCount, label: 'Tools' },
+        { value: paramCount, label: 'Parameters' },
+        { value: localCount, label: 'Run locally' },
+        { value: hostedCount, label: 'Hosted' },
+      ];
 
-  return `<title>MCP Tool Index</title>
+  const title = scope ? `${scope.label} MCP Tools` : 'MCP Tool Index';
+  const eyebrow = scope
+    ? 'Legacy Sports &middot; hosted MCP server'
+    : 'Legacy Sports &middot; agent toolchain';
+  const lede = scope
+    ? `Every tool this server exposes &mdash; names, descriptions, and full input
+        schemas, read straight from <code>${escapeHtml(servers[0].packageDir)}</code>.
+        One of ${scope.totalServers} MCP servers in the repo; the other
+        ${scope.totalServers - 1} are indexed in <code>docs/mcp/api-reference.html</code>.`
+    : `Every tool exposed by the ${model.serverCount} Model Context Protocol servers in
+        <code>tools/mcp/</code> &mdash; names, descriptions, and full input schemas, read
+        straight from the server sources.`;
+
+  return `<title>${escapeHtml(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
@@ -74,13 +104,9 @@ ${styles()}
 <div class="shell">
   <header class="masthead">
     <div class="masthead-inner">
-      <p class="eyebrow">Legacy Sports &middot; agent toolchain</p>
-      <h1>MCP Tool Index</h1>
-      <p class="lede">
-        Every tool exposed by the ${model.serverCount} Model Context Protocol servers in
-        <code>tools/mcp/</code> &mdash; names, descriptions, and full input schemas, read
-        straight from the server sources.
-      </p>
+      <p class="eyebrow">${eyebrow}</p>
+      <h1>${escapeHtml(title)}</h1>
+      <p class="lede">${lede}</p>
       <dl class="statline">
 ${stats
   .map(
@@ -113,8 +139,8 @@ ${stats
     </div>
   </div>
 
-  <div class="layout">
-    <nav class="rail" aria-label="Servers">
+  <div class="layout${scope ? ' layout--single' : ''}">
+    <nav class="rail" aria-label="Servers"${scope ? ' hidden' : ''}>
       <p class="rail-heading">Servers</p>
       <ul id="rail-list"></ul>
       <p class="rail-note">
@@ -129,15 +155,22 @@ ${stats
   <footer class="colophon">
     <p>
       Generated from <code>${escapeHtml(model.generatedFrom)}</code> by
-      <code>scripts/generate-mcp-api-reference.mjs</code>${
-        meta.commit ? ` at <code>${escapeHtml(meta.commit)}</code>` : ''
-      }.
-      Re-run <code>make mcp-api-reference</code> after changing a server to refresh it.
-    </p>
+      <code>scripts/generate-mcp-api-reference.mjs</code>.
+      Re-run <code>make mcp-api-reference</code> after changing a server to refresh it.${
+        meta.scope
+          ? ' This page is served by the server itself at <code>GET /docs</code>, ' +
+            'behind the same bearer token its tools require, and is redeployed with it.'
+          : ''
+      }
+    </p>${
+      meta.scope
+        ? ''
+        : `
     <p>
       Covers the servers this repo owns. <code>.mcp.json</code> also wires up the
       third-party Stripe MCP server, whose tools are documented by Stripe.
-    </p>
+    </p>`
+    }
   </footer>
 </div>
 
@@ -423,6 +456,9 @@ button.ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 3
   padding-top: 32px;
 }
 
+/* Declared after .layout so it wins the cascade — same specificity, later rule. */
+.layout--single { grid-template-columns: minmax(0, 1fr); }
+
 .rail {
   position: sticky;
   top: 76px;
@@ -430,6 +466,8 @@ button.ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 3
   flex-direction: column;
   gap: 10px;
 }
+
+.rail[hidden] { display: none; }
 
 .rail-heading {
   margin: 0;
