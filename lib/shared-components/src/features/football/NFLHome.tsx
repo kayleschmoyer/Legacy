@@ -188,9 +188,9 @@ interface LeagueRowProps {
 }
 
 function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
+  const isFrozen = !!(league.tierFrozenAt || league.frozenAt);
   const statusColors = getDraftStatusColors(league.draftStatus);
   const statusLabel = getLeagueStatusLabel(league);
-  const isFrozen = !!league.tierFrozenAt;
   const [showFrozenNotice, setShowFrozenNotice] = useState(false);
 
   const handlePress = () => {
@@ -214,12 +214,9 @@ function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
         alignItems="flex-start"
         gap="$2"
         cursor="pointer"
+        opacity={isFrozen ? 0.65 : 1}
         onPress={handlePress}
-        accessibilityLabel={
-          isFrozen
-            ? `View ${league.name ?? 'league'} (read-only)`
-            : `View ${league.name ?? 'league'}`
-        }
+        accessibilityLabel={`View ${league.name ?? 'league'}${isFrozen ? ' (frozen)' : ''}`}
         role="link"
         testID={`football-league-row-${league.id}`}
         pressStyle={{ opacity: 0.8, scale: 0.99 }}
@@ -268,6 +265,7 @@ function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
               paddingVertical="$1"
               borderWidth={1}
               borderColor="$gray7"
+              testID={`football-league-frozen-badge-${league.id}`}
             >
               <Text
                 color="$gray11"
@@ -279,8 +277,7 @@ function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
                 Read-only
               </Text>
             </YStack>
-          ) : null}
-          {statusLabel ? (
+          ) : statusLabel ? (
             <YStack
               backgroundColor={statusColors.bg}
               borderRadius="$3"
@@ -300,23 +297,24 @@ function LeagueRow({ league, onViewLeague }: LeagueRowProps) {
               </Text>
             </YStack>
           ) : null}
-          {(league.weekAdvanceStatus === 'processing' ||
-            league.weekAdvanceStatus === 'queued') && (
-            <YStack
-              backgroundColor="$yellow3"
-              borderRadius="$3"
-              paddingHorizontal="$2"
-              paddingVertical="$1"
-              borderWidth={1}
-              borderColor="$yellow7"
-              accessibilityLabel="League week advancing"
-            >
-              <Text color="$yellow11" fontSize="$2" fontWeight="600">
-                Advancing
-              </Text>
-            </YStack>
-          )}
-          {league.weekAdvanceStatus === 'failed' && (
+          {!isFrozen &&
+            (league.weekAdvanceStatus === 'processing' ||
+              league.weekAdvanceStatus === 'queued') && (
+              <YStack
+                backgroundColor="$yellow3"
+                borderRadius="$3"
+                paddingHorizontal="$2"
+                paddingVertical="$1"
+                borderWidth={1}
+                borderColor="$yellow7"
+                accessibilityLabel="League week advancing"
+              >
+                <Text color="$yellow11" fontSize="$2" fontWeight="600">
+                  Advancing
+                </Text>
+              </YStack>
+            )}
+          {!isFrozen && league.weekAdvanceStatus === 'failed' && (
             <YStack
               backgroundColor="$red3"
               borderRadius="$3"
@@ -535,6 +533,8 @@ function NFLHome({
     writeFootballHomeShowArchived(showArchived);
   }, [showArchived]);
 
+  // Frozen/tier-frozen leagues (subscription downgrade, LS-5193) are the
+  // "archived" leagues split out below (LS-6258/FBH-004, LS-6262/FBH-008).
   const activeLeagues = leagues.filter((l) => !l.tierFrozenAt && !l.frozenAt);
   const archivedLeagues = leagues.filter(
     (l) => !!(l.tierFrozenAt || l.frozenAt),
@@ -1181,7 +1181,10 @@ function NFLHome({
           </YStack>
 
           {/* Archived leagues — collapsed by default (LS-6262 / FBH-008),
-              mirroring MLBHome's active/archived split. */}
+              mirroring MLBHome's active/archived split. Rows render with the
+              "Read-only" badge/dimmed styling from `LeagueRow` itself
+              (LS-6258 / FBH-004), so no extra opacity wrapper is needed
+              here. */}
           {archivedLeagues.length > 0 ? (
             <YStack gap="$3" marginTop="$2" testID="football-archived-section">
               <XStack
@@ -1189,12 +1192,20 @@ function NFLHome({
                 gap="$2"
                 cursor="pointer"
                 onPress={() => setShowArchived((v) => !v)}
+                onKeyDown={(e: React.KeyboardEvent<HTMLElement>) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setShowArchived((v) => !v);
+                  }
+                }}
+                tabIndex={0}
                 accessibilityRole="button"
                 accessibilityLabel={
                   showArchived
                     ? 'Hide archived leagues'
                     : 'Show archived leagues'
                 }
+                testID="football-archived-leagues-toggle"
               >
                 <Text
                   fontSize="$3"
@@ -1210,9 +1221,11 @@ function NFLHome({
               {showArchived ? (
                 <YStack gap="$2">
                   {filteredArchived.map((league) => (
-                    <YStack key={league.id} opacity={0.65}>
-                      <LeagueRow league={league} onViewLeague={onViewLeague} />
-                    </YStack>
+                    <LeagueRow
+                      key={league.id}
+                      league={league}
+                      onViewLeague={onViewLeague}
+                    />
                   ))}
                 </YStack>
               ) : null}

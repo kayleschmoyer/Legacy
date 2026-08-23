@@ -483,6 +483,119 @@ describe('NFLHome — league row metadata (LS-6256)', () => {
   });
 });
 
+describe('NFLHome — frozen/archived league differentiator (LS-6258/FBH-004)', () => {
+  it('collapses tier-frozen leagues into the archived disclosure section, hidden by default', () => {
+    const active: NFLHomeLeague = {
+      id: 1,
+      name: 'Active League',
+      draftStatus: 'completed',
+      currentWeekNumber: 4,
+    };
+    const frozen: NFLHomeLeague = {
+      id: 2,
+      name: 'Frozen League',
+      draftStatus: 'completed',
+      currentWeekNumber: 14,
+      tierFrozenAt: '2026-05-01T00:00:00.000Z',
+    };
+    render(
+      <NFLHome
+        leagues={[active, frozen]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+
+    expect(screen.getByTestId('football-league-row-1')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('football-league-row-2'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('football-archived-leagues-toggle'),
+    ).toHaveTextContent('Archived leagues (1)');
+  });
+
+  it('reveals the frozen league row with a "Read-only" badge (not the stale draft status) after expanding the disclosure', () => {
+    const frozen: NFLHomeLeague = {
+      id: 2,
+      name: 'Frozen League',
+      draftStatus: 'completed',
+      currentWeekNumber: 14,
+      frozenAt: '2026-05-01T00:00:00.000Z',
+    };
+    render(
+      <NFLHome leagues={[frozen]} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+
+    fireEvent.click(screen.getByTestId('football-archived-leagues-toggle'));
+
+    expect(screen.getByTestId('football-league-row-2')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('football-league-frozen-badge-2'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Read-only')).toBeInTheDocument();
+    expect(screen.queryByText('Week 14')).not.toBeInTheDocument();
+  });
+
+  it('invokes onViewLeague after confirming the read-only warning dialog on a revealed frozen league row', () => {
+    const onViewLeague = jest.fn();
+    const frozen: NFLHomeLeague = {
+      id: 2,
+      name: 'Frozen League',
+      draftStatus: 'completed',
+      tierFrozenAt: '2026-05-01T00:00:00.000Z',
+    };
+    render(
+      <NFLHome
+        leagues={[frozen]}
+        onCreateLeague={noop}
+        onViewLeague={onViewLeague}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('football-archived-leagues-toggle'));
+    fireEvent.click(screen.getByTestId('football-league-row-2'));
+    expect(onViewLeague).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('View anyway'));
+    expect(onViewLeague).toHaveBeenCalledWith(2);
+  });
+
+  it('still lists the archived league in the disclosure when every league is frozen', () => {
+    const frozen: NFLHomeLeague = {
+      id: 2,
+      name: 'Frozen League',
+      draftStatus: 'completed',
+      tierFrozenAt: '2026-05-01T00:00:00.000Z',
+    };
+    render(
+      <NFLHome leagues={[frozen]} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+
+    expect(
+      screen.getByTestId('football-archived-leagues-toggle'),
+    ).toHaveTextContent('Archived leagues (1)');
+    fireEvent.click(screen.getByTestId('football-archived-leagues-toggle'));
+    expect(
+      screen.getByTestId('football-league-frozen-badge-2'),
+    ).toBeInTheDocument();
+  });
+
+  it('omits the archived-leagues disclosure when no leagues are frozen', () => {
+    const active: NFLHomeLeague = {
+      id: 1,
+      name: 'Active League',
+      draftStatus: 'completed',
+    };
+    render(
+      <NFLHome leagues={[active]} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+
+    expect(
+      screen.queryByTestId('football-archived-leagues-toggle'),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('NFLHome — player discovery entry point (LS-5411)', () => {
   it('does not render the Browse Players CTA when onBrowsePlayers is omitted', () => {
     render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
