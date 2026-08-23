@@ -321,6 +321,18 @@ jest.mock('../../../../features/leagues/LeagueChatTab', () => {
   };
 });
 
+jest.mock('../../FreeAgents', () => {
+  const { View, Text } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    LeagueFreeAgents: ({ leagueId }: { leagueId: number }) => (
+      <View testID="league-free-agents">
+        <Text>{leagueId}</Text>
+      </View>
+    ),
+  };
+});
+
 jest.mock('../../../../features/scoring/LeagueScoringEditor', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
@@ -592,6 +604,11 @@ describe('FootballLeagueId', () => {
     it('renders Roster tab', () => {
       render(<FootballLeagueId />);
       expect(screen.getByText('Roster')).toBeTruthy();
+    });
+
+    it('renders Free Agents tab', () => {
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Free Agents')).toBeTruthy();
     });
 
     it('renders Matchups tab', () => {
@@ -1025,6 +1042,36 @@ describe('FootballLeagueId', () => {
       expect(screen.queryByTestId('league-roster-management')).toBeNull();
       expect(
         screen.getByText('Join this league to manage a roster.'),
+      ).toBeTruthy();
+    });
+  });
+
+  // FLD-026 / LS-5417 parity — a top-level Free Agents tab so leagues without
+  // waivers enabled (which hid the only other path to this screen, the
+  // Waivers tab's browse button) still have a way to browse the pool.
+  describe('free agents tab (LS-6309)', () => {
+    it('renders LeagueFreeAgents for the current league when the user has a team', () => {
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-free-agents'));
+
+      expect(screen.getByTestId('league-free-agents')).toBeTruthy();
+      expect(screen.getByText('42')).toBeTruthy();
+    });
+
+    it('shows a join prompt instead of free agents when userTeamId is null', () => {
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: null }, loading: false },
+      ]);
+
+      render(<FootballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-free-agents'));
+
+      expect(screen.queryByTestId('league-free-agents')).toBeNull();
+      expect(
+        screen.getByText(
+          'Join this league to browse free agents and submit claims.',
+        ),
       ).toBeTruthy();
     });
   });

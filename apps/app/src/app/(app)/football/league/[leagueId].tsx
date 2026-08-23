@@ -41,6 +41,7 @@ import {
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
 import { LeagueOverviewTab } from '../../../../features/leagues/LeagueOverviewTab';
+import { LeagueFreeAgents } from '../../FreeAgents';
 import { usePullToRefresh } from '../../../../common/hooks/usePullToRefresh';
 import { useStandings } from '../../../../features/matchup/hooks/useStandings';
 import { CommissionerScreen } from '../../../../features/commissioner/CommissionerScreen';
@@ -60,6 +61,10 @@ import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
 const BASE_FOOTBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster' },
+  // Top-level Free Agents tab (FLD-026 / LS-5417 parity) — previously only
+  // reachable via the conditional Waivers tab's "Browse Free Agents" button,
+  // which meant leagues without waivers enabled had no path to it at all.
+  { id: 'free-agents', label: 'Free Agents' },
   { id: 'matchups', label: 'Matchups' },
   { id: 'trades', label: 'Trades' },
   { id: 'standings', label: 'Standings' },
@@ -715,6 +720,20 @@ export default function FootballLeagueId(): React.JSX.Element {
               <YStack flex={1} padding="$3">
                 <Text color="$textMuted">
                   Join this league to manage a roster.
+                </Text>
+              </YStack>
+            )}
+          </YStack>
+        )}
+
+        {selectedTab === 'free-agents' && (
+          <YStack flex={1}>
+            {userTeamId != null ? (
+              <LeagueFreeAgents leagueId={numLeagueId} />
+            ) : (
+              <YStack flex={1} padding="$3">
+                <Text color="$textMuted">
+                  Join this league to browse free agents and submit claims.
                 </Text>
               </YStack>
             )}
