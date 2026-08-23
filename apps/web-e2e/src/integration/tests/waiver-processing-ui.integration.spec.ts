@@ -36,7 +36,7 @@ import { createLeagueViaUI } from '../helpers/create-league';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
 // ---------------------------------------------------------------------------
@@ -852,12 +852,17 @@ test.describe
   // -----------------------------------------------------------------
 
   test('Phase 9: Pending Waiver Claims card is absent after processing', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    commissionerPage,
+    managerPage1,
   }) => {
-    const verifyNoPendingClaims = async (jwt: string): Promise<void> => {
-      await switchUser(page, jwt, `/baseball/league/${state.leagueId}/roster`);
+    // Use dedicated browser contexts for each role rather than switchUser on
+    // a single page. switchUser has a race condition (LS-3672, LS-3705,
+    // LS-3735, LS-9486): the background JWT refresh can dispatch AUTH_LOGOUT
+    // and clear localStorage after page.evaluate() sets the profile, landing
+    // on the unauthenticated sign-in page and leaving the Pending Waiver card
+    // unrendered.
+    const verifyNoPendingClaims = async (page: Page): Promise<void> => {
+      await page.goto(`/baseball/league/${state.leagueId}/roster`);
       await page.waitForLoadState('load');
       await expect(page).toHaveURL(/\/roster/);
       await expect(page.locator('body')).not.toContainText(
@@ -875,13 +880,11 @@ test.describe
     };
 
     await test.step('No pending claims banner on commissioner roster', async () => {
-      await verifyNoPendingClaims(commissionerJwt);
+      await verifyNoPendingClaims(commissionerPage);
     });
 
     await test.step('No pending claims banner on Manager 1 roster', async () => {
-      await verifyNoPendingClaims(managerJwt1);
+      await verifyNoPendingClaims(managerPage1);
     });
-
-    await switchUser(page, commissionerJwt);
   });
 });
