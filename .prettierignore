@@ -36,3 +36,7 @@ apps/app/android/
 # scripts/generate-skill-index.mjs (source of truth: SKILL.md frontmatter);
 # reformatting it would break the sync drift check
 .agents/skills/INDEX.md
+# Generated MCP API reference — byte-exact output of
+# scripts/generate-mcp-api-reference.mjs (source of truth: tools/mcp/*/src/);
+# reformatting it would break the sync drift check
+docs/mcp/

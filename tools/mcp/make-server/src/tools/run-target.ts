@@ -96,6 +96,8 @@ const ALLOWED_TARGETS = new Set([
   // Read-only drift checks (LS-8549) — AGENTS.md tells agents to verify
   // generated-file sync with these before committing routing/command changes.
   'lint-skill-index',
+  'mcp-api-reference',
+  'lint-mcp-api-reference',
   'lint-agent-prompts',
   // Generated-file resync targets (LS-9027) — AGENTS.md mandates running these whenever
   // skill frontmatter or .claude/commands/*.md change; without them agents

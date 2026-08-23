@@ -18,6 +18,22 @@ MCP server configuration is maintained in multiple files to support different AI
 
 VS Code-based agents use a `"type": "stdio"` field per server; CLI-based agents omit it (stdio is the default transport). VS Code env var references use `${env:VAR_NAME}` while other clients use `${VAR_NAME}`.
 
+## Tool Reference
+
+Every tool across all servers — names, descriptions, and full input schemas — is
+indexed in a single browsable page:
+
+- **[`docs/mcp/api-reference.html`](../../docs/mcp/api-reference.html)** — open it
+  in a browser to search and filter the whole tool surface.
+- **[`docs/mcp/api-reference.json`](../../docs/mcp/api-reference.json)** — the same
+  model as machine-readable data.
+
+Both are generated from the server sources by
+`scripts/generate-mcp-api-reference.mjs`. Run **`make mcp-api-reference`** after
+adding, removing, or re-describing a tool and commit the result — CI's
+`custom-checks` job fails on drift (check locally with
+`make lint-mcp-api-reference`).
+
 ## Servers
 
 ### ci-server
