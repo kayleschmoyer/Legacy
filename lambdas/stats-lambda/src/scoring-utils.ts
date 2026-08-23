@@ -1,9 +1,9 @@
 /**
  * Side-effect-free scoring utilities.
  *
- * Extracted from the calculate-matchup-scores handler so that callers
- * (e.g. load-game.ts) can import the core scoring logic without pulling
- * in module-level side effects (Rollbar init, heavier handler deps).
+ * Holds the core matchup-scoring logic for the baseball stats pipeline.
+ * Kept free of module-level side effects so callers (load-game.ts) can import
+ * it without paying for them at module load.
  */
 
 import {
@@ -13,7 +13,6 @@ import {
 } from '@legacy-sports/db-client';
 import {
   calculateMatchupScore,
-  getDefaultScoringSettings,
   type PlayerGameStats,
   type ScoringSettings,
 } from '@legacy-sports/scoring';
@@ -26,16 +25,19 @@ export interface CalculateMatchupScoresResponse {
   team2GamesSelected: number;
   gamesPerMatchup: number;
   updated: boolean;
-  error?: string;
 }
 
 /**
  * Core logic for calculating and updating matchup scores.
+ *
+ * `scoringSettings` is required on purpose: it must carry the league's own
+ * multipliers. Defaulting it would silently persist default-scored values for
+ * a league with custom scoring, with no error and no log line (LS-9535).
  */
 export async function calculateAndUpdateMatchupScores(
   db: PublicDb,
   matchupId: number,
-  scoringSettings?: ScoringSettings,
+  scoringSettings: ScoringSettings,
   forceRecalculation = false,
 ): Promise<CalculateMatchupScoresResponse> {
   // 1. Get matchup details
@@ -148,7 +150,6 @@ export async function calculateAndUpdateMatchupScores(
   }
 
   // 4. Calculate matchup scores
-  const settings = scoringSettings ?? getDefaultScoringSettings();
   const matchupScore = calculateMatchupScore(
     matchupId,
     team1Id,
@@ -156,7 +157,7 @@ export async function calculateAndUpdateMatchupScores(
     team1PlayerStats,
     team2PlayerStats,
     gamesPerMatchup ?? 5,
-    settings,
+    scoringSettings,
   );
 
   // 5. Update matchup table with calculated scores

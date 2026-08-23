@@ -274,7 +274,7 @@ For each player in the batch:
 
 ### Score calculation
 
-**Handler:** `lambdas/stats-lambda/src/handlers/calculate-matchup-scores.ts`
+**Handler:** `lambdas/stats-lambda/src/load-game.ts`, which calls `calculateAndUpdateMatchupScores` in `lambdas/stats-lambda/src/scoring-utils.ts`
 **Library:** `lib/scoring/src/matchup-scoring.ts` ΓåÆ `calculateMatchupScore()`
 
 After all player stats are loaded for a matchup:

@@ -366,4 +366,25 @@ describe('load-game score calculation trigger (LS-1762)', () => {
       expect.objectContaining({ matchupId: 42 }),
     );
   });
+
+  it('skips scoring without alerting when the leagueId lookup finds no matchup (LS-9535)', async () => {
+    // No matchup row -> leagueId stays null. Scoring without the league's own
+    // multipliers would silently persist default-scored values, so the handler
+    // must skip rather than fall back to defaults.
+    mockSelectFrom.limit.mockResolvedValueOnce([]);
+
+    const event = makeSqsEvent([makeMatchupMessage()]);
+    const result = await handler(event);
+
+    expect(mockCalculateAndUpdateMatchupScores).not.toHaveBeenCalled();
+    expect(result.batchItemFailures).toEqual([]);
+    expect(mockCaptureError).not.toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ context: 'post-stats-score-calculation' }),
+    );
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('matchup 42 no longer exists'),
+      expect.objectContaining({ matchupId: 42 }),
+    );
+  });
 });

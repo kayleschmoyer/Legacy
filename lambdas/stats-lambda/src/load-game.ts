@@ -334,34 +334,40 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           // Calculate scores before marking status 'completed' so that any
           // consumer polling statsLoadingStatus sees scores already persisted.
           if (finalStatus === 'completed') {
+            // matchups.league_id is NOT NULL, so a null leagueId means the
+            // lookup above failed or the matchup row is gone — the same benign
+            // enqueue/delete race the catch below already tolerates. Either
+            // way we must not score: without the league's own multipliers,
+            // scoring would silently persist default-scored values (LS-9535).
+            const leagueIdUnavailableMessage = `Cannot calculate scores for matchup ${message.matchupId}: leagueId unavailable`;
+
             try {
+              if (leagueId === null) {
+                throw new Error(leagueIdUnavailableMessage);
+              }
+
               // Fetch league-specific scoring multipliers (snake_case keys from DB)
               // and convert to camelCase for the scoring engine
-              let scoringSettings: ScoringSettings | undefined;
-              if (leagueId !== null) {
-                const rawMultipliers = await getScoringMultipliersForLeague(
-                  db,
-                  leagueId,
-                );
-                const toCamelCase = (
-                  record: Record<string, number>,
-                ): Record<string, number> => {
-                  const result: Record<string, number> = {};
-                  for (const [key, value] of Object.entries(record)) {
-                    result[
-                      key.replace(/_([a-z])/g, (_, c: string) =>
-                        c.toUpperCase(),
-                      )
-                    ] = value;
-                  }
-                  return result;
-                };
-                scoringSettings = {
-                  batting: toCamelCase(rawMultipliers.batting),
-                  pitching: toCamelCase(rawMultipliers.pitching),
-                  fielding: toCamelCase(rawMultipliers.fielding),
-                };
-              }
+              const rawMultipliers = await getScoringMultipliersForLeague(
+                db,
+                leagueId,
+              );
+              const toCamelCase = (
+                record: Record<string, number>,
+              ): Record<string, number> => {
+                const result: Record<string, number> = {};
+                for (const [key, value] of Object.entries(record)) {
+                  result[
+                    key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
+                  ] = value;
+                }
+                return result;
+              };
+              const scoringSettings: ScoringSettings = {
+                batting: toCamelCase(rawMultipliers.batting),
+                pitching: toCamelCase(rawMultipliers.pitching),
+                fielding: toCamelCase(rawMultipliers.fielding),
+              };
 
               const scoreResult = await calculateAndUpdateMatchupScores(
                 db,
@@ -386,9 +392,13 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
               // Matchup deletion between SQS enqueue and processing is a normal
               // race (especially in dev with test data cleanup) — log a warning
               // and skip Rollbar capture rather than alerting on a caller error.
-              const isMatchupNotFound =
-                scoreErrorMessage === `Matchup ${message.matchupId} not found`;
-              if (isMatchupNotFound) {
+              // An unavailable leagueId has the same root cause (the matchup row
+              // could not be read), so it gets the same treatment.
+              const isMissingMatchup =
+                scoreErrorMessage ===
+                  `Matchup ${message.matchupId} not found` ||
+                scoreErrorMessage === leagueIdUnavailableMessage;
+              if (isMissingMatchup) {
                 LOGGER.warn(
                   `Skipping score calculation: matchup ${message.matchupId} no longer exists`,
                   { matchupId: message.matchupId },
@@ -412,7 +422,8 @@ const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
                 );
               }
               // Score calculation failure is non-fatal — stats are loaded,
-              // scores can be recalculated later via the standalone handler
+              // and scores are recalculated the next time this matchup's
+              // stats are loaded (forceRecalculation is always true here).
             }
           }
 

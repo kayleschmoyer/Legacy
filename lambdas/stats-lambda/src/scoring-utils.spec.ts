@@ -1,56 +1,34 @@
 // ── Mocks ───────────────────────────────────────────────────────────────────
 
-jest.mock('@legacy-sports/logging', () => ({
-  LOGGER: {
-    info: jest.fn(),
-    debug: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  },
-}));
-
-jest.mock('@legacy-sports/rollbar', () => ({
-  captureError: jest.fn(),
-  getRollbarConfigFromEnv: jest.fn(() => null),
-  initRollbar: jest.fn(),
-}));
-
-const mockRunWithPublicClient = jest.fn();
 const mockGetMatchupPlayerGameStats = jest.fn();
 const mockUpdateMatchupScore = jest.fn();
 
 jest.mock('@legacy-sports/db-client', () => ({
-  runWithPublicClient: (...args: unknown[]): unknown =>
-    mockRunWithPublicClient(...args),
   getMatchupPlayerGameStats: (...args: unknown[]): unknown =>
     mockGetMatchupPlayerGameStats(...args),
   updateMatchupScore: (...args: unknown[]): unknown =>
     mockUpdateMatchupScore(...args),
 }));
 
-jest.mock('@legacy-sports/utils/node', () => ({
-  getDbOptions: jest.fn(() => ({})),
-}));
-
 const mockCalculateMatchupScore = jest.fn();
-const mockGetDefaultScoringSettings = jest.fn();
 
 jest.mock('@legacy-sports/scoring', () => ({
   calculateMatchupScore: (...args: unknown[]): unknown =>
     mockCalculateMatchupScore(...args),
-  getDefaultScoringSettings: (...args: unknown[]): unknown =>
-    mockGetDefaultScoringSettings(...args),
 }));
 
 // ── Import under test ───────────────────────────────────────────────────────
 
-import {
-  batchCalculateMatchupScores,
-  calculateAndUpdateMatchupScores,
-  handler,
-} from './calculate-matchup-scores';
+import type { ScoringSettings } from '@legacy-sports/scoring';
+import { calculateAndUpdateMatchupScores } from './scoring-utils';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+const SETTINGS = {
+  batting: { hr: 4 },
+  pitching: { so: 1 },
+  fielding: {},
+} as unknown as ScoringSettings;
 
 function makeMockDb() {
   return {
@@ -111,16 +89,10 @@ function makePlayerGameStat(
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe('calculate-matchup-scores', () => {
+describe('scoring-utils', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetDefaultScoringSettings.mockReturnValue({
-      batting: {},
-      pitching: {},
-    });
   });
-
-  // ── calculateAndUpdateMatchupScores ─────────────────────────────────────
 
   describe('calculateAndUpdateMatchupScores', () => {
     it('throws when matchup is not found', async () => {
@@ -128,7 +100,7 @@ describe('calculate-matchup-scores', () => {
       db.query.matchups.findFirst.mockResolvedValue(undefined);
 
       await expect(
-        calculateAndUpdateMatchupScores(db as never, 999),
+        calculateAndUpdateMatchupScores(db as never, 999, SETTINGS),
       ).rejects.toThrow('Matchup 999 not found');
     });
 
@@ -138,7 +110,11 @@ describe('calculate-matchup-scores', () => {
         makeMatchupRow({ team1Score: '12.5', team2Score: '9.3' }),
       );
 
-      const result = await calculateAndUpdateMatchupScores(db as never, 1);
+      const result = await calculateAndUpdateMatchupScores(
+        db as never,
+        1,
+        SETTINGS,
+      );
 
       expect(result).toMatchObject({
         matchupId: 1,
@@ -168,7 +144,7 @@ describe('calculate-matchup-scores', () => {
       const result = await calculateAndUpdateMatchupScores(
         db as never,
         1,
-        undefined,
+        SETTINGS,
         true,
       );
 
@@ -198,7 +174,11 @@ describe('calculate-matchup-scores', () => {
         team2Score: '18.2',
       });
 
-      const result = await calculateAndUpdateMatchupScores(db as never, 1);
+      const result = await calculateAndUpdateMatchupScores(
+        db as never,
+        1,
+        SETTINGS,
+      );
 
       expect(result).toMatchObject({
         matchupId: 1,
@@ -210,8 +190,6 @@ describe('calculate-matchup-scores', () => {
         updated: true,
       });
 
-      // Verify scoring was called with default settings
-      expect(mockGetDefaultScoringSettings).toHaveBeenCalled();
       expect(mockCalculateMatchupScore).toHaveBeenCalledWith(
         1,
         10,
@@ -235,7 +213,7 @@ describe('calculate-matchup-scores', () => {
       expect(team2Map.size).toBe(1);
     });
 
-    it('uses custom scoring settings when provided', async () => {
+    it('passes the caller-supplied league scoring settings straight through', async () => {
       const db = makeMockDb();
       db.query.matchups.findFirst.mockResolvedValue(makeMatchupRow());
       mockGetMatchupPlayerGameStats.mockResolvedValue([]);
@@ -249,14 +227,14 @@ describe('calculate-matchup-scores', () => {
         team2Score: null,
       });
 
-      const customSettings = { batting: { hr: 4 }, pitching: { so: 1 } };
-      await calculateAndUpdateMatchupScores(
-        db as never,
-        1,
-        customSettings as never,
-      );
+      const customSettings = {
+        batting: { hr: 7 },
+        pitching: { so: 3 },
+        fielding: {},
+      } as unknown as ScoringSettings;
 
-      expect(mockGetDefaultScoringSettings).not.toHaveBeenCalled();
+      await calculateAndUpdateMatchupScores(db as never, 1, customSettings);
+
       expect(mockCalculateMatchupScore).toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
@@ -278,7 +256,11 @@ describe('calculate-matchup-scores', () => {
         }),
       );
 
-      const result = await calculateAndUpdateMatchupScores(db as never, 1);
+      const result = await calculateAndUpdateMatchupScores(
+        db as never,
+        1,
+        SETTINGS,
+      );
 
       expect(result.gamesPerMatchup).toBe(0);
     });
@@ -297,96 +279,17 @@ describe('calculate-matchup-scores', () => {
         team2Score: null,
       });
 
-      const result = await calculateAndUpdateMatchupScores(db as never, 1);
+      const result = await calculateAndUpdateMatchupScores(
+        db as never,
+        1,
+        SETTINGS,
+      );
 
       expect(result.team1Score).toBeNull();
       expect(result.team2Score).toBeNull();
       expect(result.team1GamesSelected).toBe(0);
       expect(result.team2GamesSelected).toBe(0);
       expect(result.updated).toBe(true);
-    });
-  });
-
-  // ── handler ─────────────────────────────────────────────────────────────
-
-  describe('handler', () => {
-    it('invokes calculateAndUpdateMatchupScores via runWithPublicClient', async () => {
-      mockRunWithPublicClient.mockImplementation(
-        async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => {
-          const db = makeMockDb();
-          db.query.matchups.findFirst.mockResolvedValue(
-            makeMatchupRow({ team1Score: '5', team2Score: '3' }),
-          );
-          return cb(db);
-        },
-      );
-
-      const result = await handler({ matchupId: 1 });
-
-      expect(result.matchupId).toBe(1);
-      expect(result.team1Score).toBe(5);
-      expect(mockRunWithPublicClient).toHaveBeenCalled();
-    });
-
-    it('re-throws and captures errors', async () => {
-      const err = new Error('db connection failed');
-      mockRunWithPublicClient.mockRejectedValue(err);
-
-      await expect(handler({ matchupId: 1 })).rejects.toThrow(
-        'db connection failed',
-      );
-    });
-  });
-
-  // ── batchCalculateMatchupScores ─────────────────────────────────────────
-
-  describe('batchCalculateMatchupScores', () => {
-    it('processes multiple matchups and returns results', async () => {
-      // Each handler call goes through runWithPublicClient
-      let callCount = 0;
-      mockRunWithPublicClient.mockImplementation(
-        async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => {
-          callCount++;
-          const db = makeMockDb();
-          db.query.matchups.findFirst.mockResolvedValue(
-            makeMatchupRow({
-              id: callCount,
-              team1Score: String(callCount * 10),
-              team2Score: String(callCount * 5),
-            }),
-          );
-          return cb(db);
-        },
-      );
-
-      const results = await batchCalculateMatchupScores([1, 2]);
-
-      expect(results).toHaveLength(2);
-      expect(results[0].matchupId).toBe(1);
-      expect(results[1].matchupId).toBe(2);
-    });
-
-    it('captures errors per-matchup without stopping the batch', async () => {
-      mockRunWithPublicClient
-        .mockRejectedValueOnce(new Error('matchup 1 failed'))
-        .mockImplementationOnce(
-          async (_opts: unknown, cb: (db: unknown) => Promise<unknown>) => {
-            const db = makeMockDb();
-            db.query.matchups.findFirst.mockResolvedValue(
-              makeMatchupRow({ id: 2, team1Score: '10', team2Score: '5' }),
-            );
-            return cb(db);
-          },
-        );
-
-      const results = await batchCalculateMatchupScores([1, 2]);
-
-      expect(results).toHaveLength(2);
-      expect(results[0].error).toBe('matchup 1 failed');
-      expect(results[0].updated).toBe(false);
-      // batchCalculateMatchupScores calls with forceRecalculation: true
-      expect(results[1].updated).toBe(true);
-      expect(results[1].error).toBeUndefined();
     });
   });
 });
