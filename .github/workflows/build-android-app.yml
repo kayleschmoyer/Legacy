@@ -228,6 +228,23 @@ jobs:
           extra-gradle-flags: "--configuration-cache --configuration-cache-problems=warn"
         timeout-minutes: 40
 
+      # LS-9603: upload the Hermes-composed sourcemap so Rollbar can symbolicate
+      # release-build crashes (bytecode offsets -> real file/line/function
+      # names). Keyed to EXPO_PUBLIC_APP_VERSION — the same code_version value
+      # the mobile Rollbar SDK reports at runtime (getRollbarConfigFromEnv in
+      # lib/rollbar/src/lib/rollbar.native.ts). Debug builds aren't uploaded —
+      # they aren't distributed to real users, and Rollbar sourcemaps aren't
+      # queryable/replaceable per-version, so only the version real crashes
+      # will actually report against should get one.
+      - name: Upload Hermes sourcemap to Rollbar
+        if: steps.version.outputs.build_type == 'release'
+        uses: ./.github/actions/rollbar-sourcemap-upload
+        with:
+          rollbar-access-token: ${{ secrets.ROLLBAR_ACCESS_TOKEN }}
+          version: ${{ steps.version.outputs.version }}
+          search-dir: apps/app/android/app/build
+          minified-url: "app://android/index.android.bundle"
+
       - name: Set APK Name
         id: apk-name
         run: |

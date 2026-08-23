@@ -249,6 +249,56 @@ For production releases, you'll need:
 - **iOS:** macOS runners (higher cost, required for iOS)
 - **Concurrent:** Up to 2 jobs can run simultaneously
 
+## 🩻 Crash Symbolication (Rollbar Sourcemaps)
+
+Release builds ship Hermes bytecode, not source JS — an unsymbolicated Rollbar
+crash shows raw bytecode offsets (`index.android.bundle:1:XXXXXXX`) instead of
+real file/line/function names (this is what made LS-9468 undiagnosable and
+forced it to be closed as Won't Do).
+
+**Android (active):**
+
+- Hermes sourcemap output is enabled by the RN Gradle plugin's default
+  `hermesFlags` (`["-O", "-output-source-map"]` — `apps/app/android/app/build.gradle`
+  leaves this commented out, i.e. left at the default, which is "on").
+  `assembleRelease` composes the final bytecode-offset-to-source map as a
+  `*.bundle.map` file somewhere under `apps/app/android/app/build/` (the exact
+  intermediate path has moved between RN Gradle plugin versions, so the upload
+  step searches for it rather than hardcoding one).
+- `.github/workflows/build-android-app.yml`'s "Upload Hermes sourcemap to
+  Rollbar" step (release builds only) runs `.github/actions/rollbar-sourcemap-upload`
+  right after the APK is built, uploading to Rollbar's
+  `POST /api/1/sourcemap` API keyed by `version` = the build's semver
+  (`steps.version.outputs.version`, from `apps/app/package.json`). This is the
+  exact same value shipped to the device as `EXPO_PUBLIC_APP_VERSION`, which
+  `lib/rollbar/src/lib/rollbar.native.ts`'s `getRollbarConfigFromEnv()` sends
+  to Rollbar at runtime as `code_version` — Rollbar matches an occurrence's
+  `code_version` to a sourcemap's `version` to symbolicate it, so these two
+  MUST stay in lockstep. Uses the `ROLLBAR_ACCESS_TOKEN` server-side
+  (post_server_item) secret, mirroring the web sourcemap upload pattern in
+  `tools/vite-configs/rollbar-sourcemap-plugin.ts`.
+- **To verify a given release has a working sourcemap:** check the "Upload
+  Hermes sourcemap to Rollbar" step's log in the `build-android-app.yml` run
+  for that version — it logs the uploaded file path and Rollbar's response.
+  To confirm symbolication end-to-end, trigger (or wait for) a crash in a
+  build with that version installed and check the occurrence in the Rollbar
+  UI: a working upload shows real source file/line/function names in the
+  traceback instead of `index.android.bundle` offsets.
+
+**iOS (not yet active):** `.github/workflows/build-ios-app.yml` is disabled
+(no Apple Developer Program certificates configured) and, independent of that,
+does not currently Hermes-compile its bundle or emit a sourcemap at all — it
+calls `react-native bundle` directly rather than going through Expo prebuild's
+Hermes compile step the way the Android workflow does. `app.json` has no
+`jsEngine` override, so Hermes is Expo's default engine for iOS too, but
+producing a sourcemap here requires the same `hermesc -output-source-map`
+step Android gets from the RN Gradle plugin. Wiring
+`.github/actions/rollbar-sourcemap-upload` into iOS is the same shape as the
+Android step above (`search-dir: apps/app/ios/build`, `minified-url: app://ios/main.jsbundle`)
+— add it once the iOS build workflow is re-enabled and its bundle step
+produces a Hermes-composed sourcemap. Fixing the disabled iOS pipeline itself
+is out of scope for LS-9603.
+
 ## 🔍 Troubleshooting
 
 ### **Common Android Issues**

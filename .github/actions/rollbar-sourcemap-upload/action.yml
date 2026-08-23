@@ -1,0 +1,87 @@
+name: "Rollbar Mobile Sourcemap Upload"
+description: "Finds the Hermes-composed sourcemap for a mobile release build and uploads it to Rollbar's sourcemap API"
+
+inputs:
+  rollbar-access-token:
+    description: "Rollbar server-side (post_server_item) access token"
+    required: true
+  version:
+    description: "Version string to key the sourcemap with — must match the code_version the mobile Rollbar SDK reports at runtime (EXPO_PUBLIC_APP_VERSION)"
+    required: true
+  search-dir:
+    description: "Directory to search recursively for the composed Hermes sourcemap (*.bundle.map)"
+    required: true
+  minified-url:
+    description: "The minified_url Rollbar associates with the sourcemap — must match the bundle path/name in the crash's frame URLs (e.g. app://android/index.android.bundle)"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Find and upload Hermes sourcemap"
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        TOKEN="${{ inputs.rollbar-access-token }}"
+        VERSION="${{ inputs.version }}"
+        SEARCH_DIR="${{ inputs.search-dir }}"
+        MINIFIED_URL="${{ inputs.minified-url }}"
+
+        if [ -z "$TOKEN" ]; then
+          echo "::warning::Rollbar access token not set — skipping sourcemap upload"
+          exit 0
+        fi
+
+        if [ -z "$VERSION" ]; then
+          echo "::warning::version is required (must match the mobile app's EXPO_PUBLIC_APP_VERSION / code_version) — skipping sourcemap upload"
+          exit 0
+        fi
+
+        # Hermes composes the final bytecode-offset-to-source sourcemap as
+        # *.bundle.map under the Gradle/Xcode build output tree. The exact
+        # intermediate path has moved between RN Gradle plugin versions, so
+        # search rather than hardcode it (mirrors the resilience of
+        # tools/vite-configs/rollbar-sourcemap-plugin.ts's findMapFiles).
+        MAP_FILE=$(find "$SEARCH_DIR" -iname "*.bundle.map" -print -quit 2>/dev/null || true)
+
+        if [ -z "$MAP_FILE" ]; then
+          echo "::warning::No *.bundle.map found under $SEARCH_DIR (sourcemap output may be disabled, or build output layout changed) — skipping upload rather than failing the release build"
+          exit 0
+        fi
+
+        echo "📡 Uploading $MAP_FILE to Rollbar (version=$VERSION, minified_url=$MINIFIED_URL)..."
+
+        HTTP_CODE=$(curl -s -o /tmp/rollbar-sourcemap-response.json -w "%{http_code}" \
+          -X POST "https://api.rollbar.com/api/1/sourcemap" \
+          -F "access_token=$TOKEN" \
+          -F "version=$VERSION" \
+          -F "minified_url=$MINIFIED_URL" \
+          -F "source_map=@${MAP_FILE}")
+
+        RESPONSE=$(cat /tmp/rollbar-sourcemap-response.json 2>/dev/null || echo "{}")
+
+        # Rollbar returns HTTP 200 for both success and application-level
+        # errors (invalid token, wrong scope) — must check the JSON `err`
+        # field. err: 0 means success, err: 1 means the upload was rejected.
+        # A missing `jq` must NOT be conflated with a successful upload: if we
+        # can't parse the response, treat it as unverified rather than assume
+        # err=0 (review finding — a silent jq failure previously masked a
+        # rejected upload as a false-positive success).
+        if ! command -v jq >/dev/null 2>&1; then
+          echo "::warning::jq not found on this runner — cannot verify the Rollbar response body, treating the upload as unverified"
+          ROLLBAR_ERR="unknown"
+        else
+          ROLLBAR_ERR=$(echo "$RESPONSE" | jq -r '.err // 0')
+        fi
+
+        if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ] && [ "$ROLLBAR_ERR" = "0" ]; then
+          echo "✅ Sourcemap uploaded to Rollbar (version=$VERSION)"
+        else
+          # Non-fatal: a Rollbar API hiccup (network blip, transient 5xx) should
+          # never block shipping a release build, mirroring rollbar-deploy's
+          # "don't fail the workflow for a notification issue" convention.
+          echo "::warning::Rollbar sourcemap upload failed (http=$HTTP_CODE): $RESPONSE"
+        fi
+
+        rm -f /tmp/rollbar-sourcemap-response.json
