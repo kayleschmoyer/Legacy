@@ -79,6 +79,25 @@ nx_show_projects()   # MCP tool — lists all registered Nx project names
 
 ## Tool Design Guidelines
 
+### Tool count is a budget
+
+Tool definitions (name + description + input schema) are advertised to the model
+up front, so **every registered tool bills every session whether or not it is
+called** — 256 tools cost ~89,250 tokens today, and input schemas cost roughly
+2× descriptions.
+
+Before adding a tool, ask: **could this be an `action` value or an optional param
+on an existing tool in the same server?** If yes, extend that tool instead. If
+you supersede a tool, **deregister it in the same PR** — keeping it as a thin
+alias saves nothing. Record the measured token delta with
+`scripts/mcp-token-measure`.
+
+CI enforces per-server ceilings on tool count and definition tokens
+(`make lint-mcp-api-reference`).
+
+> **Read [mcp-tool-consolidation.md](mcp-tool-consolidation.md) before adding,
+> merging, or removing a tool.** Reviewers enforce this as pattern #48.
+
 ### Naming
 
 - Tool names use **snake_case** with a domain prefix: `jira_create_ticket`, `db_query`, `worktree_list`
@@ -108,7 +127,7 @@ Return the payload in the `text` field and set `isError: true` for errors. See [
 
 ### Batch / bulk tools
 
-Any operation an agent routinely calls N times in a loop (create N tickets, transition N tickets, merge N PRs) should get an **array-accepting batch variant** alongside the retained single-item tool. Batch tools follow one convention across all in-repo servers — naming (`bulk_*` / `*_batch`), partial-failure result shape (`{ total, succeeded, failed: [{ index/key, error }] }` — one item erroring never fails the whole call), a max batch size (default 50) with a clear over-limit error, and a copy-paste helper. **Read [mcp-batch-tool-convention.md](mcp-batch-tool-convention.md) before adding one.**
+Any operation an agent routinely calls N times in a loop (create N tickets, transition N tickets, merge N PRs) should accept an array. **Default: widen the existing tool's param to take a scalar _or_ an array** (`z.union([Key, z.array(Key).min(1).max(50)])`) rather than registering a second tool — see [mcp-tool-consolidation.md](mcp-tool-consolidation.md). Register a separate `bulk_*` / `*_batch` tool only when the batch path needs a materially different schema or result shape, not merely because it loops. Batch tools follow one convention across all in-repo servers — naming (`bulk_*` / `*_batch`), partial-failure result shape (`{ total, succeeded, failed: [{ index/key, error }] }` — one item erroring never fails the whole call), a max batch size (default 50) with a clear over-limit error, and a copy-paste helper. **Read [mcp-batch-tool-convention.md](mcp-batch-tool-convention.md) before adding one.**
 
 ### Safety
 

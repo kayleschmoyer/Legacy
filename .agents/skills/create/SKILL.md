@@ -21,6 +21,8 @@ Scaffold a new project in the monorepo with standardized configuration. Pick the
 | **MCP server**     | `tools/mcp/<name>/`      | AI agent tooling via Model Context Protocol                     | [references/create-mcp-server.md](references/create-mcp-server.md) |
 | **Agent skill**    | `.agents/skills/<name>/` | AI agent skill following agentskills.io format                  | [references/create-skill.md](references/create-skill.md)           |
 
+> **Adding or changing a tool on an existing MCP server** (not creating a server) — read [references/mcp-tool-consolidation.md](references/mcp-tool-consolidation.md) first. Tool definitions are always-resident token cost, so an `action` param on an existing tool beats a new tool, and anything superseded must be deregistered in the same PR.
+
 ## Shared Checklist (all project types)
 
 1. **`project.json`** — register with Nx. Include `$schema`, `sourceRoot`, `projectType`, and `tags`. Libraries need `"typecheck": {}`; apps/lambdas override the typecheck command to use `tsconfig.app.json`.

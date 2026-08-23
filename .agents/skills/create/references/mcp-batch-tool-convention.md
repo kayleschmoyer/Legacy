@@ -18,7 +18,18 @@ Do **not** add a batch variant when:
 - Items are interdependent or ordered such that a partial result is meaningless (a true all-or-nothing transaction — model that explicitly, not as a batch).
 - A single underlying API call already accepts multiple items cheaply and exposes no per-item failure detail worth surfacing — wrap that API directly instead of layering this convention on top.
 
-**The single-item tool is always retained.** A batch variant is additive, never a replacement — one-off calls stay ergonomic.
+**Prefer widening the existing tool over registering a second one.** Per
+[mcp-tool-consolidation.md](mcp-tool-consolidation.md), the default is to make
+the existing tool's param accept a scalar _or_ an array
+(`z.union([Key, z.array(Key).min(1).max(50)])`), so one-off calls stay ergonomic
+and no new definition is added to the always-resident surface. Everything below
+— result shape, partial-failure reporting, size limits — applies to that widened
+tool exactly as it does to a standalone batch tool.
+
+Register a **separate** batch tool only when the batch path needs a materially
+different schema or result shape from the single-item path. When you do, the
+single-item tool is retained (it is a genuinely different shape, not an alias);
+when you widen instead, there was never a second tool to retain.
 
 ## Naming
 
@@ -29,7 +40,7 @@ Pick one of two equivalent forms and stay consistent within a server:
 
 The batch tool accepts an **array** parameter named for the item it operates on: `keys: [...]`, `numbers: [...]`, `items: [...]`, `tickets: [...]`. Existing servers already mix both forms; either is fine — match the neighbors in the server you're editing.
 
-> **Single tool that accepts both** (alternative): a single-item tool may instead accept _either_ a scalar or an array (see `jira_transition`, which takes `key: string | string[]` and dispatches to `bulkTransition` internally). Use this only when the single and batch paths share almost all logic; otherwise prefer a distinct batch tool so each description stays focused.
+> **Naming applies only to separate batch tools.** The preferred shape — one tool accepting either a scalar or an array (see `jira_transition`, which takes `key: string | string[]` and dispatches to `bulkTransition` internally, or `jira_view`'s `key`/`keys`) — needs no new name at all. Reach for a `bulk_*` / `*_batch` name only when you have established the batch path genuinely cannot share the single-item tool's schema.
 
 ## Result shape (partial failure)
 
