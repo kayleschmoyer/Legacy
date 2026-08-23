@@ -92,11 +92,32 @@ jest.mock('@legacy-sports/graphql', () => ({
     loading: false,
     refetch: mockRefetchPlayers,
   })),
+  useGetHeadToHeadRecordQuery: jest.fn(() => ({
+    data: undefined,
+    loading: false,
+  })),
 }));
 
-jest.mock('@legacy-sports/shared-components', () => ({
-  useWebSocket: jest.fn(() => ({ connected: false })),
-}));
+jest.mock('@legacy-sports/shared-components', () => {
+  const { View, Text } = jest.requireActual<typeof import('react-native')>(
+    'react-native',
+  ) as RNComponents;
+  return {
+    useWebSocket: jest.fn(() => ({ connected: false })),
+    Chip: ({
+      label,
+      testID,
+    }: {
+      label: string;
+      testID?: string;
+      [key: string]: unknown;
+    }) => (
+      <View testID={testID}>
+        <Text>{label}</Text>
+      </View>
+    ),
+  };
+});
 
 jest.mock('@legacy-sports/app-config/native', () => ({
   config: { websocketUrl: 'wss://example.test' },
@@ -221,6 +242,10 @@ describe('FootballMatchupScreen', () => {
       loading: false,
       refetch: mockRefetchPlayers,
     } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+    jest.mocked(graphqlLib.useGetHeadToHeadRecordQuery).mockReturnValue({
+      data: undefined,
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetHeadToHeadRecordQuery>);
   });
 
   it('shows spinner while matchup is loading', () => {
@@ -257,6 +282,39 @@ describe('FootballMatchupScreen', () => {
     render(<FootballMatchupScreen matchupId={1} />);
     expect(screen.getByText('102.50')).toBeTruthy();
     expect(screen.getByText('87.30')).toBeTruthy();
+  });
+
+  it('does not render a head-to-head chip when there is no prior matchup history', () => {
+    render(<FootballMatchupScreen matchupId={1} />);
+    expect(screen.queryByTestId('head-to-head-chip')).toBeNull();
+  });
+
+  it('does not render a head-to-head chip while the record is loading', () => {
+    jest.mocked(graphqlLib.useGetHeadToHeadRecordQuery).mockReturnValue({
+      data: undefined,
+      loading: true,
+    } as ReturnType<typeof graphqlLib.useGetHeadToHeadRecordQuery>);
+    render(<FootballMatchupScreen matchupId={1} />);
+    expect(screen.queryByTestId('head-to-head-chip')).toBeNull();
+  });
+
+  it('renders the all-time head-to-head record as a chip near the score header', () => {
+    jest.mocked(graphqlLib.useGetHeadToHeadRecordQuery).mockReturnValue({
+      data: {
+        getHeadToHeadRecord: {
+          team1Id: '10',
+          team2Id: '20',
+          team1Wins: 3,
+          team2Wins: 2,
+          ties: 0,
+          totalMatchups: 5,
+        },
+      },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetHeadToHeadRecordQuery>);
+    render(<FootballMatchupScreen matchupId={1} />);
+    expect(screen.getByTestId('head-to-head-chip')).toBeTruthy();
+    expect(screen.getByText('Team 10 vs Team 20: 3-2 all-time')).toBeTruthy();
   });
 
   it('renders week number', () => {

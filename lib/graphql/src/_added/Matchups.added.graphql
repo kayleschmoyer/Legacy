@@ -40,6 +40,21 @@ query GetTeamMatchupHistory($leagueId: Int!, $teamId: Int!, $limit: Int) {
   }
 }
 
+query GetHeadToHeadRecord($leagueId: Int!, $team1Id: Int!, $team2Id: Int!) {
+  getHeadToHeadRecord(
+    leagueId: $leagueId
+    team1Id: $team1Id
+    team2Id: $team2Id
+  ) {
+    team1Id
+    team2Id
+    team1Wins
+    team2Wins
+    ties
+    totalMatchups
+  }
+}
+
 mutation UpdateMatchupPlayerPosition($matchupPlayerId: Int!, $positionId: Int) {
   updateMatchupPlayerPosition(
     matchupPlayerId: $matchupPlayerId

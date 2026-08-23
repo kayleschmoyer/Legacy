@@ -7454,6 +7454,25 @@ export type GetTeamMatchupHistoryQuery = {
   }> | null;
 };
 
+export type GetHeadToHeadRecordQueryVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+  team1Id: Scalars['Int']['input'];
+  team2Id: Scalars['Int']['input'];
+}>;
+
+export type GetHeadToHeadRecordQuery = {
+  __typename?: 'Query';
+  getHeadToHeadRecord?: {
+    __typename?: 'HeadToHeadRecord';
+    team1Id?: string | null;
+    team2Id?: string | null;
+    team1Wins?: number | null;
+    team2Wins?: number | null;
+    ties?: number | null;
+    totalMatchups?: number | null;
+  } | null;
+};
+
 export type UpdateMatchupPlayerPositionMutationVariables = Exact<{
   matchupPlayerId: Scalars['Int']['input'];
   positionId?: InputMaybe<Scalars['Int']['input']>;
@@ -20695,6 +20714,107 @@ export type GetTeamMatchupHistorySuspenseQueryHookResult = ReturnType<
 export type GetTeamMatchupHistoryQueryResult = Apollo.QueryResult<
   GetTeamMatchupHistoryQuery,
   GetTeamMatchupHistoryQueryVariables
+>;
+export const GetHeadToHeadRecord = gql`
+  query GetHeadToHeadRecord($leagueId: Int!, $team1Id: Int!, $team2Id: Int!) {
+    getHeadToHeadRecord(
+      leagueId: $leagueId
+      team1Id: $team1Id
+      team2Id: $team2Id
+    ) {
+      team1Id
+      team2Id
+      team1Wins
+      team2Wins
+      ties
+      totalMatchups
+    }
+  }
+`;
+
+/**
+ * __useGetHeadToHeadRecordQuery__
+ *
+ * To run a query within a React component, call `useGetHeadToHeadRecordQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetHeadToHeadRecordQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetHeadToHeadRecordQuery({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *      team1Id: // value for 'team1Id'
+ *      team2Id: // value for 'team2Id'
+ *   },
+ * });
+ */
+export function useGetHeadToHeadRecordQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetHeadToHeadRecordQuery,
+    GetHeadToHeadRecordQueryVariables
+  > &
+    (
+      | { variables: GetHeadToHeadRecordQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetHeadToHeadRecordQuery,
+    GetHeadToHeadRecordQueryVariables
+  >(GetHeadToHeadRecord, options);
+}
+export function useGetHeadToHeadRecordLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetHeadToHeadRecordQuery,
+    GetHeadToHeadRecordQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetHeadToHeadRecordQuery,
+    GetHeadToHeadRecordQueryVariables
+  >(GetHeadToHeadRecord, options);
+}
+export function useGetHeadToHeadRecordSuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetHeadToHeadRecordQuery,
+        GetHeadToHeadRecordQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetHeadToHeadRecordQuery,
+    GetHeadToHeadRecordQueryVariables
+  >(
+    GetHeadToHeadRecord,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetHeadToHeadRecordQuery,
+          GetHeadToHeadRecordQueryVariables
+        >,
+  );
+}
+export type GetHeadToHeadRecordQueryHookResult = ReturnType<
+  typeof useGetHeadToHeadRecordQuery
+>;
+export type GetHeadToHeadRecordLazyQueryHookResult = ReturnType<
+  typeof useGetHeadToHeadRecordLazyQuery
+>;
+export type GetHeadToHeadRecordSuspenseQueryHookResult = ReturnType<
+  typeof useGetHeadToHeadRecordSuspenseQuery
+>;
+export type GetHeadToHeadRecordQueryResult = Apollo.QueryResult<
+  GetHeadToHeadRecordQuery,
+  GetHeadToHeadRecordQueryVariables
 >;
 export const UpdateMatchupPlayerPosition = gql`
   mutation UpdateMatchupPlayerPosition(

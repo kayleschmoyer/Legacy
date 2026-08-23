@@ -13,13 +13,15 @@ import {
 } from 'tamagui';
 import { config } from '@legacy-sports/app-config/native';
 import { LOGGER } from '@legacy-sports/logging';
-import { useWebSocket } from '@legacy-sports/shared-components';
+import { Chip, useWebSocket } from '@legacy-sports/shared-components';
 import { MatchupRecapPanel } from '@legacy-sports/shared-components/matchup';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
+  type GetHeadToHeadRecordQuery,
   type GetMatchupByIdQuery,
   type GetMatchupPlayersQuery,
   MatchupStatus,
+  useGetHeadToHeadRecordQuery,
   useGetMatchupByIdQuery,
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
@@ -30,6 +32,9 @@ import { useHasEntitlement } from '../../../features/subscription/useSubscriptio
 type Matchup = NonNullable<GetMatchupByIdQuery['getMatchupById']>;
 type MatchupPlayer = NonNullable<
   NonNullable<GetMatchupPlayersQuery['getMatchupPlayers']>[number]
+>;
+type HeadToHeadRecord = NonNullable<
+  GetHeadToHeadRecordQuery['getHeadToHeadRecord']
 >;
 
 const DST_POSITION_ORDER = [
@@ -201,6 +206,38 @@ function ScoreHeader({
         </YStack>
       </XStack>
     </Card>
+  );
+}
+
+/**
+ * Small pill showing the all-time head-to-head record between the two teams
+ * in this matchup, e.g. "Team 10 vs Team 20: 3-2 all-time" (FMD-046).
+ * Renders nothing while loading or once there's no prior-matchup history.
+ */
+function HeadToHeadChip({
+  team1Id,
+  team2Id,
+  loading,
+  record,
+}: {
+  team1Id: number | null | undefined;
+  team2Id: number | null | undefined;
+  loading: boolean;
+  record: HeadToHeadRecord | null | undefined;
+}) {
+  if (loading || !record || !record.totalMatchups) return null;
+
+  const team1Wins = record.team1Wins ?? 0;
+  const team2Wins = record.team2Wins ?? 0;
+  const ties = record.ties ?? 0;
+
+  return (
+    <Chip
+      testID="head-to-head-chip"
+      alignSelf="center"
+      tone="neutral"
+      label={`Team ${team1Id ?? 'Unknown'} vs Team ${team2Id ?? 'Unknown'}: ${team1Wins}-${team2Wins}${ties > 0 ? `-${ties}` : ''} all-time`}
+    />
   );
 }
 
@@ -438,6 +475,15 @@ export function FootballMatchupScreen(
     [defensiveFormat],
   );
 
+  const { data: h2hData, loading: h2hLoading } = useGetHeadToHeadRecordQuery({
+    variables: {
+      leagueId: matchup?.leagueId ?? 0,
+      team1Id: matchup?.team1Id ?? 0,
+      team2Id: matchup?.team2Id ?? 0,
+    },
+    skip: !matchup?.leagueId || !matchup?.team1Id || !matchup?.team2Id,
+  });
+
   if (matchupError) {
     return (
       <Card
@@ -490,6 +536,13 @@ export function FootballMatchupScreen(
     >
       <YStack gap="$3" paddingBottom="$8">
         <ScoreHeader matchup={matchup} isRefreshing={isRefreshingScore} />
+
+        <HeadToHeadChip
+          team1Id={matchup.team1Id}
+          team2Id={matchup.team2Id}
+          loading={h2hLoading}
+          record={h2hData?.getHeadToHeadRecord}
+        />
 
         {playersLoading ? (
           <YStack alignItems="center" padding="$4">
