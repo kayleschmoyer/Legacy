@@ -184,7 +184,11 @@ jobs:
           set -eo pipefail
 
           if [ -z "$PR_NUMBER" ]; then
-            echo "::warning::workflow_dispatch was triggered without pr_number — lint/format will run a whole-repo check (not scoped to any PR diff) and CI Gate will not post to a PR. Pass pr_number to scope this run to a PR, mirroring the native pull_request trigger."
+            WARN_MSG="workflow_dispatch was triggered without pr_number"
+            WARN_MSG="$WARN_MSG — lint/format will run a whole-repo check"
+            WARN_MSG="$WARN_MSG (not scoped to any PR diff) and CI Gate will not post to a PR."
+            WARN_MSG="$WARN_MSG Pass pr_number to scope this run to a PR, mirroring the native pull_request trigger."
+            echo "::warning::$WARN_MSG"
             exit 0
           fi
 
@@ -807,10 +811,21 @@ jobs:
   # and applies the "CI: Runner Flake" label so the author knows this is
   # infrastructure noise, not a code problem.
   #
-  # Detection: fetches the last 8 KB of logs for each cancelled job and looks
-  # for the GitHub-emitted "runner has received a shutdown signal" message.
-  # If not found (e.g. logs unavailable), the job exits silently to avoid
-  # false-positive comments on deliberate cancellations.
+  # Detection (LS-9451): delegated to the shared ./.github/actions/detect-
+  # runner-shutdown composite action — the same one lambda-terraform-apply.yml
+  # uses — instead of an inline copy, so the two paths can't drift. Label-apply
+  # and PR-comment stay here: ci_retry_runner_flake (tools/mcp/ci-server/src/
+  # tools/retry-runner-flake.ts) parses both the "CI: Runner Flake" label and
+  # the comment body signature "CI cancelled due to a runner restart" plus a
+  # /actions/runs/(\d+) match, so the label constant and comment wording must
+  # not change without updating that tool in lockstep.
+  #
+  # Known behavioural delta from the migration: the old inline copy only
+  # scanned jobs with conclusion == 'cancelled' AND a runner_name set. The
+  # shared action scans conclusion in {failure, cancelled} and does not
+  # require runner_name — this widening is intentional (lambda-terraform-
+  # apply's spot deaths conclude as `failure`, not `cancelled`) and accepted
+  # for this job too, per LS-9451.
   #
   # The "CI: Runner Flake" label is cleared by a step in determine-scope at
   # the start of every subsequent CI run.
@@ -826,74 +841,33 @@ jobs:
     runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
-      - name: "Detect and report runner shutdown"
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: "Detect runner shutdown"
+        id: detect
+        uses: ./.github/actions/detect-runner-shutdown
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Report runner shutdown"
+        if: steps.detect.outputs.shutdown-detected == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DETECT_JOB_NAMES: ${{ steps.detect.outputs.job-names }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
             const prNumber = context.issue.number;
             const runId = context.runId;
-            const token = process.env.GH_TOKEN;
 
-            // List all jobs for this workflow run (includes workflow_call child jobs)
-            let allJobs = [];
-            let page = 1;
-            while (true) {
-              const { data } = await github.rest.actions.listJobsForWorkflowRun({
-                owner, repo, run_id: runId, per_page: 100, page,
-              });
-              allJobs = allJobs.concat(data.jobs);
-              if (data.jobs.length < 100) break;
-              page++;
-            }
-
-            const cancelledJobs = allJobs.filter(j => j.conclusion === 'cancelled' && j.runner_name);
-            if (cancelledJobs.length === 0) {
-              core.info('No cancelled jobs with a runner name — skipping.');
-              return;
-            }
-
-            // Confirm shutdown by checking the tail of each cancelled job's log
-            // for the signature message GitHub emits on runner teardown.
-            // Fetching only the last 8 KB keeps this fast for large log files.
-            const shutdownJobs = [];
-            for (const job of cancelledJobs) {
-              try {
-                const redirectRes = await fetch(
-                  `https://api.github.com/repos/${owner}/${repo}/actions/jobs/${job.id}/logs`,
-                  {
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                      'User-Agent': 'github-actions',
-                      Accept: 'application/vnd.github+json',
-                    },
-                    redirect: 'manual',
-                  }
-                );
-                const logUrl = redirectRes.headers.get('location');
-                if (!logUrl) {
-                  core.info(`No redirect URL for job "${job.name}" — skipping log check`);
-                  continue;
-                }
-                const logRes = await fetch(logUrl, { headers: { Range: 'bytes=-8192' } });
-                const logText = await logRes.text();
-                if (logText.includes('runner has received a shutdown signal')) {
-                  shutdownJobs.push(job);
-                }
-              } catch (e) {
-                core.warning(`Could not fetch logs for job "${job.name}" (${job.id}): ${e.message}`);
-              }
-            }
-
-            if (shutdownJobs.length === 0) {
-              core.info('No shutdown signal found in cancelled job logs — likely a user cancellation. Skipping.');
-              return;
-            }
-
-            const jobList = shutdownJobs.map(j => `\`${j.name}\``).join(', ');
+            const jobList = process.env.DETECT_JOB_NAMES
+              .split(',')
+              .map((name) => name.trim())
+              .filter(Boolean)
+              .map((name) => `\`${name}\``)
+              .join(', ');
             const LABEL = 'CI: Runner Flake';
 
             try {

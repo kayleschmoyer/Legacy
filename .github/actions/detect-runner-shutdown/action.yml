@@ -14,9 +14,10 @@ description: "Classify a failed workflow run as self-hosted-runner churn (spot i
 # workflow (a PR workflow labels the PR; a main-branch deploy workflow has no
 # PR to label and re-dispatches itself instead).
 #
-# ci-orchestrator.yml still carries its own inline copy of this detection
-# (PR-comment flavoured). Migrating it onto this action is LS-9451 — kept out
-# of LS-9438 so a main-CI change does not ride along with a deploy fix.
+# ci-orchestrator.yml's report-runner-shutdown job also consumes this action
+# (LS-9451) — kept out of LS-9438 so the main-CI migration would not ride
+# along with the deploy-pipeline fix. It layers label-apply and PR-comment
+# behaviour on top of this action's classification.
 # ---------------------------------------------------------------------------
 
 inputs:
