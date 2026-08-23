@@ -66,7 +66,7 @@ export function MatchupDetailPage() {
     variables: { id: leagueIdNum ?? 0 },
     skip: !leagueIdNum,
   });
-  const leagueSport = leagueData?.league?.sport ?? 'baseball';
+  const leagueSport = leagueData?.league?.sport ?? Sport.Baseball;
 
   const userCurrentMatchup = React.useMemo(() => {
     if (!currentWeek || !userTeamId || !allLeagueMatchups.length) return null;
@@ -287,7 +287,11 @@ export function MatchupDetailPage() {
           ) : undefined
         }
         rosterComparison={
-          <MatchupRosterComparison matchup={matchup} userTeamId={userTeamId} />
+          <MatchupRosterComparison
+            matchup={matchup}
+            userTeamId={userTeamId}
+            sport={leagueSport}
+          />
         }
         additionalSections={
           leagueSport === Sport.Football ? (

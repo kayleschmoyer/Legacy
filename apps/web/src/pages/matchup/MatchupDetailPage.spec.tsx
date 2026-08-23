@@ -107,8 +107,12 @@ jest.mock('../../features/matchup/MatchupScoreboard', () => ({
 jest.mock('../../features/matchup/MatchupWinProbabilityPanel', () => ({
   MatchupWinProbabilityPanel: () => <div data-testid="win-probability" />,
 }));
+const mockMatchupRosterComparison = jest.fn();
 jest.mock('../../features/matchup/MatchupRosterComparison', () => ({
-  MatchupRosterComparison: () => <div data-testid="roster-comparison" />,
+  MatchupRosterComparison: (props: { sport?: string | null }) => {
+    mockMatchupRosterComparison(props);
+    return <div data-testid="roster-comparison" />;
+  },
 }));
 jest.mock('../../features/matchup/MatchupRosterEditor', () => ({
   MatchupRosterEditor: () => <div data-testid="roster-editor" />,
@@ -285,6 +289,35 @@ describe('MatchupDetailPage forbidden vs not-found state (LS-5900)', () => {
     expect(
       screen.queryByText('You no longer have access to this league'),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('MatchupDetailPage – roster comparison sport wiring (LS-5431)', () => {
+  beforeEach(() => {
+    mockMatchupRosterComparison.mockClear();
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: undefined,
+    });
+  });
+
+  it('passes sport="football" for a football league, so MatchupRosterComparison renders football labels/position groups/click-routing instead of defaulting to baseball', () => {
+    mockLeagueSport = 'football';
+    render(<MatchupDetailPage />);
+
+    expect(mockMatchupRosterComparison).toHaveBeenCalledWith(
+      expect.objectContaining({ sport: 'football' }),
+    );
+  });
+
+  it('passes sport="baseball" for a baseball league', () => {
+    mockLeagueSport = 'baseball';
+    render(<MatchupDetailPage />);
+
+    expect(mockMatchupRosterComparison).toHaveBeenCalledWith(
+      expect.objectContaining({ sport: 'baseball' }),
+    );
   });
 });
 
