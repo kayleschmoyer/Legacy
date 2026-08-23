@@ -49,6 +49,8 @@ const mockMatchup = {
   team2Score: 87.3,
   status: 'in_progress',
   weekNumber: 7,
+  team1: { id: 10, name: "Schmoyer's Smashers", primaryColor: '#123456' },
+  team2: { id: 20, name: 'Gridiron Ghosts', primaryColor: '#654321' },
 };
 
 const COMPLETED_MATCHUP = {
@@ -119,18 +121,51 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
-// Renders plain testID'd nodes so this spec asserts on prop wiring without
-// depending on the real components' Tamagui styled() internals.
+// Render a minimal stand-in for the shared scoreboard hero so this suite
+// stays focused on FootballMatchupScreen's own logic (team/record/status/
+// counter wiring) rather than re-testing MatchupScoreboardHero's internals
+// (see its own spec). Mirrors MatchupDetailScreen.spec.tsx's approach for
+// the same shared-components/matchup boundary.
 jest.mock('@legacy-sports/shared-components/matchup', () => {
-  const { Text: RNTextComponent, View } =
-    jest.requireActual<RNComponents>('react-native');
   const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { Text, View } = jest.requireActual<RNComponents>('react-native');
   return {
-    MatchupStatusChip: ({ status }: { status?: string | null }) =>
+    MatchupScoreboardHero: ({
+      weekNumber,
+      totalMatchups,
+      status,
+      team1,
+      team2,
+    }: {
+      weekNumber?: number | null;
+      totalMatchups?: number | null;
+      status?: string | null;
+      team1: { name?: string | null; record?: string | null; score?: number };
+      team2: { name?: string | null; record?: string | null; score?: number };
+    }) =>
       ReactActual.createElement(
-        RNTextComponent,
-        { testID: 'status-chip' },
-        status ?? 'unknown',
+        View,
+        { testID: 'matchup-scoreboard-hero' },
+        status != null
+          ? ReactActual.createElement(Text, { testID: 'status-chip' }, status)
+          : null,
+        ReactActual.createElement(Text, null, team1.name),
+        team1.record != null
+          ? ReactActual.createElement(Text, null, team1.record)
+          : null,
+        ReactActual.createElement(Text, null, (team1.score ?? 0).toFixed(2)),
+        ReactActual.createElement(Text, null, team2.name),
+        team2.record != null
+          ? ReactActual.createElement(Text, null, team2.record)
+          : null,
+        ReactActual.createElement(Text, null, (team2.score ?? 0).toFixed(2)),
+        weekNumber != null
+          ? ReactActual.createElement(
+              Text,
+              null,
+              `Matchup ${weekNumber}${totalMatchups ? `/${totalMatchups}` : ''}`,
+            )
+          : null,
       ),
     MatchupRecapPanel: () =>
       ReactActual.createElement(View, { testID: 'recap-panel' }),
@@ -139,6 +174,21 @@ jest.mock('@legacy-sports/shared-components/matchup', () => {
 
 jest.mock('@legacy-sports/app-config/native', () => ({
   config: { websocketUrl: 'wss://example.test' },
+}));
+
+const mockUseStandings = jest.fn(() => ({
+  standings: [] as {
+    teamId: number;
+    wins: number;
+    losses: number;
+    ties: number;
+  }[],
+  loading: false,
+  error: undefined,
+  refetch: jest.fn(),
+}));
+jest.mock('../../../features/matchup/hooks/useStandings', () => ({
+  useStandings: (...args: unknown[]) => mockUseStandings(...args),
 }));
 
 jest.mock('../../../common/auth/AuthHooks', () => ({
@@ -333,6 +383,44 @@ describe('FootballMatchupScreen', () => {
   it('renders the matchup counter with the league total-matchups value', () => {
     render(<FootballMatchupScreen matchupId={1} totalMatchups={14} />);
     expect(screen.getByText('Matchup 7/14')).toBeTruthy();
+  });
+
+  it('renders team names instead of raw team IDs (LS-6361)', () => {
+    render(<FootballMatchupScreen matchupId={1} leagueId={99} />);
+    expect(screen.getAllByText("Schmoyer's Smashers").length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText('Gridiron Ghosts').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Team 10')).toBeNull();
+    expect(screen.queryByText('Team 20')).toBeNull();
+  });
+
+  it('renders each team record from league standings', () => {
+    mockUseStandings.mockReturnValue({
+      standings: [
+        { teamId: 10, wins: 5, losses: 2, ties: 0 },
+        { teamId: 20, wins: 3, losses: 4, ties: 1 },
+      ],
+      loading: false,
+      error: undefined,
+      refetch: jest.fn(),
+    });
+    render(<FootballMatchupScreen matchupId={1} leagueId={99} />);
+    expect(screen.getByText('5-2')).toBeTruthy();
+    expect(screen.getByText('3-4-1')).toBeTruthy();
+  });
+
+  it('falls back to "Team {id}" when team data is missing from the matchup', () => {
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: { ...mockMatchup, team1: null, team2: null } },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: mockRefetchMatchup,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+    render(<FootballMatchupScreen matchupId={1} />);
+    expect(screen.getAllByText('Team 10').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Team 20').length).toBeGreaterThan(0);
   });
 
   it('renders the matchup status chip with the current status', () => {

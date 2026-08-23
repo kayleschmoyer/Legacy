@@ -7176,11 +7176,13 @@ export type GetMatchupByIdQuery = {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     team2?: {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     winProbability?: {
       __typename?: 'MatchupWinProbability';
@@ -7230,11 +7232,13 @@ export type GetMatchupHistoryQuery = {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     team2?: {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     winProbability?: {
       __typename?: 'MatchupWinProbability';
@@ -7442,11 +7446,13 @@ export type GetTeamMatchupHistoryQuery = {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     team2?: {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     winProbability?: {
       __typename?: 'MatchupWinProbability';
@@ -11291,11 +11297,13 @@ export type GetMatchupsByWeekQuery = {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     team2?: {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     winProbability?: {
       __typename?: 'MatchupWinProbability';
@@ -11333,11 +11341,13 @@ export type GetMatchupsForLeagueQuery = {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     team2?: {
       __typename?: 'Team';
       id?: number | null;
       name?: string | null;
+      primaryColor?: string | null;
     } | null;
     winProbability?: {
       __typename?: 'MatchupWinProbability';
@@ -12636,11 +12646,13 @@ export type MatchupFragment = {
     __typename?: 'Team';
     id?: number | null;
     name?: string | null;
+    primaryColor?: string | null;
   } | null;
   team2?: {
     __typename?: 'Team';
     id?: number | null;
     name?: string | null;
+    primaryColor?: string | null;
   } | null;
   winProbability?: {
     __typename?: 'MatchupWinProbability';
@@ -16017,10 +16029,12 @@ export const MatchupFragmentDoc = gql`
     team1 {
       id
       name
+      primaryColor
     }
     team2 {
       id
       name
+      primaryColor
     }
     winProbability {
       team1ProjectedScore

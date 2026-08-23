@@ -17,10 +17,12 @@ fragment Matchup on Matchup {
   team1 {
     id
     name
+    primaryColor
   }
   team2 {
     id
     name
+    primaryColor
   }
 
   # LS-6323: premium projected-points signal for list rows. Server-gated by

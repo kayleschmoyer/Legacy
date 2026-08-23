@@ -16,7 +16,7 @@ import { LOGGER } from '@legacy-sports/logging';
 import { Chip, useWebSocket } from '@legacy-sports/shared-components';
 import {
   MatchupRecapPanel,
-  MatchupStatusChip,
+  MatchupScoreboardHero,
 } from '@legacy-sports/shared-components/matchup';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
@@ -31,6 +31,7 @@ import {
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 import { PremiumGate } from '../../../features/subscription/PremiumGate';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
+import { useStandings } from '../../../features/matchup/hooks/useStandings';
 
 type Matchup = NonNullable<GetMatchupByIdQuery['getMatchupById']>;
 type MatchupPlayer = NonNullable<
@@ -80,6 +81,7 @@ interface FootballMatchupScreenProps {
   readonly defensiveFormat?: string | null;
   /** League's total matchup weeks, for the "Matchup {week}/{total}" counter. */
   readonly totalMatchups?: number | null;
+  readonly leagueId?: number | null;
 }
 
 /**
@@ -122,66 +124,82 @@ export function getPlayerPosition(player: MatchupPlayer['player']): string {
   return positions[0] ?? '—';
 }
 
+type TeamStandingRecord = {
+  teamId?: number | string | null;
+  wins?: number | null;
+  losses?: number | null;
+  ties?: number | null;
+};
+
+/**
+ * Formats a team's W-L(-T) record from league standings, e.g. "5-2" or
+ * "5-2-1" when the league allows ties. Returns undefined when no standing
+ * row exists for the team (e.g. standings haven't loaded yet).
+ */
+export function formatTeamRecord(
+  teamId: number | null | undefined,
+  standings: readonly TeamStandingRecord[],
+): string | undefined {
+  if (teamId == null) return undefined;
+  const standing = standings.find((s) => Number(s.teamId) === teamId);
+  if (!standing) return undefined;
+  const wins = standing.wins ?? 0;
+  const losses = standing.losses ?? 0;
+  const ties = standing.ties ?? 0;
+  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+}
+
 function ScoreHeader({
   matchup,
   isRefreshing,
+  standings,
   totalMatchups,
 }: {
   matchup: Matchup;
   isRefreshing: boolean;
+  standings: readonly TeamStandingRecord[];
   totalMatchups?: number | null;
 }) {
   const team1Score = matchup.team1Score ?? 0;
   const team2Score = matchup.team2Score ?? 0;
+  const totalGames = matchup.gamesPerMatchup ?? 0;
+  const gamesPlayed = matchup.selectedGamesCount ?? 0;
 
   return (
-    <Card bordered backgroundColor="$background" borderRadius="$4" padding="$4">
-      <XStack alignItems="center" justifyContent="space-between">
-        <YStack alignItems="center" flex={1}>
-          <Text fontSize="$2" color="$gray9" marginBottom="$1">
-            Team {matchup.team1Id}
-          </Text>
-          <Text
-            fontSize="$8"
-            fontWeight="700"
-            color={team1Score > team2Score ? '$green10' : '$color12'}
-            opacity={isRefreshing ? 0.5 : 1}
-          >
-            {team1Score.toFixed(2)}
-          </Text>
+    <YStack opacity={isRefreshing ? 0.5 : 1}>
+      {isRefreshing ? (
+        <YStack
+          testID="score-refreshing-spinner"
+          position="absolute"
+          top="$2"
+          right="$2"
+          zIndex={1}
+        >
+          <Spinner size="small" color="$brandNavyLight" />
         </YStack>
-
-        <YStack alignItems="center" paddingHorizontal="$3" gap="$1.5">
-          {isRefreshing ? (
-            <YStack testID="score-refreshing-spinner">
-              <Spinner size="small" color="$brandNavyLight" />
-            </YStack>
-          ) : (
-            <MatchupStatusChip status={matchup.status} />
-          )}
-          {matchup.weekNumber != null ? (
-            <Text fontSize="$1" color="$gray7">
-              Matchup {matchup.weekNumber}
-              {totalMatchups ? `/${totalMatchups}` : ''}
-            </Text>
-          ) : null}
-        </YStack>
-
-        <YStack alignItems="center" flex={1}>
-          <Text fontSize="$2" color="$gray9" marginBottom="$1">
-            Team {matchup.team2Id}
-          </Text>
-          <Text
-            fontSize="$8"
-            fontWeight="700"
-            color={team2Score > team1Score ? '$green10' : '$color12'}
-            opacity={isRefreshing ? 0.5 : 1}
-          >
-            {team2Score.toFixed(2)}
-          </Text>
-        </YStack>
-      </XStack>
-    </Card>
+      ) : null}
+      <MatchupScoreboardHero
+        weekNumber={matchup.weekNumber}
+        totalMatchups={totalMatchups}
+        status={matchup.status}
+        team1={{
+          id: matchup.team1Id,
+          name: matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`,
+          primaryColor: matchup.team1?.primaryColor,
+          score: team1Score,
+          record: formatTeamRecord(matchup.team1Id, standings),
+        }}
+        team2={{
+          id: matchup.team2Id,
+          name: matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`,
+          primaryColor: matchup.team2?.primaryColor,
+          score: team2Score,
+          record: formatTeamRecord(matchup.team2Id, standings),
+        }}
+        gamesPlayed={gamesPlayed}
+        totalGames={totalGames}
+      />
+    </YStack>
   );
 }
 
@@ -354,7 +372,7 @@ function RosterSection({
 export function FootballMatchupScreen(
   props: FootballMatchupScreenProps,
 ): React.JSX.Element {
-  const { matchupId, defensiveFormat, totalMatchups } = props;
+  const { matchupId, defensiveFormat, totalMatchups, leagueId } = props;
   const router = useRouter();
   const canSeeRecap = useHasEntitlement(ENTITLEMENTS.ai_matchup_recap);
 
@@ -375,6 +393,8 @@ export function FootballMatchupScreen(
     notifyOnNetworkStatusChange: true,
   });
 
+  const { standings, error: standingsError } = useStandings(leagueId);
+
   const {
     data: playersData,
     loading: playersLoading,
@@ -389,6 +409,17 @@ export function FootballMatchupScreen(
       LOGGER.error('Failed to load matchup', matchupError, { matchupId });
     }
   }, [matchupError, matchupId]);
+
+  // Non-fatal: the header still renders name/score/avatar without a record
+  // when standings fail to load (formatTeamRecord returns undefined), so a
+  // standings error only degrades the header rather than blocking the page.
+  useEffect(() => {
+    if (standingsError) {
+      LOGGER.error('Failed to load league standings', standingsError, {
+        leagueId,
+      });
+    }
+  }, [standingsError, leagueId]);
 
   // On resume from background, cache-first would otherwise serve stale scores
   // with no network round-trip — force a network refetch instead (LS-6388).
@@ -514,6 +545,7 @@ export function FootballMatchupScreen(
         <ScoreHeader
           matchup={matchup}
           isRefreshing={isRefreshingScore}
+          standings={standings}
           totalMatchups={totalMatchups}
         />
 
@@ -534,14 +566,14 @@ export function FootballMatchupScreen(
               teamId={matchup.team1Id}
               players={players}
               positionOrder={positionOrder}
-              label={`Team ${matchup.team1Id ?? '1'}`}
+              label={matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`}
               onPlayerPress={onPlayerPress}
             />
             <RosterSection
               teamId={matchup.team2Id}
               players={players}
               positionOrder={positionOrder}
-              label={`Team ${matchup.team2Id ?? '2'}`}
+              label={matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`}
               onPlayerPress={onPlayerPress}
             />
           </>

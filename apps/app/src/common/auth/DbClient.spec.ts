@@ -312,8 +312,18 @@ describe('createStaleMatchupGuardLink (LS-6359)', () => {
       startTime: null,
       endTime: null,
       updatedAt: overrides.updatedAt,
-      team1: { __typename: 'Team', id: '100', name: 'Team One' },
-      team2: { __typename: 'Team', id: '200', name: 'Team Two' },
+      team1: {
+        __typename: 'Team',
+        id: '100',
+        name: 'Team One',
+        primaryColor: null,
+      },
+      team2: {
+        __typename: 'Team',
+        id: '200',
+        name: 'Team Two',
+        primaryColor: null,
+      },
       // The Matchup fragment now selects winProbability (LS-6323) — omitting
       // it here makes cache.readQuery throw a missing-field error inside
       // dropStaleMatchupResult, silently passing the stale response through.
