@@ -110,14 +110,85 @@ jest.mock(
   },
 );
 
-jest.mock('../../../../features/roster/LineupEditor', () => {
-  const { Text, View } = jest.requireActual<RNComponents>('react-native');
+// The Lineup tab now mounts the shared cross-platform RosterBoard (LS-9649).
+// This double surfaces the props under test and exposes one pressable per
+// interaction so the route's assign / bench / swap wiring is asserted directly
+// — the old LineupEditor mock swallowed the editor entirely and asserted
+// nothing about it.
+type MockRosterSlot = { id: number | null; positionType: string };
+type MockRosterPlayer = {
+  id: number;
+  playerId: number;
+  positionId: number | null;
+};
+type MockRosterBoardProps = {
+  positions: readonly MockRosterSlot[];
+  teamPlayers: readonly MockRosterPlayer[];
+  onPlayerAssign: (player: MockRosterPlayer, position: MockRosterSlot) => void;
+  onPlayerRemove: (position: MockRosterSlot) => void;
+  onPlayerSwap: (
+    incoming: MockRosterPlayer,
+    target: MockRosterSlot,
+    displaced: MockRosterPlayer,
+  ) => void;
+  getPlayerStats?: (
+    player: MockRosterPlayer,
+  ) => { actual?: number | null } | null;
+  readOnly?: boolean;
+  sport?: string;
+};
+
+jest.mock('@legacy-sports/shared-components/roster', () => {
+  const { Pressable, Text, View } = jest.requireActual<
+    RNComponents & { Pressable: typeof import('react-native').Pressable }
+  >('react-native');
   return {
-    LineupEditor: ({ actual }: { actual: Record<number, number> }) => (
-      <View testID="lineup-editor">
-        <Text testID="lineup-editor-actual">{JSON.stringify(actual)}</Text>
-      </View>
-    ),
+    RosterBoard: ({
+      positions,
+      teamPlayers,
+      onPlayerAssign,
+      onPlayerRemove,
+      onPlayerSwap,
+      getPlayerStats,
+      readOnly,
+      sport,
+    }: MockRosterBoardProps) => {
+      const slot = positions[0];
+      const benched = teamPlayers.find((p) => p.positionId == null);
+      const occupant = teamPlayers.find((p) => p.positionId === slot?.id);
+      const actual: Record<number, number> = {};
+      for (const p of teamPlayers) {
+        const points = getPlayerStats?.(p)?.actual;
+        if (points != null) actual[p.playerId] = points;
+      }
+      return (
+        <View testID="roster-board">
+          <Text testID="roster-board-sport">{sport}</Text>
+          <Text testID="roster-board-readonly">{String(!!readOnly)}</Text>
+          <Text testID="roster-board-slots">
+            {positions.map((p) => p.positionType).join(',')}
+          </Text>
+          <Text testID="roster-board-actual">{JSON.stringify(actual)}</Text>
+          <Pressable
+            testID="roster-board-assign"
+            onPress={() => benched && slot && onPlayerAssign(benched, slot)}
+          />
+          <Pressable
+            testID="roster-board-remove"
+            onPress={() => slot && onPlayerRemove(slot)}
+          />
+          <Pressable
+            testID="roster-board-swap"
+            onPress={() =>
+              benched &&
+              slot &&
+              occupant &&
+              onPlayerSwap(benched, slot, occupant)
+            }
+          />
+        </View>
+      );
+    },
   };
 });
 
@@ -202,7 +273,13 @@ const mockMatchupScores = {
   ],
 };
 
-const mockPositions = [{ id: 1, leagueId: 10, positionType: 'QB' }];
+// `id` is widened to match the schema's nullable LeaguePosition.id so the
+// null-slot guard test can override this fixture.
+const mockPositions: {
+  id: number | null;
+  leagueId: number;
+  positionType: string;
+}[] = [{ id: 1, leagueId: 10, positionType: 'QB' }];
 
 const mockMembers = [
   {
@@ -216,6 +293,23 @@ const mockMembers = [
       id: 1,
       firstName: 'Josh',
       lastName: 'Allen',
+      brefId: null,
+      eligiblePositions: ['QB'],
+    },
+  },
+  // Benched (positionId === null) — RosterBoard derives bench membership from
+  // a null positionId, so this is the player the assign/swap paths move.
+  {
+    id: 102,
+    playerId: 2,
+    positionId: null,
+    teamId: 42,
+    leagueId: 10,
+    onTradeBlock: false,
+    player: {
+      id: 2,
+      firstName: 'Backup',
+      lastName: 'Quarterback',
       brefId: null,
       eligiblePositions: ['QB'],
     },
@@ -241,7 +335,14 @@ const mockUseGetTeamMembersQuery = jest.fn(() => ({
   loading: false,
   data: { teamMembers: mockMembers },
 }));
-const mockUseUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
+const mockUpdateTeamMemberPosition = jest.fn(() => Promise.resolve({}));
+const mockSwapTeamMemberPositions = jest.fn(() => Promise.resolve({}));
+const mockUseUpdateTeamMemberPositionMutation = jest.fn(() => [
+  mockUpdateTeamMemberPosition,
+]);
+const mockUseSwapTeamMemberPositionsMutation = jest.fn(() => [
+  mockSwapTeamMemberPositions,
+]);
 const mockUseUpdateTeamBrandingMutation = jest.fn(() => [
   jest.fn(),
   { loading: false },
@@ -282,6 +383,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseMatchupScoresQuery(...args),
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
     mockUseUpdateTeamMemberPositionMutation(...args),
+  useSwapTeamMemberPositionsMutation: (...args: unknown[]) =>
+    mockUseSwapTeamMemberPositionsMutation(...args),
   useUpdateTeamBrandingMutation: (...args: unknown[]) =>
     mockUseUpdateTeamBrandingMutation(...args),
 }));
@@ -312,7 +415,12 @@ describe('FootballTeam route', () => {
       loading: false,
       data: { getMatchupById: mockMatchup },
     });
-    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
+    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([
+      mockUpdateTeamMemberPosition,
+    ]);
+    mockUseSwapTeamMemberPositionsMutation.mockReturnValue([
+      mockSwapTeamMemberPositions,
+    ]);
     mockUseUpdateTeamBrandingMutation.mockReturnValue([
       jest.fn(),
       { loading: false },
@@ -371,10 +479,94 @@ describe('FootballTeam route', () => {
     expect(screen.getByTestId('roster-screen-42-dst')).toBeTruthy();
   });
 
-  it('shows lineup editor when Lineup tab is selected', () => {
+  it('renders the shared RosterBoard for football on the Lineup tab', () => {
     render(<FootballTeam />);
     fireEvent.press(screen.getByTestId('tab-Lineup'));
-    expect(screen.getByTestId('lineup-editor')).toBeTruthy();
+    expect(screen.getByTestId('roster-board')).toBeTruthy();
+    // sport="football" is what makes the board resolve football slot
+    // eligibility instead of the baseball-only table the old fork used.
+    expect(screen.getByTestId('roster-board-sport')).toHaveTextContent(
+      'football',
+    );
+  });
+
+  it("forwards the league's football slots to the board", () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.getByTestId('roster-board-slots')).toHaveTextContent('QB');
+  });
+
+  it('leaves the board editable for the team owner', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.getByTestId('roster-board-readonly')).toHaveTextContent(
+      'false',
+    );
+  });
+
+  it('renders a read-only board for a non-owner', () => {
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 99 } });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.getByTestId('roster-board-readonly')).toHaveTextContent(
+      'true',
+    );
+  });
+
+  it('assigns a benched player to a slot via updateTeamMemberPosition', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    fireEvent.press(screen.getByTestId('roster-board-assign'));
+    expect(mockUpdateTeamMemberPosition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: { teamMemberId: 102, positionId: 1 },
+      }),
+    );
+  });
+
+  it('benches a starter by clearing their positionId', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    fireEvent.press(screen.getByTestId('roster-board-remove'));
+    expect(mockUpdateTeamMemberPosition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: { teamMemberId: 101, positionId: null },
+      }),
+    );
+  });
+
+  it('issues no mutation when a roster slot has no id', () => {
+    // `LeaguePosition.id` is nullable in the schema. Without a guard, remove
+    // would match every benched player (bench === `positionId == null`) and
+    // assign would send positionId: null, benching the player it should start.
+    mockUseGetPositionsForLeagueQuery.mockReturnValue({
+      loading: false,
+      data: {
+        leaguePositions: [{ id: null, leagueId: 10, positionType: 'QB' }],
+      },
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    fireEvent.press(screen.getByTestId('roster-board-remove'));
+    fireEvent.press(screen.getByTestId('roster-board-assign'));
+    expect(mockUpdateTeamMemberPosition).not.toHaveBeenCalled();
+  });
+
+  it('swaps two players with a single atomic mutation', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    fireEvent.press(screen.getByTestId('roster-board-swap'));
+    expect(mockSwapTeamMemberPositions).toHaveBeenCalledTimes(1);
+    expect(mockSwapTeamMemberPositions).toHaveBeenCalledWith({
+      variables: {
+        teamMemberIdA: 102,
+        positionIdA: 1,
+        teamMemberIdB: 101,
+        positionIdB: undefined,
+      },
+    });
+    // The old wiring fired two independent, non-transactional updates here.
+    expect(mockUpdateTeamMemberPosition).not.toHaveBeenCalled();
   });
 
   it('passes defensiveFormat to FootballLeagueRosterScreen', () => {
@@ -451,14 +643,14 @@ describe('FootballTeam route', () => {
     expect(screen.queryByTestId('matchup-card')).toBeNull();
   });
 
-  it("passes the current team's matchup scores to LineupEditor's actual prop", () => {
+  it("passes the current team's matchup scores to the board", () => {
     mockUseMatchupScoresQuery.mockReturnValue({
       loading: false,
       data: mockMatchupScores,
     });
     render(<FootballTeam />);
     fireEvent.press(screen.getByTestId('tab-Lineup'));
-    expect(screen.getByTestId('lineup-editor-actual')).toHaveTextContent(
+    expect(screen.getByTestId('roster-board-actual')).toHaveTextContent(
       JSON.stringify({ 1: 24.7 }),
     );
   });
@@ -474,7 +666,7 @@ describe('FootballTeam route', () => {
     });
     render(<FootballTeam />);
     fireEvent.press(screen.getByTestId('tab-Lineup'));
-    expect(screen.getByTestId('lineup-editor-actual')).toHaveTextContent('{}');
+    expect(screen.getByTestId('roster-board-actual')).toHaveTextContent('{}');
   });
 
   it('falls back to empty actual scores while the matchup scores query is loading', () => {
@@ -484,7 +676,7 @@ describe('FootballTeam route', () => {
     });
     render(<FootballTeam />);
     fireEvent.press(screen.getByTestId('tab-Lineup'));
-    expect(screen.getByTestId('lineup-editor-actual')).toHaveTextContent('{}');
+    expect(screen.getByTestId('roster-board-actual')).toHaveTextContent('{}');
   });
 
   it('falls back to empty actual scores when the matchup scores query errors', () => {
@@ -495,7 +687,7 @@ describe('FootballTeam route', () => {
     });
     render(<FootballTeam />);
     fireEvent.press(screen.getByTestId('tab-Lineup'));
-    expect(screen.getByTestId('lineup-editor-actual')).toHaveTextContent('{}');
+    expect(screen.getByTestId('roster-board-actual')).toHaveTextContent('{}');
   });
 
   it('skips the matchup scores query when currentWeekNumber is unavailable', () => {
