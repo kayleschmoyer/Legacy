@@ -323,6 +323,196 @@ describe('fetchRunLogsRing', () => {
   });
 });
 
+describe('errorSummary step-scoping (LS-9556)', () => {
+  beforeEach(() => {
+    mockGithubGet.mockReset();
+    mockGithubGetArrayBuffer.mockReset();
+  });
+
+  it('scopes a run-based job to only the failing step, dropping successful setup/checkout noise', async () => {
+    // Reproduces the "lint & format" job from LS-9556 (run 32586634982, job
+    // 97065111193): the failing step is "Lint" (step 3), but the whole job
+    // log also includes "Set up job" (runner bootstrap) and "Checkout" (git
+    // fetch spam) steps that both succeeded.
+    mockGithubGet.mockResolvedValue({
+      total_count: 1,
+      jobs: [
+        {
+          id: 97065111193,
+          name: 'lint & format',
+          status: 'completed',
+          conclusion: 'failure',
+          steps: [
+            {
+              name: 'Set up job',
+              status: 'completed',
+              conclusion: 'success',
+              number: 1,
+            },
+            {
+              name: 'Checkout',
+              status: 'completed',
+              conclusion: 'success',
+              number: 2,
+            },
+            {
+              name: 'Lint',
+              status: 'completed',
+              conclusion: 'failure',
+              number: 3,
+            },
+          ],
+        },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      bufferToArrayBuffer(
+        Buffer.concat([
+          buildStoredZipEntry(
+            '1_Set up job.txt',
+            'hook_job_started.sh: runner heartbeat\n',
+          ),
+          buildStoredZipEntry(
+            '2_Checkout.txt',
+            '* [new branch]      LS-1001-fix-error-logging -> origin/LS-1001-fix-error-logging\n',
+          ),
+          buildStoredZipEntry(
+            '3_Lint.txt',
+            "src/foo.ts\n  12:5  error  'foo' is defined but never used  no-unused-vars\n\n✖ 1 problem (1 error, 0 warnings)\n",
+          ),
+        ]),
+      ),
+    );
+
+    const result = await fetchRunLogsRing(
+      { runId: 32586634982, failedOnly: true },
+      500,
+      () => false,
+    );
+
+    expect(result.lines.join('\n')).not.toContain('hook_job_started.sh');
+    expect(result.lines.join('\n')).not.toContain('new branch');
+    expect(result.lines.join('\n')).toContain('no-unused-vars');
+    expect(result.lines.join('\n')).toContain('✖ 1 problem');
+    // Steps already came from the jobs-list response — no extra job-detail call.
+    expect(mockGithubGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('scopes a bare-jobId errorSummary call to the failing step via an extra job-detail lookup', async () => {
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      bufferToArrayBuffer(
+        Buffer.concat([
+          buildStoredZipEntry('1_Set up job.txt', 'bootstrap noise\n'),
+          buildStoredZipEntry('2_Test.txt', 'FAIL src/foo.spec.ts\n'),
+        ]),
+      ),
+    );
+    mockGithubGet.mockResolvedValue({
+      id: 42,
+      name: 'test',
+      status: 'completed',
+      conclusion: 'failure',
+      steps: [
+        {
+          name: 'Set up job',
+          status: 'completed',
+          conclusion: 'success',
+          number: 1,
+        },
+        { name: 'Test', status: 'completed', conclusion: 'failure', number: 2 },
+      ],
+    });
+
+    const result = await fetchRunLogsRing({ jobId: 42 }, 500, () => false);
+
+    expect(result.lines.join('\n')).not.toContain('bootstrap noise');
+    expect(result.lines.join('\n')).toContain('FAIL src/foo.spec.ts');
+    expect(mockGithubGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the whole job log when no step is marked failure (e.g. a cancelled job)', async () => {
+    mockGithubGet.mockResolvedValue({
+      total_count: 1,
+      jobs: [
+        {
+          id: 1,
+          name: 'cancelled-job',
+          status: 'completed',
+          conclusion: 'cancelled',
+          steps: [
+            {
+              name: 'Set up job',
+              status: 'completed',
+              conclusion: 'success',
+              number: 1,
+            },
+            {
+              name: 'Build',
+              status: 'completed',
+              conclusion: 'cancelled',
+              number: 2,
+            },
+          ],
+        },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      bufferToArrayBuffer(
+        buildStoredZipEntry('1_Set up job.txt', 'setup output here\n'),
+      ),
+    );
+
+    const result = await fetchRunLogsRing(
+      { runId: 1, failedOnly: true },
+      500,
+      () => false,
+    );
+
+    expect(result.lines.join('\n')).toContain('setup output here');
+  });
+
+  it('does not scope by step when no priorityMatcher is passed (non-errorSummary calls keep the full log)', async () => {
+    mockGithubGet.mockResolvedValue({
+      total_count: 1,
+      jobs: [
+        {
+          id: 1,
+          name: 'lint-job',
+          status: 'completed',
+          conclusion: 'failure',
+          steps: [
+            {
+              name: 'Set up job',
+              status: 'completed',
+              conclusion: 'success',
+              number: 1,
+            },
+            {
+              name: 'Lint',
+              status: 'completed',
+              conclusion: 'failure',
+              number: 2,
+            },
+          ],
+        },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      bufferToArrayBuffer(
+        Buffer.concat([
+          buildStoredZipEntry('1_Set up job.txt', 'setup output\n'),
+          buildStoredZipEntry('2_Lint.txt', 'lint output\n'),
+        ]),
+      ),
+    );
+
+    const result = await fetchRunLogsRing({ runId: 1, failedOnly: true }, 500);
+
+    expect(result.lines.join('\n')).toContain('setup output');
+    expect(result.lines.join('\n')).toContain('lint output');
+  });
+});
+
 describe('fetchRunLogs scope metadata (LS-8301)', () => {
   beforeEach(() => {
     mockGithubGet.mockReset();

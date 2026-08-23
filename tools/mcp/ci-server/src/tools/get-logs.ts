@@ -77,18 +77,24 @@ const ESC = String.fromCharCode(27);
 const ANSI_ESCAPE_PREFIX = new RegExp(`^${ESC}\\[`);
 
 /**
- * Jest's own failure markers (LS-8391). errorSummary's generic ERROR_PATTERNS
- * treats these the same as console.error noise (React prop warnings,
- * intentional error-path test fixtures), so a busy suite can crowd the real
- * `FAIL <file>` / `Tests: N failed` lines out of the 200-line cap. These are
- * matched against the ANSI-stripped line — jest colors "FAIL" and "✕" — and
- * given priority so they always survive extraction. See isJestFailureLine.
+ * Jest's own failure markers (LS-8391, extended LS-9556). errorSummary's
+ * generic ERROR_PATTERNS treats these the same as console.error noise (React
+ * prop warnings, intentional error-path test fixtures), so a busy suite can
+ * crowd the real `FAIL <file>` / `Tests: N failed` lines out of the 200-line
+ * cap. These are matched against the ANSI-stripped line — jest colors "FAIL"
+ * and "✕" — and given priority so they always survive extraction. See
+ * isJestFailureLine.
  */
 const JEST_FAILURE_PATTERNS = [
   /(?:^|\s)FAIL(?:\s|$)/, // suite failure header, e.g. "FAIL src/foo.spec.ts"
   /Test Suites:.*failed/i,
   /Tests:.*failed/i,
   /(?:^|\s)✕(?:\s|$)/, // individual failing test marker
+  // Per-test failure detail header, e.g. "● FootballLeagueId › matchups tab
+  // › playoff bracket toggle (FLD-017) › ...". LS-9556: the original LS-8391
+  // fix only covered the "✕" summary-list marker, so these individual
+  // failing-test names were still absent from errorSummary output.
+  /^\s*●\s+\S/,
 ];
 
 export function isJestFailureLine(line: string): boolean {
@@ -125,6 +131,28 @@ export function isTestFailureLine(line: string): boolean {
 }
 
 /**
+ * ESLint's own failure markers (LS-9556). A stylish-formatter violation row
+ * does match the generic ERROR_PATTERNS scan (it contains the literal word
+ * "error"), but without step-scoping (see scopeEntriesToFailingSteps in
+ * logs.ts) those rows never survived the 200-line cap in a
+ * runner-bootstrap-heavy whole-job log. Given priority alongside the other
+ * tool-specific markers, same mechanism as isJestFailureLine, as
+ * defense-in-depth for logs where the failing step alone still has enough
+ * volume to threaten the cap.
+ */
+const ESLINT_FAILURE_PATTERNS = [
+  // e.g. "  12:5  error  'foo' is defined but never used  no-unused-vars"
+  /^\s*\d+:\d+\s+(?:error|warning)\s+\S/,
+  // e.g. "✖ 6 problems (6 errors, 0 warnings)"
+  /✖\s*\d+\s+problems?/i,
+];
+
+export function isEslintFailureLine(line: string): boolean {
+  const stripped = stripAnsiCodes(line);
+  return ESLINT_FAILURE_PATTERNS.some((pattern) => pattern.test(stripped));
+}
+
+/**
  * Priority matcher combining framework-specific failure markers with
  * GitHub's own `##[error]` annotation (LS-8772). Passed to
  * `fetchRunLogsRing` so these lines always survive the 200-line cap,
@@ -132,8 +160,45 @@ export function isTestFailureLine(line: string): boolean {
  * other jobs' chatter) also matches the generic ERROR_PATTERNS scan.
  */
 export function isPriorityFailureLine(line: string): boolean {
-  return isTestFailureLine(line) || isGithubErrorAnnotationLine(line);
+  return (
+    isTestFailureLine(line) ||
+    isGithubErrorAnnotationLine(line) ||
+    isEslintFailureLine(line)
+  );
 }
+
+/**
+ * Success-marker lines that must never be selected as errors, however they
+ * got captured — as generic-pattern context, or (defensively) a
+ * priority-matcher false positive. Observed regression (LS-9556): a
+ * Prettier "all clear" message was one of the 200 lines errorSummary
+ * returned for a failing lint job, crowding out the real ESLint diagnostics.
+ */
+const SUCCESS_MARKER_PATTERNS = [/All matched files use Prettier code style!/i];
+
+function isSuccessMarkerLine(line: string): boolean {
+  return SUCCESS_MARKER_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+/**
+ * Self-hosted runner supervisory chatter (LS-9556): the hook_job_started.sh
+ * bootstrap script's own group header and heartbeat line. This is runner
+ * infrastructure output, never step output — excluded explicitly, in
+ * addition to step-scoping (logs.ts), as defense-in-depth for the case
+ * where a runner-lifecycle line lands inside the ±2-line context window
+ * around a real match.
+ */
+const RUNNER_BOOTSTRAP_NOISE = /hook_job_started\.sh/;
+
+/**
+ * jsdom's own console.error noise inside jest runs (the LS-8391 signature,
+ * recurring per LS-9556): environment warnings like "Not implemented:
+ * window.scrollTo" or "A suspended resource finished loading inside a
+ * test..." match the generic ERROR_PATTERNS `console.error`/`error` scan
+ * just as readily as an actual failure, but are not test failures.
+ */
+const JSDOM_NOISE =
+  /Not implemented:\s|A suspended resource finished loading inside a test/;
 
 function extractErrorSummary(
   allLines: string[],
@@ -178,12 +243,16 @@ function extractErrorSummary(
       !ANSI_ESCAPE_PREFIX.test(line) &&
       !/node_modules/.test(line) &&
       !/^\s*at\s/.test(line) &&
-      !GIT_FETCH_NOISE.test(line)
+      !GIT_FETCH_NOISE.test(line) &&
+      !RUNNER_BOOTSTRAP_NOISE.test(line) &&
+      !JSDOM_NOISE.test(line) &&
+      !isSuccessMarkerLine(line)
     ) {
-      // Add context before — never git-fetch noise, even as context (LS-8772)
+      // Add context before — never git-fetch noise or a success marker, even
+      // as context (LS-8772 / LS-9556)
       for (let j = Math.max(0, i - contextLines); j < i; j++) {
         const ctx = allLines[j];
-        if (GIT_FETCH_NOISE.test(ctx)) continue;
+        if (GIT_FETCH_NOISE.test(ctx) || isSuccessMarkerLine(ctx)) continue;
         if (!result.includes(ctx)) result.push(ctx);
       }
       result.push(line);
@@ -194,7 +263,7 @@ function extractErrorSummary(
         j++
       ) {
         const ctx = allLines[j];
-        if (GIT_FETCH_NOISE.test(ctx)) continue;
+        if (GIT_FETCH_NOISE.test(ctx) || isSuccessMarkerLine(ctx)) continue;
         result.push(ctx);
       }
     }
@@ -213,9 +282,17 @@ function extractErrorSummary(
   // Jest's own failure markers (LS-8391) go first and are guaranteed to
   // survive the cap, even when the generic-pattern matches above would
   // otherwise fill the whole 200-line budget with console.error noise.
-  const prioritySeen = new Set(priorityLines);
-  const rest = deduped.filter((line) => !prioritySeen.has(line));
-  return [...priorityLines, ...rest].slice(0, 200);
+  // Success markers are filtered even here (LS-9556) — a success line can
+  // never legitimately match a *_FAILURE_PATTERNS priority matcher, but this
+  // keeps the guarantee (AC4) independent of how a line was captured.
+  const filteredPriority = priorityLines.filter(
+    (line) => !isSuccessMarkerLine(line),
+  );
+  const prioritySeen = new Set(filteredPriority);
+  const rest = deduped.filter(
+    (line) => !prioritySeen.has(line) && !isSuccessMarkerLine(line),
+  );
+  return [...filteredPriority, ...rest].slice(0, 200);
 }
 
 /** Default hard cap on total output characters to prevent context overflow. */

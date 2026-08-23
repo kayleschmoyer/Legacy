@@ -68,17 +68,19 @@ const MAX_LOG_JOBS = 10;
  */
 const PRIORITY_LINES_CAP = 300;
 
+interface GitHubJobStep {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  number: number;
+}
+
 interface GitHubJob {
   id: number;
   name: string;
   status: string;
   conclusion: string | null;
-  steps?: Array<{
-    name: string;
-    status: string;
-    conclusion: string | null;
-    number: number;
-  }>;
+  steps?: GitHubJobStep[];
 }
 
 interface GitHubJobsResponse {
@@ -103,8 +105,10 @@ function isBlobNotFound404(err: unknown): boolean {
 
 /**
  * Fetch a single job's detail (including its `steps` array) directly by id.
- * Used only on the 404 log-fetch path to distinguish "job never started" from
- * a genuine missing-log error, so it costs nothing on the common success path.
+ * Used on the 404 log-fetch path to distinguish "job never started" from a
+ * genuine missing-log error, and (LS-9556) on a bare-jobId errorSummary call
+ * to get step-conclusion data for scoping — a run-scoped call already has
+ * this from the jobs-list response and skips this lookup entirely.
  */
 async function fetchJobDetail(
   jobId: number,
@@ -150,15 +154,23 @@ function findStreamedEntryEnd(data: Buffer, from: number): number {
   return candidates.length > 0 ? Math.min(...candidates) : data.length;
 }
 
+/** One entry (a step's raw output) extracted from a job's log ZIP archive. */
+interface ZipEntry {
+  name: string;
+  text: string;
+}
+
 /**
- * Extract text content from a ZIP archive buffer.
+ * Extract every entry (name + decompressed text) from a ZIP archive buffer.
  * Uses Node built-in zlib (inflateRawSync) to decompress individual ZIP entries.
- * Concatenates all text files found in the archive.
  * Skips entries whose declared uncompressed size exceeds MAX_UNCOMPRESSED_ENTRY_BYTES.
+ * GitHub Actions names each entry `<step-number>_<step-name>.txt`, which
+ * `scopeEntriesToFailingSteps` (LS-9556) relies on to slice a job's log down
+ * to only the step that failed.
  */
-function extractTextFromZip(buffer: ArrayBuffer): string {
+function extractZipEntries(buffer: ArrayBuffer): ZipEntry[] {
   const data = Buffer.from(buffer);
-  const texts: string[] = [];
+  const entries: ZipEntry[] = [];
 
   // Parse ZIP local file headers (signature 0x04034b50)
   let offset = 0;
@@ -173,14 +185,19 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
     const fileNameLength = data.readUInt16LE(offset + 26);
     const extraFieldLength = data.readUInt16LE(offset + 28);
 
-    const dataOffset = offset + 30 + fileNameLength + extraFieldLength;
-    if (dataOffset > data.length) {
-      // Malformed header: fileNameLength/extraFieldLength claim more bytes
-      // than remain in the buffer. Nothing past this point in the archive
-      // can be trusted, so stop parsing instead of reading with an
-      // out-of-range offset (legacy-sports-review-bot, LS-9229).
+    const nameStart = offset + 30;
+    const nameEnd = nameStart + fileNameLength;
+    if (nameEnd > data.length) {
+      // Malformed header: fileNameLength claims more bytes than remain in
+      // the buffer. Nothing past this point in the archive can be trusted,
+      // so stop parsing instead of reading with an out-of-range offset
+      // (legacy-sports-review-bot, LS-9229).
       break;
     }
+    const name = data.subarray(nameStart, nameEnd).toString('utf-8');
+    const dataOffset = nameEnd + extraFieldLength;
+    if (dataOffset > data.length) break;
+
     // Streamed entries (bit 3) have zeroed sizes in the local header — the
     // header field can't be trusted, so locate the boundary by scanning
     // forward for the next entry instead.
@@ -205,15 +222,16 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
             // self-terminating, so a streamed entry's trailing data
             // descriptor bytes (included in `compressedData` since its real
             // length is unknown) are harmlessly ignored past the stream end.
-            texts.push(
-              inflateRawSync(compressedData, {
+            entries.push({
+              name,
+              text: inflateRawSync(compressedData, {
                 maxOutputLength: MAX_UNCOMPRESSED_ENTRY_BYTES,
               }).toString('utf-8'),
-            );
+            });
           } else if (compressionMethod === 0 && !streamed) {
             // Stored (no compression) — only trustworthy when the header's
             // size fields are real, i.e. not a streamed entry.
-            texts.push(compressedData.toString('utf-8'));
+            entries.push({ name, text: compressedData.toString('utf-8') });
           }
         } catch {
           // Skip entries that fail to decompress
@@ -224,18 +242,65 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
     offset = entryEnd;
   }
 
-  return texts.join('');
+  return entries;
+}
+
+/** Parse the leading `<n>_` step-number prefix from a ZIP entry name (e.g.
+ * "3_Lint.txt" -> 3). Returns null when the name doesn't follow this
+ * convention (defensive — callers fall back to no step-scoping). */
+function stepNumberFromEntryName(name: string): number | null {
+  const match = /^(\d+)_/.exec(name);
+  return match ? Number(match[1]) : null;
 }
 
 /**
- * Fetch log text for a single job via the GitHub REST API.
- * GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs returns a 302 redirect
- * to a downloadable log archive (ZIP). We fetch as binary, unzip, and extract text.
+ * Scope a job's log entries down to only the step(s) GitHub marked
+ * `conclusion: "failure"` (LS-9556). Structural fix for the recurring
+ * errorSummary defect (LS-8391/LS-8405/LS-8772): instead of scoring every
+ * line of the *whole* job log — which mixes in successful setup/checkout/
+ * other-tool steps' noise (runner bootstrap heartbeats, git fetch spam,
+ * unrelated tools' success output) — use the GitHub Jobs API's per-step
+ * conclusion (already available on the job) to slice to only the step that
+ * actually failed, before any line-level pattern matching runs. Each prior
+ * fix instead bolted on one more tool-specific regex to the whole-log scan,
+ * which is why the defect class kept recurring for every new job type.
+ *
+ * Returns null when step data is unavailable, no step is marked "failure",
+ * or no ZIP entry could be matched to a failing step number — callers
+ * should fall back to the whole job log in that case (e.g. a cancelled job
+ * with no distinct failing step).
  */
-async function fetchJobLogs(
+function scopeEntriesToFailingSteps(
+  entries: ZipEntry[],
+  steps: GitHubJobStep[] | undefined,
+): string | null {
+  if (!steps || steps.length === 0) return null;
+  const failingNumbers = new Set(
+    steps.filter((s) => s.conclusion === 'failure').map((s) => s.number),
+  );
+  if (failingNumbers.size === 0) return null;
+
+  const matched = entries.filter((e) => {
+    const n = stepNumberFromEntryName(e.name);
+    return n !== null && failingNumbers.has(n);
+  });
+  if (matched.length === 0) return null;
+
+  return matched.map((e) => e.text).join('\n');
+}
+
+/**
+ * Fetch a single job's log as per-step ZIP entries via the GitHub REST API.
+ * GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs returns a 302 redirect
+ * to a downloadable log archive (ZIP). We fetch as binary, unzip, and extract
+ * each entry. When the response isn't a ZIP (plain text), it is returned as a
+ * single synthetic entry with no step-number prefix, so step-scoping cleanly
+ * no-ops for those callers instead of misbehaving.
+ */
+async function fetchJobLogEntries(
   jobId: number,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<ZipEntry[]> {
   const buffer = await githubGetArrayBuffer(`/actions/jobs/${jobId}/logs`, {
     signal,
   });
@@ -248,10 +313,21 @@ async function fetchJobLogs(
     header[2] === 0x03 &&
     header[3] === 0x04
   ) {
-    return extractTextFromZip(buffer);
+    return extractZipEntries(buffer);
   }
   // Not a ZIP — treat as plain text
-  return Buffer.from(buffer).toString('utf-8');
+  return [
+    { name: `job-${jobId}`, text: Buffer.from(buffer).toString('utf-8') },
+  ];
+}
+
+/** Fetch log text for a single job, concatenating all of its ZIP entries. */
+async function fetchJobLogs(
+  jobId: number,
+  signal?: AbortSignal,
+): Promise<string> {
+  const entries = await fetchJobLogEntries(jobId, signal);
+  return entries.map((e) => e.text).join('');
 }
 
 /**
@@ -467,9 +543,9 @@ export async function fetchRunLogsRing(
 }> {
   // Single job — fetch and trim directly
   if (params.jobId) {
-    let raw: string;
+    let entries: ZipEntry[];
     try {
-      raw = await fetchJobLogs(params.jobId, params.signal);
+      entries = await fetchJobLogEntries(params.jobId, params.signal);
     } catch (err) {
       if (
         isBlobNotFound404(err) &&
@@ -478,6 +554,21 @@ export async function fetchRunLogsRing(
         return { lines: [JOB_NEVER_STARTED_MESSAGE], totalLines: 1 };
       }
       throw err;
+    }
+
+    let raw = entries.map((e) => e.text).join('');
+    if (priorityMatcher) {
+      // errorSummary requested — scope to the failing step before falling
+      // back to the whole job log (LS-9556). A bare jobId call has no step
+      // data yet, so look the job up once, best-effort.
+      try {
+        const job = await fetchJobDetail(params.jobId, params.signal);
+        const scoped = scopeEntriesToFailingSteps(entries, job.steps);
+        if (scoped !== null) raw = scoped;
+      } catch {
+        // Step lookup is best-effort here — fall back to the unscoped log
+        // rather than failing the whole call over it.
+      }
     }
     const allLines = raw.split(/\r?\n/);
     return {
@@ -531,7 +622,15 @@ export async function fetchRunLogsRing(
     const batchResults = await Promise.all(
       batch.map(async (job) => {
         try {
-          const text = await fetchJobLogs(job.id, params.signal);
+          const entries = await fetchJobLogEntries(job.id, params.signal);
+          let text = entries.map((e) => e.text).join('');
+          if (priorityMatcher) {
+            // errorSummary requested — scope to the failing step (LS-9556).
+            // Step data is already on `job` from the run-jobs API response,
+            // no extra request needed here (unlike the bare-jobId path).
+            const scoped = scopeEntriesToFailingSteps(entries, job.steps);
+            if (scoped !== null) text = scoped;
+          }
           return { name: job.name, text };
         } catch (err) {
           if (

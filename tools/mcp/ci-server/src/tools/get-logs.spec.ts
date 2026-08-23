@@ -15,6 +15,7 @@ jest.mock('../logs.js', () => {
 
 import {
   getLogs,
+  isEslintFailureLine,
   isGithubErrorAnnotationLine,
   isJestFailureLine,
   isPlaywrightFailureLine,
@@ -479,6 +480,186 @@ describe('getLogs', () => {
         expect.objectContaining({ runId: 1 }),
         expect.any(Number),
         expect.any(Function),
+      );
+    });
+  });
+
+  describe('isEslintFailureLine (LS-9556)', () => {
+    it('matches a stylish-formatter violation row', () => {
+      expect(
+        isEslintFailureLine(
+          "  12:5  error  'foo' is defined but never used  no-unused-vars",
+        ),
+      ).toBe(true);
+    });
+
+    it('matches the "N problems" summary line', () => {
+      expect(isEslintFailureLine('✖ 6 problems (6 errors, 0 warnings)')).toBe(
+        true,
+      );
+    });
+
+    it('does not match a bare file path or unrelated text', () => {
+      expect(isEslintFailureLine('src/app/foo.ts')).toBe(false);
+      expect(
+        isEslintFailureLine('All matched files use Prettier code style!'),
+      ).toBe(false);
+    });
+  });
+
+  describe('isPriorityFailureLine includes ESLint (LS-9556)', () => {
+    it('matches an ESLint violation row and summary', () => {
+      expect(
+        isPriorityFailureLine(
+          "  12:5  error  'foo' is defined  no-unused-vars",
+        ),
+      ).toBe(true);
+      expect(isPriorityFailureLine('✖ 6 problems (6 errors, 0 warnings)')).toBe(
+        true,
+      );
+    });
+  });
+
+  describe('isJestFailureLine matches the ● per-test failure header (LS-9556)', () => {
+    it('matches a "●" failing-test detail line', () => {
+      expect(
+        isJestFailureLine(
+          '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › renders',
+        ),
+      ).toBe(true);
+    });
+
+    it('does not match a line with no leading "●" marker', () => {
+      expect(isJestFailureLine('console.log("hello")')).toBe(false);
+    });
+  });
+
+  describe('errorSummary regression fixtures (LS-9556, LS-8391/LS-8405/LS-8772 recurrence)', () => {
+    it('AC1: returns real ESLint diagnostics, not runner-bootstrap noise, for the lint job (job 97065111193)', async () => {
+      // Mirrors the actual regression from run 32586634982 / job 97065111193:
+      // once logs.ts scopes to the failing "Lint" step, fetchRunLogsRing's
+      // `lines` no longer contain runner-bootstrap/fetch noise at all — this
+      // test locks in that extractErrorSummary correctly surfaces the real
+      // diagnostics and never re-admits the Prettier success line as context.
+      const lines = [
+        'src/app/foo.ts',
+        "  12:5  error  'foo' is defined but never used  no-unused-vars",
+        '  20:1  error  Missing return type on function  @typescript-eslint/explicit-function-return-type',
+        'src/app/bar.ts',
+        "  5:10  error  'bar' is never reassigned. Use 'const' instead  prefer-const",
+        '  8:3   error  Unexpected console statement  no-console',
+        "  9:1   error  'baz' is defined but never used  no-unused-vars",
+        '  15:2  error  Missing semicolon  semi',
+        '',
+        '✖ 6 problems (6 errors, 0 warnings)',
+        'All matched files use Prettier code style!',
+      ];
+      mockFetch.mockResolvedValue({
+        lines,
+        totalLines: lines.length,
+        priorityLines: [
+          "  12:5  error  'foo' is defined but never used  no-unused-vars",
+          '✖ 6 problems (6 errors, 0 warnings)',
+        ],
+      });
+
+      const result = await getLogs({
+        runId: 32586634982,
+        jobId: 97065111193,
+        errorSummary: true,
+      });
+
+      const logsText = parseLogs(result.content[0].text);
+      expect(logsText).toContain('no-unused-vars');
+      expect(logsText).toContain('✖ 6 problems (6 errors, 0 warnings)');
+      // AC4: the Prettier success line must never be selected as an error line.
+      expect(logsText).not.toContain(
+        'All matched files use Prettier code style!',
+      );
+    });
+
+    it('AC2: returns the ● failing test names and the Tests: summary, not jsdom console.error noise (job 97065111167)', async () => {
+      const jsdomNoise = Array.from(
+        { length: 50 },
+        (_, i) => `console.error: Not implemented: window.scrollTo (${i})`,
+      );
+      const lines = [
+        ...jsdomNoise,
+        'FAIL app src/app/(app)/football/league/[leagueId].spec.tsx',
+        '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › renders the bracket',
+        '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › toggles open',
+        '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › persists state',
+        'Tests:       3 failed, 1428 passed, 1431 total',
+      ];
+      mockFetch.mockResolvedValue({
+        lines,
+        totalLines: lines.length,
+        priorityLines: [
+          'FAIL app src/app/(app)/football/league/[leagueId].spec.tsx',
+          '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › renders the bracket',
+          '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › toggles open',
+          '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › persists state',
+          'Tests:       3 failed, 1428 passed, 1431 total',
+        ],
+      });
+
+      const result = await getLogs({
+        runId: 32586634982,
+        jobId: 97065111167,
+        errorSummary: true,
+      });
+
+      const logsText = parseLogs(result.content[0].text);
+      expect(logsText).toContain(
+        '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › renders the bracket',
+      );
+      expect(logsText).toContain(
+        '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › toggles open',
+      );
+      expect(logsText).toContain(
+        '● FootballLeagueId › matchups tab › playoff bracket toggle (FLD-017) › persists state',
+      );
+      expect(logsText).toContain(
+        'Tests:       3 failed, 1428 passed, 1431 total',
+      );
+      // The three ● lines must appear before the jsdom noise in the summary.
+      expect(logsText.indexOf('●')).toBeLessThan(
+        logsText.indexOf('console.error'),
+      );
+    });
+
+    it('AC4: never selects a success-marker line even when it survives as generic-scan context', async () => {
+      const lines = [
+        "  12:5  error  'foo' is defined but never used  no-unused-vars",
+        'All matched files use Prettier code style!',
+      ];
+      mockFetch.mockResolvedValue({
+        lines,
+        totalLines: lines.length,
+        priorityLines: [],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText).toContain('no-unused-vars');
+      expect(logsText).not.toContain(
+        'All matched files use Prettier code style!',
+      );
+    });
+
+    it('AC4: never selects a success-marker line even if it is (incorrectly) passed as a priority line', async () => {
+      mockFetch.mockResolvedValue({
+        lines: ['some other line'],
+        totalLines: 1,
+        priorityLines: ['All matched files use Prettier code style!'],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true });
+      const logsText = parseLogs(result.content[0].text);
+
+      expect(logsText).not.toContain(
+        'All matched files use Prettier code style!',
       );
     });
   });
