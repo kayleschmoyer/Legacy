@@ -978,6 +978,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       has-report: ${{ steps.merge.outputs.has-report }}
+      has-flaky: ${{ steps.merge.outputs.has-flaky }}
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -1027,15 +1028,26 @@ jobs:
             # Emit HTML (for browsing), JSON (machine-readable), and a compact
             # agent-targeted Markdown summary (LS-7838) that is copied next to
             # index.html so agents can fetch one small file instead of inflating
-            # the embedded report.json.
+            # the embedded report.json. flakyJsonFile (LS-9659) additionally
+            # captures every flaky outcome (passed only after retry — the
+            # nightly's retries=2 keeps the run green while the same spec later
+            # blocks PR CI at retries=0) as machine-readable input for the
+            # file-flaky-tickets job below.
             {
               printf '%s' 'module.exports = { testDir: "apps/web-e2e/src", reporter: ['
               printf '%s' '["html"], ["json", { outputFile: "test-results.json" }], '
-              printf '%s\n' '["./apps/web-e2e/src/reporters/agent-md-reporter.ts", { outputFile: "summary.md" }]] };'
+              printf '%s\n' '["./apps/web-e2e/src/reporters/agent-md-reporter.ts", { outputFile: "summary.md", flakyJsonFile: "flaky-tests.json" }]] };'
             } > playwright.merge.config.js
             pnpm dlx playwright@1.58.2 merge-reports -c playwright.merge.config.js ./all-blob-reports
+
+            HAS_FLAKY=false
+            if [ -f flaky-tests.json ] && [ "$(jq '.flaky | length' flaky-tests.json)" -gt 0 ]; then
+              HAS_FLAKY=true
+            fi
+            echo "has-flaky=$HAS_FLAKY" >> $GITHUB_OUTPUT
           else
             echo "has-report=false" >> $GITHUB_OUTPUT
+            echo "has-flaky=false" >> $GITHUB_OUTPUT
             echo "No blob reports found — skipping deploy"
           fi
 
@@ -1146,6 +1158,121 @@ jobs:
           echo "**Report:** https://bkrupa.github.io/legacy-sports-deploys/playwright-report/$DEST/" >> $GITHUB_STEP_SUMMARY
           echo "**JSON:** https://bkrupa.github.io/legacy-sports-deploys/playwright-report/$DEST/test-results.json" >> $GITHUB_STEP_SUMMARY
           echo "**Run:** https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+
+      # Hand the merged flaky list (LS-9659) to the file-flaky-tickets job —
+      # only on automated runs with at least one flaky outcome, so the
+      # download step there can rely on the artifact existing.
+      - name: "Upload Flaky Tests Artifact"
+        if: ${{ github.event_name == 'workflow_run' && steps.merge.outputs.has-flaky == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: nightly-flaky-tests
+          path: flaky-tests.json
+          retention-days: 3
+          if-no-files-found: error
+
+  # ===========================================================================
+  # Nightly flaky-pass → Jira filing (LS-9659)
+  # ===========================================================================
+  # The automated full-suite run executes the hermetic e2e suite at retries=2
+  # (deliberately — one flake must not kill full-suite signal), which keeps a
+  # flaky-but-passing spec invisible until it deterministically blocks
+  # unrelated PRs at PR CI's retries=0 (the LS-8871 class). This job makes
+  # the masking visible: it consumes the merged flaky list emitted by the
+  # agent-md-reporter and files (or updates) one deduplicated Jira ticket per
+  # flaky spec — canonical summary "E2E flaky: <spec>", label e2e-flaky,
+  # repeat nights adding occurrence comments instead of new tickets.
+  #
+  # Jira auth mirrors rollbar-jira-reconcile.yml / jira-status-audit.yml:
+  # OAuth 2.0 client-credentials from the JIRA_CREDENTIALS repo secret. If
+  # the secret is absent the job warns and no-ops rather than failing.
+  # Automated (workflow_run) runs only — a manual dispatch is a debugging
+  # session, not nightly signal.
+  file-flaky-tickets:
+    name: "File Flaky-Test Tickets"
+    needs: [deploy-report]
+    if: ${{ !cancelled() && github.event_name == 'workflow_run' && needs.deploy-report.outputs.has-flaky == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout (filing script)"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/flaky-tickets
+          sparse-checkout-cone-mode: true
+          fetch-depth: 1
+
+      - name: "Setup Node.js"
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 22
+
+      - name: "Download Flaky Tests Artifact"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: nightly-flaky-tests
+          path: flaky-tests
+
+      - name: "Authenticate with Jira (OAuth 2.0)"
+        id: jira-auth
+        env:
+          JIRA_CREDENTIALS: ${{ secrets.JIRA_CREDENTIALS }}
+        run: |
+          if [[ -z "$JIRA_CREDENTIALS" ]]; then
+            echo "::warning::JIRA_CREDENTIALS not set — skipping flaky-ticket filing"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CLIENT_ID=$(echo "$JIRA_CREDENTIALS" | jq -r '.client_id')
+          CLIENT_SECRET=$(echo "$JIRA_CREDENTIALS" | jq -r '.client_secret')
+          CLOUD_ID=$(echo "$JIRA_CREDENTIALS" | jq -r '.cloud_id')
+
+          echo "::add-mask::$CLIENT_SECRET"
+          echo "::add-mask::$CLIENT_ID"
+
+          TOKEN_RESPONSE=$(curl -sf \
+            --request POST \
+            --header "Content-Type: application/json" \
+            --data "$(jq -n --arg id "$CLIENT_ID" --arg secret "$CLIENT_SECRET" \
+              '{grant_type:"client_credentials",client_id:$id,client_secret:$secret}')" \
+            "https://auth.atlassian.com/oauth/token" 2>&1) || {
+            echo "::warning::Failed to obtain Jira OAuth token — skipping flaky-ticket filing"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          }
+
+          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')
+          echo "::add-mask::$ACCESS_TOKEN"
+
+          {
+            echo "JIRA_ACCESS_TOKEN=$ACCESS_TOKEN"
+            echo "JIRA_API_BASE=https://api.atlassian.com/ex/jira/$CLOUD_ID"
+          } >> "$GITHUB_ENV"
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "✅ Jira authenticated"
+
+      - name: "File / update flaky-test tickets"
+        id: file
+        if: steps.jira-auth.outputs.skip != 'true'
+        run: |
+          STATUS=0
+          node .github/scripts/flaky-tickets/file-flaky-tickets.mjs \
+            --flaky-json flaky-tests/flaky-tests.json \
+            --run-url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --summary-md flaky-summary.md \
+            --github-output >> "$GITHUB_OUTPUT" || STATUS=$?
+
+          # Publish the per-spec table even when some tickets errored — the
+          # script writes the summary before exiting non-zero.
+          if [ -f flaky-summary.md ]; then
+            cat flaky-summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$STATUS"
 
   # ===========================================================================
   # Surface-map drift audit (LS-7850, detection child of LS-7848)

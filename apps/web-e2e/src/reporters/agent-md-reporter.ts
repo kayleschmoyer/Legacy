@@ -25,6 +25,24 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path';
 interface Options {
   /** Destination path, relative to the Playwright config dir. */
   outputFile?: string;
+  /**
+   * Optional machine-readable flaky-test output (LS-9659). When set, the
+   * reporter also writes a JSON file listing every test whose outcome was
+   * 'flaky' (passed only after retries) so a workflow step can consume the
+   * signal — the nightly runs at retries=2, which keeps the run green while
+   * the same spec later blocks PR CI at retries=0. The file is written even
+   * when the list is empty, so "no flaky tests" is distinguishable from
+   * "reporter never ran". Filing/notification logic deliberately lives in
+   * the workflow, not here.
+   */
+  flakyJsonFile?: string;
+}
+
+interface FlakyEntry {
+  /** Spec path relative to the Playwright rootDir (forward slashes). */
+  file: string;
+  /** Describe-path + test title, matching the Markdown flaky list. */
+  title: string;
 }
 
 interface Failure {
@@ -72,11 +90,13 @@ function describeTitle(test: TestCase): string {
 
 export default class AgentMarkdownReporter implements Reporter {
   private readonly outputFile: string;
+  private readonly flakyJsonFile?: string;
   private rootDir = process.cwd();
   private suiteRoot?: Suite;
 
   constructor(options: Options = {}) {
     this.outputFile = options.outputFile ?? 'test-results/summary.md';
+    this.flakyJsonFile = options.flakyJsonFile;
   }
 
   onBegin(config: FullConfig, suite: Suite): void {
@@ -93,6 +113,7 @@ export default class AgentMarkdownReporter implements Reporter {
     let skipped = 0;
     const failures: Failure[] = [];
     const flakyTitles: string[] = [];
+    const flakyEntries: FlakyEntry[] = [];
     const skips: Array<{ title: string; reason: string | null }> = [];
 
     for (const test of tests) {
@@ -119,6 +140,7 @@ export default class AgentMarkdownReporter implements Reporter {
       } else if (outcome === 'flaky') {
         flaky++;
         flakyTitles.push(`${file} › ${title}`);
+        flakyEntries.push({ file, title });
       } else {
         skipped++;
         const ann = test.annotations.find(
@@ -197,6 +219,20 @@ export default class AgentMarkdownReporter implements Reporter {
       : resolve(this.rootDir, this.outputFile);
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, lines.join('\n'), 'utf-8');
+
+    if (this.flakyJsonFile) {
+      // Raw (unescaped) file/title values: this output is machine-read by the
+      // nightly flaky-ticket step, not rendered as Markdown.
+      const flakyDest = isAbsolute(this.flakyJsonFile)
+        ? this.flakyJsonFile
+        : resolve(this.rootDir, this.flakyJsonFile);
+      mkdirSync(dirname(flakyDest), { recursive: true });
+      writeFileSync(
+        flakyDest,
+        `${JSON.stringify({ total, flaky: flakyEntries }, null, 2)}\n`,
+        'utf-8',
+      );
+    }
   }
 
   private relFile(test: TestCase): string {
