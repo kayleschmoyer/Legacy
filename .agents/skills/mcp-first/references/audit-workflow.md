@@ -44,6 +44,8 @@ The report has an `action_required` section with:
 
 The `informational` section shows `noise_filtered` (auto-skipped commands) and `covered_commands` (already have MCP tools) for transparency.
 
+> **The pre-classifier does not apply the consolidation gate.** It classifies by whether _any_ MCP tool covers the command, not by whether an _existing_ tool could absorb it as an action. Treat every `missing-tool` it hands you — including high-confidence ones in `gaps_auto_classified` — as unverified until you run Step 3a.
+
 ### 3. Check for existing tickets
 
 Before creating new tickets, check for existing ones:
@@ -53,6 +55,20 @@ jira_list_children(key: <currentBucketEpicKey>)
 ```
 
 Match on underlying capability, not exact wording.
+
+### 3a. Apply the consolidation gate (required for every `missing-tool`)
+
+This audit loop is the only feedback mechanism on our MCP tool surface, and every gap type it knows resolves to "write more tool". That is why the surface grew 81 tools (April 2026) → 173 (June) → 219 (August) with no net removal, reaching ~89,250 tokens of definitions that every session pays whether or not it calls them.
+
+For each proposed `missing-tool`, answer:
+
+> Could this be an `action` value, or an optional param, on an existing tool in the same server?
+
+1. **Look at the siblings first.** Search `docs/mcp/api-reference.html`, or grep the target server's `src/tools/`. A gap whose natural name shares a domain prefix with an existing tool (`ci_*`, `worktree_*`, `github_pr_*`) is a strong signal it belongs _on_ that tool.
+2. **Yes** → reclassify as `missing-feature` before filing. Name the tool it should extend.
+3. **No** → `missing-tool` stands. Record which tools you considered and why the schemas are incompatible.
+
+**Escape hatch, deliberately:** forcing unrelated operations into one tool yields a wide union of mutually-exclusive optional params, which costs more than two tools and validates nothing. If more than roughly half the params would be action-scoped, keep them separate. See the union-schema anti-pattern in [mcp-tool-consolidation.md](../../create/references/mcp-tool-consolidation.md).
 
 ### 4. Create tickets for approved gaps
 
@@ -74,11 +90,16 @@ Description template:
 ## Proposed MCP Tool
 
 **Server**: <server from report>
+**Consolidation gate**: considered <existing tools>; not viable because <reason>.
 
 ## Context
 
 Identified during automated audit on <date>.
 ```
+
+The **Consolidation gate** line is mandatory on every `missing-tool` ticket (Step 3a). A `missing-tool` ticket without it is not ready to implement — triage sends it back through the gate.
+
+For `missing-feature` gaps that came out of the gate, name the tool to extend and the proposed `action` value or param.
 
 For `missing-awareness` gaps, the description should note which skill doc or AGENTS.md section needs updating.
 
@@ -139,7 +160,9 @@ When you hit that error:
 
 - **Don't create duplicate tickets** — always search the bucket epic's children first
 - **Don't ticket one-off commands** — the script filters these, but verify if uncertain
-- **`missing-feature` vs `missing-tool`** — if a tool exists but needs a new parameter, that's `missing-feature`
+- **`missing-feature` vs `missing-tool`** — if a tool exists but needs a new parameter or `action` value, that's `missing-feature`. This is the single most common misclassification; the pre-classifier gets it wrong because it only checks whether _any_ tool already covers the command, not whether an existing tool _could_ absorb it. Run the [consolidation gate](#3a-apply-the-consolidation-gate-required-for-every-missing-tool) on every one.
+- **A new tool is the expensive way to add a capability** — it re-pays name, description, and full input schema (~349 tokens on average, and schemas cost ~2× descriptions). An `action` value on an existing tool reuses all of it.
+- **`redundant-tool` is a real finding** — if the audit surfaces two tools doing nearly the same thing, or a tool superseded by another but still registered, file it. Resolution is consolidate + **deregister**; see [mcp-tool-consolidation.md](../../create/references/mcp-tool-consolidation.md)
 - **Overflow != gap** — if the tool works with correct params, fix docs not the tool
 - **Documented exceptions still count** — patterns marked as "shell fallback" in AGENTS.md are tracked gaps, not permanent exemptions
 

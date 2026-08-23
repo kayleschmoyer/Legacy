@@ -18,13 +18,16 @@ jira_list_children(key: <currentKey>, status: "To Do", includeBlockers: true)
 
 Read the ticket description carefully. Gap types determine the implementation approach:
 
-| Gap type            | What to do                                                       |
-| ------------------- | ---------------------------------------------------------------- |
-| `missing-tool`      | Add a new tool to the appropriate MCP server                     |
-| `missing-feature`   | Add a parameter/flag to an existing MCP tool                     |
-| `missing-awareness` | Update skill docs or AGENTS.md to guide agents to existing tools |
-| Skill doc gap       | Create or update `.agents/skills/<name>/SKILL.md`                |
-| AGENTS.md gap       | Update AGENTS.md instructions                                    |
+| Gap type            | What to do                                                                                 |
+| ------------------- | ------------------------------------------------------------------------------------------ |
+| `missing-tool`      | Add a new tool to the appropriate MCP server — **only after the consolidation gate below** |
+| `missing-feature`   | Add a parameter/flag or `action` value to an existing MCP tool                             |
+| `redundant-tool`    | Consolidate into an existing tool and **deregister** the superseded one                    |
+| `missing-awareness` | Update skill docs or AGENTS.md to guide agents to existing tools                           |
+| Skill doc gap       | Create or update `.agents/skills/<name>/SKILL.md`                                          |
+| AGENTS.md gap       | Update AGENTS.md instructions                                                              |
+
+> **Consolidation gate — run this before implementing any `missing-tool` ticket.** Ask: could this be an `action` value or optional param on an existing tool in the same server? Check the siblings (`docs/mcp/api-reference.html`, or the server's `src/tools/`) rather than trusting the ticket's own classification — tickets filed before LS-9703 never went through the gate. If the answer is yes, re-scope the ticket to `missing-feature` and say so in a comment before writing code. Full rationale: [gaps.md — The Consolidation Gate](gaps.md#the-consolidation-gate).
 
 ### 3. Implement the fix
 
@@ -44,6 +47,18 @@ Read the ticket description carefully. Gap types determine the implementation ap
 1. Find the existing tool implementation
 2. Add the new parameter to the schema and handler
 3. Maintain backwards compatibility (new params should be optional)
+4. Where the addition is a new mode of operation rather than a tweak, model it as an `action` enum value instead of another boolean flag — six booleans cost six schema entries, one `.enum()` costs one
+
+#### For consolidations (`redundant-tool`)
+
+Read [mcp-tool-consolidation.md](../../create/references/mcp-tool-consolidation.md) before starting. The short version:
+
+1. Fold the redundant tool's behavior into the surviving tool as an `action` value or widened param
+2. **Deregister the superseded tool in the same PR** — a "thin alias" saves zero tokens and is explicitly forbidden
+3. Remove it from the **hosted Lambda mirror** too — `lambda.ts` drifts behind `index.ts` (LS-9509); diff the tool literals rather than assuming
+4. Update every call site: `.agents/skills/**`, `.claude/commands/**`, `.github/prompts/**`, `.cursor/`, `.opencode/`, `.codex/`, `docs/**`. A dangling pointer is worse than the alias was
+5. `make mcp-api-reference` and commit the regenerated docs
+6. Record the before/after token delta (`node scripts/mcp-token-measure/measure.mjs --json`) in the PR, and lower the CI ceiling to the new value in the same commit
 
 #### For skill/doc updates
 

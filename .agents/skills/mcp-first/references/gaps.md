@@ -25,6 +25,35 @@ This reference enforces the **MCP-first principle** from AGENTS.md: shell comman
 
 ---
 
+## The Consolidation Gate
+
+**Applies to both phases** — when filing a gap (Phase 1) and when implementing one (Phase 2).
+
+This loop is the only active feedback mechanism on our MCP tool surface, and until LS-9703 it could only ever **add**. Every gap type resolved to "write more tool": `missing-tool` adds a tool, `missing-feature` adds a param, `missing-awareness` adds docs. Nothing in the taxonomy could merge or remove anything. The result: 81 tools (April 2026) → 173 (June) → 219 (August), with no net removal ever, and ~89,250 tokens of tool definitions that every session pays whether or not it calls them.
+
+**Before filing or implementing any `missing-tool` gap, answer this:**
+
+> Could this be an `action` value, or an optional param, on an existing tool in the same server?
+
+- **Yes** → file it as `missing-feature`, not `missing-tool`.
+- **No** → `missing-tool` is correct. Say _why_ in the ticket: which existing tools you considered and what makes the schemas incompatible.
+
+Check the sibling tools before answering — `docs/mcp/api-reference.html` is searchable, or grep the server's `src/tools/`. A gap whose natural name shares a domain prefix with an existing tool (`ci_*`, `worktree_*`, `github_pr_*`) is a strong signal it belongs as an action on that tool.
+
+**The gate has a real escape hatch.** Forcing unrelated operations into one tool produces a wide union of mutually-exclusive optional params — that costs _more_ than two tools and validates nothing. If more than roughly half the params would be action-scoped, they don't belong together. See the union-schema anti-pattern in [mcp-tool-consolidation.md](../../create/references/mcp-tool-consolidation.md).
+
+**Ticket template addition** — every `missing-tool` ticket must carry:
+
+```
+Consolidation gate: considered <existing tools>; not viable because <reason>.
+```
+
+A `missing-tool` ticket without that line is not ready to implement — send it back through the gate.
+
+> **Implementing a `redundant-tool` or a consolidation?** Read [mcp-tool-consolidation.md](../../create/references/mcp-tool-consolidation.md) first. The non-negotiable part: **deregister the superseded tool in the same PR** — from the stdio server _and_ the hosted Lambda mirror — or the change saves nothing. Reviewers enforce this as pattern #48.
+
+---
+
 ## Phase 1: Audit (Quick Reference)
 
 > Full procedure: [`audit-workflow.md`](audit-workflow.md)
@@ -43,8 +72,9 @@ The audit adds ~850K tokens to a session. On short sessions (ticket triage, sing
 2. **Manually review** conversation history for Copilot CLI `powershell` tool invocations — `ci_audit_session_bash` does **not** currently extract them, so inspect those commands separately and include any gaps they reveal in the audit
 3. **Review** the `action_required` section — accept high-confidence gaps, verify medium/low-confidence ones, classify overflow/failure fix types
 4. **Check** for existing tickets under the current bucket epic (`jira_list_children`)
-5. **Create** tickets for approved gaps using the draft summaries from the report plus any manually identified `powershell` gaps
-6. **Report** findings to the user
+5. **Gate** every proposed `missing-tool` — could it be an `action` value or optional param on an existing tool in the same server? If yes, reclassify as `missing-feature`. The pre-classifier does not do this for you. See [The Consolidation Gate](#the-consolidation-gate)
+6. **Create** tickets for approved gaps using the draft summaries from the report plus any manually identified `powershell` gaps
+7. **Report** findings to the user
 
 The tool handles Bash classification, noise filtering, and ticket drafting automatically. The agent's role is to review and approve, not classify from scratch; `powershell` command review is still manual until extraction support is added.
 
@@ -56,10 +86,11 @@ The tool handles Bash classification, noise filtering, and ticket drafting autom
 
 1. **Find** the next unblocked To Do ticket: call `jira_get_bucket_epic({ bucket: 'mcp-gaps' })` to get the current epic key, then `jira_list_children(key: <currentKey>, status: "To Do")`
 2. **Understand** the gap type — determines implementation approach and risk:
-   - `missing-tool` — add a new tool to the appropriate MCP server. **Risk: Medium** (new code in a shared server used by all agents)
-   - `missing-feature` — add a parameter/flag to an existing tool. **Risk: Medium** (modifying existing server code)
+   - `missing-tool` — add a new tool to the appropriate MCP server. **Risk: Medium** (new code in a shared server used by all agents). **Apply the [consolidation gate](#the-consolidation-gate) first** — most `missing-tool` tickets are really `missing-feature`.
+   - `missing-feature` — add a parameter/flag or `action` value to an existing tool. **Risk: Medium** (modifying existing server code)
+   - `redundant-tool` — a tool that duplicates, or could be an `action` on, an existing tool. Consolidate and **deregister** the superseded tool. **Risk: Medium** (call sites across skills/commands must be updated)
    - `missing-awareness` / doc gap — update skill docs or AGENTS.md. **Risk: Low** (doc changes only)
-     For `missing-tool` and `missing-feature` gaps, run the [planning reference](../../plan-ticket/references/planning.md) before implementation to understand the MCP server's existing patterns, conventions, and tool registration approach. Changes to auth-related tools or tools that make external API calls are **High risk**.
+     For `missing-tool`, `missing-feature`, and `redundant-tool` gaps, run the [planning reference](../../plan-ticket/references/planning.md) before implementation to understand the MCP server's existing patterns, conventions, and tool registration approach. Changes to auth-related tools or tools that make external API calls are **High risk**.
 3. **Implement** following the target MCP server's conventions
 4. **Validate** with `make pc`
 5. **Self-review** — run `/review` (or the self-review steps in `skills/pr-lifecycle/references/self-review.md`) and check against `skills/pr-lifecycle/references/common-review-patterns.md` before pushing. MCP tool code is especially prone to patterns #11 (silent error swallowing), #12 (argument injection), #14 (`shell: true`), and #20 (unbounded output).
@@ -106,7 +137,7 @@ All extraction is Node-native via the `legacy-sports-ci` MCP tools (LS-8316) —
 
 2. **Drill into high-frequency commands** — for each pattern appearing 5+ times, locate the sessions using it with `ci_find_session({ query: "<command prefix>" })`, then pull the full command strings from those sessions via `ci_audit_session_bash({ sessionId, ... })` (default JSON mode returns every command verbatim with timestamps and source transcripts).
 
-3. **Classify** using the same taxonomy as Phase 1 (Step 2): `missing-tool`, `missing-feature`, `missing-awareness` — or let `ci_audit_session_bash({ auditMode: true })` pre-classify with confidence scores and draft ticket summaries.
+3. **Classify** using the same taxonomy as Phase 1 (Step 2): `missing-tool`, `missing-feature`, `redundant-tool`, `missing-awareness` — or let `ci_audit_session_bash({ auditMode: true })` pre-classify with confidence scores and draft ticket summaries. Apply [the consolidation gate](#the-consolidation-gate) to every `missing-tool` before it becomes a ticket — the pre-classifier does not apply it for you.
 
 ### Frequency thresholds
 

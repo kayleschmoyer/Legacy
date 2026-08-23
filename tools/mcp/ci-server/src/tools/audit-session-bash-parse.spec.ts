@@ -398,6 +398,37 @@ describe('audit-session-bash-parse', () => {
       expect(result.draft_summary).toContain('feat(mcp):');
     });
 
+    it('attaches the consolidation gate to every missing-tool classification (LS-9703)', () => {
+      // High-confidence path (RECURRING_INVESTIGATIVE table).
+      const recurring = classifyGapType(
+        'git show origin/main:package.json',
+        'git show origin/main:package.json',
+      );
+      expect(recurring.gap_type).toBe('missing-tool');
+      expect(recurring.consolidation_gate).toContain('REQUIRED before filing');
+      expect(recurring.consolidation_gate).toContain('`action` value');
+
+      // Low-confidence generic fallback path — the one that produced most of
+      // the historical missing-tool backlog, so it must carry the gate too.
+      const fallback = classifyGapType(
+        'some-unknown-binary --flag',
+        'some-unknown-binary',
+      );
+      expect(fallback.gap_type).toBe('missing-tool');
+      expect(fallback.confidence).toBe('low');
+      expect(fallback.consolidation_gate).toContain('REQUIRED before filing');
+    });
+
+    it('omits the consolidation gate on non-missing-tool classifications', () => {
+      const awareness = classifyGapType('grep -r "foo" src/', 'grep -r "foo"');
+      expect(awareness.gap_type).toBe('missing-awareness');
+      expect(awareness.consolidation_gate).toBeUndefined();
+
+      const feature = classifyGapType('gh workflow list', 'gh workflow list');
+      expect(feature.gap_type).toBe('missing-feature');
+      expect(feature.consolidation_gate).toBeUndefined();
+    });
+
     it('classifies grep usage as high-confidence missing-awareness with a docs draft', () => {
       const result = classifyGapType('grep -r "foo" src/', 'grep -r "foo"');
       expect(result).toMatchObject({

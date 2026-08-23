@@ -536,6 +536,9 @@ export function isRecurringInvestigative(
 const SUMMARY_PREFIX: Readonly<Record<string, string>> = {
   'missing-tool': 'feat(mcp):',
   'missing-feature': 'feat(mcp):',
+  // Consolidating a duplicate tool into an existing one and deregistering the
+  // superseded tool is a refactor, not a feature (LS-9703).
+  'redundant-tool': 'refactor(mcp):',
   'missing-awareness': 'docs(skills):',
 };
 
@@ -545,15 +548,50 @@ export interface GapClassification {
   server: string;
   reason: string;
   draft_summary: string;
+  /**
+   * Set on `missing-tool` gaps only. This classifier decides gap_type by
+   * whether ANY MCP tool already covers the command — it cannot tell whether an
+   * EXISTING tool could absorb the capability as an `action` value or optional
+   * param, which is the cheaper fix. That judgment needs the target server's
+   * tool inventory, which is not readable here: this module also runs in the
+   * hosted Lambda deployment, where the repo (and `docs/mcp/api-reference.json`)
+   * is absent. So the report flags the gate instead of applying it, and the
+   * reviewing agent answers it against the api-reference. See LS-9703 and
+   * `.agents/skills/mcp-first/references/audit-workflow.md` step 3a.
+   */
+  consolidation_gate?: string;
 }
 
 /**
+ * The gate prompt attached to every `missing-tool` classification. Filing a new
+ * tool re-pays name + description + full input schema (~349 tokens on average,
+ * schemas costing roughly 2x descriptions); an `action` value on an existing
+ * tool reuses all of it.
+ */
+const CONSOLIDATION_GATE_PROMPT =
+  'REQUIRED before filing: could this be an `action` value or optional param on an ' +
+  'existing tool in the same server? Check siblings in docs/mcp/api-reference.html. ' +
+  'If yes, reclassify as `missing-feature` and name the tool to extend. If no, record ' +
+  'which tools you considered and why the schemas are incompatible. ' +
+  'See .agents/skills/mcp-first/references/audit-workflow.md step 3a.';
+
+/**
  * Classify a gap command into a gap type with confidence and draft ticket info.
+ *
+ * Attaches `consolidation_gate` to `missing-tool` results so the gate travels
+ * with the report rather than depending on the reviewing agent remembering it.
  */
 export function classifyGapType(
   cmd: string,
   pattern: string,
 ): GapClassification {
+  const classification = classifyGapTypeInner(cmd, pattern);
+  return classification.gap_type === 'missing-tool'
+    ? { ...classification, consolidation_gate: CONSOLIDATION_GATE_PROMPT }
+    : classification;
+}
+
+function classifyGapTypeInner(cmd: string, pattern: string): GapClassification {
   const stripped = stripCdPrefix(cmd.trim());
 
   // Check recurring investigative patterns first (high confidence)
