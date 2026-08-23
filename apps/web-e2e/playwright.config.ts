@@ -63,6 +63,17 @@ const DESKTOP_GRID_ONLY_SPECS = [
 ];
 
 /**
+ * useIsCompactDraftViewport() switches EliteDraftBoardScreen to
+ * CompactLiveDraftBoard below the `$sm` breakpoint (≤640px) — well above
+ * both mobile projects' 375px viewport, so the draft board always renders
+ * in compact mode there. CompactLiveDraftBoard has no equivalent of
+ * DraftTopBand's `data-testid="current-pick"` (LS-9488); specs asserting on
+ * it only make sense against the desktop `chromium`/`firefox`/`webkit`
+ * projects.
+ */
+const DESKTOP_DRAFT_TOPBAND_ONLY_SPECS = [/mid-draft-trades\.spec\.ts$/];
+
+/**
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({
@@ -191,7 +202,10 @@ export default defineConfig({
     /* Test against mobile viewports. */
     {
       name: 'Mobile Chrome',
-      testIgnore: DESKTOP_GRID_ONLY_SPECS,
+      testIgnore: [
+        ...DESKTOP_GRID_ONLY_SPECS,
+        ...DESKTOP_DRAFT_TOPBAND_ONLY_SPECS,
+      ],
       use: {
         ...devices['Pixel 5'],
         viewport: { width: 375, height: 667 },
@@ -202,7 +216,10 @@ export default defineConfig({
     },
     {
       name: 'Mobile Safari',
-      testIgnore: DESKTOP_GRID_ONLY_SPECS,
+      testIgnore: [
+        ...DESKTOP_GRID_ONLY_SPECS,
+        ...DESKTOP_DRAFT_TOPBAND_ONLY_SPECS,
+      ],
       use: {
         ...devices['iPhone 12'],
         viewport: { width: 375, height: 667 },

@@ -400,6 +400,19 @@ async function mockDraftGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { draftQueueEntries: [] } }),
       });
+    } else if (opName.includes('nudgeexpireddraftpick')) {
+      // Fired automatically by useDraftTimer when the pick countdown hits
+      // 0:00 (LS-9488) — a no-op response is enough since this test doesn't
+      // assert on the nudge outcome, only that the trade flow works.
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            autoProcessDraftPicks: { draftsProcessed: 0, picksAutoMade: 0 },
+          },
+        }),
+      });
     } else if (
       opName.includes('getplayerstats') ||
       opName.includes('getbattingstats') ||
