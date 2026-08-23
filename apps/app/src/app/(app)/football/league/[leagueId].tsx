@@ -81,12 +81,19 @@ function LeagueWSPageHandler({
   onRosterUpdate,
   onTradeOffer,
   onDraftCompleted,
+  onMatchupScoreUpdate,
 }: {
   onRosterUpdate: () => void;
   onTradeOffer: () => void;
   onDraftCompleted: () => void;
+  onMatchupScoreUpdate: () => void;
 }) {
-  useLeagueWebSocket({ onRosterUpdate, onTradeOffer, onDraftCompleted });
+  useLeagueWebSocket({
+    onRosterUpdate,
+    onTradeOffer,
+    onDraftCompleted,
+    onMatchupScoreUpdated: onMatchupScoreUpdate,
+  });
   return null;
 }
 
@@ -125,11 +132,21 @@ export default function FootballLeagueId(): React.JSX.Element {
         : '';
   const numLeagueId = parseInt(leagueIdStr, 10);
 
+  const { isPremium } = useSubscription();
+
+  // Live score updates (LS-6316 / FLD-011): premium users get an instant
+  // refetch on the WS MATCHUP_SCORE_UPDATED push (wired to
+  // LeagueWSPageHandler below); free users fall back to 60s polling since
+  // they don't get the live push.
   const {
     matchups: rawMatchups,
     loading: matchupsLoading,
     refetch: refetchMatchups,
-  } = useMatchupsForLeague(isNaN(numLeagueId) ? null : numLeagueId);
+  } = useMatchupsForLeague(
+    isNaN(numLeagueId) ? null : numLeagueId,
+    undefined,
+    isPremium ? undefined : 60_000,
+  );
 
   const {
     data: leagueData,
@@ -350,8 +367,6 @@ export default function FootballLeagueId(): React.JSX.Element {
     return isCommissioner ? 'commish' : isMember ? 'member' : 'spectator';
   }, [rolePref, isCommissioner, isMember]);
   const setRole = useCallback((r: LeagueRole) => setRolePref(r), []);
-
-  const { isPremium } = useSubscription();
 
   const [season, setSeason] = useState<string>(
     String(league?.seasonNumber ?? new Date().getFullYear()),
@@ -604,6 +619,9 @@ export default function FootballLeagueId(): React.JSX.Element {
         }}
         onDraftCompleted={() => {
           Alert.alert('Draft Complete', 'The draft has finished!');
+        }}
+        onMatchupScoreUpdate={() => {
+          if (isPremium) void refetchMatchups();
         }}
       />
       <LeagueDetailShell

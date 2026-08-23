@@ -15,6 +15,7 @@ import { useEffect, useRef } from 'react';
 import { ClientNotificationType } from '@legacy-sports/utils';
 import type {
   LeagueChatMessageNotification,
+  MatchupScoreUpdatedNotification,
   SubscriptionUpdatedNotification,
 } from '@legacy-sports/websocket-client';
 import { useLeagueWebSocketClient } from '../context/LeagueWebSocketContext';
@@ -26,6 +27,12 @@ export interface UseLeagueWebSocketOptions {
   onTradeOffer?: () => void;
   /** Fired when a draft finishes for this league. */
   onDraftCompleted?: () => void;
+  /**
+   * Fired whenever the scoring system writes a matchup's score, including a
+   * single-player stat correction outside of batch completion (LS-6316).
+   * Mirrors apps/web/src/hooks/useLeagueWebSocket.ts's onMatchupScoreUpdated.
+   */
+  onMatchupScoreUpdated?: (n: MatchupScoreUpdatedNotification) => void;
   /** Fired when a new chat message arrives in this league's chat room. */
   onLeagueChatMessage?: (n: LeagueChatMessageNotification) => void;
   /**
@@ -53,6 +60,9 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
   const onDraftCompletedRef = useRef(options.onDraftCompleted);
   onDraftCompletedRef.current = options.onDraftCompleted;
 
+  const onMatchupScoreUpdatedRef = useRef(options.onMatchupScoreUpdated);
+  onMatchupScoreUpdatedRef.current = options.onMatchupScoreUpdated;
+
   const onLeagueChatMessageRef = useRef(options.onLeagueChatMessage);
   onLeagueChatMessageRef.current = options.onLeagueChatMessage;
 
@@ -79,6 +89,14 @@ export function useLeagueWebSocket(options: UseLeagueWebSocketOptions): {
     unsubs.push(
       client.on(ClientNotificationType.DRAFT_COMPLETED, () => {
         onDraftCompletedRef.current?.();
+      }),
+    );
+
+    unsubs.push(
+      client.on(ClientNotificationType.MATCHUP_SCORE_UPDATED, (n) => {
+        onMatchupScoreUpdatedRef.current?.(
+          n as MatchupScoreUpdatedNotification,
+        );
       }),
     );
 

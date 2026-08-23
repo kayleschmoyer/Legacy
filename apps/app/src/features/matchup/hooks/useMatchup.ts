@@ -28,6 +28,7 @@ export function useMatchupById(matchupId: number | null | undefined) {
 export function useMatchupsForLeague(
   leagueId: number | null | undefined,
   weekNumber?: number,
+  pollInterval?: number,
 ) {
   const { data, loading, error, refetch } = useGetMatchupsForLeagueQuery({
     variables: {
@@ -35,6 +36,7 @@ export function useMatchupsForLeague(
       weekNumber: weekNumber ?? null,
     },
     skip: !leagueId,
+    pollInterval,
   });
 
   return {

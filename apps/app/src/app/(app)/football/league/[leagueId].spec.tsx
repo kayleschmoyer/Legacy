@@ -438,8 +438,22 @@ jest.mock('../../../../common/auth/AuthHooks', () => ({
   Secret: { INTERNAL_JWT: 'INTERNAL_JWT' },
 }));
 
+const mockUseSubscription = jest.fn(() => ({ isPremium: false }));
 jest.mock('../../../../features/subscription/useSubscription', () => ({
-  useSubscription: () => ({ isPremium: false }),
+  useSubscription: () => mockUseSubscription(),
+}));
+
+// Captures the options passed to useLeagueWebSocket by LeagueWSPageHandler so
+// tests can invoke onMatchupScoreUpdated directly without a real WS client
+// (LS-6316 / FLD-011).
+let mockCapturedWsOptions: {
+  onMatchupScoreUpdated?: () => void;
+} | null = null;
+jest.mock('../../../../hooks/useLeagueWebSocket', () => ({
+  useLeagueWebSocket: (options: { onMatchupScoreUpdated?: () => void }) => {
+    mockCapturedWsOptions = options;
+    return { connected: false };
+  },
 }));
 
 jest.mock('../../../../common/utilities/RouteUtils', () => ({
@@ -522,6 +536,8 @@ describe('FootballLeagueId', () => {
     mockCapturedWaiverSubscribeRefresh.length = 0;
     mockCapturedOnPlayerAssign = null;
     mockCapturedOnPlayerRemove = null;
+    mockCapturedWsOptions = null;
+    mockUseSubscription.mockReturnValue({ isPremium: false });
     jest
       .requireMock<{
         useLocalSearchParams: jest.Mock;
@@ -1433,6 +1449,65 @@ describe('FootballLeagueId', () => {
           params: { matchupId: '7', leagueId: '42' },
         }),
       );
+    });
+  });
+
+  // LS-6316 (FLD-011): matchup scoring previously had no WS handler at all —
+  // the matchups list only ever refreshed via manual pull-to-refresh, with no
+  // premium/free distinction.
+  describe('live score updates (LS-6316 / FLD-011)', () => {
+    const { useMatchupsForLeague } = jest.requireMock<{
+      useMatchupsForLeague: jest.Mock;
+    }>('../../../../features/matchup/hooks/useMatchup');
+
+    it('polls matchups every 60s for free-tier users', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: false });
+      render(<FootballLeagueId />);
+      expect(useMatchupsForLeague).toHaveBeenCalledWith(42, undefined, 60_000);
+    });
+
+    it('does not poll matchups for premium users (relies on the WS push instead)', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: true });
+      render(<FootballLeagueId />);
+      expect(useMatchupsForLeague).toHaveBeenCalledWith(
+        42,
+        undefined,
+        undefined,
+      );
+    });
+
+    it('refetches matchups on a WS score update for premium users', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: true });
+      const refetch = jest.fn();
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [],
+        loading: false,
+        refetch,
+      });
+      render(<FootballLeagueId />);
+
+      void act(() => {
+        mockCapturedWsOptions?.onMatchupScoreUpdated?.();
+      });
+
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('ignores a WS score update for free-tier users (they rely on 60s polling)', () => {
+      mockUseSubscription.mockReturnValue({ isPremium: false });
+      const refetch = jest.fn();
+      useMatchupsForLeague.mockReturnValue({
+        matchups: [],
+        loading: false,
+        refetch,
+      });
+      render(<FootballLeagueId />);
+
+      void act(() => {
+        mockCapturedWsOptions?.onMatchupScoreUpdated?.();
+      });
+
+      expect(refetch).not.toHaveBeenCalled();
     });
   });
 });
