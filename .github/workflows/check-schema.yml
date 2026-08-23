@@ -233,7 +233,9 @@ jobs:
         env:
           HAS_BREAKING: ${{ steps.contract.outputs.has_breaking }}
           HAS_INVALID: ${{ steps.contract.outputs.has_invalid }}
-          ACK: ${{ contains(github.event.pull_request.labels.*.name, 'schema-breaking-ok') }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
           # Fail closed: empty outputs mean the contract step errored (e.g. the
@@ -246,8 +248,22 @@ jobs:
             echo "::error::Committed GraphQL operations no longer validate against the schema in this PR. See the contract gate comment for the affected files."
             exit 1
           fi
+          # Read the label via the API instead of github.event.pull_request.labels:
+          # the event payload is a snapshot from when this run started, so it never
+          # sees a label added afterward, and a re-run replays the same stale
+          # payload. Querying live state here means adding the label + re-running
+          # this job — no new commit — is enough to clear the gate (LS-9558).
+          ACK=false
+          if [ "$HAS_BREAKING" = "true" ] && [ -n "${PR_NUMBER:-}" ]; then
+            if gh pr view "$PR_NUMBER" --repo "$REPO" --json labels --jq '.labels[].name' \
+                | grep -qx 'schema-breaking-ok'; then
+              ACK=true
+            fi
+          fi
           if [ "$HAS_BREAKING" = "true" ] && [ "$ACK" != "true" ]; then
-            echo "::error::Breaking schema changes detected. Update affected clients/integration specs, or add the 'schema-breaking-ok' label to acknowledge an intentional break."
+            MSG="Breaking schema changes detected. Update affected clients/integration specs, "
+            MSG+="or add the 'schema-breaking-ok' label then re-run this check (no new commit needed)."
+            echo "::error::$MSG"
             exit 1
           fi
           if [ "$HAS_BREAKING" = "true" ]; then
