@@ -471,6 +471,8 @@ export const TeamStanding = builder.objectRef<{
   divisionId?: number | null;
   /** Human-readable division label (e.g. "Division 1"); null when no divisions */
   divisionName?: string | null;
+  /** Current streak of consecutive same-result completed matchups, e.g. "W3", "L2", "T1". Null with no completed matchups. */
+  streak?: string | null;
   /** Median-game / "all-play" record (LS-6344); undefined/null unless the
    *  league has medianGameEnabled. */
   medianWins?: number;
@@ -500,6 +502,11 @@ builder.objectType(TeamStanding, {
     secondaryColor: t.exposeString('secondaryColor', { nullable: true }),
     divisionId: t.exposeInt('divisionId', { nullable: true }),
     divisionName: t.exposeString('divisionName', { nullable: true }),
+    streak: t.exposeString('streak', {
+      nullable: true,
+      description:
+        'Current streak of consecutive same-result completed matchups, e.g. "W3", "L2", "T1".',
+    }),
     medianWins: t.exposeInt('medianWins', { nullable: true }),
     medianLosses: t.exposeInt('medianLosses', { nullable: true }),
     medianTies: t.exposeInt('medianTies', { nullable: true }),

@@ -16,6 +16,7 @@ query GetLeagueStandings($leagueId: Int!, $throughWeek: Int) {
     secondaryColor
     divisionId
     divisionName
+    streak
     clinchStatus
   }
 }

@@ -4986,6 +4986,11 @@ type TeamStanding {
   primaryColor: String
   rank: Int
   secondaryColor: String
+
+  """
+  Current streak of consecutive same-result completed matchups, e.g. "W3", "L2", "T1".
+  """
+  streak: String
   teamId: ID
   teamName: String
   ties: Int

@@ -21,6 +21,7 @@ function makeTeam(
     primaryColor: null,
     secondaryColor: null,
     divisionId: null,
+    streak: null,
     medianWins: null,
     medianLosses: null,
     medianTies: null,
@@ -415,5 +416,39 @@ describe('StandingsTable', () => {
 
     const rows = getAllByRole('row');
     expect(rows[1].textContent).toContain('Avalanche');
+  });
+
+  it("renders the Streak column with each team's current streak — LS-6340", () => {
+    const { getByText } = render(
+      <StandingsTable
+        standings={[
+          makeTeam({ teamId: '1', teamName: 'Thunder', streak: 'W3' }),
+          makeTeam({ teamId: '2', teamName: 'Lightning', streak: 'L2' }),
+        ]}
+      />,
+    );
+    expect(getByText('Strk')).toBeTruthy();
+    expect(getByText('W3')).toBeTruthy();
+    expect(getByText('L2')).toBeTruthy();
+  });
+
+  it('renders a placeholder dash when a team has no streak yet — LS-6340', () => {
+    const { getByText } = render(
+      <StandingsTable
+        standings={[
+          makeTeam({ teamId: '1', teamName: 'Thunder', streak: null }),
+        ]}
+      />,
+    );
+    expect(getByText('—')).toBeTruthy();
+  });
+
+  it('surfaces the tiebreaker rule used to break ties — LS-6340', () => {
+    const { getByText } = render(<StandingsTable standings={mockStandings} />);
+    expect(
+      getByText(
+        'Ties in the standings are broken by total points scored (PF).',
+      ),
+    ).toBeTruthy();
   });
 });

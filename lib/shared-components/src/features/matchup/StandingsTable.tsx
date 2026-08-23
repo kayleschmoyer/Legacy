@@ -96,6 +96,13 @@ type SortKey =
   | 'medianRecord';
 type SortDirection = 'asc' | 'desc';
 
+function streakColor(streak: string | null | undefined): string | undefined {
+  if (!streak) return undefined;
+  if (streak.startsWith('W')) return '$green10';
+  if (streak.startsWith('L')) return '$red10';
+  return undefined;
+}
+
 const diffOf = (s: StandingRecord): number | null =>
   s.pointsFor != null && s.pointsAgainst != null
     ? s.pointsFor - s.pointsAgainst
@@ -388,6 +395,23 @@ function StandingsRow({
           {diff == null ? '—' : `${diff > 0 ? '+' : ''}${diff.toFixed(1)}`}
         </Text>
       </YStack>
+      <YStack
+        tag="td"
+        role="cell"
+        width={56}
+        alignItems="center"
+        justifyContent="center"
+        display="none"
+        $gtMd={{ display: 'flex' }}
+      >
+        <Text
+          fontSize="$3"
+          fontWeight="600"
+          color={streakColor(standing.streak)}
+        >
+          {standing.streak ?? '—'}
+        </Text>
+      </YStack>
       {showWaiverOrder ? (
         <YStack
           tag="td"
@@ -646,6 +670,19 @@ export function StandingsTable({
         >
           <SortButton label="Diff" sortKeyValue="diff" />
         </YStack>
+        <YStack
+          tag="th"
+          {...{ scope: 'col' }}
+          role="columnheader"
+          width={56}
+          alignItems="center"
+          display="none"
+          $gtMd={{ display: 'flex' }}
+        >
+          <Text fontSize="$3" fontWeight="bold" color="$gray11">
+            Strk
+          </Text>
+        </YStack>
         {showWaiverOrder ? (
           <YStack
             tag="th"
@@ -755,6 +792,9 @@ export function StandingsTable({
           </YStack>
         </YStack>
       )}
+      <Text fontSize="$1" color="$gray9" marginTop="$3">
+        Ties in the standings are broken by total points scored (PF).
+      </Text>
     </Card>
   );
 }

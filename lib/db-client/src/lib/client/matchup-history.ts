@@ -55,6 +55,8 @@ export interface TeamStanding {
   divisionId?: number | null;
   /** Human-readable division label (e.g. "Division 1"); null when no divisions */
   divisionName?: string | null;
+  /** Current streak of consecutive same-result completed matchups, e.g. "W3", "L2", "T1". Null with no completed matchups. */
+  streak?: string | null;
   /**
    * Median-game / "all-play" record (LS-6344): each completed week, a win if
    * the team's score beat that week's league median, a loss if below, a tie
@@ -502,6 +504,7 @@ async function _computeStandings(
       secondaryColor: team.secondaryColor,
       divisionId: divId,
       divisionName: ordinal != null ? `Division ${ordinal}` : null,
+      streak: null,
     });
   }
 
@@ -655,6 +658,25 @@ async function _computeStandings(
     return totalScore;
   }
 
+  // Process matchups in chronological order so the current-streak computation
+  // below reflects the most recent completed results, not DB fetch order.
+  const chronologicalMatchups = [...matchups].sort(
+    (a, b) => a.weekNumber - b.weekNumber || a.id - b.id,
+  );
+
+  // Tracks each team's current streak as it walks the chronological matchup
+  // list; overwritten every completed matchup so only the trailing run of
+  // same-result games survives.
+  const streakMap = new Map<number, { type: 'W' | 'L' | 'T'; count: number }>();
+
+  function applyStreakResult(teamId: number, result: 'W' | 'L' | 'T'): void {
+    const current = streakMap.get(teamId);
+    streakMap.set(teamId, {
+      type: result,
+      count: current && current.type === result ? current.count + 1 : 1,
+    });
+  }
+
   // Per-week team scores for the median-game / "all-play" option (LS-6344),
   // populated below only when medianGameEnabled. Keyed by weekNumber →
   // team's completed-matchup score that week.
@@ -663,8 +685,7 @@ async function _computeStandings(
     { teamId: number; score: number }[]
   >();
 
-  // Process each matchup
-  for (const matchup of matchups) {
+  for (const matchup of chronologicalMatchups) {
     if (!matchup.team1Id || !matchup.team2Id) continue;
 
     const score1 = computeTeamMatchupScore(matchup.id, matchup.team1Id);
@@ -688,12 +709,18 @@ async function _computeStandings(
       if (score1 > score2) {
         team1Standing.wins++;
         team2Standing.losses++;
+        applyStreakResult(matchup.team1Id, 'W');
+        applyStreakResult(matchup.team2Id, 'L');
       } else if (score2 > score1) {
         team2Standing.wins++;
         team1Standing.losses++;
+        applyStreakResult(matchup.team1Id, 'L');
+        applyStreakResult(matchup.team2Id, 'W');
       } else {
         team1Standing.ties++;
         team2Standing.ties++;
+        applyStreakResult(matchup.team1Id, 'T');
+        applyStreakResult(matchup.team2Id, 'T');
       }
 
       if (medianGameEnabled) {
@@ -738,6 +765,13 @@ async function _computeStandings(
           standing.medianTies = (standing.medianTies ?? 0) + 1;
         }
       }
+    }
+  }
+
+  for (const [teamId, streak] of streakMap) {
+    const standing = standingsMap.get(teamId);
+    if (standing) {
+      standing.streak = `${streak.type}${streak.count}`;
     }
   }
 

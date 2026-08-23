@@ -973,6 +973,149 @@ describe('Matchup History', () => {
       expect(byTeam.get(1)?.medianWins).toBe(1);
       expect(byTeam.get(3)?.medianLosses).toBe(1);
     });
+
+    it('should compute the trailing streak from chronological (id) order', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+      ];
+
+      // Team A: win, win, loss (in id order) -> current streak is a single loss.
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+        {
+          id: 2,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+        {
+          id: 3,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 80,
+          team2Score: 90,
+          status: 'completed',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
+
+      const standings = await calculateStandings(mockDb, 1);
+
+      const teamA = standings.find((s) => s.teamId === 1);
+      const teamB = standings.find((s) => s.teamId === 2);
+      expect(teamA?.streak).toBe('L1');
+      expect(teamB?.streak).toBe('W1');
+    });
+
+    it('should compute a multi-game win streak', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+      ];
+
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+        {
+          id: 2,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 95,
+          team2Score: 80,
+          status: 'completed',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
+
+      const standings = await calculateStandings(mockDb, 1);
+
+      const teamA = standings.find((s) => s.teamId === 1);
+      expect(teamA?.streak).toBe('W2');
+    });
+
+    it('should compute a multi-game tie streak', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+      ];
+
+      // Team A: win, then two consecutive ties -> current streak is 'T2'.
+      const mockMatchups: SimpleMatchup[] = [
+        {
+          id: 1,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 100,
+          team2Score: 90,
+          status: 'completed',
+        },
+        {
+          id: 2,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 85,
+          team2Score: 85,
+          status: 'completed',
+        },
+        {
+          id: 3,
+          leagueId: 1,
+          team1Id: 1,
+          team2Id: 2,
+          team1Score: 70,
+          team2Score: 70,
+          status: 'completed',
+        },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, mockMatchups);
+
+      const standings = await calculateStandings(mockDb, 1);
+
+      const teamA = standings.find((s) => s.teamId === 1);
+      const teamB = standings.find((s) => s.teamId === 2);
+      expect(teamA?.streak).toBe('T2');
+      expect(teamB?.streak).toBe('T2');
+    });
+
+    it('should return a null streak when there are no completed matchups', async () => {
+      const mockTeams = [
+        { id: 1, name: 'Team A' },
+        { id: 2, name: 'Team B' },
+      ];
+
+      mockDb = buildStandingsMockDb(mockTeams, []);
+
+      const standings = await calculateStandings(mockDb, 1);
+
+      const teamA = standings.find((s) => s.teamId === 1);
+      expect(teamA?.streak).toBeNull();
+    });
   });
 
   // LS-9525: the game-stat fetches moved from two independent IN lists

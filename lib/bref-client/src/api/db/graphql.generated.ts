@@ -4751,6 +4751,8 @@ export type TeamStanding = {
   primaryColor?: Maybe<Scalars['String']['output']>;
   rank?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
+  /** Current streak of consecutive same-result completed matchups, e.g. "W3", "L2", "T1". */
+  streak?: Maybe<Scalars['String']['output']>;
   teamId?: Maybe<Scalars['ID']['output']>;
   teamName?: Maybe<Scalars['String']['output']>;
   ties?: Maybe<Scalars['Int']['output']>;
