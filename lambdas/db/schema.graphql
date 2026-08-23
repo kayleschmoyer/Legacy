@@ -1923,6 +1923,22 @@ type LeagueMemberPaymentStatus {
 }
 
 """
+Moderation report for a league chat message
+"""
+type LeagueMessageReport {
+  createdAt: String
+  id: ID
+  messageId: Int
+  moderatorNotes: String
+  reason: String
+  reportedBy: Int
+  resolution: String
+  resolvedAt: String
+  reviewedBy: Int
+  status: MatchupMessageReportStatus
+}
+
+"""
 A position configuration in a league
 """
 type LeaguePosition {
@@ -2398,6 +2414,7 @@ type Mutation {
   Award Playoff Appearance badges to all teams that qualified for the playoffs.
   """
   awardPlayoffAppearanceBadges(leagueId: Int!, teamIds: [Int!]!): Boolean
+  blockLeagueChatUser(blockedUserId: Int!, leagueId: Int!): MatchupChatBlock
 
   """
   Commissioner: drop all players from a team (useful for inactive teams).
@@ -2786,6 +2803,7 @@ type Mutation {
   Reorder the current user's draft queue. playerIds must contain the same players that are already queued — only the order changes.
   """
   reorderDraftQueue(draftId: Int!, playerIds: [Int!]!): [DraftQueueEntry!]
+  reportLeagueMessage(messageId: Int!, reason: String!): LeagueMessageReport
 
   """
   Request deletion of all personal data (GDPR Art. 17 - Right to Erasure)
@@ -2992,6 +3010,7 @@ type Mutation {
     """
     sport: Sport
   ): TwentyQuestionsGame
+  unblockLeagueChatUser(blockedUserId: Int!, leagueId: Int!): Boolean
 
   """
   Withdraw a pending keeper designation before the draft goes live. (LS-8673)
@@ -3796,6 +3815,7 @@ type Query {
   ): HeadToHeadRecord
   getLeagueAnalytics(leagueId: Int!): LeagueAnalytics
   getLeagueAnnouncements(leagueId: Int!): [LeagueChatMessage!]
+  getLeagueChatBlocks(leagueId: Int!): [MatchupChatBlock!]
   getLeagueDraft(leagueId: Int!): Draft
 
   """

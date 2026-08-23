@@ -1636,6 +1636,21 @@ export type LeagueMemberPaymentStatus = {
   username?: Maybe<Scalars['String']['output']>;
 };
 
+/** Moderation report for a league chat message */
+export type LeagueMessageReport = {
+  __typename?: 'LeagueMessageReport';
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id?: Maybe<Scalars['ID']['output']>;
+  messageId?: Maybe<Scalars['Int']['output']>;
+  moderatorNotes?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  reportedBy?: Maybe<Scalars['Int']['output']>;
+  resolution?: Maybe<Scalars['String']['output']>;
+  resolvedAt?: Maybe<Scalars['String']['output']>;
+  reviewedBy?: Maybe<Scalars['Int']['output']>;
+  status?: Maybe<MatchupMessageReportStatus>;
+};
+
 /** A position configuration in a league */
 export type LeaguePosition = {
   __typename?: 'LeaguePosition';
@@ -1976,6 +1991,7 @@ export type Mutation = {
   awardLeagueChampionBadge?: Maybe<Scalars['Boolean']['output']>;
   /** Award Playoff Appearance badges to all teams that qualified for the playoffs. */
   awardPlayoffAppearanceBadges?: Maybe<Scalars['Boolean']['output']>;
+  blockLeagueChatUser?: Maybe<MatchupChatBlock>;
   /** Commissioner: drop all players from a team (useful for inactive teams). */
   bulkDropTeamPlayers?: Maybe<CommissionerActionResult>;
   /** Cancel a Season Draft Game (only the creator can cancel, only in setup or drafting) */
@@ -2095,6 +2111,7 @@ export type Mutation = {
   renewLeague?: Maybe<League>;
   /** Reorder the current user's draft queue. playerIds must contain the same players that are already queued — only the order changes. */
   reorderDraftQueue?: Maybe<Array<DraftQueueEntry>>;
+  reportLeagueMessage?: Maybe<LeagueMessageReport>;
   /** Request deletion of all personal data (GDPR Art. 17 - Right to Erasure) */
   requestDataDeletion?: Maybe<DataRequest>;
   /** Request an export of all personal data (GDPR Art. 15 - Right of Access) */
@@ -2158,6 +2175,7 @@ export type Mutation = {
   twentyQuestionsGuess?: Maybe<TwentyQuestionsGame>;
   /** Start a new 20 Questions game (errors if an active game exists) */
   twentyQuestionsStart?: Maybe<TwentyQuestionsGame>;
+  unblockLeagueChatUser?: Maybe<Scalars['Boolean']['output']>;
   /** Withdraw a pending keeper designation before the draft goes live. (LS-8673) */
   undesignateKeeper?: Maybe<KeeperDesignation>;
   undoLastDraftPick?: Maybe<DraftPick>;
@@ -2256,6 +2274,11 @@ export type MutationAwardLeagueChampionBadgeArgs = {
 export type MutationAwardPlayoffAppearanceBadgesArgs = {
   leagueId: Scalars['Int']['input'];
   teamIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationBlockLeagueChatUserArgs = {
+  blockedUserId: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationBulkDropTeamPlayersArgs = {
@@ -2613,6 +2636,11 @@ export type MutationReorderDraftQueueArgs = {
   playerIds: Array<Scalars['Int']['input']>;
 };
 
+export type MutationReportLeagueMessageArgs = {
+  messageId: Scalars['Int']['input'];
+  reason: Scalars['String']['input'];
+};
+
 export type MutationRespondDraftSlotTradeArgs = {
   accept: Scalars['Boolean']['input'];
   tradeId: Scalars['Int']['input'];
@@ -2771,6 +2799,11 @@ export type MutationTwentyQuestionsGuessArgs = {
 export type MutationTwentyQuestionsStartArgs = {
   difficulty?: InputMaybe<TwentyQuestionsDifficulty>;
   sport?: InputMaybe<Sport>;
+};
+
+export type MutationUnblockLeagueChatUserArgs = {
+  blockedUserId: Scalars['Int']['input'];
+  leagueId: Scalars['Int']['input'];
 };
 
 export type MutationUndesignateKeeperArgs = {
@@ -3318,6 +3351,7 @@ export type Query = {
   getHeadToHeadRecord?: Maybe<HeadToHeadRecord>;
   getLeagueAnalytics?: Maybe<LeagueAnalytics>;
   getLeagueAnnouncements?: Maybe<Array<LeagueChatMessage>>;
+  getLeagueChatBlocks?: Maybe<Array<MatchupChatBlock>>;
   getLeagueDraft?: Maybe<Draft>;
   /** Get the full season history for a league by traversing the previousLeagueId lineage chain. Returns seasons in reverse chronological order (current first). */
   getLeagueHistory?: Maybe<Array<LeagueSeasonSummary>>;
@@ -3661,6 +3695,10 @@ export type QueryGetLeagueAnalyticsArgs = {
 };
 
 export type QueryGetLeagueAnnouncementsArgs = {
+  leagueId: Scalars['Int']['input'];
+};
+
+export type QueryGetLeagueChatBlocksArgs = {
   leagueId: Scalars['Int']['input'];
 };
 

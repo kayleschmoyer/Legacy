@@ -1,11 +1,12 @@
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
-import { and, asc, desc, eq, inArray, lt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNull, lt, or } from 'drizzle-orm';
 import { builder } from './builder';
 import { Team } from './leagues/types';
 import {
   AuthenticationError,
   ForbiddenError,
+  NotFoundError,
   UserInputError,
 } from './graphql-errors';
 import { validateGifUrl } from './validate-gif-url';
@@ -47,6 +48,25 @@ function toUtcIso(pgTs: string): string {
     return new Date(normalized).toISOString();
   }
   return new Date(normalized + 'Z').toISOString();
+}
+
+/**
+ * Normalize a matchup_chat_blocks row for the MatchupChatBlock GraphQL type.
+ * `updated_at` is a `timestamptz` column with no `mode: 'string'`, so drizzle
+ * returns it as a `Date` even though the other timestamp columns on this
+ * table (and the GraphQL type) are strings — this table had no consumers
+ * before LS-6297, so the mismatch was never exercised.
+ */
+function toChatBlockResult<T extends { updatedAt: Date | string }>(
+  row: T,
+): Omit<T, 'updatedAt'> & { updatedAt: string } {
+  return {
+    ...row,
+    updatedAt:
+      row.updatedAt instanceof Date
+        ? row.updatedAt.toISOString()
+        : row.updatedAt,
+  };
 }
 
 function escapeRegExp(value: string): string {
@@ -392,6 +412,44 @@ builder.objectType(LeagueChatMessage, {
 });
 
 /**
+ * LeagueMessageReport — a moderation report against a league chat message
+ * (LS-6297). Mirrors MatchupMessageReport; backed by the
+ * `league_message_reports` table, which FKs to `league_messages` instead of
+ * `matchup_messages`.
+ */
+const LeagueMessageReport = builder.objectRef<{
+  id: number;
+  messageId: number;
+  reportedBy: number;
+  reason: string;
+  status: 'pending' | 'reviewing' | 'resolved' | 'dismissed';
+  createdAt: string;
+  resolvedAt: string | null;
+  reviewedBy: number | null;
+  moderatorNotes: string | null;
+  resolution: string | null;
+}>('LeagueMessageReport');
+
+builder.objectType(LeagueMessageReport, {
+  description: 'Moderation report for a league chat message',
+  fields: (t) => ({
+    id: t.exposeID('id'),
+    messageId: t.exposeInt('messageId'),
+    reportedBy: t.exposeInt('reportedBy'),
+    reason: t.exposeString('reason'),
+    status: t.field({
+      type: MatchupMessageReportStatus,
+      resolve: (report) => report.status,
+    }),
+    createdAt: t.exposeString('createdAt'),
+    resolvedAt: t.exposeString('resolvedAt', { nullable: true }),
+    reviewedBy: t.exposeInt('reviewedBy', { nullable: true }),
+    moderatorNotes: t.exposeString('moderatorNotes', { nullable: true }),
+    resolution: t.exposeString('resolution', { nullable: true }),
+  }),
+});
+
+/**
  * DirectMessage — a private message between two players.
  * Backed by the `direct_messages` table.
  */
@@ -705,6 +763,31 @@ builder.queryField('getLeagueMessages', (t) =>
         throw ForbiddenError('Not a member of this league');
       }
 
+      // Mute senders the caller has blocked in this league (LS-6297) — a
+      // 'league' or 'global' scoped block against the sender, not yet
+      // expired. Filtered client-side (post-query) since the block set per
+      // caller is typically tiny relative to a message page.
+      const activeBlocks = await context.db
+        .select({ blockedUserId: PublicSchema.matchupChatBlocks.blockedUserId })
+        .from(PublicSchema.matchupChatBlocks)
+        .where(
+          and(
+            eq(PublicSchema.matchupChatBlocks.blockingUserId, context.user.id),
+            eq(PublicSchema.matchupChatBlocks.leagueId, args.leagueId),
+            inArray(PublicSchema.matchupChatBlocks.scope, ['league', 'global']),
+            or(
+              isNull(PublicSchema.matchupChatBlocks.expiresAt),
+              gt(
+                PublicSchema.matchupChatBlocks.expiresAt,
+                new Date().toISOString(),
+              ),
+            ),
+          ),
+        );
+      const blockedUserIds = new Set(
+        activeBlocks.map((block) => block.blockedUserId),
+      );
+
       const query = context.db
         .select()
         .from(PublicSchema.leagueMessages)
@@ -720,17 +803,50 @@ builder.queryField('getLeagueMessages', (t) =>
 
       const results = args.limit ? await query.limit(args.limit) : await query;
 
-      return results.map((msg) => ({
-        id: msg.id,
-        leagueId: msg.leagueId,
-        userId: msg.userId,
-        messageText: msg.messageText,
-        timestamp: msg.timestamp ?? null,
-        messageType: msg.messageType ?? 'text',
-        gifUrl: msg.gifUrl ?? null,
-        metadata: msg.metadata ?? null,
-        mentionedUserIds: msg.mentionedUserIds ?? null,
-      }));
+      return results
+        .filter((msg) => msg.userId == null || !blockedUserIds.has(msg.userId))
+        .map((msg) => ({
+          id: msg.id,
+          leagueId: msg.leagueId,
+          userId: msg.userId,
+          messageText: msg.messageText,
+          timestamp: msg.timestamp ?? null,
+          messageType: msg.messageType ?? 'text',
+          gifUrl: msg.gifUrl ?? null,
+          metadata: msg.metadata ?? null,
+          mentionedUserIds: msg.mentionedUserIds ?? null,
+        }));
+    },
+  }),
+);
+
+// Query: getLeagueChatBlocks — list the users the caller has blocked in a
+// league's chat (LS-6297). Scoped to this league's 'league'-scope blocks;
+// mirrors the (currently unconsumed) MatchupChatBlock table/type.
+builder.queryField('getLeagueChatBlocks', (t) =>
+  t.field({
+    type: [MatchupChatBlock],
+    args: {
+      leagueId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const rows = await context.db
+        .select()
+        .from(PublicSchema.matchupChatBlocks)
+        .where(
+          and(
+            eq(PublicSchema.matchupChatBlocks.blockingUserId, context.user.id),
+            eq(PublicSchema.matchupChatBlocks.leagueId, args.leagueId),
+            eq(PublicSchema.matchupChatBlocks.scope, 'league'),
+          ),
+        )
+        .orderBy(desc(PublicSchema.matchupChatBlocks.createdAt));
+
+      return rows.map(toChatBlockResult);
     },
   }),
 );
@@ -1047,6 +1163,173 @@ builder.mutationField('sendLeagueMessage', (t) =>
         metadata: null,
         mentionedUserIds: msg.mentionedUserIds ?? null,
       };
+    },
+  }),
+);
+
+// Mutation: blockLeagueChatUser — mute another league member's league chat
+// messages (LS-6297). Reuses the matchup_chat_blocks table with scope
+// 'league' and a null matchupId, exactly as its scope enum was designed to
+// support; enforced by getLeagueMessages filtering out blocked senders.
+builder.mutationField('blockLeagueChatUser', (t) =>
+  t.field({
+    type: MatchupChatBlock,
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      blockedUserId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      if (args.blockedUserId === context.user.id) {
+        throw UserInputError('Cannot block yourself');
+      }
+
+      const membership = await context.db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, args.leagueId),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw ForbiddenError('Not a member of this league');
+      }
+
+      const existing = await context.db
+        .select()
+        .from(PublicSchema.matchupChatBlocks)
+        .where(
+          and(
+            eq(PublicSchema.matchupChatBlocks.leagueId, args.leagueId),
+            eq(PublicSchema.matchupChatBlocks.blockingUserId, context.user.id),
+            eq(
+              PublicSchema.matchupChatBlocks.blockedUserId,
+              args.blockedUserId,
+            ),
+            eq(PublicSchema.matchupChatBlocks.scope, 'league'),
+          ),
+        )
+        .limit(1);
+
+      if (existing[0]) {
+        return toChatBlockResult(existing[0]);
+      }
+
+      const rows = await context.db
+        .insert(PublicSchema.matchupChatBlocks)
+        .values({
+          leagueId: args.leagueId,
+          matchupId: null,
+          blockingUserId: context.user.id,
+          blockedUserId: args.blockedUserId,
+          scope: 'league',
+        })
+        .returning();
+
+      return toChatBlockResult(rows[0]);
+    },
+  }),
+);
+
+// Mutation: unblockLeagueChatUser — reverse a blockLeagueChatUser call
+// (LS-6297).
+builder.mutationField('unblockLeagueChatUser', (t) =>
+  t.field({
+    type: 'Boolean',
+    args: {
+      leagueId: t.arg.int({ required: true }),
+      blockedUserId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      await context.db
+        .delete(PublicSchema.matchupChatBlocks)
+        .where(
+          and(
+            eq(PublicSchema.matchupChatBlocks.leagueId, args.leagueId),
+            eq(PublicSchema.matchupChatBlocks.blockingUserId, context.user.id),
+            eq(
+              PublicSchema.matchupChatBlocks.blockedUserId,
+              args.blockedUserId,
+            ),
+            eq(PublicSchema.matchupChatBlocks.scope, 'league'),
+          ),
+        );
+
+      return true;
+    },
+  }),
+);
+
+// Mutation: reportLeagueMessage — file a moderation report against a league
+// chat message (LS-6297). Persists to league_message_reports, the
+// league-chat analogue of matchup_message_reports.
+builder.mutationField('reportLeagueMessage', (t) =>
+  t.field({
+    type: LeagueMessageReport,
+    args: {
+      messageId: t.arg.int({ required: true }),
+      reason: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const trimmedReason = args.reason.trim();
+      if (trimmedReason.length === 0) {
+        throw UserInputError('Report reason cannot be empty');
+      }
+      if (trimmedReason.length > 1000) {
+        throw UserInputError('Report reason cannot exceed 1000 characters');
+      }
+      const reason = escapeHtml(trimmedReason);
+
+      const messages = await context.db
+        .select({ leagueId: PublicSchema.leagueMessages.leagueId })
+        .from(PublicSchema.leagueMessages)
+        .where(eq(PublicSchema.leagueMessages.id, args.messageId))
+        .limit(1);
+
+      if (!messages[0]) {
+        throw NotFoundError('Message not found');
+      }
+
+      const membership = await context.db
+        .select()
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, messages[0].leagueId),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+
+      if (membership.length === 0) {
+        throw ForbiddenError('Not a member of this league');
+      }
+
+      const rows = await context.db
+        .insert(PublicSchema.leagueMessageReports)
+        .values({
+          messageId: args.messageId,
+          reportedBy: context.user.id,
+          reason,
+        })
+        .returning();
+
+      return rows[0];
     },
   }),
 );

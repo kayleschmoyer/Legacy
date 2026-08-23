@@ -328,6 +328,13 @@ export const matchupMessages = pgTable(
   },
 );
 
+/**
+ * League-scoped blocks (scope = 'league') are additionally protected by a
+ * partial unique index on (blocking_user_id, blocked_user_id, league_id)
+ * defined in the DB migration — Drizzle does not natively support partial
+ * indexes for uniqueness enforcement, so deduplication is also handled at
+ * the service layer in blockLeagueChatUser.
+ */
 export const matchupChatBlocks = pgTable(
   'matchup_chat_blocks',
   {

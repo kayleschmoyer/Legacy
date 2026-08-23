@@ -33,6 +33,35 @@ describe('Chat and Tiebreakers Resolver', () => {
     ...overrides,
   });
 
+  const makeChatBlock = (overrides: Record<string, unknown> = {}) => ({
+    id: 1,
+    leagueId: 1,
+    matchupId: null,
+    blockingUserId: 1,
+    blockedUserId: 2,
+    scope: 'league',
+    createdAt: new Date(),
+    expiresAt: null,
+    updatedAt: new Date(),
+    ...overrides,
+  });
+
+  const makeLeagueMessageReport = (
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    id: 1,
+    messageId: 1,
+    reportedBy: 1,
+    reason: 'Abusive language',
+    status: 'pending',
+    createdAt: new Date(),
+    resolvedAt: null,
+    reviewedBy: null,
+    moderatorNotes: null,
+    resolution: null,
+    ...overrides,
+  });
+
   const makeDirectMsg = (overrides: Record<string, unknown> = {}) => ({
     id: 1,
     fromUserId: 1,
@@ -156,6 +185,29 @@ describe('Chat and Tiebreakers Resolver', () => {
           userId: 'userId',
           teamId: 'teamId',
           permissionLevel: 'permissionLevel',
+        },
+        matchupChatBlocks: {
+          id: 'id',
+          leagueId: 'leagueId',
+          matchupId: 'matchupId',
+          blockingUserId: 'blockingUserId',
+          blockedUserId: 'blockedUserId',
+          scope: 'scope',
+          createdAt: 'createdAt',
+          expiresAt: 'expiresAt',
+          updatedAt: 'updatedAt',
+        },
+        leagueMessageReports: {
+          id: 'id',
+          messageId: 'messageId',
+          reportedBy: 'reportedBy',
+          reason: 'reason',
+          status: 'status',
+          createdAt: 'createdAt',
+          resolvedAt: 'resolvedAt',
+          reviewedBy: 'reviewedBy',
+          moderatorNotes: 'moderatorNotes',
+          resolution: 'resolution',
         },
         matchups: {
           id: 'id',
@@ -405,7 +457,7 @@ describe('Chat and Tiebreakers Resolver', () => {
       // The cursor condition is folded into the same `where` call as the
       // leagueId scope, not a second filter — assert the query was built
       // with a single combined where clause rather than skipped entirely.
-      expect(mockDb.where).toHaveBeenCalledTimes(2); // membership + messages
+      expect(mockDb.where).toHaveBeenCalledTimes(3); // membership + active blocks (LS-6297) + messages
     });
 
     it('still returns the newest page when before is omitted', async () => {
@@ -423,6 +475,74 @@ describe('Chat and Tiebreakers Resolver', () => {
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({ id: 100 });
+    });
+
+    // ── block enforcement (LS-6297) ─────────────────────────────────────
+
+    it('filters out messages from a blocked sender', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership
+      mockDb.where
+        .mockReturnValueOnce(mockDb) // membership's .where() — chained with .limit()
+        .mockResolvedValueOnce([{ blockedUserId: 2 }]); // active blocks (terminal .where())
+      mockDb.limit.mockResolvedValueOnce([
+        makeLeagueMsg({ id: 1, userId: 2 }),
+        makeLeagueMsg({ id: 2, userId: 3 }),
+      ]); // messages
+
+      const resolver = getQuery('getLeagueMessages');
+      const result = (await resolver(
+        {},
+        { leagueId: 1, limit: 20 },
+        mockContext,
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ id: 2, userId: 3 });
+    });
+
+    it('does not filter messages when the caller has no active blocks', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ id: 1 }]); // membership
+      mockDb.where
+        .mockReturnValueOnce(mockDb) // membership's .where() — chained with .limit()
+        .mockResolvedValueOnce([]); // no active blocks (terminal .where())
+      mockDb.limit.mockResolvedValueOnce([makeLeagueMsg({ userId: 2 })]);
+
+      const resolver = getQuery('getLeagueMessages');
+      const result = (await resolver(
+        {},
+        { leagueId: 1, limit: 20 },
+        mockContext,
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      expect(result).toHaveLength(1);
+    });
+  });
+
+  // ── getLeagueChatBlocks (LS-6297) ────────────────────────────────────────
+
+  describe('getLeagueChatBlocks query', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getQuery('getLeagueChatBlocks');
+      await expect(
+        resolver({}, { leagueId: 1 }, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('returns the blocks the caller has created for a league', async () => {
+      mockDb.orderBy.mockResolvedValueOnce([makeChatBlock()]);
+
+      const resolver = getQuery('getLeagueChatBlocks');
+      const result = (await resolver(
+        {},
+        { leagueId: 1 },
+        mockContext,
+        undefined as never,
+      )) as Array<Record<string, unknown>>;
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ blockingUserId: 1, blockedUserId: 2 });
     });
   });
 
@@ -873,6 +993,220 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(publish).not.toHaveBeenCalled();
 
       delete mockContext.notificationPublisher;
+    });
+  });
+
+  // ── blockLeagueChatUser (LS-6297) ───────────────────────────────────────
+
+  describe('blockLeagueChatUser mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('blockLeagueChatUser');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, blockedUserId: 2 },
+          unauthCtx,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('throws when blocking yourself', async () => {
+      const resolver = getMutation('blockLeagueChatUser');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, blockedUserId: 1 }, // same as mockContext.user.id
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Cannot block yourself');
+    });
+
+    it('throws when not a league member', async () => {
+      mockDb.limit.mockResolvedValueOnce([]); // no membership
+
+      const resolver = getMutation('blockLeagueChatUser');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, blockedUserId: 2 },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Not a member of this league');
+    });
+
+    it('returns the existing block without inserting a duplicate', async () => {
+      const existing = makeChatBlock();
+      mockDb.limit
+        .mockResolvedValueOnce([{ id: 1 }]) // membership
+        .mockResolvedValueOnce([existing]); // existing block found
+
+      const resolver = getMutation('blockLeagueChatUser');
+      const result = (await resolver(
+        {},
+        { leagueId: 1, blockedUserId: 2 },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(result).toEqual({
+        ...existing,
+        updatedAt: existing.updatedAt.toISOString(),
+      });
+      expect(mockDb.insert).not.toHaveBeenCalled();
+    });
+
+    it('creates a new league-scoped block', async () => {
+      const block = makeChatBlock();
+      mockDb.limit
+        .mockResolvedValueOnce([{ id: 1 }]) // membership
+        .mockResolvedValueOnce([]); // no existing block
+      mockDb.returning.mockResolvedValueOnce([block]);
+
+      const resolver = getMutation('blockLeagueChatUser');
+      const result = (await resolver(
+        {},
+        { leagueId: 1, blockedUserId: 2 },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          leagueId: 1,
+          matchupId: null,
+          blockingUserId: 1,
+          blockedUserId: 2,
+          scope: 'league',
+        }),
+      );
+      expect(result).toMatchObject({ blockedUserId: 2, scope: 'league' });
+    });
+  });
+
+  // ── unblockLeagueChatUser (LS-6297) ─────────────────────────────────────
+
+  describe('unblockLeagueChatUser mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('unblockLeagueChatUser');
+      await expect(
+        resolver(
+          {},
+          { leagueId: 1, blockedUserId: 2 },
+          unauthCtx,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('deletes the block and returns true', async () => {
+      const resolver = getMutation('unblockLeagueChatUser');
+      const result = await resolver(
+        {},
+        { leagueId: 1, blockedUserId: 2 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.delete).toHaveBeenCalled();
+      expect(result).toBe(true);
+    });
+  });
+
+  // ── reportLeagueMessage (LS-6297) ───────────────────────────────────────
+
+  describe('reportLeagueMessage mutation', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getMutation('reportLeagueMessage');
+      await expect(
+        resolver(
+          {},
+          { messageId: 1, reason: 'Abusive' },
+          unauthCtx,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('throws when reason is empty', async () => {
+      const resolver = getMutation('reportLeagueMessage');
+      await expect(
+        resolver(
+          {},
+          { messageId: 1, reason: '   ' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Report reason cannot be empty');
+    });
+
+    it('throws when reason exceeds 1000 characters', async () => {
+      const resolver = getMutation('reportLeagueMessage');
+      await expect(
+        resolver(
+          {},
+          { messageId: 1, reason: 'x'.repeat(1001) },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Report reason cannot exceed 1000 characters');
+    });
+
+    it('throws when the message is not found', async () => {
+      mockDb.limit.mockResolvedValueOnce([]); // no message
+
+      const resolver = getMutation('reportLeagueMessage');
+      await expect(
+        resolver(
+          {},
+          { messageId: 999, reason: 'Abusive' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Message not found');
+    });
+
+    it('throws when not a league member', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ leagueId: 1 }]) // message found
+        .mockResolvedValueOnce([]); // no membership
+
+      const resolver = getMutation('reportLeagueMessage');
+      await expect(
+        resolver(
+          {},
+          { messageId: 1, reason: 'Abusive' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('Not a member of this league');
+    });
+
+    it('creates a report successfully', async () => {
+      const report = makeLeagueMessageReport();
+      mockDb.limit
+        .mockResolvedValueOnce([{ leagueId: 1 }]) // message found
+        .mockResolvedValueOnce([{ id: 1 }]); // membership
+      mockDb.returning.mockResolvedValueOnce([report]);
+
+      const resolver = getMutation('reportLeagueMessage');
+      const result = (await resolver(
+        {},
+        { messageId: 1, reason: 'Abusive language' },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageId: 1,
+          reportedBy: 1,
+          reason: 'Abusive language',
+        }),
+      );
+      expect(result).toMatchObject({ status: 'pending' });
     });
   });
 

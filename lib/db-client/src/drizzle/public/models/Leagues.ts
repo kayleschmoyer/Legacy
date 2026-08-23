@@ -16,6 +16,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 import { players } from './Players';
+import { users } from './Users';
 import {
   draftOrder,
   draftMode,
@@ -28,6 +29,7 @@ import {
   leaguePermissionLevel,
   positionSlot,
   rosterContinuity,
+  matchupMessageReportStatus,
   rosterLockTiming,
   schedulingStrategy,
   waiverClaimStatus,
@@ -354,6 +356,56 @@ export const leagueMessages = pgTable(
         foreignColumns: [leagues.id],
         name: 'league_messages_leagues_id_fk',
       }).onDelete('cascade'),
+    };
+  },
+);
+
+/**
+ * League Message Report - Moderation report for a league chat message
+ * (LS-6297). Mirrors matchup_message_reports, but FK'd to league_messages —
+ * that table's message_id FK is bound to matchup_messages, so it can't be
+ * reused here.
+ */
+export const leagueMessageReports = pgTable(
+  'league_message_reports',
+  {
+    id: serial('id').primaryKey().notNull(),
+    messageId: integer('message_id').notNull(),
+    reportedBy: integer('reported_by').notNull(),
+    reason: text('reason').notNull(),
+    status: matchupMessageReportStatus('status').notNull().default('pending'),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    resolvedAt: timestamp('resolved_at', { mode: 'string' }),
+    reviewedBy: integer('reviewed_by'),
+    moderatorNotes: text('moderator_notes'),
+    resolution: text('resolution'),
+  },
+  (table) => {
+    return {
+      leagueMessageReportsMessageFk: foreignKey({
+        columns: [table.messageId],
+        foreignColumns: [leagueMessages.id],
+        name: 'league_message_reports_message_fk',
+      }).onDelete('cascade'),
+      leagueMessageReportsReporterFk: foreignKey({
+        columns: [table.reportedBy],
+        foreignColumns: [users.id],
+        name: 'league_message_reports_reporter_fk',
+      }).onDelete('cascade'),
+      leagueMessageReportsReviewerFk: foreignKey({
+        columns: [table.reviewedBy],
+        foreignColumns: [users.id],
+        name: 'league_message_reports_reviewer_fk',
+      }).onDelete('set null'),
+      messageIdIdx: index('league_message_reports_message_idx').on(
+        table.messageId,
+      ),
+      statusIdx: index('league_message_reports_status_idx').on(table.status),
+      reportedByIdx: index('league_message_reports_reported_by_idx').on(
+        table.reportedBy,
+      ),
     };
   },
 );
