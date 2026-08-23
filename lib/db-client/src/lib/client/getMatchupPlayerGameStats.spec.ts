@@ -183,3 +183,208 @@ describe('getMatchupPlayerGameStats', () => {
     expect(result).toEqual([]);
   });
 });
+
+/**
+ * LS-9602 — repeated game selections must each contribute.
+ *
+ * LS-9534 decided (2026-08-23) that one real game MAY legitimately fill several
+ * slots of a matchup. getMatchupPlayerGameStats used to collapse those with
+ * `new Set(gameIdentifiers)`, so a game filling five slots scored once and the
+ * other four selections were silently discarded — under-counting the persisted
+ * matchups.team1_score / team2_score the UI renders.
+ */
+describe('getMatchupPlayerGameStats — repeated game selections (LS-9602)', () => {
+  /** Build N matchup_player_games rows all pointing at the same real game. */
+  const slotsOnSameGame = (count: number): MockRow[] =>
+    Array.from({ length: count }, (_, i) => ({
+      matchupPlayerId: MATCHUP_PLAYER_ID,
+      gameNum: i + 1,
+      gameIdentifier: GAME_IDENTIFIER,
+    }));
+
+  const selectCallCount = (db: PublicDb): number =>
+    (db as unknown as { select: jest.Mock }).select.mock.calls.length;
+
+  it('returns one entry per slot when the same game fills three slots', async () => {
+    const db = createMockDb([
+      matchupInfoResult,
+      matchupPlayersResult,
+      slotsOnSameGame(3),
+      matchupResult,
+      teamMembersResult,
+      [battingRow],
+      [], // pitching
+      [], // fielding
+    ]);
+
+    const result = await getMatchupPlayerGameStats(db, MATCHUP_ID);
+
+    // Previously 1 — the dedupe collapsed all three slots into a single entry.
+    expect(result).toHaveLength(3);
+    for (const entry of result) {
+      expect(entry.playerId).toBe(PLAYER_ID);
+      expect(entry.season).toBe(SEASON);
+      expect(entry.teamId).toBe(TEAM1_ID);
+      expect(entry.battingStats).toEqual(battingRow);
+    }
+  });
+
+  it('multiplies the contribution by the slot count (all five slots on one game)', async () => {
+    const db = createMockDb([
+      matchupInfoResult,
+      matchupPlayersResult,
+      slotsOnSameGame(5),
+      matchupResult,
+      teamMembersResult,
+      [battingRow],
+      [],
+      [],
+    ]);
+
+    const result = await getMatchupPlayerGameStats(db, MATCHUP_ID);
+
+    expect(result).toHaveLength(5);
+    // The scoring layer aggregates these entries additively, so N identical
+    // entries are worth N times the single-slot contribution.
+    const totalHits = result.reduce(
+      (sum, entry) => sum + (entry.battingStats?.h ?? 0),
+      0,
+    );
+    expect(totalHits).toBe(battingRow.h * 5);
+  });
+
+  it('does not issue extra stat queries for repeated slots', async () => {
+    // Stat rows are a pure function of (playerId, season, gameIdentifier), so
+    // five slots on one game must still cost exactly one batting + one pitching
+    // + one fielding fetch. Guards the N+1 risk called out in LS-9602.
+    const oneSlot = createMockDb([
+      matchupInfoResult,
+      matchupPlayersResult,
+      slotsOnSameGame(1),
+      matchupResult,
+      teamMembersResult,
+      [battingRow],
+      [],
+      [],
+    ]);
+    await getMatchupPlayerGameStats(oneSlot, MATCHUP_ID);
+
+    const fiveSlots = createMockDb([
+      matchupInfoResult,
+      matchupPlayersResult,
+      slotsOnSameGame(5),
+      matchupResult,
+      teamMembersResult,
+      [battingRow],
+      [],
+      [],
+    ]);
+    const result = await getMatchupPlayerGameStats(fiveSlots, MATCHUP_ID);
+
+    expect(result).toHaveLength(5);
+    expect(selectCallCount(fiveSlots)).toBe(selectCallCount(oneSlot));
+  });
+
+  it('keeps distinct games distinct while repeating duplicated ones', async () => {
+    const otherGameId = 'BOS202105200';
+    const otherBattingRow = {
+      ...battingRow,
+      gameIdentifier: otherGameId,
+      gameNum: 2,
+      h: 1,
+    };
+
+    const db = createMockDb([
+      matchupInfoResult,
+      matchupPlayersResult,
+      [
+        {
+          matchupPlayerId: MATCHUP_PLAYER_ID,
+          gameNum: 1,
+          gameIdentifier: GAME_IDENTIFIER,
+        },
+        {
+          matchupPlayerId: MATCHUP_PLAYER_ID,
+          gameNum: 2,
+          gameIdentifier: GAME_IDENTIFIER,
+        },
+        {
+          matchupPlayerId: MATCHUP_PLAYER_ID,
+          gameNum: 3,
+          gameIdentifier: otherGameId,
+        },
+      ],
+      matchupResult,
+      teamMembersResult,
+      [battingRow], // first game — batting
+      [], // first game — pitching
+      [], // first game — fielding
+      [otherBattingRow], // second game — batting
+      [], // second game — pitching
+      [], // second game — fielding
+    ]);
+
+    const result = await getMatchupPlayerGameStats(db, MATCHUP_ID);
+
+    expect(result).toHaveLength(3);
+    expect(
+      result.filter((r) => r.battingStats?.gameIdentifier === GAME_IDENTIFIER),
+    ).toHaveLength(2);
+    expect(
+      result.filter((r) => r.battingStats?.gameIdentifier === otherGameId),
+    ).toHaveLength(1);
+  });
+
+  it('does not merge game lists across two matchup_player rows for one player', async () => {
+    // matchup_players is unique on (matchup_id, player_id, team_id), so the same
+    // player can hold two rows in one matchup. Keying the map by playerId merged
+    // their game lists and applied the FIRST row's season to both.
+    const secondMatchupPlayerId = MATCHUP_PLAYER_ID + 1;
+    const secondSeason = 1998;
+    const secondGameId = 'CHN199804060';
+
+    const db = createMockDb([
+      matchupInfoResult,
+      [
+        {
+          matchupPlayerId: MATCHUP_PLAYER_ID,
+          playerId: PLAYER_ID,
+          season: SEASON,
+          matchupId: MATCHUP_ID,
+        },
+        {
+          matchupPlayerId: secondMatchupPlayerId,
+          playerId: PLAYER_ID,
+          season: secondSeason,
+          matchupId: MATCHUP_ID,
+        },
+      ],
+      [
+        {
+          matchupPlayerId: MATCHUP_PLAYER_ID,
+          gameNum: 1,
+          gameIdentifier: GAME_IDENTIFIER,
+        },
+        {
+          matchupPlayerId: secondMatchupPlayerId,
+          gameNum: 1,
+          gameIdentifier: secondGameId,
+        },
+      ],
+      matchupResult,
+      teamMembersResult,
+      [battingRow], // first matchup player
+      [],
+      [],
+      [{ ...battingRow, season: secondSeason, gameIdentifier: secondGameId }],
+      [],
+      [],
+    ]);
+
+    const result = await getMatchupPlayerGameStats(db, MATCHUP_ID);
+
+    expect(result).toHaveLength(2);
+    // Each matchup_player row keeps its own resolved season.
+    expect(result.map((r) => r.season).sort()).toEqual([secondSeason, SEASON]);
+  });
+});

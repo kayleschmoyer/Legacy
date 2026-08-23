@@ -697,10 +697,17 @@ export async function getMatchupPlayerGameStats(
       inArray(Schema.matchupPlayerGames.matchupPlayerId, matchupPlayerIds),
     );
 
-  // Build map of player -> game identifiers
-  const playerGamesMap = new Map<
+  // Build map of matchup player -> selected game identifiers.
+  //
+  // Keyed by matchupPlayerId rather than playerId (LS-9602). matchup_players is
+  // unique on (matchup_id, player_id, team_id), so one player can legitimately
+  // hold two rows in a matchup when they appear for both teams. Keying by
+  // playerId merged those rows' game lists and silently kept only the first
+  // row's season. Keying by the matchup_player row keeps each selection set —
+  // and its own resolved season — separate.
+  const matchupPlayerGamesMap = new Map<
     number,
-    { season: number; gameIdentifiers: string[] }
+    { playerId: number; season: number; gameIdentifiers: string[] }
   >();
   const matchupPlayerMap = new Map<
     number,
@@ -722,16 +729,16 @@ export async function getMatchupPlayerGameStats(
     const gameId = game.gameIdentifier;
     if (!gameId) continue;
 
-    if (!playerGamesMap.has(mpInfo.playerId)) {
-      playerGamesMap.set(mpInfo.playerId, {
+    let playerGames = matchupPlayerGamesMap.get(game.matchupPlayerId);
+    if (!playerGames) {
+      playerGames = {
+        playerId: mpInfo.playerId,
         season: mpInfo.season,
         gameIdentifiers: [],
-      });
+      };
+      matchupPlayerGamesMap.set(game.matchupPlayerId, playerGames);
     }
-    const playerGames = playerGamesMap.get(mpInfo.playerId);
-    if (playerGames) {
-      playerGames.gameIdentifiers.push(gameId);
-    }
+    playerGames.gameIdentifiers.push(gameId);
   }
 
   // Get team membership for players
@@ -777,9 +784,43 @@ export async function getMatchupPlayerGameStats(
     fieldingStats: typeof Schema.gameFielding.$inferSelect | null;
   }[] = [];
 
-  for (const [playerId, { season, gameIdentifiers }] of playerGamesMap) {
-    const uniqueGameIds = [...new Set(gameIdentifiers)];
-    for (const gameIdentifier of uniqueGameIds) {
+  // Stat rows are a pure function of (playerId, season, gameIdentifier), so the
+  // same game selected into several slots resolves to the same three rows. Cache
+  // per lookup key: every slot still yields its own result entry (LS-9602), but
+  // the query count stays one fetch per DISTINCT triple — the same number of
+  // round trips this loop issued while it was deduping.
+  const statsCache = new Map<
+    string,
+    {
+      batting: typeof Schema.gameBatting.$inferSelect | null;
+      pitching: typeof Schema.gamePitching.$inferSelect | null;
+      fielding: typeof Schema.gameFielding.$inferSelect | null;
+    }
+  >();
+
+  for (const {
+    playerId,
+    season,
+    gameIdentifiers,
+  } of matchupPlayerGamesMap.values()) {
+    // No dedupe: LS-9534 decided one real game may legitimately fill multiple
+    // slots of a matchup, so a game in N slots must contribute N times.
+    for (const gameIdentifier of gameIdentifiers) {
+      const cacheKey = `${playerId}_${season}_${gameIdentifier}`;
+      const cached = statsCache.get(cacheKey);
+      if (cached) {
+        results.push({
+          playerId,
+          teamId: playerTeamMap.get(playerId) ?? null,
+          season,
+          gameNum: cached.batting?.gameNum ?? 0,
+          battingStats: cached.batting,
+          pitchingStats: cached.pitching,
+          fieldingStats: cached.fielding,
+        });
+        continue;
+      }
+
       const battingRows = await db
         .select()
         .from(Schema.gameBatting)
@@ -821,6 +862,8 @@ export async function getMatchupPlayerGameStats(
         .orderBy(asc(Schema.gameFielding.gameNum))
         .limit(1);
       const fielding = fieldingRows[0] ?? null;
+
+      statsCache.set(cacheKey, { batting, pitching, fielding });
 
       results.push({
         playerId,
