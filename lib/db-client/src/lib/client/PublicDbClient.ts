@@ -1177,16 +1177,48 @@ function assignMultiplier(
   definition: ScoringStatDefinition,
   value: number,
 ): void {
-  switch (definition.statGroup) {
+  const group = definition.statGroup;
+
+  switch (group) {
+    // Baseball groups are always present on the object, so assign directly.
     case 'batting':
-      multipliers.batting[definition.sourceColumn] = value;
-      break;
     case 'pitching':
-      multipliers.pitching[definition.sourceColumn] = value;
-      break;
     case 'fielding':
-      multipliers.fielding[definition.sourceColumn] = value;
+      multipliers[group][definition.sourceColumn] = value;
       break;
+    // Football groups are optional on `LeagueScoringMultipliers` and created
+    // lazily, so a profile with no definitions in a group leaves the key
+    // absent rather than present-but-empty. `camelCaseScoringMultipliers`
+    // relies on that distinction (LS-9664).
+    case 'passing':
+    case 'rushing':
+    case 'receiving':
+    case 'kicking':
+    case 'defense':
+    case 'idp': {
+      const weights =
+        multipliers[group] ?? (Object.create(null) as Record<string, number>);
+      weights[definition.sourceColumn] = value;
+      multipliers[group] = weights;
+      break;
+    }
+    default: {
+      // Exhaustiveness guard — intentional, and intentionally unreachable.
+      //
+      // Adding a value to the `scoring_stat_group` enum without handling it
+      // above is exactly how every football multiplier came to be silently
+      // discarded (LS-9664). The `never` assignment makes that a COMPILE
+      // error, which is the point; the `throw` only covers a row whose
+      // `stat_group` is outside the enum the types promise (a hand-edited or
+      // migrated-ahead database), where failing loudly beats dropping a
+      // multiplier on the floor.
+      //
+      // So this branch is dead by construction today. Do not "simplify" it
+      // away — deleting it restores the exact silent-discard bug this ticket
+      // fixed, and does so invisibly.
+      const unhandled: never = group;
+      throw new Error(`Unhandled scoring stat group: ${String(unhandled)}`);
+    }
   }
 }
 
@@ -1561,8 +1593,11 @@ export async function getScoringMultipliersForLeague(
 }
 
 /**
- * Scoring multiplier groups that `assignMultiplier` never populates today but
- * that `LeagueScoringMultipliers` carries for the football profiles.
+ * The football scoring multiplier groups — optional on
+ * `LeagueScoringMultipliers` because `assignMultiplier` only creates one once a
+ * `scoring_stat_definitions` row in that group is assigned. A profile with no
+ * football definitions therefore omits the keys entirely rather than carrying
+ * empty objects (LS-9664).
  */
 const OPTIONAL_SCORING_MULTIPLIER_GROUPS = [
   'passing',
