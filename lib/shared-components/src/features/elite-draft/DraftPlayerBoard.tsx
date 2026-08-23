@@ -48,7 +48,10 @@ const BASEBALL_POSITIONS: readonly string[] = [
 // 'idp' league only DL/LB/DB, so offering the other format's pill would
 // always return zero players. Derived from `defensiveFormat` directly
 // (rather than the league's `leaguePositions`) so this is correct for mock
-// drafts too — `initializeMockDraft` never seeds `league_positions`.
+// drafts too — `initializeMockDraft` never seeds `league_positions`. Neither
+// list includes BENCH or SFLEX (Superflex, LS-6337) — BENCH's eligibility
+// list is every football position, and SFLEX is a premium roster slot, not
+// a draftable stat position.
 const FOOTBALL_POSITIONS_DST: readonly string[] = [
   'ALL',
   'QB',

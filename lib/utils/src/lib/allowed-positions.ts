@@ -57,6 +57,8 @@ const FOOTBALL_ALLOWED_POSITIONS: Readonly<Record<string, readonly string[]>> =
     DB: ['DB'],
     /** FLEX accepts RB, WR, or TE — the canonical football flex eligibility rule. */
     FLEX: ['RB', 'WR', 'TE'],
+    /** SFLEX (Superflex, premium slot) accepts QB, RB, WR, or TE (LS-6337). */
+    SFLEX: ['QB', 'RB', 'WR', 'TE'],
     BENCH: ['QB', 'RB', 'WR', 'TE', 'K', 'DST', 'DL', 'LB', 'DB'],
   });
 

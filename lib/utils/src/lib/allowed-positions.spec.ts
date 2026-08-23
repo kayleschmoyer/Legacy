@@ -68,6 +68,10 @@ describe('ALLOWED_POSITIONS_BY_SPORT.football', () => {
     expect(football['FLEX']).toEqual(['RB', 'WR', 'TE']);
   });
 
+  it('SFLEX (Superflex, premium slot) accepts QB, RB, WR, TE (LS-6337)', () => {
+    expect(football['SFLEX']).toEqual(['QB', 'RB', 'WR', 'TE']);
+  });
+
   it('BENCH accepts all offensive + defensive position values (both formats)', () => {
     expect(football['BENCH']).toEqual([
       'QB',

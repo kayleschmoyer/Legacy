@@ -73,6 +73,18 @@ describe('rosterEligibility', () => {
     it('rejects unknown slot types for classified players', () => {
       expect(canPlayerPlayPosition(player(['1B']), 'ZZZ')).toBe(false);
     });
+
+    it('SFLEX (Superflex, premium slot) accepts QB, RB, WR, TE but not K (LS-6337)', () => {
+      expect(canPlayerPlayPosition(player(['QB']), 'SFLEX', 'football')).toBe(
+        true,
+      );
+      expect(canPlayerPlayPosition(player(['RB']), 'SFLEX', 'football')).toBe(
+        true,
+      );
+      expect(canPlayerPlayPosition(player(['K']), 'SFLEX', 'football')).toBe(
+        false,
+      );
+    });
   });
 
   describe('getPositionLabel', () => {
@@ -80,6 +92,10 @@ describe('rosterEligibility', () => {
       expect(getPositionLabel('SP')).toBe('Starting Pitcher');
       expect(getPositionLabel('1B')).toBe('1st Base');
       expect(getPositionLabel('zz')).toBe('ZZ');
+    });
+
+    it('labels SFLEX as Superflex (LS-6337)', () => {
+      expect(getPositionLabel('SFLEX')).toBe('Superflex');
     });
   });
 });

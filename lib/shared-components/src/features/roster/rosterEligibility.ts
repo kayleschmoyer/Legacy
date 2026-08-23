@@ -112,6 +112,7 @@ export const POSITION_LABEL: Record<string, string> = {
   WR: 'Wide Receiver',
   TE: 'Tight End',
   FLEX: 'Flex',
+  SFLEX: 'Superflex',
   K: 'Kicker',
   DST: 'Defense / Special Teams',
   DL: 'Defensive Lineman',

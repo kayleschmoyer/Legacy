@@ -135,7 +135,7 @@ export const footballPositionBadges = {
   DL: '#C25A2A', // burnt orange-red (defensive line)
   LB: '#9B7A3D', // amber-brown (linebackers)
   DB: '#1B3A5C', // brand navy (defensive backs) — was purple #6B3FA0, LS-8526
-  SUPERFLEX: '#D4AF37', // gold variant — any-position flex
+  SFLEX: '#D4AF37', // gold variant — any-position flex (Superflex, premium slot — LS-6337)
   IDP: '#5B7FA6', // steel blue — individual defensive player umbrella
 } as const;
 
