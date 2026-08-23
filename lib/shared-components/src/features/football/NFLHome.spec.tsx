@@ -1,4 +1,5 @@
 import React from 'react';
+import { act } from '@testing-library/react';
 import { NFLHome, type NFLHomeLeague } from './NFLHome';
 import { fireEvent, render, screen, within } from '../../test-utils';
 
@@ -24,6 +25,42 @@ function makeLeagues(count: number): NFLHomeLeague[] {
 
 const noop = () => {
   // Intentionally empty — default handler for props this suite doesn't assert on.
+};
+
+// NFLHome seeds search/showArchived from sessionStorage (mirrors LS-6284 /
+// FBH-030 for baseball) so state survives a sport-switch remount — clear it
+// between tests so one test's typed search doesn't leak into the next.
+beforeEach(() => {
+  sessionStorage.clear();
+});
+
+const ROLE_LEAGUES: NFLHomeLeague[] = [
+  {
+    id: 10,
+    name: 'Commish League',
+    draftStatus: 'completed',
+    permissionLevel: 'commissioner',
+  },
+  {
+    id: 11,
+    name: 'GM League',
+    draftStatus: 'completed',
+    permissionLevel: 'general_manager',
+  },
+  {
+    id: 12,
+    name: 'Member League',
+    draftStatus: 'completed',
+    permissionLevel: 'member',
+  },
+];
+
+const FROZEN_LEAGUE: NFLHomeLeague = {
+  id: 20,
+  name: 'Frozen Fossils',
+  draftStatus: 'completed',
+  currentWeekNumber: 10,
+  tierFrozenAt: '2024-03-01T00:00:00.000Z',
 };
 
 describe('NFLHome — leagues list virtualization (LS-6257)', () => {
@@ -766,5 +803,196 @@ describe('NFLHome — matchup highlight cards (LS-5407, LS-6265)', () => {
     expect(within(firstCard).getByText('Alpha Offense')).toBeInTheDocument();
     expect(within(secondCard).getByText('League Two')).toBeInTheDocument();
     expect(within(secondCard).getByText('Gamma Squad')).toBeInTheDocument();
+  });
+});
+
+describe('NFLHome — league search (LS-6262 / FBH-008)', () => {
+  it('filters the league list via search', () => {
+    jest.useFakeTimers();
+    const leagues = makeLeagues(2);
+    render(
+      <NFLHome leagues={leagues} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
+      target: { value: 'League 1' },
+    });
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    expect(screen.getByText('League 1')).toBeInTheDocument();
+    expect(screen.queryByText('League 2')).not.toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  it('shows "No leagues match your search" when search yields no results', () => {
+    jest.useFakeTimers();
+    render(
+      <NFLHome
+        leagues={makeLeagues(2)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
+      target: { value: 'xyznotfound' },
+    });
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    expect(
+      screen.getByText('No leagues match your search'),
+    ).toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  it('restores a previously entered search term across a remount', () => {
+    jest.useFakeTimers();
+    const leagues = makeLeagues(2);
+    const { unmount } = render(
+      <NFLHome leagues={leagues} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/Search leagues/i), {
+      target: { value: 'League 1' },
+    });
+    unmount();
+
+    render(
+      <NFLHome leagues={leagues} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    expect(screen.getByPlaceholderText(/Search leagues/i)).toHaveValue(
+      'League 1',
+    );
+    act(() => {
+      jest.advanceTimersByTime(200);
+    });
+    expect(screen.getByText('League 1')).toBeInTheDocument();
+    expect(screen.queryByText('League 2')).not.toBeInTheDocument();
+    jest.useRealTimers();
+  });
+
+  it('does not render the search box when the user has no leagues', () => {
+    render(<NFLHome leagues={[]} onCreateLeague={noop} onViewLeague={noop} />);
+    expect(
+      screen.queryByPlaceholderText(/Search leagues/i),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('NFLHome — role filter (LS-6262 / FBH-008)', () => {
+  it('does not render the role filter bar when no league has permissionLevel data', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(2)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    expect(
+      screen.queryByTestId('football-role-filter-bar'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the role filter bar only when leagues have permissionLevel data', () => {
+    const { rerender } = render(
+      <NFLHome
+        leagues={makeLeagues(2)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    expect(
+      screen.queryByTestId('football-role-filter-bar'),
+    ).not.toBeInTheDocument();
+
+    rerender(
+      <NFLHome
+        leagues={ROLE_LEAGUES}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    expect(screen.getByTestId('football-role-filter-bar')).toBeInTheDocument();
+  });
+
+  it('filters leagues by role when a filter button is pressed', () => {
+    render(
+      <NFLHome
+        leagues={ROLE_LEAGUES}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    const filterBar = screen.getByTestId('football-role-filter-bar');
+    fireEvent.click(within(filterBar).getByText('Commissioner'));
+    expect(screen.getByText('Commish League')).toBeInTheDocument();
+    expect(screen.queryByText('GM League')).not.toBeInTheDocument();
+    expect(screen.queryByText('Member League')).not.toBeInTheDocument();
+  });
+
+  it('groups every non-commissioner role into the Member filter', () => {
+    render(
+      <NFLHome
+        leagues={ROLE_LEAGUES}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    const filterBar = screen.getByTestId('football-role-filter-bar');
+    fireEvent.click(within(filterBar).getByText('Member'));
+    expect(screen.getByText('GM League')).toBeInTheDocument();
+    expect(screen.getByText('Member League')).toBeInTheDocument();
+    expect(screen.queryByText('Commish League')).not.toBeInTheDocument();
+  });
+});
+
+describe('NFLHome — frozen / archived leagues (LS-6262 / FBH-008)', () => {
+  it('excludes tier-frozen leagues from the active list and shows the archived toggle', () => {
+    render(
+      <NFLHome
+        leagues={[...makeLeagues(2), FROZEN_LEAGUE]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    expect(screen.queryByText('Frozen Fossils')).not.toBeInTheDocument();
+    expect(screen.getByText(/Archived leagues \(1\)/)).toBeInTheDocument();
+  });
+
+  it('expands the archived section when the toggle is clicked', () => {
+    render(
+      <NFLHome
+        leagues={[...makeLeagues(2), FROZEN_LEAGUE]}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+    expect(screen.getByText('Frozen Fossils')).toBeInTheDocument();
+  });
+
+  it('does not render the archived section when all leagues are active', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(2)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    expect(screen.queryByText(/Archived leagues/)).not.toBeInTheDocument();
+  });
+
+  it('restores an expanded archived section across a remount', () => {
+    const leagues = [...makeLeagues(2), FROZEN_LEAGUE];
+    const { unmount } = render(
+      <NFLHome leagues={leagues} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    fireEvent.click(screen.getByText(/Archived leagues \(1\)/));
+    expect(screen.getByText('Frozen Fossils')).toBeInTheDocument();
+    unmount();
+
+    render(
+      <NFLHome leagues={leagues} onCreateLeague={noop} onViewLeague={noop} />,
+    );
+    expect(screen.getByText('Frozen Fossils')).toBeInTheDocument();
   });
 });

@@ -4,6 +4,7 @@ import {
   H1,
   H2,
   H3,
+  Input,
   Paragraph,
   ScrollView,
   Separator,
@@ -15,6 +16,12 @@ import { FlatList, type RefreshControlProps } from 'react-native';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { TrendingPlayersPreview } from './TrendingPlayersPreview';
 import type { FootballPlayerCardPlayer } from './FootballPlayerCard';
+import {
+  readFootballHomeSearch,
+  readFootballHomeShowArchived,
+  writeFootballHomeSearch,
+  writeFootballHomeShowArchived,
+} from './footballHomeSessionState';
 import { Platform } from '../../platform-components';
 import {
   formatDraftStatusForCard,
@@ -29,6 +36,10 @@ export interface NFLHomeLeague {
   currentWeekNumber?: number | null;
   weekAdvanceStatus?: string | null;
   maxRosterSize?: number | null;
+  tierFrozenAt?: string | null;
+  frozenAt?: string | null;
+  /** The current user's permission level in this league (e.g. 'commissioner', 'general_manager'). */
+  permissionLevel?: string | null;
 }
 
 // LS-6257 (FBH-003) — the leagues list previously rendered every league
@@ -345,6 +356,19 @@ function LeaguesList(props: LeaguesListProps) {
   );
 }
 
+type RoleFilter = 'all' | 'commissioner' | 'member';
+
+function matchesRoleFilter(
+  permissionLevel: string | null | undefined,
+  filter: RoleFilter,
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'commissioner') return permissionLevel === 'commissioner';
+  // 'member' bucket: everything that isn't commissioner (general_manager,
+  // assistant_manager, and leagues with no permission level at all).
+  return permissionLevel !== 'commissioner';
+}
+
 const SKELETON_ROW_COUNT = 3;
 
 /**
@@ -418,7 +442,49 @@ function NFLHome({
   hasUnlimitedLeagues = false,
   resumeLeague,
 }: NFLHomeProps) {
-  const hasLeagues = leagues.length > 0;
+  // Seeded from sessionStorage so switching sport and back (a full unmount —
+  // onSwitchSport routes to /baseball) restores what the user had
+  // typed/toggled instead of silently resetting it (mirrors LS-6284 / FBH-030).
+  const [search, setSearch] = React.useState(readFootballHomeSearch);
+  const [debouncedSearch, setDebouncedSearch] = React.useState(search);
+  const [showArchived, setShowArchived] = React.useState(
+    readFootballHomeShowArchived,
+  );
+  const [roleFilter, setRoleFilter] = React.useState<RoleFilter>('all');
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  React.useEffect(() => {
+    writeFootballHomeSearch(search);
+  }, [search]);
+
+  React.useEffect(() => {
+    writeFootballHomeShowArchived(showArchived);
+  }, [showArchived]);
+
+  const activeLeagues = leagues.filter((l) => !l.tierFrozenAt && !l.frozenAt);
+  const archivedLeagues = leagues.filter(
+    (l) => !!(l.tierFrozenAt || l.frozenAt),
+  );
+
+  const hasLeagues = activeLeagues.length > 0;
+  const hasRoleData = leagues.some((l) => l.permissionLevel != null);
+
+  const filteredLeagues = activeLeagues.filter(
+    (l) =>
+      (l?.name || '')
+        .toLowerCase()
+        .includes(debouncedSearch.trim().toLowerCase()) &&
+      matchesRoleFilter(l.permissionLevel, roleFilter),
+  );
+  const filteredArchived = archivedLeagues.filter((l) =>
+    (l?.name || '')
+      .toLowerCase()
+      .includes(debouncedSearch.trim().toLowerCase()),
+  );
 
   // Static, football-specific "getting started" copy ported from the canonical
   // (now-retired) web FootballLandingPage side panel. Varies only by whether the
@@ -804,9 +870,82 @@ function NFLHome({
 
         {/* Your Football Leagues */}
         <YStack gap="$4">
-          <H2 color="$color" fontSize="$7" fontWeight="700">
-            Your Football Leagues
-          </H2>
+          <XStack
+            flexDirection="column"
+            alignItems="flex-start"
+            gap="$3"
+            // Header stacks title over the search box on phones and reflows
+            // to a single row with the search pinned right on desktop,
+            // mirroring MLBHome's "Your Leagues" header (LS-6262 / FBH-008).
+            $gtMd={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <H2 color="$color" fontSize="$7" fontWeight="700">
+              Your Football Leagues
+            </H2>
+            {hasLeagues ? (
+              <XStack
+                alignItems="center"
+                backgroundColor="$glassSurface"
+                borderRadius="$5"
+                borderWidth={1}
+                borderColor="$glassBorder"
+                paddingHorizontal="$3"
+                width="100%"
+                maxWidth={340}
+              >
+                <Input
+                  size="$4"
+                  placeholder="Search leagues..."
+                  value={search}
+                  onChangeText={setSearch}
+                  backgroundColor="transparent"
+                  borderWidth={0}
+                  flex={1}
+                  accessibilityLabel="Search leagues"
+                  aria-label="Search leagues"
+                />
+              </XStack>
+            ) : null}
+          </XStack>
+
+          {hasRoleData && hasLeagues ? (
+            <XStack gap="$2" flexWrap="wrap" testID="football-role-filter-bar">
+              {(
+                [
+                  { key: 'all', label: 'All' },
+                  { key: 'commissioner', label: 'Commissioner' },
+                  { key: 'member', label: 'Member' },
+                ] as { key: RoleFilter; label: string }[]
+              ).map(({ key, label }) => {
+                const active = roleFilter === key;
+                return (
+                  <Button
+                    key={key}
+                    size="$2"
+                    backgroundColor={active ? '$orange9' : '$gray3'}
+                    borderColor={active ? '$orange9' : '$gray7'}
+                    borderWidth={1}
+                    borderRadius="$5"
+                    onPress={() => setRoleFilter(key)}
+                    accessibilityLabel={`Filter by ${label}`}
+                  >
+                    <Text
+                      fontSize={12}
+                      fontWeight={active ? '700' : '500'}
+                      color={active ? 'white' : '$gray11'}
+                    >
+                      {label}
+                    </Text>
+                  </Button>
+                );
+              })}
+            </XStack>
+          ) : null}
+
           <YStack
             backgroundColor="$gray2"
             borderRadius="$3"
@@ -861,7 +1000,7 @@ function NFLHome({
                   </Button>
                 ) : null}
               </YStack>
-            ) : leagues.length === 0 ? (
+            ) : activeLeagues.length === 0 ? (
               <YStack alignItems="center" padding="$5" gap="$3">
                 <Text color="$color" fontSize="$5" textAlign="center">
                   No football leagues yet
@@ -918,10 +1057,66 @@ function NFLHome({
                   </XStack>
                 )}
               </YStack>
+            ) : filteredLeagues.length === 0 ? (
+              <YStack
+                alignItems="center"
+                padding="$5"
+                gap="$3"
+                testID="football-no-search-results"
+              >
+                <Text color="$color" fontSize="$5" textAlign="center">
+                  No leagues match your search
+                </Text>
+                <Text color="$gray10" fontSize="$3" textAlign="center">
+                  Try a different search term or clear the search field.
+                </Text>
+              </YStack>
             ) : (
-              <LeaguesList leagues={leagues} onViewLeague={onViewLeague} />
+              <LeaguesList
+                leagues={filteredLeagues}
+                onViewLeague={onViewLeague}
+              />
             )}
           </YStack>
+
+          {/* Archived leagues — collapsed by default (LS-6262 / FBH-008),
+              mirroring MLBHome's active/archived split. */}
+          {archivedLeagues.length > 0 ? (
+            <YStack gap="$3" marginTop="$2" testID="football-archived-section">
+              <XStack
+                alignItems="center"
+                gap="$2"
+                cursor="pointer"
+                onPress={() => setShowArchived((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showArchived
+                    ? 'Hide archived leagues'
+                    : 'Show archived leagues'
+                }
+              >
+                <Text
+                  fontSize="$3"
+                  color="$gray10"
+                  textTransform="uppercase"
+                  letterSpacing={1}
+                  fontWeight="600"
+                >
+                  {showArchived ? '▾' : '▸'} Archived leagues (
+                  {filteredArchived.length})
+                </Text>
+              </XStack>
+              {showArchived ? (
+                <YStack gap="$2">
+                  {filteredArchived.map((league) => (
+                    <YStack key={league.id} opacity={0.65}>
+                      <LeagueRow league={league} onViewLeague={onViewLeague} />
+                    </YStack>
+                  ))}
+                </YStack>
+              ) : null}
+            </YStack>
+          ) : null}
         </YStack>
 
         {trendingPlayers != null && (

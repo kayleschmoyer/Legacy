@@ -42,7 +42,12 @@ jest.mock('@legacy-sports/shared-components/football', () => {
     jest.requireActual<RNComponents>('react-native');
   return {
     NFLHome: (props: {
-      leagues: { name?: string | null }[];
+      leagues: {
+        name?: string | null;
+        permissionLevel?: string | null;
+        frozenAt?: string | null;
+        tierFrozenAt?: string | null;
+      }[];
       loading?: boolean;
       error?: boolean;
       isAuthenticated?: boolean;
@@ -72,6 +77,14 @@ jest.mock('@legacy-sports/shared-components/football', () => {
       return (
         <View testID="nfl-home">
           <Text>{`leagues:${props.leagues.map((l) => l.name).join(',')}`}</Text>
+          <Text>
+            {`leagueMeta:${props.leagues
+              .map(
+                (l) =>
+                  `${l.name}|${l.permissionLevel ?? 'null'}|${l.frozenAt ?? 'null'}|${l.tierFrozenAt ?? 'null'}`,
+              )
+              .join(',')}`}
+          </Text>
           <Text>{`loading:${String(props.loading)}`}</Text>
           <Text>{`error:${String(props.error)}`}</Text>
           <Text>{`isAuthenticated:${String(props.isAuthenticated)}`}</Text>
@@ -331,6 +344,29 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
       screen.getByText('leagues:Grid Iron Legends,Touchdown Club'),
     ).toBeTruthy();
     expect(screen.queryByText(/Mock Draft Sandbox/)).toBeNull();
+  });
+
+  it('threads permissionLevel, frozenAt, and tierFrozenAt from userLeagues into the leagues prop (LS-6262 / FBH-008)', () => {
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [
+          {
+            ...FOOTBALL_LEAGUES[0],
+            frozenAt: null,
+            tierFrozenAt: '2024-03-01T00:00:00.000Z',
+            userMembership: { permissionLevel: 'commissioner' },
+          },
+        ],
+        userLeagueCount: 1,
+      },
+      loading: false,
+    });
+    render(<FootballHomeScreen />);
+    expect(
+      screen.getByText(
+        'leagueMeta:Grid Iron Legends|commissioner|null|2024-03-01T00:00:00.000Z',
+      ),
+    ).toBeTruthy();
   });
 
   describe('create league — free-tier cap enforcement (LS-5025)', () => {

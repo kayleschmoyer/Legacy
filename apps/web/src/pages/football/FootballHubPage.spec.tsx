@@ -106,7 +106,12 @@ interface StubLeague {
   weekAdvanceStatus: string | null;
   currentMatchup?: number | null;
   leaguePhase?: string | null;
-  userMembership?: { teamId?: number | null } | null;
+  frozenAt?: string | null;
+  tierFrozenAt?: string | null;
+  userMembership?: {
+    teamId?: number | null;
+    permissionLevel?: string | null;
+  } | null;
 }
 
 function leaguesOfCount(n: number, sport = 'football'): StubLeague[] {
@@ -377,6 +382,46 @@ describe('FootballHubPage — null-sport league handling (FBH-001)', () => {
       'League 1',
       'Legacy League',
     ]);
+  });
+});
+
+describe('FootballHubPage — league metadata threading (LS-6262 / FBH-008)', () => {
+  it('threads permissionLevel, frozenAt, and tierFrozenAt from userLeagues through to the leagues prop', () => {
+    setLeagues([
+      {
+        ...leaguesOfCount(1)[0],
+        id: 1,
+        name: 'Commish League',
+        frozenAt: '2024-11-01T00:00:00.000Z',
+        tierFrozenAt: null,
+        userMembership: { permissionLevel: 'commissioner' },
+      },
+    ]);
+
+    render(<FootballHubPage />);
+
+    const leaguesProp = mockNFLHome.mock.calls[0][0].leagues as Array<{
+      id: string | number;
+      frozenAt?: string | null;
+      tierFrozenAt?: string | null;
+      permissionLevel?: string | null;
+    }>;
+    expect(leaguesProp[0]).toMatchObject({
+      frozenAt: '2024-11-01T00:00:00.000Z',
+      tierFrozenAt: null,
+      permissionLevel: 'commissioner',
+    });
+  });
+
+  it('passes permissionLevel as undefined when userMembership is absent', () => {
+    setLeagues([{ ...leaguesOfCount(1)[0], id: 1, userMembership: null }]);
+
+    render(<FootballHubPage />);
+
+    const leaguesProp = mockNFLHome.mock.calls[0][0].leagues as Array<{
+      permissionLevel?: string | null;
+    }>;
+    expect(leaguesProp[0].permissionLevel).toBeUndefined();
   });
 });
 

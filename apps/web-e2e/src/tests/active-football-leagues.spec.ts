@@ -90,6 +90,51 @@ test.describe('Active Football Leagues List (LS-5406) @regression', () => {
 
     await expect(page.getByText('No football leagues yet')).toHaveCount(0);
   });
+
+  test('search field filters the league list by name', async ({ page }) => {
+    await mockUserLeagues(page, MOCK_LEAGUES);
+    await page.goto('/football');
+    await page.waitForLoadState('load');
+
+    const search = page.getByPlaceholder(/search leagues/i);
+    await expect(search).toBeVisible();
+    // Use pressSequentially so Tamagui's onChangeText fires on each keystroke
+    await search.click();
+    await search.pressSequentially('Blitz');
+
+    const scroller = page.getByTestId('football-leagues-virtual-scroller');
+    await expect(scroller.getByText('Blitz Brigade')).toBeVisible();
+    await expect(scroller.getByText('Gridiron Generals')).not.toBeVisible();
+    await expect(scroller.getByText('Endzone Elite')).not.toBeVisible();
+  });
+
+  test('archived leagues section is collapsed by default and expands to reveal frozen leagues (LS-6262 / FBH-008)', async ({
+    page,
+  }) => {
+    const frozenLeague = {
+      __typename: 'League',
+      id: 204,
+      name: 'Retired Renegades',
+      sport: 'football',
+      draftStatus: 'completed',
+      currentWeekNumber: 10,
+      weekAdvanceStatus: null,
+      maxRosterSize: 16,
+      tierFrozenAt: '2024-03-01T00:00:00.000Z',
+      frozenAt: null,
+      inviteCode: 'DDD00204',
+    };
+    await mockUserLeagues(page, [...MOCK_LEAGUES, frozenLeague]);
+    await page.goto('/football');
+    await page.waitForLoadState('load');
+
+    await expect(page.getByText('Retired Renegades')).not.toBeVisible();
+    const toggle = page.getByText(/Archived leagues \(1\)/);
+    await expect(toggle).toBeVisible();
+
+    await toggle.click();
+    await expect(page.getByText('Retired Renegades')).toBeVisible();
+  });
 });
 
 // /football is not in PUBLIC_PATHS/PUBLIC_EXACT_PATHS (apps/web/src/main.tsx)

@@ -86,6 +86,9 @@ export function FootballHubPage() {
           maxRosterSize: l.maxRosterSize,
           currentMatchup: l.currentMatchup,
           leaguePhase: l.leaguePhase,
+          frozenAt: l.frozenAt,
+          tierFrozenAt: l.tierFrozenAt,
+          permissionLevel: l.userMembership?.permissionLevel,
         })),
     [data?.userLeagues],
   );
