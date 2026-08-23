@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, Text, VisuallyHidden, XStack, YStack } from 'tamagui';
-import { MatchupStatus } from '@legacy-sports/graphql';
 import { PACE_TINT_THRESHOLDS } from './paceThresholds';
+import { MatchupStatusChip } from './MatchupStatusChip';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
@@ -9,7 +9,6 @@ import {
   BRAND_SEAM_RED,
   GREEN,
   GREEN_DEEP,
-  GREEN_LIGHT,
   POS_OUTFIELD,
   RED,
   TEXT_MUTED,
@@ -49,15 +48,6 @@ const TopBand = tamaguiStyled(XStack, {
     paddingHorizontal: '$3',
     paddingVertical: '$2',
   },
-}) as StyledComponent;
-
-const StatusChip = tamaguiStyled(XStack, {
-  alignItems: 'center',
-  gap: '$1.5',
-  paddingHorizontal: '$3',
-  paddingVertical: '$1.5',
-  borderRadius: '$10',
-  borderWidth: 1,
 }) as StyledComponent;
 
 const TeamSide = tamaguiStyled(YStack, {
@@ -183,75 +173,6 @@ export interface MatchupScoreboardHeroProps {
   onTeamPress?: (teamId: number) => void;
 }
 
-interface StatusConfig {
-  bg: string;
-  border: string;
-  text: string;
-  label: string;
-  live: boolean;
-}
-
-function statusConfigFor(status?: string | null): StatusConfig {
-  if (status == null) {
-    return {
-      bg: withAlpha(TEXT_MUTED, 0.14),
-      border: withAlpha(TEXT_MUTED, 0.4),
-      text: TEXT_MUTED,
-      label: 'Status unknown',
-      live: false,
-    };
-  }
-  // Cast to MatchupStatus so TypeScript enforces exhaustiveness via the never default.
-  const s = status as MatchupStatus;
-  switch (s) {
-    case MatchupStatus.InProgress:
-      return {
-        bg: withAlpha(GREEN, 0.16),
-        border: withAlpha(GREEN, 0.5),
-        text: GREEN_LIGHT,
-        label: 'Live',
-        live: true,
-      };
-    case MatchupStatus.Completed:
-      return {
-        bg: withAlpha(BRAND_NAVY_LIGHT, 0.18),
-        border: withAlpha(BRAND_NAVY_LIGHT, 0.5),
-        text: BRAND_GOLD_LIGHT,
-        label: 'Final',
-        live: false,
-      };
-    case MatchupStatus.Cancelled:
-      return {
-        bg: withAlpha(TEXT_MUTED, 0.14),
-        border: withAlpha(TEXT_MUTED, 0.4),
-        text: TEXT_MUTED,
-        label: 'Cancelled',
-        live: false,
-      };
-    case MatchupStatus.Scheduled:
-      return {
-        bg: withAlpha(TEXT_MUTED, 0.14),
-        border: withAlpha(TEXT_MUTED, 0.4),
-        text: TEXT_MUTED,
-        label: 'Scheduled',
-        live: false,
-      };
-    default: {
-      // Compile-time exhaustiveness: adding a new MatchupStatus without a case
-      // here will cause a TypeScript error.
-      const _exhaustive: never = s;
-      void _exhaustive;
-      return {
-        bg: withAlpha(TEXT_MUTED, 0.14),
-        border: withAlpha(TEXT_MUTED, 0.4),
-        text: TEXT_MUTED,
-        label: 'Status unknown',
-        live: false,
-      };
-    }
-  }
-}
-
 // ── Team panel ──────────────────────────────────────────────────────────────
 
 function TeamPanel({
@@ -357,7 +278,6 @@ export function MatchupScoreboardHero({
   const score1 = team1.score ?? 0;
   const score2 = team2.score ?? 0;
   const team1Leading = score1 >= score2;
-  const chip = statusConfigFor(status);
 
   const team1Name = team1.name ?? 'Team 1';
   const team2Name = team2.name ?? 'Team 2';
@@ -377,24 +297,10 @@ export function MatchupScoreboardHero({
       </VisuallyHidden>
       <TopBand>
         <XStack alignItems="center" gap="$2" flexWrap="wrap">
-          <StatusChip backgroundColor={chip.bg} borderColor={chip.border}>
-            {chip.live && (
-              <YStack
-                width={6}
-                height={6}
-                borderRadius={3}
-                backgroundColor={chip.text}
-              />
-            )}
-            <Text
-              fontSize="$2"
-              fontWeight="700"
-              color={chip.text}
-              letterSpacing={0.5}
-            >
-              {chip.label} · Week {weekNumber ?? '—'}
-            </Text>
-          </StatusChip>
+          <MatchupStatusChip
+            status={status}
+            detail={`Week ${weekNumber ?? '—'}`}
+          />
           <Text fontSize="$2" color={TEXT_MUTED}>
             Head-to-Head · Matchup {weekNumber ?? '?'}
             {totalMatchups ? `/${totalMatchups}` : ''}

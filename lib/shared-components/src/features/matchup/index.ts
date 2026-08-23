@@ -3,6 +3,7 @@ export * from './GamesRemaining';
 export * from './MatchupCard';
 export * from './MatchupScoreboardView';
 export * from './MatchupScoreboardHero';
+export * from './MatchupStatusChip';
 export * from './PlayerProjections';
 export * from './MatchupRecapPanel';
 export * from './LeagueTradeBlock';

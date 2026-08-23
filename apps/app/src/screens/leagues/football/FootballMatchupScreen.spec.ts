@@ -1,6 +1,4 @@
-import { MatchupStatus } from '@legacy-sports/graphql';
 import {
-  getMatchupStatusLabel,
   getPlayerName,
   getPlayerPosition,
   getPositionOrder,
@@ -74,29 +72,6 @@ describe('getPositionOrder', () => {
       expect(dst).toContain(pos);
       expect(idp).toContain(pos);
     }
-  });
-});
-
-describe('getMatchupStatusLabel', () => {
-  it('returns SCHEDULED for scheduled matchups', () => {
-    expect(getMatchupStatusLabel(MatchupStatus.Scheduled)).toBe('SCHEDULED');
-  });
-
-  it('returns LIVE for in-progress matchups', () => {
-    expect(getMatchupStatusLabel(MatchupStatus.InProgress)).toBe('LIVE');
-  });
-
-  it('returns FINAL for completed matchups', () => {
-    expect(getMatchupStatusLabel(MatchupStatus.Completed)).toBe('FINAL');
-  });
-
-  it('returns CANCELLED for cancelled matchups', () => {
-    expect(getMatchupStatusLabel(MatchupStatus.Cancelled)).toBe('CANCELLED');
-  });
-
-  it('returns SCHEDULED when status is null or undefined', () => {
-    expect(getMatchupStatusLabel(null)).toBe('SCHEDULED');
-    expect(getMatchupStatusLabel(undefined)).toBe('SCHEDULED');
   });
 });
 

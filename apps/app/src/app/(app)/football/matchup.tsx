@@ -35,6 +35,7 @@ export default function FootballMatchupRoute(): React.JSX.Element {
     <FootballMatchupScreen
       matchupId={matchupId}
       defensiveFormat={leagueData?.league?.defensiveFormat ?? null}
+      totalMatchups={leagueData?.league?.totalMatchups ?? null}
     />
   );
 }

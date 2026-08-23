@@ -47,7 +47,7 @@ const mockMatchup = {
   team2Id: 20,
   team1Score: 102.5,
   team2Score: 87.3,
-  status: 'scheduled',
+  status: 'in_progress',
   weekNumber: 7,
 };
 
@@ -119,6 +119,24 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
+// Renders plain testID'd nodes so this spec asserts on prop wiring without
+// depending on the real components' Tamagui styled() internals.
+jest.mock('@legacy-sports/shared-components/matchup', () => {
+  const { Text: RNTextComponent, View } =
+    jest.requireActual<RNComponents>('react-native');
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  return {
+    MatchupStatusChip: ({ status }: { status?: string | null }) =>
+      ReactActual.createElement(
+        RNTextComponent,
+        { testID: 'status-chip' },
+        status ?? 'unknown',
+      ),
+    MatchupRecapPanel: () =>
+      ReactActual.createElement(View, { testID: 'recap-panel' }),
+  };
+});
+
 jest.mock('@legacy-sports/app-config/native', () => ({
   config: { websocketUrl: 'wss://example.test' },
 }));
@@ -151,16 +169,6 @@ jest.mock('../../../features/subscription/PremiumGate', () => ({
       : ReactActual.createElement(Text, null, 'UPGRADE_TO_PREMIUM');
   },
 }));
-
-jest.mock('@legacy-sports/shared-components/matchup', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
-  return {
-    MatchupRecapPanel: () =>
-      jest
-        .requireActual<typeof import('react')>('react')
-        .createElement(View, { testID: 'recap-panel' }),
-  };
-});
 
 jest.mock('@legacy-sports/utils', () => ({
   ENTITLEMENTS: { ai_matchup_recap: 'ai_matchup_recap' },
@@ -317,29 +325,39 @@ describe('FootballMatchupScreen', () => {
     expect(screen.getByText('Team 10 vs Team 20: 3-2 all-time')).toBeTruthy();
   });
 
-  it('renders week number', () => {
+  it('renders the matchup counter without a total when totalMatchups is absent', () => {
     render(<FootballMatchupScreen matchupId={1} />);
-    expect(screen.getByText('Wk 7')).toBeTruthy();
+    expect(screen.getByText('Matchup 7')).toBeTruthy();
   });
 
-  it.each([
-    ['scheduled', 'SCHEDULED'],
-    ['in_progress', 'LIVE'],
-    ['completed', 'FINAL'],
-    ['cancelled', 'CANCELLED'],
-  ])('renders header status label %s as %s', (status, expectedLabel) => {
-    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
-      data: { getMatchupById: { ...mockMatchup, status } },
-      loading: false,
-      error: undefined,
-      networkStatus: 7, // NetworkStatus.ready
-      refetch: mockRefetchMatchup,
-    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
-
-    render(<FootballMatchupScreen matchupId={1} />);
-
-    expect(screen.getByText(expectedLabel)).toBeTruthy();
+  it('renders the matchup counter with the league total-matchups value', () => {
+    render(<FootballMatchupScreen matchupId={1} totalMatchups={14} />);
+    expect(screen.getByText('Matchup 7/14')).toBeTruthy();
   });
+
+  it('renders the matchup status chip with the current status', () => {
+    render(<FootballMatchupScreen matchupId={1} />);
+    expect(screen.getByTestId('status-chip')).toBeTruthy();
+    expect(screen.getByText('in_progress')).toBeTruthy();
+  });
+
+  it.each(['scheduled', 'in_progress', 'completed', 'cancelled'])(
+    'renders the status chip for status %s',
+    (status) => {
+      jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+        data: { getMatchupById: { ...mockMatchup, status } },
+        loading: false,
+        error: undefined,
+        networkStatus: 7, // NetworkStatus.ready
+        refetch: mockRefetchMatchup,
+      } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+
+      render(<FootballMatchupScreen matchupId={1} />);
+
+      expect(screen.getByTestId('status-chip')).toBeTruthy();
+      expect(screen.getByText(status)).toBeTruthy();
+    },
+  );
 
   it('renders player name for team 1', () => {
     render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
