@@ -119,7 +119,7 @@ Reproduce locally with the chunked validation pipeline (see AGENTS.md "Validate 
 ```
 ci_list_runs(branch: "BRANCH_NAME", limit: 5)
 ci_get_logs(runId: RUN_ID, failedOnly: true)
-ci_rerun_failed_jobs(runId: RUN_ID)   # only for flaky/transient failures
+ci_rerun(runId: RUN_ID)   # scope: "failed" is the default; only for flaky/transient failures
 ```
 
 Full playbook: [ci-failure.md](ci-failure.md).

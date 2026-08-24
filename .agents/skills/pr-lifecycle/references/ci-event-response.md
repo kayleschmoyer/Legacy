@@ -91,7 +91,7 @@ Find the event type in the left column, read across for the first action. Detail
 | **Lockfile**               | `pnpm-lock.yaml` out of sync                            | Run `make install`, commit the lockfile update                                                                                                                                                                                                                                                                                                          |
 | **E2E**                    | Playwright test failures                                | **First run the attribution gate in [e2e-hold.md](e2e-hold.md)** — if the failing specs are pre-existing on `origin/main`, do NOT debug them here: enter the hold protocol (blocker ticket → hold marker → monitor). Only when attributed to this PR: see [e2e-determinism](../../testing/references/e2e-determinism.md); fix flake or update selectors |
 | **Migrations**             | "Verify Migrations Applied" failure                     | Run `pnpm --prefix lib/db-client run db:up` (or hosted `db_migrate` MCP for dev RDS), re-push; if journal mismatch after editing a committed migration, soft-reset to branch base so the migration re-stages as "added", then re-apply — see [database skill](../../database/SKILL.md)                                                                  |
-| **Infrastructure / flake** | Timeout, network error, runner OOM                      | Re-run via `ci_rerun_failed_jobs(runId: <id>)` once; if it fails again, investigate root cause                                                                                                                                                                                                                                                          |
+| **Infrastructure / flake** | Timeout, network error, runner OOM                      | Re-run via `ci_rerun(runId: <id>)` once; if it fails again, investigate root cause                                                                                                                                                                                                                                                                      |
 
 After fixing, validate before pushing. In **cloud** sessions run the seven `pc-*` chunks in order (never a single `make pc`) — see [cloud-agent-mode](../../cloud-agent-mode/SKILL.md); locally `make pc` is fine. See [workflow-overview](../../workflow-overview/SKILL.md) Step 11.
 
@@ -173,7 +173,7 @@ Read carefully. If the comment contains instructions or a question directed at t
 2. If not listed there: `ci_get_logs(runId: <id>)` and read the failure output.
 3. Classify using the [Failure Classification](#failure-classification) table above.
 4. If the root cause is unclear after reading logs, check whether the check name appears in `ruleset.json` as a required check. Non-required checks that fail do not block merge — confirm before spending time debugging them.
-5. If blocked and the failure is genuinely undiagnosable (infrastructure issue, external service outage): `ci_rerun_failed_jobs(runId: <id>)` once. If it fails again, surface to the user with the log excerpt.
+5. If blocked and the failure is genuinely undiagnosable (infrastructure issue, external service outage): `ci_rerun(runId: <id>)` once. If it fails again, surface to the user with the log excerpt.
 
 ---
 

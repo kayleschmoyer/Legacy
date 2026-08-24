@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 11,
-  "toolCount": 253,
+  "toolCount": 248,
   "servers": [
     {
       "dir": "worktree-server",
@@ -2746,7 +2746,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 24,
+      "toolCount": 19,
       "tools": [
         {
           "name": "ci_audit_session_bash",
@@ -2855,30 +2855,21 @@
         },
         {
           "name": "ci_cancel_run",
-          "description": "Prefer this over `gh run cancel` via shell. Cancel a single in-flight GitHub Actions run — e.g. killing a stale-SHA dispatch after pushing a follow-up commit, or stopping an expensive live-backend integration run that is no longer needed. GitHub does not transition the run to `cancelled` synchronously (it passes through `cancel_in_progress` first), so the response reflects the actual post-cancel status from a follow-up fetch, not an assumed value. Cancelling a run that has already completed returns a clear error rather than throwing. Use ci_cancel_runs to cancel every in-flight run of a workflow on a branch in one call.",
+          "description": "Prefer this over `gh run cancel` via shell. Cancel a single in-flight run via runId — e.g. killing a stale-SHA dispatch after pushing a follow-up commit — or every in-flight (queued/in_progress) run of a workflow on a branch via workflow+branch (e.g. serializing expensive live-backend integration runs so a fresh dispatch never races a stale one, LS-7878); pass one mode, not both. Single-run mode re-fetches the run after cancelling since GitHub does not transition synchronously (it passes through `cancel_in_progress` first); cancelling an already-completed run returns a clear error rather than throwing. Bulk mode resolves `workflow` the same way ci_list_runs does and returns the standard partial-failure shape { success, total, succeeded, failed }, with total: 0 when nothing is in flight.",
           "inputs": {
             "runId": {
               "type": "number",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "coerced",
                 "integer",
                 "> 0"
               ],
-              "description": "Run ID. Use the \"id\" field from ci_list_runs output (\"databaseId\" is an alias for the same value)."
-            }
-          },
-          "transports": [
-            "stdio"
-          ]
-        },
-        {
-          "name": "ci_cancel_runs",
-          "description": "Bulk variant of ci_cancel_run: cancel every non-completed (queued/in_progress) run of a workflow on a branch in one call — e.g. serializing expensive live-backend integration runs so a fresh dispatch never races a stale one on the same branch (LS-7878). Resolves `workflow` the same way ci_list_runs does (display name, filename, or numeric ID). Returns the standard partial-failure shape { success, total, succeeded, failed } so one run failing to cancel does not fail the whole call; returns total: 0 when no in-flight runs are found.",
-          "inputs": {
+              "description": "Run ID to cancel (single-run mode). Use the \"id\" field from ci_list_runs output (\"databaseId\" is an alias)."
+            },
             "workflow": {
               "type": "union",
-              "optional": false,
+              "optional": true,
               "variants": [
                 {
                   "type": "string",
@@ -2892,15 +2883,15 @@
                   ]
                 }
               ],
-              "description": "Workflow filename, display name, or numeric ID"
+              "description": "Workflow filename, display name, or numeric ID (bulk mode, with branch)."
             },
             "branch": {
               "type": "string",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "min 1"
               ],
-              "description": "Branch name to scope the cancellation to"
+              "description": "Branch to scope bulk cancellation to (bulk mode, with workflow)."
             }
           },
           "transports": [
@@ -3282,52 +3273,21 @@
         },
         {
           "name": "ci_rerun",
-          "description": "Prefer this over `gh run rerun` or `gh run rerun --failed` via shell. Rerun failed jobs, a specific job, or an entire CI run. Defaults to failed-only (equivalent to `gh run rerun --failed`). Use ci_rerun_failed_jobs when you want a dedicated name that mirrors the shell command and makes the intent explicit. The failed-only path auto-escalates to a full run rerun when the run has jobs left `cancelled` by an upstream dependency failure (GitHub's rerun-failed-jobs endpoint never reschedules those, LS-9212) — check the response `scope`/`message` for `\"run (escalated from failed-jobs)\"` to know when that happened.",
+          "description": "Prefer this over `gh run rerun` via shell. Rerun failed jobs, a specific job, the whole run, or up to 50 runs in one batch call. scope: \"failed\" (default) reruns only failed jobs, auto-escalating to a full run rerun when a job was left `cancelled` by an upstream dependency failure — GitHub's rerun-failed-jobs endpoint never reschedules those (LS-9212); check the response `scope`/`message` for `\"run (escalated from failed-jobs)\"`. scope: \"job\" reruns a single job via jobId (single-run only). scope: \"all\" reruns the entire run. Pass runIds (1-50) instead of runId to rerun several runs independently in one call — scope \"job\" and withDiagnostics are single-run only; batch results use the standard partial-failure shape { success, total, succeeded, failed }. withDiagnostics: true (single-run, scope \"failed\" only) is the triage-then-rerun one-shot: fetches a short failure-log snippet and richer per-job payload before rerunning, and errors clearly (never a silent no-op) when there are no failed jobs to rerun.",
           "inputs": {
             "runId": {
               "type": "number",
-              "optional": false,
-              "constraints": [
-                "coerced",
-                "integer",
-                "> 0"
-              ],
-              "description": "Run ID"
-            },
-            "failedOnly": {
-              "type": "boolean",
-              "optional": true,
-              "default": true,
-              "description": "Rerun only failed jobs unless jobId set (default: true)"
-            },
-            "jobId": {
-              "type": "number",
               "optional": true,
               "constraints": [
                 "coerced",
                 "integer",
                 "> 0"
               ],
-              "description": "Specific job ID to rerun"
+              "description": "Run ID (single-run mode). Exactly one of runId/runIds is required."
             },
-            "debug": {
-              "type": "boolean",
-              "optional": true,
-              "default": false,
-              "description": "Enable debug logging"
-            }
-          },
-          "transports": [
-            "stdio"
-          ]
-        },
-        {
-          "name": "ci_rerun_batch",
-          "description": "Batch variant of ci_rerun: rerun several runs in one call (e.g. re-validating multiple PRs after a shared root-cause fix). Accepts an array of run IDs (max 50); each run is rerun independently so one run erroring does not fail the whole call. Returns the standard partial-failure shape { success, total, succeeded: [...], failed: [{ index, runId, error }] }. Keep ci_rerun for single-run use.",
-          "inputs": {
             "runIds": {
               "type": "array",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "min 1",
                 "max 50"
@@ -3341,69 +3301,46 @@
                   "> 0"
                 ]
               },
-              "description": "Run IDs to rerun (1-50). Use the \"id\" field from ci_list_runs output (\"databaseId\" is an alias)."
+              "description": "Run IDs to rerun independently (1-50, batch mode). Not with runId, scope=\"job\", or withDiagnostics."
             },
-            "failedOnly": {
-              "type": "boolean",
+            "scope": {
+              "type": "enum",
               "optional": true,
-              "default": true,
-              "description": "Rerun only failed jobs of each run (default: true). Set false to rerun the entire run."
+              "enum": [
+                "failed",
+                "job",
+                "all"
+              ],
+              "default": "failed",
+              "description": "What to rerun: \"failed\" (default), \"job\" (needs jobId, single-run only), or \"all\"."
             },
-            "debug": {
-              "type": "boolean",
-              "optional": true,
-              "default": false,
-              "description": "Enable debug logging"
-            }
-          },
-          "transports": [
-            "stdio"
-          ]
-        },
-        {
-          "name": "ci_rerun_failed_jobs",
-          "description": "Prefer this over `gh run rerun --failed` via shell. Re-run only the failed jobs of a GitHub Actions run. Equivalent to ci_rerun({ runId, failedOnly: true }) but with a dedicated name for discoverability. Use when a transient CI failure (flaky test, runner timeout, network hiccup) needs a re-run without touching the full workflow. Auto-escalates to a full run rerun when the run has downstream required jobs left `cancelled` by an upstream dependency failure — GitHub's rerun-failed-jobs endpoint only reschedules jobs with conclusion `failure`, so cancelled dependents would otherwise sit stranded until the workflow times out, leaving `mergeable_state: blocked` with no visibly-failed check (LS-9212). Check the response `scope`/`message` for `\"run (escalated from failed-jobs)\"` to know when that happened.",
-          "inputs": {
-            "runId": {
+            "jobId": {
               "type": "number",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "coerced",
                 "integer",
                 "> 0"
               ],
-              "description": "Run ID. Use the \"id\" field from ci_list_runs output (\"databaseId\" is an alias for the same value)."
+              "description": "Specific job ID to rerun; required with scope=\"job\", single-run only."
             },
-            "debug": {
+            "withDiagnostics": {
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "Enable debug logging"
-            }
-          },
-          "transports": [
-            "stdio"
-          ]
-        },
-        {
-          "name": "ci_retry_failed",
-          "description": "Semantic one-shot for the triage-then-rerun loop: identifies failed jobs in a run, fetches a short error snippet from the original logs, and triggers a rerun of just the failed jobs. Returns { originalRunId, originalAttempt, newRunId, newAttempt, failedJobsRerun, originalLogSnippet, url }. Errors clearly when there are no failed jobs to rerun (so it never silently no-ops). Replaces the manual chain ci_view_run → ci_view_run_jobs → ci_get_logs → ci_rerun_failed_jobs.",
-          "inputs": {
-            "runId": {
-              "type": "number",
-              "optional": false,
-              "constraints": [
-                "coerced",
-                "integer",
-                "> 0"
-              ],
-              "description": "Run ID. Use the \"id\" field from ci_list_runs output (\"databaseId\" is an alias for the same value)."
+              "description": "Single-run, scope=\"failed\" only. Fetch a failure-log snippet and richer per-job payload before rerunning."
             },
             "withFreshLogs": {
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "Include a follow-up hint in the response pointing at the ci_get_logs call that will fetch fresh failure logs once the new attempt completes."
+              "description": "withDiagnostics only. Include a follow-up hint pointing at the ci_get_logs call for fresh failure logs once the new attempt completes."
+            },
+            "debug": {
+              "type": "boolean",
+              "optional": true,
+              "default": false,
+              "description": "Enable debug logging (ignored for scope=\"job\")"
             }
           },
           "transports": [
@@ -3412,7 +3349,7 @@
         },
         {
           "name": "ci_retry_runner_flake",
-          "description": "Single-call detect-and-retry for the recurring self-hosted-runner-shutdown flake: given a PR number, checks whether the repo's own \"CI: Runner Flake\" label and \"runner shutdown\" bot comment are present (applied by ci-orchestrator.yml when a self-hosted runner shuts down mid-run), and if so, extracts the run ID from the comment and reruns the affected failed job(s) via the same path as ci_retry_failed — without the caller first fetching or grepping logs to confirm the failure signature. Returns a clear, non-error informational result (never a silent no-op) when the label or comment is absent, pointing at ci_retry_failed({ runId }) as the manual fallback. Additive only — does not change ci_retry_failed or ci_rerun_failed_jobs behavior.",
+          "description": "Single-call detect-and-retry for the recurring self-hosted-runner-shutdown flake: given a PR number, checks whether the repo's own \"CI: Runner Flake\" label and \"runner shutdown\" bot comment are present (applied by ci-orchestrator.yml when a self-hosted runner shuts down mid-run), and if so, extracts the run ID from the comment and reruns the affected failed job(s) via the same diagnostics path as ci_rerun({ withDiagnostics: true }) — without the caller first fetching or grepping logs to confirm the failure signature. Returns a clear, non-error informational result (never a silent no-op) when the label or comment is absent, pointing at ci_rerun({ runId, withDiagnostics: true }) as the manual fallback. Additive only — does not change ci_rerun behavior. Kept as a separate tool (not folded into ci_rerun) because its input (prNumber, not runId) and shutdown-detection precondition give it a materially different schema — the documented escape hatch in the consolidation standard.",
           "inputs": {
             "prNumber": {
               "type": "number",
@@ -3584,17 +3521,35 @@
         },
         {
           "name": "ci_view_run",
-          "description": "Prefer this over `gh run view` via shell. View a CI run summary with jobs and conclusions.",
+          "description": "Prefer this over `gh run view` via shell. View a CI run summary with jobs and conclusions. Pass runIds (1-50) instead of runId to inspect several runs independently in one call (e.g. checking CI across multiple PRs before merging) — attempt and format are single-run only; batch results use the standard partial-failure shape { success, total, succeeded, failed }.",
           "inputs": {
             "runId": {
               "type": "number",
-              "optional": false,
+              "optional": true,
               "constraints": [
                 "coerced",
                 "integer",
                 "> 0"
               ],
-              "description": "Run ID"
+              "description": "Run ID (single-run mode). Exactly one of runId/runIds is required."
+            },
+            "runIds": {
+              "type": "array",
+              "optional": true,
+              "constraints": [
+                "min 1",
+                "max 50"
+              ],
+              "items": {
+                "type": "number",
+                "optional": false,
+                "constraints": [
+                  "coerced",
+                  "integer",
+                  "> 0"
+                ]
+              },
+              "description": "Run IDs to inspect independently (1-50, batch mode). Not with runId or attempt."
             },
             "attempt": {
               "type": "number",
@@ -3604,7 +3559,7 @@
                 "integer",
                 "> 0"
               ],
-              "description": "Attempt number"
+              "description": "Attempt number (single-run only)."
             },
             "includeJobs": {
               "type": "boolean",
@@ -3620,40 +3575,7 @@
                 "json"
               ],
               "default": "markdown",
-              "description": "Output format. \"markdown\" (default) returns a compact summary with a job table and a Failed Jobs section. \"json\" returns the full structured payload."
-            }
-          },
-          "transports": [
-            "stdio"
-          ]
-        },
-        {
-          "name": "ci_view_run_batch",
-          "description": "Batch variant of ci_view_run: inspect several runs in one call (e.g. checking CI status across multiple PRs before merging). Accepts an array of run IDs (max 50); each run is fetched independently so one run erroring does not fail the whole call. Returns the standard partial-failure shape { success, total, succeeded: [...], failed: [{ index, runId, error }] }. Use ci_view_run for a single run or when targeting a specific attempt (attempt is not supported here).",
-          "inputs": {
-            "runIds": {
-              "type": "array",
-              "optional": false,
-              "constraints": [
-                "min 1",
-                "max 50"
-              ],
-              "items": {
-                "type": "number",
-                "optional": false,
-                "constraints": [
-                  "coerced",
-                  "integer",
-                  "> 0"
-                ]
-              },
-              "description": "Run IDs to inspect (1-50). Use the \"id\" field from ci_list_runs output (\"databaseId\" is an alias)."
-            },
-            "includeJobs": {
-              "type": "boolean",
-              "optional": true,
-              "default": true,
-              "description": "Include jobs for each run (default: true)"
+              "description": "Output format for single-run mode. \"markdown\" (default) returns a compact summary with a job table and a Failed Jobs section. \"json\" returns the full structured payload. Batch mode always returns structured JSON per run."
             }
           },
           "transports": [

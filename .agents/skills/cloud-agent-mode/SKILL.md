@@ -369,7 +369,7 @@ Environment behaviors that look like bugs but are not. Recognize the symptom and
 
 **Symptom**: a CI Orchestrator run gets stuck with one or more jobs `queued` for 30+ minutes (observed: 110+ minutes) after an upstream GitHub Actions hiccup (e.g. "Service Unavailable" during `Resolve Runner Label`). Every rerun/cancel path fails or no-ops:
 
-- `ci_rerun_failed_jobs({ runId })` → `Streamable HTTP error: ... "message":"Service Unavailable"`
+- `ci_rerun({ runId })` → `Streamable HTTP error: ... "message":"Service Unavailable"`
 - `mcp__github__actions_run_trigger({ method: "rerun_failed_jobs" | "rerun_workflow_run" })` → `403 This workflow is already running` — persistently, not the transient race `postWithRetryOnAlreadyRunning` already retries through (`tools/mcp/ci-server/src/github-api.ts`)
 - `mcp__github__actions_run_trigger({ method: "cancel_workflow_run" })` → reports success, but the run's overall `status` stays `"queued"` (never `"completed"`/`"cancelled"`) and the stuck jobs keep `queued` for another hour+
 

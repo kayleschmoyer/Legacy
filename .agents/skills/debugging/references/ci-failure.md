@@ -531,7 +531,7 @@ In these cases, rerun the failed jobs:
 **MCP (preferred):**
 
 ```
-ci_rerun_failed_jobs(runId: RUN_ID)
+ci_rerun(runId: RUN_ID)   # scope: "failed" is the default
 ```
 
 **Shell fallback:**
@@ -645,7 +645,7 @@ foreach ($p in $patterns) {
 
 - **No run found**: `ci_list_runs` returns empty — run may be in-progress or the branch name is wrong.
 - **Logs empty**: `ci_get_logs(failedOnly: true)` returned nothing — try `failedOnly: false`. Shell: `gh run view RUN_ID --log`.
-- **detect-changes failure**: usually infrastructure — rerun with `ci_rerun_failed_jobs(runId: RUN_ID)`.
+- **detect-changes failure**: usually infrastructure — rerun with `ci_rerun(runId: RUN_ID)`.
 - **Merge-queue rejection**: find the merge-queue run with `ci_list_runs(workflow: "merge-queue.yml", limit: 5)`, then debug normally. If the PR looks green but won't merge, load [ci-checks-reference.md](../../pr-lifecycle/references/ci-checks-reference.md) and run `github_pr_why_blocked(prNumber: PR_NUMBER)`.
 
 > **Advanced troubleshooting** (A1–A8: concurrency cancellations, skills lint, E2E failures, setup detection, Terraform locks, merge queue, build artifacts): see [ci-troubleshooting-advanced.md](ci-troubleshooting-advanced.md)

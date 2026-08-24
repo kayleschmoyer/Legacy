@@ -33,7 +33,7 @@ function noSignalResult(prNumber: number, reason: string): ToolResult {
         type: 'text',
         text:
           `No runner-shutdown flake signal detected for PR #${prNumber}: ${reason} ` +
-          `Use ci_retry_failed({ runId }) to manually retry after confirming the failure cause.`,
+          `Use ci_rerun({ runId, withDiagnostics: true }) to manually retry after confirming the failure cause.`,
       },
     ],
   };

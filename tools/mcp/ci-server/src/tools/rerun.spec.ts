@@ -24,7 +24,7 @@ describe('rerun', () => {
     mockGithubGet.mockResolvedValue({ jobs: [] });
   });
 
-  describe('ci_rerun_failed_jobs contract (failedOnly: true)', () => {
+  describe('scope="failed" contract (failedOnly: true)', () => {
     it('calls rerun-failed-jobs endpoint with a valid runId', async () => {
       await rerun({ runId: 123, failedOnly: true });
 

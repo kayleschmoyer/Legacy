@@ -267,7 +267,7 @@ async function resolveToken(): Promise<{ token: string; expiresAt?: Date }> {
                 '(id, status, conclusion, head_sha, name, created_at) with python3 or jq rather than reading the full JSON inline. ' +
                 'Fallback for write actions (rerun/cancel/dispatch): use the built-in mcp__github__actions_run_trigger tool instead — ' +
                 'e.g. mcp__github__actions_run_trigger({ method: "rerun_failed_jobs", owner, repo, run_id }) covers ' +
-                'ci_rerun_failed_jobs/ci_rerun, method: "cancel_workflow_run" covers ci_cancel_run, and ' +
+                'ci_rerun, method: "cancel_workflow_run" covers ci_cancel_run, and ' +
                 'method: "run_workflow" covers ci_dispatch_workflow. It authenticates via the platform\'s own ' +
                 "GitHub token, independent of this server's credential resolution. " +
                 'Fallback for ci_get_playwright_test_result(source: "s3"): this tool needs the same run-id-to-commit-SHA ' +

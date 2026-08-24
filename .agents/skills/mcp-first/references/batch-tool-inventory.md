@@ -51,9 +51,8 @@ specific skills · **P2** occasional batching benefit.
 | github   | `github_manage_labels` (single PR)                                               | accept `numbers: [...]` for cross-PR label ops                      | Med — sweep labelling                                                | **P1**   | LS-8035           |
 | github   | `github_request_review`                                                          | `github_request_review_batch` (array of PR numbers)                 | Low–Med — request bot review on N PRs                                | **P2**   | LS-8035           |
 | github   | `github_retrigger_check`                                                         | `github_retrigger_batch` (array of `{ number, check }`)             | Med — re-kick CI across stuck PRs                                    | **P1**   | LS-8035           |
-| ci       | `ci_rerun`                                                                       | `ci_rerun_batch` (array of run IDs)                                 | High — re-kick N failed runs in a sweep                              | **P0**   | LS-8036           |
-| ci       | `ci_rerun_failed_jobs`                                                           | `ci_rerun_failed_jobs_batch` (array of run IDs)                     | Med — same, job-scoped                                               | **P1**   | LS-8036           |
-| ci       | `ci_view_run`                                                                    | `ci_view_run_batch` (array of run IDs)                              | Med — inspect N runs per triage                                      | **P1**   | LS-8036           |
+| ci       | `ci_rerun` (folded into `ci_rerun`'s `runIds` param — LS-9714)                   | ✅ done — `runIds` (1-50) on `ci_rerun`                             | High — re-kick N failed runs in a sweep                              | **P0**   | LS-8036 ✅ done   |
+| ci       | `ci_view_run` (folded into `ci_view_run`'s `runIds` param — LS-9714)             | ✅ done — `runIds` (1-50) on `ci_view_run`                          | Med — inspect N runs per triage                                      | **P1**   | LS-8036 ✅ done   |
 | aws      | `aws_lambda_status`                                                              | `aws_lambda_status_batch` (array of fn names)                       | Med — post-deploy verify N lambdas                                   | **P1**   | LS-8037           |
 | aws      | `aws_logs_tail`                                                                  | `aws_logs_tail_batch` (array of log groups)                         | Med — debug across N lambdas                                         | **P1**   | LS-8037           |
 | worktree | `worktree_commit`                                                                | `worktree_commit_batch` (array of `{ worktree, message }`)          | Med — multi-worktree dispatch                                        | **P1**   | LS-8038 ✅ done   |
@@ -128,18 +127,18 @@ specific skills · **P2** occasional batching benefit.
 | `github_create_label`, `github_list_labels`, `github_ensure_sweep_labels`, `github_sweep_stale_claims`                                                                                                                                                                                | ⚪ single-use  | Label/maintenance utilities.               |
 | `github_secret_*`, `github_secrets_check`, `github_set_commit_status`, `github_list_commit_statuses`, `github_get_branch_protection`, `github_get_repo_info`, `github_get_file_content`, `github_list_runners`, `github_webhook_*`, `github_auth_status`, `github_resolve_action_sha` | ⚪ single-use  | Config/read/auth.                          |
 
-### ci-server (17 tools) → LS-8036
+### ci-server (19 tools) → LS-8036 (batching) + LS-9714 (consolidation)
 
-| Tool                                                                             | Class          | Notes                          |
-| -------------------------------------------------------------------------------- | -------------- | ------------------------------ |
-| `ci_rerun`                                                                       | 🔴 needs-batch | **P0.** Re-kick N failed runs. |
-| `ci_rerun_failed_jobs`                                                           | 🔴 needs-batch | P1.                            |
-| `ci_view_run`                                                                    | 🔴 needs-batch | P1 — inspect N runs.           |
-| `ci_list_runs`                                                                   | ⚪ single-use  | Returns a list.                |
-| `ci_view_run_jobs`, `ci_get_logs`, `ci_search_logs`, `ci_workflow_info`          | ⚪ single-use  | Reads.                         |
-| `ci_auto_fix`, `ci_dispatch_workflow`, `ci_workflow_set_state`                   | ⚪ single-use  | One-shot orchestration.        |
-| `ci_get_playwright_report`, `ci_get_playwright_test_result`                      | ⚪ single-use  | Per-report reads.              |
-| `ci_audit_session_bash`, `ci_find_session`, `ci_session_stats`, `ci_auth_status` | ⚪ single-use  | Session/audit/auth.            |
+| Tool                                                                             | Class         | Notes                                                                                                                                        |
+| -------------------------------------------------------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ci_rerun`                                                                       | ✅ batched    | `runIds` (1-50) param widening, not a separate tool (LS-9714 absorbed the former `ci_rerun_batch`/`ci_rerun_failed_jobs`/`ci_retry_failed`). |
+| `ci_view_run`                                                                    | ✅ batched    | `runIds` (1-50) param widening (LS-9714 absorbed the former `ci_view_run_batch`).                                                            |
+| `ci_cancel_run`                                                                  | ✅ batched    | `workflow`+`branch` selector mode (LS-9714 absorbed the former `ci_cancel_runs`).                                                            |
+| `ci_list_runs`                                                                   | ⚪ single-use | Returns a list.                                                                                                                              |
+| `ci_view_run_jobs`, `ci_get_logs`, `ci_search_logs`, `ci_workflow_info`          | ⚪ single-use | Reads.                                                                                                                                       |
+| `ci_auto_fix`, `ci_dispatch_workflow`, `ci_workflow_set_state`                   | ⚪ single-use | One-shot orchestration.                                                                                                                      |
+| `ci_get_playwright_report`, `ci_get_playwright_test_result`                      | ⚪ single-use | Per-report reads.                                                                                                                            |
+| `ci_audit_session_bash`, `ci_find_session`, `ci_session_stats`, `ci_auth_status` | ⚪ single-use | Session/audit/auth.                                                                                                                          |
 
 ### aws-server (15 tools) → LS-8037
 
@@ -193,8 +192,8 @@ multi-statement SQL. **No gap.**
 ## Roll-up
 
 - **Tools inventoried**: 10 servers, ~160 registered tools.
-- **Already batched**: 9 tools (the convention models) + 3 worktree batches landed via LS-8038.
-- **Needs-batch candidates**: 23, concentrated in **jira (7)**, **github (8)**, **ci (3)**, **aws (2)**, **worktree (3)**.
+- **Already batched**: 9 tools (the convention models) + 3 worktree batches landed via LS-8038 + 3 ci batches landed via LS-8036/LS-9714 (the latter folded the standalone `*_batch` tools back into param widening).
+- **Needs-batch candidates**: 20, concentrated in **jira (7)**, **github (8)**, **aws (2)**, **worktree (3)**.
 - **P0 (do first)**: `jira_transition`, `jira_edit_ticket`, `github_merge_pr`, `github_rebase_pr` (removed LS-9294; batch variant `github_bulk_rebase` shipped),
   `github_reply_to_review`, `ci_rerun` — these are the operations agents most often call N-in-a-row during PR/ticket sweeps.
 - **No-gap servers**: make, nx, browser, db (their multi-target needs are already covered or inherently single-shot).

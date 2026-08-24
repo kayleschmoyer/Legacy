@@ -183,7 +183,7 @@ Distinct from the plain 401 above: this failure mode surfaces as an explicit err
 Incompatible auth server: does not support dynamic client registration
 ```
 
-Observed once so far: `legacy-sports-github`, `legacy-sports-jira`, and `legacy-sports-ci` all began failing identically, mid-session, after 8+ hours of normal operation (LS-9439, during the LS-9346/PR #7072 merge drive). All three failed on both reads and writes (e.g. `github_pr_why_blocked`, `jira_view`, `ci_rerun_failed_jobs`), not just mutations.
+Observed once so far: `legacy-sports-github`, `legacy-sports-jira`, and `legacy-sports-ci` all began failing identically, mid-session, after 8+ hours of normal operation (LS-9439, during the LS-9346/PR #7072 merge drive). All three failed on both reads and writes (e.g. `github_pr_why_blocked`, `jira_view`, `ci_rerun`), not just mutations.
 
 **`auth_check_all` will not catch this.** It is a credential/token-_presence_ check (env vars, cache files — see [Pre-flight Auth Check](#pre-flight-auth-check-separate-from-load-failures) below), not a live OAuth-session probe, so it kept reporting `allAuthenticated: true` for the whole outage. A green `auth_check_all` is not proof the hosted connectors are actually reachable if a real tool call is throwing this error string.
 

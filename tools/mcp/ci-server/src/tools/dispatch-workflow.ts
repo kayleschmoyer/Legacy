@@ -313,7 +313,7 @@ export async function dispatchWorkflow(
               'This workflow only runs on other events (e.g. pull_request, push) and cannot be manually dispatched. ' +
                 'Retrigger the existing run instead:',
               `  1. ci_list_runs({ workflow: "${params.workflow}", branch: "${ref}" }) — find the failed run's "id"`,
-              '  2. ci_rerun_failed_jobs({ runId: <id> })',
+              '  2. ci_rerun({ runId: <id> })',
             ].join('\n'),
           },
         ],

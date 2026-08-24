@@ -93,7 +93,7 @@ The `setup` composite action validates the Nx workspace after installing depende
 ci_search_logs(runId: RUN_ID, pattern: "Nx CLI not available|node_modules.*not found|workspace.*invalid|nx binary.*not functional", context: 5)
 ```
 
-**Resolution:** usually a transient runner issue or cache corruption — `ci_rerun_failed_jobs(runId: RUN_ID)`. If it persists, clear the local Nx cache with `make clean-cache` (never raw `pnpm exec nx reset` — it destroys the pooled `node_modules` symlink, LS-5242) and push an empty commit to bust the CI cache:
+**Resolution:** usually a transient runner issue or cache corruption — `ci_rerun(runId: RUN_ID)`. If it persists, clear the local Nx cache with `make clean-cache` (never raw `pnpm exec nx reset` — it destroys the pooled `node_modules` symlink, LS-5242) and push an empty commit to bust the CI cache:
 
 ```bash
 make clean-cache

@@ -22,9 +22,9 @@ There is **no standing E2E-on-main signal** — hermetic E2E runs only on PR bra
 
 1. **Extract the failing specs** from the run: `ci_get_playwright_test_result` / `ci_get_logs(runId)`. Record spec paths, test titles, and error signatures.
 2. **Diff-relevance check** (fast, weak): map failing specs to surfaces via `apps/web-e2e/src/e2e-surface-map.json` and compare against the PR's changed files (`github_pr_diff`). Overlap → almost certainly yours; fix normally. No overlap → continue probing (still not proof).
-3. **Cross-PR corroboration** (fast, supporting only): are other open PRs' latest runs failing the **same specs with the same signatures**? (`github_pr_dashboard` → `ci_view_run_batch` on the failing PRs' runs.) Corroboration supports "pre-existing"; lack of it strongly suggests the failure is yours.
+3. **Cross-PR corroboration** (fast, supporting only): are other open PRs' latest runs failing the **same specs with the same signatures**? (`github_pr_dashboard` → `ci_view_run({ runIds: [...] })` on the failing PRs' runs.) Corroboration supports "pre-existing"; lack of it strongly suggests the failure is yours.
 4. **Local baseline — the authoritative probe.** Run the failing spec(s) locally (hermetic specs run anywhere — see the [testing skill](../../testing/SKILL.md) for the local run recipe):
-   - On **your branch**: confirm the failure reproduces (if it doesn't, treat as flake/infra — `ci_rerun_failed_jobs` once, then re-triage).
+   - On **your branch**: confirm the failure reproduces (if it doesn't, treat as flake/infra — `ci_rerun` once, then re-triage).
    - On **`origin/main`**: stash your diff (`worktree_stash`) or run in a clean checkout of `origin/main`.
    - **Fails on `origin/main` too → pre-existing. Enter Phase B.**
    - **Passes on `origin/main`, fails on your branch → it is yours**, no matter how unrelated it looks. Fix it normally ([e2e-determinism](../../testing/references/e2e-determinism.md)).

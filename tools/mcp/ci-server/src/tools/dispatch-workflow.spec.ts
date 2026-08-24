@@ -44,7 +44,7 @@ describe('dispatchWorkflow', () => {
     expect(result.content[0].text).toContain('Workflow dispatch requested');
   });
 
-  it('redirects to ci_list_runs + ci_rerun_failed_jobs on a 422 workflow_dispatch-trigger-missing error', async () => {
+  it('redirects to ci_list_runs + ci_rerun on a 422 workflow_dispatch-trigger-missing error', async () => {
     mockGithubPost.mockRejectedValue(
       new Error(
         'GitHub API 422: {"message":"Workflow does not have \'workflow_dispatch\' trigger"}',
@@ -59,7 +59,7 @@ describe('dispatchWorkflow', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("no 'workflow_dispatch' trigger");
     expect(result.content[0].text).toContain('ci_list_runs');
-    expect(result.content[0].text).toContain('ci_rerun_failed_jobs');
+    expect(result.content[0].text).toContain('ci_rerun');
     expect(result.content[0].text).toContain('jira-link-check.yml');
   });
 
@@ -70,7 +70,7 @@ describe('dispatchWorkflow', () => {
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('actions:write');
-    expect(result.content[0].text).not.toContain('ci_rerun_failed_jobs');
+    expect(result.content[0].text).not.toContain('ci_rerun');
   });
 
   describe('display-name resolution (LS-9230)', () => {
