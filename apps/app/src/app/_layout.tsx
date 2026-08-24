@@ -224,14 +224,25 @@ export default function Layout() {
     [],
   );
 
+  // Start signal for the launch choreography (LS-9728): the overlay mounts in
+  // the same commit that requests SplashScreen.hideAsync(), so a timeline that
+  // starts on mount plays behind the still-visible native splash (child
+  // effects run before this parent effect, and the hide itself is an async
+  // native round trip). Flip this only once the hide has settled so the reveal
+  // is actually on screen; the component's own fail-safe covers a hide that
+  // never settles.
+  const [nativeSplashHidden, setNativeSplashHidden] = React.useState(false);
+
   useEffect(() => {
     if (!fontsLoaded && !fontError) return;
     if (fontError) {
       LOGGER.warn('[Fonts] Brand font load failed (non-fatal):', fontError);
     }
-    SplashScreen.hideAsync().catch(() => {
-      // Safe to ignore — see preventAutoHideAsync() above.
-    });
+    // Rejection is safe to ignore (see preventAutoHideAsync() above) — it
+    // means the splash is already gone, so the launch animation may start
+    // either way.
+    const markSplashHidden = (): void => setNativeSplashHidden(true);
+    SplashScreen.hideAsync().then(markSplashHidden, markSplashHidden);
   }, [fontsLoaded, fontError]);
 
   // Keep the splash screen visible (return null, not a fallback UI) until
@@ -268,7 +279,10 @@ export default function Layout() {
             fully covers the auth-gate BrandedSplash (same field + lockup), so
             cold start reads as one continuous branded surface. */}
         {showLaunchAnimation ? (
-          <AnimatedLaunchScreen onFinished={handleLaunchFinished} />
+          <AnimatedLaunchScreen
+            start={nativeSplashHidden}
+            onFinished={handleLaunchFinished}
+          />
         ) : null}
       </View>
     </TamaguiProvider>

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing } from 'react-native';
 import { Text, Theme, YStack } from 'tamagui';
 import { BrandLogo } from './BrandLogo';
@@ -16,9 +16,27 @@ export const LAUNCH_FADE_OUT_MS = 150;
 export const LAUNCH_TOTAL_MS =
   LAUNCH_REVEAL_MS + LAUNCH_HOLD_MS + LAUNCH_FADE_OUT_MS;
 
+/**
+ * Fail-safe for the `start` gate (LS-9728): if the caller never signals
+ * `start` (e.g. `SplashScreen.hideAsync()` neither resolves nor rejects), the
+ * choreography begins on its own after this delay so the overlay can never
+ * hold the app hostage behind an opaque full-screen surface.
+ */
+export const LAUNCH_START_FAILSAFE_MS = 2000;
+
 export interface AnimatedLaunchScreenProps {
   /** Called once the overlay has fully faded out; unmount it then. */
   onFinished?: () => void;
+  /**
+   * Visibility gate for the choreography (LS-9728). While `false`, the overlay
+   * renders its initial frame (opaque field, reveal not yet begun) and none of
+   * the timeline runs — pass `true` once the native splash has actually hidden
+   * (`SplashScreen.hideAsync()` resolved), so the reveal cannot play unseen
+   * behind the splash. Defaults to `true` for standalone use. The
+   * `LAUNCH_START_FAILSAFE_MS` fail-safe begins the timeline anyway if the
+   * signal never arrives.
+   */
+  start?: boolean;
   testID?: string;
 }
 
@@ -44,7 +62,11 @@ const OVERLAY_STYLE = {
  * fires.
  *
  * Cold-start-only gating is the *caller's* job via first-mount state (see
- * apps/app/src/app/_layout.tsx) — this component simply plays once on mount.
+ * apps/app/src/app/_layout.tsx) — this component plays once, beginning when
+ * the `start` prop turns true (or immediately on mount when it is omitted).
+ * The timeline must not run on mount unconditionally: on a cold start the JS
+ * tree commits while the native splash still covers the screen, and a
+ * mount-anchored timeline plays partially or fully behind it (LS-9728).
  *
  * When the OS "Reduce Motion" setting is on, the reveal collapses to the final
  * frame and only the opacity-only fade-out runs, mirroring the brand rule of
@@ -52,6 +74,7 @@ const OVERLAY_STYLE = {
  */
 export function AnimatedLaunchScreen({
   onFinished,
+  start = true,
   testID = 'animated-launch-screen',
 }: AnimatedLaunchScreenProps): React.JSX.Element {
   const overlayOpacity = useRef(new Animated.Value(1)).current;
@@ -59,11 +82,31 @@ export function AnimatedLaunchScreen({
   const lockupOpacity = useRef(new Animated.Value(0)).current;
   const lockupTranslate = useRef(new Animated.Value(8)).current;
 
-  // Keep the latest callback without retriggering the mount-only effect.
+  // Latches true when the caller signals visibility (or the fail-safe fires);
+  // never returns to false, so the timeline below runs exactly once.
+  const [begun, setBegun] = useState(start);
+
+  useEffect(() => {
+    if (start) setBegun(true);
+  }, [start]);
+
+  // Fail-safe: begin even without the start signal so the opaque overlay can
+  // never wedge on-screen waiting for a hide that never resolves.
+  useEffect(() => {
+    if (begun) return;
+    const failsafeTimer = setTimeout(
+      () => setBegun(true),
+      LAUNCH_START_FAILSAFE_MS,
+    );
+    return () => clearTimeout(failsafeTimer);
+  }, [begun]);
+
+  // Keep the latest callback without retriggering the begin-once effect.
   const onFinishedRef = useRef(onFinished);
   onFinishedRef.current = onFinished;
 
   useEffect(() => {
+    if (!begun) return;
     let cancelled = false;
 
     const reveal = (reduceMotion: boolean) => {
@@ -122,7 +165,7 @@ export function AnimatedLaunchScreen({
       clearTimeout(fadeTimer);
       clearTimeout(finishTimer);
     };
-  }, [overlayOpacity, ruleScale, lockupOpacity, lockupTranslate]);
+  }, [begun, overlayOpacity, ruleScale, lockupOpacity, lockupTranslate]);
 
   return (
     <Animated.View

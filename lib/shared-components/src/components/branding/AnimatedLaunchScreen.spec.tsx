@@ -8,6 +8,9 @@
  *  - only transform and opacity are animated (brand motion rule)
  *  - reduce-motion collapses the reveal to the final frame (no timing() reveal;
  *    only the opacity-only fade-out runs)
+ *  - start gating (LS-9728): with start={false} nothing runs until the start
+ *    signal arrives, and the LAUNCH_START_FAILSAFE_MS fail-safe begins the
+ *    timeline on its own if it never does
  *  - unmount before completion never fires onFinished (cleanup)
  *
  * The setup-level react-native mock differs per jest project (web vs mobile),
@@ -21,6 +24,7 @@ import {
   LAUNCH_FADE_OUT_MS,
   LAUNCH_HOLD_MS,
   LAUNCH_REVEAL_MS,
+  LAUNCH_START_FAILSAFE_MS,
   LAUNCH_TOTAL_MS,
 } from './AnimatedLaunchScreen';
 import { render } from '../../test-utils';
@@ -239,6 +243,53 @@ describe('AnimatedLaunchScreen', () => {
 
     act(() => {
       jest.advanceTimersByTime(LAUNCH_FADE_OUT_MS);
+    });
+    expect(onFinished).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds the timeline until start turns true (LS-9728)', async () => {
+    const onFinished = jest.fn();
+    const { rerender } = render(
+      <AnimatedLaunchScreen start={false} onFinished={onFinished} />,
+    );
+    await flushReduceMotionRead();
+
+    // Gated: no reveal timings on mount...
+    expect(getMock().Animated.timing).not.toHaveBeenCalled();
+
+    // ...and no fade/finish timers either — the whole nominal lifetime can
+    // elapse (still short of the fail-safe) without anything starting.
+    act(() => {
+      jest.advanceTimersByTime(LAUNCH_TOTAL_MS);
+    });
+    expect(getMock()._timingCalls).toHaveLength(0);
+    expect(onFinished).not.toHaveBeenCalled();
+
+    // The start signal begins the full choreography from that moment.
+    rerender(<AnimatedLaunchScreen start onFinished={onFinished} />);
+    await flushReduceMotionRead();
+    expect(getMock().Animated.timing).toHaveBeenCalledTimes(3);
+
+    act(() => {
+      jest.advanceTimersByTime(LAUNCH_TOTAL_MS);
+    });
+    expect(onFinished).toHaveBeenCalledTimes(1);
+  });
+
+  it('begins on its own after the fail-safe when start never arrives (LS-9728)', async () => {
+    const onFinished = jest.fn();
+    render(<AnimatedLaunchScreen start={false} onFinished={onFinished} />);
+    await flushReduceMotionRead();
+    expect(getMock().Animated.timing).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(LAUNCH_START_FAILSAFE_MS);
+    });
+    await flushReduceMotionRead();
+    expect(getMock().Animated.timing).toHaveBeenCalledTimes(3);
+
+    act(() => {
+      jest.advanceTimersByTime(LAUNCH_TOTAL_MS);
     });
     expect(onFinished).toHaveBeenCalledTimes(1);
   });

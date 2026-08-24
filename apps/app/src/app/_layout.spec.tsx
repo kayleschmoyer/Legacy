@@ -65,14 +65,22 @@ jest.mock('@apollo/client/react', () => ({
 jest.mock('@legacy-sports/shared-components', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories are hoisted above imports, so modules must be required inside the factory
   const { View } = require('react-native') as typeof import('react-native');
-  // Captures the latest onFinished prop so tests can drive the overlay's
-  // dismissal (defined inside the factory — see the hoisting note above).
-  const launchProps: { onFinished?: () => void } = {};
+  // Captures the latest onFinished/start props so tests can drive the
+  // overlay's dismissal and assert the LS-9728 visibility gate (defined inside
+  // the factory — see the hoisting note above).
+  const launchProps: { onFinished?: () => void; start?: boolean } = {};
   return {
     AuthProvider: ({ children }: { children: React.ReactNode }) => children,
     ErrorBoundary: ({ children }: { children: React.ReactNode }) => children,
-    AnimatedLaunchScreen: ({ onFinished }: { onFinished?: () => void }) => {
+    AnimatedLaunchScreen: ({
+      onFinished,
+      start,
+    }: {
+      onFinished?: () => void;
+      start?: boolean;
+    }) => {
       launchProps.onFinished = onFinished;
+      launchProps.start = start;
       return <View testID="animated-launch-screen" />;
     },
     // Non-standard export so tests can access the captured props
@@ -144,10 +152,10 @@ function getGrowthBookSpies(): GrowthBookSpies {
   };
 }
 
-function getLaunchProps(): { onFinished?: () => void } {
-  return jest.requireMock<{ _launchProps: { onFinished?: () => void } }>(
-    '@legacy-sports/shared-components',
-  )._launchProps;
+function getLaunchProps(): { onFinished?: () => void; start?: boolean } {
+  return jest.requireMock<{
+    _launchProps: { onFinished?: () => void; start?: boolean };
+  }>('@legacy-sports/shared-components')._launchProps;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -254,5 +262,35 @@ describe('_layout.tsx — cold-start launch animation gating (LS-9464)', () => {
       result.rerender(<Layout />);
     });
     expect(result.queryByTestId('animated-launch-screen')).toBeNull();
+  });
+
+  it('gates the choreography start on SplashScreen.hideAsync resolution (LS-9728)', async () => {
+    // Hold the native-splash hide unresolved so the overlay must wait.
+    let resolveHide!: () => void;
+    const splashScreen = jest.requireMock<{ hideAsync: jest.Mock }>(
+      'expo-splash-screen',
+    );
+    splashScreen.hideAsync.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveHide = resolve;
+      }),
+    );
+
+    let result!: ReturnType<typeof render>;
+    await act(() => {
+      result = render(<Layout />);
+    });
+
+    // The overlay is mounted (covering the tree) but must not have been told
+    // to start while the native splash is still up.
+    expect(result.queryByTestId('animated-launch-screen')).toBeTruthy();
+    expect(getLaunchProps().start).toBe(false);
+
+    // Once the hide settles, the start signal flips.
+    await act(async () => {
+      resolveHide();
+      await Promise.resolve();
+    });
+    expect(getLaunchProps().start).toBe(true);
   });
 });
