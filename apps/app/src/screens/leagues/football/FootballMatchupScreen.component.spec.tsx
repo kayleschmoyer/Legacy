@@ -304,6 +304,21 @@ jest.mock('../../../features/subscription/PremiumGate', () => ({
 
 jest.mock('@legacy-sports/utils', () => ({
   ENTITLEMENTS: { ai_matchup_recap: 'ai_matchup_recap' },
+  ALLOWED_POSITIONS_BY_SPORT: {
+    football: {
+      QB: ['QB'],
+      RB: ['RB'],
+      WR: ['WR'],
+      TE: ['TE'],
+      K: ['K'],
+      DST: ['DST'],
+      DL: ['DL'],
+      LB: ['LB'],
+      DB: ['DB'],
+      FLEX: ['RB', 'WR', 'TE'],
+      SFLEX: ['QB', 'RB', 'WR', 'TE'],
+    },
+  },
 }));
 
 jest.mock('tamagui', () => {

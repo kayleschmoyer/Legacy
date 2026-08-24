@@ -1,4 +1,5 @@
 import {
+  getFlexSubLabel,
   getPlayerName,
   getPlayerPosition,
   getPositionOrder,
@@ -35,6 +36,21 @@ jest.mock('@legacy-sports/shared-components/matchup', () => ({
 
 jest.mock('@legacy-sports/utils', () => ({
   ENTITLEMENTS: { ai_matchup_recap: 'ai_matchup_recap' },
+  ALLOWED_POSITIONS_BY_SPORT: {
+    football: {
+      QB: ['QB'],
+      RB: ['RB'],
+      WR: ['WR'],
+      TE: ['TE'],
+      K: ['K'],
+      DST: ['DST'],
+      DL: ['DL'],
+      LB: ['LB'],
+      DB: ['DB'],
+      FLEX: ['RB', 'WR', 'TE'],
+      SFLEX: ['QB', 'RB', 'WR', 'TE'],
+    },
+  },
 }));
 
 describe('getPositionOrder', () => {
@@ -72,6 +88,25 @@ describe('getPositionOrder', () => {
       expect(dst).toContain(pos);
       expect(idp).toContain(pos);
     }
+  });
+});
+
+describe('getFlexSubLabel', () => {
+  it('lists accepted positions for FLEX', () => {
+    expect(getFlexSubLabel('FLEX')).toBe('RB/WR/TE');
+  });
+
+  it('lists accepted positions for SFLEX', () => {
+    expect(getFlexSubLabel('SFLEX')).toBe('QB/RB/WR/TE');
+  });
+
+  it('returns undefined for single-position slots', () => {
+    expect(getFlexSubLabel('QB')).toBeUndefined();
+    expect(getFlexSubLabel('TE')).toBeUndefined();
+  });
+
+  it('returns undefined for an unknown slot', () => {
+    expect(getFlexSubLabel('BN')).toBeUndefined();
   });
 });
 

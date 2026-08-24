@@ -20,7 +20,7 @@ import {
   MatchupRecapPanel,
   MatchupScoreboardHero,
 } from '@legacy-sports/shared-components/matchup';
-import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { ALLOWED_POSITIONS_BY_SPORT, ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   type GetHeadToHeadRecordQuery,
   type GetMatchupByIdQuery,
@@ -74,12 +74,25 @@ const POSITION_LABELS: Record<string, string> = {
   WR: 'WR',
   TE: 'TE',
   FLEX: 'FLEX',
+  SFLEX: 'SFLEX',
   K: 'K',
   DST: 'D/ST',
   DL: 'DL',
   LB: 'LB',
   DB: 'DB',
 };
+
+/**
+ * Returns a short "RB/WR/TE"-style sublabel listing the positions a flex
+ * slot accepts, sourced from the same slot→eligibility mapping used for
+ * lineup validation (LS-6384). Returns undefined for non-flex slots, since
+ * those already unambiguously name a single position.
+ */
+export function getFlexSubLabel(slot: string): string | undefined {
+  const eligible = ALLOWED_POSITIONS_BY_SPORT.football[slot];
+  if (!eligible || eligible.length <= 1) return undefined;
+  return eligible.join('/');
+}
 
 interface FootballMatchupScreenProps {
   readonly matchupId: number;
@@ -369,10 +382,15 @@ function RosterSection({
               pressStyle: { opacity: 0.6 },
             }}
           >
-            <YStack width={36} alignItems="flex-end">
+            <YStack width={48} alignItems="flex-end">
               <Text fontSize="$2" fontWeight="700" color="$gray9">
                 {POSITION_LABELS[slot] ?? slot}
               </Text>
+              {getFlexSubLabel(slot) ? (
+                <Text fontSize="$1" color="$gray7" numberOfLines={1}>
+                  {getFlexSubLabel(slot)}
+                </Text>
+              ) : null}
             </YStack>
             <Text fontSize="$3" color={player ? '$color12' : '$gray7'} flex={1}>
               {player ? getPlayerName(player.player) : 'Empty'}
