@@ -4,6 +4,7 @@ import {
   useGetMatchupRosterQuery,
   useGetMatchupsByWeekQuery,
   useGetMatchupsForLeagueQuery,
+  useSetOptimalLineupMutation,
   useSwapMatchupPlayerPositionsMutation,
   useUpdateMatchupPlayerPositionMutation,
 } from '@legacy-sports/graphql';
@@ -166,4 +167,21 @@ export function useSwapMatchupPlayerPositions() {
   };
 
   return { swapPositions, loading, error };
+}
+
+/**
+ * Hook for the premium "Optimize My Lineup" one-click action (LS-6378):
+ * sets a football team's starters to the combination of rostered players
+ * that maximizes total projected points. Only works when the matchup
+ * status is 'scheduled'; server-side gated on ENTITLEMENTS.optimal_lineup.
+ */
+export function useSetOptimalLineup() {
+  const [mutate, { loading, error }] = useSetOptimalLineupMutation();
+
+  const optimizeLineup = async (matchupId: number, teamId: number) => {
+    const result = await mutate({ variables: { matchupId, teamId } });
+    return result.data?.setOptimalLineup ?? null;
+  };
+
+  return { optimizeLineup, loading, error };
 }

@@ -2147,6 +2147,8 @@ export type Mutation = {
   setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Set or clear a custom nickname for a player on your roster. Pass null or empty string to remove the nickname. */
   setNickname?: Maybe<TeamMember>;
+  /** Premium (LS-6378): sets a football team’s starting lineup to the combination of rostered players that maximizes total projected points for the matchup week, respecting each starting slot’s position eligibility. Requires ENTITLEMENTS.optimal_lineup and team ownership; only available while the matchup is scheduled. */
+  setOptimalLineup?: Maybe<Array<MatchupPlayer>>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -2724,6 +2726,11 @@ export type MutationSetDraftQueueArgs = {
 export type MutationSetNicknameArgs = {
   nickname?: InputMaybe<Scalars['String']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationSetOptimalLineupArgs = {
+  matchupId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
 };
 
 export type MutationSetTeamLockArgs = {
@@ -7703,6 +7710,175 @@ export type SwapMatchupPlayerPositionsMutationVariables = Exact<{
 export type SwapMatchupPlayerPositionsMutation = {
   __typename?: 'Mutation';
   swapMatchupPlayerPositions?: Array<{
+    __typename?: 'MatchupPlayer';
+    id?: string | null;
+    matchupId?: number | null;
+    playerId?: number | null;
+    teamId?: number | null;
+    positionId?: number | null;
+    season?: number | null;
+    numberOfGames?: number | null;
+    player?: {
+      __typename?: 'Player';
+      id?: number | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      brefId?: string | null;
+      eligiblePositions?: Array<string> | null;
+    } | null;
+    seasonBatting?: {
+      __typename?: 'SeasonBatting';
+      games?: number | null;
+      plateAppearances?: number | null;
+      atBats?: number | null;
+      runs?: number | null;
+      hits?: number | null;
+      doubles?: number | null;
+      triples?: number | null;
+      homeRuns?: number | null;
+      rbi?: number | null;
+      stolenBases?: number | null;
+      caughtStealing?: number | null;
+      baseOnBalls?: number | null;
+      strikeouts?: number | null;
+      groundedIntoDoublePlays?: number | null;
+      hitByPitch?: number | null;
+      sacrificeHits?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      battingAverage?: number | null;
+      onBasePercentage?: number | null;
+      sluggingPercentage?: number | null;
+    } | null;
+    seasonPitching?: {
+      __typename?: 'SeasonPitching';
+      wins?: number | null;
+      losses?: number | null;
+      winLossPercentage?: string | null;
+      earnedRunAverage?: string | null;
+      games?: number | null;
+      gamesStarted?: number | null;
+      gamesFinished?: number | null;
+      completeGames?: number | null;
+      shutouts?: number | null;
+      saves?: number | null;
+      inningsPitched?: number | null;
+      hits?: number | null;
+      runs?: number | null;
+      earnedRuns?: number | null;
+      homeRuns?: number | null;
+      baseOnBalls?: number | null;
+      intentionalBaseOnBalls?: number | null;
+      strikeouts?: number | null;
+      hitByPitch?: number | null;
+      balks?: number | null;
+      wildPitches?: number | null;
+      battersFaced?: number | null;
+      outsRecorded?: number | null;
+    } | null;
+    seasonFielding?: {
+      __typename?: 'SeasonFielding';
+      games?: number | null;
+      gamesStarted?: number | null;
+      inningsDefended?: number | null;
+      chances?: number | null;
+      putouts?: number | null;
+      assists?: number | null;
+      errors?: number | null;
+      doublePlays?: number | null;
+      fieldingPercentage?: number | null;
+    } | null;
+    games?: Array<{
+      __typename?: 'MatchupPlayerGame';
+      id?: number | null;
+      matchupPlayerId?: number | null;
+      gameNum?: number | null;
+      gameIdentifier?: string | null;
+      gamePosition?: string | null;
+      statsLoadingStatus?: string | null;
+      pitcherStartSkipped?: boolean | null;
+      noGameDataFound?: boolean | null;
+      battingGame?: {
+        __typename?: 'GameBatting';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        plateAppearances?: number | null;
+        atBats?: number | null;
+        runs?: number | null;
+        hits?: number | null;
+        doubles?: number | null;
+        triples?: number | null;
+        homeRuns?: number | null;
+        rbi?: number | null;
+        stolenBases?: number | null;
+        caughtStealing?: number | null;
+        baseOnBalls?: number | null;
+        strikeouts?: number | null;
+        groundedIntoDoublePlays?: number | null;
+        hitByPitch?: number | null;
+        sacrificeHits?: number | null;
+        sacrificeFlies?: string | null;
+        intentionalBaseOnBalls?: number | null;
+        battingAverage?: number | null;
+      } | null;
+      pitchingGame?: {
+        __typename?: 'GamePitching';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        wins?: number | null;
+        losses?: number | null;
+        gamesStarted?: number | null;
+        gamesFinished?: number | null;
+        completeGames?: number | null;
+        shutouts?: number | null;
+        saves?: number | null;
+        inningsPitched?: number | null;
+        hits?: number | null;
+        runs?: number | null;
+        earnedRuns?: number | null;
+        homeRuns?: number | null;
+        baseOnBalls?: number | null;
+        intentionalBaseOnBalls?: number | null;
+        strikeouts?: number | null;
+        hitByPitch?: number | null;
+        battersFaced?: number | null;
+        outsRecorded?: number | null;
+        era?: number | null;
+      } | null;
+      fieldingGame?: {
+        __typename?: 'GameFielding';
+        playerId?: number | null;
+        season?: number | null;
+        gameNum?: number | null;
+        gameIdentifier?: string | null;
+        position?: string | null;
+        games?: number | null;
+        gamesStarted?: number | null;
+        inningsPlayed?: number | null;
+        putouts?: number | null;
+        assists?: number | null;
+        errors?: number | null;
+        doublePlays?: number | null;
+        passedBalls?: number | null;
+        stolenBasesAllowed?: number | null;
+        caughtStealing?: number | null;
+        fieldingPercentage?: number | null;
+      } | null;
+    }> | null;
+  }> | null;
+};
+
+export type SetOptimalLineupMutationVariables = Exact<{
+  matchupId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
+}>;
+
+export type SetOptimalLineupMutation = {
+  __typename?: 'Mutation';
+  setOptimalLineup?: Array<{
     __typename?: 'MatchupPlayer';
     id?: string | null;
     matchupId?: number | null;
@@ -21022,6 +21198,60 @@ export type SwapMatchupPlayerPositionsMutationResult =
 export type SwapMatchupPlayerPositionsMutationOptions = BaseMutationOptions<
   SwapMatchupPlayerPositionsMutation,
   SwapMatchupPlayerPositionsMutationVariables
+>;
+export const SetOptimalLineup = gql`
+  mutation SetOptimalLineup($matchupId: Int!, $teamId: Int!) {
+    setOptimalLineup(matchupId: $matchupId, teamId: $teamId) {
+      ...MatchupPlayer
+      ...AppMatchupPlayer
+    }
+  }
+  ${MatchupPlayerFragmentDoc}
+  ${AppMatchupPlayerFragmentDoc}
+`;
+export type SetOptimalLineupMutationFn = MutationFunction<
+  SetOptimalLineupMutation,
+  SetOptimalLineupMutationVariables
+>;
+
+/**
+ * __useSetOptimalLineupMutation__
+ *
+ * To run a mutation, you first call `useSetOptimalLineupMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useSetOptimalLineupMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [setOptimalLineupMutation, { data, loading, error }] = useSetOptimalLineupMutation({
+ *   variables: {
+ *      matchupId: // value for 'matchupId'
+ *      teamId: // value for 'teamId'
+ *   },
+ * });
+ */
+export function useSetOptimalLineupMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    SetOptimalLineupMutation,
+    SetOptimalLineupMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    SetOptimalLineupMutation,
+    SetOptimalLineupMutationVariables
+  >(SetOptimalLineup, options);
+}
+export type SetOptimalLineupMutationHookResult = ReturnType<
+  typeof useSetOptimalLineupMutation
+>;
+export type SetOptimalLineupMutationResult =
+  Apollo.MutationResult<SetOptimalLineupMutation>;
+export type SetOptimalLineupMutationOptions = BaseMutationOptions<
+  SetOptimalLineupMutation,
+  SetOptimalLineupMutationVariables
 >;
 export const GetLeagueMessages = gql`
   query GetLeagueMessages($leagueId: Int!, $limit: Int, $before: Int) {

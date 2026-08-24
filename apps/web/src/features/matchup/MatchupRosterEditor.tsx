@@ -16,16 +16,24 @@ import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
+  Sport,
   useGetMatchupByIdLazyQuery,
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { PremiumGate } from '../../components/PremiumGate';
 import {
+  BRAND_GOLD,
+  BRAND_GOLD_PRESS,
   BRAND_NAVY,
   BRAND_NAVY_DARK,
   BRAND_NAVY_LIGHT,
+  TEXT_ON_GOLD,
 } from '../../constants/colors';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import {
+  useSetOptimalLineup,
   useSwapMatchupPlayerPositions,
   useUpdateMatchupPlayerPosition,
 } from '../../hooks/useMatchup';
@@ -54,6 +62,11 @@ export interface MatchupRosterEditorProps {
   leagueId: number;
   /** When true the lineup is displayed read-only (e.g. matchup is in-progress). */
   locked?: boolean;
+  /**
+   * League sport — gates the premium "Optimize My Lineup" one-click action
+   * (LS-6378), which is football-only for now.
+   */
+  sport?: Sport;
 }
 
 /**
@@ -68,6 +81,7 @@ export function MatchupRosterEditor({
   userTeamId,
   leagueId,
   locked = false,
+  sport,
 }: MatchupRosterEditorProps) {
   // ── Fetch data ──────────────────────────────────────────────────────────
   const matchupId =
@@ -95,8 +109,15 @@ export function MatchupRosterEditor({
     useUpdateMatchupPlayerPosition();
   const { swapPositions, loading: swapLoading } =
     useSwapMatchupPlayerPositions();
+  const { optimizeLineup, loading: optimizeLoading } = useSetOptimalLineup();
 
-  const mutating = updateLoading || swapLoading;
+  const mutating = updateLoading || swapLoading || optimizeLoading;
+
+  // ── Optimize My Lineup (LS-6378) ───────────────────────────────────────
+  // Football-only premium one-click action: sets starters to the
+  // combination of rostered players that maximizes total projected points.
+  const hasOptimalLineup = useHasEntitlement(ENTITLEMENTS.optimal_lineup);
+  const showOptimizer = sport === Sport.Football;
 
   const [fetchMatchupStatus] = useGetMatchupByIdLazyQuery({
     fetchPolicy: 'network-only',
@@ -243,6 +264,26 @@ export function MatchupRosterEditor({
     [updatePosition, refetchPlayers, ensureMatchupStillScheduled],
   );
 
+  const handleOptimizeLineup = useCallback(async () => {
+    if (lockedRef.current) return;
+    if (!(await ensureMatchupStillScheduled())) return;
+    try {
+      await optimizeLineup(matchupId, userTeamId);
+      await refetchPlayers();
+    } catch (error) {
+      LOGGER.error(
+        'Failed to optimize matchup lineup',
+        error instanceof Error ? error : String(error),
+      );
+    }
+  }, [
+    optimizeLineup,
+    matchupId,
+    userTeamId,
+    refetchPlayers,
+    ensureMatchupStillScheduled,
+  ]);
+
   const handleRetry = useCallback(async () => {
     try {
       await refetchPlayers();
@@ -308,14 +349,45 @@ export function MatchupRosterEditor({
   }
 
   return (
-    <MatchupRosterEditorView
-      players={players}
-      positionMap={positionMap}
-      positionOptions={positionOptions}
-      locked={effectiveLocked}
-      mutating={mutating}
-      onSwapPositions={handleSwapPositions}
-      onMoveToPosition={handleMoveToPosition}
-    />
+    <YStack gap="$3">
+      {showOptimizer && !effectiveLocked && (
+        <XStack justifyContent="flex-end">
+          {hasOptimalLineup ? (
+            <Button
+              size="$3"
+              backgroundColor={BRAND_GOLD}
+              color={TEXT_ON_GOLD}
+              pressStyle={{ backgroundColor: BRAND_GOLD_PRESS }}
+              hoverStyle={{ backgroundColor: BRAND_GOLD_PRESS }}
+              disabled={mutating}
+              onPress={() => {
+                void handleOptimizeLineup();
+              }}
+            >
+              {optimizeLoading ? 'Optimizing…' : 'Optimize My Lineup'}
+            </Button>
+          ) : (
+            <PremiumGate
+              isPremium={false}
+              featureName="Optimize My Lineup"
+              featureDescription="One-click set your starters to the combination of rostered players that maximizes your projected points."
+            >
+              <Button size="$3" disabled>
+                Optimize My Lineup
+              </Button>
+            </PremiumGate>
+          )}
+        </XStack>
+      )}
+      <MatchupRosterEditorView
+        players={players}
+        positionMap={positionMap}
+        positionOptions={positionOptions}
+        locked={effectiveLocked}
+        mutating={mutating}
+        onSwapPositions={handleSwapPositions}
+        onMoveToPosition={handleMoveToPosition}
+      />
+    </YStack>
   );
 }

@@ -13,6 +13,7 @@ export * from './lib/ErrorHandling';
 export * from './lib/format-draft-date';
 export * from './lib/help-content';
 export * from './lib/league-utils';
+export * from './lib/lineup-optimizer';
 export * from './lib/notification-copy';
 export * from './lib/notification-types';
 export * from './lib/sanitize-name';

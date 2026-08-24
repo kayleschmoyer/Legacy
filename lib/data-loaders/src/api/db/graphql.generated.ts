@@ -2141,6 +2141,8 @@ export type Mutation = {
   setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
   /** Set or clear a custom nickname for a player on your roster. Pass null or empty string to remove the nickname. */
   setNickname?: Maybe<TeamMember>;
+  /** Premium (LS-6378): sets a football team’s starting lineup to the combination of rostered players that maximizes total projected points for the matchup week, respecting each starting slot’s position eligibility. Requires ENTITLEMENTS.optimal_lineup and team ownership; only available while the matchup is scheduled. */
+  setOptimalLineup?: Maybe<Array<MatchupPlayer>>;
   /** Commissioner: lock or unlock a team to prevent/allow roster moves. */
   setTeamLock?: Maybe<CommissionerActionResult>;
   /** Mark or unmark a roster player as available for trade. Only the team owner (GM or assistant manager) may call this. */
@@ -2718,6 +2720,11 @@ export type MutationSetDraftQueueArgs = {
 export type MutationSetNicknameArgs = {
   nickname?: InputMaybe<Scalars['String']['input']>;
   teamMemberId: Scalars['Int']['input'];
+};
+
+export type MutationSetOptimalLineupArgs = {
+  matchupId: Scalars['Int']['input'];
+  teamId: Scalars['Int']['input'];
 };
 
 export type MutationSetTeamLockArgs = {

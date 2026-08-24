@@ -16,9 +16,19 @@
  * over the network once that window has elapsed.
  */
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { MatchupRosterEditorView } from '@legacy-sports/shared-components/roster';
-import { type MatchupFragment, MatchupStatus } from '@legacy-sports/graphql';
+import {
+  type MatchupFragment,
+  MatchupStatus,
+  Sport,
+} from '@legacy-sports/graphql';
 import {
   useGetMatchupByIdLazyQuery,
   useGetMatchupPlayersQuery,
@@ -26,9 +36,11 @@ import {
 } from '@legacy-sports/graphql';
 import { MatchupRosterEditor } from './MatchupRosterEditor';
 import {
+  useSetOptimalLineup,
   useSwapMatchupPlayerPositions,
   useUpdateMatchupPlayerPosition,
 } from '../../hooks/useMatchup';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 
 jest.mock('@legacy-sports/graphql', () => {
   const actual = jest.requireActual<typeof import('@legacy-sports/graphql')>(
@@ -43,8 +55,27 @@ jest.mock('@legacy-sports/graphql', () => {
 });
 
 jest.mock('../../hooks/useMatchup', () => ({
+  useSetOptimalLineup: jest.fn(),
   useSwapMatchupPlayerPositions: jest.fn(),
   useUpdateMatchupPlayerPosition: jest.fn(),
+}));
+
+jest.mock('../../hooks/useIsPremium', () => ({
+  useHasEntitlement: jest.fn(),
+}));
+
+jest.mock('../../components/PremiumGate', () => ({
+  PremiumGate: ({
+    children,
+    featureName,
+  }: {
+    children: React.ReactNode;
+    featureName: string;
+  }) => (
+    <div data-testid="premium-gate" data-feature={featureName}>
+      {children}
+    </div>
+  ),
 }));
 
 // Capture the props the wrapper passes into the shared View so the test can
@@ -128,6 +159,17 @@ const positionsResponse = {
 const scheduledStatusResponse = {
   data: { getMatchupById: { ...matchup, status: MatchupStatus.Scheduled } },
 };
+
+// Default mocks for the optimizer hooks shared by every describe block below
+// (most don't pass `sport`, so the button never renders, but the hooks are
+// still called unconditionally and must not return undefined).
+beforeEach(() => {
+  (useSetOptimalLineup as jest.Mock).mockReturnValue({
+    optimizeLineup: jest.fn().mockResolvedValue(undefined),
+    loading: false,
+  });
+  (useHasEntitlement as jest.Mock).mockReturnValue(false);
+});
 
 describe('MatchupRosterEditor — empty roster state (LS-5898)', () => {
   const fetchMatchupStatus = jest.fn();
@@ -572,5 +614,119 @@ describe('MatchupRosterEditor — pre-flight cache TTL (LS-5894 / BMD-024)', () 
 
     expect(fetchMatchupStatus).toHaveBeenCalledTimes(2);
     expect(updatePosition).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('MatchupRosterEditor — Optimize My Lineup (LS-6378)', () => {
+  const swapPositions = jest.fn().mockResolvedValue(undefined);
+  const updatePosition = jest.fn().mockResolvedValue(undefined);
+  const optimizeLineup = jest.fn().mockResolvedValue([]);
+  const fetchMatchupStatus = jest
+    .fn()
+    .mockResolvedValue(scheduledStatusResponse);
+
+  beforeEach(() => {
+    swapPositions.mockClear();
+    updatePosition.mockClear();
+    optimizeLineup.mockClear();
+    optimizeLineup.mockResolvedValue([]);
+    fetchMatchupStatus.mockClear();
+    fetchMatchupStatus.mockResolvedValue(scheduledStatusResponse);
+    playersResponse.refetch.mockClear();
+    viewPropsRef.current = null;
+
+    (useGetMatchupByIdLazyQuery as jest.Mock).mockReturnValue([
+      fetchMatchupStatus,
+      {},
+    ]);
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue(playersResponse);
+    (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue(
+      positionsResponse,
+    );
+    (useSwapMatchupPlayerPositions as jest.Mock).mockReturnValue({
+      swapPositions,
+      loading: false,
+    });
+    (useUpdateMatchupPlayerPosition as jest.Mock).mockReturnValue({
+      updatePosition,
+      loading: false,
+    });
+    (useSetOptimalLineup as jest.Mock).mockReturnValue({
+      optimizeLineup,
+      loading: false,
+    });
+  });
+
+  it('does not render the button for a non-football matchup', () => {
+    (useHasEntitlement as jest.Mock).mockReturnValue(true);
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+        sport={Sport.Baseball}
+      />,
+    );
+
+    expect(screen.queryByText('Optimize My Lineup')).not.toBeInTheDocument();
+  });
+
+  it('shows a premium upsell instead of an active button for a free football user', () => {
+    (useHasEntitlement as jest.Mock).mockReturnValue(false);
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(screen.getByTestId('premium-gate')).toHaveAttribute(
+      'data-feature',
+      'Optimize My Lineup',
+    );
+    expect(screen.getByText('Optimize My Lineup')).toBeDisabled();
+  });
+
+  it('calls setOptimalLineup and refetches players when a premium football user clicks the button', async () => {
+    (useHasEntitlement as jest.Mock).mockReturnValue(true);
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={false}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(screen.queryByTestId('premium-gate')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Optimize My Lineup'));
+
+    await waitFor(() => expect(optimizeLineup).toHaveBeenCalledWith(1234, 10));
+    expect(playersResponse.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides the button entirely once the matchup is locked, even for a premium user', () => {
+    (useHasEntitlement as jest.Mock).mockReturnValue(true);
+
+    render(
+      <MatchupRosterEditor
+        matchup={matchup}
+        userTeamId={10}
+        leagueId={849}
+        locked={true}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(screen.queryByText('Optimize My Lineup')).not.toBeInTheDocument();
   });
 });

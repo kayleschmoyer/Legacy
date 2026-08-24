@@ -324,6 +324,7 @@ export function MatchupDetailPage() {
               matchup={matchup}
               userTeamId={userTeamId}
               leagueId={leagueIdNum}
+              sport={leagueSport}
             />
           ) : undefined
         }

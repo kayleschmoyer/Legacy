@@ -82,6 +82,13 @@ mutation SwapMatchupPlayerPositions(
   }
 }
 
+mutation SetOptimalLineup($matchupId: Int!, $teamId: Int!) {
+  setOptimalLineup(matchupId: $matchupId, teamId: $teamId) {
+    ...MatchupPlayer
+    ...AppMatchupPlayer
+  }
+}
+
 fragment AppMatchup on Matchup {
   id
   weekNumber

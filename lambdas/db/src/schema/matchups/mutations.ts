@@ -4,11 +4,18 @@
 
 import {
   createAllMatchupsForLeague,
+  type FootballMatchupPlayerGameStats,
   type GenericDatabase,
+  getMatchupFootballPlayerGameStats,
   populateMatchupPlayersAndSeasons,
   PublicSchema,
 } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
+import {
+  ALLOWED_POSITIONS_BY_SPORT,
+  ENTITLEMENTS,
+  optimizeLineup,
+} from '@legacy-sports/utils';
 import { and, asc, eq, inArray, isNull, not } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
@@ -19,11 +26,16 @@ import {
   MatchupPlayer,
   MatchupStatus,
 } from './types';
+import { getFootballPlayerSeasonAverage } from './football-season-projection';
+import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
+import { computeFootballGamePoints } from './matchupScores';
 import { builder, Context } from '../builder';
 import {
   checkAdminInDb,
   requireAdmin,
+  requireEntitlement,
   verifyCommissionerAccess,
+  verifyLeagueMembership,
 } from '../authorization';
 import { MatchupService } from '../../services/matchup-service';
 import { writeAuditLog } from '../commissioner-tools';
@@ -841,6 +853,381 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
       );
 
       return results.map((r) => ({
+        ...r,
+        positionId: r.positionId ?? null,
+        season: seasonMap.get(r.playerId) ?? null,
+      }));
+    },
+  }),
+);
+
+/**
+ * Determine each rostered player's projected fantasy points for the matchup
+ * week: actual points if any of their games this week have already been
+ * scored, otherwise their season-average points per game (LS-6364 model).
+ * Mirrors `resolveFootballMatchupScores`'s per-player projection, but for
+ * every rostered player on the team (bench included), keyed by the player's
+ * real position rather than their current (possibly bench/FLEX) slot — the
+ * lineup optimizer needs a position-accurate score to compare players who
+ * aren't currently starting.
+ */
+async function getFootballProjectedPointsByPlayerId(
+  context: Context,
+  matchupId: number,
+  leagueId: number,
+  weekNumber: number,
+  roster: Array<{ id: number; playerId: number }>,
+): Promise<Map<number, number>> {
+  const db = context.db;
+  const playerIds = roster.map((r) => r.playerId);
+
+  const [playerDetailRows, seasonRows, gameStats, scoringSettings] =
+    await Promise.all([
+      db
+        .select({
+          id: PublicSchema.players.id,
+          position: PublicSchema.players.position,
+          isDst: PublicSchema.players.isDst,
+        })
+        .from(PublicSchema.players)
+        .where(inArray(PublicSchema.players.id, playerIds)),
+      db
+        .select({
+          playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+          season: PublicSchema.leagueWeekPlayerSeasons.season,
+        })
+        .from(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          and(
+            eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, leagueId),
+            eq(PublicSchema.leagueWeekPlayerSeasons.weekNumber, weekNumber),
+            inArray(PublicSchema.leagueWeekPlayerSeasons.playerId, playerIds),
+          ),
+        ),
+      getMatchupFootballPlayerGameStats(db, matchupId),
+      getFootballScoringSettingsForLeague(db, leagueId),
+    ]);
+
+  const playerDetailMap = new Map(playerDetailRows.map((p) => [p.id, p]));
+  const seasonMap = new Map(seasonRows.map((s) => [s.playerId, s.season]));
+
+  const gameStatsByMatchupPlayerId = new Map<
+    number,
+    FootballMatchupPlayerGameStats[]
+  >();
+  for (const stat of gameStats) {
+    const list = gameStatsByMatchupPlayerId.get(stat.matchupPlayerId) ?? [];
+    list.push(stat);
+    gameStatsByMatchupPlayerId.set(stat.matchupPlayerId, list);
+  }
+
+  const projectedPointsByPlayerId = new Map<number, number>();
+
+  await Promise.all(
+    roster.map(async (row) => {
+      const detail = playerDetailMap.get(row.playerId);
+      const season = seasonMap.get(row.playerId);
+      if (!detail || season == null) {
+        projectedPointsByPlayerId.set(row.playerId, 0);
+        return;
+      }
+
+      const posType = detail.position ?? '';
+      // No 'DP' variant here (unlike matchupScores.ts's slot-based posType
+      // check) — `players.position` is the strict playerPosition enum, whose
+      // IDP values are only 'DL' | 'LB' | 'DB'.
+      const isIdp = posType === 'DL' || posType === 'LB' || posType === 'DB';
+
+      const played = gameStatsByMatchupPlayerId.get(row.id) ?? [];
+      if (played.length > 0) {
+        const total = played.reduce(
+          (sum, g) =>
+            sum +
+            computeFootballGamePoints(
+              g,
+              detail.isDst,
+              isIdp,
+              scoringSettings,
+              posType,
+            ),
+          0,
+        );
+        projectedPointsByPlayerId.set(row.playerId, total);
+        return;
+      }
+
+      const average = await getFootballPlayerSeasonAverage(
+        db,
+        row.playerId,
+        season,
+        detail.isDst,
+        isIdp,
+        scoringSettings,
+        posType,
+      );
+      projectedPointsByPlayerId.set(row.playerId, average);
+    }),
+  );
+
+  return projectedPointsByPlayerId;
+}
+
+/**
+ * Solves the assignment problem for a team's roster (via `optimizeLineup`)
+ * and applies the result: clears every current slot first, then assigns the
+ * new positions, mirroring `performMatchupPlayerPositionSwap`'s
+ * clear-then-assign pattern so the bulk reassignment can never collide with
+ * `matchup_players_unique_slot_idx`.
+ *
+ * Exported standalone (rather than inlined in the resolver) so the
+ * assignment + write behavior can be exercised directly against a real
+ * Postgres instance in integration tests, mirroring the existing
+ * `performMatchupPlayerPositionSwap` precedent in this file.
+ */
+export async function computeAndApplyOptimalLineup(
+  db: GenericDatabase<typeof PublicSchema>,
+  params: {
+    roster: Array<{ id: number; playerId: number }>;
+    leaguePositions: Array<{ id: number; positionType: string }>;
+    optimizerPlayers: Array<{
+      id: number;
+      points: number;
+      eligibleStatPositions: readonly string[];
+    }>;
+  },
+): Promise<
+  Array<{
+    id: number;
+    matchupId: number;
+    playerId: number;
+    teamId: number;
+    positionId: number | null;
+  }>
+> {
+  const { roster, leaguePositions, optimizerPlayers } = params;
+
+  const assignment = optimizeLineup(
+    optimizerPlayers,
+    leaguePositions,
+    ALLOWED_POSITIONS_BY_SPORT.football,
+  );
+  const slotIdByPlayerId = new Map(
+    assignment.map((a) => [a.playerId, a.slotId]),
+  );
+
+  const matchupPlayerIds = roster.map((r) => r.id);
+
+  return db.transaction(async (tx) => {
+    await tx
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: null })
+      .where(inArray(PublicSchema.matchupPlayers.id, matchupPlayerIds));
+
+    const rows: Array<{
+      id: number;
+      matchupId: number;
+      playerId: number;
+      teamId: number;
+      positionId: number | null;
+    }> = [];
+
+    for (const row of roster) {
+      const newPositionId = slotIdByPlayerId.get(row.playerId) ?? null;
+      const [result] = await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: newPositionId, manuallyEdited: true })
+        .where(eq(PublicSchema.matchupPlayers.id, row.id))
+        .returning({
+          id: PublicSchema.matchupPlayers.id,
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          teamId: PublicSchema.matchupPlayers.teamId,
+          positionId: PublicSchema.matchupPlayers.positionId,
+        });
+      if (result) rows.push(result);
+    }
+    return rows;
+  });
+}
+
+// Mutation: setOptimalLineup
+//
+// Premium one-click lineup optimizer (LS-6378 / FMD-021): sets a football
+// team's starting lineup to the combination of rostered players that
+// maximizes total projected points for the week, respecting each slot's
+// position eligibility. Solves the assignment problem exactly via
+// `optimizeLineup` (Hungarian algorithm, @legacy-sports/utils) rather than a
+// greedy fill.
+//
+// Football-only for now — baseball fantasy scoring depends on a much larger
+// stat/scoring-settings surface (batting/pitching/fielding across a
+// multi-game matchup) that this ticket does not cover; the ticket itself
+// (FMD-021) is scoped to the Football Matchup Detail page.
+builder.mutationField('setOptimalLineup', (t) =>
+  t.field({
+    type: [MatchupPlayer],
+    description:
+      'Premium (LS-6378): sets a football team’s starting lineup to the combination of rostered players that maximizes total projected points for the matchup week, respecting each starting slot’s position eligibility. Requires ENTITLEMENTS.optimal_lineup and team ownership; only available while the matchup is scheduled.',
+    args: {
+      matchupId: t.arg.int({ required: true }),
+      teamId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const db = context.db;
+
+      const [matchup] = await db
+        .select({
+          id: PublicSchema.matchups.id,
+          leagueId: PublicSchema.matchups.leagueId,
+          weekNumber: PublicSchema.matchups.weekNumber,
+          status: PublicSchema.matchups.status,
+          team1Id: PublicSchema.matchups.team1Id,
+          team2Id: PublicSchema.matchups.team2Id,
+        })
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.id, args.matchupId))
+        .limit(1);
+
+      if (!matchup) {
+        throw NotFoundError('Matchup not found');
+      }
+
+      if (args.teamId !== matchup.team1Id && args.teamId !== matchup.team2Id) {
+        throw UserInputError('Team is not part of this matchup');
+      }
+
+      const membership = await verifyLeagueMembership(
+        db,
+        matchup.leagueId,
+        context.user.id,
+      );
+
+      // Self-service only for now (LS-6378): a team's owner optimizes their
+      // own lineup. Unlike the swap/move mutations, there is no
+      // commissioner/GM bypass here — the ticket scopes this to the
+      // premium-gated one-click action a team owner takes on their own
+      // roster, not a league-management tool.
+      if (membership.teamId !== args.teamId) {
+        throw ForbiddenError('You can only optimize your own team roster');
+      }
+
+      await requireEntitlement(context, ENTITLEMENTS.optimal_lineup);
+
+      if (matchup.status !== 'scheduled') {
+        throw MatchupLockedError(matchup.status);
+      }
+
+      const [league] = await db
+        .select({ sport: PublicSchema.leagues.sport })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, matchup.leagueId))
+        .limit(1);
+
+      if (league?.sport !== 'football') {
+        throw UserInputError(
+          'Optimize My Lineup is currently available for football leagues only',
+        );
+      }
+
+      const leaguePositions = await db
+        .select({
+          id: PublicSchema.leaguePosition.id,
+          positionType: PublicSchema.leaguePosition.positionType,
+        })
+        .from(PublicSchema.leaguePosition)
+        .where(eq(PublicSchema.leaguePosition.leagueId, matchup.leagueId));
+
+      const rosterRows = await db
+        .select({
+          id: PublicSchema.matchupPlayers.id,
+          playerId: PublicSchema.matchupPlayers.playerId,
+        })
+        .from(PublicSchema.matchupPlayers)
+        .where(
+          and(
+            eq(PublicSchema.matchupPlayers.matchupId, args.matchupId),
+            eq(PublicSchema.matchupPlayers.teamId, args.teamId),
+          ),
+        );
+
+      if (rosterRows.length === 0) {
+        return [];
+      }
+
+      const playerIds = rosterRows.map((r) => r.playerId);
+
+      const [projectedPointsByPlayerId, eligibilityRows, seasonRows] =
+        await Promise.all([
+          getFootballProjectedPointsByPlayerId(
+            context,
+            args.matchupId,
+            matchup.leagueId,
+            matchup.weekNumber,
+            rosterRows,
+          ),
+          db
+            .select({
+              playerId: PublicSchema.footballPlayerEligiblePositions.playerId,
+              position: PublicSchema.footballPlayerEligiblePositions.position,
+            })
+            .from(PublicSchema.footballPlayerEligiblePositions)
+            .where(
+              inArray(
+                PublicSchema.footballPlayerEligiblePositions.playerId,
+                playerIds,
+              ),
+            ),
+          db
+            .select({
+              playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+              season: PublicSchema.leagueWeekPlayerSeasons.season,
+            })
+            .from(PublicSchema.leagueWeekPlayerSeasons)
+            .where(
+              and(
+                eq(
+                  PublicSchema.leagueWeekPlayerSeasons.leagueId,
+                  matchup.leagueId,
+                ),
+                eq(
+                  PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                  matchup.weekNumber,
+                ),
+                inArray(
+                  PublicSchema.leagueWeekPlayerSeasons.playerId,
+                  playerIds,
+                ),
+              ),
+            ),
+        ]);
+
+      const eligiblePositionsByPlayer = new Map<number, string[]>();
+      for (const row of eligibilityRows) {
+        const positions = eligiblePositionsByPlayer.get(row.playerId) ?? [];
+        positions.push(row.position);
+        eligiblePositionsByPlayer.set(row.playerId, positions);
+      }
+
+      const seasonMap = new Map(seasonRows.map((s) => [s.playerId, s.season]));
+
+      const optimizerPlayers = rosterRows.map((row) => ({
+        id: row.playerId,
+        points: projectedPointsByPlayerId.get(row.playerId) ?? 0,
+        eligibleStatPositions:
+          eligiblePositionsByPlayer.get(row.playerId) ?? [],
+      }));
+
+      const updated = await computeAndApplyOptimalLineup(db, {
+        roster: rosterRows,
+        leaguePositions,
+        optimizerPlayers,
+      });
+
+      return updated.map((r) => ({
         ...r,
         positionId: r.positionId ?? null,
         season: seasonMap.get(r.playerId) ?? null,
