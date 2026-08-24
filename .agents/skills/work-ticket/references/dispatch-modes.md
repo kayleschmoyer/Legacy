@@ -4,7 +4,7 @@ The delegation playbooks for **parent tickets**, entered from [SKILL.md](../SKIL
 
 > **Why dedicated modes**: epics routinely contain dozens of independent children. Silently claiming "the first available child" misrepresents user intent and leaves the rest of the epic invisible. Recursion below the input ticket is required because **Epic→Epic parent links exist in this Jira project as an observed fact** — production trees have Epics whose direct children are themselves Epics holding the actual stories/tasks (the example transcript below recurses into two child epics). Do not assume the textbook "an Epic cannot parent another Epic" hierarchy here; `jira_get_all_descendants` traverses whatever depth actually exists.
 >
-> **Chips claim atomically, the orchestrator does not.** Each spawned chip claims its own ticket via `jira_claim_ticket` as its first action — the orchestrator performs **zero Jira state mutations** on children. If a chip fails to start (spawn error, crash, OOM), the ticket stays in "To Do" and is eligible for the next dispatcher pass, instead of being stranded "In Progress" with no active worker. Concurrent-dispatcher race is handled by `jira_claim_ticket` returning `ALREADY_CLAIMED` to the loser.
+> **Chips claim atomically, the orchestrator does not.** Each spawned chip claims its own ticket via `jira_transition({ action: "claim" })` as its first action — the orchestrator performs **zero Jira state mutations** on children. If a chip fails to start (spawn error, crash, OOM), the ticket stays in "To Do" and is eligible for the next dispatcher pass, instead of being stranded "In Progress" with no active worker. Concurrent-dispatcher race is handled by `jira_claim_ticket` returning `ALREADY_CLAIMED` to the loser.
 
 ## Parent Dispatch Mode (Story/Task with To Do children, no `--batch`)
 
@@ -18,7 +18,7 @@ This mode runs when `/work-ticket` is invoked on a Story/Task that has children 
    - `blocked: boolean` — true if the ticket has active (non-Done, non-In-Review) blockers
    - `blockers: [{key, status}]` — the specific blocking tickets and their current statuses
 
-   > **Why blocker annotation matters**: chips dispatched to a ticket with an unresolved blocker fail their first `jira_claim_ticket` call and exit — wasting a chip session and leaving the user without visibility into _why_ a "To Do" ticket is not ready to work. Having blocker state inline lets the user defer blocked tickets here and lets batch mode filter them out cleanly.
+   > **Why blocker annotation matters**: chips dispatched to a ticket with an unresolved blocker fail their first claim call and exit — wasting a chip session and leaving the user without visibility into _why_ a "To Do" ticket is not ready to work. Having blocker state inline lets the user defer blocked tickets here and lets batch mode filter them out cleanly.
 
 3. **Zero-To-Do branch**: if `jira_get_all_descendants` returned `total: 0`, fetch a status breakdown with `jira_get_all_descendants(key: "LS-<epic>")` (no status filter) to show what exists, then surface it:
 
@@ -133,7 +133,7 @@ AskUserQuestion → user picks "Spawn chips for all"
 
 Spawning chip "Work LS-4603 (Stats Page header)" with context docs/design/stats-header/ ✓
 …(repeats for LS-4604 … LS-4632)…
-(Each chip claims its own ticket atomically via jira_claim_ticket as its first action)
+(Each chip claims its own ticket atomically via jira_transition({ action: "claim" }) as its first action)
 
 Dispatched 8 chips. Each chip will drive its ticket to merge in its own session/worktree.
 Stopping.
@@ -161,7 +161,7 @@ Used when `--batch` is passed or implied (Epic input always implies it; so does 
    - **Check the `blocked` field from `jira_get_all_descendants` — if `blocked: true`, skip the ticket and record it in the `skipped (blocked)` set along with its `blockers[]`.** If the descendants result is more than a minute old, re-fetch with `jira_get_all_descendants(key: "LS-####", status: "To Do")` to get fresh blocker state before dispatching. Skipping blocked tickets prevents the chip from immediately failing inside its first `jira_claim_ticket` call.
    - Spawn a chip via `mcp__ccd_session__spawn_task` using the Parent Dispatch Mode chip template (step 5 above). Inject parent-derived context where applicable (design bundle path, etc.). Substitute concrete `<child>`, `<epic>`, and `<short summary>` per child; keep `title` under 60 chars.
 
-   **Do NOT transition the child to "In Progress" yourself** — each chip calls `jira_claim_ticket` as its first action and claims atomically. Claiming upfront here would strand the ticket "In Progress" with no active worker if the chip fails to start, and the ticket would silently fall off the "To Do" queue for the next batch run. Spawn all chips in a single pass. Do **not** wait between them.
+   **Do NOT transition the child to "In Progress" yourself** — each chip calls `jira_transition({ action: "claim" })` as its first action and claims atomically. Claiming upfront here would strand the ticket "In Progress" with no active worker if the chip fails to start, and the ticket would silently fall off the "To Do" queue for the next batch run. Spawn all chips in a single pass. Do **not** wait between them.
 
 4. **Stop after dispatch.** Do not wait on chips, track their state, or shepherd their PRs. Parent status will mirror children as their PRs merge — Jira Branch Sync handles the cascade; chips also re-verify and transition the parent when they finish. Report to the user:
    - The dispatched chip set (one line per chip).

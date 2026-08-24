@@ -41,12 +41,6 @@ interface ConsolidatedParams {
    * reference the ticket's key — see `claimTicket`'s `openPrs` doc (LS-9289).
    */
   openPrs?: OpenPrRef[];
-  /**
-   * Optional deprecation label. When set, the response includes a
-   * `deprecation` field so callers can surface the warning. Used by the
-   * `jira_bulk_transition` and `jira_claim_ticket` alias registrations.
-   */
-  deprecation?: string;
 }
 
 const JIRA_KEY_REGEX = /^[A-Z][A-Z0-9_]+-\d+$/;
@@ -235,41 +229,34 @@ export async function consolidatedTransition(
   const keys = Array.isArray(params.keys) ? params.keys : [params.keys];
 
   if (keys.length === 0) {
-    return errorResult('At least one key is required.', params.deprecation);
+    return errorResult('At least one key is required.');
   }
   if (keys.length > 50) {
-    return errorResult(
-      'At most 50 keys are allowed per call.',
-      params.deprecation,
-    );
+    return errorResult('At most 50 keys are allowed per call.');
   }
 
   const invalidKeys = keys.filter((k) => !JIRA_KEY_REGEX.test(k));
   if (invalidKeys.length > 0) {
     return errorResult(
       `Invalid Jira key(s): ${invalidKeys.join(', ')}. Expected format: PROJECT-123`,
-      params.deprecation,
     );
   }
 
   if (params.status.trim().length === 0) {
     return errorResult(
       `Status must be a non-empty string (e.g. ${COMMON_STATUSES.join(', ')}).`,
-      params.deprecation,
     );
   }
 
   if (params.cascade && keys.length > 1) {
     return errorResult(
       'cascade=true is not supported when transitioning multiple keys. Pass a single key or set cascade=false.',
-      params.deprecation,
     );
   }
 
   if (action === 'claim' && !matchesStatus(params.status, 'In Progress')) {
     return errorResult(
       `action: 'claim' only supports status: 'In Progress' (got "${params.status}").`,
-      params.deprecation,
     );
   }
 
@@ -350,7 +337,6 @@ export async function consolidatedTransition(
     failed: failedKeys.length,
     results,
   };
-  if (params.deprecation) response['deprecation'] = params.deprecation;
 
   // Per the MCP partial-failure rule, surface isError when *any* key fails so
   // agents that only check the top-level flag can't silently drop a partial
@@ -361,12 +347,11 @@ export async function consolidatedTransition(
   };
 }
 
-function errorResult(message: string, deprecation?: string): CallToolResult {
+function errorResult(message: string): CallToolResult {
   const payload: Record<string, unknown> = {
     success: false,
     error: message,
   };
-  if (deprecation) payload['deprecation'] = deprecation;
   return {
     isError: true,
     content: [{ type: 'text', text: JSON.stringify(payload) }],

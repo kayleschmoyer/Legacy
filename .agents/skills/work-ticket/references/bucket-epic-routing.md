@@ -33,7 +33,7 @@ Ticket: LS-<child> — <one-line summary, scrubbed>
 Originating epic: LS-<epic> (design-sync bucket)
 Design bundle: docs/design/<design-id>/
 
-Claim the ticket atomically via jira_claim_ticket as your first action, then run the /implement-design command — which loads Skill(skill: "design-sync") + Skill(skill: "frontend-design") — and follow it end-to-end. /implement-design owns the design-bundle read, completeness gate, slicing decision, and drive-to-merge for design tickets.
+Claim the ticket atomically via jira_transition({ keys, status: "In Progress", action: "claim" }) as your first action, then run the /implement-design command — which loads Skill(skill: "design-sync") + Skill(skill: "frontend-design") — and follow it end-to-end. /implement-design owns the design-bundle read, completeness gate, slicing decision, and drive-to-merge for design tickets.
 
 Drive to merge per AGENTS.md. A task is complete only when the PR is MERGED and Jira is "Done".`
 })

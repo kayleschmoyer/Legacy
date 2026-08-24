@@ -35,7 +35,6 @@ import { getAllDescendants } from './tools/get-all-descendants.js';
 import { rolloverSync } from './tools/rollover-sync.js';
 import { startWork } from './tools/start-work.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
-import { claimTicket } from './tools/claim-ticket.js';
 import { jiraKeysSchema, openPrsSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
 
@@ -237,7 +236,7 @@ export function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_transition',
-    "Transition ticket(s) to a new status. Accepts a single key or an array (1-50). When action='claim', performs the assignee-set + transition atomically (replaces jira_claim_ticket).",
+    "Transition ticket(s) to a new status. Accepts a single key or an array (1-50). When action='claim', performs the assignee-set + transition atomically.",
     {
       keys: jiraKeysSchema.optional(),
       key: jiraKeysSchema.optional(),
@@ -278,46 +277,6 @@ export function createMcpServer(): McpServer {
         assigneeAccountId: params.assigneeAccountId,
         openPrs: params.openPrs,
       });
-    },
-  );
-  server.tool(
-    'jira_bulk_transition',
-    'DEPRECATED: use `jira_transition({ keys, status })`.',
-    {
-      keys: z
-        .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
-        .min(1)
-        .max(50),
-      status: z.string().min(1),
-    },
-    async (params) => {
-      process.stderr.write(
-        '[legacy-sports-jira] DEPRECATION: jira_bulk_transition is deprecated; use jira_transition({ keys, status }).\n',
-      );
-      return consolidatedTransition({
-        keys: params.keys,
-        status: params.status,
-        action: 'transition',
-        deprecation:
-          'jira_bulk_transition is deprecated; use jira_transition({ keys, status }).',
-      });
-    },
-  );
-  server.tool(
-    'jira_claim_ticket',
-    'DEPRECATED: use `jira_transition({ keys, status: "In Progress", action: "claim" })`. ' +
-      'Kept as a thin alias for one release. Returns action: "PROCEED", "STOP", "ALREADY_CLAIMED", or "PR_EXISTS".',
-    {
-      key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
-      assignee: z.string().email().optional(),
-      assigneeAccountId: z.string().optional(),
-      openPrs: openPrsSchema,
-    },
-    async (p) => {
-      process.stderr.write(
-        '[legacy-sports-jira] DEPRECATION: jira_claim_ticket is deprecated; use jira_transition({ keys, status: "In Progress", action: "claim" }).\n',
-      );
-      return claimTicket(p);
     },
   );
   server.tool(

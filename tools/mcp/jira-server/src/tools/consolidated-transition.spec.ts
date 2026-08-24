@@ -394,33 +394,3 @@ describe('consolidatedTransition — claim action', () => {
     expect(mutations).toHaveLength(0);
   });
 });
-
-describe('consolidatedTransition — deprecation', () => {
-  it('echoes the deprecation label in the response (alias path)', async () => {
-    mockJiraRequest.mockImplementation(
-      (opts: { method: string; path: string }) => {
-        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
-          return Promise.resolve({
-            transitions: [{ id: '31', name: 'Done', to: { name: 'Done' } }],
-          });
-        }
-        return Promise.resolve(undefined);
-      },
-    );
-
-    const result = await consolidatedTransition({
-      keys: ['LS-1'],
-      status: 'Done',
-      deprecation: 'jira_bulk_transition is deprecated',
-    });
-    const data = parse(result);
-    expect(data['deprecation']).toBe('jira_bulk_transition is deprecated');
-    expect(data['success']).toBe(true);
-  });
-});
-
-interface PerKey {
-  status?: string;
-  error?: string;
-  [k: string]: unknown;
-}

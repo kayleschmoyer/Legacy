@@ -54,7 +54,7 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     const result = await resolveAndAssign({
       key: 'LS-1',
       explicitAssignee: 'agent@example.com',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
 
     expect(result.accountId).toBe('acct-1');
@@ -82,7 +82,7 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     const result = await resolveAndAssign({
       key: 'LS-1',
       explicitAssignee: 'agent@example.com',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
 
     expect(result.accountId).toBe('acct-jql');
@@ -110,7 +110,7 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     const result = await resolveAndAssign({
       key: 'LS-1',
       explicitAssignee: 'agent@example.com',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
 
     expect(result.accountId).toBe('acct-jql');
@@ -126,7 +126,7 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     const result = await resolveAndAssign({
       key: 'LS-1',
       explicitAssignee: 'nobody@example.com',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
 
     expect(result.accountId).toBeUndefined();
@@ -147,7 +147,7 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     await resolveAndAssign({
       key: 'LS-1',
       explicitAssignee: 'we"ird@example.com',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
 
     const jql = (mockSearchJql.mock.calls as Array<[{ jql: string }]>)[0][0]
@@ -170,12 +170,12 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     await resolveAndAssign({
       key: 'LS-1',
       explicitAssignee: 'agent@example.com',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
     await resolveAndAssign({
       key: 'LS-2',
       explicitAssignee: 'agent@example.com',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
 
     expect(mockSearchJql).toHaveBeenCalledTimes(1);
@@ -198,7 +198,7 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
 
     const result = await resolveAndAssign({
       key: 'LS-1',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
 
     expect(result.accountId).toBe('acct-env');
@@ -209,7 +209,7 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     const result = await resolveAndAssign({
       key: 'LS-1',
       explicitAssigneeAccountId: 'acct-direct',
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
 
     expect(result.accountId).toBe('acct-direct');

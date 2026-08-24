@@ -42,7 +42,7 @@ export const jiraKeysSchema = z
 
 /**
  * Zod schema for the `openPrs` parameter shared by `jira_transition`
- * (action='claim') and the deprecated `jira_claim_ticket` alias. Caller-
+ * (action='claim'). Caller-
  * supplied because the jira server has no GitHub credentials of its own and
  * cannot look this up itself (LS-9289).
  */

@@ -1,6 +1,4 @@
 import { listPRComments } from './list-pr-comments';
-import { listPRInlineComments } from './list-pr-inline-comments';
-import { listReviewComments } from './list-review-comments';
 
 jest.mock('../github-api', () => ({
   githubRest: jest.fn(),
@@ -20,10 +18,6 @@ const { githubRest: mockGithubRest } = jest.requireMock<{
 const { getRepoOwnerName: mockGetRepoOwnerName } = jest.requireMock<{
   getRepoOwnerName: jest.Mock;
 }>('../auth');
-const { LOGGER: mockLogger } = jest.requireMock<{
-  LOGGER: { warn: jest.Mock; error: jest.Mock; info: jest.Mock };
-}>('@legacy-sports/logging/server');
-
 const ISSUE_COMMENTS_PATH = '/repos/owner/repo/issues/42/comments';
 const PULL_COMMENTS_PATH = '/repos/owner/repo/pulls/42/comments';
 
@@ -191,45 +185,5 @@ describe('listPRComments', () => {
 
     const result = await listPRComments({ number: 42, type: 'top-level' });
     expect(result.isError).toBe(true);
-  });
-});
-
-describe('deprecated aliases', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockGetRepoOwnerName.mockResolvedValue({ owner: 'owner', name: 'repo' });
-  });
-
-  it('listPRInlineComments forwards to type: "inline" and logs deprecation', async () => {
-    setupRest({ inline: inlineFixture });
-
-    const result = await listPRInlineComments({
-      number: 42,
-      path: 'src/bar.ts',
-    });
-    const out = parseOutput(result);
-
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('github_list_pr_inline_comments is deprecated'),
-    );
-    expect(out.type).toBe('inline');
-    expect(out.total).toBe(1);
-    expect((out.comments as Array<{ path: string }>)[0].path).toBe(
-      'src/bar.ts',
-    );
-  });
-
-  it('listReviewComments forwards to type: "review" and logs deprecation', async () => {
-    setupRest({ inline: inlineFixture });
-
-    const result = await listReviewComments({ number: 42, reviewId: 666 });
-    const out = parseOutput(result);
-
-    expect(mockLogger.warn).toHaveBeenCalledWith(
-      expect.stringContaining('github_list_review_comments is deprecated'),
-    );
-    expect(out.type).toBe('review');
-    expect(out.total).toBe(1);
-    expect((out.comments as Array<{ id: number }>)[0].id).toBe(101);
   });
 });

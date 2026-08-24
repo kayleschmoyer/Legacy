@@ -6,8 +6,6 @@ import { prWhyBlocked } from './tools/pr-why-blocked';
 import { closePR } from './tools/close-pr';
 import { listReviews } from './tools/list-reviews';
 import { commentPR } from './tools/comment-pr';
-import { listPRInlineComments } from './tools/list-pr-inline-comments';
-import { listReviewComments } from './tools/list-review-comments';
 import { editPR } from './tools/edit-pr';
 import { prCommits } from './tools/pr-commits';
 import { setCommitStatus } from './tools/set-commit-status';
@@ -22,8 +20,6 @@ jest.mock('./tools/pr-why-blocked');
 jest.mock('./tools/close-pr');
 jest.mock('./tools/list-reviews');
 jest.mock('./tools/comment-pr');
-jest.mock('./tools/list-pr-inline-comments');
-jest.mock('./tools/list-review-comments');
 jest.mock('./tools/edit-pr');
 jest.mock('./tools/pr-commits');
 jest.mock('./tools/set-commit-status');
@@ -86,8 +82,6 @@ describe('index tool registration — prNumber alias resolution', () => {
     jest.mocked(closePR).mockResolvedValue(okResult);
     jest.mocked(listReviews).mockResolvedValue(okResult);
     jest.mocked(commentPR).mockResolvedValue(okResult);
-    jest.mocked(listPRInlineComments).mockResolvedValue(okResult);
-    jest.mocked(listReviewComments).mockResolvedValue(okResult);
     jest.mocked(editPR).mockResolvedValue(okResult);
     jest.mocked(prCommits).mockResolvedValue(okResult);
     jest.mocked(setCommitStatus).mockResolvedValue(okResult);
@@ -331,92 +325,6 @@ describe('index tool registration — prNumber alias resolution', () => {
         { type: 'text', text: MISSING_PARAM_ERROR },
       ]);
       expect(commentPR).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('github_list_pr_inline_comments', () => {
-    it('accepts "number" and forwards it to the handler', async () => {
-      const result = await client.callTool({
-        name: 'github_list_pr_inline_comments',
-        arguments: { number: 123 },
-      });
-
-      expect(result.isError).toBeFalsy();
-      expect(listPRInlineComments).toHaveBeenCalledWith({
-        number: 123,
-        path: undefined,
-        since: undefined,
-      });
-    });
-
-    it('accepts the "prNumber" alias and forwards it as "number"', async () => {
-      const result = await client.callTool({
-        name: 'github_list_pr_inline_comments',
-        arguments: { prNumber: 456 },
-      });
-
-      expect(result.isError).toBeFalsy();
-      expect(listPRInlineComments).toHaveBeenCalledWith({
-        number: 456,
-        path: undefined,
-        since: undefined,
-      });
-    });
-
-    it('returns the named missing-parameter error when neither is provided', async () => {
-      const result = await client.callTool({
-        name: 'github_list_pr_inline_comments',
-        arguments: {},
-      });
-
-      expect(result.isError).toBe(true);
-      expect(result.content).toEqual([
-        { type: 'text', text: MISSING_PARAM_ERROR },
-      ]);
-      expect(listPRInlineComments).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('github_list_review_comments', () => {
-    it('accepts "number" and forwards it to the handler', async () => {
-      const result = await client.callTool({
-        name: 'github_list_review_comments',
-        arguments: { number: 123 },
-      });
-
-      expect(result.isError).toBeFalsy();
-      expect(listReviewComments).toHaveBeenCalledWith({
-        number: 123,
-        since: undefined,
-        reviewId: undefined,
-      });
-    });
-
-    it('accepts the "prNumber" alias and forwards it as "number"', async () => {
-      const result = await client.callTool({
-        name: 'github_list_review_comments',
-        arguments: { prNumber: 456 },
-      });
-
-      expect(result.isError).toBeFalsy();
-      expect(listReviewComments).toHaveBeenCalledWith({
-        number: 456,
-        since: undefined,
-        reviewId: undefined,
-      });
-    });
-
-    it('returns the named missing-parameter error when neither is provided', async () => {
-      const result = await client.callTool({
-        name: 'github_list_review_comments',
-        arguments: {},
-      });
-
-      expect(result.isError).toBe(true);
-      expect(result.content).toEqual([
-        { type: 'text', text: MISSING_PARAM_ERROR },
-      ]);
-      expect(listReviewComments).not.toHaveBeenCalled();
     });
   });
 

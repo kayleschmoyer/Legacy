@@ -14,7 +14,7 @@ Add a batch variant when **all** of the following hold:
 
 Do **not** add a batch variant when:
 
-- The operation is almost always called once (e.g. `jira_claim_ticket` at the start of a single ticket workflow).
+- The operation is almost always called once (e.g. claiming a ticket at the start of a single ticket workflow).
 - Items are interdependent or ordered such that a partial result is meaningless (a true all-or-nothing transaction — model that explicitly, not as a batch).
 - A single underlying API call already accepts multiple items cheaply and exposes no per-item failure detail worth surfacing — wrap that API directly instead of layering this convention on top.
 

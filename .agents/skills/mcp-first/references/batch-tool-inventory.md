@@ -101,7 +101,6 @@ specific skills · **P2** occasional batching benefit.
 | `jira_view` (`include: ['transitions']`)        | ⚪ single-use  | Lookup — use jira_view with include instead of former jira_get_transitions. |
 | `jira_view` (`include: ['comments']`)           | ⚪ single-use  | Read — use jira_view with include instead of former jira_get_comments.      |
 | `jira_check_blockers`                           | ✅ batched     | `keys` accepts 1-50 in one JQL call (LS-9509).                              |
-| `jira_claim_ticket`                             | ⚪ single-use  | One claim per session.                                                      |
 | `jira_delete_ticket`                            | ⚪ single-use  | Rare; could batch later if needed.                                          |
 | `jira_get_bucket_epic` / `jira_set_bucket_epic` | ⚪ single-use  | Config.                                                                     |
 | `jira_rollover_sync`                            | ⚪ single-use  | Already a bulk operation internally.                                        |

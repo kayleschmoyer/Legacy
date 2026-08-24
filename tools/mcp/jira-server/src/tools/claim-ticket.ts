@@ -129,7 +129,7 @@ export async function claimTicket(
           key,
           explicitAssignee: assignee,
           explicitAssigneeAccountId: assigneeAccountId,
-          toolName: 'jira_claim_ticket',
+          toolName: 'jira_transition',
         });
         warnings.push(...repair.warnings);
         if (repair.accountId !== undefined) {
@@ -259,7 +259,7 @@ export async function claimTicket(
       key,
       explicitAssignee: assignee,
       explicitAssigneeAccountId: assigneeAccountId,
-      toolName: 'jira_claim_ticket',
+      toolName: 'jira_transition',
     });
     warnings.push(...assignResult.warnings);
 

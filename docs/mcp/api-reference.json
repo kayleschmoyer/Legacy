@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 11,
-  "toolCount": 258,
+  "toolCount": 254,
   "servers": [
     {
       "dir": "worktree-server",
@@ -3824,7 +3824,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 57,
+      "toolCount": 55,
       "tools": [
         {
           "name": "get_job_logs",
@@ -4709,44 +4709,6 @@
           ]
         },
         {
-          "name": "github_list_pr_inline_comments",
-          "description": "DEPRECATED: use github_list_pr_comments with type: \"inline\" instead. Returns inline PR review comments; will be removed in a future release. Pass the PR number as \"number\" (preferred) or \"prNumber\" (alias).",
-          "inputs": {
-            "number": {
-              "type": "number",
-              "optional": true,
-              "constraints": [
-                "coerced"
-              ],
-              "description": "PR number"
-            },
-            "prNumber": {
-              "type": "number",
-              "optional": true,
-              "constraints": [
-                "coerced"
-              ],
-              "description": "Alias for \"number\" — use either, not both"
-            },
-            "path": {
-              "type": "string",
-              "optional": true,
-              "constraints": [
-                "min 1"
-              ],
-              "description": "Filter to a specific file path (exact match)"
-            },
-            "since": {
-              "type": "string",
-              "optional": true,
-              "description": "ISO 8601 timestamp — only return comments posted at or after this time"
-            }
-          },
-          "transports": [
-            "stdio"
-          ]
-        },
-        {
           "name": "github_list_prs",
           "description": "Prefer this over `gh pr list` via shell. List PRs with optional filters. Auto-paginates to return all matching PRs (up to limit). Response includes total and hasMore fields.",
           "inputs": {
@@ -4793,46 +4755,6 @@
               ],
               "default": 500,
               "description": "Max total results across all pages (default: 500, auto-paginates)"
-            }
-          },
-          "transports": [
-            "stdio"
-          ]
-        },
-        {
-          "name": "github_list_review_comments",
-          "description": "DEPRECATED: use github_list_pr_comments with type: \"review\" instead. Returns inline PR review comments with reviewId filtering; will be removed in a future release. Pass the PR number as \"number\" (preferred) or \"prNumber\" (alias).",
-          "inputs": {
-            "number": {
-              "type": "number",
-              "optional": true,
-              "constraints": [
-                "coerced"
-              ],
-              "description": "PR number"
-            },
-            "prNumber": {
-              "type": "number",
-              "optional": true,
-              "constraints": [
-                "coerced"
-              ],
-              "description": "Alias for \"number\" — use either, not both"
-            },
-            "since": {
-              "type": "string",
-              "optional": true,
-              "description": "ISO 8601 timestamp — only return comments created at or after this time"
-            },
-            "reviewId": {
-              "type": "number",
-              "optional": true,
-              "constraints": [
-                "coerced",
-                "integer",
-                "> 0"
-              ],
-              "description": "Filter to comments from a specific review submission (pull_request_review_id)"
             }
           },
           "transports": [
@@ -5951,7 +5873,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 23,
+      "toolCount": 21,
       "tools": [
         {
           "name": "jira_add_comment",
@@ -6233,38 +6155,6 @@
           ]
         },
         {
-          "name": "jira_bulk_transition",
-          "description": "DEPRECATED: use `jira_transition({ keys, status })`. Kept as a thin alias for one release.",
-          "inputs": {
-            "keys": {
-              "type": "array",
-              "optional": false,
-              "constraints": [
-                "min 1",
-                "max 50"
-              ],
-              "items": {
-                "type": "string",
-                "optional": false,
-                "constraints": [
-                  "matches /^[A-Z][A-Z0-9_]+-\\d+$/"
-                ]
-              }
-            },
-            "status": {
-              "type": "string",
-              "optional": false,
-              "constraints": [
-                "min 1"
-              ]
-            }
-          },
-          "transports": [
-            "stdio",
-            "hosted"
-          ]
-        },
-        {
           "name": "jira_check_blockers",
           "description": "3-way dependency check: STOP if blocker not ready, use blocker branch if In Review, base off main if Done/no blockers. Accepts up to 50 keys in one call — pass `keys` (or a comma-separated `key`) when filtering a dispatch batch, so one JQL round-trip replaces N per-ticket calls and no sub-agent is needed to sweep blockers. Batch form returns { total, unblocked: [key], blocked: [key], results: [{key, canProceed, blockers, recommendation}], notFound? }; a single `key` still returns the flat { canProceed, blockers, recommendation }. When you are already listing tickets, prefer jira_search / jira_list_children with includeBlockers: true — those annotate blockers with no extra request at all.",
           "inputs": {
@@ -6305,60 +6195,6 @@
                 }
               ],
               "description": "Ticket keys to check in one call (1-50)."
-            }
-          },
-          "transports": [
-            "stdio",
-            "hosted"
-          ]
-        },
-        {
-          "name": "jira_claim_ticket",
-          "description": "DEPRECATED: use `jira_transition({ keys, status: \"In Progress\", action: \"claim\" })`. Kept as a thin alias for one release. Atomically reads, validates, and claims a Jira ticket. Returns action: \"PROCEED\", \"STOP\", \"ALREADY_CLAIMED\", or \"PR_EXISTS\".",
-          "inputs": {
-            "key": {
-              "type": "string",
-              "optional": false,
-              "constraints": [
-                "matches /^[A-Z][A-Z0-9_]+-\\d+$/"
-              ],
-              "description": "Ticket key to claim"
-            },
-            "assignee": {
-              "type": "string",
-              "optional": true,
-              "constraints": [
-                "email"
-              ],
-              "description": "Email of the user to assign the ticket to. Overridden by `assigneeAccountId` — email-based lookup always 401s under the hosted Lambda (LS-7891). Prefer `assigneeAccountId` when known."
-            },
-            "assigneeAccountId": {
-              "type": "string",
-              "optional": true,
-              "description": "Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works where email-based assignment always 401s (LS-7891). Takes precedence over `assignee`."
-            },
-            "openPrs": {
-              "type": "array",
-              "optional": true,
-              "items": {
-                "type": "object",
-                "optional": false,
-                "properties": {
-                  "number": {
-                    "type": "number",
-                    "optional": false
-                  },
-                  "url": {
-                    "type": "string",
-                    "optional": true
-                  },
-                  "title": {
-                    "type": "string",
-                    "optional": true
-                  }
-                }
-              },
-              "description": "Only used when action='claim'. Open PRs the caller has already found to reference this ticket key — e.g. github_pr_dashboard(state: 'open') filtered by key. The jira server has no GitHub credentials of its own (LS-9289) and cannot check this itself. When non-empty, claim returns action: 'PR_EXISTS' (instead of 'PROCEED') with the PR list attached, to prevent duplicate work on a ticket someone else already opened a PR for. Omit (or pass []) when no open PR was found or the check was skipped."
             }
           },
           "transports": [
@@ -6807,7 +6643,7 @@
         },
         {
           "name": "jira_start_work",
-          "description": "Semantic one-shot for Step 3 of the ticket spine (\"Jira → In Progress\"). Verifies state, resolves the In Progress transition id, transitions the ticket, and sets the assignee in a single call. Idempotent on already-In-Progress tickets (no-op success). Refuses Done tickets with an error. Returns { key, status, previousStatus, assignee, idempotent, warnings }. Assignee precedence: explicit `assigneeAccountId` > explicit `assignee` (email) > JIRA_ASSIGNEE_ACCOUNT_ID env var > JIRA_ASSIGNEE_EMAIL env var > authenticated service account. accountId-based paths are checked first because they need no lookup at all; email resolution falls back from /user/search to a JQL lookup that works under the hosted Lambda scopes (LS-9513). Prefer this over the four-call chain (jira_view → jira_view({ include: ['transitions'] }) → jira_transition → assignee PUT) for the standard \"start work\" flow. Use jira_claim_ticket when you also need blocker checks, child summaries, or branch recommendations.",
+          "description": "Semantic one-shot for Step 3 of the ticket spine (\"Jira → In Progress\"). Verifies state, resolves the In Progress transition id, transitions the ticket, and sets the assignee in a single call. Idempotent on already-In-Progress tickets (no-op success). Refuses Done tickets with an error. Returns { key, status, previousStatus, assignee, idempotent, warnings }. Assignee precedence: explicit `assigneeAccountId` > explicit `assignee` (email) > JIRA_ASSIGNEE_ACCOUNT_ID env var > JIRA_ASSIGNEE_EMAIL env var > authenticated service account. accountId-based paths are checked first because they need no lookup at all; email resolution falls back from /user/search to a JQL lookup that works under the hosted Lambda scopes (LS-9513). Prefer this over the four-call chain (jira_view → jira_view({ include: ['transitions'] }) → jira_transition → assignee PUT) for the standard \"start work\" flow. Use jira_transition({ action: 'claim' }) when you also need blocker checks, child summaries, or branch recommendations.",
           "inputs": {
             "key": {
               "type": "string",
@@ -6838,7 +6674,7 @@
         },
         {
           "name": "jira_transition",
-          "description": "Transition one or more tickets to a new status. Accepts a single key or an array (1-50). Any status the workflow exposes works (common: ${COMMON_STATUSES.join(', ')}); the transition id is resolved dynamically from the issue's available workflow transitions, and an actionable error listing the available targets is returned if the workflow disallows it. When using a single key, cascade=true auto-transitions open subtasks to Done. When action='claim' (single key, status='In Progress'), atomically validates blockers, sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS plus the full ticket details — replaces the deprecated jira_claim_ticket). Returns `{ success, results: { [key]: { status?, error?, ... } } }`.",
+          "description": "Transition one or more tickets to a new status. Accepts a single key or an array (1-50). Any status the workflow exposes works (common: ${COMMON_STATUSES.join(', ')}); the transition id is resolved dynamically from the issue's available workflow transitions, and an actionable error listing the available targets is returned if the workflow disallows it. When using a single key, cascade=true auto-transitions open subtasks to Done. When action='claim' (single key, status='In Progress'), atomically validates blockers, sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS plus the full ticket details). Returns `{ success, results: { [key]: { status?, error?, ... } } }`.",
           "inputs": {
             "keys": {
               "type": "union",
@@ -6937,7 +6773,7 @@
                 "claim"
               ],
               "default": "transition",
-              "description": "'transition' (default): plain state change. 'claim': atomic blocker-check + assignee-set + transition to In Progress (current jira_claim_ticket behavior)."
+              "description": "'transition' (default): plain state change. 'claim': atomic blocker-check + assignee-set + transition to In Progress."
             },
             "assignee": {
               "type": "string",

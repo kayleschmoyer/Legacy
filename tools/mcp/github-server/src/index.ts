@@ -47,8 +47,6 @@ import { prCommits } from './tools/pr-commits.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prWhyBlocked } from './tools/pr-why-blocked.js';
 import { listPRComments } from './tools/list-pr-comments.js';
-import { listPRInlineComments } from './tools/list-pr-inline-comments.js';
-import { listReviewComments } from './tools/list-review-comments.js';
 import { getFileContent } from './tools/get-file-content.js';
 import { getBranchProtection } from './tools/get-branch-protection.js';
 import { awaitRef } from './tools/await-ref.js';
@@ -738,94 +736,6 @@ export function createServer(): McpServer {
         reviewId: params.reviewId,
         path: params.path,
         since: params.since,
-      });
-    },
-  );
-
-  // --- github_list_pr_inline_comments (DEPRECATED alias) ---
-  server.tool(
-    'github_list_pr_inline_comments',
-    'DEPRECATED: use github_list_pr_comments with type: "inline" instead. Returns inline PR review comments; will be removed in a future release. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
-    {
-      number: prNumberField('number').optional().describe('PR number'),
-      prNumber: prNumberField('prNumber')
-        .optional()
-        .describe('Alias for "number" — use either, not both'),
-      path: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe('Filter to a specific file path (exact match)'),
-      since: z
-        .string()
-        .optional()
-        .describe(
-          'ISO 8601 timestamp — only return comments posted at or after this time',
-        ),
-    },
-    async (params) => {
-      const resolved = params.number ?? params.prNumber;
-      if (!resolved) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: 'text',
-              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
-            },
-          ],
-        };
-      }
-      return listPRInlineComments({
-        number: resolved,
-        path: params.path,
-        since: params.since,
-      });
-    },
-  );
-
-  // --- github_list_review_comments (DEPRECATED alias) ---
-  server.tool(
-    'github_list_review_comments',
-    'DEPRECATED: use github_list_pr_comments with type: "review" instead. Returns inline PR review comments with reviewId filtering; will be removed in a future release. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
-    {
-      number: prNumberField('number').optional().describe('PR number'),
-      prNumber: prNumberField('prNumber')
-        .optional()
-        .describe('Alias for "number" — use either, not both'),
-      since: z
-        .string()
-        .optional()
-        .describe(
-          'ISO 8601 timestamp — only return comments created at or after this time',
-        ),
-      reviewId: z.coerce
-        .number()
-        .int()
-        .positive()
-        .optional()
-        .describe(
-          'Filter to comments from a specific review submission (pull_request_review_id)',
-        ),
-    },
-    async (params) => {
-      const resolved = params.number ?? params.prNumber;
-      if (!resolved) {
-        return {
-          isError: true,
-          content: [
-            {
-              type: 'text',
-              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
-            },
-          ],
-        };
-      }
-      return listReviewComments({
-        number: resolved,
-        since: params.since,
-        reviewId: params.reviewId,
       });
     },
   );

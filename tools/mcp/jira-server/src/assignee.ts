@@ -8,7 +8,7 @@ export interface ResolveAndAssignParams {
   explicitAssignee?: string;
   /** Explicit accountId param passed by the caller (e.g. the tool's `assigneeAccountId` arg). */
   explicitAssigneeAccountId?: string;
-  /** Tool name used to prefix log lines (e.g. 'jira_claim_ticket'). */
+  /** Tool name used to prefix log lines (e.g. 'jira_transition'). */
   toolName: string;
 }
 

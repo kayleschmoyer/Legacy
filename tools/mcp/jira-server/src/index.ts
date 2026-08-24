@@ -20,7 +20,6 @@ import { bulkLinkIssues } from './tools/bulk-link-issues.js';
 import { bulkListChildren } from './tools/bulk-list-children.js';
 import { getBucketEpic, setBucketEpic } from './tools/bucket-epic.js';
 import { rolloverSync } from './tools/rollover-sync.js';
-import { claimTicket } from './tools/claim-ticket.js';
 import { startWork } from './tools/start-work.js';
 import { jiraKeysSchema, openPrsSchema } from './schemas.js';
 import { tryGetJiraCredentials } from './netrc.js';
@@ -560,7 +559,7 @@ server.tool(
     'When using a single key, cascade=true auto-transitions open subtasks to Done. ' +
     "When action='claim' (single key, status='In Progress'), atomically validates blockers, " +
     'sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS ' +
-    'plus the full ticket details — replaces the deprecated jira_claim_ticket). ' +
+    'plus the full ticket details). ' +
     'Returns `{ success, results: { [key]: { status?, error?, ... } } }`.',
   {
     keys: jiraKeysSchema.optional(),
@@ -576,7 +575,7 @@ server.tool(
       .enum(['transition', 'claim'])
       .default('transition')
       .describe(
-        "'transition' (default): plain state change. 'claim': atomic blocker-check + assignee-set + transition to In Progress (current jira_claim_ticket behavior).",
+        "'transition' (default): plain state change. 'claim': atomic blocker-check + assignee-set + transition to In Progress.",
       ),
     assignee: z
       .string()
@@ -626,69 +625,6 @@ server.tool(
   },
 );
 
-// --- jira_bulk_transition (deprecated alias) ---
-server.tool(
-  'jira_bulk_transition',
-  'DEPRECATED: use `jira_transition({ keys, status })`. Kept as a thin alias for one release.',
-  {
-    keys: z
-      .array(z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/))
-      .min(1)
-      .max(50),
-    status: z.string().min(1),
-  },
-  async (params) => {
-    process.stderr.write(
-      '[legacy-sports-jira] DEPRECATION: jira_bulk_transition is deprecated; use jira_transition({ keys, status }) instead.\n',
-    );
-    return consolidatedTransition({
-      keys: params.keys,
-      status: params.status,
-      action: 'transition',
-      deprecation:
-        'jira_bulk_transition is deprecated; use jira_transition({ keys, status }) instead.',
-    });
-  },
-);
-
-// --- jira_claim_ticket (deprecated alias) ---
-server.tool(
-  'jira_claim_ticket',
-  'DEPRECATED: use `jira_transition({ keys, status: "In Progress", action: "claim" })`. ' +
-    'Kept as a thin alias for one release. ' +
-    'Atomically reads, validates, and claims a Jira ticket. ' +
-    'Returns action: "PROCEED", "STOP", "ALREADY_CLAIMED", or "PR_EXISTS".',
-  {
-    key: z
-      .string()
-      .regex(
-        /^[A-Z][A-Z0-9_]+-\d+$/,
-        'Must be a valid Jira issue key (e.g., LS-1234)',
-      )
-      .describe('Ticket key to claim'),
-    assignee: z
-      .string()
-      .email()
-      .optional()
-      .describe(
-        'Email of the user to assign the ticket to. Overridden by `assigneeAccountId` — email-based lookup always 401s under the hosted Lambda (LS-7891). Prefer `assigneeAccountId` when known.',
-      ),
-    assigneeAccountId: z
-      .string()
-      .optional()
-      .describe(
-        'Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works where email-based assignment always 401s (LS-7891). Takes precedence over `assignee`.',
-      ),
-    openPrs: openPrsSchema,
-  },
-  async (params) => {
-    process.stderr.write(
-      '[legacy-sports-jira] DEPRECATION: jira_claim_ticket is deprecated; use jira_transition({ keys, status: "In Progress", action: "claim" }) instead.\n',
-    );
-    return claimTicket(params);
-  },
-);
-
 // --- jira_start_work ---
 server.tool(
   'jira_start_work',
@@ -704,7 +640,7 @@ server.tool(
     'that works under the hosted Lambda scopes (LS-9513). ' +
     "Prefer this over the four-call chain (jira_view → jira_view({ include: ['transitions'] }) → " +
     'jira_transition → assignee PUT) for the standard "start work" flow. Use ' +
-    'jira_claim_ticket when you also need blocker checks, child summaries, or branch ' +
+    "jira_transition({ action: 'claim' }) when you also need blocker checks, child summaries, or branch " +
     'recommendations.',
   {
     key: z
