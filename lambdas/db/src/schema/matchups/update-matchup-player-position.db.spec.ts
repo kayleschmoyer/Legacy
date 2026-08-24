@@ -9,8 +9,19 @@
  * (matchup_id, team_id, position_id). Wrapping both statements in a single
  * transaction — combined with the `matchup_players_unique_slot_idx` partial
  * unique index (LS-8412) — guarantees only one of two racing callers can
- * commit; the loser now surfaces a `23505` unique constraint violation
- * instead of silently corrupting the roster.
+ * commit; the loser surfaces a `23505` unique constraint violation instead
+ * of silently corrupting the roster.
+ *
+ * LS-6371 subsequently added a `SELECT ... FOR UPDATE` on the matchup row at
+ * the top of this same transaction (to serialize against a concurrent
+ * `updateMatchupStatus`), which as a side effect fully serializes *any* two
+ * `performMatchupPlayerPositionUpdate` calls on the same matchup — including
+ * two racing for the same slot. They can no longer overlap at the
+ * `matchup_players` write, so the unique-index race this suite originally
+ * exercised can't occur anymore: both calls now succeed in sequence, with
+ * the second legitimately evicting the first's just-committed occupant. The
+ * safety invariant (at most one occupant per slot) still holds — just via
+ * lock ordering instead of a caught constraint violation.
  */
 import { eq, sql } from 'drizzle-orm';
 import { performMatchupPlayerPositionUpdate } from './mutations';
@@ -121,7 +132,7 @@ describe('performMatchupPlayerPositionUpdate - atomic eviction + assignment (LS-
     expect(await loadPosition(rowA.id)).toBeNull();
   });
 
-  it('rejects one of two concurrent claims on the same slot instead of leaving both occupied', async () => {
+  it('serializes two concurrent claims on the same slot instead of leaving both occupied (LS-6371)', async () => {
     const owner = getUser(2);
     const leagueFixture = getLeague(0);
     const [playerA, playerB] = getTestPlayers();
@@ -179,15 +190,12 @@ describe('performMatchupPlayerPositionUpdate - atomic eviction + assignment (LS-
       ])
       .returning();
 
-    // Pre-warm two idle pool connections. Without this, pg-pool hands the
-    // first `db.transaction()` call the sole existing idle connection and
-    // makes the second wait on a brand-new connection being established —
-    // which is slower than the whole first transaction, so it always starts
-    // (and the eviction cascade always resolves it cleanly) only after the
-    // first already committed. That's a legitimate outcome too, but it never
-    // exercises the unique-index race this test exists to cover. Warming two
-    // connections lets both transactions start on already-established
-    // connections and genuinely overlap.
+    // Pre-warm two idle pool connections so both transactions can start on
+    // already-established connections without one waiting on connection
+    // setup — that would otherwise let the first transaction commit before
+    // the second's `SELECT ... FOR UPDATE` on the matchup row is even
+    // issued, which is a legitimate outcome but not the one this test wants
+    // to force: both calls genuinely queuing on the same matchup lock.
     await Promise.all([db.execute(sql`select 1`), db.execute(sql`select 1`)]);
 
     const results = await Promise.allSettled([
@@ -208,17 +216,14 @@ describe('performMatchupPlayerPositionUpdate - atomic eviction + assignment (LS-
     const fulfilled = results.filter((r) => r.status === 'fulfilled');
     const rejected = results.filter((r) => r.status === 'rejected');
 
-    // Exactly one caller wins the slot; the invariant (at most one occupant
-    // per slot) holds instead of both callers silently succeeding.
-    expect(fulfilled).toHaveLength(1);
-    expect(rejected).toHaveLength(1);
-    // drizzle-orm wraps the raw pg driver error in a DrizzleQueryError, so
-    // the code/constraint land on `.cause`, not the top-level rejection.
-    const rejectionReason = rejected[0].reason as { cause?: unknown };
-    expect(rejectionReason.cause).toMatchObject({
-      code: '23505',
-      constraint: 'matchup_players_unique_slot_idx',
-    });
+    // The matchup-row lock (LS-6371) fully serializes both calls, so
+    // neither hits the `matchup_players_unique_slot_idx` race anymore —
+    // both succeed, with whichever call's transaction commits second
+    // legitimately evicting the first's just-assigned occupant. The safety
+    // invariant (at most one occupant per slot) holds via lock ordering
+    // instead of a caught constraint violation.
+    expect(fulfilled).toHaveLength(2);
+    expect(rejected).toHaveLength(0);
 
     const finalPositions = [
       await loadPosition(rowA.id),

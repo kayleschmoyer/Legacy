@@ -16,7 +16,7 @@ import {
   ENTITLEMENTS,
   optimizeLineup,
 } from '@legacy-sports/utils';
-import { and, asc, eq, inArray, isNull, not } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, not, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
 
 import {
@@ -457,6 +457,13 @@ export async function auditAndNotifyCommissionerBypass(
  * two racing transactions can commit; the loser surfaces as a unique
  * constraint violation that the caller translates into a `ConflictError`.
  *
+ * The same transaction also takes `SELECT ... FOR UPDATE` on the matchup row
+ * and re-checks `status === 'scheduled'` before writing, so a concurrent
+ * `updateMatchupStatus` (which locks the same row) either serializes behind
+ * this edit or is observed here and the edit is rejected — a status flip
+ * landing between the caller's read and this write can no longer let an edit
+ * persist after lock (LS-6371 / FMD-014).
+ *
  * Exported standalone (rather than inlined in the resolver) so it can be
  * exercised directly against a real Postgres instance in integration tests.
  */
@@ -478,6 +485,25 @@ export async function performMatchupPlayerPositionUpdate(
   const { matchupId, teamId, matchupPlayerId, positionId } = params;
 
   return db.transaction(async (tx) => {
+    // Surface lock waits as errors rather than silent hangs.
+    await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+
+    const [lockedMatchup] = await tx
+      .select({ status: PublicSchema.matchups.status })
+      .from(PublicSchema.matchups)
+      .where(eq(PublicSchema.matchups.id, matchupId))
+      .limit(1)
+      .for('update');
+
+    if (!lockedMatchup) {
+      throw NotFoundError('Matchup not found');
+    }
+
+    // Only allow edits when matchup is scheduled (not yet locked)
+    if (lockedMatchup.status !== 'scheduled') {
+      throw MatchupLockedError(lockedMatchup.status);
+    }
+
     // If assigning to a slot, evict any existing occupant first so only one
     // player can occupy a given slot at a time.
     if (positionId != null) {
@@ -531,14 +557,13 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
       const { matchup, matchupPlayer, isCommissionerBypass } =
         await verifyMatchupTeamOwnership(context, args.matchupPlayerId);
 
-      // Only allow edits when matchup is scheduled (not yet locked)
-      if (matchup.status !== 'scheduled') {
-        throw MatchupLockedError(matchup.status);
-      }
-
       const db = context.db;
 
-      // Fetch the target player to find their matchup+team context
+      // Fetch the target player to find their matchup+team context. The
+      // authoritative matchup-status recheck happens inside
+      // performMatchupPlayerPositionUpdate's transaction, under a row lock
+      // (LS-6371) — not here, since this read isn't synchronized with a
+      // concurrent updateMatchupStatus.
       const [targetPlayer] = await db
         .select({
           matchupId: PublicSchema.matchupPlayers.matchupId,
@@ -667,6 +692,29 @@ export async function performMatchupPlayerPositionSwap(
   } = params;
 
   return db.transaction(async (tx) => {
+    // Surface lock waits as errors rather than silent hangs.
+    await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
+
+    // Re-lock and re-check the matchup status inside the transaction so a
+    // concurrent updateMatchupStatus (which also locks the row) serializes
+    // against us — otherwise a status flip landing between the resolver's
+    // ownership check and this write lets a post-lock swap persist
+    // (LS-6371 / FMD-014). Both players are already verified to share the
+    // same matchup, so a single lock covers the pair.
+    const [lockedMatchup] = await tx
+      .select({ status: PublicSchema.matchups.status })
+      .from(PublicSchema.matchups)
+      .where(eq(PublicSchema.matchups.id, matchupIdA))
+      .limit(1)
+      .for('update');
+
+    if (!lockedMatchup) {
+      throw NotFoundError('Matchup not found');
+    }
+    if (lockedMatchup.status !== 'scheduled') {
+      throw MatchupLockedError(lockedMatchup.status);
+    }
+
     // Clear both positions first to avoid unique constraint violations
     await tx
       .update(PublicSchema.matchupPlayers)
@@ -784,10 +832,12 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
         throw UserInputError('Both players must be in the same matchup');
       }
 
+      // Fast-fail path only — performMatchupPlayerPositionSwap re-checks
+      // status under a row lock inside its transaction and is the
+      // authoritative guard, so this uses the same MatchupLockedError type
+      // for a consistent API contract (LS-6371 review).
       if (matchupA.status !== 'scheduled') {
-        throw UserInputError(
-          'Cannot modify roster after the matchup has started or completed',
-        );
+        throw MatchupLockedError(matchupA.status);
       }
 
       const db = context.db;
