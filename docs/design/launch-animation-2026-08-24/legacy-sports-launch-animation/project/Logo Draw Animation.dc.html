@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+html, body { height: 100%; margin: 0; background: #05080F; }
+a { color: #C5A55A; } a:hover { color: #D9BE7F; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&amp;family=Literata:ital,wght@0,400;1,400&amp;display=swap" rel="stylesheet">
+<script>window.OM_SCENES = '[{"name":"Showcase draw","dur":2.1,"desc":"The medallion sketches in as gold ink strokes"},{"name":"Showcase punch","dur":0.5,"desc":"The sketch punches into the real logo with a camera kick"},{"name":"Wordmark","dur":0.9,"desc":"LEGACY SPORTS stamps in with the tagline"},{"name":"Hold","dur":1.5,"desc":"The finished launch screen holds, then fades for the loop"}]';</script>
+<script>window.OM_PLAYBACK = '{"mode":"loop"}';</script>
+<script>window.TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "ink": "#C5A55A",
+  "motionEditor": true
+}/*EDITMODE-END*/;</script>
+</helmet>
+<x-import component-from-global-scope="LogoDrawApp" from="./animations-v3.jsx ./tweaks-panel.jsx ./android-frame.jsx ./logo-anim.jsx" hint-size="100%,100%" style="position:absolute; inset:0"></x-import>
+</x-dc>
+</body>
+</html>

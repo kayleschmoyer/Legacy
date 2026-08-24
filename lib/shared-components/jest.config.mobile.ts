@@ -98,6 +98,11 @@ module.exports = {
     '/src/features/elite-draft/DraftPickAnnouncement\\.spec\\.tsx$',
     '/src/features/elite-draft/DraftClockRing\\.spec\\.tsx$',
     '/src/features/elite-draft/DraftMiniBoard\\.spec\\.tsx$',
+    // Same LS-9180 problem: AnimatedLaunchScreen gained a `.native.tsx` fork
+    // (LS-9746, draw -> punch-in -> stamp choreography). This generic spec
+    // covers the unchanged web choreography only; its purpose-built
+    // `AnimatedLaunchScreen.native.spec.tsx` sibling covers the native one.
+    '/src/components/branding/AnimatedLaunchScreen\\.spec\\.tsx$',
     // useVoiceCommands.native.ts is a static stub (no RN speech-recognition
     // equivalent) with no branches to test; its generic spec drives the web
     // `window.SpeechRecognition` implementation exclusively (LS-9180).

@@ -26,6 +26,8 @@ export default {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/src/features/leagues/ProposeTradeDialogNativeModal.spec.tsx',
+    // Mobile-only regression test (LS-9746) — see jest.config.web.ts for why.
+    '/src/components/branding/AnimatedLaunchScreen.native.spec.tsx',
   ],
   testRegex: '/src/.*\\.spec\\.(ts|tsx|js)$',
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/index.ts'],

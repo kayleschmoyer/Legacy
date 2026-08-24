@@ -304,6 +304,17 @@
       "lastSyncedAt": "2026-08-13T00:00:00.000Z",
       "jiraKey": "LS-9432",
       "source": "manual-local-sync"
+    },
+    {
+      "id": "launch-animation-2026-08-24",
+      "url": null,
+      "title": "Animated Logo Draw → Punch-in Launch Screen (Android)",
+      "slug": "legacy-sports-launch-animation",
+      "status": "active",
+      "lastSyncedHash": "sha256-c7f171e9b24fd0e30260680619d4069bbb8d994abef6f4a85c3766dd3fe818ee",
+      "lastSyncedAt": "2026-08-24T00:00:00.000Z",
+      "jiraKey": "LS-9746",
+      "source": "manual-local-sync"
     }
   ]
 }
