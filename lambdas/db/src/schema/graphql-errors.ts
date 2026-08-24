@@ -135,6 +135,21 @@ export function RateLimitedError(
 }
 
 /**
+ * Throw when a write is rejected because it collided with a concurrent
+ * write to the same resource (e.g. two roster edits racing for the same
+ * matchup slot).
+ *
+ * Maps to Apollo code `CONFLICT` (HTTP 409 equivalent). The client should
+ * refetch the current state and let the user retry rather than surfacing a
+ * generic server-error message.
+ */
+export function ConflictError(message: string): GraphQLError {
+  return new GraphQLError(message, {
+    extensions: { code: 'CONFLICT' },
+  });
+}
+
+/**
  * Throw when a matchup roster edit is rejected because the matchup is no
  * longer in the `scheduled` state (e.g. `in_progress`, `completed`, or
  * `cancelled`).

@@ -29,6 +29,7 @@ import { MatchupService } from '../../services/matchup-service';
 import { writeAuditLog } from '../commissioner-tools';
 import {
   AuthenticationError,
+  ConflictError,
   ForbiddenError,
   MatchupLockedError,
   NotFoundError,
@@ -431,6 +432,80 @@ export async function auditAndNotifyCommissionerBypass(
   }
 }
 
+/**
+ * Atomically evict any existing occupant of `positionId` and assign it to
+ * `matchupPlayerId`, so a slot can never end up with two occupants.
+ *
+ * Runs the eviction and the assignment inside a single transaction — two
+ * concurrent calls targeting the same slot used to run as two independent,
+ * unsynchronized statements each, which let both callers evict each other's
+ * write and then both succeed in claiming the slot (LS-6377). Wrapping both
+ * statements in one transaction, combined with the partial unique index
+ * `matchup_players_unique_slot_idx` (LS-8412), guarantees that at most one of
+ * two racing transactions can commit; the loser surfaces as a unique
+ * constraint violation that the caller translates into a `ConflictError`.
+ *
+ * Exported standalone (rather than inlined in the resolver) so it can be
+ * exercised directly against a real Postgres instance in integration tests.
+ */
+export async function performMatchupPlayerPositionUpdate(
+  db: GenericDatabase<typeof PublicSchema>,
+  params: {
+    matchupId: number;
+    teamId: number;
+    matchupPlayerId: number;
+    positionId: number | null;
+  },
+): Promise<{
+  id: number;
+  matchupId: number;
+  playerId: number;
+  teamId: number;
+  positionId: number | null;
+}> {
+  const { matchupId, teamId, matchupPlayerId, positionId } = params;
+
+  return db.transaction(async (tx) => {
+    // If assigning to a slot, evict any existing occupant first so only one
+    // player can occupy a given slot at a time.
+    if (positionId != null) {
+      await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: null })
+        .where(
+          and(
+            eq(PublicSchema.matchupPlayers.matchupId, matchupId),
+            eq(PublicSchema.matchupPlayers.teamId, teamId),
+            eq(PublicSchema.matchupPlayers.positionId, positionId),
+            not(eq(PublicSchema.matchupPlayers.id, matchupPlayerId)),
+          ),
+        );
+    }
+
+    // Update the position and mark as manually edited to protect from
+    // future roster-tab propagation overwriting this intentional choice.
+    const updated = await tx
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: positionId ?? null, manuallyEdited: true })
+      .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerId))
+      .returning({
+        id: PublicSchema.matchupPlayers.id,
+        matchupId: PublicSchema.matchupPlayers.matchupId,
+        playerId: PublicSchema.matchupPlayers.playerId,
+        teamId: PublicSchema.matchupPlayers.teamId,
+        positionId: PublicSchema.matchupPlayers.positionId,
+      });
+
+    if (updated.length === 0) {
+      throw NotFoundError(
+        `Failed to update matchup player position: matchup player ${matchupPlayerId} no longer exists`,
+      );
+    }
+
+    return updated[0];
+  });
+}
+
 // Mutation: updateMatchupPlayerPosition
 // Allows changing a player's position within a matchup before it starts
 builder.mutationField('updateMatchupPlayerPosition', (t) =>
@@ -462,51 +537,50 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
         .limit(1);
 
       if (!targetPlayer) {
-        throw new Error('Matchup player not found');
+        throw NotFoundError('Matchup player not found');
       }
 
-      // If assigning to a slot, evict any existing occupant first so only one
-      // player can occupy a given slot at a time.
-      if (args.positionId != null) {
-        await db
-          .update(PublicSchema.matchupPlayers)
-          .set({ positionId: null })
-          .where(
-            and(
-              eq(PublicSchema.matchupPlayers.matchupId, targetPlayer.matchupId),
-              eq(PublicSchema.matchupPlayers.teamId, targetPlayer.teamId),
-              eq(PublicSchema.matchupPlayers.positionId, args.positionId),
-              not(eq(PublicSchema.matchupPlayers.id, args.matchupPlayerId)),
-            ),
-          );
-      }
-
-      // Update the position and mark as manually edited to protect from
-      // future roster-tab propagation overwriting this intentional choice.
-      const updated = await db
-        .update(PublicSchema.matchupPlayers)
-        .set({ positionId: args.positionId ?? null, manuallyEdited: true })
-        .where(eq(PublicSchema.matchupPlayers.id, args.matchupPlayerId))
-        .returning({
-          id: PublicSchema.matchupPlayers.id,
-          matchupId: PublicSchema.matchupPlayers.matchupId,
-          playerId: PublicSchema.matchupPlayers.playerId,
-          teamId: PublicSchema.matchupPlayers.teamId,
-          positionId: PublicSchema.matchupPlayers.positionId,
+      let updated: {
+        id: number;
+        matchupId: number;
+        playerId: number;
+        teamId: number;
+        positionId: number | null;
+      };
+      try {
+        updated = await performMatchupPlayerPositionUpdate(db, {
+          matchupId: targetPlayer.matchupId,
+          teamId: targetPlayer.teamId,
+          matchupPlayerId: args.matchupPlayerId,
+          positionId: args.positionId ?? null,
         });
-
-      if (updated.length === 0) {
-        throw new Error('Failed to update matchup player position');
+      } catch (error: unknown) {
+        // drizzle-orm wraps the raw pg driver error in a DrizzleQueryError,
+        // moving the Postgres error code/constraint onto `.cause` instead of
+        // the top-level error — check both so this works regardless of
+        // whether the driver error arrives wrapped or bare.
+        const errorCause = (error as { cause?: unknown } | undefined)?.cause;
+        const cause = errorCause ?? error;
+        const pgError = cause as { code?: string; constraint?: string };
+        if (
+          pgError.code === '23505' &&
+          pgError.constraint === 'matchup_players_unique_slot_idx'
+        ) {
+          throw ConflictError(
+            'That slot was just filled by another update. Please refresh and try again.',
+          );
+        }
+        throw error;
       }
 
       if (isCommissionerBypass) {
         await auditAndNotifyCommissionerBypass(context, {
           leagueId: matchup.leagueId,
           targetTeamId: matchupPlayer.teamId,
-          matchupPlayerId: updated[0].id,
-          playerId: updated[0].playerId,
+          matchupPlayerId: updated.id,
+          playerId: updated.playerId,
           before: { positionId: matchupPlayer.positionId },
-          after: { positionId: updated[0].positionId ?? null },
+          after: { positionId: updated.positionId ?? null },
         });
       }
 
@@ -523,17 +597,14 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
               PublicSchema.leagueWeekPlayerSeasons.weekNumber,
               matchup.weekNumber,
             ),
-            eq(
-              PublicSchema.leagueWeekPlayerSeasons.playerId,
-              updated[0].playerId,
-            ),
+            eq(PublicSchema.leagueWeekPlayerSeasons.playerId, updated.playerId),
           ),
         )
         .limit(1);
 
       return {
-        ...updated[0],
-        positionId: updated[0].positionId ?? null,
+        ...updated,
+        positionId: updated.positionId ?? null,
         season: seasonsResult[0]?.season ?? null,
       };
     },
