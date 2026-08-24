@@ -14,13 +14,11 @@
  * never used per project hermetic-test policy.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+// Element access goes through `playersPage.football` (LS-8096 / ADR-0015 —
+// this spec is selector-free; locators live in the page object).
+import { test } from '../fixtures/pages';
 import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const PAGE_URL = '/players?sport=nfl';
 
 // Selectable position pills, excluding the leading "All" pill.
 const POSITIONS = [
@@ -77,223 +75,181 @@ async function mockFootballPlayers(page: import('@playwright/test').Page) {
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 test.describe('FootballPositionFilter — toggle group ARIA @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockFootballPlayers(page);
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
   });
 
   test('pill container has role=group with accessible label', async ({
-    page,
+    playersPage,
   }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    await expect(group).toBeVisible();
+    await playersPage.football.expectPillGroupVisible();
   });
 
-  test('every pill is a role=button toggle', async ({ page }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    await expect(group.getByRole('button')).toHaveCount(ALL_PILLS.length);
+  test('every pill is a role=button toggle', async ({ playersPage }) => {
+    await playersPage.football.expectPillCount(ALL_PILLS.length);
   });
 
   test('"All" pill is pressed and in tab order by default', async ({
-    page,
+    playersPage,
   }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    const allPill = group.getByRole('button', { name: 'All' });
-    await expect(allPill).toHaveAttribute('aria-pressed', 'true');
-    await expect(allPill).toHaveAttribute('tabindex', '0');
+    await playersPage.football.expectPositionPressed('All', true);
+    await playersPage.football.expectPositionTabStop('All', true);
   });
 
   test('position pills are unpressed and out of tab order by default', async ({
-    page,
+    playersPage,
   }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
     for (const pos of POSITIONS) {
-      const pill = group.getByRole('button', { name: pos });
-      await expect(pill).toHaveAttribute('aria-pressed', 'false');
-      await expect(pill).toHaveAttribute('tabindex', '-1');
+      await playersPage.football.expectPositionPressed(pos, false);
+      await playersPage.football.expectPositionTabStop(pos, false);
     }
   });
 });
 
 test.describe('FootballPositionFilter — multi-select @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockFootballPlayers(page);
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
   });
 
   test('clicking a position selects it and deselects "All"', async ({
-    page,
+    playersPage,
   }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    await group.getByRole('button', { name: 'QB' }).click();
+    await playersPage.football.clickPosition('QB');
 
-    await expect(group.getByRole('button', { name: 'QB' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await expect(group.getByRole('button', { name: 'All' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
+    await playersPage.football.expectPositionPressed('QB', true);
+    await playersPage.football.expectPositionPressed('All', false);
   });
 
   test('multiple positions can be selected at once (QB + RB)', async ({
-    page,
+    playersPage,
   }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    await group.getByRole('button', { name: 'QB' }).click();
-    await group.getByRole('button', { name: 'RB' }).click();
+    await playersPage.football.clickPosition('QB');
+    await playersPage.football.clickPosition('RB');
 
-    await expect(group.getByRole('button', { name: 'QB' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await expect(group.getByRole('button', { name: 'RB' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await expect(group.getByRole('button', { name: 'All' })).toHaveAttribute(
-      'aria-pressed',
-      'false',
-    );
+    await playersPage.football.expectPositionPressed('QB', true);
+    await playersPage.football.expectPositionPressed('RB', true);
+    await playersPage.football.expectPositionPressed('All', false);
   });
 
-  test('clicking a selected position toggles it back off', async ({ page }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    const qbPill = group.getByRole('button', { name: 'QB' });
-    await qbPill.click();
-    await expect(qbPill).toHaveAttribute('aria-pressed', 'true');
-    await qbPill.click();
-    await expect(qbPill).toHaveAttribute('aria-pressed', 'false');
+  test('clicking a selected position toggles it back off', async ({
+    playersPage,
+  }) => {
+    await playersPage.football.clickPosition('QB');
+    await playersPage.football.expectPositionPressed('QB', true);
+    await playersPage.football.clickPosition('QB');
+    await playersPage.football.expectPositionPressed('QB', false);
   });
 
-  test('"All" clears the current multi-selection', async ({ page }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    await group.getByRole('button', { name: 'QB' }).click();
-    await group.getByRole('button', { name: 'RB' }).click();
-    await group.getByRole('button', { name: 'All' }).click();
+  test('"All" clears the current multi-selection', async ({ playersPage }) => {
+    await playersPage.football.clickPosition('QB');
+    await playersPage.football.clickPosition('RB');
+    await playersPage.football.clickPosition('All');
 
-    await expect(group.getByRole('button', { name: 'All' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await playersPage.football.expectPositionPressed('All', true);
     for (const pos of POSITIONS) {
-      await expect(group.getByRole('button', { name: pos })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-      );
+      await playersPage.football.expectPositionPressed(pos, false);
     }
   });
 });
 
 test.describe('FootballPositionFilter — keyboard navigation @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockFootballPlayers(page);
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
   });
 
-  test('ArrowRight moves roving focus from All → QB', async ({ page }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    const allPill = group.getByRole('button', { name: 'All' });
-    await allPill.focus();
+  test('ArrowRight moves roving focus from All → QB', async ({
+    page,
+    playersPage,
+  }) => {
+    await playersPage.football.focusPosition('All');
     await page.keyboard.press('ArrowRight');
 
-    const qbPill = group.getByRole('button', { name: 'QB' });
-    await expect(qbPill).toHaveAttribute('tabindex', '0');
-    await expect(qbPill).toBeFocused();
-    await expect(allPill).toHaveAttribute('tabindex', '-1');
+    await playersPage.football.expectPositionTabStop('QB', true);
+    await playersPage.football.expectPositionFocused('QB');
+    await playersPage.football.expectPositionTabStop('All', false);
   });
 
   test('ArrowLeft wraps roving focus from All → DB (last item)', async ({
     page,
+    playersPage,
   }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    const allPill = group.getByRole('button', { name: 'All' });
-    await allPill.focus();
+    await playersPage.football.focusPosition('All');
     await page.keyboard.press('ArrowLeft');
 
-    const dbPill = group.getByRole('button', { name: 'DB' });
-    await expect(dbPill).toHaveAttribute('tabindex', '0');
-    await expect(dbPill).toBeFocused();
+    await playersPage.football.expectPositionTabStop('DB', true);
+    await playersPage.football.expectPositionFocused('DB');
   });
 
   test('Space toggles the focused pill without moving selection', async ({
     page,
+    playersPage,
   }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    const allPill = group.getByRole('button', { name: 'All' });
-    await allPill.focus();
+    await playersPage.football.focusPosition('All');
     await page.keyboard.press('ArrowRight'); // focus QB
     await page.keyboard.press(' '); // toggle QB on
 
-    const qbPill = group.getByRole('button', { name: 'QB' });
-    await expect(qbPill).toHaveAttribute('aria-pressed', 'true');
+    await playersPage.football.expectPositionPressed('QB', true);
   });
 
   test('only the focused pill has tabindex=0 after keyboard navigation', async ({
     page,
+    playersPage,
   }) => {
-    const group = page.getByRole('group', { name: 'Filter by position' });
-    await group.getByRole('button', { name: 'All' }).focus();
+    await playersPage.football.focusPosition('All');
     await page.keyboard.press('ArrowRight'); // QB
     await page.keyboard.press('ArrowRight'); // RB
 
-    const rbPill = group.getByRole('button', { name: 'RB' });
-    await expect(rbPill).toHaveAttribute('tabindex', '0');
+    await playersPage.football.expectPositionTabStop('RB', true);
 
     for (const label of ALL_PILLS.filter((p) => p !== 'RB')) {
-      await expect(group.getByRole('button', { name: label })).toHaveAttribute(
-        'tabindex',
-        '-1',
-      );
+      await playersPage.football.expectPositionTabStop(label, false);
     }
   });
 });
 
 test.describe('Football players search — clear button & a11y @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockFootballPlayers(page);
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
   });
 
   test('search input exposes an accessible name (LS-6488)', async ({
-    page,
+    playersPage,
   }) => {
-    const search = page.getByRole('textbox', { name: 'Search players' });
-    await expect(search).toBeVisible();
+    await playersPage.football.expectSearchVisible();
   });
 
   test('clear button is hidden while the search input is empty (LS-6487)', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(
-      page.getByRole('button', { name: 'Clear search' }),
-    ).toHaveCount(0);
+    await playersPage.football.expectClearSearchAbsent();
   });
 
   test('clear button appears once text is entered and clears it on click (LS-6487)', async ({
-    page,
+    playersPage,
   }) => {
-    const search = page.getByRole('textbox', { name: 'Search players' });
-    await search.fill('mahomes');
+    await playersPage.football.fillSearch('mahomes');
 
-    const clear = page.getByRole('button', { name: 'Clear search' });
-    await expect(clear).toBeVisible();
+    await playersPage.football.expectClearSearchVisible();
 
-    await clear.click();
-    await expect(search).toHaveValue('');
-    await expect(clear).toHaveCount(0);
+    await playersPage.football.clickClearSearch();
+    await playersPage.football.expectSearchValue('');
+    await playersPage.football.expectClearSearchAbsent();
   });
 
-  test('clear button is keyboard operable (LS-6487)', async ({ page }) => {
-    const search = page.getByRole('textbox', { name: 'Search players' });
-    await search.fill('allen');
+  test('clear button is keyboard operable (LS-6487)', async ({
+    page,
+    playersPage,
+  }) => {
+    await playersPage.football.fillSearch('allen');
 
-    const clear = page.getByRole('button', { name: 'Clear search' });
-    await clear.focus();
+    await playersPage.football.focusClearSearch();
     await page.keyboard.press('Enter');
 
-    await expect(search).toHaveValue('');
-    await expect(clear).toHaveCount(0);
+    await playersPage.football.expectSearchValue('');
+    await playersPage.football.expectClearSearchAbsent();
   });
 });

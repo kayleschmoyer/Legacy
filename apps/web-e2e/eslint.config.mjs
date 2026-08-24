@@ -86,6 +86,47 @@ const ls8096NoSelectorsInSpecsRules = [
   },
 ];
 
+// LS-9660 ban positional selection (.first()/.nth()/.last()) chained directly
+// on a text-derived locator (getByText/getByLabel/getByTitle/getByAltText) —
+// EVERYWHERE under src/, page objects included. app.tsx mounts desktop AND
+// mobile copies of the nav chrome (both always in the DOM, one display:none),
+// so `page.getByText(name).first()` resolves the DOM-first (desktop) copy
+// regardless of viewport — a deterministic Mobile-Chrome-only failure class
+// (LS-9494/LS-9496/LS-9572). Positional selection on text is ambiguous by
+// construction; scope to a testid/role container so the text match is unique.
+const ls9660NoPositionalTextLocatorRules = [
+  {
+    selector:
+      'CallExpression[callee.property.name=/^(first|last|nth)$/][callee.object.callee.property.name=/^(getByText|getByLabel|getByTitle|getByAltText)$/]',
+    message:
+      'LS-9660: .first()/.nth()/.last() chained on a text-derived locator (getByText/getByLabel/getByTitle/getByAltText) is banned — the app mounts desktop AND mobile nav chrome in the DOM simultaneously, so the DOM-first text match can be a CSS-hidden copy on the other viewport. Scope to a testid/role container so the match is unique (e.g. page.getByTestId(...).getByText(...)), or use a role-based locator with an accessible name. See .agents/skills/testing/SKILL.md → Positional selection on text locators.',
+  },
+];
+
+// LS-9660 extend the LS-4456 hard-sleep/networkidle bans to hermetic spec
+// files (they previously covered only page objects and helpers). Both are
+// flake generators: waitForTimeout bakes a fixed race into the test, and
+// networkidle never settles reliably with Apollo polling/WebSockets.
+const ls9660HermeticWaitRules = [
+  {
+    selector:
+      "CallExpression[callee.type='MemberExpression'][callee.property.name='waitForTimeout']",
+    message:
+      'LS-9660: page.waitForTimeout() is banned in hermetic specs — it bakes flake into the test. Gate on a stable signal instead: expect(testid).toBeVisible(), page.waitForResponse(operationName), or expect.poll. See .agents/skills/testing/SKILL.md.',
+  },
+  {
+    selector:
+      "CallExpression[callee.type='MemberExpression'][callee.property.name='waitForLoadState'][arguments.0.value='networkidle']",
+    message:
+      "LS-9660: waitForLoadState('networkidle') is banned in hermetic specs — Playwright officially discourages it and Apollo polling/WebSockets defeat it. Gate on a visible test id instead. See .agents/skills/testing/SKILL.md.",
+  },
+  {
+    selector: "Property[key.name='waitUntil'][value.value='networkidle']",
+    message:
+      "LS-9660: waitUntil: 'networkidle' is banned in hermetic specs — Playwright officially discourages it and Apollo polling/WebSockets defeat it. Use the default 'load' and gate on a visible test id instead. See .agents/skills/testing/SKILL.md.",
+  },
+];
+
 const ls4461IntegrationRules = [
   {
     selector:
@@ -108,6 +149,14 @@ const ls8096MigratedSpecFiles = [
   'create-league-post-creation-redirect.spec.ts',
   'draft-selection-workflow.spec.ts',
   'free-agents-pickup.spec.ts',
+  // LS-9660 grandfather burn-down — the LS-9496 43-failing-list specs,
+  // migrated onto POM locators (playersPage.football / leaguePage verbs).
+  'football-availability-filter.spec.ts',
+  'football-players-position-url.spec.ts',
+  'football-players-team-filter.spec.ts',
+  'football-position-filter-a11y.spec.ts',
+  'football-team-filter.spec.ts',
+  'gif-picker.spec.ts',
   'join-league.spec.ts',
   'league-creation-advanced.spec.ts',
   'league-creation-football.spec.ts',
@@ -144,6 +193,110 @@ const ls8096MigratedSpecFiles = [
   'waiver-claims.spec.ts',
 ].map((basename) => `**/${basename}`);
 
+// LS-9660 grandfather lists — files with pre-existing violations of the
+// LS-9660 rules at rollout time. The rules apply to every OTHER file in the
+// matching suite immediately; these files keep only their pre-existing rule
+// set until they are cleaned up (tracked by the LS-9660 burn-down follow-up
+// ticket). Do NOT add new files here — fix the locator instead. As files are
+// cleaned up, delete their entry so the full rule set locks in.
+//
+// Hermetic specs (src/tests/) grandfathered for positional-text-locator
+// and/or hard-wait violations. A single union list keeps the override
+// composition simple (a file exempt for one LS-9660 rule is exempt for both —
+// the burn-down removes it from the list only once it is clean of both).
+const ls9660GrandfatheredSpecFiles = [
+  'active-baseball-leagues.spec.ts',
+  'admin-console.spec.ts',
+  'admin-cross-platform-parity.spec.ts',
+  'admin-dashboard.spec.ts',
+  'admin-jwt-decoder.spec.ts',
+  'auction-draft.spec.ts',
+  'auth-flows.spec.ts',
+  'baseball-join-league-cta.spec.ts',
+  'baseball-ui.spec.ts',
+  'combobox-search-a11y.spec.ts',
+  'commissioner-announcements.spec.ts',
+  'commissioner-audit-delete.spec.ts',
+  'commissioner-draft-status.spec.ts',
+  'commissioner-game-selection.spec.ts',
+  'commissioner-tab-nav.spec.ts',
+  'commissioner-waiver-errors.spec.ts',
+  'dark-mode.spec.ts',
+  'disclosure-game.spec.ts',
+  'draft-functionality.spec.ts',
+  'draft-graphql-integration.spec.ts',
+  'draft-spectator-watch.spec.ts',
+  'faq-page.spec.ts',
+  'football-free-agents-waivers.spec.ts',
+  'football-hub.spec.ts',
+  'football-join-league-cta.spec.ts',
+  'football-players-name-search.spec.ts',
+  'form-a11y.spec.ts',
+  'full-season-ui.spec.ts',
+  'global-error-handling.spec.ts',
+  'heading-hierarchy-a11y.spec.ts',
+  'home-standings-lazy-load.spec.ts',
+  'homepage.spec.ts',
+  'join-league-gating.spec.ts',
+  'league-chat-activity.spec.ts',
+  'league-premium-gate.spec.ts',
+  'loading-state-a11y.spec.ts',
+  'management-and-pages.spec.ts',
+  'mid-draft-trades.spec.ts',
+  'mock-draft-simulator.spec.ts',
+  'nfl-player-stats-category-tabs.spec.ts',
+  'on-this-day.spec.ts',
+  'overview-tab.spec.ts',
+  'player-detail-career-arc-chart.spec.ts',
+  'player-detail-deeplink.spec.ts',
+  'player-detail-season-batting-table.spec.ts',
+  'player-stats-format-preference.spec.ts',
+  'playoff-bracket.spec.ts',
+  'pre-draft-lobby-trades.spec.ts',
+  'pricing-page.spec.ts',
+  'profile-league-branding.spec.ts',
+  'scoreboard.spec.ts',
+  'season-awards.spec.ts',
+  'season-draft-game-detail.spec.ts',
+  'season-draft-games-flow.spec.ts',
+  'season-draft-games.spec.ts',
+  'season-draft-sport-toggle.spec.ts',
+  'season-progression.spec.ts',
+  'season-renewal-core.spec.ts',
+  'season-renewal-teams-errors.spec.ts',
+  'sport-aware-player-list.spec.ts',
+  'subscription.spec.ts',
+  'tab-navigation-a11y.spec.ts',
+  'team-detail-info-roster-branding.spec.ts',
+  'team-detail.spec.ts',
+  'twenty-questions.spec.ts',
+  'websocket-realtime-updates.spec.ts',
+].map((basename) => `**/${basename}`);
+
+// Integration suite (src/integration/) grandfathered for
+// positional-text-locator violations (the hard-wait bans intentionally do
+// not apply to the live-backend suite — it has its own determinism guards).
+const ls9660GrandfatheredIntegrationFiles = [
+  'commissioner-announcements-ui.integration.spec.ts',
+  'commissioner-settings-ui.integration.spec.ts',
+  'draft-board-a11y-ui.integration.spec.ts',
+  'full-season-ui.integration.spec.ts',
+  'league-activity-feed-ui.integration.spec.ts',
+  'league-scoring-editor-ui.integration.spec.ts',
+  'live-draft-ui.integration.spec.ts',
+  'matchup-detail-ui.integration.spec.ts',
+  'matchup-roster-editor-ui.integration.spec.ts',
+  'matchup-roster-recap-ui.integration.spec.ts',
+  'mock-draft-simulator-ui.integration.spec.ts',
+  'playoff-bracket-ui.integration.spec.ts',
+  'roster-management-ui.integration.spec.ts',
+  'season-renewal-migration-ui.integration.spec.ts',
+  'subscription-gating.integration.spec.ts',
+  'trade-flow-ui.integration.spec.ts',
+  'wait-for-join-page.ts', // integration/helpers — matched via the pages/helpers overlay
+  'waiver-processing-ui.integration.spec.ts',
+].map((basename) => `**/${basename}`);
+
 export default [
   ...baseConfig,
   {
@@ -173,6 +326,20 @@ export default [
     },
   },
   {
+    // LS-9660 baseline: ban positional selection on text-derived locators
+    // across ALL of src/ — page objects (base/, components/, pages/),
+    // fixtures, mocks, helpers, and specs alike. Flat config replaces
+    // `no-restricted-syntax` wholesale on the last matching block, so every
+    // suite-specific block below re-spreads these rules into its own union;
+    // this block is what applies them to the file classes no later block
+    // matches (base/, components/, fixtures/, mocks/, utils/, support/,
+    // driver/, root-level src files).
+    files: ['**/src/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error', ...ls9660NoPositionalTextLocatorRules],
+    },
+  },
+  {
     // Integration suite: enforce both LS-4461 (no raw HTTP) and LS-4458
     // (no conditional UI guards). Expanded inline because the LS-4458
     // override below would otherwise override-replace these selectors.
@@ -195,11 +362,51 @@ export default [
     },
   },
   {
+    // LS-9660 overlay for the integration suite: identical to the block
+    // above plus the positional-text-locator ban, matching every integration
+    // file EXCEPT the grandfathered ones (which stay on the block above).
+    files: [
+      '**/src/integration/tests/**/*.ts',
+      '**/src/integration/fixtures/**/*.ts',
+      '**/src/integration/*.ts',
+    ],
+    ignores: [
+      '**/src/integration/global-setup.ts',
+      '**/src/integration/global-teardown.ts',
+      '**/src/integration/tests/google-oauth.integration.spec.ts',
+      ...ls9660GrandfatheredIntegrationFiles,
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...ls4461IntegrationRules,
+        ...ls4458SpecRules,
+        ...ls9660NoPositionalTextLocatorRules,
+      ],
+    },
+  },
+  {
     // Hermetic spec suite: enforce LS-4458 only. LS-4461 does not apply —
     // hermetic specs use `page.route` mocking instead of `gqlFetch`.
     files: ['**/src/tests/**/*.spec.ts'],
     rules: {
       'no-restricted-syntax': ['error', ...ls4458SpecRules],
+    },
+  },
+  {
+    // LS-9660 overlay for hermetic specs: LS-4458 plus the
+    // positional-text-locator ban and the hard-wait bans
+    // (waitForTimeout / networkidle), matching every spec EXCEPT the
+    // grandfathered ones (which stay on the block above until cleaned up).
+    files: ['**/src/tests/**/*.spec.ts'],
+    ignores: ls9660GrandfatheredSpecFiles,
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...ls4458SpecRules,
+        ...ls9660NoPositionalTextLocatorRules,
+        ...ls9660HermeticWaitRules,
+      ],
     },
   },
   {
@@ -212,6 +419,20 @@ export default [
     files: ['**/src/pages/**/*.ts', '**/src/**/helpers/**/*.ts'],
     rules: {
       'no-restricted-syntax': ['error', ...ls4456PageObjectRules],
+    },
+  },
+  {
+    // LS-9660 overlay for page objects + helpers: LS-4456 plus the
+    // positional-text-locator ban, matching every file EXCEPT the
+    // grandfathered ones (which stay on the block above until cleaned up).
+    files: ['**/src/pages/**/*.ts', '**/src/**/helpers/**/*.ts'],
+    ignores: ls9660GrandfatheredIntegrationFiles,
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...ls4456PageObjectRules,
+        ...ls9660NoPositionalTextLocatorRules,
+      ],
     },
   },
   {
@@ -232,6 +453,11 @@ export default [
         'error',
         ...ls4458SpecRules,
         ...ls8096NoSelectorsInSpecsRules,
+        // LS-9660: migrated specs also carry the positional-text-locator and
+        // hard-wait bans (they are never grandfathered — an allowlisted spec
+        // must be clean of both).
+        ...ls9660NoPositionalTextLocatorRules,
+        ...ls9660HermeticWaitRules,
       ],
     },
   },

@@ -126,7 +126,14 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
   test('clicking a matchup notification navigates to /matchup/:matchupId and closes the dropdown', async ({
     page,
     notificationsPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'drives the desktop notification-bell dropdown, hidden at the mobile viewport (notifications-page.spec.ts covers the mobile surface; LS-9693)',
+    );
     await mockDropdownNotifications(page, [MATCHUP_NOTIFICATION]);
     await page.goto('/');
     await page.waitForLoadState('load');
@@ -148,7 +155,14 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
   test('clicking a trade notification navigates to the trade center', async ({
     page,
     notificationsPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'drives the desktop notification-bell dropdown, hidden at the mobile viewport (notifications-page.spec.ts covers the mobile surface; LS-9693)',
+    );
     await mockDropdownNotifications(page, [TRADE_NOTIFICATION]);
     await page.goto('/');
     await page.waitForLoadState('load');
@@ -166,7 +180,14 @@ test.describe('NotificationDropdown – click navigation @regression', () => {
   test('clicking a trade notification with a tradeOfferId navigates to the trade center with offerId param', async ({
     page,
     notificationsPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'drives the desktop notification-bell dropdown, hidden at the mobile viewport (notifications-page.spec.ts covers the mobile surface; LS-9693)',
+    );
     const tradeNotificationWithOffer: MockNotification = {
       ...TRADE_NOTIFICATION,
       id: 1003,

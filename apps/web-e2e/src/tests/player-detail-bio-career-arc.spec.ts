@@ -743,7 +743,14 @@ test.describe('Player Detail Modal – open from stats table @regression', () =>
   test('clicking a player row on /players opens the modal', async ({
     page,
     playersPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'clicks a desktop grid row, replaced by the card feed at the mobile viewport (LS-9075)',
+    );
     await setupMocks(page);
     await playersPage.gotoStats();
 

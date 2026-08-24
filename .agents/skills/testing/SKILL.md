@@ -357,7 +357,7 @@ Hermetic Playwright specs under `apps/web-e2e/src/tests/` use a **three-layer se
 
 **Selector ban in spec files (LS-8096 — ESLint enforced):**
 
-The `apps/web-e2e/.eslintrc.js` `no-restricted-syntax` rule bans these calls in migrated `*.spec.ts` files (selectors must move into the page object layer):
+The `apps/web-e2e/eslint.config.mjs` `no-restricted-syntax` rule bans these calls in migrated `*.spec.ts` files (selectors must move into the page object layer):
 
 - `getByTestId(...)`
 - `getByRole(...)`
@@ -365,9 +365,25 @@ The `apps/web-e2e/.eslintrc.js` `no-restricted-syntax` rule bans these calls in 
 - `getByText(...)`
 - `locator(...)`
 
-The rule is currently scoped to the migrated specs by basename — see the final override in `apps/web-e2e/.eslintrc.js` for the list. When migrating a new spec to the semantic POM, **add its basename** to that override; once every spec under `src/tests/` is migrated, widen `files` to `src/tests/**/*.spec.ts` and delete the per-file list.
+The rule is currently scoped to the migrated specs by basename — see the final override in `apps/web-e2e/eslint.config.mjs` for the list. When migrating a new spec to the semantic POM, **add its basename** to that override; once every spec under `src/tests/` is migrated, widen `files` to `src/tests/**/*.spec.ts` and delete the per-file list.
 
-> **Why basename globs + extended LAST:** ESLint legacy-config overrides do not merge `no-restricted-syntax` — the later override replaces the rule list entirely (LS-7947 clobber hazard). The LS-8096 override uses **basename globs** to form a distinct override key, lands **last** in the array so it wins on matched files, and **re-spreads the LS-4458 spec rules** so those checks remain active.
+> **Why basename globs + extended LAST:** ESLint config objects do not merge `no-restricted-syntax` — the later matching object replaces the rule list entirely (LS-7947 clobber hazard). The LS-8096 override uses **basename globs** to form a distinct override key, lands **last** in the array so it wins on matched files, and **re-spreads the LS-4458 spec rules** so those checks remain active.
+
+**Positional selection on text locators (LS-9660 — ESLint enforced suite-wide):**
+
+`.first()` / `.nth()` / `.last()` chained directly on a **text-derived locator** — `getByText`, `getByLabel`, `getByTitle`, `getByAltText` — is banned across ALL of `apps/web-e2e/src`, page objects included. `apps/web/src/app/app.tsx` mounts desktop AND mobile copies of the nav chrome (both always in the DOM, one `display:none`), so `page.getByText(name).first()` resolves the DOM-first (desktop) copy regardless of viewport — a deterministic Mobile-Chrome-only failure class (LS-9494/LS-9496/LS-9572).
+
+The fix is never positional narrowing; make the match unique instead:
+
+- **Scope to a testid/role container first**: `page.getByTestId('league-switcher-chip').getByText(name)` — the container pins which copy of the chrome (or which region of the page) you mean.
+- **Prefer a role-based locator with an accessible name**: `page.getByRole('button', { name: 'QB' })` — role + name is usually unique where bare text is not.
+- If the text genuinely repeats inside one container (a list of identical labels), assert the collection (`expectCount`) or key the locator on the row's testid instead of picking an index.
+
+Files that predate the rule are grandfathered by basename (`ls9660GrandfatheredSpecFiles` / `ls9660GrandfatheredIntegrationFiles` in `apps/web-e2e/eslint.config.mjs`). Do **not** add new files to those lists — fix the locator; delete a file's entry when it is cleaned up.
+
+**Hard waits in hermetic specs (LS-9660 — ESLint enforced):**
+
+`page.waitForTimeout()`, `waitForLoadState('networkidle')`, and `waitUntil: 'networkidle'` are banned in hermetic specs under `src/tests/` (they were already banned in page objects and helpers by LS-4456 — this extends the ban to the spec layer). Both are flake generators: a fixed sleep bakes a race into the test, and `networkidle` never settles reliably with Apollo polling/WebSockets. Gate on a stable signal instead: `expect(testid).toBeVisible()`, `page.waitForResponse(operationName)`, or `expect.poll`. The same grandfather list applies.
 
 **Writing a new spec under the semantic POM:**
 
@@ -447,7 +463,7 @@ Reference dual-mode spec: `src/tests/shared/player-stats-search.dual.spec.ts`.
 
 - The hermeticity rule (`route.continue()` is forbidden) applies **only** to `apps/web-e2e/src/tests/`. Flagging `page.request.post` or direct API calls in `src/integration/tests/` as a hermeticity violation is incorrect — those specs are designed to hit the live API.
 - Integration specs use `*.integration.spec.ts` naming and carry `@integration @critical` tags. Their test names typically include `(Live Backend)`.
-- A similar carve-out already exists for `console.log`: `apps/web-e2e/.eslintrc.json` sets `"no-console": "off"` for `src/**/*.ts`.
+- A similar carve-out already exists for `console.log`: `apps/web-e2e/eslint.config.mjs` sets `"no-console": "off"` for `src/**/*.ts`.
 
 **Precedent**: [PR #3763](https://github.com/bkrupa/legacy-sports/pull/3763) (LS-4289) — the reviewer bot incorrectly flagged `page.request.post` in a live-draft integration spec across 3 review cycles, requiring `CANNOT-COMPLY` escalation each time. This rule split was created to prevent that from recurring.
 

@@ -238,7 +238,17 @@ test.describe('Standings Tab – data rendering @regression', () => {
     await standingsPage.statCell('8').first().expectVisible();
   });
 
-  test('shows loss totals from standings data', async ({ standingsPage }) => {
+  test('shows loss totals from standings data', async ({
+    standingsPage,
+    isMobile,
+  }) => {
+    // StandingsTable hides the losses column below the mobile breakpoint
+    // (responsive column hiding, LS-9493) — desktop-only affordance exposed
+    // by the LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'StandingsTable hides the losses column at the mobile viewport (LS-9493)',
+    );
     // Alpha Squad (8W-2L): loss count 2 should be visible
     await standingsPage.statCell('2').first().expectVisible();
   });

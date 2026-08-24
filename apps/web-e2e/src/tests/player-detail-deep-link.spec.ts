@@ -640,7 +640,16 @@ test.describe('Player Detail Deep Link — from Draft Board @regression', () => 
   test('player in draft pool can be deep-linked from draft board context', async ({
     page,
     playersPage,
+    isMobile,
   }) => {
+    // Waits for the desktop draft board ([data-testid="draft-board"]), which
+    // the mobile draft surface does not render — exposed by the LS-9658 full
+    // mobile sweep (LS-9660). The deep link itself is covered at all
+    // viewports by the "URL deep link … from draft context" test below.
+    test.skip(
+      isMobile,
+      'waits for the desktop draft board, not rendered by the mobile draft surface',
+    );
     await installDraftMocks(page);
     await installPlayerDetailMocks(page);
 

@@ -118,7 +118,10 @@ export class NavHeader extends BaseComponent {
 
   /** Click a link/item inside the open mobile drawer, located by its text. */
   async clickMobileMenuItem(text: string | RegExp): Promise<void> {
-    await this.#mobileNav.getByText(text).first().click();
+    // Scoped to the drawer nav, the text engine's smallest-match semantics
+    // make this unique (items are single-text-node buttons / section labels),
+    // so no positional narrowing is needed (LS-9660).
+    await this.#mobileNav.getByText(text).click();
   }
 
   /**
@@ -211,7 +214,10 @@ export class NavHeader extends BaseComponent {
 
   /** Assert an item/section with the given text is visible in the open drawer. */
   async expectMobileMenuItem(text: string | RegExp): Promise<void> {
-    await expect(this.#mobileNav.getByText(text).first()).toBeVisible({
+    // Scoped to the drawer nav, the text engine's smallest-match semantics
+    // make this unique (items are single-text-node buttons / section labels),
+    // so no positional narrowing is needed (LS-9660).
+    await expect(this.#mobileNav.getByText(text)).toBeVisible({
       timeout: 10000,
     });
   }

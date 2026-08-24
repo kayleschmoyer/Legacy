@@ -412,7 +412,14 @@ test.describe('Draft Selection Workflow @regression', () => {
   test('should display draft board with available players when draft is in-progress', async ({
     page,
     draftPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'the draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
+    );
     await setupDraftRoute(page);
 
     await draftPage.gotoLeague(TEST_LEAGUE_ID);
@@ -431,7 +438,14 @@ test.describe('Draft Selection Workflow @regression', () => {
   test('should allow searching for players in the draft pool', async ({
     page,
     draftPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'the draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
+    );
     await setupDraftRoute(page);
 
     await draftPage.gotoLeague(TEST_LEAGUE_ID);
@@ -446,7 +460,14 @@ test.describe('Draft Selection Workflow @regression', () => {
   test('should send makeDraftPick mutation when drafting a player', async ({
     page,
     draftPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'the draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
+    );
     const { capturedMutations } = await setupDraftRoute(page, {
       isMyPick: true,
     });
@@ -473,7 +494,14 @@ test.describe('Draft Selection Workflow @regression', () => {
   test("should show correct turn indicator when it is not the user's turn", async ({
     page,
     draftPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'the draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
+    );
     await setupDraftRoute(page, { isMyPick: false });
 
     await draftPage.gotoLeague(TEST_LEAGUE_ID);
@@ -491,7 +519,14 @@ test.describe('Draft Selection Workflow @regression', () => {
   test('should display pick history after picks are made', async ({
     page,
     draftPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'the draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
+    );
     // Set up with existing pick history
     await setupDraftRoute(page, {
       pickHistory: [
@@ -518,7 +553,14 @@ test.describe('Draft Selection Workflow @regression', () => {
   test('should handle makeDraftPick error gracefully', async ({
     page,
     draftPage,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'the draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
+    );
     // Set up base mocks first so the fallback route has something to delegate to
     await setupDraftRoute(page, { isMyPick: true });
 

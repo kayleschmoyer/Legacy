@@ -300,11 +300,12 @@ test.describe('Player Statistics Page @regression', () => {
     // batting grid to avoid a strict-mode collision.
     await playersPage.stats.expectLoadingIndicator();
 
-    // Wait for content to load
-    await page.waitForLoadState('networkidle');
-
-    // Verify page content is loaded
-    await playersPage.stats.expectText(/MLB Player Statistics/i);
+    // Verify page content is loaded — the retrying assertion outlasts the 2 s
+    // mock delay, so no load-state gate is needed (networkidle is banned,
+    // LS-9660).
+    await playersPage.stats.expectText(/MLB Player Statistics/i, {
+      timeout: 10000,
+    });
   });
 
   test('should handle error states gracefully', async ({

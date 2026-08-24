@@ -220,7 +220,13 @@ adminTest.describe('Admin Console — Users section @regression', () => {
 
   adminTest(
     'shows "admin" access badge for the admin user',
-    async ({ page }) => {
+    async ({ page, isMobile }) => {
+      // Desktop-only affordance at the mobile viewport — exposed by the
+      // LS-9658 full mobile sweep (LS-9660).
+      adminTest.skip(
+        isMobile,
+        'the access-badge column is hidden at the mobile viewport (responsive column hiding)',
+      );
       await expect(
         page.getByText('admin', { exact: true }).first(),
       ).toBeVisible();

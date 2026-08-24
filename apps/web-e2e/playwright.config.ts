@@ -50,6 +50,22 @@ const E2E_PORT = Number(process.env.E2E_PORT) || 4280;
  * resource contention were actually this same viewport/UI mismatch.
  */
 const DESKTOP_GRID_ONLY_SPECS = [
+  // LS-9660: the whole MLB player-stats desktop-grid family asserts grid
+  // affordances (column headers, Combined/Hitters/Pitchers view tabs,
+  // filter-controls, pagination/pageSize select, per-grid loading/error
+  // testids, grid rows and leader tables) that the ≤800px card feed never
+  // renders (LS-9075). All were latent until LS-9658 ran the full sharded
+  // mobile sweep on run-all PRs — the first such run failed 70 tests across
+  // these files, every one a desktop-affordance-at-mobile-viewport mismatch
+  // (verified deterministic locally). Tests inside them that self-set a
+  // desktop/mobile viewport keep their coverage via the desktop projects.
+  /player-stats\.spec\.ts$/,
+  /player-stats-mocked\.spec\.ts$/,
+  /player-stats-row-click-modal\.spec\.ts$/,
+  /player-stats-share\.spec\.ts$/,
+  /player-stats-url-persistence\.spec\.ts$/,
+  /players-stats-redirect\.spec\.ts$/,
+  /player-stats-search\.dual\.spec\.ts$/,
   /nfl-player-stats-category-tabs\.spec\.ts$/,
   /player-stats-fantasy-sort\.spec\.ts$/,
   /player-stats-format-preference\.spec\.ts$/,

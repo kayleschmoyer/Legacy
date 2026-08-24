@@ -115,7 +115,15 @@ test.describe('Pricing page — feature comparison @smoke', () => {
 
   test('comparison table rows include leagues and mock drafts', async ({
     page,
+    isMobile,
   }) => {
+    // The feature-comparison table never renders at the mobile viewport —
+    // desktop-only affordance exposed by the LS-9658 full mobile sweep
+    // (LS-9660).
+    test.skip(
+      isMobile,
+      'the feature-comparison table is a desktop-only affordance at the mobile viewport',
+    );
     await page.goto('/pricing');
     await page.waitForLoadState('load');
 

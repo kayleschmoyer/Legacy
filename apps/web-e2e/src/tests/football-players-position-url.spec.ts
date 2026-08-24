@@ -13,13 +13,11 @@
 
 // Position pills are multi-select toggle buttons (role=button + aria-pressed)
 // since LS-6464; single-value `?position=` deep links still select exactly one.
-import { expect, test } from '../fixtures/auth-enhanced';
+// Element access goes through `playersPage.football` (LS-8096 / ADR-0015 —
+// this spec is selector-free; locators live in the page object).
+import { expect, test } from '../fixtures/pages';
 import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
 
@@ -61,68 +59,63 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
     await mockFootballGraphQL(page);
   });
 
-  test('deep-link ?position=QB pre-selects the QB pill', async ({ page }) => {
-    await page.goto(`${PAGE_URL}&position=QB`);
+  test('deep-link ?position=QB pre-selects the QB pill', async ({
+    playersPage,
+  }) => {
+    await playersPage.football.goto('&position=QB');
 
-    const qbPill = page.getByRole('button', { name: 'QB' });
-    const allPill = page.getByRole('button', { name: 'All' });
-    await expect(qbPill).toHaveAttribute('aria-pressed', 'true');
-    await expect(allPill).toHaveAttribute('aria-pressed', 'false');
+    await playersPage.football.expectPositionPressed('QB', true);
+    await playersPage.football.expectPositionPressed('All', false);
   });
 
   test('deep-link ?position=FLEX pre-selects the FLEX pill', async ({
-    page,
+    playersPage,
   }) => {
-    await page.goto(`${PAGE_URL}&position=FLEX`);
+    await playersPage.football.goto('&position=FLEX');
 
-    const flexPill = page.getByRole('button', { name: 'FLEX' });
-    await expect(flexPill).toHaveAttribute('aria-pressed', 'true');
+    await playersPage.football.expectPositionPressed('FLEX', true);
   });
 
   test('invalid ?position= param falls back to All being selected', async ({
-    page,
+    playersPage,
   }) => {
-    await page.goto(`${PAGE_URL}&position=INVALID`);
+    await playersPage.football.goto('&position=INVALID');
 
-    const allPill = page.getByRole('button', { name: 'All' });
-    await expect(allPill).toHaveAttribute('aria-pressed', 'true');
+    await playersPage.football.expectPositionPressed('All', true);
   });
 
   test('selecting a position writes ?position= to the URL', async ({
     page,
+    playersPage,
   }) => {
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
 
-    await page.getByRole('button', { name: 'RB' }).click();
+    await playersPage.football.clickPosition('RB');
 
     await expect(page).toHaveURL(/[?&]position=RB/);
-    await expect(page.getByRole('button', { name: 'RB' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await playersPage.football.expectPositionPressed('RB', true);
   });
 
   test('selecting All clears the ?position= param from the URL', async ({
     page,
+    playersPage,
   }) => {
-    await page.goto(`${PAGE_URL}&position=QB`);
+    await playersPage.football.goto('&position=QB');
 
-    await page.getByRole('button', { name: 'All' }).click();
+    await playersPage.football.clickPosition('All');
 
     await expect(page).not.toHaveURL(/[?&]position=/);
-    await expect(page.getByRole('button', { name: 'All' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    await playersPage.football.expectPositionPressed('All', true);
   });
 
   test('position is restored after navigating to player detail and pressing back', async ({
     page,
+    playersPage,
   }) => {
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
 
     // Select QB — writes ?position=QB in-place (replace: true)
-    await page.getByRole('button', { name: 'QB' }).click();
+    await playersPage.football.clickPosition('QB');
     await expect(page).toHaveURL(/[?&]position=QB/);
 
     // Navigate forward to a player detail page (simulates clicking a player card)
@@ -131,11 +124,9 @@ test.describe('FootballPlayers — URL position persistence @regression', () => 
     // Browser back returns to /players?sport=nfl&position=QB
     await page.goBack();
 
-    await expect(page.getByRole('button', { name: 'QB' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-      { timeout: 5000 },
-    );
+    await playersPage.football.expectPositionPressed('QB', true, {
+      timeout: 5000,
+    });
     await expect(page).toHaveURL(/[?&]position=QB/);
   });
 });

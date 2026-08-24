@@ -68,6 +68,8 @@ export class PlayersPage {
   readonly detail: PlayerDetailSurface;
   /** `/players/compare` surface. */
   readonly compare: PlayerCompareSurface;
+  /** Football (`?sport=nfl`) presentation of `/players` (LS-9660; web-only). */
+  readonly football: FootballPlayersSurface;
 
   readonly #driver: AppDriver;
   /**
@@ -88,6 +90,7 @@ export class PlayersPage {
     this.stats = new PlayerStatsSurface(driver, this.#page);
     this.detail = new PlayerDetailSurface(driver, this.#page);
     this.compare = new PlayerCompareSurface(this.#driver, this.#page);
+    this.football = new FootballPlayersSurface(this.#driver, this.#page);
   }
 
   /** Resolve the web `Page`, or throw a descriptive web-only error on native. */
@@ -1647,5 +1650,244 @@ class PlayerCompareSurface {
     await this.#suggestions
       .byRole('option', { name })
       .expectAttribute('aria-selected', 'false');
+  }
+}
+
+// ===========================================================================
+// /players?sport=nfl (football presentation of the canonical stats page)
+// ===========================================================================
+
+/**
+ * Semantic surface for the football (`?sport=nfl`) presentation of the
+ * canonical `/players` page (LS-9371): the team-filter native `<select>`
+ * (name="team-filter", footballStatsConfig.tsx), the position-pill toggle
+ * group (`role=group` "Filter by position"), the player search box, and the
+ * rendered player list. Extracted in LS-9660 so the football filter specs are
+ * selector-free (LS-8096 / ADR-0015).
+ *
+ * WEB-ONLY: the team filter is a real native `<select>` asserted through raw
+ * option locators, and the pill group's roving-tabindex checks read
+ * `tabindex`/focus state — none of which have portable driver verbs yet.
+ * Constructed with a non-web driver, every verb throws the standard
+ * escape-hatch error (same contract as the other surfaces). The five specs
+ * driving this surface are desktop-only (`DESKTOP_GRID_ONLY_SPECS` in
+ * playwright.config.ts) — the affordances it asserts never render at the
+ * mobile card-feed viewport (LS-9075/LS-9493).
+ */
+class FootballPlayersSurface {
+  readonly #driver: AppDriver;
+  readonly #page: Page | undefined;
+
+  constructor(driver: AppDriver, page: Page | undefined) {
+    this.#driver = driver;
+    this.#page = page;
+  }
+
+  #requireWebPage(): Page {
+    if (!this.#page) {
+      throw new Error(
+        'FootballPlayersSurface: web-only (native <select> / roving-tabindex ' +
+          'assertions have no portable driver verbs); unavailable on the ' +
+          'native driver.',
+      );
+    }
+    return this.#page;
+  }
+
+  // ── Private locators ─────────────────────────────────────────────
+
+  /** The canonical surface's real native team-filter `<select>`. */
+  get #teamSelect(): Locator {
+    return this.#requireWebPage().locator('select[name="team-filter"]');
+  }
+
+  get #pillGroup(): Locator {
+    return this.#requireWebPage().getByRole('group', {
+      name: 'Filter by position',
+    });
+  }
+
+  #pill(name: string): Locator {
+    return this.#pillGroup.getByRole('button', { name });
+  }
+
+  get #search(): Locator {
+    return this.#requireWebPage().getByRole('textbox', {
+      name: 'Search players',
+    });
+  }
+
+  get #clearSearch(): Locator {
+    return this.#requireWebPage().getByRole('button', { name: 'Clear search' });
+  }
+
+  // ── Navigation ───────────────────────────────────────────────────
+
+  /**
+   * Open `/players?sport=nfl`; `query` appends extra search params
+   * (e.g. `'&position=QB'` for deep-link specs).
+   */
+  async goto(query = ''): Promise<void> {
+    await this.#driver.open(`/players?sport=nfl${query}`);
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────
+
+  /**
+   * Select a team-filter option by value (a team abbreviation or one of the
+   * sentinels `All` / `FREE_AGENT` / `AFC` / `NFC`). `force` matches the
+   * pre-migration specs — the styled native select can sit behind a Tamagui
+   * decoration layer that intercepts hit-testing.
+   */
+  async selectTeam(value: string): Promise<void> {
+    await this.#teamSelect.selectOption(value, { force: true });
+  }
+
+  /** Click a position pill ("All", "QB", "RB", …) in the toggle group. */
+  async clickPosition(name: string): Promise<void> {
+    await this.#pill(name).click();
+  }
+
+  /** Focus a position pill directly (keyboard-navigation specs). */
+  async focusPosition(name: string): Promise<void> {
+    await this.#pill(name).focus();
+  }
+
+  /** Type into the player search box. */
+  async fillSearch(text: string): Promise<void> {
+    await this.#search.fill(text);
+  }
+
+  /** Click the search box's clear (×) button. */
+  async clickClearSearch(): Promise<void> {
+    await this.#clearSearch.click();
+  }
+
+  /** Focus the clear button directly (keyboard-operability specs). */
+  async focusClearSearch(): Promise<void> {
+    await this.#clearSearch.focus();
+  }
+
+  // ── Reads ────────────────────────────────────────────────────────
+
+  /** Every team-filter option's `value`, in DOM order. */
+  async teamOptionValues(): Promise<string[]> {
+    return this.#teamSelect
+      .locator('option')
+      .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+  }
+
+  // ── Assertions: player list ──────────────────────────────────────
+
+  /** Assert a player (rendered by full name) is visible in the list. */
+  async expectPlayerVisible(name: string): Promise<void> {
+    await expect(this.#requireWebPage().getByText(name)).toBeVisible();
+  }
+
+  /** Assert a player is not visible (filtered out of the list). */
+  async expectPlayerHidden(name: string): Promise<void> {
+    await expect(this.#requireWebPage().getByText(name)).not.toBeVisible();
+  }
+
+  // ── Assertions: team filter ──────────────────────────────────────
+
+  async expectTeamFilterAttached(): Promise<void> {
+    await expect(this.#teamSelect).toBeAttached();
+  }
+
+  /** Assert an option with the given value exists in the team filter. */
+  async expectTeamOptionAttached(value: string): Promise<void> {
+    await expect(
+      this.#teamSelect.locator(`option[value="${value}"]`),
+    ).toBeAttached();
+  }
+
+  /**
+   * Assert the currently selected option's visible label. The native select
+   * shows its checked option as the control label (no separate trigger
+   * element on the canonical surface).
+   */
+  async expectSelectedTeamText(
+    text: string,
+    opts: { exact?: boolean } = {},
+  ): Promise<void> {
+    const checked = this.#teamSelect.locator('option:checked');
+    if (opts.exact) {
+      await expect(checked).toHaveText(text);
+    } else {
+      await expect(checked).toContainText(text);
+    }
+  }
+
+  async expectTeamOptionCount(count: number): Promise<void> {
+    await expect(this.#teamSelect.locator('option')).toHaveCount(count);
+  }
+
+  /** Assert the option at `index` (DOM order) carries the given value. */
+  async expectTeamOptionValueAt(index: number, value: string): Promise<void> {
+    await expect(this.#teamSelect.locator('option').nth(index)).toHaveAttribute(
+      'value',
+      value,
+    );
+  }
+
+  // ── Assertions: position pill group ──────────────────────────────
+
+  /** Assert the pill container is a visible labelled `role=group`. */
+  async expectPillGroupVisible(): Promise<void> {
+    await expect(this.#pillGroup).toBeVisible();
+  }
+
+  /** Assert the group renders exactly `count` `role=button` pills. */
+  async expectPillCount(count: number): Promise<void> {
+    await expect(this.#pillGroup.getByRole('button')).toHaveCount(count);
+  }
+
+  /** Assert a pill's `aria-pressed` toggle state. */
+  async expectPositionPressed(
+    name: string,
+    pressed: boolean,
+    opts: { timeout?: number } = {},
+  ): Promise<void> {
+    await expect(this.#pill(name)).toHaveAttribute(
+      'aria-pressed',
+      String(pressed),
+      opts,
+    );
+  }
+
+  /** Assert whether a pill is the group's roving tab stop (`tabindex`). */
+  async expectPositionTabStop(
+    name: string,
+    inTabOrder: boolean,
+  ): Promise<void> {
+    await expect(this.#pill(name)).toHaveAttribute(
+      'tabindex',
+      inTabOrder ? '0' : '-1',
+    );
+  }
+
+  /** Assert a pill currently holds keyboard focus. */
+  async expectPositionFocused(name: string): Promise<void> {
+    await expect(this.#pill(name)).toBeFocused();
+  }
+
+  // ── Assertions: search box ───────────────────────────────────────
+
+  async expectSearchVisible(): Promise<void> {
+    await expect(this.#search).toBeVisible();
+  }
+
+  async expectSearchValue(value: string): Promise<void> {
+    await expect(this.#search).toHaveValue(value);
+  }
+
+  async expectClearSearchVisible(): Promise<void> {
+    await expect(this.#clearSearch).toBeVisible();
+  }
+
+  /** Assert the clear button is absent (search box empty). */
+  async expectClearSearchAbsent(): Promise<void> {
+    await expect(this.#clearSearch).toHaveCount(0);
   }
 }

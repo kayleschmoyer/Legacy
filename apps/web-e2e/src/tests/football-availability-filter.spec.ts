@@ -13,17 +13,16 @@
  * nflTeam (see buildFootballQueryVars in footballStatsHelpers.ts).
  *
  * Interaction strategy: the canonical surface renders a native <select> with
- * name="team-filter" (footballStatsConfig.tsx). Tests target it via
- * selectOption() with force:true.
+ * name="team-filter" (footballStatsConfig.tsx), driven through the
+ * `playersPage.football` semantic surface (LS-8096 / ADR-0015 — this spec is
+ * selector-free; locators live in the page object).
  *
  * All GraphQL responses are mocked via route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
-
-const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock player fixtures ──────────────────────────────────────────────────────
 
@@ -75,10 +74,6 @@ function playersResponse(
   };
 }
 
-function nativeSelect(page: import('@playwright/test').Page) {
-  return page.locator('select[name="team-filter"]');
-}
-
 /**
  * Smart route that mirrors server-side free-agent filtering:
  * freeAgent:true in variables → return only SPILLER; otherwise return all.
@@ -106,61 +101,61 @@ async function mockAvailabilityFilter(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe('Football availability / free-agent filter (LS-5602) @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockAvailabilityFilter(page);
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
   });
 
   test('initial load shows all players (rostered and free agents)', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
-    await expect(page.getByText('Jordan Spiller')).toBeVisible();
+    await playersPage.football.expectPlayerVisible('Patrick Mahomes');
+    await playersPage.football.expectPlayerVisible('Jordan Spiller');
   });
 
   test('toggling free-agent filter reduces the list to unrostered players', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+    await playersPage.football.expectPlayerVisible('Patrick Mahomes');
 
-    await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
+    await playersPage.football.selectTeam('FREE_AGENT');
 
-    await expect(page.getByText('Jordan Spiller')).toBeVisible();
-    await expect(page.getByText('Patrick Mahomes')).not.toBeVisible();
+    await playersPage.football.expectPlayerVisible('Jordan Spiller');
+    await playersPage.football.expectPlayerHidden('Patrick Mahomes');
   });
 
   test('resetting to All Teams restores the full player pool', async ({
-    page,
+    playersPage,
   }) => {
     // Apply the free-agent filter first.
-    await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
-    await expect(page.getByText('Patrick Mahomes')).not.toBeVisible();
+    await playersPage.football.selectTeam('FREE_AGENT');
+    await playersPage.football.expectPlayerHidden('Patrick Mahomes');
 
     // Reset to "All Teams".
-    await nativeSelect(page).selectOption('All', { force: true });
+    await playersPage.football.selectTeam('All');
 
-    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
-    await expect(page.getByText('Jordan Spiller')).toBeVisible();
+    await playersPage.football.expectPlayerVisible('Patrick Mahomes');
+    await playersPage.football.expectPlayerVisible('Jordan Spiller');
   });
 
   test('filter control shows "Free Agents" when filter is active', async ({
-    page,
+    playersPage,
   }) => {
     // The canonical /players surface renders a real native <select> whose
     // selected option is the visible label (no separate trigger element).
-    await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
-    await expect(nativeSelect(page).locator('option:checked')).toHaveText(
-      'Free Agents',
-    );
+    await playersPage.football.selectTeam('FREE_AGENT');
+    await playersPage.football.expectSelectedTeamText('Free Agents', {
+      exact: true,
+    });
   });
 
   test('filter control resets to "All Teams" when filter is cleared', async ({
-    page,
+    playersPage,
   }) => {
-    await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
-    await nativeSelect(page).selectOption('All', { force: true });
-    await expect(nativeSelect(page).locator('option:checked')).toHaveText(
-      'All Teams',
-    );
+    await playersPage.football.selectTeam('FREE_AGENT');
+    await playersPage.football.selectTeam('All');
+    await playersPage.football.expectSelectedTeamText('All Teams', {
+      exact: true,
+    });
   });
 });

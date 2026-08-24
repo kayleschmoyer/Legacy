@@ -15,21 +15,17 @@
  *
  * Interaction strategy: the canonical surface renders a real native <select>
  * with name="team-filter" (footballStatsConfig.tsx) whose selected option is
- * the visible label — there is no separate Tamagui trigger element. Tests
- * target it via select[name="team-filter"] and Playwright's selectOption()
- * with force:true.
+ * the visible label — there is no separate Tamagui trigger element. It is
+ * driven through the `playersPage.football` semantic surface (LS-8096 /
+ * ADR-0015 — this spec is selector-free; locators live in the page object).
  *
  * All GraphQL responses are mocked via route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
-
-// ── Constants ────────────────────────────────────────────────────────────────
-
-const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock helpers ─────────────────────────────────────────────────────────────
 
@@ -67,28 +63,23 @@ async function mockFootballPlayers(page: import('@playwright/test').Page) {
   );
 }
 
-// Locator for the canonical surface's real native <select> (rendered by
-// footballStatsConfig.tsx with name="team-filter").
-function nativeSelect(page: import('@playwright/test').Page) {
-  return page.locator('select[name="team-filter"]');
-}
-
 // ── Tests: Free Agents filter (LS-6493) ─────────────────────────────────────
 
 test.describe('FootballTeamFilter — Free Agents filter (LS-6493) @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockFootballPlayers(page);
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
   });
 
-  test('"Free Agents" option exists in the team filter', async ({ page }) => {
-    await expect(
-      nativeSelect(page).locator('option[value="FREE_AGENT"]'),
-    ).toBeAttached();
+  test('"Free Agents" option exists in the team filter', async ({
+    playersPage,
+  }) => {
+    await playersPage.football.expectTeamOptionAttached('FREE_AGENT');
   });
 
   test('selecting "Free Agents" sends freeAgent:true with no nflTeam in the GraphQL query', async ({
     page,
+    playersPage,
   }) => {
     const requestPromise = page.waitForRequest(
       (req) =>
@@ -113,7 +104,7 @@ test.describe('FootballTeamFilter — Free Agents filter (LS-6493) @regression',
         })(),
     );
 
-    await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
+    await playersPage.football.selectTeam('FREE_AGENT');
 
     const req = await requestPromise;
     const body = JSON.parse(req.postData() ?? '{}') as {
@@ -124,61 +115,53 @@ test.describe('FootballTeamFilter — Free Agents filter (LS-6493) @regression',
   });
 
   test('selecting "Free Agents" updates the filter control label to "Free Agents"', async ({
-    page,
+    playersPage,
   }) => {
     // The canonical /players surface renders a real native <select> whose
     // selected option is the visible label (no separate trigger element).
-    await nativeSelect(page).selectOption('FREE_AGENT', { force: true });
-    await expect(nativeSelect(page).locator('option:checked')).toContainText(
-      'Free Agents',
-    );
+    await playersPage.football.selectTeam('FREE_AGENT');
+    await playersPage.football.expectSelectedTeamText('Free Agents');
   });
 });
 
 // ── Tests: Sort order (LS-6494; canonical alphabetical order per LS-9371) ────
 
 test.describe('FootballTeamFilter — sort order @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockFootballPlayers(page);
-    await page.goto(PAGE_URL);
-    // allInnerTexts() does not retry — wait for options to be mounted first
-    await expect(nativeSelect(page).locator('option')).toHaveCount(36);
+    await playersPage.football.goto();
+    // The option-values read does not retry — wait for options to be mounted
+    await playersPage.football.expectTeamOptionCount(36);
   });
 
   test('sentinel options appear first: All Teams, Free Agents, AFC, NFC', async ({
-    page,
+    playersPage,
   }) => {
-    const opts = nativeSelect(page).locator('option');
-    await expect(opts.nth(0)).toHaveAttribute('value', 'All');
-    await expect(opts.nth(1)).toHaveAttribute('value', 'FREE_AGENT');
-    await expect(opts.nth(2)).toHaveAttribute('value', 'AFC');
-    await expect(opts.nth(3)).toHaveAttribute('value', 'NFC');
+    await playersPage.football.expectTeamOptionValueAt(0, 'All');
+    await playersPage.football.expectTeamOptionValueAt(1, 'FREE_AGENT');
+    await playersPage.football.expectTeamOptionValueAt(2, 'AFC');
+    await playersPage.football.expectTeamOptionValueAt(3, 'NFC');
   });
 
   test('all 32 teams plus 4 sentinel options are present in the dropdown', async ({
-    page,
+    playersPage,
   }) => {
     // 4 sentinels (All Teams, Free Agents, AFC, NFC) + 32 NFL teams
-    await expect(nativeSelect(page).locator('option')).toHaveCount(36);
+    await playersPage.football.expectTeamOptionCount(36);
   });
 
   test('first team option after the sentinels is ARI (alphabetical by abbreviation)', async ({
-    page,
+    playersPage,
   }) => {
     // The canonical surface lists teams alphabetically by abbreviation
     // (footballStatsHelpers.ts) — ARI sorts first.
-    await expect(nativeSelect(page).locator('option').nth(4)).toHaveAttribute(
-      'value',
-      'ARI',
-    );
+    await playersPage.football.expectTeamOptionValueAt(4, 'ARI');
   });
 
   test('all 32 team options are sorted alphabetically by abbreviation', async ({
-    page,
+    playersPage,
   }) => {
-    const values = await nativeSelect(page)
-      .locator('option')
-      .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+    const values = await playersPage.football.teamOptionValues();
 
     // Skip the 4 sentinels (All, FREE_AGENT, AFC, NFC).
     const teamValues = values.slice(4);

@@ -235,18 +235,39 @@ test.describe('Player Stats Page — static elements @smoke', () => {
     await page.waitForLoadState('load');
   });
 
-  test('shows the MLB Player Statistics heading', async ({ page }) => {
+  test('shows the MLB Player Statistics heading', async ({
+    page,
+    isMobile,
+  }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'asserts the desktop stats grid, replaced by the card feed at the mobile viewport (LS-9075)',
+    );
     // Title is rendered as a styled <Text> (not a semantic heading element)
     await expect(page.getByText(/player statistics/i).first()).toBeVisible();
   });
 
-  test('shows the player search input', async ({ page }) => {
+  test('shows the player search input', async ({ page, isMobile }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'asserts the desktop stats grid toolbar, replaced by the card feed at the mobile viewport (LS-9075)',
+    );
     await expect(
       page.getByPlaceholder('Search player name · min 2 chars'),
     ).toBeVisible();
   });
 
-  test('shows Share and Export action buttons', async ({ page }) => {
+  test('shows Share and Export action buttons', async ({ page, isMobile }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'asserts the desktop stats grid toolbar, replaced by the card feed at the mobile viewport (LS-9075)',
+    );
     await expect(
       page.getByRole('button', { name: /share/i }).first(),
     ).toBeVisible();
@@ -255,14 +276,26 @@ test.describe('Player Stats Page — static elements @smoke', () => {
     ).toBeVisible();
   });
 
-  test('search input accepts text', async ({ page }) => {
+  test('search input accepts text', async ({ page, isMobile }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'asserts the desktop stats grid toolbar, replaced by the card feed at the mobile viewport (LS-9075)',
+    );
     const input = page.getByPlaceholder('Search player name · min 2 chars');
     await expect(input).toBeVisible();
     await input.fill('Trout');
     await expect(input).toHaveValue('Trout');
   });
 
-  test('search input can be cleared', async ({ page }) => {
+  test('search input can be cleared', async ({ page, isMobile }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'asserts the desktop stats grid toolbar, replaced by the card feed at the mobile viewport (LS-9075)',
+    );
     const input = page.getByPlaceholder('Search player name · min 2 chars');
     await expect(input).toBeVisible();
     await input.fill('Aaron');
@@ -278,7 +311,14 @@ test.describe('Player Stats Page — static elements @smoke', () => {
 test.describe('Unknown Routes @regression', () => {
   test('navigating to an unknown route does not crash the app', async ({
     page,
+    isMobile,
   }) => {
+    // Desktop-only affordance at the mobile viewport — exposed by the
+    // LS-9658 full mobile sweep (LS-9660).
+    test.skip(
+      isMobile,
+      'asserts recovery via the desktop stats grid, replaced by the card feed at the mobile viewport (LS-9075)',
+    );
     await page.goto('/this-route-does-not-exist');
     await page.waitForLoadState('load');
 

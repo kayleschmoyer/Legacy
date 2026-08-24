@@ -10,19 +10,16 @@
  *      reselected
  *
  * Interaction strategy: the canonical surface renders a native <select> with
- * name="team-filter" (footballStatsConfig.tsx). Tests target it via
- * Playwright's selectOption() with force:true.
+ * name="team-filter" (footballStatsConfig.tsx), driven through the
+ * `playersPage.football` semantic surface (LS-8096 / ADR-0015 — this spec is
+ * selector-free; locators live in the page object).
  *
  * All GraphQL responses are mocked via route.fulfill() — route.continue() is
  * never used per project hermetic-test policy.
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { expect, test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const PAGE_URL = '/players?sport=nfl';
 
 // ── Mock player fixtures ───────────────────────────────────────────────────────
 
@@ -80,10 +77,6 @@ function filterByTeam(
   return players.filter((p) => p.nflTeam === nflTeam);
 }
 
-function nativeSelect(page: import('@playwright/test').Page) {
-  return page.locator('select[name="team-filter"]');
-}
-
 async function mockTeamFilterablePlayers(
   page: import('@playwright/test').Page,
 ): Promise<void> {
@@ -110,22 +103,21 @@ async function mockTeamFilterablePlayers(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe('FootballPlayers — team filter (LS-5607) @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, playersPage }) => {
     await mockTeamFilterablePlayers(page);
-    await page.goto(PAGE_URL);
+    await playersPage.football.goto();
   });
 
   test('team filter dropdown is present with an All Teams default', async ({
-    page,
+    playersPage,
   }) => {
-    await expect(nativeSelect(page)).toBeAttached();
-    await expect(
-      nativeSelect(page).locator('option[value="All"]'),
-    ).toBeAttached();
+    await playersPage.football.expectTeamFilterAttached();
+    await playersPage.football.expectTeamOptionAttached('All');
   });
 
   test('selecting a team sends nflTeam in the GraphQL request without conference or freeAgent', async ({
     page,
+    playersPage,
   }) => {
     const requestPromise = page.waitForRequest((req) => {
       if (!req.url().includes('/graphql') || req.method() !== 'POST')
@@ -147,7 +139,7 @@ test.describe('FootballPlayers — team filter (LS-5607) @regression', () => {
       }
     });
 
-    await nativeSelect(page).selectOption('BUF', { force: true });
+    await playersPage.football.selectTeam('BUF');
 
     const req = await requestPromise;
     const body = JSON.parse(req.postData() ?? '{}') as {
@@ -158,43 +150,44 @@ test.describe('FootballPlayers — team filter (LS-5607) @regression', () => {
     expect(body.variables?.freeAgent).toBeUndefined();
   });
 
-  test('selecting a team renders only rows for that team', async ({ page }) => {
-    await nativeSelect(page).selectOption('BUF', { force: true });
+  test('selecting a team renders only rows for that team', async ({
+    playersPage,
+  }) => {
+    await playersPage.football.selectTeam('BUF');
 
-    await expect(page.getByText('Josh Allen')).toBeVisible();
-    await expect(page.getByText('Patrick Mahomes')).not.toBeVisible();
+    await playersPage.football.expectPlayerVisible('Josh Allen');
+    await playersPage.football.expectPlayerHidden('Patrick Mahomes');
   });
 
   test('selecting a team updates the filter control to the team full name', async ({
-    page,
+    playersPage,
   }) => {
     // The canonical /players surface renders a real native <select> whose
     // selected option is the visible label (no separate trigger element).
-    await nativeSelect(page).selectOption('BUF', { force: true });
+    await playersPage.football.selectTeam('BUF');
 
-    await expect(nativeSelect(page).locator('option:checked')).toContainText(
-      'Buffalo Bills',
-    );
+    await playersPage.football.expectSelectedTeamText('Buffalo Bills');
   });
 
   test('selecting All Teams after filtering restores the full player list', async ({
-    page,
+    playersPage,
   }) => {
-    await nativeSelect(page).selectOption('BUF', { force: true });
-    await expect(page.getByText('Josh Allen')).toBeVisible();
-    await expect(page.getByText('Patrick Mahomes')).not.toBeVisible();
+    await playersPage.football.selectTeam('BUF');
+    await playersPage.football.expectPlayerVisible('Josh Allen');
+    await playersPage.football.expectPlayerHidden('Patrick Mahomes');
 
-    await nativeSelect(page).selectOption('All', { force: true });
+    await playersPage.football.selectTeam('All');
 
-    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
-    await expect(page.getByText('Josh Allen')).toBeVisible();
+    await playersPage.football.expectPlayerVisible('Patrick Mahomes');
+    await playersPage.football.expectPlayerVisible('Josh Allen');
   });
 
   test('selecting All Teams sends no nflTeam variable in the GraphQL request', async ({
     page,
+    playersPage,
   }) => {
-    await nativeSelect(page).selectOption('BUF', { force: true });
-    await expect(page.getByText('Josh Allen')).toBeVisible();
+    await playersPage.football.selectTeam('BUF');
+    await playersPage.football.expectPlayerVisible('Josh Allen');
 
     const requestPromise = page.waitForRequest((req) => {
       if (!req.url().includes('/graphql') || req.method() !== 'POST')
@@ -211,7 +204,7 @@ test.describe('FootballPlayers — team filter (LS-5607) @regression', () => {
       }
     });
 
-    await nativeSelect(page).selectOption('All', { force: true });
+    await playersPage.football.selectTeam('All');
 
     const req = await requestPromise;
     const body = JSON.parse(req.postData() ?? '{}') as {

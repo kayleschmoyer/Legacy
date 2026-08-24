@@ -944,29 +944,46 @@ test.describe('Logout Flow @regression', () => {
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Profile Dropdown Logout @regression', () => {
-  adminTest('profile dropdown contains a Sign Out option', async ({ page }) => {
-    // Navigate to a stable authenticated page.
-    await page.goto('/about');
-    await page.waitForLoadState('load');
+  adminTest(
+    'profile dropdown contains a Sign Out option',
+    async ({ page, isMobile }) => {
+      // Desktop-only affordance at the mobile viewport — exposed by the
+      // LS-9658 full mobile sweep (LS-9660).
+      adminTest.skip(
+        isMobile,
+        'the desktop user-profile dropdown never renders at the mobile viewport (the drawer covers sign-out on mobile)',
+      );
+      // Navigate to a stable authenticated page.
+      await page.goto('/about');
+      await page.waitForLoadState('load');
 
-    // The profile button shows the username "admin" on desktop viewports.
-    const profileButton = page
-      .getByRole('banner')
-      .getByRole('button')
-      .filter({ hasText: /admin/i });
+      // The profile button shows the username "admin" on desktop viewports.
+      const profileButton = page
+        .getByRole('banner')
+        .getByRole('button')
+        .filter({ hasText: /admin/i });
 
-    await expect(profileButton).toBeVisible({ timeout: 15000 });
-    await profileButton.click();
+      await expect(profileButton).toBeVisible({ timeout: 15000 });
+      await profileButton.click();
 
-    // The Sign Out menu item should now be visible inside the dropdown.
-    await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible({
-      timeout: 10000,
-    });
-  });
+      // The Sign Out menu item should now be visible inside the dropdown.
+      await expect(page.getByRole('button', { name: /sign out/i })).toBeVisible(
+        {
+          timeout: 10000,
+        },
+      );
+    },
+  );
 
   adminTest(
     'clicking Sign Out returns user to the login gate',
-    async ({ page, browserName }) => {
+    async ({ page, browserName, isMobile }) => {
+      // Desktop-only affordance at the mobile viewport — exposed by the
+      // LS-9658 full mobile sweep (LS-9660).
+      adminTest.skip(
+        isMobile,
+        'the desktop user-profile dropdown never renders at the mobile viewport (the drawer covers sign-out on mobile)',
+      );
       test.skip(
         browserName === 'webkit',
         'WebKit blocks localStorage access in this context',

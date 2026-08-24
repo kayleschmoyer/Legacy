@@ -351,7 +351,16 @@ test.describe('Player Detail Modal — Dismiss @regression', () => {
   test('back button navigates to /players/stats and shows the stats heading', async ({
     page,
     playersPage,
+    isMobile,
   }) => {
+    // The "MLB Player Statistics" heading belongs to the desktop stats grid,
+    // hidden by the mobile card feed (LS-9493) — exposed by the LS-9658 full
+    // mobile sweep (LS-9660). Back-button dismissal at the mobile viewport is
+    // covered by the other Dismiss tests in this describe block.
+    test.skip(
+      isMobile,
+      'asserts the desktop stats-grid heading, hidden at the mobile viewport (LS-9493)',
+    );
     await setupMocks(page);
     await playersPage.gotoDetail(1, 'networkidle');
 

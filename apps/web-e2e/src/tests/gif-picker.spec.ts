@@ -9,9 +9,14 @@
  * The Giphy API (non-GraphQL) is intercepted via page.route().
  *
  * All GraphQL queries and Giphy API calls are mocked.
+ *
+ * Element access goes through the injected `leaguePage` semantic object
+ * (LS-8096 / ADR-0015) — the spec is selector-free; GraphQL/Giphy mocks stay
+ * inline (ADR-0015 §6).
  */
 
-import { expect, test } from '../fixtures/auth-enhanced';
+import { test } from '../fixtures/pages';
+import type { LeaguePage } from '../pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { agoIso } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
@@ -315,14 +320,14 @@ async function injectGiphyApiKey(
 /** Navigate to overview, switch to Chat sub-tab */
 async function goToLeagueChatTab(
   page: import('@playwright/test').Page,
+  leaguePage: LeaguePage,
 ): Promise<void> {
   await injectGiphyApiKey(page);
-  await page.goto('/baseball/league/1/overview');
-  await page.waitForLoadState('load');
+  await leaguePage.gotoDetail(1, 'overview');
   // Click the "Chat" sub-tab inside the overview card
-  await page.getByText('Chat').first().click();
+  await leaguePage.openTab('Chat', { exact: true });
   // Wait for the message input to confirm the chat area loaded
-  await expect(page.getByPlaceholder(/message/i).first()).toBeVisible();
+  await leaguePage.chatInput.expectVisible();
 }
 
 // ---------------------------------------------------------------------------
@@ -330,136 +335,135 @@ async function goToLeagueChatTab(
 // ---------------------------------------------------------------------------
 
 test.describe('GIF Picker — navigation to chat @smoke', () => {
-  test('opens chat sub-tab without errors', async ({ page }) => {
+  test('opens chat sub-tab without errors', async ({ page, leaguePage }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
     await injectGiphyApiKey(page);
-    await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('load');
+    await leaguePage.gotoDetail(1, 'overview');
 
-    await page.getByText('Chat').first().click();
+    await leaguePage.openTab('Chat', { exact: true });
 
-    await expect(page.locator('body')).not.toContainText(
-      'Unexpected Application Error',
-    );
+    await leaguePage.expectNoAppError();
   });
 
-  test('shows GIF toggle button in the chat input area', async ({ page }) => {
+  test('shows GIF toggle button in the chat input area', async ({
+    page,
+    leaguePage,
+  }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
-    await goToLeagueChatTab(page);
+    await goToLeagueChatTab(page, leaguePage);
 
-    await expect(
-      page.getByRole('button', { name: /open gif picker/i }),
-    ).toBeVisible();
+    await leaguePage.button(/open gif picker/i).expectVisible();
   });
 });
 
 test.describe('GIF Picker — open and close @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, leaguePage }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
-    await goToLeagueChatTab(page);
+    await goToLeagueChatTab(page, leaguePage);
   });
 
-  test('clicking GIF button shows "GIF Search" heading', async ({ page }) => {
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible();
+  test('clicking GIF button shows "GIF Search" heading', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectVisible();
   });
 
-  test('GIF picker shows search input after opening', async ({ page }) => {
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByPlaceholder(/search gifs/i)).toBeVisible();
+  test('GIF picker shows search input after opening', async ({
+    leaguePage,
+  }) => {
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.placeholder(/search gifs/i).expectVisible();
   });
 
-  test('GIF picker shows G rating button', async ({ page }) => {
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible();
+  test('GIF picker shows G rating button', async ({ leaguePage }) => {
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectVisible();
 
     // G and PG rating buttons are in the header row. exact:true avoids
     // substring collisions with unrelated buttons whose accessible name
     // contains "G" (e.g. a league-switcher chip labeled "Test GIF League"),
     // which .filter({hasText: 'G'}).first() picked up depending on DOM
     // order at narrower viewports (LS-9493).
-    await expect(
-      page.getByRole('button', { name: 'G', exact: true }),
-    ).toBeVisible();
+    await leaguePage.button('G', { exact: true }).expectVisible();
   });
 
-  test('GIF picker shows PG rating button', async ({ page }) => {
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible();
+  test('GIF picker shows PG rating button', async ({ leaguePage }) => {
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectVisible();
 
-    await expect(
-      page.getByRole('button', { name: 'PG', exact: true }),
-    ).toBeVisible();
+    await leaguePage.button('PG', { exact: true }).expectVisible();
   });
 
-  test('close button dismisses the GIF picker', async ({ page }) => {
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible();
+  test('close button dismisses the GIF picker', async ({ leaguePage }) => {
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectVisible();
 
-    await page.getByRole('button', { name: /close gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).not.toBeVisible();
+    await leaguePage.button(/close gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectHidden();
   });
 });
 
 test.describe('GIF Picker — GIF grid @regression', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, leaguePage }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
-    await goToLeagueChatTab(page);
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible();
+    await goToLeagueChatTab(page, leaguePage);
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectVisible();
     // Wait for the GIF grid to populate before individual tests start asserting.
     // GifPicker fires two trending fetches on mount (Effect 1 immediately, Effect 2
     // after a 400 ms debounce). The debounced re-fetch sets loading=true, which
     // temporarily removes GIF buttons from the DOM. Waiting here ensures beforeEach
     // only returns once at least one GIF button is visible, so the test body never
     // races against the loading window (LS-5987).
-    await expect(
-      page.getByRole('button', { name: /^Send GIF:/i }).first(),
-    ).toBeVisible();
+    await leaguePage
+      .button(/^Send GIF:/i)
+      .first()
+      .expectVisible();
   });
 
   test('shows GIF buttons with "Send GIF:" aria-label after Giphy load', async ({
-    page,
+    leaguePage,
   }) => {
-    await expect(
-      page.getByRole('button', { name: /^Send GIF:/i }).first(),
-    ).toBeVisible();
+    await leaguePage
+      .button(/^Send GIF:/i)
+      .first()
+      .expectVisible();
   });
 
-  test('shows the mocked GIF title in aria-label', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: 'Send GIF: Funny Cat' }),
-    ).toBeVisible();
+  test('shows the mocked GIF title in aria-label', async ({ leaguePage }) => {
+    await leaguePage.button('Send GIF: Funny Cat').expectVisible();
   });
 
-  test('shows multiple GIFs from mock response', async ({ page }) => {
-    const gifButtons = page.getByRole('button', { name: /^Send GIF:/i });
-    await expect(gifButtons).toHaveCount(2);
+  test('shows multiple GIFs from mock response', async ({ leaguePage }) => {
+    await leaguePage.button(/^Send GIF:/i).expectCount(2);
   });
 });
 
 test.describe('GIF Picker — empty state @regression', () => {
   test('shows "No GIFs found" when Giphy returns empty results', async ({
     page,
+    leaguePage,
   }) => {
     await mockGraphQL(page);
     await mockGiphy(page, { empty: true });
-    await goToLeagueChatTab(page);
+    await goToLeagueChatTab(page, leaguePage);
 
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible();
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectVisible();
 
-    await expect(page.getByText('No GIFs found')).toBeVisible();
+    await leaguePage.text('No GIFs found').expectVisible();
   });
 });
 
 test.describe('GIF Picker — broken thumbnail fallback @regression', () => {
   test('shows "Image unavailable" placeholder when GIF thumbnail fails to load (LS-4106)', async ({
     page,
+    leaguePage,
   }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
@@ -470,45 +474,47 @@ test.describe('GIF Picker — broken thumbnail fallback @regression', () => {
         await route.fulfill({ status: 404, body: '' });
       },
     );
-    await goToLeagueChatTab(page);
+    await goToLeagueChatTab(page, leaguePage);
 
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible();
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectVisible();
 
-    // Placeholder text replaces the broken thumbnail.
-    await expect(page.getByText('Image unavailable').first()).toBeVisible();
+    // Placeholder text replaces the broken thumbnail (both mocked GIFs fail,
+    // so the placeholder renders twice — assert the collection's first).
+    await leaguePage.text('Image unavailable').first().expectVisible();
 
     // The failed GIF button is disabled so it cannot be sent.
-    const failedButton = page
-      .getByRole('button', { name: /^Image unavailable:/i })
-      .first();
-    await expect(failedButton).toBeVisible();
-    await expect(failedButton).toBeDisabled();
+    const failedButton = leaguePage.button(/^Image unavailable:/i).first();
+    await failedButton.expectVisible();
+    await failedButton.expectDisabled();
   });
 });
 
 test.describe('GIF Picker — "Powered by GIPHY" footer @regression', () => {
-  test('shows GIPHY attribution text when open', async ({ page }) => {
+  test('shows GIPHY attribution text when open', async ({
+    page,
+    leaguePage,
+  }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
-    await goToLeagueChatTab(page);
+    await goToLeagueChatTab(page, leaguePage);
 
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText(/Powered by GIPHY/i)).toBeVisible();
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text(/Powered by GIPHY/i).expectVisible();
   });
 });
 
 test.describe('GIF Picker — Cancel button @regression', () => {
-  test('Cancel button closes the picker', async ({ page }) => {
+  test('Cancel button closes the picker', async ({ page, leaguePage }) => {
     await mockGraphQL(page);
     await mockGiphy(page);
-    await goToLeagueChatTab(page);
+    await goToLeagueChatTab(page, leaguePage);
 
-    await page.getByRole('button', { name: /open gif picker/i }).click();
-    await expect(page.getByText('GIF Search')).toBeVisible();
+    await leaguePage.button(/open gif picker/i).tap();
+    await leaguePage.text('GIF Search').expectVisible();
 
     // The footer Cancel button also calls onClose
-    await page.getByRole('button', { name: /^Cancel$/i }).click();
-    await expect(page.getByText('GIF Search')).not.toBeVisible();
+    await leaguePage.button(/^Cancel$/i).tap();
+    await leaguePage.text('GIF Search').expectHidden();
   });
 });
