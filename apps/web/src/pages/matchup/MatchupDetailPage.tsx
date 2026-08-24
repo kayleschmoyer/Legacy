@@ -302,6 +302,7 @@ export function MatchupDetailPage() {
           <MatchupScoreboard
             matchup={matchup}
             gamesRemaining={gamesRemaining}
+            showTimeInfo={leagueSport === Sport.Football}
             liveUpdateSignal={liveUpdateSignal}
           />
         }

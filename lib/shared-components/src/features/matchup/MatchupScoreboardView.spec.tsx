@@ -169,4 +169,19 @@ describe('MatchupScoreboardView', () => {
     expect(screen.getByText('Team A')).toBeTruthy();
     expect(screen.getByText('Team B')).toBeTruthy();
   });
+
+  it('renders the timeInfo label when provided', () => {
+    render(
+      <MatchupScoreboardView
+        {...baseProps({ timeInfo: 'Kickoff Sun 1:00 PM' })}
+      />,
+    );
+    expect(screen.getByText('Kickoff Sun 1:00 PM')).toBeTruthy();
+  });
+
+  it('renders no timeInfo text when omitted', () => {
+    render(<MatchupScoreboardView {...baseProps()} />);
+    expect(screen.queryByText(/^Kickoff /)).toBeNull();
+    expect(screen.queryByText(/^Ends /)).toBeNull();
+  });
 });

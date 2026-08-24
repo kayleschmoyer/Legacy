@@ -125,6 +125,12 @@ export interface MatchupScoreboardViewProps {
    * server-stored fallback values; surfaces a stale-data warning banner.
    */
   hasPlayersError?: boolean;
+  /**
+   * Optional pre-formatted kickoff/time-remaining label (e.g. "Kickoff Sun 1:00 PM",
+   * "Ends Mon 8:15 PM"), rendered in the top bar when provided. The caller
+   * computes and formats this string — this component does no date math.
+   */
+  timeInfo?: string | null;
   /** When provided, team names become clickable links to view that team's roster */
   onTeamClick?: (teamId: number) => void;
 }
@@ -152,6 +158,7 @@ export function MatchupScoreboardView({
   team1Projected,
   team2Projected,
   hasPlayersError = false,
+  timeInfo,
   onTeamClick,
 }: MatchupScoreboardViewProps) {
   if (!hasMatchup) {
@@ -279,6 +286,11 @@ export function MatchupScoreboardView({
           {gamesPerMatchup && (
             <Text fontSize="$2" color={BRAND_NAVY_LIGHT} marginLeft="$1">
               {gamesCompleted}/{gamesPerMatchup} games
+            </Text>
+          )}
+          {timeInfo && (
+            <Text fontSize="$2" color={BRAND_NAVY_LIGHT} marginLeft="$1">
+              {timeInfo}
             </Text>
           )}
         </XStack>

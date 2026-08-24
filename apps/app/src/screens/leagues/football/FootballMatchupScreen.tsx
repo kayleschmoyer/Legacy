@@ -18,12 +18,10 @@ import {
   derivePlayoffImplications,
   MatchupAdditionalSections,
   MatchupRecapPanel,
-  MatchupScoreboardHero,
 } from '@legacy-sports/shared-components/matchup';
 import { ALLOWED_POSITIONS_BY_SPORT, ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   type GetHeadToHeadRecordQuery,
-  type GetMatchupByIdQuery,
   type GetMatchupPlayersQuery,
   MatchupStatus,
   useGetHeadToHeadRecordQuery,
@@ -36,11 +34,11 @@ import {
 } from '@legacy-sports/graphql';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
 import { MatchupRosterEditor } from '../../../features/matchup/components/MatchupRosterEditor';
+import { MatchupScoreboard } from '../../../features/matchup/components/MatchupScoreboard';
 import { PremiumGate } from '../../../features/subscription/PremiumGate';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 import { useStandings } from '../../../features/matchup/hooks/useStandings';
 
-type Matchup = NonNullable<GetMatchupByIdQuery['getMatchupById']>;
 type MatchupPlayer = NonNullable<
   NonNullable<GetMatchupPlayersQuery['getMatchupPlayers']>[number]
 >;
@@ -144,91 +142,6 @@ export function getPlayerPosition(player: MatchupPlayer['player']): string {
   const positions = player?.eligiblePositions;
   if (!positions || positions.length === 0) return '—';
   return positions[0] ?? '—';
-}
-
-type TeamStandingRecord = {
-  teamId?: number | string | null;
-  wins?: number | null;
-  losses?: number | null;
-  ties?: number | null;
-};
-
-/**
- * Formats a team's W-L(-T) record from league standings, e.g. "5-2" or
- * "5-2-1" when the league allows ties. Returns undefined when no standing
- * row exists for the team (e.g. standings haven't loaded yet).
- */
-export function formatTeamRecord(
-  teamId: number | null | undefined,
-  standings: readonly TeamStandingRecord[],
-): string | undefined {
-  if (teamId == null) return undefined;
-  const standing = standings.find((s) => Number(s.teamId) === teamId);
-  if (!standing) return undefined;
-  const wins = standing.wins ?? 0;
-  const losses = standing.losses ?? 0;
-  const ties = standing.ties ?? 0;
-  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
-}
-
-function ScoreHeader({
-  matchup,
-  isRefreshing,
-  standings,
-  totalMatchups,
-  team1ProjectedScore,
-  team2ProjectedScore,
-}: {
-  matchup: Matchup;
-  isRefreshing: boolean;
-  standings: readonly TeamStandingRecord[];
-  totalMatchups?: number | null;
-  team1ProjectedScore?: number;
-  team2ProjectedScore?: number;
-}) {
-  const team1Score = matchup.team1Score ?? 0;
-  const team2Score = matchup.team2Score ?? 0;
-  const totalGames = matchup.gamesPerMatchup ?? 0;
-  const gamesPlayed = matchup.selectedGamesCount ?? 0;
-
-  return (
-    <YStack opacity={isRefreshing ? 0.5 : 1}>
-      {isRefreshing ? (
-        <YStack
-          testID="score-refreshing-spinner"
-          position="absolute"
-          top="$2"
-          right="$2"
-          zIndex={1}
-        >
-          <Spinner size="small" color="$brandNavyLight" />
-        </YStack>
-      ) : null}
-      <MatchupScoreboardHero
-        weekNumber={matchup.weekNumber}
-        totalMatchups={totalMatchups}
-        status={matchup.status}
-        team1={{
-          id: matchup.team1Id,
-          name: matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`,
-          primaryColor: matchup.team1?.primaryColor,
-          score: team1Score,
-          projectedScore: team1ProjectedScore,
-          record: formatTeamRecord(matchup.team1Id, standings),
-        }}
-        team2={{
-          id: matchup.team2Id,
-          name: matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`,
-          primaryColor: matchup.team2?.primaryColor,
-          score: team2Score,
-          projectedScore: team2ProjectedScore,
-          record: formatTeamRecord(matchup.team2Id, standings),
-        }}
-        gamesPlayed={gamesPlayed}
-        totalGames={totalGames}
-      />
-    </YStack>
-  );
 }
 
 /**
@@ -511,6 +424,8 @@ export function FootballMatchupScreen(
     notifyOnNetworkStatusChange: true,
   });
 
+  const isRefreshingScore = matchupNetworkStatus === NetworkStatus.refetch;
+
   const { standings, error: standingsError } = useStandings(leagueId);
 
   const { data: userTeamData } = useGetUserTeamIdQuery({
@@ -556,8 +471,6 @@ export function FootballMatchupScreen(
     });
     return () => subscription.remove();
   }, [refetchMatchup, refetchPlayers]);
-
-  const isRefreshingScore = matchupNetworkStatus === NetworkStatus.refetch;
 
   const [wsToken, setWsToken] = useState<string | undefined>();
   useEffect(() => {
@@ -774,11 +687,13 @@ export function FootballMatchupScreen(
       }
     >
       <YStack gap="$3" paddingBottom="$8">
-        <ScoreHeader
+        <MatchupScoreboard
           matchup={matchup}
+          leagueId={matchup.leagueId}
           isRefreshing={isRefreshingScore}
           standings={standings}
           totalMatchups={totalMatchups}
+          showTimeInfo
           team1ProjectedScore={team1Projection}
           team2ProjectedScore={team2Projection}
         />

@@ -20,3 +20,4 @@ export * from './hooks/useLineupLockCountdown';
 export * from './PlayoffBracket';
 export * from './usePlayoffBracket';
 export * from './paceThresholds';
+export * from './matchupTimeInfo';

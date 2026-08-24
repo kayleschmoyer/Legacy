@@ -173,6 +173,12 @@ export interface MatchupScoreboardHeroProps {
   team2: MatchupScoreboardHeroTeam;
   gamesPlayed: number;
   totalGames: number;
+  /**
+   * Optional pre-formatted kickoff/time-remaining label (e.g. "Kickoff Sun 1:00 PM",
+   * "Ends Mon 8:15 PM"), rendered next to the status chip when provided. The
+   * caller computes and formats this string — this component does no date math.
+   */
+  timeInfo?: string | null;
   /** When provided, team avatars/names become pressable to view that team. */
   onTeamPress?: (teamId: number) => void;
 }
@@ -287,6 +293,7 @@ export function MatchupScoreboardHero({
   team2,
   gamesPlayed,
   totalGames,
+  timeInfo,
   onTeamPress,
 }: MatchupScoreboardHeroProps) {
   const score1 = team1.score ?? 0;
@@ -345,6 +352,11 @@ export function MatchupScoreboardHero({
             Head-to-Head · Matchup {weekNumber ?? '?'}
             {totalMatchups ? `/${totalMatchups}` : ''}
           </Text>
+          {timeInfo && (
+            <Text fontSize="$2" color={TEXT_MUTED}>
+              {timeInfo}
+            </Text>
+          )}
         </XStack>
       </TopBand>
 

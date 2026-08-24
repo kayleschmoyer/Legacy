@@ -1,6 +1,10 @@
 import React, { useMemo } from 'react';
+import { Spinner, YStack } from 'tamagui';
 import { type SeasonStats } from '@legacy-sports/scoring';
-import { MatchupScoreboardHero } from '@legacy-sports/shared-components/matchup';
+import {
+  formatMatchupTimeInfo,
+  MatchupScoreboardHero,
+} from '@legacy-sports/shared-components/matchup';
 import {
   type AppMatchupFragment,
   type AppMatchupPlayerFragment,
@@ -11,13 +15,58 @@ import { useLeagueScoringSettings } from '../../../common/scoring';
 import { mapMatchupPlayerToSeasonStats } from '../../../common/scoring/mapGraphQLToScoringFormat';
 import { computeMatchupScores } from '../computeMatchupScores';
 
+export interface TeamStandingRecord {
+  teamId?: number | string | null;
+  wins?: number | null;
+  losses?: number | null;
+  ties?: number | null;
+}
+
+/**
+ * Formats a team's W-L(-T) record from league standings, e.g. "5-2" or
+ * "5-2-1" when the league allows ties. Returns undefined when no standing
+ * row exists for the team (e.g. standings haven't loaded yet).
+ */
+export function formatTeamRecord(
+  teamId: number | null | undefined,
+  standings: readonly TeamStandingRecord[],
+): string | undefined {
+  if (teamId == null) return undefined;
+  const standing = standings.find((s) => Number(s.teamId) === teamId);
+  if (!standing) return undefined;
+  const wins = standing.wins ?? 0;
+  const losses = standing.losses ?? 0;
+  const ties = standing.ties ?? 0;
+  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+}
+
 export interface MatchupScoreboardProps {
   matchup: AppMatchupFragment | null | undefined;
   /** League id used to resolve team names and scoring settings. */
   leagueId: number | null | undefined;
   gamesRemaining?: number;
+  /** League's total matchup weeks, for the "Matchup {week}/{total}" counter. */
+  totalMatchups?: number | null;
+  /**
+   * Show a kickoff/time-remaining line derived from the matchup's
+   * startTime/endTime (LS-5430). Football-only — baseball's scoreboard does
+   * not ask for this, so callers must opt in explicitly.
+   */
+  showTimeInfo?: boolean;
+  /** League standings, used to render each team's W-L(-T) record. */
+  standings?: readonly TeamStandingRecord[];
+  /** Dims the scoreboard and shows a spinner while a background score refetch is in flight. */
+  isRefreshing?: boolean;
   /** When provided, team avatars/names become pressable to view that team. */
   onTeamPress?: (teamId: number) => void;
+  /**
+   * Overrides the wrapper's own player-level projected score (LS-6364).
+   * Football passes the lambda-computed `matchupScores` projection here,
+   * which accounts for season pace/bye weeks; falls back to the internally
+   * computed `computeMatchupScores` projection when omitted.
+   */
+  team1ProjectedScore?: number;
+  team2ProjectedScore?: number;
 }
 
 /**
@@ -34,7 +83,13 @@ export function MatchupScoreboard({
   matchup,
   leagueId,
   gamesRemaining = 0,
+  totalMatchups,
+  showTimeInfo = false,
+  standings = [],
+  isRefreshing = false,
   onTeamPress,
+  team1ProjectedScore,
+  team2ProjectedScore,
 }: MatchupScoreboardProps) {
   const matchupIdNum = matchup?.id ? parseInt(matchup.id, 10) : 0;
 
@@ -93,25 +148,50 @@ export function MatchupScoreboard({
   const totalGames = matchup?.gamesPerMatchup ?? 0;
   const gamesPlayed = Math.max(0, totalGames - gamesRemaining);
 
+  const timeInfo = showTimeInfo
+    ? formatMatchupTimeInfo(
+        matchup?.status,
+        matchup?.startTime,
+        matchup?.endTime,
+      )
+    : null;
+
   return (
-    <MatchupScoreboardHero
-      weekNumber={matchup?.weekNumber}
-      status={matchup?.status}
-      team1={{
-        id: matchup?.team1Id ?? null,
-        name: team1Name,
-        score: team1Score,
-        projectedScore: team1Projected,
-      }}
-      team2={{
-        id: matchup?.team2Id ?? null,
-        name: team2Name,
-        score: team2Score,
-        projectedScore: team2Projected,
-      }}
-      gamesPlayed={gamesPlayed}
-      totalGames={totalGames}
-      onTeamPress={onTeamPress}
-    />
+    <YStack opacity={isRefreshing ? 0.5 : 1}>
+      {isRefreshing ? (
+        <YStack
+          testID="score-refreshing-spinner"
+          position="absolute"
+          top="$2"
+          right="$2"
+          zIndex={1}
+        >
+          <Spinner size="small" color="$brandNavyLight" />
+        </YStack>
+      ) : null}
+      <MatchupScoreboardHero
+        weekNumber={matchup?.weekNumber}
+        totalMatchups={totalMatchups}
+        status={matchup?.status}
+        timeInfo={timeInfo}
+        team1={{
+          id: matchup?.team1Id ?? null,
+          name: team1Name,
+          score: team1Score,
+          projectedScore: team1ProjectedScore ?? team1Projected,
+          record: formatTeamRecord(matchup?.team1Id, standings),
+        }}
+        team2={{
+          id: matchup?.team2Id ?? null,
+          name: team2Name,
+          score: team2Score,
+          projectedScore: team2ProjectedScore ?? team2Projected,
+          record: formatTeamRecord(matchup?.team2Id, standings),
+        }}
+        gamesPlayed={gamesPlayed}
+        totalGames={totalGames}
+        onTeamPress={onTeamPress}
+      />
+    </YStack>
   );
 }

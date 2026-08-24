@@ -5,7 +5,10 @@ import {
   computeScoring,
   type SeasonStats,
 } from '@legacy-sports/scoring';
-import { MatchupScoreboardView } from '@legacy-sports/shared-components/matchup';
+import {
+  formatMatchupTimeInfo,
+  MatchupScoreboardView,
+} from '@legacy-sports/shared-components/matchup';
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
@@ -305,6 +308,12 @@ export function computeMatchupScores({
 export interface MatchupScoreboardProps {
   matchup: MatchupFragment | null | undefined;
   gamesRemaining?: number;
+  /**
+   * Show a kickoff/time-remaining line derived from the matchup's
+   * startTime/endTime (LS-5430). Football-only — baseball's scoreboard does
+   * not ask for this, so callers must opt in explicitly.
+   */
+  showTimeInfo?: boolean;
   /** When provided, team names become clickable links to view that team's roster */
   onTeamClick?: (teamId: number) => void;
   /**
@@ -330,6 +339,7 @@ export interface MatchupScoreboardProps {
 export function MatchupScoreboard({
   matchup,
   gamesRemaining = 0,
+  showTimeInfo = false,
   onTeamClick,
   liveUpdateSignal,
 }: MatchupScoreboardProps) {
@@ -415,6 +425,14 @@ export function MatchupScoreboard({
     );
   }, [matchup?.team2Id, teamsData]);
 
+  const timeInfo = showTimeInfo
+    ? formatMatchupTimeInfo(
+        matchup?.status,
+        matchup?.startTime,
+        matchup?.endTime,
+      )
+    : null;
+
   return (
     <MatchupScoreboardView
       hasMatchup={!!matchup}
@@ -431,6 +449,7 @@ export function MatchupScoreboard({
       team1Projected={team1Projected}
       team2Projected={team2Projected}
       hasPlayersError={playersError != null}
+      timeInfo={timeInfo}
       onTeamClick={onTeamClick}
     />
   );

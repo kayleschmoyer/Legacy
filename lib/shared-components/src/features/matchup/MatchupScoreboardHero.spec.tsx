@@ -192,6 +192,21 @@ describe('MatchupScoreboardHero', () => {
     expect(screen.getByText('Team A and Team B tied at 100.00')).toBeTruthy();
   });
 
+  it('renders the timeInfo label when provided', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({ timeInfo: 'Ends Sun 1:00 PM' })}
+      />,
+    );
+    expect(screen.getByText('Ends Sun 1:00 PM')).toBeTruthy();
+  });
+
+  it('renders no timeInfo text when omitted', () => {
+    render(<MatchupScoreboardHero {...baseProps()} />);
+    expect(screen.queryByText(/^Kickoff /)).toBeNull();
+    expect(screen.queryByText(/^Ends /)).toBeNull();
+  });
+
   it('exposes each score as a polite live region labelled with the team name', () => {
     render(<MatchupScoreboardHero {...baseProps()} />);
     const score1 = screen.getByLabelText('Team A score 87.50');
