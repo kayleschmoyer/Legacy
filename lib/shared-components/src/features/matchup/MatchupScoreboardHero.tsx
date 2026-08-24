@@ -1,5 +1,6 @@
 import React from 'react';
 import { Card, Text, VisuallyHidden, XStack, YStack } from 'tamagui';
+import { MatchupStatus } from '@legacy-sports/graphql';
 import { PACE_TINT_THRESHOLDS } from './paceThresholds';
 import { MatchupStatusChip } from './MatchupStatusChip';
 import {
@@ -181,14 +182,20 @@ function TeamPanel({
   gamesPlayed,
   totalGames,
   onTeamPress,
+  preLock,
 }: {
   team: MatchupScoreboardHeroTeam;
   leading: boolean;
   gamesPlayed: number;
   totalGames: number;
   onTeamPress?: (teamId: number) => void;
+  preLock: boolean;
 }) {
   const score = team.score ?? 0;
+  // Pre-lock (scheduled, no games started), a 0 score means "no stats yet",
+  // not "your team scored zero" — show a placeholder instead (LS-6386).
+  const showPlaceholder = preLock && score === 0;
+  const scoreDisplay = showPlaceholder ? '—' : score.toFixed(2);
   const pace = paceColor(score, team.projectedScore, gamesPlayed, totalGames);
   const scoreColor = pace ?? (leading ? BRAND_GOLD_LIGHT : TEXT_PRIMARY);
   const pressable = onTeamPress != null && team.id != null;
@@ -235,9 +242,13 @@ function TeamPanel({
         color={scoreColor}
         aria-live="polite"
         aria-atomic="true"
-        aria-label={`${team.name ?? 'Team'} score ${score.toFixed(2)}`}
+        aria-label={
+          showPlaceholder
+            ? `${team.name ?? 'Team'} score not yet available`
+            : `${team.name ?? 'Team'} score ${scoreDisplay}`
+        }
       >
-        {score.toFixed(2)}
+        {scoreDisplay}
       </ScoreText>
       {team.projectedScore != null && (
         <Text
@@ -278,13 +289,16 @@ export function MatchupScoreboardHero({
   const score1 = team1.score ?? 0;
   const score2 = team2.score ?? 0;
   const team1Leading = score1 >= score2;
+  const preLock = status === MatchupStatus.Scheduled;
 
   const team1Name = team1.name ?? 'Team 1';
   const team2Name = team2.name ?? 'Team 2';
   const scoreAnnouncement =
-    score1 === score2
-      ? `${team1Name} and ${team2Name} tied at ${score1.toFixed(2)}`
-      : `${team1Leading ? team1Name : team2Name} now leads ${Math.max(score1, score2).toFixed(2)} to ${Math.min(score1, score2).toFixed(2)}`;
+    preLock && score1 === 0 && score2 === 0
+      ? `${team1Name} vs ${team2Name}: matchup has not started yet`
+      : score1 === score2
+        ? `${team1Name} and ${team2Name} tied at ${score1.toFixed(2)}`
+        : `${team1Leading ? team1Name : team2Name} now leads ${Math.max(score1, score2).toFixed(2)} to ${Math.min(score1, score2).toFixed(2)}`;
 
   return (
     <HeroCard role="region" aria-label={`Week ${weekNumber ?? 1} scoreboard`}>
@@ -315,6 +329,7 @@ export function MatchupScoreboardHero({
           gamesPlayed={gamesPlayed}
           totalGames={totalGames}
           onTeamPress={onTeamPress}
+          preLock={preLock}
         />
         <YStack alignSelf="center" paddingHorizontal="$2">
           <Text
@@ -333,6 +348,7 @@ export function MatchupScoreboardHero({
           gamesPlayed={gamesPlayed}
           totalGames={totalGames}
           onTeamPress={onTeamPress}
+          preLock={preLock}
         />
       </XStack>
     </HeroCard>

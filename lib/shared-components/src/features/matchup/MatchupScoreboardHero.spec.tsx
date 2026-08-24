@@ -51,7 +51,7 @@ describe('MatchupScoreboardHero', () => {
     expect(screen.getByText('150.25 proj')).toBeTruthy();
   });
 
-  it('falls back to 0.00 when a score is missing', () => {
+  it('falls back to 0.00 when a score is missing on an in-progress matchup', () => {
     render(
       <MatchupScoreboardHero
         {...baseProps({
@@ -61,6 +61,35 @@ describe('MatchupScoreboardHero', () => {
       />,
     );
     expect(screen.getAllByText('0.00').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows a "—" placeholder instead of 0.00 for a scheduled (pre-lock) matchup (LS-6386)', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({
+          status: MatchupStatus.Scheduled,
+          team1: { id: 10, name: 'Team A', score: null },
+          team2: { id: 20, name: 'Team B', score: null },
+        })}
+      />,
+    );
+    expect(screen.queryByText('0.00')).toBeNull();
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows an actual 0.00 for a scheduled matchup once a real (non-zero) score exists', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({
+          status: MatchupStatus.Scheduled,
+          team1: { id: 10, name: 'Team A', score: 0 },
+          team2: { id: 20, name: 'Team B', score: 14.5 },
+        })}
+      />,
+    );
+    // Team A is still scoreless pre-lock, so it gets the placeholder; Team B
+    // has a real score and renders normally.
+    expect(screen.getByText('14.50')).toBeTruthy();
   });
 
   it('renders the W-L-T record when provided and a placeholder otherwise', () => {
