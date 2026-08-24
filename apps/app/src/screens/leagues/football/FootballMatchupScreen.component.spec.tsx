@@ -6,6 +6,28 @@ import * as graphqlLib from '@legacy-sports/graphql';
 import * as sharedComponentsLib from '@legacy-sports/shared-components';
 import { FootballMatchupScreen } from './FootballMatchupScreen';
 
+// Stubs the mobile lineup editor so this suite verifies FootballMatchupScreen's
+// own wiring (which team gets the editor, and when) without re-testing the
+// editor's own drag/swap behavior — that's covered by MatchupRosterEditor.spec.tsx.
+jest.mock('../../../features/matchup/components/MatchupRosterEditor', () => {
+  const ReactActual = jest.requireActual<typeof import('react')>('react');
+  const { Text } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    MatchupRosterEditor: ({
+      userTeamId,
+    }: {
+      userTeamId: number;
+      [key: string]: unknown;
+    }) =>
+      ReactActual.createElement(
+        Text,
+        { testID: 'matchup-roster-editor' },
+        `editor-for-team-${userTeamId}`,
+      ),
+  };
+});
+
 type RNComponents = { View: typeof RNView; Text: typeof RNText };
 
 const mockRouterPush = jest.fn();
@@ -109,6 +131,10 @@ jest.mock('@legacy-sports/graphql', () => ({
   })),
   useGetPlayoffProjectionsQuery: jest.fn(() => ({
     data: { getPlayoffProjections: [] },
+    loading: false,
+  })),
+  useGetUserTeamIdQuery: jest.fn(() => ({
+    data: undefined,
     loading: false,
   })),
 }));
@@ -671,6 +697,73 @@ describe('FootballMatchupScreen', () => {
 
     fireEvent.press(emptySlots[emptySlots.length - 1]);
     expect(mockRouterPush).toHaveBeenCalledWith('/football/team/20');
+  });
+
+  // ── Mobile lineup editor wiring (LS-6375) ──────────────────────────────────
+  // Mobile previously had no lineup editor at all — owners had to use web to
+  // bench a hurt starter pre-lock. FootballMatchupScreen now swaps in the
+  // shared MatchupRosterEditor for the user's own team while the matchup is
+  // still editable, mirroring the baseball mobile screen and web parity.
+
+  it('renders the lineup editor for the user’s own team when the matchup is scheduled', () => {
+    jest.mocked(graphqlLib.useGetUserTeamIdQuery).mockReturnValue({
+      data: { userTeamId: 10 },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetUserTeamIdQuery>);
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: { ...mockMatchup, status: 'scheduled' } },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: mockRefetchMatchup,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} leagueId={99} />);
+
+    expect(screen.getByTestId('matchup-roster-editor')).toBeTruthy();
+    expect(screen.getByText('editor-for-team-10')).toBeTruthy();
+    // The opponent's roster stays read-only.
+    expect(screen.queryByText('editor-for-team-20')).toBeNull();
+  });
+
+  it('renders the lineup editor while the matchup is in progress (pre-lock)', () => {
+    jest.mocked(graphqlLib.useGetUserTeamIdQuery).mockReturnValue({
+      data: { userTeamId: 10 },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetUserTeamIdQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} leagueId={99} />);
+
+    expect(screen.getByTestId('matchup-roster-editor')).toBeTruthy();
+  });
+
+  it('does not render a lineup editor once the matchup is completed', () => {
+    jest.mocked(graphqlLib.useGetUserTeamIdQuery).mockReturnValue({
+      data: { userTeamId: 10 },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetUserTeamIdQuery>);
+    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
+      data: { getMatchupById: COMPLETED_MATCHUP },
+      loading: false,
+      error: undefined,
+      networkStatus: 7, // NetworkStatus.ready
+      refetch: mockRefetchMatchup,
+    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} leagueId={99} />);
+
+    expect(screen.queryByTestId('matchup-roster-editor')).toBeNull();
+  });
+
+  it('does not render a lineup editor for a spectator with no team in the matchup', () => {
+    jest.mocked(graphqlLib.useGetUserTeamIdQuery).mockReturnValue({
+      data: { userTeamId: 999 },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useGetUserTeamIdQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} leagueId={99} />);
+
+    expect(screen.queryByTestId('matchup-roster-editor')).toBeNull();
   });
 
   it('places a dedicated RB in the RB slot instead of a flex-eligible RB/WR player, even when the flex player is listed first (LS-6380)', () => {

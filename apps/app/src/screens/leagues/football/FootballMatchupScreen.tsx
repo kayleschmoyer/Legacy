@@ -31,9 +31,11 @@ import {
   useGetMatchupByIdQuery,
   useGetMatchupPlayersQuery,
   useGetPlayoffProjectionsQuery,
+  useGetUserTeamIdQuery,
   useMatchupScoresQuery,
 } from '@legacy-sports/graphql';
 import { readKeychainValue, Secret } from '../../../common/auth/AuthHooks';
+import { MatchupRosterEditor } from '../../../features/matchup/components/MatchupRosterEditor';
 import { PremiumGate } from '../../../features/subscription/PremiumGate';
 import { useHasEntitlement } from '../../../features/subscription/useSubscription';
 import { useStandings } from '../../../features/matchup/hooks/useStandings';
@@ -496,6 +498,12 @@ export function FootballMatchupScreen(
 
   const { standings, error: standingsError } = useStandings(leagueId);
 
+  const { data: userTeamData } = useGetUserTeamIdQuery({
+    variables: { leagueId: leagueId ?? 0 },
+    skip: !leagueId,
+  });
+  const userTeamId = userTeamData?.userTeamId ?? null;
+
   const {
     data: playersData,
     loading: playersLoading,
@@ -660,6 +668,15 @@ export function FootballMatchupScreen(
     skip: !matchup?.leagueId || !showsPlayoffStakes,
   });
 
+  // The lineup editor replaces the read-only roster card for the user's own
+  // team while the matchup is still open to changes — mirrors the baseball
+  // mobile pattern (MatchupDetailScreen) and the web parity implementation
+  // (MatchupRosterEditor / MatchupDetailPage) so owners no longer need the
+  // web app to bench a hurt starter pre-lock (LS-6375).
+  const isMatchupEditable =
+    matchup?.status === MatchupStatus.Scheduled ||
+    matchup?.status === MatchupStatus.InProgress;
+
   const team1Id = matchup?.team1Id ?? null;
   const team2Id = matchup?.team2Id ?? null;
   const team1Name = matchup?.team1?.name ?? `Team ${team1Id ?? '1'}`;
@@ -764,24 +781,52 @@ export function FootballMatchupScreen(
           </YStack>
         ) : (
           <>
-            <RosterSection
-              teamId={matchup.team1Id}
-              players={players}
-              positionOrder={positionOrder}
-              label={matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`}
-              playerPoints={playerPoints}
-              onPlayerPress={onPlayerPress}
-              onEmptySlotPress={onEmptySlotPress}
-            />
-            <RosterSection
-              teamId={matchup.team2Id}
-              players={players}
-              positionOrder={positionOrder}
-              label={matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`}
-              playerPoints={playerPoints}
-              onPlayerPress={onPlayerPress}
-              onEmptySlotPress={onEmptySlotPress}
-            />
+            {leagueId != null &&
+            userTeamId != null &&
+            isMatchupEditable &&
+            matchup.team1Id === userTeamId ? (
+              <MatchupRosterEditor
+                matchupId={matchupId}
+                leagueId={leagueId}
+                userTeamId={userTeamId}
+                matchupStatus={matchup.status ?? MatchupStatus.Completed}
+                statsLoadingStatus={matchup.statsLoadingStatus}
+                locked={matchup.status === MatchupStatus.InProgress}
+              />
+            ) : (
+              <RosterSection
+                teamId={matchup.team1Id}
+                players={players}
+                positionOrder={positionOrder}
+                label={matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`}
+                playerPoints={playerPoints}
+                onPlayerPress={onPlayerPress}
+                onEmptySlotPress={onEmptySlotPress}
+              />
+            )}
+            {leagueId != null &&
+            userTeamId != null &&
+            isMatchupEditable &&
+            matchup.team2Id === userTeamId ? (
+              <MatchupRosterEditor
+                matchupId={matchupId}
+                leagueId={leagueId}
+                userTeamId={userTeamId}
+                matchupStatus={matchup.status ?? MatchupStatus.Completed}
+                statsLoadingStatus={matchup.statsLoadingStatus}
+                locked={matchup.status === MatchupStatus.InProgress}
+              />
+            ) : (
+              <RosterSection
+                teamId={matchup.team2Id}
+                players={players}
+                positionOrder={positionOrder}
+                label={matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`}
+                playerPoints={playerPoints}
+                onPlayerPress={onPlayerPress}
+                onEmptySlotPress={onEmptySlotPress}
+              />
+            )}
           </>
         )}
 
