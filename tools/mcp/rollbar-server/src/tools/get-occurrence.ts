@@ -1,5 +1,6 @@
 import { rollbarGet } from '../rollbar-api.js';
 import type { ToolResult } from '../types.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 export interface GetOccurrenceParams {
   /** Internal item ID — fetches the most recent occurrence of this item. */
@@ -104,7 +105,7 @@ export async function getOccurrence(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(occurrence, null, 2),
+          text: minifiedJson(occurrence),
         },
       ],
     };

@@ -109,10 +109,28 @@ When migrating a tool (or writing a new one):
 6. **Measure** — record before/after token counts in the PR (epic LS-8018 ships
    a measurement harness).
 
-## Review checklist note
+## Enforcement (LS-9707)
 
-New or changed MCP tools must not return pretty-printed JSON. Reviewers: see
-**pattern #45** in
+`.github/checks/mcp-response-format.sh` fails the `custom-checks` job on any
+`JSON.stringify(x, null, 2)` under `tools/mcp/**` outside a `.spec.ts`. Writing
+JSON to disk (`writeFile`/`writeFileSync`) is exempt — pretty printing a file
+costs no tokens and helps humans read it.
+
+It is a check script rather than an ESLint rule on purpose: several MCP servers
+(`mcp-jira-server`, `mcp-ci-server`) define no lint target and get none
+inferred, so `nx affected -t lint` skips them entirely — and those are exactly
+the servers that went unmigrated. A repo-wide grep covers every server
+regardless of its nx configuration.
+
+Per AGENTS.md Tier-3 there is no suppression escape: fix the site, or widen the
+script's exemption if you have found a genuinely new legitimate case.
+
+**Why this exists.** This was review pattern #45, enforced manually, and manual
+enforcement failed. Epic LS-8018 closed `Done` with all ten per-server children
+`Done` while worktree-server and ci-server still had 30 pretty-printed response
+sites between them.
+
+Reviewers: pattern **#45** in
 [`common-review-patterns.md`](../../pr-lifecycle/references/common-review-patterns.md).
 Default expectation — flat uniform lists are `markdownTable`; everything else is
 `minifiedJson`; both go through `pickFields`/`truncate` first.

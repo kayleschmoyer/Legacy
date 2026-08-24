@@ -18,6 +18,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /** One Bash tool_use call extracted from a session transcript. */
 export interface BashCall {
@@ -1002,7 +1003,7 @@ export function formatAudit(
     'For overflows/failures: classify the fix_type. ' +
     'Then create Jira tickets for approved gaps under the current MCP gaps bucket epic.';
 
-  return JSON.stringify(report, null, 2);
+  return minifiedJson(report);
 }
 
 /**

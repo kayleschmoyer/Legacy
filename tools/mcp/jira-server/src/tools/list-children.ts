@@ -1,5 +1,6 @@
 import {
   markdownTable,
+  minifiedJson,
   pickFields,
   type FlatRecord,
 } from '@legacy-sports/mcp-format';
@@ -188,7 +189,7 @@ async function listAllChildren(
     if (truncated) payload.truncated = true;
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(payload) }],
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

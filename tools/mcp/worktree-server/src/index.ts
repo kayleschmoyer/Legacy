@@ -73,6 +73,11 @@ import {
   type RemoteBranchRow,
   type WorktreeListEntry,
 } from './format';
+import {
+  markdownTable,
+  minifiedJson,
+  pickFields,
+} from '@legacy-sports/mcp-format';
 
 // ---------------------------------------------------------------------------
 // Constants & state
@@ -1057,7 +1062,7 @@ function formatJobSnapshotResult(snapshot: JobSnapshot): ToolResult {
     if (snapshot.hint) body['hint'] = snapshot.hint;
   }
   return {
-    content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(body) }],
     ...(snapshot.status === 'failed' ? { isError: true } : {}),
   };
 }
@@ -3759,7 +3764,7 @@ const handleCallTool = async (
         };
 
         return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: minifiedJson(result) }],
         };
       } catch (err: unknown) {
         const e = err as { stdout?: string; stderr?: string; status?: number };
@@ -3806,7 +3811,7 @@ const handleCallTool = async (
           };
         }
         return {
-          content: [{ type: 'text', text: JSON.stringify({ files }, null, 2) }],
+          content: [{ type: 'text', text: minifiedJson({ files }) }],
         };
       } catch (err: unknown) {
         const e = err as { stdout?: string; stderr?: string; message?: string };
@@ -4029,7 +4034,7 @@ const handleCallTool = async (
       }
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson(result) }],
       };
     }
 
@@ -4478,9 +4483,19 @@ const handleCallTool = async (
               timestamp: fields[4] ?? '',
             };
           });
+        // Flat, uniform records — the shape markdownTable exists for. Column
+        // headers are written once instead of repeating five keys per entry
+        // (mcp-response-format.md). `message` already embeds the selector, so
+        // `action` would be a redundant column.
         return {
           content: [
-            { type: 'text', text: JSON.stringify({ entries }, null, 2) },
+            {
+              type: 'text',
+              text: markdownTable(
+                pickFields(entries, ['shortSha', 'message', 'timestamp']),
+                { columns: ['shortSha', 'message', 'timestamp'] },
+              ),
+            },
           ],
         };
       } catch (err: unknown) {
@@ -4686,7 +4701,7 @@ const handleCallTool = async (
       });
 
       return {
-        content: [{ type: 'text', text: JSON.stringify({ files }, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson({ files }) }],
       };
     }
 
@@ -6623,7 +6638,7 @@ const handleCallTool = async (
         }
 
         return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+          content: [{ type: 'text', text: minifiedJson(result) }],
         };
       } catch (err: unknown) {
         const e = err as { stdout?: string; stderr?: string; message?: string };
@@ -7519,7 +7534,7 @@ const handleCallTool = async (
       };
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson(result) }],
         isError: !installSuccess,
       };
     }
@@ -7696,7 +7711,7 @@ const handleCallTool = async (
             grep: grepPattern,
             ...result,
           };
-          let grepText = JSON.stringify(grepPayload, null, 2);
+          let grepText = minifiedJson(grepPayload);
 
           if (grepText.length > MAX_OUTPUT_CHARS) {
             const originalMatches = result.matches;
@@ -7971,7 +7986,7 @@ const handleCallTool = async (
         }
 
         const grepPayload = { path: filePath, grep: grepPattern, ...result };
-        let grepText = JSON.stringify(grepPayload, null, 2);
+        let grepText = minifiedJson(grepPayload);
 
         if (grepText.length > MAX_OUTPUT_CHARS) {
           const originalMatches = result.matches;
@@ -8323,7 +8338,7 @@ const handleCallTool = async (
             grep: grepPattern,
             ...result,
           };
-          let grepText = JSON.stringify(grepPayload, null, 2);
+          let grepText = minifiedJson(grepPayload);
 
           if (grepText.length > MAX_OUTPUT_CHARS) {
             const originalMatches = result.matches;
@@ -8894,7 +8909,7 @@ const handleCallTool = async (
             'abandoned — re-run with a filter for the missing worktrees.',
         };
         return {
-          content: [{ type: 'text', text: JSON.stringify(running, null, 2) }],
+          content: [{ type: 'text', text: minifiedJson(running) }],
         };
       }
 
@@ -8928,7 +8943,7 @@ const handleCallTool = async (
       };
 
       return {
-        content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson(summary) }],
         isError: failed > 0,
       };
     }
@@ -8987,7 +9002,7 @@ const handleCallTool = async (
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ jobs: listJobs() }, null, 2),
+            text: minifiedJson({ jobs: listJobs() }),
           },
         ],
       };
@@ -10031,7 +10046,7 @@ const handleCallTool = async (
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ results }, null, 2),
+            text: minifiedJson({ results }),
           },
         ],
       };
@@ -10266,7 +10281,7 @@ const handleCallTool = async (
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ results }, null, 2),
+            text: minifiedJson({ results }),
           },
         ],
       };

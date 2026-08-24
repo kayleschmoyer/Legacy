@@ -1,5 +1,6 @@
 import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 interface ViewRunParams {
   runId: number;
@@ -230,7 +231,7 @@ export async function viewRun(params: ViewRunParams): Promise<ToolResult> {
       const result: Record<string, unknown> = mapRun(run);
       if (jobs) result.jobs = jobs.map(mapJob);
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson(result) }],
       };
     }
 

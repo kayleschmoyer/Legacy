@@ -8,6 +8,7 @@ import {
   reportUrlFor,
 } from '../playwright-report.js';
 import { listPlaywrightS3Artifacts, resolveRunSha } from '../s3-artifacts.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /** Hard cap on any single string field in the response. Prevents a chatty
  * test (huge stdout / multi-MB snippet) from blowing past MCP limits. */
@@ -241,7 +242,7 @@ export async function getPlaywrightTestResult(params: {
     };
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(response) }],
     };
   }
 
@@ -315,7 +316,7 @@ export async function getPlaywrightTestResult(params: {
       message: `No test matched ${describeTarget}${fileNeedle && titleNeedle ? ` in files matching "${effectiveFileName}"` : ''}.`,
     };
     return {
-      content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(response) }],
     };
   }
 
@@ -352,7 +353,7 @@ export async function getPlaywrightTestResult(params: {
           : 'Pass testTitle to disambiguate.'),
     };
     return {
-      content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(response) }],
     };
   }
 
@@ -380,6 +381,6 @@ export async function getPlaywrightTestResult(params: {
   };
 
   return {
-    content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(response) }],
   };
 }

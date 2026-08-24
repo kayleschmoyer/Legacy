@@ -1,0 +1,54 @@
+{
+  "entries": [
+    {
+      "shortSha": "9675d7a",
+      "message": "HEAD@{0}: commit: LS-9706 refactor(mcp): trim the eight most expensive tool definitions",
+      "timestamp": "2026-08-23T15:44:02-04:00"
+    },
+    {
+      "shortSha": "bdda3f5",
+      "message": "HEAD@{1}: commit: LS-9705 refactor(mcp): deregister four dead deprecated tool aliases",
+      "timestamp": "2026-08-23T15:31:18-04:00"
+    },
+    {
+      "shortSha": "0a23ee0",
+      "message": "HEAD@{2}: commit: LS-9704 feat(mcp): enforce a tool-count and definition-token budget in CI",
+      "timestamp": "2026-08-23T15:12:44-04:00"
+    },
+    {
+      "shortSha": "d2cb5db",
+      "message": "HEAD@{3}: commit: LS-9703 feat(mcp): add redundant-tool gap type and a consolidation gate",
+      "timestamp": "2026-08-23T15:02:51-04:00"
+    },
+    {
+      "shortSha": "cf42e41",
+      "message": "HEAD@{4}: commit: LS-9702 docs(mcp): add the MCP tool-consolidation standard",
+      "timestamp": "2026-08-23T14:48:09-04:00"
+    },
+    {
+      "shortSha": "4526c5f",
+      "message": "HEAD@{5}: checkout: moving from main to claude/mcp-token-efficiency",
+      "timestamp": "2026-08-23T14:31:55-04:00"
+    },
+    {
+      "shortSha": "5f4b89a",
+      "message": "HEAD@{6}: commit: LS-9658 fix(ci): run e2e-mobile at full parity with the chromium e2e job",
+      "timestamp": "2026-08-22T19:04:11-04:00"
+    },
+    {
+      "shortSha": "8c43d60",
+      "message": "HEAD@{7}: commit: LS-9648 docs(skills): never call delete_trigger",
+      "timestamp": "2026-08-22T18:22:30-04:00"
+    },
+    {
+      "shortSha": "17d7097",
+      "message": "HEAD@{8}: commit: LS-9603 chore(mobile): upload Hermes sourcemaps to Rollbar",
+      "timestamp": "2026-08-22T17:51:06-04:00"
+    },
+    {
+      "shortSha": "bf118d3",
+      "message": "HEAD@{9}: commit: LS-9604 fix(ci): post No Merge Conflicts as a commit status",
+      "timestamp": "2026-08-22T17:12:44-04:00"
+    }
+  ]
+}

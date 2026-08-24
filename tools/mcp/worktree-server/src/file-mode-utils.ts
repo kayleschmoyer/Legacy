@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { isAbsolute, resolve, sep } from 'node:path';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /** MCP tool response envelope (subset used by these tools). */
 export interface ToolResponse {
@@ -176,7 +177,7 @@ export function executeWorktreeFileMode(
   });
 
   return {
-    content: [{ type: 'text', text: JSON.stringify({ results }, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson({ results }) }],
   };
 }
 
@@ -254,7 +255,7 @@ export function executeWorktreeSetExecutable(
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ path: filePath, executable, mode }, null, 2),
+        text: minifiedJson({ path: filePath, executable, mode }),
       },
     ],
   };

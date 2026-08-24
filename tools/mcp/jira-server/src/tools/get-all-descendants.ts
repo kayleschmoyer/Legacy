@@ -6,6 +6,7 @@ import {
 } from '../blockers.js';
 import { searchJqlAll } from '../jql-search.js';
 import { matchesStatus } from '../locale.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 export interface GetAllDescendantsParams {
   key: string;
@@ -138,7 +139,7 @@ export async function getAllDescendants(
   if (errors.length > 0) response.errors = errors;
 
   return {
-    content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(response) }],
   };
 }
 

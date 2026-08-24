@@ -1,6 +1,7 @@
 import { githubGet, postWithRetryOnAlreadyRunning } from '../github-api.js';
 import { fetchRunLogsRing } from '../logs.js';
 import type { ToolResult } from '../types.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 interface RetryFailedParams {
   runId: number;
@@ -186,7 +187,7 @@ export async function retryFailed(
     };
 
     return {
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(payload) }],
     };
   } catch (error) {
     return {

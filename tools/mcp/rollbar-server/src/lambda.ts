@@ -20,6 +20,7 @@ import { graphqlIntrospectType } from './tools/graphql-introspect-type.js';
 import { listOccurrences } from './tools/list-occurrences.js';
 import { setStatus } from './tools/set-status.js';
 import { topActiveItems } from './tools/top-active-items.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -41,7 +42,7 @@ function createMcpServer(): McpServer {
           : `Set ${ROLLBAR_READ_TOKEN_ENV} on the Lambda or populate the ROLLBAR_READ_TOKEN_SECRET_NAME secret in AWS Secrets Manager.`,
       };
       return {
-        content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        content: [{ type: 'text', text: minifiedJson(result) }],
       };
     },
   );

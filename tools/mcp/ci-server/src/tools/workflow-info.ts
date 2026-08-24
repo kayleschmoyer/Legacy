@@ -1,5 +1,6 @@
 import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 interface WorkflowInfoParams {
   workflow?: string;
@@ -116,7 +117,7 @@ export async function workflowInfo(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result, null, 2),
+          text: minifiedJson(result),
         },
       ],
     };

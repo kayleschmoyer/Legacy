@@ -2,6 +2,7 @@ import { LOGGER } from '@legacy-sports/logging';
 
 import { githubGet } from '../github-api.js';
 import type { ToolResult } from '../types.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 // Hard per-call ceiling. This server runs on a Lambda whose configured
 // timeout is 30s (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout,
@@ -91,7 +92,7 @@ export async function waitRun(params: WaitRunParams): Promise<ToolResult> {
       body.hint = waitRunHint(params.runId);
     }
     return {
-      content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
+      content: [{ type: 'text', text: minifiedJson(body) }],
     };
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);

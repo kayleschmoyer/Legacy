@@ -8,6 +8,7 @@ import {
 } from '../playwright-report.js';
 import { deploysTokenWasFallback, githubGet } from '../github-api.js';
 import { listPlaywrightS3Artifacts, resolveRunSha } from '../s3-artifacts.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /**
  * Return a Playwright report as compact, agent-targeted Markdown.
@@ -107,7 +108,7 @@ async function tryS3Fallback(params: {
   };
 
   return {
-    content: [{ type: 'text', text: JSON.stringify(response, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(response) }],
   };
 }
 

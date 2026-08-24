@@ -7,6 +7,7 @@
 
 import { dirname, resolve } from 'node:path';
 import { validateTrackedPaths } from './file-mode-utils';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /** MCP tool response envelope (subset used by this tool). */
 export interface ToolResponse {
@@ -163,7 +164,7 @@ export function executeWorktreeMv(args: MvArgs, deps: MvDeps): ToolResponse {
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ moved: results.length, results }, null, 2),
+        text: minifiedJson({ moved: results.length, results }),
       },
     ],
   };

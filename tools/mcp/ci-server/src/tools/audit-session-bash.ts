@@ -15,6 +15,7 @@ import {
 import { getRepoRoot } from '../github-api.js';
 import { findClaudeProjectsDir, resolveProjectSlug } from '../session-files.js';
 import type { ToolResult } from '../types.js';
+import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /**
  * Strict allow-list for project slug basenames. Mirrors assertSafeSlug in session-files.ts.
@@ -196,6 +197,6 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
     output['scratch_subprocess_calls'] = scratchCalls;
   }
   return {
-    content: [{ type: 'text', text: JSON.stringify(output, null, 2) }],
+    content: [{ type: 'text', text: minifiedJson(output) }],
   };
 }
