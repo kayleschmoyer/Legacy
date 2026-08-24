@@ -159,6 +159,80 @@ describe('LeagueDetailShell', () => {
     expect(labels).toEqual(['Overview', 'Roster', 'Trades']);
   });
 
+  // LS-7564: the native football league screen (apps/app/.../football/league/
+  // [leagueId].tsx) composes its 8 tabs (9 with Waivers enabled) through this
+  // exact shared shell, so the LS-7562 hoist fix applies with zero
+  // football-specific code. These cases pin that contract against football's
+  // actual tab shape — an extra memberOnly Chat tab and an optionally-spliced
+  // Waivers tab — rather than relying solely on the generic 4-tab fixture
+  // above, per LS-7564 AC5 ("confirm the football screen independently").
+  describe('football tab layout (LS-7564)', () => {
+    const FOOTBALL_TABS: readonly LeagueTabDef[] = [
+      { id: 'overview', label: 'Overview' },
+      { id: 'roster', label: 'Roster' },
+      { id: 'free-agents', label: 'Free Agents' },
+      { id: 'matchups', label: 'Matchups' },
+      { id: 'trades', label: 'Trades' },
+      { id: 'standings', label: 'Standings' },
+      { id: 'chat', label: 'Chat', memberOnly: true },
+      { id: 'commissioner', label: 'Settings', commishOnly: true },
+    ];
+    const FOOTBALL_TABS_WITH_WAIVERS: readonly LeagueTabDef[] = [
+      ...FOOTBALL_TABS.slice(0, 5),
+      { id: 'waivers', label: 'Waivers' },
+      ...FOOTBALL_TABS.slice(5),
+    ];
+
+    it('hoists Settings next to Overview at phone width with football’s 8-tab layout', () => {
+      (useMedia as jest.Mock).mockReturnValue({ xs: true });
+      const { getByRole } = renderShell({
+        sport: 'football',
+        tabs: FOOTBALL_TABS,
+      });
+      const labels = within(getByRole('tablist', { name: 'League sections' }))
+        .getAllByRole('tab')
+        .map((el) => el.textContent);
+      expect(labels[0]).toBe('Overview');
+      expect(labels[1]).toBe('Settings');
+    });
+
+    it('hoists Settings next to Overview at phone width with Waivers enabled (9 tabs)', () => {
+      (useMedia as jest.Mock).mockReturnValue({ xs: true });
+      const { getByRole } = renderShell({
+        sport: 'football',
+        tabs: FOOTBALL_TABS_WITH_WAIVERS,
+      });
+      const labels = within(getByRole('tablist', { name: 'League sections' }))
+        .getAllByRole('tab')
+        .map((el) => el.textContent);
+      expect(labels[0]).toBe('Overview');
+      expect(labels[1]).toBe('Settings');
+    });
+
+    it('keeps Settings in its canonical trailing slot on wide viewports for football', () => {
+      (useMedia as jest.Mock).mockReturnValue({});
+      const { getByRole } = renderShell({
+        sport: 'football',
+        tabs: FOOTBALL_TABS,
+      });
+      const labels = within(getByRole('tablist', { name: 'League sections' }))
+        .getAllByRole('tab')
+        .map((el) => el.textContent);
+      expect(labels[labels.length - 1]).toBe('Settings');
+    });
+
+    it('does not render Settings for a non-commissioner viewing the football tab layout', () => {
+      (useMedia as jest.Mock).mockReturnValue({ xs: true });
+      const { queryByText } = renderShell({
+        sport: 'football',
+        tabs: FOOTBALL_TABS,
+        role: 'member',
+        isCommissioner: false,
+      });
+      expect(queryByText('Settings')).toBeNull();
+    });
+  });
+
   it('fires onTabChange when a tab is pressed', () => {
     const onTabChange = jest.fn();
     const { getByText } = renderShell({ onTabChange });
