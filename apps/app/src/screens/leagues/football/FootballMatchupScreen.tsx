@@ -246,11 +246,55 @@ function HeadToHeadChip({
   );
 }
 
+type PlayerPointsMap = ReadonlyMap<
+  number,
+  { actualPoints: number; projectedPoints: number }
+>;
+
+/**
+ * Right-aligned actual/projected points for one roster row, matching web's
+ * per-player scoring columns (FMD-024). Renders em dashes for players with
+ * no matchupScores entry yet (e.g. scores still loading).
+ */
+function PlayerPoints({
+  playerId,
+  playerPoints,
+}: {
+  playerId: number | null | undefined;
+  playerPoints: PlayerPointsMap;
+}) {
+  const stats = playerId != null ? playerPoints.get(playerId) : undefined;
+  return (
+    <XStack width={76} justifyContent="flex-end" gap="$2">
+      <Text
+        fontSize="$3"
+        fontWeight="700"
+        color="$color12"
+        fontFamily="$mono"
+        textAlign="right"
+        width={36}
+      >
+        {stats ? stats.actualPoints.toFixed(1) : '—'}
+      </Text>
+      <Text
+        fontSize="$2"
+        color="$gray8"
+        fontFamily="$mono"
+        textAlign="right"
+        width={32}
+      >
+        {stats ? stats.projectedPoints.toFixed(1) : '—'}
+      </Text>
+    </XStack>
+  );
+}
+
 interface RosterSectionProps {
   readonly teamId: number | null | undefined;
   readonly players: MatchupPlayer[];
   readonly positionOrder: readonly string[];
   readonly label: string;
+  readonly playerPoints: PlayerPointsMap;
   readonly onPlayerPress: (player: MatchupPlayer) => void;
   readonly onEmptySlotPress: (teamId: number | null | undefined) => void;
 }
@@ -260,6 +304,7 @@ function RosterSection({
   players,
   positionOrder,
   label,
+  playerPoints,
   onPlayerPress,
   onEmptySlotPress,
 }: RosterSectionProps) {
@@ -337,6 +382,10 @@ function RosterSection({
                 {getPlayerPosition(player.player)}
               </Text>
             ) : null}
+            <PlayerPoints
+              playerId={player?.playerId}
+              playerPoints={playerPoints}
+            />
           </XStack>
         );
       })}
@@ -374,6 +423,10 @@ function RosterSection({
               <Text fontSize="$2" color="$gray7">
                 {getPlayerPosition(player.player)}
               </Text>
+              <PlayerPoints
+                playerId={player.playerId}
+                playerPoints={playerPoints}
+              />
             </XStack>
           ))}
         </>
@@ -545,6 +598,28 @@ export function FootballMatchupScreen(
   const team1Projection = teamProjectedScore(matchup?.team1Id);
   const team2Projection = teamProjectedScore(matchup?.team2Id);
 
+  // Per-player actual + projected points for roster rows (FMD-024) — web
+  // parity via MatchupRosterComparison. Sourced from the same matchupScores
+  // query used for the team-level projected score above, keyed by playerId
+  // across both teams.
+  const playerPoints = useMemo(() => {
+    const map = new Map<
+      number,
+      { actualPoints: number; projectedPoints: number }
+    >();
+    for (const teamStats of matchupScoresData?.matchupScores ?? []) {
+      if (teamStats.__typename !== 'FootballMatchupStats') continue;
+      for (const player of teamStats.players) {
+        if (player.playerId == null) continue;
+        map.set(player.playerId, {
+          actualPoints: player.totalPoints,
+          projectedPoints: player.projectedPoints,
+        });
+      }
+    }
+    return map;
+  }, [matchupScoresData]);
+
   // Playoff stakes only matter for a matchup still to be decided — skip the
   // query once the matchup is Completed or has no weekNumber to gate on.
   const showsPlayoffStakes =
@@ -667,6 +742,7 @@ export function FootballMatchupScreen(
               players={players}
               positionOrder={positionOrder}
               label={matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`}
+              playerPoints={playerPoints}
               onPlayerPress={onPlayerPress}
               onEmptySlotPress={onEmptySlotPress}
             />
@@ -675,6 +751,7 @@ export function FootballMatchupScreen(
               players={players}
               positionOrder={positionOrder}
               label={matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`}
+              playerPoints={playerPoints}
               onPlayerPress={onPlayerPress}
               onEmptySlotPress={onEmptySlotPress}
             />

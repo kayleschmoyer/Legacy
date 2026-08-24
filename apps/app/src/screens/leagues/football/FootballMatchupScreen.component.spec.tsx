@@ -600,6 +600,50 @@ describe('FootballMatchupScreen', () => {
     expect(mockRouterPush).toHaveBeenCalledWith('/football/players/5');
   });
 
+  it('renders per-player actual and projected points from matchupScores (FMD-024)', () => {
+    jest.mocked(graphqlLib.useMatchupScoresQuery).mockReturnValue({
+      data: {
+        matchupScores: [
+          {
+            __typename: 'FootballMatchupStats',
+            teamId: 10,
+            teamName: 'Team 10',
+            totalPoints: 102.5,
+            projectedPoints: 121.4,
+            players: [
+              {
+                __typename: 'FootballMatchupPlayer',
+                playerId: 5,
+                playerName: 'Patrick Mahomes',
+                position: 'QB',
+                totalPoints: 24.6,
+                projectedPoints: 22.1,
+                games: [],
+              },
+            ],
+          },
+        ],
+      },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useMatchupScoresQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+
+    expect(screen.getByText('24.6')).toBeTruthy();
+    expect(screen.getByText('22.1')).toBeTruthy();
+  });
+
+  it('renders em dashes for player points when matchupScores has no entry for the player', () => {
+    jest.mocked(graphqlLib.useMatchupScoresQuery).mockReturnValue({
+      data: { matchupScores: [] },
+      loading: false,
+    } as ReturnType<typeof graphqlLib.useMatchupScoresQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+
   it('navigates to the team roster route when an empty starter slot is pressed (LS-6382)', () => {
     render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
 
