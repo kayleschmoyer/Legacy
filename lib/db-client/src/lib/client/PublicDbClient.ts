@@ -959,6 +959,52 @@ export async function getRosterLockRules(db: PublicDb, leagueId: number) {
 }
 
 /**
+ * Compute the effective roster lock time for a matchup, given the league's
+ * `rosterLockTiming` setting and any custom lock rules. Pure function shared
+ * by `isRosterLocked` and the `Matchup.lockTime` GraphQL resolver (LS-6368)
+ * so both stay in sync.
+ */
+function toValidDate(value: string | Date): Date | null {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function computeRosterLockTime(
+  matchupStartTime: string | Date | null | undefined,
+  rosterLockTiming: string,
+  lockRules?: {
+    customLockTime?: string | Date | null;
+    lockHoursBeforeMatchup?: number | null;
+  } | null,
+): Date | null {
+  if (lockRules?.customLockTime) {
+    return toValidDate(lockRules.customLockTime);
+  }
+
+  if (!matchupStartTime) return null;
+  const matchupStart = toValidDate(matchupStartTime);
+  if (!matchupStart) return null;
+
+  switch (rosterLockTiming) {
+    case 'day_before':
+      return new Date(matchupStart.getTime() - 24 * 60 * 60 * 1000);
+    case 'week_before':
+      return new Date(matchupStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+    case 'custom':
+      if (lockRules?.lockHoursBeforeMatchup) {
+        return new Date(
+          matchupStart.getTime() -
+            lockRules.lockHoursBeforeMatchup * 60 * 60 * 1000,
+        );
+      }
+      return matchupStart;
+    case 'matchup_start':
+    default:
+      return matchupStart;
+  }
+}
+
+/**
  * Check if roster is currently locked for a team in a matchup
  */
 export async function isRosterLocked(
@@ -1015,50 +1061,20 @@ export async function isRosterLocked(
   const lockRules = await getRosterLockRules(db, leagueId);
   const now = new Date();
 
-  // Check custom lock time
-  if (lockRules?.customLockTime) {
-    const customLock = new Date(lockRules.customLockTime);
-    if (now >= customLock) {
-      return {
-        isLocked: true,
-        reason: 'Custom lock time reached',
-        lockTime: customLock,
-      };
-    }
-  }
+  const lockTime = computeRosterLockTime(
+    matchup.startTime,
+    league.rosterLockTiming,
+    lockRules,
+  );
 
-  // Check matchup start time with lock timing rules
-  if (matchup.startTime && league.rosterLockTiming) {
-    const matchupStart = new Date(matchup.startTime);
-    let lockTime = matchupStart;
-
-    switch (league.rosterLockTiming) {
-      case 'day_before':
-        lockTime = new Date(matchupStart.getTime() - 24 * 60 * 60 * 1000);
-        break;
-      case 'week_before':
-        lockTime = new Date(matchupStart.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'custom':
-        if (lockRules?.lockHoursBeforeMatchup) {
-          lockTime = new Date(
-            matchupStart.getTime() -
-              lockRules.lockHoursBeforeMatchup * 60 * 60 * 1000,
-          );
-        }
-        break;
-      case 'matchup_start':
-      default:
-        lockTime = matchupStart;
-    }
-
-    if (now >= lockTime) {
-      return {
-        isLocked: true,
-        reason: 'Roster lock time reached',
-        lockTime,
-      };
-    }
+  if (lockTime && now >= lockTime) {
+    return {
+      isLocked: true,
+      reason: lockRules?.customLockTime
+        ? 'Custom lock time reached'
+        : 'Roster lock time reached',
+      lockTime,
+    };
   }
 
   return { isLocked: false };

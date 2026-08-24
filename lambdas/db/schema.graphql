@@ -1992,6 +1992,11 @@ type Matchup {
   gamesPerMatchup: Int
   id: ID
   leagueId: Int
+
+  """
+  When lineups lock for this matchup (ISO 8601), computed from the league's roster-lock settings. Null once the matchup is no longer 'scheduled' (already locked) or when no lock time can be computed.
+  """
+  lockTime: String
   pitcherStartsPerMatchup: Int
 
   """

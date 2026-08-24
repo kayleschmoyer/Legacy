@@ -2,6 +2,7 @@ import React, { type ReactNode } from 'react';
 import { Text, YStack } from 'tamagui';
 import { type MatchupFragment } from '@legacy-sports/graphql';
 import { GamesRemaining } from './GamesRemaining';
+import { LineupLockBanner } from './LineupLockBanner';
 import { MatchupNavigationControls } from './MatchupNavigationControls';
 
 export interface MatchupDetailLayoutProps {
@@ -52,14 +53,15 @@ function formatMatchupTimestamp(value: string): string {
  * Section order:
  *   1. header (optional)
  *   2. MatchupNavigationControls
- *   3. scoreboard
- *   4. winProbabilityPanel
- *   5. GamesRemaining (when gamesPerMatchup > 0)
- *   6. Matchup information (start/end times)
- *   7. rosterEditor
- *   8. recapPanel
- *   9. rosterComparison
- *   10. additionalSections
+ *   3. LineupLockBanner (only when matchup.status === 'scheduled')
+ *   4. scoreboard
+ *   5. winProbabilityPanel
+ *   6. GamesRemaining (when gamesPerMatchup > 0)
+ *   7. Matchup information (start/end times)
+ *   8. rosterEditor
+ *   9. recapPanel
+ *   10. rosterComparison
+ *   11. additionalSections
  */
 export function MatchupDetailLayout({
   matchup,
@@ -110,6 +112,8 @@ export function MatchupDetailLayout({
         onMatchupChange={onMatchupChange}
         onResetToDefault={onResetToDefault}
       />
+
+      <LineupLockBanner matchup={matchup} />
 
       {scoreboard}
 

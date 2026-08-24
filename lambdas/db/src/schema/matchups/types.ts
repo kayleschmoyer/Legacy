@@ -15,6 +15,7 @@ import {
   MatchupWinProbabilityType,
   resolveMatchupWinProbability,
 } from './winProbability';
+import { resolveMatchupLockTime } from './lockTime';
 import { builder } from '../builder';
 import { hasEntitlement } from '../authorization';
 import { ENTITLEMENTS } from '../entitlements';
@@ -133,6 +134,15 @@ builder.objectType(Matchup, {
     }),
     startTime: t.exposeString('startTime', { nullable: true }),
     endTime: t.exposeString('endTime', { nullable: true }),
+    lockTime: t.string({
+      nullable: true,
+      description:
+        'When lineups lock for this matchup (ISO 8601), computed from the ' +
+        "league's roster-lock settings. Null once the matchup is no longer " +
+        "'scheduled' (already locked) or when no lock time can be computed.",
+      resolve: (matchup, _args, context) =>
+        resolveMatchupLockTime(matchup, context),
+    }),
     // Server-authoritative freshness marker (LS-6359): clients compare this
     // against their cached value to reject a refetch response that's older
     // than what they already have — e.g. a CDN/Apollo-router cache serving a

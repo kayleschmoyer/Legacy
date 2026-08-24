@@ -1699,6 +1699,8 @@ export type Matchup = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** When lineups lock for this matchup (ISO 8601), computed from the league's roster-lock settings. Null once the matchup is no longer 'scheduled' (already locked) or when no lock time can be computed. */
+  lockTime?: Maybe<Scalars['String']['output']>;
   pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   /** Auto-generated narrative recap, only available for completed matchups. */
   recap?: Maybe<MatchupRecap>;
@@ -7221,6 +7223,7 @@ export type GetMatchupByIdQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    lockTime?: string | null;
     updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
@@ -7277,6 +7280,7 @@ export type GetMatchupHistoryQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    lockTime?: string | null;
     updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
@@ -7491,6 +7495,7 @@ export type GetTeamMatchupHistoryQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    lockTime?: string | null;
     updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
@@ -11512,6 +11517,7 @@ export type GetMatchupsByWeekQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    lockTime?: string | null;
     updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
@@ -11556,6 +11562,7 @@ export type GetMatchupsForLeagueQuery = {
     selectedGamesCount?: number | null;
     startTime?: string | null;
     endTime?: string | null;
+    lockTime?: string | null;
     updatedAt?: string | null;
     team1?: {
       __typename?: 'Team';
@@ -12875,6 +12882,7 @@ export type MatchupFragment = {
   selectedGamesCount?: number | null;
   startTime?: string | null;
   endTime?: string | null;
+  lockTime?: string | null;
   updatedAt?: string | null;
   team1?: {
     __typename?: 'Team';
@@ -16265,6 +16273,7 @@ export const MatchupFragmentDoc = gql`
     selectedGamesCount
     startTime
     endTime
+    lockTime
     updatedAt
     team1 {
       id

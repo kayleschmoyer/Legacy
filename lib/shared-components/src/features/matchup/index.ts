@@ -15,6 +15,8 @@ export * from './MatchupNavigationControls';
 export * from './MatchupAdditionalSections';
 export * from './MatchupDetailLayout';
 export * from './MatchupDetailSkeleton';
+export * from './LineupLockBanner';
+export * from './hooks/useLineupLockCountdown';
 export * from './PlayoffBracket';
 export * from './usePlayoffBracket';
 export * from './paceThresholds';

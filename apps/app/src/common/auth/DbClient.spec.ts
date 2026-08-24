@@ -328,6 +328,8 @@ describe('createStaleMatchupGuardLink (LS-6359)', () => {
       // it here makes cache.readQuery throw a missing-field error inside
       // dropStaleMatchupResult, silently passing the stale response through.
       winProbability: null,
+      // Same hazard as winProbability above, for the LS-6368 lockTime field.
+      lockTime: null,
     };
   }
 
