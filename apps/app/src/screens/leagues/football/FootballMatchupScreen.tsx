@@ -328,7 +328,16 @@ function RosterSection({
     for (const slot of positionOrder) grouped[slot] = [];
     const bench: MatchupPlayer[] = [];
 
-    for (const player of teamPlayers) {
+    // Assign the most position-restricted players first (fewest eligible
+    // slots), so a flex-eligible player doesn't take the one slot a
+    // dedicated player at that position can fill. See LS-6380.
+    const byEligibilitySpecificity = [...teamPlayers].sort(
+      (a, b) =>
+        (a.player?.eligiblePositions?.length ?? 0) -
+        (b.player?.eligiblePositions?.length ?? 0),
+    );
+
+    for (const player of byEligibilitySpecificity) {
       const eligiblePositions = player.player?.eligiblePositions ?? [];
       let placed = false;
       for (const slot of positionOrder) {
