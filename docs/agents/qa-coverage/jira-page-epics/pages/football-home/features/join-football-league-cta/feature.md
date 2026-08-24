@@ -78,5 +78,11 @@ variant — one CTA label covers both layouts.
 - **Ticket:** LS-6288 (FBH-034) — Join CTA copy/label diverges across platforms
 - **Prior parity fix:** LS-7819 — retired the standalone `FootballLandingPage`
   in favor of the shared `NFLHome` component
+- **QA finding:** LS-7635 (GAP-003) — a stale code-scan finding claimed this
+  CTA was entirely unwired on web; by the time it was picked up, the wiring
+  above (from LS-6288/LS-7819) already existed. The one real gap it
+  surfaced — no unit test asserting the `onJoinLeague` wiring on
+  `FootballHubPage` — was closed by `FootballHubPage.spec.tsx`'s
+  `describe('FootballHubPage — Join League CTA wiring (LS-7635 / GAP-003)')`.
 - **Baseball counterpart:** [`../../baseball-home/features/join-baseball-league-cta/feature.md`](../../baseball-home/features/join-baseball-league-cta/feature.md)
 - **Shared hub component:** `lib/shared-components/src/features/football/NFLHome.tsx`

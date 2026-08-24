@@ -149,10 +149,20 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockNavigate.mockReturnValue(navigateSpy);
   mockNFLHome.mockImplementation(
-    ({ onCreateLeague }: React.ComponentProps<typeof NFLHome>) => (
-      <button data-testid="create-league-button" onClick={onCreateLeague}>
-        Create League
-      </button>
+    ({
+      onCreateLeague,
+      onJoinLeague,
+    }: React.ComponentProps<typeof NFLHome>) => (
+      <>
+        <button data-testid="create-league-button" onClick={onCreateLeague}>
+          Create League
+        </button>
+        {onJoinLeague && (
+          <button data-testid="join-league-button" onClick={onJoinLeague}>
+            Join League
+          </button>
+        )}
+      </>
     ),
   );
   mockUpgradeModal.mockImplementation(
@@ -257,6 +267,17 @@ describe('FootballHubPage — free-tier league cap gating (LS-5184)', () => {
 
     expect(navigateSpy).not.toHaveBeenCalled();
     expect(screen.getByTestId('upgrade-modal')).toBeInTheDocument();
+  });
+});
+
+describe('FootballHubPage — Join League CTA wiring (LS-7635 / GAP-003)', () => {
+  it('wires onJoinLeague to NFLHome and navigates to /football/league/join when pressed', () => {
+    setLeagues(leaguesOfCount(2));
+
+    render(<FootballHubPage />);
+    fireEvent.click(screen.getByTestId('join-league-button'));
+
+    expect(navigateSpy).toHaveBeenCalledWith('/football/league/join');
   });
 });
 
