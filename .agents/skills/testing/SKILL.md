@@ -450,6 +450,26 @@ Rules for dual-mode specs: no `page.route()`, no mock payload imports, no identi
 
 Reference dual-mode spec: `src/tests/shared/player-stats-search.dual.spec.ts`.
 
+### Dual-mode by default for new UI-flow specs
+
+**A new spec covering a UI flow is dual-mode by default** — write it under `src/tests/shared/` against
+`fixtures/dual.ts` + the `TestData` seam, not as a new `*.integration.spec.ts`. Write it live-only
+(under `src/integration/tests/`) only when the flow genuinely needs infra a mock cannot emulate: a real
+OAuth handshake, a real Stripe checkout, a real websocket push whose _delivery_ (not just its payload)
+is the thing under test, a real async Lambda race, or a real external dataset (e.g. live game logs). "It
+touches multiple users" or "it needs a seeded league" is **not** by itself a reason to go live-only — it
+means `TestData` needs a new verb (grow it verb-by-verb, per the seam's existing contract), not that the
+flow belongs in the live-only suite. See [LS-9674's migration matrix](../../../docs/dev-process/e2e-dual-mode-migration-matrix.md)
+for the reasoning worked through against the 24 pre-existing integration specs, including the cases that
+correctly stay live-only (real WebSocket delivery canaries, real read-replica lag races, real
+priority-resolution/business-logic correctness) versus the much larger set that only _looked_
+live-only because the seam hadn't grown the verbs yet.
+
+Review-checklist addition: a new spec under `src/integration/tests/` should name, in its own header
+comment or PR description, which specific assertion needs live infra. "No particular reason, that's
+where similar specs live" is not sufficient — that reasoning is exactly how a 24-spec, zero-PR-coverage
+backlog accumulates.
+
 ## Integration vs E2E Directory Distinction
 
 `apps/web-e2e/` contains two distinct test suites with different network contracts:
