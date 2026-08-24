@@ -32,3 +32,7 @@ export {
   type FootballPlayerHeaderProps,
   type FootballPlayerHeaderPlayer,
 } from './FootballPlayerHeader';
+export {
+  detectPreset as detectFootballScoringPreset,
+  type FootballScoringFormat,
+} from './ScoringSettingsEditor';

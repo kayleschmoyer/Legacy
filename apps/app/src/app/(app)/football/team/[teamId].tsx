@@ -12,6 +12,7 @@ import {
 import { Alert, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
+import type { FootballScoringFormat } from '@legacy-sports/shared-components/football';
 import {
   RosterBoard,
   type RosterPlayerStats,
@@ -22,6 +23,7 @@ import {
   MatchupFragment,
   MatchupScoresQuery,
   useGetLeagueByIdQuery,
+  useGetLeagueScoringProfileQuery,
   useGetMatchupByIdQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
@@ -36,6 +38,14 @@ import { FootballLeagueRosterScreen } from '../../../../screens/leagues/football
 import { MatchupCard } from '../../../../features/matchup/components/MatchupCard';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
+import { deriveFootballScoringFormat } from '../../../../common/scoring/footballScoringFormat';
+
+const SCORING_FORMAT_LABELS: Record<FootballScoringFormat, string> = {
+  standard: 'Standard',
+  half_ppr: 'Half-PPR',
+  ppr: 'PPR',
+  custom: 'Custom',
+};
 
 const ALL_TABS = Object.freeze([
   'Roster',
@@ -212,6 +222,7 @@ interface TabContentProps {
   avatarUrl: string | null | undefined;
   bannerUrl: string | null | undefined;
   defensiveFormat: string | null | undefined;
+  scoringFormat: FootballScoringFormat | undefined;
   getPlayerStats: (player: AppTeamMemberFragment) => RosterPlayerStats | null;
   matchup: MatchupFragment | null | undefined;
   matchupId: number;
@@ -233,6 +244,7 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     avatarUrl,
     bannerUrl,
     defensiveFormat,
+    scoringFormat,
     getPlayerStats,
     matchup,
     matchupId,
@@ -262,6 +274,16 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     case 'Lineup':
       return (
         <YStack padding="$4">
+          {scoringFormat && (
+            <Text
+              testID="lineup-scoring-format-badge"
+              color="$gray10"
+              fontSize="$2"
+              paddingBottom="$2"
+            >
+              {SCORING_FORMAT_LABELS[scoringFormat]} Scoring
+            </Text>
+          )}
           <RosterBoard<AppTeamMemberFragment, LeaguePositionFragment>
             positions={rosterSlots.filter(
               (s): s is LeaguePositionFragment => s != null,
@@ -332,6 +354,17 @@ export default function FootballTeam(): React.JSX.Element {
         leagueId: team?.team?.leagueId || -1,
       },
     });
+
+  const { data: scoringProfileData } = useGetLeagueScoringProfileQuery({
+    skip: team?.team?.leagueId === undefined,
+    variables: {
+      leagueId: team?.team?.leagueId || -1,
+    },
+  });
+
+  const scoringFormat = deriveFootballScoringFormat(
+    scoringProfileData?.leagueScoringProfile,
+  );
 
   const { loading: loadingMembers, data: membersData } = useGetTeamMembersQuery(
     {
@@ -551,6 +584,7 @@ export default function FootballTeam(): React.JSX.Element {
           avatarUrl={team.team.avatarUrl}
           bannerUrl={team.team.bannerUrl}
           defensiveFormat={leagueData?.league?.defensiveFormat}
+          scoringFormat={scoringFormat}
           getPlayerStats={getPlayerStats}
           matchup={matchupData?.getMatchupById}
           matchupId={currentMatchupId ?? 0}

@@ -156,7 +156,7 @@ const PRESETS: ReadonlyArray<{
   { id: 'ppr', label: 'PPR', rec: 1, description: '1 pt / rec' },
 ];
 
-function detectPreset(rec: number): FootballScoringFormat {
+export function detectPreset(rec: number): FootballScoringFormat {
   if (rec === 0) return 'standard';
   if (rec === 0.5) return 'half_ppr';
   if (rec === 1) return 'ppr';

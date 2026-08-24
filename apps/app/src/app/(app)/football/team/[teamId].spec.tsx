@@ -30,6 +30,20 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
+// Avoids loading the real @legacy-sports/shared-components/football barrel
+// (pulled in transitively via deriveFootballScoringFormat), which drags in
+// NFLHome/FootballPlayerCard/etc. and @react-native-google-signin/google-signin
+// — an ESM-only package Jest can't parse (not in the app jest config's
+// transformIgnorePatterns allowlist).
+jest.mock('@legacy-sports/shared-components/football', () => ({
+  detectFootballScoringPreset: (rec: number) => {
+    if (rec === 0) return 'standard';
+    if (rec === 0.5) return 'half_ppr';
+    if (rec === 1) return 'ppr';
+    return 'custom';
+  },
+}));
+
 jest.mock('tamagui', () => {
   const React = jest.requireActual<typeof import('react')>('react');
   const mocks = jest.requireActual<
@@ -373,7 +387,40 @@ const mockUseGetMatchupByIdQuery = jest.fn(() => ({
   data: { getMatchupById: mockMatchup },
 }));
 
+function buildScoringProfile(recMultiplier: number) {
+  return {
+    leagueScoringProfile: {
+      profileId: 1,
+      profileName: 'Test Profile',
+      stats: [
+        {
+          multiplier: recMultiplier,
+          defaultMultiplier: 1,
+          isOverride: recMultiplier !== 1,
+          isEnabled: true,
+          definition: {
+            id: 1,
+            statKey: 'rec',
+            statGroup: 'receiving',
+            displayName: 'Reception',
+          },
+        },
+      ],
+      multiplierGroups: [],
+      positionBonuses: [],
+    },
+  };
+}
+
+const mockUseGetLeagueScoringProfileQuery = jest.fn(() => ({
+  loading: false,
+  data: buildScoringProfile(1),
+}));
+
 jest.mock('@legacy-sports/graphql', () => ({
+  // Real value (not a hook mock) — footballScoringFormat.ts reads
+  // ScoringStatGroup.Receiving at module scope to derive the badge.
+  ScoringStatGroup: { Receiving: 'receiving' },
   useGetTeamByIdQuery: (...args: unknown[]) => mockUseGetTeamByIdQuery(...args),
   useGetUserTeamIdQuery: (...args: unknown[]) =>
     mockUseGetUserTeamIdQuery(...args),
@@ -381,6 +428,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetMatchupByIdQuery(...args),
   useGetLeagueByIdQuery: (...args: unknown[]) =>
     mockUseGetLeagueByIdQuery(...args),
+  useGetLeagueScoringProfileQuery: (...args: unknown[]) =>
+    mockUseGetLeagueScoringProfileQuery(...args),
   useGetPositionsForLeagueQuery: (...args: unknown[]) =>
     mockUseGetPositionsForLeagueQuery(...args),
   useGetTeamMembersQuery: (...args: unknown[]) =>
@@ -434,6 +483,10 @@ describe('FootballTeam route', () => {
     mockUseMatchupScoresQuery.mockReturnValue({
       loading: false,
       data: undefined,
+    });
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: buildScoringProfile(1),
     });
   });
 
@@ -508,6 +561,28 @@ describe('FootballTeam route', () => {
     expect(screen.getByTestId('roster-board-sport')).toHaveTextContent(
       'football',
     );
+  });
+
+  it("shows the league's scoring format badge on the Lineup tab", () => {
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: buildScoringProfile(0.5),
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.getByTestId('lineup-scoring-format-badge')).toHaveTextContent(
+      'Half-PPR Scoring',
+    );
+  });
+
+  it('shows no scoring format badge when the profile has no receiving rec stat', () => {
+    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+      loading: false,
+      data: undefined,
+    });
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Lineup'));
+    expect(screen.queryByTestId('lineup-scoring-format-badge')).toBeNull();
   });
 
   it("forwards the league's football slots to the board", () => {
