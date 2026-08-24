@@ -88,10 +88,27 @@ const mockPlayer = {
   eligiblePositions: ['QB'],
 };
 
+// League position ids -> slot labels, mirroring the leaguePositions table
+// (LS-6379). Matchup player fixtures reference these ids via `positionId`,
+// the server-stored source of truth for slot assignment.
+const mockLeaguePositions = [
+  { id: 1301, positionType: 'QB' },
+  { id: 1302, positionType: 'RB' },
+  { id: 1303, positionType: 'WR' },
+  { id: 1304, positionType: 'TE' },
+  { id: 1305, positionType: 'FLEX' },
+  { id: 1306, positionType: 'K' },
+  { id: 1307, positionType: 'DST' },
+  { id: 1308, positionType: 'DL' },
+  { id: 1309, positionType: 'LB' },
+  { id: 1310, positionType: 'DB' },
+];
+
 const mockMatchupPlayer = {
   id: 201,
   playerId: 5,
   teamId: 10,
+  positionId: 1301, // QB
   player: mockPlayer,
 };
 
@@ -127,6 +144,10 @@ jest.mock('@legacy-sports/graphql', () => ({
   })),
   useGetUserTeamIdQuery: jest.fn(() => ({
     data: undefined,
+    loading: false,
+  })),
+  useGetPositionsForLeagueQuery: jest.fn(() => ({
+    data: { leaguePositions: mockLeaguePositions },
     loading: false,
   })),
 }));
@@ -651,11 +672,14 @@ describe('FootballMatchupScreen', () => {
     expect(screen.queryByTestId('matchup-roster-editor')).toBeNull();
   });
 
-  it('places a dedicated RB in the RB slot instead of a flex-eligible RB/WR player, even when the flex player is listed first (LS-6380)', () => {
-    const flexEligiblePlayer = {
+  it('honors the server-stored positionId over a client re-derivation from eligiblePositions (LS-6379)', () => {
+    // Player intentionally moved to FLEX pre-lock via updateMatchupPlayerPosition
+    // — eligiblePositions would still let a greedy allocator place them in RB.
+    const flexAssignedPlayer = {
       id: 501,
       playerId: 501,
       teamId: 10,
+      positionId: 1305, // FLEX
       player: {
         id: 501,
         firstName: 'Flex',
@@ -667,6 +691,7 @@ describe('FootballMatchupScreen', () => {
       id: 502,
       playerId: 502,
       teamId: 10,
+      positionId: 1302, // RB
       player: {
         id: 502,
         firstName: 'Dedicated',
@@ -675,9 +700,7 @@ describe('FootballMatchupScreen', () => {
       },
     };
     jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
-      // Flex-eligible player iterates first — the greedy bug filled RB with
-      // this player and benched the dedicated RB.
-      data: { getMatchupPlayers: [flexEligiblePlayer, dedicatedRbPlayer] },
+      data: { getMatchupPlayers: [flexAssignedPlayer, dedicatedRbPlayer] },
       loading: false,
       refetch: mockRefetchPlayers,
     } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
@@ -687,6 +710,31 @@ describe('FootballMatchupScreen', () => {
     expect(screen.getByText('Dedicated Runningback')).toBeTruthy();
     expect(screen.getByText('Flex Player')).toBeTruthy();
     expect(screen.queryByText('BN')).toBeNull();
+  });
+
+  it('benches a player whose positionId is null, even when eligiblePositions would place them in an empty slot (LS-6379)', () => {
+    const benchedFlexEligiblePlayer = {
+      id: 503,
+      playerId: 503,
+      teamId: 10,
+      positionId: null,
+      player: {
+        id: 503,
+        firstName: 'Benched',
+        lastName: 'Flexer',
+        eligiblePositions: ['RB', 'WR'],
+      },
+    };
+    jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
+      data: { getMatchupPlayers: [benchedFlexEligiblePlayer] },
+      loading: false,
+      refetch: mockRefetchPlayers,
+    } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+
+    expect(screen.getByText('Benched Flexer')).toBeTruthy();
+    expect(screen.getByText('BN')).toBeTruthy();
   });
 
   it('renders DST position slot in DST format', () => {

@@ -26,6 +26,7 @@ import {
   useGetHeadToHeadRecordQuery,
   useGetMatchupByIdQuery,
   useGetMatchupPlayersQuery,
+  useGetPositionsForLeagueQuery,
   useGetUserTeamIdQuery,
   useMatchupScoresQuery,
 } from '@legacy-sports/graphql';
@@ -224,6 +225,8 @@ interface RosterSectionProps {
   /** League's total roster size, used to derive the bench capacity (LS-6383). */
   readonly maxRosterSize?: number | null;
   readonly playerPoints: PlayerPointsMap;
+  /** Maps a league position's id to its slot label (e.g. 'RB', 'FLEX'), sourced from `leaguePositions` (LS-6379). */
+  readonly positionMap: ReadonlyMap<number, string>;
   readonly onPlayerPress: (player: MatchupPlayer) => void;
   readonly onEmptySlotPress: (teamId: number | null | undefined) => void;
 }
@@ -235,6 +238,7 @@ function RosterSection({
   label,
   maxRosterSize,
   playerPoints,
+  positionMap,
   onPlayerPress,
   onEmptySlotPress,
 }: RosterSectionProps) {
@@ -245,33 +249,24 @@ function RosterSection({
     for (const slot of positionOrder) grouped[slot] = [];
     const bench: MatchupPlayer[] = [];
 
-    // Assign the most position-restricted players first (fewest eligible
-    // slots), so a flex-eligible player doesn't take the one slot a
-    // dedicated player at that position can fill. See LS-6380.
-    const byEligibilitySpecificity = [...teamPlayers].sort(
-      (a, b) =>
-        (a.player?.eligiblePositions?.length ?? 0) -
-        (b.player?.eligiblePositions?.length ?? 0),
-    );
-
-    for (const player of byEligibilitySpecificity) {
-      const eligiblePositions = player.player?.eligiblePositions ?? [];
-      let placed = false;
-      for (const slot of positionOrder) {
-        if (
-          eligiblePositions.includes(slot) &&
-          (grouped[slot]?.length ?? 0) === 0
-        ) {
-          grouped[slot]?.push(player);
-          placed = true;
-          break;
-        }
+    // The server-stored `positionId` is the source of truth for slot
+    // assignment — it reflects the user's actual lineup choices (e.g. moving
+    // an RB-eligible player to FLEX), which a client-side re-derivation from
+    // `eligiblePositions` would silently override. See LS-6379.
+    for (const player of teamPlayers) {
+      const slot =
+        player.positionId != null
+          ? positionMap.get(player.positionId)
+          : undefined;
+      if (slot && grouped[slot]) {
+        grouped[slot].push(player);
+      } else {
+        bench.push(player);
       }
-      if (!placed) bench.push(player);
     }
 
     return { grouped, bench };
-  }, [teamPlayers, positionOrder]);
+  }, [teamPlayers, positionOrder, positionMap]);
 
   // Bench capacity is the league's total roster size minus the starter
   // slots; only shown when a valid (positive) cap can be derived (LS-6383).
@@ -439,6 +434,24 @@ export function FootballMatchupScreen(
     variables: { matchupId },
     notifyOnNetworkStatusChange: true,
   });
+
+  const { data: positionsData } = useGetPositionsForLeagueQuery({
+    variables: { leagueId: leagueId ?? 0 },
+    skip: !leagueId,
+  });
+
+  // Maps league position id -> slot label (e.g. 'RB', 'FLEX'), the canonical
+  // server-side lookup used to honor `matchupPlayer.positionId` (LS-6379).
+  const positionMap = useMemo(() => {
+    const map = new Map<number, string>();
+    positionsData?.leaguePositions?.forEach((pos) => {
+      if (pos?.id != null && pos.positionType) {
+        const id = typeof pos.id === 'string' ? parseInt(pos.id, 10) : pos.id;
+        map.set(id, pos.positionType);
+      }
+    });
+    return map;
+  }, [positionsData]);
 
   useEffect(() => {
     if (matchupError) {
@@ -684,6 +697,7 @@ export function FootballMatchupScreen(
                 label={matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`}
                 maxRosterSize={maxRosterSize}
                 playerPoints={playerPoints}
+                positionMap={positionMap}
                 onPlayerPress={onPlayerPress}
                 onEmptySlotPress={onEmptySlotPress}
               />
@@ -708,6 +722,7 @@ export function FootballMatchupScreen(
                 label={matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`}
                 maxRosterSize={maxRosterSize}
                 playerPoints={playerPoints}
+                positionMap={positionMap}
                 onPlayerPress={onPlayerPress}
                 onEmptySlotPress={onEmptySlotPress}
               />
