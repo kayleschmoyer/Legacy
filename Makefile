@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index mcp-api-reference lint-mcp-api-reference mcp-docs lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps hash-design-bundle format fmt typecheck validate \
+	lint lint-fix lint-workflows lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps hash-design-bundle format fmt typecheck validate \
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
@@ -298,9 +298,13 @@ mcp-api-reference: ## Regenerate docs/mcp/api-reference.{html,json} from the too
 	@$(call echo_blue,Generating MCP API reference...)
 	@node scripts/generate-mcp-api-reference.mjs
 
-lint-mcp-api-reference: ## Check docs/mcp/api-reference.json is in sync with the tools/mcp/ servers
-	@$(call echo_blue,Checking MCP API reference sync...)
+lint-mcp-api-reference: ## Check MCP API reference sync + the tool-definition budget (docs/mcp/tool-budget.json)
+	@$(call echo_blue,Checking MCP API reference sync and tool-definition budget...)
 	@node scripts/generate-mcp-api-reference.mjs --check
+
+mcp-tool-budget: ## Re-seed docs/mcp/tool-budget.json ceilings from the current measurement (review the diff!)
+	@$(call echo_blue,Re-seeding MCP tool-definition budget...)
+	@node scripts/generate-mcp-api-reference.mjs --update-budget
 
 mcp-docs: ## Fetch a hosted MCP server's own /docs page (SERVER=ci|github|jira|db-admin|rollbar)
 	@$(call echo_blue,Fetching hosted MCP server docs...)

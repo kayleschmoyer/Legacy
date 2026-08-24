@@ -9,13 +9,24 @@
  *   lib/mcp-docs/src/pages/<id>.generated.ts — one single-server page per hosted
  *       server, embedded in its Lambda bundle and served from `GET /docs`
  *
+ * Also enforces the tool-definition budget (LS-9704): `--check` fails when a
+ * server exceeds its ceiling in docs/mcp/tool-budget.json, and equally when it
+ * drops well below one without the ceiling being lowered — see
+ * ./mcp-api-reference/budget.mjs for why both directions matter.
+ *
  * Usage:
- *   node scripts/generate-mcp-api-reference.mjs           # write both files
- *   node scripts/generate-mcp-api-reference.mjs --check    # fail on drift (CI)
+ *   node scripts/generate-mcp-api-reference.mjs                  # write both files
+ *   node scripts/generate-mcp-api-reference.mjs --check          # fail on drift + budget (CI)
+ *   node scripts/generate-mcp-api-reference.mjs --update-budget  # re-seed ceilings from current measurement
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  budgetFromMeasurement,
+  checkBudget,
+  measureDefinitionTokens,
+} from './mcp-api-reference/budget.mjs';
 import { collect } from './mcp-api-reference/collect.mjs';
 import { render } from './mcp-api-reference/render.mjs';
 
@@ -23,6 +34,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = join(REPO_ROOT, 'docs/mcp');
 const HTML_PATH = join(OUT_DIR, 'api-reference.html');
 const JSON_PATH = join(OUT_DIR, 'api-reference.json');
+const BUDGET_PATH = join(OUT_DIR, 'tool-budget.json');
 const PAGES_DIR = join(REPO_ROOT, 'lib/mcp-docs/src/pages');
 
 /** Filename key for a server's generated page, e.g. 'db-admin'. */
@@ -54,6 +66,7 @@ function readIfPresent(path) {
 
 function main() {
   const check = process.argv.includes('--check');
+  const updateBudget = process.argv.includes('--update-budget');
 
   const model = collect(REPO_ROOT);
   if (model.toolCount === 0) {
@@ -61,6 +74,19 @@ function main() {
       'No MCP tools extracted — the extractor is out of step with the servers.',
     );
     process.exit(1);
+  }
+
+  const measured = measureDefinitionTokens(model);
+
+  if (updateBudget) {
+    const body = `${JSON.stringify(budgetFromMeasurement(measured), null, 2)}\n`;
+    mkdirSync(OUT_DIR, { recursive: true });
+    writeFileSync(BUDGET_PATH, body);
+    console.log(
+      `Re-seeded ${relative(REPO_ROOT, BUDGET_PATH)} at ${measured.toolCount} tools / ${measured.total} definition tokens.\n` +
+        'Review the diff before committing — this overwrites every ceiling, including ones you may not have intended to raise.',
+    );
+    return;
   }
 
   const outputs = [
@@ -102,7 +128,35 @@ function main() {
       );
       process.exit(1);
     }
-    console.log(`MCP API reference is up to date (${model.toolCount} tools).`);
+    const budgetRaw = readIfPresent(BUDGET_PATH);
+    if (budgetRaw === undefined) {
+      console.error(
+        `Missing ${relative(REPO_ROOT, BUDGET_PATH)}.\n\n` +
+          'Seed it with `node scripts/generate-mcp-api-reference.mjs --update-budget` and commit the result.',
+      );
+      process.exit(1);
+    }
+
+    const { violations, lines } = checkBudget(measured, JSON.parse(budgetRaw));
+    console.log(
+      `MCP tool-definition budget (${measured.toolCount} tools, ${measured.total} tokens):\n${lines.join('\n')}`,
+    );
+
+    if (violations.length) {
+      console.error(
+        '\nMCP tool-definition budget violated:\n\n' +
+          violations.map((v) => `  - ${v}`).join('\n\n') +
+          '\n\nTool definitions are always-resident token cost — every registered tool bills every\n' +
+          'session whether or not it is called. See .agents/skills/create/references/mcp-tool-consolidation.md.\n' +
+          'To re-seed every ceiling from the current measurement:\n' +
+          '  node scripts/generate-mcp-api-reference.mjs --update-budget',
+      );
+      process.exit(1);
+    }
+
+    console.log(
+      `\nMCP API reference is up to date (${model.toolCount} tools), budget holds.`,
+    );
     return;
   }
 

@@ -34,6 +34,35 @@ adding, removing, or re-describing a tool and commit the result — CI's
 `custom-checks` job fails on drift (check locally with
 `make lint-mcp-api-reference`).
 
+## Tool-Definition Budget
+
+A tool definition (name + description + input schema) is advertised to the model
+up front, so **every registered tool bills every session whether or not it is
+called** — 256 tools cost ~89,250 tokens today.
+
+`docs/mcp/tool-budget.json` holds a per-server ceiling for tool count and
+definition tokens, enforced by the same `make lint-mcp-api-reference` check.
+It is a **ratchet**, so the check fails in both directions:
+
+| Situation                                   | Result | Fix                                                        |
+| ------------------------------------------- | ------ | ---------------------------------------------------------- |
+| Over the ceiling                            | fail   | Consolidate, or raise the ceiling and justify it in the PR |
+| Well under the ceiling (beyond a tolerance) | fail   | Lower the ceiling in the same PR to lock the saving in     |
+
+Without the second direction a ceiling is a one-time cap that erodes — the next
+tool added quietly spends whatever a consolidation saved. The tolerance is 2% of
+the ceiling with a 200-token floor, so routine description edits don't force a
+budget commit while a real consolidation does.
+
+Re-seed every ceiling from the current measurement with **`make mcp-tool-budget`**
+(review the diff — it overwrites all ceilings, including ones you may not have
+meant to raise).
+
+> Before adding a tool, read
+> [`.agents/skills/create/references/mcp-tool-consolidation.md`](../../.agents/skills/create/references/mcp-tool-consolidation.md).
+> An `action` param on an existing tool is almost always cheaper than a new tool,
+> and anything superseded must be deregistered in the same PR.
+
 #### Stability of `api-reference.json`
 
 The JSON is a **generated artifact, not a published API**. Its shape follows
