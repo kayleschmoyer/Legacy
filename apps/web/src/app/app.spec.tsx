@@ -3,6 +3,8 @@ import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import React from 'react';
 
 import App from './app';
+import { useFeatureValue } from '../context/GrowthBookProvider';
+import * as analytics from '../utils/analytics';
 
 // Mock all the components that might have complex dependencies
 jest.mock('@legacy-sports/shared-components', () => {
@@ -802,6 +804,83 @@ describe('App', () => {
 
       // Take snapshot of the entire page layout
       expect(container.firstChild).toMatchSnapshot();
+    });
+  });
+
+  describe('FootballGate', () => {
+    const mockUseFeatureValue = useFeatureValue as jest.Mock;
+
+    afterEach(() => {
+      // Restore the file-level default (loading/unconfigured GrowthBook).
+      mockUseFeatureValue.mockReturnValue(null);
+    });
+
+    it('redirects to / and fires trackFeatureGateBlocked when football_enabled is explicitly false', async () => {
+      mockUseFeatureValue.mockReturnValue(false);
+      const trackSpy = jest
+        .spyOn(analytics, 'trackFeatureGateBlocked')
+        .mockImplementation(() => undefined);
+
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      await act(() => Promise.resolve());
+
+      expect(container).not.toHaveTextContent('Football Hub');
+      expect(container).toHaveTextContent('Home Page');
+      expect(trackSpy).toHaveBeenCalledTimes(1);
+      expect(trackSpy).toHaveBeenCalledWith('football_enabled');
+
+      trackSpy.mockRestore();
+    });
+
+    it('renders the football hub and does not track a redirect when football_enabled is true', async () => {
+      mockUseFeatureValue.mockReturnValue(true);
+      const trackSpy = jest
+        .spyOn(analytics, 'trackFeatureGateBlocked')
+        .mockImplementation(() => undefined);
+
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      await act(() => Promise.resolve());
+
+      expect(container).toHaveTextContent('Football Hub');
+      expect(trackSpy).not.toHaveBeenCalled();
+
+      trackSpy.mockRestore();
+    });
+
+    it('renders the football hub and does not track a redirect while GrowthBook is loading/unconfigured (null)', async () => {
+      mockUseFeatureValue.mockReturnValue(null);
+      const trackSpy = jest
+        .spyOn(analytics, 'trackFeatureGateBlocked')
+        .mockImplementation(() => undefined);
+
+      const { container } = render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+      await act(() => Promise.resolve());
+
+      expect(container).toHaveTextContent('Football Hub');
+      expect(trackSpy).not.toHaveBeenCalled();
+
+      trackSpy.mockRestore();
     });
   });
 });

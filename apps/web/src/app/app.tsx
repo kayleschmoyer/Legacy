@@ -30,6 +30,7 @@ import { ScoreboardTicker } from '../components/scoreboard/ScoreboardTicker';
 import { NAV_Z_INDEX } from '../constants/dimensions';
 import { useFeatureValue } from '../context/GrowthBookProvider';
 import { useIsPremiumStatus } from '../hooks/useIsPremium';
+import { trackFeatureGateBlocked } from '../utils/analytics';
 
 /* ────────────────────────────────────────────────────────
  * Lazy-loaded routes — these pages are split into separate
@@ -225,7 +226,10 @@ function FootballGate({
   children: React.ReactNode;
 }): React.ReactNode {
   const footballEnabled = useFeatureValue('football_enabled', true);
-  if (footballEnabled === false) return <Navigate to="/" replace />;
+  if (footballEnabled === false) {
+    trackFeatureGateBlocked('football_enabled');
+    return <Navigate to="/" replace />;
+  }
   return children;
 }
 

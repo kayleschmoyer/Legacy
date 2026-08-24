@@ -318,6 +318,20 @@ export function trackPremiumFeatureBlocked(featureName: string): void {
   });
 }
 
+/**
+ * Track when a feature-flag kill-switch redirects the user away from a
+ * gated route (e.g. GrowthBook's `football_enabled` flag forcing
+ * FootballGate to redirect to `/`). Makes a rollout kill-switch flip
+ * visible in GA4 instead of a silent, unmonitored bounce.
+ * @param featureName - GrowthBook feature flag key that triggered the redirect
+ */
+export function trackFeatureGateBlocked(featureName: string): void {
+  trackEvent('feature_gate_blocked', {
+    feature_name: featureName,
+    category: 'feature_flag',
+  });
+}
+
 // =============================================================================
 // League Creation
 // =============================================================================
