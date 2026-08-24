@@ -115,7 +115,8 @@ type ElementOp =
   | { readonly type: 'first' }
   | { readonly type: 'last' }
   | { readonly type: 'index'; readonly n: number }
-  | { readonly type: 'filterText'; readonly text: string | RegExp };
+  | { readonly type: 'filterText'; readonly text: string | RegExp }
+  | { readonly type: 'visible' };
 
 /** Default retry budget when a spec does not pass an explicit `timeout`. */
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -174,6 +175,13 @@ class AppiumElement implements UIElement {
         const filtered: NativeElement[] = [];
         for (const el of matched) {
           if (matchesText(await el.getText(), op.text)) filtered.push(el);
+        }
+        matched = filtered;
+      }
+      if (op.type === 'visible') {
+        const filtered: NativeElement[] = [];
+        for (const el of matched) {
+          if (await el.isDisplayed()) filtered.push(el);
         }
         matched = filtered;
       }
@@ -322,6 +330,10 @@ class AppiumElement implements UIElement {
       { type: 'filterText', text },
       `(hasText=${String(text)})`,
     );
+  }
+
+  visible(): UIElement {
+    return this.#withOp({ type: 'visible' }, '(visible)');
   }
 
   // ── Actions ───────────────────────────────────────────────────────

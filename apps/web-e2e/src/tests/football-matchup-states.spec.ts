@@ -202,10 +202,24 @@ async function mockFootballMatchupStatesGraphQL(
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
     } else if (op === 'GetMatchupPlayers') {
+      // A GraphQL error (not an empty-but-successful `[]`) — MatchupScoreboard's
+      // computeMatchupScores() only falls back to the matchup's server-stored
+      // team1Score/team2Score when the players query errors or returns
+      // null/undefined; a successful empty array is treated as "zero players,
+      // zero live score" and sums to 0, which doesn't match this file's fixture
+      // scores. This spec has no per-player roster fixtures to compute a live
+      // score from, so it intentionally exercises the fallback path — the one
+      // that actually renders `currentMatchup.team1Score`/`team2Score` (LS-9712:
+      // found while driving an unrelated PR to green — this was flaking
+      // Mobile-Chrome-only under CI's live-DOM timing, though the bug applies
+      // to any viewport).
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { getMatchupPlayers: [] } }),
+        body: JSON.stringify({
+          errors: [{ message: 'getMatchupPlayers not mocked for this spec' }],
+          data: null,
+        }),
       });
     } else if (op === 'GetMatchupWinProbability') {
       await route.fulfill({

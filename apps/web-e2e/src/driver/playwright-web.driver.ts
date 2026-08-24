@@ -68,6 +68,10 @@ class PlaywrightElement implements UIElement {
     return new PlaywrightElement(this.#locator.filter({ hasText: text }));
   }
 
+  visible(): UIElement {
+    return new PlaywrightElement(this.#locator.filter({ visible: true }));
+  }
+
   // ── Actions ───────────────────────────────────────────────────────
   async tap(): Promise<void> {
     await this.#locator.click();

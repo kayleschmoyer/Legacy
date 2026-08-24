@@ -40,9 +40,13 @@ export class StandingsPage extends BaseScreen {
   /**
    * A standings stat cell by its rendered value (win/loss totals, etc.).
    * Values collide across rows, so specs pin the match with `.first()`.
+   * `exact` matching (LS-9712) — a non-exact single-digit value like `'2'`
+   * substring-matches unrelated page text (an "e2e-test" identity label
+   * elsewhere in the tree matched `statCell('2')`, intermittently winning
+   * `.first()` over the real stat cell depending on DOM order).
    */
   statCell(value: string): UIElement {
-    return this.driver.byText(value);
+    return this.driver.byText(value, { exact: true });
   }
 
   /** The full table row for a team, scoped by its display name. */

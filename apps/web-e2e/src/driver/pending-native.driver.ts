@@ -81,6 +81,9 @@ class UnavailableNativeElement implements UIElement {
   filterByText(): UIElement {
     return this;
   }
+  visible(): UIElement {
+    return this;
+  }
 
   // ── Actions ───────────────────────────────────────────────────────
   tap(): Promise<void> {

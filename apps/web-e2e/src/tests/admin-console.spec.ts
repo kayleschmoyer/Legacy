@@ -14,7 +14,6 @@ import {
   adminTest,
   createCustomAuthTest,
   expect,
-  test,
 } from '../fixtures/auth-enhanced';
 import {
   extractOperationName,
@@ -220,15 +219,17 @@ adminTest.describe('Admin Console — Users section @regression', () => {
 
   adminTest(
     'shows "admin" access badge for the admin user',
-    async ({ page, isMobile }) => {
-      // Desktop-only affordance at the mobile viewport — exposed by the
-      // LS-9658 full mobile sweep (LS-9660).
-      adminTest.skip(
-        isMobile,
-        'the access-badge column is hidden at the mobile viewport (responsive column hiding)',
-      );
+    async ({ page }) => {
+      // Scoped to `main` (LS-9712): the app shell renders the desktop
+      // profile-dropdown trigger — which also shows the username text
+      // "admin" — in a CSS-hidden duplicate nav block at mobile viewports.
+      // An unscoped page-wide `.first()` resolves to that hidden node by DOM
+      // order instead of the visible access badge in the Recent Signups list.
+      // Not skipped on mobile (unlike main's parallel LS-9660 fix) — the
+      // badge has no responsive `$sm`/`display:none` gate in AdminPage.tsx,
+      // so it genuinely renders on mobile once correctly scoped.
       await expect(
-        page.getByText('admin', { exact: true }).first(),
+        page.getByRole('main').getByText('admin', { exact: true }),
       ).toBeVisible();
     },
   );

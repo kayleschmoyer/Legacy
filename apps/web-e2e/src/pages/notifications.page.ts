@@ -66,8 +66,10 @@ export class NotificationsPage extends BaseScreen {
   // ── Private elements: bell dropdown ──────────────────────────────
   // The header bell trigger. The app shell renders NotificationDropdown twice
   // (desktop + mobile nav), so the test id resolves to two elements — one is
-  // hidden by responsive CSS. `.first()` targets the one visible at the desktop
-  // test viewport, avoiding a strict-mode violation.
+  // hidden by responsive CSS. `.visible()` (LS-9712) resolves to whichever
+  // instance is actually rendered at the current viewport, instead of
+  // `.first()`'s DOM-order pick, which silently targeted the wrong (hidden)
+  // instance under the Mobile Chrome project and hung every action on it.
   readonly #bellTrigger: UIElement;
 
   constructor(driver: AppDriver) {
@@ -91,7 +93,7 @@ export class NotificationsPage extends BaseScreen {
     this.#appError = driver.byText('Unexpected Application Error');
     this.#mainContent = driver.byTestId('main-content');
 
-    this.#bellTrigger = driver.byTestId('notifications-trigger').first();
+    this.#bellTrigger = driver.byTestId('notifications-trigger').visible();
   }
 
   // ── Reads ────────────────────────────────────────────────────────

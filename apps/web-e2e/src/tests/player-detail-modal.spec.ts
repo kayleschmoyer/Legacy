@@ -650,8 +650,10 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await playersPage.detail.back();
 
     await playersPage.detail.waitForStatsList();
-    // The stats page heading is a styled div, not a semantic heading element
-    await playersPage.stats.expectText(/MLB Player Statistics/i);
+    // expectStatsSurfaceVisible (LS-9712) resolves the desktop table vs. the
+    // phone-width card feed by the actual viewport, unlike a hardcoded
+    // desktop-only "MLB Player Statistics" text check (LS-9075/LS-9326).
+    await playersPage.stats.expectStatsSurfaceVisible();
   });
 
   test('batting tab switches back from fielding tab', async ({

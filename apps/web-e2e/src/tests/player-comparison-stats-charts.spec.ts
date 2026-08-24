@@ -802,6 +802,12 @@ adminTest.describe(
       await playersPage.compare.expectSeasonBySeasonHeading();
     });
 
+    // Below SEASON_STACK_BREAKPOINT (480px — PlayerComparison.tsx), the season
+    // breakdown renders as a stacked SeasonCardList instead of a `role="table"`
+    // (LS-7035, LS-9712). Both mobile projects are 375px, so `role="table"`
+    // never exists there — genuinely a different (untested) surface, not a
+    // locator bug. "shows Season by Season heading" above is left unskipped:
+    // that heading renders in both layouts.
     adminTest(
       'shows Batting by Season table for Judge',
       async ({ playersPage, isMobile }) => {
@@ -852,7 +858,13 @@ adminTest.describe(
 
     adminTest(
       'does NOT show Pitching by Season table for Judge (non-pitcher)',
-      async ({ playersPage }) => {
+      async ({ playersPage, isMobile }) => {
+        // Desktop-only affordance at the mobile viewport — exposed by the
+        // LS-9658 full mobile sweep (LS-9660).
+        adminTest.skip(
+          isMobile,
+          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
+        );
         await playersPage.compare.expectSeasonTableHidden(
           'pitching',
           'Aaron Judge',
@@ -882,7 +894,13 @@ adminTest.describe(
 
     adminTest(
       'Ohtani season batting table contains 2021 season row data',
-      async ({ playersPage }) => {
+      async ({ playersPage, isMobile }) => {
+        // Desktop-only affordance at the mobile viewport — exposed by the
+        // LS-9658 full mobile sweep (LS-9660).
+        adminTest.skip(
+          isMobile,
+          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
+        );
         // 2021 season: 155 games, 46 HR, .257 AVG
         await playersPage.compare.expectText('2021');
       },

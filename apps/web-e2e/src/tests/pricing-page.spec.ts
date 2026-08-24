@@ -127,8 +127,17 @@ test.describe('Pricing page — feature comparison @smoke', () => {
     await page.goto('/pricing');
     await page.waitForLoadState('load');
 
-    // Key comparison rows from COMPARISON_ROWS constant
-    await expect(page.getByText(/leagues/i).first()).toBeVisible({
+    // Key comparison rows from COMPARISON_ROWS constant. Scoped to `main`
+    // (LS-9712): the desktop nav's "My Leagues" dropdown trigger also
+    // matches /leagues/i, and an unscoped `.first()` picks that CSS-hidden
+    // desktop nav item over the visible comparison-table row at mobile
+    // viewports.
+    await expect(
+      page
+        .getByRole('main')
+        .getByText(/leagues/i)
+        .first(),
+    ).toBeVisible({
       timeout: 10_000,
     });
     await expect(page.getByText(/mock drafts/i).first()).toBeVisible();

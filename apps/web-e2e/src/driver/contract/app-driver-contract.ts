@@ -90,6 +90,16 @@ export const APP_DRIVER_CONTRACT_CASES: readonly AppDriverContractCase[] = [
     },
   },
   {
+    name: 'visible narrows a duplicated testid to the rendered instance',
+    run: async (driver) => {
+      const duplicate = driver.byTestId(FIXTURE.duplicate);
+      await duplicate.expectCount(2);
+      const shown = duplicate.visible();
+      await shown.expectCount(1);
+      await shown.expectContainsText(FIXTURE.duplicateVisibleText);
+    },
+  },
+  {
     name: 'byRole resolves a heading by name and level',
     run: async (driver) => {
       await driver

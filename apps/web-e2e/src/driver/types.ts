@@ -98,6 +98,16 @@ export interface UIElement extends ElementScope {
   last(): UIElement;
   /** Matches narrowed to those containing `text`. */
   filterByText(text: string | RegExp): UIElement;
+  /**
+   * Matches narrowed to those currently visible/displayed. For disambiguating
+   * a selector that legitimately resolves to more than one element because
+   * the same testid/role is rendered at more than one breakpoint or state
+   * (e.g. a responsive component mounted once per CSS breakpoint, toggled via
+   * `display:none` rather than conditional rendering) — `first()`/`last()`
+   * pick by DOM order, which does not track which instance is actually
+   * interactable at the current viewport/state.
+   */
+  visible(): UIElement;
 
   // ── Actions ───────────────────────────────────────────────────────
   /** Activate the element (click on web, tap on native). */

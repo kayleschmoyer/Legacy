@@ -285,6 +285,9 @@ test.describe('Player Detail – back navigation: in-app path @regression', () =
 
     // navigate(-1) returns to the previous history entry (/players/stats?playerId=1)
     await playersPage.detail.waitForStatsList();
-    await playersPage.stats.expectText(/MLB Player Statistics/i);
+    // expectStatsSurfaceVisible (LS-9712) resolves the desktop table vs. the
+    // phone-width card feed by the actual viewport, unlike a hardcoded
+    // desktop-only "MLB Player Statistics" text check (LS-9075/LS-9326).
+    await playersPage.stats.expectStatsSurfaceVisible();
   });
 });

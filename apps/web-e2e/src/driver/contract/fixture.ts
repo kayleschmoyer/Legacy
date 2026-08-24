@@ -35,6 +35,15 @@ export const FIXTURE = {
   alertText: 'Something happened',
   absent: 'contract-absent',
   hidden: 'contract-hidden',
+  /**
+   * Two elements sharing one testid — one `display:none`, one rendered — the
+   * fixture shape of a responsive component mounted once per CSS breakpoint
+   * (LS-9712). `visible()` must resolve to the rendered one regardless of DOM
+   * order; `first()` deliberately would not (it is DOM-order, not viewport).
+   */
+  duplicate: 'contract-duplicate',
+  duplicateHiddenText: 'Duplicate (hidden)',
+  duplicateVisibleText: 'Duplicate (visible)',
 } as const;
 
 /** Static, script-free HTML rendering of {@link FIXTURE} for the web driver. */
@@ -61,6 +70,8 @@ export const FIXTURE_HTML = `<!DOCTYPE html>
     <button data-testid="${FIXTURE.disabledButton}" disabled>${FIXTURE.disabledButtonName}</button>
     <div role="alert">${FIXTURE.alertText}</div>
     <div data-testid="${FIXTURE.hidden}" style="display:none">Hidden</div>
+    <div data-testid="${FIXTURE.duplicate}" style="display:none">${FIXTURE.duplicateHiddenText}</div>
+    <div data-testid="${FIXTURE.duplicate}">${FIXTURE.duplicateVisibleText}</div>
   </main>
 </body>
 </html>`;

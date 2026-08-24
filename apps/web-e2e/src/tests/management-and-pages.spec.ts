@@ -8,6 +8,7 @@
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { skipOnMobileProject } from '../utils/viewport';
 
 /** URL predicate for the GraphQL API endpoint */
 
@@ -230,7 +231,14 @@ test.describe('Player Comparison Page @smoke', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('Player Stats Page — static elements @smoke', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    // These static elements (the "Player Statistics" title, the desktop
+    // search input, Share/Export buttons) are all specific to the desktop
+    // data-grid surface — below the `media.sm` breakpoint, PlayerStatsPage
+    // renders PlayersCardFeed instead, which has no equivalent of any of them
+    // (LS-9075, LS-9712 — same category the `DESKTOP_GRID_ONLY_SPECS` list in
+    // playwright.config.ts already excludes for other specs).
+    skipOnMobileProject(testInfo, 'desktop-data-grid-only surface');
     await page.goto('/players/stats');
     await page.waitForLoadState('load');
   });
@@ -311,14 +319,11 @@ test.describe('Player Stats Page — static elements @smoke', () => {
 test.describe('Unknown Routes @regression', () => {
   test('navigating to an unknown route does not crash the app', async ({
     page,
-    isMobile,
-  }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts recovery via the desktop stats grid, replaced by the card feed at the mobile viewport (LS-9075)',
-    );
+  }, testInfo) => {
+    // The brand/logo is a desktop-only header affordance (LS-9712) — see
+    // navigation.spec.ts. The banner-visibility half of this assertion still
+    // holds on mobile; only the logo check needs the desktop viewport.
+    skipOnMobileProject(testInfo, 'desktop-only header affordance');
     await page.goto('/this-route-does-not-exist');
     await page.waitForLoadState('load');
 

@@ -1592,16 +1592,20 @@ class PlayerCompareSurface {
    * Assert a free-text label/value is visible on the page. Resolves to the
    * first match by default (comparison values like "0.0" or "Aaron Judge"
    * appear in multiple cells); pass `first: false` to require a unique match.
+   * Scoped to `main` (LS-9712): an unscoped page-wide search for a generic
+   * label like "Games" can also match the desktop nav (CSS-hidden at mobile
+   * viewports), and `.first()` picked that hidden nav match by DOM order.
    */
   async expectText(
     text: string | RegExp,
     opts: { exact?: boolean; first?: boolean } = {},
   ): Promise<void> {
     const { exact, first = true } = opts;
+    const main = this.#driver.byRole('main');
     const element =
       typeof text === 'string'
-        ? this.#driver.byText(text, { exact })
-        : this.#driver.byText(text);
+        ? main.byText(text, { exact })
+        : main.byText(text);
     await (first ? element.first() : element).expectVisible();
   }
 
