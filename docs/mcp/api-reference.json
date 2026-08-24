@@ -1041,7 +1041,7 @@
         },
         {
           "name": "worktree_rebase_onto_main",
-          "description": "Semantic one-shot rebase: fetch origin/main → rebase current branch onto it → push with --force-with-lease. Replaces the three-step worktree_fetch → worktree_rebase(base: \"origin/main\") → worktree_push sequence. Aborts and reports if conflict markers are detected post-rebase rather than pushing a broken state. Refuses to operate on the main branch.",
+          "description": "Semantic one-shot rebase: fetch origin/main → rebase current branch onto it → push with --force-with-lease. Replaces the three-step worktree_fetch → worktree_rebase(base: \"origin/main\") → worktree_push sequence. Pass `upstream` for the `--onto` 3-arg form after a squash-merged stacked base (see worktree-workflow skill). Aborts and reports if conflict markers are detected post-rebase rather than pushing a broken state. Refuses to operate on the main branch.",
           "inputs": {
             "worktree": {
               "type": "string",
@@ -1052,6 +1052,11 @@
               "type": "string",
               "optional": true,
               "description": "Branch to rebase onto (default: \"main\")."
+            },
+            "upstream": {
+              "type": "string",
+              "optional": true,
+              "description": "Old base head to replay from — enables `git rebase --onto <onto> <upstream>`. Omit for a plain rebase onto `onto`; see worktree-workflow skill for when to set this."
             },
             "disableRerere": {
               "type": "boolean",

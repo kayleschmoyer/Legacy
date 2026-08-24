@@ -53,7 +53,18 @@ When a PR is intentionally stacked on another (soft-dependency) PR's branch — 
 
 The merge-queue bot's generic conflict advice (`git checkout main && git merge main`, or a plain `git rebase origin/main`) does **not** know this happened — it replays every one of the base branch's original commits on top of the squash commit, producing a cascade of trivial-but-noisy conflicts (or, in the merge case, a redundant merge commit carrying duplicate history).
 
-**Before following the generic advice on a stacked PR whose base was just auto-retargeted**, check whether the old base branch's PR was squash/rebase-merged (a 1-parent merge commit) vs. truly merge-committed (2 parents — in which case the old commits are still reachable under their original SHAs and a plain rebase is fine):
+**Detect the squash first** — `git merge-base --is-ancestor <sha> origin/main` answers "is my old base commit in main as-is, or did it land under a new SHA?" (exit `0` = still an ancestor, plain rebase is fine; non-zero = squashed, use the `--onto` form below):
+
+```bash
+git fetch origin
+git merge-base --is-ancestor <last-commit-of-old-base-branch> origin/main; echo $?
+```
+
+**Before following the generic advice on a stacked PR whose base was just auto-retargeted**, check whether the old base branch's PR was squash/rebase-merged (a 1-parent merge commit) vs. truly merge-committed (2 parents — in which case the old commits are still reachable under their original SHAs and a plain rebase is fine).
+
+**Preferred (MCP):** `worktree_rebase_onto_main({ upstream: "<last-commit-of-old-base-branch>" })` — `upstream` triggers the three-arg `git rebase --onto` form (`onto` defaults to `"main"`, i.e. `origin/main`, so it's omittable in the common case). Conflict detection and reporting on this path are identical to the plain two-arg rebase — same `conflictDetected` / `conflictedFiles` payload shape, same rerere-marker safety check, same abort-and-report-cleanly behavior on failure.
+
+**Shell fallback:**
 
 ```bash
 git fetch origin
@@ -62,6 +73,8 @@ git push --force-with-lease origin HEAD
 ```
 
 `<last-commit-of-old-base-branch>` is the old base PR's `head.sha` (still available from the closed PR even after its branch is deleted) — find it via `github_view_pr` on the old base PR number, or `git log` if the branch ref is still local. This drops the now-squashed commits cleanly instead of replaying them. The merge-queue processor (`.github/scripts/merge-queue-processor.js`, `detectSquashedStackedBase`) auto-detects this case via the PR's `BaseRefChangedEvent` timeline and emits this exact advice when it can; fall back to the manual check above if the bot's comment still shows the generic advice.
+
+For a stack of N PRs, each parent's merge repeats this once per child (N-1 rebases total) — see [branch-tree-management.md](sibling/branch-tree-management.md) for the full stacked-PR cascade order.
 
 ## Check for Conflicts After Rebase
 

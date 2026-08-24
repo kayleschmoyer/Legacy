@@ -1,5 +1,6 @@
 export interface RebaseOntoMainOpts {
   onto: string;
+  upstream?: string;
   disableRerere: boolean;
   pushTimeoutMs: number;
 }
@@ -29,7 +30,7 @@ export function rebaseOntoMain(
   opts: RebaseOntoMainOpts,
   deps: RebaseDeps,
 ): ToolResult {
-  const { onto, disableRerere, pushTimeoutMs } = opts;
+  const { onto, upstream, disableRerere, pushTimeoutMs } = opts;
   const { runGit, runShell, nonInteractiveEnv } = deps;
   const log: string[] = [`[cwd: ${cwd}]`];
 
@@ -55,14 +56,14 @@ export function rebaseOntoMain(
   const fetchOut = runGit(['fetch', 'origin', onto], cwd, { timeout: 60_000 });
   if (fetchOut.trim()) log.push(fetchOut.trim());
 
-  // Get commit count before rebase for reporting
+  // Get commit count before rebase for reporting. When `upstream` is given,
+  // that's the true exclusion boundary for what gets replayed; otherwise fall
+  // back to counting commits ahead of the target branch.
   const beforeSha = runGit(['rev-parse', 'HEAD'], cwd).trim();
   const commitsAhead = (() => {
     try {
-      return runGit(
-        ['rev-list', '--count', `origin/${onto}..HEAD`],
-        cwd,
-      ).trim();
+      const range = upstream ? `${upstream}..HEAD` : `origin/${onto}..HEAD`;
+      return runGit(['rev-list', '--count', range], cwd).trim();
     } catch {
       return '?';
     }
@@ -76,9 +77,15 @@ export function rebaseOntoMain(
     rebaseEnv['GIT_CONFIG_VALUE_0'] = 'false';
   }
 
-  log.push(`$ git rebase origin/${onto}`);
+  // Three-arg `--onto` form when `upstream` is given: replays only commits
+  // after `upstream`, dropping commits that became duplicate ancestors when
+  // a stacked PR's base was squash-merged (LS-9731). Two-arg form otherwise.
+  const rebaseArgs = upstream
+    ? ['rebase', '--onto', `origin/${onto}`, upstream]
+    : ['rebase', `origin/${onto}`];
+  log.push(`$ git ${rebaseArgs.join(' ')}`);
   try {
-    const rebaseOut = runGit(['rebase', `origin/${onto}`], cwd, {
+    const rebaseOut = runGit(rebaseArgs, cwd, {
       timeout: 120_000,
       env: rebaseEnv,
     });

@@ -138,6 +138,66 @@ describe('rebaseOntoMain', () => {
     expect(payload.pushError).toMatch(/rejected/);
   });
 
+  it('uses the three-arg --onto form when upstream is provided', () => {
+    let call = 0;
+    let rebaseArgsSeen: readonly string[] | undefined;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse') return 'abc123\n';
+      if (args[0] === 'rev-list') return '2\n';
+      if (args[0] === 'rebase') {
+        rebaseArgsSeen = args;
+        return 'Successfully rebased';
+      }
+      if (args[0] === 'diff') return '';
+      if (args[0] === 'push') return '';
+      return '';
+    });
+    const result = rebaseOntoMain(
+      '/cwd',
+      { ...OPTS, upstream: 'deadbeef' },
+      deps,
+    );
+    expect(result.isError).toBeFalsy();
+    expect(rebaseArgsSeen).toEqual([
+      'rebase',
+      '--onto',
+      'origin/main',
+      'deadbeef',
+    ]);
+    const payload = parsePayload(result.content[0].text);
+    expect(payload.pushed).toBe(true);
+  });
+
+  it('reports conflicts identically on the --onto path', () => {
+    let call = 0;
+    jest.mocked(deps.runGit).mockImplementation((args) => {
+      call++;
+      if (call === 1) return 'feature-branch\n';
+      if (args[0] === 'fetch') return '';
+      if (args[0] === 'rev-parse') return 'abc123\n';
+      if (args[0] === 'rev-list') return '1\n';
+      if (args[0] === 'rebase') {
+        throw Object.assign(new Error('rebase fail'), {
+          stdout: 'CONFLICT (content): Merge conflict in foo.ts',
+          stderr: '',
+        });
+      }
+      return '';
+    });
+    const result = rebaseOntoMain(
+      '/cwd',
+      { ...OPTS, upstream: 'deadbeef' },
+      deps,
+    );
+    expect(result.isError).toBe(true);
+    const payload = parsePayload(result.content[0].text);
+    expect(payload.conflictDetected).toBe(true);
+    expect(payload.message).toMatch(/conflicts/);
+  });
+
   it('sets rerere env variables when disableRerere is true', () => {
     let rebaseEnv: Record<string, string> | undefined;
     let call = 0;

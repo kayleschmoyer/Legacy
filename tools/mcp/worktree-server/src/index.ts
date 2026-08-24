@@ -2854,6 +2854,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       description:
         'Semantic one-shot rebase: fetch origin/main → rebase current branch onto it → push with --force-with-lease. ' +
         'Replaces the three-step worktree_fetch → worktree_rebase(base: "origin/main") → worktree_push sequence. ' +
+        'Pass `upstream` for the `--onto` 3-arg form after a squash-merged stacked base (see worktree-workflow skill). ' +
         'Aborts and reports if conflict markers are detected post-rebase rather than pushing a broken state. ' +
         'Refuses to operate on the main branch.',
       inputSchema: {
@@ -2867,6 +2868,12 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           onto: {
             type: 'string',
             description: 'Branch to rebase onto (default: "main").',
+          },
+          upstream: {
+            type: 'string',
+            description:
+              'Old base head to replay from — enables `git rebase --onto <onto> <upstream>`. ' +
+              'Omit for a plain rebase onto `onto`; see worktree-workflow skill for when to set this.',
           },
           disableRerere: {
             type: 'boolean',
@@ -6095,11 +6102,13 @@ const handleCallTool = async (
       const {
         worktree: wtKey,
         onto: ontoRaw,
+        upstream,
         disableRerere: disableRerereRaw,
         pushTimeoutMs: pushTimeoutRaw,
       } = args as {
         worktree?: string;
         onto?: string;
+        upstream?: string;
         disableRerere?: boolean;
         pushTimeoutMs?: number;
       };
@@ -6123,7 +6132,7 @@ const handleCallTool = async (
       try {
         return rebaseOntoMain(
           cwd,
-          { onto, disableRerere, pushTimeoutMs },
+          { onto, upstream, disableRerere, pushTimeoutMs },
           {
             runGit,
             runShell: run,
