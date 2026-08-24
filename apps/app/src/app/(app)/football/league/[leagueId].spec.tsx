@@ -172,6 +172,11 @@ jest.mock('@legacy-sports/shared-components', () => {
     </View>
   );
   return {
+    Chip: ({ label }: { label: string; tone?: string }) => (
+      <View testID={`chip-${label}`}>
+        <Text>{label}</Text>
+      </View>
+    ),
     isDraftPaused: (status: string | null | undefined) => status === 'paused',
     isDraftRoomReachable: (status: string | null | undefined) =>
       status === 'in-progress' || status === 'drafting' || status === 'paused',

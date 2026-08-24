@@ -125,14 +125,6 @@ jest.mock('@legacy-sports/graphql', () => ({
     data: { matchupScores: [] },
     loading: false,
   })),
-  useGetLeagueStandingsQuery: jest.fn(() => ({
-    data: { getLeagueStandings: [] },
-    loading: false,
-  })),
-  useGetPlayoffProjectionsQuery: jest.fn(() => ({
-    data: { getPlayoffProjections: [] },
-    loading: false,
-  })),
   useGetUserTeamIdQuery: jest.fn(() => ({
     data: undefined,
     loading: false,
@@ -208,58 +200,14 @@ jest.mock('../../../features/subscription/PremiumGate', () => ({
   },
 }));
 
+// MatchupAdditionalSections is self-fetching (its own GraphQL hooks) and
+// fully covered by its own spec — stub it here rather than re-testing its
+// internals (playoff implications, key players, etc.) at this layer.
 jest.mock('@legacy-sports/shared-components/matchup', () => {
   const ReactActual = jest.requireActual<typeof import('react')>('react');
-  const { Text, View } = jest.requireActual<RNComponents>('react-native');
-  // Mirrors lib/shared-components/src/features/matchup/MatchupAdditionalSections.tsx's
-  // derivePlayoffImplications — reimplemented here rather than requireActual'd
-  // because the real module barrel transitively pulls in MatchupCard, which
-  // uses tamaguiStyled and crashes under this file's lightweight tamagui mock.
-  const derivePlayoffImplications = (
-    teams: Array<{ teamId: number | null | undefined; teamName: string }>,
-    projections: Array<{
-      teamId?: number | null;
-      magicNumber?: number | null;
-      eliminationNumber?: number | null;
-    }>,
-  ) => {
-    const byTeamId = new Map(projections.map((p) => [p.teamId, p]));
-    return teams.flatMap(({ teamId, teamName }) => {
-      const projection = teamId != null ? byTeamId.get(teamId) : null;
-      if (!projection || teamId == null) return [];
-      if (projection.magicNumber === 1) {
-        return [{ teamId, teamName, kind: 'clinch' as const }];
-      }
-      if (projection.eliminationNumber === 1) {
-        return [{ teamId, teamName, kind: 'eliminated' as const }];
-      }
-      return [];
-    });
-  };
+  const { View } = jest.requireActual<RNComponents>('react-native');
   return {
-    derivePlayoffImplications,
-    MatchupAdditionalSections: ({
-      playoffImplications,
-    }: {
-      playoffImplications: Array<{
-        teamId: number;
-        kind: 'clinch' | 'eliminated';
-      }>;
-      [key: string]: unknown;
-    }) =>
-      ReactActual.createElement(
-        View,
-        { testID: 'league-context-section' },
-        playoffImplications.map((implication) =>
-          ReactActual.createElement(
-            Text,
-            { key: implication.teamId },
-            implication.kind === 'clinch'
-              ? 'Win to clinch playoffs'
-              : 'Lose and you are eliminated',
-          ),
-        ),
-      ),
+    MatchupAdditionalSections: () => null,
     MatchupRecapPanel: () =>
       ReactActual.createElement(View, { testID: 'recap-panel' }),
   };
@@ -398,14 +346,6 @@ describe('FootballMatchupScreen', () => {
       data: undefined,
       loading: false,
     } as ReturnType<typeof graphqlLib.useGetHeadToHeadRecordQuery>);
-    jest.mocked(graphqlLib.useGetLeagueStandingsQuery).mockReturnValue({
-      data: { getLeagueStandings: [] },
-      loading: false,
-    } as ReturnType<typeof graphqlLib.useGetLeagueStandingsQuery>);
-    jest.mocked(graphqlLib.useGetPlayoffProjectionsQuery).mockReturnValue({
-      data: { getPlayoffProjections: [] },
-      loading: false,
-    } as ReturnType<typeof graphqlLib.useGetPlayoffProjectionsQuery>);
   });
 
   it('shows spinner while matchup is loading', () => {
@@ -946,59 +886,6 @@ describe('FootballMatchupScreen', () => {
 
     expect(matchupRefetch).toHaveBeenCalled();
     expect(playersRefetch).toHaveBeenCalled();
-  });
-
-  it('shows a "Win to clinch playoffs" banner when a team can clinch by winning this matchup', () => {
-    jest.mocked(graphqlLib.useGetPlayoffProjectionsQuery).mockReturnValue({
-      data: {
-        getPlayoffProjections: [
-          { teamId: 10, magicNumber: 1, eliminationNumber: null },
-        ],
-      },
-      loading: false,
-    } as ReturnType<typeof graphqlLib.useGetPlayoffProjectionsQuery>);
-
-    render(<FootballMatchupScreen matchupId={1} />);
-
-    expect(screen.getByText('Win to clinch playoffs')).toBeTruthy();
-  });
-
-  it('shows a "Lose and you are eliminated" banner when a team is eliminated by losing this matchup', () => {
-    jest.mocked(graphqlLib.useGetPlayoffProjectionsQuery).mockReturnValue({
-      data: {
-        getPlayoffProjections: [
-          { teamId: 20, magicNumber: null, eliminationNumber: 1 },
-        ],
-      },
-      loading: false,
-    } as ReturnType<typeof graphqlLib.useGetPlayoffProjectionsQuery>);
-
-    render(<FootballMatchupScreen matchupId={1} />);
-
-    expect(screen.getByText('Lose and you are eliminated')).toBeTruthy();
-  });
-
-  it('shows no playoff implication banner when neither team is at a clinch/elimination edge', () => {
-    render(<FootballMatchupScreen matchupId={1} />);
-
-    expect(screen.queryByText('Win to clinch playoffs')).toBeNull();
-    expect(screen.queryByText('Lose and you are eliminated')).toBeNull();
-  });
-
-  it('does not query playoff projections once the matchup is completed', () => {
-    jest.mocked(graphqlLib.useGetMatchupByIdQuery).mockReturnValue({
-      data: { getMatchupById: { ...mockMatchup, status: 'completed' } },
-      loading: false,
-      error: undefined,
-      networkStatus: 7, // NetworkStatus.ready
-      refetch: mockRefetchMatchup,
-    } as ReturnType<typeof graphqlLib.useGetMatchupByIdQuery>);
-
-    render(<FootballMatchupScreen matchupId={1} />);
-
-    expect(
-      jest.mocked(graphqlLib.useGetPlayoffProjectionsQuery).mock.calls[0][0],
-    ).toEqual(expect.objectContaining({ skip: true }));
   });
 });
 

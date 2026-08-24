@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { CombinedGraphQLErrors } from '@apollo/client';
 import { Button, H2, Text, XStack, YStack } from 'tamagui';
 import {
+  MatchupAdditionalSections,
   MatchupDetailLayout,
   MatchupDetailSkeleton,
   MatchupRecapPanel,
@@ -19,7 +20,6 @@ import {
 import { env } from '../../config/environment';
 import { PageMeta } from '../../components/PageMeta';
 import { PremiumGate } from '../../components/PremiumGate';
-import { MatchupAdditionalSections } from '../../features/matchup/MatchupAdditionalSections';
 import { MatchupScoreboard } from '../../features/matchup/MatchupScoreboard';
 import { MatchupWinProbabilityPanel } from '../../features/matchup/MatchupWinProbabilityPanel';
 import { MatchupRosterComparison } from '../../features/matchup/MatchupRosterComparison';

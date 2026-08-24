@@ -142,9 +142,6 @@ jest.mock('../../features/matchup/MatchupRosterComparison', () => ({
 jest.mock('../../features/matchup/MatchupRosterEditor', () => ({
   MatchupRosterEditor: () => <div data-testid="roster-editor" />,
 }));
-jest.mock('../../features/matchup/MatchupAdditionalSections', () => ({
-  MatchupAdditionalSections: () => <div data-testid="additional-sections" />,
-}));
 jest.mock('@legacy-sports/shared-components/matchup', () => ({
   MatchupDetailLayout: (props: {
     header?: React.ReactNode;
@@ -166,6 +163,7 @@ jest.mock('@legacy-sports/shared-components/matchup', () => ({
     </div>
   ),
   MatchupRecapPanel: () => <div data-testid="recap-panel" />,
+  MatchupAdditionalSections: () => <div data-testid="additional-sections" />,
 }));
 
 describe('MatchupDetailPage – PageMeta description sport-gating (LS-5892)', () => {
