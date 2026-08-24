@@ -2,6 +2,7 @@ import {
   getPlayerLabel,
   getPositionBadge,
   getSlotOrder,
+  isMemberOnBye,
 } from './FootballLeagueRosterScreen';
 
 describe('getSlotOrder', () => {
@@ -104,5 +105,37 @@ describe('getPositionBadge', () => {
   it('returns em dash when player is null', () => {
     const member = { player: null };
     expect(getPositionBadge(member)).toBe('—');
+  });
+});
+
+describe('isMemberOnBye', () => {
+  it('returns true when the member is on a team that is on bye this week', () => {
+    const member = { player: { nflTeam: 'KC' } };
+    expect(isMemberOnBye(member, { KC: 6, BUF: 12 }, 6)).toBe(true);
+  });
+
+  it('returns false when the member is on a team that is not on bye this week', () => {
+    const member = { player: { nflTeam: 'BUF' } };
+    expect(isMemberOnBye(member, { KC: 6, BUF: 12 }, 6)).toBe(false);
+  });
+
+  it('returns false when the member has no nflTeam', () => {
+    const member = { player: { nflTeam: null } };
+    expect(isMemberOnBye(member, { KC: 6 }, 6)).toBe(false);
+  });
+
+  it('returns false when currentWeek is null', () => {
+    const member = { player: { nflTeam: 'KC' } };
+    expect(isMemberOnBye(member, { KC: 6 }, null)).toBe(false);
+  });
+
+  it('returns false when byeWeeksByTeam is undefined', () => {
+    const member = { player: { nflTeam: 'KC' } };
+    expect(isMemberOnBye(member, undefined, 6)).toBe(false);
+  });
+
+  it('returns false when player is null', () => {
+    const member = { player: null };
+    expect(isMemberOnBye(member, { KC: 6 }, 6)).toBe(false);
   });
 });

@@ -21,6 +21,7 @@ import {
   useGetLeagueByIdQuery,
   useGetLeagueScoringProfileQuery,
   useGetMatchupByIdQuery,
+  useGetNflTeamSeasonMetadataQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
   useGetTeamMembersQuery,
@@ -292,6 +293,8 @@ interface TabContentProps {
   matchupId: number;
   matchupLoading: boolean;
   matchupError: unknown;
+  byeWeeksByTeam: Readonly<Record<string, number>>;
+  currentWeek: number | null | undefined;
 }
 
 function TabContent(props: TabContentProps): React.JSX.Element | null {
@@ -314,6 +317,8 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     matchupId,
     matchupLoading,
     matchupError,
+    byeWeeksByTeam,
+    currentWeek,
   } = props;
 
   switch (selectedTab) {
@@ -323,6 +328,8 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
           teamId={teamId}
           defensiveFormat={defensiveFormat}
           rosterSlots={rosterSlots}
+          byeWeeksByTeam={byeWeeksByTeam}
+          currentWeek={currentWeek}
         />
       );
     case 'Matchup':
@@ -361,6 +368,8 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
             getPlayerStats={getPlayerStats}
             readOnly={!isOwner}
             sport="football"
+            byeWeeksByTeam={byeWeeksByTeam}
+            currentWeek={currentWeek}
           />
         </YStack>
       );
@@ -440,6 +449,20 @@ export default function FootballTeam(): React.JSX.Element {
   );
 
   const currentWeekNumber = leagueData?.league?.currentWeekNumber;
+
+  // Bye-week warning data (LS-6430) — same pattern as the football league
+  // route (apps/app/src/app/(app)/football/league/[leagueId].tsx).
+  const { data: nflByeWeekData } = useGetNflTeamSeasonMetadataQuery({
+    variables: { season: leagueData?.league?.seasonNumber ?? undefined },
+    skip: !leagueData?.league?.seasonNumber,
+  });
+  const byeWeeksByTeam = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const meta of nflByeWeekData?.nflTeamSeasonMetadata ?? []) {
+      if (meta?.teamAbbreviation) map[meta.teamAbbreviation] = meta.byeWeek;
+    }
+    return map;
+  }, [nflByeWeekData?.nflTeamSeasonMetadata]);
 
   const { data: matchupScoresData } = useMatchupScoresQuery({
     skip: team?.team?.leagueId === undefined || currentWeekNumber == null,
@@ -654,6 +677,8 @@ export default function FootballTeam(): React.JSX.Element {
           matchupId={currentMatchupId ?? 0}
           matchupLoading={loadingMatchup}
           matchupError={matchupError}
+          byeWeeksByTeam={byeWeeksByTeam}
+          currentWeek={currentWeekNumber}
         />
       </YStack>
     </ScrollView>

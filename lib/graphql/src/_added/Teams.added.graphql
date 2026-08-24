@@ -108,5 +108,6 @@ fragment AppTeamMember on TeamMember {
     lastName
     brefId
     eligiblePositions
+    nflTeam
   }
 }

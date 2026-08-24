@@ -61,6 +61,28 @@ interface FootballLeagueRosterScreenProps {
   readonly teamId: number;
   readonly defensiveFormat?: string | null;
   readonly rosterSlots?: readonly (LeaguePositionFragment | null)[];
+  /**
+   * Per-NFL-team bye week for the league's active season, keyed by team
+   * abbreviation (LS-6430). Paired with `currentWeek` to flag roster members
+   * whose team is on bye with a BYE badge.
+   */
+  readonly byeWeeksByTeam?: Readonly<Record<string, number>>;
+  /** The league's active/viewed week. Compared against `byeWeeksByTeam` (LS-6430). */
+  readonly currentWeek?: number | null;
+}
+
+/**
+ * True when the given roster member's NFL team has no game this week
+ * (LS-6430). Mirrors the RosterBoard bye-week check (LS-6334).
+ */
+export function isMemberOnBye(
+  member: Pick<TeamMember, 'player'>,
+  byeWeeksByTeam: Readonly<Record<string, number>> | undefined,
+  currentWeek: number | null | undefined,
+): boolean {
+  const nflTeam = member.player?.nflTeam;
+  if (!nflTeam || currentWeek == null) return false;
+  return byeWeeksByTeam?.[nflTeam] === currentWeek;
 }
 
 /**
@@ -123,7 +145,13 @@ export function getPositionBadge(member: Pick<TeamMember, 'player'>): string {
 export function FootballLeagueRosterScreen(
   props: FootballLeagueRosterScreenProps,
 ): React.JSX.Element {
-  const { teamId, defensiveFormat, rosterSlots = [] } = props;
+  const {
+    teamId,
+    defensiveFormat,
+    rosterSlots = [],
+    byeWeeksByTeam,
+    currentWeek,
+  } = props;
 
   const { data, loading, error } = useGetTeamMembersQuery({
     variables: { teamId },
@@ -266,6 +294,18 @@ export function FootballLeagueRosterScreen(
                       <Text fontSize="$3" color="$color12" flex={1}>
                         {getPlayerLabel(member)}
                       </Text>
+                      {isMemberOnBye(member, byeWeeksByTeam, currentWeek) && (
+                        <XStack
+                          paddingHorizontal="$2"
+                          paddingVertical="$1"
+                          borderRadius="$10"
+                          backgroundColor="$red10"
+                        >
+                          <Text fontSize="$1" fontWeight="700" color="white">
+                            BYE
+                          </Text>
+                        </XStack>
+                      )}
                     </XStack>
                   ))}
                 </YStack>

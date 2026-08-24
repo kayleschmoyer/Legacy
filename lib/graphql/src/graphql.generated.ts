@@ -9059,6 +9059,7 @@ export type AppTeamMemberFragment = {
     lastName?: string | null;
     brefId?: string | null;
     eligiblePositions?: Array<string> | null;
+    nflTeam?: string | null;
   } | null;
 };
 
@@ -15785,6 +15786,7 @@ export const AppTeamMemberFragmentDoc = gql`
       lastName
       brefId
       eligiblePositions
+      nflTeam
     }
   }
 `;

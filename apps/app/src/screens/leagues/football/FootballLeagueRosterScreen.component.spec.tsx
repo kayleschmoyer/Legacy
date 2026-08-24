@@ -141,6 +141,64 @@ describe('FootballLeagueRosterScreen', () => {
     expect(screen.getByText('Josh Allen')).toBeTruthy();
   });
 
+  describe('bye-week badge (LS-6430)', () => {
+    const byeMember = {
+      id: 102,
+      playerId: 2,
+      player: {
+        id: 2,
+        firstName: 'Pat',
+        lastName: 'Mahomes',
+        eligiblePositions: ['QB'],
+        nflTeam: 'KC',
+      },
+    };
+
+    it('shows a BYE badge next to a roster member whose team is on bye this week', () => {
+      jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+        data: { teamMembers: [byeMember] },
+        loading: false,
+        error: undefined,
+      } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+      render(
+        <FootballLeagueRosterScreen
+          teamId={1}
+          defensiveFormat="dst"
+          byeWeeksByTeam={{ KC: 6 }}
+          currentWeek={6}
+        />,
+      );
+      expect(screen.getByText('BYE')).toBeTruthy();
+    });
+
+    it('does not show a BYE badge when the member team is not on bye this week', () => {
+      jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+        data: { teamMembers: [byeMember] },
+        loading: false,
+        error: undefined,
+      } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+      render(
+        <FootballLeagueRosterScreen
+          teamId={1}
+          defensiveFormat="dst"
+          byeWeeksByTeam={{ KC: 12 }}
+          currentWeek={6}
+        />,
+      );
+      expect(screen.queryByText('BYE')).toBeNull();
+    });
+
+    it('does not show a BYE badge when byeWeeksByTeam/currentWeek are not passed', () => {
+      jest.mocked(graphqlLib.useGetTeamMembersQuery).mockReturnValue({
+        data: { teamMembers: [byeMember] },
+        loading: false,
+        error: undefined,
+      } as ReturnType<typeof graphqlLib.useGetTeamMembersQuery>);
+      render(<FootballLeagueRosterScreen teamId={1} defensiveFormat="dst" />);
+      expect(screen.queryByText('BYE')).toBeNull();
+    });
+  });
+
   it('groups a member by assigned positionId, not by first eligible position', () => {
     const wrInFlex = {
       id: 201,

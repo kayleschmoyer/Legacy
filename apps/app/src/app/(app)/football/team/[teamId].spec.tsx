@@ -147,22 +147,33 @@ jest.mock('tamagui', () => {
 jest.mock(
   '../../../../screens/leagues/football/FootballLeagueRosterScreen',
   () => {
-    const { View } = jest.requireActual<RNComponents>('react-native');
+    const { Text, View } = jest.requireActual<RNComponents>('react-native');
     return {
       FootballLeagueRosterScreen: ({
         teamId,
         defensiveFormat,
         rosterSlots,
+        byeWeeksByTeam,
+        currentWeek,
       }: {
         teamId: number;
         defensiveFormat?: string | null;
         rosterSlots?: readonly unknown[];
+        byeWeeksByTeam?: Record<string, number>;
+        currentWeek?: number | null;
       }) => (
         <View
           testID={`roster-screen-${teamId}-${defensiveFormat ?? 'dst'}-slots-${
             rosterSlots?.length ?? 0
           }`}
-        />
+        >
+          <Text testID="roster-screen-bye-weeks">
+            {JSON.stringify(byeWeeksByTeam ?? {})}
+          </Text>
+          <Text testID="roster-screen-current-week">
+            {JSON.stringify(currentWeek ?? null)}
+          </Text>
+        </View>
       ),
     };
   },
@@ -194,6 +205,8 @@ type MockRosterBoardProps = {
   ) => { actual?: number | null } | null;
   readOnly?: boolean;
   sport?: string;
+  byeWeeksByTeam?: Record<string, number>;
+  currentWeek?: number | null;
 };
 
 jest.mock('@legacy-sports/shared-components/roster', () => {
@@ -210,6 +223,8 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
       getPlayerStats,
       readOnly,
       sport,
+      byeWeeksByTeam,
+      currentWeek,
     }: MockRosterBoardProps) => {
       const slot = positions[0];
       const benched = teamPlayers.find((p) => p.positionId == null);
@@ -227,6 +242,12 @@ jest.mock('@legacy-sports/shared-components/roster', () => {
             {positions.map((p) => p.positionType).join(',')}
           </Text>
           <Text testID="roster-board-actual">{JSON.stringify(actual)}</Text>
+          <Text testID="roster-board-bye-weeks">
+            {JSON.stringify(byeWeeksByTeam ?? {})}
+          </Text>
+          <Text testID="roster-board-current-week">
+            {JSON.stringify(currentWeek ?? null)}
+          </Text>
           <Pressable
             testID="roster-board-assign"
             onPress={() => benched && slot && onPlayerAssign(benched, slot)}
@@ -294,6 +315,14 @@ const mockLeague = {
   defensiveFormat: 'dst',
   currentWeekNumber: 5,
   currentMatchup: 77,
+  seasonNumber: 2026,
+};
+
+const mockNflByeWeekData = {
+  nflTeamSeasonMetadata: [
+    { teamAbbreviation: 'KC', byeWeek: 6, sosTier: 1, season: 2026 },
+    { teamAbbreviation: 'BUF', byeWeek: 12, sosTier: 2, season: 2026 },
+  ],
 };
 
 const mockMatchupScores = {
@@ -424,6 +453,9 @@ const mockUseGetMatchupByIdQuery = jest.fn(() => ({
   loading: false,
   data: { getMatchupById: mockMatchup },
 }));
+const mockUseGetNflTeamSeasonMetadataQuery = jest.fn(() => ({
+  data: mockNflByeWeekData,
+}));
 
 function buildScoringProfile(recMultiplier: number) {
   return {
@@ -466,6 +498,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetMatchupByIdQuery(...args),
   useGetLeagueByIdQuery: (...args: unknown[]) =>
     mockUseGetLeagueByIdQuery(...args),
+  useGetNflTeamSeasonMetadataQuery: (...args: unknown[]) =>
+    mockUseGetNflTeamSeasonMetadataQuery(...args),
   useGetLeagueScoringProfileQuery: (...args: unknown[]) =>
     mockUseGetLeagueScoringProfileQuery(...args),
   useGetPositionsForLeagueQuery: (...args: unknown[]) =>
@@ -521,6 +555,9 @@ describe('FootballTeam route', () => {
     mockUseMatchupScoresQuery.mockReturnValue({
       loading: false,
       data: undefined,
+    });
+    mockUseGetNflTeamSeasonMetadataQuery.mockReturnValue({
+      data: mockNflByeWeekData,
     });
     mockUseGetLeagueScoringProfileQuery.mockReturnValue({
       loading: false,
@@ -839,6 +876,49 @@ describe('FootballTeam route', () => {
     expect(mockUseMatchupScoresQuery).toHaveBeenCalledWith({
       skip: false,
       variables: { leagueId: 10, weekNum: 5 },
+    });
+  });
+
+  describe('bye-week data wiring (LS-6430)', () => {
+    it('passes byeWeeksByTeam and currentWeek to RosterBoard', () => {
+      render(<FootballTeam />);
+      fireEvent.press(screen.getByTestId('tab-Lineup'));
+      expect(screen.getByTestId('roster-board-bye-weeks')).toHaveTextContent(
+        JSON.stringify({ KC: 6, BUF: 12 }),
+      );
+      expect(screen.getByTestId('roster-board-current-week')).toHaveTextContent(
+        '5',
+      );
+    });
+
+    it('passes byeWeeksByTeam and currentWeek to FootballLeagueRosterScreen', () => {
+      render(<FootballTeam />);
+      expect(screen.getByTestId('roster-screen-bye-weeks')).toHaveTextContent(
+        JSON.stringify({ KC: 6, BUF: 12 }),
+      );
+      expect(
+        screen.getByTestId('roster-screen-current-week'),
+      ).toHaveTextContent('5');
+    });
+
+    it('skips the NFL bye-week query when the league has no season number', () => {
+      mockUseGetLeagueByIdQuery.mockReturnValue({
+        loading: false,
+        data: { league: { ...mockLeague, seasonNumber: null } },
+      });
+      render(<FootballTeam />);
+      expect(mockUseGetNflTeamSeasonMetadataQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: true }),
+      );
+    });
+
+    it('falls back to an empty bye-week map when the query has no data', () => {
+      mockUseGetNflTeamSeasonMetadataQuery.mockReturnValue({ data: undefined });
+      render(<FootballTeam />);
+      fireEvent.press(screen.getByTestId('tab-Lineup'));
+      expect(screen.getByTestId('roster-board-bye-weeks')).toHaveTextContent(
+        '{}',
+      );
     });
   });
 });
