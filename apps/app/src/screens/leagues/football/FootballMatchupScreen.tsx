@@ -102,6 +102,8 @@ interface FootballMatchupScreenProps {
   /** League's total matchup weeks, for the "Matchup {week}/{total}" counter. */
   readonly totalMatchups?: number | null;
   readonly leagueId?: number | null;
+  /** League's total roster size, for the bench-capacity indicator (LS-6383). */
+  readonly maxRosterSize?: number | null;
 }
 
 /**
@@ -309,6 +311,8 @@ interface RosterSectionProps {
   readonly players: MatchupPlayer[];
   readonly positionOrder: readonly string[];
   readonly label: string;
+  /** League's total roster size, used to derive the bench capacity (LS-6383). */
+  readonly maxRosterSize?: number | null;
   readonly playerPoints: PlayerPointsMap;
   readonly onPlayerPress: (player: MatchupPlayer) => void;
   readonly onEmptySlotPress: (teamId: number | null | undefined) => void;
@@ -319,6 +323,7 @@ function RosterSection({
   players,
   positionOrder,
   label,
+  maxRosterSize,
   playerPoints,
   onPlayerPress,
   onEmptySlotPress,
@@ -357,6 +362,15 @@ function RosterSection({
 
     return { grouped, bench };
   }, [teamPlayers, positionOrder]);
+
+  // Bench capacity is the league's total roster size minus the starter
+  // slots; only shown when a valid (positive) cap can be derived (LS-6383).
+  const benchCap =
+    maxRosterSize != null ? maxRosterSize - positionOrder.length : null;
+  const benchLabel =
+    benchCap != null && benchCap > 0
+      ? `BENCH (${starters.bench.length}/${benchCap})`
+      : 'BENCH';
 
   return (
     <Card
@@ -429,7 +443,7 @@ function RosterSection({
             paddingHorizontal="$3"
             paddingTop="$2"
           >
-            BENCH
+            {benchLabel}
           </Text>
           {starters.bench.map((player, idx) => (
             <XStack
@@ -467,7 +481,8 @@ function RosterSection({
 export function FootballMatchupScreen(
   props: FootballMatchupScreenProps,
 ): React.JSX.Element {
-  const { matchupId, defensiveFormat, totalMatchups, leagueId } = props;
+  const { matchupId, defensiveFormat, totalMatchups, leagueId, maxRosterSize } =
+    props;
   const router = useRouter();
   const canSeeRecap = useHasEntitlement(ENTITLEMENTS.ai_matchup_recap);
 
@@ -799,6 +814,7 @@ export function FootballMatchupScreen(
                 players={players}
                 positionOrder={positionOrder}
                 label={matchup.team1?.name ?? `Team ${matchup.team1Id ?? '1'}`}
+                maxRosterSize={maxRosterSize}
                 playerPoints={playerPoints}
                 onPlayerPress={onPlayerPress}
                 onEmptySlotPress={onEmptySlotPress}
@@ -822,6 +838,7 @@ export function FootballMatchupScreen(
                 players={players}
                 positionOrder={positionOrder}
                 label={matchup.team2?.name ?? `Team ${matchup.team2Id ?? '2'}`}
+                maxRosterSize={maxRosterSize}
                 playerPoints={playerPoints}
                 onPlayerPress={onPlayerPress}
                 onEmptySlotPress={onEmptySlotPress}

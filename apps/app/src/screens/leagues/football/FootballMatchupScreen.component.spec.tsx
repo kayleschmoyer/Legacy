@@ -815,6 +815,105 @@ describe('FootballMatchupScreen', () => {
     expect(screen.getAllByText('DL').length).toBeGreaterThan(0);
   });
 
+  it('shows the bench count and capacity when maxRosterSize is available (LS-6383)', () => {
+    jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
+      data: {
+        getMatchupPlayers: [
+          mockMatchupPlayer,
+          {
+            id: 202,
+            playerId: 6,
+            teamId: 10,
+            player: {
+              id: 6,
+              firstName: 'Bench',
+              lastName: 'Guy',
+              eligiblePositions: ['QB'],
+            },
+          },
+        ],
+      },
+      loading: false,
+      refetch: mockRefetchPlayers,
+    } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+
+    // dst format has 7 starter slots; maxRosterSize 8 leaves a bench cap of
+    // 1. Mahomes fills the QB starter slot, leaving 'Bench Guy' as the one
+    // bench player.
+    render(
+      <FootballMatchupScreen
+        matchupId={1}
+        defensiveFormat="dst"
+        maxRosterSize={8}
+      />,
+    );
+
+    expect(screen.getByText('BENCH (1/1)')).toBeTruthy();
+  });
+
+  it('falls back to a plain "BENCH" label when maxRosterSize is not provided', () => {
+    jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
+      data: {
+        getMatchupPlayers: [
+          mockMatchupPlayer,
+          {
+            id: 202,
+            playerId: 6,
+            teamId: 10,
+            player: {
+              id: 6,
+              firstName: 'Bench',
+              lastName: 'Guy',
+              eligiblePositions: ['QB'],
+            },
+          },
+        ],
+      },
+      loading: false,
+      refetch: mockRefetchPlayers,
+    } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+
+    render(<FootballMatchupScreen matchupId={1} defensiveFormat="dst" />);
+
+    expect(screen.getAllByText('BENCH').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/BENCH \(/)).toBeNull();
+  });
+
+  it('falls back to a plain "BENCH" label when maxRosterSize does not exceed the starter slot count', () => {
+    jest.mocked(graphqlLib.useGetMatchupPlayersQuery).mockReturnValue({
+      data: {
+        getMatchupPlayers: [
+          mockMatchupPlayer,
+          {
+            id: 202,
+            playerId: 6,
+            teamId: 10,
+            player: {
+              id: 6,
+              firstName: 'Bench',
+              lastName: 'Guy',
+              eligiblePositions: ['QB'],
+            },
+          },
+        ],
+      },
+      loading: false,
+      refetch: mockRefetchPlayers,
+    } as ReturnType<typeof graphqlLib.useGetMatchupPlayersQuery>);
+
+    // dst format has 7 starter slots; maxRosterSize 7 leaves no bench cap.
+    render(
+      <FootballMatchupScreen
+        matchupId={1}
+        defensiveFormat="dst"
+        maxRosterSize={7}
+      />,
+    );
+
+    expect(screen.getAllByText('BENCH').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/BENCH \(/)).toBeNull();
+  });
+
   it('refetches matchup and players network-only when the app returns to foreground', () => {
     render(<FootballMatchupScreen matchupId={1} />);
 
