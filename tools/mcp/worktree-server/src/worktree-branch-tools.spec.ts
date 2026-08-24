@@ -1,13 +1,8 @@
-// Dedicated unit tests for the worktree_branch_create and
-// worktree_branch_switch MCP tools (LS-9441). The handlers registered under
-// those tool names in index.ts (`case 'worktree_branch_create'` /
-// `case 'worktree_branch_switch'`) are thin wrappers over
-// executeWorktreeBranchCreate / executeWorktreeBranchSwitch below.
-import {
-  type BranchOpsDeps,
-  executeWorktreeBranchCreate,
-  executeWorktreeBranchSwitch,
-} from './branch-ops';
+// Dedicated unit tests for the worktree_branch MCP tool (LS-9441, consolidated
+// under LS-9726). The handler registered under that tool name in index.ts
+// (`case 'worktree_branch'`) is a thin wrapper over executeWorktreeBranch
+// below, which dispatches on `action` to the create/switch flows.
+import { type BranchOpsDeps, executeWorktreeBranch } from './branch-ops';
 
 const MAIN_REPO = '/repo';
 const WORKTREE = '/repo-worktrees/LS-1234';
@@ -27,10 +22,13 @@ function textOf(res: { content: { type: 'text'; text: string }[] }): string {
   return res.content[0].text;
 }
 
-describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
+describe("worktree_branch (action: 'create')", () => {
   it('refuses to create a branch named "main"', () => {
     const deps = makeDeps();
-    const res = executeWorktreeBranchCreate({ branch: 'main' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'main', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/cannot create a branch named "main"/);
     expect(deps.runGit).not.toHaveBeenCalled();
@@ -38,7 +36,10 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
 
   it('refuses to create a branch named "origin/main"', () => {
     const deps = makeDeps();
-    const res = executeWorktreeBranchCreate({ branch: 'origin/main' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'origin/main', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(deps.runGit).not.toHaveBeenCalled();
   });
@@ -49,7 +50,10 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
         .fn()
         .mockReturnValue({ error: 'No active worktree set.' }),
     });
-    const res = executeWorktreeBranchCreate({ branch: 'LS-1/scratch' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'LS-1/scratch', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toBe('No active worktree set.');
   });
@@ -58,7 +62,10 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
     const deps = makeDeps({
       resolveTargetDir: jest.fn().mockReturnValue({ path: MAIN_REPO }),
     });
-    const res = executeWorktreeBranchCreate({ branch: 'LS-1/scratch' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'LS-1/scratch', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/main repository root/);
     expect(deps.runGit).not.toHaveBeenCalled();
@@ -66,7 +73,10 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
 
   it('refuses when HEAD is detached (no current branch)', () => {
     const deps = makeDeps({ runGit: jest.fn().mockReturnValue('') });
-    const res = executeWorktreeBranchCreate({ branch: 'LS-1/scratch' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'LS-1/scratch', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/detached/);
   });
@@ -82,7 +92,10 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
           });
         }),
     });
-    const res = executeWorktreeBranchCreate({ branch: '-bad' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: '-bad', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/invalid branch name/);
   });
@@ -96,8 +109,8 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
         throw new Error('unknown revision');
       }); // rev-parse --verify on `from`
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchCreate(
-      { branch: 'LS-1/scratch', from: 'nonexistent-ref' },
+    const res = executeWorktreeBranch(
+      { branch: 'LS-1/scratch', action: 'create', from: 'nonexistent-ref' },
       deps,
     );
     expect(res.isError).toBe(true);
@@ -116,7 +129,10 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
       .mockReturnValueOnce('') // checkout -b
       .mockReturnValueOnce('LS-1/scratch\n'); // branch --show-current (verify)
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchCreate({ branch: 'LS-1/scratch' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'LS-1/scratch', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBeUndefined();
     expect(JSON.parse(textOf(res))).toMatchObject({
       success: true,
@@ -140,8 +156,8 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
       .mockReturnValueOnce('') // checkout -b branch from
       .mockReturnValueOnce('LS-1/scratch\n');
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchCreate(
-      { branch: 'LS-1/scratch', from: 'origin/main' },
+    const res = executeWorktreeBranch(
+      { branch: 'LS-1/scratch', action: 'create', from: 'origin/main' },
       deps,
     );
     expect(res.isError).toBeUndefined();
@@ -159,7 +175,10 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
       .mockReturnValueOnce('') // checkout -b (no-op per mock)
       .mockReturnValueOnce('claude/LS-1234-feature\n'); // still on old branch
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchCreate({ branch: 'LS-1/scratch' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'LS-1/scratch', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/Branch create failed/);
   });
@@ -176,21 +195,27 @@ describe('worktree_branch_create (executeWorktreeBranchCreate)', () => {
         });
       });
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchCreate({ branch: 'LS-1/scratch' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'LS-1/scratch', action: 'create' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/already exists/);
     expect(textOf(res)).toMatch(/exit code 128/);
   });
 });
 
-describe('worktree_branch_switch (executeWorktreeBranchSwitch)', () => {
+describe("worktree_branch (action: 'switch')", () => {
   it('propagates resolveTargetDir errors', () => {
     const deps = makeDeps({
       resolveTargetDir: jest
         .fn()
         .mockReturnValue({ error: 'No active worktree set.' }),
     });
-    const res = executeWorktreeBranchSwitch({ branch: 'main' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'main', action: 'switch' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toBe('No active worktree set.');
   });
@@ -199,7 +224,10 @@ describe('worktree_branch_switch (executeWorktreeBranchSwitch)', () => {
     const deps = makeDeps({
       resolveTargetDir: jest.fn().mockReturnValue({ path: MAIN_REPO }),
     });
-    const res = executeWorktreeBranchSwitch({ branch: 'claude/x' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'claude/x', action: 'switch' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/main repository root/);
     expect(deps.runGit).not.toHaveBeenCalled();
@@ -213,7 +241,10 @@ describe('worktree_branch_switch (executeWorktreeBranchSwitch)', () => {
         });
       }),
     });
-    const res = executeWorktreeBranchSwitch({ branch: '-bad' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: '-bad', action: 'switch' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/invalid branch name/);
   });
@@ -227,7 +258,10 @@ describe('worktree_branch_switch (executeWorktreeBranchSwitch)', () => {
         throw new Error('unknown revision or path not in the working tree');
       }); // rev-parse --verify refs/heads/<branch>
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchSwitch({ branch: 'nope' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'nope', action: 'switch' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/does not exist locally/);
     expect(runGit).not.toHaveBeenCalledWith(
@@ -245,8 +279,8 @@ describe('worktree_branch_switch (executeWorktreeBranchSwitch)', () => {
       .mockReturnValueOnce('') // checkout
       .mockReturnValueOnce('claude/LS-1234-feature-other\n'); // branch --show-current (verify)
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchSwitch(
-      { branch: 'claude/LS-1234-feature-other' },
+    const res = executeWorktreeBranch(
+      { branch: 'claude/LS-1234-feature-other', action: 'switch' },
       deps,
     );
     expect(res.isError).toBeUndefined();
@@ -267,7 +301,10 @@ describe('worktree_branch_switch (executeWorktreeBranchSwitch)', () => {
       .mockReturnValueOnce('') // checkout (no-op per mock)
       .mockReturnValueOnce('claude/LS-1234-feature\n'); // still on old branch
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchSwitch({ branch: 'target' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'target', action: 'switch' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/Branch switch failed/);
   });
@@ -285,7 +322,10 @@ describe('worktree_branch_switch (executeWorktreeBranchSwitch)', () => {
         });
       });
     const deps = makeDeps({ runGit });
-    const res = executeWorktreeBranchSwitch({ branch: 'target' }, deps);
+    const res = executeWorktreeBranch(
+      { branch: 'target', action: 'switch' },
+      deps,
+    );
     expect(res.isError).toBe(true);
     expect(textOf(res)).toMatch(/would be overwritten/);
     expect(textOf(res)).toMatch(/exit code 1/);

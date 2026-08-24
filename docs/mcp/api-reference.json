@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 11,
-  "toolCount": 254,
+  "toolCount": 253,
   "servers": [
     {
       "dir": "worktree-server",
@@ -14,7 +14,7 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 61,
+      "toolCount": 60,
       "tools": [
         {
           "name": "auth_check_all",
@@ -49,37 +49,27 @@
           ]
         },
         {
-          "name": "worktree_branch_create",
-          "description": "Create a new local branch off the current worktree HEAD (or an explicit `from` ref) and switch to it, all within the same worktree directory — no new worktree/pool slot needed (git checkout -b). Use this for a throwaway scratch branch stacked on the active branch (e.g. to verify a mechanism via a temp PR) instead of raw `git checkout -b` via Bash. Pair with worktree_branch_switch to return to the original branch. For a brand-new worktree directory on its own branch, use make_worktree_create instead — this tool never creates a new directory.",
+          "name": "worktree_branch",
+          "description": "Create or switch a local branch within the active worktree's directory — no new worktree/pool slot needed. `action: 'create'` runs `git checkout -b` (off HEAD, or an explicit `from` ref) for a throwaway scratch branch stacked on the active branch, instead of raw git via Bash. `action: 'switch'` runs `git checkout` on an already-existing local branch, e.g. to return to the original branch once a scratch branch is no longer needed. For a brand-new worktree directory on its own branch, use make_worktree_create instead — this tool never creates a new directory.",
           "inputs": {
             "branch": {
               "type": "string",
               "optional": false,
-              "description": "Name of the new branch to create and switch to (e.g. \"LS-9411/scratch-mobile-proof\"). Must not be \"main\" or \"origin/main\"."
+              "description": "action='create': name of the new branch (e.g. \"LS-9411/scratch-mobile-proof\"); must not be \"main\" or \"origin/main\". action='switch': name of the existing local branch to switch to."
+            },
+            "action": {
+              "type": "string",
+              "optional": false,
+              "description": "'create' to branch and switch; 'switch' to an existing branch.",
+              "enum": [
+                "create",
+                "switch"
+              ]
             },
             "from": {
               "type": "string",
               "optional": true,
-              "description": "Ref (branch, tag, or SHA) to base the new branch on. Omit to base on the worktree's current HEAD."
-            },
-            "worktree": {
-              "type": "string",
-              "optional": true,
-              "description": "Ticket key, absolute path, or omit for active worktree."
-            }
-          },
-          "transports": [
-            "stdio"
-          ]
-        },
-        {
-          "name": "worktree_branch_switch",
-          "description": "Switch the active worktree to an already-existing local branch (git checkout). Typical use: return to the original branch after a worktree_branch_create scratch branch is no longer needed. Does not create a new branch — pass an existing local branch name; use worktree_branch_create to create-and-switch in one call.",
-          "inputs": {
-            "branch": {
-              "type": "string",
-              "optional": false,
-              "description": "Existing local branch name to switch to."
+              "description": "action='create' only. Ref (branch, tag, or SHA) to base the new branch on. Omit to base on the worktree's current HEAD."
             },
             "worktree": {
               "type": "string",

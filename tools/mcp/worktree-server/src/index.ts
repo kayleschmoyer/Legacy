@@ -32,10 +32,7 @@ import {
 } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
 import { checkJiraAuth } from './auth-checks';
-import {
-  executeWorktreeBranchCreate,
-  executeWorktreeBranchSwitch,
-} from './branch-ops';
+import { executeWorktreeBranch } from './branch-ops';
 import {
   getConflictInfo,
   scanStagedForConflictMarkers,
@@ -2963,30 +2960,37 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
       },
     },
     {
-      name: 'worktree_branch_create',
+      name: 'worktree_branch',
       description:
-        'Create a new local branch off the current worktree HEAD (or an explicit ' +
-        '`from` ref) and switch to it, all within the same worktree directory — ' +
-        'no new worktree/pool slot needed (git checkout -b). Use this for a ' +
-        'throwaway scratch branch stacked on the active branch (e.g. to verify a ' +
-        'mechanism via a temp PR) instead of raw `git checkout -b` via Bash. ' +
-        'Pair with worktree_branch_switch to return to the original branch. ' +
-        'For a brand-new worktree directory on its own branch, use ' +
-        'make_worktree_create instead — this tool never creates a new directory.',
+        "Create or switch a local branch within the active worktree's directory — " +
+        "no new worktree/pool slot needed. `action: 'create'` runs `git checkout -b` " +
+        '(off HEAD, or an explicit `from` ref) for a throwaway scratch branch stacked ' +
+        "on the active branch, instead of raw git via Bash. `action: 'switch'` runs " +
+        '`git checkout` on an already-existing local branch, e.g. to return to the ' +
+        'original branch once a scratch branch is no longer needed. For a brand-new ' +
+        'worktree directory on its own branch, use make_worktree_create instead — this ' +
+        'tool never creates a new directory.',
       inputSchema: {
         type: 'object' as const,
         properties: {
           branch: {
             type: 'string',
             description:
-              'Name of the new branch to create and switch to (e.g. "LS-9411/scratch-mobile-proof"). ' +
-              'Must not be "main" or "origin/main".',
+              'action=\'create\': name of the new branch (e.g. "LS-9411/scratch-mobile-proof"); ' +
+              'must not be "main" or "origin/main". ' +
+              "action='switch': name of the existing local branch to switch to.",
+          },
+          action: {
+            type: 'string',
+            enum: ['create', 'switch'],
+            description:
+              "'create' to branch and switch; 'switch' to an existing branch.",
           },
           from: {
             type: 'string',
             description:
-              'Ref (branch, tag, or SHA) to base the new branch on. Omit to base on the ' +
-              "worktree's current HEAD.",
+              "action='create' only. Ref (branch, tag, or SHA) to base the new branch on. " +
+              "Omit to base on the worktree's current HEAD.",
           },
           worktree: {
             type: 'string',
@@ -2994,30 +2998,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Ticket key, absolute path, or omit for active worktree.',
           },
         },
-        required: ['branch'],
-      },
-    },
-    {
-      name: 'worktree_branch_switch',
-      description:
-        'Switch the active worktree to an already-existing local branch (git checkout). ' +
-        'Typical use: return to the original branch after a worktree_branch_create scratch ' +
-        'branch is no longer needed. Does not create a new branch — pass an existing local ' +
-        'branch name; use worktree_branch_create to create-and-switch in one call.',
-      inputSchema: {
-        type: 'object' as const,
-        properties: {
-          branch: {
-            type: 'string',
-            description: 'Existing local branch name to switch to.',
-          },
-          worktree: {
-            type: 'string',
-            description:
-              'Ticket key, absolute path, or omit for active worktree.',
-          },
-        },
-        required: ['branch'],
+        required: ['branch', 'action'],
       },
     },
     {
@@ -10763,21 +10744,16 @@ const handleCallTool = async (
     }
 
     // -----------------------------------------------------------------------
-    // worktree_branch_create
+    // worktree_branch
     // -----------------------------------------------------------------------
-    case 'worktree_branch_create': {
-      return executeWorktreeBranchCreate(
-        args as { branch: string; from?: string; worktree?: string },
-        { resolveTargetDir, runGit, mainRepo: MAIN_REPO },
-      );
-    }
-
-    // -----------------------------------------------------------------------
-    // worktree_branch_switch
-    // -----------------------------------------------------------------------
-    case 'worktree_branch_switch': {
-      return executeWorktreeBranchSwitch(
-        args as { branch: string; worktree?: string },
+    case 'worktree_branch': {
+      return executeWorktreeBranch(
+        args as {
+          branch: string;
+          action: 'create' | 'switch';
+          from?: string;
+          worktree?: string;
+        },
         { resolveTargetDir, runGit, mainRepo: MAIN_REPO },
       );
     }

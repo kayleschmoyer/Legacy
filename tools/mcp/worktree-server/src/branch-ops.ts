@@ -1,8 +1,7 @@
 // ---------------------------------------------------------------------------
-// Pure(ish) helpers for the worktree_branch_create / worktree_branch_switch
-// tools.
+// Pure(ish) helpers for the worktree_branch tool (action: 'create' | 'switch').
 //
-// Extracted from the request handlers in index.ts so the create/switch flow
+// Extracted from the request handler in index.ts so the create/switch flow
 // (branch-name validation, main-repo-root guard, git invocation sequencing)
 // can be unit-tested without spawning git — see worktree-branch-tools.spec.ts.
 // ---------------------------------------------------------------------------
@@ -16,16 +15,12 @@ export interface ToolResponse {
   [key: string]: unknown;
 }
 
-/** Arguments accepted by the worktree_branch_create tool. */
-export interface BranchCreateArgs {
+/** Arguments accepted by the worktree_branch tool. */
+export interface BranchArgs {
   branch: string;
+  action: 'create' | 'switch';
+  /** `action: 'create'` only. Ref to base the new branch on; omit for HEAD. */
   from?: string;
-  worktree?: string;
-}
-
-/** Arguments accepted by the worktree_branch_switch tool. */
-export interface BranchSwitchArgs {
-  branch: string;
   worktree?: string;
 }
 
@@ -58,11 +53,23 @@ function isMainRoot(cwd: string, mainRepo: string): boolean {
 }
 
 /**
- * Execute the worktree_branch_create tool: validate the branch name, resolve
- * an optional `from` ref, then `git checkout -b` within the active worktree.
+ * Execute the worktree_branch tool with action: 'create' | 'switch'.
  */
-export function executeWorktreeBranchCreate(
-  args: BranchCreateArgs,
+export function executeWorktreeBranch(
+  args: BranchArgs,
+  deps: BranchOpsDeps,
+): ToolResponse {
+  return args.action === 'switch'
+    ? executeWorktreeBranchSwitch(args, deps)
+    : executeWorktreeBranchCreate(args, deps);
+}
+
+/**
+ * `action: 'create'`: validate the branch name, resolve an optional `from`
+ * ref, then `git checkout -b` within the active worktree.
+ */
+function executeWorktreeBranchCreate(
+  args: BranchArgs,
   deps: BranchOpsDeps,
 ): ToolResponse {
   const { branch, from, worktree: wtKey } = args;
@@ -204,11 +211,11 @@ export function executeWorktreeBranchCreate(
 }
 
 /**
- * Execute the worktree_branch_switch tool: validate the branch name, confirm
- * it exists locally, then `git checkout` it within the active worktree.
+ * `action: 'switch'`: validate the branch name, confirm it exists locally,
+ * then `git checkout` it within the active worktree.
  */
-export function executeWorktreeBranchSwitch(
-  args: BranchSwitchArgs,
+function executeWorktreeBranchSwitch(
+  args: BranchArgs,
   deps: BranchOpsDeps,
 ): ToolResponse {
   const { branch, worktree: wtKey } = args;
@@ -267,7 +274,7 @@ export function executeWorktreeBranchSwitch(
       content: [
         {
           type: 'text',
-          text: `Branch "${branch}" does not exist locally. Use worktree_branch_create to create it, or worktree_fetch + a plain checkout for a remote-only branch.`,
+          text: `Branch "${branch}" does not exist locally. Use worktree_branch with action: 'create' to create it, or worktree_fetch + a plain checkout for a remote-only branch.`,
         },
       ],
       isError: true,
