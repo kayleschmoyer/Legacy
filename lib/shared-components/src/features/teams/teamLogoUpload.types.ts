@@ -24,6 +24,13 @@ export interface UseTeamLogoUploadOptions {
   getAuthToken: () => Promise<string | null>;
   /** Called with the uploaded image's URL on success. */
   onUploaded: (url: string) => void;
+  /**
+   * Which team image slot this upload targets — passed through as the
+   * image-upload lambda's `imageType` query param. Defaults to `'avatar'`
+   * (TeamBrandingControl's single "logo" field maps onto the team's avatar
+   * slot); pass `'banner'` to target the header/banner slot instead (LS-6434).
+   */
+  imageType?: 'avatar' | 'banner';
 }
 
 export interface UseTeamLogoUploadResult {

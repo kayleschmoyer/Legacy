@@ -22,12 +22,18 @@ const bytesToMb = (bytes: number): string => (bytes / (1024 * 1024)).toFixed(2);
  * cross-platform package — never has a static dependency on a native-only
  * package; paired with `useTeamLogoUpload.ts` via Metro's `.native.ts`
  * resolution (mirrors `utils/SecureStorage{.native}.ts`).
+ *
+ * `imageType` (default `'avatar'`) is also reused by the football team
+ * Settings screen's avatar/banner upload (LS-6434) — replacing a raw
+ * pasted-URL field that skipped this hook's MIME/size checks and the
+ * lambda's NSFW scan entirely.
  */
 export function useTeamLogoUpload({
   teamId,
   imageUploadUrl,
   getAuthToken,
   onUploaded,
+  imageType = 'avatar',
 }: UseTeamLogoUploadOptions): UseTeamLogoUploadResult {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -92,7 +98,7 @@ export function useTeamLogoUpload({
         return;
       }
 
-      const uploadUrl = `${imageUploadUrl}/images/upload?teamId=${teamId}&imageType=avatar`;
+      const uploadUrl = `${imageUploadUrl}/images/upload?teamId=${teamId}&imageType=${imageType}`;
       const response = await fetch(uploadUrl, {
         method: 'POST',
         headers: {
@@ -116,7 +122,7 @@ export function useTeamLogoUpload({
     } finally {
       setUploading(false);
     }
-  }, [teamId, imageUploadUrl, getAuthToken, onUploaded]);
+  }, [teamId, imageUploadUrl, getAuthToken, onUploaded, imageType]);
 
   return { uploading, uploadError, pickAndUploadLogo };
 }

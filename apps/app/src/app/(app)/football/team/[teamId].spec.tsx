@@ -23,12 +23,50 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+// LS-6434: mocks for the picker+upload-backed BrandingSettings — the avatar/
+// banner fields used to be free-text URL inputs with no MIME/size/NSFW
+// screening, unlike web's TeamDetailPage upload flow (LS-1810).
+const mockPickAndUploadLogo = jest.fn();
+type MockUploadState = { uploading: boolean; uploadError: string | null };
+const mockAvatarUploadState: MockUploadState = {
+  uploading: false,
+  uploadError: null,
+};
+const mockBannerUploadState: MockUploadState = {
+  uploading: false,
+  uploadError: null,
+};
+type MockTeamLogoUploadOptions = {
+  imageType?: 'avatar' | 'banner';
+  onUploaded: (url: string) => void;
+};
+const mockUseTeamLogoUpload = jest.fn((options: MockTeamLogoUploadOptions) => {
+  const state =
+    options.imageType === 'banner'
+      ? mockBannerUploadState
+      : mockAvatarUploadState;
+  return {
+    uploading: state.uploading,
+    uploadError: state.uploadError,
+    pickAndUploadLogo: (): void => {
+      mockPickAndUploadLogo(options);
+    },
+  };
+});
+
 jest.mock('@legacy-sports/shared-components', () => {
   const { View } = jest.requireActual<RNComponents>('react-native');
   return {
     UnifiedLoadingPanel: () => <View testID="loading-panel" />,
+    SecureStorageProvider: { getItem: jest.fn(() => Promise.resolve('jwt')) },
+    useTeamLogoUpload: (options: MockTeamLogoUploadOptions) =>
+      mockUseTeamLogoUpload(options),
   };
 });
+
+jest.mock('@legacy-sports/app-config/native', () => ({
+  config: { imageUploadUrl: 'https://upload.example.com' },
+}));
 
 // Avoids loading the real @legacy-sports/shared-components/football barrel
 // (pulled in transitively via deriveFootballScoringFormat), which drags in
@@ -802,5 +840,121 @@ describe('FootballTeam route', () => {
       skip: false,
       variables: { leagueId: 10, weekNum: 5 },
     });
+  });
+});
+
+describe('FootballTeam route — Settings tab branding upload (LS-6434)', () => {
+  const mockUpdateTeamBranding = jest.fn(() => Promise.resolve({ data: {} }));
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockAvatarUploadState.uploading = false;
+    mockAvatarUploadState.uploadError = null;
+    mockBannerUploadState.uploading = false;
+    mockBannerUploadState.uploadError = null;
+
+    mockUseGetTeamByIdQuery.mockReturnValue({
+      loading: false,
+      data: { team: mockTeam },
+    });
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 42 } });
+    mockUseGetLeagueByIdQuery.mockReturnValue({
+      loading: false,
+      data: { league: mockLeague },
+    });
+    mockUseGetPositionsForLeagueQuery.mockReturnValue({
+      loading: false,
+      data: { leaguePositions: mockPositions },
+    });
+    mockUseGetTeamMembersQuery.mockReturnValue({
+      loading: false,
+      data: { teamMembers: mockMembers },
+    });
+    mockUseGetMatchupByIdQuery.mockReturnValue({
+      loading: false,
+      data: { getMatchupById: mockMatchup },
+    });
+    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([
+      mockUpdateTeamMemberPosition,
+    ]);
+    mockUseUpdateTeamBrandingMutation.mockReturnValue([
+      mockUpdateTeamBranding,
+      { loading: false },
+    ]);
+    mockUseMatchupScoresQuery.mockReturnValue({
+      loading: false,
+      data: undefined,
+    });
+  });
+
+  it('renders Upload Avatar / Upload Banner buttons instead of free-text URL fields', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    expect(screen.getByText('Upload Avatar')).toBeTruthy();
+    expect(screen.getByText('Upload Banner')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(/example\.com/)).toBeNull();
+  });
+
+  it('picks and uploads through the imageType-scoped hook for avatar and banner independently', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    fireEvent.press(screen.getByText('Upload Avatar'));
+    fireEvent.press(screen.getByText('Upload Banner'));
+
+    expect(mockPickAndUploadLogo).toHaveBeenCalledTimes(2);
+    expect(mockUseTeamLogoUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ imageType: 'avatar', teamId: 42 }),
+    );
+    expect(mockUseTeamLogoUpload).toHaveBeenCalledWith(
+      expect.objectContaining({ imageType: 'banner', teamId: 42 }),
+    );
+  });
+
+  it('persists a completed avatar upload to avatarUrl via updateTeamBranding, not bannerUrl', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    const avatarOptions = mockUseTeamLogoUpload.mock.calls.find(
+      ([options]) => options.imageType === 'avatar',
+    )?.[0];
+    avatarOptions?.onUploaded('https://cdn.example.com/scanned-avatar.png');
+
+    expect(mockUpdateTeamBranding).toHaveBeenCalledWith({
+      variables: {
+        teamId: 42,
+        leagueId: 10,
+        avatarUrl: 'https://cdn.example.com/scanned-avatar.png',
+      },
+    });
+  });
+
+  it('persists a completed banner upload to bannerUrl via updateTeamBranding, not avatarUrl', () => {
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    const bannerOptions = mockUseTeamLogoUpload.mock.calls.find(
+      ([options]) => options.imageType === 'banner',
+    )?.[0];
+    bannerOptions?.onUploaded('https://cdn.example.com/scanned-banner.png');
+
+    expect(mockUpdateTeamBranding).toHaveBeenCalledWith({
+      variables: {
+        teamId: 42,
+        leagueId: 10,
+        bannerUrl: 'https://cdn.example.com/scanned-banner.png',
+      },
+    });
+  });
+
+  it('shows the upload error and disables the button while an upload is in flight', () => {
+    mockAvatarUploadState.uploading = true;
+    mockBannerUploadState.uploadError = 'Image failed content screening.';
+    render(<FootballTeam />);
+    fireEvent.press(screen.getByTestId('tab-Settings'));
+
+    expect(screen.getByText('Uploading…')).toBeTruthy();
+    expect(screen.getByText('Image failed content screening.')).toBeTruthy();
   });
 });

@@ -1,18 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Button,
-  Input,
-  Label,
-  Separator,
-  Spinner,
-  Tabs,
-  Text,
-  YStack,
-} from 'tamagui';
-import { Alert, ScrollView } from 'react-native';
+import { Button, Separator, Spinner, Tabs, Text, YStack } from 'tamagui';
+import { Alert, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { UnifiedLoadingPanel } from '@legacy-sports/shared-components';
+import {
+  SecureStorageProvider,
+  UnifiedLoadingPanel,
+  useTeamLogoUpload,
+} from '@legacy-sports/shared-components';
 import type { FootballScoringFormat } from '@legacy-sports/shared-components/football';
+import { config } from '@legacy-sports/app-config/native';
 import {
   RosterBoard,
   type RosterPlayerStats,
@@ -38,6 +34,7 @@ import { FootballLeagueRosterScreen } from '../../../../screens/leagues/football
 import { MatchupCard } from '../../../../features/matchup/components/MatchupCard';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
+import { INTERNAL_JWT_KEY } from '../../../../common/auth/jwtRefresh';
 import { deriveFootballScoringFormat } from '../../../../common/scoring/footballScoringFormat';
 
 const SCORING_FORMAT_LABELS: Record<FootballScoringFormat, string> = {
@@ -92,19 +89,74 @@ interface BrandingSettingsProps {
   currentBannerUrl: string | null | undefined;
 }
 
+interface BrandingImageFieldProps {
+  label: string;
+  currentUrl: string | null | undefined;
+  uploading: boolean;
+  uploadError: string | null;
+  onPick: () => void;
+}
+
+/** Upload button + thumbnail + error text for one team image slot (avatar or banner). */
+function BrandingImageField({
+  label,
+  currentUrl,
+  uploading,
+  uploadError,
+  onPick,
+}: BrandingImageFieldProps): React.JSX.Element {
+  return (
+    <YStack gap="$2">
+      <Text fontSize="$3" fontWeight="500">
+        {label}
+      </Text>
+      {currentUrl && (
+        <Image
+          source={{ uri: currentUrl }}
+          style={{ width: 96, height: 96, borderRadius: 8 }}
+          testID={`branding-${label.toLowerCase()}-preview`}
+        />
+      )}
+      {uploadError && (
+        <Text fontSize="$2" color="$red9" role="alert">
+          {uploadError}
+        </Text>
+      )}
+      <Button
+        onPress={onPick}
+        disabled={uploading}
+        theme="active"
+        icon={uploading ? <Spinner size="small" /> : undefined}
+      >
+        {uploading
+          ? 'Uploading…'
+          : currentUrl
+            ? `Change ${label}`
+            : `Upload ${label}`}
+      </Button>
+    </YStack>
+  );
+}
+
+/**
+ * LS-6434: avatar/banner used to be free-text HTTPS URL fields, so a GM could
+ * point the team at any external image — bypassing the MIME/size checks and
+ * Cloudflare NSFW scan that the image-upload lambda runs on every upload
+ * (lambdas/image-upload/src/index.ts), unlike web's TeamDetailPage
+ * (LS-1810). Picking from the device library and uploading through that same
+ * lambda closes the gap: every accepted image is now actually screened,
+ * rather than trusted by URL alone.
+ */
 function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
   const { teamId, leagueId, currentAvatarUrl, currentBannerUrl } = props;
-  const [avatarUrl, setAvatarUrl] = useState(currentAvatarUrl ?? '');
-  const [bannerUrl, setBannerUrl] = useState(currentBannerUrl ?? '');
-  const [updateTeamBranding, { loading }] = useUpdateTeamBrandingMutation();
+  const [updateTeamBranding] = useUpdateTeamBrandingMutation();
 
-  const handleSave = () => {
+  const persistImage = (imageType: 'avatar' | 'banner') => (url: string) => {
     updateTeamBranding({
       variables: {
         teamId,
         leagueId,
-        avatarUrl: avatarUrl || null,
-        bannerUrl: bannerUrl || null,
+        ...(imageType === 'avatar' ? { avatarUrl: url } : { bannerUrl: url }),
       },
     })
       .then(() => {
@@ -113,36 +165,48 @@ function BrandingSettings(props: BrandingSettingsProps): React.JSX.Element {
       .catch(handleError);
   };
 
+  const getAuthToken = () => SecureStorageProvider.getItem(INTERNAL_JWT_KEY);
+
+  const avatarUpload = useTeamLogoUpload({
+    teamId,
+    imageType: 'avatar',
+    imageUploadUrl: config.imageUploadUrl,
+    getAuthToken,
+    onUploaded: persistImage('avatar'),
+  });
+
+  const bannerUpload = useTeamLogoUpload({
+    teamId,
+    imageType: 'banner',
+    imageUploadUrl: config.imageUploadUrl,
+    getAuthToken,
+    onUploaded: persistImage('banner'),
+  });
+
   return (
-    <YStack padding="$4" gap="$3">
+    <YStack padding="$4" gap="$4">
       <Text fontSize="$5" fontWeight="600">
         Team Branding
       </Text>
       <Text fontSize="$3" color="$gray10">
-        Enter image URLs for your team logo and banner. Images are displayed
-        across the app and must comply with community guidelines.
+        Upload images for your team avatar and banner (PNG, JPEG, or WebP, max 2
+        MB). Images are screened for inappropriate content before they&apos;re
+        shown across the league.
       </Text>
-      <Label htmlFor="avatar-url">Avatar URL</Label>
-      <Input
-        id="avatar-url"
-        value={avatarUrl}
-        onChangeText={setAvatarUrl}
-        placeholder="https://example.com/avatar.png"
-        autoCapitalize="none"
-        keyboardType="url"
+      <BrandingImageField
+        label="Avatar"
+        currentUrl={currentAvatarUrl}
+        uploading={avatarUpload.uploading}
+        uploadError={avatarUpload.uploadError}
+        onPick={() => void avatarUpload.pickAndUploadLogo()}
       />
-      <Label htmlFor="banner-url">Banner URL</Label>
-      <Input
-        id="banner-url"
-        value={bannerUrl}
-        onChangeText={setBannerUrl}
-        placeholder="https://example.com/banner.png"
-        autoCapitalize="none"
-        keyboardType="url"
+      <BrandingImageField
+        label="Banner"
+        currentUrl={currentBannerUrl}
+        uploading={bannerUpload.uploading}
+        uploadError={bannerUpload.uploadError}
+        onPick={() => void bannerUpload.pickAndUploadLogo()}
       />
-      <Button onPress={handleSave} disabled={loading} theme="active">
-        {loading ? 'Saving…' : 'Save Branding'}
-      </Button>
     </YStack>
   );
 }
