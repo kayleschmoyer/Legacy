@@ -88,6 +88,30 @@ describe('MatchupScoreboardView', () => {
     expect(screen.getByText('SCHEDULED')).toBeTruthy();
   });
 
+  it('shows the CANCELLED status and explanation for cancelled matchups', () => {
+    render(
+      <MatchupScoreboardView
+        {...baseProps({ status: MatchupStatus.Cancelled })}
+      />,
+    );
+    expect(screen.getByText('CANCELLED')).toBeTruthy();
+    expect(screen.getByText('This matchup was cancelled.')).toBeTruthy();
+  });
+
+  it('hides projections and the games progress bar for cancelled matchups', () => {
+    render(
+      <MatchupScoreboardView
+        {...baseProps({
+          status: MatchupStatus.Cancelled,
+          team1Projected: 100,
+          team2Projected: 90,
+        })}
+      />,
+    );
+    expect(screen.queryByText(/proj/i)).toBeNull();
+    expect(screen.queryByText(/games completed/)).toBeNull();
+  });
+
   it('surfaces the stale-data warning when hasPlayersError is true', () => {
     render(<MatchupScoreboardView {...baseProps({ hasPlayersError: true })} />);
     expect(

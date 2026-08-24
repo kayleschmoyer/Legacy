@@ -6,6 +6,7 @@ import { Clock } from '@tamagui/lucide-icons/icons/Clock';
 import { Swords } from '@tamagui/lucide-icons/icons/Swords';
 import { TrendingUp } from '@tamagui/lucide-icons/icons/TrendingUp';
 import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import { XCircle } from '@tamagui/lucide-icons/icons/XCircle';
 import { MatchupStatus } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,
@@ -171,11 +172,18 @@ export function MatchupScoreboardView({
   const isTied = team1Score === team2Score;
   const isLive = status === MatchupStatus.InProgress;
   const isCompleted = status === MatchupStatus.Completed;
+  // LS-6369: without this branch, cancelled matchups fell through to the
+  // default "SCHEDULED" config below — mislabelling a cancelled matchup as
+  // upcoming, and diverging from mobile's Cancelled chip (MatchupStatusChip).
+  const isCancelled = status === MatchupStatus.Cancelled;
   const gamesCompleted = gamesPerMatchup ? gamesPerMatchup - gamesRemaining : 0;
 
-  // Show projections when games remain and matchup isn't completed
+  // Show projections when games remain and matchup isn't completed or cancelled
   const showProjections =
-    !isCompleted && gamesRemaining > 0 && team1Projected !== null;
+    !isCompleted &&
+    !isCancelled &&
+    gamesRemaining > 0 &&
+    team1Projected !== null;
 
   const statusConfig = isLive
     ? {
@@ -193,13 +201,21 @@ export function MatchupScoreboardView({
           label: 'FINAL',
           icon: <Trophy size={12} color={BRAND_GOLD_LIGHT} />,
         }
-      : {
-          bg: '$gray3',
-          border: '$gray7',
-          text: '$gray11',
-          label: 'SCHEDULED',
-          icon: <Clock size={12} color="var(--gray11)" />,
-        };
+      : isCancelled
+        ? {
+            bg: '$gray3',
+            border: '$gray7',
+            text: '$gray11',
+            label: 'CANCELLED',
+            icon: <XCircle size={12} color="var(--gray11)" />,
+          }
+        : {
+            bg: '$gray3',
+            border: '$gray7',
+            text: '$gray11',
+            label: 'SCHEDULED',
+            icon: <Clock size={12} color="var(--gray11)" />,
+          };
 
   return (
     <ScoreboardCard
@@ -226,6 +242,29 @@ export function MatchupScoreboardView({
           <AlertTriangle size={14} color="var(--orange11)" />
           <Text fontSize="$2" fontWeight="600" color="$orange11">
             Live stats unavailable — showing last saved scores.
+          </Text>
+        </XStack>
+      )}
+
+      {/* Cancelled explanation: the status chip alone ("CANCELLED") gives no
+          actionable next step — this banner makes the state unambiguous
+          (LS-6369). */}
+      {isCancelled && (
+        <XStack
+          role="status"
+          aria-live="polite"
+          alignItems="center"
+          gap="$2"
+          paddingHorizontal="$5"
+          paddingVertical="$2"
+          backgroundColor="$gray3"
+          borderBottomWidth={1}
+          borderBottomColor="$gray7"
+          $sm={{ paddingHorizontal: '$3' }}
+        >
+          <XCircle size={14} color="var(--gray11)" />
+          <Text fontSize="$2" fontWeight="600" color="$gray11">
+            This matchup was cancelled.
           </Text>
         </XStack>
       )}
@@ -432,7 +471,7 @@ export function MatchupScoreboardView({
       </XStack>
 
       {/* Games Progress Bar */}
-      {gamesPerMatchup && gamesPerMatchup > 0 && (
+      {!isCancelled && gamesPerMatchup && gamesPerMatchup > 0 && (
         <YStack
           paddingHorizontal="$5"
           paddingVertical="$3"

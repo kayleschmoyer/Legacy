@@ -1,9 +1,11 @@
 import React from 'react';
 import { Card, Text, VisuallyHidden, XStack, YStack } from 'tamagui';
+import { XCircle } from '@tamagui/lucide-icons/icons/XCircle';
 import { MatchupStatus } from '@legacy-sports/graphql';
 import { PACE_TINT_THRESHOLDS } from './paceThresholds';
 import { MatchupStatusChip } from './MatchupStatusChip';
 import {
+  BLACK,
   BRAND_GOLD_LIGHT,
   BRAND_NAVY,
   BRAND_NAVY_LIGHT,
@@ -14,6 +16,7 @@ import {
   RED,
   TEXT_MUTED,
   TEXT_PRIMARY,
+  WHITE,
   withAlpha,
 } from '../../utils/colors';
 import { FONT_DISPLAY, FONT_MONO } from '../../utils/typography';
@@ -289,6 +292,7 @@ export function MatchupScoreboardHero({
   const score1 = team1.score ?? 0;
   const score2 = team2.score ?? 0;
   const team1Leading = score1 >= score2;
+  const isCancelled = status === MatchupStatus.Cancelled;
   const preLock = status === MatchupStatus.Scheduled;
 
   const team1Name = team1.name ?? 'Team 1';
@@ -309,6 +313,28 @@ export function MatchupScoreboardHero({
           {scoreAnnouncement}
         </Text>
       </VisuallyHidden>
+      {/* Cancelled explanation: the status chip alone ("Cancelled") gives no
+          actionable next step — this banner makes the state unambiguous and
+          matches the equivalent banner in MatchupScoreboardView (LS-6369). */}
+      {isCancelled && (
+        <XStack
+          role="status"
+          aria-live="polite"
+          alignItems="center"
+          gap="$2"
+          paddingHorizontal="$5"
+          paddingVertical="$2"
+          backgroundColor={withAlpha(BLACK, 0.28)}
+          borderBottomWidth={1}
+          borderBottomColor={withAlpha(WHITE, 0.06)}
+          $sm={{ paddingHorizontal: '$3' }}
+        >
+          <XCircle size={14} color={TEXT_MUTED} />
+          <Text fontSize="$2" fontWeight="600" color={TEXT_MUTED}>
+            This matchup was cancelled.
+          </Text>
+        </XStack>
+      )}
       <TopBand>
         <XStack alignItems="center" gap="$2" flexWrap="wrap">
           <MatchupStatusChip

@@ -137,13 +137,23 @@ describe('MatchupScoreboardHero', () => {
     expect(onTeamPress).not.toHaveBeenCalled();
   });
 
-  it('shows the Cancelled chip for cancelled matchups', () => {
+  it('shows the Cancelled chip and explanation for cancelled matchups', () => {
     render(
       <MatchupScoreboardHero
         {...baseProps({ status: MatchupStatus.Cancelled })}
       />,
     );
     expect(screen.getByText('Cancelled · Week 5')).toBeTruthy();
+    expect(screen.getByText('This matchup was cancelled.')).toBeTruthy();
+  });
+
+  it('does not show the cancelled explanation for non-cancelled matchups', () => {
+    render(
+      <MatchupScoreboardHero
+        {...baseProps({ status: MatchupStatus.InProgress })}
+      />,
+    );
+    expect(screen.queryByText('This matchup was cancelled.')).toBeNull();
   });
 
   it('shows the Scheduled chip for scheduled matchups', () => {
