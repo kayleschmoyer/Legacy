@@ -516,7 +516,12 @@ export function createServer(): McpServer {
   // --- github_list_reviews ---
   server.tool(
     'github_list_reviews',
-    'List reviews on a PR (or many PRs in one batched GraphQL call). Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix). Pass `prs: number[]` (1-50) to fetch reviews for many PRs in one GraphQL round-trip; the response is `{ reviews: { [prNumber]: [...] }, missing: number[], truncated: number[] }`. Batch mode caps reviews at 100 per PR (GraphQL `first` limit); PRs whose totalCount exceeds the cap are listed in `truncated` so callers can fall back to single-PR mode if they need the full history. Pass `compact: false` to also get the full review body text (e.g. to read a monolithic bot review\'s findings) — no extra API call is made; the body is truncated to `maxBodyChars` (default 10000) with a trailing `[truncated]` marker when it exceeds that length. Single-PR mode accepts the PR number as "number" (preferred) or "prNumber" (alias).',
+    'List reviews on a PR, or many PRs in one batched GraphQL call. Returns reviewer, state, submittedAt, ' +
+      'bodyLength, and commentCount per review — enough to tell APPROVED from COMMENTED and to see whether ' +
+      'inline comments exist. Batch mode (`prs`, 1-50) returns ' +
+      '`{ reviews: { [prNumber]: [...] }, missing, truncated }`, capped at 100 reviews per PR. ' +
+      'Pass compact: false for full review bodies (truncated at maxBodyChars). ' +
+      'Review-cycle workflow: .agents/skills/pr-lifecycle/references/respond-to-review.md.',
     {
       number: z.coerce
         .number()
@@ -538,7 +543,7 @@ export function createServer(): McpServer {
         .max(50)
         .optional()
         .describe(
-          'Batch mode: PR numbers (1-50). When provided, reviews for all PRs are fetched in one batched GraphQL call and returned as a map keyed by PR number. Bad PR numbers are reported in `missing` and do not fail the whole call.',
+          'Batch mode: PR numbers (1-50), fetched in one GraphQL call. Bad numbers land in `missing`.',
         ),
       reviewer: z
         .string()
@@ -1273,7 +1278,14 @@ export function createServer(): McpServer {
   // --- github_finish_fix_round ---
   server.tool(
     'github_finish_fix_round',
-    'Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies the bot:ready-for-review label that re-triggers the Reviewer Bot cycle. Validates every reply BEFORE any side effect (exactly one of threadId/issueId, FIX requires `sha`, JUSTIFY/CANNOT-COMPLY require `body`) — a single invalid entry rejects the whole call. FIX reply body is emitted as exactly `FIX: <sha>` (no trailing prose — the bot is strict). JUSTIFY/CANNOT-COMPLY bodies are prefixed with the kind token if not already present. Partial failures do not block successful replies: failed replies are surfaced in `errors[]` and their threads are NOT resolved. Only FIX threads are resolved — JUSTIFY and CANNOT-COMPLY remain open for bot/human adjudication in the next cycle. Replaces the three-step github_reply_to_review_thread → github_resolve_threads → github_manage_labels(add: bot:ready-for-review) sequence. For a PR-level (threadless — no file/line) finding, pass issueId instead of threadId: the reply posts as a top-level PR comment in the issue-id-qualified format the Reviewer Bot resolves back to that specific finding (LS-7938) — see .agents/skills/pr-lifecycle/references/respond-to-review.md. Pass the PR number as "prNumber" (preferred) or "number" (alias).',
+    'Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread ' +
+      'FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies bot:ready-for-review to ' +
+      're-trigger the Reviewer Bot. Replaces github_reply_to_review_thread → github_resolve_threads → ' +
+      'github_manage_labels. Every reply is validated before any side effect, so one invalid entry rejects ' +
+      'the whole call; after that, a failed reply lands in `errors[]` and leaves its thread unresolved ' +
+      'without blocking the rest. Only FIX threads are resolved. Use issueId (not threadId) for a PR-level ' +
+      'finding with no file/line. Reply format and the full contract: ' +
+      '.agents/skills/pr-lifecycle/references/respond-to-review.md.',
     {
       prNumber: prNumberField('prNumber').optional().describe('PR number'),
       number: prNumberField('number')

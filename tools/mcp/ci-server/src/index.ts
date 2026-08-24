@@ -67,7 +67,9 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_get_logs',
-    'Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job. Defaults to failed-step logs only. Use jobName to filter logs to a specific job by name (case-insensitive substring match) without needing its numeric ID. Response is a minified-JSON metadata line followed by the raw log text with real newlines (not a JSON string field) — if this response is large enough to be persisted to a tool-results/*.txt file, grep and offset/limit-chunked Read both work directly against the log content.',
+    'Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job, failed steps ' +
+      'only by default. Response is a minified-JSON metadata line followed by raw log text with real ' +
+      'newlines, so grep and chunked Read work directly against it when the response is persisted to a file.',
     {
       runId: z.coerce
         .number()
@@ -81,14 +83,15 @@ export function createServer(): McpServer {
         .max(10)
         .optional()
         .describe(
-          'Batch mode: fetch logs for up to 10 runs in one call (concurrency capped at 3). Response is a minified-JSON header line ({ runIds, missing: [{ runId, reason }] }) followed by one "=== run <id> ===" section per successful run, each with its own metadata line + raw log text — runs whose log archives are missing (e.g. BlobNotFound 404 after GitHub log expiry) are isolated to missing[] instead of failing the whole call. Cannot be combined with jobId.',
+          'Batch mode: up to 10 runs in one call, each returned as a "=== run <id> ===" section. Runs whose ' +
+            'log archive is gone (expired) are isolated to missing[] rather than failing the call. Not with jobId.',
         ),
       jobId: z.coerce.number().int().positive().optional().describe('Job ID'),
       jobName: z
         .string()
         .optional()
         .describe(
-          'Filter logs to jobs whose name contains this string (case-insensitive substring match). Useful when you know the job name from ci_view_run but not its numeric ID.',
+          'Case-insensitive substring match on job name — use when you know the name but not the numeric ID.',
         ),
       failedOnly: coercedBoolean
         .default(true)
@@ -106,7 +109,7 @@ export function createServer(): McpServer {
         .max(5000)
         .optional()
         .describe(
-          'Maximum lines of log output to return (max: 5000). Defaults to 500 when errorSummary is false. When errorSummary is true, fetches up to 10000 lines for broader error extraction.',
+          'Max lines returned (cap 5000). Default 500, or up to 10000 when errorSummary is set.',
         ),
       maxChars: z.coerce
         .number()
@@ -115,7 +118,7 @@ export function createServer(): McpServer {
         .max(200_000)
         .optional()
         .describe(
-          'Hard cap on total output characters (default: 50000). Prevents context overflow when individual log lines are very long (e.g. JSON blobs). Output is truncated at this limit regardless of maxLines.',
+          'Hard cap on total characters (default 50000), applied regardless of maxLines.',
         ),
       truncateLineLength: z.coerce
         .number()
@@ -124,7 +127,7 @@ export function createServer(): McpServer {
         .max(10_000)
         .optional()
         .describe(
-          'Truncate individual lines longer than this many characters (e.g. 500). Useful when logs contain very long JSON or minified output. Truncated lines are suffixed with ...[line truncated].',
+          'Truncate individual lines past this length; truncated lines are suffixed ...[line truncated].',
         ),
       errorSummary: coercedBoolean
         .default(false)
@@ -643,27 +646,12 @@ export function createServer(): McpServer {
     'ci_get_playwright_test_result',
     {
       description:
-        'Read a SINGLE test result out of a Playwright report (GH Pages) or list S3 blob artifacts for a CI run. ' +
-        'Use this (not ci_get_playwright_report) when you already know which test is failing and just need ' +
-        'its error, snippet, stdout/stderr, and attachment list — it keeps the full report out of context. ' +
-        "Matches testTitle as a case-insensitive substring against each test's full title " +
-        '(describe path joined with " > "). If multiple tests match, returns a candidates list instead ' +
-        'of a single result; pass fileName to disambiguate. String fields are truncated to ~4000 chars ' +
-        'so a chatty test cannot overflow the response.\n\n' +
-        'GH Pages mode (source="gh-pages", default): fetches from the legacy-sports-deploys gh-pages branch. ' +
-        'When reportName is a bare numeric run ID, automatically tries nightly-{id} and manual-{id} as fallbacks ' +
-        'so you do not need to know the exact deployed name.\n\n' +
-        'S3 mode (source="s3"): for integration nightly runs whose GH Pages report is absent or when you need ' +
-        'the raw Playwright blob artifacts. Resolves the run ID to a HEAD SHA via the GitHub API, lists all ' +
-        'blob zip files under s3://legacy-sports-dev-ci-artifacts/ci-artifacts/{sha}/playwright-blobs/, and ' +
-        'returns 1-hour presigned GET URLs. Objects expire after 3 days — older runs return empty:true. ' +
-        'Each blob zip is a Playwright blob-reporter archive; use playwright merge-reports or unzip to extract ' +
-        'individual test-results (error-context.md, trace.zip).\n\n' +
-        'Alternative lookup by runId + testFile (LS-8888): the <integration-results> webhook payload only ever ' +
-        'gives a runId and a spec file path, never a resolved report name or exact test title — pass runId ' +
-        'instead of reportName and testFile instead of fileName to look up straight from that payload. ' +
-        'testTitle is then optional; if the file has exactly one non-passing test it is resolved automatically, ' +
-        'otherwise a candidates list is returned (pass testTitle to disambiguate).',
+        'Read a SINGLE test result from a Playwright report, or list S3 blob artifacts for a CI run. ' +
+        'Prefer this over ci_get_playwright_report when you already know which test failed and want only ' +
+        'its error, snippet, stdout/stderr, and attachments — it keeps the full report out of context. ' +
+        'Identify the report with reportName or runId, and the test with testTitle and/or fileName/testFile; ' +
+        'an ambiguous match returns a candidates list. Report naming, S3 blob handling, and the ' +
+        'runId+testFile webhook lookup: .agents/skills/read-playwright-report/SKILL.md.',
       inputSchema: z
         .object({
           reportName: z
@@ -674,39 +662,38 @@ export function createServer(): McpServer {
             )
             .optional()
             .describe(
-              'Report name as deployed: "pr-{number}" for PRs (e.g. "pr-2173"), "manual-{number}" for manually-triggered runs (e.g. "manual-146"), "nightly-{run_id}" for nightly runs, or a bare numeric GitHub run ID (auto-expanded to nightly-/manual- fallbacks in gh-pages mode, or used directly in s3 mode). Alternative to runId — one of the two is required.',
+              'Deployed report name (pr-N, manual-N, nightly-<runId>) or a bare numeric run ID. Alternative to runId; one is required.',
             ),
           runId: z
             .union([z.string(), z.number()])
             .optional()
             .describe(
-              'GitHub Actions run ID, as reported in the <integration-results> webhook payload (e.g. 30733200775). ' +
-                'Alternative to reportName — resolves the report name internally (same as passing a bare numeric reportName). One of the two is required.',
+              'GitHub Actions run ID (e.g. from the <integration-results> webhook). Alternative to reportName; one is required.',
             ),
           testTitle: z
             .string()
             .min(1)
             .optional()
             .describe(
-              'Substring of the test\'s full title (case-insensitive). Full title is the describe path joined by " > ", ending with the test name. Used as a filter hint in s3 mode (not parsed from blobs). Optional when fileName/testFile is given — see runId+testFile lookup above.',
+              'Case-insensitive substring of the full title (describe path joined by " > "). Optional when fileName/testFile is given.',
             ),
           fileName: z
             .string()
             .optional()
             .describe(
-              'Optional substring filter on the spec file name (case-insensitive) to disambiguate identical titles across files (gh-pages mode only). Alternative name: testFile.',
+              'Case-insensitive spec-filename substring, to disambiguate identical titles (gh-pages mode). Alias: testFile.',
             ),
           testFile: z
             .string()
             .optional()
             .describe(
-              'Alias for fileName matching the <integration-results> webhook field name (spec file path, e.g. "live-draft-ui.integration.spec.ts"). One of testTitle or fileName/testFile is required.',
+              'Alias for fileName, matching the <integration-results> webhook field. One of testTitle or fileName/testFile is required.',
             ),
           source: z
             .enum(['gh-pages', 's3'])
             .optional()
             .describe(
-              'Artifact source. "gh-pages" (default): fetch from legacy-sports-deploys GitHub Pages. "s3": resolve HEAD SHA from run ID and return presigned S3 URLs for Playwright blob archives — use when the GH Pages report is absent or for raw integration CI artifacts.',
+              '"gh-pages" (default) or "s3" (presigned blob-archive URLs) — use s3 when the GH Pages report is absent.',
             ),
           maxChars: z.coerce
             .number()
@@ -715,7 +702,7 @@ export function createServer(): McpServer {
             .max(100_000)
             .optional()
             .describe(
-              'Reserved for future use (default: 10000). Presigned URLs cannot be truncated (they would become invalid), so s3 mode always returns full artifact fields. In gh-pages mode a fixed 4000-char per-field cap (MAX_FIELD_CHARS) is applied instead.',
+              'Reserved for future use. gh-pages mode applies a fixed 4000-char per-field cap; s3 presigned URLs are never truncated.',
             ),
         })
         .superRefine((val, ctx) => {
@@ -744,16 +731,12 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_audit_session_bash',
-    'Extract Bash tool_use calls (and optionally MCP overflows/failures) from the current Claude Code session transcript. ' +
-      'Reads JSONL session files from ~/.claude/projects/ and returns a structured JSON report with every Bash command executed ' +
-      'during the session — including subagent transcripts. Designed for the MCP gap audit (Phase 1) to produce a complete ' +
-      'Bash command inventory that survives context-window compaction. ' +
-      'Auto-detects the current session and project when no parameters are provided, including worktree sessions started ' +
-      'with the Claude Code launcher worktree checkbox (e.g. ~/.claude/projects/D--code-legacy-sports--claude-worktrees-<name>/). ' +
-      'Default output: structured JSON report with full command details. ' +
-      'Pass gapsOnly:true for a compact plain-text frequency-table summary that separates potential MCP gaps from already-covered commands. ' +
-      'Pass auditMode:true for a structured JSON audit report with pre-classified gaps, confidence scores, draft ticket summaries, and noise filtering — minimizes LLM reasoning by pre-doing the classification. ' +
-      'Pass scanScratch:true to also scan scratch/*.py files for subprocess shell patterns (subprocess.run, Popen, os.system, etc.).',
+    'Extract Bash tool_use calls (and optionally MCP overflows/failures) from the current Claude Code session ' +
+      'transcript, including subagent transcripts, so the inventory survives context compaction. ' +
+      'Auto-detects the current session and project, worktree sessions included. Output modes: default ' +
+      'structured JSON; gapsOnly for a compact frequency table; auditMode for a pre-classified gap report ' +
+      'with confidence scores and draft ticket summaries. ' +
+      'Drives the MCP gap audit — see .agents/skills/mcp-first/references/audit-workflow.md.',
     {
       sessionId: z
         .string()
@@ -765,18 +748,14 @@ export function createServer(): McpServer {
         .string()
         .optional()
         .describe(
-          'Project slug (e.g. "D--code-legacy-sports" for the main repo, ' +
-            '"D--code-legacy-sports--claude-worktrees-<name>" for a launcher worktree session). ' +
-            'Auto-detected from CWD if omitted — worktree sessions are detected automatically.',
+          'Project slug (e.g. "D--code-legacy-sports"). Auto-detected from CWD if omitted.',
         ),
       projectsDir: z
         .string()
         .optional()
         .describe(
-          'Explicit base directory containing project session folders (e.g. "/root/.claude/projects"). ' +
-            'Overrides auto-detection (env override, $HOME, then OS user home). Use this when the server ' +
-            "process's resolved home directory does not match the actual session location, which can happen " +
-            'in Claude Code Remote (CCR) sessions.',
+          'Base directory holding project session folders. Overrides auto-detection — needed when the ' +
+            "server process's home does not match the session location (some CCR topologies).",
         ),
       includeMcp: coercedBoolean
         .default(false)
@@ -792,27 +771,19 @@ export function createServer(): McpServer {
       gapsOnly: coercedBoolean
         .default(false)
         .describe(
-          'Compact gap-focused output: one line per unique command pattern, <5 KB. ' +
-            'Separates potential MCP gaps from already-covered commands. ' +
-            'Use this instead of the default JSON output when running the MCP gap audit inline.',
+          'Compact output: one line per unique command pattern (<5 KB), gaps separated from covered commands.',
         ),
       scanScratch: coercedBoolean
         .default(false)
         .describe(
-          'Also scan scratch/*.py files for subprocess shell patterns ' +
-            '(subprocess.run, Popen, call, check_output, check_call, os.system). ' +
-            'Results appear under "scratch_subprocess_calls" in JSON output, or as a ' +
-            '"=== scratch/*.py subprocess calls ===" section in text/gaps-only output. ' +
-            'Default: false.',
+          'Also scan scratch/*.py for subprocess shell patterns; reported under "scratch_subprocess_calls".',
         ),
       auditMode: coercedBoolean
         .default(false)
         .describe(
-          'Structured audit mode: returns a JSON report with pre-classified gaps, ' +
-            'confidence scores (high/medium/low), draft Jira ticket summaries, ' +
-            'noise filtering, and overflow/failure triage. Designed to minimize LLM ' +
-            'reasoning — review and approve rather than classify from scratch. ' +
-            'Implies includeMcp:true. Use this instead of gapsOnly for the full audit workflow.',
+          'Full audit report: pre-classified gaps with confidence scores, draft ticket summaries, noise ' +
+            'filtering, and overflow/failure triage. Implies includeMcp. Review and approve rather than ' +
+            'classify from scratch.',
         ),
     },
     (params) => auditSessionBash(params),

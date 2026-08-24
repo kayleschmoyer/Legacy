@@ -1793,7 +1793,7 @@
         },
         {
           "name": "make_run",
-          "description": "Prefer this over `make <target>` via shell. Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc. Fast targets return their result in one call. A target still running after ~45s returns { status: \"running\", jobId } instead of blocking into the ~60s MCP transport timeout — the target keeps running in the background; call make_run_wait({ jobId }) to continue waiting, do NOT re-run the target. Stepwise validation (timeout-prone cloud/ephemeral sessions): the pc pipeline is also runnable as checkpointed chunks — pc-db-prep, pc-typecheck, pc-format, pc-lint, pc-workflows, pc-test, pc-build — equivalent to `pc` ONLY when ALL steps run in that order. NOTE: runner-apply has an interactive confirmation prompt — always pass variables=\"NO_CONFIRM=1\" when invoking it, otherwise the process will block waiting for stdin. runner-apply also runs terraform plan+apply and may take 10+ minutes.",
+          "description": "Prefer this over `make <target>` via shell. Run a whitelisted Makefile target (pc, build, test, lint, typecheck, format, codegen, install, kill-stale, ...). A target still running after ~45s returns { status: \"running\", jobId }; call make_run_wait({ jobId }) to keep waiting and do NOT re-run it. The pc pipeline also runs as ordered chunks (pc-db-prep, pc-typecheck, pc-format, pc-lint, pc-workflows, pc-test, pc-build) — equivalent to `pc` only when all run in that order. runner-apply prompts interactively: always pass variables=\"NO_CONFIRM=1\". Target details and per-environment validation: .agents/skills/repo-tooling/SKILL.md.",
           "inputs": {
             "target": {
               "type": "string",
@@ -1820,7 +1820,7 @@
                 "integer",
                 "> 0"
               ],
-              "description": "Cap Jest worker parallelism for test-bearing targets (pc, pre-commit, pc-test, test) by passing MAXWORKERS=<n>, which those targets forward to `nx affected -t test` as `-- --maxWorkers=<n>`. Use on memory-constrained machines to avoid \"Fatal process out of memory: Zone\" crashes (with \"spawn UNKNOWN\" in jest-worker) from full-parallelism Jest workers across every affected project — that failure signature means retry with a lower maxWorkers, not that the code under test regressed. E.g. maxWorkers: 2. No effect on non-test targets."
+              "description": "Cap Jest worker parallelism on test-bearing targets (MAXWORKERS=<n>). Use on memory-constrained machines: an out-of-memory crash with \"spawn UNKNOWN\" in jest-worker means retry lower, not a real test regression. No effect on non-test targets."
             },
             "timeoutMs": {
               "type": "number",
@@ -1829,17 +1829,17 @@
                 "integer",
                 "> 0"
               ],
-              "description": "Process-level timeout in milliseconds (runaway backstop — NOT a transport guard). Defaults: 600000 (10 min) for heavy targets (pc, pre-commit, build-all, test-all, install, full-check, dev-setup, ami-build, runner-apply, format, codegen), 300000 (5 min) for all others. Pass 900000 for make pc on a cold cache. On timeout, the result carries { timedOut: true } with the captured output."
+              "description": "Runaway backstop in ms, not a transport guard. Defaults 600000 for heavy targets, 300000 otherwise; pass 900000 for `pc` on a cold cache. On timeout the result carries { timedOut: true }."
             },
             "runInBackground": {
               "type": "boolean",
               "optional": true,
-              "description": "When true, return immediately with a { jobId } instead of waiting out the ~45s sync budget. Use make_run_wait({ jobId }) to block until completion (re-call if it returns status: \"running\"), or make_run_status({ jobId }) for a non-blocking snapshot. The default already backgrounds the process safely — this flag just skips the initial bounded wait."
+              "description": "Return a { jobId } immediately instead of waiting out the ~45s sync budget. The default already backgrounds safely; this only skips the initial wait. Follow with make_run_wait/make_run_status."
             },
             "verbose": {
               "type": "boolean",
               "optional": true,
-              "description": "When true, include the full raw output (up to 30k chars) in the response instead of the default compact summary. Default false: prettier per-file listings are collapsed to a count, and each step body is truncated to 20 lines with a note to run the step directly for the rest. Use verbose: true only when you need the complete output for debugging."
+              "description": "Return full raw output (up to 30k chars) instead of the compact summary, which collapses prettier file listings to a count and truncates each step body to 20 lines."
             }
           },
           "transports": [
@@ -2755,7 +2755,7 @@
       "tools": [
         {
           "name": "ci_audit_session_bash",
-          "description": "Extract Bash tool_use calls (and optionally MCP overflows/failures) from the current Claude Code session transcript. Reads JSONL session files from ~/.claude/projects/ and returns a structured JSON report with every Bash command executed during the session — including subagent transcripts. Designed for the MCP gap audit (Phase 1) to produce a complete Bash command inventory that survives context-window compaction. Auto-detects the current session and project when no parameters are provided, including worktree sessions started with the Claude Code launcher worktree checkbox (e.g. ~/.claude/projects/D--code-legacy-sports--claude-worktrees-<name>/). Default output: structured JSON report with full command details. Pass gapsOnly:true for a compact plain-text frequency-table summary that separates potential MCP gaps from already-covered commands. Pass auditMode:true for a structured JSON audit report with pre-classified gaps, confidence scores, draft ticket summaries, and noise filtering — minimizes LLM reasoning by pre-doing the classification. Pass scanScratch:true to also scan scratch/*.py files for subprocess shell patterns (subprocess.run, Popen, os.system, etc.).",
+          "description": "Extract Bash tool_use calls (and optionally MCP overflows/failures) from the current Claude Code session transcript, including subagent transcripts, so the inventory survives context compaction. Auto-detects the current session and project, worktree sessions included. Output modes: default structured JSON; gapsOnly for a compact frequency table; auditMode for a pre-classified gap report with confidence scores and draft ticket summaries. Drives the MCP gap audit — see .agents/skills/mcp-first/references/audit-workflow.md.",
           "inputs": {
             "sessionId": {
               "type": "string",
@@ -2765,12 +2765,12 @@
             "project": {
               "type": "string",
               "optional": true,
-              "description": "Project slug (e.g. \"D--code-legacy-sports\" for the main repo, \"D--code-legacy-sports--claude-worktrees-<name>\" for a launcher worktree session). Auto-detected from CWD if omitted — worktree sessions are detected automatically."
+              "description": "Project slug (e.g. \"D--code-legacy-sports\"). Auto-detected from CWD if omitted."
             },
             "projectsDir": {
               "type": "string",
               "optional": true,
-              "description": "Explicit base directory containing project session folders (e.g. \"/root/.claude/projects\"). Overrides auto-detection (env override, $HOME, then OS user home). Use this when the server process's resolved home directory does not match the actual session location, which can happen in Claude Code Remote (CCR) sessions."
+              "description": "Base directory holding project session folders. Overrides auto-detection — needed when the server process's home does not match the session location (some CCR topologies)."
             },
             "includeMcp": {
               "type": "boolean",
@@ -2792,19 +2792,19 @@
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "Compact gap-focused output: one line per unique command pattern, <5 KB. Separates potential MCP gaps from already-covered commands. Use this instead of the default JSON output when running the MCP gap audit inline."
+              "description": "Compact output: one line per unique command pattern (<5 KB), gaps separated from covered commands."
             },
             "scanScratch": {
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "Also scan scratch/*.py files for subprocess shell patterns (subprocess.run, Popen, call, check_output, check_call, os.system). Results appear under \"scratch_subprocess_calls\" in JSON output, or as a \"=== scratch/*.py subprocess calls ===\" section in text/gaps-only output. Default: false."
+              "description": "Also scan scratch/*.py for subprocess shell patterns; reported under \"scratch_subprocess_calls\"."
             },
             "auditMode": {
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "Structured audit mode: returns a JSON report with pre-classified gaps, confidence scores (high/medium/low), draft Jira ticket summaries, noise filtering, and overflow/failure triage. Designed to minimize LLM reasoning — review and approve rather than classify from scratch. Implies includeMcp:true. Use this instead of gapsOnly for the full audit workflow."
+              "description": "Full audit report: pre-classified gaps with confidence scores, draft ticket summaries, noise filtering, and overflow/failure triage. Implies includeMcp. Review and approve rather than classify from scratch."
             }
           },
           "transports": [
@@ -3014,7 +3014,7 @@
         },
         {
           "name": "ci_get_logs",
-          "description": "Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job. Defaults to failed-step logs only. Use jobName to filter logs to a specific job by name (case-insensitive substring match) without needing its numeric ID. Response is a minified-JSON metadata line followed by the raw log text with real newlines (not a JSON string field) — if this response is large enough to be persisted to a tool-results/*.txt file, grep and offset/limit-chunked Read both work directly against the log content.",
+          "description": "Prefer this over `gh run view --log-failed` via shell. Fetch CI logs for a run or job, failed steps only by default. Response is a minified-JSON metadata line followed by raw log text with real newlines, so grep and chunked Read work directly against it when the response is persisted to a file.",
           "inputs": {
             "runId": {
               "type": "number",
@@ -3042,7 +3042,7 @@
                   "> 0"
                 ]
               },
-              "description": "Batch mode: fetch logs for up to 10 runs in one call (concurrency capped at 3). Response is a minified-JSON header line ({ runIds, missing: [{ runId, reason }] }) followed by one \"=== run <id> ===\" section per successful run, each with its own metadata line + raw log text — runs whose log archives are missing (e.g. BlobNotFound 404 after GitHub log expiry) are isolated to missing[] instead of failing the whole call. Cannot be combined with jobId."
+              "description": "Batch mode: up to 10 runs in one call, each returned as a \"=== run <id> ===\" section. Runs whose log archive is gone (expired) are isolated to missing[] rather than failing the call. Not with jobId."
             },
             "jobId": {
               "type": "number",
@@ -3057,7 +3057,7 @@
             "jobName": {
               "type": "string",
               "optional": true,
-              "description": "Filter logs to jobs whose name contains this string (case-insensitive substring match). Useful when you know the job name from ci_view_run but not its numeric ID."
+              "description": "Case-insensitive substring match on job name — use when you know the name but not the numeric ID."
             },
             "failedOnly": {
               "type": "boolean",
@@ -3084,7 +3084,7 @@
                 "> 0",
                 "max 5000"
               ],
-              "description": "Maximum lines of log output to return (max: 5000). Defaults to 500 when errorSummary is false. When errorSummary is true, fetches up to 10000 lines for broader error extraction."
+              "description": "Max lines returned (cap 5000). Default 500, or up to 10000 when errorSummary is set."
             },
             "maxChars": {
               "type": "number",
@@ -3095,7 +3095,7 @@
                 "> 0",
                 "max 200000"
               ],
-              "description": "Hard cap on total output characters (default: 50000). Prevents context overflow when individual log lines are very long (e.g. JSON blobs). Output is truncated at this limit regardless of maxLines."
+              "description": "Hard cap on total characters (default 50000), applied regardless of maxLines."
             },
             "truncateLineLength": {
               "type": "number",
@@ -3106,7 +3106,7 @@
                 "> 0",
                 "max 10000"
               ],
-              "description": "Truncate individual lines longer than this many characters (e.g. 500). Useful when logs contain very long JSON or minified output. Truncated lines are suffixed with ...[line truncated]."
+              "description": "Truncate individual lines past this length; truncated lines are suffixed ...[line truncated]."
             },
             "errorSummary": {
               "type": "boolean",
@@ -3156,7 +3156,7 @@
         },
         {
           "name": "ci_get_playwright_test_result",
-          "description": "Read a SINGLE test result out of a Playwright report (GH Pages) or list S3 blob artifacts for a CI run. Use this (not ci_get_playwright_report) when you already know which test is failing and just need its error, snippet, stdout/stderr, and attachment list — it keeps the full report out of context. Matches testTitle as a case-insensitive substring against each test's full title (describe path joined with \" > \"). If multiple tests match, returns a candidates list instead of a single result; pass fileName to disambiguate. String fields are truncated to ~4000 chars so a chatty test cannot overflow the response.\n\nGH Pages mode (source=\"gh-pages\", default): fetches from the legacy-sports-deploys gh-pages branch. When reportName is a bare numeric run ID, automatically tries nightly-{id} and manual-{id} as fallbacks so you do not need to know the exact deployed name.\n\nS3 mode (source=\"s3\"): for integration nightly runs whose GH Pages report is absent or when you need the raw Playwright blob artifacts. Resolves the run ID to a HEAD SHA via the GitHub API, lists all blob zip files under s3://legacy-sports-dev-ci-artifacts/ci-artifacts/{sha}/playwright-blobs/, and returns 1-hour presigned GET URLs. Objects expire after 3 days — older runs return empty:true. Each blob zip is a Playwright blob-reporter archive; use playwright merge-reports or unzip to extract individual test-results (error-context.md, trace.zip).\n\nAlternative lookup by runId + testFile (LS-8888): the <integration-results> webhook payload only ever gives a runId and a spec file path, never a resolved report name or exact test title — pass runId instead of reportName and testFile instead of fileName to look up straight from that payload. testTitle is then optional; if the file has exactly one non-passing test it is resolved automatically, otherwise a candidates list is returned (pass testTitle to disambiguate).",
+          "description": "Read a SINGLE test result from a Playwright report, or list S3 blob artifacts for a CI run. Prefer this over ci_get_playwright_report when you already know which test failed and want only its error, snippet, stdout/stderr, and attachments — it keeps the full report out of context. Identify the report with reportName or runId, and the test with testTitle and/or fileName/testFile; an ambiguous match returns a candidates list. Report naming, S3 blob handling, and the runId+testFile webhook lookup: .agents/skills/read-playwright-report/SKILL.md.",
           "inputs": {
             "reportName": {
               "type": "string",
@@ -3164,7 +3164,7 @@
               "constraints": [
                 "matches /^[\\w.-]+$/"
               ],
-              "description": "Report name as deployed: \"pr-{number}\" for PRs (e.g. \"pr-2173\"), \"manual-{number}\" for manually-triggered runs (e.g. \"manual-146\"), \"nightly-{run_id}\" for nightly runs, or a bare numeric GitHub run ID (auto-expanded to nightly-/manual- fallbacks in gh-pages mode, or used directly in s3 mode). Alternative to runId — one of the two is required."
+              "description": "Deployed report name (pr-N, manual-N, nightly-<runId>) or a bare numeric run ID. Alternative to runId; one is required."
             },
             "runId": {
               "type": "union",
@@ -3179,7 +3179,7 @@
                   "optional": false
                 }
               ],
-              "description": "GitHub Actions run ID, as reported in the <integration-results> webhook payload (e.g. 30733200775). Alternative to reportName — resolves the report name internally (same as passing a bare numeric reportName). One of the two is required."
+              "description": "GitHub Actions run ID (e.g. from the <integration-results> webhook). Alternative to reportName; one is required."
             },
             "testTitle": {
               "type": "string",
@@ -3187,17 +3187,17 @@
               "constraints": [
                 "min 1"
               ],
-              "description": "Substring of the test's full title (case-insensitive). Full title is the describe path joined by \" > \", ending with the test name. Used as a filter hint in s3 mode (not parsed from blobs). Optional when fileName/testFile is given — see runId+testFile lookup above."
+              "description": "Case-insensitive substring of the full title (describe path joined by \" > \"). Optional when fileName/testFile is given."
             },
             "fileName": {
               "type": "string",
               "optional": true,
-              "description": "Optional substring filter on the spec file name (case-insensitive) to disambiguate identical titles across files (gh-pages mode only). Alternative name: testFile."
+              "description": "Case-insensitive spec-filename substring, to disambiguate identical titles (gh-pages mode). Alias: testFile."
             },
             "testFile": {
               "type": "string",
               "optional": true,
-              "description": "Alias for fileName matching the <integration-results> webhook field name (spec file path, e.g. \"live-draft-ui.integration.spec.ts\"). One of testTitle or fileName/testFile is required."
+              "description": "Alias for fileName, matching the <integration-results> webhook field. One of testTitle or fileName/testFile is required."
             },
             "source": {
               "type": "enum",
@@ -3206,7 +3206,7 @@
                 "gh-pages",
                 "s3"
               ],
-              "description": "Artifact source. \"gh-pages\" (default): fetch from legacy-sports-deploys GitHub Pages. \"s3\": resolve HEAD SHA from run ID and return presigned S3 URLs for Playwright blob archives — use when the GH Pages report is absent or for raw integration CI artifacts."
+              "description": "\"gh-pages\" (default) or \"s3\" (presigned blob-archive URLs) — use s3 when the GH Pages report is absent."
             },
             "maxChars": {
               "type": "number",
@@ -3217,7 +3217,7 @@
                 "> 0",
                 "max 100000"
               ],
-              "description": "Reserved for future use (default: 10000). Presigned URLs cannot be truncated (they would become invalid), so s3 mode always returns full artifact fields. In gh-pages mode a fixed 4000-char per-field cap (MAX_FIELD_CHARS) is applied instead."
+              "description": "Reserved for future use. gh-pages mode applies a fixed 4000-char per-field cap; s3 presigned URLs are never truncated."
             }
           },
           "transports": [
@@ -4307,7 +4307,7 @@
         },
         {
           "name": "github_finish_fix_round",
-          "description": "Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies the bot:ready-for-review label that re-triggers the Reviewer Bot cycle. Validates every reply BEFORE any side effect (exactly one of threadId/issueId, FIX requires `sha`, JUSTIFY/CANNOT-COMPLY require `body`) — a single invalid entry rejects the whole call. FIX reply body is emitted as exactly `FIX: <sha>` (no trailing prose — the bot is strict). JUSTIFY/CANNOT-COMPLY bodies are prefixed with the kind token if not already present. Partial failures do not block successful replies: failed replies are surfaced in `errors[]` and their threads are NOT resolved. Only FIX threads are resolved — JUSTIFY and CANNOT-COMPLY remain open for bot/human adjudication in the next cycle. Replaces the three-step github_reply_to_review_thread → github_resolve_threads → github_manage_labels(add: bot:ready-for-review) sequence. For a PR-level (threadless — no file/line) finding, pass issueId instead of threadId: the reply posts as a top-level PR comment in the issue-id-qualified format the Reviewer Bot resolves back to that specific finding (LS-7938) — see .agents/skills/pr-lifecycle/references/respond-to-review.md. Pass the PR number as \"prNumber\" (preferred) or \"number\" (alias).",
+          "description": "Semantic one-shot for the Author Agent Contract end-of-round: posts per-thread FIX/JUSTIFY/CANNOT-COMPLY replies, resolves the FIX threads, and applies bot:ready-for-review to re-trigger the Reviewer Bot. Replaces github_reply_to_review_thread → github_resolve_threads → github_manage_labels. Every reply is validated before any side effect, so one invalid entry rejects the whole call; after that, a failed reply lands in `errors[]` and leaves its thread unresolved without blocking the rest. Only FIX threads are resolved. Use issueId (not threadId) for a PR-level finding with no file/line. Reply format and the full contract: .agents/skills/pr-lifecycle/references/respond-to-review.md.",
           "inputs": {
             "prNumber": {
               "type": "number",
@@ -4763,7 +4763,7 @@
         },
         {
           "name": "github_list_reviews",
-          "description": "List reviews on a PR (or many PRs in one batched GraphQL call). Returns reviewer, state, submittedAt, bodyLength, and commentCount per review. Use to check whether Copilot APPROVED or COMMENTED, and whether inline comments exist (Copilot sometimes posts COMMENTED with 0 inline comments — a quirk that causes bot-review FAILURE but leaves no threads to fix). Pass `prs: number[]` (1-50) to fetch reviews for many PRs in one GraphQL round-trip; the response is `{ reviews: { [prNumber]: [...] }, missing: number[], truncated: number[] }`. Batch mode caps reviews at 100 per PR (GraphQL `first` limit); PRs whose totalCount exceeds the cap are listed in `truncated` so callers can fall back to single-PR mode if they need the full history. Pass `compact: false` to also get the full review body text (e.g. to read a monolithic bot review's findings) — no extra API call is made; the body is truncated to `maxBodyChars` (default 10000) with a trailing `[truncated]` marker when it exceeds that length. Single-PR mode accepts the PR number as \"number\" (preferred) or \"prNumber\" (alias).",
+          "description": "List reviews on a PR, or many PRs in one batched GraphQL call. Returns reviewer, state, submittedAt, bodyLength, and commentCount per review — enough to tell APPROVED from COMMENTED and to see whether inline comments exist. Batch mode (`prs`, 1-50) returns `{ reviews: { [prNumber]: [...] }, missing, truncated }`, capped at 100 reviews per PR. Pass compact: false for full review bodies (truncated at maxBodyChars). Review-cycle workflow: .agents/skills/pr-lifecycle/references/respond-to-review.md.",
           "inputs": {
             "number": {
               "type": "number",
@@ -4801,7 +4801,7 @@
                   "> 0"
                 ]
               },
-              "description": "Batch mode: PR numbers (1-50). When provided, reviews for all PRs are fetched in one batched GraphQL call and returned as a map keyed by PR number. Bad PR numbers are reported in `missing` and do not fail the whole call."
+              "description": "Batch mode: PR numbers (1-50), fetched in one GraphQL call. Bad numbers land in `missing`."
             },
             "reviewer": {
               "type": "string",
@@ -6659,12 +6659,12 @@
               "constraints": [
                 "email"
               ],
-              "description": "Email of the user to assign the ticket to. Overridden by `assigneeAccountId` — email-based lookup always 401s under the hosted Lambda (LS-7891). Prefer `assigneeAccountId` when known."
+              "description": "Assignee email. Overridden by `assigneeAccountId`, which needs no lookup — prefer it when known."
             },
             "assigneeAccountId": {
               "type": "string",
               "optional": true,
-              "description": "Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works where email-based assignment always 401s (LS-7891). Takes precedence over `assignee`."
+              "description": "Assignee Jira accountId — assigned directly with no lookup. Takes precedence over `assignee`."
             }
           },
           "transports": [
@@ -6755,7 +6755,7 @@
                   }
                 }
               },
-              "description": "Only used when action='claim'. Open PRs the caller has already found to reference this ticket key — e.g. github_pr_dashboard(state: 'open') filtered by key. The jira server has no GitHub credentials of its own (LS-9289) and cannot check this itself. When non-empty, claim returns action: 'PR_EXISTS' (instead of 'PROCEED') with the PR list attached, to prevent duplicate work on a ticket someone else already opened a PR for. Omit (or pass []) when no open PR was found or the check was skipped."
+              "description": "action='claim' only. Open PRs the caller already found for this key (this server has no GitHub credentials and cannot look them up). When non-empty, claim returns 'PR_EXISTS' instead of 'PROCEED'. See .agents/skills/work-ticket/references/leaf-mode.md."
             },
             "status": {
               "type": "string",
@@ -6781,12 +6781,12 @@
               "constraints": [
                 "email"
               ],
-              "description": "Only used when action='claim'. Email of the user to assign the ticket to — pass the session's own JIRA_ASSIGNEE_EMAIL so the claim is attributed to the caller rather than the shared server-side default. Overridden by `assigneeAccountId` and JIRA_ASSIGNEE_ACCOUNT_ID. Resolution tries /user/search (needs read:jira-user, which the hosted Lambda lacks) and falls back to a JQL lookup that works under read:jira-work (LS-9513); the JQL fallback only finds users who already have at least one issue assigned to them."
+              "description": "action='claim' only. Assignee email — pass the session's own JIRA_ASSIGNEE_EMAIL so the claim is attributed to the caller, not the shared server default. Overridden by `assigneeAccountId`. Resolution caveats: .agents/skills/work-ticket/references/leaf-mode.md."
             },
             "assigneeAccountId": {
               "type": "string",
               "optional": true,
-              "description": "Only used when action='claim'. Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call at all, so it is the cheapest and most reliable path. Takes precedence over `assignee` and both JIRA_ASSIGNEE_* env vars."
+              "description": "action='claim' only. Assignee accountId — assigned directly with no lookup, so it is the most reliable path. Takes precedence over `assignee` and the JIRA_ASSIGNEE_* env vars."
             },
             "cascade": {
               "type": "boolean",
@@ -7255,7 +7255,7 @@
         },
         {
           "name": "aws_logs_tail",
-          "description": "Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure). Returns markdown by default — an `### Errors` section extracted from ERROR/WARN/Exception lines (plus stack frames) followed by a `### Recent` code-block with the last 50 lines; pass `format: \"json\"` for the original structured payload. Pass `functions: string[]` (1-10) for batch mode: per-function blocks fetched concurrently (cap 5); one failing function does not fail the others. For historical incident forensics, use `startTime` + `endTime` (ISO-8601) to pin an exact window instead of the rolling `since` lookback.",
+          "description": "Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function. Returns markdown by default (an `### Errors` section plus a `### Recent` tail); pass format: \"json\" for the structured payload. `functions` runs 1-10 in batch, isolating per-function failures. For incident forensics pin an exact window with startTime/endTime instead of the rolling `since`. Investigation workflow: .agents/skills/cloudwatch-archaeology/SKILL.md.",
           "inputs": {
             "function": {
               "type": "enum",
@@ -7279,7 +7279,7 @@
                   "LAMBDA_FUNCTIONS"
                 ]
               },
-              "description": "Batch mode: 1-10 Lambda function short names. Logs are fetched concurrently (cap 5) and returned as `{ logs: { [name]: <block> } }`."
+              "description": "Batch mode: 1-10 function short names, fetched concurrently as `{ logs: { [name]: <block> } }`."
             },
             "since": {
               "type": "string",
@@ -7293,7 +7293,7 @@
               "constraints": [
                 "datetime"
               ],
-              "description": "Absolute window start (ISO-8601, e.g. 2025-06-01T00:00:00Z). When set, `since` is ignored and the tool fetches logs from this exact timestamp. Pair with `endTime` to pin a closed window; omit `endTime` to tail from `startTime` to now."
+              "description": "Absolute window start (ISO-8601). Overrides `since`. Pair with `endTime` for a closed window."
             },
             "endTime": {
               "type": "string",
@@ -7301,7 +7301,7 @@
               "constraints": [
                 "datetime"
               ],
-              "description": "Absolute window end (ISO-8601). Only meaningful when `startTime` is also set. Omit to fetch from `startTime` to now."
+              "description": "Absolute window end (ISO-8601). Requires `startTime`; omit to tail through to now."
             },
             "filter": {
               "type": "string",

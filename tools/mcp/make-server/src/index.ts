@@ -30,13 +30,13 @@ const server = new McpServer({
 // --- make_run ---
 server.tool(
   'make_run',
-  'Prefer this over `make <target>` via shell. Run a whitelisted Makefile target. Covers: pc, build, test, lint, typecheck, format, codegen, install, kill-stale, etc. ' +
-    'Fast targets return their result in one call. A target still running after ~45s returns { status: "running", jobId } instead of blocking into the ~60s MCP transport timeout — ' +
-    'the target keeps running in the background; call make_run_wait({ jobId }) to continue waiting, do NOT re-run the target. ' +
-    'Stepwise validation (timeout-prone cloud/ephemeral sessions): the pc pipeline is also runnable as checkpointed chunks — ' +
-    'pc-db-prep, pc-typecheck, pc-format, pc-lint, pc-workflows, pc-test, pc-build — equivalent to `pc` ONLY when ALL steps run in that order. ' +
-    'NOTE: runner-apply has an interactive confirmation prompt — always pass variables="NO_CONFIRM=1" when invoking it, ' +
-    'otherwise the process will block waiting for stdin. runner-apply also runs terraform plan+apply and may take 10+ minutes.',
+  'Prefer this over `make <target>` via shell. Run a whitelisted Makefile target (pc, build, test, lint, ' +
+    'typecheck, format, codegen, install, kill-stale, ...). A target still running after ~45s returns ' +
+    '{ status: "running", jobId }; call make_run_wait({ jobId }) to keep waiting and do NOT re-run it. ' +
+    'The pc pipeline also runs as ordered chunks (pc-db-prep, pc-typecheck, pc-format, pc-lint, pc-workflows, ' +
+    'pc-test, pc-build) — equivalent to `pc` only when all run in that order. ' +
+    'runner-apply prompts interactively: always pass variables="NO_CONFIRM=1". ' +
+    'Target details and per-environment validation: .agents/skills/repo-tooling/SKILL.md.',
   {
     target: z.string().describe('Make target'),
     worktreePath: z
@@ -54,11 +54,9 @@ server.tool(
       .positive()
       .optional()
       .describe(
-        'Cap Jest worker parallelism for test-bearing targets (pc, pre-commit, pc-test, test) by passing MAXWORKERS=<n>, ' +
-          'which those targets forward to `nx affected -t test` as `-- --maxWorkers=<n>`. Use on memory-constrained ' +
-          'machines to avoid "Fatal process out of memory: Zone" crashes (with "spawn UNKNOWN" in jest-worker) from ' +
-          'full-parallelism Jest workers across every affected project — that failure signature means retry with a ' +
-          'lower maxWorkers, not that the code under test regressed. E.g. maxWorkers: 2. No effect on non-test targets.',
+        'Cap Jest worker parallelism on test-bearing targets (MAXWORKERS=<n>). Use on memory-constrained ' +
+          'machines: an out-of-memory crash with "spawn UNKNOWN" in jest-worker means retry lower, not a real ' +
+          'test regression. No effect on non-test targets.',
       ),
     timeoutMs: z
       .number()
@@ -66,30 +64,22 @@ server.tool(
       .positive()
       .optional()
       .describe(
-        'Process-level timeout in milliseconds (runaway backstop — NOT a transport guard). ' +
-          'Defaults: 600000 (10 min) for heavy targets ' +
-          '(pc, pre-commit, build-all, test-all, install, full-check, dev-setup, ami-build, runner-apply, format, codegen), ' +
-          '300000 (5 min) for all others. ' +
-          'Pass 900000 for make pc on a cold cache. ' +
-          'On timeout, the result carries { timedOut: true } with the captured output.',
+        'Runaway backstop in ms, not a transport guard. Defaults 600000 for heavy targets, 300000 otherwise; ' +
+          'pass 900000 for `pc` on a cold cache. On timeout the result carries { timedOut: true }.',
       ),
     runInBackground: z
       .boolean()
       .optional()
       .describe(
-        'When true, return immediately with a { jobId } instead of waiting out the ~45s sync budget. ' +
-          'Use make_run_wait({ jobId }) to block until completion (re-call if it returns status: "running"), ' +
-          'or make_run_status({ jobId }) for a non-blocking snapshot. ' +
-          'The default already backgrounds the process safely — this flag just skips the initial bounded wait.',
+        'Return a { jobId } immediately instead of waiting out the ~45s sync budget. The default already ' +
+          'backgrounds safely; this only skips the initial wait. Follow with make_run_wait/make_run_status.',
       ),
     verbose: z
       .boolean()
       .optional()
       .describe(
-        'When true, include the full raw output (up to 30k chars) in the response instead of the ' +
-          'default compact summary. Default false: prettier per-file listings are collapsed to a ' +
-          'count, and each step body is truncated to 20 lines with a note to run the step directly ' +
-          'for the rest. Use verbose: true only when you need the complete output for debugging.',
+        'Return full raw output (up to 30k chars) instead of the compact summary, which collapses prettier ' +
+          'file listings to a count and truncates each step body to 20 lines.',
       ),
   },
   async (params) => runTarget(params),

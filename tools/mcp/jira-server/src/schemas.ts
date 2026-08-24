@@ -59,9 +59,7 @@ export const openPrsSchema = z
   .array(openPrRefSchema)
   .optional()
   .describe(
-    "Only used when action='claim'. Open PRs the caller has already found to reference this ticket key — e.g. " +
-      "github_pr_dashboard(state: 'open') filtered by key. The jira server has no GitHub credentials of its own " +
-      "(LS-9289) and cannot check this itself. When non-empty, claim returns action: 'PR_EXISTS' (instead of " +
-      "'PROCEED') with the PR list attached, to prevent duplicate work on a ticket someone else already opened a " +
-      'PR for. Omit (or pass []) when no open PR was found or the check was skipped.',
+    "action='claim' only. Open PRs the caller already found for this key (this server has no GitHub " +
+      "credentials and cannot look them up). When non-empty, claim returns 'PR_EXISTS' instead of 'PROCEED'. " +
+      'See .agents/skills/work-ticket/references/leaf-mode.md.',
   );

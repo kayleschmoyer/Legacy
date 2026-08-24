@@ -93,7 +93,11 @@ server.tool(
 // --- aws_logs_tail ---
 server.tool(
   'aws_logs_tail',
-  'Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function (app or runner infrastructure). Returns markdown by default — an `### Errors` section extracted from ERROR/WARN/Exception lines (plus stack frames) followed by a `### Recent` code-block with the last 50 lines; pass `format: "json"` for the original structured payload. Pass `functions: string[]` (1-10) for batch mode: per-function blocks fetched concurrently (cap 5); one failing function does not fail the others. For historical incident forensics, use `startTime` + `endTime` (ISO-8601) to pin an exact window instead of the rolling `since` lookback.',
+  'Prefer this over `aws logs tail` via shell. Fetch recent CloudWatch logs for a Lambda function. ' +
+    'Returns markdown by default (an `### Errors` section plus a `### Recent` tail); pass format: "json" ' +
+    'for the structured payload. `functions` runs 1-10 in batch, isolating per-function failures. ' +
+    'For incident forensics pin an exact window with startTime/endTime instead of the rolling `since`. ' +
+    'Investigation workflow: .agents/skills/cloudwatch-archaeology/SKILL.md.',
   {
     function: z
       .enum(LAMBDA_FUNCTIONS)
@@ -107,7 +111,7 @@ server.tool(
       .max(10)
       .optional()
       .describe(
-        'Batch mode: 1-10 Lambda function short names. Logs are fetched concurrently (cap 5) and returned as `{ logs: { [name]: <block> } }`.',
+        'Batch mode: 1-10 function short names, fetched concurrently as `{ logs: { [name]: <block> } }`.',
       ),
     since: z
       .string()
@@ -120,14 +124,14 @@ server.tool(
       .datetime()
       .optional()
       .describe(
-        'Absolute window start (ISO-8601, e.g. 2025-06-01T00:00:00Z). When set, `since` is ignored and the tool fetches logs from this exact timestamp. Pair with `endTime` to pin a closed window; omit `endTime` to tail from `startTime` to now.',
+        'Absolute window start (ISO-8601). Overrides `since`. Pair with `endTime` for a closed window.',
       ),
     endTime: z
       .string()
       .datetime()
       .optional()
       .describe(
-        'Absolute window end (ISO-8601). Only meaningful when `startTime` is also set. Omit to fetch from `startTime` to now.',
+        'Absolute window end (ISO-8601). Requires `startTime`; omit to tail through to now.',
       ),
     filter: z.string().optional().describe('Filter pattern for log messages'),
     environment: z

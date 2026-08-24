@@ -582,13 +582,16 @@ server.tool(
       .email()
       .optional()
       .describe(
-        "Only used when action='claim'. Email of the user to assign the ticket to — pass the session's own JIRA_ASSIGNEE_EMAIL so the claim is attributed to the caller rather than the shared server-side default. Overridden by `assigneeAccountId` and JIRA_ASSIGNEE_ACCOUNT_ID. Resolution tries /user/search (needs read:jira-user, which the hosted Lambda lacks) and falls back to a JQL lookup that works under read:jira-work (LS-9513); the JQL fallback only finds users who already have at least one issue assigned to them.",
+        "action='claim' only. Assignee email — pass the session's own JIRA_ASSIGNEE_EMAIL so the claim is " +
+          'attributed to the caller, not the shared server default. Overridden by `assigneeAccountId`. ' +
+          'Resolution caveats: .agents/skills/work-ticket/references/leaf-mode.md.',
       ),
     assigneeAccountId: z
       .string()
       .optional()
       .describe(
-        "Only used when action='claim'. Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call at all, so it is the cheapest and most reliable path. Takes precedence over `assignee` and both JIRA_ASSIGNEE_* env vars.",
+        "action='claim' only. Assignee accountId — assigned directly with no lookup, so it is the most " +
+          'reliable path. Takes precedence over `assignee` and the JIRA_ASSIGNEE_* env vars.',
       ),
     cascade: z
       .boolean()
@@ -655,13 +658,13 @@ server.tool(
       .email()
       .optional()
       .describe(
-        'Email of the user to assign the ticket to. Overridden by `assigneeAccountId` — email-based lookup always 401s under the hosted Lambda (LS-7891). Prefer `assigneeAccountId` when known.',
+        'Assignee email. Overridden by `assigneeAccountId`, which needs no lookup — prefer it when known.',
       ),
     assigneeAccountId: z
       .string()
       .optional()
       .describe(
-        'Jira accountId of the user to assign the ticket to — assigned directly with no user-lookup API call, so it works where email-based assignment always 401s (LS-7891). Takes precedence over `assignee`.',
+        'Assignee Jira accountId — assigned directly with no lookup. Takes precedence over `assignee`.',
       ),
   },
   async (params) => startWork(params),
