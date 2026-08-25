@@ -256,14 +256,7 @@ test.describe('Player Detail – back navigation: in-app path @regression', () =
   test('back button returns to /players/stats after in-app navigation from the stats list', async ({
     page,
     playersPage,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'navigates via a desktop grid row, replaced by the card feed at the mobile viewport (LS-9075)',
-    );
     await setupMocks(page);
     await playersPage.gotoStats();
 

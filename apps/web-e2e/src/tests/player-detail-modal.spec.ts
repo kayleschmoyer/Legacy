@@ -628,15 +628,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
   test('player nav: back button returns to /players/stats', async ({
     page,
     playersPage,
-    isMobile,
   }) => {
-    // The post-back assertion gates on the desktop grid heading, which the
-    // ≤800px card feed never renders (LS-9075) — desktop-only affordance
-    // exposed by the LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts the desktop stats-grid heading after back — the mobile card feed has no equivalent (LS-9075)',
-    );
     await setupPlayerDetailMocks(page);
     await playersPage.gotoDetail(1, 'networkidle');
 

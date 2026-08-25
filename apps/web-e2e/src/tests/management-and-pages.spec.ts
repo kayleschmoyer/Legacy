@@ -8,7 +8,7 @@
 import { expect, test } from '../fixtures/auth-enhanced';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
-import { skipOnMobileProject } from '../utils/viewport';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 /** URL predicate for the GraphQL API endpoint */
 
@@ -230,52 +230,35 @@ test.describe('Player Comparison Page @smoke', () => {
 // Player Stats Page (/players/stats)
 // ---------------------------------------------------------------------------
 
+/**
+ * Addressed at the desktop data grid — the "MLB Player Statistics" title, the
+ * `Search player name · min 2 chars` input, and the Share/Export actions.
+ * LS-9075 replaced that grid with `PlayersCardFeed` below `media.sm`, which
+ * renders a fixed "Players" heading, its own search field and a chip rail, and
+ * has no Share/Export equivalent — so there is no locator that resolves both.
+ * Pinned rather than skipped: the assertions still run under the mobile
+ * projects, just at the width they were written for (LS-9712).
+ */
 test.describe('Player Stats Page — static elements @smoke', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
+
   test.beforeEach(async ({ page }, testInfo) => {
-    // These static elements (the "Player Statistics" title, the desktop
-    // search input, Share/Export buttons) are all specific to the desktop
-    // data-grid surface — below the `media.sm` breakpoint, PlayerStatsPage
-    // renders PlayersCardFeed instead, which has no equivalent of any of them
-    // (LS-9075, LS-9712 — same category the `DESKTOP_GRID_ONLY_SPECS` list in
-    // playwright.config.ts already excludes for other specs).
-    skipOnMobileProject(testInfo, 'desktop-data-grid-only surface');
     await page.goto('/players/stats');
     await page.waitForLoadState('load');
   });
 
-  test('shows the MLB Player Statistics heading', async ({
-    page,
-    isMobile,
-  }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts the desktop stats grid, replaced by the card feed at the mobile viewport (LS-9075)',
-    );
+  test('shows the MLB Player Statistics heading', async ({ page }) => {
     // Title is rendered as a styled <Text> (not a semantic heading element)
     await expect(page.getByText(/player statistics/i).first()).toBeVisible();
   });
 
   test('shows the player search input', async ({ page, isMobile }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts the desktop stats grid toolbar, replaced by the card feed at the mobile viewport (LS-9075)',
-    );
     await expect(
       page.getByPlaceholder('Search player name · min 2 chars'),
     ).toBeVisible();
   });
 
   test('shows Share and Export action buttons', async ({ page, isMobile }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts the desktop stats grid toolbar, replaced by the card feed at the mobile viewport (LS-9075)',
-    );
     await expect(
       page.getByRole('button', { name: /share/i }).first(),
     ).toBeVisible();
@@ -285,12 +268,6 @@ test.describe('Player Stats Page — static elements @smoke', () => {
   });
 
   test('search input accepts text', async ({ page, isMobile }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts the desktop stats grid toolbar, replaced by the card feed at the mobile viewport (LS-9075)',
-    );
     const input = page.getByPlaceholder('Search player name · min 2 chars');
     await expect(input).toBeVisible();
     await input.fill('Trout');
@@ -298,12 +275,6 @@ test.describe('Player Stats Page — static elements @smoke', () => {
   });
 
   test('search input can be cleared', async ({ page, isMobile }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts the desktop stats grid toolbar, replaced by the card feed at the mobile viewport (LS-9075)',
-    );
     const input = page.getByPlaceholder('Search player name · min 2 chars');
     await expect(input).toBeVisible();
     await input.fill('Aaron');
@@ -319,16 +290,20 @@ test.describe('Player Stats Page — static elements @smoke', () => {
 test.describe('Unknown Routes @regression', () => {
   test('navigating to an unknown route does not crash the app', async ({
     page,
-  }, testInfo) => {
-    // The brand/logo is a desktop-only header affordance (LS-9712) — see
-    // navigation.spec.ts. The banner-visibility half of this assertion still
-    // holds on mobile; only the logo check needs the desktop viewport.
-    skipOnMobileProject(testInfo, 'desktop-only header affordance');
+  }) => {
     await page.goto('/this-route-does-not-exist');
     await page.waitForLoadState('load');
 
-    // The app should still render its shell (header etc.) without a JS crash
-    await expect(page.getByRole('banner')).toBeVisible();
-    await expect(page.getByTestId('header-logo')).toBeVisible();
+    // The app should still render its shell (header etc.) without a JS crash.
+    // Both assertions are deliberately viewport-agnostic so this keeps running
+    // at phone width: the `banner` landmark and the Help & support control are
+    // rendered by the desktop `NavContent` and the mobile header alike. The
+    // previous `header-logo` check was desktop-only chrome and could never pass
+    // at 375px, which is why this test had been skipped there (LS-9712).
+    const banner = page.getByRole('banner');
+    await expect(banner).toBeVisible();
+    await expect(
+      banner.getByRole('button', { name: /help & support/i }),
+    ).toBeVisible();
   });
 });

@@ -18,6 +18,7 @@ import {
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -642,13 +643,7 @@ adminTest.describe(
 
     adminTest(
       'shows Games and Losses in pitching section',
-      async ({ playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
+      async ({ playersPage }) => {
         // "Games" also appears in the Career Batting section; asserting visibility
         // confirms it renders in the comparison table (both rows are correct).
         await playersPage.compare.expectText('Games');
@@ -810,13 +805,7 @@ adminTest.describe(
     // that heading renders in both layouts.
     adminTest(
       'shows Batting by Season table for Judge',
-      async ({ playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
+      async ({ playersPage }) => {
         await playersPage.compare.expectSeasonTableVisible(
           'batting',
           'Aaron Judge',
@@ -826,13 +815,7 @@ adminTest.describe(
 
     adminTest(
       'shows Batting by Season table for Ohtani',
-      async ({ playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
+      async ({ playersPage }) => {
         await playersPage.compare.expectSeasonTableVisible(
           'batting',
           'Shohei Ohtani',
@@ -842,13 +825,7 @@ adminTest.describe(
 
     adminTest(
       'shows Pitching by Season table for Ohtani',
-      async ({ playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
+      async ({ playersPage }) => {
         await playersPage.compare.expectSeasonTableVisible(
           'pitching',
           'Shohei Ohtani',
@@ -858,13 +835,7 @@ adminTest.describe(
 
     adminTest(
       'does NOT show Pitching by Season table for Judge (non-pitcher)',
-      async ({ playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
+      async ({ playersPage }) => {
         await playersPage.compare.expectSeasonTableHidden(
           'pitching',
           'Aaron Judge',
@@ -872,35 +843,36 @@ adminTest.describe(
       },
     );
 
-    adminTest(
-      'season batting table shows column headers (Year, G, AB, H, HR, etc.)',
-      async ({ playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
-        // Locate within the season breakdown section
-        await playersPage.compare.expectSeasonBySeasonHeading();
+    /**
+     * Column headers only exist on the wide layout: below the stack breakpoint
+     * `SeasonCardList` renders one card per season, using the year as the card
+     * *title* and only `headers.slice(1)` as field labels — so "AB" and "AVG"
+     * are present at 375px but a literal "Year" header is not. Pinned rather
+     * than skipped; the sibling cases in this describe stay unpinned and now
+     * run at both widths via the role-agnostic `seasonTable()` lookup
+     * (LS-9712).
+     */
+    adminTest.describe('desktop column headers', () => {
+      adminTest.use({ viewport: DESKTOP_VIEWPORT });
 
-        // Column headers for batting table
-        await playersPage.compare.expectText('Year');
-        // AB and HR appear in the batting table headers
-        await playersPage.compare.expectText('AB');
-        await playersPage.compare.expectText('AVG');
-      },
-    );
+      adminTest(
+        'season batting table shows column headers (Year, G, AB, H, HR, etc.)',
+        async ({ playersPage }) => {
+          // Locate within the season breakdown section
+          await playersPage.compare.expectSeasonBySeasonHeading();
+
+          // Column headers for batting table
+          await playersPage.compare.expectText('Year');
+          // AB and HR appear in the batting table headers
+          await playersPage.compare.expectText('AB');
+          await playersPage.compare.expectText('AVG');
+        },
+      );
+    });
 
     adminTest(
       'Ohtani season batting table contains 2021 season row data',
-      async ({ playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
+      async ({ playersPage }) => {
         // 2021 season: 155 games, 46 HR, .257 AVG
         await playersPage.compare.expectText('2021');
       },
@@ -908,13 +880,7 @@ adminTest.describe(
 
     adminTest(
       'Ohtani season pitching table shows pitching headers',
-      async ({ playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
+      async ({ playersPage }) => {
         // Scope to the pitching table to avoid matching career pitching comparison
         await playersPage.compare.expectSeasonTableHeader(
           'pitching',
@@ -946,12 +912,6 @@ adminTest.describe(
     adminTest(
       'no expand toggle when a player has 4 or fewer seasons',
       async ({ page, playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
         // Default mock gives Ohtani 2 seasons — below the truncation threshold.
         await mockGraphQL(page);
         await playersPage.gotoCompare();
@@ -968,12 +928,6 @@ adminTest.describe(
     adminTest(
       'expand toggle reveals seasons beyond the four most recent',
       async ({ page, playersPage, isMobile }) => {
-        // Desktop-only affordance at the mobile viewport — exposed by the
-        // LS-9658 full mobile sweep (LS-9660).
-        adminTest.skip(
-          isMobile,
-          'the season/career comparison tables are hidden at the mobile viewport (responsive layout)',
-        );
         // Give Ohtani six batting seasons so the toggle appears.
         await mockGraphQL(page, { 2: { batting: MOCK_OHTANI_MANY_BATTING } });
         await playersPage.gotoCompare();

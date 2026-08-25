@@ -16,6 +16,7 @@ import { expect, test } from '../fixtures/auth-enhanced';
 import { FIXED_NOW_ISO, fromNowIso } from '../mocks/time';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -390,16 +391,10 @@ async function mockAuctionDraftGraphQL(
 // ---------------------------------------------------------------------------
 
 test.describe('Auction Draft Board — budget display @regression', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
   test('renders the auction draft room with budget tracker', async ({
     page,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'the auction draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
-    );
     await mockAuctionDraftGraphQL(page, MOCK_AUCTION_STATE_NOMINATING);
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('load');
@@ -428,16 +423,10 @@ test.describe('Auction Draft Board — budget display @regression', () => {
 });
 
 test.describe('Auction Draft — nomination & bid interface @regression', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
   test('shows nomination panel when it is the current user turn', async ({
     page,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'the auction draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
-    );
     // Team ID 1 is the nominator and the user's team
     await mockAuctionDraftGraphQL(page, MOCK_AUCTION_STATE_NOMINATING);
     await page.goto(DRAFT_URL);
@@ -461,14 +450,7 @@ test.describe('Auction Draft — nomination & bid interface @regression', () => 
 
   test('shows bid interface when a player is on the block', async ({
     page,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'the auction draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
-    );
     await mockAuctionDraftGraphQL(page, MOCK_AUCTION_STATE_BIDDING);
     await page.goto(DRAFT_URL);
     await page.waitForLoadState('load');
@@ -501,16 +483,10 @@ test.describe('Auction Draft — nomination & bid interface @regression', () => 
 });
 
 test.describe('Auction Draft — budget tracking updates @regression', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
   test('budget table reflects updated amounts after a winning bid', async ({
     page,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'the auction draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
-    );
     // Install base mocks first (lower priority in LIFO chain)
     await mockAuctionDraftGraphQL(page, MOCK_AUCTION_STATE_BIDDING);
 
@@ -559,16 +535,10 @@ test.describe('Auction Draft — budget tracking updates @regression', () => {
 });
 
 test.describe('Auction Draft — outbid notification @regression', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
   test('displays outbid state when another team leads the bid', async ({
     page,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'the auction draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
-    );
     // Current user is team 1, but team 3 (Budget Beasts) is the high bidder
     await mockAuctionDraftGraphQL(page, MOCK_AUCTION_STATE_OUTBID);
     await page.goto(DRAFT_URL);
@@ -604,14 +574,7 @@ test.describe('Auction Draft — outbid notification @regression', () => {
 
   test('shows high-bidder confirmation when user is winning', async ({
     page,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'the auction draft board renders its compact variant at the mobile viewport, without this desktop affordance (LS-9488 class)',
-    );
     // Auction state where the current user (team 1) IS the high bidder
     const stateUserWinning = {
       ...MOCK_AUCTION_STATE_BIDDING,

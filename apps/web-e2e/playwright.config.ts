@@ -87,21 +87,14 @@ const DESKTOP_GRID_ONLY_SPECS = [
  * it only make sense against the desktop `chromium`/`firefox`/`webkit`
  * projects.
  *
- * LS-9712: the same gate is unconditional (`if (isCompact) return
- * <CompactLiveDraftBoard ... />` — EliteDraftBoardScreen.tsx), so the desktop
- * wide-board render path — `data-testid="draft-board"`, the standard bid/
- * nomination panels — never runs at all under a mobile project, not just its
- * top band. auction-draft.spec.ts and draft-selection-workflow.spec.ts are
- * entirely about that wide board (auction room, nomination/bid UI, the pick
- * queue) with no test that exercises anything else, so — unlike the mixed
- * files fixed with per-test `skipOnMobileProject` in the same ticket — a
- * whole-file exclusion is correct here, same as `mid-draft-trades.spec.ts`.
+ * LS-9712 removed `auction-draft.spec.ts` and `draft-selection-workflow.spec.ts`
+ * from this list. Excluding them stopped them running under the mobile projects
+ * altogether; pinning a desktop viewport on their describes keeps them
+ * executing there instead, which is the weaker of the two guarantees to give
+ * up. `mid-draft-trades.spec.ts` stays because its subject is one testid
+ * (`current-pick`) that the compact board has no analogue for.
  */
-const DESKTOP_DRAFT_TOPBAND_ONLY_SPECS = [
-  /mid-draft-trades\.spec\.ts$/,
-  /auction-draft\.spec\.ts$/,
-  /draft-selection-workflow\.spec\.ts$/,
-];
+const DESKTOP_DRAFT_TOPBAND_ONLY_SPECS = [/mid-draft-trades\.spec\.ts$/];
 
 /**
  * @see https://playwright.dev/docs/test-configuration

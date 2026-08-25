@@ -1073,8 +1073,15 @@ class PlayerCompareSurface {
 
   /** A season-breakdown table by kind + player name. */
   seasonTable(kind: 'batting' | 'pitching', playerName: string): UIElement {
-    return this.#driver.byRole('table', {
-      name: `Season ${kind} for ${playerName}`,
+    // Matched by accessible name rather than role: below
+    // SEASON_STACK_BREAKPOINT (480px) `PlayerComparison` renders this surface
+    // as a `role="list"` card list (`SeasonCardList`) instead of a
+    // `role="table"`, with the *same* `aria-label` on both. Pinning the role to
+    // `table` made every caller time out under the mobile projects even though
+    // the surface was present and populated — which is why these tests had been
+    // skipped there rather than fixed (LS-9712).
+    return this.#driver.byLabel(`Season ${kind} for ${playerName}`, {
+      exact: true,
     });
   }
 

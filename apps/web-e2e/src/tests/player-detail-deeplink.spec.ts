@@ -23,6 +23,7 @@ import {
   unmockedGraphQLFallback,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -495,20 +496,20 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
   // location.key is set — the back button correctly returns to /players
   // (LS-9076 — the canonical stats route, formerly /players/stats).
 
+  /**
+   * The `desktop:` cases here drive `player-row-N`, a desktop data-grid row that
+   * `PlayersCardFeed` has no equivalent for below `media.sm` (LS-9075). Pinned
+   * rather than skipped. The `mobile:` cases in this same describe call
+   * `page.setViewportSize(MOBILE_VIEWPORT)` themselves, so they override this
+   * pin per-test and keep exercising the card feed (LS-9712).
+   */
   test.describe('Stats/Search origin @critical', () => {
+    test.use({ viewport: DESKTOP_VIEWPORT });
+
     test('desktop: click player row opens /players/:id dialog', async ({
       page,
       playersPage,
-      isMobile,
     }) => {
-      // LS-9326: this test's `stats.row(1)` locator only exists in the
-      // desktop table (LS-9075's card feed has no equivalent) — scoped away
-      // from the mobile projects; the 'mobile: ...' test below already
-      // covers the same flow via the card feed.
-      test.skip(
-        isMobile,
-        'covered by the mobile: variant below via the card feed (LS-9075/LS-9326)',
-      );
       await mockStatsWithPlayerDetail(page);
       await playersPage.gotoStats();
 
@@ -524,14 +525,7 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
     test('desktop: back button returns to /players', async ({
       page,
       playersPage,
-      isMobile,
     }) => {
-      // LS-9326: see the desktop 'click player row' test above — scoped away
-      // from the mobile projects; 'mobile: back button ...' below covers it.
-      test.skip(
-        isMobile,
-        'covered by the mobile: variant below via the card feed (LS-9075/LS-9326)',
-      );
       await mockStatsWithPlayerDetail(page);
       await playersPage.gotoStats();
 

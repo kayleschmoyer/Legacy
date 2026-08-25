@@ -15,6 +15,7 @@
 
 import { expect, test } from '../fixtures/pages';
 import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -739,18 +740,19 @@ test.describe('Player Detail Modal – duplicate season deduplication @regressio
 
 // ── Tests: Opening modal from stats page ────────────────────────────────────
 
+/**
+ * Opens the modal by clicking `player-row-N`, a desktop data-grid row.
+ * `PlayersCardFeed` renders `players-card-feed-card-N` cards instead below
+ * `media.sm`, so the row locator has no phone-width equivalent (LS-9075).
+ * Pinned rather than skipped (LS-9712).
+ */
 test.describe('Player Detail Modal – open from stats table @regression', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
+
   test('clicking a player row on /players opens the modal', async ({
     page,
     playersPage,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'clicks a desktop grid row, replaced by the card feed at the mobile viewport (LS-9075)',
-    );
     await setupMocks(page);
     await playersPage.gotoStats();
 

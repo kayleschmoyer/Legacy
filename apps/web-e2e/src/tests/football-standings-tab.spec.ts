@@ -23,6 +23,7 @@
 
 import { expect, test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -206,39 +207,41 @@ test.describe('Football Standings Tab — navigation @smoke', () => {
 // ── Standings Tab — data rendering ────────────────────────────────────────────
 
 test.describe('Football Standings Tab — data rendering @regression', () => {
-  test('renders a standings table with rank, team, W/L/T, and points columns', async ({
-    page,
-    leaguePage,
-    standingsPage,
-  }, testInfo) => {
-    // T/Win% columns hide below the `$sm` breakpoint and PF/PA hide below
-    // `$md` (StandingsTable's responsive column hiding) — both thresholds
-    // sit above the mobile projects' 375px viewport, so this desktop-only
-    // column set never renders there (LS-9493).
-    test.skip(
-      testInfo.project.name === 'Mobile Chrome' ||
-        testInfo.project.name === 'Mobile Safari',
-      'T/PF/PA columns are hidden below the $sm/$md breakpoints on narrow viewports',
-    );
+  /**
+   * T/Win% columns hide below the `$sm` breakpoint and PF/PA below `$md`
+   * (StandingsTable's responsive column hiding) — both thresholds sit above
+   * the mobile projects' 375px viewport, so this desktop-only column set
+   * never renders there (LS-9493). Pinned rather than skipped so the column
+   * assertions still run under the mobile projects (LS-9712); the sibling
+   * tests below keep their phone-width coverage.
+   */
+  test.describe('desktop column set', () => {
+    test.use({ viewport: DESKTOP_VIEWPORT });
 
-    await mockFootballStandings(page);
-    await standingsPage.goto(1, 'football');
-    await standingsPage.expectNoAppError();
+    test('renders a standings table with rank, team, W/L/T, and points columns', async ({
+      page,
+      leaguePage,
+      standingsPage,
+    }) => {
+      await mockFootballStandings(page);
+      await standingsPage.goto(1, 'football');
+      await standingsPage.expectNoAppError();
 
-    // Every team from the mocked standings renders.
-    await standingsPage.team('Northside Ironclads').expectVisible();
-    await standingsPage.team('Southgate Marauders').expectVisible();
-    await standingsPage.team('Eastway Blitz').expectVisible();
+      // Every team from the mocked standings renders.
+      await standingsPage.team('Northside Ironclads').expectVisible();
+      await standingsPage.team('Southgate Marauders').expectVisible();
+      await standingsPage.team('Eastway Blitz').expectVisible();
 
-    // Rank, W, L, T, and points columns render. Anchored regexes avoid
-    // substring collisions (e.g. "W" matching "Win%").
-    await leaguePage.standingsColumnHeader(/^#$/).expectVisible();
-    await leaguePage.standingsColumnHeader(/^Team$/).expectVisible();
-    await leaguePage.standingsColumnHeader(/^W$/).expectVisible();
-    await leaguePage.standingsColumnHeader(/^L$/).expectVisible();
-    await leaguePage.standingsColumnHeader(/^T$/).expectVisible();
-    await leaguePage.standingsColumnHeader(/^PF$/).expectVisible();
-    await leaguePage.standingsColumnHeader(/^PA$/).expectVisible();
+      // Rank, W, L, T, and points columns render. Anchored regexes avoid
+      // substring collisions (e.g. "W" matching "Win%").
+      await leaguePage.standingsColumnHeader(/^#$/).expectVisible();
+      await leaguePage.standingsColumnHeader(/^Team$/).expectVisible();
+      await leaguePage.standingsColumnHeader(/^W$/).expectVisible();
+      await leaguePage.standingsColumnHeader(/^L$/).expectVisible();
+      await leaguePage.standingsColumnHeader(/^T$/).expectVisible();
+      await leaguePage.standingsColumnHeader(/^PF$/).expectVisible();
+      await leaguePage.standingsColumnHeader(/^PA$/).expectVisible();
+    });
   });
 
   test('orders rows by standing (best record first), independent of input order', async ({

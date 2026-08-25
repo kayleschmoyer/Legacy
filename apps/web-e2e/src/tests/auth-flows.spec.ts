@@ -7,6 +7,7 @@
 
 import { adminTest, expect, test, unauthTest } from '../fixtures/pages';
 import { E2E_SIGNING_SECRET, signE2EJwt } from '../utils/jwt';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 /** Read the base URL that Playwright is actually using (set in playwright.config.ts). */
 const E2E_ORIGIN = `http://localhost:${process.env.E2E_PORT || 4280}`;
@@ -944,15 +945,11 @@ test.describe('Logout Flow @regression', () => {
 // ---------------------------------------------------------------------------
 
 adminTest.describe('Profile Dropdown Logout @regression', () => {
+  adminTest.use({ viewport: DESKTOP_VIEWPORT });
+
   adminTest(
     'profile dropdown contains a Sign Out option',
     async ({ page, isMobile }) => {
-      // Desktop-only affordance at the mobile viewport — exposed by the
-      // LS-9658 full mobile sweep (LS-9660).
-      adminTest.skip(
-        isMobile,
-        'the desktop user-profile dropdown never renders at the mobile viewport (the drawer covers sign-out on mobile)',
-      );
       // Navigate to a stable authenticated page.
       await page.goto('/about');
       await page.waitForLoadState('load');
@@ -978,12 +975,6 @@ adminTest.describe('Profile Dropdown Logout @regression', () => {
   adminTest(
     'clicking Sign Out returns user to the login gate',
     async ({ page, browserName, isMobile }) => {
-      // Desktop-only affordance at the mobile viewport — exposed by the
-      // LS-9658 full mobile sweep (LS-9660).
-      adminTest.skip(
-        isMobile,
-        'the desktop user-profile dropdown never renders at the mobile viewport (the drawer covers sign-out on mobile)',
-      );
       test.skip(
         browserName === 'webkit',
         'WebKit blocks localStorage access in this context',

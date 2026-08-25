@@ -7,6 +7,7 @@ import {
   useTier,
 } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 /**
  * E2E coverage for the premium gating added in LS-5024.
@@ -36,16 +37,7 @@ const EXPORT_BUTTON = /export player statistics as json/i;
 test.describe('Premium gating — free user @critical', () => {
   test('Player Stats page is accessible but export is withheld for free users (LS-9347)', async ({
     page,
-    isMobile,
   }) => {
-    // LS-9326/LS-9075: the phone-width card feed has no Export control by
-    // design — scope the export assertion to desktop, matching the existing
-    // premium-user counterpart test below.
-    test.skip(
-      isMobile,
-      'card feed has no Export control by design (LS-9075) — desktop-only assertion',
-    );
-
     await useTier(page, 'free');
     await page.goto('/players/stats');
 
@@ -339,7 +331,16 @@ test.describe('Premium gating — Mock Draft Control All Teams (LS-9253) @critic
   });
 });
 
+/**
+ * Asserts the Player Stats Export control, which the phone-width card feed
+ * does not render by design (LS-9075). Pinned rather than skipped so the
+ * premium-entitlement assertion still runs under the mobile projects
+ * (LS-9712). The free-user describe above needs no pin — its assertion is that
+ * export is *absent*, which holds at either width.
+ */
 test.describe('Premium gating — premium user @critical', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
+
   test('View Game Logs page is not gated for premium users', async ({
     page,
   }) => {
@@ -354,16 +355,7 @@ test.describe('Premium gating — premium user @critical', () => {
 
   test('Player Stats Export JSON is available to premium users', async ({
     page,
-    isMobile,
   }) => {
-    // LS-9326: the phone-width card feed (LS-9075) intentionally has no
-    // Export/Share controls, so this assertion has no mobile equivalent —
-    // scope to desktop rather than weakening it (per the LS-9075 design).
-    test.skip(
-      isMobile,
-      'card feed has no Export control by design (LS-9075) — desktop-only assertion',
-    );
-
     await useTier(page, 'premium');
     await page.goto('/players/stats');
 

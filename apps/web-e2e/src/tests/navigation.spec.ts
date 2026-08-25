@@ -11,53 +11,30 @@
  */
 
 import { expect, test } from '../fixtures/pages';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 test.describe('Navigation Header @smoke', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
+
   test.beforeEach(async ({ page }) => {
     // /about renders without GraphQL — wait for page load
     await page.goto('/about');
     await page.waitForLoadState('load');
   });
 
-  test('renders the Legacy Sports logo/home link', async ({
-    navHeader,
-    isMobile,
-  }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts the desktop header, hidden at the mobile viewport (mobile nav covered by mobile-responsive-nav.spec.ts; LS-9693)',
-    );
+  test('renders the Legacy Sports logo/home link', async ({ navHeader }) => {
     // Home link + logo image visible, pointing at the branded asset.
     await navHeader.expectLogo();
   });
 
-  test('logo link navigates to the homepage', async ({
-    page,
-    navHeader,
-    isMobile,
-  }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'navigates via the desktop header logo, hidden at the mobile viewport (LS-9693)',
-    );
+  test('logo link navigates to the homepage', async ({ page, navHeader }) => {
     await navHeader.clickLogo();
     await expect(page).toHaveURL('/');
   });
 
   test('renders primary navigation with expected items', async ({
     navHeader,
-    isMobile,
   }) => {
-    // Desktop-only affordance at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660).
-    test.skip(
-      isMobile,
-      'asserts the desktop primary nav, hidden at the mobile viewport (mobile nav covered by mobile-responsive-nav.spec.ts; LS-9693)',
-    );
     // Navigation uses role="navigation" aria-label="Primary"
     await navHeader.expectPrimaryNavVisible();
     // Nav contains pill-tab links for Players, Stats, and Minigames

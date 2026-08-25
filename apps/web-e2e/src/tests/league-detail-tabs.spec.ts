@@ -16,6 +16,7 @@ import {
 } from '../fixtures/shared-mocks';
 import { agoIso } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // Page-object migration (LS-8092 / ADR-0015): all locators live on
 // `leaguePage` — specs are selector-free. The default `test` from
@@ -748,20 +749,20 @@ test.describe('Roster Tab – data rendering @regression', () => {
 
 // ── Waivers (within Roster Tab) ───────────────────────────────────────────────
 
+/**
+ * Roster.tsx renders PendingWaiverClaims with compact={isNarrow} below the
+ * narrow-viewport breakpoint, which shows only a claim-count summary and
+ * never the per-claim player name asserted below (LS-9493). Pinned rather
+ * than skipped so the pending-claim assertion still runs under the mobile
+ * projects (LS-9712).
+ */
 test.describe('Pending Waivers — with claims @regression', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
+
   test('shows pending waiver claim card when claims exist', async ({
     page,
     leaguePage,
-  }, testInfo) => {
-    // Roster.tsx renders PendingWaiverClaims with compact={isNarrow} below
-    // the narrow-viewport breakpoint, which shows only a claim-count summary
-    // and never the per-claim player name asserted below (LS-9493).
-    test.skip(
-      testInfo.project.name === 'Mobile Chrome' ||
-        testInfo.project.name === 'Mobile Safari',
-      'PendingWaiverClaims renders in compact (summary-only) mode on narrow viewports',
-    );
-
+  }) => {
     await mockLeagueDetailGraphQL(page, {
       waiverClaims: MOCK_WAIVER_CLAIMS,
       teamMembers: MOCK_TEAM_MEMBERS,

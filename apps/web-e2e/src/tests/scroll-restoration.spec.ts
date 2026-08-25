@@ -12,17 +12,12 @@
  */
 
 import { expect, test } from '../fixtures/pages';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 test.describe('Router scroll restoration @regression', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
+
   test('PUSH navigation scrolls to top', async ({ page, isMobile }) => {
-    // Both tests navigate via the desktop header's home link, which is
-    // $gtMd-gated and never visible at the mobile viewport — exposed by the
-    // LS-9658 full mobile sweep (LS-9660). A mobile-navigation variant of
-    // this coverage is tracked with the LS-9693 mobile-nav spec triage.
-    test.skip(
-      isMobile,
-      'navigates via the desktop header home link, hidden at the mobile viewport',
-    );
     await page.goto('/about');
     await page.waitForLoadState('load');
 
@@ -51,13 +46,7 @@ test.describe('Router scroll restoration @regression', () => {
 
   test('POP navigation (browser Back) restores scroll position', async ({
     page,
-    isMobile,
   }) => {
-    // See the PUSH test above — same desktop-only home-link navigation.
-    test.skip(
-      isMobile,
-      'navigates via the desktop header home link, hidden at the mobile viewport',
-    );
     await page.goto('/about');
     await page.waitForLoadState('load');
 

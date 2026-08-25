@@ -16,6 +16,7 @@
 
 import { test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -636,20 +637,20 @@ test.describe('Player Detail Deep Link — from Free Agents @regression', () => 
 
 // ── Tests: deep link from draft board ────────────────────────────────────────
 
+/**
+ * Waits on `draft-board`, the wide `DraftPlayerBoard` root.
+ * `useIsCompactDraftViewport()` swaps in `CompactLiveDraftBoard` at or below
+ * `$sm`, which renders `DraftPlayersTab` and carries no such hook. Pinned
+ * rather than skipped; compact draft-board coverage is tracked as LS-9732
+ * (LS-9712).
+ */
 test.describe('Player Detail Deep Link — from Draft Board @regression', () => {
+  test.use({ viewport: DESKTOP_VIEWPORT });
+
   test('player in draft pool can be deep-linked from draft board context', async ({
     page,
     playersPage,
-    isMobile,
   }) => {
-    // Waits for the desktop draft board ([data-testid="draft-board"]), which
-    // the mobile draft surface does not render — exposed by the LS-9658 full
-    // mobile sweep (LS-9660). The deep link itself is covered at all
-    // viewports by the "URL deep link … from draft context" test below.
-    test.skip(
-      isMobile,
-      'waits for the desktop draft board, not rendered by the mobile draft surface',
-    );
     await installDraftMocks(page);
     await installPlayerDetailMocks(page);
 

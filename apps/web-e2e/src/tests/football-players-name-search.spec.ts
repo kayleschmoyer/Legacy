@@ -22,6 +22,7 @@
 
 import { expect, test } from '../fixtures/auth-enhanced';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
+import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -257,31 +258,34 @@ test.describe('NFL player name search @regression', () => {
     await expect(page.getByText('Josh Allen')).not.toBeVisible();
   });
 
-  test('clearing search via clear button restores all players', async ({
-    page,
-  }, testInfo) => {
-    // The mobile card feed's SearchField (LS-8832) has no clear button —
-    // only the canonical desktop grid's search box does (LS-9493).
-    test.skip(
-      testInfo.project.name === 'Mobile Chrome' ||
-        testInfo.project.name === 'Mobile Safari',
-      'PlayersCardFeed SearchField has no "Clear search" button',
-    );
+  /**
+   * The mobile card feed's SearchField (LS-8832) has no clear button — only
+   * the canonical desktop grid's search box does (LS-9493). Pinned rather
+   * than skipped so the clear-search behaviour still runs under the mobile
+   * projects (LS-9712); the sibling tests above keep their phone-width
+   * coverage.
+   */
+  test.describe('clear button — desktop grid only', () => {
+    test.use({ viewport: DESKTOP_VIEWPORT });
 
-    const search = page.getByRole('textbox', { name: 'Search players' });
-    await search.fill('Mahomes');
+    test('clearing search via clear button restores all players', async ({
+      page,
+    }) => {
+      const search = page.getByRole('textbox', { name: 'Search players' });
+      await search.fill('Mahomes');
 
-    // Verify filtered state first.
-    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
-    await expect(page.getByText('Josh Allen')).not.toBeVisible();
+      // Verify filtered state first.
+      await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+      await expect(page.getByText('Josh Allen')).not.toBeVisible();
 
-    // Clear the search.
-    const clear = page.getByRole('button', { name: 'Clear search' });
-    await clear.click();
+      // Clear the search.
+      const clear = page.getByRole('button', { name: 'Clear search' });
+      await clear.click();
 
-    // All players should be visible again.
-    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
-    await expect(page.getByText('Josh Allen')).toBeVisible();
+      // All players should be visible again.
+      await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+      await expect(page.getByText('Josh Allen')).toBeVisible();
+    });
   });
 });
 
@@ -329,86 +333,88 @@ test.describe('NFL player name search — debounce and cursor-reset (LS-7641) @r
     expect(searchVariables[0]).toBe('Ma');
   });
 
-  test('changing the search term resets the pagination cursor and discards the current page', async ({
-    page,
-  }, testInfo) => {
-    // The mobile card feed uses infinite scroll, not the desktop grid's
-    // numbered "Page X of Y" pager, so this pager-cursor assertion is
-    // desktop-only (LS-9493).
-    test.skip(
-      testInfo.project.name === 'Mobile Chrome' ||
-        testInfo.project.name === 'Mobile Safari',
-      'PlayersCardFeed uses infinite scroll — no numbered pager to assert',
-    );
+  /**
+   * The mobile card feed uses infinite scroll, not the desktop grid's
+   * numbered "Page X of Y" pager, so this pager-cursor assertion is
+   * desktop-only (LS-9493). Pinned rather than skipped so the cursor-reset
+   * behaviour still runs under the mobile projects (LS-9712); the debounce
+   * test above keeps its phone-width coverage.
+   */
+  test.describe('cursor reset — desktop grid pager only', () => {
+    test.use({ viewport: DESKTOP_VIEWPORT });
 
-    // Paginated grid mock (LS-9366 — the desktop grid pages with a numbered
-    // pager over an offset cursor: page 2 requests after: '25' at the default
-    // page size of 25). Unsearched pool: 26 players → 2 pages, page 1 =
-    // Mahomes, page 2 = Allen. Searching returns a filtered single page.
-    const paginated = (
-      route: import('@playwright/test').Route,
-      variables: Record<string, unknown>,
-    ) => {
-      const { search, after } = variables as {
-        search?: string;
-        after?: string;
-      };
-      if (search) {
-        return fulfillJson(
-          route,
-          playersResponse(filterBySearch(ALL_PLAYERS, search)),
-        );
-      }
-      if (!after) {
+    test('changing the search term resets the pagination cursor and discards the current page', async ({
+      page,
+    }) => {
+      // Paginated grid mock (LS-9366 — the desktop grid pages with a numbered
+      // pager over an offset cursor: page 2 requests after: '25' at the default
+      // page size of 25). Unsearched pool: 26 players → 2 pages, page 1 =
+      // Mahomes, page 2 = Allen. Searching returns a filtered single page.
+      const paginated = (
+        route: import('@playwright/test').Route,
+        variables: Record<string, unknown>,
+      ) => {
+        const { search, after } = variables as {
+          search?: string;
+          after?: string;
+        };
+        if (search) {
+          return fulfillJson(
+            route,
+            playersResponse(filterBySearch(ALL_PLAYERS, search)),
+          );
+        }
+        if (!after) {
+          return fulfillJson(route, {
+            data: {
+              footballPlayers: {
+                nodes: [MAHOMES],
+                pageInfo: { hasNextPage: true, endCursor: '25' },
+                totalCount: 26,
+              },
+            },
+          });
+        }
         return fulfillJson(route, {
           data: {
             footballPlayers: {
-              nodes: [MAHOMES],
-              pageInfo: { hasNextPage: true, endCursor: '25' },
+              nodes: [ALLEN],
+              pageInfo: { hasNextPage: false, endCursor: null },
               totalCount: 26,
             },
           },
         });
-      }
-      return fulfillJson(route, {
-        data: {
-          footballPlayers: {
-            nodes: [ALLEN],
-            pageInfo: { hasNextPage: false, endCursor: null },
-            totalCount: 26,
-          },
-        },
+      };
+      await createGraphQLRouter(page, {
+        footballplayers: (route, { variables }) => paginated(route, variables),
+        footballplayerstatsgrid: (route, { variables }) =>
+          paginated(route, variables),
       });
-    };
-    await createGraphQLRouter(page, {
-      footballplayers: (route, { variables }) => paginated(route, variables),
-      footballplayerstatsgrid: (route, { variables }) =>
-        paginated(route, variables),
+      await page.goto(PAGE_URL);
+
+      // Page 1: Mahomes is visible and the pager reports two pages.
+      await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+      await expect(page.getByText('Page 1 of 2')).toBeVisible();
+
+      // Go to page 2: the grid replaces the page with Allen's row.
+      await page.getByRole('button', { name: 'Next →' }).click();
+      await expect(page.getByText('Josh Allen')).toBeVisible();
+      await expect(page.getByText('Page 2 of 2')).toBeVisible();
+
+      // Type a search term — the 300 ms debounce fires, the committed filters
+      // change, and the grid's resetKey snaps pagination back to page one with
+      // an undefined cursor (the offset cursor is only valid for the result set
+      // that produced it).
+      const search = page.getByRole('textbox', { name: 'Search players' });
+      await search.fill('Mahomes');
+
+      // After the debounce window: only Mahomes from the fresh filtered page 1
+      // is visible; Allen (from the now-discarded page 2) is gone, and the
+      // filtered single-page result collapses the pager to one page.
+      await expect(page.getByText('Patrick Mahomes')).toBeVisible();
+      await expect(page.getByText('Josh Allen')).not.toBeVisible();
+      await expect(page.getByText('Page 1 of 1')).toBeVisible();
     });
-    await page.goto(PAGE_URL);
-
-    // Page 1: Mahomes is visible and the pager reports two pages.
-    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
-    await expect(page.getByText('Page 1 of 2')).toBeVisible();
-
-    // Go to page 2: the grid replaces the page with Allen's row.
-    await page.getByRole('button', { name: 'Next →' }).click();
-    await expect(page.getByText('Josh Allen')).toBeVisible();
-    await expect(page.getByText('Page 2 of 2')).toBeVisible();
-
-    // Type a search term — the 300 ms debounce fires, the committed filters
-    // change, and the grid's resetKey snaps pagination back to page one with
-    // an undefined cursor (the offset cursor is only valid for the result set
-    // that produced it).
-    const search = page.getByRole('textbox', { name: 'Search players' });
-    await search.fill('Mahomes');
-
-    // After the debounce window: only Mahomes from the fresh filtered page 1
-    // is visible; Allen (from the now-discarded page 2) is gone, and the
-    // filtered single-page result collapses the pager to one page.
-    await expect(page.getByText('Patrick Mahomes')).toBeVisible();
-    await expect(page.getByText('Josh Allen')).not.toBeVisible();
-    await expect(page.getByText('Page 1 of 1')).toBeVisible();
   });
 });
 
