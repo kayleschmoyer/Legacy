@@ -1,16 +1,20 @@
 /**
- * AnimatedLaunchScreen.native (LS-9746) — cold-start draw -> punch-in ->
- * stamp launch choreography.
+ * AnimatedLaunchScreen.native (LS-9747) — cold-start "Slam" launch
+ * choreography: baseball + football sketch in, slam together at center,
+ * burst into the medallion bitmap, wordmark stamps in, hold, fade.
  *
  * Under test:
- *  - renders the medallion SVG + wordmark lockup on the #0A0F1A field
- *  - fixed-length phase timeline: draw -> punch -> stamp -> fade -> onFinished,
- *    scheduled independently of the Reduce-Motion check (jest fake timers)
+ *  - renders the medallion, wordmark, and sub-line on the #0A0F1A field
+ *  - fixed-length phase timeline: draw -> collide -> impact -> stamp ->
+ *    hold -> fade -> onFinished, scheduled independently of the
+ *    Reduce-Motion check (jest fake timers)
+ *  - both sketches finish drawing before the pull-back begins (AC2)
  *  - Reduce Motion collapses straight to the final frame (real logo bitmap +
- *    wordmark, no sketch/punch/stamp/flash/kick) and runs only the
- *    opacity-only fade-out
- *  - start gating + LAUNCH_START_FAILSAFE_MS fail-safe (LS-9728 contract,
- *    preserved from the web component)
+ *    wordmark + sub-line, no sketch/slam/stamp/flash/kick) and runs only
+ *    the opacity-only fade-out
+ *  - start gating + LAUNCH_START_FAILSAFE_MS fail-safe (LS-9728 contract)
+ *  - nothing but the opaque field renders before the timeline begins — no
+ *    static logo can flash on screen (AC5)
  *  - unmount before completion never fires onFinished (cleanup)
  *  - only transform/opacity are animated on plain Views (brand motion rule).
  *    SVG stroke-dashoffset (the documented AC3 exception for the sketch
@@ -27,14 +31,22 @@ import React from 'react';
 import { act } from '@testing-library/react';
 import {
   AnimatedLaunchScreen,
+  LAUNCH_COLLIDE_MS,
   LAUNCH_DRAW_MS,
   LAUNCH_FADE_OUT_MS,
-  LAUNCH_PUNCH_MS,
+  LAUNCH_FADE_OUT_OFFSET_MS,
+  LAUNCH_HOLD_MS,
+  LAUNCH_IMPACT_OFFSET_MS,
   LAUNCH_STAMP_MS,
   LAUNCH_START_FAILSAFE_MS,
   LAUNCH_TOTAL_MS,
 } from './AnimatedLaunchScreen.native';
 import { render } from '../../test-utils';
+
+// The component renders extra literal spaces around the dot (RN Text
+// doesn't collapse whitespace); RTL's getByText normalizes/collapses
+// whitespace when matching, so the query string uses single spaces.
+const SUB_LINE = 'BASEBALL · FOOTBALL';
 
 jest.mock('react-native', () => {
   class MockAnimatedValue {
@@ -50,6 +62,13 @@ jest.mock('react-native', () => {
     }
   }
 
+  // A composite node (Animated.add/multiply result) — chainable like a real
+  // AnimatedAddition/AnimatedMultiplication, which also expose .interpolate().
+  const makeCompositeNode = (op: string, args: unknown[]) => {
+    const node = { _op: op, args, interpolate: () => node };
+    return node;
+  };
+
   // Every animated style/prop object handed to a mocked Animated component is
   // recorded here so tests can assert which keys carry animated values.
   const animatedNodes: unknown[] = [];
@@ -57,7 +76,7 @@ jest.mock('react-native', () => {
   const loopCalls: unknown[] = [];
 
   const makeController = () => ({
-    start: jest.fn(),
+    start: jest.fn((cb?: () => void) => cb?.()),
     stop: jest.fn(),
     reset: jest.fn(),
   });
@@ -88,14 +107,15 @@ jest.mock('react-native', () => {
       View: AnimatedView,
       Image: AnimatedImageMock,
       createAnimatedComponent: (Component: unknown) => Component,
-      multiply: (...args: unknown[]) => ({ _op: 'multiply', args }),
-      add: (...args: unknown[]) => ({ _op: 'add', args }),
+      multiply: (...args: unknown[]) => makeCompositeNode('multiply', args),
+      add: (...args: unknown[]) => makeCompositeNode('add', args),
       timing: jest.fn(
         (_value: MockAnimatedValue, config: Record<string, unknown>) => {
           timingCalls.push({ config });
           return makeController();
         },
       ),
+      delay: jest.fn(() => makeController()),
       parallel: jest.fn((animations: { start: jest.Mock }[]) => ({
         start: jest.fn(() => {
           animations.forEach((a) => {
@@ -209,61 +229,101 @@ afterEach(() => {
 });
 
 describe('AnimatedLaunchScreen (native)', () => {
-  it('renders the medallion and wordmark lockup on the launch field', async () => {
+  it('renders the medallion, wordmark, and sub-line on the launch field', async () => {
     const { getByText, queryByTestId } = render(<AnimatedLaunchScreen />);
     await flushReduceMotionRead();
 
     expect(queryByTestId('animated-launch-screen')).toBeTruthy();
     expect(getByText('LEGACY SPORTS')).toBeTruthy();
-    expect(getByText('Where history plays on.')).toBeTruthy();
+    expect(getByText(SUB_LINE)).toBeTruthy();
   });
 
-  it('runs draw -> punch -> stamp -> fade as a fixed-length timeline, onFinished once at the total', async () => {
+  it('renders nothing but the opaque field before the timeline begins (no logo flash)', () => {
+    const { queryByTestId, queryByText } = render(
+      <AnimatedLaunchScreen start={false} />,
+    );
+
+    expect(queryByTestId('animated-launch-screen')).toBeTruthy();
+    expect(queryByText('LEGACY SPORTS')).toBeNull();
+    expect(queryByText(SUB_LINE)).toBeNull();
+    expect(getMock()._timingCalls).toHaveLength(0);
+  });
+
+  it('runs draw -> collide -> impact -> stamp -> hold -> fade as a fixed-length timeline, onFinished once at the total', async () => {
     const onFinished = jest.fn();
     render(<AnimatedLaunchScreen onFinished={onFinished} />);
     await flushReduceMotionRead();
 
-    // Draw: one linear timing over LAUNCH_DRAW_MS, plus the wobble loop.
+    // Draw: one linear timing over LAUNCH_DRAW_MS, plus the ball slide/enter
+    // timings and the bob + wobble idle loops.
     expect(
       getMock()._timingCalls.some(
         (c) => c.config['duration'] === LAUNCH_DRAW_MS,
       ),
     ).toBe(true);
-    expect(getMock()._loopCalls).toHaveLength(1);
+    expect(getMock()._loopCalls).toHaveLength(2);
     getMock()._timingCalls.length = 0;
 
-    // Punch phase starts exactly at LAUNCH_DRAW_MS: 3 parallel timings
-    // (linear progress, eased pop, kick decay) all over LAUNCH_PUNCH_MS.
+    // Nothing collide-related fires until LAUNCH_DRAW_MS has fully
+    // elapsed — both sketches finish their dash-reveal before the
+    // pull-back begins (AC2).
     act(() => {
       jest.advanceTimersByTime(LAUNCH_DRAW_MS - 1);
     });
     expect(getMock()._timingCalls).toHaveLength(0);
+
+    // Collide phase starts exactly at LAUNCH_DRAW_MS: anticipation
+    // pull-back (160ms) + rush-to-center (240ms) on the position driver,
+    // plus the rush-spin timing (240ms).
     act(() => {
       jest.advanceTimersByTime(1);
     });
-    // 3 timings share this duration: linear progress + eased pop, both over
-    // LAUNCH_PUNCH_MS, plus the camera-kick decay, whose own fixed 450ms
-    // duration coincides numerically with LAUNCH_PUNCH_MS (450) here.
+    expect(getMock()._timingCalls).toHaveLength(3);
     expect(
-      getMock()._timingCalls.filter(
-        (c) => c.config['duration'] === LAUNCH_PUNCH_MS,
-      ),
-    ).toHaveLength(3);
-    expect(onFinished).not.toHaveBeenCalled();
-
-    // Stamp phase starts at LAUNCH_DRAW_MS + LAUNCH_PUNCH_MS.
-    act(() => {
-      jest.advanceTimersByTime(LAUNCH_PUNCH_MS);
-    });
+      getMock()._timingCalls.filter((c) => c.config['duration'] === 160),
+    ).toHaveLength(1);
     expect(
-      getMock()._timingCalls.filter(
-        (c) => c.config['duration'] === LAUNCH_STAMP_MS,
-      ),
+      getMock()._timingCalls.filter((c) => c.config['duration'] === 240),
     ).toHaveLength(2);
+    expect(onFinished).not.toHaveBeenCalled();
+    getMock()._timingCalls.length = 0;
 
-    // Fade starts at draw + punch + stamp, using the same 150ms fade as before.
+    // Impact lands at LAUNCH_DRAW_MS + LAUNCH_IMPACT_OFFSET_MS = 1.70s:
+    // flash, ring, medallion opacity/pop, and the camera-kick decay.
     act(() => {
-      jest.advanceTimersByTime(LAUNCH_STAMP_MS);
+      jest.advanceTimersByTime(LAUNCH_IMPACT_OFFSET_MS);
+    });
+    expect(getMock()._timingCalls).toHaveLength(5);
+    expect(
+      getMock()._timingCalls.some((c) => c.config['duration'] === 520),
+    ).toBe(true); // medallion pop, ease-out-back
+    getMock()._timingCalls.length = 0;
+
+    // Stamp: the wordmark stamps in 80ms into the Stamp phase
+    // (LAUNCH_DRAW_MS + LAUNCH_COLLIDE_MS + 80 = 2.18s).
+    act(() => {
+      jest.advanceTimersByTime(
+        LAUNCH_COLLIDE_MS - LAUNCH_IMPACT_OFFSET_MS + 80,
+      );
+    });
+    expect(getMock()._timingCalls).toHaveLength(4);
+    expect(
+      getMock()._timingCalls.some((c) => c.config['duration'] === 600),
+    ).toBe(true); // wordmark pop, ease-out-back
+    getMock()._timingCalls.length = 0;
+
+    // Hold begins at LAUNCH_DRAW_MS + LAUNCH_COLLIDE_MS + LAUNCH_STAMP_MS =
+    // 3.00s: the medallion breathing loop starts.
+    act(() => {
+      jest.advanceTimersByTime(LAUNCH_STAMP_MS - 80);
+    });
+    expect(getMock()._loopCalls).toHaveLength(3);
+    expect(onFinished).not.toHaveBeenCalled();
+    getMock()._timingCalls.length = 0;
+
+    // Overlay fade starts LAUNCH_FADE_OUT_OFFSET_MS into the Hold phase.
+    act(() => {
+      jest.advanceTimersByTime(LAUNCH_FADE_OUT_OFFSET_MS);
     });
     expect(
       getMock()._timingCalls.some(
@@ -274,7 +334,7 @@ describe('AnimatedLaunchScreen (native)', () => {
 
     // onFinished fires exactly once, at the total lifetime.
     act(() => {
-      jest.advanceTimersByTime(LAUNCH_FADE_OUT_MS);
+      jest.advanceTimersByTime(LAUNCH_HOLD_MS - LAUNCH_FADE_OUT_OFFSET_MS);
     });
     expect(onFinished).toHaveBeenCalledTimes(1);
     act(() => {
@@ -297,14 +357,14 @@ describe('AnimatedLaunchScreen (native)', () => {
     }
   });
 
-  it('collapses to the final frame (real logo + wordmark) when reduce motion is enabled', async () => {
+  it('collapses to the final frame (real logo + wordmark + sub-line) when reduce motion is enabled', async () => {
     getMock()._setReduceMotion(true);
     const onFinished = jest.fn();
     render(<AnimatedLaunchScreen onFinished={onFinished} />);
     await flushReduceMotionRead();
 
-    // No draw/punch/stamp timings or wobble loop — the reveal jumps straight
-    // to the final frame.
+    // No draw/collide/impact/stamp timings or idle loops — the reveal
+    // jumps straight to the final frame.
     expect(
       getMock()._timingCalls.some(
         (c) => c.config['duration'] === LAUNCH_DRAW_MS,
@@ -315,7 +375,10 @@ describe('AnimatedLaunchScreen (native)', () => {
     // The opacity-only fade-out still runs on the same fixed schedule.
     act(() => {
       jest.advanceTimersByTime(
-        LAUNCH_DRAW_MS + LAUNCH_PUNCH_MS + LAUNCH_STAMP_MS,
+        LAUNCH_DRAW_MS +
+          LAUNCH_COLLIDE_MS +
+          LAUNCH_STAMP_MS +
+          LAUNCH_FADE_OUT_OFFSET_MS,
       );
     });
     expect(
@@ -325,7 +388,13 @@ describe('AnimatedLaunchScreen (native)', () => {
     ).toHaveLength(1);
 
     act(() => {
-      jest.advanceTimersByTime(LAUNCH_FADE_OUT_MS);
+      jest.advanceTimersByTime(
+        LAUNCH_TOTAL_MS -
+          (LAUNCH_DRAW_MS +
+            LAUNCH_COLLIDE_MS +
+            LAUNCH_STAMP_MS +
+            LAUNCH_FADE_OUT_OFFSET_MS),
+      );
     });
     expect(onFinished).toHaveBeenCalledTimes(1);
   });
@@ -335,7 +404,6 @@ describe('AnimatedLaunchScreen (native)', () => {
     const { rerender } = render(
       <AnimatedLaunchScreen start={false} onFinished={onFinished} />,
     );
-    await flushReduceMotionRead();
 
     expect(getMock()._timingCalls).toHaveLength(0);
 
@@ -362,7 +430,6 @@ describe('AnimatedLaunchScreen (native)', () => {
   it('begins on its own after the fail-safe when start never arrives (LS-9728)', async () => {
     const onFinished = jest.fn();
     render(<AnimatedLaunchScreen start={false} onFinished={onFinished} />);
-    await flushReduceMotionRead();
     expect(getMock()._timingCalls).toHaveLength(0);
 
     act(() => {
