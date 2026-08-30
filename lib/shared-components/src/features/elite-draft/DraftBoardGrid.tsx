@@ -339,7 +339,22 @@ export function DraftBoardGrid({
                 >
                   {`R${round}`}
                 </Text>
-                <Text fontSize={10} color={palette.surface.outlineStrong}>
+                <Text
+                  testID={`draft-board-grid-round-direction-${round}`}
+                  fontSize={15}
+                  fontWeight="900"
+                  color={palette.text.fg2}
+                  accessibilityLabel={
+                    reversed
+                      ? `Round ${round} picks read right to left`
+                      : `Round ${round} picks read left to right`
+                  }
+                  aria-label={
+                    reversed
+                      ? `Round ${round} picks read right to left`
+                      : `Round ${round} picks read left to right`
+                  }
+                >
                   {reversed ? '←' : '→'}
                 </Text>
               </YStack>
