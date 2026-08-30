@@ -377,8 +377,13 @@ test.describe('Next Step — game selection state @critical', () => {
       currentWeek: 1,
     });
     await page.goto('/baseball/league/1/commissioner');
+    // LS-9457: networkidle is an unreliable readiness signal under CI's
+    // 4-worker parallel load (can stall well past the suite's 3s expect
+    // timeout before the post-navigation assertion even starts polling).
+    // Wait for the URL match only — same fix as LS-8012 in
+    // league-creation-advanced.spec.ts. (Applies to every waitForURL call
+    // in this file — all lead to this same commissioner page.)
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -403,7 +408,6 @@ test.describe('Next Step — game selection state @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -428,7 +432,6 @@ test.describe('Next Step — game selection state @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -457,7 +460,6 @@ test.describe('Next Step — game selection state @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -497,7 +499,6 @@ test.describe('Next Step — game selection state @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -531,7 +532,6 @@ test.describe('Next Step — matchup advancement state @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -556,7 +556,6 @@ test.describe('Next Step — matchup advancement state @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -593,7 +592,6 @@ test.describe('Next Step — matchup advancement state @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -637,7 +635,6 @@ test.describe('Sequential game selection — multi-round @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -671,7 +668,6 @@ test.describe('Sequential game selection — multi-round @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -705,7 +701,6 @@ test.describe('Sequential game selection — multi-round @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -735,7 +730,6 @@ test.describe('Sequential game selection — multi-round @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -770,7 +764,6 @@ test.describe('Advance blocked when games incomplete @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -801,7 +794,6 @@ test.describe('Advance blocked when games incomplete @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -847,7 +839,6 @@ test.describe('Advance week flow — UI refresh @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
@@ -885,7 +876,6 @@ test.describe('Advance week flow — UI refresh @critical', () => {
     });
     await page.goto('/baseball/league/1/commissioner');
     await page.waitForURL(/\/baseball\/league\/\d+\/(commissioner|commish)/, {
-      waitUntil: 'networkidle',
       timeout: 15000,
     });
 
