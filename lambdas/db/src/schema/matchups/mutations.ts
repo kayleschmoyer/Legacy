@@ -3,10 +3,12 @@
  */
 
 import {
+  computeRosterLockTime,
   createAllMatchupsForLeague,
   type FootballMatchupPlayerGameStats,
   type GenericDatabase,
   getMatchupFootballPlayerGameStats,
+  getRosterLockRules,
   populateMatchupPlayersAndSeasons,
   PublicSchema,
 } from '@legacy-sports/db-client';
@@ -283,6 +285,7 @@ export async function verifyMatchupTeamOwnership(
     leagueId: number;
     weekNumber: number;
     status: string;
+    startTime: string | null;
   };
   /**
    * True when the caller does not own `matchupPlayer.teamId` and is only
@@ -322,6 +325,7 @@ export async function verifyMatchupTeamOwnership(
       leagueId: PublicSchema.matchups.leagueId,
       weekNumber: PublicSchema.matchups.weekNumber,
       status: PublicSchema.matchups.status,
+      startTime: PublicSchema.matchups.startTime,
     })
     .from(PublicSchema.matchups)
     .where(eq(PublicSchema.matchups.id, matchupPlayer.matchupId))
@@ -365,6 +369,49 @@ export async function verifyMatchupTeamOwnership(
     isCommissioner && memberResult[0].teamId !== matchupPlayer.teamId;
 
   return { matchupPlayer, matchup, isCommissionerBypass };
+}
+
+/**
+ * Whether a matchup's roster is locked for edits.
+ *
+ * `status` alone is not a reliable lock boundary (LS-6370): it is flipped to
+ * `in_progress` by the nightly `autoSelectGames`/`autoAdvanceMatchups` cron
+ * jobs, which can lag behind the matchup's actual configured lock instant.
+ * The authoritative instant is whatever `computeRosterLockTime` derives from
+ * the league's `rosterLockTiming` setting and any custom roster-lock rules
+ * (LS-6368) — not simply `matchup.startTime` — so a league locked
+ * `day_before`/`week_before`/a custom offset locks its roster on schedule
+ * even while `status` is still `scheduled` and the cron hasn't caught up.
+ */
+export async function isMatchupLocked(
+  db: GenericDatabase<typeof PublicSchema>,
+  matchup: {
+    status: string;
+    startTime: string | null;
+    leagueId: number;
+  },
+): Promise<boolean> {
+  if (matchup.status !== 'scheduled') {
+    return true;
+  }
+
+  const [league] = await db
+    .select({ rosterLockTiming: PublicSchema.leagues.rosterLockTiming })
+    .from(PublicSchema.leagues)
+    .where(eq(PublicSchema.leagues.id, matchup.leagueId))
+    .limit(1);
+  // A scheduled matchup with no league is a data-integrity problem, not an
+  // unlocked one — fail closed rather than silently allowing roster edits.
+  if (!league) return true;
+
+  const lockRules = await getRosterLockRules(db, matchup.leagueId);
+  const lockTime = computeRosterLockTime(
+    matchup.startTime,
+    league.rosterLockTiming,
+    lockRules,
+  );
+
+  return lockTime != null && new Date() >= lockTime;
 }
 
 /**
@@ -458,11 +505,11 @@ export async function auditAndNotifyCommissionerBypass(
  * constraint violation that the caller translates into a `ConflictError`.
  *
  * The same transaction also takes `SELECT ... FOR UPDATE` on the matchup row
- * and re-checks `status === 'scheduled'` before writing, so a concurrent
- * `updateMatchupStatus` (which locks the same row) either serializes behind
- * this edit or is observed here and the edit is rejected — a status flip
- * landing between the caller's read and this write can no longer let an edit
- * persist after lock (LS-6371 / FMD-014).
+ * and re-checks `isMatchupLocked` (status or a passed startTime, LS-6370)
+ * before writing, so a concurrent `updateMatchupStatus` (which locks the same
+ * row) either serializes behind this edit or is observed here and the edit is
+ * rejected — a status flip landing between the caller's read and this write
+ * can no longer let an edit persist after lock (LS-6371 / FMD-014).
  *
  * Exported standalone (rather than inlined in the resolver) so it can be
  * exercised directly against a real Postgres instance in integration tests.
@@ -489,7 +536,11 @@ export async function performMatchupPlayerPositionUpdate(
     await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
     const [lockedMatchup] = await tx
-      .select({ status: PublicSchema.matchups.status })
+      .select({
+        status: PublicSchema.matchups.status,
+        startTime: PublicSchema.matchups.startTime,
+        leagueId: PublicSchema.matchups.leagueId,
+      })
       .from(PublicSchema.matchups)
       .where(eq(PublicSchema.matchups.id, matchupId))
       .limit(1)
@@ -499,8 +550,10 @@ export async function performMatchupPlayerPositionUpdate(
       throw NotFoundError('Matchup not found');
     }
 
-    // Only allow edits when matchup is scheduled (not yet locked)
-    if (lockedMatchup.status !== 'scheduled') {
+    // Only allow edits before the matchup locks — either because its status
+    // has moved off 'scheduled', or its configured lock instant has already
+    // passed (LS-6370).
+    if (await isMatchupLocked(tx, lockedMatchup)) {
       throw MatchupLockedError(lockedMatchup.status);
     }
 
@@ -557,13 +610,18 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
       const { matchup, matchupPlayer, isCommissionerBypass } =
         await verifyMatchupTeamOwnership(context, args.matchupPlayerId);
 
+      // Fast-fail path only — performMatchupPlayerPositionUpdate re-checks
+      // the lock under a row lock inside its transaction and is the
+      // authoritative guard (both status and configured lock instant,
+      // LS-6370 / LS-6371), so this read isn't synchronized with a
+      // concurrent updateMatchupStatus.
+      if (await isMatchupLocked(context.db, matchup)) {
+        throw MatchupLockedError(matchup.status);
+      }
+
       const db = context.db;
 
-      // Fetch the target player to find their matchup+team context. The
-      // authoritative matchup-status recheck happens inside
-      // performMatchupPlayerPositionUpdate's transaction, under a row lock
-      // (LS-6371) — not here, since this read isn't synchronized with a
-      // concurrent updateMatchupStatus.
+      // Fetch the target player to find their matchup+team context.
       const [targetPlayer] = await db
         .select({
           matchupId: PublicSchema.matchupPlayers.matchupId,
@@ -695,14 +753,19 @@ export async function performMatchupPlayerPositionSwap(
     // Surface lock waits as errors rather than silent hangs.
     await tx.execute(sql`SET LOCAL statement_timeout = '5000'`);
 
-    // Re-lock and re-check the matchup status inside the transaction so a
-    // concurrent updateMatchupStatus (which also locks the row) serializes
-    // against us — otherwise a status flip landing between the resolver's
-    // ownership check and this write lets a post-lock swap persist
-    // (LS-6371 / FMD-014). Both players are already verified to share the
-    // same matchup, so a single lock covers the pair.
+    // Re-lock and re-check isMatchupLocked (status or a passed startTime,
+    // LS-6370) inside the transaction so a concurrent updateMatchupStatus
+    // (which also locks the row) serializes against us — otherwise a status
+    // flip landing between the resolver's ownership check and this write
+    // lets a post-lock swap persist (LS-6371 / FMD-014). Both players are
+    // already verified to share the same matchup, so a single lock covers
+    // the pair.
     const [lockedMatchup] = await tx
-      .select({ status: PublicSchema.matchups.status })
+      .select({
+        status: PublicSchema.matchups.status,
+        startTime: PublicSchema.matchups.startTime,
+        leagueId: PublicSchema.matchups.leagueId,
+      })
       .from(PublicSchema.matchups)
       .where(eq(PublicSchema.matchups.id, matchupIdA))
       .limit(1)
@@ -711,7 +774,7 @@ export async function performMatchupPlayerPositionSwap(
     if (!lockedMatchup) {
       throw NotFoundError('Matchup not found');
     }
-    if (lockedMatchup.status !== 'scheduled') {
+    if (await isMatchupLocked(tx, lockedMatchup)) {
       throw MatchupLockedError(lockedMatchup.status);
     }
 
@@ -833,10 +896,10 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
       }
 
       // Fast-fail path only — performMatchupPlayerPositionSwap re-checks
-      // status under a row lock inside its transaction and is the
-      // authoritative guard, so this uses the same MatchupLockedError type
-      // for a consistent API contract (LS-6371 review).
-      if (matchupA.status !== 'scheduled') {
+      // the lock under a row lock inside its transaction and is the
+      // authoritative guard (both status and configured lock instant,
+      // LS-6370 / LS-6371).
+      if (await isMatchupLocked(context.db, matchupA)) {
         throw MatchupLockedError(matchupA.status);
       }
 

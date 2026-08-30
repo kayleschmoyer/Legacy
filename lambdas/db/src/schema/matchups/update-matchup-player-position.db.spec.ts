@@ -25,6 +25,7 @@
  */
 import { eq, sql } from 'drizzle-orm';
 import { performMatchupPlayerPositionUpdate } from './mutations';
+import { MatchupLockedError } from '../graphql-errors';
 import {
   cleanupTestData,
   getTestDatabase,
@@ -130,6 +131,35 @@ describe('performMatchupPlayerPositionUpdate - atomic eviction + assignment (LS-
     expect(result.positionId).toBe(slot.id);
     expect(await loadPosition(rowB.id)).toBe(slot.id);
     expect(await loadPosition(rowA.id)).toBeNull();
+  });
+
+  it('rejects the update once the league-configured lock instant has passed, even while status is still scheduled and startTime is in the future (LS-6370)', async () => {
+    const { team, matchup, slot, rowB } = await seedTwoPlayerMatchup();
+
+    // A `day_before` league locks 24h ahead of kickoff — set startTime just
+    // 12h out so status is still 'scheduled' (the autoAdvanceMatchups cron
+    // hasn't run) but the configured lock instant is already 12h in the past.
+    await db
+      .update(leagues)
+      .set({ rosterLockTiming: 'day_before' })
+      .where(eq(leagues.id, matchup.leagueId));
+    await db
+      .update(matchups)
+      .set({
+        startTime: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+      })
+      .where(eq(matchups.id, matchup.id));
+
+    await expect(
+      performMatchupPlayerPositionUpdate(db, {
+        matchupId: matchup.id,
+        teamId: team.id,
+        matchupPlayerId: rowB.id,
+        positionId: slot.id,
+      }),
+    ).rejects.toThrow(MatchupLockedError('scheduled').message);
+
+    expect(await loadPosition(rowB.id)).toBeNull();
   });
 
   it('serializes two concurrent claims on the same slot instead of leaving both occupied (LS-6371)', async () => {

@@ -298,6 +298,41 @@ describe('performMatchupPlayerPositionSwap - status TOCTOU (LS-6371)', () => {
     expect(await loadPosition(rowB.id)).toBe(posB.id);
   });
 
+  it('rejects the swap once the league-configured lock instant has passed, even while status is still scheduled and startTime is in the future (LS-6370)', async () => {
+    const { league, team, matchup, posA, posB, rowA, rowB } =
+      await seedTwoPlayerMatchup();
+
+    // A `day_before` league locks 24h ahead of kickoff — set startTime just
+    // 12h out so status is still 'scheduled' (the autoAdvanceMatchups cron
+    // hasn't run) but the configured lock instant is already 12h in the past.
+    await db
+      .update(leagues)
+      .set({ rosterLockTiming: 'day_before' })
+      .where(eq(leagues.id, league.id));
+    await db
+      .update(matchups)
+      .set({
+        startTime: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+      })
+      .where(eq(matchups.id, matchup.id));
+
+    await expect(
+      performMatchupPlayerPositionSwap(db, {
+        matchupIdA: matchup.id,
+        teamIdA: team.id,
+        matchupPlayerIdA: rowA.id,
+        positionIdA: posB.id,
+        matchupIdB: matchup.id,
+        teamIdB: team.id,
+        matchupPlayerIdB: rowB.id,
+        positionIdB: posA.id,
+      }),
+    ).rejects.toThrow(MatchupLockedError('scheduled').message);
+
+    expect(await loadPosition(rowA.id)).toBe(posA.id);
+    expect(await loadPosition(rowB.id)).toBe(posB.id);
+  });
+
   it('serializes against a concurrent status flip taking the same row lock, and rejects once it observes the committed flip', async () => {
     const { team, matchup, posA, posB, rowA, rowB } =
       await seedTwoPlayerMatchup();
