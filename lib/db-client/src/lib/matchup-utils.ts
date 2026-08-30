@@ -30,7 +30,10 @@ import {
 } from '@legacy-sports/scheduling';
 import {
   ALLOWED_POSITIONS,
+  type EligibleSeasons,
   isNegroLeague,
+  MIN_SEASON_GAMES_FOR_SELECTION,
+  resolveEligibleSeasons,
   SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
@@ -66,8 +69,15 @@ export interface SeasonSelectionResult {
 
 /**
  * Select random seasons for players based on their available batting, pitching,
- * and fielding stats. A player qualifies for a season if they have at least
- * minGames in ANY of: batting, pitching, or fielding.
+ * and fielding stats. A player's games for a season is the max across batting,
+ * pitching, and summed fielding.
+ *
+ * Eligibility is two-tier (LS-9534): a season must clear
+ * `max(minGames, MIN_SEASON_GAMES_FOR_SELECTION)` to be assignable. Only when a
+ * player has no such season does the league's own `minGames` floor apply, so a
+ * short career still yields a season instead of dropping the player from the
+ * matchup. A player with nothing clearing `minGames` is reported in
+ * `skippedPlayers` — callers must handle that without failing selection.
  */
 export function selectSeasonsForPlayers(
   playerIds: number[],
@@ -120,34 +130,55 @@ export function selectSeasonsForPlayers(
     uniquePlayerSeasons: playerSeasonGames.size,
   });
 
-  const seasonsByPlayer = new Map<number, number[]>();
+  // Regroup the flat "playerId-season" counts into per-player season maps so
+  // the two-tier eligibility floor (LS-9534) can be applied per player.
+  const gamesByPlayerSeason = new Map<number, Map<number, number>>();
 
   playerSeasonGames.forEach((games, key) => {
-    if (games >= minGames) {
-      const [playerIdStr, seasonStr] = key.split('-');
-      const playerId = parseInt(playerIdStr, 10);
-      const season = parseInt(seasonStr, 10);
+    const [playerIdStr, seasonStr] = key.split('-');
+    const playerId = parseInt(playerIdStr, 10);
+    const season = parseInt(seasonStr, 10);
 
-      if (!seasonsByPlayer.has(playerId)) {
-        seasonsByPlayer.set(playerId, []);
-      }
-      const seasons = seasonsByPlayer.get(playerId);
-      if (seasons && !seasons.includes(season)) {
-        seasons.push(season);
-      }
+    let seasons = gamesByPlayerSeason.get(playerId);
+    if (!seasons) {
+      seasons = new Map<number, number>();
+      gamesByPlayerSeason.set(playerId, seasons);
     }
+    seasons.set(season, Math.max(seasons.get(season) ?? 0, games));
   });
 
+  const eligibilityByPlayer = new Map<number, EligibleSeasons>();
+  let fallbackPlayers = 0;
+
+  for (const playerId of playerIds) {
+    const eligibility = resolveEligibleSeasons(
+      gamesByPlayerSeason.get(playerId) ?? new Map<number, number>(),
+      minGames,
+    );
+    eligibilityByPlayer.set(playerId, eligibility);
+    if (eligibility.tier === 'fallback') fallbackPlayers++;
+  }
+
+  const playersWithSeasons = [...eligibilityByPlayer.values()].filter(
+    (e) => e.tier !== 'none',
+  ).length;
+
   LOGGER.info('Eligible seasons by player', {
-    playersWithSeasons: seasonsByPlayer.size,
-    playersWithoutSeasons: playerIds.length - seasonsByPlayer.size,
+    playersWithSeasons,
+    playersWithoutSeasons: playerIds.length - playersWithSeasons,
+    // Players with no season at or above MIN_SEASON_GAMES_FOR_SELECTION, held
+    // at the league floor instead of being dropped (LS-9534).
+    playersOnFallbackFloor: fallbackPlayers,
+    preferredFloor: Math.max(minGames, MIN_SEASON_GAMES_FOR_SELECTION),
+    leagueFloor: minGames,
   });
 
   const selections: SeasonSelection[] = [];
   const skippedPlayers: SeasonSelectionResult['skippedPlayers'] = [];
 
   for (const playerId of playerIds) {
-    const availableSeasons = seasonsByPlayer.get(playerId) || [];
+    const eligibility = eligibilityByPlayer.get(playerId);
+    const availableSeasons = eligibility?.seasons ?? [];
 
     if (availableSeasons.length === 0) {
       const playerBattingSeasons = battingStats
@@ -177,8 +208,11 @@ export function selectSeasonsForPlayers(
         pitchingSeasons: playerPitchingSeasons,
       });
 
+      // Graceful degradation (LS-9534): this player gets no season and no
+      // stats this week. The caller must not fail the whole run over it.
       LOGGER.warn(`No eligible seasons for player ${playerId}`, {
         minGamesRequired: minGames,
+        preferredMinGames: Math.max(minGames, MIN_SEASON_GAMES_FOR_SELECTION),
         battingSeasons: playerBattingSeasons,
         pitchingSeasons: playerPitchingSeasons,
       });
@@ -197,6 +231,8 @@ export function selectSeasonsForPlayers(
 
     LOGGER.debug(`Selected season ${selectedSeason} for player ${playerId}`, {
       availableSeasons,
+      eligibilityTier: eligibility?.tier,
+      minGamesApplied: eligibility?.minGamesApplied,
     });
   }
 

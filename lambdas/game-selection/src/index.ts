@@ -24,7 +24,10 @@ import {
 import type { PublicDb } from '@legacy-sports/db-client';
 import {
   cryptoRandomInt,
+  MIN_SEASON_GAMES_FOR_SELECTION,
   MIN_SEASON_WITH_GAME_DATA,
+  resolveEligibleSeasons,
+  SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
 import { and, eq, gte, inArray, isNotNull, sql } from 'drizzle-orm';
 import { withDb } from './utils/db';
@@ -540,11 +543,18 @@ async function createMatchupForLeagueWeek(
 
     // BATCH 2: Fetch all available seasons for all players in one query
     // Query both batting and pitching to handle pitcher-only players
-    // Filter to seasons with at least 2x games as matchup requires
+    // Eligibility is applied below via resolveEligibleSeasons (LS-9534)
     // Only consider seasons from 1901+ (Baseball-Reference has game-level data from 1901 onwards)
-    const minGames = (matchup.gamesPerMatchup ?? 7) * 2;
+    const minGames = (matchup.gamesPerMatchup ?? 7) * SEASON_MATCHUP_MULTIPLIER;
+    // Seasons at or above this floor are the only ones assignable while the
+    // player has any (LS-9534); `minGames` is the fallback for short careers.
+    const preferredMinGames = Math.max(
+      minGames,
+      MIN_SEASON_GAMES_FOR_SELECTION,
+    );
     LOGGER.info(
-      `Batch fetching available seasons for ${playerIds.length} players (min ${minGames} games, seasons ${MIN_SEASON_WITH_GAME_DATA}+)`,
+      `Batch fetching available seasons for ${playerIds.length} players ` +
+        `(preferred min ${preferredMinGames} games, fallback ${minGames}, seasons ${MIN_SEASON_WITH_GAME_DATA}+)`,
     );
     const [allBattingSeasons, allPitchingSeasons] = await Promise.all([
       db
@@ -598,23 +608,21 @@ async function createMatchupForLeagueWeek(
       );
     });
 
-    // Group seasons by player ID, filtering to only those with enough games
-    const seasonsByPlayer = new Map<number, number[]>();
+    // Group seasons by player ID so the two-tier eligibility floor (LS-9534)
+    // can be applied per player.
+    const gamesByPlayerSeason = new Map<number, Map<number, number>>();
 
     playerSeasonGames.forEach((games, key) => {
-      if (games >= minGames) {
-        const [playerIdStr, seasonStr] = key.split('-');
-        const playerId = parseInt(playerIdStr, 10);
-        const season = parseInt(seasonStr, 10);
+      const [playerIdStr, seasonStr] = key.split('-');
+      const playerId = parseInt(playerIdStr, 10);
+      const season = parseInt(seasonStr, 10);
 
-        if (!seasonsByPlayer.has(playerId)) {
-          seasonsByPlayer.set(playerId, []);
-        }
-        const seasons = seasonsByPlayer.get(playerId);
-        if (seasons && !seasons.includes(season)) {
-          seasons.push(season);
-        }
+      let seasons = gamesByPlayerSeason.get(playerId);
+      if (!seasons) {
+        seasons = new Map<number, number>();
+        gamesByPlayerSeason.set(playerId, seasons);
       }
+      seasons.set(season, Math.max(seasons.get(season) ?? 0, games));
     });
 
     // Prepare batch inserts
@@ -650,7 +658,21 @@ async function createMatchupForLeagueWeek(
         );
       } else {
         // Need to select a new season
-        const availableSeasons = seasonsByPlayer.get(player.id) || [];
+        const eligibility = resolveEligibleSeasons(
+          gamesByPlayerSeason.get(player.id) ?? new Map<number, number>(),
+          minGames,
+        );
+        const availableSeasons = eligibility.seasons;
+
+        if (eligibility.tier === 'fallback') {
+          // No season clears MIN_SEASON_GAMES_FOR_SELECTION — this player's
+          // whole career is short, so hold them at the league floor rather
+          // than dropping them from the matchup (LS-9534).
+          LOGGER.info(
+            `Player ${player.id} has no season at or above ${preferredMinGames} games; falling back to the league floor`,
+            { minGamesApplied: eligibility.minGamesApplied },
+          );
+        }
 
         if (availableSeasons.length === 0) {
           // Log detailed info about why no seasons were found
@@ -661,8 +683,12 @@ async function createMatchupForLeagueWeek(
             .filter((s) => s.playerId === player.id)
             .map((s) => `${s.season}(${s.g}g)`);
 
+          // Graceful degradation (LS-9534): the player simply gets no season
+          // this week and contributes no stats. Never throw — one unassignable
+          // player must not fail selection for the whole matchup.
           LOGGER.warn(`No eligible seasons for player ${player.id}`, {
             minGamesRequired: minGames,
+            preferredMinGames,
             battingSeasons: playerBattingSeasons,
             pitchingSeasons: playerPitchingSeasons,
           });

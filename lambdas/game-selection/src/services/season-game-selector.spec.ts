@@ -1,13 +1,22 @@
 import type { PublicDb } from '@legacy-sports/db-client';
+import { notInArray } from 'drizzle-orm';
 import {
   selectGamesForMatchup,
   selectGamesForMatchupPlayer,
 } from './season-game-selector';
 
+// Standalone spy for LOGGER.warn. Tests assert on this rather than on
+// LOGGER.warn itself, which would trip @typescript-eslint/unbound-method.
+// The mock factory forwards through an arrow so the reference resolves at
+// call time, after this const is initialised.
+const mockLoggerWarn = jest.fn();
+
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
     info: jest.fn(),
-    warn: jest.fn(),
+    warn: (...args: unknown[]): void => {
+      mockLoggerWarn(...args);
+    },
     error: jest.fn(),
     debug: jest.fn(),
   },
@@ -330,6 +339,65 @@ describe('season-game-selector', () => {
 
       expect(result.statsAreCached).toBe(false);
       expect(result.gameIdentifier).toBeNull();
+    });
+
+    it('does not repeat a game while the season still has distinct games left (LS-9534)', async () => {
+      // AC4: two slots are already filled from a season with more games left.
+      // The third slot must exclude what is already used and land on a
+      // different game — the recycle path is only for an exhausted pool.
+      const selectResults: unknown[][] = [
+        // 1. cachedCheck - batting stats exist
+        [{ gameIdentifier: 'game-1925-001' }],
+        // 2. getPrimaryFieldingPosition
+        [{ pos: 'CF', g: 140 }],
+        // 3. usedGames - two slots already filled
+        [
+          { gameIdentifier: 'game-1925-001' },
+          { gameIdentifier: 'game-1925-002' },
+        ],
+        // 4. selectGameIdentifier with exclusions - distinct games remain
+        [
+          { gameIdentifier: 'game-1925-003' },
+          { gameIdentifier: 'game-1925-004' },
+        ],
+      ];
+
+      let selectIndex = 0;
+      const mockDb = {
+        select: jest.fn().mockImplementation(() => {
+          const result = selectResults[selectIndex++] ?? [];
+          const chainResult = Object.assign([...result], {
+            limit: jest.fn().mockReturnValue(result),
+          });
+          return {
+            from: jest.fn().mockReturnValue({
+              where: jest.fn().mockReturnValue(chainResult),
+            }),
+          };
+        }),
+      } as unknown as PublicDb;
+
+      const result = await selectGamesForMatchupPlayer(
+        mockDb,
+        100,
+        1,
+        1925,
+        'non-pitcher',
+      );
+
+      expect(result.statsAreCached).toBe(true);
+      expect(['game-1925-001', 'game-1925-002']).not.toContain(
+        result.gameIdentifier,
+      );
+      expect(result.gameIdentifier).toBe('game-1925-003');
+      // The already-used identifiers are pushed into the query, not filtered
+      // after the fact — that is what keeps the slots distinct.
+      expect(notInArray).toHaveBeenCalledWith('gameIdentifier', [
+        'game-1925-001',
+        'game-1925-002',
+      ]);
+      // No recycle warning: the pool was not exhausted.
+      expect(mockLoggerWarn).not.toHaveBeenCalled();
     });
 
     it('should recycle a non-pitcher game when unique pool exhausted', async () => {

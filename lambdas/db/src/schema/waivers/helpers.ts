@@ -9,7 +9,9 @@ import type { PublicDb } from '@legacy-sports/db-client';
 import { PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import {
+  MIN_SEASON_GAMES_FOR_SELECTION,
   MIN_SEASON_WITH_GAME_DATA,
+  resolveEligibleSeasons,
   SEASON_MATCHUP_MULTIPLIER,
 } from '@legacy-sports/utils';
 import { and, eq, gte, isNotNull, or, sql } from 'drizzle-orm';
@@ -184,12 +186,28 @@ export async function addClaimedPlayerToCurrentMatchup(
       seasonGames.set(s.season, Math.max(seasonGames.get(s.season) ?? 0, g));
     }
 
-    // Filter to only seasons with enough games
-    const eligible = [...seasonGames.entries()]
-      .filter(([, games]) => games >= minGames)
-      .map(([season]) => season);
+    // Two-tier eligibility floor (LS-9534): only seasons at or above
+    // MIN_SEASON_GAMES_FOR_SELECTION are assignable while the player has one;
+    // the league floor is the fallback for short careers.
+    const eligibility = resolveEligibleSeasons(seasonGames, minGames);
+    const eligible = eligibility.seasons;
+
+    if (eligibility.tier === 'fallback') {
+      LOGGER.info(
+        'Waiver-claimed player has no season at or above the preferred floor — falling back to the league floor',
+        {
+          playerId,
+          leagueId,
+          weekNumber,
+          preferredMinGames: Math.max(minGames, MIN_SEASON_GAMES_FOR_SELECTION),
+          minGamesApplied: eligibility.minGamesApplied,
+        },
+      );
+    }
 
     if (eligible.length === 0) {
+      // Graceful degradation: the player is still added to matchup_players
+      // below, they just have no season this week and contribute no stats.
       LOGGER.warn(
         'No eligible seasons for waiver-claimed player — skipping season selection',
         {
@@ -197,6 +215,7 @@ export async function addClaimedPlayerToCurrentMatchup(
           leagueId,
           weekNumber,
           minGames,
+          preferredMinGames: Math.max(minGames, MIN_SEASON_GAMES_FOR_SELECTION),
         },
       );
       // Still insert matchup_players below so the player shows up

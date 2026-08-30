@@ -755,12 +755,21 @@ export async function selectGamesForMatchup(
       const playerSeason = seasonMap.get(matchupPlayer.playerId);
 
       if (!playerSeason) {
-        // A player can legitimately have no season when they were added via
-        // waivers mid-week but have insufficient historical game data to assign
-        // a season. Skip game selection for them rather than crashing the entire
-        // matchup — they will simply contribute no stats for this matchup.
+        // A player can legitimately have no season: they were added via waivers
+        // mid-week, or no season of theirs clears the eligibility floor in
+        // @legacy-sports/utils `resolveEligibleSeasons` (LS-9534). This is the
+        // documented graceful-degradation path for both — skip game selection
+        // for this player rather than crashing the entire matchup. They simply
+        // contribute no stats, and every other player in the matchup still gets
+        // their games. Never throw here.
         LOGGER.warn(
           `No season assigned for player ${matchupPlayer.playerId} in league ${matchup.leagueId}, week ${matchup.weekNumber} — skipping game selection`,
+          {
+            matchupId,
+            matchupPlayerId: matchupPlayer.id,
+            playerId: matchupPlayer.playerId,
+            weekNumber: matchup.weekNumber,
+          },
         );
         continue;
       }

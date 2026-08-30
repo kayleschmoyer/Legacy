@@ -336,6 +336,56 @@ describe('season-selector', () => {
       expect(skipped.reason).toContain('No seasons with at least 10 games');
     });
 
+    it('should prefer seasons clearing MIN_SEASON_GAMES_FOR_SELECTION over thinner ones (LS-9534)', () => {
+      // 1923 clears the league floor of 10 but is far too thin for a 5-slot
+      // matchup to draw from; 1925 clears the selection floor. Only 1925 may
+      // be assigned, even though both used to be eligible.
+      const playerIds = [1];
+      const battingStats: PlayerSeasonStats[] = [
+        { playerId: 1, season: 1923, g: 12 },
+        { playerId: 1, season: 1925, g: 140 },
+      ];
+
+      const result = selectSeasonsForPlayers(
+        playerIds,
+        battingStats,
+        [],
+        [],
+        10,
+        1,
+        1,
+      );
+
+      expect(result.selections).toHaveLength(1);
+      expect(result.selections[0].season).toBe(1925);
+      expect(result.skippedPlayers).toHaveLength(0);
+    });
+
+    it('should fall back to the league floor when the only season is under MIN_SEASON_GAMES_FOR_SELECTION (LS-9534)', () => {
+      // AC3: a player whose only season is thinner than the selection floor.
+      // They must still get that season rather than dropping out of the
+      // matchup — the floor is a preference, not a hard eligibility cut for
+      // players who have nothing better.
+      const playerIds = [1];
+      const battingStats: PlayerSeasonStats[] = [
+        { playerId: 1, season: 1980, g: 12 },
+      ];
+
+      const result = selectSeasonsForPlayers(
+        playerIds,
+        battingStats,
+        [],
+        [],
+        10,
+        1,
+        1,
+      );
+
+      expect(result.selections).toHaveLength(1);
+      expect(result.selections[0].season).toBe(1980);
+      expect(result.skippedPlayers).toHaveLength(0);
+    });
+
     it('should not duplicate seasons when player has same season in batting and pitching', () => {
       const playerIds = [1];
       const battingStats: PlayerSeasonStats[] = [
