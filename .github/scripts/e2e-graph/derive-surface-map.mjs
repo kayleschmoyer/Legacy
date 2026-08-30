@@ -38,6 +38,10 @@
  *   - Build/config/harness files that sit outside the module graph keep a
  *     hand-written runAllWhenChanged core (AC3), including this generator's
  *     own directory.
+ *   - A pure re-export barrel (`export … from`) is followed in full whenever
+ *     ANY one of its names is demanded — narrowing to just the matching edge
+ *     assumes sibling re-exports stay unloaded, which real ESM module
+ *     linking does not do (LS-9689 shadow-audit finding; see buildClosure).
  *
  * Zero dependencies (node stdlib only) so it can run in the detect-changes CI
  * job, which deliberately skips pnpm install. Output is deterministic: no
@@ -345,12 +349,19 @@ export function createResolver(repoRoot, aliases) {
  * Demand-driven transitive closure over the import graph.
  *
  * A work item is (file, name): "the export `name` of `file` may be used"
- * (name === ALL: the whole module runs). Narrowing rule: demanding one name
- * from a PURE BARREL follows only the matching re-export edge, so
- * `import { useAuth } from '…/entry/auth'` does not drag in every feature the
- * barrel re-exports. Any module with local code conservatively activates all
- * of its own import edges (each narrowed to the names IT imports), because
- * without an AST we cannot know which import its local code uses.
+ * (name === ALL: the whole module runs). A PURE BARREL's `export … from`
+ * statements are real ESM re-exports: loading the barrel for any one name
+ * still makes the module linker resolve and evaluate every re-export target,
+ * regardless of which name was demanded — so `import { useAuth } from
+ * '…/entry/auth'` reaches every feature that barrel re-exports too (LS-9689:
+ * an earlier version of this function narrowed to just the matching
+ * re-export edge on the theory that the rest stay unreached; the shadow
+ * audit against real, unbundled Playwright coverage showed that theory was
+ * the dominant source of under-selection — narrowing IS still safe for a
+ * non-barrel module's own `import` edges, which get name-narrowed as before).
+ * Any module with local code conservatively activates all of its own import
+ * edges (each narrowed to the names IT imports), because without an AST we
+ * cannot know which import its local code uses.
  *
  * @param {Array<string | [string, string]>} entries file, or [file, name]
  * @param {(rel: string) => object} moduleOf resolver from createResolver
@@ -392,6 +403,20 @@ export function buildClosure(entries, moduleOf, { followDynamic }) {
         }
       }
     }
+    // A PURE barrel's `export … from` statements are ESM re-exports, not
+    // lazy accessors: loading the barrel for ANY one of its names still
+    // requires the module linker to resolve and evaluate every re-export
+    // target, independent of which name the demand narrowed to (LS-9689 —
+    // the shadow audit's dominant under-selection cause was this narrowing
+    // assuming sibling barrel exports stay unreached when a real, unbundled
+    // Playwright run touches them regardless). So a pure barrel additionally
+    // queues every reexport target at ALL, without perturbing
+    // `matchedReexport` above — that flag still means "did the narrowed
+    // demand resolve via a reexport edge", and gates the imports-fallback
+    // below exactly as before.
+    if (name !== ALL && mod.isPureBarrel) {
+      for (const r of mod.reexports) queue.push([r.file, ALL]);
+    }
 
     // Local code activates the module's own imports; a pure barrel has none
     // beyond its re-exports, which the demand above already narrowed. A pure
@@ -417,6 +442,30 @@ export function buildClosure(entries, moduleOf, { followDynamic }) {
 export const WILDCARD_SEGMENT = '\u0000';
 
 const GOTO_RE = /(?:([\w$.]+)\s*\.\s*)?(goto(?:App)?|open)\s*\(\s*([^)]*)/g;
+
+// `test('page.goto(commissionerUrl) detects …', …)` / `describe(...)` titles
+// routinely document call shapes in prose — GOTO_RE has no way to tell that
+// apart from a real call unless the title text is removed first.
+const TITLE_STRING_RE =
+  /\b(?:test|it|describe)(?:\.\w+)?\s*\(\s*(['"`])(?:\\.|(?!\1)[\s\S])*?\1/g;
+// A `//` comment can itself narrate a goto()/open() call (see above); safe to
+// drop wholesale here (unlike extractImports, this function never re-emits
+// the text) as long as `://` inside a URL string survives.
+const LINE_COMMENT_RE = /(?<!:)\/\/.*$/gm;
+
+/**
+ * Strip text that can never contain a real goto()/open() CALL — block
+ * comments, test/it/describe title strings, and line comments — before
+ * GOTO_RE scans for call syntax. Titles are blanked char-by-char (newlines
+ * preserved) rather than deleted so line/column positions of any remaining
+ * match are undisturbed.
+ */
+function stripNonCallText(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(TITLE_STRING_RE, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(LINE_COMMENT_RE, '');
+}
 
 /**
  * Only Playwright's own navigation surfaces take a ROUTE argument: bare
@@ -475,7 +524,7 @@ export function extractRoutes(source) {
   const routes = new Set();
   const weakRoutes = new Set();
   const unresolved = [];
-  for (const m of source.matchAll(GOTO_RE)) {
+  for (const m of stripNonCallText(source).matchAll(GOTO_RE)) {
     const isOpen = m[2] === 'open';
     const routeReceiver = !isOpen && isRouteReceiver(m[1]);
     const arg = normalizeRouteArg(m[3]);

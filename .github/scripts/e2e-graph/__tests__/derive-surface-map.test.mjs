@@ -144,7 +144,13 @@ describe('resolveSpecifier', () => {
 describe('buildClosure (demand-driven narrowing)', () => {
   const aliases = loadPathAliases(MINI);
 
-  it('demanding one name from a pure barrel does not pull sibling subtrees', () => {
+  it('demanding one name from a pure barrel also pulls sibling re-export subtrees (LS-9689)', () => {
+    // A prior version of buildClosure narrowed to just the matching
+    // re-export edge here, on the theory that `Button` staying unused meant
+    // `DraftWidget`'s subtree stayed unloaded. Real ESM module linking always
+    // resolves every `export … from` statement in a loaded module regardless
+    // of which name a downstream consumer wants — the LS-9689 shadow audit's
+    // dominant under-selection cause was exactly this gap between the two.
     const moduleOf = createResolver(MINI, aliases);
     const closure = buildClosure(
       [['lib/mini-lib/src/index.ts', 'Button']],
@@ -153,8 +159,22 @@ describe('buildClosure (demand-driven narrowing)', () => {
     );
     assert.ok(closure.has('lib/mini-lib/src/button.ts'));
     assert.ok(closure.has('lib/mini-lib/src/shared.ts'));
-    assert.ok(!closure.has('lib/mini-lib/src/draft-widget.ts'));
-    assert.ok(!closure.has('lib/mini-lib/src/draft-internals.ts'));
+    assert.ok(closure.has('lib/mini-lib/src/draft-widget.ts'));
+    assert.ok(closure.has('lib/mini-lib/src/draft-internals.ts'));
+  });
+
+  it('a non-barrel module still narrows its own import edges to the demanded name', () => {
+    // Precision is preserved where it's actually safe: a module with LOCAL
+    // CODE (not a pure re-export barrel) only activates the import edges its
+    // own imports carry — a direct, non-barrel import of one file is not
+    // affected by this ticket's fix.
+    const moduleOf = createResolver(MINI, aliases);
+    const closure = buildClosure(
+      ['apps/web/src/pages/draft/DraftPage.tsx'],
+      moduleOf,
+      { followDynamic: false },
+    );
+    assert.ok(closure.has('apps/web/src/pages/draft/draft-helper.ts'));
   });
 
   it('an ALL demand on a barrel pulls everything it re-exports', () => {
@@ -232,6 +252,33 @@ describe('extractRoutes', () => {
       "await page.goto('https://example.com/x');\nawait page.goto('about:blank');",
     );
     assert.deepEqual(r.routes, []);
+  });
+
+  it('ignores goto()/open() text inside a test/describe title (LS-9689)', () => {
+    const r = extractRoutes(
+      "test('page.goto(commissionerUrl) detects Season Active', async ({ page }) => {\n" +
+        "  await page.goto('/baseball/league/1/commissioner');\n" +
+        '});',
+    );
+    assert.deepEqual(r.routes, ['/baseball/league/1/commissioner']);
+    assert.deepEqual(r.unresolved, []);
+  });
+
+  it('ignores goto()/open() text inside a line comment (LS-9689)', () => {
+    const r = extractRoutes(
+      '// goto(commissionerUrl) always finds it.\n' +
+        "await page.goto('/baseball/league/1/commissioner');",
+    );
+    assert.deepEqual(r.routes, ['/baseball/league/1/commissioner']);
+    assert.deepEqual(r.unresolved, []);
+  });
+
+  it('does not treat "://" inside a line comment as a call', () => {
+    const r = extractRoutes(
+      "// see https://example.com/docs for details\nawait page.goto('/about');",
+    );
+    assert.deepEqual(r.routes, ['/about']);
+    assert.deepEqual(r.unresolved, []);
   });
 });
 
@@ -327,13 +374,23 @@ describe('derive() on the mini fixture repo', () => {
     }
   });
 
-  it('narrow spec reaches its page but not other features (the precision AC)', () => {
+  it('a spec reaches its own page plus every sibling a shared barrel it touches re-exports (LS-9689)', () => {
+    // AboutPage imports Button from the SAME pure barrel (@mini/lib) that
+    // also re-exports DraftWidget — real ESM module linking loads
+    // draft-widget.ts (and its own import, draft-internals.ts) the moment
+    // the barrel is loaded for Button, regardless of whether AboutPage ever
+    // references DraftWidget. Previously this function narrowed to just the
+    // Button edge, which is exactly the assumption the LS-9689 shadow audit
+    // showed was producing real under-selection. What stays precise: the
+    // DraftPage MODULE itself (as opposed to files re-exported alongside it
+    // from a shared barrel) is still untouched — about.spec.ts never reaches
+    // DraftPage.tsx, because nothing in its own closure imports it.
     const about = manifest.specs['apps/web-e2e/src/tests/about.spec.ts'];
     assert.ok(about.includes('apps/web/src/pages/about/AboutPage.tsx'));
     assert.ok(about.includes('lib/mini-lib/src/button.ts'));
     assert.ok(
-      !about.includes('lib/mini-lib/src/draft-internals.ts'),
-      'about spec must not reach draft internals through the barrel',
+      about.includes('lib/mini-lib/src/draft-internals.ts'),
+      'about spec must reach draft internals through the shared barrel',
     );
     assert.ok(!about.includes('apps/web/src/pages/draft/DraftPage.tsx'));
   });
