@@ -1,9 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Button, Card, Separator, Spinner, styled, Text } from 'tamagui';
 import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
+import { Scale } from '@tamagui/lucide-icons/icons/Scale';
 import { Trophy } from '@tamagui/lucide-icons/icons/Trophy';
+import {
+  TiebreakerMethod,
+  useGetTiebreakerRulesQuery,
+} from '@legacy-sports/graphql';
 import { useStandings } from '../../hooks/useStandings';
 import {
   AMBER,
@@ -14,6 +19,64 @@ import {
   withAlpha,
 } from '../../constants/colors';
 import { AvatarImage } from '../../components/common';
+
+const TIEBREAKER_METHOD_LABELS: Record<TiebreakerMethod, string> = {
+  [TiebreakerMethod.HighestCategory]: 'Highest Category',
+  [TiebreakerMethod.TotalSeasonPoints]: 'Total Season Points',
+  [TiebreakerMethod.HeadToHeadRecord]: 'Head-to-Head Record',
+  [TiebreakerMethod.Random]: 'Random',
+  [TiebreakerMethod.CoChampion]: 'Co-Champion',
+};
+
+/** Exported for unit testing. */
+export function describeTiebreakerRule(
+  rule:
+    | {
+        primaryMethod?: TiebreakerMethod | null;
+        secondaryMethod?: TiebreakerMethod | null;
+        tertiaryMethod?: TiebreakerMethod | null;
+      }
+    | null
+    | undefined,
+): string {
+  if (!rule) {
+    return 'No tiebreaker rules configured for this league yet.';
+  }
+  const methods = [
+    rule.primaryMethod,
+    rule.secondaryMethod,
+    rule.tertiaryMethod,
+  ]
+    .filter((m): m is TiebreakerMethod => Boolean(m))
+    .map((m) => TIEBREAKER_METHOD_LABELS[m]);
+  return `Tiebreaker order: ${methods.join(' → ')}.`;
+}
+
+/** Exported for unit testing. */
+export function getTiedTeamIds<
+  T extends {
+    id: number;
+    wins: number | null;
+    losses: number | null;
+    ties: number | null;
+  },
+>(teams: readonly T[]): Set<number> {
+  const recordCounts = new Map<string, number[]>();
+  for (const team of teams) {
+    if (team.wins == null) continue;
+    const key = `${team.wins}-${team.losses ?? 0}-${team.ties ?? 0}`;
+    const ids = recordCounts.get(key) ?? [];
+    ids.push(team.id);
+    recordCounts.set(key, ids);
+  }
+  const tied = new Set<number>();
+  for (const ids of recordCounts.values()) {
+    if (ids.length > 1) {
+      ids.forEach((id) => tied.add(id));
+    }
+  }
+  return tied;
+}
 
 interface Team {
   id: number;
@@ -179,6 +242,22 @@ export function LeagueStandings({
     [rankedTeams],
   );
 
+  const tiedTeamIds = useMemo(() => getTiedTeamIds(rankedTeams), [rankedTeams]);
+  const hasTies = tiedTeamIds.size > 0;
+
+  const { data: tiebreakerData } = useGetTiebreakerRulesQuery({
+    variables: { leagueId },
+    skip: !hasTies,
+  });
+  const tiebreakerReason = describeTiebreakerRule(
+    tiebreakerData?.getTiebreakerRules,
+  );
+
+  const [expandedTeamId, setExpandedTeamId] = useState<number | null>(null);
+  const toggleTiebreakerInfo = (teamId: number) => {
+    setExpandedTeamId((current) => (current === teamId ? null : teamId));
+  };
+
   const isLoading = loading || standingsLoading;
 
   const handleTeamClick = (teamId: number) => {
@@ -193,6 +272,8 @@ export function LeagueStandings({
 
   const renderTeamRow = (team: RankedTeam, index: number, total: number) => {
     const isUserTeam = userTeamId === team.id;
+    const isTied = tiedTeamIds.has(team.id);
+    const isExpanded = expandedTeamId === team.id;
     const rank = index + 1;
     // Only show rank numbers and award gold/silver/bronze styles when this
     // specific team has a standings record (post-season-start). During the
@@ -308,17 +389,53 @@ export function LeagueStandings({
           </Text>
 
           {/* Record (W-L-T) */}
-          <Text
+          <XStack
             width={80}
-            fontSize="$3"
-            fontWeight="600"
-            color="$color"
-            textAlign="center"
+            alignItems="center"
+            justifyContent="center"
+            gap="$1"
           >
-            {team.wins != null
-              ? `${team.wins}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}`
-              : '—'}
-          </Text>
+            <Text
+              fontSize="$3"
+              fontWeight="600"
+              color="$color"
+              textAlign="center"
+            >
+              {team.wins != null
+                ? `${team.wins}-${team.losses ?? 0}${team.ties ? `-${team.ties}` : ''}`
+                : '—'}
+            </Text>
+            {isTied && (
+              <YStack
+                role="button"
+                tabIndex={0}
+                cursor="pointer"
+                aria-label={`Tiebreaker info for ${team.name}`}
+                aria-expanded={isExpanded}
+                testID={`tiebreaker-toggle-${team.id}`}
+                onPress={(e: { stopPropagation: () => void }) => {
+                  e.stopPropagation();
+                  toggleTiebreakerInfo(team.id);
+                }}
+                onKeyDown={(e: {
+                  key: string;
+                  stopPropagation: () => void;
+                  preventDefault: () => void;
+                }) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleTiebreakerInfo(team.id);
+                  }
+                }}
+              >
+                <Scale
+                  size={14}
+                  color={isExpanded ? BRAND_GOLD_LIGHT : '$textMuted'}
+                />
+              </YStack>
+            )}
+          </XStack>
 
           {/* Points */}
           <Text
@@ -333,6 +450,21 @@ export function LeagueStandings({
               : '—'}
           </Text>
         </XStack>
+        {isTied && isExpanded && (
+          <XStack
+            paddingHorizontal="$4"
+            paddingVertical="$2"
+            backgroundColor="$surfaceSubtle"
+            alignItems="center"
+            gap="$2"
+            testID={`tiebreaker-reason-${team.id}`}
+          >
+            <Scale size={12} color="$textMuted" />
+            <Text fontSize="$2" color="$textMuted" fontStyle="italic">
+              Tied on record. {tiebreakerReason}
+            </Text>
+          </XStack>
+        )}
         {index < total - 1 && (
           <Separator borderColor="$outlineSubtle" marginVertical={0} />
         )}
