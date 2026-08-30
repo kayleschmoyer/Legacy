@@ -135,9 +135,20 @@ test.describe('Home standings lazy-load @critical', () => {
       timeout: STANDINGS_DELAY_MS + 5000,
     });
     if (!isNarrowProject) {
-      await expect(page.getByText('· Overall 6-2')).toBeVisible();
+      // LS-9586: this reads from the same merged payload as the hero card's
+      // "6-2" above and always commits in the same React render — but it ran
+      // with the bare 3000ms default `expect` timeout while the hero-card
+      // assertion above it gets STANDINGS_DELAY_MS+5000. Under CI load that
+      // left this assertion with no slack at all against the very query
+      // delay it depends on. Match the hero card's timeout so a slow CI
+      // runner can't flake this line independently of it.
+      await expect(page.getByText('· Overall 6-2')).toBeVisible({
+        timeout: STANDINGS_DELAY_MS + 5000,
+      });
     }
-    await expect(page.getByText('Rank #1')).toBeVisible();
+    await expect(page.getByText('Rank #1')).toBeVisible({
+      timeout: STANDINGS_DELAY_MS + 5000,
+    });
     await expect(page.getByText('0-0')).toHaveCount(0);
   });
 });
