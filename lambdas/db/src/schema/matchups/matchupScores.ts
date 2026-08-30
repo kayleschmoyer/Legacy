@@ -17,16 +17,13 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   aggregatePlayerStats,
   calculatePlayerScore,
-  computeFootballDefenseFantasyPoints,
-  computeFootballIdpFantasyPoints,
-  computeFootballOffenseFantasyPoints,
+  computeFootballPlayerGamePoints,
   type FootballScoringSettings,
   getDefaultFootballScoringSettings,
   getDefaultScoringSettings,
   type PlayerGameStats,
 } from '@legacy-sports/scoring';
-
-import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
+import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import { getFootballPlayerSeasonAverage } from './football-season-projection';
 import { builder } from '../builder';
 import { FootballMatchupStatsRef } from '../football';
@@ -136,7 +133,10 @@ type GameIDPShape = {
   safeties: number | null;
 };
 
-// ─── DB-to-GraphQL / DB-to-scoring adapters ──────────────────────────────────
+// ─── DB-to-GraphQL adapters ──────────────────────────────────────────────────
+//
+// Scoring reads the stat rows through `computeFootballPlayerGamePoints`'s own
+// mapping (LS-9672); these shape the same rows for the GraphQL response.
 
 type OffenseRow =
   typeof PublicSchema.gameFootballPlayerOffenseStats.$inferSelect;
@@ -215,13 +215,11 @@ function adaptKickingFromOffense(row: OffenseRow): GameKickingShape {
 /**
  * Compute fantasy points for a single player game.
  *
- * Branches on player type:
- *  - DST players (`isDst=true`): `computeDefenseScore` using sacks, turnovers, and
- *    points-allowed bands.
- *  - IDP players (`isIdp=true`): `computeIDPScore` using tackles, sacks, and
- *    defensive plays.
- *  - All other players (offense + kicking): sums `computeScoring` across whichever
- *    stat groups are present.
+ * A thin adapter over `computeFootballPlayerGamePoints`, which is the one
+ * place football per-game scoring is implemented (LS-9672). This resolver and
+ * the stats lambda that persists `matchups.team1_score` / `team2_score` share
+ * it, so the breakdown a user reads and the score they are ranked by cannot
+ * be computed differently.
  *
  * @param stats    Raw Drizzle stat row(s) for one player game from `getMatchupFootballPlayerGameStats`.
  * @param isDst    True when `players.is_dst` is true (DST team defense slot).
@@ -240,72 +238,11 @@ export function computeFootballGamePoints(
   settings: FootballScoringSettings = getDefaultFootballScoringSettings(),
   position?: string,
 ): number {
-  if (isDst && stats.defense) {
-    const adapted = adaptDefenseRow(stats.defense);
-    return computeFootballDefenseFantasyPoints(
-      {
-        sacks: adapted.sacks,
-        int: adapted.int,
-        fumbles_rec: adapted.fumRec,
-        def_td: adapted.defTd,
-        safeties: adapted.safeties,
-        pts_allowed: adapted.ptsAllowed,
-        yds_allowed: adapted.ydsAllowed,
-      },
-      settings,
-    );
-  }
-
-  if (isIdp && stats.idpDefense) {
-    const adapted = adaptIdpRow(stats.idpDefense);
-    return computeFootballIdpFantasyPoints(
-      {
-        solo_tkl: adapted.soloTkl,
-        ast_tkl: adapted.astTkl,
-        sacks: adapted.sacks,
-        int: adapted.int,
-        pd: adapted.pd,
-        ff: adapted.ff,
-        fr: adapted.fr,
-        def_td: adapted.defTd,
-        safeties: adapted.safeties,
-      },
-      settings,
-      position,
-    );
-  }
-
-  // Offense / kicking — all offensive stats are in the unified offense row
-  if (!stats.offense) return 0;
-
-  return computeFootballOffenseFantasyPoints(
-    {
-      passing: {
-        yds: stats.offense.passYds,
-        td: stats.offense.passTd,
-        int: stats.offense.interceptions,
-        sacked: stats.offense.sacked,
-      },
-      rushing: {
-        yds: stats.offense.rushYds,
-        td: stats.offense.rushTd,
-        fumbles: stats.offense.rushFumbles,
-      },
-      receiving: {
-        rec: stats.offense.rec,
-        yds: stats.offense.recYds,
-        td: stats.offense.recTd,
-        fumbles: stats.offense.recFumbles,
-      },
-      kicking: {
-        fgm: stats.offense.fgm,
-        fg_50m: stats.offense.fg50m,
-        xpm: stats.offense.xpm,
-      },
-    },
-    settings,
+  return computeFootballPlayerGamePoints(stats, settings, {
+    isDst,
+    isIdp,
     position,
-  );
+  });
 }
 
 // ─── Football resolver ───────────────────────────────────────────────────────

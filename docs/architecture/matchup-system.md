@@ -102,6 +102,50 @@ applies the multipliers, and persists only the resulting team totals to
 score have been if we tweaked HR from 4 to 3?" cheap to answer — the input
 data is unchanged.
 
+#### Football scoring: one resolution step, one per-game function (LS-9672)
+
+Baseball and football share the profile tables above but not the shape of
+their multipliers, and the difference has produced the same bug twice.
+`scoring_stat_definitions` keys everything by `source_column`, which is
+snake_case. Baseball's scoring engine is camelCase-keyed, so a baseball
+caller must run `camelCaseScoringMultipliers` before scoring — skipping it
+resolves `outs_recorded` to weight 0 and silently under-scores every matchup
+(LS-9532). **Football's engine is snake_case-keyed** (`fumbles_rec`,
+`def_td`, `solo_tkl`), so running that same transform on football groups
+would produce exactly the opposite failure, and just as silently.
+
+The decision (LS-9672, closing out the epic's "no entry point may compute
+scores differently" rule):
+
+- **Football does not join baseball's shared scoring function.** The maths
+  genuinely differ — DST points-allowed brackets and IDP have no baseball
+  analogue — so forcing one function would be a false abstraction.
+- **Football does share a multiplier-resolution step and a per-game scoring
+  function of its own.** `getFootballScoringSettingsForLeague`
+  (`@legacy-sports/scoring/server`) is the only place a league's football
+  profile is resolved, and `computeFootballPlayerGamePoints`
+  (`@legacy-sports/scoring`) is the only place a player-game becomes points.
+  The `matchupScores` breakdown resolver and the stats lambda that writes
+  `matchups.team1_score` both go through both, so the number a user reads in
+  the box score and the number they are ranked by cannot drift.
+- **The `source_column` → scoring-key mapping is explicit and asserted.**
+  `FOOTBALL_STAT_DEFINITIONS` plus `resolveFootballScoringTarget` /
+  `resolveFootballStatColumnSource` (`lib/scoring/src/football/StatDefinitionMapping.ts`)
+  carry the three-way translation, including the two places the names
+  diverge: the DST points-allowed brackets live under a separate
+  `defenseBands` key (`pts_band_35plus` → `pts_35_plus`), and several
+  columns are exposed under different Drizzle property names (`int` →
+  `interceptions`, `fg_50m` → `fg50m`, `yds` → `passYds`/`rushYds`/`recYds`).
+  Tests fail the build if a seeded definition has no mapping target, if a
+  mapping points at a key the `DEFAULT_*` constants do not have, if it points
+  at a Drizzle property that does not exist, or if an override on any of the
+  35 definitions fails to move the score. Adding a football stat without
+  wiring it is a red build, not a stat that quietly scores 0.
+
+`@legacy-sports/scoring/server` exists because the resolution step needs
+db-client's Node-only query helpers while `lib/scoring`'s main entry is
+bundled into the web and mobile apps (LS-9041).
+
 ### 4. Status machine and automated progression
 
 A matchup's `status` enum is `scheduled → in_progress → completed` (with

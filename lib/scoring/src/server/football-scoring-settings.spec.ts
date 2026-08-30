@@ -11,29 +11,39 @@
  *     source columns to the scoring lib's `pts_*` band keys
  */
 
-import { getDefaultFootballScoringSettings } from '@legacy-sports/scoring';
+import type { PublicDb } from '@legacy-sports/db-client';
 import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
+import { getDefaultFootballScoringSettings } from '../football/DefaultScoring';
+
+type QueryRow = Record<string, unknown>;
+
+interface QueryChain {
+  from: () => QueryChain;
+  where: () => QueryChain;
+  limit: () => QueryChain;
+  then: (resolve: (rows: QueryRow[]) => unknown) => unknown;
+}
 
 // Drizzle queries are thenables: select().from().where().limit().then(cb).
 // This helper returns a chainable mock that resolves to a queued result set
 // each time db.select() is called, in call order.
-function makeDb(resultQueue: any[][]): any {
+function makeDb(resultQueue: QueryRow[][]): PublicDb {
   let callIndex = 0;
 
-  return {
-    select: jest.fn().mockImplementation(() => {
+  const db = {
+    select: jest.fn((): QueryChain => {
       const results = resultQueue[callIndex++] ?? [];
-      const chain: any = {
-        from: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        then: jest
-          .fn()
-          .mockImplementation((resolve: (v: any) => any) => resolve(results)),
+      const chain: QueryChain = {
+        from: () => chain,
+        where: () => chain,
+        limit: () => chain,
+        then: (resolve) => resolve(results),
       };
       return chain;
     }),
   };
+
+  return db as unknown as PublicDb;
 }
 
 const activeProfile = {

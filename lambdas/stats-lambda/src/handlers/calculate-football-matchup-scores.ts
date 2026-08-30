@@ -4,7 +4,6 @@ import { LOGGER } from '@legacy-sports/logging';
 import { addBreadcrumb, captureError } from '@legacy-sports/rollbar';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import {
-  type FootballMatchupPlayerGameStats,
   getMatchupFootballPlayerGameStats,
   type PublicDb,
   PublicSchema,
@@ -12,18 +11,8 @@ import {
   updateMatchupScore,
 } from '@legacy-sports/db-client';
 import { createNotificationPublisher } from '@legacy-sports/aws-utils';
-import {
-  computeDefenseScore,
-  computeIDPScore,
-  computeScoring,
-  DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS,
-  DEFAULT_DEFENSE_SCORING,
-  DEFAULT_IDP_SCORING,
-  DEFAULT_KICKING_SCORING,
-  DEFAULT_PASSING_SCORING,
-  DEFAULT_RECEIVING_SCORING,
-  DEFAULT_RUSHING_SCORING,
-} from '@legacy-sports/scoring';
+import { computeFootballPlayerGamePoints } from '@legacy-sports/scoring';
+import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import type { CalculateFootballScoresMessage } from '../load-game-types';
 import { emitFootballFailure, emitFootballSuccess } from '../football-metrics';
 import { publishFootballGameAlerts } from '../football-notification-triggers';
@@ -48,8 +37,21 @@ export interface CalculateFootballScoresResult {
 
 /**
  * Core football matchup score calculation.
- * Fetches player game stats, applies sport-appropriate scoring (DST bands,
- * IDP flat multipliers, or offensive flat multipliers), and writes team scores.
+ *
+ * Fetches player game stats, applies the **league's** scoring settings (DST
+ * bands, IDP flat multipliers, or offensive flat multipliers), and writes team
+ * scores.
+ *
+ * Before LS-9672 this scored every league from the hardcoded `DEFAULT_*`
+ * constants: a commissioner could configure football scoring and it had zero
+ * effect on the matchup scores this function persists, with no error and no
+ * log line. It now resolves the league's profile through the same
+ * `getFootballScoringSettingsForLeague` the `matchupScores` breakdown
+ * resolver uses, and scores each player-game through the same
+ * `computeFootballPlayerGamePoints`, so the two cannot drift apart.
+ *
+ * A league with no scoring profile still resolves to the platform defaults,
+ * so unconfigured leagues score exactly as they did before.
  */
 export async function calculateAndUpdateFootballMatchupScores(
   db: PublicDb,
@@ -64,7 +66,7 @@ export async function calculateAndUpdateFootballMatchupScores(
     throw new Error(`Matchup ${matchupId} not found`);
   }
 
-  const { team1Id, team2Id, team1Score, team2Score } = matchupResult;
+  const { team1Id, team2Id, team1Score, team2Score, leagueId } = matchupResult;
 
   if (!forceRecalculation && team1Score && team2Score) {
     return {
@@ -75,17 +77,42 @@ export async function calculateAndUpdateFootballMatchupScores(
     };
   }
 
-  // Fetch all matchup players with teamId for grouping
+  // Fetch all matchup players with teamId for grouping, plus the rostered
+  // position type — position-scoped bonuses (LS-9104) are part of the
+  // league's scoring configuration, so leaving them out would reintroduce
+  // the same silent no-op for a subset of it (LS-9672).
   const matchupPlayers = await db
     .select({
       matchupPlayerId: PublicSchema.matchupPlayers.id,
       teamId: PublicSchema.matchupPlayers.teamId,
+      positionType: PublicSchema.leaguePosition.positionType,
     })
     .from(PublicSchema.matchupPlayers)
+    .leftJoin(
+      PublicSchema.leaguePosition,
+      eq(
+        PublicSchema.leaguePosition.id,
+        PublicSchema.matchupPlayers.positionId,
+      ),
+    )
     .where(eq(PublicSchema.matchupPlayers.matchupId, matchupId));
 
   const matchupPlayerToTeam = new Map<number, number>(
     matchupPlayers.map((mp) => [mp.matchupPlayerId, mp.teamId]),
+  );
+  const matchupPlayerToPosition = new Map<number, string>(
+    matchupPlayers
+      .filter((mp): mp is typeof mp & { positionType: string } =>
+        Boolean(mp.positionType),
+      )
+      .map((mp) => [mp.matchupPlayerId, mp.positionType]),
+  );
+
+  // The league's configured scoring, or the platform defaults when it has no
+  // profile — the same resolution the matchupScores breakdown resolver uses.
+  const scoringSettings = await getFootballScoringSettingsForLeague(
+    db,
+    leagueId,
   );
 
   const playerGameStats = await getMatchupFootballPlayerGameStats(
@@ -100,7 +127,9 @@ export async function calculateAndUpdateFootballMatchupScores(
     const teamId = matchupPlayerToTeam.get(stat.matchupPlayerId);
     if (teamId === undefined) continue;
 
-    const score = computeFootballPlayerGameScore(stat);
+    const score = computeFootballPlayerGamePoints(stat, scoringSettings, {
+      position: matchupPlayerToPosition.get(stat.matchupPlayerId),
+    });
 
     if (teamId === team1Id) {
       team1Total += score;
@@ -126,89 +155,6 @@ export async function calculateAndUpdateFootballMatchupScores(
       : team2Total,
     updated: true,
   };
-}
-
-function computeFootballPlayerGameScore(
-  stat: FootballMatchupPlayerGameStats,
-): number {
-  if (stat.defense !== null) {
-    return computeDefenseScore(
-      {
-        sacks: stat.defense.sacks,
-        int: stat.defense.interceptions,
-        fumbles_rec: stat.defense.fumblesRec,
-        def_td: stat.defense.defTd,
-        safeties: stat.defense.safeties,
-        pts_allowed: stat.defense.ptsAllowed,
-        yds_allowed: stat.defense.ydsAllowed,
-        pass_yds_allowed: stat.defense.passYdsAllowed,
-        rush_yds_allowed: stat.defense.rushYdsAllowed,
-      },
-      DEFAULT_DEFENSE_SCORING,
-      DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS,
-    );
-  }
-
-  if (stat.idpDefense !== null) {
-    return computeIDPScore(
-      {
-        solo_tkl: stat.idpDefense.soloTkl,
-        ast_tkl: stat.idpDefense.astTkl,
-        sacks:
-          stat.idpDefense.sacks !== null
-            ? parseFloat(stat.idpDefense.sacks)
-            : null,
-        int: stat.idpDefense.interceptions,
-        pd: stat.idpDefense.pd,
-        ff: stat.idpDefense.ff,
-        fr: stat.idpDefense.fr,
-        def_td: stat.idpDefense.defTd,
-        safeties: stat.idpDefense.safeties,
-      },
-      DEFAULT_IDP_SCORING,
-    );
-  }
-
-  // Offensive / kicking player — sum applicable stat groups from the combined view
-  let score = 0;
-  const o = stat.offense;
-
-  if (o !== null) {
-    if (o.passAtt !== null) {
-      score += computeScoring(
-        {
-          yds: o.passYds,
-          td: o.passTd,
-          int: o.interceptions,
-          sacked: o.sacked,
-        },
-        DEFAULT_PASSING_SCORING,
-      );
-    }
-
-    if (o.rushAtt !== null) {
-      score += computeScoring(
-        { yds: o.rushYds, td: o.rushTd, fumbles: o.rushFumbles },
-        DEFAULT_RUSHING_SCORING,
-      );
-    }
-
-    if (o.rec !== null) {
-      score += computeScoring(
-        { rec: o.rec, yds: o.recYds, td: o.recTd, fumbles: o.recFumbles },
-        DEFAULT_RECEIVING_SCORING,
-      );
-    }
-
-    if (o.fgm !== null) {
-      score += computeScoring(
-        { fgm: o.fgm, fg_50m: o.fg50m, xpm: o.xpm },
-        DEFAULT_KICKING_SCORING,
-      );
-    }
-  }
-
-  return score;
 }
 
 const baseHandler = async (event: SQSEvent): Promise<SQSBatchResponse> => {

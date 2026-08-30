@@ -1,3 +1,26 @@
+/**
+ * Resolve a league's football scoring settings from its active scoring
+ * profile (LS-9041, LS-9672).
+ *
+ * Falls back to the hardcoded defaults for any stat group or stat with no
+ * profile and no override entry, so a league that has never touched its
+ * scoring settings scores exactly as it did before league profiles existed.
+ *
+ * ## Why this lives behind `@legacy-sports/scoring/server`
+ *
+ * It needs db-client's query helpers, which are Node-only (their config
+ * reaches for `fs.readFileSync`). `lib/scoring`'s main entry is bundled into
+ * the web and mobile apps, and importing db-client's runtime from there broke
+ * the Vite build during LS-9041 ("readFileSync is not exported by
+ * __vite-browser-external"). The `/server` subpath keeps the query side out
+ * of the browser graph while letting every server-side scoring entry point —
+ * the `matchupScores` breakdown resolver and the stats lambda that writes the
+ * authoritative matchup score — resolve multipliers through the *same*
+ * function. Before LS-9672 the stats lambda resolved nothing at all and
+ * scored every football matchup from the platform defaults, silently ignoring
+ * whatever the commissioner had configured.
+ */
+
 import {
   getActiveScoringProfileForLeague,
   getScoringPositionBonusesForProfile,
@@ -7,39 +30,12 @@ import {
   type PublicDb,
   type ScoringStatDefinition,
 } from '@legacy-sports/db-client';
+import { getDefaultFootballScoringSettings } from '../football/DefaultScoring';
+import type { FootballScoringSettings } from '../football/ScoringSettings';
 import {
-  type DefensePointsAllowedBands,
-  type FootballScoringSettings,
-  getDefaultFootballScoringSettings,
-} from '@legacy-sports/scoring';
-
-/**
- * Maps a `defense_pts_band_*` stat definition's `source_column` to the
- * corresponding key in `DefensePointsAllowedBands` — the two use slightly
- * different naming (`pts_band_35plus` vs. `pts_35_plus`) because the DB
- * column names were seeded independently of the scoring-lib band type.
- */
-const DEFENSE_BAND_COLUMN_TO_BAND_KEY: Record<
-  string,
-  keyof DefensePointsAllowedBands
-> = {
-  pts_band_0: 'pts_0',
-  pts_band_1_6: 'pts_1_6',
-  pts_band_7_13: 'pts_7_13',
-  pts_band_14_17: 'pts_14_17',
-  pts_band_18_27: 'pts_18_27',
-  pts_band_28_34: 'pts_28_34',
-  pts_band_35plus: 'pts_35_plus',
-};
-
-const FOOTBALL_SCORING_GROUPS = new Set<ScoringStatDefinition['statGroup']>([
-  'passing',
-  'rushing',
-  'receiving',
-  'kicking',
-  'defense',
-  'idp',
-]);
+  type FootballScoringStatGroup,
+  resolveFootballScoringTarget,
+} from '../football/StatDefinitionMapping';
 
 /**
  * Stat groups eligible for a position-scoped bonus (LS-9104). Excludes
@@ -55,22 +51,6 @@ const BONUS_ELIGIBLE_GROUPS = new Set<ScoringStatDefinition['statGroup']>([
   'idp',
 ]);
 
-/**
- * Build a league's football scoring settings from its active scoring
- * profile, falling back to the hardcoded defaults for any stat group/stat
- * with no profile or no override entry (LS-9041). Mirrors the merge
- * semantics of `getScoringMultipliersForLeague` (override > default,
- * disabled entries excluded) but returns the strongly-typed
- * `FootballScoringSettings` shape the football scoring functions consume,
- * including the DST points-allowed bands (which have no baseball
- * equivalent).
- *
- * Lives in lambdas/db (server-only) rather than lib/scoring: lib/scoring is
- * bundled into the web/mobile apps, and a runtime import of db-client's
- * query helpers here would drag db-client's Node-only config (e.g.
- * fs.readFileSync) into the browser bundle (LS-9041 build-break — Vite
- * failed on "readFileSync is not exported by __vite-browser-external").
- */
 export async function getFootballScoringSettingsForLeague(
   db: PublicDb,
   leagueId: number,
@@ -95,7 +75,10 @@ export async function getFootballScoringSettingsForLeague(
     definitions.map((definition) => [definition.id, definition]),
   );
 
-  const flatGroups: Record<string, Partial<Record<string, number>>> = {
+  const flatGroups: Record<
+    FootballScoringStatGroup,
+    Partial<Record<string, number>>
+  > = {
     passing: settings.passing,
     rushing: settings.rushing,
     receiving: settings.receiving,
@@ -105,7 +88,16 @@ export async function getFootballScoringSettingsForLeague(
   };
 
   for (const definition of definitions) {
-    if (!FOOTBALL_SCORING_GROUPS.has(definition.statGroup)) {
+    // Routes a football definition to either a flat multiplier or the
+    // separate `defenseBands` map, and returns null for baseball groups —
+    // `defense` in the DB spans both targets, so group name alone cannot
+    // tell them apart (LS-9672).
+    const target = resolveFootballScoringTarget(
+      definition.statGroup,
+      definition.sourceColumn,
+    );
+
+    if (!target) {
       continue;
     }
 
@@ -118,21 +110,21 @@ export async function getFootballScoringSettingsForLeague(
       ? null
       : (overrideMultiplier ?? normalizeNumeric(definition.defaultMultiplier));
 
-    if (definition.statGroup === 'defense') {
-      const bandKey = DEFENSE_BAND_COLUMN_TO_BAND_KEY[definition.sourceColumn];
-      if (bandKey) {
-        settings.defenseBands[bandKey] = resolvedMultiplier ?? 0;
-        continue;
-      }
+    if (target.kind === 'band') {
+      // A disabled band still has to resolve to a number: the band lookup is
+      // total (every points-allowed value lands in exactly one bracket), so
+      // there is no "absent" state the way there is for a flat multiplier.
+      settings.defenseBands[target.settingsKey] = resolvedMultiplier ?? 0;
+      continue;
     }
 
-    const group = flatGroups[definition.statGroup];
+    const group = flatGroups[target.group];
     if (resolvedMultiplier === null) {
       // Disabled stat — remove any default so it contributes 0, matching
       // getScoringMultipliersForLeague's "disabled stats don't score" rule.
-      delete group[definition.sourceColumn];
+      delete group[target.settingsKey];
     } else {
-      group[definition.sourceColumn] = resolvedMultiplier;
+      group[target.settingsKey] = resolvedMultiplier;
     }
   }
 

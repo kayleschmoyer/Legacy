@@ -51,6 +51,7 @@
       "@legacy-sports/rollbar/web": ["lib/rollbar/src/web.ts"],
       "@legacy-sports/scheduling": ["lib/scheduling/src/index.ts"],
       "@legacy-sports/scoring": ["lib/scoring/src/index.ts"],
+      "@legacy-sports/scoring/server": ["lib/scoring/src/server.ts"],
       "@legacy-sports/shared-components": [
         "lib/shared-components/src/index.ts"
       ],

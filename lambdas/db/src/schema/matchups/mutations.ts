@@ -29,7 +29,7 @@ import {
   MatchupStatus,
 } from './types';
 import { getFootballPlayerSeasonAverage } from './football-season-projection';
-import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
+import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import { computeFootballGamePoints } from './matchupScores';
 import { builder, Context } from '../builder';
 import {

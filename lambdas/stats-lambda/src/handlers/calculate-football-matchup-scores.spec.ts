@@ -32,21 +32,33 @@ jest.mock('@legacy-sports/db-client', () => ({
   updateMatchupScore: (...args: unknown[]): unknown =>
     mockUpdateMatchupScore(...args),
   PublicSchema: {
-    matchupPlayers: { id: 'id', matchupId: 'matchupId', teamId: 'teamId' },
+    matchupPlayers: {
+      id: 'id',
+      matchupId: 'matchupId',
+      teamId: 'teamId',
+      positionId: 'positionId',
+    },
+    leaguePosition: { id: 'id', positionType: 'positionType' },
   },
 }));
 
+// Scoring itself is exercised by calculate-football-matchup-scores.scoring.spec.ts
+// against the real implementations; this suite is about SQS plumbing.
 jest.mock('@legacy-sports/scoring', () => ({
-  computeDefenseScore: jest.fn(() => 0),
-  computeIDPScore: jest.fn(() => 0),
-  computeScoring: jest.fn(() => 0),
-  DEFAULT_DEFENSE_POINTS_ALLOWED_BANDS: [],
-  DEFAULT_DEFENSE_SCORING: {},
-  DEFAULT_IDP_SCORING: {},
-  DEFAULT_KICKING_SCORING: {},
-  DEFAULT_PASSING_SCORING: {},
-  DEFAULT_RECEIVING_SCORING: {},
-  DEFAULT_RUSHING_SCORING: {},
+  computeFootballPlayerGamePoints: jest.fn(() => 0),
+}));
+
+jest.mock('@legacy-sports/scoring/server', () => ({
+  getFootballScoringSettingsForLeague: jest.fn(() => ({
+    passing: {},
+    rushing: {},
+    receiving: {},
+    kicking: {},
+    defense: {},
+    defenseBands: {},
+    idp: {},
+    positionBonuses: {},
+  })),
 }));
 
 const mockEmitSuccess = jest.fn();
@@ -107,6 +119,7 @@ const mockDb = {
   query: { matchups: { findFirst: jest.fn() } },
   select: jest.fn().mockReturnThis(),
   from: jest.fn().mockReturnThis(),
+  leftJoin: jest.fn().mockReturnThis(),
   where: jest.fn().mockReturnValue([]),
 };
 
@@ -147,6 +160,7 @@ describe('calculate-football-matchup-scores handler', () => {
     );
     mockDb.query.matchups.findFirst.mockResolvedValue({
       id: 7,
+      leagueId: 42,
       team1Id: 1,
       team2Id: 2,
       team1Score: null,
@@ -192,6 +206,7 @@ describe('calculate-football-matchup-scores handler', () => {
     mockDb.query.matchups.findFirst
       .mockResolvedValueOnce({
         id: 7,
+        leagueId: 42,
         team1Id: 1,
         team2Id: 2,
         team1Score: null,

@@ -99,13 +99,13 @@ jest.mock('@legacy-sports/db-client', () => ({
   getMatchupFootballPlayerGameStats: jest.fn(),
 }));
 
-jest.mock('./football-scoring-settings', () => ({
+jest.mock('@legacy-sports/scoring/server', () => ({
   getFootballScoringSettingsForLeague: jest.fn(),
 }));
 
 import { getMatchupFootballPlayerGameStats } from '@legacy-sports/db-client';
 import { getDefaultFootballScoringSettings } from '@legacy-sports/scoring';
-import { getFootballScoringSettingsForLeague } from './football-scoring-settings';
+import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import {
   resolveBaseballMatchupScores,
   resolveFootballMatchupScores,
