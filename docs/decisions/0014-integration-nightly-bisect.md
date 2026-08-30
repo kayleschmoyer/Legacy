@@ -80,7 +80,27 @@ running the expensive suite more often.
 
 ### Bisect runbook
 
-When a nightly integration run fails on `main`:
+When a nightly integration run fails on `main`, the **primary method is a
+direct query against the E2E test-result ledger**
+([testing § E2E Ledger](../../.agents/skills/testing/references/e2e-ledger.md),
+LS-9757: an S3-backed record of every executed test's pass/fail/flaky
+outcome per SHA, populated from both PR CI and nightly runs). Querying the
+ledger for the failing spec(s) returns their full historical timeline and
+identifies the introducing commit directly, without enumerating every merge
+in the window:
+
+```bash
+node .github/scripts/e2e-ledger/query-e2e-ledger.mjs --spec <failing-spec-path> --json
+```
+
+Returns `{ spec, records: [...] }`, each record shaped
+`{sha, prNumber, timestamp, spec, testName, status, retryCount,
+relatedToDiff}`, oldest to newest. The first `failed`/`flaky` record after a
+run of `passed` records is the introducing commit. Requires AWS credentials
+with read access to `legacy-sports-dev-ci-artifacts` in the environment.
+
+**Fallback — manual merge-log bisection** (kept for when the ledger has no
+data for a spec, e.g. a brand-new spec with no history yet):
 
 1. Find the last green nightly's commit SHA (`ci_list_runs` on
    `run-playwright-tests.yml`, or the run list in the Actions UI) and the
@@ -119,7 +139,8 @@ When a nightly integration run fails on `main`:
   merge/branch-deletion — accepted by design; the LS-7876/#5023 incident is
   the canonical example. Mitigation is procedural (confirm completion before
   merging when the result matters), not mechanical.
-- Attribution is manual (the bisect runbook) instead of automatic.
+- Attribution is ledger-assisted (see the 2026-08-30 amendment below) with a
+  manual fallback, instead of fully automatic.
 
 ### Now constrained
 
@@ -146,3 +167,16 @@ of merges collapse into one run), strictly cheaper on idle days (no merges →
 no run → nothing new to regress), and the ~24h regression window is
 preserved. The term "nightly" is retained throughout the docs and tooling to
 mean this automated full-suite run.
+
+## Amendment (2026-08-30): bisect runbook is now ledger-assisted (LS-9757 / LS-9758)
+
+The manual `git log --first-parent` + surface-map bisect runbook above is
+**not replaced** — it is kept as the documented fallback — but is no longer
+the first step. LS-9757 added a durable, queryable S3 ledger of every
+executed E2E test's pass/fail/flaky outcome per SHA
+([testing § E2E Ledger](../../.agents/skills/testing/references/e2e-ledger.md)),
+and LS-9758 wired a direct ledger query in as the **primary** bisect method
+(see the updated runbook above): querying a failing spec's history now
+identifies its introducing commit by direct lookup, without enumerating
+every merge in the window. The manual runbook remains the fallback for a
+spec with no ledger history yet (e.g. a brand-new spec).

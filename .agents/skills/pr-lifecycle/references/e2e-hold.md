@@ -28,7 +28,15 @@ There is **no standing E2E-on-main signal** — hermetic E2E runs only on PR bra
    - On **`origin/main`**: stash your diff (`worktree_stash`) or run in a clean checkout of `origin/main`.
    - **Fails on `origin/main` too → pre-existing. Enter Phase B.**
    - **Passes on `origin/main`, fails on your branch → it is yours**, no matter how unrelated it looks. Fix it normally ([e2e-determinism](../../testing/references/e2e-determinism.md)).
-5. **Optional: identify the first bad main commit** (strengthens the ticket, not required to hold): walk recent merges to main (`worktree_log`) and bisect locally against the failing spec.
+5. **Identify the first bad main commit** (strengthens the ticket, not required to hold): query the **E2E test-result ledger** ([testing § E2E Ledger](../../testing/references/e2e-ledger.md), LS-9757) for the failing spec first — it returns the spec's full pass/fail/flaky timeline across SHAs directly, replacing manual cross-referencing of PR run IDs (the LS-9695 investigation is the worked example of what that manual archaeology looked like before the ledger existed).
+
+   ```bash
+   node .github/scripts/e2e-ledger/query-e2e-ledger.mjs --spec <spec-path> --json
+   ```
+
+   Returns `{ spec, records: [...] }`, each record shaped `{sha, prNumber, timestamp, spec, testName, status, retryCount, relatedToDiff}`, ordered oldest to newest; the first `failed`/`flaky` record after a run of `passed` records is the introducing commit. Requires AWS credentials with read access to `legacy-sports-dev-ci-artifacts` in the environment. If the ledger has no data for this spec (e.g. a brand-new spec with no history), fall back to the manual method: walk recent merges to main (`worktree_log`) and bisect locally against the failing spec.
+
+   Once the ledger confirms the introducing commit, cite it directly in the blocker ticket body (Phase B step 2) instead of the manual bisection notes.
 
 ## Phase B: Find-or-create the blocker ticket
 

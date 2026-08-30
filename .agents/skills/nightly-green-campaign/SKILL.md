@@ -97,9 +97,15 @@ ci_search_logs(runId: <run_id>, pattern: "HTTP 429", contextBefore: 5, contextAf
 
 ### Phase 4 — Bisect the day's merges (ADR-0014 duty)
 
-Full runbook home: [ADR-0014 § Bisect runbook](../../../docs/decisions/0014-integration-nightly-bisect.md#bisect-runbook). Compact form:
+Full runbook home: [ADR-0014 § Bisect runbook](../../../docs/decisions/0014-integration-nightly-bisect.md#bisect-runbook), which documents the **ledger query ([testing § E2E Ledger](../testing/references/e2e-ledger.md), LS-9757) as the primary method** and the manual `git log --first-parent` walk as the fallback for when the ledger lacks data. Primary method:
 
-> **A durable per-test S3 ledger now exists** ([testing § E2E Ledger](../testing/references/e2e-ledger.md), LS-9757) — `node .github/scripts/e2e-ledger/query-e2e-ledger.mjs --spec <spec>` returns a spec's full pass/fail/flaky timeline by direct lookup. It is not yet wired into this phase (LS-9758, follow-up); the manual `git log` + surface-map procedure below is still the current bisect path.
+```bash
+node .github/scripts/e2e-ledger/query-e2e-ledger.mjs --spec <failing-spec-path> --json
+```
+
+Returns `{ spec, records: [...] }`, each record shaped `{sha, prNumber, timestamp, spec, testName, status, retryCount, relatedToDiff}`, oldest to newest. The first `failed`/`flaky` record after a run of `passed` records is the introducing commit — no need to enumerate every merge in the window. Requires AWS credentials with read access to `legacy-sports-dev-ci-artifacts` in the environment.
+
+Fall back to the manual runbook only when the ledger has no data for the failing spec (e.g. a brand-new spec with no history yet):
 
 ```bash
 git log --first-parent --oneline <last-green-nightly-sha>..<failing-nightly-sha>
@@ -177,3 +183,4 @@ Created 2026-07-02 from the skills audit (`scratch/skills-audit/synthesis.json`,
 - Regression-search mandate: `git show 1b5b610 --stat` and testing SKILL Critical Rule 3
 - Flag-seeding failure share (19/22 at time of writing): failure table in `.agents/skills/testing/references/ci-failure-prevention.md`
 - Open tickets LS-4356 / LS-4357: check Jira before citing as still OPEN
+- Ledger query tool (LS-9757/LS-9758): the `query-e2e-ledger.mjs` invocation in Phase 4 is verified against the shipped tool (PR #7413) — re-verify against [testing § E2E Ledger](../testing/references/e2e-ledger.md) and the script itself if its interface changes
