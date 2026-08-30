@@ -683,11 +683,13 @@ export function LeagueDetailPage(): React.JSX.Element {
     }
   }, [leagueId, reduxLeagueTeams.length, getLeagueTeams, dispatch]);
 
-  // Fetch playoff bracket for the standings tab
+  // Eagerly fetch the playoff bracket (needed for the standings tab) instead
+  // of gating on activeTab — waiting for the tab switch meant first paint of
+  // Standings always ate a full request RTT (LS-6343).
   const { data: bracketData, loading: bracketLoading } =
     useGetPlayoffBracketQuery({
       variables: { leagueId },
-      skip: isNaN(leagueId) || activeTab !== 'standings',
+      skip: isNaN(leagueId) || !data?.league?.playoffEnabled,
     });
 
   // ── WebSocket: listen for draft lifecycle events ──
