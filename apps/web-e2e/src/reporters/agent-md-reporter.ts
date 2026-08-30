@@ -36,6 +36,26 @@ interface Options {
    * the workflow, not here.
    */
   flakyJsonFile?: string;
+  /**
+   * Optional machine-readable per-test ledger output (LS-9757). When set,
+   * the reporter writes a JSON file listing every *executed* test (passed,
+   * failed, or flaky — skipped tests are excluded, they were never run)
+   * with its outcome and retry count. This is the raw, run-context-free
+   * half of an S3 ledger record; a workflow step enriches each entry with
+   * `sha`/`timestamp`/`prNumber`/`relatedToDiff` (context this reporter
+   * doesn't have) and writes it to S3. See
+   * `.github/scripts/e2e-ledger/build-ledger-records.mjs`.
+   */
+  ledgerJsonFile?: string;
+}
+
+/** Raw per-test record, before the workflow-level enrichment step adds
+ * sha/timestamp/prNumber/relatedToDiff (LS-9757). */
+interface LedgerEntry {
+  spec: string;
+  testName: string;
+  status: 'passed' | 'failed' | 'flaky';
+  retryCount: number;
 }
 
 interface FlakyEntry {
@@ -91,12 +111,14 @@ function describeTitle(test: TestCase): string {
 export default class AgentMarkdownReporter implements Reporter {
   private readonly outputFile: string;
   private readonly flakyJsonFile?: string;
+  private readonly ledgerJsonFile?: string;
   private rootDir = process.cwd();
   private suiteRoot?: Suite;
 
   constructor(options: Options = {}) {
     this.outputFile = options.outputFile ?? 'test-results/summary.md';
     this.flakyJsonFile = options.flakyJsonFile;
+    this.ledgerJsonFile = options.ledgerJsonFile;
   }
 
   onBegin(config: FullConfig, suite: Suite): void {
@@ -115,6 +137,7 @@ export default class AgentMarkdownReporter implements Reporter {
     const flakyTitles: string[] = [];
     const flakyEntries: FlakyEntry[] = [];
     const skips: Array<{ title: string; reason: string | null }> = [];
+    const ledgerEntries: LedgerEntry[] = [];
 
     for (const test of tests) {
       const outcome = test.outcome();
@@ -122,8 +145,15 @@ export default class AgentMarkdownReporter implements Reporter {
       // describe-path + test title, excluding project/file suites, to match
       // report.json's `path` (the MCP renderReportAsMarkdown layout).
       const title = describeTitle(test);
+      const retryCount = Math.max(0, test.results.length - 1);
       if (outcome === 'expected') {
         passed++;
+        ledgerEntries.push({
+          spec: file,
+          testName: title,
+          status: 'passed',
+          retryCount,
+        });
       } else if (outcome === 'unexpected') {
         failed++;
         const errored = [...test.results]
@@ -137,10 +167,22 @@ export default class AgentMarkdownReporter implements Reporter {
           error: err?.message ?? null,
           snippet: err?.snippet ?? null,
         });
+        ledgerEntries.push({
+          spec: file,
+          testName: title,
+          status: 'failed',
+          retryCount,
+        });
       } else if (outcome === 'flaky') {
         flaky++;
         flakyTitles.push(`${file} › ${title}`);
         flakyEntries.push({ file, title });
+        ledgerEntries.push({
+          spec: file,
+          testName: title,
+          status: 'flaky',
+          retryCount,
+        });
       } else {
         skipped++;
         const ann = test.annotations.find(
@@ -230,6 +272,20 @@ export default class AgentMarkdownReporter implements Reporter {
       writeFileSync(
         flakyDest,
         `${JSON.stringify({ total, flaky: flakyEntries }, null, 2)}\n`,
+        'utf-8',
+      );
+    }
+
+    if (this.ledgerJsonFile) {
+      // Raw per-test records for the E2E ledger (LS-9757): machine-read by
+      // the workflow-level enrichment step, not rendered as Markdown.
+      const ledgerDest = isAbsolute(this.ledgerJsonFile)
+        ? this.ledgerJsonFile
+        : resolve(this.rootDir, this.ledgerJsonFile);
+      mkdirSync(dirname(ledgerDest), { recursive: true });
+      writeFileSync(
+        ledgerDest,
+        `${JSON.stringify({ entries: ledgerEntries }, null, 2)}\n`,
         'utf-8',
       );
     }

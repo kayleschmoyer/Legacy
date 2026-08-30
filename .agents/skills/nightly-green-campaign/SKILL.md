@@ -99,6 +99,8 @@ ci_search_logs(runId: <run_id>, pattern: "HTTP 429", contextBefore: 5, contextAf
 
 Full runbook home: [ADR-0014 § Bisect runbook](../../../docs/decisions/0014-integration-nightly-bisect.md#bisect-runbook). Compact form:
 
+> **A durable per-test S3 ledger now exists** ([testing § E2E Ledger](../testing/references/e2e-ledger.md), LS-9757) — `node .github/scripts/e2e-ledger/query-e2e-ledger.mjs --spec <spec>` returns a spec's full pass/fail/flaky timeline by direct lookup. It is not yet wired into this phase (LS-9758, follow-up); the manual `git log` + surface-map procedure below is still the current bisect path.
+
 ```bash
 git log --first-parent --oneline <last-green-nightly-sha>..<failing-nightly-sha>
 ```

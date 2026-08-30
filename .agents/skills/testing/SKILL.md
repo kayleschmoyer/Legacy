@@ -337,6 +337,7 @@ Once 3 consecutive nightly runs hit 0 failures / 0 flakies, the maintenance poli
 - [Shutdown Hygiene](references/shutdown-hygiene.md) -- stale process detection and cleanup
 - [Test Tagging Guide](references/test-tagging-guide.md) -- tag decision guide with examples
 - [0/0 Nightly Maintenance Policy](references/zero-zero-maintenance-policy.md) -- rules for maintaining 0 failures / 0 flakies once achieved
+- [E2E Ledger](references/e2e-ledger.md) -- durable per-test S3 record (PR CI + nightly) for bisecting a regression to its introducing commit; how it's written, stored, and queried
 
 ## Integration Reference Files
 

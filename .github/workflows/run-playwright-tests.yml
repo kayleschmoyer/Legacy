@@ -989,6 +989,7 @@ jobs:
           # merge-reports fails with "Cannot find module" (LS-7928).
           sparse-checkout: |
             .github/actions/s3-artifact
+            .github/scripts/e2e-ledger
             scripts/rewrite-pw-attachment-paths.py
             apps/web-e2e/src/reporters/agent-md-reporter.ts
           sparse-checkout-cone-mode: false
@@ -1033,10 +1034,13 @@ jobs:
             # nightly's retries=2 keeps the run green while the same spec later
             # blocks PR CI at retries=0) as machine-readable input for the
             # file-flaky-tickets job below.
+            # ledgerJsonFile (LS-9757) additionally captures every executed
+            # test (passed/failed/flaky) as machine-readable input for the
+            # E2E ledger write step below.
             {
               printf '%s' 'module.exports = { testDir: "apps/web-e2e/src", reporter: ['
               printf '%s' '["html"], ["json", { outputFile: "test-results.json" }], '
-              printf '%s\n' '["./apps/web-e2e/src/reporters/agent-md-reporter.ts", { outputFile: "summary.md", flakyJsonFile: "flaky-tests.json" }]] };'
+              printf '%s\n' '["./apps/web-e2e/src/reporters/agent-md-reporter.ts", { outputFile: "summary.md", flakyJsonFile: "flaky-tests.json", ledgerJsonFile: "e2e-ledger.json" }]] };'
             } > playwright.merge.config.js
             pnpm dlx playwright@1.58.2 merge-reports -c playwright.merge.config.js ./all-blob-reports
 
@@ -1049,6 +1053,49 @@ jobs:
             echo "has-report=false" >> $GITHUB_OUTPUT
             echo "has-flaky=false" >> $GITHUB_OUTPUT
             echo "No blob reports found — skipping deploy"
+          fi
+
+      # E2E ledger (LS-9757): persist one record per executed test to S3, same
+      # as the PR-CI write in ci-pipeline.yml's "Deploy Playwright Report"
+      # job. No PR/diff context exists on a nightly/full-suite run, so
+      # prNumber and relatedToDiff are always null here — see
+      # build-ledger-records.mjs. Fail-open: an S3 write error must never
+      # fail this (already informational) job.
+      - name: "Build E2E Ledger Records"
+        id: build-ledger
+        if: ${{ !cancelled() && steps.merge.outputs.has-report == 'true' }}
+        continue-on-error: true
+        run: |
+          node .github/scripts/e2e-ledger/build-ledger-records.mjs \
+            --ledger-json e2e-ledger.json \
+            --sha "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --out-dir /tmp/e2e-ledger-staging \
+            || echo "::warning::E2E ledger record build failed — no ledger data this run (fail-open)"
+
+      # Deliberately not the `s3-artifact` composite action: see the matching
+      # step in ci-pipeline.yml for why the ledger needs a spec-first S3 key
+      # layout instead of that action's ci-artifacts/${GITHUB_SHA}/<name>
+      # template.
+      - name: "Configure AWS Credentials (E2E ledger)"
+        if: ${{ !cancelled() && steps.build-ledger.outcome == 'success' }}
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: "arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts"
+          aws-region: us-east-1
+
+      - name: "Sync E2E Ledger to S3 (spec-first layout)"
+        if: ${{ !cancelled() && steps.build-ledger.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          if [ -d /tmp/e2e-ledger-staging/spec ]; then
+            aws s3 sync /tmp/e2e-ledger-staging/spec \
+              s3://legacy-sports-dev-ci-artifacts/e2e-ledger/v1/spec \
+              --quiet \
+              || echo "::warning::E2E ledger S3 sync failed — no ledger data this run (fail-open)"
+          else
+            echo "No E2E ledger records staged — skipping S3 sync"
           fi
 
       - name: "Rewrite Attachment Paths in test-results.json"

@@ -1056,7 +1056,7 @@ jobs:
   # ============================================================================
   deploy-playwright-report:
     name: "Deploy Playwright Report"
-    needs: [e2e, e2e-mobile]
+    needs: [detect-changes, e2e, e2e-mobile]
     # Each deploy workflow pushes to a unique subdirectory of the gh-pages branch
     # on bkrupa/legacy-sports-deploys. Push conflicts are handled by the retry-
     # with-rebase loop in the deploy step below. A shared concurrency group is
@@ -1121,12 +1121,74 @@ jobs:
           # small file instead of inflating the embedded report.json. A merge
           # config (rather than --reporter) is required to register the custom
           # reporter; testDir points at the common parent of the e2e/integration
-          # specs so mixed-testDir blobs merge cleanly.
+          # specs so mixed-testDir blobs merge cleanly. ledgerJsonFile (LS-9757)
+          # additionally captures every executed test (passed/failed/flaky) as
+          # machine-readable input for the E2E ledger write step below.
           {
             printf '%s' 'module.exports = { testDir: "apps/web-e2e/src", reporter: ['
-            printf '%s\n' '["html"], ["./apps/web-e2e/src/reporters/agent-md-reporter.ts", { outputFile: "summary.md" }]] };'
+            printf '%s\n' '["html"], ["./apps/web-e2e/src/reporters/agent-md-reporter.ts", { outputFile: "summary.md", ledgerJsonFile: "e2e-ledger.json" }]] };'
           } > playwright.merge.config.js
           pnpm dlx playwright@1.58.2 merge-reports -c playwright.merge.config.js ./all-blob-reports
+
+      # E2E ledger (LS-9757): persist one record per executed test to S3 so a
+      # future regression can be bisected by direct lookup instead of manual
+      # archaeology through PR comments and pruned nightly reports. Reuses the
+      # per-test entries the reporter above already collected while parsing
+      # the merged Playwright JSON results (same parsing step that feeds
+      # flaky-tickets filing on the nightly side) and enriches them with this
+      # PR's sha/PR-number/relatedToDiff. relatedToDiff comes from the SAME
+      # e2e-select output (detect-changes job) that decided which specs to
+      # run for this PR. Deliberately fail-open (same posture as e2e-select
+      # itself) — a ledger-write error must never fail the required e2e-
+      # affected check.
+      - name: "Build E2E Ledger Records"
+        id: build-ledger
+        if: ${{ !cancelled() && steps.check-reports.outputs.has-reports == 'true' }}
+        continue-on-error: true
+        env:
+          E2E_RUN_ALL: ${{ needs.detect-changes.outputs.e2e-affected-run-all }}
+          E2E_AFFECTED_SPECS: ${{ needs.detect-changes.outputs.e2e-affected-specs }}
+        run: |
+          set -uo pipefail
+          printf '%s\n' "$E2E_AFFECTED_SPECS" > /tmp/e2e-affected-specs.txt
+          RUN_ALL_FLAG=""
+          [ "$E2E_RUN_ALL" = "true" ] && RUN_ALL_FLAG="--run-all"
+          node .github/scripts/e2e-ledger/build-ledger-records.mjs \
+            --ledger-json e2e-ledger.json \
+            --sha "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --out-dir /tmp/e2e-ledger-staging \
+            --pr-number "${{ github.event.pull_request.number }}" \
+            --affected-specs-file /tmp/e2e-affected-specs.txt \
+            $RUN_ALL_FLAG \
+            || echo "::warning::E2E ledger record build failed — no ledger data this run (fail-open, does not block the PR)"
+
+      # Deliberately not the `s3-artifact` composite action: that action
+      # keys uploads as ci-artifacts/${GITHUB_SHA}/<name> with `--delete`
+      # sync semantics, which fits a one-shot-per-run artifact but not an
+      # accumulating, spec-first ledger. This step reuses the same OIDC
+      # role/bucket/`aws s3 sync` mechanics against the spec-first prefix
+      # build-ledger-records.mjs already staged locally.
+      - name: "Configure AWS Credentials (E2E ledger)"
+        if: ${{ !cancelled() && steps.build-ledger.outcome == 'success' }}
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        with:
+          role-to-assume: "arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts"
+          aws-region: us-east-1
+
+      - name: "Sync E2E Ledger to S3 (spec-first layout)"
+        if: ${{ !cancelled() && steps.build-ledger.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          if [ -d /tmp/e2e-ledger-staging/spec ]; then
+            aws s3 sync /tmp/e2e-ledger-staging/spec \
+              s3://legacy-sports-dev-ci-artifacts/e2e-ledger/v1/spec \
+              --quiet \
+              || echo "::warning::E2E ledger S3 sync failed — no ledger data this run (fail-open, does not block the PR)"
+          else
+            echo "No E2E ledger records staged — skipping S3 sync"
+          fi
 
       - name: "Generate App Token"
         id: app-token
