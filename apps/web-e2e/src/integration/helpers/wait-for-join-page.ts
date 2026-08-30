@@ -1,7 +1,7 @@
 import type { Page, Response } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { awsRequestContext } from './graphql';
-import { gqlFetchEnvelope } from './gql-fetch';
+import { gqlFetch, gqlFetchEnvelope } from './gql-fetch';
 
 /**
  * Run `validateInviteCode` once and decide what to do next:
@@ -486,6 +486,35 @@ export async function joinLeagueAsManager(
     new RegExp(`/baseball/league/${leagueId}(?:[/?#]|$)`),
     { timeout: urlRedirectTimeoutMs },
   );
+
+  // Write→read visibility tax (antipattern #3, LS-4350): joinLeagueByCode
+  // returning success does not guarantee the read path (used by every other
+  // page/user that queries this league — e.g. the commissioner's overview
+  // page checking team rosters) has caught up yet. Poll userTeamId with this
+  // manager's own JWT until the membership is visible before handing control
+  // back to the caller, so every downstream phase can trust the invariant
+  // instead of re-discovering the race independently. Callback returns null
+  // on error so expect.poll retries on assertion failure rather than
+  // throwing (antipattern #1).
+  await expect
+    .poll(
+      async () => {
+        const data = await gqlFetch<{ userTeamId: number | null }>(
+          jwt,
+          `query GetUserTeamIdAfterJoin($leagueId: Int!) { userTeamId(leagueId: $leagueId) }`,
+          { leagueId },
+        ).catch(() => null);
+        return data?.userTeamId ?? null;
+      },
+      {
+        timeout: 30_000,
+        message:
+          `joinLeagueByCode("${inviteCode}", "${teamName}") succeeded but ` +
+          `userTeamId was not visible on the read path within 30s for ` +
+          `league ${leagueId}`,
+      },
+    )
+    .not.toBeNull();
 
   return leagueId;
 }

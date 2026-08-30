@@ -823,9 +823,36 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
   // -------------------------------------------------------------------------
 
   test('Phase 5: Free agency & waivers', async ({ api, apiCommissioner }) => {
+    // Phase 2's draft (2.13 in particular) fills every roster slot on every
+    // team before the backend reports draftStatus 'completed' -- a
+    // prerequisite for free-agent claims. That drains most or all of the
+    // player pool `state.availablePlayers` was snapshotted from back in
+    // step 2.3, before any drafting happened. Indexing into that stale
+    // snapshot here picks players who may since have been drafted onto a
+    // roster in this same league, which the backend correctly rejects with
+    // "This player is already on a roster in this league". Fetch the
+    // league-scoped `freeAgents` list fresh, right before claiming, so the
+    // players picked are guaranteed actually undrafted at claim time --
+    // mirroring the same freeAgents(leagueId) pattern already used by
+    // waiver-processing-ui.integration.spec.ts.
+    let freeAgentPool: Array<{ id: number }> = [];
+    await test.step('5.0 Fetch current free agents', async () => {
+      const data = await graphqlOk<{
+        freeAgents: Array<{ id: number }>;
+      }>(
+        api,
+        `query GetFreeAgents($leagueId: Int!) {
+           freeAgents(leagueId: $leagueId) { id }
+         }`,
+        { leagueId: state.leagueId },
+      );
+      freeAgentPool = data.freeAgents;
+      // 5.1 and 5.3 each claim one, so at least 2 are required.
+      expect(freeAgentPool.length).toBeGreaterThanOrEqual(2);
+    });
+
     await test.step('5.1 Claim free agent', async () => {
-      const faPlayer =
-        state.availablePlayers[state.availablePlayers.length - 1];
+      const faPlayer = freeAgentPool[freeAgentPool.length - 1];
       const dropPlayer = state.team1Roster[state.team1Roster.length - 1];
 
       const data = await graphqlOk<{
@@ -861,8 +888,7 @@ test.describe.serial('Full Season Lifecycle @integration @critical', () => {
     });
 
     await test.step('5.3 Re-claim a different free agent', async () => {
-      const faPlayer =
-        state.availablePlayers[state.availablePlayers.length - 2];
+      const faPlayer = freeAgentPool[freeAgentPool.length - 2];
       const dropPlayer = state.team1Roster[state.team1Roster.length - 1];
 
       const data = await graphqlOk<{

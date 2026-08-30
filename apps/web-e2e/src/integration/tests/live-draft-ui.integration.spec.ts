@@ -313,13 +313,27 @@ test.describe
       page.on('websocket', (ws) => {
         ws.on('framereceived', (frame) => {
           try {
+            // The server wraps every push in an outer envelope —
+            // `{ type: 'notification', data: { type: 'DRAFT_PICK_MADE', ... } }`
+            // (see WebSocketNotificationService.broadcast) — so the frame's
+            // top-level `type` is always the literal string 'notification',
+            // never the actual notification kind. That lives one level down
+            // at `data.type`. Reading the outer field made this canary check
+            // `f.type === 'DRAFT_PICK_MADE'` against a value that could never
+            // equal it, hard-failing every run regardless of whether the WS
+            // stack was actually delivering picks.
             const payload = JSON.parse(String(frame.payload)) as {
               type?: string;
+              data?: { type?: string };
             };
-            if (payload?.type) {
+            const notificationType =
+              payload?.type === 'notification'
+                ? payload.data?.type
+                : payload?.type;
+            if (notificationType) {
               wsFrames.push({
                 label,
-                type: payload.type,
+                type: notificationType,
                 receivedAt: Date.now(),
               });
             }

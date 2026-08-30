@@ -109,13 +109,18 @@ async function proposeTradeViaUI(
     timeout: 10000,
   });
 
-  // Wait for player buttons to render (not just the always-present close button).
-  // Using .first() races against myPlayers loading — the X close button resolves
-  // immediately before data arrives. Poll until count > 1 (close + ≥1 player).
+  // Wait for player buttons to render (not just the always-present X close +
+  // ← Back buttons). Using .first() races against myPlayers loading — the
+  // X close button resolves immediately before data arrives. The 'offer'
+  // step always renders both the header X close AND a "← Back" button
+  // (trade-dialog-back-to-team) before any player data has loaded, so
+  // count > 1 can pass on that 2-button baseline alone — a bad-data poll
+  // (antipattern #5) that races ahead of myPlayers. Poll until count > 2,
+  // mirroring the 'request' step's threshold below.
   const dialogButtons = dialog.getByRole('button');
   await expect
     .poll(async () => dialogButtons.count(), { timeout: 15_000 })
-    .toBeGreaterThan(1);
+    .toBeGreaterThan(2);
   const dialogCount = await dialogButtons.count();
 
   // Click the first player button (skip navigation/step buttons)
@@ -668,10 +673,15 @@ test.describe
         timeout: 10000,
       });
       const offerBtns = counterDialog.getByRole('button');
-      // Same race as Phase 5: poll until count > 1 so player buttons are loaded.
+      // Same race as Phase 5 (proposeTradeViaUI): the 'offer' step always
+      // renders the header X close AND a "← Back" button before any player
+      // data has loaded, so count > 1 can pass on that 2-button baseline
+      // alone — a bad-data poll (antipattern #5) that races ahead of
+      // myPlayers. Poll until count > 2, mirroring the request-step
+      // threshold a few lines below.
       await expect
         .poll(async () => offerBtns.count(), { timeout: 15_000 })
-        .toBeGreaterThan(1);
+        .toBeGreaterThan(2);
       const offerCount = await offerBtns.count();
       let offerPlayerClicked = false;
       for (let i = 0; i < offerCount; i++) {
