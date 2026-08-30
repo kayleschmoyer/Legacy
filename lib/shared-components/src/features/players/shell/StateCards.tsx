@@ -119,9 +119,17 @@ function SkeletonBar({ width }: { width: number }) {
 
 export interface ErrorCardProps {
   onRetry?: () => void;
+  /** Overrides the default "Unable to load player stats" heading. */
+  title?: string;
+  /** Overrides the default archive-service explanation body copy. */
+  message?: string;
 }
 
-export function ErrorCard({ onRetry }: ErrorCardProps) {
+export function ErrorCard({
+  onRetry,
+  title = 'Unable to load player stats',
+  message = "We couldn't reach the archive service. Your filters are safe — we'll restore them when the connection returns.",
+}: ErrorCardProps) {
   return (
     <YStack
       testID="player-stats-error-card"
@@ -166,7 +174,7 @@ export function ErrorCard({ onRetry }: ErrorCardProps) {
           textAlign: 'center',
         })}
       >
-        Unable to load player stats
+        {title}
       </Text>
       <Text
         style={csp({
@@ -180,8 +188,7 @@ export function ErrorCard({ onRetry }: ErrorCardProps) {
           margin: 0,
         })}
       >
-        We couldn't reach the archive service. Your filters are safe — we'll
-        restore them when the connection returns.
+        {message}
       </Text>
       {onRetry && (
         <Pressable
@@ -219,9 +226,17 @@ export function ErrorCard({ onRetry }: ErrorCardProps) {
 
 export interface EmptyCardProps {
   onClear?: () => void;
+  /** Overrides the default "No players found" heading. */
+  title?: string;
+  /** Overrides the default filter-adjustment guidance body copy. */
+  message?: string;
 }
 
-export function EmptyCard({ onClear }: EmptyCardProps) {
+export function EmptyCard({
+  onClear,
+  title = 'No players found',
+  message = 'No players match the current filters. Try widening your search, relaxing a range, or clearing filters entirely.',
+}: EmptyCardProps) {
   return (
     <YStack
       testID="player-stats-empty-card"
@@ -265,7 +280,7 @@ export function EmptyCard({ onClear }: EmptyCardProps) {
           textAlign: 'center',
         })}
       >
-        No players found
+        {title}
       </Text>
       <Text
         style={csp({
@@ -279,8 +294,7 @@ export function EmptyCard({ onClear }: EmptyCardProps) {
           margin: 0,
         })}
       >
-        No players match the current filters. Try widening your search, relaxing
-        a range, or clearing filters entirely.
+        {message}
       </Text>
       {onClear && (
         <Pressable

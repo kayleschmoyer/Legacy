@@ -1,22 +1,15 @@
 /**
  * PitchingStatsDataGrid - Career Pitching Statistics Data Grid
  *
- * A comprehensive data grid component for displaying career pitching
- * statistics with server-side sorting, filtering, and pagination.
- *
- * Features:
- * - Server-side operations with GraphQL (sort, filter, paginate)
- * - Responsive design (mobile-first)
- * - Accessibility compliant (ARIA labels, keyboard navigation)
- * - Cross-platform compatibility (Web/React Native)
- * - Performance optimized
- *
- * @author Legacy Sports Team
+ * Thin adapter over the shared sport-agnostic {@link StatsDataGrid}
+ * (LS-9036): owns the career-pitching GraphQL data-fetching hooks, offset
+ * pagination math, and the pitching column configuration; delegates all
+ * row/table rendering to StatsDataGrid — the same presentational component
+ * the batting and football grids consume.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
-import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Text } from 'tamagui';
 import {
   type CareerPitchingFragment,
   type GetCareerPitchingStatsQueryVariables,
@@ -25,48 +18,9 @@ import {
 } from '@legacy-sports/graphql';
 import { resolveVisibleColumns } from './columnVisibility';
 import { formatPositionsPlayed } from './services/CareerStatsService';
-import { StatsGridHeaderCell } from './shell/StatsGridHeaderCell';
-import { StatsGridPagination } from './shell/StatsGridPagination';
-import {
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY,
-  BRAND_NAVY_DARK,
-  BRAND_NAVY_LIGHT,
-} from '../../utils/colors';
-
-const TEXT_HIGH_CONTRAST = '#F5F7FA';
-const TEXT_MUTED = '#9CAAC5';
-const BG_PAGE = '#0A0F1A';
-const OUTLINE_SUBTLE = '#1C2740';
-
-const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
-const FONT_BODY = "'Literata', serif";
-const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
-
-// SVG icon — web-only; return null on native to avoid DOM svg crash
-const AlertIcon = () => {
-  if (Platform.OS !== 'web') return null;
-  return (
-    <svg
-      role="img"
-      aria-label="Error"
-      width="40"
-      height="40"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#C41E3A"
-      strokeWidth="1.6"
-    >
-      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  );
-};
-
-// =============================================================================
-// Type Definitions
-// =============================================================================
+import { StatsDataGrid, type StatsDataGridColumn } from './shell/StatsDataGrid';
+import { FONT_BODY } from './shell/tokens';
+import { TEXT_PRIMARY } from '../../utils/colors';
 
 export interface PitchingGridColumn {
   readonly key: string;
@@ -344,9 +298,99 @@ const COLUMN_TO_SORT_FIELD_MAP: Record<string, string> = {
   fantasyPointsPerGame: 'fantasyPointsPerGame',
 };
 
-// =============================================================================
-// Component Implementation
-// =============================================================================
+/** Resolves a cell's display value, including the special-cased columns. */
+function cellValueFor(
+  column: PitchingGridColumn,
+  player: CareerPitchingFragment | null | undefined,
+): string {
+  if (column.key === 'playerName') {
+    return (
+      `${player?.player?.firstName ?? ''} ${player?.player?.lastName ?? ''}`.trim() ||
+      `Player ${player?.playerId ?? '-'}`
+    );
+  }
+  if (column.key === 'formattedPositions') {
+    return (
+      formatPositionsPlayed(player?.positionsPlayed) ||
+      player?.primaryPosition ||
+      '-'
+    );
+  }
+  if (column.key === 'inningsPitched') {
+    const outs = player?.outsRecorded;
+    if (outs == null || outs === 0) return '-';
+    const wholeInnings = Math.floor(outs / 3);
+    const extraOuts = outs % 3;
+    return `${wholeInnings}.${extraOuts}`;
+  }
+  const rawVal = getFieldValue(player, column.key);
+  if (column.formatter) {
+    return column.formatter(rawVal);
+  }
+  return stringifyPrimitive(rawVal);
+}
+
+/** Stringifies only primitives with a safe default toString; anything else (object, undefined) falls back to an em dash. */
+function stringifyPrimitive(val: unknown): string {
+  switch (typeof val) {
+    case 'string':
+      return val;
+    case 'number':
+    case 'boolean':
+    case 'bigint':
+      return String(val);
+    default:
+      return '—';
+  }
+}
+
+/**
+ * Reads `key` off `player` without asserting it's a known key of
+ * CareerPitchingFragment — column.key is a plain string, so a misaligned
+ * column config degrades to `undefined` here instead of an unsafe cast.
+ */
+function getFieldValue(
+  player: CareerPitchingFragment | null | undefined,
+  key: string,
+): unknown {
+  if (!player || !(key in player)) return undefined;
+  return (player as unknown as Record<string, unknown>)[key];
+}
+
+function toGridColumns(
+  displayColumns: readonly PitchingGridColumn[],
+): readonly StatsDataGridColumn<CareerPitchingFragment>[] {
+  return displayColumns.map((column) => {
+    const isNameCol = column.key === PITCHING_NAME_COLUMN_KEY;
+    return {
+      key: column.key,
+      label: column.label,
+      sortable: column.sortable,
+      sortKey: COLUMN_TO_SORT_FIELD_MAP[column.key] ?? column.key,
+      align: column.align,
+      width: column.width,
+      minWidth: column.minWidth,
+      accessibilityLabel: column.sortable
+        ? `Sort by ${column.label}`
+        : undefined,
+      formatter: (player: CareerPitchingFragment) =>
+        cellValueFor(column, player),
+      renderCell: isNameCol
+        ? (player: CareerPitchingFragment) => (
+            <Text
+              numberOfLines={1}
+              fontFamily={FONT_BODY}
+              fontWeight="600"
+              fontSize={14}
+              color={TEXT_PRIMARY}
+            >
+              {cellValueFor(column, player)}
+            </Text>
+          )
+        : undefined,
+    };
+  });
+}
 
 export function PitchingStatsDataGrid({
   title = 'Career Pitching Statistics',
@@ -361,10 +405,6 @@ export function PitchingStatsDataGrid({
   availabilityFilter,
   onDataLoaded,
 }: PitchingStatsDataGridProps): React.ReactElement {
-  // =============================================================================
-  // State Management
-  // =============================================================================
-
   const [queryParams, setQueryParams] =
     useState<GetCareerPitchingStatsQueryVariables>({
       limit: initialParams.limit || 25,
@@ -373,10 +413,6 @@ export function PitchingStatsDataGrid({
       orderDirection: initialParams.orderDirection || 'desc',
       ...initialParams,
     });
-
-  // =============================================================================
-  // Data Fetching
-  // =============================================================================
 
   const { data, loading, error, refetch } = useGetCareerPitchingStatsQuery({
     variables: queryParams,
@@ -391,21 +427,22 @@ export function PitchingStatsDataGrid({
   );
 
   const displayPitchingData = useMemo(() => {
+    const withoutNulls = pitchingData.filter(
+      (p): p is CareerPitchingFragment => p != null,
+    );
     if (
       !availabilityFilter ||
       availabilityFilter === 'all' ||
       !rosteredPlayerIds
     ) {
-      return pitchingData;
+      return withoutNulls;
     }
     if (availabilityFilter === 'free_agents') {
-      return pitchingData.filter(
-        (p) => p != null && !rosteredPlayerIds.has(p.playerId ?? -1),
+      return withoutNulls.filter(
+        (p) => !rosteredPlayerIds.has(p.playerId ?? -1),
       );
     }
-    return pitchingData.filter(
-      (p) => p != null && rosteredPlayerIds.has(p.playerId ?? -1),
-    );
+    return withoutNulls.filter((p) => rosteredPlayerIds.has(p.playerId ?? -1));
   }, [pitchingData, availabilityFilter, rosteredPlayerIds]);
 
   // Surface the currently displayed rows to the host so an Export action can
@@ -434,10 +471,6 @@ export function PitchingStatsDataGrid({
   });
   const totalCount = countData?.careerPitchingStatsCount ?? pitchingData.length;
 
-  // =============================================================================
-  // Event Handlers
-  // =============================================================================
-
   const updateQueryParams = useCallback(
     (updates: Partial<GetCareerPitchingStatsQueryVariables>) => {
       setQueryParams((prev) => ({ ...prev, ...updates }));
@@ -446,10 +479,9 @@ export function PitchingStatsDataGrid({
   );
 
   const handleSort = useCallback(
-    (columnKey: string, orderDirection: 'asc' | 'desc') => {
-      const sortField = COLUMN_TO_SORT_FIELD_MAP[columnKey] || columnKey;
+    (sortKey: string, orderDirection: 'asc' | 'desc') => {
       updateQueryParams({
-        orderBy: sortField,
+        orderBy: sortKey,
         orderDirection,
         offset: 0,
       });
@@ -498,9 +530,15 @@ export function PitchingStatsDataGrid({
     }
   }, [refetch]);
 
-  // =============================================================================
-  // Pagination Calculations
-  // =============================================================================
+  const handleClearFilters = useCallback(() => {
+    updateQueryParams({
+      minGames: 0,
+      minWins: 0,
+      minStrikeouts: 0,
+      position: undefined,
+      offset: 0,
+    });
+  }, [updateQueryParams]);
 
   const pageSize = queryParams.limit || 25;
   const currentOffset = queryParams.offset || 0;
@@ -523,328 +561,43 @@ export function PitchingStatsDataGrid({
     [statsFormat, visibleColumns],
   );
 
-  // =============================================================================
-  // Render Helpers
-  // =============================================================================
-
-  const renderDataGrid = () => (
-    <YStack
-      flex={1}
-      style={{
-        background: `rgba(16,22,38,0.75)`,
-        border: `1px solid rgba(44,74,124,0.35)`,
-        borderRadius: 14,
-        overflow: 'hidden',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        boxShadow: `0 4px 24px rgba(0,0,0,0.3)`,
-      }}
-    >
-      {/* Horizontal scroll wrapper — keeps the header aligned with body rows
-          when columns overflow the viewport (mobile). Without this wrapper the
-          body scrolls independently and the column labels appear unmoored. */}
-      <YStack flex={1} style={{ overflowX: 'auto' }}>
-        <XStack
-          style={{
-            background: BRAND_NAVY_DARK,
-            borderBottom: `2px solid ${OUTLINE_SUBTLE}`,
-            minWidth: 'max-content',
-          }}
-          paddingVertical="$2"
-          paddingHorizontal="$3"
-        >
-          {displayColumns.map((column) => {
-            const sortField =
-              COLUMN_TO_SORT_FIELD_MAP[column.key] || column.key;
-            const isActiveSortColumn = queryParams.orderBy === sortField;
-
-            return (
-              <StatsGridHeaderCell
-                key={column.key}
-                label={column.label}
-                sortable={column.sortable}
-                isActive={isActiveSortColumn}
-                direction={
-                  queryParams.orderDirection === 'desc' ? 'desc' : 'asc'
-                }
-                onSort={(nextDirection) =>
-                  handleSort(column.key, nextDirection)
-                }
-                align={column.align}
-                width={column.width}
-                minWidth={column.minWidth}
-                flexGrow={1}
-                paddingHorizontal="$1"
-              />
-            );
-          })}
-        </XStack>
-
-        <YStack flex={1} style={{ minWidth: 'max-content' }}>
-          {loading ? (
-            <XStack
-              testID="loading-indicator"
-              justifyContent="center"
-              alignItems="center"
-              padding="$6"
-              gap="$3"
-            >
-              <Spinner size="large" color={BRAND_NAVY_LIGHT} />
-              <Text style={{ color: TEXT_MUTED }}>
-                Loading pitching statistics...
-              </Text>
-            </XStack>
-          ) : displayPitchingData.length === 0 ? (
-            <YStack
-              justifyContent="center"
-              alignItems="center"
-              padding="$6"
-              gap="$3"
-            >
-              <Text
-                fontSize="$5"
-                fontWeight="600"
-                style={{ color: TEXT_HIGH_CONTRAST }}
-              >
-                No pitchers found
-              </Text>
-              <Text
-                fontSize="$3"
-                textAlign="center"
-                style={{ color: TEXT_MUTED }}
-              >
-                Try adjusting your filters to find more pitchers.
-              </Text>
-              <Button
-                onPress={() => {
-                  updateQueryParams({
-                    minGames: 0,
-                    minWins: 0,
-                    minStrikeouts: 0,
-                    position: undefined,
-                    offset: 0,
-                  });
-                }}
-                style={{
-                  background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-                  border: `1px solid rgba(196,165,90,0.3)`,
-                  borderRadius: 10,
-                  color: BRAND_GOLD_LIGHT,
-                }}
-              >
-                Clear Filters
-              </Button>
-            </YStack>
-          ) : (
-            displayPitchingData.map(
-              (player: CareerPitchingFragment | null, index: number) => (
-                <XStack
-                  key={player?.playerId || index}
-                  style={{
-                    background:
-                      index % 2 === 0 ? BG_PAGE : 'rgba(17,27,47,0.8)',
-                    borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-                    transition: 'background 0.12s ease',
-                    cursor: 'pointer',
-                  }}
-                  hoverStyle={{
-                    backgroundColor: `rgba(27,58,92,0.3)` as never,
-                  }}
-                  pressStyle={{ scale: 0.998 }}
-                  paddingVertical="$2"
-                  paddingHorizontal="$3"
-                  onPress={() => player && handleRowClick(player)}
-                  cursor="pointer"
-                >
-                  {displayColumns.map((column) => {
-                    const isNameCol = column.key === 'playerName';
-                    const cellValue =
-                      column.key === 'playerName'
-                        ? `${player?.player?.firstName ?? ''} ${player?.player?.lastName ?? ''}`.trim() ||
-                          `Player ${player?.playerId ?? '-'}`
-                        : column.key === 'formattedPositions'
-                          ? formatPositionsPlayed(player?.positionsPlayed) ||
-                            player?.primaryPosition ||
-                            '-'
-                          : column.key === 'inningsPitched'
-                            ? (() => {
-                                const outs = player?.outsRecorded;
-                                if (outs == null || outs === 0) return '-';
-                                const wholeInnings = Math.floor(outs / 3);
-                                const extraOuts = outs % 3;
-                                return `${wholeInnings}.${extraOuts}`;
-                              })()
-                            : column.formatter
-                              ? column.formatter(
-                                  player?.[column.key as keyof typeof player],
-                                )
-                              : (() => {
-                                  const rawVal =
-                                    player?.[column.key as keyof typeof player];
-                                  return typeof rawVal === 'object'
-                                    ? '—'
-                                    : String(rawVal ?? '—');
-                                })();
-                    return (
-                      <XStack
-                        key={column.key}
-                        width={column.width || 'auto'}
-                        minWidth={column.minWidth}
-                        flexGrow={1}
-                        justifyContent={
-                          column.align === 'center'
-                            ? 'center'
-                            : column.align === 'right'
-                              ? 'flex-end'
-                              : 'flex-start'
-                        }
-                        alignItems="center"
-                      >
-                        <Text
-                          numberOfLines={1}
-                          style={{
-                            fontFamily: isNameCol ? FONT_BODY : FONT_MONO,
-                            fontWeight: isNameCol ? '600' : '400',
-                            fontSize: isNameCol ? 14 : 13,
-                            color: isNameCol ? TEXT_HIGH_CONTRAST : TEXT_MUTED,
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          {cellValue}
-                        </Text>
-                      </XStack>
-                    );
-                  })}
-                </XStack>
-              ),
-            )
-          )}
-        </YStack>
-      </YStack>
-    </YStack>
+  const gridColumns = useMemo(
+    () => toGridColumns(displayColumns),
+    [displayColumns],
   );
 
-  const renderPagination = () => (
-    <StatsGridPagination
+  return (
+    <StatsDataGrid
+      testId={testId}
+      className={className}
+      title={title}
+      subtitle={`${totalCount.toLocaleString()} pitchers · sorted by ${queryParams.orderBy ?? 'wins'}`}
+      rows={displayPitchingData}
+      getRowId={(player, index) => player.playerId ?? index}
+      columns={gridColumns}
+      onRowClick={handleRowClick}
+      sortField={queryParams.orderBy ?? undefined}
+      sortDir={queryParams.orderDirection === 'desc' ? 'desc' : 'asc'}
+      onSortChange={handleSort}
+      loading={loading}
+      error={error}
+      onRetry={handleRefresh}
+      errorTitle="Error Loading Statistics"
+      onClear={handleClearFilters}
+      emptyTitle="No pitchers found"
+      loadingColumnCount={Math.max(0, gridColumns.length - 2)}
       currentPage={currentPageNumber}
       totalPages={totalPages}
       totalCount={totalCount}
       pageSize={pageSize}
-      loading={loading}
       hasPreviousPage={hasPreviousPage}
       hasNextPage={hasNextPage}
-      prevLabel="← Prev"
       onPrev={() => handlePageChange('prev')}
       onNext={() => handlePageChange('next')}
       onGoToPage={handleGoToPage}
       onPageSizeChange={handlePageSizeChange}
+      showPagination={showPagination}
     />
-  );
-
-  // =============================================================================
-  // Main Render
-  // =============================================================================
-
-  return (
-    <YStack
-      flex={1}
-      gap="$4"
-      padding="$4"
-      backgroundColor="$background"
-      className={className}
-      testID={testId}
-    >
-      {/* Section caption — eyebrow + count/sort subtitle */}
-      <XStack justifyContent="space-between" alignItems="flex-end">
-        <YStack gap="$1">
-          <Text
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: '700',
-              fontSize: 11,
-              letterSpacing: 1.76,
-              textTransform: 'uppercase',
-              color: BRAND_GOLD_LIGHT,
-            }}
-          >
-            Pitching Leaders
-          </Text>
-          <Text
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: '800',
-              fontSize: 22,
-              letterSpacing: -0.22,
-              color: TEXT_HIGH_CONTRAST,
-            }}
-          >
-            {title}
-          </Text>
-          {!loading && !error && (
-            <Text
-              style={{
-                fontFamily: FONT_BODY,
-                fontSize: 13,
-                color: TEXT_MUTED,
-              }}
-            >
-              {totalCount.toLocaleString()} pitchers · sorted by{' '}
-              {queryParams.orderBy ?? 'wins'}
-            </Text>
-          )}
-        </YStack>
-      </XStack>
-
-      {error && !loading && (
-        <YStack
-          testID="error-message"
-          justifyContent="center"
-          alignItems="center"
-          padding="$6"
-          gap="$3"
-          style={{
-            background: 'rgba(196,30,58,0.08)',
-            border: '1px solid rgba(196,30,58,0.3)',
-            borderRadius: 14,
-          }}
-        >
-          <AlertIcon />
-          <Text
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: '700',
-              fontSize: 18,
-              color: '#E63950',
-              textTransform: 'uppercase',
-              letterSpacing: 0.72,
-            }}
-          >
-            Error Loading Statistics
-          </Text>
-          <Text
-            style={{ fontFamily: FONT_BODY, fontSize: 14, color: TEXT_MUTED }}
-            textAlign="center"
-          >
-            {error?.message ?? 'Failed to load pitching statistics'}
-          </Text>
-          <Button
-            onPress={handleRefresh}
-            style={{
-              background: BRAND_NAVY,
-              border: `1px solid rgba(196,165,90,0.3)`,
-              borderRadius: 10,
-              color: BRAND_GOLD_LIGHT,
-            }}
-          >
-            Try Again
-          </Button>
-        </YStack>
-      )}
-
-      {(!error || loading) && renderDataGrid()}
-
-      {showPagination && !error && renderPagination()}
-    </YStack>
   );
 }
 

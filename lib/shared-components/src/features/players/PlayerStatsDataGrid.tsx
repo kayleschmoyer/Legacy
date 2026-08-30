@@ -1,25 +1,18 @@
 /**
- * PlayerStatsDataGrid - Modern Career Statistics Data Grid
+ * PlayerStatsDataGrid - Career Batting Statistics Data Grid
  *
- * A comprehensive, responsive data grid component for displaying career batting
- * statistics with server-side sorting, filtering, search, and pagination.
+ * Thin adapter over the shared sport-agnostic {@link StatsDataGrid}
+ * (LS-9036): owns the career-batting GraphQL data-fetching hook, cursor
+ * pagination math, and the batting column configuration; delegates all
+ * row/table rendering to StatsDataGrid — the same presentational component
+ * the pitching and football grids consume — so there is exactly one
+ * row-rendering implementation shared across sports.
  *
- * Features:
- * - Server-side operations with GraphQL connections (sort, filter, search, paginate)
- * - Cursor-based pagination using relay-style connections
- * - Responsive design (mobile-first)
- * - Accessibility compliant (ARIA labels, keyboard navigation)
- * - Cross-platform compatibility (Web/React Native)
- * - Comprehensive error handling and loading states
- * - Performance optimized (virtualization-ready)
- *
- * @author Legacy Sports Team
  * @since 2025-09-28
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
-import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
+import { Text } from 'tamagui';
 import {
   type CareerStatsQueryParams,
   DEFAULT_CAREER_STATS_PARAMS,
@@ -27,49 +20,15 @@ import {
   useCareerStatsWithNames,
 } from './services/CareerStatsService';
 import { resolveVisibleColumns } from './columnVisibility';
-import { StatsGridHeaderCell } from './shell/StatsGridHeaderCell';
-import { StatsGridPagination } from './shell/StatsGridPagination';
+import { StatsDataGrid, type StatsDataGridColumn } from './shell/StatsDataGrid';
+import { FONT_BODY, FONT_DISPLAY } from './shell/tokens';
 import {
-  BRAND_GOLD_LIGHT,
-  BRAND_NAVY,
-  BRAND_NAVY_DARK,
-  BRAND_NAVY_LIGHT,
   getPositionColor,
-  OUTLINE_SUBTLE,
   POS_UTILITY,
-  TEXT_HIGH_CONTRAST,
   TEXT_MUTED,
+  TEXT_PRIMARY,
 } from '../../utils/colors';
 import { PositionBadge } from '../../components/PositionBadge';
-
-const BG_PAGE = '#0A0F1A';
-const BG_ELEVATED = '#16223A';
-const SURFACE_CARD_ROW = 'rgba(17,27,47,0.92)';
-
-const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
-const FONT_BODY = "'Literata', serif";
-const FONT_MONO = "'JetBrains Mono', ui-monospace, monospace";
-
-// SVG icon — web-only; return null on native to avoid DOM svg crash
-const AlertIcon = () => {
-  if (Platform.OS !== 'web') return null;
-  return (
-    <svg
-      role="img"
-      aria-label="Error"
-      width="40"
-      height="40"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="#C41E3A"
-      strokeWidth="1.6"
-    >
-      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  );
-};
 
 // =============================================================================
 // Type Definitions
@@ -408,13 +367,92 @@ export const CAREER_STATS_COLUMNS: readonly GridColumn[] = [
 // =============================================================================
 
 /**
+ * Builds the {@link StatsDataGrid} column set from the batting `GridColumn`
+ * config. The Player column renders a rich cell (position badge + name); every
+ * other column renders its formatted value in the shared mono/muted style.
+ */
+function toGridColumns(
+  displayColumns: readonly GridColumn[],
+): readonly StatsDataGridColumn<PlayerCareerStats>[] {
+  return displayColumns.map((column) => {
+    const isNameCol = column.key === BATTING_NAME_COLUMN_KEY;
+    return {
+      key: column.key,
+      label: column.label,
+      sortable: column.sortable,
+      sortKey: COLUMN_TO_SORT_FIELD_MAP[column.key as string] ?? column.key,
+      align: column.align,
+      width: column.width,
+      minWidth: column.minWidth,
+      sticky: isNameCol,
+      accessibilityLabel: column.sortable
+        ? `Sort by ${column.label}`
+        : undefined,
+      renderCell: (player: PlayerCareerStats) => {
+        const raw = player[column.key];
+        const cellValue = column.formatter
+          ? column.formatter(raw)
+          : raw == null
+            ? '—'
+            : typeof raw === 'string' ||
+                typeof raw === 'number' ||
+                typeof raw === 'boolean'
+              ? String(raw)
+              : '—';
+
+        if (isNameCol) {
+          const posKey = player.primaryPosition;
+          const posColor = posKey
+            ? getPositionColor('baseball', posKey)
+            : POS_UTILITY;
+          return (
+            <>
+              {posKey && (
+                <PositionBadge
+                  position={posKey}
+                  color={posColor}
+                  variant="solid"
+                  paddingHorizontal={7}
+                  paddingVertical={3}
+                  borderRadius={4}
+                  minWidth={32}
+                  fontSize={10}
+                  fontWeight="800"
+                  fontFamily={FONT_DISPLAY}
+                  letterSpacing={0.8}
+                />
+              )}
+              <Text
+                numberOfLines={1}
+                fontFamily={FONT_BODY}
+                fontWeight="600"
+                fontSize={14}
+                color={TEXT_PRIMARY}
+              >
+                {cellValue}
+              </Text>
+            </>
+          );
+        }
+
+        return (
+          <Text
+            numberOfLines={1}
+            fontWeight="400"
+            fontSize={13}
+            color={TEXT_MUTED}
+            fontVariant={['tabular-nums']}
+          >
+            {cellValue}
+          </Text>
+        );
+      },
+    };
+  });
+}
+
+/**
  * PlayerStatsDataGrid Component
- *
- * A production-ready data grid for career batting statistics with comprehensive
- * functionality including server-side operations, responsive design, and accessibility.
- *
- * @param props - Component configuration
- * @returns React component
  *
  * @example
  * ```tsx
@@ -439,37 +477,54 @@ export function PlayerStatsDataGrid({
   onSortChange,
   onDataLoaded,
 }: PlayerStatsDataGridProps): React.ReactElement {
-  // =============================================================================
-  // State Management
-  // =============================================================================
-
   const [queryParams, setQueryParams] = useState<CareerStatsQueryParams>({
     ...DEFAULT_CAREER_STATS_PARAMS,
     ...initialParams,
   });
 
-  // =============================================================================
-  // Data Fetching
-  // =============================================================================
-
   const {
-    data,
+    data: rawData,
     loading,
     error,
-    totalCount,
-    hasNextPage,
-    hasPreviousPage,
+    totalCount: rawTotalCount,
+    hasNextPage: rawHasNextPage,
+    hasPreviousPage: rawHasPreviousPage,
     pageSize,
     refetch,
   } = useCareerStatsWithNames(queryParams);
 
-  // =============================================================================
-  // Event Handlers
-  // =============================================================================
+  // useCareerStatsWithNames fetches network-only, so `data` (and totalCount)
+  // transiently reset to empty on every sort/filter/page change while the new
+  // request is in flight. Without this, a mid-refetch render would see zero
+  // rows and StatsDataGrid would swap the whole grid (title + pagination
+  // included) for the loading skeleton — losing the pager the user just
+  // clicked. Keep serving the last successful page during a refetch instead.
+  const lastGoodRef = React.useRef({
+    data: rawData,
+    totalCount: rawTotalCount,
+    hasNextPage: rawHasNextPage,
+    hasPreviousPage: rawHasPreviousPage,
+  });
+  if (rawData.length > 0 || !loading) {
+    lastGoodRef.current = {
+      data: rawData,
+      totalCount: rawTotalCount,
+      hasNextPage: rawHasNextPage,
+      hasPreviousPage: rawHasPreviousPage,
+    };
+  }
+  const usingStaleData = loading && rawData.length === 0;
+  const data = usingStaleData ? lastGoodRef.current.data : rawData;
+  const totalCount = usingStaleData
+    ? lastGoodRef.current.totalCount
+    : rawTotalCount;
+  const hasNextPage = usingStaleData
+    ? lastGoodRef.current.hasNextPage
+    : rawHasNextPage;
+  const hasPreviousPage = usingStaleData
+    ? lastGoodRef.current.hasPreviousPage
+    : rawHasPreviousPage;
 
-  /**
-   * Updates query parameters and triggers data refetch
-   */
   const updateQueryParams = useCallback(
     (updates: Partial<CareerStatsQueryParams>) => {
       setQueryParams((prev) => ({ ...prev, ...updates }));
@@ -477,29 +532,20 @@ export function PlayerStatsDataGrid({
     [],
   );
 
-  /**
-   * Handles sorting changes
-   */
   const handleSort = useCallback(
-    (columnKey: string, orderDirection: 'asc' | 'desc') => {
-      // Map UI column key to GraphQL sort field
-      const sortField = COLUMN_TO_SORT_FIELD_MAP[columnKey] || columnKey;
+    (sortKey: string, orderDirection: 'asc' | 'desc') => {
       updateQueryParams({
-        orderBy: sortField,
+        orderBy: sortKey,
         orderDirection,
-        after: undefined,
-      }); // Reset to first page
+        after: undefined, // reset to first page
+      });
       // Propagate to the host so the new sort can be mirrored to the URL,
-      // keeping "share current view" fidelity (LS-7115). Reports the mapped
-      // GraphQL field so it round-trips straight back into orderBy on reload.
-      onSortChange?.(sortField, orderDirection);
+      // keeping "share current view" fidelity (LS-7115).
+      onSortChange?.(sortKey, orderDirection);
     },
     [updateQueryParams, onSortChange],
   );
 
-  /**
-   * Handles pagination navigation
-   */
   const handlePageChange = useCallback(
     (direction: 'next' | 'prev') => {
       // Use btoa/atob (browser-native) instead of Buffer (Node.js-only) so
@@ -513,9 +559,7 @@ export function PlayerStatsDataGrid({
         // The backend treats the `after` cursor as the starting offset of the
         // next page, so advance by a full page size.
         const nextOffset = currentOffset + pageSz;
-        updateQueryParams({
-          after: btoa(String(nextOffset)),
-        });
+        updateQueryParams({ after: btoa(String(nextOffset)) });
       } else if (direction === 'prev' && hasPreviousPage) {
         // Go back one full page; if we reach offset 0 omit the cursor so the
         // query defaults to the first page (matching initial load behaviour).
@@ -534,55 +578,39 @@ export function PlayerStatsDataGrid({
     ],
   );
 
-  /**
-   * Handles page size changes
-   */
   const handlePageSizeChange = useCallback(
     (newPageSize: number) => {
-      updateQueryParams({ first: newPageSize, after: undefined }); // Reset to first page when changing page size
+      updateQueryParams({ first: newPageSize, after: undefined });
     },
     [updateQueryParams],
   );
 
-  /**
-   * Jumps to a specific page number
-   */
   const handleGoToPage = useCallback(
     (pageNumber: number) => {
-      const pageSize = queryParams.first ?? 25;
-      const totalPages = Math.ceil(totalCount / pageSize);
-
-      // Validate page number
+      const pageSz = queryParams.first ?? 25;
+      const totalPages = Math.ceil(totalCount / pageSz);
       if (pageNumber < 1 || pageNumber > totalPages) {
         return;
       }
-
-      // Calculate offset for the target page (page 1 = offset 0)
-      const offset = (pageNumber - 1) * pageSize;
-
-      // Create cursor from offset (same encoding used by backend)
+      const offset = (pageNumber - 1) * pageSz;
+      // Cursor from offset (same encoding used by backend)
       const cursor = offset > 0 ? btoa(offset.toString()) : undefined;
-
       updateQueryParams({ after: cursor });
     },
     [queryParams.first, totalCount, updateQueryParams],
   );
 
-  // Calculate total pages and current page number
   const totalPages = useMemo(() => {
-    const pageSize = queryParams.first ?? 25;
-    return Math.max(1, Math.ceil(totalCount / pageSize));
+    const pageSz = queryParams.first ?? 25;
+    return Math.max(1, Math.ceil(totalCount / pageSz));
   }, [totalCount, queryParams.first]);
 
   const currentPageNumber = useMemo(() => {
-    const pageSize = queryParams.first ?? 25;
+    const pageSz = queryParams.first ?? 25;
     const offset = queryParams.after ? parseInt(atob(queryParams.after)) : 0;
-    return Math.floor(offset / pageSize) + 1;
+    return Math.floor(offset / pageSz) + 1;
   }, [queryParams.after, queryParams.first]);
 
-  /**
-   * Handles row selection
-   */
   const handleRowClick = useCallback(
     (player: PlayerCareerStats) => {
       onPlayerSelect?.(player);
@@ -590,18 +618,22 @@ export function PlayerStatsDataGrid({
     [onPlayerSelect],
   );
 
-  /**
-   * Handles manual refresh
-   */
   const handleRefresh = useCallback(() => {
     if (refetch) {
       void refetch();
     }
   }, [refetch]);
 
-  // =============================================================================
-  // Responsive Column Filtering
-  // =============================================================================
+  const handleClearFilters = useCallback(() => {
+    updateQueryParams({
+      minGames: DEFAULT_CAREER_STATS_PARAMS.minGames ?? 10,
+      minHomeRuns: 0,
+      minRBI: 0,
+      searchTerm: undefined,
+      position: undefined,
+      after: undefined,
+    });
+  }, [updateQueryParams]);
 
   // Columns to render: an explicit per-column selection (LS-7105) overrides the
   // statsFormat preset; the Player column is always kept. When no selection is
@@ -615,6 +647,11 @@ export function PlayerStatsDataGrid({
         BATTING_NAME_COLUMN_KEY,
       ),
     [statsFormat, visibleColumns],
+  );
+
+  const gridColumns = useMemo(
+    () => toGridColumns(displayColumns),
+    [displayColumns],
   );
 
   const displayData = useMemo(() => {
@@ -643,433 +680,39 @@ export function PlayerStatsDataGrid({
     onDataLoaded?.(displayData);
   }, [displayData, onDataLoaded]);
 
-  // =============================================================================
-  // Render Helpers
-  // =============================================================================
-
-  /**
-   * Renders the data grid table
-   */
-  const renderDataGrid = () => (
-    <YStack
-      flex={1}
-      style={{
-        background: `rgba(16,22,38,0.75)`,
-        border: `1px solid rgba(44,74,124,0.35)`,
-        borderRadius: 14,
-        overflow: 'hidden',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        boxShadow: `0 4px 24px rgba(0,0,0,0.3)`,
-      }}
-    >
-      {/* Horizontal scroll wrapper — keeps the header aligned with body rows
-          when columns overflow the viewport (mobile). Without this wrapper the
-          body scrolls independently and the column labels appear unmoored. */}
-      <YStack flex={1} style={{ overflowX: 'auto' }}>
-        {/* Table Header */}
-        <XStack
-          style={{
-            background: BRAND_NAVY_DARK,
-            borderBottom: `2px solid ${OUTLINE_SUBTLE}`,
-            minWidth: 'max-content',
-          }}
-          paddingVertical="$2"
-        >
-          {displayColumns.map((column) => {
-            const sortField =
-              COLUMN_TO_SORT_FIELD_MAP[column.key as string] || column.key;
-            const isActiveSortColumn = queryParams.orderBy === sortField;
-            const isPlayerCol = column.key === 'displayName';
-
-            return (
-              <StatsGridHeaderCell
-                key={column.key}
-                label={column.label}
-                sortable={column.sortable}
-                isActive={isActiveSortColumn}
-                direction={
-                  queryParams.orderDirection === 'desc' ? 'desc' : 'asc'
-                }
-                onSort={(nextDirection) =>
-                  handleSort(column.key, nextDirection)
-                }
-                align={column.align}
-                width={column.width}
-                minWidth={column.minWidth}
-                flexGrow={isPlayerCol ? 0 : 1}
-                paddingHorizontal="$2"
-                sticky={isPlayerCol}
-              />
-            );
-          })}
-        </XStack>
-
-        {/* Table Body */}
-        <YStack flex={1} style={{ minWidth: 'max-content' }}>
-          {loading ? (
-            <YStack
-              testID="loading-indicator"
-              aria-busy
-              aria-label="Loading player statistics..."
-              style={{ background: 'transparent' }}
-            >
-              {/* Skeleton rows that mirror populated row geometry */}
-              {Array.from({ length: 8 }).map((_, rowIdx) => (
-                <XStack
-                  key={`skel-${rowIdx}`}
-                  style={{
-                    background: rowIdx % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
-                    borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-                  }}
-                  paddingVertical="$2"
-                >
-                  {displayColumns.map((column) => {
-                    const isNameCol = column.key === 'displayName';
-                    return (
-                      <XStack
-                        key={column.key}
-                        width={column.width || 'auto'}
-                        minWidth={column.minWidth}
-                        flexGrow={isNameCol ? 0 : 1}
-                        flexShrink={0}
-                        alignItems="center"
-                        gap="$2"
-                        paddingHorizontal="$2"
-                        justifyContent={
-                          column.align === 'center'
-                            ? 'center'
-                            : column.align === 'right'
-                              ? 'flex-end'
-                              : 'flex-start'
-                        }
-                        style={
-                          isNameCol
-                            ? {
-                                position: 'sticky',
-                                left: 0,
-                                zIndex: 1,
-                                background:
-                                  rowIdx % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
-                                borderLeft: `1px solid ${OUTLINE_SUBTLE}`,
-                              }
-                            : undefined
-                        }
-                      >
-                        {isNameCol ? (
-                          <>
-                            <YStack
-                              style={{
-                                width: 32,
-                                height: 18,
-                                borderRadius: 4,
-                                background: 'rgba(255,255,255,0.08)',
-                              }}
-                            />
-                            <YStack
-                              style={{
-                                flex: 1,
-                                height: 12,
-                                borderRadius: 3,
-                                background: 'rgba(255,255,255,0.08)',
-                              }}
-                            />
-                          </>
-                        ) : (
-                          <YStack
-                            style={{
-                              width: '70%',
-                              height: 10,
-                              borderRadius: 3,
-                              background: 'rgba(255,255,255,0.08)',
-                            }}
-                          />
-                        )}
-                      </XStack>
-                    );
-                  })}
-                </XStack>
-              ))}
-              <XStack
-                justifyContent="center"
-                alignItems="center"
-                padding="$3"
-                gap="$2"
-              >
-                <Spinner size="small" color={BRAND_NAVY_LIGHT} />
-                <Text style={{ color: TEXT_MUTED, fontSize: 12 }}>
-                  Loading player statistics...
-                </Text>
-              </XStack>
-            </YStack>
-          ) : data.length === 0 ? (
-            <YStack
-              justifyContent="center"
-              alignItems="center"
-              padding="$6"
-              gap="$3"
-            >
-              <Text
-                fontSize="$5"
-                fontWeight="600"
-                style={{ color: TEXT_HIGH_CONTRAST }}
-              >
-                No players found
-              </Text>
-              <Text
-                fontSize="$3"
-                textAlign="center"
-                style={{ color: TEXT_MUTED }}
-              >
-                Try adjusting your search terms or filters to find more players.
-              </Text>
-              <Button
-                onPress={() => {
-                  updateQueryParams({
-                    minGames: DEFAULT_CAREER_STATS_PARAMS.minGames ?? 10,
-                    minHomeRuns: 0,
-                    minRBI: 0,
-                    searchTerm: undefined,
-                    position: undefined,
-                    after: undefined,
-                  });
-                }}
-                style={{
-                  background: `linear-gradient(135deg, ${BRAND_NAVY} 0%, ${BRAND_NAVY_LIGHT} 100%)`,
-                  border: `1px solid rgba(196,165,90,0.3)`,
-                  borderRadius: 10,
-                  color: BRAND_GOLD_LIGHT,
-                }}
-              >
-                Clear Filters
-              </Button>
-            </YStack>
-          ) : (
-            displayData.map((player: PlayerCareerStats, index: number) => (
-              <XStack
-                key={player.id}
-                data-testid={`player-row-${player.playerId}`}
-                style={{
-                  background: index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW,
-                  borderBottom: `1px solid ${OUTLINE_SUBTLE}`,
-                  transition: 'background 0.12s ease',
-                }}
-                hoverStyle={{
-                  backgroundColor: BG_ELEVATED as never,
-                }}
-                pressStyle={{ scale: 0.998 }}
-                paddingVertical="$2"
-                onPress={() => handleRowClick(player)}
-                cursor="pointer"
-              >
-                {displayColumns.map((column) => {
-                  const isNameCol = column.key === 'displayName';
-                  const raw = player[column.key];
-                  const cellValue = column.formatter
-                    ? column.formatter(raw)
-                    : raw == null
-                      ? '—'
-                      : typeof raw === 'string' ||
-                          typeof raw === 'number' ||
-                          typeof raw === 'boolean'
-                        ? String(raw)
-                        : '—';
-                  const rowBg = index % 2 === 0 ? BG_PAGE : SURFACE_CARD_ROW;
-                  const posKey = player.primaryPosition;
-                  const posColor = posKey
-                    ? getPositionColor('baseball', posKey)
-                    : POS_UTILITY;
-                  return (
-                    <XStack
-                      key={column.key}
-                      width={column.width || 'auto'}
-                      minWidth={column.minWidth}
-                      flexGrow={isNameCol ? 0 : 1}
-                      flexShrink={0}
-                      justifyContent={
-                        column.align === 'center'
-                          ? 'center'
-                          : column.align === 'right'
-                            ? 'flex-end'
-                            : 'flex-start'
-                      }
-                      alignItems="center"
-                      paddingHorizontal="$2"
-                      gap="$2"
-                      style={
-                        isNameCol
-                          ? {
-                              position: 'sticky',
-                              left: 0,
-                              zIndex: 1,
-                              background: rowBg,
-                              borderLeft: `1px solid ${posColor}`,
-                            }
-                          : undefined
-                      }
-                    >
-                      {isNameCol && posKey ? (
-                        <PositionBadge
-                          position={posKey}
-                          color={posColor}
-                          variant="solid"
-                          paddingHorizontal={7}
-                          paddingVertical={3}
-                          borderRadius={4}
-                          minWidth={32}
-                          fontSize={10}
-                          fontWeight="800"
-                          fontFamily={FONT_DISPLAY}
-                          letterSpacing={0.8}
-                        />
-                      ) : null}
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          fontFamily: isNameCol ? FONT_BODY : FONT_MONO,
-                          fontWeight: isNameCol ? '600' : '400',
-                          fontSize: isNameCol ? 14 : 13,
-                          color: isNameCol ? TEXT_HIGH_CONTRAST : TEXT_MUTED,
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        {cellValue}
-                      </Text>
-                    </XStack>
-                  );
-                })}
-              </XStack>
-            ))
-          )}
-        </YStack>
-      </YStack>
-    </YStack>
-  );
-
-  /**
-   * Renders pagination controls with page jumping
-   */
-  const renderPagination = () => (
-    <StatsGridPagination
+  return (
+    <StatsDataGrid
+      testId={testId}
+      className={className}
+      title={title}
+      subtitle={`${totalCount.toLocaleString()} players · sorted by ${queryParams.orderBy ?? 'homeRuns'}`}
+      rows={displayData}
+      getRowId={(player) => player.id}
+      getRowTestId={(player) => `player-row-${player.playerId}`}
+      columns={gridColumns}
+      onRowClick={handleRowClick}
+      sortField={queryParams.orderBy ?? undefined}
+      sortDir={queryParams.orderDirection === 'desc' ? 'desc' : 'asc'}
+      onSortChange={handleSort}
+      loading={loading}
+      error={error}
+      onRetry={handleRefresh}
+      errorTitle="Error Loading Statistics"
+      onClear={handleClearFilters}
+      emptyTitle="No players found"
+      loadingColumnCount={Math.max(0, gridColumns.length - 1)}
       currentPage={currentPageNumber}
       totalPages={totalPages}
       totalCount={totalCount}
       pageSize={pageSize}
-      loading={loading}
+      hasPreviousPage={hasPreviousPage}
+      hasNextPage={hasNextPage}
       onPrev={() => handlePageChange('prev')}
       onNext={() => handlePageChange('next')}
       onGoToPage={handleGoToPage}
       onPageSizeChange={handlePageSizeChange}
+      showPagination={showPagination}
     />
-  );
-
-  // =============================================================================
-  // Main Render
-  // =============================================================================
-
-  return (
-    <YStack
-      flex={1}
-      gap="$4"
-      padding="$4"
-      backgroundColor="$background"
-      className={className}
-      testID={testId}
-    >
-      {/* Section caption — eyebrow + count/sort subtitle */}
-      <XStack justifyContent="space-between" alignItems="flex-end">
-        <YStack gap="$1">
-          <Text
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: '700',
-              fontSize: 11,
-              letterSpacing: 1.76,
-              textTransform: 'uppercase',
-              color: BRAND_GOLD_LIGHT,
-            }}
-          >
-            Batting Leaders
-          </Text>
-          <Text
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: '800',
-              fontSize: 22,
-              letterSpacing: -0.22,
-              color: TEXT_HIGH_CONTRAST,
-            }}
-          >
-            {title}
-          </Text>
-          {!loading && !error && (
-            <Text
-              style={{
-                fontFamily: FONT_BODY,
-                fontSize: 13,
-                color: TEXT_MUTED,
-              }}
-            >
-              {totalCount.toLocaleString()} players · sorted by{' '}
-              {queryParams.orderBy ?? 'homeRuns'}
-            </Text>
-          )}
-        </YStack>
-      </XStack>
-
-      {/* Error State */}
-      {error && !loading && (
-        <YStack
-          testID="error-message"
-          justifyContent="center"
-          alignItems="center"
-          padding="$6"
-          gap="$3"
-          style={{
-            background: 'rgba(196,30,58,0.08)',
-            border: '1px solid rgba(196,30,58,0.3)',
-            borderRadius: 14,
-          }}
-        >
-          <AlertIcon />
-          <Text
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontWeight: '700',
-              fontSize: 18,
-              color: '#E63950',
-              textTransform: 'uppercase',
-              letterSpacing: 0.72,
-            }}
-          >
-            Error Loading Statistics
-          </Text>
-          <Text
-            style={{ fontFamily: FONT_BODY, fontSize: 14, color: TEXT_MUTED }}
-            textAlign="center"
-          >
-            {error?.message ?? 'Failed to load player statistics'}
-          </Text>
-          <Button
-            onPress={handleRefresh}
-            style={{
-              background: BRAND_NAVY,
-              border: `1px solid rgba(196,165,90,0.3)`,
-              borderRadius: 10,
-              color: BRAND_GOLD_LIGHT,
-            }}
-          >
-            Try Again
-          </Button>
-        </YStack>
-      )}
-
-      {/* Data Grid */}
-      {(!error || loading) && renderDataGrid()}
-
-      {/* Pagination */}
-      {showPagination && !error && renderPagination()}
-    </YStack>
   );
 }
 

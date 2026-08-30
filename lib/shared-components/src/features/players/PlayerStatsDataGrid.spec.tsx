@@ -334,15 +334,13 @@ describe('PlayerStatsDataGrid - Rendering', () => {
       </TestWrapper>,
     );
 
-    expect(screen.getByText('Test Player Statistics')).toBeInTheDocument();
+    // Loading renders the shared skeleton (StatsDataGrid/StateCards — LS-9036).
     expect(
-      screen.getByText('Loading player statistics...'),
+      screen.getByTestId('player-stats-loading-skeleton'),
     ).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(
-        screen.queryByText('Loading player statistics...'),
-      ).not.toBeInTheDocument();
+      expect(screen.getByText('Test Player Statistics')).toBeInTheDocument();
     });
 
     // Verify table headers are present
@@ -569,15 +567,13 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
       </TestWrapper>,
     );
 
+    // Renders the shared ErrorCard (StatsDataGrid/StateCards — LS-9036).
     await waitFor(() => {
-      expect(screen.getByText('Error Loading Statistics')).toBeInTheDocument();
-      expect(
-        screen.getByText('Failed to load player statistics'),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId('player-stats-error-card')).toBeInTheDocument();
     });
 
     // Should show retry button
-    expect(screen.getByText('Try Again')).toBeInTheDocument();
+    expect(screen.getByText('Retry')).toBeInTheDocument();
   });
 
   test('should display empty state when no data is returned', async () => {
@@ -587,19 +583,13 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
       </TestWrapper>,
     );
 
+    // Renders the shared EmptyCard (StatsDataGrid/StateCards — LS-9036).
     await waitFor(() => {
       expect(screen.getByText('No players found')).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          'Try adjusting your search terms or filters to find more players.',
-        ),
-      ).toBeInTheDocument();
     });
 
-    // Should show the empty-state "Clear Filters" recovery button
-    expect(screen.getAllByText('Clear Filters').length).toBeGreaterThanOrEqual(
-      1,
-    );
+    // Should show the empty-state "Clear all filters" recovery button
+    expect(screen.getByText('Clear all filters')).toBeInTheDocument();
   });
 
   test('should handle error recovery with retry button', async () => {
@@ -611,16 +601,16 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Error Loading Statistics')).toBeInTheDocument();
+      expect(screen.getByTestId('player-stats-error-card')).toBeInTheDocument();
     });
 
     // Click retry button to refetch
-    const retryButton = screen.getByText('Try Again');
+    const retryButton = screen.getByText('Retry');
     fireEvent.click(retryButton);
 
     await waitFor(() => {
       expect(
-        screen.queryByText('Error Loading Statistics'),
+        screen.queryByTestId('player-stats-error-card'),
       ).not.toBeInTheDocument();
     });
   });
@@ -753,18 +743,22 @@ describe('PlayerStatsDataGrid - Error Handling', () => {
 // =============================================================================
 
 describe('PlayerStatsDataGrid - Accessibility', () => {
-  test('should have proper ARIA labels and roles', () => {
+  test('should have proper ARIA labels and roles', async () => {
     render(
       <TestWrapper>
         <PlayerStatsDataGrid {...defaultProps} />
       </TestWrapper>,
     );
 
-    expect(screen.getByText('Test Player Statistics')).toBeInTheDocument();
-    // Loading state is announced via aria-busy/aria-label
+    // Loading skeleton is decorative (aria-hidden); the shell-level aria-live
+    // region (PlayerStatsShell) owns the actual "loading" announcement.
     expect(
-      screen.getByLabelText('Loading player statistics...'),
+      screen.getByTestId('player-stats-loading-skeleton'),
     ).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Player Statistics')).toBeInTheDocument();
+    });
   });
 });
 
@@ -931,7 +925,7 @@ function findAncestor(
   return null;
 }
 
-describe('PlayerStatsDataGrid - Editorial reskin (LS-4615)', () => {
+describe('PlayerStatsDataGrid - Editorial reskin (LS-4615 / LS-9036)', () => {
   test('renders a position chip with the player primary position', async () => {
     render(
       <TestWrapper>
@@ -949,7 +943,7 @@ describe('PlayerStatsDataGrid - Editorial reskin (LS-4615)', () => {
     expect(within(row).getByText('1B')).toBeInTheDocument();
   });
 
-  test('applies position-colored accent rule to the sticky player cell', async () => {
+  test('sticks the player-name cell to the left edge over an opaque backdrop', async () => {
     render(
       <TestWrapper>
         <PlayerStatsDataGrid {...defaultProps} />
@@ -961,40 +955,29 @@ describe('PlayerStatsDataGrid - Editorial reskin (LS-4615)', () => {
     });
 
     const nameNode = screen.getByText('Player 1486');
-    // The player cell wraps the name in a sticky XStack with a 1px left border
-    // colored by the player's position (1B -> POS_FIRST_BASE in utils/colors.ts).
+    // The shared StatsDataGrid (LS-9036) pins identity columns via a sticky
+    // XStack over an opaque background — the per-position left-border accent
+    // was a batting-only decoration retired in the sport-agnostic reskin.
     const stickyCell = findAncestor(
       nameNode,
       (n) => n.style.position === 'sticky',
     );
     expect(stickyCell).not.toBeNull();
     expect(stickyCell?.style.left).toBe('0px');
-    expect(stickyCell?.style.borderLeft.replace(/\s+/g, '')).toContain(
-      '1pxsolid',
-    );
   });
 
-  test('renders skeleton rows that mirror the data row geometry while loading', () => {
+  test('renders the shared loading skeleton while data is fetching', () => {
     render(
       <TestWrapper>
         <PlayerStatsDataGrid {...defaultProps} />
       </TestWrapper>,
     );
 
-    // Before the GraphQL mock resolves, the grid is in its loading state.
-    // The skeleton block is announced with aria-busy + aria-label; locate it
-    // via the spinner-adjacent loading caption inside the same container.
-    const loadingCaption = screen.getByText('Loading player statistics...');
-    expect(loadingCaption).toBeInTheDocument();
-    const loadingRegion = findAncestor(
-      loadingCaption,
-      (n) => n.getAttribute('aria-busy') !== null,
-    );
-    expect(loadingRegion).not.toBeNull();
-    expect(loadingRegion).toHaveAttribute(
-      'aria-label',
-      'Loading player statistics...',
-    );
+    // Before the GraphQL mock resolves, the grid renders the shared
+    // decorative skeleton (StatsDataGrid/StateCards — LS-9036).
+    const skeleton = screen.getByTestId('player-stats-loading-skeleton');
+    expect(skeleton).toBeInTheDocument();
+    expect(skeleton).toHaveAttribute('aria-hidden', 'true');
   });
 });
 

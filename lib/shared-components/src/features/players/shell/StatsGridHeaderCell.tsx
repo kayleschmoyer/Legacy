@@ -70,6 +70,7 @@ export function StatsGridHeaderCell({
 
   return (
     <XStack
+      role="columnheader"
       width={width || 'auto'}
       minWidth={minWidth}
       flexGrow={flexGrow}
