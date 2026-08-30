@@ -665,6 +665,13 @@ export const MatchupPlayer = builder.objectRef<{
   teamId: number;
   positionId: number | null;
   season: number | null;
+  /**
+   * Set only on the object returned directly from
+   * updateMatchupPlayerPosition/swapMatchupPlayerPositions (LS-6376). Groups
+   * the row(s) written by that mutation call for undoMatchupPlayerSwap.
+   * Null (or undefined) on every other MatchupPlayer resolution path.
+   */
+  swapId?: string | null;
 }>('MatchupPlayer');
 
 builder.objectType(MatchupPlayer, {
@@ -676,6 +683,9 @@ builder.objectType(MatchupPlayer, {
     teamId: t.exposeInt('teamId'),
     positionId: t.exposeInt('positionId', { nullable: true }),
     season: t.exposeInt('season', { nullable: true }),
+    // Only set on the direct result of updateMatchupPlayerPosition /
+    // swapMatchupPlayerPositions; null everywhere else (LS-6376).
+    swapId: t.exposeString('swapId', { nullable: true }),
     // Computed field: number of games this player will play in the matchup
     // SP players get pitcherStartsPerMatchup; all others get gamesPerMatchup
     numberOfGames: t.int({

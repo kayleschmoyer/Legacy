@@ -1839,6 +1839,7 @@ export type MatchupPlayer = {
   seasonBatting?: Maybe<SeasonBatting>;
   seasonFielding?: Maybe<SeasonFielding>;
   seasonPitching?: Maybe<SeasonPitching>;
+  swapId?: Maybe<Scalars['String']['output']>;
   teamId?: Maybe<Scalars['Int']['output']>;
 };
 
@@ -2177,6 +2178,7 @@ export type Mutation = {
   /** Withdraw a pending keeper designation before the draft goes live. (LS-8673) */
   undesignateKeeper?: Maybe<KeeperDesignation>;
   undoLastDraftPick?: Maybe<DraftPick>;
+  undoMatchupPlayerSwap?: Maybe<Array<MatchupPlayer>>;
   /** Commissioner: update the persistent LM note for a league. */
   updateCommissionerNote?: Maybe<CommissionerActionResult>;
   updateDraftSettings?: Maybe<UpdateDraftSettingsPayload>;
@@ -2816,6 +2818,10 @@ export type MutationUndesignateKeeperArgs = {
 
 export type MutationUndoLastDraftPickArgs = {
   draftId: Scalars['Int']['input'];
+};
+
+export type MutationUndoMatchupPlayerSwapArgs = {
+  swapId: Scalars['String']['input'];
 };
 
 export type MutationUpdateCommissionerNoteArgs = {

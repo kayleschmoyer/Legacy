@@ -20,6 +20,7 @@ import {
 } from '@legacy-sports/utils';
 import { and, asc, eq, inArray, isNull, not, sql } from 'drizzle-orm';
 import { GraphQLError } from 'graphql';
+import { randomUUID } from 'crypto';
 
 import {
   AdvanceLeagueWeekResponse,
@@ -668,6 +669,19 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
         throw error;
       }
 
+      // LS-6376: record the move so it can be reverted via
+      // undoMatchupPlayerSwap within the undo window.
+      const swapId = randomUUID();
+      await db.insert(PublicSchema.matchupPlayerHistory).values({
+        swapId,
+        matchupPlayerId: updated.id,
+        matchupId: updated.matchupId,
+        teamId: targetPlayer.teamId,
+        playerId: updated.playerId,
+        previousPositionId: matchupPlayer.positionId ?? null,
+        newPositionId: updated.positionId ?? null,
+      });
+
       if (isCommissionerBypass) {
         await auditAndNotifyCommissionerBypass(context, {
           leagueId: matchup.leagueId,
@@ -701,6 +715,7 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
         ...updated,
         positionId: updated.positionId ?? null,
         season: seasonsResult[0]?.season ?? null,
+        swapId,
       };
     },
   }),
@@ -717,6 +732,16 @@ builder.mutationField('updateMatchupPlayerPosition', (t) =>
  * Exported standalone (rather than inlined in the resolver) so it can be
  * exercised directly against a real Postgres instance in integration tests.
  */
+export interface MatchupPlayerSwapResult {
+  id: number;
+  matchupId: number;
+  playerId: number;
+  teamId: number;
+  positionId: number | null;
+  /** Groups this row with its swap partner for undoMatchupPlayerSwap (LS-6376). */
+  swapId: string;
+}
+
 export async function performMatchupPlayerPositionSwap(
   db: GenericDatabase<typeof PublicSchema>,
   params: {
@@ -729,15 +754,7 @@ export async function performMatchupPlayerPositionSwap(
     matchupPlayerIdB: number;
     positionIdB: number | null;
   },
-): Promise<
-  Array<{
-    id: number;
-    matchupId: number;
-    playerId: number;
-    teamId: number;
-    positionId: number | null;
-  }>
-> {
+): Promise<Array<MatchupPlayerSwapResult>> {
   const {
     matchupIdA,
     teamIdA,
@@ -777,6 +794,24 @@ export async function performMatchupPlayerPositionSwap(
     if (await isMatchupLocked(tx, lockedMatchup)) {
       throw MatchupLockedError(lockedMatchup.status);
     }
+
+    // Capture pre-swap positions for the history rows below, before either
+    // row is touched.
+    const previousRows = await tx
+      .select({
+        id: PublicSchema.matchupPlayers.id,
+        positionId: PublicSchema.matchupPlayers.positionId,
+      })
+      .from(PublicSchema.matchupPlayers)
+      .where(
+        inArray(PublicSchema.matchupPlayers.id, [
+          matchupPlayerIdA,
+          matchupPlayerIdB,
+        ]),
+      );
+    const previousPositionById = new Map(
+      previousRows.map((r) => [r.id, r.positionId]),
+    );
 
     // Clear both positions first to avoid unique constraint violations
     await tx
@@ -856,7 +891,34 @@ export async function performMatchupPlayerPositionSwap(
       );
     }
 
-    return [updatedA[0], updatedB[0]];
+    // LS-6376: record both sides of the swap under a shared swapId so it can
+    // be atomically reverted via undoMatchupPlayerSwap within the undo window.
+    const swapId = randomUUID();
+    await tx.insert(PublicSchema.matchupPlayerHistory).values([
+      {
+        swapId,
+        matchupPlayerId: updatedA[0].id,
+        matchupId: updatedA[0].matchupId,
+        teamId: teamIdA,
+        playerId: updatedA[0].playerId,
+        previousPositionId: previousPositionById.get(matchupPlayerIdA) ?? null,
+        newPositionId: updatedA[0].positionId ?? null,
+      },
+      {
+        swapId,
+        matchupPlayerId: updatedB[0].id,
+        matchupId: updatedB[0].matchupId,
+        teamId: teamIdB,
+        playerId: updatedB[0].playerId,
+        previousPositionId: previousPositionById.get(matchupPlayerIdB) ?? null,
+        newPositionId: updatedB[0].positionId ?? null,
+      },
+    ]);
+
+    return [
+      { ...updatedA[0], swapId },
+      { ...updatedB[0], swapId },
+    ];
   });
 }
 
@@ -963,6 +1025,226 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
 
       const seasonMap = new Map(
         seasonsResults.map((s) => [s.playerId, s.season]),
+      );
+
+      return results.map((r) => ({
+        ...r,
+        positionId: r.positionId ?? null,
+        season: seasonMap.get(r.playerId) ?? null,
+      }));
+    },
+  }),
+);
+
+// ── Undo Matchup Player Swap ─────────────────────────────────────────────────
+
+/**
+ * Window within which a swap/move can be undone (LS-6376). Matches the
+ * client's 5s undo toast plus generous margin for a dropped-connection retry.
+ */
+export const UNDO_MATCHUP_PLAYER_SWAP_WINDOW_MS = 60_000;
+
+/**
+ * Atomically reverts every un-undone matchup_player_history row for a given
+ * swapId back to its previousPositionId, then marks those rows undone.
+ *
+ * Exported standalone (rather than inlined in the resolver) so it can be
+ * exercised directly against a real Postgres instance in integration tests,
+ * mirroring performMatchupPlayerPositionSwap.
+ */
+export async function performUndoMatchupPlayerSwap(
+  db: GenericDatabase<typeof PublicSchema>,
+  swapId: string,
+): Promise<
+  Array<{
+    id: number;
+    matchupId: number;
+    playerId: number;
+    teamId: number;
+    positionId: number | null;
+  }>
+> {
+  return db.transaction(async (tx) => {
+    const historyRows = await tx
+      .select()
+      .from(PublicSchema.matchupPlayerHistory)
+      .where(
+        and(
+          eq(PublicSchema.matchupPlayerHistory.swapId, swapId),
+          isNull(PublicSchema.matchupPlayerHistory.undoneAt),
+        ),
+      );
+
+    if (historyRows.length === 0) {
+      throw NotFoundError(
+        `No pending swap found for swapId ${swapId} — it may already be undone or too old`,
+      );
+    }
+
+    const oldestCreatedAtMs = Math.min(
+      ...historyRows.map((r) => r.createdAt.getTime()),
+    );
+    if (Date.now() - oldestCreatedAtMs > UNDO_MATCHUP_PLAYER_SWAP_WINDOW_MS) {
+      throw UserInputError('The undo window for this swap has expired');
+    }
+
+    const matchupPlayerIds = historyRows.map((r) => r.matchupPlayerId);
+
+    // Clear every affected slot first to avoid unique constraint violations,
+    // mirroring performMatchupPlayerPositionSwap.
+    await tx
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: null })
+      .where(inArray(PublicSchema.matchupPlayers.id, matchupPlayerIds));
+
+    // Evict any third row (e.g. a concurrent roster-tab sync) that may now
+    // occupy a slot being restored to, so the assignments below can't
+    // collide with matchup_players_unique_slot_idx.
+    for (const row of historyRows) {
+      if (row.previousPositionId != null) {
+        await tx
+          .update(PublicSchema.matchupPlayers)
+          .set({ positionId: null })
+          .where(
+            and(
+              eq(PublicSchema.matchupPlayers.matchupId, row.matchupId),
+              eq(PublicSchema.matchupPlayers.teamId, row.teamId),
+              eq(
+                PublicSchema.matchupPlayers.positionId,
+                row.previousPositionId,
+              ),
+              not(inArray(PublicSchema.matchupPlayers.id, matchupPlayerIds)),
+            ),
+          );
+      }
+    }
+
+    const results: Array<{
+      id: number;
+      matchupId: number;
+      playerId: number;
+      teamId: number;
+      positionId: number | null;
+    }> = [];
+
+    for (const row of historyRows) {
+      const updated = await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: row.previousPositionId ?? null })
+        .where(eq(PublicSchema.matchupPlayers.id, row.matchupPlayerId))
+        .returning({
+          id: PublicSchema.matchupPlayers.id,
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          teamId: PublicSchema.matchupPlayers.teamId,
+          positionId: PublicSchema.matchupPlayers.positionId,
+        });
+
+      if (updated.length === 0) {
+        throw NotFoundError(
+          `Failed to undo swap: matchup player ${row.matchupPlayerId} no longer exists`,
+        );
+      }
+      results.push(updated[0]);
+    }
+
+    await tx
+      .update(PublicSchema.matchupPlayerHistory)
+      .set({ undoneAt: new Date() })
+      .where(eq(PublicSchema.matchupPlayerHistory.swapId, swapId));
+
+    return results;
+  });
+}
+
+// Mutation: undoMatchupPlayerSwap
+// Reverts a swap/move made via swapMatchupPlayerPositions or
+// updateMatchupPlayerPosition, within UNDO_MATCHUP_PLAYER_SWAP_WINDOW_MS of
+// the original change (LS-6376).
+builder.mutationField('undoMatchupPlayerSwap', (t) =>
+  t.field({
+    type: [MatchupPlayer],
+    args: {
+      swapId: t.arg.string({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const db = context.db;
+
+      const historyRows = await db
+        .select({
+          matchupPlayerId: PublicSchema.matchupPlayerHistory.matchupPlayerId,
+        })
+        .from(PublicSchema.matchupPlayerHistory)
+        .where(
+          and(
+            eq(PublicSchema.matchupPlayerHistory.swapId, args.swapId),
+            isNull(PublicSchema.matchupPlayerHistory.undoneAt),
+          ),
+        );
+
+      if (historyRows.length === 0) {
+        throw NotFoundError(
+          `No pending swap found for swapId ${args.swapId} — it may already be undone or too old`,
+        );
+      }
+
+      // Verify the caller owns (or has commissioner access to) every team
+      // affected, and that none of the matchups have since locked. Also
+      // captures leagueId/weekNumber per matchupId for season resolution
+      // below, since undone rows only carry matchupId.
+      const leagueWeekByMatchupId = new Map<
+        number,
+        { leagueId: number; weekNumber: number }
+      >();
+      for (const row of historyRows) {
+        const { matchup } = await verifyMatchupTeamOwnership(
+          context,
+          row.matchupPlayerId,
+        );
+        if (matchup.status !== 'scheduled') {
+          throw MatchupLockedError(matchup.status);
+        }
+        leagueWeekByMatchupId.set(matchup.id, {
+          leagueId: matchup.leagueId,
+          weekNumber: matchup.weekNumber,
+        });
+      }
+
+      const results = await performUndoMatchupPlayerSwap(db, args.swapId);
+
+      const seasonsResults =
+        results.length > 0
+          ? await db
+              .select({
+                leagueId: PublicSchema.leagueWeekPlayerSeasons.leagueId,
+                weekNumber: PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+                playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+                season: PublicSchema.leagueWeekPlayerSeasons.season,
+              })
+              .from(PublicSchema.leagueWeekPlayerSeasons)
+              .where(
+                inArray(
+                  PublicSchema.leagueWeekPlayerSeasons.playerId,
+                  results.map((r) => r.playerId),
+                ),
+              )
+          : [];
+
+      const seasonMap = new Map(
+        seasonsResults
+          .filter((s) => {
+            const lw = leagueWeekByMatchupId.get(
+              results.find((r) => r.playerId === s.playerId)?.matchupId ?? -1,
+            );
+            return (
+              lw?.leagueId === s.leagueId && lw?.weekNumber === s.weekNumber
+            );
+          })
+          .map((s) => [s.playerId, s.season]),
       );
 
       return results.map((r) => ({
@@ -1180,7 +1462,7 @@ builder.mutationField('setOptimalLineup', (t) =>
   t.field({
     type: [MatchupPlayer],
     description:
-      'Premium (LS-6378): sets a football team’s starting lineup to the combination of rostered players that maximizes total projected points for the matchup week, respecting each starting slot’s position eligibility. Requires ENTITLEMENTS.optimal_lineup and team ownership; only available while the matchup is scheduled.',
+      'Premium (LS-6378): sets a football team\u2019s starting lineup to the combination of rostered players that maximizes total projected points for the matchup week, respecting each starting slot\u2019s position eligibility. Requires ENTITLEMENTS.optimal_lineup and team ownership; only available while the matchup is scheduled.',
     args: {
       matchupId: t.arg.int({ required: true }),
       teamId: t.arg.int({ required: true }),

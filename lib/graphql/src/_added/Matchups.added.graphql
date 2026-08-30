@@ -82,6 +82,13 @@ mutation SwapMatchupPlayerPositions(
   }
 }
 
+mutation UndoMatchupPlayerSwap($swapId: String!) {
+  undoMatchupPlayerSwap(swapId: $swapId) {
+    ...MatchupPlayer
+    ...AppMatchupPlayer
+  }
+}
+
 mutation SetOptimalLineup($matchupId: Int!, $teamId: Int!) {
   setOptimalLineup(matchupId: $matchupId, teamId: $teamId) {
     ...MatchupPlayer

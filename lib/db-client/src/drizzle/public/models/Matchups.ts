@@ -167,6 +167,53 @@ export const matchupPlayers = pgTable(
   },
 );
 
+/**
+ * Position-change history for a matchup player (LS-6376).
+ *
+ * Written on every position change made via updateMatchupPlayerPosition or
+ * swapMatchupPlayerPositions, so a swap can be atomically reverted before the
+ * matchup starts. `swapId` groups the one or two rows written by a single
+ * mutation call — a swap writes two rows sharing the same swapId, a single
+ * move writes one — and is what the client passes to
+ * `undoMatchupPlayerSwap`. `undoneAt` is set once a row has been reverted, so
+ * a swap can't be undone twice.
+ */
+export const matchupPlayerHistory = pgTable(
+  'matchup_player_history',
+  {
+    id: serial('id').primaryKey().notNull(),
+    swapId: char('swap_id', { length: 36 }).notNull(),
+    matchupPlayerId: integer('matchup_player_id').notNull(),
+    matchupId: integer('matchup_id').notNull(),
+    teamId: integer('team_id').notNull(),
+    playerId: integer('player_id').notNull(),
+    previousPositionId: integer('previous_position_id'),
+    newPositionId: integer('new_position_id'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    undoneAt: timestamp('undone_at', { withTimezone: true }),
+  },
+  (table) => {
+    return {
+      matchupPlayerHistoryMatchupPlayerFk: foreignKey({
+        columns: [table.matchupPlayerId],
+        foreignColumns: [matchupPlayers.id],
+        name: 'matchup_player_history_matchup_player_fk',
+      }).onDelete('cascade'),
+      matchupPlayerHistoryMatchupFk: foreignKey({
+        columns: [table.matchupId],
+        foreignColumns: [matchups.id],
+        name: 'matchup_player_history_matchup_fk',
+      }).onDelete('cascade'),
+      swapIdIdx: index('matchup_player_history_swap_id_idx').on(table.swapId),
+      matchupPlayerIdIdx: index(
+        'matchup_player_history_matchup_player_id_idx',
+      ).on(table.matchupPlayerId, table.createdAt.desc()),
+    };
+  },
+);
+
 export const leagueWeekPlayerSeasons = pgTable(
   'league_week_player_seasons',
   {

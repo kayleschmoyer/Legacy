@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Alert } from 'react-native';
 import { Spinner, Text, XStack, YStack } from 'tamagui';
 import { LOGGER } from '@legacy-sports/logging';
@@ -15,6 +21,7 @@ import {
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
   useSwapMatchupPlayerPositionsMutation,
+  useUndoMatchupPlayerSwapMutation,
   useUpdateMatchupPlayerPositionMutation,
 } from '@legacy-sports/graphql';
 import {
@@ -73,8 +80,58 @@ export function MatchupRosterEditor({
     useUpdateMatchupPlayerPositionMutation();
   const [swapPositionsMutation, { loading: swapLoading }] =
     useSwapMatchupPlayerPositionsMutation();
+  const [undoSwapMutation] = useUndoMatchupPlayerSwapMutation();
 
   const mutating = updateLoading || swapLoading;
+
+  // LS-6376: offers a 5s "Undo" toast after a swap/move so a user who loses
+  // connectivity between the swap and its confirmation can revert it. The
+  // server independently enforces a 60s undo window (UNDO_MATCHUP_PLAYER_SWAP_WINDOW_MS)
+  // as a generous margin for a dropped-connection retry.
+  const UNDO_TOAST_DURATION_MS = 5_000;
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    },
+    [],
+  );
+
+  const handleUndo = useCallback(
+    async (swapId: string) => {
+      try {
+        await undoSwapMutation({ variables: { swapId } });
+        await refetchPlayers();
+      } catch (err) {
+        LOGGER.error(
+          'Failed to undo matchup player swap:',
+          err instanceof Error ? err : String(err),
+        );
+        Alert.alert('Error', 'Failed to undo. Please try again.');
+      }
+    },
+    [undoSwapMutation, refetchPlayers],
+  );
+
+  const offerUndo = useCallback(
+    (swapId: string | null | undefined) => {
+      if (!swapId) return;
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+
+      Alert.alert('Lineup updated', 'Tap Undo to revert this change.', [
+        { text: 'Undo', onPress: () => void handleUndo(swapId) },
+        { text: 'Dismiss', style: 'cancel' },
+      ]);
+
+      // Mirrors the 5s undo window even though the OS Alert itself has no
+      // built-in auto-dismiss timer.
+      undoTimerRef.current = setTimeout(() => {
+        undoTimerRef.current = null;
+      }, UNDO_TOAST_DURATION_MS);
+    },
+    [handleUndo],
+  );
 
   const [fetchMatchupStatus] = useGetMatchupByIdLazyQuery({
     fetchPolicy: 'network-only',
@@ -179,7 +236,7 @@ export function MatchupRosterEditor({
         return;
       }
       try {
-        await swapPositionsMutation({
+        const { data } = await swapPositionsMutation({
           variables: {
             matchupPlayerIdA: idA,
             positionIdA: newPosition1Id,
@@ -188,6 +245,7 @@ export function MatchupRosterEditor({
           },
         });
         await refetchPlayers();
+        offerUndo(data?.swapMatchupPlayerPositions?.[0]?.swapId);
       } catch (err) {
         handleRosterMutationError({
           error: err,
@@ -199,7 +257,12 @@ export function MatchupRosterEditor({
         Alert.alert('Error', 'Failed to swap positions. Please try again.');
       }
     },
-    [swapPositionsMutation, refetchPlayers, checkForLockAfterRejection],
+    [
+      swapPositionsMutation,
+      refetchPlayers,
+      checkForLockAfterRejection,
+      offerUndo,
+    ],
   );
 
   const handleMoveToPosition = useCallback(
@@ -210,13 +273,14 @@ export function MatchupRosterEditor({
         return;
       }
       try {
-        await updatePositionMutation({
+        const { data } = await updatePositionMutation({
           variables: {
             matchupPlayerId: id,
             positionId,
           },
         });
         await refetchPlayers();
+        offerUndo(data?.updateMatchupPlayerPosition?.swapId);
       } catch (err) {
         handleRosterMutationError({
           error: err,
@@ -228,7 +292,12 @@ export function MatchupRosterEditor({
         Alert.alert('Error', 'Failed to update position. Please try again.');
       }
     },
-    [updatePositionMutation, refetchPlayers, checkForLockAfterRejection],
+    [
+      updatePositionMutation,
+      refetchPlayers,
+      checkForLockAfterRejection,
+      offerUndo,
+    ],
   );
 
   if (

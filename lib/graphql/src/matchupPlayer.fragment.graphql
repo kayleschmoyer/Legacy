@@ -5,6 +5,7 @@ fragment MatchupPlayer on MatchupPlayer {
   teamId
   positionId
   season
+  swapId
   numberOfGames
   player {
     id
