@@ -1693,6 +1693,8 @@ export type Matchup = {
   gamesPerMatchup?: Maybe<Scalars['Int']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
+  /** When lineups lock for this matchup (ISO 8601), computed from the league's roster-lock settings. Null once the matchup is no longer 'scheduled' (already locked) or when no lock time can be computed. */
+  lockTime?: Maybe<Scalars['String']['output']>;
   pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   /** Auto-generated narrative recap, only available for completed matchups. */
   recap?: Maybe<MatchupRecap>;

@@ -22,6 +22,7 @@ import {
   RateLimitedError,
   UserInputError,
 } from '../graphql-errors';
+import { assertPositionAssignmentsEligible } from '../position-eligibility';
 import { checkAndIncrementRateLimit } from '../rate-limit';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -229,10 +230,28 @@ builder.mutationField('updateTeamMemberPosition', (t) =>
       },
       async (_parent, args, context, user) => {
         const { teamMemberId, positionId } = args;
+        const db = context.db;
+
+        // Slot-eligibility gate (LS-6427). Runs before the `try` below, and
+        // so before the transaction: a rejected roster move is expected user
+        // input, and the catch block logs everything it sees as a system
+        // error. A missing member is left to the in-transaction
+        // "Team member not found" check so that path is unchanged.
+        const [target] = await db
+          .select({
+            playerId: PublicSchema.teamMembers.playerId,
+            leagueId: PublicSchema.teamMembers.leagueId,
+          })
+          .from(PublicSchema.teamMembers)
+          .where(eq(PublicSchema.teamMembers.id, teamMemberId))
+          .limit(1);
+        if (target) {
+          await assertPositionAssignmentsEligible(db, target.leagueId, [
+            { playerId: target.playerId, positionId: positionId ?? null },
+          ]);
+        }
 
         try {
-          const db = context.db;
-
           // Assigning a position that another member of the same team already
           // holds would violate the `team_members_uk_team_position`
           // UNIQUE(team_id, position_id) constraint and surface to the client
@@ -363,10 +382,41 @@ builder.mutationField('swapTeamMemberPositions', (t) =>
       },
       async (_parent, args, context, user) => {
         const { teamMemberIdA, positionIdA, teamMemberIdB, positionIdB } = args;
+        const db = context.db;
+
+        // Slot-eligibility gate for BOTH sides of the swap (LS-6427). A swap
+        // is two assignments, so validating only one side would leave the
+        // other bypassable by ordering the arguments. Runs before the `try`
+        // for the same reason as `updateTeamMemberPosition` above.
+        const swapMembers = await db
+          .select({
+            id: PublicSchema.teamMembers.id,
+            playerId: PublicSchema.teamMembers.playerId,
+            leagueId: PublicSchema.teamMembers.leagueId,
+          })
+          .from(PublicSchema.teamMembers)
+          .where(
+            inArray(PublicSchema.teamMembers.id, [
+              teamMemberIdA,
+              teamMemberIdB,
+            ]),
+          );
+        const targetPositionByMemberId = new Map<number, number | null>([
+          [teamMemberIdA, positionIdA ?? null],
+          [teamMemberIdB, positionIdB ?? null],
+        ]);
+        if (swapMembers.length > 0) {
+          await assertPositionAssignmentsEligible(
+            db,
+            swapMembers[0].leagueId,
+            swapMembers.map((member) => ({
+              playerId: member.playerId,
+              positionId: targetPositionByMemberId.get(member.id) ?? null,
+            })),
+          );
+        }
 
         try {
-          const db = context.db;
-
           // Perform the swap atomically inside a transaction
           const results = await db.transaction(async (tx) => {
             // Step 1: Clear both positions to avoid unique constraint violation

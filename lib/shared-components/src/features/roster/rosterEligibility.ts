@@ -69,8 +69,18 @@ export function isDualEligible(player: RosterEligiblePlayer): boolean {
  * True when `player` may be assigned to a slot of `positionType`.
  *
  * Mirrors the web canonical rule: an empty eligibility list is treated as
- * universally eligible (the server-side mutation is the final gate), otherwise
- * the player must be eligible for one of the positions the slot accepts.
+ * universally eligible, otherwise the player must be eligible for one of the
+ * positions the slot accepts.
+ *
+ * The server-side mutation is the final gate, and as of LS-6427 that gate
+ * actually exists: `updateTeamMemberPosition` and `swapTeamMemberPositions`
+ * validate every assignment through `canFillSlot` in
+ * `lambdas/db/src/schema/position-eligibility.ts`, against the same
+ * `ALLOWED_POSITIONS_BY_SPORT` table this function reads. This function
+ * remains an affordance — it greys out moves the server would refuse — and is
+ * intentionally stricter in one place: it returns `false` for a slot code
+ * absent from the crosswalk (e.g. the premium football `KP` slot), where the
+ * server fails open rather than block a write it cannot prove is wrong.
  *
  * `sport` selects the eligibility crosswalk (defaults to baseball, this
  * function's original behavior — LS-5421 added the football table).

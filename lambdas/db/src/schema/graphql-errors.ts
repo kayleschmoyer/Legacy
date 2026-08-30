@@ -150,6 +150,40 @@ export function ConflictError(message: string): GraphQLError {
 }
 
 /**
+ * Throw when a roster move is rejected because the player is not eligible for
+ * the target slot — a kicker into a QB slot, a QB into a FLEX (LS-6427).
+ *
+ * Maps to Apollo code `POSITION_INELIGIBLE`. Like `MatchupLockedError`, the
+ * specifics travel in `extensions` rather than only in prose, so a client can
+ * name the offending player and slot (and offer the slots that *would* work)
+ * without parsing the message. Distinct from `BAD_USER_INPUT` so the roster
+ * UI can react to it specifically instead of surfacing a generic failure.
+ */
+export function PositionIneligibleError(details: {
+  playerId: number;
+  playerName: string;
+  positionId: number;
+  slotType: string;
+  /** Stat positions the slot accepts; empty when the slot has no crosswalk entry. */
+  allowedPositions: string[];
+  /** Stat positions the player is actually eligible at. */
+  playerPositions: string[];
+}): GraphQLError {
+  const { playerName, slotType, allowedPositions, playerPositions } = details;
+  const accepts = allowedPositions.length
+    ? `${slotType} accepts ${allowedPositions.join(', ')}`
+    : `${slotType} has no eligible positions configured`;
+  const plays = playerPositions.length
+    ? `${playerName} is eligible at ${playerPositions.join(', ')}`
+    : `${playerName} has no eligible positions on record`;
+
+  return new GraphQLError(
+    `${playerName} cannot be assigned to the ${slotType} slot — ${accepts}, but ${plays}.`,
+    { extensions: { code: 'POSITION_INELIGIBLE', ...details } },
+  );
+}
+
+/**
  * Throw when a matchup roster edit is rejected because the matchup is no
  * longer in the `scheduled` state (e.g. `in_progress`, `completed`, or
  * `cancelled`).
