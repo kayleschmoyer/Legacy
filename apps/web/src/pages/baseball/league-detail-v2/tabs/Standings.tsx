@@ -138,7 +138,9 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         loading={standingsLoading}
         currentUserTeamId={myTeamId}
         onTeamPress={onTeam}
-        getTeamUrl={(teamId) => `/baseball/teams/${teamId}`}
+        getTeamUrl={(teamId) =>
+          `/${isFootball ? 'football' : 'baseball'}/teams/${teamId}`
+        }
         title="League Standings"
         subtitle={subtitle}
         showWaiverOrder={showWaiverOrder}

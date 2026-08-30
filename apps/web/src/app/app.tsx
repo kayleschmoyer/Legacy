@@ -174,6 +174,11 @@ const FootballPlayersComparePage = lazyWithRetry(() =>
     default: m.FootballPlayersComparePage,
   })),
 );
+const FootballTeamDetailPage = lazyWithRetry(() =>
+  import('../pages/football/FootballTeamDetailPage').then((m) => ({
+    default: m.FootballTeamDetailPage,
+  })),
+);
 const FootballViewGameLogsPage = lazyWithRetry(() =>
   import('../pages/football/FootballViewGameLogsPage').then((m) => ({
     default: m.FootballViewGameLogsPage,
@@ -748,6 +753,14 @@ function App() {
               element={
                 <FootballGate>
                   <MatchupDetailPage />
+                </FootballGate>
+              }
+            />
+            <Route
+              path="/football/teams/:teamId"
+              element={
+                <FootballGate>
+                  <FootballTeamDetailPage />
                 </FootballGate>
               }
             />

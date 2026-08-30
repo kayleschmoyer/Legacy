@@ -290,11 +290,14 @@ export function LeagueDetailPageV2(): React.JSX.Element {
     if ((tab === 'roster' || tab === 'team') && !isMember) setTab('overview');
   }, [tab, isCommissioner, isMember, setTab, leagueLoading, userTeamIdSettled]);
 
+  // Team Detail lives under the league's own sport namespace (LS-6438) —
+  // before the football page existed this hard-coded /baseball/teams/, which
+  // dropped football managers onto the baseball board.
   const onTeamNav = useCallback(
     (teamId: number) => {
-      navigate(`/baseball/teams/${teamId}`);
+      navigate(`/${sportBasePath}/teams/${teamId}`);
     },
-    [navigate],
+    [navigate, sportBasePath],
   );
 
   const [seasonValue, setSeasonValue] = useState<string>(
