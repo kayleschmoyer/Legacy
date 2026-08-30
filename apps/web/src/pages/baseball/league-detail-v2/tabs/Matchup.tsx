@@ -168,6 +168,13 @@ export const MatchupTab: React.FC<MatchupTabProps> = ({
       void refetchMatchupsRef.current();
       void refetchMatchupRef.current();
     },
+    // Force a refetch on reconnect (LS-6357) — a dropped connection means any
+    // number of onMatchupStatsComplete pushes may have been missed, so we
+    // can't rely on waiting for the next one.
+    onReconnect: () => {
+      void refetchMatchupsRef.current();
+      void refetchMatchupRef.current();
+    },
   });
 
   // Narrow the shared league connection's context to this matchup while the

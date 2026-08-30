@@ -265,6 +265,30 @@ describe('MatchupTab — matchup-scoped stats-complete refetch (LS-6358)', () =>
   });
 });
 
+describe('MatchupTab — refetch on websocket reconnect (LS-6357)', () => {
+  it('refetches matchups and the current matchup when the socket reconnects', () => {
+    const refetch = jest.fn();
+    const refetchMatchups = jest.fn();
+    mockUseMatchupById.mockReturnValue({
+      matchup: baseMatchup,
+      loading: false,
+      error: null,
+      refetch,
+    });
+    mockUseMatchupsByWeek.mockReturnValue({
+      matchups: [baseMatchup],
+      refetch: refetchMatchups,
+    });
+    renderTab({}, { initialMatchupId: '1' });
+
+    const { onReconnect } = mockUseLeagueWebSocket.mock.calls[0][0];
+    onReconnect();
+
+    expect(refetchMatchups).toHaveBeenCalled();
+    expect(refetch).toHaveBeenCalled();
+  });
+});
+
 describe('MatchupTab — loading state', () => {
   it('shows loading indicator while matchup is being fetched', () => {
     mockUseMatchupById.mockReturnValue({
