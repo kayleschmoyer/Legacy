@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
 import { Bell } from '@tamagui/lucide-icons/icons/Bell';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { Zap } from '@tamagui/lucide-icons/icons/Zap';
@@ -26,7 +25,6 @@ interface MobileTab {
 
 const TABS: MobileTab[] = [
   { id: 'players', label: 'Players', to: '/players', Icon: Users },
-  { id: 'stats', label: 'Stats', to: '/players/stats', Icon: BarChart2 },
   { id: 'minigames', label: 'Minigames', to: '/games', Icon: Zap },
   { id: 'alerts', label: 'Alerts', to: '/notifications', Icon: Bell },
   { id: 'you', label: 'You', to: '/profile/settings', isAvatar: true },
@@ -51,14 +49,7 @@ export const MobileBottomBar: React.FC<Props> = ({ draftLive = false }) => {
   })();
 
   const isActive = (tab: MobileTab) => {
-    if (tab.id === 'players')
-      return (
-        location.pathname === '/players' ||
-        (location.pathname.startsWith('/players') &&
-          !location.pathname.startsWith('/players/stats'))
-      );
-    if (tab.id === 'stats')
-      return location.pathname.startsWith('/players/stats');
+    if (tab.id === 'players') return location.pathname.startsWith('/players');
     if (tab.id === 'minigames')
       return (
         location.pathname.startsWith('/games') ||

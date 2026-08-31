@@ -10,7 +10,6 @@ import {
   type HelpFaqItem,
 } from '@legacy-sports/utils';
 import { AlertTriangle } from '@tamagui/lucide-icons/icons/AlertTriangle';
-import { BarChart3 } from '@tamagui/lucide-icons/icons/BarChart3';
 import { Bug } from '@tamagui/lucide-icons/icons/Bug';
 import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
 import { Gamepad2 } from '@tamagui/lucide-icons/icons/Gamepad2';
@@ -66,7 +65,6 @@ const CONTACT_ICON_MAP: Record<
 const QUICK_LINKS = [
   { to: '/baseball', icon: Trophy, label: 'My Leagues' },
   { to: '/players', icon: Users, label: 'Players' },
-  { to: '/players/stats', icon: BarChart3, label: 'Player Stats' },
   { to: '/baseball/league/create', icon: Plus, label: 'Create League' },
   { to: '/profile/settings', icon: Settings, label: 'Profile Settings' },
 ];

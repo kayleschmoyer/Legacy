@@ -37,9 +37,8 @@ test.describe('Navigation Header @smoke', () => {
   }) => {
     // Navigation uses role="navigation" aria-label="Primary"
     await navHeader.expectPrimaryNavVisible();
-    // Nav contains pill-tab links for Players, Stats, and Minigames
+    // Nav contains pill-tab links for Players and Minigames
     await navHeader.expectNavItem(/^players$/i);
-    await navHeader.expectNavItem(/^stats$/i);
     await navHeader.expectNavItem(/^minigames$/i);
   });
 

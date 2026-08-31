@@ -247,12 +247,9 @@ test.describe('Primary Navigation Landmark @smoke', () => {
     await page.waitForLoadState('load');
 
     const primaryNav = page.getByRole('navigation', { name: 'Primary' });
-    // Nav contains pill-tab links for Players, Stats, and Minigames
+    // Nav contains pill-tab links for Players and Minigames
     await expect(
       primaryNav.getByRole('link', { name: /^players$/i }),
-    ).toBeVisible();
-    await expect(
-      primaryNav.getByRole('link', { name: /^stats$/i }),
     ).toBeVisible();
     await expect(
       primaryNav.getByRole('link', { name: /^minigames$/i }),

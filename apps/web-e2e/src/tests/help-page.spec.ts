@@ -117,14 +117,6 @@ test.describe('Help Page — quick links @smoke', () => {
     await expect(link).toBeVisible();
   });
 
-  test('shows Player Stats quick link pointing to /players/stats', async ({
-    page,
-  }) => {
-    const link = page.getByRole('link', { name: /player stats/i });
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute('href', '/players/stats');
-  });
-
   test('shows Create League quick link pointing to /baseball/league/create', async ({
     page,
   }) => {

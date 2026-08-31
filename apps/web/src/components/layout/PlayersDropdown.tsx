@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Paragraph, XStack, YStack } from '@legacy-sports/shared-components/ui';
 import { Text } from '@legacy-sports/ui-abstractions';
 import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
-import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
 import { ChevronDown } from '@tamagui/lucide-icons/icons/ChevronDown';
 import { ChevronUp } from '@tamagui/lucide-icons/icons/ChevronUp';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
@@ -49,7 +48,6 @@ export const PlayersDropdown: React.FC = () => {
 
   const isActive =
     location.pathname === '/players' ||
-    location.pathname === '/players/stats' ||
     location.pathname === '/players/compare';
   const isHighlighted = isActive || isOpen;
 
@@ -167,44 +165,6 @@ export const PlayersDropdown: React.FC = () => {
                   </Paragraph>
                   <Paragraph style={descStyle}>
                     Browse the full roster
-                  </Paragraph>
-                </YStack>
-              </XStack>
-            </MenuItem>
-          </Link>
-
-          <Link
-            to="/players/stats"
-            style={{ textDecoration: 'none', display: 'block' }}
-          >
-            <MenuItem
-              onPress={() => setIsOpen(false)}
-              role="menuitem"
-              active={location.pathname === '/players/stats'}
-            >
-              <XStack alignItems="flex-start" gap={12} flex={1}>
-                <BarChart2
-                  size={17}
-                  color={
-                    location.pathname === '/players/stats'
-                      ? BRAND_GOLD
-                      : TEXT_MUTED
-                  }
-                  style={{ flexShrink: 0, marginTop: 1 }}
-                />
-                <YStack flex={1} gap={0}>
-                  <Paragraph
-                    color={
-                      location.pathname === '/players/stats'
-                        ? BRAND_GOLD
-                        : '$color'
-                    }
-                    style={titleStyle}
-                  >
-                    Player Stats
-                  </Paragraph>
-                  <Paragraph style={descStyle}>
-                    Rankings &amp; performance
                   </Paragraph>
                 </YStack>
               </XStack>

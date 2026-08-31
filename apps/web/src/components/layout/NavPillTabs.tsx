@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
 import { Users } from '@tamagui/lucide-icons/icons/Users';
 import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { FONT_DISPLAY } from './NavDropdownShared';
@@ -21,7 +20,6 @@ interface Tab {
 
 const TABS: Tab[] = [
   { id: 'players', label: 'Players', to: '/players', Icon: Users },
-  { id: 'stats', label: 'Stats', to: '/players/stats', Icon: BarChart2 },
   { id: 'minigames', label: 'Minigames', to: '/games', Icon: Zap },
 ];
 
@@ -33,14 +31,7 @@ export const NavPillTabs: React.FC<Props> = ({ draftLive = false }) => {
   const location = useLocation();
 
   const isActive = (tab: Tab) => {
-    if (tab.id === 'players')
-      return (
-        location.pathname === '/players' ||
-        (location.pathname.startsWith('/players') &&
-          !location.pathname.startsWith('/players/stats'))
-      );
-    if (tab.id === 'stats')
-      return location.pathname.startsWith('/players/stats');
+    if (tab.id === 'players') return location.pathname.startsWith('/players');
     if (tab.id === 'minigames')
       return (
         location.pathname.startsWith('/games') ||

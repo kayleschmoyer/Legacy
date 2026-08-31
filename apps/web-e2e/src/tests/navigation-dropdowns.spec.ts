@@ -2,7 +2,7 @@
  * Navigation Links & Dropdowns E2E Tests
  *
  * Covers the desktop header navigation:
- *   - NavPillTabs (Players, Stats, Minigames links)
+ *   - NavPillTabs (Players, Minigames links)
  *   - User Profile menu (items: Profile Settings, Subscription, Sign Out)
  *   - Help & support menu (Escape key closes it)
  *
@@ -47,10 +47,6 @@ test.describe('Navigation – Nav pill tabs @smoke', () => {
     await navHeader.expectNavItem(/^players$/i);
   });
 
-  test('renders the Stats pill link', async ({ navHeader }) => {
-    await navHeader.expectNavItem(/^stats$/i);
-  });
-
   test('renders the Minigames pill link', async ({ navHeader }) => {
     await navHeader.expectNavItem(/^minigames$/i);
   });
@@ -61,14 +57,6 @@ test.describe('Navigation – Nav pill tabs @smoke', () => {
   }) => {
     await navHeader.clickNavItem(/^players$/i);
     await expect(page).toHaveURL(/\/players/);
-  });
-
-  test('clicking Stats navigates to /players (redirected from /players/stats, LS-9076)', async ({
-    page,
-    navHeader,
-  }) => {
-    await navHeader.clickNavItem(/^stats$/i);
-    await expect(page).toHaveURL(/\/players$/);
   });
 
   test('clicking Minigames navigates to /games', async ({

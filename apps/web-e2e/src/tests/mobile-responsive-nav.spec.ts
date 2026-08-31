@@ -114,10 +114,6 @@ test.describe('Mobile panel navigation links @critical', () => {
     await navHeader.expectMobileMenuItem(/minigames/i);
   });
 
-  test('shows Stats link @regression', async ({ navHeader }) => {
-    await navHeader.expectMobileMenuItem(/^stats$/i);
-  });
-
   test('shows Help & support link in You section @regression', async ({
     navHeader,
   }) => {

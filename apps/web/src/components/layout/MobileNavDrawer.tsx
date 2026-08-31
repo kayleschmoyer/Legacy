@@ -1,7 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { BarChart2 } from '@tamagui/lucide-icons/icons/BarChart2';
 import { Bug } from '@tamagui/lucide-icons/icons/Bug';
 import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
 import { Compass } from '@tamagui/lucide-icons/icons/Compass';
@@ -388,13 +387,7 @@ export const MobileNavDrawer: React.FC<Props> = ({
             Icon: Users,
             label: 'Players',
             to: '/players',
-            active: isPathActive('/players') && !isPathActive('/players/stats'),
-          },
-          {
-            Icon: BarChart2,
-            label: 'Stats',
-            to: '/players/stats',
-            active: isPathActive('/players/stats'),
+            active: isPathActive('/players'),
           },
           {
             Icon: Zap,
