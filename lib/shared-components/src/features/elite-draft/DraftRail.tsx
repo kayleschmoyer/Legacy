@@ -53,11 +53,13 @@ const HOVER_BORDER = withAlpha(WHITE, 0.1);
 // isolated component tests (e.g. EliteDraftBoard.a11y.spec.tsx) don't set
 // up, while declarative $md style props resolve without it.
 const RailRoot = tamaguiStyled(YStack, {
-  // `gridArea` docks this component into the still-CSS-Grid `.d-layout`
-  // container in EliteDraftBoardScreen.tsx (raw HTML/CSS, out of scope for
-  // this ticket — see LS-9057). Tamagui forwards unrecognized style keys
-  // straight through to the underlying web element's style object.
-  gridArea: 'rail',
+  // Docks this component into the still-CSS-Grid `.d-layout` container in
+  // EliteDraftBoardScreen.tsx (raw HTML/CSS, out of scope for this ticket —
+  // see LS-9057). `gridArea` is NOT a recognized Tamagui style token, so
+  // Tamagui's styled() silently drops it instead of forwarding it to the
+  // underlying web element (confirmed via computed style: LS-9344) — grid
+  // placement is applied via `style={{ gridArea: 'rail' }}` at the JSX usage
+  // site below instead.
   backgroundColor: SURFACE_SUBTLE,
   borderLeftWidth: 1,
   borderLeftColor: BORDER_HAIRLINE,
@@ -386,6 +388,7 @@ export function DraftRail({
       testID="draft-rail"
       data-collapsed={mobileCollapsed ? 'true' : 'false'}
       collapsed={mobileCollapsed}
+      style={{ gridArea: 'rail' }}
     >
       <RailMobileToggle
         tag="button"

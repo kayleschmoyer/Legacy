@@ -96,11 +96,13 @@ const BUTTON_A11Y = { role: 'button' as const, tabIndex: 0 };
 // casting the result to a concrete component type keeps call sites lint-clean.
 
 const TopBandRoot = tamaguiStyled(XStack, {
-  // `gridArea` docks this component into the still-CSS-Grid `.d-layout`
-  // container in EliteDraftBoardScreen.tsx (raw HTML/CSS, out of scope for
-  // this ticket — see LS-9057). Tamagui forwards unrecognized style keys
-  // straight through to the underlying web element's style object.
-  gridArea: 'topband',
+  // Docks this component into the still-CSS-Grid `.d-layout` container in
+  // EliteDraftBoardScreen.tsx (raw HTML/CSS, out of scope for this ticket —
+  // see LS-9057). `gridArea` is NOT a recognized Tamagui style token, so
+  // Tamagui's styled() silently drops it instead of forwarding it to the
+  // underlying web element (confirmed via computed style: LS-9344) — grid
+  // placement is applied via `style={{ gridArea: 'topband' }}` at the JSX
+  // usage site below instead.
   backgroundColor: '$surfaceSubtle',
   borderBottomWidth: 1,
   borderBottomColor: '$surfacePanelBorder',
@@ -408,7 +410,11 @@ export function DraftTopBand({
   const showAutopick = draftId !== null && myTeamId !== null;
 
   return (
-    <TopBandRoot role="banner" aria-label="Draft status">
+    <TopBandRoot
+      role="banner"
+      aria-label="Draft status"
+      style={{ gridArea: 'topband' }}
+    >
       {/* Pick status */}
       <StatusBlock>
         <LiveLabel aria-live="polite">
