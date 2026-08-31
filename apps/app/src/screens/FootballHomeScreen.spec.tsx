@@ -72,6 +72,7 @@ jest.mock('@legacy-sports/shared-components/football', () => {
         onPress: () => void;
       };
       matchupHighlights?: { leagueId: string | number }[];
+      onGoToAllSports?: () => void;
     }) => {
       capturedRefreshControl = props.refreshControl ?? null;
       return (
@@ -124,6 +125,12 @@ jest.mock('@legacy-sports/shared-components/football', () => {
           </Pressable>
           <Pressable testID="retry" onPress={() => props.onRetry?.()}>
             <Text>retry</Text>
+          </Pressable>
+          <Pressable
+            testID="all-sports"
+            onPress={() => props.onGoToAllSports?.()}
+          >
+            <Text>all-sports</Text>
           </Pressable>
         </View>
       );
@@ -802,6 +809,15 @@ describe('FootballHomeScreen (mobile NFLHome wrapper)', () => {
         pathname: '/football/league/[leagueId]',
         params: { leagueId: 2 },
       });
+    });
+  });
+
+  describe('"All Sports" (LS-6286 / FBH-032)', () => {
+    it('forwards onGoToAllSports to NFLHome', () => {
+      const onGoToAllSports = jest.fn();
+      render(<FootballHomeScreen onGoToAllSports={onGoToAllSports} />);
+      fireEvent.press(screen.getByTestId('all-sports'));
+      expect(onGoToAllSports).toHaveBeenCalledTimes(1);
     });
   });
 });

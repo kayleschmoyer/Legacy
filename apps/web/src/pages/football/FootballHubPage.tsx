@@ -93,6 +93,18 @@ export function FootballHubPage() {
     [data?.userLeagues],
   );
 
+  // "All Sports" switcher option (LS-6286 / FBH-032): only shown when the
+  // user has leagues in more than one sport, derived from the already-fetched
+  // userLeagues data — no new query needed.
+  const hasMultipleSports = React.useMemo(() => {
+    const sports = new Set(
+      (data?.userLeagues ?? [])
+        .filter(Boolean)
+        .map((l) => l.sport ?? Sport.Football),
+    );
+    return sports.size > 1;
+  }, [data?.userLeagues]);
+
   // Matchup highlights (LS-5407 / LS-6265, FBH-011): one "This Week's
   // Matchup" card per league that has an active/upcoming matchup, instead of
   // arbitrarily picking just the first league with a matchup and hiding the
@@ -171,6 +183,7 @@ export function FootballHubPage() {
           trendingPlayersLoading={trendingPlayersLoading}
           matchupHighlights={matchupHighlights}
           onSwitchSport={(sport) => navigate(`/${sport}`)}
+          onGoToAllSports={hasMultipleSports ? () => navigate('/') : undefined}
           onSignIn={() => navigate('/')}
           onRetry={() => void refetch()}
           leagueCap={leagueCap}

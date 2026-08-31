@@ -308,7 +308,10 @@ export default function HomeTab() {
         >
           {/* The switcher flips the inline view instead of pushing
               `/football`, which would leave the tab shell (LS-8823). */}
-          <BaseballHomeScreen onSwitchSport={handleViewSport} />
+          <BaseballHomeScreen
+            onSwitchSport={handleViewSport}
+            onGoToAllSports={handleBackFromSport}
+          />
         </View>
       )}
       {mountedSports.has('football') && (
@@ -321,7 +324,10 @@ export default function HomeTab() {
         >
           {/* The switcher flips the inline view instead of pushing
               `/baseball`, which would leave the tab shell (LS-8823). */}
-          <FootballHomeScreen onSwitchSport={handleViewSport} />
+          <FootballHomeScreen
+            onSwitchSport={handleViewSport}
+            onGoToAllSports={handleBackFromSport}
+          />
         </View>
       )}
     </>

@@ -639,3 +639,46 @@ describe('FootballHubPage — resume last league shortcut wiring (LS-6294 / FBH-
     expect(navigateSpy).toHaveBeenCalledWith('/football/league/2');
   });
 });
+
+describe('FootballHubPage — "All Sports" switcher option (LS-6286 / FBH-032)', () => {
+  it('passes onGoToAllSports when the user has leagues in more than one sport', () => {
+    setLeagues([
+      ...leaguesOfCount(1, 'football'),
+      ...leaguesOfCount(1, 'baseball'),
+    ]);
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].onGoToAllSports).toBeInstanceOf(
+      Function,
+    );
+  });
+
+  it('omits onGoToAllSports when the user has leagues in only one sport', () => {
+    setLeagues(leaguesOfCount(2, 'football'));
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].onGoToAllSports).toBeUndefined();
+  });
+
+  it('omits onGoToAllSports when the user has no leagues', () => {
+    setLeagues([]);
+
+    render(<FootballHubPage />);
+
+    expect(mockNFLHome.mock.calls[0][0].onGoToAllSports).toBeUndefined();
+  });
+
+  it('navigates to the aggregated Home route when the option is pressed', () => {
+    setLeagues([
+      ...leaguesOfCount(1, 'football'),
+      ...leaguesOfCount(1, 'baseball'),
+    ]);
+
+    render(<FootballHubPage />);
+    mockNFLHome.mock.calls[0][0].onGoToAllSports?.();
+
+    expect(navigateSpy).toHaveBeenCalledWith('/');
+  });
+});

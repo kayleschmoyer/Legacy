@@ -8,6 +8,7 @@ type PressProps = Children & { onPress?: () => void; disabled?: boolean };
 type ButtonProps = PressProps & {
   ['aria-label']?: string;
   accessibilityLabel?: string;
+  testID?: string;
 };
 type InputProps = {
   value?: string;
@@ -48,12 +49,14 @@ jest.mock('tamagui', () => {
     disabled,
     'aria-label': ariaLabel,
     accessibilityLabel,
+    testID,
   }: ButtonProps) => (
     <button
       type="button"
       onClick={onPress}
       disabled={!!disabled}
       aria-label={ariaLabel ?? accessibilityLabel}
+      data-testid={testID}
     >
       {children}
     </button>
@@ -996,5 +999,45 @@ describe('MLBHome', () => {
         screen.queryByText('Unlimited with Premium'),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('MLBHome — "All Sports" switcher option (LS-6286 / FBH-032)', () => {
+  it('renders the "All Sports" option when onGoToAllSports is supplied', () => {
+    render(
+      <MLBHome {...baseProps} leagues={LEAGUES} onGoToAllSports={jest.fn()} />,
+    );
+    expect(screen.getByTestId('sport-switcher-all')).toBeInTheDocument();
+  });
+
+  it('does not render the "All Sports" option when onGoToAllSports is omitted', () => {
+    render(<MLBHome {...baseProps} leagues={LEAGUES} />);
+    expect(screen.queryByTestId('sport-switcher-all')).not.toBeInTheDocument();
+  });
+
+  it('invokes onGoToAllSports when the option is pressed', () => {
+    const onGoToAllSports = jest.fn();
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        onGoToAllSports={onGoToAllSports}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('sport-switcher-all'));
+    expect(onGoToAllSports).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders both the single-sport switch button and "All Sports" together', () => {
+    render(
+      <MLBHome
+        {...baseProps}
+        leagues={LEAGUES}
+        onSwitchSport={jest.fn()}
+        onGoToAllSports={jest.fn()}
+      />,
+    );
+    expect(screen.getByTestId('sport-switcher-football')).toBeInTheDocument();
+    expect(screen.getByTestId('sport-switcher-all')).toBeInTheDocument();
   });
 });

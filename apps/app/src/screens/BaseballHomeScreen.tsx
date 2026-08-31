@@ -26,6 +26,13 @@ type BaseballHomeScreenProps = {
    * outside the tab shell (LS-8823). Omitted → `MLBHome` hides the switcher.
    */
   onSwitchSport?: (sport: 'football') => void;
+  /**
+   * Returns to the cross-sport sports dashboard (LS-6286 / FBH-032). Owned by
+   * the host (`(tabs)/home.tsx`), which wires this to the same dashboard-return
+   * action already used by its system-back handler. Omitted → `MLBHome` hides
+   * the "All Sports" option.
+   */
+  onGoToAllSports?: () => void;
 };
 
 /**
@@ -40,6 +47,7 @@ type BaseballHomeScreenProps = {
  */
 export default function BaseballHomeScreen({
   onSwitchSport,
+  onGoToAllSports,
 }: BaseballHomeScreenProps) {
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const mountedRef = useRef(true);
@@ -213,6 +221,7 @@ export default function BaseballHomeScreen({
         onInviteFriends={openInviteModal}
         onBrowsePlayers={() => router.navigate('/baseball/players')}
         onSwitchSport={onSwitchSport}
+        onGoToAllSports={onGoToAllSports}
         isPremium={isPremium && !subscriptionLoading && leaguesLoaded}
         leagueCap={
           showLeagueCap

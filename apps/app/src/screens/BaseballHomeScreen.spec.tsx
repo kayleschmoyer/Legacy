@@ -96,6 +96,7 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
       onAdvancedCreate?: (leagueName: string) => void;
       onBrowsePlayers?: () => void;
       onSwitchSport?: (sport: 'football') => void;
+      onGoToAllSports?: () => void;
       refreshControl?: import('../common/hooks/usePullToRefresh').PullToRefreshControlElement;
     }) => {
       capturedRefreshControl = props.refreshControl ?? null;
@@ -108,6 +109,12 @@ jest.mock('@legacy-sports/shared-components/baseball', () => {
             onPress={() => props.onSwitchSport?.('football')}
           >
             <Text>switch-sport</Text>
+          </Pressable>
+          <Pressable
+            testID="all-sports"
+            onPress={() => props.onGoToAllSports?.()}
+          >
+            <Text>all-sports</Text>
           </Pressable>
           <Text>{`loading:${String(props.loading)}`}</Text>
           <Text>{`error:${String(props.error)}`}</Text>
@@ -258,6 +265,15 @@ describe('BaseballHomeScreen (mobile MLBHome wrapper)', () => {
     it('hides the switcher when the host does not offer one', () => {
       render(<BaseballHomeScreen />);
       expect(screen.getByText('switcher:off')).toBeTruthy();
+    });
+
+    it('forwards onGoToAllSports to MLBHome (LS-6286 / FBH-032)', () => {
+      const onGoToAllSports = jest.fn();
+      render(<BaseballHomeScreen onGoToAllSports={onGoToAllSports} />);
+
+      fireEvent.press(screen.getByTestId('all-sports'));
+
+      expect(onGoToAllSports).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -83,6 +83,18 @@ export function BaseballScreen() {
     [data?.userLeagues],
   );
 
+  // "All Sports" switcher option (LS-6286 / FBH-032): only shown when the
+  // user has leagues in more than one sport, derived from the already-fetched
+  // userLeagues data — no new query needed.
+  const hasMultipleSports = React.useMemo(() => {
+    const sports = new Set(
+      (data?.userLeagues ?? [])
+        .filter(Boolean)
+        .map((l) => l.sport ?? Sport.Baseball),
+    );
+    return sports.size > 1;
+  }, [data?.userLeagues]);
+
   // Loading guard: cover the one-render window between auth resolving and Apollo
   // starting the query — in that window `loading` is still false but `data` is
   // undefined. Without `|| (!data && !error)` the empty-league layout flashes
@@ -176,6 +188,11 @@ export function BaseballScreen() {
           leagueCap={leagueCap}
           onSwitchSport={
             footballEnabled ? (sport) => navigate(`/${sport}`) : undefined
+          }
+          onGoToAllSports={
+            footballEnabled && hasMultipleSports
+              ? () => navigate('/')
+              : undefined
           }
         />
       </div>

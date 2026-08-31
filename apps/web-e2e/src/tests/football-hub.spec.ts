@@ -648,6 +648,62 @@ test.describe('Scenario 4: Football hub and sport-based routing @critical', () =
     });
   });
 
+  test('"All Sports" option is hidden when the user has leagues in only one sport (LS-6286 / FBH-032)', async ({
+    page,
+  }) => {
+    await page.goto('/football');
+    await expect(page.getByTestId('football-screen')).toBeVisible({
+      timeout: 10000,
+    });
+
+    // Baseline mocked leagues are single-sport (football) — the option must
+    // not render.
+    await expect(page.getByTestId('sport-switcher-all')).toHaveCount(0);
+  });
+
+  test('"All Sports" option navigates to the aggregated Home page for a multi-sport user (LS-6286 / FBH-032)', async ({
+    page,
+  }) => {
+    const footballLeague = {
+      ...mockLeague({ id: 1, name: 'Grid Iron Legends' }),
+      sport: 'football',
+    };
+    const baseballLeague = {
+      ...mockLeague({ id: 2, name: 'Saturday Sluggers' }),
+      sport: 'baseball',
+    };
+
+    await page.route(isGraphQLEndpoint, async (route) => {
+      const op = extractOperationName(route).toLowerCase();
+      if (op === 'getuserleagues') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              userLeagues: [footballLeague, baseballLeague],
+              userLeagueCount: 2,
+            },
+          }),
+        });
+        return;
+      }
+      await unmockedGraphQLFallback(route);
+    });
+
+    await page.goto('/football');
+    await expect(page.getByTestId('football-screen')).toBeVisible({
+      timeout: 10000,
+    });
+
+    const allSportsSwitcher = page.getByTestId('sport-switcher-all');
+    await expect(allSportsSwitcher).toBeVisible();
+
+    await allSportsSwitcher.click();
+
+    await expect(page).toHaveURL('/');
+  });
+
   test('primary navigation is visible on the football hub', async ({
     page,
   }) => {

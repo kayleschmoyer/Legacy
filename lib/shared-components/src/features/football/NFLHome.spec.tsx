@@ -1289,3 +1289,56 @@ describe('NFLHome — frozen / archived leagues (LS-6262 / FBH-008)', () => {
     expect(screen.getByText('Frozen Fossils')).toBeInTheDocument();
   });
 });
+
+describe('NFLHome — "All Sports" switcher option (LS-6286 / FBH-032)', () => {
+  it('renders the "All Sports" option when onGoToAllSports is supplied', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(1)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onGoToAllSports={noop}
+      />,
+    );
+    expect(screen.getByTestId('sport-switcher-all')).toBeInTheDocument();
+  });
+
+  it('does not render the "All Sports" option when onGoToAllSports is omitted', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(1)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+      />,
+    );
+    expect(screen.queryByTestId('sport-switcher-all')).not.toBeInTheDocument();
+  });
+
+  it('invokes onGoToAllSports when the option is pressed', () => {
+    const onGoToAllSports = jest.fn();
+    render(
+      <NFLHome
+        leagues={makeLeagues(1)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onGoToAllSports={onGoToAllSports}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('sport-switcher-all'));
+    expect(onGoToAllSports).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders both the single-sport switch button and "All Sports" together', () => {
+    render(
+      <NFLHome
+        leagues={makeLeagues(1)}
+        onCreateLeague={noop}
+        onViewLeague={noop}
+        onSwitchSport={noop}
+        onGoToAllSports={noop}
+      />,
+    );
+    expect(screen.getByTestId('sport-switcher-baseball')).toBeInTheDocument();
+    expect(screen.getByTestId('sport-switcher-all')).toBeInTheDocument();
+  });
+});

@@ -61,6 +61,7 @@ interface MLBHomeHarnessPropsExtended extends MLBHomeHarnessProps {
   onMockDraft?: () => void;
   onMockDraftUpgrade?: () => void;
   onSwitchSport?: (sport: string) => void;
+  onGoToAllSports?: () => void;
 }
 
 // Capture the props the wrapper feeds into the shared component and expose
@@ -77,6 +78,9 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
       <span data-testid="has-switch-sport">
         {String(!!props.onSwitchSport)}
       </span>
+      <span data-testid="has-all-sports">
+        {String(!!props.onGoToAllSports)}
+      </span>
       <button onClick={() => props.onViewLeague(7)}>view</button>
       <button onClick={() => props.onJoinLeague()}>join</button>
       {props.onMockDraft ? (
@@ -91,6 +95,9 @@ jest.mock('@legacy-sports/shared-components/baseball', () => ({
         <button onClick={() => props.onSwitchSport?.('football')}>
           switch-sport
         </button>
+      ) : null}
+      {props.onGoToAllSports ? (
+        <button onClick={() => props.onGoToAllSports?.()}>all-sports</button>
       ) : null}
       <button
         onClick={() =>
@@ -411,5 +418,63 @@ describe('BaseballScreen — free-tier league cap gating (LS-5804/LS-5817)', () 
     });
     render(<BaseballScreen />);
     expect(screen.getByTestId('at-limit').textContent).toBe('true');
+  });
+});
+
+describe('BaseballScreen — "All Sports" switcher option (LS-6286 / FBH-032)', () => {
+  it('omits onGoToAllSports when football_enabled flag is off, even with multi-sport leagues', () => {
+    mockUseFeatureIsOn.mockReturnValue(false);
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [
+          { id: 1, name: 'Saturday Sluggers', sport: 'baseball' },
+          { id: 2, name: 'Grid Iron Legends', sport: 'football' },
+        ],
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+
+    render(<BaseballScreen />);
+
+    expect(screen.getByTestId('has-all-sports').textContent).toBe('false');
+  });
+
+  it('omits onGoToAllSports when the user has leagues in only one sport', () => {
+    mockUseFeatureIsOn.mockReturnValue(true);
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [{ id: 1, name: 'Saturday Sluggers', sport: 'baseball' }],
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+
+    render(<BaseballScreen />);
+
+    expect(screen.getByTestId('has-all-sports').textContent).toBe('false');
+  });
+
+  it('passes onGoToAllSports and navigates to "/" when the user has multi-sport leagues and football is enabled', () => {
+    mockUseFeatureIsOn.mockReturnValue(true);
+    mockUseGetUserLeaguesQuery.mockReturnValue({
+      data: {
+        userLeagues: [
+          { id: 1, name: 'Saturday Sluggers', sport: 'baseball' },
+          { id: 2, name: 'Grid Iron Legends', sport: 'football' },
+        ],
+      },
+      loading: false,
+      error: undefined,
+      refetch: mockRefetch,
+    });
+
+    render(<BaseballScreen />);
+
+    expect(screen.getByTestId('has-all-sports').textContent).toBe('true');
+    fireEvent.click(screen.getByText('all-sports'));
+    expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 });

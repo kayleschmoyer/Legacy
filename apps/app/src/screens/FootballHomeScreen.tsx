@@ -26,6 +26,13 @@ type FootballHomeScreenProps = {
    * outside the tab shell (LS-8823). Omitted → `NFLHome` hides the switcher.
    */
   onSwitchSport?: (sport: 'baseball') => void;
+  /**
+   * Returns to the cross-sport sports dashboard (LS-6286 / FBH-032). Owned by
+   * the host (`(tabs)/home.tsx`), which wires this to the same dashboard-return
+   * action already used by its system-back handler. Omitted → `NFLHome` hides
+   * the "All Sports" option.
+   */
+  onGoToAllSports?: () => void;
 };
 
 /**
@@ -37,6 +44,7 @@ type FootballHomeScreenProps = {
  */
 export default function FootballHomeScreen({
   onSwitchSport,
+  onGoToAllSports,
 }: FootballHomeScreenProps) {
   const userInfo = useAuthorizedUserInfo();
   const router = useRouter();
@@ -218,6 +226,7 @@ export default function FootballHomeScreen({
       trendingPlayersLoading={trendingPlayersLoading}
       matchupHighlights={matchupHighlights}
       onSwitchSport={onSwitchSport}
+      onGoToAllSports={onGoToAllSports}
       leagueCap={
         showLeagueCap
           ? {

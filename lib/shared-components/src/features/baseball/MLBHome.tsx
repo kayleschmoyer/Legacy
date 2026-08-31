@@ -116,6 +116,15 @@ export interface MLBHomeProps {
    * available — the switcher renders a button per entry.
    */
   onSwitchSport?: (sport: 'football') => void;
+  /**
+   * When provided, renders an "All Sports" option in the sport switcher row
+   * (LS-6286 / FBH-032) alongside the single-sport switch button, for users
+   * with leagues in more than one sport. Navigates to the app's existing
+   * aggregated cross-sport leagues view. Omit to hide the option — each
+   * platform decides when to pass it (e.g. only when the user has leagues in
+   * more than one sport).
+   */
+  onGoToAllSports?: () => void;
   /** Called when a non-premium viewer tries to enable a premium-gated feature in the dialog. */
   onUpgrade?: () => void;
   /**
@@ -301,6 +310,7 @@ export function MLBHome({
   leagueCap,
   isPremium,
   onSwitchSport,
+  onGoToAllSports,
   onUpgrade,
   testID,
   refreshControl,
@@ -786,26 +796,48 @@ export function MLBHome({
         )}
 
         {/* In-page sport switcher (LS-5815) */}
-        {onSwitchSport ? (
+        {onSwitchSport || onGoToAllSports ? (
           <XStack alignItems="center" gap="$3" flexWrap="wrap">
             <Text fontSize="$3" color="$glassTextMuted" fontWeight="600">
               Also play:
             </Text>
-            <Button
-              size="$2"
-              backgroundColor={withAlpha(BRAND_NAVY, 0.1)}
-              borderColor={withAlpha(BRAND_NAVY, 0.3)}
-              borderWidth={1}
-              borderRadius="$5"
-              onPress={() => onSwitchSport('football')}
-              accessibilityLabel="Switch to Football"
-              aria-label="Switch to Football"
-              testID="sport-switcher-football"
-            >
-              <Text fontSize={12} fontWeight="600" color="$gray11">
-                Football
-              </Text>
-            </Button>
+            {onSwitchSport ? (
+              <Button
+                size="$2"
+                backgroundColor={withAlpha(BRAND_NAVY, 0.1)}
+                borderColor={withAlpha(BRAND_NAVY, 0.3)}
+                borderWidth={1}
+                borderRadius="$5"
+                onPress={() => onSwitchSport('football')}
+                accessibilityLabel="Switch to Football"
+                aria-label="Switch to Football"
+                testID="sport-switcher-football"
+              >
+                <Text fontSize={12} fontWeight="600" color="$gray11">
+                  Football
+                </Text>
+              </Button>
+            ) : null}
+            {/* All Sports (LS-6286 / FBH-032): jumps to the existing
+                aggregated cross-sport leagues view, alongside the
+                single-sport switch button rather than replacing it. */}
+            {onGoToAllSports ? (
+              <Button
+                size="$2"
+                backgroundColor={withAlpha(BRAND_NAVY, 0.1)}
+                borderColor={withAlpha(BRAND_NAVY, 0.3)}
+                borderWidth={1}
+                borderRadius="$5"
+                onPress={onGoToAllSports}
+                accessibilityLabel="View All Sports"
+                aria-label="View All Sports"
+                testID="sport-switcher-all"
+              >
+                <Text fontSize={12} fontWeight="600" color="$gray11">
+                  All Sports
+                </Text>
+              </Button>
+            ) : null}
           </XStack>
         ) : null}
 
