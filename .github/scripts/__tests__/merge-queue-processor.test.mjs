@@ -114,6 +114,9 @@ function makeGithub({
   compareResults = {},
   // LS-9662: rows served to pulls.listFiles (the PR's own changed files).
   prListFiles = [],
+  // LS-9774: when set, reRunWorkflow throws this Error instead of
+  // succeeding — used to exercise the "too old to rerun" fallback path.
+  reRunWorkflowError = null,
 } = {}) {
   const calls = {
     merges: [],
@@ -250,6 +253,7 @@ function makeGithub({
         }),
         reRunWorkflow: async (args) => {
           calls.reruns.push(args);
+          if (reRunWorkflowError) throw reRunWorkflowError;
           return {};
         },
         // LS-9490: dead-run detection + cancellation
@@ -2450,6 +2454,62 @@ describe('merge-queue-processor — cancelled orchestrator run self-heal (LS-905
       calls.reruns.map((r) => r.run_id),
       [111],
       'should re-run only the newest cancelled pull_request run',
+    );
+  });
+
+  it('LS-9774: dispatches a fresh orchestrator run when the cancelled run is too old to rerun', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [cancelledPullRequestRun({ id: 111 })],
+      reRunWorkflowError: new Error(
+        'Unable to retry this workflow run because it was created over a month ago',
+      ),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.deepStrictEqual(
+      calls.reruns.map((r) => r.run_id),
+      [111],
+      'should still attempt the rerun first',
+    );
+    const dispatch = calls.dispatches.find(
+      (d) => d.workflow_id === 'ci-orchestrator.yml',
+    );
+    assert.ok(
+      dispatch,
+      'should fall back to dispatching a fresh orchestrator run',
+    );
+    assert.strictEqual(dispatch.ref, 'main');
+    assert.strictEqual(dispatch.inputs.pr_number, String(makePR().number));
+  });
+
+  it('LS-9774: does not fall back to dispatch for a non-"too old" rerun error', async () => {
+    const { github, calls } = makeGithub({
+      ...baseArgs,
+      workflowRuns: [cancelledPullRequestRun({ id: 111 })],
+      reRunWorkflowError: new Error('some other transient failure'),
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.dispatches.filter((d) => d.workflow_id === 'ci-orchestrator.yml')
+        .length,
+      0,
+      'should not dispatch a fresh run for an unrelated rerun failure',
     );
   });
 

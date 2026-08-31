@@ -1430,9 +1430,49 @@ module.exports = async ({
         run_id: candidate.id,
       });
     } catch (rerunError) {
-      console.warn(
-        `⚠️ PR #${pr.number}: could not re-run orchestrator run ${candidate.id}: ${rerunError.message}`,
+      // LS-9774: GitHub refuses to rerun a workflow run older than ~30 days
+      // ("Unable to retry this workflow run because it was created over a
+      // month ago") — not a permission problem, and not transient. Retrying
+      // the SAME rerun every cycle forever just repeats the same 403
+      // (observed on PR #3396, an old dependabot PR). Fall back to
+      // dispatching a brand-new orchestrator run scoped to this PR instead —
+      // that doesn't touch the old run at all, so the "too old" restriction
+      // doesn't apply.
+      const isTooOldToRerun = /created over a month ago/i.test(
+        rerunError.message ?? '',
       );
+      if (!isTooOldToRerun) {
+        console.warn(
+          `⚠️ PR #${pr.number}: could not re-run orchestrator run ${candidate.id}: ${rerunError.message}`,
+        );
+        return;
+      }
+      console.log(
+        `🩹 PR #${pr.number}: orchestrator run ${candidate.id} is too old to ` +
+          `rerun — dispatching a fresh run instead (LS-9774)`,
+      );
+      try {
+        await github.request(
+          'POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches',
+          {
+            owner,
+            repo,
+            workflow_id: ORCHESTRATOR_WORKFLOW_FILE,
+            // workflow_dispatch runs the workflow file FROM this ref —
+            // 'main' always has the current definition (with the pr_number
+            // input); the orchestrator resolves the PR's actual base/head
+            // SHAs via the API regardless of dispatch ref (LS-9148), so this
+            // doesn't run main's code against the PR, just main's workflow
+            // definition.
+            ref: 'main',
+            inputs: { pr_number: String(pr.number) },
+          },
+        );
+      } catch (dispatchError) {
+        console.warn(
+          `⚠️ PR #${pr.number}: could not dispatch a fresh orchestrator run: ${dispatchError.message}`,
+        );
+      }
     }
   }
 
