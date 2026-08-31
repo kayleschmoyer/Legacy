@@ -94,6 +94,23 @@ jobs:
           client-id: ${{ secrets.MERGE_QUEUE_APP_ID }}
           private-key: ${{ secrets.MERGE_QUEUE_APP_PRIVATE_KEY }}
 
+      # LS-9773: the Merge Queue app above does NOT hold "Commit statuses:
+      # write" (confirmed 403 "Resource not accessible by integration" via
+      # LS-9571) — merge-queue-processor.js's bot-review self-heal status
+      # posts have been silently failing (swallowed by their own try/catch).
+      # Legacy Sports CI was granted that permission for exactly this class
+      # of write; mint a second token and let the script use it just for
+      # those two calls. continue-on-error means a mint failure degrades to
+      # the processor's existing github client (today's behavior) rather
+      # than failing the whole job.
+      - name: Generate CI App Token
+        id: ci-app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          private-key: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           token: ${{ steps.generate-token.outputs.token }}
@@ -218,10 +235,12 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           ESCALATION_WEBHOOK_URL: ${{ secrets.ESCALATION_WEBHOOK_URL }}
+          CI_APP_TOKEN: ${{ steps.ci-app-token.outputs.token }}
         with:
           github-token: ${{ steps.generate-token.outputs.token }}
           script: |
             const isDryRun = ${{ github.event.inputs.dry_run || false }};
             const forceCheck = ${{ github.event.inputs.force_check || false }};
             const isRetry = ${{ github.event.inputs.is_retry || false }};
-            await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry });
+            const ciAppToken = process.env.CI_APP_TOKEN || undefined;
+            await require('./.github/scripts/merge-queue-processor.js')({ github, context, isDryRun, forceCheck, isRetry, ciAppToken });

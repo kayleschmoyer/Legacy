@@ -36,18 +36,18 @@ confirmed from the GitHub UI, it's marked (inferred).
 
 - **Secrets:** `MERGE_QUEUE_APP_ID`, `MERGE_QUEUE_APP_PRIVATE_KEY`
 - **Used by:** `merge-queue.yml`, `ci-orchestrator.yml`
-- **Permissions:** ADR-0006 documents `contents: write` + `pull_requests: write` (merge only) — **this is stale/incomplete**: `.github/scripts/merge-queue-processor.js` (invoked from `merge-queue.yml`) also calls `github.rest.repos.createCommitStatus` with this app's token, implying it also holds `Commit statuses: write`. As of LS-9571 PR #7415 (commit `7f0d6c4`), `ci-pipeline.yml`'s CI Gate status-post step was switched to use this app's token instead of `secrets.GITHUB_TOKEN` — **check that PR's outcome to confirm empirically whether the status post succeeded**, since this doc's claim about the permission is inferred from the `createCommitStatus` call site, not confirmed from the GitHub UI.
+- **Permissions:** ADR-0006 documents `contents: write` + `pull_requests: write` (merge only). **Confirmed NOT to have `Commit statuses: write`** — despite `.github/scripts/merge-queue-processor.js` calling `github.rest.repos.createCommitStatus` with this app's token in its `bot-review` self-heal path, LS-9571 (PR #7415) proved that call 403s with "Resource not accessible by integration" when tested against the CI Gate status. Those `createCommitStatus` calls were wrapped in a try/catch that only logged a warning, so this had been silently failing in production; fixed in LS-9773 by switching those two calls to the Legacy Sports CI app instead (see its entry above).
 - **ADR-0006 role:** Merge Queue Bot App — triggers the merge queue / squash-merges when `merge-when-ready` is set and checks pass. Cannot review or push new commits.
 
 ## Legacy Sports CI
 
 - **Client ID:** `3148299`
 - **Secrets:** `RUNNER_GITHUB_APP_ID`, `RUNNER_GITHUB_APP_KEY_BASE64` (base64-encoded PEM — note the different secret naming convention vs. every other app here, which stores a raw PEM; `actions/create-github-app-token` accepts either form), `RUNNER_GITHUB_APP_WEBHOOK_SECRET`
-- **Used by:** `terraform/runners/github-runners.tf` only (via `runner-terraform-apply.yml` and `rollback.yml`, which map the secrets to `TF_VAR_github_app_key_base64` / `TF_VAR_github_app_id` / `TF_VAR_github_app_webhook_secret`) — **not used in any GitHub Actions workflow step for API calls**, only by Terraform to configure the `github-aws-runners` module's `github_app` block:
-  - `id` — self-hosted runner registration (the module uses this to mint runner-registration tokens)
-  - `webhook_secret` — validates the `workflow_job` webhook GitHub sends to the scale-up Lambda when a job is queued
-- **Permissions:** not confirmed from the GitHub UI. The installed app shows only 2 repository permissions selected, 1 of which is the always-mandatory `Metadata: read` — meaning exactly **one** substantive permission is granted. Given its current usage (runner registration + webhook), that's almost certainly something in the `Self-hosted runners` / `Administration` family, **not** `Commit statuses: write`.
-- **Desired future state (per LS-9571 discussion, 2026-08-30):** intended to also be used for reporting-style GitHub API authentication from `ci-pipeline.yml` (e.g. the CI Gate status post, sticky PR comments) — the idea being "the CI bot" is the natural identity for CI-pipeline-originated writes, separate from Personal Merge Queue (merge-queue-specific) and Legacy Sports Code Bot (authoring-specific). **Not yet implemented** — would require (a) confirming/adding `Commit statuses: write` (and any other needed scopes) to this app's permissions in the GitHub UI, and (b) wiring a `create-github-app-token` step in `ci-pipeline.yml` using these secrets.
+- **Used by:**
+  - `terraform/runners/github-runners.tf` (via `runner-terraform-apply.yml` and `rollback.yml`, mapping the secrets to `TF_VAR_github_app_key_base64` / `TF_VAR_github_app_id` / `TF_VAR_github_app_webhook_secret`) to configure the `github-aws-runners` module's `github_app` block: `id` for self-hosted runner registration, `webhook_secret` for the `workflow_job` webhook that triggers the scale-up Lambda.
+  - **`ci-pipeline.yml`** (`summarize` job, "Generate CI App Token" step) — posts the `CI Gate` commit status (LS-9571, PR #7415).
+  - **`merge-queue.yml`** (via `merge-queue-processor.js`, `ciAppToken`) — posts the `bot-review` self-heal escalation/pending status when the Reviewer Bot crashes or stalls (LS-9209 self-heal path; LS-9773, PR TBD).
+- **Permissions:** explicitly granted `Commit statuses: write` (2026-08-30, in response to LS-9571) after both Legacy Sports Code Bot and Personal Merge Queue were confirmed NOT to hold it — see their entries above. Base permission set otherwise unconfirmed from the GitHub UI (originally just enough for runner registration + webhook — likely something in the `Self-hosted runners` / `Administration` family).
 
 ## Legacy Sports CI Android
 
@@ -63,6 +63,6 @@ confirmed from the GitHub UI, it's marked (inferred).
 
 ## Open items
 
-- Confirm exact granted permissions for Legacy Sports CI, Legacy Sports CI Android, and Legacy Sports PR Preview from the GitHub UI (Settings → GitHub Apps → _app_ → Permissions & events) — this doc's permission claims for those three are inferred from usage, not confirmed.
-- Confirm whether Personal Merge Queue's `createCommitStatus` call in `merge-queue-processor.js` actually succeeds in production, or has been silently 403ing the same way Legacy Sports Code Bot did (LS-9571 PR #7415 is the first place this got tested against the CI Gate specifically).
-- If Legacy Sports CI is granted `Commit statuses: write` per the desired future state above, revisit `ci-pipeline.yml`'s CI Gate / sticky-comment / label steps to use it instead of Personal Merge Queue or `secrets.GITHUB_TOKEN`.
+- Confirm exact granted permissions for Legacy Sports CI Android and Legacy Sports PR Preview from the GitHub UI (Settings → GitHub Apps → _app_ → Permissions & events) — this doc's permission claims for those two are inferred from usage, not confirmed. (Legacy Sports CI's `Commit statuses: write` grant is confirmed — see its entry above.)
+- Legacy Sports Code Bot and Personal Merge Queue are both confirmed to lack `Commit statuses: write`; if either is found to need it for something else in the future, don't assume — test it the way LS-9571/LS-9773 did.
+- Consider whether the sticky-PR-comment and label calls in `ci-pipeline.yml` (currently on Legacy Sports Code Bot) should also move to Legacy Sports CI now that it's the established "CI-pipeline-originated writes" identity — not done here to keep LS-9571/LS-9773 minimal; those two calls are confirmed working on their current app.

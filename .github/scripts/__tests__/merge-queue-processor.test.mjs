@@ -1788,6 +1788,68 @@ describe('merge-queue-processor — bot-review self-heal (LS-8289)', () => {
     );
   });
 
+  it('LS-9773: stamps the self-heal pending marker via the injected CI app client when ciAppToken is supplied', async () => {
+    const { github, calls } = makeGithub({
+      reviews: APPROVED_BOT_REVIEW,
+      branchRules: BOT_REVIEW_RULES,
+      checkRuns: DEFAULT_CHECK_RUNS,
+      commitStatuses: [],
+      pr: makePR({
+        labels: [
+          { name: 'merge-when-ready' },
+          { name: 'bot:ready-for-review' },
+        ],
+      }),
+    });
+
+    const ciStatusCalls = [];
+    const fakeCiOctokit = {
+      rest: {
+        repos: {
+          createCommitStatus: async (args) => {
+            ciStatusCalls.push(args);
+            return { data: {} };
+          },
+        },
+      },
+    };
+    let factoryCalledWithToken;
+    const octokitFactory = (token) => {
+      factoryCalledWithToken = token;
+      return fakeCiOctokit;
+    };
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      ciAppToken: 'fake-ci-app-token',
+      octokitFactory,
+    });
+
+    assert.strictEqual(
+      factoryCalledWithToken,
+      'fake-ci-app-token',
+      'octokitFactory should be minted with the supplied ciAppToken',
+    );
+    assert.ok(
+      ciStatusCalls.some(
+        (s) =>
+          s.context === 'bot-review' &&
+          s.state === 'pending' &&
+          s.description.includes('self-heal re-trigger #1'),
+      ),
+      'the self-heal pending marker should post through the injected CI app client',
+    );
+    assert.strictEqual(
+      calls.statuses.length,
+      0,
+      'the Merge Queue app client (github mock) should NOT receive the status write',
+    );
+  });
+
   it('re-triggers the reviewer when CHANGES_REQUESTED is stale (no bot-review status on head SHA)', async () => {
     const { github, calls } = makeGithub({
       reviews: [],
@@ -2116,6 +2178,68 @@ describe('merge-queue-processor — review-stall sweep (LS-9209)', () => {
       'arbitration label applied, trigger label NOT cycled again',
     );
     assert.strictEqual(calls.labelsRemoved.length, 0);
+  });
+
+  it('LS-9773: posts the terminal bot-review failure via the injected CI app client when ciAppToken is supplied', async () => {
+    const { github, calls } = makeGithub({
+      mergeReadyItems: [],
+      sweepPRs: [sweepPR()],
+      commitStatuses: [
+        {
+          context: 'bot-review',
+          state: 'pending',
+          description:
+            'self-heal re-trigger #1: re-firing Reviewer (W1) (LS-9209)',
+          created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          context: 'bot-review',
+          state: 'pending',
+          description:
+            'self-heal re-trigger #2: re-firing Reviewer (W1) (LS-9209)',
+          created_at: STALE_PENDING_AT,
+        },
+      ],
+    });
+
+    const ciStatusCalls = [];
+    const octokitFactory = () => ({
+      rest: {
+        repos: {
+          createCommitStatus: async (args) => {
+            ciStatusCalls.push(args);
+            return { data: {} };
+          },
+        },
+      },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+      ciAppToken: 'fake-ci-app-token',
+      octokitFactory,
+    });
+
+    assert.ok(
+      ciStatusCalls.some(
+        (s) => s.state === 'failure' && s.context === 'bot-review',
+      ),
+      'terminal failure should post through the injected CI app client',
+    );
+    assert.strictEqual(
+      calls.statuses.length,
+      0,
+      'the Merge Queue app client (github mock) should NOT receive the status write',
+    );
+    assert.deepStrictEqual(
+      calls.labels.map((l) => l.labels).flat(),
+      ['needs-human-arbitration'],
+      'arbitration label applied regardless of which client posted the status',
+    );
   });
 
   it('does not double-process a PR already handled by the queued-path loop', async () => {

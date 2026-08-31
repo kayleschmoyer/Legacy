@@ -165,9 +165,40 @@ const COMPARE_FILES_CAP = 300;
 // Cap the specs/commits enumerated in the revalidation PR comment.
 const MAX_GUARD_LISTED_ITEMS = 10;
 
-module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
+module.exports = async ({
+  github,
+  context,
+  isDryRun,
+  forceCheck,
+  isRetry,
+  ciAppToken,
+  // Test seam: production always uses the real @actions/github getOctokit;
+  // tests inject a fake factory so the ciAppToken path can be exercised
+  // without constructing a real Octokit client (which would make genuine
+  // HTTP requests when its methods are called). Deliberately NOT a default
+  // parameter — those are evaluated eagerly on every call regardless of
+  // whether ciAppToken is set, which would require('@actions/github') (a
+  // module that only exists inside the real Actions runner's github-script
+  // sandbox, not this repo's own node_modules) on every single processor
+  // invocation, breaking every test that doesn't pass ciAppToken.
+  octokitFactory,
+}) => {
   const { owner, repo } = context.repo;
   const isTriggeredByWorkflow = context.eventName === 'workflow_run';
+
+  // LS-9773: the `github` client above (Merge Queue app) does not hold
+  // "Commit statuses: write" — confirmed via LS-9571 (403 "Resource not
+  // accessible by integration"), which is why the two createCommitStatus
+  // calls below were silently failing (swallowed by their own try/catch).
+  // Legacy Sports CI was granted that permission specifically for this
+  // class of write; use a second client authenticated as that app for just
+  // those two calls. Falls back to `github` itself when no token is
+  // supplied — the unit-test harness's mock `github` client, or a failed
+  // mint upstream — so behavior degrades to today's (broken) state rather
+  // than throwing.
+  const statusGithub = ciAppToken
+    ? (octokitFactory || require('@actions/github').getOctokit)(ciAppToken)
+    : github;
 
   // Log X-RateLimit-Remaining/Used after every GitHub API call so run logs
   // show budget consumption over time. Only log when the bucket (per-100) drops
@@ -1106,7 +1137,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
           `applying ${ARBITRATION_LABEL} (LS-9209)`,
       );
       try {
-        await github.rest.repos.createCommitStatus({
+        await statusGithub.rest.repos.createCommitStatus({
           owner,
           repo,
           sha: pr.head.sha,
@@ -1186,7 +1217,7 @@ module.exports = async ({ github, context, isDryRun, forceCheck, isRetry }) => {
     // burn an attempt. Also serves as the visible in-progress footprint until
     // the re-triggered W1 run overwrites it.
     try {
-      await github.rest.repos.createCommitStatus({
+      await statusGithub.rest.repos.createCommitStatus({
         owner,
         repo,
         sha: pr.head.sha,
