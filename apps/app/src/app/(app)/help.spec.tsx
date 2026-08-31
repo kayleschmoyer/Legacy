@@ -23,22 +23,24 @@ function setJiraProxyUrl(value: string | undefined): void {
   mockConfig.jiraProxyUrl = value;
 }
 
-const mockSetBugReportOpen = jest.fn();
+const mockModalVisible = jest.fn();
+const mockReportKind = jest.fn();
 jest.mock('../../features/bug-report/BugReportModal', () => ({
   __esModule: true,
   default: ({
     visible,
     onClose,
+    kind,
   }: {
     visible: boolean;
     onClose: () => void;
+    kind?: string;
   }) => {
     const { Text } =
       jest.requireActual<typeof import('react-native')>('react-native');
-    mockSetBugReportOpen(visible);
-    return visible ? (
-      <Text onPress={onClose}>bug-report-modal-open</Text>
-    ) : null;
+    mockModalVisible(visible);
+    if (visible) mockReportKind(kind);
+    return visible ? <Text onPress={onClose}>feedback-modal-open</Text> : null;
   },
 }));
 
@@ -90,8 +92,9 @@ describe('HelpScreen — Report a Bug action routing (LS-8842)', () => {
 
     fireEvent.press(screen.getByText('Report a Bug'));
 
-    expect(mockSetBugReportOpen).toHaveBeenLastCalledWith(true);
-    expect(screen.getByText('bug-report-modal-open')).toBeTruthy();
+    expect(mockModalVisible).toHaveBeenLastCalledWith(true);
+    expect(mockReportKind).toHaveBeenLastCalledWith('bug');
+    expect(screen.getByText('feedback-modal-open')).toBeTruthy();
     expect(openUrlSpy).not.toHaveBeenCalled();
   });
 
@@ -101,21 +104,16 @@ describe('HelpScreen — Report a Bug action routing (LS-8842)', () => {
 
     fireEvent.press(screen.getByText('Report a Bug'));
 
-    expect(mockSetBugReportOpen).not.toHaveBeenCalledWith(true);
+    expect(mockModalVisible).not.toHaveBeenCalledWith(true);
     expect(openUrlSpy).toHaveBeenCalledTimes(1);
     const [openedUrl] = openUrlSpy.mock.calls[0];
     expect(openedUrl).toContain('discord.gg');
     expect(openedUrl).not.toContain('github.com');
   });
 
-  it('still opens the URL directly for other contact entries (Suggest a Feature, Community Discussions, Discord)', () => {
+  it('still opens the URL directly for non-action contact entries (Community Discussions, Discord)', () => {
     setJiraProxyUrl('https://api.example.com/jira');
     render(<HelpScreen />);
-
-    fireEvent.press(screen.getByText('Suggest a Feature'));
-    expect(openUrlSpy).toHaveBeenCalledWith(
-      expect.stringContaining('github.com'),
-    );
 
     fireEvent.press(screen.getByText('Community Discussions'));
     expect(openUrlSpy).toHaveBeenCalledWith(
@@ -127,6 +125,58 @@ describe('HelpScreen — Report a Bug action routing (LS-8842)', () => {
       expect.stringContaining('discord.gg'),
     );
 
-    expect(mockSetBugReportOpen).not.toHaveBeenCalledWith(true);
+    expect(mockModalVisible).not.toHaveBeenCalledWith(true);
+  });
+});
+
+describe('HelpScreen — Suggest a Feature action routing (LS-9247)', () => {
+  let openUrlSpy: jest.SpiedFunction<typeof Linking.openURL>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setJiraProxyUrl(undefined);
+    openUrlSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('opens the in-app feature request modal instead of an external link when jiraProxyUrl is configured', () => {
+    setJiraProxyUrl('https://api.example.com/jira');
+    render(<HelpScreen />);
+
+    fireEvent.press(screen.getByText('Suggest a Feature'));
+
+    expect(mockModalVisible).toHaveBeenLastCalledWith(true);
+    expect(mockReportKind).toHaveBeenLastCalledWith('feature');
+    expect(screen.getByText('feedback-modal-open')).toBeTruthy();
+    expect(openUrlSpy).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the GitHub feature request template when jiraProxyUrl is unconfigured', () => {
+    setJiraProxyUrl(undefined);
+    render(<HelpScreen />);
+
+    fireEvent.press(screen.getByText('Suggest a Feature'));
+
+    expect(mockModalVisible).not.toHaveBeenCalledWith(true);
+    expect(openUrlSpy).toHaveBeenCalledTimes(1);
+    const [openedUrl] = openUrlSpy.mock.calls[0];
+    expect(openedUrl).toContain('github.com');
+    expect(openedUrl).toContain('feature_request');
+  });
+
+  it('routes bug and feature entries to their own modal kinds independently', () => {
+    setJiraProxyUrl('https://api.example.com/jira');
+    render(<HelpScreen />);
+
+    fireEvent.press(screen.getByText('Suggest a Feature'));
+    expect(mockReportKind).toHaveBeenLastCalledWith('feature');
+
+    fireEvent.press(screen.getByText('feedback-modal-open'));
+
+    fireEvent.press(screen.getByText('Report a Bug'));
+    expect(mockReportKind).toHaveBeenLastCalledWith('bug');
   });
 });

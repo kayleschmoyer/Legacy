@@ -71,20 +71,70 @@ function fallbackFilename(mimeType: string, index: number): string {
   return `screenshot-${String(Date.now())}-${String(index)}.${ext}`;
 }
 
+/** Which kind of feedback this modal collects. */
+export type ReportKind = 'bug' | 'feature';
+
+/**
+ * Per-kind copy and Jira payload shape. Feature requests file as `Task` so they
+ * do not land in the client-bug backlog as defects to reproduce (LS-9247).
+ */
+const REPORT_KINDS = {
+  bug: {
+    issueType: 'Bug',
+    title: 'Report a Bug',
+    subtitle: "Describe what happened and we'll file a ticket automatically.",
+    placeholder:
+      'Describe the issue, steps to reproduce, and what you expected to happen...',
+    inputLabel: 'Bug description',
+    submitLabel: 'Submit Report',
+    fallbackSummary: 'Bug report',
+    labels: ['user-reported', 'mobile'],
+  },
+  feature: {
+    issueType: 'Task',
+    title: 'Suggest a Feature',
+    subtitle: "Tell us your idea and we'll file it for the team to review.",
+    placeholder:
+      'Describe the feature you want, and what it would let you do...',
+    inputLabel: 'Feature request description',
+    submitLabel: 'Submit Suggestion',
+    fallbackSummary: 'Feature request',
+    labels: ['user-reported', 'mobile', 'feature-request'],
+  },
+} as const satisfies Record<
+  ReportKind,
+  {
+    issueType: string;
+    title: string;
+    subtitle: string;
+    placeholder: string;
+    inputLabel: string;
+    submitLabel: string;
+    fallbackSummary: string;
+    labels: readonly string[];
+  }
+>;
+
 export interface BugReportModalProps {
   visible: boolean;
   onClose: () => void;
+  /** Which flow to render. Defaults to the bug-report flow. */
+  kind?: ReportKind;
 }
 
 /**
- * In-app "Report a Bug" flow for native. Submits directly to the jira-proxy
- * `/bug` endpoint — the same destination and Jira project as the web bug
- * report modal (apps/web/src/components/layout/BugReportButton.tsx).
+ * In-app feedback flow for native, covering both "Report a Bug" and
+ * "Suggest a Feature" (`kind`). Submits directly to the jira-proxy `/bug`
+ * endpoint — the same destination and Jira project as the web bug report modal
+ * (apps/web/src/components/layout/BugReportButton.tsx) — with the issue type
+ * and labels varying by kind.
  */
 export default function BugReportModal({
   visible,
   onClose,
+  kind = 'bug',
 }: BugReportModalProps): React.JSX.Element {
+  const copy = REPORT_KINDS[kind];
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -191,9 +241,10 @@ export default function BugReportModal({
           // Atlassian Document Format `text` node, not interpolated HTML/wiki
           // markup, so there's no injection surface here — same as web's
           // BugReportButton, which sends this field unsanitized too.
-          summary: buildSummary(trimmed) || 'Bug report',
+          summary: buildSummary(trimmed) || copy.fallbackSummary,
           description: trimmed,
-          labels: ['user-reported', 'mobile'],
+          issueType: copy.issueType,
+          labels: [...copy.labels],
           priority: 'Medium',
           appVersion: config.appVersion,
           commitSha: config.commitSha,
@@ -225,13 +276,13 @@ export default function BugReportModal({
       setSuccessMessage(
         data.issueKey
           ? `Thanks! Created ${data.issueKey}.`
-          : 'Thanks for the report!',
+          : 'Thanks for the feedback!',
       );
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Something went wrong.';
       const errorObj = err instanceof Error ? err : new Error(message);
-      LOGGER.error('Failed to submit native bug report', errorObj);
+      LOGGER.error(`Failed to submit native ${kind} report`, errorObj);
       captureError(errorObj);
       setErrorMessage(message);
     } finally {
@@ -280,11 +331,10 @@ export default function BugReportModal({
             <>
               <YStack gap="$1">
                 <Text fontSize={18} fontWeight="700" color="$color">
-                  Report a Bug
+                  {copy.title}
                 </Text>
                 <Text fontSize="$3" color="$colorPress">
-                  Describe what happened and we&apos;ll file a ticket
-                  automatically.
+                  {copy.subtitle}
                 </Text>
               </YStack>
 
@@ -293,8 +343,8 @@ export default function BugReportModal({
                 onChangeText={setDescription}
                 maxLength={MAX_DESCRIPTION_LENGTH}
                 numberOfLines={5}
-                placeholder="Describe the issue, steps to reproduce, and what you expected to happen..."
-                aria-label="Bug description"
+                placeholder={copy.placeholder}
+                aria-label={copy.inputLabel}
                 editable={!submitting}
               />
 
@@ -390,7 +440,7 @@ export default function BugReportModal({
                     <Spinner color="white" />
                   ) : (
                     <Text color="white" fontWeight="600">
-                      Submit Report
+                      {copy.submitLabel}
                     </Text>
                   )}
                 </Button>

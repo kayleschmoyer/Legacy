@@ -22,7 +22,7 @@ export interface HelpContactItem {
   description: string;
   url?: string;
   /** When set, the item triggers an in-app action (with `url` as fallback). */
-  action?: 'bug-report';
+  action?: 'bug-report' | 'feature-request';
 }
 
 /* ─── General FAQ ─── */
@@ -150,6 +150,7 @@ export const HELP_CONTACT_ITEMS: HelpContactItem[] = [
     description:
       "Have an idea that would make Legacy Sports better? We'd love to hear it.",
     url: 'https://github.com/bkrupa/legacy-sports/issues/new?labels=enhancement&template=feature_request.md',
+    action: 'feature-request',
   },
   {
     icon: '💬',

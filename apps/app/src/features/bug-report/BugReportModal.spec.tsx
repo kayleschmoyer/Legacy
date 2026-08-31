@@ -213,6 +213,7 @@ describe('BugReportModal', () => {
     const body = JSON.parse(options.body as string) as Record<string, unknown>;
     expect(body.description).toBe('Everything is broken');
     expect(body.labels).toEqual(['user-reported', 'mobile']);
+    expect(body.issueType).toBe('Bug');
     expect(body.appVersion).toBe('1.0.0');
     expect(body.commitSha).toBe('abc1234');
   });
@@ -392,6 +393,47 @@ describe('BugReportModal', () => {
       await waitFor(() => {
         expect(screen.queryByText('🖼 shot.png')).toBeNull();
       });
+    });
+  });
+
+  describe('feature request mode (LS-9247)', () => {
+    it('renders feature-request copy instead of bug-report copy', () => {
+      render(<BugReportModal visible kind="feature" onClose={jest.fn()} />);
+
+      expect(screen.getByText('Suggest a Feature')).toBeTruthy();
+      expect(screen.queryByText('Report a Bug')).toBeNull();
+      expect(screen.getByText('Submit Suggestion')).toBeTruthy();
+      expect(screen.getByLabelText('Feature request description')).toBeTruthy();
+    });
+
+    it('submits as a Task with the feature-request label so it does not land in the bug backlog', async () => {
+      mockFetch.mockResolvedValue(okBugResponse('LS-4321'));
+      render(<BugReportModal visible kind="feature" onClose={jest.fn()} />);
+
+      fireEvent.changeText(
+        screen.getByLabelText('Feature request description'),
+        'Add dark mode to the league page',
+      );
+      fireEvent.press(screen.getByText('Submit Suggestion'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Thanks! Created LS-4321.')).toBeTruthy();
+      });
+
+      const [calledUrl, options] = mockFetch.mock.calls[0];
+      expect(calledUrl).toBe('https://api.example.com/jira/bug');
+      const body = JSON.parse(options.body as string) as Record<
+        string,
+        unknown
+      >;
+      expect(body.issueType).toBe('Task');
+      expect(body.labels).toEqual([
+        'user-reported',
+        'mobile',
+        'feature-request',
+      ]);
+      expect(body.summary).toBe('Add dark mode to the league page');
+      expect(body.description).toBe('Add dark mode to the league page');
     });
   });
 });

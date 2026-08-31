@@ -18,6 +18,11 @@ const SITE_URL = 'https://test.atlassian.net';
 
 type FetchCall = [string, RequestInit];
 
+/** Minimal shape of the ADF description document posted to Jira. */
+interface JiraAdfDoc {
+  content: Array<{ content?: Array<{ text?: string }> }>;
+}
+
 /** Narrow T | undefined → T, failing the test if undefined. */
 function defined<T>(val: T | undefined): T {
   if (val === undefined) throw new Error('Expected value to be defined');
@@ -219,6 +224,105 @@ describe('createJiraBug — epic parent field', () => {
       fields: { parent?: { key: string } };
     };
     expect(body.fields.parent).toBeUndefined();
+  });
+});
+
+describe('createJiraBug — issue type (LS-9247)', () => {
+  let fetchSpy: jest.MockedFunction<typeof fetch>;
+
+  beforeEach(() => {
+    fetchSpy = jest.spyOn(global, 'fetch') as jest.MockedFunction<typeof fetch>;
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    jest.clearAllMocks();
+  });
+
+  async function createAndReadFields(
+    input: Parameters<typeof createJiraBug>[0],
+  ): Promise<{ issuetype: { name: string }; description: JiraAdfDoc }> {
+    fetchSpy.mockResolvedValueOnce(makeCreateIssueResponse());
+    await createJiraBug(input, 'LS', 'jira-secret');
+    const calls = fetchSpy.mock.calls as unknown as FetchCall[];
+    const createCall = findCreateIssueFetchCall(calls);
+    expect(createCall).toBeDefined();
+    return (
+      JSON.parse(defined(createCall)[1].body as string) as {
+        fields: { issuetype: { name: string }; description: JiraAdfDoc };
+      }
+    ).fields;
+  }
+
+  /** Flatten the ADF description back to plain text for assertions. */
+  function adfText(doc: JiraAdfDoc): string {
+    return doc.content
+      .flatMap((node) => node.content?.map((c) => c.text ?? '') ?? [])
+      .join('\n\n');
+  }
+
+  it('defaults to Bug when issueType is omitted', async () => {
+    const fields = await createAndReadFields({ summary: 'Test bug' });
+    expect(fields.issuetype).toEqual({ name: 'Bug' });
+  });
+
+  it('creates a Bug when issueType is explicitly Bug', async () => {
+    const fields = await createAndReadFields({
+      summary: 'Test bug',
+      issueType: 'Bug',
+    });
+    expect(fields.issuetype).toEqual({ name: 'Bug' });
+  });
+
+  it('creates a Task when issueType is Task', async () => {
+    const fields = await createAndReadFields({
+      summary: 'Add dark mode',
+      issueType: 'Task',
+    });
+    expect(fields.issuetype).toEqual({ name: 'Task' });
+  });
+
+  it('uses feature-request description scaffolding for Task issues', async () => {
+    const fields = await createAndReadFields({
+      summary: 'Add dark mode',
+      description: 'I would like a dark theme',
+      issueType: 'Task',
+    });
+
+    const text = adfText(fields.description);
+    expect(text).toContain('## Feature Request');
+    expect(text).not.toContain('## Bug Report');
+    expect(text).toContain('## Agent Triage Notes');
+    expect(text).not.toContain('## Agent Investigation Notes');
+    // Nothing is broken, so the bug-shaped console-error stub is omitted.
+    expect(text).not.toContain('No errors captured at report time.');
+  });
+
+  it('keeps bug description scaffolding for Bug issues', async () => {
+    const fields = await createAndReadFields({
+      summary: 'Broken page',
+      description: 'The page is blank',
+      issueType: 'Bug',
+    });
+
+    const text = adfText(fields.description);
+    expect(text).toContain('## Bug Report');
+    expect(text).toContain('## Agent Investigation Notes');
+    expect(text).toContain('No errors captured at report time.');
+    expect(text).not.toContain('## Feature Request');
+  });
+
+  it('still records captured console errors on a Task issue', async () => {
+    const fields = await createAndReadFields({
+      summary: 'Add dark mode',
+      description: 'I would like a dark theme',
+      issueType: 'Task',
+      recentErrors: [{ message: 'boom', timestamp: '2026-08-10T00:00:00Z' }],
+    });
+
+    const text = adfText(fields.description);
+    expect(text).toContain('## Recent Console Errors');
+    expect(text).toContain('boom');
   });
 });
 

@@ -11,7 +11,9 @@ import {
 } from '@legacy-sports/rollbar';
 import type { AttachmentInput, CreateIssueInput } from './JiraClient';
 import {
+  ALLOWED_ISSUE_TYPES,
   createJiraBug,
+  isAllowedIssueType,
   resolveCurrentBugEpicKey,
   searchJiraBugs,
 } from './JiraClient';
@@ -220,6 +222,15 @@ function parseBugReport(rawBody: string | null): CreateIssueInput {
       throw new Error('Field "description" must be a string');
     }
     input.description = body['description'];
+  }
+
+  if (body['issueType'] !== undefined) {
+    if (!isAllowedIssueType(body['issueType'])) {
+      throw new Error(
+        `Field "issueType" must be one of: ${ALLOWED_ISSUE_TYPES.join(', ')}`,
+      );
+    }
+    input.issueType = body['issueType'];
   }
 
   if (body['priority'] !== undefined) {

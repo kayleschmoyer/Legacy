@@ -156,9 +156,33 @@ export interface CapturedErrorInput {
   timestamp: string;
 }
 
+/**
+ * Jira issue types this proxy is allowed to create.
+ *
+ * `Bug` backs the in-app "Report a Bug" flow; `Task` backs the in-app
+ * "Suggest a Feature" flow (LS-9247). Feature requests are deliberately NOT
+ * filed as `Bug` — they would otherwise pollute the client-bug backlog and be
+ * picked up by the `/work-bugs` sweep as defects to reproduce.
+ */
+export const ALLOWED_ISSUE_TYPES = ['Bug', 'Task'] as const;
+
+export type AllowedIssueType = (typeof ALLOWED_ISSUE_TYPES)[number];
+
+export const DEFAULT_ISSUE_TYPE: AllowedIssueType = 'Bug';
+
+/** Type guard for untrusted request input — no cast needed at the call site. */
+export function isAllowedIssueType(value: unknown): value is AllowedIssueType {
+  return (
+    typeof value === 'string' &&
+    (ALLOWED_ISSUE_TYPES as readonly string[]).includes(value)
+  );
+}
+
 export interface CreateIssueInput {
   summary: string;
   description?: string;
+  /** Jira issue type to create. Defaults to `Bug` when omitted. */
+  issueType?: AllowedIssueType;
   priority?: 'Low' | 'Medium' | 'High' | 'Critical';
   labels?: string[];
   reporterEmail?: string;
@@ -216,18 +240,24 @@ function textToAdf(text: string): JiraDocNode {
 }
 
 /**
- * Build an agent-ready ADF description from the bug report payload.
+ * Build an agent-ready ADF description from the report payload.
  *
  * The output is structured so a coding agent can act on it directly:
  * user description first, then technical context, browser context,
  * console errors, and a short investigation checklist.
+ *
+ * Feature requests (`issueType: 'Task'`) get a request-shaped variant: the
+ * console-error and "reproduce the issue" scaffolding is bug-specific noise
+ * when there is nothing broken to reproduce (LS-9247).
  */
 function buildDescription(input: CreateIssueInput): JiraDocNode {
   const parts: string[] = [];
+  const isFeatureRequest = input.issueType === 'Task';
 
   // ── 1. User-provided description ─────────────────────────────────────────
   if (input.description) {
-    parts.push(`## Bug Report\n\n${input.description}`);
+    const heading = isFeatureRequest ? 'Feature Request' : 'Bug Report';
+    parts.push(`## ${heading}\n\n${input.description}`);
   }
 
   // ── 2. Technical context ─────────────────────────────────────────────────
@@ -254,38 +284,52 @@ function buildDescription(input: CreateIssueInput): JiraDocNode {
   }
 
   // ── 4. Recent console errors ─────────────────────────────────────────────
-  if (input.recentErrors && input.recentErrors.length > 0) {
-    const errorLines = input.recentErrors.map((e) => {
+  // Feature requests only carry this section when errors were actually
+  // captured — "no errors" is meaningless for a request with nothing broken.
+  const recentErrors = input.recentErrors ?? [];
+  const hasRecentErrors = recentErrors.length > 0;
+  if (hasRecentErrors) {
+    const errorLines = recentErrors.map((e) => {
       const loc = e.source
         ? ` (${e.source}${e.lineno != null ? `:${String(e.lineno)}` : ''})`
         : '';
       return `- [${e.timestamp}] ${e.message}${loc}`;
     });
     parts.push(`## Recent Console Errors\n\n${errorLines.join('\n')}`);
-  } else {
+  } else if (!isFeatureRequest) {
     parts.push(
       '## Recent Console Errors\n\nNo errors captured at report time.',
     );
   }
 
-  // ── 5. Agent investigation notes ─────────────────────────────────────────
-  const investigationSteps: string[] = [
-    '1. Reproduce the issue at the Page URL above using the same viewport dimensions.',
-    '2. Look at the component(s) responsible for rendering that route.',
-  ];
-  if (input.commitSha) {
-    investigationSteps.push(
-      `3. Run \`git log ${input.commitSha}\` and \`git show ${input.commitSha}\` to inspect recent changes near the affected area.`,
+  // ── 5. Agent notes ───────────────────────────────────────────────────────
+  if (isFeatureRequest) {
+    const requestSteps: string[] = [
+      '1. Treat this as a user-submitted product request, not a defect — there is nothing to reproduce.',
+      '2. Confirm the request is in scope and not already covered by existing functionality before building.',
+      '3. Identify the screen(s) and component(s) the request touches, starting from the Page URL above if present.',
+      '4. Write acceptance criteria on this ticket before implementing; escalate to the user if the request is ambiguous.',
+    ];
+    parts.push(`## Agent Triage Notes\n\n${requestSteps.join('\n')}`);
+  } else {
+    const investigationSteps: string[] = [
+      '1. Reproduce the issue at the Page URL above using the same viewport dimensions.',
+      '2. Look at the component(s) responsible for rendering that route.',
+    ];
+    if (input.commitSha) {
+      investigationSteps.push(
+        `3. Run \`git log ${input.commitSha}\` and \`git show ${input.commitSha}\` to inspect recent changes near the affected area.`,
+      );
+    }
+    if (hasRecentErrors) {
+      investigationSteps.push(
+        '4. The console errors above indicate where the failure originates — start there.',
+      );
+    }
+    parts.push(
+      `## Agent Investigation Notes\n\n${investigationSteps.join('\n')}`,
     );
   }
-  if (input.recentErrors && input.recentErrors.length > 0) {
-    investigationSteps.push(
-      '4. The console errors above indicate where the failure originates — start there.',
-    );
-  }
-  parts.push(
-    `## Agent Investigation Notes\n\n${investigationSteps.join('\n')}`,
-  );
 
   return textToAdf(parts.join('\n\n'));
 }
@@ -404,7 +448,7 @@ export async function createJiraBug(
 
   const fields: JiraIssueFields = {
     project: { key: projectKey },
-    issuetype: { name: 'Bug' },
+    issuetype: { name: input.issueType ?? DEFAULT_ISSUE_TYPE },
     summary: input.summary,
     description: buildDescription(input),
   };

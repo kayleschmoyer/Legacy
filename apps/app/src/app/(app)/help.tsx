@@ -11,7 +11,9 @@ import { Linking, ScrollView } from 'react-native';
 import { H1, H3, Separator, Text, XStack, YStack } from 'tamagui';
 import { brand } from '@legacy-sports/design-tokens';
 import { config } from '@legacy-sports/app-config/native';
-import BugReportModal from '../../features/bug-report/BugReportModal';
+import BugReportModal, {
+  type ReportKind,
+} from '../../features/bug-report/BugReportModal';
 
 /* ─── FAQ data (imported from @legacy-sports/utils) ─── */
 
@@ -66,13 +68,14 @@ function FaqItem({ question, answer }: FaqItemProps) {
 /* ─── Main component ─── */
 
 export default function HelpScreen(): React.JSX.Element {
-  const [bugReportOpen, setBugReportOpen] = useState(false);
+  const [reportKind, setReportKind] = useState<ReportKind | null>(null);
 
   return (
     <>
       <BugReportModal
-        visible={bugReportOpen}
-        onClose={() => setBugReportOpen(false)}
+        visible={reportKind !== null}
+        kind={reportKind ?? 'bug'}
+        onClose={() => setReportKind(null)}
       />
       <ScrollView>
         <YStack
@@ -254,21 +257,30 @@ export default function HelpScreen(): React.JSX.Element {
 
             <YStack padding="$4" gap="$3">
               {HELP_CONTACT_ITEMS.map((item) => {
-                // Report a Bug opens the in-app flow when it's available; the
-                // GitHub URL is a genuine fallback only, and only when the
-                // in-app path is unavailable — not the default (LS-8842).
-                const useBugReportAction =
-                  item.action === 'bug-report' && !!config.jiraProxyUrl;
-                const onPress = useBugReportAction
-                  ? () => setBugReportOpen(true)
-                  : item.action === 'bug-report'
-                    ? () => void Linking.openURL(DISCORD_URL)
-                    : item.url
-                      ? () => {
-                          const { url } = item;
-                          if (url) void Linking.openURL(url);
-                        }
-                      : undefined;
+                // Report a Bug (LS-8842) and Suggest a Feature (LS-9247) both
+                // open the in-app flow when it's available, so the submission
+                // lands in Jira. External URLs are a genuine fallback only, and
+                // only when the in-app path is unavailable — not the default.
+                // Report a Bug falls back to Discord (faster human response);
+                // Suggest a Feature falls back to its GitHub issue template.
+                const inAppKind: ReportKind | null =
+                  item.action === 'bug-report'
+                    ? 'bug'
+                    : item.action === 'feature-request'
+                      ? 'feature'
+                      : null;
+
+                const onPress =
+                  inAppKind && config.jiraProxyUrl
+                    ? () => setReportKind(inAppKind)
+                    : item.action === 'bug-report'
+                      ? () => void Linking.openURL(DISCORD_URL)
+                      : item.url
+                        ? () => {
+                            const { url } = item;
+                            if (url) void Linking.openURL(url);
+                          }
+                        : undefined;
 
                 return (
                   <YStack

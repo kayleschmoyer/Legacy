@@ -18,6 +18,9 @@ jest.mock('@legacy-sports/rollbar', () => ({
 
 // Mock the Jira client
 jest.mock('./JiraClient', () => ({
+  // The issue-type allowlist is real data, not behaviour — keep the actual
+  // value so request validation is tested against the shipped list.
+  ...jest.requireActual<typeof import('./JiraClient')>('./JiraClient'),
   createJiraBug: jest.fn(),
   searchJiraBugs: jest.fn(),
   resolveCurrentBugEpicKey: jest.fn(),
@@ -270,6 +273,70 @@ describe('Jira Proxy Handler', () => {
       });
       const result = await baseHandler(event);
       expect(result.statusCode).toBe(400);
+    });
+
+    it('returns 400 when issueType is not an allowed type (LS-9247)', async () => {
+      const event = makeEvent({
+        body: JSON.stringify({ summary: 'Test', issueType: 'Epic' }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+      const body = JSON.parse(result.body) as { error: string };
+      expect(body.error).toContain('issueType');
+    });
+
+    it('returns 400 when issueType is not a string (LS-9247)', async () => {
+      const event = makeEvent({
+        body: JSON.stringify({ summary: 'Test', issueType: 42 }),
+      });
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(400);
+    });
+
+    it('forwards an allowed issueType to createJiraBug (LS-9247)', async () => {
+      mockCreateJiraBug.mockResolvedValueOnce({
+        issueKey: 'LS-100',
+        issueUrl: 'https://test.atlassian.net/browse/LS-100',
+      });
+
+      const event = makeEvent({
+        body: JSON.stringify({
+          summary: 'Add dark mode',
+          description: 'I would like a dark theme',
+          issueType: 'Task',
+          labels: ['user-reported', 'mobile', 'feature-request'],
+        }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(201);
+      const [input] = mockCreateJiraBug.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
+      expect(input['issueType']).toBe('Task');
+      expect(input['labels']).toEqual([
+        'user-reported',
+        'mobile',
+        'feature-request',
+      ]);
+    });
+
+    it('omits issueType when the client does not send one (LS-9247)', async () => {
+      mockCreateJiraBug.mockResolvedValueOnce({
+        issueKey: 'LS-101',
+        issueUrl: 'https://test.atlassian.net/browse/LS-101',
+      });
+
+      const event = makeEvent({
+        body: JSON.stringify({ summary: 'Test bug' }),
+      });
+
+      const result = await baseHandler(event);
+      expect(result.statusCode).toBe(201);
+      const [input] = mockCreateJiraBug.mock.calls[0] as [
+        Record<string, unknown>,
+      ];
+      expect(input['issueType']).toBeUndefined();
     });
 
     it('returns 500 when JIRA_SECRET_NAME is not set', async () => {
