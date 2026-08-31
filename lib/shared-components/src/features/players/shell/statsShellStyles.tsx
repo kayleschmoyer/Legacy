@@ -54,6 +54,19 @@ export function StatsShellStyles(): React.JSX.Element | null {
         .ps-toolbar { grid-template-columns: 1fr; }
         .ps-toolbar > * { width: 100%; }
       }
+      /* Football's position filter (11 pills) doesn't fit the shared 4-control
+         column alongside team/rows/advanced without wrapping to 2 lines and
+         stretching the whole toolbar row taller (LS-9506). Give it a
+         dedicated full-width row below the compact controls instead. */
+      .ps-toolbar-football { grid-template-columns: minmax(240px, 1.5fr) minmax(140px, 1fr) minmax(120px, 1fr) auto; }
+      .ps-toolbar-football > *:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+      .ps-toolbar-football > *:nth-child(3) { grid-column: 2; grid-row: 1; }
+      .ps-toolbar-football > *:nth-child(4) { grid-column: 3; grid-row: 1; }
+      .ps-toolbar-football > *:nth-child(5) { grid-column: 4; grid-row: 1; }
+      @media (max-width: 640px) {
+        .ps-toolbar-football { grid-template-columns: 1fr; }
+        .ps-toolbar-football > * { width: 100%; grid-column: auto; grid-row: auto; }
+      }
       .ps-adv-grid { grid-template-columns: repeat(3, 1fr); }
       @media (max-width: 640px) {
         .ps-adv-grid { grid-template-columns: 1fr; }

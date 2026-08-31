@@ -835,6 +835,7 @@ export function useFootballController(
     activeTab: view,
     onTabChange: handleViewChange,
     tablistAriaLabel: 'Stat category',
+    toolbarGridClassName: 'ps-toolbar-football',
     renderToolbarControls,
     hasPendingChanges: false,
     onApply: undefined,
