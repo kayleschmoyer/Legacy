@@ -14,6 +14,7 @@ export { ResetPasswordPage } from './reset-password.page';
 export { RosterPage } from './roster.page';
 export { SettingsPage } from './settings.page';
 export { StandingsPage } from './standings.page';
+export { SubscriptionScreen } from './subscription.page';
 export { TradeCenterPage } from './trade-center.page';
 export { TradesPage } from './trades.page';
 export { WaiversPage } from './waivers.page';

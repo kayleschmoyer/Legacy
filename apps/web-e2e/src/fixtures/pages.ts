@@ -25,6 +25,7 @@ import {
   RosterPage,
   SettingsPage,
   StandingsPage,
+  SubscriptionScreen,
   TradesPage,
   WaiversPage,
 } from '../pages';
@@ -65,7 +66,7 @@ export interface PageObjectFixtures {
   matchupPage: MatchupPage;
   /** The Discord OAuth callback screen (/auth/discord/callback). */
   discordCallbackScreen: DiscordCallbackScreen;
-  /** The Profile Settings screen (/profile/settings) — the callback redirect target. */
+  /** The Profile Settings screen (/profile/settings) — Discord-callback landing + 2FA section. */
   profileSettingsScreen: ProfileSettingsScreen;
   /**
    * The resolver / redirect + legacy-alias routes (ADR-0016 driver-typed).
@@ -88,6 +89,8 @@ export interface PageObjectFixtures {
    * route (ADR-0015 §2).
    */
   navHeader: NavHeader;
+  /** Subscription screen — exposes the billing action + step-up challenge. */
+  subscriptionScreen: SubscriptionScreen;
 }
 
 /**
@@ -212,6 +215,12 @@ const pageObjects = {
     use: (component: NavHeader) => Promise<void>,
   ) => {
     await use(new NavHeader(page.getByRole('banner')));
+  },
+  subscriptionScreen: async (
+    { page }: { page: Page },
+    use: (pageObject: SubscriptionScreen) => Promise<void>,
+  ) => {
+    await use(new SubscriptionScreen(new PlaywrightWebDriver(page)));
   },
 };
 

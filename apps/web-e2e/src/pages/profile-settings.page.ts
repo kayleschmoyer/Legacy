@@ -1,24 +1,27 @@
 import type { AppDriver, UIElement } from '../driver';
 import { BaseScreen } from '../base/base.screen';
+import { TwoFactorSection } from '../components/two-factor-section.component';
 
 /**
- * Lean page object for the Profile Settings screen (/profile/settings).
+ * Page object for the Profile Settings screen (`/profile/settings`), migrated to
+ * the platform-neutral driver (ADR-0016). Covers two surfaces, added
+ * opportunistically as their specs were touched (ADR-0016 rollout):
  *
- * Written against the platform-neutral {@link AppDriver} interface (ADR-0016).
- * This object intentionally covers only the surface the Discord callback flow
- * lands on — the page heading (proof of the post-link redirect) and the Linked
- * Identities section (LS-7825), which is where a freshly-linked Discord account
- * shows up. The broader Profile Settings coverage lives in
- * `profile-settings.spec.ts` and can migrate verbs here opportunistically as it
- * is touched (ADR-0016 rollout). Carries no mocking or data setup.
+ *   • the Discord callback landing surface — the page heading (proof of the
+ *     post-link redirect) and the Linked Identities section (LS-7825);
+ *   • the Two-Factor Authentication section (LS-8463), exposed as a composed
+ *     component.
  *
- * The heading and providers resolve via the portable role/text/testID
- * vocabulary — no web-only surfaces.
+ * Broader Profile Settings coverage stays in the raw-Playwright
+ * `profile-settings.spec.ts` until migrated. Locators resolve via the portable
+ * role/text/testID vocabulary — no web-only surfaces. Carries no mocking or data
+ * setup.
  */
 export class ProfileSettingsScreen extends BaseScreen {
   // ── Private elements ─────────────────────────────────────────────
   readonly #heading: UIElement;
   readonly #linkedIdentitiesSection: UIElement;
+  readonly #twoFactor: TwoFactorSection;
 
   constructor(driver: AppDriver) {
     super(driver);
@@ -27,6 +30,21 @@ export class ProfileSettingsScreen extends BaseScreen {
     this.#linkedIdentitiesSection = driver.byTestId(
       'profile-linked-identities-section',
     );
+    this.#twoFactor = new TwoFactorSection(
+      driver.byTestId('profile-2fa-section'),
+    );
+  }
+
+  /** The Two-Factor Authentication section component. */
+  get twoFactor(): TwoFactorSection {
+    return this.#twoFactor;
+  }
+
+  // ── Actions ──────────────────────────────────────────────────────
+
+  /** Navigate to `/profile/settings` and wait for the 2FA section to render. */
+  async goto(): Promise<void> {
+    await this.open('/profile/settings', 'profile-2fa-section');
   }
 
   // ── Assertions ───────────────────────────────────────────────────

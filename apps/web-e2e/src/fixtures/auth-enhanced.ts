@@ -16,7 +16,7 @@ const E2E_ORIGIN = `http://localhost:${process.env.E2E_PORT || 4280}`;
  * Sets the HttpOnly JWT cookie, the JS-readable CSRF cookie,
  * and caches the user profile + token expiry in localStorage.
  */
-function buildAuthStorageState(
+export function buildAuthStorageState(
   jwt: string,
   userOverrides: Record<string, unknown> = {},
 ) {
