@@ -11,9 +11,10 @@ import { MatchupStatus } from '@legacy-sports/graphql';
 import {
   BRAND_GOLD_LIGHT,
   BRAND_NAVY_LIGHT,
+  TEXT_MUTED,
   withAlpha,
 } from '../../utils/colors';
-import { FONT_DISPLAY } from '../../utils/typography';
+import { FONT_DISPLAY, FONT_MONO } from '../../utils/typography';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
 
 // ── Styled Components ─────────────────────────────────────────────────────────
@@ -116,6 +117,10 @@ export interface MatchupScoreboardViewProps {
   team2Id?: number | null;
   team1Name: string;
   team2Name: string;
+  /** Optional team1 W-L-T record string (e.g. "7-3-1"). */
+  team1Record?: string | null;
+  /** Optional team2 W-L-T record string (e.g. "7-3-1"). */
+  team2Record?: string | null;
   team1Score: number | null;
   team2Score: number | null;
   team1Projected: number | null;
@@ -153,6 +158,8 @@ export function MatchupScoreboardView({
   team2Id,
   team1Name,
   team2Name,
+  team1Record,
+  team2Record,
   team1Score,
   team2Score,
   team1Projected,
@@ -344,6 +351,16 @@ export function MatchupScoreboardView({
           >
             {team1Name}
           </Text>
+          {team1Record != null && (
+            <Text
+              testID={team1Id != null ? `team-record-${team1Id}` : undefined}
+              fontFamily={FONT_MONO}
+              fontSize="$2"
+              color={TEXT_MUTED}
+            >
+              {team1Record}
+            </Text>
+          )}
           <ScoreDisplay
             fontSize={48}
             $sm={{ fontSize: 32 }}
@@ -438,6 +455,16 @@ export function MatchupScoreboardView({
           >
             {team2Name}
           </Text>
+          {team2Record != null && (
+            <Text
+              testID={team2Id != null ? `team-record-${team2Id}` : undefined}
+              fontFamily={FONT_MONO}
+              fontSize="$2"
+              color={TEXT_MUTED}
+            >
+              {team2Record}
+            </Text>
+          )}
           <ScoreDisplay
             fontSize={48}
             $sm={{ fontSize: 32 }}

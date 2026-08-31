@@ -157,6 +157,25 @@ describe('MatchupScoreboardView', () => {
     expect(screen.queryByText('Proj: 120.50')).toBeNull();
   });
 
+  it('renders each team record when provided', () => {
+    render(
+      <MatchupScoreboardView
+        {...baseProps({ team1Record: '7-3-1', team2Record: '5-5' })}
+      />,
+    );
+    expect(screen.getByText('7-3-1')).toBeTruthy();
+    expect(screen.getByText('5-5')).toBeTruthy();
+  });
+
+  it('does not render a record when not provided', () => {
+    render(
+      <MatchupScoreboardView
+        {...baseProps({ team1Record: undefined, team2Record: undefined })}
+      />,
+    );
+    expect(screen.queryByText(/^\d+-\d+/)).toBeNull();
+  });
+
   it('renders team names as interactive when onTeamClick is provided', () => {
     // The tamagui Text mock strips `onPress`, so the callback cannot be fired
     // via fireEvent here; this asserts the clickable branch renders cleanly.

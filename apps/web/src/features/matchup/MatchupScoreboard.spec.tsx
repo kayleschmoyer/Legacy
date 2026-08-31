@@ -43,6 +43,7 @@ jest.mock('../../config/environment', () => ({
 // jest.requireActual, so computeMatchupScores' equality checks are unaffected.
 const mockUseGetMatchupPlayersQuery = jest.fn();
 const mockUseGetLeagueTeamsQuery = jest.fn();
+const mockUseGetLeagueStandingsQuery = jest.fn(() => ({ data: undefined }));
 jest.mock('@legacy-sports/graphql', () => {
   const actual = jest.requireActual<typeof import('@legacy-sports/graphql')>(
     '@legacy-sports/graphql',
@@ -53,6 +54,8 @@ jest.mock('@legacy-sports/graphql', () => {
       mockUseGetMatchupPlayersQuery(opts),
     useGetLeagueTeamsQuery: (opts: unknown): unknown =>
       mockUseGetLeagueTeamsQuery(opts),
+    useGetLeagueStandingsQuery: (opts: unknown): unknown =>
+      mockUseGetLeagueStandingsQuery(opts),
   };
 });
 
@@ -590,6 +593,7 @@ describe('MatchupScoreboard — live score updates via liveUpdateSignal (LS-5425
     mockUseGetLeagueTeamsQuery.mockReturnValue({
       data: { leagueTeams: [] },
     });
+    mockUseGetLeagueStandingsQuery.mockReturnValue({ data: undefined });
     mockUseLeagueScoringSettings.mockReturnValue({
       settings: { batting: {}, pitching: {}, fielding: {} },
     });

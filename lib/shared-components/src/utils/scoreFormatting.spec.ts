@@ -1,5 +1,6 @@
 import {
   formatPoints,
+  formatRecord,
   formatScore,
   formatWinPercentage,
   getLeadingTeam,
@@ -68,6 +69,17 @@ describe('formatWinPercentage', () => {
 
   it('returns placeholder for null', () => {
     expect(formatWinPercentage(null)).toBe('—');
+  });
+});
+
+describe('formatRecord', () => {
+  it('formats a record without ties as "W-L"', () => {
+    expect(formatRecord(5, 2)).toBe('5-2');
+    expect(formatRecord(5, 2, 0)).toBe('5-2');
+  });
+
+  it('formats a record with ties as "W-L-T"', () => {
+    expect(formatRecord(7, 3, 1)).toBe('7-3-1');
   });
 });
 

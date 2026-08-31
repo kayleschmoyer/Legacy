@@ -9,10 +9,12 @@ import {
   formatMatchupTimeInfo,
   MatchupScoreboardView,
 } from '@legacy-sports/shared-components/matchup';
+import { formatRecord } from '@legacy-sports/shared-components/utils';
 import {
   type MatchupFragment,
   type MatchupPlayerFragment,
   MatchupStatus,
+  useGetLeagueStandingsQuery,
   useGetLeagueTeamsQuery,
   useGetMatchupPlayersQuery,
 } from '@legacy-sports/graphql';
@@ -425,6 +427,36 @@ export function MatchupScoreboard({
     );
   }, [matchup?.team2Id, teamsData]);
 
+  // Fetch league standings to surface each team's W-L-T record in the header.
+  const { data: standingsData } = useGetLeagueStandingsQuery({
+    variables: { leagueId: leagueIdNum ?? 0 },
+    skip: !leagueIdNum,
+  });
+
+  const team1Record = useMemo(() => {
+    const standing = standingsData?.getLeagueStandings?.find(
+      (s) => Number(s.teamId) === matchup?.team1Id,
+    );
+    if (!standing) return null;
+    return formatRecord(
+      standing.wins ?? 0,
+      standing.losses ?? 0,
+      standing.ties ?? 0,
+    );
+  }, [matchup?.team1Id, standingsData]);
+
+  const team2Record = useMemo(() => {
+    const standing = standingsData?.getLeagueStandings?.find(
+      (s) => Number(s.teamId) === matchup?.team2Id,
+    );
+    if (!standing) return null;
+    return formatRecord(
+      standing.wins ?? 0,
+      standing.losses ?? 0,
+      standing.ties ?? 0,
+    );
+  }, [matchup?.team2Id, standingsData]);
+
   const timeInfo = showTimeInfo
     ? formatMatchupTimeInfo(
         matchup?.status,
@@ -444,6 +476,8 @@ export function MatchupScoreboard({
       team2Id={matchup?.team2Id}
       team1Name={team1Name}
       team2Name={team2Name}
+      team1Record={team1Record}
+      team2Record={team2Record}
       team1Score={team1Score}
       team2Score={team2Score}
       team1Projected={team1Projected}

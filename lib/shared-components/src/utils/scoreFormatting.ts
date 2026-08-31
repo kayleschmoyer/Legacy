@@ -36,10 +36,11 @@ export function formatWinPercentage(
 }
 
 /**
- * Format a record as "W-L" (e.g. "5-2").
+ * Format a record as "W-L" (e.g. "5-2"), or "W-L-T" when ties are non-zero
+ * (e.g. "7-3-1").
  */
-export function formatRecord(wins: number, losses: number): string {
-  return `${wins}-${losses}`;
+export function formatRecord(wins: number, losses: number, ties = 0): string {
+  return ties > 0 ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
 }
 
 /**
