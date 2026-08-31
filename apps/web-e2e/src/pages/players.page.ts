@@ -493,14 +493,22 @@ class PlayerStatsSurface {
   /** Assert the batting grid shows its loading indicator. */
   async expectLoadingIndicator(timeout = 5000): Promise<void> {
     await this.#battingGrid
-      .byTestId('loading-indicator')
+      .byTestId('player-stats-loading-skeleton')
       .expectVisible({ timeout });
   }
 
-  /** Assert the batting grid shows its inline error message. */
+  /** Assert a grid shows its inline error message. */
   async expectGridError(timeout = 5000): Promise<void> {
-    await this.#battingGrid
-      .byTestId('error-message')
+    // StatsDataGrid (LS-9036) replaces its whole `player-stats-data-grid`
+    // container with a bare ErrorCard on error rather than nesting it inside
+    // that container, so the card can no longer be scoped to one grid via
+    // `#battingGrid` — it must be located from the page root. The Combined
+    // view's batting + pitching grids render one `player-stats-error-card`
+    // each on a shared-error mock, so take the first (this assertion only
+    // needs to confirm an error surfaced, not which grid it came from).
+    await this.#driver
+      .byTestId('player-stats-error-card')
+      .first()
       .expectVisible({ timeout });
   }
 
