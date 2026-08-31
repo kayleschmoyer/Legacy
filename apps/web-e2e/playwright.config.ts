@@ -127,15 +127,30 @@ export default defineConfig({
   /* No retries — flake is a P1 bug, not something to paper over. A failing test
    * should fail on its first run so the signal is visible in CI. */
   retries: 0,
-  /* 4 workers: GHA runners have 7GB RAM; Playwright tests are I/O-bound not CPU-bound,
-   * so 4 parallel browsers (~400MB) finishes in ~5min vs ~15min at 2 workers */
-  workers: process.env.CI ? 4 : undefined,
+  /* LS-9695: was 4. The self-hosted runner fleet is pinned to 4 vCPU / ≥16 GB
+   * (terraform/runners/variables.tf, LS-8693) — 4 Playwright workers on a
+   * 4-vCPU box means one worker per vCPU with zero headroom for the OS, the
+   * `vite preview` webServer, and each headless browser's own compositor/GPU
+   * threads. Under any transient CPU pressure (a noisy spot-instance
+   * neighbor, a merge-queue revalidation burst) a worker's render thread gets
+   * starved for a beat, and whichever assertion happens to be polling at that
+   * moment times out — at random, in whichever spec that worker happened to
+   * be running. That exactly matches the LS-9695 signature (a single random
+   * `toBeVisible()` timeout, in a different unrelated spec every run, cleared
+   * by a rerun): it is CPU oversubscription, not a matchup-area fixture race
+   * — the failures were never concentrated in matchup/league-detail, they
+   * just landed there first because those specs run early alphabetically.
+   * 3 workers leaves one vCPU of headroom per runner. */
+  workers: process.env.CI ? 3 : undefined,
   /* Per-test timeout cap.  Budget math: a typical test has up to ~6 chained
-   * assertions plus one navigation/action.  With expect.timeout=3s and
-   * actionTimeout=10s, 6 expects + 1 action = 28s, fitting in 30s with
-   * headroom.  This is the Playwright default — earlier 20s was below the
-   * worst-case sum of inner timeouts and caused deterministic TLE on slow runs. */
-  timeout: 30000,
+   * assertions plus one navigation/action.  With expect.timeout=5s and
+   * actionTimeout=10s, 6 expects + 1 action = 40s, fitting in 45s with
+   * headroom. LS-9695: expect.timeout was 3s — the observed CPU-contention
+   * timeouts were reported at "~3-5s", i.e. right at that cap plus polling
+   * overhead. 5s absorbs the transient scheduling delay from the worker
+   * change above without masking a genuinely broken render (a locator that
+   * never becomes visible still fails, just after 5s instead of 3s). */
+  timeout: 45000,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     // Compact, agent-targeted Markdown summary (LS-7838) — readable with a
@@ -180,11 +195,14 @@ export default defineConfig({
   },
 
   expect: {
-    /* Per-assertion polling cap.  Sized so that ~6 chained expects (18s) plus
-     * one action (10s) still fits in the 30s test budget with headroom.
-     * Cold V8 JIT on CI typically commits within 1–2s; 3s leaves margin
-     * without letting a single hung assertion consume the whole test. */
-    timeout: 3000,
+    /* Per-assertion polling cap.  Sized so that ~6 chained expects (30s) plus
+     * one action (10s) still fits in the 45s test budget with headroom.
+     * LS-9695: was 3000 — under real CI CPU contention (see the `workers`
+     * comment above) a healthy render can occasionally take a couple of
+     * seconds longer than the cold-JIT 1-2s baseline to commit; 5s leaves
+     * margin for that without letting a single hung assertion consume the
+     * whole test. */
+    timeout: 5000,
   },
 
   /* Configure projects for major browsers */
