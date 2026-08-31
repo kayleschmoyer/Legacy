@@ -10,12 +10,8 @@
  * All GraphQL queries are mocked (route.fulfill only — no route.continue()),
  * so this spec runs without a live backend.
  *
- * One feature.md-listed behavior is NOT covered here because the underlying
- * functionality does not exist yet:
- *   - "click team to view roster": Standings.tsx hardcodes
- *     `getTeamUrl={(teamId) => \`/baseball/teams/${teamId}\`}` for every
- *     sport, and no `/football/teams/:teamId` route is registered in
- *     app.tsx — filed as a bug under LS-5268.
+ * "Click team to view roster" (LS-9255) is covered below — clicking a team
+ * row navigates to the football team route `/football/teams/:teamId`.
  *
  * The week selector for historical ("as of Week N") standings is covered
  * below (LS-6341).
@@ -186,6 +182,30 @@ async function mockFootballStandings(
     getuserleagues: (route) =>
       fulfillJson(route, { data: { userLeagues: [league] } }),
     getusers: (route) => fulfillJson(route, { data: { users: [] } }),
+    // Backs the football team detail route (LS-9255) once a Standings row is
+    // clicked — FootballTeamDetailPage queries the team by id and its roster.
+    getteambyid: (route, request) => {
+      const teamId = Number(request.variables['teamId']);
+      const team = MOCK_TEAMS.find((t) => t.id === teamId) ?? MOCK_TEAMS[0];
+      return fulfillJson(route, {
+        data: { team: { ...team, managerId: team.owner } },
+      });
+    },
+    getteammembers: (route) =>
+      fulfillJson(route, { data: { teamMembers: [] } }),
+    getviewermembership: (route) =>
+      fulfillJson(route, {
+        data: {
+          viewerMembership: {
+            __typename: 'LeagueMember',
+            leagueId: 1,
+            userId: 1,
+            teamId: 1,
+            permissionLevel: 'general_manager',
+            username: 'testuser',
+          },
+        },
+      }),
   });
 }
 
@@ -201,6 +221,24 @@ test.describe('Football Standings Tab — navigation @smoke', () => {
 
     await expect(page).toHaveURL('/football/league/1/standings');
     await standingsPage.expectNoAppError();
+  });
+
+  // LS-9255: clicking a team on a football league's Standings tab used to
+  // navigate to /baseball/teams/:id (hardcoded for every sport) — assert it
+  // now stays under the football team route and that route actually renders.
+  test('clicking a team navigates to the football team detail route', async ({
+    page,
+    standingsPage,
+  }) => {
+    await mockFootballStandings(page);
+    await standingsPage.goto(1, 'football');
+    await standingsPage.expectNoAppError();
+
+    await standingsPage.team('Northside Ironclads').tap();
+
+    await expect(page).toHaveURL('/football/teams/1');
+    await standingsPage.expectNoAppError();
+    await expect(page.getByText('Northside Ironclads')).toBeVisible();
   });
 });
 
