@@ -1307,6 +1307,43 @@ jobs:
           set-nx-shas: false
           include-optional-deps: false
 
+      # LS-9571: the sticky PR comment and failure-label reporting calls below
+      # previously ran on secrets.GITHUB_TOKEN — the ambient github-actions[bot]
+      # installation token, whose REST quota is shared across every
+      # concurrently-running workflow in the repo. With 20+ PRs in flight that
+      # shared bucket exhausts and these purely-reporting calls 403. The Agent
+      # Author app (id 3158619, already used this way by
+      # check-schema.yml/ci-orchestrator.yml/etc.) has its own separate
+      # installation budget. continue-on-error + the `|| secrets.GITHUB_TOKEN`
+      # fallback below mean a failure to mint this token degrades back to the
+      # previous (shared-budget) behavior rather than failing the job.
+      # NOTE: the CI Gate status-post step further down uses a different app
+      # (see the "Generate CI App Token" step below) — Agent Author does not
+      # hold "Commit statuses: write" (confirmed 403 here).
+      - name: "Generate App Token"
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: 3158619
+          private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+
+      # LS-9571: dedicated token for the CI Gate status post below — the
+      # Legacy Sports CI app (client-id 3148299, secrets.RUNNER_GITHUB_APP_ID /
+      # RUNNER_GITHUB_APP_KEY_BASE64), otherwise only used by Terraform for
+      # self-hosted runner registration/webhooks (terraform/runners/). Granted
+      # "Commit statuses: write" specifically for this call after both Agent
+      # Author and the Merge Queue app 403'd with "Resource not accessible by
+      # integration" (see PR #7415 history) — this is now the proven-working
+      # token for this specific write.
+      - name: "Generate CI App Token"
+        id: ci-app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          private-key: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+
       - name: "Debug: Job Results"
         shell: bash
         run: |
@@ -1372,6 +1409,9 @@ jobs:
         # bake, and once required a missing status blocks merge on its own.
         continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        # LS-9571: prefer the Merge Queue app's token (separate installation
+        # budget, proven "Commit statuses: write") over GITHUB_TOKEN, whose
+        # REST quota is shared across every concurrently-running workflow.
         env:
           GATE_RESULTS: |
             {
@@ -1386,7 +1426,17 @@ jobs:
           DISPATCH_PR_NUMBER: ${{ inputs.pr-number }}
           DISPATCH_HEAD_SHA: ${{ inputs.head-sha }}
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # LS-9571 follow-up: both the Agent Author app and the Merge Queue
+          # app 403'd this specific call with "Resource not accessible by
+          # integration" — neither is granted "Commit statuses: write" on
+          # this repo, despite the Merge Queue app calling createCommitStatus
+          # elsewhere in merge-queue-processor.js (that call's own success was
+          # never actually confirmed; this is our first real test of it).
+          # Observed on PR #7415 runs 33341720008 and 33346685792. The
+          # Legacy Sports CI app (see "Generate CI App Token" above) was then
+          # explicitly granted this permission and is the proven-working
+          # token; fall back to GITHUB_TOKEN if minting fails.
+          github-token: ${{ steps.ci-app-token.outputs.token || secrets.GITHUB_TOKEN }}
           script: |
             const { postCiGate } = require('./.github/scripts/ci-gate.js');
             const results = JSON.parse(process.env.GATE_RESULTS);
@@ -1450,7 +1500,7 @@ jobs:
         uses: ./.github/actions/ci-reporting
         with:
           status: ${{ steps.collect-results.outputs.overall-status }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           event-name: ${{ github.event_name }}
           pr-number: ${{ github.event.pull_request.number }}
           execution-mode: "local"
@@ -1472,7 +1522,7 @@ jobs:
         if: always() && github.event.pull_request.number
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.app-token.outputs.token || secrets.GITHUB_TOKEN }}
           script: |
             const prNumber = context.issue.number;
             if (!prNumber) return;
