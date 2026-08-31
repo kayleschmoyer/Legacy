@@ -291,6 +291,31 @@ describe('HomeScreen', () => {
       expect(queryByTestId('sport-card-primary-football')).toBeNull();
     });
 
+    it('reserves the same badge slot on the non-primary card too, so the two banners stay aligned (LS-9500)', () => {
+      const { getAllByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league]}
+          primarySport="baseball"
+        />,
+      );
+      // The "Your Sport" text renders on both cards (invisible on the
+      // non-primary one) so each card reserves identical vertical space
+      // for the badge slot instead of only the primary card growing taller.
+      expect(getAllByText('Your Sport')).toHaveLength(2);
+    });
+
+    it('does not reserve the badge slot on either card when primarySport is null (tie), so no extra space is added (LS-9500)', () => {
+      const { queryAllByText } = render(
+        <HomeScreen
+          {...baseProps}
+          leagues={[league, footballLeague]}
+          primarySport={null}
+        />,
+      );
+      expect(queryAllByText('Your Sport')).toHaveLength(0);
+    });
+
     it('shows no indicator on either card when primarySport is null (tie)', () => {
       const { queryByTestId } = render(
         <HomeScreen

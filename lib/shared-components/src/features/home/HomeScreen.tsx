@@ -2004,9 +2004,13 @@ function SportCard({
       </XStack>
 
       <YStack gap="$1">
-        {isPrimary ? (
+        {/* Rendered (invisibly, when not primary) rather than conditionally
+            mounted whenever this row differentiates a primary sport, so
+            every card in the row reserves the same height and the titles
+            below stay aligned — LS-9500. */}
+        {isPrimary !== undefined ? (
           <XStack
-            testID={`sport-card-primary-${sport.key}`}
+            testID={isPrimary ? `sport-card-primary-${sport.key}` : undefined}
             alignSelf="flex-start"
             backgroundColor={withAlpha(BRAND_GOLD_LIGHT, 0.14)}
             borderWidth={1}
@@ -2015,6 +2019,8 @@ function SportCard({
             paddingVertical={4}
             paddingHorizontal={10}
             marginBottom="$1"
+            opacity={isPrimary ? 1 : 0}
+            aria-hidden={!isPrimary}
           >
             <Text
               fontFamily={DISPLAY_FONT}
@@ -3358,7 +3364,9 @@ export function HomeScreen(props: HomeScreenProps): React.JSX.Element {
                       isLight={isLight}
                       showBadge
                       isPrimary={
-                        primarySport != null && sport.key === primarySport
+                        primarySport != null
+                          ? sport.key === primarySport
+                          : undefined
                       }
                       onView={() => onViewSport(sport.key)}
                       onCreate={() => onCreateLeague(sport.key)}
