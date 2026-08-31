@@ -175,6 +175,14 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const sport = sportFromPathname(location.pathname);
+  // Where to send the user on Cancel. Callers that aren't the sport landing
+  // page itself (e.g. the unified dashboard's Join League quick action) pass
+  // their own path via navigation state so Cancel returns there instead of
+  // always dropping the user on `/${sport}` (LS-9345). Falls back to the
+  // sport landing page for direct/deep-link entry, where there's nowhere
+  // else to go back to.
+  const cancelTarget =
+    (location.state as { from?: string } | null)?.from ?? `/${sport}`;
   const { inviteCode: urlInviteCode } = useParams<{ inviteCode?: string }>();
   // Initialise directly from the URL param so validation fires on the first
   // render rather than after a state-update round-trip (LS-2950 regression).
@@ -695,7 +703,7 @@ export function JoinLeagueByCodePage(): React.JSX.Element {
                 backgroundColor="$gray6"
                 color="$gray11"
                 animation="fast"
-                onPress={() => navigate(`/${sport}`)}
+                onPress={() => navigate(cancelTarget)}
                 disabled={loading}
               >
                 Cancel

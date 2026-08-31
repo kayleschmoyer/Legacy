@@ -135,7 +135,11 @@ jest.mock('../../hooks/useIsPremium', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function renderPage() {
+function renderPage(
+  initialEntries: Array<string | { pathname: string; state?: unknown }> = [
+    '/baseball/join',
+  ],
+) {
   const { useJoinLeagueByCodeMutation, useValidateInviteCodeLazyQuery } =
     gqlMock as {
       useJoinLeagueByCodeMutation: jest.Mock;
@@ -144,7 +148,7 @@ function renderPage() {
 
   return {
     ...render(
-      <MemoryRouter initialEntries={['/baseball/join']}>
+      <MemoryRouter initialEntries={initialEntries}>
         <Routes>
           <Route
             path="/baseball/join"
@@ -440,6 +444,19 @@ describe('JoinLeagueByCodePage', () => {
 
     fireEvent.click(screen.getByText(/Cancel/i));
     expect(mockNavigate).toHaveBeenCalledWith('/baseball');
+  });
+
+  /**
+   * Regression: LS-9345 — Cancel always dropped the user on `/baseball`, even
+   * when they arrived from the unified home dashboard ("/") rather than the
+   * baseball landing page. Callers now pass their own path via navigation
+   * state so Cancel returns to the actual origin.
+   */
+  it('cancel button returns to the caller-provided origin when navigation state carries one (LS-9345 regression)', () => {
+    renderPage([{ pathname: '/baseball/join', state: { from: '/' } }]);
+
+    fireEvent.click(screen.getByText(/Cancel/i));
+    expect(mockNavigate).toHaveBeenCalledWith('/');
   });
 
   /**

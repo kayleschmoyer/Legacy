@@ -75,6 +75,22 @@ test.describe('Homepage @smoke', () => {
     await expect(page).toHaveURL('/baseball/league/create');
   });
 
+  // LS-9345: reaching the join form from the unified dashboard ("/") used to
+  // lose that origin — Cancel always fell back to "/baseball", which reads
+  // as the wrong home page to a user who started on the actual dashboard.
+  test('Join League Cancel returns to "/", not "/baseball" (LS-9345)', async ({
+    page,
+  }) => {
+    const cta = page.getByRole('button', { name: /join league/i }).first();
+    await expect(cta).toBeVisible();
+    await cta.click({ force: true });
+    await page.waitForURL('/baseball/league/join', { timeout: 10000 });
+
+    await page.getByRole('button', { name: /cancel/i }).click();
+
+    await expect(page).toHaveURL('/');
+  });
+
   test('features section is present', async ({ page }) => {
     // The homepage includes content sections: sport picker and/or history feed
     await expect(
