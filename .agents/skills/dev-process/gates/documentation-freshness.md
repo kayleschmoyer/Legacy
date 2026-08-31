@@ -24,6 +24,7 @@ When code in the **left column** changes, update the doc in the **right column**
 | GraphQL schema (`*.graphql`)                                                                        | Generated artifacts via `make codegen`; consumer docs                                                          |
 | Test tagging conventions                                                                            | [test-tagging-guide](../../testing/references/test-tagging-guide.md)                                           |
 | Coding standards rule changes                                                                       | [standards SKILL.md](../../standards/SKILL.md), top-review-findings table                                      |
+| New/changed GitHub App, or which app a workflow step authenticates as                               | [github-apps-inventory.md](../../../../docs/ci-cd/github-apps-inventory.md)                                    |
 
 This table is **incomplete by design** — extend it as new areas develop reference docs. The pre-PR checklist requires consulting it; missing entries are a doc gap to file.
 
