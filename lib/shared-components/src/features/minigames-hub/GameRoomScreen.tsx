@@ -69,6 +69,8 @@ export interface GameRoomScreenProps {
   bestScore: number | null;
   /** 20 Questions token balance. Null while loading or on error. */
   tokens: number | null;
+  /** Mock Draft weekly drafts remaining. Null while loading or on error. */
+  mockDraftsRemaining: number | null;
   /** Hidden entirely when null — the layout flows up with no gap. */
   resumeGame: GameRoomResumeGame | null;
   personalStats: GameRoomPersonalStats;
@@ -89,6 +91,8 @@ function glyphFor(kind: MinigameIconKind): GameRoomGlyphName {
       return 'barChart';
     case 'quiz':
       return 'helpCircle';
+    case 'mockDraft':
+      return 'clipboard';
   }
 }
 
@@ -406,6 +410,7 @@ export function GameRoomScreen({
   activeGamesCount,
   bestScore,
   tokens: tokenBalance,
+  mockDraftsRemaining,
   resumeGame,
   personalStats,
   onSelectGame,
@@ -448,6 +453,7 @@ export function GameRoomScreen({
                 activeGamesCount,
                 bestScore,
                 tokens: tokenBalance,
+                mockDraftsRemaining,
               })}
               onPress={() => onSelectGame(template.id)}
             />

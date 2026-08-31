@@ -65,6 +65,9 @@ const mockUseGetTwentyQuestionsTokenBalanceQuery = jest.fn(
 const mockUseGetMinigamePersonalStatsQuery = jest.fn(
   (): MockQueryResult => IDLE_QUERY,
 );
+const mockUseGetMyMockDraftUsageQuery = jest.fn(
+  (): MockQueryResult => IDLE_QUERY,
+);
 
 jest.mock('@legacy-sports/graphql', () => ({
   // Mirrors the generated `SeasonDraftGameStatus` enum; the module is replaced
@@ -83,6 +86,8 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetTwentyQuestionsTokenBalanceQuery(...args),
   useGetMinigamePersonalStatsQuery: (...args: unknown[]) =>
     mockUseGetMinigamePersonalStatsQuery(...args),
+  useGetMyMockDraftUsageQuery: (...args: unknown[]) =>
+    mockUseGetMyMockDraftUsageQuery(...args),
 }));
 
 // The Game Room layout has its own spec in lib/shared-components; this suite
@@ -100,6 +105,7 @@ jest.mock('@legacy-sports/shared-components', () => {
       activeGamesCount: number | null;
       bestScore: number | null;
       tokens: number | null;
+      mockDraftsRemaining: number | null;
       resumeGame: { gameId: number } | null;
       personalStats: Record<string, number | null>;
       onSelectGame: (id: string) => void;
@@ -126,6 +132,10 @@ jest.mock('@legacy-sports/shared-components', () => {
         <View
           testID="games-entry-twenty-questions"
           onTouchEnd={() => onSelectGame('twenty-questions')}
+        />
+        <View
+          testID="games-entry-mock-draft"
+          onTouchEnd={() => onSelectGame('mock-draft')}
         />
       </View>
     ),
@@ -187,10 +197,32 @@ function mockPersonalStats(
   });
 }
 
+function mockMockDraftUsage(
+  remaining: number | null,
+  { loading = false, error = undefined as Error | undefined } = {},
+) {
+  mockUseGetMyMockDraftUsageQuery.mockReturnValue({
+    data:
+      remaining === null
+        ? undefined
+        : {
+            getMyMockDraftUsage: {
+              used: 2 - remaining,
+              limit: 2,
+              remaining,
+              isUnlimited: false,
+            },
+          },
+    loading,
+    error,
+  });
+}
+
 interface ReceivedProps {
   activeGamesCount: number | null;
   bestScore: number | null;
   tokens: number | null;
+  mockDraftsRemaining: number | null;
   resumeGame: Record<string, unknown> | null;
   personalStats: Record<string, number | null>;
 }
@@ -220,6 +252,7 @@ beforeEach(() => {
   mockBestScore(null);
   mockTokenBalance(null);
   mockPersonalStats(null);
+  mockMockDraftUsage(null);
 });
 
 describe('GamesTab', () => {
@@ -296,6 +329,24 @@ describe('GamesTab', () => {
       mockTokenBalance(null, { error: new Error('boom') });
       render(<GamesTab />);
       expect(receivedProps().tokens).toBeNull();
+    });
+
+    it('passes mock drafts remaining through once loaded', () => {
+      mockMockDraftUsage(1);
+      render(<GamesTab />);
+
+      expect(receivedProps().mockDraftsRemaining).toBe(1);
+    });
+
+    it('passes null for mock drafts remaining while loading or on error', () => {
+      mockMockDraftUsage(null, { loading: true });
+      const { unmount } = render(<GamesTab />);
+      expect(receivedProps().mockDraftsRemaining).toBeNull();
+      unmount();
+
+      mockMockDraftUsage(null, { error: new Error('boom') });
+      render(<GamesTab />);
+      expect(receivedProps().mockDraftsRemaining).toBeNull();
     });
   });
 
@@ -389,6 +440,17 @@ describe('GamesTab', () => {
         error,
       );
     });
+
+    it('logs a mock draft usage query error without throwing', () => {
+      const error = new Error('boom');
+      mockMockDraftUsage(null, { error });
+      render(<GamesTab />);
+
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        expect.stringContaining('getMyMockDraftUsage'),
+        error,
+      );
+    });
   });
 
   describe('resume banner data', () => {
@@ -472,6 +534,7 @@ describe('GamesTab', () => {
       ['season-draft', '/season-draft'],
       ['disclosure', '/disclosure-game'],
       ['twenty-questions', '/games/twenty-questions'],
+      ['mock-draft', '/baseball/mock-draft'],
     ])('tracks and navigates on %s tap', (id, route) => {
       render(<GamesTab />);
 

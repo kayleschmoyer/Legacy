@@ -6,13 +6,18 @@ import {
   statFor,
 } from './MinigamesHub.shared';
 
-const NO_STATS = { activeGamesCount: null, bestScore: null, tokens: null };
+const NO_STATS = {
+  activeGamesCount: null,
+  bestScore: null,
+  tokens: null,
+  mockDraftsRemaining: null,
+};
 
 describe('GAME_TEMPLATES', () => {
   it('gives every game its own icon kind (LS-8800)', () => {
     const kinds = GAME_TEMPLATES.map((t) => t.iconKind);
 
-    expect(kinds).toEqual(['draft', 'stats', 'quiz']);
+    expect(kinds).toEqual(['draft', 'stats', 'quiz', 'mockDraft']);
     expect(new Set(kinds).size).toBe(GAME_TEMPLATES.length);
   });
 
@@ -21,6 +26,7 @@ describe('GAME_TEMPLATES', () => {
       ['season-draft', 'navy'],
       ['disclosure', 'seam'],
       ['twenty-questions', 'navy'],
+      ['mock-draft', 'navy'],
     ]);
   });
 });
@@ -29,7 +35,7 @@ describe('statFor', () => {
   // The two existing hubs render these labels; the Game Room redesign added
   // compactStatFor alongside rather than changing them.
   it('returns the long-form labels unchanged', () => {
-    const args = { activeGamesCount: 2, bestScore: 7 };
+    const args = { activeGamesCount: 2, bestScore: 7, mockDraftsRemaining: 1 };
 
     expect(statFor('season-draft', args)).toEqual({
       label: 'Games Active',
@@ -43,12 +49,21 @@ describe('statFor', () => {
       label: 'Questions',
       value: '20',
     });
+    expect(statFor('mock-draft', args)).toEqual({
+      label: 'Drafts Left',
+      value: '1',
+    });
   });
 });
 
 describe('compactStatFor', () => {
-  it('returns the Active / Best / Tokens chips with their tones', () => {
-    const args = { activeGamesCount: 2, bestScore: 7, tokens: 40 };
+  it('returns the Active / Best / Tokens / Left chips with their tones', () => {
+    const args = {
+      activeGamesCount: 2,
+      bestScore: 7,
+      tokens: 40,
+      mockDraftsRemaining: 1,
+    };
 
     expect(compactStatFor('season-draft', args)).toEqual({
       label: 'Active',
@@ -63,6 +78,11 @@ describe('compactStatFor', () => {
     expect(compactStatFor('twenty-questions', args)).toEqual({
       label: 'Tokens',
       value: '40',
+      tone: 'neutral',
+    });
+    expect(compactStatFor('mock-draft', args)).toEqual({
+      label: 'Left',
+      value: '1',
       tone: 'neutral',
     });
   });

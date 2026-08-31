@@ -10,6 +10,7 @@ import {
   SeasonDraftGameStatus,
   useGetDisclosureGameBestScoreQuery,
   useGetMinigamePersonalStatsQuery,
+  useGetMyMockDraftUsageQuery,
   useGetSeasonDraftGamesQuery,
   useGetTwentyQuestionsTokenBalanceQuery,
 } from '@legacy-sports/graphql';
@@ -28,6 +29,7 @@ const ROUTES: Record<MinigameId, string> = {
   'season-draft': '/season-draft',
   disclosure: '/disclosure-game',
   'twenty-questions': '/games/twenty-questions',
+  'mock-draft': '/baseball/mock-draft',
 };
 
 export default function GamesTab() {
@@ -54,6 +56,11 @@ export default function GamesTab() {
     loading: personalStatsLoading,
     error: personalStatsError,
   } = useGetMinigamePersonalStatsQuery();
+  const {
+    data: mockDraftUsageData,
+    loading: mockDraftUsageLoading,
+    error: mockDraftUsageError,
+  } = useGetMyMockDraftUsageQuery();
 
   // Errors are non-fatal — every stat falls back to '—' — but log them so a
   // broken query doesn't silently disappear from Rollbar/Discord.
@@ -86,6 +93,14 @@ export default function GamesTab() {
       );
     }
   }, [personalStatsError]);
+  useEffect(() => {
+    if (mockDraftUsageError) {
+      LOGGER.error(
+        'GamesTab: getMyMockDraftUsage query failed:',
+        mockDraftUsageError,
+      );
+    }
+  }, [mockDraftUsageError]);
 
   const games = useMemo(
     () => sdGamesData?.seasonDraftGames ?? [],
@@ -112,6 +127,11 @@ export default function GamesTab() {
     tokenBalanceLoading || tokenBalanceError
       ? null
       : (tokenBalanceData?.twentyQuestionsTokenBalance ?? null);
+
+  const mockDraftsRemaining =
+    mockDraftUsageLoading || mockDraftUsageError
+      ? null
+      : (mockDraftUsageData?.getMyMockDraftUsage?.remaining ?? null);
 
   const personalStats = useMemo(() => {
     if (personalStatsLoading || personalStatsError) {
@@ -184,6 +204,7 @@ export default function GamesTab() {
       activeGamesCount={activeGamesCount}
       bestScore={bestScore}
       tokens={tokens}
+      mockDraftsRemaining={mockDraftsRemaining}
       resumeGame={resumeGame}
       personalStats={personalStats}
       onSelectGame={handleSelectGame}

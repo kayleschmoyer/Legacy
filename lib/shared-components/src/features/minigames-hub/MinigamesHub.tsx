@@ -26,6 +26,7 @@ import {
   SeasonDraftGameStatus,
   useGetDisclosureGameBestScoreQuery,
   useGetMinigamesStatsQuery,
+  useGetMyMockDraftUsageQuery,
   useGetSeasonDraftGamesQuery,
 } from '@legacy-sports/graphql';
 import { LOGGER } from '@legacy-sports/logging';
@@ -110,7 +111,7 @@ function useAccentColors(accent: Accent): {
 function glyphFor(
   kind: MinigameTemplate['iconKind'],
 ): 'clipboard' | 'barChart' {
-  return kind === 'draft' ? 'clipboard' : 'barChart';
+  return kind === 'draft' || kind === 'mockDraft' ? 'clipboard' : 'barChart';
 }
 
 const GameCard: React.FC<{
@@ -299,6 +300,8 @@ export function MinigamesHub({
     useGetDisclosureGameBestScoreQuery();
   const { data: minigamesStatsData, error: minigamesStatsError } =
     useGetMinigamesStatsQuery();
+  const { data: mockDraftUsageData, error: mockDraftUsageError } =
+    useGetMyMockDraftUsageQuery();
 
   // Errors are non-fatal — the UI falls back to '—' for null data — but log
   // them so a broken query doesn't silently disappear from Rollbar/Discord.
@@ -318,6 +321,14 @@ export function MinigamesHub({
       );
     }
   }, [minigamesStatsError]);
+  useEffect(() => {
+    if (mockDraftUsageError) {
+      LOGGER.error(
+        'MinigamesHub: getMyMockDraftUsage query failed:',
+        mockDraftUsageError,
+      );
+    }
+  }, [mockDraftUsageError]);
 
   // Count only in-progress games (setup or drafting).
   // Show "—" while loading or if the query errored; show "0" for a successful
@@ -333,10 +344,16 @@ export function MinigamesHub({
 
   const bestScore = bestScoreData?.disclosureGameBestScore ?? null;
   const dbStats = minigamesStatsData?.minigamesStats;
+  const mockDraftsRemaining =
+    mockDraftUsageData?.getMyMockDraftUsage?.remaining ?? null;
 
   const games: GameDef[] = GAME_TEMPLATES.map((template) => ({
     ...template,
-    stat: statFor(template.id, { activeGamesCount, bestScore }),
+    stat: statFor(template.id, {
+      activeGamesCount,
+      bestScore,
+      mockDraftsRemaining,
+    }),
   }));
 
   const heroStats: Array<{ n: string; l: string } | null> = [

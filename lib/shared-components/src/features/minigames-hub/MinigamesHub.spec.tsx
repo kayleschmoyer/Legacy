@@ -4,6 +4,7 @@ import {
   SeasonDraftGameStatus,
   useGetDisclosureGameBestScoreQuery,
   useGetMinigamesStatsQuery,
+  useGetMyMockDraftUsageQuery,
   useGetSeasonDraftGamesQuery,
 } from '@legacy-sports/graphql';
 import { MinigamesHub } from './MinigamesHub';
@@ -43,6 +44,18 @@ function setupDefaultMocks() {
     loading: false,
     error: undefined,
   } as unknown as ReturnType<typeof useGetMinigamesStatsQuery>);
+  jest.mocked(useGetMyMockDraftUsageQuery).mockReturnValue({
+    data: {
+      getMyMockDraftUsage: {
+        used: 1,
+        limit: 2,
+        remaining: 1,
+        isUnlimited: false,
+      },
+    },
+    loading: false,
+    error: undefined,
+  } as unknown as ReturnType<typeof useGetMyMockDraftUsageQuery>);
 }
 
 describe('MinigamesHub', () => {
@@ -70,9 +83,12 @@ describe('MinigamesHub', () => {
     expect(getByText('Season Draft')).toBeTruthy();
     expect(getByText('Who Am I?')).toBeTruthy();
     expect(getByText('20 Questions')).toBeTruthy();
+    expect(getByText('Mock Draft')).toBeTruthy();
     // activeGamesCount counts only Setup/Drafting statuses (2 of the 3 mocked games).
     expect(getByText('2')).toBeTruthy();
     expect(getByText('7')).toBeTruthy();
+    // mockDraftsRemaining from the mocked getMyMockDraftUsage query.
+    expect(getByText('1')).toBeTruthy();
   });
 
   it('falls back to em-dash while stat queries are loading', () => {
@@ -105,6 +121,17 @@ describe('MinigamesHub', () => {
     expect(onNavigate).toHaveBeenCalledWith('season-draft');
   });
 
+  it('calls onNavigate when the Mock Draft card is pressed', () => {
+    const onNavigate = jest.fn();
+    const { getByText } = render(
+      <MinigamesHub onNavigate={onNavigate} isNarrow={false} />,
+    );
+
+    fireEvent.click(getByText('Start Draft'));
+
+    expect(onNavigate).toHaveBeenCalledWith('mock-draft');
+  });
+
   it('logs a non-fatal query error instead of throwing', () => {
     const { LOGGER } = jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
       '@legacy-sports/logging',
@@ -122,6 +149,25 @@ describe('MinigamesHub', () => {
     // can extract the stack trace.
     expect(LOGGER.error).toHaveBeenCalledWith(
       expect.stringContaining('disclosureGameBestScore'),
+      queryError,
+    );
+  });
+
+  it('logs a non-fatal getMyMockDraftUsage query error instead of throwing', () => {
+    const { LOGGER } = jest.requireMock<{ LOGGER: { error: jest.Mock } }>(
+      '@legacy-sports/logging',
+    );
+    const queryError = new Error('boom');
+    jest.mocked(useGetMyMockDraftUsageQuery).mockReturnValue({
+      data: undefined,
+      loading: false,
+      error: queryError,
+    } as unknown as ReturnType<typeof useGetMyMockDraftUsageQuery>);
+
+    render(<MinigamesHub onNavigate={jest.fn()} isNarrow={false} />);
+
+    expect(LOGGER.error).toHaveBeenCalledWith(
+      expect.stringContaining('getMyMockDraftUsage'),
       queryError,
     );
   });

@@ -18,6 +18,7 @@ function renderScreen(overrides: Partial<GameRoomScreenProps> = {}) {
     activeGamesCount: 2,
     bestScore: 7,
     tokens: 40,
+    mockDraftsRemaining: 1,
     resumeGame: null,
     personalStats: { draftsWon: 3, dayStreak: 5, gamesPlayed: 21 },
     onSelectGame: jest.fn(),
@@ -29,7 +30,7 @@ function renderScreen(overrides: Partial<GameRoomScreenProps> = {}) {
 }
 
 describe('GameRoomScreen', () => {
-  it('renders the header, every section, and all three game rows', () => {
+  it('renders the header, every section, and all four game rows', () => {
     const { getByText, getByTestId } = renderScreen();
 
     expect(getByText('Minigames')).toBeTruthy();
@@ -44,9 +45,10 @@ describe('GameRoomScreen', () => {
     expect(getByTestId('games-entry-season-draft')).toBeTruthy();
     expect(getByTestId('games-entry-disclosure')).toBeTruthy();
     expect(getByTestId('games-entry-twenty-questions')).toBeTruthy();
+    expect(getByTestId('games-entry-mock-draft')).toBeTruthy();
   });
 
-  it('renders the Active / Best / Tokens stat chips with live values', () => {
+  it('renders the Active / Best / Tokens / Left stat chips with live values', () => {
     const { getByText } = renderScreen();
 
     expect(getByText('Active')).toBeTruthy();
@@ -55,6 +57,8 @@ describe('GameRoomScreen', () => {
     expect(getByText('7')).toBeTruthy();
     expect(getByText('Tokens')).toBeTruthy();
     expect(getByText('40')).toBeTruthy();
+    expect(getByText('Left')).toBeTruthy();
+    expect(getByText('1')).toBeTruthy();
   });
 
   it('falls back to an em dash for every stat that is null', () => {
@@ -62,11 +66,12 @@ describe('GameRoomScreen', () => {
       activeGamesCount: null,
       bestScore: null,
       tokens: null,
+      mockDraftsRemaining: null,
       personalStats: NO_PERSONAL_STATS,
     });
 
-    // 3 stat chips + 3 Your Numbers cells.
-    expect(getAllByText('—')).toHaveLength(6);
+    // 4 stat chips + 3 Your Numbers cells.
+    expect(getAllByText('—')).toHaveLength(7);
   });
 
   it('keeps the row accessibility contract from the previous layout', () => {

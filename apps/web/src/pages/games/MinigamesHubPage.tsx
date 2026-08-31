@@ -24,6 +24,7 @@ export const MinigamesHubPage: React.FC = () => {
           else if (id === 'disclosure') navigate('/games/disclosure');
           else if (id === 'twenty-questions')
             navigate('/games/twenty-questions');
+          else if (id === 'mock-draft') navigate('/baseball/mock-draft');
         }}
       />
     </>

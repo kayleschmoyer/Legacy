@@ -9,7 +9,11 @@
  * glyph name.
  */
 
-export type MinigameId = 'season-draft' | 'disclosure' | 'twenty-questions';
+export type MinigameId =
+  | 'season-draft'
+  | 'disclosure'
+  | 'twenty-questions'
+  | 'mock-draft';
 
 /**
  * One kind per game (LS-8800). `draft` and `stats` predate the Game Room
@@ -20,8 +24,12 @@ export type MinigameId = 'season-draft' | 'disclosure' | 'twenty-questions';
  * it maps with `kind === 'draft' ? 'clipboard' : 'barChart'`, so `quiz` falls
  * through to the same stats mark it rendered before. Only `GameRoomScreen`
  * distinguishes all three.
+ *
+ * `mockDraft` (LS-9510) is a distinct kind from `draft` — despite sharing the
+ * clipboard glyph with Season Draft — so `GAME_TEMPLATES` keeps one icon kind
+ * per game.
  */
-export type MinigameIconKind = 'draft' | 'stats' | 'quiz';
+export type MinigameIconKind = 'draft' | 'stats' | 'quiz' | 'mockDraft';
 
 export interface MinigameStat {
   label: string;
@@ -86,6 +94,16 @@ export const GAME_TEMPLATES: MinigameTemplate[] = [
     meta: ['Up to 20 questions', 'Easy · Medium · Hard'],
     cta: 'Play Now',
   },
+  {
+    id: 'mock-draft',
+    title: 'Mock Draft',
+    tag: 'Solo · Practice vs. AI',
+    desc: 'Run a full draft against AI opponents to test strategies and rankings before the real thing — nothing here touches your real leagues.',
+    accent: 'navy',
+    iconKind: 'mockDraft',
+    meta: ['4–12 teams · Snake or Linear', 'All MLB · NL Only · AL Only'],
+    cta: 'Start Draft',
+  },
 ];
 
 /** `—` while a stat is loading or its query errored, so the user can tell an
@@ -99,7 +117,11 @@ function statValue(n: number | null): string {
 /** Shared stat-selection logic — identical business rules on both platforms. */
 export function statFor(
   id: MinigameId,
-  args: { activeGamesCount: number | null; bestScore: number | null },
+  args: {
+    activeGamesCount: number | null;
+    bestScore: number | null;
+    mockDraftsRemaining: number | null;
+  },
 ): MinigameStat {
   switch (id) {
     case 'season-draft':
@@ -111,6 +133,11 @@ export function statFor(
       return { label: 'Your Best', value: statValue(args.bestScore) };
     case 'twenty-questions':
       return { label: 'Questions', value: '20' };
+    case 'mock-draft':
+      return {
+        label: 'Drafts Left',
+        value: statValue(args.mockDraftsRemaining),
+      };
   }
 }
 
@@ -129,6 +156,7 @@ export function compactStatFor(
     activeGamesCount: number | null;
     bestScore: number | null;
     tokens: number | null;
+    mockDraftsRemaining: number | null;
   },
 ): MinigameCompactStat {
   switch (id) {
@@ -148,6 +176,12 @@ export function compactStatFor(
       return {
         label: 'Tokens',
         value: statValue(args.tokens),
+        tone: 'neutral',
+      };
+    case 'mock-draft':
+      return {
+        label: 'Left',
+        value: statValue(args.mockDraftsRemaining),
         tone: 'neutral',
       };
   }
