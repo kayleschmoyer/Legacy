@@ -71,9 +71,10 @@ const overviewGames = (row: FootballStatsRow): number | null => {
 
 /**
  * Fantasy points are the product the whole app optimizes for, so every view
- * leads its stat columns with career FPTS and FP/G. Both are display-only:
- * football fantasy points are computed across stat categories (LS-6469), so
- * the category-join sort model can't order by them in SQL.
+ * leads its stat columns with career FPTS and FP/G. Both sort via the
+ * server's pool-wide fantasy-points sort ('fpts'/'fpg', no category required
+ * — LS-9071), which sums across every stat category the player has rows in
+ * rather than joining a single category table (LS-9504).
  */
 const fantasyColumns = (
   games: (row: FootballStatsRow) => number | null | undefined,
@@ -81,12 +82,14 @@ const fantasyColumns = (
   {
     key: 'fantasyPoints',
     label: 'FPTS',
+    sortKey: 'fpts',
     width: 90,
     format: (row) => fmtFloat(row.careerStats?.fantasyPoints, 1),
   },
   {
     key: 'fantasyPointsPerGame',
     label: 'FP/G',
+    sortKey: 'fpg',
     width: 74,
     format: (row) => {
       const fantasyPoints = row.careerStats?.fantasyPoints;

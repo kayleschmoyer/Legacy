@@ -352,19 +352,20 @@ test.beforeEach(async ({ page }) => {
 
 // ── 1. Default landing ────────────────────────────────────────────────────────
 
-test.describe('NFL stats — Overview default (LS-8566) @regression', () => {
-  test('lands on Overview with no category, name/asc sort, and DST rows inline', async ({
+test.describe('NFL stats — Overview default (LS-8566, LS-9504) @regression', () => {
+  test('lands on Overview with no category, fpts/desc sort, and DST rows inline', async ({
     page,
   }) => {
     await mockStatsGrids(page);
     const firstRequest = waitForGridRequest(page);
     await page.goto(PAGE_URL);
 
-    // Outgoing variables: no category (overview), default name/asc sort.
+    // Outgoing variables: no category (overview), default fpts/desc sort
+    // (pool-wide career fantasy points — LS-9504).
     const variables = await firstRequest;
     expect(variables.category).toBeUndefined();
-    expect(variables.sortBy).toBe('name');
-    expect(variables.sortDir).toBe('asc');
+    expect(variables.sortBy).toBe('fpts');
+    expect(variables.sortDir).toBe('desc');
     expect(variables.first).toBe(25);
     expect(variables.after).toBeUndefined();
 

@@ -147,6 +147,15 @@ describe('FootballStatsDataGrid (LS-8566)', () => {
     expect(onSortChange).toHaveBeenLastCalledWith('name', 'asc');
   });
 
+  it('FPTS and FP/G headers are sortable via the pool-wide sort (LS-9504)', () => {
+    setData([makePlayer(1)], 1);
+    const { onSortChange } = renderGrid();
+    fireEvent.click(screen.getByLabelText('Sort by FPTS'));
+    expect(onSortChange).toHaveBeenLastCalledWith('fpts', 'desc');
+    fireEvent.click(screen.getByLabelText('Sort by FP/G'));
+    expect(onSortChange).toHaveBeenLastCalledWith('fpg', 'desc');
+  });
+
   it('pages via the offset cursor and resets on resetKey change', () => {
     setData(
       Array.from({ length: 25 }, (_, i) => makePlayer(i + 1)),

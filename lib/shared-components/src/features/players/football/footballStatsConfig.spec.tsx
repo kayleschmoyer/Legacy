@@ -53,10 +53,10 @@ describe('useFootballController tabs + sort (LS-8566)', () => {
     expect(controllerRef.current?.activeTab).toBe('overview');
   });
 
-  it('defaults to the overview with its name-ascending sort and no category', () => {
+  it('defaults to the overview with its fantasy-points-descending sort and no category (LS-9504)', () => {
     render(<Harness isPremium />);
-    expect(mockGridProps.sortField).toBe('name');
-    expect(mockGridProps.sortDir).toBe('asc');
+    expect(mockGridProps.sortField).toBe('fpts');
+    expect(mockGridProps.sortDir).toBe('desc');
     expect(
       (mockGridProps.queryVars as { category?: string }).category,
     ).toBeUndefined();

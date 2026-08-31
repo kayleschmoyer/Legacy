@@ -2,6 +2,7 @@ import {
   buildFootballQueryVars,
   buildFootballStatsQuery,
   DEFAULT_SORT_BY_VIEW,
+  FOOTBALL_POOL_SORT_FIELDS,
   FOOTBALL_STAT_SORT_FIELDS,
   FOOTBALL_STATS_VIEWS,
   FOOTBALL_VIEW_TABS,
@@ -59,8 +60,14 @@ describe('isFootballSortField', () => {
     }
   });
 
+  it('accepts the pool-wide fantasy sorts (LS-9504)', () => {
+    for (const field of FOOTBALL_POOL_SORT_FIELDS) {
+      expect(isFootballSortField(field)).toBe(true);
+    }
+  });
+
   it('rejects unknown values', () => {
-    expect(isFootballSortField('fpts')).toBe(false);
+    expect(isFootballSortField('fpts2')).toBe(false);
     expect(isFootballSortField('passing.nope')).toBe(false);
     expect(isFootballSortField('')).toBe(false);
   });
@@ -79,6 +86,13 @@ describe('isSortFieldValidForView', () => {
     expect(isSortFieldValidForView('passing.yds', 'overview')).toBe(false);
     expect(isSortFieldValidForView('defense.sacks', 'defense')).toBe(true);
     expect(isSortFieldValidForView('idp.totalTkl', 'defense')).toBe(false);
+  });
+
+  it('allows the pool-wide fantasy sorts on every view (LS-9504)', () => {
+    for (const view of FOOTBALL_STATS_VIEWS) {
+      expect(isSortFieldValidForView('fpts', view)).toBe(true);
+      expect(isSortFieldValidForView('fpg', view)).toBe(true);
+    }
   });
 });
 
@@ -103,9 +117,20 @@ describe('resolveSortForView', () => {
   });
 
   it('falls back when the field is not a sort field at all', () => {
-    expect(resolveSortForView('overview', 'fpts', 'desc')).toEqual(
+    expect(resolveSortForView('overview', 'bogus', 'desc')).toEqual(
       DEFAULT_SORT_BY_VIEW.overview,
     );
+  });
+
+  it('keeps an explicit pool-wide fantasy sort on any view (LS-9504)', () => {
+    expect(resolveSortForView('passing', 'fpts', 'asc')).toEqual({
+      sortField: 'fpts',
+      sortDir: 'asc',
+    });
+    expect(resolveSortForView('overview', 'fpg', 'desc')).toEqual({
+      sortField: 'fpg',
+      sortDir: 'desc',
+    });
   });
 });
 
@@ -126,11 +151,11 @@ describe('buildFootballQueryVars (view/category)', () => {
     sortDir: 'asc' as const,
   };
 
-  it('omits category on the overview and applies its default sort', () => {
+  it('omits category on the overview and applies its default sort (LS-9504)', () => {
     const vars = buildFootballQueryVars({ ...base, view: 'overview' });
     expect(vars.category).toBeUndefined();
-    expect(vars.sortBy).toBe('name');
-    expect(vars.sortDir).toBe('asc');
+    expect(vars.sortBy).toBe('fpts');
+    expect(vars.sortDir).toBe('desc');
   });
 
   it('emits the view as category with the default leaders sort', () => {

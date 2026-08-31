@@ -180,12 +180,23 @@ export const FOOTBALL_STAT_SORT_FIELDS = {
   ],
 } as const;
 
+/**
+ * Pool-wide career fantasy-point sorts (LS-9071): unlike the namespaced
+ * `category.field` stat keys, these require no `category` — the server sums
+ * fantasy points across every stat category the player has rows in. Valid on
+ * every view, since every view's stat columns lead with FPTS/FP-G (LS-9504).
+ */
+export const FOOTBALL_POOL_SORT_FIELDS = ['fpts', 'fpg'] as const;
+export type FootballPoolSortField = (typeof FOOTBALL_POOL_SORT_FIELDS)[number];
+
 export type FootballSortField =
   | (typeof FOOTBALL_PLAYER_SORT_FIELDS)[number]
+  | FootballPoolSortField
   | (typeof FOOTBALL_STAT_SORT_FIELDS)[keyof typeof FOOTBALL_STAT_SORT_FIELDS][number];
 
 const VALID_SORT_FIELDS = new Set<string>([
   ...FOOTBALL_PLAYER_SORT_FIELDS,
+  ...FOOTBALL_POOL_SORT_FIELDS,
   ...Object.values(FOOTBALL_STAT_SORT_FIELDS).flat(),
 ]);
 
@@ -199,15 +210,19 @@ export function isFootballSortField(value: string): value is FootballSortField {
 }
 
 /**
- * Whether a sort field is valid on a given view: players-table sorts are valid
- * everywhere; a namespaced stat sort only on the view whose category matches
- * its prefix (the server enforces the same pairing).
+ * Whether a sort field is valid on a given view: players-table sorts and
+ * pool-wide fantasy sorts are valid everywhere; a namespaced stat sort only on
+ * the view whose category matches its prefix (the server enforces the same
+ * pairing).
  */
 export function isSortFieldValidForView(
   field: FootballSortField,
   view: FootballStatsView,
 ): boolean {
-  if ((FOOTBALL_PLAYER_SORT_FIELDS as readonly string[]).includes(field)) {
+  if (
+    (FOOTBALL_PLAYER_SORT_FIELDS as readonly string[]).includes(field) ||
+    (FOOTBALL_POOL_SORT_FIELDS as readonly string[]).includes(field)
+  ) {
     return true;
   }
   return view !== 'overview' && field.startsWith(`${view}.`);
@@ -215,14 +230,14 @@ export function isSortFieldValidForView(
 
 /**
  * Per-view default sort — the "leaders" ordering a fresh tab lands on. The
- * overview keeps the alphabetical roster feel; every stat tab leads with its
- * headline volume stat descending (mirrors MLB batting defaulting to HR desc).
+ * overview leads with career fantasy points descending (LS-9504) — the same
+ * "leaders first" pattern every stat tab uses for its headline volume stat.
  */
 export const DEFAULT_SORT_BY_VIEW: Record<
   FootballStatsView,
   { sortField: FootballSortField; sortDir: 'asc' | 'desc' }
 > = {
-  overview: { sortField: 'name', sortDir: 'asc' },
+  overview: { sortField: 'fpts', sortDir: 'desc' },
   passing: { sortField: 'passing.yds', sortDir: 'desc' },
   rushing: { sortField: 'rushing.yds', sortDir: 'desc' },
   receiving: { sortField: 'receiving.yds', sortDir: 'desc' },
