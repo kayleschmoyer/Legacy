@@ -1,18 +1,19 @@
 /**
  * Waivers domain — Query resolvers
  *
- * Queries: freeAgents, teamWaiverClaims
+ * Queries: freeAgents, teamWaiverClaims, teamWaiverPriority
  */
 import {
   careerGamesCondition,
   careerSeasonsCondition,
   PublicSchema,
 } from '@legacy-sports/db-client';
-import { and, eq, inArray, sql } from 'drizzle-orm';
-import { WaiverClaim } from './types';
+import { and, eq, inArray, lt, sql } from 'drizzle-orm';
+import { TeamWaiverPriority, WaiverClaim } from './types';
 import { PlayerRef } from '../players';
 import { builder } from '../builder';
 import { AuthenticationError } from '../graphql-errors';
+import { verifyLeagueMembership } from '../authorization';
 
 // ── Query resolvers ────────────────────────────────────────────────────────
 
@@ -234,6 +235,80 @@ builder.queryField('teamWaiverClaims', (t) =>
             : null,
         };
       });
+    },
+  }),
+);
+
+/**
+ * Returns a team's rolling-waiver priority (e.g. "3rd of 12") so the UI can
+ * display it next to Pending Waiver Claims. `priority` is null for FAAB
+ * leagues, where there is no rolling priority order (LS-6312 / FLD-029).
+ */
+builder.queryField('teamWaiverPriority', (t) =>
+  t.field({
+    type: TeamWaiverPriority,
+    nullable: true,
+    args: {
+      teamId: t.arg.int({ required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const db = context.db;
+      const { teamId } = args;
+
+      const [team] = await db
+        .select({
+          leagueId: PublicSchema.teams.leagueId,
+          waiverOrder: PublicSchema.teams.waiverOrder,
+        })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.id, teamId))
+        .limit(1);
+
+      if (!team) {
+        return null;
+      }
+
+      // Without this check any authenticated user could enumerate waiver
+      // priority for any team across any league.
+      await verifyLeagueMembership(db, team.leagueId, context.user.id);
+
+      const [league] = await db
+        .select({ waiverType: PublicSchema.leagues.waiverType })
+        .from(PublicSchema.leagues)
+        .where(eq(PublicSchema.leagues.id, team.leagueId))
+        .limit(1);
+
+      const waiverType = league?.waiverType ?? 'standard';
+
+      const [totalRow] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(PublicSchema.teams)
+        .where(eq(PublicSchema.teams.leagueId, team.leagueId))
+        .limit(1);
+      const totalTeams = totalRow?.count ?? 0;
+
+      // Rank is derived from waiver_order rather than trusted as pre-dense,
+      // so a gap or duplicate value can never produce a wrong "Nth" badge.
+      let priority: number | null = null;
+      if (waiverType === 'standard' && team.waiverOrder != null) {
+        const [aheadRow] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(PublicSchema.teams)
+          .where(
+            and(
+              eq(PublicSchema.teams.leagueId, team.leagueId),
+              lt(PublicSchema.teams.waiverOrder, team.waiverOrder),
+            ),
+          )
+          .limit(1);
+        priority = (aheadRow?.count ?? 0) + 1;
+      }
+
+      return { teamId, waiverType, priority, totalTeams };
     },
   }),
 );

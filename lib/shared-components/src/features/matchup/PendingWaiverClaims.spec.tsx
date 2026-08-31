@@ -1,4 +1,4 @@
-import type { WaiverClaim } from '@legacy-sports/graphql';
+import type { TeamWaiverPriority, WaiverClaim } from '@legacy-sports/graphql';
 import { PendingWaiverClaims } from './PendingWaiverClaims';
 import { fireEvent, render, waitFor } from '../../test-utils';
 
@@ -16,8 +16,13 @@ let mockQueryReturn: {
   refetch: jest.Mock;
 };
 
+let mockPriorityQueryReturn: {
+  data: { teamWaiverPriority: TeamWaiverPriority | null } | undefined;
+};
+
 jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamWaiverClaimsQuery: jest.fn(() => mockQueryReturn),
+  useGetTeamWaiverPriorityQuery: jest.fn(() => mockPriorityQueryReturn),
   useCancelWaiverClaimMutation: () => [mockCancelClaim],
 }));
 
@@ -78,6 +83,23 @@ function setClaims(claims: WaiverClaim[]) {
   };
 }
 
+function setPriority(priority: TeamWaiverPriority | null) {
+  mockPriorityQueryReturn = { data: { teamWaiverPriority: priority } };
+}
+
+function makePriority(
+  overrides: Partial<TeamWaiverPriority> = {},
+): TeamWaiverPriority {
+  return {
+    __typename: 'TeamWaiverPriority',
+    teamId: TEAM_ID,
+    waiverType: 'standard',
+    priority: 3,
+    totalTeams: 12,
+    ...overrides,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -85,6 +107,7 @@ function setClaims(claims: WaiverClaim[]) {
 describe('PendingWaiverClaims', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    setPriority(null);
   });
 
   // ---- Hiding when empty ----
@@ -162,6 +185,54 @@ describe('PendingWaiverClaims', () => {
     expect(getByText('Mike Trout')).toBeTruthy();
     expect(getByText('Mookie Betts')).toBeTruthy();
     expect(getByText('Shohei Ohtani')).toBeTruthy();
+  });
+
+  // ---- Waiver priority badge (LS-6312 / FLD-029) ----
+
+  it('shows the priority badge for a standard (non-FAAB) league', () => {
+    setClaims([basicClaim]);
+    setPriority(makePriority({ priority: 3, totalTeams: 12 }));
+    const { getByTestId } = render(<PendingWaiverClaims teamId={TEAM_ID} />);
+    expect(getByTestId('waiver-priority-badge').textContent).toBe(
+      'Priority: 3rd of 12',
+    );
+  });
+
+  it('formats 1st/2nd/3rd/4th/11th ordinals correctly', () => {
+    setClaims([basicClaim]);
+    setPriority(makePriority({ priority: 1, totalTeams: 10 }));
+    const { rerender, getByTestId } = render(
+      <PendingWaiverClaims teamId={TEAM_ID} />,
+    );
+    expect(getByTestId('waiver-priority-badge').textContent).toBe(
+      'Priority: 1st of 10',
+    );
+
+    setPriority(makePriority({ priority: 2, totalTeams: 10 }));
+    rerender(<PendingWaiverClaims teamId={TEAM_ID} />);
+    expect(getByTestId('waiver-priority-badge').textContent).toBe(
+      'Priority: 2nd of 10',
+    );
+
+    setPriority(makePriority({ priority: 11, totalTeams: 12 }));
+    rerender(<PendingWaiverClaims teamId={TEAM_ID} />);
+    expect(getByTestId('waiver-priority-badge').textContent).toBe(
+      'Priority: 11th of 12',
+    );
+  });
+
+  it('hides the priority badge for a FAAB league', () => {
+    setClaims([basicClaim]);
+    setPriority(makePriority({ waiverType: 'faab', priority: null }));
+    const { queryByTestId } = render(<PendingWaiverClaims teamId={TEAM_ID} />);
+    expect(queryByTestId('waiver-priority-badge')).toBeNull();
+  });
+
+  it('hides the priority badge when priority data has not loaded', () => {
+    setClaims([basicClaim]);
+    setPriority(null);
+    const { queryByTestId } = render(<PendingWaiverClaims teamId={TEAM_ID} />);
+    expect(queryByTestId('waiver-priority-badge')).toBeNull();
   });
 
   // ---- Cancel mutation + refetch ----

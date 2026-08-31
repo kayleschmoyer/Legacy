@@ -112,7 +112,12 @@ describe('Waivers Resolver', () => {
           playerId: 'playerId',
           currentSalary: 'currentSalary',
         },
-        teams: { id: 'id', name: 'name', leagueId: 'leagueId' },
+        teams: {
+          id: 'id',
+          name: 'name',
+          leagueId: 'leagueId',
+          waiverOrder: 'waiverOrder',
+        },
         matchups: { id: 'id', leagueId: 'leagueId' },
         matchupPlayers: { id: 'id', matchupId: 'matchupId' },
         matchupPlayerGames: { matchupPlayerId: 'matchupPlayerId' },
@@ -336,6 +341,112 @@ describe('Waivers Resolver', () => {
       );
 
       expect(result).toEqual([]);
+    });
+  });
+
+  // ── teamWaiverPriority ─────────────────────────────────────────────────────
+
+  describe('teamWaiverPriority query', () => {
+    it('throws when unauthenticated', async () => {
+      const resolver = getQuery('teamWaiverPriority');
+      await expect(
+        resolver({}, { teamId: 1 }, unauthCtx, undefined as never),
+      ).rejects.toThrow('Authentication required');
+    });
+
+    it('returns null when the team is not found', async () => {
+      mockDb.limit.mockResolvedValueOnce([]); // team lookup
+
+      const resolver = getQuery('teamWaiverPriority');
+      const result = await resolver(
+        {},
+        { teamId: 999 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('throws when the caller is not a member of the team-owning league', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ leagueId: 5, waiverOrder: 3 }]) // team
+        .mockResolvedValueOnce([]); // league membership lookup: no rows
+
+      const resolver = getQuery('teamWaiverPriority');
+      await expect(
+        resolver({}, { teamId: 1 }, mockContext, undefined as never),
+      ).rejects.toThrow('User is not a member of this league');
+    });
+
+    it('returns priority and totalTeams for a standard (non-FAAB) league', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ leagueId: 5, waiverOrder: 3 }]) // team
+        .mockResolvedValueOnce([{ permissionLevel: 'member', teamId: 1 }]) // league membership
+        .mockResolvedValueOnce([{ waiverType: 'standard' }]) // league
+        .mockResolvedValueOnce([{ count: 12 }]) // totalTeams
+        .mockResolvedValueOnce([{ count: 2 }]); // teams ahead (waiverOrder < 3)
+
+      const resolver = getQuery('teamWaiverPriority');
+      const result = await resolver(
+        {},
+        { teamId: 1 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual({
+        teamId: 1,
+        waiverType: 'standard',
+        priority: 3,
+        totalTeams: 12,
+      });
+    });
+
+    it('returns a null priority for a FAAB league', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ leagueId: 5, waiverOrder: 3 }]) // team
+        .mockResolvedValueOnce([{ permissionLevel: 'member', teamId: 1 }]) // league membership
+        .mockResolvedValueOnce([{ waiverType: 'faab' }]) // league
+        .mockResolvedValueOnce([{ count: 12 }]); // totalTeams
+
+      const resolver = getQuery('teamWaiverPriority');
+      const result = await resolver(
+        {},
+        { teamId: 1 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual({
+        teamId: 1,
+        waiverType: 'faab',
+        priority: null,
+        totalTeams: 12,
+      });
+    });
+
+    it('returns a null priority when the team has no waiverOrder yet', async () => {
+      mockDb.limit
+        .mockResolvedValueOnce([{ leagueId: 5, waiverOrder: null }]) // team
+        .mockResolvedValueOnce([{ permissionLevel: 'member', teamId: 1 }]) // league membership
+        .mockResolvedValueOnce([{ waiverType: 'standard' }]) // league
+        .mockResolvedValueOnce([{ count: 12 }]); // totalTeams
+
+      const resolver = getQuery('teamWaiverPriority');
+      const result = await resolver(
+        {},
+        { teamId: 1 },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(result).toEqual({
+        teamId: 1,
+        waiverType: 'standard',
+        priority: null,
+        totalTeams: 12,
+      });
     });
   });
 

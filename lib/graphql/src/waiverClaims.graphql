@@ -15,6 +15,15 @@ query GetTeamWaiverClaims($teamId: Int!, $status: String) {
   }
 }
 
+query GetTeamWaiverPriority($teamId: Int!) {
+  teamWaiverPriority(teamId: $teamId) {
+    teamId
+    waiverType
+    priority
+    totalTeams
+  }
+}
+
 mutation CancelWaiverClaim($claimId: Int!) {
   cancelWaiverClaim(claimId: $claimId) {
     id

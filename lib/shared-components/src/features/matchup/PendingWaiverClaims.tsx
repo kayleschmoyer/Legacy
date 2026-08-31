@@ -8,8 +8,25 @@ import { LOGGER } from '@legacy-sports/logging';
 import {
   useCancelWaiverClaimMutation,
   useGetTeamWaiverClaimsQuery,
+  useGetTeamWaiverPriorityQuery,
 } from '@legacy-sports/graphql';
 import { Button } from '../../Button';
+
+/** "1st" / "2nd" / "3rd" / "4th" — used only for the waiver priority badge. */
+function formatOrdinal(n: number): string {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}
 
 export interface PendingWaiverClaimsProps {
   teamId: number;
@@ -48,6 +65,13 @@ export function PendingWaiverClaims({
     variables: { teamId, status: 'pending' },
     fetchPolicy: 'cache-and-network',
   });
+
+  // Rolling-waiver priority (e.g. "3rd of 12") — null for FAAB leagues, where
+  // there is no priority order to show (LS-6312 / FLD-029).
+  const { data: priorityData } = useGetTeamWaiverPriorityQuery({
+    variables: { teamId },
+  });
+  const waiverPriority = priorityData?.teamWaiverPriority;
 
   useEffect(() => {
     if (!onSubscribeRefresh) return;
@@ -110,6 +134,23 @@ export function PendingWaiverClaims({
           >
             Pending Waiver Claims
           </Text>
+          {waiverPriority?.waiverType === 'standard' &&
+            waiverPriority.priority != null &&
+            waiverPriority.totalTeams != null && (
+              <Text
+                fontSize={10}
+                fontWeight="700"
+                color="$amber10"
+                backgroundColor="$amber3"
+                paddingHorizontal="$1.5"
+                paddingVertical={1}
+                borderRadius="$1"
+                testID="waiver-priority-badge"
+              >
+                Priority: {formatOrdinal(waiverPriority.priority)} of{' '}
+                {waiverPriority.totalTeams}
+              </Text>
+            )}
           {loading && <Spinner size="small" color="$amber9" />}
         </XStack>
 

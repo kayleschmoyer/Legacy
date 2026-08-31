@@ -3497,6 +3497,7 @@ export type Query = {
   teamMembers?: Maybe<Array<TeamMember>>;
   teamTradeOffers?: Maybe<Array<TradeOffer>>;
   teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
+  teamWaiverPriority?: Maybe<TeamWaiverPriority>;
   /** Return the caller's current active game, or null if none */
   twentyQuestionsActiveGame?: Maybe<TwentyQuestionsGame>;
   /** Paginated history of the caller's past games */
@@ -4129,6 +4130,10 @@ export type QueryTeamTradeOffersArgs = {
 
 export type QueryTeamWaiverClaimsArgs = {
   status?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryTeamWaiverPriorityArgs = {
   teamId: Scalars['Int']['input'];
 };
 
@@ -4835,6 +4840,14 @@ export type TeamStatistics = {
   totalPoints?: Maybe<Scalars['Float']['output']>;
   winPercentage?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
+};
+
+export type TeamWaiverPriority = {
+  __typename?: 'TeamWaiverPriority';
+  priority?: Maybe<Scalars['Int']['output']>;
+  teamId: Scalars['Int']['output'];
+  totalTeams: Scalars['Int']['output'];
+  waiverType: Scalars['String']['output'];
 };
 
 export type TemporaryPremiumGrantResult = {

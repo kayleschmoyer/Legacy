@@ -3503,6 +3503,7 @@ export type Query = {
   teamMembers?: Maybe<Array<TeamMember>>;
   teamTradeOffers?: Maybe<Array<TradeOffer>>;
   teamWaiverClaims?: Maybe<Array<WaiverClaim>>;
+  teamWaiverPriority?: Maybe<TeamWaiverPriority>;
   /** Return the caller's current active game, or null if none */
   twentyQuestionsActiveGame?: Maybe<TwentyQuestionsGame>;
   /** Paginated history of the caller's past games */
@@ -4135,6 +4136,10 @@ export type QueryTeamTradeOffersArgs = {
 
 export type QueryTeamWaiverClaimsArgs = {
   status?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['Int']['input'];
+};
+
+export type QueryTeamWaiverPriorityArgs = {
   teamId: Scalars['Int']['input'];
 };
 
@@ -4841,6 +4846,14 @@ export type TeamStatistics = {
   totalPoints?: Maybe<Scalars['Float']['output']>;
   winPercentage?: Maybe<Scalars['Float']['output']>;
   wins?: Maybe<Scalars['Int']['output']>;
+};
+
+export type TeamWaiverPriority = {
+  __typename?: 'TeamWaiverPriority';
+  priority?: Maybe<Scalars['Int']['output']>;
+  teamId: Scalars['Int']['output'];
+  totalTeams: Scalars['Int']['output'];
+  waiverType: Scalars['String']['output'];
 };
 
 export type TemporaryPremiumGrantResult = {
@@ -15280,6 +15293,21 @@ export type GetTeamWaiverClaimsQuery = {
     processedAt?: string | null;
     createdAt?: string | null;
   }> | null;
+};
+
+export type GetTeamWaiverPriorityQueryVariables = Exact<{
+  teamId: Scalars['Int']['input'];
+}>;
+
+export type GetTeamWaiverPriorityQuery = {
+  __typename?: 'Query';
+  teamWaiverPriority?: {
+    __typename?: 'TeamWaiverPriority';
+    teamId: number;
+    waiverType: string;
+    priority?: number | null;
+    totalTeams: number;
+  } | null;
 };
 
 export type CancelWaiverClaimMutationVariables = Exact<{
@@ -37815,6 +37843,99 @@ export type GetTeamWaiverClaimsSuspenseQueryHookResult = ReturnType<
 export type GetTeamWaiverClaimsQueryResult = Apollo.QueryResult<
   GetTeamWaiverClaimsQuery,
   GetTeamWaiverClaimsQueryVariables
+>;
+export const GetTeamWaiverPriority = gql`
+  query GetTeamWaiverPriority($teamId: Int!) {
+    teamWaiverPriority(teamId: $teamId) {
+      teamId
+      waiverType
+      priority
+      totalTeams
+    }
+  }
+`;
+
+/**
+ * __useGetTeamWaiverPriorityQuery__
+ *
+ * To run a query within a React component, call `useGetTeamWaiverPriorityQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTeamWaiverPriorityQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * you can use to render your UI.
+ *
+ * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
+ *
+ * @example
+ * const { data, loading, error } = useGetTeamWaiverPriorityQuery({
+ *   variables: {
+ *      teamId: // value for 'teamId'
+ *   },
+ * });
+ */
+export function useGetTeamWaiverPriorityQuery(
+  baseOptions: Apollo.QueryHookOptions<
+    GetTeamWaiverPriorityQuery,
+    GetTeamWaiverPriorityQueryVariables
+  > &
+    (
+      | { variables: GetTeamWaiverPriorityQueryVariables; skip?: boolean }
+      | { skip: boolean }
+    ),
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useQuery<
+    GetTeamWaiverPriorityQuery,
+    GetTeamWaiverPriorityQueryVariables
+  >(GetTeamWaiverPriority, options);
+}
+export function useGetTeamWaiverPriorityLazyQuery(
+  baseOptions?: Apollo.LazyQueryHookOptions<
+    GetTeamWaiverPriorityQuery,
+    GetTeamWaiverPriorityQueryVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useLazyQuery<
+    GetTeamWaiverPriorityQuery,
+    GetTeamWaiverPriorityQueryVariables
+  >(GetTeamWaiverPriority, options);
+}
+export function useGetTeamWaiverPrioritySuspenseQuery(
+  baseOptions?:
+    | Apollo.SkipToken
+    | Apollo.SuspenseQueryHookOptions<
+        GetTeamWaiverPriorityQuery,
+        GetTeamWaiverPriorityQueryVariables
+      >,
+) {
+  const options =
+    baseOptions === Apollo.skipToken
+      ? baseOptions
+      : { ...defaultOptions, ...baseOptions };
+  return Apollo.useSuspenseQuery<
+    GetTeamWaiverPriorityQuery,
+    GetTeamWaiverPriorityQueryVariables
+  >(
+    GetTeamWaiverPriority,
+    options as
+      | Apollo.SkipToken
+      | Apollo.SuspenseQueryHookOptions<
+          GetTeamWaiverPriorityQuery,
+          GetTeamWaiverPriorityQueryVariables
+        >,
+  );
+}
+export type GetTeamWaiverPriorityQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverPriorityQuery
+>;
+export type GetTeamWaiverPriorityLazyQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverPriorityLazyQuery
+>;
+export type GetTeamWaiverPrioritySuspenseQueryHookResult = ReturnType<
+  typeof useGetTeamWaiverPrioritySuspenseQuery
+>;
+export type GetTeamWaiverPriorityQueryResult = Apollo.QueryResult<
+  GetTeamWaiverPriorityQuery,
+  GetTeamWaiverPriorityQueryVariables
 >;
 export const CancelWaiverClaim = gql`
   mutation CancelWaiverClaim($claimId: Int!) {

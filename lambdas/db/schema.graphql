@@ -4240,6 +4240,7 @@ type Query {
     teamId: Int!
   ): [TradeOffer!]
   teamWaiverClaims(status: String, teamId: Int!): [WaiverClaim!]
+  teamWaiverPriority(teamId: Int!): TeamWaiverPriority
 
   """
   Return the caller's current active game, or null if none
@@ -5062,6 +5063,13 @@ type TeamStatistics {
   totalPoints: Float
   winPercentage: Float
   wins: Int
+}
+
+type TeamWaiverPriority {
+  priority: Int
+  teamId: Int!
+  totalTeams: Int!
+  waiverType: String!
 }
 
 type TemporaryPremiumGrantResult {

@@ -51,6 +51,25 @@ WaiverClaim.implement({
   }),
 });
 
+// ── TeamWaiverPriority type ────────────────────────────────────────────────
+
+export const TeamWaiverPriority = builder.objectRef<{
+  teamId: number;
+  waiverType: string;
+  priority: number | null;
+  totalTeams: number;
+}>('TeamWaiverPriority');
+
+TeamWaiverPriority.implement({
+  fields: (t) => ({
+    teamId: t.exposeInt('teamId', { nullable: false }),
+    waiverType: t.exposeString('waiverType', { nullable: false }),
+    /** Team's rolling-waiver priority rank (1 = first pick). Null for FAAB leagues. */
+    priority: t.exposeInt('priority', { nullable: true }),
+    totalTeams: t.exposeInt('totalTeams', { nullable: false }),
+  }),
+});
+
 // ── ProcessWaiverClaimsResult type ─────────────────────────────────────────
 
 export const ProcessWaiverClaimsResult = builder.objectRef<{
