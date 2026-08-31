@@ -46,7 +46,9 @@ confirmed from the GitHub UI, it's marked (inferred).
 - **Used by:**
   - `terraform/runners/github-runners.tf` (via `runner-terraform-apply.yml` and `rollback.yml`, mapping the secrets to `TF_VAR_github_app_key_base64` / `TF_VAR_github_app_id` / `TF_VAR_github_app_webhook_secret`) to configure the `github-aws-runners` module's `github_app` block: `id` for self-hosted runner registration, `webhook_secret` for the `workflow_job` webhook that triggers the scale-up Lambda.
   - **`ci-pipeline.yml`** (`summarize` job, "Generate CI App Token" step) — posts the `CI Gate` commit status (LS-9571, PR #7415).
-  - **`merge-queue.yml`** (via `merge-queue-processor.js`, `ciAppToken`) — posts the `bot-review` self-heal escalation/pending status when the Reviewer Bot crashes or stalls (LS-9209 self-heal path; LS-9773, PR TBD).
+  - **`merge-queue.yml`** (via `merge-queue-processor.js`, `ciAppToken`) — posts the `bot-review` self-heal escalation/pending status when the Reviewer Bot crashes or stalls (LS-9209 self-heal path; LS-9773, PR #7418).
+  - **`check-conflicts.yml`** (`check-conflicts` job, "Generate CI App Token" step) — posts the `No Merge Conflicts` commit status (LS-9775).
+  - **`security-scanning.yml`** (`security-gate` job, "Generate CI App Token" step) — posts the `security` commit status (LS-9775).
 - **Permissions:** explicitly granted `Commit statuses: write` (2026-08-30, in response to LS-9571) after both Legacy Sports Code Bot and Personal Merge Queue were confirmed NOT to hold it — see their entries above. Base permission set otherwise unconfirmed from the GitHub UI (originally just enough for runner registration + webhook — likely something in the `Self-hosted runners` / `Administration` family).
 
 ## Legacy Sports CI Android

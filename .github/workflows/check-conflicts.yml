@@ -156,6 +156,19 @@ jobs:
         with:
           client-id: 3158619
           private-key: ${{ secrets.AGENT_AUTHOR_APP_PRIVATE_KEY }}
+      # LS-9775: separate token for the commit-status post below. Agent Author
+      # (above) does not hold "Commit statuses: write" (confirmed via
+      # LS-9571). Legacy Sports CI does — mint it here, alongside the plain
+      # GITHUB_TOKEN this job already relies on, so the status post draws
+      # from a separate installation budget instead of the one shared across
+      # every concurrently-running workflow in the repo.
+      - name: Generate CI App Token
+        id: ci-app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          private-key: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
       - name: Resolve PR info
         id: pr-info
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
@@ -250,10 +263,14 @@ jobs:
         env:
           MERGEABLE: ${{ steps.test-merge.outputs.mergeable }}
         with:
-          # The default GITHUB_TOKEN, not the app-installation token: this
-          # workflow's own `statuses: write` permission grant covers it, and
-          # that's the same token CI Gate posts through (ci-pipeline.yml).
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          # LS-9775: prefer the Legacy Sports CI app token (separate
+          # installation budget, proven Commit statuses: write) over the
+          # default GITHUB_TOKEN, whose REST quota is shared across every
+          # concurrently-running workflow in the repo — the same class of
+          # risk that caused LS-9571. Falls back to GITHUB_TOKEN (this
+          # workflow's own `statuses: write` permission grant covers it) if
+          # minting fails, e.g. on a fork PR where secrets aren't available.
+          github-token: ${{ steps.ci-app-token.outputs.token || secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
             const mergeable = process.env.MERGEABLE === 'true';

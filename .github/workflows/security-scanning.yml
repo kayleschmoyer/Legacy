@@ -850,10 +850,24 @@ jobs:
     if: always()
 
     steps:
+      # LS-9775: separate token for the commit-status post below. Legacy
+      # Sports CI (client-id 3148299) is proven to hold "Commit statuses:
+      # write" (LS-9571) and has its own installation budget, separate from
+      # the shared GITHUB_TOKEN bucket the withRateLimitRetry helper below
+      # was originally written to work around (LS-9231). Keep that retry
+      # logic — it's still useful for the GITHUB_TOKEN fallback path.
+      - name: "Generate CI App Token"
+        id: ci-app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ secrets.RUNNER_GITHUB_APP_ID }}
+          private-key: ${{ secrets.RUNNER_GITHUB_APP_KEY_BASE64 }}
+
       - name: "Evaluate Security Gate"
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ steps.ci-app-token.outputs.token || secrets.GITHUB_TOKEN }}
           script: |
             // Retry helper for GitHub REST calls that can hit the installation's
             // hourly rate limit (LS-9231). Rapid successive pushes/reruns can
