@@ -251,8 +251,13 @@ export function LeagueDetailPageV2(): React.JSX.Element {
   // invalid routes (or mistyped URLs) resolve cleanly without silently
   // rendering Overview content at a non-overview URL.  Uses replace so the
   // bogus slug never enters browser history and the back button works cleanly.
+  //
+  // Gated on `league` being loaded: `sportBasePath` falls back to 'baseball'
+  // until the league query resolves, so firing this before then would always
+  // redirect an unknown tab on a football league to /baseball/... regardless
+  // of the league's actual sport (LS-9254).
   useEffect(() => {
-    if (!routeTab) return;
+    if (!routeTab || !league) return;
     const isKnown =
       routeTab in TAB_ALIASES ||
       (TAB_IDS as readonly string[]).includes(routeTab);
@@ -261,7 +266,7 @@ export function LeagueDetailPageV2(): React.JSX.Element {
         replace: true,
       });
     }
-  }, [routeTab, leagueId, navigate, sportBasePath]);
+  }, [routeTab, leagueId, navigate, sportBasePath, league]);
 
   const [tab, setTabState] = useState<TabId>(tabFromRoute);
   useEffect(() => setTabState(tabFromRoute), [tabFromRoute]);
