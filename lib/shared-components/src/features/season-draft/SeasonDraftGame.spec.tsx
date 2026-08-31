@@ -12,7 +12,7 @@ import {
 } from '@legacy-sports/graphql';
 import { SeasonDraftGame } from './SeasonDraftGame';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { fireEvent, render, waitFor } from '../../test-utils';
+import { act, fireEvent, render, waitFor } from '../../test-utils';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -618,6 +618,53 @@ describe('SeasonDraftGame', () => {
           }) as unknown,
         );
       });
+    });
+  });
+
+  describe('pick deadline expiry nudge (LS-9511)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('retries the expiry nudge instead of leaving the draft stuck when the server has not yet observed the deadline as passed', () => {
+      const pastDeadline = new Date(Date.now() - 1000).toISOString();
+      jest.mocked(useGetSeasonDraftGameQuery).mockReturnValue({
+        data: {
+          seasonDraftGame: {
+            ...mockGameState,
+            pickDeadlineSeconds: 60,
+            currentPickDeadline: pastDeadline,
+          },
+        },
+        loading: false,
+        error: undefined,
+        refetch: mockRefetch,
+        startPolling: jest.fn(),
+        stopPolling: jest.fn(),
+      } as unknown as ReturnType<typeof useGetSeasonDraftGameQuery>);
+
+      // Server hasn't (yet) observed the deadline as passed — e.g. the
+      // client's clock is running slightly ahead of the server's. This must
+      // not permanently stop the client from nudging again.
+      mockProcessExpiredMutation.mockResolvedValue({
+        data: { processExpiredSeasonDraftPick: false },
+      });
+
+      render(<SeasonDraftGame gameId={1} currentUserId={1} />);
+
+      // Fires once immediately on mount, since the deadline is already past.
+      expect(mockProcessExpiredMutation).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        jest.advanceTimersByTime(2500);
+      });
+
+      // Must retry rather than giving up after the first unsuccessful nudge.
+      expect(mockProcessExpiredMutation.mock.calls.length).toBeGreaterThan(1);
     });
   });
 });

@@ -230,16 +230,20 @@ export const SeasonDraftGame: React.FC<SeasonDraftGameProps> = ({
   const [processExpiredPickMutation] =
     useProcessExpiredSeasonDraftPickMutation();
 
-  // Track which deadline timestamps we've already nudged so the on-zero
-  // forfeit fires at most once per deadline, even with multiple clients.
-  const nudgedDeadlinesRef = useRef<Set<string>>(new Set());
+  // Nudge the server to forfeit the expired pick. `PickDeadlineCountdown`
+  // calls this repeatedly (throttled) for as long as the deadline stays
+  // expired, so a nudge that the server declines to act on yet — its clock
+  // hasn't observed the deadline as passed (skew), or a transient request
+  // failure — gets retried instead of leaving the draft stuck forever
+  // (LS-9511). The mutation is idempotent, so an occasional duplicate call
+  // once it does succeed is harmless.
   const handleDeadlineExpired = useCallback(
-    (deadline: string) => {
-      if (nudgedDeadlinesRef.current.has(deadline)) return;
-      nudgedDeadlinesRef.current.add(deadline);
+    (_deadline: string) => {
       void processExpiredPickMutation({ variables: { gameId } }).then(
-        () => {
-          void refetchGame();
+        (result) => {
+          if (result.data?.processExpiredSeasonDraftPick) {
+            void refetchGame();
+          }
         },
         (error: unknown) => {
           const err = error instanceof Error ? error : new Error(String(error));
@@ -1940,19 +1944,30 @@ function PickDeadlineCountdown({
 
   const onExpiredRef = useRef(onExpired);
   onExpiredRef.current = onExpired;
-  const firedRef = useRef(false);
+  // Retries the expiry nudge every RETRY_INTERVAL_MS for as long as the
+  // deadline stays expired, instead of firing once. A single fire-once
+  // nudge left the draft stuck forever whenever the server declined to act
+  // on it yet — its clock hadn't observed the deadline as passed (client
+  // clock skew) or the request failed — since nothing else prompts a retry
+  // (LS-9511). `deadline` changing (the server accepted a forfeit, from
+  // this client or another) resets the throttle for the next pick.
+  const lastNudgeAtRef = useRef(0);
   useEffect(() => {
-    firedRef.current = false;
+    lastNudgeAtRef.current = 0;
   }, [deadline]);
 
   useEffect(() => {
+    const RETRY_INTERVAL_MS = 2000;
     const tick = () => {
       const end = new Date(deadline).getTime();
       const next = Math.max(0, Math.ceil((end - Date.now()) / 1000));
       setRemaining(next);
-      if (next === 0 && !firedRef.current) {
-        firedRef.current = true;
-        onExpiredRef.current?.(deadline);
+      if (next === 0) {
+        const now = Date.now();
+        if (now - lastNudgeAtRef.current >= RETRY_INTERVAL_MS) {
+          lastNudgeAtRef.current = now;
+          onExpiredRef.current?.(deadline);
+        }
       }
     };
     tick();
