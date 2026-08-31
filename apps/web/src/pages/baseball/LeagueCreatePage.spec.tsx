@@ -669,6 +669,59 @@ describe('LeagueCreatePage — sport-aware (LS-4631)', () => {
   });
 });
 
+describe('LeagueCreatePage — mid-form sport switch clears football-only submit fields (LS-6157)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreateLeague.mockResolvedValue({ data: undefined });
+    mockLeagueCount = 0;
+    mockIsPremium = false;
+    mockIsPremiumLoading = false;
+  });
+
+  async function submitAndGetInput() {
+    fireEvent.change(screen.getByPlaceholderText('Enter your league name'), {
+      target: { value: 'Test League' },
+    });
+    const submitBtn = screen.getByTestId('create-league-submit');
+    fireEvent.submit(submitBtn.closest('form') as HTMLFormElement);
+    await waitFor(() => expect(mockCreateLeague).toHaveBeenCalledTimes(1));
+    return mockCreateLeague.mock.calls[0][0].variables.input;
+  }
+
+  it('nulls scoringFormat/defensiveFormat on submit after switching football -> baseball mid-form (CLF-038)', async () => {
+    // Start on football with non-default scoring/defensive selections, then
+    // switch sport *before* submitting — mirrors a user who picks football
+    // options, changes their mind, and never revisits this section.
+    renderPage('/football/league/create?scoringFormat=half_ppr');
+    expandAllSections();
+    fireEvent.click(screen.getByTestId('defensive-format-idp'));
+
+    fireEvent.click(screen.getByTestId('sport-tab-baseball'));
+    expect(
+      screen.getByRole('heading', { name: /Create Baseball League/i }),
+    ).toBeInTheDocument();
+
+    const input = await submitAndGetInput();
+    expect(input.sport).toBe('baseball');
+    expect(input.scoringFormat).toBeUndefined();
+    expect(input.defensiveFormat).toBeUndefined();
+  });
+
+  it('nulls scoringFormat/defensiveFormat on submit after switching baseball -> football -> baseball mid-form', async () => {
+    renderPage('/baseball/league/create');
+    fireEvent.click(screen.getByTestId('sport-tab-football'));
+    expandAllSections();
+    fireEvent.click(screen.getByTestId('scoring-format-half_ppr'));
+    fireEvent.click(screen.getByTestId('defensive-format-idp'));
+    fireEvent.click(screen.getByTestId('sport-tab-baseball'));
+
+    const input = await submitAndGetInput();
+    expect(input.sport).toBe('baseball');
+    expect(input.scoringFormat).toBeUndefined();
+    expect(input.defensiveFormat).toBeUndefined();
+  });
+});
+
 describe('LeagueCreatePage — per-slot roster config (LS-6147)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
