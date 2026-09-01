@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input, Label, Text, XStack, YStack } from 'tamagui';
+import { TEAM_COUNT_OPTIONS_BY_SPORT } from '@legacy-sports/shared-components/leagues';
 import type { SportChoice } from './StepSportSelect';
 
 export interface LeagueSettings {
@@ -14,7 +15,9 @@ interface StepLeagueSettingsProps {
   onChange: (settings: LeagueSettings) => void;
 }
 
-const TEAM_COUNT_OPTIONS = [4, 6, 8, 10, 12, 14, 16, 18, 20];
+// Team-count options are sport-specific and sourced from the shared wizard
+// constants (CLF-001) so this step, the rich web page, and native all offer
+// the same values per sport instead of one flat list shared across sports.
 
 // Auction is a premium selection method configured on the Premium Options
 // step, not a draft order — see StepPremiumOptions (LS-6139).
@@ -81,6 +84,8 @@ export function StepLeagueSettings({
   onChange,
 }: StepLeagueSettingsProps) {
   const defaultTeams = sport === 'FOOTBALL' ? 12 : 10;
+  const teamCountOptions =
+    TEAM_COUNT_OPTIONS_BY_SPORT[sport === 'FOOTBALL' ? 'football' : 'baseball'];
 
   function set<K extends keyof LeagueSettings>(
     key: K,
@@ -131,7 +136,7 @@ export function StepLeagueSettings({
           Default: {defaultTeams} teams
         </Text>
         <XStack flexWrap="wrap" gap="$2">
-          {TEAM_COUNT_OPTIONS.map((n) => (
+          {teamCountOptions.map((n) => (
             <XStack
               key={n}
               pressStyle={{ opacity: 0.8 }}

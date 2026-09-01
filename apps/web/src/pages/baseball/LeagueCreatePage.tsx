@@ -57,6 +57,8 @@ import {
   RosterContinuityField,
   SalaryCapField,
   WaiverSystemField,
+  ROSTER_SIZE_OPTIONS_BY_SPORT as WIZARD_ROSTER_SIZE_OPTIONS_BY_SPORT,
+  TEAM_COUNT_OPTIONS_BY_SPORT as WIZARD_TEAM_COUNT_OPTIONS_BY_SPORT,
 } from '@legacy-sports/shared-components/leagues';
 import {
   GetUserLeagues,
@@ -235,7 +237,16 @@ export interface CreateLeagueFormData {
   rosterSlots: Record<string, number>;
 }
 
-const TEAM_COUNT_OPTIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16];
+// Team-count and roster-size option sets are sport-specific and, for
+// football, sourced from the shared wizard constants (CLF-001) so the rich
+// web page, the web wizard, and native all offer the same football values —
+// a league created on one platform stays editable/creatable on the others.
+// Baseball keeps its existing, wider option set (unchanged; not in CLF-001's
+// scope).
+export const TEAM_COUNT_OPTIONS_BY_SPORT: Record<SportId, readonly number[]> = {
+  baseball: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16],
+  football: WIZARD_TEAM_COUNT_OPTIONS_BY_SPORT.football,
+};
 const ALL_DIVISION_COUNT_OPTIONS = [1, 2, 3, 4];
 
 // ── Sport-specific datasets (per docs/design/HI6N3yPYUzeh981B5SkXmw CreateForm.jsx) ──
@@ -258,7 +269,7 @@ const PLAYER_POOL_OPTIONS_BY_SPORT: Record<
 
 const ROSTER_SIZE_OPTIONS_BY_SPORT: Record<SportId, readonly number[]> = {
   baseball: [20, 22, 24, 26, 28, 30, 35, 40],
-  football: [13, 14, 15, 16, 17, 18, 20, 22],
+  football: WIZARD_ROSTER_SIZE_OPTIONS_BY_SPORT.football,
 };
 
 interface RosterRange {
@@ -436,7 +447,7 @@ export function applyImportedSettings(
     apply(
       'numberOfTeams',
       s.numberOfTeams,
-      (TEAM_COUNT_OPTIONS as readonly number[]).includes(s.numberOfTeams),
+      TEAM_COUNT_OPTIONS_BY_SPORT[sport].includes(s.numberOfTeams),
     );
   }
 
@@ -1743,7 +1754,9 @@ export function LeagueCreatePage(): React.JSX.Element {
     // sets the form controls use; anything invalid or absent falls back to
     // the existing default, matching the tolerant `?name=` behavior above.
     const teamsParam = Number(searchParams.get('teams'));
-    const initialNumberOfTeams = TEAM_COUNT_OPTIONS.includes(teamsParam)
+    const initialNumberOfTeams = TEAM_COUNT_OPTIONS_BY_SPORT[
+      selectedSport
+    ].includes(teamsParam)
       ? teamsParam
       : initialDefaults.numberOfTeams;
 
@@ -3007,7 +3020,7 @@ export function LeagueCreatePage(): React.JSX.Element {
                   >
                     <ButtonGroup
                       value={formData.numberOfTeams}
-                      options={TEAM_COUNT_OPTIONS}
+                      options={TEAM_COUNT_OPTIONS_BY_SPORT[formData.sport]}
                       onChange={(v) => handleInputChange('numberOfTeams', v)}
                       disabled={isFormDisabled}
                     />

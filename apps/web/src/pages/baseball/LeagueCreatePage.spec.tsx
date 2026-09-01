@@ -29,10 +29,12 @@ import {
   Routes,
   useNavigationType,
 } from 'react-router-dom';
+import { TEAM_COUNT_OPTIONS_BY_SPORT as WIZARD_TEAM_COUNT_OPTIONS_BY_SPORT } from '@legacy-sports/shared-components/leagues';
 import type { CreateLeagueFormData } from './LeagueCreatePage';
 import {
   applyImportedSettings,
   isPoolTooSmall,
+  TEAM_COUNT_OPTIONS_BY_SPORT,
   validateFormFull,
   VALIDATION_ERROR_SECTION,
 } from './LeagueCreatePage';
@@ -3336,5 +3338,19 @@ describe('LeagueCreatePage — sport tab access (LS-9128)', () => {
     expect(
       screen.getByRole('heading', { name: /Create Football League/i }),
     ).toBeInTheDocument();
+  });
+});
+
+// CLF-001 regression: the rich web page, the web wizard (StepLeagueSettings),
+// and native (via the shared "Line-score Wizard" constants) must all offer
+// the same football team-count options — otherwise a league created on one
+// platform (e.g. 16 teams on web) is unselectable/uneditable on another
+// (native previously capped at 14). Baseball intentionally keeps its own,
+// wider option set and is not asserted here.
+describe('football team-count option parity across platforms (CLF-001)', () => {
+  it('matches the shared wizard constants that native and the web wizard both consume', () => {
+    expect(TEAM_COUNT_OPTIONS_BY_SPORT.football).toEqual(
+      WIZARD_TEAM_COUNT_OPTIONS_BY_SPORT.football,
+    );
   });
 });
