@@ -221,6 +221,20 @@ async function validateFile(filePath, schema, ajv) {
         ),
       );
       data.on = stripped;
+
+      // GitHub Actions treats a bare `workflow_call:` (no value, parsed by
+      // js-yaml as `null`) as a valid trigger with no declared inputs —
+      // this is common, valid syntax (e.g. `on: { workflow_call:,
+      // pull_request: ... }`). The SchemaStore schema's `workflow_call`
+      // property requires `type: object` with no `null` alternative (unlike
+      // most other event keys, which explicitly allow `null`), so AJV
+      // rejects it with a false-positive "must be object" / "must match
+      // exactly one schema in oneOf" (LS-9801). Normalize null to an empty
+      // object before validation — semantically identical, and satisfies
+      // the schema's stricter type requirement.
+      if (data.on.workflow_call === null) {
+        data.on.workflow_call = {};
+      }
     }
 
     const validate = ajv.compile(schema);
@@ -421,6 +435,7 @@ module.exports = {
   collectWorkingDirectories,
   checkWorkingDirectoryPaths,
   isActionFile,
+  validateFile,
 };
 
 if (require.main === module) {

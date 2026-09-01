@@ -25,7 +25,11 @@ const {
   collectWorkingDirectories,
   checkWorkingDirectoryPaths,
   isActionFile,
+  validateFile,
 } = require(resolve(__dirname, '..', 'validate-workflows.js'));
+
+const Ajv = require('ajv');
+const addFormats = require('ajv-formats');
 
 // js-yaml is a project dep used by the script under test.
 const yaml = require('js-yaml');
@@ -190,6 +194,75 @@ test('isActionFile matches action.yml and action.yaml at any depth', () => {
 test('isActionFile rejects workflow files', () => {
   assert.equal(isActionFile('.github/workflows/ci.yml'), false);
   assert.equal(isActionFile('.github/workflows/action-runner.yml'), false);
+});
+
+// validateFile / workflow_call null-coercion (LS-9801): SchemaStore's
+// github-workflow.json requires `on.workflow_call` to be `type: object`,
+// with no `null` alternative — unlike most other event keys. A bare
+// `workflow_call:` (no value) is valid, common GitHub Actions syntax and
+// js-yaml parses it as `null`, which the schema then rejects as a
+// false-positive "must match exactly one schema in oneOf".
+function makeOnWorkflowCallSchema() {
+  return {
+    type: 'object',
+    properties: {
+      on: {
+        type: 'object',
+        properties: {
+          workflow_call: { type: 'object' },
+          pull_request: { type: ['object', 'null'] },
+        },
+        additionalProperties: false,
+      },
+    },
+  };
+}
+
+function makeAjv() {
+  const ajv = new Ajv({
+    allErrors: true,
+    strict: false,
+    allowUnionTypes: true,
+  });
+  addFormats(ajv);
+  return ajv;
+}
+
+test('validateFile normalizes a bare `workflow_call:` (null) to {} before validation (LS-9801)', async () => {
+  const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-9801-'));
+  try {
+    const filePath = join(tmpRepo, 'workflow.yml');
+    writeFileSync(
+      filePath,
+      'on:\n  workflow_call:\n  pull_request:\n    branches: [main]\n',
+    );
+
+    const result = await validateFile(
+      filePath,
+      makeOnWorkflowCallSchema(),
+      makeAjv(),
+    );
+    assert.equal(result, null, JSON.stringify(result?.errors));
+  } finally {
+    rmSync(tmpRepo, { recursive: true, force: true });
+  }
+});
+
+test('validateFile still fails when workflow_call is a genuinely invalid type (e.g. a string)', async () => {
+  const tmpRepo = mkdtempSync(join(tmpdir(), 'ls-9801-'));
+  try {
+    const filePath = join(tmpRepo, 'workflow.yml');
+    writeFileSync(filePath, 'on:\n  workflow_call: "oops"\n');
+
+    const result = await validateFile(
+      filePath,
+      makeOnWorkflowCallSchema(),
+      makeAjv(),
+    );
+    assert.notEqual(result, null);
+  } finally {
+    rmSync(tmpRepo, { recursive: true, force: true });
+  }
 });
 
 test('checkWorkingDirectoryPaths flags paths that exist but are files, not directories', () => {
