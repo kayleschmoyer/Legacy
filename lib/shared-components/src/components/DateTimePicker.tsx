@@ -5,8 +5,8 @@ import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
 import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
 import { Clock } from '@tamagui/lucide-icons/icons/Clock';
 import { X } from '@tamagui/lucide-icons/icons/X';
+import { Platform } from 'react-native';
 import { to12Hour, to24Hour } from './dateTimePickerUtils';
-import { Platform } from '../platform-components';
 
 // `Adapt`'s `when` prop is typed as `MediaQueryKeyString`, which resolves to
 // `never` for this workspace's config in the shared-components typecheck, so a

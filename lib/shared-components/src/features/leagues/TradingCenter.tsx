@@ -13,7 +13,7 @@
  *  - Commissioner veto button on accepted trades
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, useWindowDimensions } from 'react-native';
+import { Modal, Platform, useWindowDimensions } from 'react-native';
 import {
   Card,
   type CardProps,
@@ -73,7 +73,6 @@ import {
   formatSalary,
   formatSalaryDelta,
 } from './tradeCapPreview';
-import { Platform } from '../../platform-components';
 import { Button } from '../../Button';
 import { Dropdown } from '../../Dropdown';
 import { LeagueTradeBlock } from '../matchup/LeagueTradeBlock';

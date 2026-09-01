@@ -20,7 +20,7 @@ import { ChevronRight } from '@tamagui/lucide-icons/icons/ChevronRight';
 import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { ShieldCheck } from '@tamagui/lucide-icons/icons/ShieldCheck';
 import { X } from '@tamagui/lucide-icons/icons/X';
-import { Platform } from '../../platform-components';
+import { Platform } from 'react-native';
 import {
   DRAFT_MODES,
   DRAFT_ORDERS,
