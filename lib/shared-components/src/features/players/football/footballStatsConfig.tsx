@@ -567,7 +567,7 @@ export function useFootballController(
           <TextInput
             value={searchInput}
             onChangeText={setSearchInput}
-            placeholder="Search players…"
+            placeholder={`Search player name · min ${FOOTBALL_SEARCH_MIN_LENGTH} chars`}
             placeholderTextColor={FG4}
             accessibilityLabel="Search players"
             aria-label="Search players"

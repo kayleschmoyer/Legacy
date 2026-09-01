@@ -1,9 +1,10 @@
 import React from 'react';
-import { act, render } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import {
   type FootballStatsPageProps,
   useFootballController,
 } from './footballStatsConfig';
+import { FOOTBALL_SEARCH_MIN_LENGTH } from './footballStatsHelpers';
 import type { SportStatsController } from '../shell/sportStatsConfig';
 
 // The grid is Apollo/Tamagui-heavy; capture its props so the controller's sort
@@ -26,7 +27,12 @@ const controllerRef: { current?: SportStatsController } = {};
 function Harness(props: FootballStatsPageProps) {
   const controller = useFootballController(props);
   controllerRef.current = controller;
-  return <>{controller.renderContent()}</>;
+  return (
+    <>
+      {controller.renderToolbarControls()}
+      {controller.renderContent()}
+    </>
+  );
 }
 
 describe('useFootballController tabs + sort (LS-8566)', () => {
@@ -152,5 +158,14 @@ describe('useFootballController tabs + sort (LS-8566)', () => {
       // View-default sort is treated as unset so it stays out of the URL.
       expect(lastState.filters.sortField).toBeUndefined();
     });
+  });
+
+  it('search placeholder matches the MLB stats page copy (LS-9507)', () => {
+    render(<Harness isPremium />);
+    expect(
+      screen.getByPlaceholderText(
+        `Search player name · min ${FOOTBALL_SEARCH_MIN_LENGTH} chars`,
+      ),
+    ).toBeVisible();
   });
 });
