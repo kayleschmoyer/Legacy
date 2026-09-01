@@ -5,6 +5,11 @@ import React from 'react';
 import App from './app';
 import { useFeatureValue } from '../context/GrowthBookProvider';
 import * as analytics from '../utils/analytics';
+import { prefetchHomePage } from '../utils/prefetchHomePage';
+
+jest.mock('../utils/prefetchHomePage', () => ({
+  prefetchHomePage: jest.fn(),
+}));
 
 // Mock all the components that might have complex dependencies
 jest.mock('@legacy-sports/shared-components', () => {
@@ -418,6 +423,72 @@ describe('App', () => {
       // Find the navigation element
       const navigation = container.querySelector('nav');
       expect(navigation).toMatchSnapshot();
+    });
+  });
+
+  describe('Home page prefetch (LS-9350)', () => {
+    const prefetchHomePageMock = prefetchHomePage as jest.Mock;
+
+    afterEach(() => {
+      prefetchHomePageMock.mockClear();
+    });
+
+    it('prefetches the Home chunk when landing on a non-home route', async () => {
+      render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/football']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+
+      await act(() => Promise.resolve());
+
+      expect(prefetchHomePageMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not prefetch when already on the home route', async () => {
+      render(
+        <MemoryRouter
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+          initialEntries={['/']}
+        >
+          <App />
+        </MemoryRouter>,
+      );
+
+      await act(() => Promise.resolve());
+
+      expect(prefetchHomePageMock).not.toHaveBeenCalled();
+    });
+
+    it('does not prefetch under an automated browser (navigator.webdriver), even on a non-home route', async () => {
+      const originalWebdriver = navigator.webdriver;
+      Object.defineProperty(navigator, 'webdriver', {
+        value: true,
+        configurable: true,
+      });
+
+      try {
+        render(
+          <MemoryRouter
+            future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+            initialEntries={['/football']}
+          >
+            <App />
+          </MemoryRouter>,
+        );
+
+        await act(() => Promise.resolve());
+
+        expect(prefetchHomePageMock).not.toHaveBeenCalled();
+      } finally {
+        Object.defineProperty(navigator, 'webdriver', {
+          value: originalWebdriver,
+          configurable: true,
+        });
+      }
     });
   });
 

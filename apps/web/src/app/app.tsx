@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
@@ -10,6 +10,7 @@ import {
 import { styled } from 'tamagui';
 import { Menu } from '@tamagui/lucide-icons/icons/Menu';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
+import { prefetchHomePage } from '../utils/prefetchHomePage';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { NotificationDropdown } from '../components/layout/NotificationDropdown';
@@ -333,6 +334,26 @@ function Navigation() {
   useEffect(() => {
     setDrawerOpen(false);
   }, [location.pathname]);
+
+  // Prefetch the Home page chunk once per mount so the logo/home link is
+  // instant even when Home was never the first page loaded this session —
+  // e.g. a deep link straight into a league page (LS-9350). Captured via ref
+  // so this only ever reflects the route present at mount, not later ones.
+  // Skipped under automated browsers (same navigator.webdriver gate used
+  // elsewhere in this file's config) — this fetch is purely a speculative
+  // optimization with no test value, and it can still be in flight when a
+  // hermetic E2E test's browser context closes, surfacing as a stray
+  // "Test ended" route-callback error unrelated to what the test asserts.
+  const initialPathnameRef = useRef(location.pathname);
+  useEffect(() => {
+    if (
+      initialPathnameRef.current !== '/' &&
+      typeof navigator !== 'undefined' &&
+      navigator.webdriver !== true
+    ) {
+      void prefetchHomePage();
+    }
+  }, []);
 
   if (!isAuthenticated) return null;
 
