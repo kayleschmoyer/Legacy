@@ -42,9 +42,9 @@ A hit in `apps/web-e2e/src/pages/*.page.ts` matters as much as a hit in a spec �
 
 **Then run what you found.** `make pc` does not run Playwright. See [testing/SKILL.md Critical Rule 3](../SKILL.md#critical-rules).
 
-### The five change shapes that break specs
+### The six change shapes that break specs
 
-Each row is a shape observed in this window, with the check that would have caught it.
+Each row is a shape observed in the fix history, with the check that would have caught it.
 
 | Shape                                              | What broke                                                                                                                                                                                                  | Check before shipping                                                                                                                                                                                                               |
 | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -54,10 +54,19 @@ Each row is a shape observed in this window, with the check that would have caug
 | **Mock / fixture factory field with a default**    | LS-9655 added `sport: 'baseball' \| 'football'` to `mockLeague()`, defaulting to `'baseball'`; football fixtures silently resolved to baseball → LS-9718                                                    | Adding a defaulted field to a shared factory changes behaviour at **every existing call site**. Audit them all in the same PR, the way LS-9718's fix did — do not rely on selection to find them.                                   |
 | **Entitlement / gating source change**             | LS-8645 moved the player-detail-modal gate from `GetUserById.subscriptionTier` to the `MyEntitlements` query; free-tier specs mocked only the former and fell through to the **premium** baseline → LS-9068 | When you change _what a gate reads_, grep for specs asserting the gated behaviour and update their mocks. An unmocked entitlement query resolves to the permissive baseline, so the test passes for the wrong reason.               |
 
-Two of these deserve their own rule, because both produce a test that _passes while asserting nothing_:
+A sixth shape belongs with them, and it is the one with the widest blast radius:
 
-- **An unmocked operation is not a neutral event.** It cascades to the `_apiIsolation` baseline, which serves a **premium, fully-entitled** catalog (LS-9068). A "free tier cannot see X" test whose entitlement query is unmocked is testing a premium user.
-- **A mock whose shape disagrees with `schema.graphql` is inert until it isn't.** `userTeamIdResponse()` wrapped a scalar `Int` in a fabricated `UserTeamId` object type that does not exist in the schema; every consumer compared `object !== number` and silently got `isOwner === false` (LS-8590). Check new/edited mocks against `lambdas/db/schema.graphql`.
+| Shape                                  | What broke                                                                                                                                                                                                                                            | Check before shipping                                                                                                                                                                 |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Changed value of a _baseline_ mock** | LS-5030 flipped baseline `GetUserById` from `subscriptionTier: null` to `'premium'`. Since `useIsPremium()` reads that response, the default e2e user became premium **globally**, silently breaking every free-gate assertion in the suite → LS-8010 | A baseline edit in `fixtures/shared-mocks.ts` is a repo-wide event. Grep for specs depending on the old value, and pin them explicitly (`mockUserTier(page, 'free')`) in the same PR. |
+
+At its worst this had 12 of 15 open PRs red on unrelated diffs. It reached `main` because the surface map did not map the gating sources to the dependent specs — the same gap as Part 2 below. LS-8010's repair added the `PremiumGate.tsx` / `useIsPremium.ts` mappings so the next gating change actually selects them.
+
+Three of these deserve their own rule, because each produces a test that _passes while asserting nothing_:
+
+- **An unmocked operation is not a neutral event — and it has two different outcomes.** If the operation is **not** in `BASELINE_GRAPHQL_RESPONSES`, `_apiIsolation` returns `{ errors: [...] }` and then throws after the test body (`API isolation caught N unmocked GraphQL request(s)`) — loud, and easy to fix. If it **is** in the baseline, it silently resolves to the baseline default, which for entitlements is the **full premium catalog**: a "free tier cannot see X" test whose `MyEntitlements` query is unmocked is testing a premium user (LS-9068). The loud case costs you a run; the quiet case costs you the assertion.
+- **A negative assertion about gated content must wait for the gate's data to settle.** `expect(modal).not.toBeVisible()` passes instantly if it runs before the entitlement query resolves. LS-9068's fix awaits the `MyEntitlements` response and asserts the gate overlay _is_ visible **and** the modal is closed.
+- **A mock whose shape or enum values disagree with the generated types is inert until it isn't.** `userTeamIdResponse()` wrapped a scalar `Int` in a fabricated `UserTeamId` object type that does not exist in the schema; every consumer compared `object !== number` and silently got `isOwner === false` (LS-8590). `twenty-questions.spec.ts` hand-wrote UPPERCASE enum values against a schema that serializes lowercase, so a category button was never found and a winning guess was scored as a loss (LS-7788). Check shapes against `lambdas/db/schema.graphql` and enum values against `lib/shared-components/src/api/db/graphql.generated.ts` — never against GraphQL naming convention.
 
 ## Part 2 — Affected-spec selection will not catch this for you
 
@@ -94,7 +103,9 @@ The suite runs five projects: three desktop engines at 1280×720 and two device 
 
 1. **Fix the locator** so it resolves whichever presentation the viewport renders — best, keeps coverage at both widths (`PlayerStatsSurface.expectStatsSurfaceVisible()`, LS-9326; `waivers.page.ts` `isCompactSurface()`, LS-9408).
 2. **Pin the viewport** with `test.use({ viewport: DESKTOP_VIEWPORT })` — the test still runs under every project.
-3. **Skip on mobile** — last resort, needs maintainer authorisation, because a skipped test is invisible in a green run.
+3. **Skip on mobile** — last resort, needs maintainer authorisation, because a skipped test is invisible in a green run. Take LS-9712 itself as the lesson: it introduced a `skipOnMobileProject()` helper, and its own follow-up PR (`ca414b384`, "replace mobile-viewport test skips with viewport pins") deleted the helper again and converted the skips to pins.
+
+There is also a **file-level** lever you will not see in any spec: `DESKTOP_GRID_ONLY_SPECS` in `playwright.config.ts` excludes **17 spec files** from the mobile projects entirely. That is deliberate — those files assert desktop-grid affordances the ≤800px card feed never renders (LS-9075/LS-9471/LS-9493/LS-9660) — but it is invisible in a green run. Check the list before concluding a surface has mobile coverage.
 
 Two mechanics that caused real bugs and are easy to miss:
 
@@ -163,6 +174,8 @@ Before pushing a change to `apps/web`, `lib/shared-components`, or the E2E harne
 - [ ] New query/mutation fired on mount or a timer? Baseline mock added in `fixtures/shared-mocks.ts` or a branch in every spec that mounts it.
 - [ ] Added a defaulted field to a shared mock/fixture factory? Every existing call site audited in this PR.
 - [ ] Changed what a gate reads? Specs asserting the gated behaviour updated — an unmocked entitlement query resolves permissive.
+- [ ] Changed a **value** in `fixtures/shared-mocks.ts`? Treated as repo-wide: specs depending on the old value found and pinned explicitly (LS-5030 → LS-8010).
+- [ ] New/edited mock checked against `lambdas/db/schema.graphql` (shapes) and `graphql.generated.ts` (enum serialization), not against GraphQL naming convention.
 - [ ] Changed a conditional render or a responsive branch? Specs checked at **both** widths; locator fixed in preference to a pin, pin in preference to a skip.
 - [ ] Ran `select-specs.mjs` on your own diff, and ran the specs your reverse lookup found even if selection missed them.
 - [ ] Built `dist/apps/web` fresh before believing a local pass.
@@ -171,7 +184,9 @@ Before pushing a change to `apps/web`, `lib/shared-components`, or the E2E harne
 
 ## Related
 
+- [e2e-failure-atlas.md](e2e-failure-atlas.md) — the diagnostic companion: a symptom-indexed catalogue of every failure class in the 412-commit fix history, plus the triage decision tree and the environment traps that make a local run lie
 - [e2e-determinism.md](e2e-determinism.md) — the 12 determinism levers and the nightly-integration class-of-bug catalog
+- [api-isolation-architecture.md](api-isolation-architecture.md) — the 3-layer mock system, `route.fallback()` vs `route.continue()`, baseline catalog
 - [playwright-best-practices.md](playwright-best-practices.md) — locator conventions, page objects, Tamagui pitfalls
 - [`apps/web-e2e/src/utils/viewport.ts`](../../../../apps/web-e2e/src/utils/viewport.ts) — viewport doctrine and helpers (LS-9712)
 - [`apps/web-e2e/eslint.config.mjs`](../../../../apps/web-e2e/eslint.config.mjs) — the machine-enforced half of these rules (LS-4456 / LS-4458 / LS-8096 / LS-9660)
@@ -181,4 +196,4 @@ Before pushing a change to `apps/web`, `lib/shared-components`, or the E2E harne
 
 ## Provenance and maintenance
 
-Derived from an evaluation of the ~41 E2E fix commits merged 2026-07-01 → 2026-08-31 (LS-9788). Every claim traces to a cited commit or ticket. The Part 2 selection numbers were reproduced locally against `main` at `ae09e9409`; re-run the `select-specs.mjs` command above to re-verify them, and delete Part 2's first two causes once **LS-9787** lands.
+Derived from an evaluation of the ~41 E2E fix commits merged 2026-07-01 → 2026-08-31 (LS-9788), then corrected and extended against the full 412-commit fix history (LS-9789 — which added the baseline-mock-value shape, the two-outcome unmocked-operation semantics, the enum-drift rule, and the `DESKTOP_GRID_ONLY_SPECS` note). Every claim traces to a cited commit or ticket. The Part 2 selection numbers were reproduced locally against `main` at `ae09e9409`; re-run the `select-specs.mjs` command above to re-verify them, and delete Part 2's first two causes once **LS-9787** lands.

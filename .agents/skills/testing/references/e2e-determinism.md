@@ -388,6 +388,7 @@ Bounding concurrency keeps 429s rare; **comprehensive Retry-After backoff makes 
 ## Related
 
 - [e2e-change-safety.md](e2e-change-safety.md) — the companion catalog for the **other** failure class: specs broken deterministically by a shipped product change (stale testIDs, responsive-branch changes, unmocked new operations, defaulted fixture fields), plus why affected-spec selection does not catch them. This document covers flake; that one covers drift.
+- [e2e-failure-atlas.md](e2e-failure-atlas.md) — the symptom-indexed diagnostic catalogue built from all 412 E2E fix commits: strict-mode collisions, actionability failures, listener-ordering bugs, mock/enum drift, identity races, viewport splits, state leakage, and the local-environment traps. Use it when you are looking at a failure; use this document when you are writing the spec.
 - [ci-failure-prevention.md](ci-failure-prevention.md) — proactive catalog of the top CI failure patterns (GrowthBook flag seeding, Suspense body-text comparison, migration check) with write-time checklists
 - [playwright-best-practices.md](playwright-best-practices.md) — the broader Playwright reference
 - [test-tagging-guide.md](test-tagging-guide.md) — `@flaky`, `@critical`, etc.

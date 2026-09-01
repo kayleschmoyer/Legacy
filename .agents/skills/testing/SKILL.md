@@ -329,7 +329,8 @@ Once 3 consecutive nightly runs hit 0 failures / 0 flakies, the maintenance poli
 ## E2E Reference Files
 
 - [E2E & Integration Determinism](references/e2e-determinism.md) -- ⭐ the 12 levers gating every E2E/integration PR
-- [E2E Change Safety](references/e2e-change-safety.md) -- ⭐ how to change product code without landing a red spec on `main`: the reverse lookup, the five change shapes that break specs, why affected-selection won't catch them, and the fix-side rules (reproduce first, never weaken an assertion, fix the class)
+- [E2E Change Safety](references/e2e-change-safety.md) -- ⭐ how to change product code without landing a red spec on `main`: the reverse lookup, the six change shapes that break specs, why affected-selection won't catch them, and the fix-side rules (reproduce first, never weaken an assertion, fix the class)
+- [E2E Failure Atlas](references/e2e-failure-atlas.md) -- ⭐ **start here when a spec is failing**: symptom index → root cause → why the obvious fix is wrong → right fix, covering every class in the 412-commit fix history; plus the four triage misreads, the environment traps that make a local run lie, and the recurrence-chain ledger
 - [CI Failure Prevention](references/ci-failure-prevention.md) -- ⭐ top CI failure patterns (GrowthBook flag seeding, Suspense text comparison, migration check) with proactive checklists
 - [API Isolation Architecture](references/api-isolation-architecture.md) -- 3-layer mock system
 - [CI Pipeline & Validation](references/e2e-ci-and-validation.md) -- running tests, CI behavior, troubleshooting
