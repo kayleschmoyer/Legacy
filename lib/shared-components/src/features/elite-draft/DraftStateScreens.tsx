@@ -3,6 +3,7 @@ import { Button, Text, XStack, YStack } from 'tamagui';
 import { brand, scaleDark, withAlpha } from '@legacy-sports/design-tokens';
 import { SkeletonCard } from './SkeletonCard';
 import { Skeleton } from '../../components/Skeleton';
+import { csp } from '../players/crossPlatformStyle';
 
 // Matches the sticky nav height the live draft board root also sits below,
 // so these full-screen states stay flush with the nav bar.
@@ -265,11 +266,26 @@ export function LoadingScreen(): React.JSX.Element {
                 <Skeleton key={i} width={w} height={32} radius={9999} />
               ))}
             </XStack>
-            <XStack testID="draft-loading-player-grid" flexWrap="wrap" gap="$3">
+            {/* Same CSS Grid the real player-pool grid uses (DraftPlayerBoard's
+                `gridCols` for viewMode 'grid': `repeat(auto-fill,
+                minmax(320px, 1fr))`, gap 14) — LS-9364. SkeletonCard's own
+                bars are percentage-widths, which need a definite-width
+                parent to resolve against; the previous `flexWrap` XStack gave
+                each card no explicit width, so it collapsed to ~34px instead
+                of the ~320-390px real cards render at, and swapping the
+                skeleton for real data visibly reflowed the whole grid. */}
+            <YStack
+              testID="draft-loading-player-grid"
+              style={csp({
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: 14,
+              })}
+            >
               {Array.from({ length: 9 }).map((_, i) => (
                 <SkeletonCard key={i} delay={i * 0.06} />
               ))}
-            </XStack>
+            </YStack>
           </YStack>
 
           {/* RIGHT RAIL skeleton — intel · queue · roster · history panels. */}

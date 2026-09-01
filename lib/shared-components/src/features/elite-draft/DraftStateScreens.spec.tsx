@@ -18,6 +18,14 @@ import {
   PlayersErrorScreen,
 } from './DraftStateScreens';
 import { render } from '../../test-utils';
+import { Platform } from '../../platform-components';
+
+// LS-9364's CSS Grid assertion checks an inline `display: grid` /
+// `gridTemplateColumns` style. Those keys have no React Native equivalent and
+// are stripped by `csp()` on native (see crossPlatformStyle.ts), so the
+// assertion is meaningful on web only — same pattern as
+// PlayersStatsTable.spec.tsx's `describeWeb`.
+const itWeb = Platform.OS === 'web' ? it : it.skip;
 
 describe('LoadingScreen (LS-4647 / LS-9060)', () => {
   it('renders the layout shell with topband, main, and rail skeletons', () => {
@@ -45,6 +53,24 @@ describe('LoadingScreen (LS-4647 / LS-9060)', () => {
     const grid = getByTestId('draft-loading-player-grid');
     expect(grid.children.length).toBe(9);
   });
+
+  // LS-9364: the skeleton grid must use the same CSS Grid template as the
+  // real player-pool grid (DraftPlayerBoard's `gridCols` for viewMode
+  // 'grid') — a `flexWrap` container gives each SkeletonCard no definite
+  // width for its percentage-width bars to resolve against, collapsing the
+  // card and reflowing the whole grid once real data replaces the skeleton.
+  itWeb(
+    'sizes the skeleton grid with the same CSS Grid template as the real player-pool grid',
+    () => {
+      const { getByTestId } = render(<LoadingScreen />);
+
+      const grid = getByTestId('draft-loading-player-grid');
+      expect(grid.style.display).toBe('grid');
+      expect(grid.style.gridTemplateColumns).toBe(
+        'repeat(auto-fill, minmax(320px, 1fr))',
+      );
+    },
+  );
 
   it('renders a stack of rail panel skeletons', () => {
     const { getAllByTestId } = render(<LoadingScreen />);
