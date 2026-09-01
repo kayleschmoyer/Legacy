@@ -742,7 +742,7 @@ describe('Chat and Tiebreakers Resolver', () => {
           mockContext,
           undefined as never,
         ),
-      ).rejects.toThrow('gifUrl must be an https URL');
+      ).rejects.toThrow('gifUrl must use HTTPS');
     });
 
     it('sends league message successfully', async () => {
