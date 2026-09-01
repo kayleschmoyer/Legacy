@@ -7,6 +7,7 @@ fragment MatchupPlayer on MatchupPlayer {
   season
   swapId
   numberOfGames
+  footballSeasonFppg
   player {
     id
     firstName

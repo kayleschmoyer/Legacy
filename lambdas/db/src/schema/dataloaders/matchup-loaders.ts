@@ -5,7 +5,12 @@
 import DataLoader from 'dataloader';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
+import {
+  type FootballScoringSettings,
+  getDefaultFootballScoringSettings,
+} from '@legacy-sports/scoring';
 import { withTransientRetry } from '../leagues/delete-resilience';
+import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 
 /**
  * DataLoader for locked team members by leagueId (LS-5955).
@@ -383,6 +388,38 @@ export const createMatchupMessagesLoader = (
       });
     }
     return keys.map((key) => messagesMap.get(key) ?? null);
+  });
+
+/**
+ * DataLoader for a league's football scoring settings (LS-6385).
+ * Key: leagueId (number)
+ * Returns: FootballScoringSettings, merged from the league's active scoring
+ *   profile (falling back to defaults) via getFootballScoringSettingsForLeague.
+ *
+ * Every player row in a given matchup roster shares the same leagueId, so
+ * batching collapses what would otherwise be one profile lookup per player
+ * into a single settings resolution per league.
+ */
+export const createFootballScoringSettingsLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, FootballScoringSettings>(async (keys) => {
+    const leagueIds = [...new Set(keys)] as number[];
+    const settingsByLeagueId = new Map(
+      await Promise.all(
+        leagueIds.map(
+          async (leagueId) =>
+            [
+              leagueId,
+              await getFootballScoringSettingsForLeague(db, leagueId),
+            ] as const,
+        ),
+      ),
+    );
+    return keys.map(
+      (key) =>
+        settingsByLeagueId.get(key) ?? getDefaultFootballScoringSettings(),
+    );
   });
 
 /**

@@ -1827,6 +1827,8 @@ export enum MatchupMessageType {
 /** A player selected for a specific matchup */
 export type MatchupPlayer = {
   __typename?: 'MatchupPlayer';
+  /** Average fantasy points per game for a football player's assigned matchup season, used to grade whether it's been a strong or weak season for them so far (the "Matchup Edge" chip). Not an opponent-specific matchup comparison — no defense-vs-position data source exists yet. Premium-gated (ENTITLEMENTS.football_projections); null for non-premium users, baseball players, or players with no assigned season. */
+  footballSeasonFppg?: Maybe<Scalars['Float']['output']>;
   games?: Maybe<Array<MatchupPlayerGame>>;
   id?: Maybe<Scalars['ID']['output']>;
   matchupId?: Maybe<Scalars['Int']['output']>;

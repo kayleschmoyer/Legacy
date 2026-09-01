@@ -38,6 +38,7 @@ import {
 } from './entity-loaders';
 
 import {
+  createFootballScoringSettingsLoader,
   createLeagueWeekPlayerSeasonsLoader,
   createLockedTeamMembersLoader,
   createMatchupMessagesLoader,
@@ -79,6 +80,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   matchupPlayersById: createMatchupPlayersLoader(db),
   matchupsById: createMatchupsLoader(db),
   leagueWeekPlayerSeasons: createLeagueWeekPlayerSeasonsLoader(db),
+  footballScoringSettingsByLeagueId: createFootballScoringSettingsLoader(db),
   selectedGamesCount: createSelectedGamesCountLoader(db),
   careerFielding: createCareerFieldingLoader(db),
   careerBatting: createCareerBattingLoader(db),

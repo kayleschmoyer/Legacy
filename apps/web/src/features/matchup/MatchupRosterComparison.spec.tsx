@@ -18,6 +18,7 @@ import {
 } from '@legacy-sports/graphql';
 import { MatchupRosterComparison } from './MatchupRosterComparison';
 import { useLeagueScoringSettings } from '../../lib/scoring';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -42,6 +43,10 @@ jest.mock('@legacy-sports/graphql', () => {
 
 jest.mock('../../lib/scoring', () => ({
   useLeagueScoringSettings: jest.fn(),
+}));
+
+jest.mock('../../hooks/useIsPremium', () => ({
+  useHasEntitlement: jest.fn(),
 }));
 
 jest.mock('./PlayerSeasonStatsModal', () => ({
@@ -163,6 +168,7 @@ describe('MatchupRosterComparison — bench toggle (LS-5904 / BMD-034)', () => {
       settings: { batting: {}, pitching: {}, fielding: {} },
       loading: false,
     });
+    (useHasEntitlement as jest.Mock).mockReturnValue(false);
   });
 
   it("shows each team's bench count separately when rosters are asymmetric", () => {
@@ -244,6 +250,7 @@ describe('MatchupRosterComparison — off-day vs no-data labeling (LS-9122)', ()
       settings: { batting: {}, pitching: {}, fielding: {} },
       loading: false,
     });
+    (useHasEntitlement as jest.Mock).mockReturnValue(false);
   });
 
   function makeGame(
@@ -400,6 +407,7 @@ describe('MatchupRosterComparison — football (LS-5418)', () => {
       settings: { batting: {}, pitching: {}, fielding: {} },
       loading: false,
     });
+    (useHasEntitlement as jest.Mock).mockReturnValue(false);
   });
 
   it('renders football position slot labels (QB, RB) instead of baseball ones', () => {
@@ -454,5 +462,134 @@ describe('MatchupRosterComparison — football (LS-5418)', () => {
     expect(mockOpenFootballPlayerDetailModal).toHaveBeenLastCalledWith(
       expect.objectContaining({ open: true, playerId: 901 }),
     );
+  });
+});
+
+/**
+ * Coverage for FMD-028 / LS-6385: the premium "Matchup Edge" grade chip,
+ * computed from the player's own real season-average fantasy points per game
+ * (MatchupPlayer.footballSeasonFppg, server-gated per LS-6385) — not an
+ * opponent-specific comparison.
+ */
+describe('MatchupRosterComparison — Matchup Edge grade chip (FMD-028 / LS-6385)', () => {
+  function makeFootballStarterWithFppg(
+    id: string,
+    teamId: number,
+    playerId: number,
+    positionId: number,
+    firstName: string,
+    footballSeasonFppg: number | null,
+  ): MatchupPlayerFragment {
+    return {
+      __typename: 'MatchupPlayer',
+      id,
+      matchupId: 1234,
+      playerId,
+      teamId,
+      positionId,
+      season: 2026,
+      numberOfGames: 1,
+      footballSeasonFppg,
+      player: {
+        __typename: 'Player',
+        firstName,
+        lastName: 'Player',
+        eligiblePositions: ['QB'],
+      },
+      seasonBatting: null,
+      seasonPitching: null,
+      seasonFielding: null,
+      games: [],
+    } as unknown as MatchupPlayerFragment;
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    (useGetPositionsForLeagueQuery as jest.Mock).mockReturnValue({
+      data: { leaguePositions: [{ id: 1, positionType: 'QB' }] },
+      loading: false,
+    });
+    (useGetLeagueTeamsQuery as jest.Mock).mockReturnValue({
+      data: {
+        leagueTeams: [
+          { id: 10, name: 'Team A' },
+          { id: 20, name: 'Team B' },
+        ],
+      },
+    });
+    (useLeagueScoringSettings as jest.Mock).mockReturnValue({
+      settings: { batting: {}, pitching: {}, fielding: {} },
+      loading: false,
+    });
+  });
+
+  it('shows the grade chip for a premium user with a season FPPG', () => {
+    (useHasEntitlement as jest.Mock).mockReturnValue(true);
+    const players: MatchupPlayerFragment[] = [
+      // 25 FPPG at QB clears the A+ band (min 24).
+      makeFootballStarterWithFppg('s1', 10, 901, 1, 'Pat', 25),
+      makeFootballStarterWithFppg('s2', 20, 902, 1, 'Chris', null),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+
+    render(
+      <MatchupRosterComparison
+        matchup={makeMatchup()}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(screen.getByText('A+')).toBeInTheDocument();
+  });
+
+  it('hides the grade chip for a non-premium user even with a season FPPG', () => {
+    (useHasEntitlement as jest.Mock).mockReturnValue(false);
+    const players: MatchupPlayerFragment[] = [
+      makeFootballStarterWithFppg('s1', 10, 901, 1, 'Pat', 25),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+
+    render(
+      <MatchupRosterComparison
+        matchup={makeMatchup()}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(screen.queryByText('A+')).not.toBeInTheDocument();
+  });
+
+  it('hides the grade chip when footballSeasonFppg is null (no season data yet)', () => {
+    (useHasEntitlement as jest.Mock).mockReturnValue(true);
+    const players: MatchupPlayerFragment[] = [
+      makeFootballStarterWithFppg('s1', 10, 901, 1, 'Pat', null),
+    ];
+    (useGetMatchupPlayersQuery as jest.Mock).mockReturnValue({
+      data: { getMatchupPlayers: players },
+      loading: false,
+      error: undefined,
+    });
+
+    render(
+      <MatchupRosterComparison
+        matchup={makeMatchup()}
+        sport={Sport.Football}
+      />,
+    );
+
+    expect(
+      screen.queryByTitle(
+        "Matchup Edge — grades this player's season scoring pace so far, not opponent strength",
+      ),
+    ).not.toBeInTheDocument();
   });
 });

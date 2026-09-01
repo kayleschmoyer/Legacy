@@ -15,6 +15,7 @@ import {
   MatchupWinProbabilityType,
   resolveMatchupWinProbability,
 } from './winProbability';
+import { getFootballPlayerSeasonAverage } from './football-season-projection';
 import { resolveMatchupLockTime } from './lockTime';
 import { builder } from '../builder';
 import { hasEntitlement } from '../authorization';
@@ -28,6 +29,9 @@ import {
   SeasonFieldingRef,
   SeasonPitchingRef,
 } from '../statistics';
+
+/** Football IDP position types (LS-6385), mirrors the isIdp derivation in matchupScores.ts. */
+const IDP_POSITION_TYPES = new Set(['DL', 'LB', 'DB', 'DP']);
 
 // Mirrors @legacy-sports/narrative's MatchupNarrativeResult shape. Used to
 // validate matchups.recap_json (an untyped jsonb column) when read back from
@@ -806,6 +810,70 @@ builder.objectType(MatchupPlayer, {
         } catch (err) {
           LOGGER.error(
             'Failed to resolve seasonFielding',
+            err instanceof Error ? err : new Error(String(err)),
+            {
+              matchupPlayerId: matchupPlayer.id,
+              playerId: matchupPlayer.playerId,
+              season: matchupPlayer.season,
+            },
+          );
+          return null;
+        }
+      },
+    }),
+
+    // Season-average fantasy points per game for football players (LS-6385).
+    footballSeasonFppg: t.float({
+      nullable: true,
+      description:
+        "Average fantasy points per game for a football player's assigned " +
+        "matchup season, used to grade whether it's been a strong or weak " +
+        'season for them so far (the "Matchup Edge" chip). Not an ' +
+        'opponent-specific matchup comparison — no defense-vs-position data ' +
+        'source exists yet. Premium-gated (ENTITLEMENTS.football_projections); ' +
+        'null for non-premium users, baseball players, or players with no ' +
+        'assigned season.',
+      resolve: async (matchupPlayer, _args, context) => {
+        if (!matchupPlayer.season) return null;
+        // Mirrors the ai_matchup_recap gate above: defense-in-depth behind the
+        // UI PremiumGate — an unauthenticated or free-tier caller gets null.
+        if (!context.user) return null;
+        try {
+          if (
+            !(await hasEntitlement(context, ENTITLEMENTS.football_projections))
+          ) {
+            return null;
+          }
+
+          const player = await context.loaders.players.load(
+            matchupPlayer.playerId,
+          );
+          if (!player || player.sport !== 'football') return null;
+
+          const matchup = await context.loaders.matchupsById.load(
+            matchupPlayer.matchupId,
+          );
+          if (!matchup) return null;
+
+          const settings =
+            await context.loaders.footballScoringSettingsByLeagueId.load(
+              matchup.leagueId,
+            );
+          const positionType = player.position ?? '';
+          const isIdp = IDP_POSITION_TYPES.has(positionType);
+
+          return await getFootballPlayerSeasonAverage(
+            context.db,
+            matchupPlayer.playerId,
+            matchupPlayer.season,
+            player.isDst,
+            isIdp,
+            settings,
+            positionType,
+          );
+        } catch (err) {
+          LOGGER.error(
+            'Failed to resolve footballSeasonFppg',
             err instanceof Error ? err : new Error(String(err)),
             {
               matchupPlayerId: matchupPlayer.id,

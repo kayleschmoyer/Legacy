@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
+import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   calculateMatchupProjection,
   computeScoring,
@@ -21,6 +22,7 @@ import {
 import { PlayerSeasonStatsModal } from './PlayerSeasonStatsModal';
 import { PlayerMatchupStatsModal } from './PlayerMatchupStatsModal';
 import { FootballPlayerDetailModal } from '../../components/FootballPlayerDetailModal';
+import { useHasEntitlement } from '../../hooks/useIsPremium';
 import { useLeagueScoringSettings } from '../../lib/scoring';
 import {
   mapBattingStats,
@@ -96,6 +98,97 @@ function getPositionGroup(
   if (['LF', 'CF', 'RF', 'OF'].includes(pos)) return 'outfield';
   if (pos === 'SP' || pos === 'RP') return 'pitcher';
   return 'utility';
+}
+
+// ── Matchup Edge grade (FMD-028 / LS-6385) ──────────────────────────────────
+//
+// Grades whether a football player's season has been strong or weak so far,
+// using their real season-average fantasy points per game (`footballSeasonFppg`,
+// computed server-side from actual season stat rows for the player's assigned
+// matchup season — see MatchupPlayer.footballSeasonFppg). This is NOT an
+// opponent-specific "defense rank vs position" comparison: no defense-vs-position
+// data source exists yet in this codebase, so the grade is scoped to what real
+// data actually supports — the player's own season pace.
+
+type GradeTier = 'green' | 'yellow' | 'red';
+
+interface MatchupGrade {
+  grade: string;
+  tier: GradeTier;
+}
+
+interface GradeBand {
+  min: number;
+  grade: string;
+  tier: GradeTier;
+}
+
+// Illustrative, round-number FPPG bands per football position group (standard
+// scoring scale). Not derived from a league-wide distribution — a reasonable
+// heuristic for "good/bad season", not a precise percentile rank.
+const MATCHUP_GRADE_BANDS: Partial<Record<PositionGroup, GradeBand[]>> = {
+  qb: [
+    { min: 24, grade: 'A+', tier: 'green' },
+    { min: 21, grade: 'A', tier: 'green' },
+    { min: 19, grade: 'A-', tier: 'green' },
+    { min: 17, grade: 'B+', tier: 'yellow' },
+    { min: 15, grade: 'B', tier: 'yellow' },
+    { min: 13, grade: 'B-', tier: 'yellow' },
+    { min: 11, grade: 'C+', tier: 'red' },
+    { min: 9, grade: 'C', tier: 'red' },
+    { min: 7, grade: 'C-', tier: 'red' },
+    { min: 5, grade: 'D', tier: 'red' },
+    { min: -Infinity, grade: 'F', tier: 'red' },
+  ],
+  skill: [
+    { min: 20, grade: 'A+', tier: 'green' },
+    { min: 17, grade: 'A', tier: 'green' },
+    { min: 14, grade: 'A-', tier: 'green' },
+    { min: 12, grade: 'B+', tier: 'yellow' },
+    { min: 10, grade: 'B', tier: 'yellow' },
+    { min: 8, grade: 'B-', tier: 'yellow' },
+    { min: 6, grade: 'C+', tier: 'red' },
+    { min: 4.5, grade: 'C', tier: 'red' },
+    { min: 3, grade: 'C-', tier: 'red' },
+    { min: 1.5, grade: 'D', tier: 'red' },
+    { min: -Infinity, grade: 'F', tier: 'red' },
+  ],
+  kicker: [
+    { min: 12, grade: 'A+', tier: 'green' },
+    { min: 11, grade: 'A', tier: 'green' },
+    { min: 10, grade: 'A-', tier: 'green' },
+    { min: 9, grade: 'B+', tier: 'yellow' },
+    { min: 8, grade: 'B', tier: 'yellow' },
+    { min: 7, grade: 'B-', tier: 'yellow' },
+    { min: 6, grade: 'C+', tier: 'red' },
+    { min: 5, grade: 'C', tier: 'red' },
+    { min: 4, grade: 'C-', tier: 'red' },
+    { min: 3, grade: 'D', tier: 'red' },
+    { min: -Infinity, grade: 'F', tier: 'red' },
+  ],
+  defense: [
+    { min: 14, grade: 'A+', tier: 'green' },
+    { min: 12, grade: 'A', tier: 'green' },
+    { min: 10, grade: 'A-', tier: 'green' },
+    { min: 8.5, grade: 'B+', tier: 'yellow' },
+    { min: 7, grade: 'B', tier: 'yellow' },
+    { min: 5.5, grade: 'B-', tier: 'yellow' },
+    { min: 4, grade: 'C+', tier: 'red' },
+    { min: 2.5, grade: 'C', tier: 'red' },
+    { min: 1, grade: 'C-', tier: 'red' },
+    { min: 0, grade: 'D', tier: 'red' },
+    { min: -Infinity, grade: 'F', tier: 'red' },
+  ],
+};
+
+function getMatchupGrade(
+  fppg: number,
+  group: PositionGroup,
+): MatchupGrade | null {
+  const bands = MATCHUP_GRADE_BANDS[group];
+  if (!bands) return null;
+  const band = bands.find((b) => fppg >= b.min);
+  return band ? { grade: band.grade, tier: band.tier } : null;
 }
 
 // ── Skeleton loading ─────────────────────────────────────────────────────
@@ -186,6 +279,12 @@ export function MatchupRosterComparison({
   sport,
 }: MatchupRosterComparisonProps) {
   const isFootball = sport === Sport.Football;
+  // Matchup Edge grade chip (FMD-028 / LS-6385) — gated behind the same
+  // entitlement as the other client-computed matchup projection surfaces on
+  // this page (MatchupWinProbabilityPanel).
+  const canSeeMatchupGrade = useHasEntitlement(
+    ENTITLEMENTS.football_projections,
+  );
 
   // Bench toggle state
   const [showBench, setShowBench] = useState(false);
@@ -930,6 +1029,10 @@ export function MatchupRosterComparison({
     const group = getPositionGroup(slotType ?? posLabel, isFootball);
     const statLine = formatAccumulatedStats(player);
     const lead = isLead ? ' mrc-lead' : '';
+    const matchupGrade =
+      isFootball && canSeeMatchupGrade && player.footballSeasonFppg != null
+        ? getMatchupGrade(player.footballSeasonFppg, group)
+        : null;
 
     return (
       <div className={`mrc-cell ${cls}${mine}${lead}`}>
@@ -951,6 +1054,14 @@ export function MatchupRosterComparison({
             >
               {player.player?.firstName} {player.player?.lastName}
             </button>
+            {matchupGrade && (
+              <span
+                className={`mrc-grade-chip mrc-grade-${matchupGrade.tier}`}
+                title="Matchup Edge — grades this player's season scoring pace so far, not opponent strength"
+              >
+                {matchupGrade.grade}
+              </span>
+            )}
           </div>
           <div className="mrc-pmeta">
             Season {player.season} •{' '}
