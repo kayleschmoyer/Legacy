@@ -535,7 +535,9 @@ TeamMember.implement({
     isLocked: t.boolean({
       nullable: true,
       description:
-        'True when this player has game selections recorded in the active matchup week and cannot be moved (LS-5955).',
+        "True when this player's team is in a started matchup for the " +
+        'active week (status other than `scheduled`) and cannot be moved ' +
+        '(LS-5955, LS-9405).',
       resolve: async (parent, _args, context) => {
         const { leagueId, teamId, playerId } = parent;
         if (!teamId) return false;

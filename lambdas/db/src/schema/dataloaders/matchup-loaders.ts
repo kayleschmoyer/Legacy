@@ -3,7 +3,7 @@
  */
 
 import DataLoader from 'dataloader';
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
 import {
   type FootballScoringSettings,
@@ -17,11 +17,22 @@ import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/serv
  *
  * Key: leagueId (number)
  * Returns: Set of "playerId:teamId" strings that are locked in the league's
- *   active matchup week (i.e. have at least one row in matchupPlayerGames).
+ *   active matchup week — i.e. every roster member of a team whose matchup
+ *   is no longer `scheduled` (`in_progress` or `completed`).
  *
- * Batches all leagueIds in a single request into three queries — one for
- * current-week resolution, one for legacy matchup FK fallback, and one for
- * the actual lock check — instead of N×3 queries (one set per TeamMember).
+ * This must stay aligned with the mutation-time authority,
+ * `checkPlayersNotLocked` (authorization.ts): both key off matchup status
+ * rather than `matchupPlayerGames` existence. The two used to disagree —
+ * this loader locked on stats-row existence while the mutation locked on
+ * matchup status — so a matchup could flip to `in_progress` before its
+ * first stats row landed, leaving the client's `isLocked` field (and the
+ * UI it disables) stale for that window while the server already rejected
+ * the swap (LS-9405, LS-9351).
+ *
+ * Batches all leagueIds in a single request into four queries — one for
+ * current-week resolution, one for legacy matchup FK fallback, one for
+ * started matchups, and one for the actual roster member lock check —
+ * instead of N×4 queries (one set per TeamMember).
  */
 export const createLockedTeamMembersLoader = (
   db: GenericDatabase<typeof PublicSchema>,
@@ -70,8 +81,9 @@ export const createLockedTeamMembersLoader = (
       if (week != null) leagueWeekMap.set(l.id, week);
     }
 
-    // Step 3: Fetch all locked (playerId, teamId) pairs for every active
-    //   league+week in a single query using OR conditions.
+    // Step 3: Find every team whose matchup has started (status !== 'scheduled')
+    //   for its league's active week, then lock every roster member of those
+    //   teams — the same authoritative signal `checkPlayersNotLocked` enforces.
     const lockedSets = new Map<number, Set<string>>();
     for (const leagueId of leagueIds) {
       lockedSets.set(leagueId, new Set<string>());
@@ -86,47 +98,48 @@ export const createLockedTeamMembersLoader = (
         ),
       );
 
-      const lockedRows = await db
-        .selectDistinct({
+      const startedMatchups = await db
+        .select({
           leagueId: PublicSchema.matchups.leagueId,
-          playerId: PublicSchema.matchupPlayers.playerId,
-          teamId: PublicSchema.matchupPlayers.teamId,
+          team1Id: PublicSchema.matchups.team1Id,
+          team2Id: PublicSchema.matchups.team2Id,
         })
-        .from(PublicSchema.matchupPlayerGames)
-        .innerJoin(
-          PublicSchema.matchupPlayers,
-          eq(
-            PublicSchema.matchupPlayerGames.matchupPlayerId,
-            PublicSchema.matchupPlayers.id,
-          ),
-        )
-        .innerJoin(
-          PublicSchema.matchups,
-          eq(PublicSchema.matchupPlayers.matchupId, PublicSchema.matchups.id),
-        )
+        .from(PublicSchema.matchups)
         .where(
-          and(
-            or(...orClauses),
-            or(
-              eq(
-                PublicSchema.matchups.team1Id,
-                PublicSchema.matchupPlayers.teamId,
-              ),
-              eq(
-                PublicSchema.matchups.team2Id,
-                PublicSchema.matchupPlayers.teamId,
-              ),
-            ),
-          ),
+          and(or(...orClauses), ne(PublicSchema.matchups.status, 'scheduled')),
         );
 
-      for (const row of lockedRows) {
-        if (
-          row.leagueId != null &&
-          row.playerId != null &&
-          row.teamId != null
-        ) {
-          lockedSets.get(row.leagueId)?.add(`${row.playerId}:${row.teamId}`);
+      const lockedTeamIdsByLeague = new Map<number, Set<number>>();
+      for (const m of startedMatchups) {
+        if (m.leagueId == null) continue;
+        const teamIds =
+          lockedTeamIdsByLeague.get(m.leagueId) ?? new Set<number>();
+        if (m.team1Id != null) teamIds.add(m.team1Id);
+        if (m.team2Id != null) teamIds.add(m.team2Id);
+        lockedTeamIdsByLeague.set(m.leagueId, teamIds);
+      }
+
+      const allLockedTeamIds = [
+        ...new Set([...lockedTeamIdsByLeague.values()].flatMap((s) => [...s])),
+      ];
+
+      if (allLockedTeamIds.length > 0) {
+        const memberRows = await db
+          .select({
+            teamId: PublicSchema.teamMembers.teamId,
+            playerId: PublicSchema.teamMembers.playerId,
+          })
+          .from(PublicSchema.teamMembers)
+          .where(inArray(PublicSchema.teamMembers.teamId, allLockedTeamIds));
+
+        for (const [leagueId, teamIds] of lockedTeamIdsByLeague) {
+          const lockedSet = lockedSets.get(leagueId);
+          if (!lockedSet) continue;
+          for (const row of memberRows) {
+            if (row.teamId != null && teamIds.has(row.teamId)) {
+              lockedSet.add(`${row.playerId}:${row.teamId}`);
+            }
+          }
         }
       }
     }

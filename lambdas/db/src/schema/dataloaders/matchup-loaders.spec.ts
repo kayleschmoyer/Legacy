@@ -1,10 +1,11 @@
 /**
  * Unit tests for createLockedTeamMembersLoader (LS-5955).
  *
- * Verifies the three-step batching logic:
+ * Verifies the four-step batching logic:
  *  1. league row fetch (currentWeek / currentMatchup)
  *  2. legacy matchup FK fallback (only when currentWeek is null)
- *  3. single locked-players query across all active leagues
+ *  3. started-matchups query across all active leagues
+ *  4. roster members of the locked teams from step 3
  */
 
 jest.mock('@legacy-sports/db-client', () => ({
@@ -20,6 +21,11 @@ jest.mock('@legacy-sports/db-client', () => ({
       leagueId: 'matchups.leagueId',
       team1Id: 'matchups.team1Id',
       team2Id: 'matchups.team2Id',
+      status: 'matchups.status',
+    },
+    teamMembers: {
+      teamId: 'teamMembers.teamId',
+      playerId: 'teamMembers.playerId',
     },
     matchupPlayers: {
       id: 'matchupPlayers.id',
@@ -86,8 +92,10 @@ describe('createLockedTeamMembersLoader (LS-5955)', () => {
       // Step 1: league rows
       () => [{ id: 1, currentWeek: 3, currentMatchup: null }],
       // Step 2: no legacy matchup lookup needed (currentWeek is set)
-      // Step 3: locked player rows
-      () => [{ leagueId: 1, playerId: 42, teamId: 7 }],
+      // Step 3a: started matchups (status !== 'scheduled')
+      () => [{ leagueId: 1, team1Id: 7, team2Id: null }],
+      // Step 3b: roster members of the locked teams
+      () => [{ teamId: 7, playerId: 42 }],
     ]);
 
     const loader = createLockedTeamMembersLoader(db);
@@ -104,20 +112,23 @@ describe('createLockedTeamMembersLoader (LS-5955)', () => {
       () => [{ id: 2, currentWeek: null, currentMatchup: 99 }],
       // Step 2: resolve weekNumber from matchup
       () => [{ id: 99, weekNumber: 5 }],
-      // Step 3: locked players
-      () => [{ leagueId: 2, playerId: 10, teamId: 3 }],
+      // Step 3a: started matchups
+      () => [{ leagueId: 2, team1Id: 3, team2Id: null }],
+      // Step 3b: roster members
+      () => [{ teamId: 3, playerId: 10 }],
     ]);
 
     const loader = createLockedTeamMembersLoader(db);
     const result = await loader.load(2);
 
-    expect(queryCalls).toHaveLength(3);
+    expect(queryCalls).toHaveLength(4);
     expect(result.has('10:3')).toBe(true);
   });
 
-  it('returns an empty set when no players are locked', async () => {
-    const { db } = makeMockDb([
+  it('returns an empty set when no matchups have started', async () => {
+    const { db, queryCalls } = makeMockDb([
       () => [{ id: 5, currentWeek: 1, currentMatchup: null }],
+      // Step 3a: no started matchups — step 3b is skipped entirely
       () => [],
     ]);
 
@@ -126,6 +137,7 @@ describe('createLockedTeamMembersLoader (LS-5955)', () => {
 
     expect(result).toBeInstanceOf(Set);
     expect(result.size).toBe(0);
+    expect(queryCalls).toHaveLength(2);
   });
 
   it('returns an empty set when league has no active week', async () => {
@@ -148,20 +160,52 @@ describe('createLockedTeamMembersLoader (LS-5955)', () => {
         { id: 10, currentWeek: 2, currentMatchup: null },
         { id: 11, currentWeek: 4, currentMatchup: null },
       ],
-      // Step 3: locked players for both leagues
+      // Step 3a: started matchups for both leagues
       () => [
-        { leagueId: 10, playerId: 1, teamId: 100 },
-        { leagueId: 11, playerId: 2, teamId: 200 },
+        { leagueId: 10, team1Id: 100, team2Id: null },
+        { leagueId: 11, team1Id: 200, team2Id: null },
+      ],
+      // Step 3b: roster members of both locked teams
+      () => [
+        { teamId: 100, playerId: 1 },
+        { teamId: 200, playerId: 2 },
       ],
     ]);
 
     const loader = createLockedTeamMembersLoader(db);
     const [r10, r11] = await Promise.all([loader.load(10), loader.load(11)]);
 
-    // Only 2 queries (step 2 skipped — both leagues have currentWeek)
-    expect(queryCalls).toHaveLength(2);
+    // 3 queries (step 2 skipped — both leagues have currentWeek)
+    expect(queryCalls).toHaveLength(3);
     expect(r10.has('1:100')).toBe(true);
     expect(r11.has('2:200')).toBe(true);
+  });
+
+  it('locks every roster member of a started matchup team, even those with no stats rows yet (LS-9405)', async () => {
+    // Regression: previously this loader locked only players with an
+    // existing `matchupPlayerGames` row, so a matchup that had just flipped
+    // to `in_progress` (but had not yet had stats ingested) reported every
+    // player as unlocked, letting the client allow a swap the mutation-time
+    // `checkPlayersNotLocked` check then rejected.
+    const { db } = makeMockDb([
+      () => [{ id: 1, currentWeek: 3, currentMatchup: null }],
+      // Matchup has started for team 7, but no stats/game rows exist yet.
+      () => [{ leagueId: 1, team1Id: 7, team2Id: 8 }],
+      // Both teams' full rosters come back locked regardless of stats.
+      () => [
+        { teamId: 7, playerId: 42 },
+        { teamId: 7, playerId: 43 },
+        { teamId: 8, playerId: 99 },
+      ],
+    ]);
+
+    const loader = createLockedTeamMembersLoader(db);
+    const result = await loader.load(1);
+
+    expect(result.has('42:7')).toBe(true);
+    expect(result.has('43:7')).toBe(true);
+    expect(result.has('99:8')).toBe(true);
+    expect(result.size).toBe(3);
   });
 });
 

@@ -4786,7 +4786,7 @@ export type TeamMember = {
   /** Free-text asking price displayed on the trade block listing. Null when not set. */
   askingPrice?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['Int']['output']>;
-  /** True when this player has game selections recorded in the active matchup week and cannot be moved (LS-5955). */
+  /** True when this player's team is in a started matchup for the active week (status other than `scheduled`) and cannot be moved (LS-5955, LS-9405). */
   isLocked?: Maybe<Scalars['Boolean']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
   /** Optional custom nickname for this player on this roster. (LS-1813) */
