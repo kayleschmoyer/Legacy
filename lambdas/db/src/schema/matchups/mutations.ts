@@ -32,6 +32,7 @@ import {
 import { getFootballPlayerSeasonAverage } from './football-season-projection';
 import { getFootballScoringSettingsForLeague } from '@legacy-sports/scoring/server';
 import { computeFootballGamePoints } from './matchupScores';
+import { assertPositionAssignmentsEligible } from '../position-eligibility';
 import { builder, Context } from '../builder';
 import {
   checkAdminInDb,
@@ -966,6 +967,14 @@ builder.mutationField('swapMatchupPlayerPositions', (t) =>
       }
 
       const db = context.db;
+
+      // Slot-eligibility gate (LS-6372 / LS-6427) — shared with
+      // updateTeamMemberPosition / swapTeamMemberPositions so the rule is
+      // enforced identically everywhere a position gets assigned.
+      await assertPositionAssignmentsEligible(db, matchupA.leagueId, [
+        { playerId: playerA.playerId, positionId: positionIdA ?? null },
+        { playerId: playerB.playerId, positionId: positionIdB ?? null },
+      ]);
 
       const results = await performMatchupPlayerPositionSwap(db, {
         matchupIdA: matchupA.id,
