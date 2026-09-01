@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { YStack } from 'tamagui';
 import { Platform } from 'react-native';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { LOGGER } from '@legacy-sports/logging';
-import { useDeleteAllLeaguesMutation } from '@legacy-sports/graphql';
+import {
+  type GetUserLeaguesQuery,
+  useDeleteLeagueMutation,
+  useGetUserLeaguesQuery,
+} from '@legacy-sports/graphql';
 import {
   BG_DARK,
+  BLACK,
   BORDER_STRONG,
   BRAND_GOLD,
   BRAND_GOLD_LIGHT,
@@ -18,6 +23,7 @@ import {
   TEXT_INTERFACE,
   TEXT_SECONDARY,
   TEXT_TERTIARY,
+  withAlpha,
 } from '../../constants/colors';
 
 const FONT_DISPLAY = "'Big Shoulders Display', system-ui, sans-serif";
@@ -31,6 +37,13 @@ const DELETION_TIMEOUT_MS = 30_000;
 
 type DialogStep = 'none' | 'confirm1' | 'confirm2' | 'deleting';
 
+type UserLeague = GetUserLeaguesQuery['userLeagues'][number];
+// userLeagues.id is typed nullable by the generated schema, but every row
+// returned by the resolver is a real league with a real id.
+interface SelectableLeague extends Omit<UserLeague, 'id'> {
+  id: number;
+}
+
 export const LeagueManagement: React.FC = () => {
   const { user } = useAuth();
   const isAdmin = user?.accessLevel === 'admin';
@@ -39,14 +52,66 @@ export const LeagueManagement: React.FC = () => {
   const [showError, setShowError] = useState(true);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<number>>(
+    new Set(),
+  );
 
-  const [deleteAllLeagues, { loading, error }] = useDeleteAllLeaguesMutation();
+  const {
+    data: leaguesData,
+    loading: leaguesLoading,
+    refetch: refetchLeagues,
+  } = useGetUserLeaguesQuery();
+  const leagues = useMemo(
+    (): SelectableLeague[] =>
+      (leaguesData?.userLeagues ?? []).filter(
+        (l): l is SelectableLeague => l.id != null,
+      ),
+    [leaguesData],
+  );
+
+  // Non-admins may only delete leagues they own — the resolver enforces the
+  // same rule server-side, so a non-owned league is shown but not selectable
+  // rather than surfacing a delete failure after the fact.
+  const isSelectable = (league: SelectableLeague) =>
+    isAdmin || league.owner === user?.id;
+  const selectableLeagues = useMemo(
+    () => leagues.filter(isSelectable),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isSelectable closes over isAdmin/user.id, both already deps
+    [leagues, isAdmin, user?.id],
+  );
+
+  const [deleteLeague, { loading, error }] = useDeleteLeagueMutation();
   const isBusy = loading || dialog === 'deleting';
+
+  const toggleLeague = (leagueId: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(leagueId)) {
+        next.delete(leagueId);
+      } else {
+        next.add(leagueId);
+      }
+      return next;
+    });
+  };
+
+  const allSelectableSelected =
+    selectableLeagues.length > 0 &&
+    selectableLeagues.every((l) => selectedIds.has(l.id));
+  const toggleSelectAll = () => {
+    setSelectedIds(
+      allSelectableSelected
+        ? new Set()
+        : new Set(selectableLeagues.map((l) => l.id)),
+    );
+  };
+
+  const selectedLeagues = leagues.filter((l) => selectedIds.has(l.id));
 
   const openConfirm1 = () => {
     setLocalError(null);
     setDialog('confirm1');
-    setLiveMsg('Delete all leagues dialog opened.');
+    setLiveMsg('Delete leagues dialog opened.');
   };
   const goConfirm2 = () => {
     setDialog('confirm2');
@@ -60,7 +125,7 @@ export const LeagueManagement: React.FC = () => {
   const handleFinalConfirm = () => {
     setDialog('deleting');
     setLocalError(null);
-    setLiveMsg('Deleting all leagues has started.');
+    setLiveMsg('Deleting selected leagues has started.');
 
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(
@@ -69,52 +134,82 @@ export const LeagueManagement: React.FC = () => {
       ),
     );
 
+    const idsToDelete = Array.from(selectedIds);
+
     void Promise.race([
-      deleteAllLeagues({
-        // Admins are shown the explicit member-of warning and pass through the
-        // two-step confirmation, so opt them into the system-wide purge here.
-        // Non-admins delete owner-only. The mutation defaults to owner-only when
-        // the flag is omitted, so this is the only place the broad variant is
-        // ever requested (LS-8240).
-        variables: { systemWide: isAdmin },
-        refetchQueries: ['GetUserLeagues'],
-        awaitRefetchQueries: true,
-      }),
+      Promise.allSettled(
+        idsToDelete.map((leagueId) =>
+          deleteLeague({ variables: { leagueId } }),
+        ),
+      ),
       timeoutPromise,
     ])
-      .then(() => {
+      .then(async (settled) => {
+        const failures = settled.filter((r) => r.status === 'rejected');
+
+        // One refetch for the whole batch, not one per mutation — deleting N
+        // leagues in parallel previously fired N redundant refetches of the
+        // same query. Only worth refetching if at least one delete landed.
+        if (failures.length < idsToDelete.length) {
+          await refetchLeagues();
+        }
+
         setDialog('none');
-        setShowError(false);
-        setSuccessMsg('All leagues have been deleted successfully.');
-        setLiveMsg('All leagues deleted successfully.');
-        LOGGER.info('deleteAllLeagues mutation succeeded');
+        setSelectedIds(new Set());
+
+        if (failures.length === 0) {
+          setShowError(false);
+          setSuccessMsg(
+            idsToDelete.length === 1
+              ? 'The selected league has been deleted successfully.'
+              : `${idsToDelete.length} leagues have been deleted successfully.`,
+          );
+          setLiveMsg('Selected leagues deleted successfully.');
+          LOGGER.info('deleteLeague mutation succeeded', {
+            count: idsToDelete.length,
+          });
+        } else {
+          const message =
+            failures.length === idsToDelete.length
+              ? 'Unable to delete the selected leagues. Your leagues are still intact.'
+              : `${idsToDelete.length - failures.length} of ${idsToDelete.length} leagues were deleted. ${failures.length} could not be deleted.`;
+          setShowError(true);
+          setLocalError(message);
+          setLiveMsg(
+            'Unable to delete some leagues. See the error card for details.',
+          );
+          LOGGER.error(
+            'deleteLeague mutation failed for some leagues',
+            new Error(message),
+            { failureCount: failures.length, total: idsToDelete.length },
+          );
+        }
       })
       .catch((err: Error) => {
         setDialog('none');
         setShowError(true);
         setLocalError(err.message);
         setLiveMsg('Unable to delete leagues. See the error card for details.');
-        LOGGER.error('deleteAllLeagues mutation failed', err);
+        LOGGER.error('deleteLeague mutation failed', err);
       });
   };
 
   const adminWarning = (
     <>
       <strong style={{ fontWeight: 600, color: FG_STRONG }}>
-        All leagues you are a member of will be deleted
+        As an admin, you can select any league to delete
       </strong>{' '}
-      — both the leagues you own and the leagues you have joined. As an admin,
-      this purge is absolute and applies across every era and division on your
-      account.
+      — both the leagues you own and the leagues you have joined. Deletion is
+      absolute and applies across every era and division on the account.
     </>
   );
   const memberWarning = (
     <>
       <strong style={{ fontWeight: 600, color: FG_STRONG }}>
-        Only leagues you own will be deleted.
+        You can only select and delete leagues you own.
       </strong>{' '}
-      Leagues you have joined as a manager but do not own will remain intact —
-      your spot in those leagues stays open.
+      Leagues you have joined as a manager but do not own are shown but cannot
+      be deleted here — your spot in those leagues stays open.
     </>
   );
 
@@ -483,6 +578,19 @@ export const LeagueManagement: React.FC = () => {
                 >
                   {isAdmin ? adminWarning : memberWarning}
                 </p>
+
+                <LeagueSelectionList
+                  loading={leaguesLoading}
+                  leagues={leagues}
+                  selectedIds={selectedIds}
+                  isSelectable={isSelectable}
+                  allSelectableSelected={allSelectableSelected}
+                  hasSelectable={selectableLeagues.length > 0}
+                  onToggleLeague={toggleLeague}
+                  onToggleSelectAll={toggleSelectAll}
+                  disabled={isBusy}
+                />
+
                 <div
                   style={{
                     display: 'flex',
@@ -509,7 +617,7 @@ export const LeagueManagement: React.FC = () => {
                     type="button"
                     className="lm-btn lm-btn-danger"
                     onClick={openConfirm1}
-                    disabled={isBusy}
+                    disabled={isBusy || selectedIds.size === 0}
                     aria-busy={isBusy}
                   >
                     {isBusy ? (
@@ -517,7 +625,11 @@ export const LeagueManagement: React.FC = () => {
                     ) : (
                       <TrashIcon size={16} />
                     )}
-                    {isBusy ? 'Deleting…' : 'Delete All Leagues'}
+                    {isBusy
+                      ? 'Deleting…'
+                      : selectedIds.size > 0
+                        ? `Delete Selected (${selectedIds.size})`
+                        : 'Delete Selected'}
                   </button>
                 </div>
               </div>
@@ -600,7 +712,7 @@ export const LeagueManagement: React.FC = () => {
       {dialog !== 'none' && (
         <DeleteDialog
           step={dialog}
-          isAdmin={!!isAdmin}
+          selectedLeagueNames={selectedLeagues.map((l) => l.name ?? 'League')}
           onCancel={cancelDialog}
           onContinue={goConfirm2}
           onConfirm={handleFinalConfirm}
@@ -610,13 +722,157 @@ export const LeagueManagement: React.FC = () => {
   );
 };
 
+interface LeagueSelectionListProps {
+  loading: boolean;
+  leagues: SelectableLeague[];
+  selectedIds: ReadonlySet<number>;
+  isSelectable: (league: SelectableLeague) => boolean;
+  allSelectableSelected: boolean;
+  hasSelectable: boolean;
+  onToggleLeague: (leagueId: number) => void;
+  onToggleSelectAll: () => void;
+  disabled: boolean;
+}
+
+const LeagueSelectionList: React.FC<LeagueSelectionListProps> = ({
+  loading,
+  leagues,
+  selectedIds,
+  isSelectable,
+  allSelectableSelected,
+  hasSelectable,
+  onToggleLeague,
+  onToggleSelectAll,
+  disabled,
+}) => {
+  const listStyle: React.CSSProperties = {
+    border: `1px solid ${PANEL_BORDER}`,
+    borderRadius: 12,
+    background: withAlpha(BLACK, 0.2),
+    marginBottom: 20,
+    overflow: 'hidden',
+  };
+  const rowStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 14px',
+    fontFamily: FONT_BODY,
+    fontSize: 14,
+    color: FG2,
+    borderBottom: `1px solid ${PANEL_BORDER}`,
+  };
+  // Tamagui's global reset (`@tamagui/core/reset.css`) applies `all: unset`
+  // to every <input>, which strips the native checkbox appearance and
+  // collapses it to a 0×0, invisible, unclickable box — explicit sizing and
+  // `appearance` restore it. jsdom (unit tests) doesn't load that stylesheet,
+  // so this only reproduces in a real browser.
+  const checkboxStyle: React.CSSProperties = {
+    appearance: 'auto',
+    width: 16,
+    height: 16,
+    flexShrink: 0,
+  };
+
+  if (loading) {
+    return (
+      <div style={listStyle}>
+        <p style={{ ...rowStyle, borderBottom: 'none', color: TEXT_TERTIARY }}>
+          Loading your leagues…
+        </p>
+      </div>
+    );
+  }
+
+  if (leagues.length === 0) {
+    return (
+      <div style={listStyle}>
+        <p style={{ ...rowStyle, borderBottom: 'none', color: TEXT_TERTIARY }}>
+          You have no leagues to delete.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={listStyle} role="group" aria-label="Select leagues to delete">
+      <label
+        style={{
+          ...rowStyle,
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 700,
+          fontSize: 11,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: TEXT_SECONDARY,
+          cursor: hasSelectable && !disabled ? 'pointer' : 'default',
+        }}
+      >
+        <input
+          type="checkbox"
+          style={checkboxStyle}
+          checked={allSelectableSelected}
+          onChange={onToggleSelectAll}
+          disabled={!hasSelectable || disabled}
+          aria-label="Select all leagues"
+        />
+        Select all
+      </label>
+      {leagues.map((league) => {
+        const selectable = isSelectable(league);
+        const checked = selectedIds.has(league.id);
+        return (
+          <label
+            key={league.id}
+            style={{
+              ...rowStyle,
+              cursor: selectable && !disabled ? 'pointer' : 'default',
+              opacity: selectable ? 1 : 0.55,
+            }}
+          >
+            <input
+              type="checkbox"
+              style={checkboxStyle}
+              checked={checked}
+              onChange={() => onToggleLeague(league.id)}
+              disabled={!selectable || disabled}
+              aria-label={`Select ${league.name ?? 'league'} for deletion`}
+            />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              {league.name ?? 'Untitled league'}
+              {league.sport && (
+                <span
+                  style={{
+                    marginLeft: 8,
+                    fontSize: 11,
+                    letterSpacing: '0.06em',
+                    textTransform: 'uppercase',
+                    color: TEXT_TERTIARY,
+                  }}
+                >
+                  {league.sport}
+                </span>
+              )}
+            </span>
+            {!selectable && (
+              <span style={{ fontSize: 11, color: TEXT_TERTIARY }}>
+                not yours to delete
+              </span>
+            )}
+          </label>
+        );
+      })}
+    </div>
+  );
+};
+
 interface ConsequenceListProps {
   isAdmin: boolean;
 }
 const ConsequenceList: React.FC<ConsequenceListProps> = ({ isAdmin }) => {
   const scopeItem = isAdmin
-    ? 'All leagues you are a member of (owned or joined)'
-    : 'All leagues you own';
+    ? 'Each league you select (owned or joined)'
+    : 'Each league you own that you select';
   const items = [
     scopeItem,
     'All teams in those leagues',
@@ -703,22 +959,36 @@ const ConsequenceList: React.FC<ConsequenceListProps> = ({ isAdmin }) => {
   );
 };
 
+// Long selections are summarized as "X, Y and N more" so the dialog body
+// stays a fixed height instead of growing unboundedly with the selection.
+const MAX_NAMES_SHOWN = 3;
+function summarizeSelection(names: string[]): string {
+  if (names.length === 1) return `“${names[0]}”`;
+  if (names.length <= MAX_NAMES_SHOWN) {
+    return names.map((n) => `“${n}”`).join(', ');
+  }
+  const shown = names.slice(0, MAX_NAMES_SHOWN).map((n) => `“${n}”`);
+  return `${shown.join(', ')} and ${names.length - MAX_NAMES_SHOWN} more`;
+}
+
 interface DeleteDialogProps {
   step: Exclude<DialogStep, 'none'>;
-  isAdmin: boolean;
+  selectedLeagueNames: string[];
   onCancel: () => void;
   onContinue: () => void;
   onConfirm: () => void;
 }
 const DeleteDialog: React.FC<DeleteDialogProps> = ({
   step,
-  isAdmin,
+  selectedLeagueNames,
   onCancel,
   onContinue,
   onConfirm,
 }) => {
   const isFinal = step === 'confirm2' || step === 'deleting';
   const isDeleting = step === 'deleting';
+  const count = selectedLeagueNames.length;
+  const leaguesWord = count === 1 ? 'league' : 'leagues';
 
   // Trap basic escape-to-cancel
   React.useEffect(() => {
@@ -739,14 +1009,14 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
   const body =
     step === 'confirm1' ? (
       <p style={dialogBodyText}>
-        You&rsquo;re about to delete{' '}
-        {isAdmin ? 'all leagues you are a member of' : 'all leagues you own'}.
-        This is the first of two confirmations.
+        You&rsquo;re about to delete {count} {leaguesWord}:{' '}
+        {summarizeSelection(selectedLeagueNames)}. This is the first of two
+        confirmations.
       </p>
     ) : step === 'confirm2' ? (
       <p style={dialogBodyText}>
-        Your leagues, rosters, and standings will be permanently removed. There
-        is no recovery — not even from a backup.
+        The selected {leaguesWord}, their rosters, and standings will be
+        permanently removed. There is no recovery — not even from a backup.
       </p>
     ) : (
       <p style={dialogBodyText}>
@@ -863,10 +1133,8 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
                 You will lose
               </strong>
               <span>
-                ·{' '}
-                {isAdmin
-                  ? 'All leagues you are a member of (owned or joined)'
-                  : 'All leagues you own'}
+                · {count} {leaguesWord} selected:{' '}
+                {summarizeSelection(selectedLeagueNames)}
               </span>
               <span>· All teams, rosters, and lineups</span>
               <span>· All standings and league history</span>
@@ -911,7 +1179,7 @@ const DeleteDialog: React.FC<DeleteDialogProps> = ({
               autoFocus
             >
               <TrashIcon size={16} />
-              Yes, Delete Everything
+              Yes, Delete Selected
             </button>
           )}
           {step === 'deleting' && (

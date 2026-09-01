@@ -6839,6 +6839,15 @@ export type DeleteAllLeaguesMutation = {
   deleteAllLeagues?: string | null;
 };
 
+export type DeleteLeagueMutationVariables = Exact<{
+  leagueId: Scalars['Int']['input'];
+}>;
+
+export type DeleteLeagueMutation = {
+  __typename?: 'Mutation';
+  deleteLeague?: string | null;
+};
+
 export type StartDraftMutationVariables = Exact<{
   leagueId: Scalars['Int']['input'];
   selectionMethod?: InputMaybe<Scalars['String']['input']>;
@@ -9947,15 +9956,6 @@ export type RecalculateLeagueMatchupScoresMutation = {
     matchupsRecalculated?: number | null;
     matchupsFailed?: number | null;
   } | null;
-};
-
-export type DeleteLeagueMutationVariables = Exact<{
-  leagueId: Scalars['Int']['input'];
-}>;
-
-export type DeleteLeagueMutation = {
-  __typename?: 'Mutation';
-  deleteLeague?: string | null;
 };
 
 export type AchievementRestrictionFragment = {
@@ -20047,6 +20047,54 @@ export type DeleteAllLeaguesMutationOptions = BaseMutationOptions<
   DeleteAllLeaguesMutation,
   DeleteAllLeaguesMutationVariables
 >;
+export const DeleteLeague = gql`
+  mutation DeleteLeague($leagueId: Int!) {
+    deleteLeague(leagueId: $leagueId)
+  }
+`;
+export type DeleteLeagueMutationFn = MutationFunction<
+  DeleteLeagueMutation,
+  DeleteLeagueMutationVariables
+>;
+
+/**
+ * __useDeleteLeagueMutation__
+ *
+ * To run a mutation, you first call `useDeleteLeagueMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useDeleteLeagueMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [deleteLeagueMutation, { data, loading, error }] = useDeleteLeagueMutation({
+ *   variables: {
+ *      leagueId: // value for 'leagueId'
+ *   },
+ * });
+ */
+export function useDeleteLeagueMutation(
+  baseOptions?: Apollo.MutationHookOptions<
+    DeleteLeagueMutation,
+    DeleteLeagueMutationVariables
+  >,
+) {
+  const options = { ...defaultOptions, ...baseOptions };
+  return Apollo.useMutation<
+    DeleteLeagueMutation,
+    DeleteLeagueMutationVariables
+  >(DeleteLeague, options);
+}
+export type DeleteLeagueMutationHookResult = ReturnType<
+  typeof useDeleteLeagueMutation
+>;
+export type DeleteLeagueMutationResult =
+  Apollo.MutationResult<DeleteLeagueMutation>;
+export type DeleteLeagueMutationOptions = BaseMutationOptions<
+  DeleteLeagueMutation,
+  DeleteLeagueMutationVariables
+>;
 export const StartDraft = gql`
   mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
     startDraft(leagueId: $leagueId, selectionMethod: $selectionMethod) {
@@ -25711,54 +25759,6 @@ export type RecalculateLeagueMatchupScoresMutationResult =
 export type RecalculateLeagueMatchupScoresMutationOptions = BaseMutationOptions<
   RecalculateLeagueMatchupScoresMutation,
   RecalculateLeagueMatchupScoresMutationVariables
->;
-export const DeleteLeague = gql`
-  mutation DeleteLeague($leagueId: Int!) {
-    deleteLeague(leagueId: $leagueId)
-  }
-`;
-export type DeleteLeagueMutationFn = MutationFunction<
-  DeleteLeagueMutation,
-  DeleteLeagueMutationVariables
->;
-
-/**
- * __useDeleteLeagueMutation__
- *
- * To run a mutation, you first call `useDeleteLeagueMutation` within a React component and pass it any options that fit your needs.
- * When your component renders, `useDeleteLeagueMutation` returns a tuple that includes:
- * - A mutate function that you can call at any time to execute the mutation
- * - An object with fields that represent the current status of the mutation's execution
- *
- * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
- *
- * @example
- * const [deleteLeagueMutation, { data, loading, error }] = useDeleteLeagueMutation({
- *   variables: {
- *      leagueId: // value for 'leagueId'
- *   },
- * });
- */
-export function useDeleteLeagueMutation(
-  baseOptions?: Apollo.MutationHookOptions<
-    DeleteLeagueMutation,
-    DeleteLeagueMutationVariables
-  >,
-) {
-  const options = { ...defaultOptions, ...baseOptions };
-  return Apollo.useMutation<
-    DeleteLeagueMutation,
-    DeleteLeagueMutationVariables
-  >(DeleteLeague, options);
-}
-export type DeleteLeagueMutationHookResult = ReturnType<
-  typeof useDeleteLeagueMutation
->;
-export type DeleteLeagueMutationResult =
-  Apollo.MutationResult<DeleteLeagueMutation>;
-export type DeleteLeagueMutationOptions = BaseMutationOptions<
-  DeleteLeagueMutation,
-  DeleteLeagueMutationVariables
 >;
 export const GetAchievementRestrictions = gql`
   query GetAchievementRestrictions($leagueId: Int!) {

@@ -36,6 +36,10 @@ mutation DeleteAllLeagues($systemWide: Boolean) {
   deleteAllLeagues(systemWide: $systemWide)
 }
 
+mutation DeleteLeague($leagueId: Int!) {
+  deleteLeague(leagueId: $leagueId)
+}
+
 mutation StartDraft($leagueId: Int!, $selectionMethod: String) {
   startDraft(leagueId: $leagueId, selectionMethod: $selectionMethod) {
     ...League

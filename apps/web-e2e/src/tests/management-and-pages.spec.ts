@@ -6,8 +6,8 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
-import { isGraphQLEndpoint } from '../mocks/graphql/router';
+import { userLeaguesResponse } from '../mocks/graphql';
+import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
 import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 /** URL predicate for the GraphQL API endpoint */
@@ -40,63 +40,86 @@ test.describe('Management Page — static elements @smoke', () => {
     await expect(page.getByText('Danger Zone', { exact: true })).toBeVisible();
   });
 
-  test('shows Delete All Leagues button', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: /delete all leagues/i }),
-    ).toBeVisible();
+  test('shows Delete Selected button, disabled until a league is checked', async ({
+    page,
+  }) => {
+    const deleteButton = page.getByRole('button', {
+      name: /delete selected/i,
+    });
+    await expect(deleteButton).toBeVisible();
+    await expect(deleteButton).toBeDisabled();
   });
 
-  test('shows Information card with ownership note', async ({ page }) => {
+  test('shows Information card explaining what gets deleted', async ({
+    page,
+  }) => {
     // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText (same as
     // LS-1174 fix for preferences/profile-settings)
     await expect(page.getByText('Information', { exact: true })).toBeVisible();
-    // Text varies by access level: admin sees "member of", non-admin sees "own"
+    await expect(page.getByText(/what gets deleted/i)).toBeVisible();
+  });
+
+  test('shows the ownership warning for the admin fixture user', async ({
+    page,
+  }) => {
+    // The default auth fixture (fixtures/auth.ts) authenticates as an admin
+    // (accessLevel: 'admin'), so the admin copy is what renders — a non-admin
+    // sees "You can only select and delete leagues you own." instead.
     await expect(
-      page.getByText(/leagues? (you own|you are a member of) will be deleted/i),
+      page.getByText(/as an admin, you can select any league to delete/i),
     ).toBeVisible();
   });
 });
 
-test.describe('Management Page — delete all leagues dialogs @regression', () => {
+test.describe('Management Page — selection delete dialogs @regression', () => {
   test.beforeEach(async ({ page }) => {
+    // auth-enhanced's own baseline returns an empty userLeagues list (there's
+    // nothing to select then), so override it with one league to exercise
+    // the selection UI — matching what fixtures/auth.ts (used by other
+    // management specs) does for the authenticated case.
+    await createGraphQLRouter(page, {
+      getuserleagues: (route) => fulfillJson(route, userLeaguesResponse()),
+    });
+
     await page.goto('/management');
     await page.waitForLoadState('load');
-    // Wait for the button to be ready
+    // Select the fixture's one league so Delete Selected is enabled — every
+    // test below opens the confirmation flow from that selected state.
+    const leagueCheckbox = page.getByRole('checkbox', {
+      name: /select test league for deletion/i,
+    });
+    await expect(leagueCheckbox).toBeVisible();
+    await leagueCheckbox.click();
     await expect(
-      page.getByRole('button', { name: /delete all leagues/i }),
-    ).toBeVisible();
+      page.getByRole('button', { name: /delete selected/i }),
+    ).toBeEnabled();
   });
 
-  test('clicking Delete All Leagues opens the first confirmation dialog', async ({
+  test('clicking Delete Selected opens the first confirmation dialog', async ({
     page,
   }) => {
-    await page.getByRole('button', { name: /delete all leagues/i }).click();
+    await page.getByRole('button', { name: /delete selected/i }).click();
 
     await expect(page.getByRole('alertdialog')).toBeVisible();
-    // Body text varies by access level:
-    // - admin: "You're about to delete all leagues you are a member of."
-    // - non-admin: "You're about to delete all leagues you own."
-    await expect(page.getByText(/about to delete all leagues/i)).toBeVisible();
+    await expect(page.getByText(/are you sure\?/i)).toBeVisible();
   });
 
-  test('first confirmation dialog lists affected data', async ({ page }) => {
-    await page.getByRole('button', { name: /delete all leagues/i }).click();
+  test('first confirmation dialog names the selected league', async ({
+    page,
+  }) => {
+    await page.getByRole('button', { name: /delete selected/i }).click();
 
     const dialog = page.locator('div[role="alertdialog"]');
     await expect(dialog).toBeVisible();
 
-    // Dialog body describes what will be deleted (text varies by access level)
-    await expect(
-      dialog
-        .getByText(/all leagues you own|all leagues you are a member of/i)
-        .first(),
-    ).toBeVisible();
+    // Dialog body quotes the actual selected league name, not blanket copy
+    await expect(dialog.getByText('Test League')).toBeVisible();
     // First dialog confirms it's step 1 of 2
     await expect(dialog.getByText(/first of two confirmations/i)).toBeVisible();
   });
 
   test('canceling from the first dialog closes it', async ({ page }) => {
-    await page.getByRole('button', { name: /delete all leagues/i }).click();
+    await page.getByRole('button', { name: /delete selected/i }).click();
 
     const dialog = page.locator('div[role="alertdialog"]');
     await expect(dialog).toBeVisible();
@@ -108,7 +131,7 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
   test('clicking Continue opens the final confirmation dialog', async ({
     page,
   }) => {
-    await page.getByRole('button', { name: /delete all leagues/i }).click();
+    await page.getByRole('button', { name: /delete selected/i }).click();
 
     const firstDialog = page.locator('div[role="alertdialog"]');
     await expect(firstDialog).toBeVisible();
@@ -127,7 +150,7 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     page,
   }) => {
     // Open first dialog
-    await page.getByRole('button', { name: /delete all leagues/i }).click();
+    await page.getByRole('button', { name: /delete selected/i }).click();
     const firstDialog = page.locator('div[role="alertdialog"]');
     await expect(firstDialog).toBeVisible();
 
@@ -142,29 +165,29 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
     await expect(finalDialog).not.toBeVisible();
   });
 
-  test('completing both dialogs calls the deleteAllLeagues mutation', async ({
+  test('completing both dialogs calls the deleteLeague mutation for the selected league only', async ({
     page,
   }) => {
     let mutationCalled = false;
+    let calledWithLeagueId: number | undefined;
 
-    await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('deleteallleagues')) {
+    // Exact operationName match (not a substring check) so this can't
+    // false-positive on an unrelated operation whose body happens to
+    // contain "deleteleague" — e.g. a `deleteAllLeagues` payload. Unhandled
+    // operations (getuserleagues included) fall through to the beforeEach's
+    // router.
+    await createGraphQLRouter(page, {
+      deleteleague: (route, { variables }) => {
         mutationCalled = true;
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: { deleteAllLeagues: 'All leagues deleted successfully' },
-          }),
+        calledWithLeagueId = variables.leagueId as number | undefined;
+        return fulfillJson(route, {
+          data: { deleteLeague: 'League deleted successfully' },
         });
-      } else {
-        await unmockedGraphQLFallback(route);
-      }
+      },
     });
 
-    // Step 1: click delete button
-    await page.getByRole('button', { name: /delete all leagues/i }).click();
+    // Step 1: click delete button (league already selected in beforeEach)
+    await page.getByRole('button', { name: /delete selected/i }).click();
 
     // Step 2: confirm in first dialog
     const firstDialog = page.locator('div[role="alertdialog"]');
@@ -178,11 +201,13 @@ test.describe('Management Page — delete all leagues dialogs @regression', () =
 
     const finalDialog = page.locator('div[role="alertdialog"]');
     await finalDialog
-      .getByRole('button', { name: /yes, delete everything/i })
+      .getByRole('button', { name: /yes, delete selected/i })
       .click();
 
-    // Mutation should have been called
+    // Mutation should have been called for exactly the selected league (id 1
+    // from the default fixture), not a blanket deleteAllLeagues call
     await expect.poll(() => mutationCalled).toBe(true);
+    expect(calledWithLeagueId).toBe(1);
   });
 });
 
