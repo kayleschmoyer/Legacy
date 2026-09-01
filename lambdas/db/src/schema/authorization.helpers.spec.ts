@@ -696,6 +696,58 @@ describe('checkPlayersNotLocked', () => {
       'Player is locked — the matchup for the current week has already started',
     );
   });
+
+  // Regression guard for LS-6428: the reported bug was that locking was keyed
+  // to per-player `matchup_player_games` row existence, so a Thursday Night
+  // Football starter stayed editable until the stats seeder wrote a row for
+  // them, while their non-Thursday (e.g. Sunday) teammates were never
+  // auto-locked at all because the old check keyed off `playerId`, not
+  // `teamId`. The LS-6031 fix (matchup-status based locking, asserted above)
+  // already closes this: once ANY game causes the team's fantasy matchup to
+  // leave `scheduled`, every roster move for every player on that team is
+  // rejected in the same batch — regardless of which of the team's players
+  // has an individual game in progress and regardless of stats-row
+  // existence. This test locks that in with the exact multi-player scenario
+  // from the ticket (a Thursday starter + a not-yet-played Sunday starter on
+  // the same fantasy team, submitted together).
+  it('locks every roster move for a team once its matchup has started, including players whose own game has not kicked off yet', async () => {
+    const memberRows = [
+      // Thursday Night Football starter (e.g. Josh Allen)
+      { id: 1, teamId: 10, leagueId: 2, playerId: 50 },
+      // Teammate whose Sunday game has not started yet
+      { id: 2, teamId: 10, leagueId: 2, playerId: 51 },
+    ];
+    let selectCall = 0;
+    const select = jest.fn(() => {
+      selectCall++;
+      if (selectCall === 1) {
+        // getTeamMemberInfo — both players returned in one batch
+        const where = jest.fn().mockResolvedValue(memberRows);
+        return { from: jest.fn(() => ({ where })) };
+      }
+      if (selectCall === 2) {
+        const limit = jest
+          .fn()
+          .mockResolvedValue([{ currentWeek: 5, currentMatchup: 42 }]);
+        return {
+          from: jest.fn(() => ({ where: jest.fn(() => ({ limit })) })),
+        };
+      }
+      // matchup-status check — team 10's fantasy matchup is in_progress
+      // because the Thursday game already flipped it; no matchup_player_games
+      // rows are consulted anywhere in this mock.
+      const where = jest.fn().mockResolvedValue([{ team1Id: 10, team2Id: 20 }]);
+      return { from: jest.fn(() => ({ where })) };
+    });
+    const db = { select };
+
+    // Attempting to move EITHER player throws — the whole team is locked
+    // together, so the not-yet-played Sunday starter can't be used as a
+    // loophole to bypass the Thursday starter's lock.
+    await expect(checkPlayersNotLocked(db as never, [1, 2])).rejects.toThrow(
+      'Player is locked — the matchup for the current week has already started',
+    );
+  });
 });
 
 // ── authorized() wrapper ───────────────────────────────────────────────────────
