@@ -35,7 +35,11 @@ import { guardConcurrentPick, selectAutoPickPlayer } from './auto-pick-scorer';
 import { executePickEffects } from './draft-pick-effects';
 import { builder, type Context } from '../builder';
 import { AuthenticationError, ForbiddenError } from '../graphql-errors';
-import { describeDbError, formatDbError } from '../leagues/delete-resilience';
+import {
+  describeDbError,
+  formatDbError,
+  isRetryablePgError,
+} from '../leagues/delete-resilience';
 
 /**
  * True when `error` is the Postgres `57014` (`query_canceled`) raised by the
@@ -49,6 +53,21 @@ import { describeDbError, formatDbError } from '../leagues/delete-resilience';
  */
 export function isLockWaitTimeout(error: unknown): boolean {
   return describeDbError(error).code === '57014';
+}
+
+/**
+ * True when `error` is a transient Postgres race that the dual-trigger
+ * auto-pick design (EventBridge tick + LS-8107 nudge) is expected to hit
+ * from time to time and can safely skip: a lock-wait timeout ({@link
+ * isLockWaitTimeout}, 57014) or an actual deadlock/serialization failure
+ * (40P01/40001/55P03 — LS-9691: two concurrent invocations acquiring the
+ * `drafts` row lock and the `draft_picks` FK-driven lock in different
+ * orders). Either way this is the same "someone else already covers this
+ * pick" outcome as the lock-wait case, not an application defect, so the
+ * per-draft catch below skips it instead of surfacing to Rollbar.
+ */
+export function isBenignAutoPickRace(error: unknown): boolean {
+  return isLockWaitTimeout(error) || isRetryablePgError(error);
 }
 
 // ── LS-9319: Phase 1 / Phase 2 split for the per-draft auto-pick loop ───────
@@ -729,16 +748,17 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
                 ? draftError.message
                 : String(draftError);
 
-            // LS-8398: the row-lock wait on `drafts` timing out is an
-            // expected outcome of the dual-trigger design (EventBridge tick
-            // + LS-8107 nudge racing for the same draft), not a genuine
-            // failure — the concurrent invocation that won the lock (or the
-            // next tick) already covers this pick. Log it as a benign skip
-            // rather than an application error so it doesn't page/pollute
-            // Rollbar, and don't count it against the caller's result.
-            if (isLockWaitTimeout(draftError)) {
+            // LS-8398 / LS-9691: a lock-wait timeout or an actual deadlock on
+            // `drafts` / `draft_picks` is an expected outcome of the
+            // dual-trigger design (EventBridge tick + LS-8107 nudge racing
+            // for the same draft), not a genuine failure — the concurrent
+            // invocation that won the lock (or the next tick) already covers
+            // this pick. Log it as a benign skip rather than an application
+            // error so it doesn't page/pollute Rollbar, and don't count it
+            // against the caller's result.
+            if (isBenignAutoPickRace(draftError)) {
               LOGGER.warn(
-                `[autoProcessDraftPicks] Draft ${draftId} lock wait timed out — likely a concurrent autoProcessDraftPicks invocation, skipping (will retry next cycle)`,
+                `[autoProcessDraftPicks] Draft ${draftId} hit a transient lock/deadlock race — likely a concurrent autoProcessDraftPicks invocation, skipping (will retry next cycle)`,
                 {
                   draftId,
                   leagueId: draftLeagueId,

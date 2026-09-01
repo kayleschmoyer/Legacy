@@ -82,6 +82,7 @@ jest.mock('../graphql-errors', () => ({
 
 import {
   assertLeagueMemberOrSystem,
+  isBenignAutoPickRace,
   isLockWaitTimeout,
 } from './scheduled-mutations';
 import type { Context } from '../builder';
@@ -279,6 +280,54 @@ describe('isLockWaitTimeout (LS-8398)', () => {
     expect(
       isLockWaitTimeout(new Error('Team 5 roster is full in draft 100')),
     ).toBe(false);
+  });
+});
+
+describe('isBenignAutoPickRace (LS-9691)', () => {
+  /** A Postgres error carrying a SQLSTATE `code`, as postgres.js throws. */
+  function pgError(message: string, code: string): Error {
+    return Object.assign(new Error(message), { code });
+  }
+
+  it('treats a 57014 lock-wait timeout as a benign race', () => {
+    const err = pgError(
+      'canceling statement due to statement timeout',
+      '57014',
+    );
+    expect(isBenignAutoPickRace(err)).toBe(true);
+  });
+
+  it('treats a 40P01 deadlock (the draft_picks insert failure from LS-9691) as a benign race', () => {
+    const err = pgError('deadlock detected', '40P01');
+    expect(isBenignAutoPickRace(err)).toBe(true);
+  });
+
+  it('treats a 40P01 deadlock as benign when Drizzle wraps the driver error in `.cause`', () => {
+    const driverError = pgError('deadlock detected', '40P01');
+    const wrapped = Object.assign(
+      new Error(
+        'Failed query: insert into "draft_picks" ("id", "draft_id", "team_id", "player_id", "round", "pick_number", "overall_pick", "picked_at", "bid_amount", "created_at", "updated_at") values (default, $1, $2, $3, $4, $5, $6, $7, default, default, default) returning "id"\nparams: 11479,49045,6523,4,1,13,2026-08-23T17:11:11.633Z',
+      ),
+      { cause: driverError },
+    );
+    expect(isBenignAutoPickRace(wrapped)).toBe(true);
+  });
+
+  it('treats 40001 (serialization failure) and 55P03 (lock not available) as benign races', () => {
+    expect(isBenignAutoPickRace(pgError('serialize', '40001'))).toBe(true);
+    expect(isBenignAutoPickRace(pgError('lock unavailable', '55P03'))).toBe(
+      true,
+    );
+  });
+
+  it('does not treat a non-transient error (e.g. roster full) as a benign race', () => {
+    expect(
+      isBenignAutoPickRace(new Error('Team 5 roster is full in draft 100')),
+    ).toBe(false);
+  });
+
+  it('does not treat an unrelated Postgres SQLSTATE (e.g. FK violation) as a benign race', () => {
+    expect(isBenignAutoPickRace(pgError('fk violation', '23503'))).toBe(false);
   });
 });
 
