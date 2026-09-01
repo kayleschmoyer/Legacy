@@ -180,10 +180,15 @@ test.describe('Profile Settings — Avatar Picker @regression', () => {
     await expect(page.getByRole('button', { name: 'Save' })).toBeVisible();
     await page.getByRole('button', { name: 'Save' }).click();
 
-    // The mutation should have been called
-    expect(
-      mutationCalls.some((c) => c.operationName === 'UpdateUserAvatar'),
-    ).toBe(true);
+    // The mutation should have been called. Click() only waits for the click
+    // action itself, not for the resulting network call to reach the
+    // interceptor — poll instead of reading mutationCalls synchronously, or
+    // this races the request and fails intermittently (LS-9786).
+    await expect
+      .poll(() =>
+        mutationCalls.some((c) => c.operationName === 'UpdateUserAvatar'),
+      )
+      .toBe(true);
   });
 });
 
@@ -300,11 +305,19 @@ test.describe('Profile Settings — Username Edit @regression', () => {
     // paragraph element to avoid matching the avatar picker's <button> Save.
     await page.locator('p', { hasText: /^Save$/ }).click();
 
-    // The mutation should have been called with the new username
+    // The mutation should have been called with the new username. Click()
+    // only waits for the click action itself, not for the resulting network
+    // call to reach the interceptor — poll instead of reading mutationCalls
+    // synchronously, or this races the request and fails intermittently
+    // (LS-9786).
+    await expect
+      .poll(() =>
+        mutationCalls.find((c) => c.operationName === 'UpdateUsername'),
+      )
+      .toBeDefined();
     const call = mutationCalls.find(
       (c) => c.operationName === 'UpdateUsername',
     );
-    expect(call).toBeDefined();
     expect(call?.variables).toEqual({ username: 'newuser123' });
   });
 });
