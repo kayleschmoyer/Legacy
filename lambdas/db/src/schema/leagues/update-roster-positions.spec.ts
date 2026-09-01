@@ -8,6 +8,7 @@
  * output is actually applied to the DB and the league record updated.
  */
 import type { GraphQLSchema } from 'graphql';
+import { inArray, sql } from 'drizzle-orm';
 
 jest.mock('@legacy-sports/logging', () => ({
   LOGGER: {
@@ -120,6 +121,16 @@ describe('updateRosterPositions (LS-9099)', () => {
           leagueId: 'leagueId',
           teamId: 'teamId',
           positionId: 'positionId',
+        },
+        matchupPlayers: {
+          id: 'id',
+          matchupId: 'matchupId',
+          teamId: 'teamId',
+          positionId: 'positionId',
+        },
+        matchups: {
+          id: 'id',
+          leagueId: 'leagueId',
         },
         positionSlot: {
           enumValues: [
@@ -385,5 +396,91 @@ describe('updateRosterPositions (LS-9099)', () => {
     expect(mockTx.delete).not.toHaveBeenCalled();
 
     expect(result).toEqual({ id: 1, maxRosterSize: 12 });
+  });
+
+  it('reassigns matchup_players rows off dropped slots before deleting them (LS-9354)', async () => {
+    const resolve = getResolver();
+    mockDb.limit
+      .mockResolvedValueOnce([{ id: 1, sport: 'football' }])
+      .mockResolvedValueOnce([{ permissionLevel: 'commissioner' }]);
+
+    // Current: QB x1, RB x2 (ids 2, 3), BN x7. Nobody currently rostered at
+    // RB, so the team-occupancy guard doesn't block the shrink — but a past
+    // matchup's matchup_players row (id 50) started a player in RB slot 3,
+    // which is about to be dropped.
+    mockTx.orderBy.mockResolvedValueOnce([
+      { id: 1, positionType: 'QB' },
+      { id: 2, positionType: 'RB' },
+      { id: 3, positionType: 'RB' },
+      { id: 4, positionType: 'BN' },
+      { id: 5, positionType: 'BN' },
+      { id: 6, positionType: 'BN' },
+      { id: 7, positionType: 'BN' },
+      { id: 8, positionType: 'BN' },
+      { id: 9, positionType: 'BN' },
+      { id: 10, positionType: 'BN' },
+    ]);
+    mockTx.where
+      .mockReturnValueOnce(mockTx) // currentPositions where -> chain to orderBy
+      .mockResolvedValueOnce([]) // occupiedRows (team_members) -> none rostered at RB
+      .mockResolvedValueOnce([
+        {
+          matchupPlayerId: 50,
+          matchupId: 500,
+          teamId: 100,
+          positionId: 3,
+          positionType: 'RB',
+        },
+      ]) // matchupPlayerOccupiedRows -> one historical starter on the dropped slot
+      .mockReturnValueOnce(mockTx); // final league update where -> chain to returning
+
+    mockTx.returning.mockResolvedValueOnce([{ id: 1, maxRosterSize: 10 }]);
+
+    const result = await resolve(
+      {},
+      {
+        input: {
+          leagueId: 1,
+          rosterSlots: [
+            { positionType: 'QB', count: 1 },
+            { positionType: 'RB', count: 1 },
+            { positionType: 'BN', count: 8 },
+          ],
+        },
+      },
+      mockContext,
+      undefined as never,
+    );
+
+    // matchup_players row 50 must be repointed onto the retained RB slot
+    // (id 2) before the drop, not left for ON DELETE SET NULL to null out —
+    // via a single batched CASE update, not one UPDATE per reassignment.
+    const { PublicSchema } = jest.requireMock<
+      typeof import('@legacy-sports/db-client')
+    >('@legacy-sports/db-client');
+    expect(mockTx.update).toHaveBeenCalledTimes(2); // matchupPlayers batch + leagues
+    expect(mockTx.update).toHaveBeenNthCalledWith(
+      1,
+      PublicSchema.matchupPlayers,
+    );
+    // Compare SQL fragments with their (per-call, reference-unequal) decoder
+    // functions stripped out — structural content only.
+    const stripFns = (value: unknown) =>
+      JSON.parse(
+        JSON.stringify(value, (_key, v) =>
+          typeof v === 'function' ? undefined : v,
+        ),
+      );
+    const expectedCase = sql`CASE ${PublicSchema.matchupPlayers.id} ${sql.join([sql`WHEN ${50} THEN ${2}`], sql` `)} END`;
+    expect(stripFns(mockTx.set.mock.calls[0][0])).toEqual(
+      stripFns({ positionId: expectedCase }),
+    );
+    expect(stripFns(mockTx.where.mock.calls[3][0])).toEqual(
+      stripFns(inArray(PublicSchema.matchupPlayers.id, [50])),
+    );
+    // The league_positions delete must run after that reassignment.
+    expect(mockTx.delete).toHaveBeenCalledTimes(1);
+
+    expect(result).toEqual({ id: 1, maxRosterSize: 10 });
   });
 });

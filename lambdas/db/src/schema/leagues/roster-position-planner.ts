@@ -30,6 +30,19 @@ export interface RosterPositionUpdatePlan {
   deletes: number[];
 }
 
+export interface MatchupPlayerOccupiedRow {
+  matchupPlayerId: number;
+  matchupId: number;
+  teamId: number;
+  positionId: number | null;
+  positionType: string;
+}
+
+export interface MatchupPlayerReassignment {
+  matchupPlayerId: number;
+  positionId: number;
+}
+
 /**
  * Computes the insert/reassign/delete plan for reconciling `league_positions`
  * with `newCountByType`, or throws `UserInputError` if any position type
@@ -157,4 +170,93 @@ export function planRosterPositionUpdate({
   }
 
   return plan;
+}
+
+/**
+ * Computes how to repoint `matchup_players.positionId` rows (a week's
+ * starter assignment, for matchups past, present, and future) that reference
+ * a `league_positions` row `planRosterPositionUpdate` is about to drop, onto
+ * a retained slot row of the same `positionType` (LS-9354).
+ *
+ * Without this, dropping a `league_positions` row lets the
+ * `matchup_players_position_fk` FK's `ON DELETE SET NULL` silently null out
+ * every historical starter assignment that ever referenced it — including
+ * *already-completed* matchups, whose roster-comparison view then renders
+ * those players as bench (or, once no slot matches at all, invisible) even
+ * though the week's score was already locked in with them as a starter.
+ * `team_members.positionId` gets the same treatment in
+ * `planRosterPositionUpdate`, but that only covers the live roster — a
+ * player can hold a different slot in every week's `matchup_players` row,
+ * so slot availability has to be tracked per (matchupId, teamId), not once
+ * per team.
+ *
+ * When a position type has no surviving slot to reassign onto (e.g. shrunk
+ * to zero), the affected rows are left out of the result — the FK's
+ * `ON DELETE SET NULL` is the only remaining option for those, same as if
+ * the position type had never existed for that week.
+ */
+export function planMatchupPlayerReassignments({
+  currentPositions,
+  newCountByType,
+  matchupPlayerOccupiedRows,
+}: {
+  currentPositions: CurrentPositionRow[];
+  newCountByType: Map<string, number>;
+  matchupPlayerOccupiedRows: MatchupPlayerOccupiedRow[];
+}): MatchupPlayerReassignment[] {
+  const currentIdsByType = new Map<string, number[]>();
+  for (const row of currentPositions) {
+    const list = currentIdsByType.get(row.positionType) ?? [];
+    list.push(row.id);
+    currentIdsByType.set(row.positionType, list);
+  }
+
+  const occupiedByType = new Map<string, MatchupPlayerOccupiedRow[]>();
+  for (const row of matchupPlayerOccupiedRows) {
+    if (row.positionId == null) continue;
+    const list = occupiedByType.get(row.positionType) ?? [];
+    list.push(row);
+    occupiedByType.set(row.positionType, list);
+  }
+
+  const reassignments: MatchupPlayerReassignment[] = [];
+
+  for (const [positionType, currentIds] of currentIdsByType) {
+    const newCount = newCountByType.get(positionType) ?? 0;
+    if (newCount >= currentIds.length) continue; // nothing dropped for this type
+
+    const keepIds = currentIds.slice(0, newCount);
+    const dropSet = new Set(currentIds.slice(newCount));
+    const typeRows = occupiedByType.get(positionType) ?? [];
+
+    // Slot availability is scoped per (matchupId, teamId) — the same slot id
+    // is reused week over week, so two different weeks reassigning onto the
+    // same keep-slot is not a conflict; two players in the *same* week/team
+    // landing on the same keep-slot would violate
+    // matchup_players_unique_slot_idx.
+    const usedByMatchupTeam = new Map<string, Set<number>>();
+    for (const row of typeRows) {
+      if (row.positionId == null || !keepIds.includes(row.positionId)) continue;
+      const key = `${row.matchupId}:${row.teamId}`;
+      const used = usedByMatchupTeam.get(key) ?? new Set<number>();
+      used.add(row.positionId);
+      usedByMatchupTeam.set(key, used);
+    }
+
+    for (const row of typeRows) {
+      if (row.positionId == null || !dropSet.has(row.positionId)) continue;
+      const key = `${row.matchupId}:${row.teamId}`;
+      const used = usedByMatchupTeam.get(key) ?? new Set<number>();
+      const nextKeepId = keepIds.find((id) => !used.has(id));
+      if (nextKeepId == null) continue;
+      used.add(nextKeepId);
+      usedByMatchupTeam.set(key, used);
+      reassignments.push({
+        matchupPlayerId: row.matchupPlayerId,
+        positionId: nextKeepId,
+      });
+    }
+  }
+
+  return reassignments;
 }

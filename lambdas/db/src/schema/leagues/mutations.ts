@@ -56,7 +56,10 @@ import {
   ROSTER_RANGE_BY_SPORT,
 } from './sport-validation';
 import { generateSecureInviteCode } from './helpers';
-import { planRosterPositionUpdate } from './roster-position-planner';
+import {
+  planMatchupPlayerReassignments,
+  planRosterPositionUpdate,
+} from './roster-position-planner';
 import {
   describeDbError,
   formatDbError,
@@ -1321,6 +1324,75 @@ builder.mutationField('updateRosterPositions', (t) =>
           }
 
           if (plan.deletes.length > 0) {
+            // Repoint matchup_players rows (a week's starter assignment —
+            // past, present, or future) off the slots about to be deleted
+            // and onto a retained slot of the same type first. Without this,
+            // the matchup_players_position_fk's ON DELETE SET NULL silently
+            // nulls every historical starter assignment that ever referenced
+            // a dropped slot, including already-completed matchups — the
+            // roster comparison for those weeks then shows those players as
+            // bench (or invisible) even though the week's score was already
+            // locked in with them as a starter (LS-9354).
+            const matchupPlayerOccupiedRows = await tx
+              .select({
+                matchupPlayerId: PublicSchema.matchupPlayers.id,
+                matchupId: PublicSchema.matchupPlayers.matchupId,
+                teamId: PublicSchema.matchupPlayers.teamId,
+                positionId: PublicSchema.matchupPlayers.positionId,
+                positionType: PublicSchema.leaguePosition.positionType,
+              })
+              .from(PublicSchema.matchupPlayers)
+              .innerJoin(
+                PublicSchema.matchups,
+                eq(
+                  PublicSchema.matchupPlayers.matchupId,
+                  PublicSchema.matchups.id,
+                ),
+              )
+              .innerJoin(
+                PublicSchema.leaguePosition,
+                eq(
+                  PublicSchema.matchupPlayers.positionId,
+                  PublicSchema.leaguePosition.id,
+                ),
+              )
+              .where(
+                and(
+                  eq(PublicSchema.matchups.leagueId, leagueId),
+                  isNotNull(PublicSchema.matchupPlayers.positionId),
+                ),
+              );
+
+            const matchupPlayerReassignments = planMatchupPlayerReassignments({
+              currentPositions,
+              newCountByType,
+              matchupPlayerOccupiedRows,
+            });
+
+            if (matchupPlayerReassignments.length > 0) {
+              // Single batched UPDATE via a CASE expression instead of one
+              // UPDATE per reassignment — a league resize can touch many
+              // weeks' matchup_players rows at once.
+              const positionIdCases = sql.join(
+                matchupPlayerReassignments.map(
+                  ({ matchupPlayerId, positionId }) =>
+                    sql`WHEN ${matchupPlayerId} THEN ${positionId}`,
+                ),
+                sql` `,
+              );
+              await tx
+                .update(PublicSchema.matchupPlayers)
+                .set({
+                  positionId: sql`CASE ${PublicSchema.matchupPlayers.id} ${positionIdCases} END`,
+                })
+                .where(
+                  inArray(
+                    PublicSchema.matchupPlayers.id,
+                    matchupPlayerReassignments.map((r) => r.matchupPlayerId),
+                  ),
+                );
+            }
+
             await tx
               .delete(PublicSchema.leaguePosition)
               .where(inArray(PublicSchema.leaguePosition.id, plan.deletes));

@@ -4,7 +4,10 @@
  * mutation. Kept DB-free so the "never orphan an already-rostered player"
  * guarantee can be exercised directly.
  */
-import { planRosterPositionUpdate } from './roster-position-planner';
+import {
+  planMatchupPlayerReassignments,
+  planRosterPositionUpdate,
+} from './roster-position-planner';
 
 describe('planRosterPositionUpdate', () => {
   it('plans inserts when a position type grows', () => {
@@ -142,5 +145,168 @@ describe('planRosterPositionUpdate', () => {
     });
 
     expect(plan).toEqual({ inserts: [], reassignments: [], deletes: [] });
+  });
+});
+
+/**
+ * Unit tests for `planMatchupPlayerReassignments` (LS-9354): a shrink that
+ * drops league_positions rows must repoint matchup_players.positionId (a
+ * week's starter assignment, including already-completed matchups) onto a
+ * retained same-type slot instead of leaving it for the
+ * matchup_players_position_fk's ON DELETE SET NULL to silently null out —
+ * which is what made the roster comparison for a completed week show no
+ * starters even though the week already had a score.
+ */
+describe('planMatchupPlayerReassignments (LS-9354)', () => {
+  it('reassigns a completed matchup starter off a dropped slot onto the retained slot', () => {
+    // OF shrinks from 2 slots to 1 (ids 1, 2 -> keep 1, drop 2). A player
+    // started matchup 500 (team 10) in slot 2, which is about to be deleted.
+    const reassignments = planMatchupPlayerReassignments({
+      currentPositions: [
+        { id: 1, positionType: 'OF' },
+        { id: 2, positionType: 'OF' },
+      ],
+      newCountByType: new Map([['OF', 1]]),
+      matchupPlayerOccupiedRows: [
+        {
+          matchupPlayerId: 900,
+          matchupId: 500,
+          teamId: 10,
+          positionId: 2,
+          positionType: 'OF',
+        },
+      ],
+    });
+
+    expect(reassignments).toEqual([{ matchupPlayerId: 900, positionId: 1 }]);
+  });
+
+  it('does not reassign a player already on a retained slot', () => {
+    const reassignments = planMatchupPlayerReassignments({
+      currentPositions: [
+        { id: 1, positionType: 'OF' },
+        { id: 2, positionType: 'OF' },
+      ],
+      newCountByType: new Map([['OF', 1]]),
+      matchupPlayerOccupiedRows: [
+        {
+          matchupPlayerId: 901,
+          matchupId: 500,
+          teamId: 10,
+          positionId: 1,
+          positionType: 'OF',
+        },
+      ],
+    });
+
+    expect(reassignments).toEqual([]);
+  });
+
+  it('leaves a dropped-slot row unreassigned when the type shrinks to zero (no surviving slot)', () => {
+    const reassignments = planMatchupPlayerReassignments({
+      currentPositions: [{ id: 1, positionType: 'OF' }],
+      newCountByType: new Map([['OF', 0]]),
+      matchupPlayerOccupiedRows: [
+        {
+          matchupPlayerId: 902,
+          matchupId: 500,
+          teamId: 10,
+          positionId: 1,
+          positionType: 'OF',
+        },
+      ],
+    });
+
+    expect(reassignments).toEqual([]);
+  });
+
+  it('does not let two starters in the same matchup+team collide on the one surviving slot', () => {
+    // Same matchup/team somehow has two rows referencing dropped OF slots
+    // (e.g. a mid-week lineup edit) — only one can land on the sole
+    // retained slot; the other falls back to ON DELETE SET NULL (bench).
+    const reassignments = planMatchupPlayerReassignments({
+      currentPositions: [
+        { id: 1, positionType: 'OF' },
+        { id: 2, positionType: 'OF' },
+        { id: 3, positionType: 'OF' },
+      ],
+      newCountByType: new Map([['OF', 1]]),
+      matchupPlayerOccupiedRows: [
+        {
+          matchupPlayerId: 910,
+          matchupId: 500,
+          teamId: 10,
+          positionId: 2,
+          positionType: 'OF',
+        },
+        {
+          matchupPlayerId: 911,
+          matchupId: 500,
+          teamId: 10,
+          positionId: 3,
+          positionType: 'OF',
+        },
+      ],
+    });
+
+    expect(reassignments).toHaveLength(1);
+    expect(reassignments[0].positionId).toBe(1);
+    expect([910, 911]).toContain(reassignments[0].matchupPlayerId);
+  });
+
+  it('lets different matchups reuse the same retained slot without conflict', () => {
+    // Two different weeks (matchup 500 and 501) both had a starter in the
+    // dropped slot (id 2) — both should reassign onto the retained slot
+    // (id 1) since matchup_players' uniqueness is scoped per matchup+team,
+    // not globally.
+    const reassignments = planMatchupPlayerReassignments({
+      currentPositions: [
+        { id: 1, positionType: 'OF' },
+        { id: 2, positionType: 'OF' },
+      ],
+      newCountByType: new Map([['OF', 1]]),
+      matchupPlayerOccupiedRows: [
+        {
+          matchupPlayerId: 920,
+          matchupId: 500,
+          teamId: 10,
+          positionId: 2,
+          positionType: 'OF',
+        },
+        {
+          matchupPlayerId: 921,
+          matchupId: 501,
+          teamId: 10,
+          positionId: 2,
+          positionType: 'OF',
+        },
+      ],
+    });
+
+    expect(reassignments).toEqual(
+      expect.arrayContaining([
+        { matchupPlayerId: 920, positionId: 1 },
+        { matchupPlayerId: 921, positionId: 1 },
+      ]),
+    );
+    expect(reassignments).toHaveLength(2);
+  });
+
+  it('ignores position types that are not shrinking', () => {
+    const reassignments = planMatchupPlayerReassignments({
+      currentPositions: [{ id: 1, positionType: 'OF' }],
+      newCountByType: new Map([['OF', 1]]),
+      matchupPlayerOccupiedRows: [
+        {
+          matchupPlayerId: 930,
+          matchupId: 500,
+          teamId: 10,
+          positionId: 1,
+          positionType: 'OF',
+        },
+      ],
+    });
+
+    expect(reassignments).toEqual([]);
   });
 });
