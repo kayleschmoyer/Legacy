@@ -24,6 +24,7 @@ import {
   TradingCenter,
   usePlayoffBracket,
 } from '@legacy-sports/shared-components';
+import { ErrorState } from '@legacy-sports/shared-components/ui';
 import {
   AppTeamMemberFragment,
   LeaguePositionFragment,
@@ -168,6 +169,7 @@ export default function LeagueId(): React.JSX.Element {
   const {
     data: leagueData,
     loading: leagueLoading,
+    error: leagueError,
     refetch: refetchLeague,
   } = useGetLeagueByIdQuery({
     skip: isNaN(numLeagueId),
@@ -624,6 +626,17 @@ export default function LeagueId(): React.JSX.Element {
 
   if (leagueLoading) {
     return <Spinner />;
+  }
+
+  // A query error (e.g. access revoked, network failure) previously fell
+  // through to the generic "not found" text below, masking the real cause
+  // behind a message that told the user nothing they could act on (LS-9771).
+  if (leagueError) {
+    return (
+      <YStack padding="$4">
+        <ErrorState error={leagueError} onRetry={() => void refetchLeague()} />
+      </YStack>
+    );
   }
 
   if (!league) {

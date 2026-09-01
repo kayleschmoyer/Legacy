@@ -233,6 +233,26 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
+jest.mock('@legacy-sports/shared-components/ui', () => {
+  const { Text, TouchableOpacity } =
+    jest.requireActual<typeof import('react-native')>('react-native');
+  return {
+    ErrorState: ({
+      error,
+      onRetry,
+    }: {
+      error: Error | string | null | undefined;
+      onRetry?: () => void;
+    }) => (
+      <TouchableOpacity testID="error-state-retry" onPress={onRetry}>
+        <Text>
+          {typeof error === 'string' ? error : (error?.message ?? '')}
+        </Text>
+      </TouchableOpacity>
+    ),
+  };
+});
+
 jest.mock('../../../../hooks/useLeagueWebSocketLifecycle', () => ({
   useLeagueWebSocketLifecycle: jest.fn(() => ({
     client: null,
@@ -515,6 +535,21 @@ describe('BaseballLeagueId', () => {
       });
       render(<BaseballLeagueId />);
       expect(screen.getByText(/Could not find league/)).toBeTruthy();
+    });
+  });
+
+  describe('query error state', () => {
+    it('shows a retryable error instead of the generic not-found message when the league query errors (LS-9771)', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: undefined,
+        loading: false,
+        error: new Error('Access denied: You are not a member of this league'),
+      });
+      render(<BaseballLeagueId />);
+      expect(
+        screen.getByText('Access denied: You are not a member of this league'),
+      ).toBeTruthy();
+      expect(screen.queryByText(/Could not find league/)).toBeNull();
     });
   });
 
