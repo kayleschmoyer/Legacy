@@ -419,5 +419,47 @@ describe('LeagueOverviewTab', () => {
       );
       expect(screen.queryByText('Premium Draft Settings')).toBeNull();
     });
+
+    // LS-9617: auction drafts are the same paid-tier signal as IDP.
+    const auctionLeague = {
+      ...BASE_PROPS.league,
+      selectionMethod: 'auction',
+    };
+
+    it('renders the chip for a free viewer joining an auction draft', () => {
+      render(
+        <LeagueOverviewTab
+          {...BASE_PROPS}
+          league={auctionLeague}
+          isDrafting
+          isPremium={false}
+        />,
+      );
+      expect(screen.getByText('Premium Draft Settings')).toBeTruthy();
+    });
+
+    it('omits the chip for a premium viewer joining an auction draft', () => {
+      render(
+        <LeagueOverviewTab
+          {...BASE_PROPS}
+          league={auctionLeague}
+          isDrafting
+          isPremium
+        />,
+      );
+      expect(screen.queryByText('Premium Draft Settings')).toBeNull();
+    });
+
+    it('omits the chip when selectionMethod is standard (non-auction, non-IDP)', () => {
+      render(
+        <LeagueOverviewTab
+          {...BASE_PROPS}
+          league={{ ...BASE_PROPS.league, selectionMethod: 'standard' }}
+          isDrafting
+          isPremium={false}
+        />,
+      );
+      expect(screen.queryByText('Premium Draft Settings')).toBeNull();
+    });
   });
 });

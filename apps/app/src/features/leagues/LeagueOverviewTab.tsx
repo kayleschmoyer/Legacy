@@ -47,6 +47,9 @@ interface OverviewLeague {
   salaryCapEnabled?: boolean | null;
   playoffFormat?: string | null;
   defensiveFormat?: string | null;
+  /** Draft selection method: 'standard' | 'auction' | 'random'. Auction is a
+   *  paid-tier draft setting (LS-9617), same tier signal as IDP below. */
+  selectionMethod?: string | null;
 }
 
 /**
@@ -247,8 +250,11 @@ export function LeagueOverviewTab({
   // chip below) that directly changes the player pool at draft time, so a
   // free viewer joining an IDP draft gets no client-side signal that the
   // draft they're entering uses a premium format (FLD-052 / LS-6304).
+  // Auction drafts are the same kind of paid-tier signal (ENTITLEMENTS.
+  // auction_draft) and get the same treatment (LS-9617).
   const draftHasPremiumSettings =
-    isFootball && league.defensiveFormat === 'idp';
+    (isFootball && league.defensiveFormat === 'idp') ||
+    league.selectionMethod === 'auction';
 
   const stats = [
     { label: 'Teams', value: String(rankedStandings.length || '—') },

@@ -1793,6 +1793,11 @@ type League {
   secondaryColor: String
 
   """
+  Draft selection method: 'standard', 'auction', or 'random'. Null when the league has no draft yet. (LS-9617)
+  """
+  selectionMethod: String
+
+  """
   Sport for this league (baseball or football). (LS-4628)
   """
   sport: Sport

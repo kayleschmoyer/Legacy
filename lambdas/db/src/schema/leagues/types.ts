@@ -84,6 +84,10 @@ export const League = builder.objectRef<{
    *  'dst' = team D/ST, 'idp' = Individual Defensive Players.
    *  Null for baseball leagues. */
   defensiveFormat?: 'dst' | 'idp' | null;
+  /** Draft selection method: 'standard' | 'auction' | 'random'. Sourced from
+   *  the league's `drafts` row, not the `leagues` table. Null when the
+   *  league has no draft yet. (LS-9617) */
+  selectionMethod?: 'standard' | 'auction' | 'random' | null;
   maxRosterSize: number;
   currentMatchup: number | null;
   /** Authoritative current week number — replaces the currentMatchup FK pointer. */
@@ -190,6 +194,12 @@ League.implement({
             ? 'idp'
             : 'dst'
           : null,
+    }),
+    selectionMethod: t.exposeString('selectionMethod', {
+      nullable: true,
+      description:
+        "Draft selection method: 'standard', 'auction', or 'random'. " +
+        'Null when the league has no draft yet. (LS-9617)',
     }),
     maxRosterSize: t.exposeInt('maxRosterSize'),
     currentMatchup: t.exposeInt('currentMatchup', { nullable: true }),

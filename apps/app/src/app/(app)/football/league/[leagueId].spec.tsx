@@ -938,6 +938,38 @@ describe('FootballLeagueId', () => {
       expect(screen.queryByText('Premium Draft Settings')).toBeNull();
     });
 
+    // LS-9617 — auction is the same paid-tier draft signal as IDP, now wired
+    // through selectionMethod on the League query.
+    it('renders a "Premium Draft Settings" chip on the join-draft banner for an auction draft (LS-9617)', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: {
+          league: {
+            ...mockLeague,
+            draftStatus: 'in-progress',
+            selectionMethod: 'auction',
+          },
+        },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Premium Draft Settings')).toBeTruthy();
+    });
+
+    it('omits the "Premium Draft Settings" chip when the draft is standard selection (LS-9617)', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: {
+          league: {
+            ...mockLeague,
+            draftStatus: 'in-progress',
+            selectionMethod: 'standard',
+          },
+        },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.queryByText('Premium Draft Settings')).toBeNull();
+    });
+
     it('renders commissioner announcement when lmNotes is set', () => {
       mockGetLeagueByIdQuery.mockReturnValue({
         data: {

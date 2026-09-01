@@ -13,6 +13,8 @@ fragment League on League {
   # Sport and defensive format for football-aware UI (LS-4152)
   sport
   defensiveFormat
+  # Draft selection method — 'standard' | 'auction' | 'random' (LS-9617)
+  selectionMethod
   maxRosterSize
   currentMatchup
   currentWeekNumber

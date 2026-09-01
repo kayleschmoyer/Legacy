@@ -1527,6 +1527,8 @@ export type League = {
   scoringProfile?: Maybe<ScoringConfig>;
   seasonNumber?: Maybe<Scalars['Int']['output']>;
   secondaryColor?: Maybe<Scalars['String']['output']>;
+  /** Draft selection method: 'standard', 'auction', or 'random'. Null when the league has no draft yet. (LS-9617) */
+  selectionMethod?: Maybe<Scalars['String']['output']>;
   /** Sport for this league (baseball or football). (LS-4628) */
   sport?: Maybe<Sport>;
   /** ISO timestamp set when this league was frozen due to a subscription tier downgrade. Null when the league is active or frozen for a different reason (season retirement). Cleared on re-upgrade or when the owner re-selects this league as one of their active free-tier leagues. */
@@ -6602,6 +6604,7 @@ export type CreateLeagueAndTeamsMutation = {
       owner?: number | null;
       sport?: Sport | null;
       defensiveFormat?: DefensiveFormat | null;
+      selectionMethod?: string | null;
       maxRosterSize?: number | null;
       currentMatchup?: number | null;
       currentWeekNumber?: number | null;
@@ -6684,6 +6687,7 @@ export type GetUserLeaguesQuery = {
     owner?: number | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    selectionMethod?: string | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -6765,6 +6769,7 @@ export type GetMyLeaguesQuery = {
     owner?: number | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    selectionMethod?: string | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -6864,6 +6869,7 @@ export type StartDraftMutation = {
     owner?: number | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    selectionMethod?: string | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -7020,6 +7026,7 @@ export type StartSeasonMutation = {
     owner?: number | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    selectionMethod?: string | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -10146,6 +10153,7 @@ export type UpdateLeagueSettingsMutation = {
     owner?: number | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    selectionMethod?: string | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -11320,6 +11328,7 @@ export type GetLeagueByIdQuery = {
     owner?: number | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    selectionMethod?: string | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -12320,6 +12329,7 @@ export type LeagueFragment = {
   owner?: number | null;
   sport?: Sport | null;
   defensiveFormat?: DefensiveFormat | null;
+  selectionMethod?: string | null;
   maxRosterSize?: number | null;
   currentMatchup?: number | null;
   currentWeekNumber?: number | null;
@@ -13775,6 +13785,7 @@ export type RenewLeagueMutation = {
     owner?: number | null;
     sport?: Sport | null;
     defensiveFormat?: DefensiveFormat | null;
+    selectionMethod?: string | null;
     maxRosterSize?: number | null;
     currentMatchup?: number | null;
     currentWeekNumber?: number | null;
@@ -16415,6 +16426,7 @@ export const LeagueFragmentDoc = gql`
     owner
     sport
     defensiveFormat
+    selectionMethod
     maxRosterSize
     currentMatchup
     currentWeekNumber

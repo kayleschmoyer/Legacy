@@ -175,25 +175,36 @@ builder.queryField('league', (t) =>
 
         const league = results[0];
 
-        // Get the user's membership info (including team ID)
-        const membershipResults = await context.db
-          .select({
-            leagueId: PublicSchema.leagueMembers.leagueId,
-            userId: PublicSchema.leagueMembers.userId,
-            teamId: PublicSchema.leagueMembers.teamId,
-            permissionLevel: PublicSchema.leagueMembers.permissionLevel,
-          })
-          .from(PublicSchema.leagueMembers)
-          .where(
-            and(
-              eq(PublicSchema.leagueMembers.leagueId, leagueId),
-              eq(PublicSchema.leagueMembers.userId, userId),
-            ),
-          )
-          .limit(1);
+        // Get the user's membership info (including team ID) and the
+        // league's draft selectionMethod in parallel — selectionMethod lives
+        // on `drafts` (one row per league), not denormalized onto `leagues`
+        // like draftStatus is. (LS-9617)
+        const [membershipResults, draftResults] = await Promise.all([
+          context.db
+            .select({
+              leagueId: PublicSchema.leagueMembers.leagueId,
+              userId: PublicSchema.leagueMembers.userId,
+              teamId: PublicSchema.leagueMembers.teamId,
+              permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+            })
+            .from(PublicSchema.leagueMembers)
+            .where(
+              and(
+                eq(PublicSchema.leagueMembers.leagueId, leagueId),
+                eq(PublicSchema.leagueMembers.userId, userId),
+              ),
+            )
+            .limit(1),
+          context.db
+            .select({ selectionMethod: PublicSchema.drafts.selectionMethod })
+            .from(PublicSchema.drafts)
+            .where(eq(PublicSchema.drafts.leagueId, leagueId))
+            .limit(1),
+        ]);
 
         const userMembership =
           membershipResults.length > 0 ? membershipResults[0] : null;
+        const selectionMethod = draftResults[0]?.selectionMethod ?? null;
 
         // Access control: members always have access; non-members can only view public leagues (spectator mode)
         // Admins can access any league regardless of membership or visibility
@@ -212,6 +223,7 @@ builder.queryField('league', (t) =>
           owner: league.owner,
           sport: league.sport,
           defensiveFormat: parseDefensiveFormat(league.defensiveFormat),
+          selectionMethod,
           maxRosterSize: league.maxRosterSize,
           currentMatchup: league.currentMatchup,
           currentWeek: league.currentWeek,
