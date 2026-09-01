@@ -25,7 +25,7 @@ import {
 } from '../shell/StatsDataGrid';
 
 /** Fixed identity columns every view leads with. */
-const NAME_MIN_WIDTH = 160;
+const NAME_WIDTH = 160;
 const POS_WIDTH = 72;
 const TEAM_WIDTH = 80;
 const STAT_MIN_WIDTH = 64;
@@ -68,7 +68,7 @@ export interface FootballStatsDataGridProps {
  * team text) via `renderCell`; stat columns render the value + optional
  * muted sub-label (e.g. overview's per-position key stat).
  */
-function buildColumns(
+export function buildColumns(
   statColumns: readonly FootballGridColumn[],
 ): readonly StatsDataGridColumn<FootballStatsRow>[] {
   return [
@@ -77,7 +77,7 @@ function buildColumns(
       label: 'Name',
       sortable: true,
       defaultDirection: 'asc',
-      minWidth: NAME_MIN_WIDTH,
+      width: NAME_WIDTH,
       accessibilityLabel: 'Sort by name',
       renderCell: (row) => {
         const fullName =
@@ -142,7 +142,12 @@ function buildColumns(
         sortable: column.sortKey != null,
         sortKey: column.sortKey,
         align: 'right',
-        width: column.width,
+        // Every column gets an explicit fixed width — like the baseball/
+        // pitching grids' column configs — so `StatsDataGrid` never falls
+        // back to flex-grow sizing (LS-9503: flex-grow made stat columns
+        // stretch to fill leftover space, varying per view/viewport instead
+        // of rendering at a consistent width).
+        width: column.width ?? column.minWidth ?? STAT_MIN_WIDTH,
         minWidth: column.minWidth ?? STAT_MIN_WIDTH,
         accessibilityLabel:
           column.sortKey != null ? `Sort by ${column.label}` : undefined,

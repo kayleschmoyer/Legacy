@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { FootballStatsDataGrid } from './FootballStatsDataGrid';
+import { buildColumns, FootballStatsDataGrid } from './FootballStatsDataGrid';
 import { FOOTBALL_STAT_COLUMNS_BY_VIEW } from './footballStatsColumns';
 import type { FootballQueryVars } from './footballStatsHelpers';
 
@@ -207,5 +207,31 @@ describe('FootballStatsDataGrid (LS-8566)', () => {
     const { onPageSizeChange } = renderGrid();
     fireEvent.click(screen.getByText('50'));
     expect(onPageSizeChange).toHaveBeenCalledWith(50);
+  });
+
+  describe('column widths (LS-9503)', () => {
+    // Before the fix, the Name column and every per-view stat column (except
+    // the two fantasy columns) had no explicit `width` — only `minWidth` or
+    // nothing — so StatsDataGrid's `flexGrow={column.width ? 0 : 1}` rule
+    // stretched them to fill leftover space instead of rendering at a fixed
+    // width like every column of the baseball/pitching grids does. Every
+    // resulting column must now carry an explicit numeric `width`.
+
+    it('gives the identity columns their fixed widths', () => {
+      const columns = buildColumns(FOOTBALL_STAT_COLUMNS_BY_VIEW.passing);
+      expect(columns[0]).toMatchObject({ key: 'name', width: 160 });
+      expect(columns[1]).toMatchObject({ key: 'position', width: 72 });
+      expect(columns[2]).toMatchObject({ key: 'team', width: 80 });
+    });
+
+    it('gives every stat column across every view an explicit width', () => {
+      for (const statColumns of Object.values(FOOTBALL_STAT_COLUMNS_BY_VIEW)) {
+        const columns = buildColumns(statColumns);
+        for (const column of columns.slice(3)) {
+          expect(column.width).toEqual(expect.any(Number));
+          expect(column.width as number).toBeGreaterThan(0);
+        }
+      }
+    });
   });
 });
