@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { escapeCmdShellArg } from './cmd-escape.js';
+import { buildChildEnv } from './child-env.js';
 import {
   isStaleProjectGraphError,
   PROJECT_GRAPH_CACHE_DIRS,
@@ -74,18 +75,7 @@ export function runCommand(
         // CREATE_NO_WINDOW: suppress the console window that cmd.exe/powershell.exe
         // would otherwise flash when spawned from a hidden stdio MCP child on Windows.
         windowsHide: true,
-        ...(env
-          ? {
-              env: {
-                ...process.env,
-                ...env,
-                // Preserve the host PATH so spawned processes can find binaries
-                // even if the caller-supplied env includes a PATH/Path key.
-                ...(process.env.PATH ? { PATH: process.env.PATH } : {}),
-                ...(process.env.Path ? { Path: process.env.Path } : {}),
-              },
-            }
-          : {}),
+        env: buildChildEnv(env),
       },
       (err, stdout, stderr) => {
         if (err) {
