@@ -336,6 +336,31 @@ build {
     ]
   }
 
+  # Disable unattended-upgrades / apt periodic timers on the baked image.
+  #
+  # Ubuntu 22.04's unattended-upgrades unit and the apt-daily(-upgrade).timer
+  # pair are enabled by default and keep firing on every LIVE runner instance
+  # booted from this AMI (not just at bake time) — the Packer "System updates"
+  # step above only covers the image snapshot. When a periodic apt run lands
+  # mid-job, it can partially patch a package whose files a running process
+  # already has open, producing a split-version install. This was the
+  # confirmed root cause of intermittent Android build failures where Gradle's
+  # daemon spawn crashed with "Incorrect Java version: 17.0.19... jspawnhelper
+  # version 17.0.20..." — the openjdk-17-jre-headless package (which owns
+  # jspawnhelper) got upgraded out from under the already-resolved `java`
+  # binary on a live runner. The line 407 comment above (Playwright browser
+  # install racing unattended-upgrades for the dpkg lock) is the same root
+  # cause manifesting differently — so this is disabled for BOTH variants,
+  # not just runner_android.
+  provisioner "shell" {
+    inline = [
+      "sudo systemctl disable --now unattended-upgrades.service || true",
+      "sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer || true",
+      "sudo systemctl mask unattended-upgrades.service apt-daily.service apt-daily-upgrade.service apt-daily.timer apt-daily-upgrade.timer",
+      "sudo apt-get remove -y -qq unattended-upgrades || true",
+    ]
+  }
+
   # Node.js + pnpm (LS-4949)
   #
   # pnpm is installed as a standalone release binary, NOT via corepack. The
