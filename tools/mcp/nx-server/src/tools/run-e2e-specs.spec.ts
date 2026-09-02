@@ -412,6 +412,65 @@ describe('runE2ESpecs', () => {
 
       expect(jobCallOpts().args).toContain('--project=firefox');
     });
+
+    it('appends --trace=on for hermetic runs when withTracing:true (LS-9332)', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
+
+      await runE2ESpecs({
+        specs: ['src/tests/auth.spec.ts'],
+        withTracing: true,
+      });
+
+      expect(jobCallOpts().args).toContain('--trace=on');
+    });
+
+    it('omits --trace=on for hermetic runs when withTracing is unset', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
+
+      await runE2ESpecs({ specs: ['src/tests/auth.spec.ts'] });
+
+      expect(jobCallOpts().args).not.toContain('--trace=on');
+    });
+
+    it('returns traceArtifacts for hermetic runs when withTracing:true finds trace.zip files (LS-9332)', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
+      const mockReaddir = fsPromises.readdir as jest.MockedFunction<
+        typeof fsPromises.readdir
+      >;
+      const mockStat = fsPromises.stat as unknown as jest.MockedFunction<
+        (path: unknown) => Promise<{ isDirectory: () => boolean }>
+      >;
+      mockReaddir.mockImplementation((dir: unknown) => {
+        const dirStr = String(dir);
+        if (dirStr.endsWith('test-results')) {
+          return Promise.resolve(['auth-should-login'] as never);
+        }
+        if (dirStr.endsWith('auth-should-login')) {
+          return Promise.resolve(['trace.zip'] as never);
+        }
+        return Promise.resolve([] as never);
+      });
+      mockStat.mockImplementation((p: unknown) =>
+        Promise.resolve({ isDirectory: () => !String(p).endsWith('.zip') }),
+      );
+
+      const result = await runE2ESpecs({
+        specs: ['src/tests/auth.spec.ts'],
+        withTracing: true,
+      });
+
+      const payload = JSON.parse(result.content[0].text) as {
+        mode: string;
+        traceArtifacts?: string[];
+      };
+      expect(payload.mode).toBe('hermetic');
+      expect(payload.traceArtifacts).toEqual([
+        expect.stringContaining('trace.zip'),
+      ]);
+    });
   });
 
   // --- Windows spawn shape (LS-7836) ---

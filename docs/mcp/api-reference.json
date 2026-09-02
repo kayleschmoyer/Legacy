@@ -2472,7 +2472,7 @@
         },
         {
           "name": "nx_run_e2e_specs",
-          "description": "Prefer this over raw `npx playwright test` shell commands. Hermetic mode (default): runs specs from src/tests/ against a local static build, auto-selects a free E2E_PORT, and forces E2E_AUTH_MODE=ci (no OAuth needed). Requires dist/apps/web — run nx_run({ project: \"web\", target: \"build\" }) first if missing. Integration mode (integration: true): runs specs from src/integration/tests/ against the live backend (api.legacy-fantasy.com) with workers=1 to avoid throttling. Checks e2e JWT freshness (~/.legacy-sports/e2e-token.json) and E2EPOOLPASSWORD before launching. Set withTracing: true to enable Playwright tracing; trace.zip paths are returned in traceArtifacts. Returns a compact summary: pass/fail counts, failing test details, and (integration only) graphqlErrors and traceArtifacts. A run still going after ~45s returns { status: \"running\", jobId } — call nx_job_wait({ jobId }) for the same structured summary once done; do NOT re-run (re-invoking joins the in-flight run). The underlying Playwright process is hard-killed after 30 minutes (hermetic) / 8 minutes (integration) independent of how many nx_job_wait calls you make — large hermetic batches (100+ specs) usually finish well within that, but if you hit the kill, split specs into smaller batches across multiple calls.",
+          "description": "Prefer this over raw `npx playwright test` shell commands. Hermetic mode (default): runs specs from src/tests/ against a local static build, auto-selects a free E2E_PORT, and forces E2E_AUTH_MODE=ci (no OAuth needed). Requires dist/apps/web — run nx_run({ project: \"web\", target: \"build\" }) first if missing. Integration mode (integration: true): runs specs from src/integration/tests/ against the live backend (api.legacy-fantasy.com) with workers=1 to avoid throttling. Checks e2e JWT freshness (~/.legacy-sports/e2e-token.json) and E2EPOOLPASSWORD before launching. Set withTracing: true to enable Playwright tracing in either mode; trace.zip paths are returned in traceArtifacts. Returns a compact summary: pass/fail counts, failing test details, raw output, traceArtifacts, and (integration only) graphqlErrors. A run still going after ~45s returns { status: \"running\", jobId } — call nx_job_wait({ jobId }) for the same structured summary once done; do NOT re-run (re-invoking joins the in-flight run). The underlying Playwright process is hard-killed after 30 minutes (hermetic) / 8 minutes (integration) independent of how many nx_job_wait calls you make — large hermetic batches (100+ specs) usually finish well within that, but if you hit the kill, split specs into smaller batches across multiple calls.",
           "inputs": {
             "specs": {
               "type": "array",
@@ -2510,7 +2510,7 @@
             "withTracing": {
               "type": "boolean",
               "optional": true,
-              "description": "When true (and integration: true), enables Playwright tracing (--trace=on). Trace zip paths are returned in traceArtifacts for post-run inspection."
+              "description": "When true, enables Playwright tracing (--trace=on) in either mode. Trace zip paths are returned in traceArtifacts."
             }
           },
           "transports": [

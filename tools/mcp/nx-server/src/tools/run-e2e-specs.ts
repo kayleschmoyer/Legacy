@@ -426,9 +426,9 @@ export async function runE2ESpecs(
   if (integration) {
     // Enforce single-worker serialization even if config changes.
     args.push('--workers=1');
-    if (withTracing) {
-      args.push('--trace=on');
-    }
+  }
+  if (withTracing) {
+    args.push('--trace=on');
   }
 
   const env: Record<string, string> = {};
@@ -580,11 +580,10 @@ async function buildE2eResult(
   const flaky = stats.flaky ?? 0;
   const skipped = stats.skipped ?? 0;
 
-  // Integration-mode extras: trace artifacts and GraphQL error summary.
+  // Trace artifacts (either mode, when withTracing was set) and, for
+  // integration mode, a GraphQL error summary.
   const traceZips =
-    integration && withTracing && e2eAppDir
-      ? await findTraceZips(e2eAppDir)
-      : [];
+    withTracing && e2eAppDir ? await findTraceZips(e2eAppDir) : [];
   const graphqlErrors = integration
     ? extractGraphqlErrors(combinedOutput)
     : undefined;

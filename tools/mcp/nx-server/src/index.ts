@@ -261,8 +261,8 @@ server.tool(
     'Integration mode (integration: true): runs specs from src/integration/tests/ against the live backend ' +
     '(api.legacy-fantasy.com) with workers=1 to avoid throttling. ' +
     'Checks e2e JWT freshness (~/.legacy-sports/e2e-token.json) and E2EPOOLPASSWORD before launching. ' +
-    'Set withTracing: true to enable Playwright tracing; trace.zip paths are returned in traceArtifacts. ' +
-    'Returns a compact summary: pass/fail counts, failing test details, and (integration only) graphqlErrors and traceArtifacts. ' +
+    'Set withTracing: true to enable Playwright tracing in either mode; trace.zip paths are returned in traceArtifacts. ' +
+    'Returns a compact summary: pass/fail counts, failing test details, raw output, traceArtifacts, and (integration only) graphqlErrors. ' +
     'A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait({ jobId }) for the same structured summary once done; do NOT re-run (re-invoking joins the in-flight run). ' +
     'The underlying Playwright process is hard-killed after 30 minutes (hermetic) / 8 minutes (integration) independent of how many nx_job_wait calls you make — large hermetic batches (100+ specs) usually finish well within that, but if you hit the kill, split specs into smaller batches across multiple calls.',
   {
@@ -300,8 +300,8 @@ server.tool(
       .boolean()
       .optional()
       .describe(
-        'When true (and integration: true), enables Playwright tracing (--trace=on). ' +
-          'Trace zip paths are returned in traceArtifacts for post-run inspection.',
+        'When true, enables Playwright tracing (--trace=on) in either mode. ' +
+          'Trace zip paths are returned in traceArtifacts.',
       ),
   },
   async (params) => runE2ESpecs(params),
