@@ -52,10 +52,10 @@ resource "aws_iam_role_policy_attachment" "apple_iap_lambda_vpc" {
   role       = aws_iam_role.apple_iap_lambda.name
 }
 
-# Policy granting access to GA4/Rollbar secrets in Secrets Manager
+# Policy granting access to GA4/Rollbar/DB secrets in Secrets Manager
 resource "aws_iam_policy" "apple_iap_lambda_secrets" {
   name        = "${local.name_prefix}-apple-iap-lambda-secrets"
-  description = "Allow Apple IAP Lambda to read GA4/Rollbar secrets from Secrets Manager"
+  description = "Allow Apple IAP Lambda to read GA4/Rollbar/DB credentials secrets from Secrets Manager"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -68,7 +68,8 @@ resource "aws_iam_policy" "apple_iap_lambda_secrets" {
         ]
         Resource = [
           aws_secretsmanager_secret.ga_api_secret.arn,
-          aws_secretsmanager_secret.rollbar_access_token.arn
+          aws_secretsmanager_secret.rollbar_access_token.arn,
+          aws_secretsmanager_secret.database_credentials.arn
         ]
       }
     ]
@@ -185,9 +186,12 @@ resource "aws_lambda_function" "apple_iap" {
       # Production must reject sandbox-signed notifications and vice versa.
       EXPECTED_APPLE_ENVIRONMENT = local.apple_iap_expected_environment[var.environment]
 
-      DB_HOST = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
-      DB_PORT = "5432"
-      DB_NAME = "legacy_sports"
+      DB_HOST        = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+      DB_PORT        = "5432"
+      DB_NAME        = "legacy_sports"
+      DB_SECRET_NAME = aws_secretsmanager_secret.database_credentials.name
+      # Legacy support - keep DB_CREDS_PATH as fallback
+      DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
 
       CONNECTIONS_TABLE_NAME = aws_dynamodb_table.websocket_connections.name
       WEBSOCKET_ENDPOINT     = "https://${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.id}.amazonaws.com/${var.environment}"

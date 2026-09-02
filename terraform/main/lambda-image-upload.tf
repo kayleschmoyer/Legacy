@@ -59,10 +59,10 @@ resource "aws_iam_role_policy_attachment" "image_upload_lambda_s3" {
   role       = aws_iam_role.image_upload_lambda.name
 }
 
-# Allow Lambda to read the JWT secret from Secrets Manager
+# Allow Lambda to read the JWT and DB credentials secrets from Secrets Manager
 resource "aws_iam_policy" "image_upload_lambda_secrets" {
   name        = "${local.name_prefix}-image-upload-lambda-secrets"
-  description = "Allow image-upload Lambda to read the JWT secret from Secrets Manager"
+  description = "Allow image-upload Lambda to read the JWT and DB credentials secrets from Secrets Manager"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -76,6 +76,7 @@ resource "aws_iam_policy" "image_upload_lambda_secrets" {
         Resource = [
           aws_secretsmanager_secret.jwt_secret.arn,
           aws_secretsmanager_secret.cloudflare_ai_api_token.arn,
+          aws_secretsmanager_secret.database_credentials.arn,
         ]
       }
     ]
@@ -158,6 +159,17 @@ resource "aws_lambda_function" "image_upload" {
 
       # JWT validation — reads from Secrets Manager at startup
       JWT_SECRET_NAME = aws_secretsmanager_secret.jwt_secret.name
+
+      # Database configuration — required by runWithPublicClient (index.ts) to
+      # resolve credentials via lib/db-client. Without these the Lambda throws
+      # "Database credentials misconfigured: no AWS secret name configured in
+      # Lambda environment" on first DB access. LS-9368.
+      DB_HOST        = var.enable_rds_proxy ? aws_db_proxy.main[0].endpoint : aws_db_instance.postgres.endpoint
+      DB_PORT        = "5432"
+      DB_NAME        = "legacy_sports"
+      DB_SECRET_NAME = aws_secretsmanager_secret.database_credentials.name
+      # Legacy support - keep DB_CREDS_PATH as fallback
+      DB_CREDS_PATH = aws_secretsmanager_secret.database_credentials.name
 
       # Cloudflare Workers AI
       CLOUDFLARE_ACCOUNT_ID    = var.cloudflare_account_id

@@ -31,6 +31,8 @@ name: Apply Lambda Infrastructure
 # Uses cancel-in-progress to batch multiple Lambda updates into one apply.
 
 on:
+  # Explicit `{}` (not bare `workflow_call:`) — SchemaStore's github-workflow.json
+  # now requires workflow_call to be an object, not null. LS-9368.
   workflow_call: {}
   workflow_run:
     workflows:

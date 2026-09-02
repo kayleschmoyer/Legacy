@@ -15,6 +15,8 @@ name: Deploy Storybook
 on:
   # Push to main is handled by the umbrella Deploy workflow via workflow_call
   # so all deploys report under a single run.
+  # Explicit `{}` (not bare `workflow_call:`) — SchemaStore's github-workflow.json
+  # now requires workflow_call to be an object, not null. LS-9368.
   workflow_call: {}
 
   pull_request:
