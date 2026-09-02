@@ -605,9 +605,30 @@ export class WebSocketClient {
       // load either way (LS-8881). Surface it so subscribers (e.g. the
       // `useWebSocket` hook) can show a real error instead of silently
       // staying disconnected forever.
-      LOGGER.error('Max reconnection attempts reached — giving up', {
-        attempts: this.reconnectAttempts,
-      });
+      // Log level depends on whether this is genuinely terminal.
+      // `scheduleGiveUpCooldownRetry()` below queues one more attempt after
+      // `GIVE_UP_COOLDOWN_MS` — on the *first* exhaustion that retry hasn't
+      // run yet, so the client hasn't actually given up: it's likely a
+      // transient backend/gateway blip that self-heals within the cooldown
+      // window (LS-9489). `LOGGER.error` auto-forwards to Rollbar
+      // (`RollbarOutputDestination`), so reporting an error here for every
+      // such blip is a false positive — LS-9629 saw exactly this, flooding
+      // Rollbar with "giving up" reports for connections that recovered two
+      // minutes later. Only escalate to `error` once the cooldown retry has
+      // already fired and *also* exhausted its budget (`hasRetriedAfterGiveUp`
+      // already true) — that is the truly terminal, alert-worthy case.
+      if (this.hasRetriedAfterGiveUp) {
+        LOGGER.error(
+          'Max reconnection attempts reached — giving up',
+          new Error('Max reconnection attempts reached'),
+          { attempts: this.reconnectAttempts },
+        );
+      } else {
+        LOGGER.warn(
+          'Max reconnection attempts reached — retrying once more after cooldown',
+          { attempts: this.reconnectAttempts },
+        );
+      }
       this.emitConnectionState('error');
       this.emitError(new Error('Max reconnection attempts reached'));
       this.scheduleGiveUpCooldownRetry();

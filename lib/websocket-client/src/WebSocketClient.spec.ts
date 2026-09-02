@@ -736,6 +736,80 @@ describe('WebSocketClient', () => {
       client.dispose();
     });
 
+    it('logs the first budget exhaustion as a warning, not an error, since a cooldown retry is still pending (LS-9629)', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        reconnect: true,
+        reconnectDelay: 100,
+        maxReconnectAttempts: 2,
+        autoConnect: false,
+      });
+
+      const logging = jest.requireMock<{
+        LOGGER: { warn: jest.Mock; error: jest.Mock };
+      }>('@legacy-sports/logging');
+
+      client.connect();
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(200); // budget spent — a cooldown retry is queued
+
+      // LOGGER.error auto-forwards to Rollbar (RollbarOutputDestination) — a
+      // transient blip that is about to retry on its own after the cooldown
+      // must not be reported as an error yet.
+      expect(logging.LOGGER.error).not.toHaveBeenCalledWith(
+        'Max reconnection attempts reached — giving up',
+        expect.anything(),
+      );
+      expect(logging.LOGGER.warn).toHaveBeenCalledWith(
+        'Max reconnection attempts reached — retrying once more after cooldown',
+        expect.objectContaining({ attempts: 2 }),
+      );
+
+      client.dispose();
+    });
+
+    it('escalates to a logged error once the cooldown retry also exhausts its budget (LS-9629)', () => {
+      const client = new WebSocketClient({
+        url: mockUrl,
+        token: 'test-token',
+        leagueId: 123,
+        reconnect: true,
+        reconnectDelay: 100,
+        maxReconnectAttempts: 2,
+        autoConnect: false,
+      });
+
+      const logging = jest.requireMock<{
+        LOGGER: { warn: jest.Mock; error: jest.Mock };
+      }>('@legacy-sports/logging');
+
+      // Exhaust the budget, then let the cooldown retry also fail because no
+      // server ever comes up — a permanently-rejected connection.
+      client.connect();
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(100);
+      jest.advanceTimersByTime(200);
+      expect(logging.LOGGER.error).not.toHaveBeenCalledWith(
+        'Max reconnection attempts reached — giving up',
+        expect.anything(),
+      );
+
+      jest.advanceTimersByTime(2 * 60 * 1000); // cooldown retry fires, fails immediately
+      jest.advanceTimersByTime(100); // reconnect attempt 1 fails
+      jest.advanceTimersByTime(200); // reconnect attempt 2 fails — budget spent again, now terminal
+
+      expect(logging.LOGGER.error).toHaveBeenCalledWith(
+        'Max reconnection attempts reached — giving up',
+        expect.any(Error),
+        expect.objectContaining({ attempts: 2 }),
+      );
+
+      client.dispose();
+    });
+
     it('reconnectNow is a no-op when already connected', () => {
       mockServer = new Server(mockUrl);
 
