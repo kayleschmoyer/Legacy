@@ -159,6 +159,14 @@ variable "ssh_source_cidr" {
 # dimension versus the single-AMI world.
 #
 # Rebuild history (most recent first):
+# - LS-9805 — carrier PR to roll the fleet onto the AMI baked in
+#   terraform/runners/packer/runner-ami.pkr.hcl after LS-9805 disabled
+#   unattended-upgrades/apt-daily(-upgrade) timers on the image. That PR only
+#   changed this file; without a rebuild, runners kept booting from the
+#   pre-LS-9805 AMI with the timers still enabled, still able to race a live
+#   Gradle daemon and produce the "Incorrect Java version ... jspawnhelper
+#   version ..." spawn failure the fix was meant to eliminate. Same
+#   carrier-PR + rebuild-runner-ami label mechanism documented for LS-4957 below.
 # - LS-8910 — split into runner_base (30 GB* / no Android SDK) + runner_android
 #   (60 GB, unchanged) source blocks. *See the launch_block_device_mappings
 #   comment on runner_base below for how that number was chosen.
