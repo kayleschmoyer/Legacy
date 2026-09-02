@@ -63,15 +63,29 @@ on:
 # arriving while the synchronize-triggered run was still queued behind the
 # previous SHA's pipeline cancelled the only run that would post CI Gate for the
 # new SHA, then skipped all jobs itself — leaving the merge queue waiting on
-# "CI Gate (not yet registered)" forever (LS-9053, PR #6711). Reviews that
-# determine-scope will skip anyway (state != approved) therefore get a unique
-# per-run group so they can never displace a real CI run; approved reviews keep
-# the shared group — if one displaces a queued run it executes the same CI.
+# "CI Gate (not yet registered)" forever (LS-9053, PR #6711).
+#
+# LS-9810: approved reviews used to keep the shared group on the theory that
+# "if one displaces a queued run it executes the same CI" — but on a PR
+# receiving rapid push+approval churn (11 orchestrator triggers in 90 minutes
+# observed on PR #7473), a queued run can get displaced by the *next* event
+# before it ever starts a single job, repeatedly, so the shared slot never
+# clears and no run ever posts CI Gate (runs observed sitting `pending` with 0
+# jobs for 13-16+ minutes). Every pull_request_review event — approved or not
+# — now gets its own per-run group so it can never displace, or be displaced
+# out of, the synchronize-triggered run's slot. This no longer depends on the
+# shared group to avoid a duplicate pipeline: check-prior-success's anyActive
+# check below already treats an in-flight "🚀 CI Pipeline /" check run on the
+# same SHA as "already running" and skips re-triggering ci-pipeline (LS-8402).
+# Remaining risk is narrow: two determine-scope evaluations landing in the
+# same few-second gap between a push's ci-pipeline job being dispatched and
+# its first check run appearing as in_progress — accepted as a rare, low-cost
+# race (worst case: one extra pipeline run) in exchange for eliminating the
+# deterministic livelock.
 concurrency:
   group: >-
-    ${{ (github.event_name == 'pull_request_review' &&
-         github.event.review.state != 'approved') &&
-        format('orchestrator-noop-{0}', github.run_id) ||
+    ${{ github.event_name == 'pull_request_review' &&
+        format('orchestrator-review-{0}', github.run_id) ||
         format('orchestrator-{0}', github.event.pull_request.number || github.ref) }}
   cancel-in-progress: false
 
