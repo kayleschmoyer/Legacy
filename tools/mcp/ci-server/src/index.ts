@@ -130,6 +130,14 @@ export function createServer(): McpServer {
         .describe(
           'Extract only error/failure lines with context (~200 lines max).',
         ),
+      offset: z.coerce
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe(
+          'Skip this many lines from the start of the fetched window before applying maxChars, like Read offset. Pages a log across calls; response meta returns hint/linesRemainingInWindow with the next offset.',
+        ),
     },
     async (params) => getLogs(params),
   );

@@ -120,6 +120,68 @@ describe('getLogs', () => {
     });
   });
 
+  describe('offset (LS-9291)', () => {
+    it('skips the requested number of lines from the start of the fetched window', async () => {
+      const manyLines = Array.from({ length: 10 }, (_, i) => `line ${i}`);
+      mockFetch.mockResolvedValue({ lines: manyLines, totalLines: 10 });
+
+      const result = await getLogs({ runId: 1, offset: 5 });
+
+      const text = result.content[0].text;
+      const header = parseHeader(text);
+      expect(header.offset).toBe(5);
+      expect(header.linesInWindow).toBe(10);
+      expect(parseLogs(text)).toBe('line 5\nline 6\nline 7\nline 8\nline 9');
+    });
+
+    it('defaults offset to 0 when omitted', async () => {
+      mockFetch.mockResolvedValue({ lines: ['a', 'b'], totalLines: 2 });
+      const result = await getLogs({ runId: 1 });
+      const header = parseHeader(result.content[0].text);
+      expect(header.offset).toBe(0);
+    });
+
+    it('reports linesRemainingInWindow and a paging hint when maxChars still truncates after offset', async () => {
+      // Each line is long enough that only a couple fit under a small
+      // maxChars budget, while staying well clear of the header itself
+      // (a minified-JSON meta line, ~250-350 chars) so applyHardCharCap
+      // doesn't also cut into the header.
+      const manyLines = Array.from(
+        { length: 20 },
+        (_, i) => `line ${i} ${'x'.repeat(50)}`,
+      );
+      mockFetch.mockResolvedValue({ lines: manyLines, totalLines: 20 });
+
+      const result = await getLogs({ runId: 1, offset: 2, maxChars: 500 });
+
+      const header = parseHeader(result.content[0].text);
+      expect(header.linesRemainingInWindow).toBeGreaterThan(0);
+      expect(header.hint).toMatch(/offset: \d+/);
+    });
+
+    it('returns an empty log when offset is past the end of the fetched window', async () => {
+      mockFetch.mockResolvedValue({ lines: ['a', 'b'], totalLines: 2 });
+      const result = await getLogs({ runId: 1, offset: 10 });
+      const text = result.content[0].text;
+      expect(parseLogs(text)).toBe('');
+      expect(parseHeader(text).returnedLines).toBe(0);
+    });
+
+    it('also applies to errorSummary mode', async () => {
+      mockFetch.mockResolvedValue({
+        lines: [],
+        totalLines: 0,
+        priorityLines: ['err 1', 'err 2', 'err 3'],
+      });
+
+      const result = await getLogs({ runId: 1, errorSummary: true, offset: 1 });
+      const text = result.content[0].text;
+      const header = parseHeader(text);
+      expect(header.offset).toBe(1);
+      expect(parseLogs(text)).toBe('err 2\nerr 3');
+    });
+  });
+
   describe('batch runIds', () => {
     it('returns per-run sections keyed by runId', async () => {
       mockFetch.mockImplementation((params) =>

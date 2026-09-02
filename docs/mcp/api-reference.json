@@ -3099,6 +3099,16 @@
               "optional": true,
               "default": false,
               "description": "Extract only error/failure lines with context (~200 lines max)."
+            },
+            "offset": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                ">= 0"
+              ],
+              "description": "Skip this many lines from the start of the fetched window before applying maxChars, like Read offset. Pages a log across calls; response meta returns hint/linesRemainingInWindow with the next offset."
             }
           },
           "transports": [

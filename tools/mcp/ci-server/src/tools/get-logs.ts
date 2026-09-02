@@ -13,6 +13,7 @@ interface GetLogsParams {
   truncateLineLength?: number;
   errorSummary?: boolean;
   jobName?: string;
+  offset?: number;
 }
 
 /**
@@ -404,8 +405,13 @@ async function buildRunPayload(
     // char-based caps below, so truncateLineLength/maxChars budget real
     // content instead of escape bytes.
     const strippedSummary = summary.map(stripAnsiCodes);
+    // offset (LS-9291) applies here too, for the rare case where even the
+    // curated ~200-line error summary exceeds maxChars.
+    const errorOffset = params.offset ?? 0;
+    const windowedSummary =
+      errorOffset > 0 ? strippedSummary.slice(errorOffset) : strippedSummary;
     const { processedLines, charTruncated } = applyCharLimits(
-      strippedSummary,
+      windowedSummary,
       params.truncateLineLength,
       maxChars,
     );
@@ -415,6 +421,7 @@ async function buildRunPayload(
         errorSummary: true,
         totalLogLines: totalLines,
         errorLines: summary.length,
+        offset: errorOffset,
         charTruncated,
         ...(skippedJobs
           ? {
@@ -430,11 +437,33 @@ async function buildRunPayload(
   // Strip ANSI escape sequences (LS-9557) after the ring-buffer's maxLines
   // selection but before the char-based caps below.
   const strippedLines = lines.map(stripAnsiCodes);
+  // offset (LS-9291) pages through the fetched window: it skips `offset`
+  // lines from the start of the maxLines-bounded window before the maxChars
+  // budget is applied, so a caller that knows roughly where a failure sits
+  // (e.g. "past line ~340 of 757") can jump straight there across a few
+  // targeted calls instead of one oversized dump plus manual file-slicing.
+  // It is relative to this call's fetched window, not the full log — raise
+  // `maxLines` first if the window itself doesn't yet cover the target line.
+  const offset = params.offset ?? 0;
+  const windowedLines =
+    offset > 0 ? strippedLines.slice(offset) : strippedLines;
   const { processedLines, charTruncated } = applyCharLimits(
-    strippedLines,
+    windowedLines,
     params.truncateLineLength,
     maxChars,
   );
+  const linesRemainingInWindow = windowedLines.length - processedLines.length;
+  const hints: string[] = [];
+  if (linesRemainingInWindow > 0) {
+    hints.push(
+      `${linesRemainingInWindow} more line(s) available in the fetched window — call again with offset: ${offset + processedLines.length} to continue paging`,
+    );
+  }
+  if (skippedJobs) {
+    hints.push(
+      `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
+    );
+  }
 
   return {
     meta: {
@@ -442,13 +471,12 @@ async function buildRunPayload(
       truncated: lines.length < totalLines || charTruncated,
       charTruncated,
       totalLines,
+      offset,
+      linesInWindow: strippedLines.length,
       returnedLines: processedLines.length,
-      ...(skippedJobs
-        ? {
-            skippedJobs,
-            hint: `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
-          }
-        : {}),
+      ...(linesRemainingInWindow > 0 ? { linesRemainingInWindow } : {}),
+      ...(skippedJobs ? { skippedJobs } : {}),
+      ...(hints.length > 0 ? { hint: hints.join('; ') } : {}),
     },
     logs: processedLines.join('\n'),
   };
