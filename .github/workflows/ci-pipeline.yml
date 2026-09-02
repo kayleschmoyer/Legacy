@@ -1172,7 +1172,7 @@ jobs:
       - name: "Configure AWS Credentials (E2E ledger)"
         if: ${{ !cancelled() && steps.build-ledger.outcome == 'success' }}
         continue-on-error: true
-        uses: aws-actions/configure-aws-credentials@ec61189d14ec14c8efccab744f656cffd0e33f37 # v6
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6
         with:
           role-to-assume: "arn:aws:iam::176661590736:role/legacy-sports-dev-ci-artifacts"
           aws-region: us-east-1
