@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react';
+import { Sport } from '@legacy-sports/graphql';
 import { CSS } from './styles';
 import { CircularTimer } from './CircularTimer';
 import { DraftGrid } from './DraftGrid';
@@ -15,6 +16,12 @@ import { getPositionColor } from './utils';
 import { useSpectatorScreenState } from './hooks';
 import type { SportKind } from '../../config/sports';
 import { hasErrorCode } from '../../utils/graphql-errors';
+
+/** Pre-draft lobby icon per sport — mirrors PreDraftLobby.tsx's LOBBY_CHROME. */
+const LOBBY_ICON: Record<SportKind, { emoji: string; label: string }> = {
+  baseball: { emoji: '⚾', label: 'baseball' },
+  football: { emoji: '🏈', label: 'football' },
+};
 
 // ---------------------------------------------------------------------------
 // SpectatorScreen (web) — read-only, big-screen-first live draft view
@@ -91,7 +98,7 @@ export function SpectatorScreen({
   onNavigate,
   websocketUrl,
   token,
-  sport = 'baseball',
+  sport: sportOverride,
   minSplashMs,
 }: SpectatorScreenProps): React.JSX.Element {
   const {
@@ -108,6 +115,15 @@ export function SpectatorScreen({
     recentPicks,
     pickTimeLimitSeconds,
   } = useSpectatorScreenState({ leagueId, websocketUrl, token, minSplashMs });
+
+  // The league itself is the source of truth for the spectator's sport, same
+  // as EliteDraftBoardScreen — neither web nor native route passes a `sport`
+  // prop, so before this every league watched here rendered baseball
+  // position colors/copy even when `league.sport === 'football'` (LS-9684).
+  // The explicit prop still wins when a caller supplies one.
+  const sport: SportKind =
+    sportOverride ??
+    (data.league?.sport === Sport.Football ? 'football' : 'baseball');
 
   const commentaryFor = useCallback((pick: SplashPick) => {
     if (!('name' in pick.player)) return undefined;
@@ -181,8 +197,8 @@ export function SpectatorScreen({
         <div className="d-bg-fx" />
         <div className="d-state-center" data-testid="spectator-lobby">
           <div className="d-state-icon">
-            <span role="img" aria-label="baseball">
-              ⚾
+            <span role="img" aria-label={LOBBY_ICON[sport].label}>
+              {LOBBY_ICON[sport].emoji}
             </span>
           </div>
           <div className="d-state-title">

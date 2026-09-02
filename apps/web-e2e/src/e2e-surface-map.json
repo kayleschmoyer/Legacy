@@ -7029,6 +7029,34 @@
       "lib/test-fixtures/src/lib/**",
       "lib/utils/src/lib/**",
       "lib/websocket-client/src/**"
+    ],
+    "apps/web-e2e/src/tests/football-draft-spectator-watch.spec.ts": [
+      "apps/web/src/app/app.tsx",
+      "apps/web/src/components/EliteDraftSpectator.tsx",
+      "lib/shared-components/src/features/elite-draft/**",
+      "lib/shared-components/src/hooks/useWebSocket.ts",
+      "lib/websocket-client/src/**",
+      "apps/web/src/components/**",
+      "apps/web/src/config/**",
+      "apps/web/src/constants/**",
+      "apps/web/src/hooks/**",
+      "apps/web/src/pages/login/**",
+      "apps/web/src/store/**",
+      "apps/web/src/utils/**",
+      "lib/app-config/src/lib/**",
+      "lib/design-tokens/src/lib/**",
+      "lib/env-utilities/src/lib/**",
+      "lib/graphql/src/**",
+      "lib/logging/src/**",
+      "lib/logging/src/lib/**",
+      "lib/logging/src/lib/destinations/**",
+      "lib/rollbar/src/**",
+      "lib/rollbar/src/lib/**",
+      "lib/scoring/src/**",
+      "lib/scoring/src/football/**",
+      "lib/tamagui-config/src/lib/**",
+      "lib/test-fixtures/src/lib/**",
+      "lib/utils/src/lib/**"
     ]
   }
 }

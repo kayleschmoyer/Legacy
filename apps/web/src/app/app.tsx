@@ -769,6 +769,19 @@ function App() {
                 </FootballGate>
               }
             />
+            {/* Read-only big-screen / public draft watch — football
+                equivalent of the baseball route below (LS-9684). Signed-in
+                only — deliberately not in PUBLIC_PATHS (main.tsx); access to
+                private leagues is enforced server-side and surfaced by
+                SpectatorScreen itself as a "This draft is private" state. */}
+            <Route
+              path="/football/league/:id/draft/watch"
+              element={
+                <FootballGate>
+                  <EliteDraftSpectatorScreen />
+                </FootballGate>
+              }
+            />
             <Route
               path="/football/league/:leagueId/matchups/:matchupId"
               element={
