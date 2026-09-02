@@ -44,17 +44,31 @@ export interface S3ArtifactItem {
 export interface S3ArtifactsResult {
   sha: string;
   s3Prefix: string;
-  /** Direct presigned URLs for the blob zip files found under the prefix. */
+  /** Direct presigned URLs for the files found under the prefix. */
   artifacts: S3ArtifactItem[];
   /** True when the prefix returned 0 objects (run artifacts may have expired — objects expire after 3 days). */
   empty: boolean;
 }
 
+/** Playwright artifact type — maps to the S3 prefix segment under `ci-artifacts/{sha}/`. */
+export type PlaywrightArtifactType = 'blobs' | 'coverage' | 'output';
+
+const ARTIFACT_TYPE_PREFIXES: Record<PlaywrightArtifactType, string> = {
+  blobs: 'playwright-blobs',
+  coverage: 'playwright-coverage',
+  output: 'playwright-output',
+};
+
 /**
- * List Playwright blob artifacts for a CI run and return presigned S3 URLs.
+ * List Playwright artifacts for a CI run and return presigned S3 URLs.
  *
  * Artifacts live at:
  *   s3://{bucket}/ci-artifacts/{sha}/playwright-blobs/{shard-index}/report-{hash}.zip
+ *   s3://{bucket}/ci-artifacts/{sha}/playwright-coverage/{fragment}
+ *   s3://{bucket}/ci-artifacts/{sha}/playwright-output/{fragment}
+ *
+ * `artifactType` selects which of the three prefixes to list — defaults to
+ * `"blobs"` (the pre-existing behaviour).
  *
  * Objects expire after 3 days (lifecycle policy on the bucket), so older runs
  * will return empty: true.
@@ -64,9 +78,10 @@ export interface S3ArtifactsResult {
  */
 export async function listPlaywrightS3Artifacts(
   sha: string,
+  artifactType: PlaywrightArtifactType = 'blobs',
 ): Promise<S3ArtifactsResult> {
   const client = getS3();
-  const prefix = `ci-artifacts/${sha}/playwright-blobs/`;
+  const prefix = `ci-artifacts/${sha}/${ARTIFACT_TYPE_PREFIXES[artifactType]}/`;
 
   const objects: Array<{ Key?: string; Size?: number; LastModified?: Date }> =
     [];

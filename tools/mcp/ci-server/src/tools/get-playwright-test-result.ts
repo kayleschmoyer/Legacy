@@ -1,3 +1,4 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import type { ToolResult } from '../types.js';
 import {
   fetchPlaywrightReport,
@@ -7,8 +8,11 @@ import {
   type PlaywrightTestResult,
   reportUrlFor,
 } from '../playwright-report.js';
-import { listPlaywrightS3Artifacts, resolveRunSha } from '../s3-artifacts.js';
-import { minifiedJson } from '@legacy-sports/mcp-format';
+import {
+  listPlaywrightS3Artifacts,
+  type PlaywrightArtifactType,
+  resolveRunSha,
+} from '../s3-artifacts.js';
 
 /** Hard cap on any single string field in the response. Prevents a chatty
  * test (huge stdout / multi-MB snippet) from blowing past MCP limits. */
@@ -119,6 +123,7 @@ export async function getPlaywrightTestResult(params: {
   fileName?: string;
   testFile?: string;
   source?: 'gh-pages' | 's3';
+  artifactType?: PlaywrightArtifactType;
   maxChars?: number;
 }): Promise<ToolResult> {
   const {
@@ -128,6 +133,7 @@ export async function getPlaywrightTestResult(params: {
     fileName,
     testFile,
     source = 'gh-pages',
+    artifactType = 'blobs',
   } = params;
 
   // reportName and runId are alternative ways to identify the report; fileName
@@ -209,7 +215,7 @@ export async function getPlaywrightTestResult(params: {
 
     let s3Result;
     try {
-      s3Result = await listPlaywrightS3Artifacts(sha);
+      s3Result = await listPlaywrightS3Artifacts(sha, artifactType);
     } catch (err) {
       return {
         isError: true,
@@ -223,21 +229,30 @@ export async function getPlaywrightTestResult(params: {
     }
 
     const ghPagesName = `nightly-${runId}`;
+    const artifactTypeNotes: Record<PlaywrightArtifactType, string> = {
+      blobs:
+        'Presigned URLs expire in 1 hour. Each artifact is a Playwright blob zip containing test results. Use playwright merge-reports or inspect the zip to extract individual test error-context.md / trace.zip files.',
+      coverage:
+        'Presigned URLs expire in 1 hour. Each artifact is a raw per-spec coverage fragment.',
+      output:
+        'Presigned URLs expire in 1 hour. Each artifact is a raw Playwright output file.',
+    };
     const response = {
       source: 's3' as const,
       runId,
       sha,
+      artifactType,
       ghPagesReportName: ghPagesName,
       ghPagesNote: `If the nightly GH Pages report was deployed, try ci_get_playwright_test_result with reportName="${ghPagesName}".`,
       s3Prefix: s3Result.s3Prefix,
       artifactCount: s3Result.artifacts.length,
       empty: s3Result.empty,
       emptyNote: s3Result.empty
-        ? 'No blob artifacts found. S3 objects expire after 3 days — this run may be too old.'
+        ? `No ${artifactType} artifacts found. S3 objects expire after 3 days — this run may be too old.`
         : undefined,
       testTitleFilter: testTitle ?? null,
       fileNameFilter: effectiveFileName ?? null,
-      note: 'Presigned URLs expire in 1 hour. Each artifact is a Playwright blob zip containing test results. Use playwright merge-reports or inspect the zip to extract individual test error-context.md / trace.zip files.',
+      note: artifactTypeNotes[artifactType],
       artifacts: s3Result.artifacts,
     };
 

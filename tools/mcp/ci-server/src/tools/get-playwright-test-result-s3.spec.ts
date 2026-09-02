@@ -113,8 +113,64 @@ describe('getPlaywrightTestResult — source=s3', () => {
     );
     expect(payload.ghPagesReportName).toBe(`nightly-${RUN_ID}`);
     expect(mockResolveRunSha).toHaveBeenCalledWith(parseInt(RUN_ID, 10));
-    expect(mockListArtifacts).toHaveBeenCalledWith(SHA);
+    expect(mockListArtifacts).toHaveBeenCalledWith(SHA, 'blobs');
   });
+
+  it('defaults to artifactType "blobs" and includes it in the response', async () => {
+    mockResolveRunSha.mockResolvedValue(SHA);
+    mockListArtifacts.mockResolvedValue({
+      sha: SHA,
+      s3Prefix: PREFIX,
+      artifacts: [],
+      empty: true,
+    });
+
+    const result = await getPlaywrightTestResult({
+      reportName: RUN_ID,
+      testTitle: 'some test',
+      source: 's3',
+    });
+
+    expect(mockListArtifacts).toHaveBeenCalledWith(SHA, 'blobs');
+    const payload = parseS3Payload(result.content[0].text) as ParsedS3Payload &
+      Record<string, unknown>;
+    expect(payload['artifactType']).toBe('blobs');
+  });
+
+  it.each(['coverage', 'output'] as const)(
+    'passes artifactType=%s through to listPlaywrightS3Artifacts',
+    async (artifactType) => {
+      mockResolveRunSha.mockResolvedValue(SHA);
+      mockListArtifacts.mockResolvedValue({
+        sha: SHA,
+        s3Prefix: `s3://legacy-sports-dev-ci-artifacts/ci-artifacts/${SHA}/playwright-${artifactType}/`,
+        artifacts: [
+          {
+            key: `ci-artifacts/${SHA}/playwright-${artifactType}/fragment-1.json`,
+            presignedUrl: 'https://s3.example.com/signed-url-1',
+            sizeBytes: 512,
+            lastModified: '2026-06-28T00:00:00.000Z',
+          },
+        ],
+        empty: false,
+      });
+
+      const result = await getPlaywrightTestResult({
+        reportName: RUN_ID,
+        testTitle: 'some test',
+        source: 's3',
+        artifactType,
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockListArtifacts).toHaveBeenCalledWith(SHA, artifactType);
+      const payload = parseS3Payload(
+        result.content[0].text,
+      ) as ParsedS3Payload & Record<string, unknown>;
+      expect(payload['artifactType']).toBe(artifactType);
+      expect(payload.artifacts).toHaveLength(1);
+    },
+  );
 
   it('returns empty=true with a hint when no artifacts found', async () => {
     mockResolveRunSha.mockResolvedValue(SHA);

@@ -3,7 +3,7 @@
   "_regenerate": "node scripts/generate-mcp-api-reference.mjs --update-budget",
   "total": {
     "tools": 248,
-    "tokens": 85513
+    "tokens": 85551
   },
   "servers": {
     "legacy-sports-aws": {
@@ -16,7 +16,7 @@
     },
     "legacy-sports-ci": {
       "tools": 19,
-      "tokens": 9632
+      "tokens": 9692
     },
     "legacy-sports-db-admin": {
       "tools": 3,
@@ -28,7 +28,7 @@
     },
     "legacy-sports-github": {
       "tools": 55,
-      "tokens": 17669
+      "tokens": 17662
     },
     "legacy-sports-jira": {
       "tools": 21,
@@ -40,7 +40,7 @@
     },
     "legacy-sports-nx": {
       "tools": 16,
-      "tokens": 6232
+      "tokens": 6217
     },
     "legacy-sports-rollbar": {
       "tools": 8,

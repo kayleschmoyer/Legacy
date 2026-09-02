@@ -3204,6 +3204,16 @@
               ],
               "description": "\"gh-pages\" (default) or \"s3\" (presigned blob-archive URLs) — use s3 when the GH Pages report is absent."
             },
+            "artifactType": {
+              "type": "enum",
+              "optional": true,
+              "enum": [
+                "blobs",
+                "coverage",
+                "output"
+              ],
+              "description": "s3 mode only: artifact prefix. Default \"blobs\"."
+            },
             "maxChars": {
               "type": "number",
               "optional": true,

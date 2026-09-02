@@ -663,6 +663,10 @@ export function createServer(): McpServer {
             .describe(
               '"gh-pages" (default) or "s3" (presigned blob-archive URLs) — use s3 when the GH Pages report is absent.',
             ),
+          artifactType: z
+            .enum(['blobs', 'coverage', 'output'])
+            .optional()
+            .describe('s3 mode only: artifact prefix. Default "blobs".'),
           maxChars: z.coerce
             .number()
             .int()

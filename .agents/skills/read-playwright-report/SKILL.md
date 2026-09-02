@@ -107,6 +107,7 @@ s3://legacy-sports-dev-ci-artifacts/ci-artifacts/{sha}/playwright-blobs/
 - Each zip is a Playwright **blob-reporter archive**. Use `playwright merge-reports`, or unzip to pull individual test-results (`error-context.md`, `trace.zip`).
 - S3 access does **not** use the deploys-repo token, so it works when gh-pages 404s on the credentials gap above.
 - `maxChars` is reserved for future use: presigned URLs can't be truncated without invalidating them, so s3 mode always returns full fields, while gh-pages applies its fixed 4000-char per-field cap.
+- `artifactType` (LS-9741) selects which prefix under `ci-artifacts/{sha}/` to list: `"blobs"` (default — `playwright-blobs/`, the merge-reports archives above), `"coverage"` (`playwright-coverage/` — raw per-spec coverage fragments), or `"output"` (`playwright-output/` — raw Playwright output files). Same SHA-resolution, bucket, and presigned-URL shape for all three — only the prefix segment changes.
 
 ## Preferred: `summary.md` (LS-7838)
 
