@@ -153,3 +153,112 @@ describe('reclassifyAffirmationFindings', () => {
     assert.ok(kept.every((f) => f.severity === 'observation'));
   });
 });
+
+// LS-9685: both [HIGH] findings below are pure praise, and both escaped the
+// guard on PR #7447 (LS-9797) cycle 2 because a bare failure noun in the
+// praise matched CORRECTIVE_MARKER_RE — "fail closed" tripped `fails?`, and
+// "missing/corrupt files" (naming a test case) tripped `missing`. Cycle 1
+// had reviewed the identical SHA and APPROVED it; cycle 2 flipped the PR to
+// CHANGES_REQUESTED and set bot-review=FAILURE on these two alone. Bodies
+// are reproduced verbatim from the submitted review.
+const PR_7447_ESCAPES = [
+  {
+    severity: 'high',
+    file: 'scripts/validate-workflows.js',
+    line: 28,
+    title: 'Vendored schemas improve CI reliability and security',
+    body: "The change to vendor GitHub workflow schemas and implement a 'fail closed' loading mechanism significantly enhances the reliability and security of the CI pipeline. It removes a dependency on a live external service, preventing unexpected CI failures due to upstream schema changes, and ensures that workflow validation always runs against a known-good schema. This directly addresses the root cause of LS-9797.",
+  },
+  {
+    severity: 'high',
+    file: 'scripts/__tests__/validate-workflows.test.mjs',
+    line: 118,
+    title: 'Robust tests for vendored schema loading and validation',
+    body: "The addition of comprehensive unit tests for the vendored schemas, covering offline loading, error handling for missing/corrupt files, and the specific `workflow_call` regression, provides strong assurance of the correctness and reliability of the new validation mechanism. This is crucial for maintaining the integrity of the CI pipeline's security gates.",
+  },
+];
+
+describe('isAffirmationFinding — failure-noun false negatives (LS-9685)', () => {
+  it('flags the two pure-praise findings that escaped on PR #7447', () => {
+    for (const f of PR_7447_ESCAPES) {
+      assert.ok(isAffirmationFinding(f), `should flag: ${f.title}`);
+    }
+  });
+
+  it('flags praise whose failure nouns describe a design posture', () => {
+    const cases = [
+      'The loader correctly implements fail-closed behaviour when the schema is unreadable.',
+      'Good call making the parser fail fast on malformed input.',
+    ];
+    for (const body of cases) {
+      assert.ok(
+        isAffirmationFinding({ title: '', body }),
+        `should flag: ${body}`,
+      );
+    }
+  });
+
+  it('flags praise whose failure nouns name a handled or tested case', () => {
+    const cases = [
+      'This properly handles missing environment variables at startup.',
+      'Excellent work covering the incorrect-token path in the new tests.',
+      'Great catch adding a test for the missing-file case.',
+    ];
+    for (const body of cases) {
+      assert.ok(
+        isAffirmationFinding({ title: '', body }),
+        `should flag: ${body}`,
+      );
+    }
+  });
+
+  it('still refuses praise that reports an open defect with the same nouns', () => {
+    const cases = [
+      'This excellent refactor is missing a null check on the response.',
+      'Correctly handles the retry path, but the timeout value is incorrect.',
+      'Properly validates the payload, though the error branch fails to log.',
+      'Solid approach overall — the enum switch breaks when a new stat group is added.',
+      'Good fix for the race, but the token comparison is vulnerable to timing attacks.',
+      // The failure noun is the predicate, not the object of "tests" —
+      // an open defect, however close the handling vocabulary sits.
+      'Great work on the retry helper. Tests are missing for the error path.',
+      'Excellent approach, though coverage of the timeout branch is incorrect.',
+    ];
+    for (const body of cases) {
+      assert.equal(
+        isAffirmationFinding({ title: '', body }),
+        false,
+        `should not flag: ${body}`,
+      );
+    }
+  });
+
+  it('still refuses mixed praise + critique carrying a deontic marker', () => {
+    const cases = [
+      'This excellent refactor should also handle the null case at line 42.',
+      'This excellent refactor needs a test for the edge case.',
+      'Great work here; consider extracting the retry helper instead of inlining it.',
+    ];
+    for (const body of cases) {
+      assert.equal(
+        isAffirmationFinding({ title: '', body }),
+        false,
+        `should not flag: ${body}`,
+      );
+    }
+  });
+});
+
+describe('reclassifyAffirmationFindings — PR #7447 regression (LS-9685)', () => {
+  it('gates the PR #7447 cycle-2 review to zero blocking findings', () => {
+    const { kept, reclassified } =
+      reclassifyAffirmationFindings(PR_7447_ESCAPES);
+
+    assert.equal(reclassified.length, 2);
+    assert.ok(kept.every((f) => f.severity === 'observation'));
+    assert.ok(reclassified.every((f) => f.from_severity === 'high'));
+    assert.ok(
+      reclassified.every((f) => f.reclass_reason === 'affirmation_polarity'),
+    );
+  });
+});

@@ -24,8 +24,16 @@
  * "Changes Required".
  *
  * Deliberately conservative: a finding is only reclassified when it matches
- * an affirmation phrase AND contains none of the corrective markers below —
+ * an affirmation phrase AND carries no corrective content —
  * "this excellent refactor should also handle the null case" is left alone.
+ *
+ * Corrective content is judged in two tiers (LS-9685). Deontic markers
+ * ("should", "must", "needs", "recommend", …) are unambiguous and disqualify
+ * a finding outright. Bare failure nouns ("fail", "missing", "lacks",
+ * "breaks", "incorrect") are not: they describe an open defect and a
+ * correctly-handled case equally well, so praise for error handling used to
+ * disqualify itself. They now disqualify a finding only outside the benign
+ * contexts documented on FAILURE_NOUN_RE below.
  */
 
 // Phrases that only appear when a finding is praising something the PR
@@ -33,15 +41,75 @@
 const AFFIRMATION_PHRASE_RE =
   /\b(directly addresses|crucial for|excellent (?:refactor|fix|approach|work|choice|implementation|catch)|correctly (?:implement|handle|address|resolve|prevent|fix)\w*|properly (?:handle|implement|address|guard|validat)\w*|successfully (?:fix|resolve|address|prevent)\w*|great (?:fix|work|job|catch|approach)|good (?:catch|fix|call|choice)|well[- ]?done|nicely (?:handle|do|implement)\w*|solid (?:fix|approach|implementation))\b/i;
 
-// Language that signals an actionable defect or requested change. Presence
-// of any of these disqualifies a finding from reclassification even if it
-// also contains an affirmation phrase (e.g. mixed praise + critique).
+// Unambiguously corrective language: a request for a change, a negation of
+// current behaviour, or a work marker. Any of these disqualifies a finding
+// from reclassification even when it also contains an affirmation phrase —
+// "this excellent refactor should also handle the null case" is left alone.
 // Note: "bug"/"issue" are deliberately excluded — affirmations routinely
 // reference the past-tense defect they resolve ("directly addresses the
 // infinite render loop bug"), so those nouns alone don't signal a still-open
 // defect. The markers below are unambiguous regardless of tense.
-const CORRECTIVE_MARKER_RE =
-  /\b(should|must|needs?|missing|lacks?|fails?|breaks?|vulnerab\w*|incorrect|recommend|consider|does not|doesn't|n['’]t\b|require[sd]?|instead of|rather than|however|unfortunately|todo|fixme)\b/i;
+const DEONTIC_MARKER_RE =
+  /\b(should|must|needs?|recommend|consider|does not|doesn't|n['’]t\b|require[sd]?|instead of|rather than|however|unfortunately|todo|fixme)\b/i;
+
+// Failure vocabulary that reads identically in a defect report ("the guard
+// is missing") and in praise for code that handles failure ("error handling
+// for missing/corrupt files"). These nouns used to sit in the same
+// alternation as the deontic markers above, which made the guard weakest on
+// exactly the changes it most needs to cover: CI, validation and
+// error-handling PRs, whose reviews are the ones most likely to attract
+// security-flavoured praise. Two pure-praise [HIGH] findings escaped that
+// way on PR #7447 and gated it to CHANGES_REQUESTED — "fail closed" tripped
+// `fails?` and "missing/corrupt files" (naming a test case) tripped
+// `missing` (LS-9685). A failure noun now only disqualifies a finding when
+// it is *not* in one of the benign contexts below.
+const FAILURE_NOUN_RE =
+  /\b(missing|lacks?|fails?|breaks?|vulnerab\w*|incorrect)\b/gi;
+
+// The noun names a deliberate design posture: "fail closed", "fail open",
+// "fail fast".
+const FAILURE_POSTURE_RE =
+  /^[-\s]*(closed|open|fast|safe|soft|hard|silently|gracefully)\b/i;
+
+// The noun is the object of a verb describing what the code already does
+// about it: "error handling for missing files", "tests covering incorrect
+// input", "guards against breaks in the enum". A copula or adversative
+// between the two breaks that reading — in "tests are missing for the error
+// path" the noun is the predicate, i.e. an open defect — so those words are
+// excluded from the intervening span.
+const HANDLING_VERB_RE =
+  /\b(handl|cover|test|guard|protect|prevent|avoid|detect|reject|validat|catch|tolerat|surfac)\w*\W+(?:(?!(?:is|are|was|were|be|been|being|remains?|stays?|seems?|appears?|but|yet|still|though)\b)\w+\W+){0,3}$/i;
+
+// The noun qualifies a test case or code path rather than describing the
+// PR's live behaviour: "missing-file case", "failure mode", "incorrect
+// input path".
+const HANDLED_SUBJECT_RE =
+  /^\W*(?:\w+\W+){0,2}?(cases?|paths?|modes?|scenarios?|behaviou?rs?|tests?|coverage|handling)\b/i;
+
+/**
+ * True when at least one failure noun in `text` is reporting an open defect
+ * rather than describing a failure the code deliberately handles, tests, or
+ * prevents. Conservative by design: a noun counts as benign only when its
+ * immediate surroundings say so, so "this excellent refactor is missing a
+ * null check" still reads as a defect.
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+function hasOpenDefectVocabulary(text) {
+  for (const match of text.matchAll(FAILURE_NOUN_RE)) {
+    const before = text.slice(0, match.index);
+    const after = text.slice(match.index + match[0].length);
+    const benign =
+      FAILURE_POSTURE_RE.test(after) ||
+      HANDLING_VERB_RE.test(before) ||
+      HANDLED_SUBJECT_RE.test(after);
+    if (!benign) {
+      return true;
+    }
+  }
+  return false;
+}
 
 /**
  * True when a finding's language is purely affirmative — praises something
@@ -52,7 +120,10 @@ const CORRECTIVE_MARKER_RE =
  */
 export function isAffirmationFinding(finding) {
   const text = `${finding.title ?? ''} ${finding.body ?? ''}`;
-  return AFFIRMATION_PHRASE_RE.test(text) && !CORRECTIVE_MARKER_RE.test(text);
+  if (!AFFIRMATION_PHRASE_RE.test(text) || DEONTIC_MARKER_RE.test(text)) {
+    return false;
+  }
+  return !hasOpenDefectVocabulary(text);
 }
 
 /**
