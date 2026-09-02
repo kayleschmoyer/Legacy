@@ -3,7 +3,7 @@
 
 .PHONY: help install install-force refresh install-tools install-node install-python setup setup-force \
 	clean clean-safe clean-cache clean-node clean-python force-clean reset \
-	lint lint-fix lint-workflows lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps hash-design-bundle format fmt typecheck validate \
+	lint lint-fix lint-workflows update-workflow-schemas lint-skills sync-agent-prompts lint-agent-prompts sync-skill-index lint-skill-index mcp-api-reference lint-mcp-api-reference mcp-tool-budget mcp-docs lint-theme-compliance update-theme-baseline lint-animated-theme-vars lint-workspace-deps hash-design-bundle format fmt typecheck validate \
 	test test-all test-watch test-e2e e2e-auth check-skipped-tests check-skipped-tests-verbose \
 	build build-all build-web build-mobile build-lambdas build-libs \
 	start dev dev-web dev-mobile dev-db dev-graphql dev-storybook graphiql docker-up \
@@ -273,6 +273,10 @@ lint-fix: ## Run linting with auto-fix on affected projects. Pass PARALLEL=N to 
 lint-workflows: ## Lint GitHub Actions workflow files
 	@$(call echo_blue,Linting GitHub Actions workflows...)
 	@node scripts/validate-workflows.js
+
+update-workflow-schemas: ## Refresh vendored SchemaStore schemas (CHECK=1 to report drift without writing)
+	@$(call echo_blue,Refreshing vendored workflow schemas...)
+	@node scripts/update-workflow-schemas.js $(if $(CHECK),--check,)
 
 lint-skills: ## Validate all agent skills conform to agentskills.io format
 	@$(call echo_blue,Validating agent skills...)

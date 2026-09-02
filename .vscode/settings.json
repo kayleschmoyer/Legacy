@@ -58,8 +58,8 @@
     "!Join"
   ],
   "yaml.schemas": {
-    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml",
-    "https://json.schemastore.org/github-action.json": ".github/actions/*/action.yml"
+    "./scripts/schemas/github-workflow.json": ".github/workflows/*.yml",
+    "./scripts/schemas/github-action.json": ".github/actions/*/action.yml"
   },
   "yaml.validate": true,
   "yaml.schemaStore.enable": true,

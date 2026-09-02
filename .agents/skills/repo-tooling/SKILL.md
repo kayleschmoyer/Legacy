@@ -33,6 +33,30 @@ Canonical chunk order: `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-l
 
 As of 2026-07-02, lambda unit suites run under `nx affected -t test` like every other project (the `jest --onlyChanged` gap was closed by adding `project.json` jest targets — `lambdas/db` excepted, deliberately ungated pending red-suite cleanup) — so step 8 and CI both gate lambda tests. Which suites gate merge overall: see [testing → What Gates Merge](../testing/SKILL.md#what-gates-merge).
 
+### pc-workflows: vendored JSON schemas
+
+Step 7 validates every `.github/workflows/*.yml` and `.github/actions/**/action.yml`
+against JSON schemas **vendored under `scripts/schemas/`** — not fetched from
+SchemaStore at run time.
+
+They used to be fetched live on every run, which made this step a function of a
+third party's current HEAD. On 2026-09-01 SchemaStore tightened `workflow_call`
+to reject a null value and every open PR went red simultaneously — markdown-only
+diffs included — with no repo commit to bisect or revert (LS-9797).
+
+Two consequences worth knowing:
+
+- **`pc-workflows` no longer needs network, and no longer silently skips itself.**
+  The old code returned `null` on a fetch failure and skipped validation while
+  still reporting green. Loading now fails **closed**: a missing or corrupt
+  vendored schema is an error telling you to run `make update-workflow-schemas`.
+- **Upstream schema changes arrive as a reviewable commit.** Refresh with
+  `make update-workflow-schemas` (or `CHECK=1` to report drift without writing),
+  then run `make lint-workflows` and commit the schema diff on its own.
+
+`--check` is deliberately not wired into CI — doing so would recreate the exact
+failure mode vendoring removes. See [`scripts/schemas/README.md`](../../../scripts/schemas/README.md).
+
 ### Change classification (why steps get skipped)
 
 Each pc invocation runs `node scripts/classify-changes.js --base $(NX_BASE)`, which diffs `NX_BASE...HEAD` and emits three flags:

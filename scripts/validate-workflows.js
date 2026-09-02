@@ -11,10 +11,6 @@ const yaml = require('js-yaml');
 const Ajv = require('ajv');
 const addFormats = require('ajv-formats');
 
-// Schema URLs (same as VS Code config)
-const WORKFLOW_SCHEMA_URL = 'https://json.schemastore.org/github-workflow.json';
-const ACTION_SCHEMA_URL = 'https://json.schemastore.org/github-action.json';
-
 // Terminal colors
 const colors = {
   reset: '\x1b[0m',
@@ -28,33 +24,50 @@ function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-// Fetch JSON schema from URL (handles redirects). Returns null on network errors
-// or server-side 5xx responses so callers can skip validation gracefully when
-// the schema host is offline or temporarily unavailable.
-async function fetchSchema(url) {
+// Vendored SchemaStore schemas (LS-9797).
+//
+// These are checked into the repo rather than fetched at run time. The
+// validator previously fetched https://json.schemastore.org/github-workflow.json
+// live on EVERY run, which made this check a function of a third party's
+// current HEAD rather than of the repo's contents. On 2026-09-01 SchemaStore
+// tightened `workflow_call` to reject a null value and every open PR went red
+// at once — including diffs touching nothing but markdown — with no repo
+// change to bisect and nothing to roll back.
+//
+// With the schemas vendored, an upstream change arrives the way any other
+// breaking change does: as a reviewable, revertable commit. Refresh them with
+// `make update-workflow-schemas` (scripts/update-workflow-schemas.js), which
+// also has a `--check` mode for asking, on demand, whether upstream moved.
+const SCHEMA_DIR = path.join(__dirname, 'schemas');
+const WORKFLOW_SCHEMA_PATH = path.join(SCHEMA_DIR, 'github-workflow.json');
+const ACTION_SCHEMA_PATH = path.join(SCHEMA_DIR, 'github-action.json');
+
+// Load a vendored schema from disk.
+//
+// This fails CLOSED, unlike the network fetch it replaces: a missing or corrupt
+// vendored schema is a repo problem we control and must fix, not a transient
+// outage to shrug off. The old fail-open behaviour meant a SchemaStore blip
+// silently downgraded CI to "no workflow validation ran" while still reporting
+// green — observed in practice while writing this change.
+function loadSchema(schemaPath) {
+  const rel = path.relative(process.cwd(), schemaPath);
+  let raw;
   try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Node.js Workflow Validator' },
-      redirect: 'follow',
-    });
-
-    // Treat 5xx (server-side transient errors) the same as network failures —
-    // skip validation rather than blocking the workflow on an unavailable schema host.
-    if (!response.ok) {
-      if (response.status >= 500) {
-        return null;
-      }
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    return await response.json();
+    raw = fs.readFileSync(schemaPath, 'utf8');
   } catch (error) {
-    // Distinguish network-level failures (no connectivity) from HTTP errors.
-    // TypeError covers "fetch failed" / ENOTFOUND / ETIMEDOUT etc.
-    if (error instanceof TypeError || error.cause) {
-      return null;
-    }
-    throw new Error(`Failed to fetch schema from ${url}: ${error.message}`);
+    throw new Error(
+      `Missing vendored schema ${rel} (${error.code || error.message}). ` +
+        'Run `make update-workflow-schemas` to restore it.',
+    );
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `Corrupt vendored schema ${rel}: ${error.message}. ` +
+        'Run `make update-workflow-schemas` to restore it.',
+    );
   }
 }
 
@@ -274,7 +287,7 @@ function formatErrors(results) {
 
 // Lightweight single-file mode (LS-8705): parse + schema-check one workflow
 // or action file, skipping the full-repo glob, the working-directory check,
-// and the second (irrelevant) schema fetch. Intended for iterative editing,
+// and the second (irrelevant) schema load. Intended for iterative editing,
 // where re-running the full validator after every keystroke is too slow.
 function isActionFile(filePath) {
   return /(^|[/\\])action\.ya?ml$/.test(filePath);
@@ -288,28 +301,20 @@ async function validateSingleFile(filePath) {
     process.exit(1);
   }
 
-  const schemaUrl = isActionFile(filePath)
-    ? ACTION_SCHEMA_URL
-    : WORKFLOW_SCHEMA_URL;
-
-  const schema = await fetchSchema(schemaUrl);
-  if (!schema) {
-    // Fall back to a syntax-only check when the schema host is unreachable —
-    // still catches the YAML parse errors the ad-hoc `node -e` one-liner was
-    // used for, even fully offline.
-    log(
-      '\n⚠️  Schema fetch failed (network or server error) — checking YAML syntax only',
-      'yellow',
+  // --file runs outside main()'s try/catch, so surface a load failure as a
+  // one-line error rather than an unhandled rejection stack.
+  let schema;
+  try {
+    schema = loadSchema(
+      isActionFile(filePath) ? ACTION_SCHEMA_PATH : WORKFLOW_SCHEMA_PATH,
     );
-    try {
-      yaml.load(fs.readFileSync(filePath, 'utf8'));
-      log(`✓ ${filePath} is valid YAML`, 'green');
-      process.exit(0);
-    } catch (error) {
-      log(`\n❌ ${filePath}`, 'red');
-      log(`   YAML parsing error: ${error.message}`, 'red');
-      process.exit(1);
-    }
+  } catch (error) {
+    log(
+      `
+❌ ${error.message}`,
+      'red',
+    );
+    process.exit(1);
   }
 
   const ajv = new Ajv({
@@ -345,8 +350,6 @@ async function main() {
   log('🔍 Validating GitHub Actions workflows...', 'cyan');
 
   try {
-    // Find files first so the working-directory check can run even when the
-    // SchemaStore host is unreachable.
     const workflowFiles = glob.sync('.github/workflows/*.{yml,yaml}', {
       nodir: true,
     });
@@ -357,29 +360,19 @@ async function main() {
 
     // working-directory existence check (LS-4910): catches references to
     // directories that don't exist in the repo (e.g. renamed without updating
-    // the workflow). Runs independently of the schema validation so it still
-    // gates `make pc` when offline.
+    // the workflow). Runs independently of the schema validation.
     const wdOk = runWorkingDirectoryCheck({
       workflowFiles,
       actionFiles,
       repoRoot,
     });
 
-    // Fetch schemas
-    log('\n📥 Fetching JSON schemas...', 'cyan');
-    const [workflowSchema, actionSchema] = await Promise.all([
-      fetchSchema(WORKFLOW_SCHEMA_URL),
-      fetchSchema(ACTION_SCHEMA_URL),
-    ]);
-
-    if (!workflowSchema || !actionSchema) {
-      log(
-        '\n⚠️  Schema fetch failed (network or server error) — skipping workflow validation',
-        'yellow',
-      );
-      // Still honour the working-directory check result.
-      process.exit(wdOk ? 0 : 1);
-    }
+    // Load the vendored schemas from disk. No network involved, so this check
+    // is now a pure function of the repo contents — it cannot change verdict
+    // without a diff, and it cannot silently skip itself when a host is down.
+    log('\n📖 Loading vendored JSON schemas...', 'cyan');
+    const workflowSchema = loadSchema(WORKFLOW_SCHEMA_PATH);
+    const actionSchema = loadSchema(ACTION_SCHEMA_PATH);
 
     const ajv = new Ajv({
       allErrors: true,
@@ -433,6 +426,10 @@ async function main() {
 // Allow the helpers to be required from unit tests without executing main().
 module.exports = {
   collectWorkingDirectories,
+  loadSchema,
+  validateFile,
+  WORKFLOW_SCHEMA_PATH,
+  ACTION_SCHEMA_PATH,
   checkWorkingDirectoryPaths,
   isActionFile,
   validateFile,

@@ -41,3 +41,7 @@ apps/app/android/
 # reformatting it would break the sync drift check
 docs/mcp/
 lib/mcp-docs/src/pages/
+# Vendored SchemaStore JSON schemas (LS-9797) — byte-exact copies of upstream,
+# refreshed by scripts/update-workflow-schemas.js. Reformatting them would make
+# every future upstream diff unreadable and break the `--check` drift compare.
+scripts/schemas/*.json

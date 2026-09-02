@@ -26,6 +26,9 @@ const {
   checkWorkingDirectoryPaths,
   isActionFile,
   validateFile,
+  loadSchema,
+  WORKFLOW_SCHEMA_PATH,
+  ACTION_SCHEMA_PATH,
 } = require(resolve(__dirname, '..', 'validate-workflows.js'));
 
 const Ajv = require('ajv');
@@ -278,4 +281,107 @@ test('checkWorkingDirectoryPaths flags paths that exist but are files, not direc
   } finally {
     rmSync(tmpRepo, { recursive: true, force: true });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Vendored schemas (LS-9797)
+//
+// The validator used to fetch github-workflow.json from SchemaStore live on
+// every run. On 2026-09-01 upstream tightened `workflow_call` to reject a null
+// value; every open PR went red at once with no repo diff to bisect. The
+// schemas are now vendored under scripts/schemas/, so the check is a pure
+// function of the repo contents.
+//
+// Note the division of labour with the LS-9801 tests above: those cover
+// validateFile's null-coercion behaviour against a synthetic schema. These
+// cover the vendored artefacts themselves — that they load offline, that they
+// fail closed when absent, and that the real vendored schema genuinely encodes
+// the tightened `workflow_call` rule the coercion exists to satisfy.
+// ---------------------------------------------------------------------------
+
+test('vendored workflow + action schemas load from disk without network', () => {
+  const workflow = loadSchema(WORKFLOW_SCHEMA_PATH);
+  const action = loadSchema(ACTION_SCHEMA_PATH);
+  assert.ok(workflow.properties?.on, 'workflow schema describes `on`');
+  assert.ok(action.properties?.runs, 'action schema describes `runs`');
+});
+
+test('loadSchema fails closed on a missing schema file', () => {
+  // Deliberately the opposite of the old fetchSchema(), which returned null on
+  // failure and let the caller skip validation entirely. A vendored schema that
+  // has gone missing is our bug, not a transient outage.
+  assert.throws(
+    () => loadSchema(resolve(__dirname, 'no-such-schema.json')),
+    /Missing vendored schema.*update-workflow-schemas/s,
+  );
+});
+
+test('loadSchema fails closed on a corrupt schema file', () => {
+  const tmp = mkdtempSync(join(tmpdir(), 'ls-9797-'));
+  try {
+    const bad = join(tmp, 'github-workflow.json');
+    writeFileSync(bad, '{ not json');
+    assert.throws(
+      () => loadSchema(bad),
+      /Corrupt vendored schema.*update-workflow-schemas/s,
+    );
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+// The vendored schema must actually encode the tightened rule. Validated
+// directly against AJV rather than through validateFile, which deliberately
+// coerces null -> {} first (LS-9801) and would mask this.
+test('vendored schema itself rejects a null `workflow_call` and accepts {}', () => {
+  const schema = loadSchema(WORKFLOW_SCHEMA_PATH);
+  const validate = makeAjv().compile(schema);
+
+  assert.equal(
+    validate({
+      on: { workflow_call: {} },
+      jobs: {
+        noop: { 'runs-on': 'ubuntu-latest', steps: [{ run: 'echo hi' }] },
+      },
+    }),
+    true,
+    '`workflow_call: {}` should satisfy the vendored schema',
+  );
+
+  const validNull = validate({
+    on: { workflow_call: null },
+    jobs: { noop: { 'runs-on': 'ubuntu-latest', steps: [{ run: 'echo hi' }] } },
+  });
+  assert.equal(
+    validNull,
+    false,
+    'a null `workflow_call` should fail the vendored schema',
+  );
+  assert.ok(
+    validate.errors.some((e) => e.instancePath === '/on/workflow_call'),
+    `expected an /on/workflow_call error, got ${JSON.stringify(validate.errors)}`,
+  );
+});
+
+// End-to-end guard: every workflow in the repo validates against the vendored
+// schema, so a regression fails this suite rather than waiting for CI.
+test('every workflow in the repo validates against the vendored schema', async () => {
+  const schema = loadSchema(WORKFLOW_SCHEMA_PATH);
+  const ajv = makeAjv();
+  const repoRoot = resolve(__dirname, '..', '..');
+  const glob = require('glob');
+
+  const files = glob.sync('.github/workflows/*.{yml,yaml}', {
+    cwd: repoRoot,
+    absolute: true,
+    nodir: true,
+  });
+  assert.ok(files.length > 0, 'expected to find workflow files');
+
+  const failures = [];
+  for (const file of files) {
+    const result = await validateFile(file, schema, ajv);
+    if (result) failures.push(result.file);
+  }
+  assert.deepEqual(failures, [], 'workflows failed schema validation');
 });
