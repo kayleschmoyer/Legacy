@@ -1428,6 +1428,39 @@ describe('football resolvers', () => {
         expect(mockDb.orderBy.mock.calls[0][1]).toBe('asc:id');
       });
 
+      // LS-9293: career_football_defense_idp's columns (e.g. ast_tkl) are
+      // bigint. Multiplying them by an untyped scoring-weight parameter lets
+      // Postgres infer the parameter's type as bigint from the column, which
+      // then fails to bind a fractional weight like ast_tkl's default 0.5 —
+      // "invalid input syntax for type bigint: 0.5". Every weight parameter
+      // must carry an explicit ::numeric cast so Postgres infers numeric
+      // instead.
+      it('casts every scoring-weight parameter to ::numeric so fractional weights bind against integer/bigint stat columns', async () => {
+        mockDb.then.mockImplementationOnce((resolve) => resolve([]));
+
+        await getResolver()(
+          {},
+          {
+            position: null,
+            search: null,
+            after: null,
+            sortBy: 'fpts',
+            sortDir: 'desc',
+          },
+          mockContext,
+          undefined as never,
+        );
+
+        const { sql: orderSql, params } = compileSql(
+          mockDb.orderBy.mock.calls[0][0],
+        );
+        const weightPlaceholderCount = (orderSql.match(/::numeric/g) ?? [])
+          .length;
+        // One weight per scoring category leaf (5 defense + 9 idp + 14 offense).
+        expect(weightPlaceholderCount).toBe(28);
+        expect(params).toContain(0.5);
+      });
+
       it('applies ascending direction with NULLS LAST for fpts', async () => {
         mockDb.then.mockImplementationOnce((resolve) => resolve([]));
 
