@@ -7476,7 +7476,7 @@
         },
         {
           "name": "aws_terraform_output",
-          "description": "Query Terraform state outputs. Runs `terraform output -json` and returns unwrapped values. Defaults to terraform/main; pass `chdir: \"terraform/runners\"` for runner-specific outputs (github_runners_webhook_url). Use instead of `cd terraform/main && terraform output -json | python -c ...`.",
+          "description": "Query Terraform state outputs. Runs `terraform output -json` and returns unwrapped values. Defaults to terraform/main; pass `chdir: \"terraform/runners\"` for runner-specific outputs (github_runners_webhook_url). Falls back to the main checkout if uninitialized. Use instead of `cd terraform/main && terraform output -json | python -c ...`.",
           "inputs": {
             "keys": {
               "type": "array",

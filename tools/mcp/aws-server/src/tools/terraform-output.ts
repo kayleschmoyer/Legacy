@@ -1,5 +1,6 @@
-import { join, relative, resolve } from 'node:path';
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { access } from 'node:fs/promises';
+import { join, relative, resolve } from 'node:path';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -24,6 +25,69 @@ type TerraformOutputMap = Record<string, TerraformOutputValue>;
  * `shell: true` command path if this tool is later extended.
  */
 const SAFE_TF_OUTPUT_NAME_RE = /^[A-Za-z0-9_-]+$/;
+
+/**
+ * Resolve the main checkout's repo root, for the worktree fallback below.
+ * `MAIN_REPO_PATH` (if set) wins outright; otherwise ask git for the worktree
+ * list — the main checkout is always the first entry (git documents worktree
+ * list as printing the main worktree first, followed by linked worktrees).
+ */
+async function resolveMainRepoRoot(cwd: string): Promise<string | null> {
+  if (process.env.MAIN_REPO_PATH) {
+    return process.env.MAIN_REPO_PATH;
+  }
+  try {
+    const raw = await runCommand(
+      'git',
+      ['worktree', 'list', '--porcelain'],
+      cwd,
+    );
+    const firstLine = raw
+      .split('\n')
+      .find((line) => line.startsWith('worktree '));
+    return firstLine ? firstLine.slice('worktree '.length).trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether `tfDir` has a `.terraform/` directory, i.e. `terraform init` has
+ * run there. Checked structurally rather than by pattern-matching Terraform's
+ * error text, so a future wording change in Terraform's own error message
+ * can't silently break the worktree fallback below.
+ */
+async function isTerraformInitialized(tfDir: string): Promise<boolean> {
+  try {
+    await access(join(tfDir, '.terraform'));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Run `terraform output -json` in `tfDir` and return the unwrapped, filtered map. */
+async function runTerraformOutput(
+  tfDir: string,
+  keys: string[] | undefined,
+): Promise<Record<string, unknown>> {
+  const raw = await runCommand('terraform', ['output', '-json'], tfDir);
+  const parsed = JSON.parse(raw) as TerraformOutputMap;
+
+  // Unwrap the {value, type, sensitive} envelope
+  const unwrapped: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(parsed)) {
+    unwrapped[key] = entry.sensitive ? '***SENSITIVE***' : entry.value;
+  }
+
+  // Filter to requested keys if provided, omitting missing keys rather than
+  // returning null (which is ambiguous with a legitimately null Terraform output).
+  return keys && keys.length > 0
+    ? Object.fromEntries(
+        keys.filter((k) => k in unwrapped).map((k) => [k, unwrapped[k]]),
+      )
+    : unwrapped;
+}
 
 export async function terraformOutput(
   params: TerraformOutputParams,
@@ -86,26 +150,67 @@ export async function terraformOutput(
     };
   }
 
-  try {
-    const raw = await runCommand('terraform', ['output', '-json'], tfDir);
-    const parsed = JSON.parse(raw) as TerraformOutputMap;
-
-    // Unwrap the {value, type, sensitive} envelope
-    const unwrapped: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(parsed)) {
-      unwrapped[key] = entry.sensitive ? '***SENSITIVE***' : entry.value;
+  // Worktree sessions never have `.terraform/` initialized (only the main
+  // checkout does — LS-5209). Checked structurally up front, rather than by
+  // pattern-matching Terraform's error text after a failed run, so a future
+  // wording change in that message can't silently break the fallback below.
+  // When uninitialized, skip straight to the main checkout instead of
+  // running `terraform` here just to watch it fail the same way every time.
+  if (!(await isTerraformInitialized(tfDir))) {
+    const mainRoot = await resolveMainRepoRoot(repoRoot);
+    if (mainRoot && resolve(mainRoot) !== resolve(repoRoot)) {
+      const fallbackDir = resolve(join(mainRoot, chdir));
+      try {
+        const result = await runTerraformOutput(fallbackDir, params.keys);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: minifiedJson(result),
+            },
+          ],
+        };
+      } catch (fallbackErr) {
+        const fallbackMessage =
+          fallbackErr instanceof Error
+            ? fallbackErr.message
+            : String(fallbackErr);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                ok: false,
+                chdir: tfDir,
+                error: `"${chdir}" is not terraform-initialized, and the main checkout fallback at "${fallbackDir}" also failed: ${fallbackMessage}`,
+                remedy:
+                  'Run `terraform init` in the terraform directory first.',
+              }),
+            },
+          ],
+          isError: true,
+        };
+      }
     }
 
-    // Filter to requested keys if provided, omitting missing keys rather than
-    // returning null (which is ambiguous with a legitimately null Terraform output).
-    const result: Record<string, unknown> =
-      params.keys && params.keys.length > 0
-        ? Object.fromEntries(
-            params.keys
-              .filter((k) => k in unwrapped)
-              .map((k) => [k, unwrapped[k]]),
-          )
-        : unwrapped;
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            ok: false,
+            chdir: tfDir,
+            error: `"${chdir}" is not terraform-initialized, and no main checkout could be resolved to fall back to.`,
+            remedy: 'Run `terraform init` in the terraform directory first.',
+          }),
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  try {
+    const result = await runTerraformOutput(tfDir, params.keys);
 
     // Heterogeneous map of Terraform output values -> minified JSON. The
     // response is a bare `{ outputName: value }` map (keys come from Terraform
@@ -126,10 +231,6 @@ export async function terraformOutput(
       /sso session.*expired|sso.*expired|credentials.*expired|InvalidClientTokenId|ExpiredToken/i.test(
         message,
       );
-    const isNotInit =
-      /terraform.*not.*init|no state|The directory.*has not been initialized/i.test(
-        message,
-      );
 
     return {
       content: [
@@ -141,9 +242,7 @@ export async function terraformOutput(
             error: message,
             remedy: isSsoError
               ? 'Run `aws sso login` to re-authenticate, then retry.'
-              : isNotInit
-                ? 'Run `terraform init` in the terraform directory first.'
-                : undefined,
+              : undefined,
           }),
         },
       ],

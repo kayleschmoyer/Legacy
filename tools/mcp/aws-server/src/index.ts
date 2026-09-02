@@ -430,7 +430,7 @@ server.tool(
 // --- aws_terraform_output ---
 server.tool(
   'aws_terraform_output',
-  'Query Terraform state outputs. Runs `terraform output -json` and returns unwrapped values. Defaults to terraform/main; pass `chdir: "terraform/runners"` for runner-specific outputs (github_runners_webhook_url). Use instead of `cd terraform/main && terraform output -json | python -c ...`.',
+  'Query Terraform state outputs. Runs `terraform output -json` and returns unwrapped values. Defaults to terraform/main; pass `chdir: "terraform/runners"` for runner-specific outputs (github_runners_webhook_url). Falls back to the main checkout if uninitialized. Use instead of `cd terraform/main && terraform output -json | python -c ...`.',
   {
     keys: z
       .array(z.string())
