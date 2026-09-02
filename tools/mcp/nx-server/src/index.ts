@@ -412,17 +412,17 @@ server.tool(
     "eslint.config.* so the project's flat config actually applies (ESLint 9 resolves flat " +
     'config from its cwd, not per file). A file list spanning two config roots is rejected — ' +
     `split it into one call per root. Capped at ${ESLINT_MAX_FILES} files. ` +
-    'IMPORTANT — this is NOT a fast path in this repo: every TS config here enables type-aware ' +
-    'rules via parserOptions.project, so ESLint builds a full TypeScript program before linting ' +
-    'even one file. Measured in lambdas/db: one file 4m40s vs the whole project 4m42s — scoping ' +
-    'saves ~2s of ~280s. That cost is per-run, not per-file. Use this when ' +
-    'you want a narrow report; use nx_run({ project, target: "lint" }) for a whole project (it ' +
-    'is Nx-cached) and nx_run_pc_chunk({ chunk: "pc-lint" }) for the repo. Note: typecheck ' +
-    'cannot be file-scoped at all — tsc rejects explicit source files combined with -p — so use ' +
-    'nx_run({ target: "typecheck" }) for project-granular type checking. Works on any file in the ' +
-    'repo, including files outside every Nx project (e.g. top-level scripts/, like ' +
-    'scripts/modules-pool/link.mjs) — the config-root walk above is filesystem-based, not the Nx ' +
-    'project graph, so it falls back to the repo-root eslint.config.* when no nearer one exists.',
+    'IMPORTANT — NOT a fast path in this repo: type-aware parserOptions.project rules force a ' +
+    'full TypeScript program build even for one file (~280s, measured in lambdas/db), and that ' +
+    'cost is per-run not per-file. Use this for a narrow report; use nx_run({ project, target: ' +
+    '"lint" }) for a whole (Nx-cached) project and nx_run_pc_chunk({ chunk: "pc-lint" }) for the ' +
+    'repo. Typecheck cannot be file-scoped (tsc rejects source files combined with -p) — use ' +
+    'nx_run({ target: "typecheck" }) instead. Works on any file in the repo, including files ' +
+    'outside every Nx project (e.g. top-level scripts/) — the config-root walk above is ' +
+    'filesystem-based, not the Nx project graph, so it falls back to the repo-root ' +
+    'eslint.config.* when no nearer one exists. ' +
+    'A run still going after ~45s returns { status: "running", jobId } — call nx_job_wait ' +
+    'to continue waiting; do NOT re-run (re-invoking joins the in-flight run).',
   {
     files: z
       .array(z.string())

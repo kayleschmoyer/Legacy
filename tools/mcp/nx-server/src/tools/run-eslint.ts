@@ -2,7 +2,12 @@ import { minifiedJson } from '@legacy-sports/mcp-format';
 import { existsSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { getRepoRoot, runPnpm } from '../run-command.js';
+import { registerJobFormatter } from '../job-formatters.js';
+import type { FormattedJobResult } from '../job-formatters.js';
+import { runJobWithBudget } from '../jobs.js';
+import type { JobSnapshot } from '../jobs.js';
+import { pnpmJobSpec, SYNC_BUDGET_MS } from '../nx-job.js';
+import { getRepoRoot } from '../run-command.js';
 import { MAX_OUTPUT_CHARS, truncateOutput } from '../truncate-output.js';
 import type { ToolResult } from '../types.js';
 
@@ -24,7 +29,10 @@ export const MAX_FILES = 50;
  *
  * An earlier 120s limit killed legitimate runs and surfaced as a bare
  * "Command failed" with no diagnostics, which is worse than waiting — same
- * reasoning as NX_RUN_TIMEOUT_MS in run-target.ts (LS-8353).
+ * reasoning as NX_RUN_TIMEOUT_MS in run-target.ts (LS-8353). This is now the
+ * job runner's process-level kill timeout (LS-9594) — independent of the
+ * ~45s single-call sync budget below, which only bounds how long one MCP
+ * call blocks before handing back a jobId.
  */
 const ESLINT_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -96,28 +104,23 @@ export function resolveConfigDir(absFile: string, baseCwd: string): string {
 }
 
 /**
- * Turn a failed `runPnpm` rejection into something actionable.
- *
- * `runCommand` rejects with `stdout + stderr` when ESLint reports violations,
- * but on a process timeout both streams are empty and the message degrades to
- * a bare "Command failed: …" with no diagnostics. Detect that case by elapsed
- * time and say so, rather than making the caller guess whether their code is
- * broken or the run was killed.
+ * Turn a terminal job's output into something actionable when the job runner
+ * killed the process via its internal process-level timeout, rather than
+ * ESLint itself finishing (with or without violations). On a real timeout the
+ * accumulated log rarely contains useful diagnostics, so say so explicitly
+ * instead of making the caller guess whether their code is broken or the run
+ * was killed.
  *
  * Exported for unit testing.
  */
-export function describeFailure(
-  message: string,
-  elapsedMs: number,
-  timeoutMs: number,
-): string {
-  if (elapsedMs < timeoutMs) return message;
+export function describeFailure(message: string, timedOut: boolean): string {
+  if (!timedOut) return message;
   return (
     `${message}\n\n` +
-    `Timed out after ${Math.round(timeoutMs / 1000)}s — no ESLint output was produced, ` +
-    `so this is a killed run, not a lint failure. Type-aware rules build a full TypeScript ` +
-    `program before linting, which dominates the run time and does not shrink with the file ` +
-    `list. Prefer nx_run({ project, target: "lint" }) for this project.`
+    `Timed out after ${Math.round(ESLINT_TIMEOUT_MS / 1000)}s — this is a killed run, not a ` +
+    `lint failure. Type-aware rules build a full TypeScript program before linting, which ` +
+    `dominates the run time and does not shrink with the file list. Prefer ` +
+    `nx_run({ project, target: "lint" }) for this project.`
   );
 }
 
@@ -131,6 +134,52 @@ function isInside(baseCwd: string, absPath: string): boolean {
   if (isAbsolute(rel)) return false;
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`));
 }
+
+/** Shape of the job metadata written by runESLint for deferred formatting. */
+interface ESLintJobMeta {
+  mode?: unknown;
+  filesCount?: unknown;
+  projectRoot?: unknown;
+}
+
+/**
+ * Build the structured eslint result body from a terminal job snapshot.
+ * Shared between the inline (within sync budget) path and the deferred
+ * nx_job_wait formatter so callers get the same result either way.
+ */
+function buildESLintResult(snapshot: JobSnapshot): FormattedJobResult {
+  const meta = (snapshot.meta ?? {}) as ESLintJobMeta;
+  const mode = typeof meta.mode === 'string' ? meta.mode : 'check';
+  const filesCount = typeof meta.filesCount === 'number' ? meta.filesCount : 0;
+  const projectRoot =
+    typeof meta.projectRoot === 'string' ? meta.projectRoot : '.';
+
+  const passed = snapshot.status === 'done';
+  const timedOut = !passed && /internal timeout/i.test(snapshot.error ?? '');
+  // A crash before eslint ever produced output (e.g. spawn failure) leaves
+  // snapshot.log empty — fall back to the job runner's own error message so
+  // the caller still sees something actionable instead of a blank string.
+  const rawOutput = snapshot.log || snapshot.error || '';
+  const output = describeFailure(rawOutput, timedOut);
+
+  return {
+    body: {
+      mode,
+      files: filesCount,
+      projectRoot,
+      passed,
+      output: truncateOutput(output, MAX_OUTPUT_CHARS),
+    },
+    isError: !passed,
+  };
+}
+
+// Deferred-completion formatter: a lint run still going when the sync budget
+// expires, observed later via nx_job_wait / nx_job_status, gets the same
+// structured result the inline path would have returned.
+registerJobFormatter('eslint', (snapshot) =>
+  Promise.resolve(buildESLintResult(snapshot)),
+);
 
 export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
   // Normalised up front so the ancestor walk in `resolveConfigDir` can compare
@@ -222,15 +271,35 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
     ...files,
   ];
 
-  const startedAt = Date.now();
-  try {
-    const output = await runPnpm(
-      args,
-      configDir,
-      ESLINT_TIMEOUT_MS,
-      undefined,
-      true,
-    );
+  // Run as a background job with a bounded sync wait: fast runs return their
+  // result in one call, slow ones (this repo's type-aware ESLint config
+  // floors at ~280s for even a single file — see ESLINT_TIMEOUT_MS above)
+  // return a jobId to poll via nx_job_wait — never blocking into the ~60s
+  // MCP transport timeout (LS-9594). Same job/jobId pattern as nx_run,
+  // nx_run_test, and nx_run_pc_chunk.
+  const jobSpec = pnpmJobSpec(args);
+  const snapshot = await runJobWithBudget(
+    {
+      command: jobSpec.command,
+      args: jobSpec.args,
+      shell: jobSpec.shell,
+      cwd: configDir,
+      label: `eslint (${params.files.length} file${params.files.length === 1 ? '' : 's'})`,
+      timeoutMs: ESLINT_TIMEOUT_MS,
+      // Blind retries (e.g. after a lost transport) join the in-flight run
+      // instead of spawning a duplicate eslint process.
+      idempotencyKey: `eslint:${configDir}:${args.join(' ')}`,
+      meta: {
+        kind: 'eslint',
+        mode,
+        filesCount: params.files.length,
+        projectRoot,
+      },
+    },
+    SYNC_BUDGET_MS,
+  );
+
+  if (snapshot.status === 'running' || snapshot.status === 'orphaned') {
     return {
       content: [
         {
@@ -239,33 +308,21 @@ export async function runESLint(params: RunESLintParams): Promise<ToolResult> {
             mode,
             files: params.files.length,
             projectRoot,
-            passed: true,
-            output: truncateOutput(output, MAX_OUTPUT_CHARS),
+            status: snapshot.status,
+            jobId: snapshot.jobId,
+            elapsedSec: snapshot.elapsedSec,
+            logTail: truncateOutput(snapshot.logTail ?? '', MAX_OUTPUT_CHARS),
+            hint: snapshot.hint,
           }),
         },
       ],
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const described = describeFailure(
-      message,
-      Date.now() - startedAt,
-      ESLINT_TIMEOUT_MS,
-    );
-    return {
-      content: [
-        {
-          type: 'text',
-          text: minifiedJson({
-            mode,
-            files: params.files.length,
-            projectRoot,
-            passed: false,
-            output: truncateOutput(described, MAX_OUTPUT_CHARS),
-          }),
-        },
-      ],
-      isError: true,
+      ...(snapshot.status === 'orphaned' ? { isError: true } : {}),
     };
   }
+
+  const formatted = buildESLintResult(snapshot);
+  return {
+    content: [{ type: 'text', text: minifiedJson(formatted.body) }],
+    ...(formatted.isError ? { isError: true } : {}),
+  };
 }
