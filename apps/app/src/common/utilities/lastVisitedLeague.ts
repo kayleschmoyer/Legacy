@@ -64,3 +64,23 @@ export function setLastVisitedLeague(
     );
   });
 }
+
+/**
+ * Drop the persisted last-visited league. This pointer is not scoped to a
+ * user id, so without this the post-login redirect (`app/login.tsx`) sent a
+ * newly-signed-in user straight to whichever league the *previous* account on
+ * this device last opened — a league they typically have no access to,
+ * surfaced as a false "league not found". Called on logout so the pointer
+ * never survives an account switch.
+ */
+export async function clearLastVisitedLeague(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(LAST_VISITED_LEAGUE_KEY);
+  } catch (error) {
+    // Best-effort persistence — warn (not error) so it doesn't page Rollbar.
+    LOGGER.warn(
+      'Failed to clear last visited league',
+      error instanceof Error ? error : new Error(String(error)),
+    );
+  }
+}

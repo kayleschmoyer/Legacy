@@ -28,6 +28,7 @@ import { EnvironmentVariable } from '../EnvironmentVariables';
 import { clearApolloCache } from '../ApolloClientContext';
 import { trackGoogleSignInFailure } from '../../utils/analytics';
 import { clearPushTokenRegistration } from '../../features/notifications/pushRegistrationFingerprint';
+import { clearLastVisitedLeague } from '../utilities/lastVisitedLeague';
 
 declare const __DEV__: boolean;
 
@@ -281,6 +282,11 @@ function usePlatformAuthHandlers(callbacks?: AuthCallbacks): AuthHandlers {
     // sees an unchanged token, skips registration, and push stays silently
     // disabled (LS-9541).
     await clearPushTokenRegistration();
+
+    // This pointer isn't scoped to a user id — leaving it behind sends the
+    // next account signed in on this device straight to the previous
+    // account's league, which they usually can't access ("league not found").
+    await clearLastVisitedLeague();
 
     router.replace('/');
   }, [router]);

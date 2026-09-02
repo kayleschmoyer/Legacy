@@ -150,6 +150,14 @@ jest.mock('./discordAuth', () => ({
     mockSignInWithDiscord(...args),
 }));
 
+// Mock the last-visited-league pointer so logout's clear call is assertable
+// without exercising real AsyncStorage.
+const mockClearLastVisitedLeague = jest.fn().mockResolvedValue(undefined);
+jest.mock('../utilities/lastVisitedLeague', () => ({
+  clearLastVisitedLeague: (...args: unknown[]): unknown =>
+    mockClearLastVisitedLeague(...args),
+}));
+
 // Mock app-config/native so the DbClient (graphqlHost) and any direct config
 // reads resolve during module init.
 jest.mock('@legacy-sports/app-config/native', () => ({
@@ -778,6 +786,17 @@ describe('AuthHooks', () => {
       expect(mockRemoveItem).toHaveBeenCalledWith('GOOGLE_JWT');
       expect(mockRemoveItem).toHaveBeenCalledWith('INTERNAL_JWT');
       expect(mockReplace).toHaveBeenCalledWith('/');
+    });
+
+    it('clears the last-visited-league pointer so a later sign-in on this device cannot land a different account on a league it has no access to', async () => {
+      mockSignOut.mockResolvedValue(undefined);
+      mockClearLastVisitedLeague.mockClear();
+
+      const { result } = renderHook(() => useAuthHandlers());
+
+      await act(() => result.current.logout());
+
+      expect(mockClearLastVisitedLeague).toHaveBeenCalled();
     });
 
     it('configures the OAuth provider before signing out', async () => {
