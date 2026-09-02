@@ -95,6 +95,44 @@ export async function resolveWorkflowId(workflow: string): Promise<string> {
   return basename(match.path);
 }
 
+/** Matches a full 40-character hex commit SHA (case-insensitive). */
+const FULL_SHA_RE = /^[0-9a-f]{40}$/i;
+/** Matches a plausible abbreviated commit SHA prefix (git's own minimum is 4). */
+const ABBREVIATED_SHA_RE = /^[0-9a-f]{4,39}$/i;
+
+/**
+ * Resolve a commit identifier to the full 40-character SHA GitHub's
+ * `head_sha` workflow-run filter requires an exact match against.
+ *
+ * `GET /actions/runs?head_sha=` only matches the full SHA — an abbreviated
+ * SHA (the form `git log --oneline` / `worktree_commit` naturally produce)
+ * silently matches nothing (LS-9589). `GET /repos/{owner}/{repo}/commits/{ref}`
+ * accepts an abbreviated SHA and returns the commit's full `sha`, so resolve
+ * through it first — same semantics as `git rev-parse --short`.
+ *
+ * A full SHA is returned unchanged (no extra request). A value that isn't a
+ * full SHA and doesn't even look like a hex prefix (a branch name passed by
+ * mistake, say) is also returned unchanged, so it degrades to today's
+ * exact-match behavior rather than wasting a lookup. If the lookup itself
+ * fails (unknown/ambiguous prefix), the original value is returned so the
+ * `head_sha` filter still degrades gracefully instead of hard-failing the
+ * whole list call.
+ */
+export async function resolveCommitSha(commit: string): Promise<string> {
+  const trimmed = commit.trim();
+  if (FULL_SHA_RE.test(trimmed) || !ABBREVIATED_SHA_RE.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const data = await githubGet<{ sha: string }>(
+      `/commits/${encodeURIComponent(trimmed)}`,
+    );
+    return data.sha;
+  } catch {
+    return trimmed;
+  }
+}
+
 interface ListRunsParams {
   branch?: string;
   workflow?: string;
@@ -160,7 +198,8 @@ export async function listRuns(params: ListRunsParams): Promise<ToolResult> {
   if (params.branch) queryParams.branch = params.branch;
   if (params.status) queryParams.status = params.status;
   if (params.event) queryParams.event = params.event;
-  if (params.commit) queryParams.head_sha = params.commit;
+  if (params.commit)
+    queryParams.head_sha = await resolveCommitSha(params.commit);
   if (params.user) queryParams.actor = params.user;
 
   try {
@@ -175,6 +214,31 @@ export async function listRuns(params: ListRunsParams): Promise<ToolResult> {
 
     const data = await githubGet<GitHubRunsResponse>(path, queryParams);
     const runs = data.workflow_runs.slice(0, limit).map(mapRun);
+
+    if (runs.length === 0 && workflowId) {
+      // The workflow name resolved to a real workflow, but the combination
+      // with branch/commit/status/event matched nothing. Distinguish "no
+      // runs at all for these filters" from "wrong workflow" by re-querying
+      // without the workflow filter — if the branch/commit does have runs,
+      // name the workflow(s) they actually belong to (LS-9589 AC3).
+      const broader = await githubGet<GitHubRunsResponse>(
+        '/actions/runs',
+        queryParams,
+      );
+      if (broader.workflow_runs.length > 0) {
+        const names = [
+          ...new Set(broader.workflow_runs.map((r) => r.name)),
+        ].slice(0, 5);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `No workflow runs found for workflow "${params.workflow}" with these filters, but ${broader.workflow_runs.length} run(s) exist under other workflow(s) matching the same branch/commit/status/event: ${names.map((n) => `"${n}"`).join(', ')}. Did you mean one of these?`,
+            },
+          ],
+        };
+      }
+    }
 
     return {
       content: [{ type: 'text', text: formatRunList(runs) }],
