@@ -1,4 +1,5 @@
 import postgres from 'postgres';
+import ts from 'typescript';
 import * as drizzleOrm from 'drizzle-orm';
 import * as drizzleOrmPgCore from 'drizzle-orm/pg-core';
 import * as drizzleOrmPostgresJs from 'drizzle-orm/postgres-js';
@@ -43,15 +44,36 @@ import { invokeWorkerAsync } from '../invoke-worker.js';
  * a full audit log of every migration keyed to the calling principal — the
  * principal is persisted on the job row so the worker's per-migration audit
  * lines stay keyed to the original caller across the async boundary.
+ *
+ * Callers may submit either pre-transpiled `jsSource` (the original path, LS-8119)
+ * or raw `tsSource` (LS-9582): when `tsSource` is given, `normalizeMigrations`
+ * transpiles it to CJS server-side via the TypeScript compiler API — the
+ * `typescript` package is pure JS (no native binary, unlike esbuild), so it
+ * bundles safely into the single-file Lambda output — before the payload is
+ * validated or persisted. Every downstream consumer (validation, the job row,
+ * the worker) only ever sees the resulting `jsSource`.
  */
 
-/** One transpiled migration as sent by the client, ordered by timestamp. */
+/**
+ * One migration as sent by the client, ordered by timestamp. Provide exactly
+ * one of `jsSource` (pre-transpiled CJS, e.g. via `esbuild`) or `tsSource`
+ * (raw TypeScript, transpiled server-side) — not both, not neither.
+ */
 export interface MigrationPayloadItem {
   /** Migration filename, e.g. `20260616_120000_add_x.ts`. */
   name: string;
   /** Tracking key in `drizzle.__drizzle_migrations` — the runner keys on filename. */
   hash: string;
   /** Client-transpiled CJS source of the migration module. */
+  jsSource?: string;
+  /** Raw TypeScript migration source, transpiled to CJS server-side (LS-9582). */
+  tsSource?: string;
+}
+
+/** A migration payload item after `normalizeMigrations` — `jsSource` is always populated. */
+export interface NormalizedMigrationItem {
+  name: string;
+  hash: string;
   jsSource: string;
 }
 
@@ -178,8 +200,78 @@ function assertDevEnvironment(): void {
   }
 }
 
+/**
+ * Transpile raw TypeScript migration source to CommonJS JavaScript, server-side
+ * (LS-9582). Uses the TypeScript compiler API (`ts.transpileModule`) rather
+ * than esbuild: it is pure JS with no native binary, so — unlike esbuild,
+ * which is deliberately kept out of this Lambda's bundle (see
+ * `src/client/migrate-client.ts`) — it bundles safely into the single-file
+ * Vite/Rollup output that actually ships to the Lambda.
+ *
+ * `reportDiagnostics: true` surfaces real syntax errors as a thrown error
+ * instead of letting the TypeScript compiler's error-recovery silently emit
+ * broken JavaScript.
+ */
+export function transpileTsSource(tsSource: string): string {
+  const output = ts.transpileModule(tsSource, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      esModuleInterop: true,
+    },
+    reportDiagnostics: true,
+  });
+
+  const errors = (output.diagnostics ?? []).filter(
+    (d) => d.category === ts.DiagnosticCategory.Error,
+  );
+  if (errors.length > 0) {
+    const messages = errors
+      .map((d) => ts.flattenDiagnosticMessageText(d.messageText, ' '))
+      .join('; ');
+    throw new Error(`Failed to transpile migration TypeScript: ${messages}`);
+  }
+  return output.outputText;
+}
+
+/**
+ * Normalize the raw client payload into items that always carry `jsSource`:
+ * transpile `tsSource` server-side when that's what was sent, pass `jsSource`
+ * through unchanged otherwise. Rejects an item that supplies both or neither
+ * (ambiguous) before any transpilation is attempted.
+ */
+function normalizeMigrations(
+  migrations: MigrationPayloadItem[],
+): NormalizedMigrationItem[] {
+  if (!Array.isArray(migrations)) {
+    throw new Error('No migrations provided.');
+  }
+
+  return migrations.map((m) => {
+    const hasJs = typeof m.jsSource === 'string' && m.jsSource.length > 0;
+    const hasTs = typeof m.tsSource === 'string' && m.tsSource.length > 0;
+
+    if (hasJs && hasTs) {
+      throw new Error(
+        `Migration '${m.name}' provided both jsSource and tsSource — pass exactly one.`,
+      );
+    }
+    if (hasTs) {
+      return {
+        name: m.name,
+        hash: m.hash,
+        jsSource: transpileTsSource(m.tsSource as string),
+      };
+    }
+    if (hasJs) {
+      return { name: m.name, hash: m.hash, jsSource: m.jsSource as string };
+    }
+    throw new Error(`Migration '${m.name}' must provide jsSource or tsSource.`);
+  });
+}
+
 /** Validate the request payload (count, total size, per-item name format). */
-function validatePayload(migrations: MigrationPayloadItem[]): void {
+function validatePayload(migrations: NormalizedMigrationItem[]): void {
   if (!Array.isArray(migrations) || migrations.length === 0) {
     throw new Error('No migrations provided.');
   }
@@ -250,7 +342,7 @@ async function getAppliedHashes(sqlClient: postgres.Sql): Promise<Set<string>> {
  */
 export async function applyMigrationBatch(
   sql: postgres.Sql,
-  migrations: MigrationPayloadItem[],
+  migrations: NormalizedMigrationItem[],
   principal: string,
   onProgress?: () => Promise<void>,
 ): Promise<MigrateResult> {
@@ -344,9 +436,11 @@ export async function migrate(
 ): Promise<ToolResult> {
   const principal = auditPrincipal(caller);
 
+  let migrations: NormalizedMigrationItem[];
   try {
     assertDevEnvironment();
-    validatePayload(params.migrations);
+    migrations = normalizeMigrations(params.migrations);
+    validatePayload(migrations);
   } catch (error) {
     LOGGER.error(
       `[db_migrate] rejected request (${principal}): ${errorMessage(error)}`,
@@ -365,9 +459,7 @@ export async function migrate(
 
   // Persist in apply order so the worker (and the audit trail) see the same
   // ordering the sync loop used to enforce.
-  const ordered = [...params.migrations].sort((a, b) =>
-    a.name.localeCompare(b.name),
-  );
+  const ordered = [...migrations].sort((a, b) => a.name.localeCompare(b.name));
 
   let sql: postgres.Sql;
   try {

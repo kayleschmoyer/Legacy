@@ -3,8 +3,9 @@ import {
   applyMigrationBatch,
   evalMigrationModule,
   migrate,
-  type MigrationPayloadItem,
   migrationRequire,
+  type NormalizedMigrationItem,
+  transpileTsSource,
 } from './migrate';
 import { getMigrationSql } from '../db.js';
 import {
@@ -70,7 +71,7 @@ function upSource(): string {
   return `"use strict";\nObject.defineProperty(exports, "__esModule", { value: true });\nexports.up = async () => {};`;
 }
 
-function item(name: string, jsSource = upSource()): MigrationPayloadItem {
+function item(name: string, jsSource = upSource()): NormalizedMigrationItem {
   return { name, hash: name, jsSource };
 }
 
@@ -88,6 +89,34 @@ describe('migrationRequire (sandbox allowlist)', () => {
     expect(() => migrationRequire('fs')).toThrow(/not allowed/);
     expect(() => migrationRequire('child_process')).toThrow(/not allowed/);
     expect(() => migrationRequire('../secrets')).toThrow(/not allowed/);
+  });
+});
+
+describe('transpileTsSource (server-side TS transpile, LS-9582)', () => {
+  it('transpiles a named export to CJS that evalMigrationModule accepts', () => {
+    const js = transpileTsSource(
+      'export const up = async ({ db }: { db: unknown }): Promise<void> => {};',
+    );
+    const mod = evalMigrationModule(js);
+    expect(typeof mod.up).toBe('function');
+  });
+
+  it('erases type-only imports', () => {
+    const js = transpileTsSource(
+      [
+        "import type { PgDatabase } from 'drizzle-orm/pg-core';",
+        'export const up = async ({ db }: { db: PgDatabase<unknown> }): Promise<void> => {};',
+      ].join('\n'),
+    );
+    expect(js).not.toContain('drizzle-orm/pg-core');
+    const mod = evalMigrationModule(js);
+    expect(typeof mod.up).toBe('function');
+  });
+
+  it('throws with a clear message on invalid syntax', () => {
+    expect(() => transpileTsSource('export const up = async ( => {};')).toThrow(
+      /Failed to transpile migration TypeScript/,
+    );
   });
 });
 
@@ -249,6 +278,91 @@ describe('db_migrate (async submit)', () => {
     expect(String(payload.error)).toContain('Too many migrations');
   });
 
+  it('transpiles tsSource server-side and submits it as jsSource (LS-9582)', async () => {
+    const result = await migrate(
+      {
+        migrations: [
+          {
+            name: '20260616_120000_a.ts',
+            hash: '20260616_120000_a.ts',
+            tsSource: 'export const up = async () => {};',
+          },
+        ],
+      },
+      CALLER,
+    );
+
+    expect(result.isError).toBeUndefined();
+    const inserted = mockInsertJob.mock.calls[0][1];
+    const persisted = JSON.parse(inserted.payload) as {
+      migrations: NormalizedMigrationItem[];
+    };
+    expect(persisted.migrations).toHaveLength(1);
+    expect(persisted.migrations[0].jsSource).toContain('exports.up');
+    expect('tsSource' in persisted.migrations[0]).toBe(false);
+  });
+
+  it('rejects a migration that provides both jsSource and tsSource', async () => {
+    const result = await migrate(
+      {
+        migrations: [
+          {
+            name: '20260616_120000_a.ts',
+            hash: '20260616_120000_a.ts',
+            jsSource: upSource(),
+            tsSource: 'export const up = async () => {};',
+          },
+        ],
+      },
+      CALLER,
+    );
+
+    expect(result.isError).toBe(true);
+    const payload = parse(result.content[0].text);
+    expect(String(payload.error)).toContain(
+      'provided both jsSource and tsSource',
+    );
+    expect(mockInsertJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects a migration that provides neither jsSource nor tsSource', async () => {
+    const result = await migrate(
+      {
+        migrations: [
+          { name: '20260616_120000_a.ts', hash: '20260616_120000_a.ts' },
+        ],
+      },
+      CALLER,
+    );
+
+    expect(result.isError).toBe(true);
+    const payload = parse(result.content[0].text);
+    expect(String(payload.error)).toContain(
+      'must provide jsSource or tsSource',
+    );
+    expect(mockInsertJob).not.toHaveBeenCalled();
+  });
+
+  it('rejects unparseable tsSource with a clear error', async () => {
+    const result = await migrate(
+      {
+        migrations: [
+          {
+            name: '20260616_120000_a.ts',
+            hash: '20260616_120000_a.ts',
+            tsSource: 'export const up = async ( => {};',
+          },
+        ],
+      },
+      CALLER,
+    );
+
+    expect(result.isError).toBe(true);
+    const payload = parse(result.content[0].text);
+    expect(String(payload.error)).toContain('Failed to transpile');
+    expect(mockInsertJob).not.toHaveBeenCalled();
+  });
+
   it('persists the job in apply order and returns { jobId, status: running }', async () => {
     const result = await migrate(
       {
@@ -278,7 +392,7 @@ describe('db_migrate (async submit)', () => {
       '20260616_130000_c.ts',
     ]);
     const persisted = JSON.parse(inserted.payload) as {
-      migrations: MigrationPayloadItem[];
+      migrations: NormalizedMigrationItem[];
     };
     expect(persisted.migrations.map((m) => m.name)).toEqual([
       '20260616_120000_a.ts',

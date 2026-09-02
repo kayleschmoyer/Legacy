@@ -47,9 +47,13 @@ via `@legacy-sports/mcp-bearer-auth`. Clients mint the bearer per-connect with
 ### `db_migrate` (remote DDL — handle with care)
 
 `db_migrate` is effectively a remote DDL endpoint. The hosted Lambda cannot see
-a developer's local migrations directory, so the **client** transpiles each
-pending migration `.ts` to CommonJS with esbuild and POSTs
-`{ migrations: [{ name, hash, jsSource }] } ` (ordered by timestamp).
+a developer's local migrations directory, so the caller POSTs
+`{ migrations: [{ name, hash, tsSource }] }` (ordered by timestamp) with the
+**raw** `.ts` migration source — the server transpiles it to CommonJS itself
+via the TypeScript compiler API (`transpileTsSource`, LS-9582), so no
+client-side transpile step is required. `jsSource` (already-transpiled CJS,
+e.g. from esbuild) is still accepted for backward compatibility; provide
+exactly one of `jsSource`/`tsSource` per migration, never both.
 
 **Async job contract (LS-8563).** The tool validates the payload, persists it
 to a job row (`drizzle.__db_migrate_jobs`, created on demand), fires an async
@@ -83,18 +87,20 @@ transported over the wire, not arbitrary third-party code. The principal is
 persisted on the job row, so the worker's per-migration audit lines stay keyed
 to the original caller across the async boundary.
 
-Client helper: `src/client/migrate-cli.ts` (run via `tsx`). It reads
-`MCP_DB_ADMIN_URL` + `MCP_DB_ADMIN_BEARER` from the environment, submits the
-batch, and polls the job to its terminal state so callers still see one
-logical operation. The pure transpile/payload/poll logic lives in
-`src/client/migrate-client.ts`.
+Client helper: `src/client/migrate-cli.ts` (run via `tsx`, outside an MCP
+session — needs `MCP_DB_ADMIN_URL` + `MCP_DB_ADMIN_BEARER` in the shell). It
+still transpiles locally with esbuild before POSTing (`src/client/migrate-client.ts`)
+and polls the job to its terminal state so callers still see one logical
+operation; this path is unaffected by LS-9582.
 
-**Agent callers** (MCP session, no `MCP_DB_ADMIN_BEARER` in the shell): don't
-hand-run `esbuild` and hand-paste the output into `jsSource` — run
-`node scripts/db/transpile-migration.mjs [<migration-file>...]` (LS-9203) and
-pass its stdout straight through as the `migrations` argument to the
-`db_migrate` MCP tool call. No arguments transpiles every migration file in
-`lib/db-client/migrations/` (the server skips already-applied ones).
+**Agent callers** (MCP session, calling the `db_migrate` tool directly): read
+each pending migration file's raw `.ts` source (e.g. with the `Read` tool) and
+pass it straight through as `tsSource` — `{ migrations: [{ name, hash,
+tsSource }] }`. The server transpiles it itself (LS-9582); no local esbuild
+invocation, and no intermediate script, is needed. (The
+`scripts/db/transpile-migration.mjs` helper from LS-9203 still works — it
+produces a `jsSource`-shaped payload — but `tsSource` is the simpler path now
+that the server does the transpile.)
 
 ## Environment (set by Terraform — see `terraform/main/lambda-mcp-db.tf`)
 

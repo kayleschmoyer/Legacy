@@ -76,16 +76,14 @@ function createMcpServer(caller: McpCaller): McpServer {
   server.tool(
     'db_migrate',
     'Apply UNMERGED local-branch migrations to the dev database over HTTPS (no SSM tunnel). ' +
-      'The client transpiles each pending migration .ts to CJS JavaScript and sends ' +
-      '{ migrations: [{ name, hash, jsSource }] } ordered by timestamp. ASYNC: the server ' +
-      'validates the payload, persists it to a job row, fires a background worker, and returns ' +
-      '{ jobId, status: "running" } immediately — poll db_migration_status({ jobId }) every ~5s ' +
-      'until terminal (done/failed/orphaned) for the result ({ applied, appliedNames, skipped, ' +
-      'success, failed?, error? }). The worker evaluates each migration in a constrained sandbox ' +
-      'as the migration_user role; already-applied migrations are skipped and the run stops on ' +
-      'the first failure, so re-submitting after a failure is resume-safe. If a job is already ' +
-      'running, the call joins it (returns the existing jobId) instead of starting a second ' +
-      'worker. Dev-only.',
+      'Send { migrations: [{ name, hash, tsSource }] } ordered by timestamp — tsSource is raw ' +
+      '.ts source, transpiled server-side (no client esbuild step); jsSource (pre-transpiled ' +
+      'CJS) also still works — exactly one per migration. ASYNC: validates, persists a job row, ' +
+      'fires a worker, returns { jobId, status: "running" } — poll db_migration_status({ jobId }) ' +
+      'every ~5s until terminal (done/failed/orphaned) for the result ({ applied, appliedNames, ' +
+      'skipped, success, failed?, error? }). Already-applied migrations are skipped and the run ' +
+      'stops on the first failure, so re-submitting after a failure is resume-safe. A running ' +
+      'job is joined, not duplicated. Dev-only.',
     {
       migrations: z
         .array(
@@ -96,8 +94,15 @@ function createMcpServer(caller: McpCaller): McpServer {
             hash: z.string().describe('Tracking key (the migration filename).'),
             jsSource: z
               .string()
+              .optional()
               .describe(
-                'Client-transpiled CJS source of the migration module.',
+                'Pre-transpiled CJS source (one of jsSource/tsSource).',
+              ),
+            tsSource: z
+              .string()
+              .optional()
+              .describe(
+                'Raw TS source; transpiled server-side (one of jsSource/tsSource).',
               ),
           }),
         )

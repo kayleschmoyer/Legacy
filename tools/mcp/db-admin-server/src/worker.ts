@@ -4,7 +4,7 @@ import { errorMessage } from './types.js';
 import { finishJob, heartbeatJob, loadJob } from './jobs.js';
 import {
   applyMigrationBatch,
-  type MigrationPayloadItem,
+  type NormalizedMigrationItem,
 } from './tools/migrate.js';
 
 /**
@@ -52,7 +52,7 @@ export async function runDbMigrateWorker(jobId: string): Promise<void> {
 
   try {
     const payload = JSON.parse(job.payload) as {
-      migrations: MigrationPayloadItem[];
+      migrations: NormalizedMigrationItem[];
     };
     const result = await applyMigrationBatch(
       sql,
