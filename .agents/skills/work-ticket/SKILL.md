@@ -69,7 +69,7 @@ If the session was launched via the launcher's `worktree` checkbox (CWD is `.cla
 worktree_set(key: "<absolute .claude/worktrees/... path>")
 ```
 
-The worktree MCP server tracks an "active" worktree independently of the session CWD. Without this call it defaults to whatever worktree was active in a previous session, causing `worktree_rename_session`, `worktree_commit`, `worktree_run`, and all other worktree MCP tools to silently target the wrong tree (LS-3459). Use `pwd` or the `WORKTREE_PATH` env var to get the absolute path.
+The worktree MCP server tracks an "active" worktree independently of the session CWD. Without this call it defaults to whatever worktree was active in a previous session, causing `worktree_rename_session`, `worktree_commit`, `worktree_run`, and all other worktree MCP tools to silently target the wrong tree (a past-incident root cause — see the "Agent committed/ran against the WRONG worktree" row in `.agents/skills/failure-archaeology/references/incident-index.md` if you want the ticket history; it has no bearing on the ticket you're working now). Use `pwd` or the `WORKTREE_PATH` env var to get the absolute path.
 
 Skip this sub-step only if no worktree MCP tools will be used in this session (rare — `worktree_rename_session` in Step 1 already requires it).
 

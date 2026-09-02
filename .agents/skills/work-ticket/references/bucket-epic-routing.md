@@ -13,7 +13,7 @@ Identify the bucket by calling `jira_get_bucket_epic({ bucket: "<name>" })` for 
 | **client-bugs**    | `jira_get_bucket_epic({ bucket: "client-bugs" })` | `/work-ticket LS-####`                                                                                                                                                                                                 | None — the child ticket carries the bug repro. (`/work-bugs` is the **bucket-level dispatcher** with no `$ARGUMENTS`; do not invoke it per-child.) |
 | Other bucket epics | no registry match                                 | `/work-ticket LS-####`                                                                                                                                                                                                 | One-line summary of the bucket's purpose if visible in the epic description; otherwise omit                                                        |
 
-> The custom Jira MCP server's `jira_get_bucket_epic` is the canonical lookup. Hardcoded keys (e.g. LS-2981 for `mcp-gaps`) drift as buckets rotate; **never** hardcode.
+> The custom Jira MCP server's `jira_get_bucket_epic` is the canonical lookup. Hardcoding a specific epic key for `mcp-gaps` (or any bucket) drifts as buckets rotate; **never** hardcode — always resolve the current key via `jira_get_bucket_epic`.
 
 ## Chip prompt selection
 
