@@ -84,7 +84,10 @@ import {
   assertLeagueMemberOrSystem,
   isBenignAutoPickRace,
   isLockWaitTimeout,
+  runAutoPickLockedTransaction,
 } from './scheduled-mutations';
+import type { CandidatePool } from './candidate-pool';
+import { withTransientRetry } from '../leagues/delete-resilience';
 import type { Context } from '../builder';
 
 // Minimal db mock — the real drizzle query builder is replaced with a jest.fn()
@@ -280,6 +283,67 @@ describe('isLockWaitTimeout (LS-8398)', () => {
     expect(
       isLockWaitTimeout(new Error('Team 5 roster is full in draft 100')),
     ).toBe(false);
+  });
+});
+
+describe('runAutoPickLockedTransaction deadlock retry (LS-9690)', () => {
+  /** A Postgres error carrying a SQLSTATE `code`, as postgres.js throws. */
+  function pgError(message: string, code: string): Error {
+    return Object.assign(new Error(message), { code });
+  }
+
+  it('retries once and succeeds when the drafts row lock transaction hits a deadlock (40P01)', async () => {
+    let attempts = 0;
+    const successResult = { isDraftComplete: false } as never;
+    const db = {
+      transaction: jest.fn(() => {
+        attempts++;
+        if (attempts === 1) {
+          return Promise.reject<never>(pgError('deadlock detected', '40P01'));
+        }
+        return Promise.resolve(successResult);
+      }),
+    };
+
+    const result = await withTransientRetry(() =>
+      runAutoPickLockedTransaction({
+        db: db as never,
+        draftId: 11479,
+        draftLeagueId: 11817,
+        pickTimeLimitSeconds: 30,
+        candidatePool: {} as CandidatePool,
+        predicted: null,
+      }),
+    );
+
+    expect(attempts).toBe(2);
+    expect(db.transaction).toHaveBeenCalledTimes(2);
+    expect(result).toBe(successResult);
+  });
+
+  it('does not swallow a genuine (non-transient) error from the locked transaction', async () => {
+    const db = {
+      transaction: jest.fn(() =>
+        Promise.reject<never>(
+          new Error('Team 5 roster is full in draft 11479'),
+        ),
+      ),
+    };
+
+    await expect(
+      withTransientRetry(() =>
+        runAutoPickLockedTransaction({
+          db: db as never,
+          draftId: 11479,
+          draftLeagueId: 11817,
+          pickTimeLimitSeconds: 30,
+          candidatePool: {} as CandidatePool,
+          predicted: null,
+        }),
+      ),
+    ).rejects.toThrow('Team 5 roster is full in draft 11479');
+    // Non-transient errors are not retried — a single attempt only.
+    expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 });
 

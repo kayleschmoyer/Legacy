@@ -39,6 +39,7 @@ import {
   describeDbError,
   formatDbError,
   isRetryablePgError,
+  withTransientRetry,
 } from '../leagues/delete-resilience';
 
 /**
@@ -680,14 +681,37 @@ builder.mutationField('autoProcessDraftPicks', (t) =>
               );
 
               // ─── Phase 2: Short locked write transaction ──────────────────
-              const pickResult = await runAutoPickLockedTransaction({
-                db: context.db,
-                draftId,
-                draftLeagueId,
-                pickTimeLimitSeconds,
-                candidatePool,
-                predicted,
-              });
+              // Wrapped in withTransientRetry (LS-9690): the `drafts` row lock
+              // is also taken by makeDraftPick / commissionerPick / setDraftOrder,
+              // and a concurrent invocation racing this one for the same row can
+              // trip Postgres's deadlock detector (40P01) rather than merely
+              // waiting out the lock (which isLockWaitTimeout already handles).
+              // The transaction re-verifies everything (deadline, league status,
+              // TOCTOU pick check, guardConcurrentPick) under the lock, so
+              // retrying it whole after a rolled-back deadlock is safe.
+              const pickResult = await withTransientRetry(
+                () =>
+                  runAutoPickLockedTransaction({
+                    db: context.db,
+                    draftId,
+                    draftLeagueId,
+                    pickTimeLimitSeconds,
+                    candidatePool,
+                    predicted,
+                  }),
+                {
+                  onRetry: (attempt, detail) =>
+                    LOGGER.warn(
+                      '[autoProcessDraftPicks] Retrying auto-pick transaction after transient DB error',
+                      {
+                        draftId,
+                        leagueId: draftLeagueId,
+                        attempt,
+                        dbError: formatDbError(detail),
+                      },
+                    ),
+                },
+              );
 
               if (!pickResult) {
                 break; // Deadline not expired or cleared — exit inner loop
