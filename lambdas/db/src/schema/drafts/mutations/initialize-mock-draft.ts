@@ -463,7 +463,12 @@ builder.mutationField('initializeMockDraft', (t) =>
           // If the first pick belongs to a CPU team (human is not in slot 1),
           // immediately expire the deadline so autoProcessDraftPicks fires as
           // soon as the client nudges (~2 s after loading the draft board).
-          const firstPickIsCpu = userPickPosition !== 1;
+          // Control All Teams (LS-9253) never seats a CPU team — every slot,
+          // including the ones the human isn't personally named on, is a
+          // human-controlled pick — so this must never treat another slot's
+          // turn as a CPU turn to immediately expire, even when the human's
+          // own seat isn't position 1 (LS-9369).
+          const firstPickIsCpu = !controlAllTeams && userPickPosition !== 1;
           const initialDeadline = firstPickIsCpu
             ? new Date(Date.now() - 1)
             : new Date(Date.now() + pickTimeLimit * 1000);

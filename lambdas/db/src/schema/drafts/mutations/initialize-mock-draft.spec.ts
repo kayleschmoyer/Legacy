@@ -710,6 +710,40 @@ describe('initializeMockDraft Control All Teams (LS-9253)', () => {
     expect(draftTeamInserts).toHaveLength(4);
     expect(draftTeamInserts.every((dt) => dt.autoPick === false)).toBe(true);
   });
+
+  // LS-9369: the human's own seat isn't always draft position 1. Before this
+  // fix, `firstPickIsCpu` was computed as `userPickPosition !== 1` with no
+  // regard for controlAllTeams, so any Control All Teams draft where the
+  // human picked a seat other than #1 got its initial deadline set to
+  // already-expired (`Date.now() - 1`) instead of the untimed sentinel —
+  // wrong data for a mode where no team ever auto-picks and the client's
+  // "untimed" flag (queries.league.isOfflineDraft) shouldn't be the only
+  // thing standing between this draft and a bogus expired pick clock.
+  it('never sets an already-expired initial deadline for controlAllTeams, even when the human is not seated in position 1', async () => {
+    const resolve = await captureInitializeMockDraftResolver({
+      requireEntitlementImpl: jest.fn().mockResolvedValue(undefined),
+    });
+    const { chain, mockTx } = makeChainAndTx();
+    const db = makeMockDb((cb: unknown) =>
+      (cb as (tx: unknown) => Promise<unknown>)(mockTx),
+    );
+
+    // VALID_ARGS.userPickPosition is 2 (not position 1).
+    const beforeCall = Date.now();
+    await resolve(
+      {},
+      { ...VALID_ARGS, controlAllTeams: true },
+      { user: { id: 1 }, db },
+      undefined,
+    );
+
+    const draftDeadlineUpdate = chain.set.mock.calls[0][0] as {
+      currentPickDeadline: Date;
+    };
+    expect(draftDeadlineUpdate.currentPickDeadline.getTime()).toBeGreaterThan(
+      beforeCall,
+    );
+  });
 });
 
 export {};
