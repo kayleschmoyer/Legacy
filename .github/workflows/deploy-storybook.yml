@@ -15,7 +15,7 @@ name: Deploy Storybook
 on:
   # Push to main is handled by the umbrella Deploy workflow via workflow_call
   # so all deploys report under a single run.
-  workflow_call:
+  workflow_call: {}
 
   pull_request:
     types: [opened, synchronize, reopened]

@@ -31,7 +31,7 @@ name: Apply Lambda Infrastructure
 # Uses cancel-in-progress to batch multiple Lambda updates into one apply.
 
 on:
-  workflow_call:
+  workflow_call: {}
   workflow_run:
     workflows:
       - "Upload Lambdas"
