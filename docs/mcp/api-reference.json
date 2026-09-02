@@ -5567,7 +5567,7 @@
         },
         {
           "name": "github_secrets_check",
-          "description": "List all repo secret names or check specific secrets exist. Returns names, createdAt, updatedAt (never values). When names are omitted, lists all; when provided, returns per-secret exists status.",
+          "description": "List secret names or check they exist (never values). environment scopes to an environment; bulk-list 403s degrade instead of throwing.",
           "inputs": {
             "names": {
               "type": "array",
@@ -5579,7 +5579,11 @@
                 "type": "string",
                 "optional": false
               },
-              "description": "Specific secret names to check for existence. If omitted, lists all secret names."
+              "description": "Names to check. Omit to list all."
+            },
+            "environment": {
+              "type": "string",
+              "optional": true
             }
           },
           "transports": [

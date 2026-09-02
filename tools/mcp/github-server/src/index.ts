@@ -1415,15 +1415,14 @@ export function createServer(): McpServer {
   // --- github_secrets_check ---
   server.tool(
     'github_secrets_check',
-    'List all repo secret names or check specific secrets exist. Returns names, createdAt, updatedAt (never values). When names are omitted, lists all; when provided, returns per-secret exists status.',
+    'List secret names or check they exist (never values). environment scopes to an environment; bulk-list 403s degrade instead of throwing.',
     {
       names: z
         .array(z.string())
         .min(1)
         .optional()
-        .describe(
-          'Specific secret names to check for existence. If omitted, lists all secret names.',
-        ),
+        .describe('Names to check. Omit to list all.'),
+      environment: z.string().optional(),
     },
     async (params) => secretsCheck(params),
   );
