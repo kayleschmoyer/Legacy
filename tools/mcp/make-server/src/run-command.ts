@@ -2,6 +2,8 @@ import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { buildChildEnv } from './child-env.js';
+
 const COMMAND_TIMEOUT = 300_000; // 5 minutes default for make targets
 
 export { resolveBashExecutable } from './resolve-bash.js';
@@ -37,6 +39,7 @@ export function runCommand(
   timeoutMs = COMMAND_TIMEOUT,
   shell = false,
   maxBuffer = 10 * 1024 * 1024,
+  env?: Record<string, string>,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(
@@ -50,6 +53,7 @@ export function runCommand(
         // CREATE_NO_WINDOW: suppress the console window that cmd.exe/powershell.exe
         // would otherwise flash when spawned from a hidden stdio MCP child on Windows.
         windowsHide: true,
+        env: buildChildEnv(env),
       },
       (err, stdout, stderr) => {
         if (err) {
