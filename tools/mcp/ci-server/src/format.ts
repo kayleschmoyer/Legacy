@@ -26,9 +26,14 @@ type Row = Record<string, unknown>;
 /**
  * Columns surfaced for a workflow-run list. Pruned from the 17 fields `mapRun`
  * produces: `databaseId` duplicates `id`, `workflowName` duplicates `name`,
- * `url` is derivable from `id`, and `headSha`/`startedAt`/`updatedAt`/
+ * `url` is derivable from `id`, and `startedAt`/`updatedAt`/
  * `workflowDatabaseId`/`attempt` are rarely read off a list (agents fetch run
  * detail when they need them). `id` is the value follow-up tools take as `runId`.
+ *
+ * `headSha` (short form) is included (LS-9584): `headBranch` is identical
+ * across every run on a branch, so without a commit it's impossible to tell
+ * which run belongs to the current head after a force-push/amend and which
+ * belongs to a superseded SHA — a recurring source of false-red triage.
  */
 export const RUN_LIST_COLUMNS = [
   'id',
@@ -37,6 +42,7 @@ export const RUN_LIST_COLUMNS = [
   'conclusion',
   'event',
   'headBranch',
+  'headSha',
   'number',
   'displayTitle',
   'createdAt',
@@ -44,6 +50,9 @@ export const RUN_LIST_COLUMNS = [
 
 /** Cap the commit/PR title so one verbose row can't dominate the table. */
 const RUN_DISPLAY_TITLE_MAX = 80;
+
+/** Short-SHA length, matching `gh run list --json headSha`'s conventional prefix. */
+const RUN_HEAD_SHA_SHORT_LENGTH = 9;
 
 /**
  * Render a workflow-run list as a compact Markdown table. Returns an explicit
@@ -53,6 +62,10 @@ export function formatRunList(runs: readonly Row[]): string {
   if (runs.length === 0) return 'No workflow runs found.';
   const rows = pickFields(runs, RUN_LIST_COLUMNS).map((run) => ({
     ...run,
+    headSha:
+      typeof run.headSha === 'string'
+        ? run.headSha.slice(0, RUN_HEAD_SHA_SHORT_LENGTH)
+        : run.headSha,
     displayTitle: truncate(
       typeof run.displayTitle === 'string' ? run.displayTitle : '',
       RUN_DISPLAY_TITLE_MAX,

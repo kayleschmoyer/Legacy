@@ -84,7 +84,6 @@ describe('formatRunList', () => {
     for (const dropped of [
       'databaseId',
       'workflowName',
-      'headSha',
       'workflowDatabaseId',
       'startedAt',
       'updatedAt',
@@ -100,6 +99,13 @@ describe('formatRunList', () => {
     expect(out).toContain('27490583650');
     expect(out).toContain('pending');
     expect(out).toContain('claude/relaxed-wright-owhd9w');
+  });
+
+  it('includes headSha shortened to a 9-char prefix so runs can be mapped to commits (LS-9584)', () => {
+    const out = formatRunList([makeRun()]);
+    expect(out).toContain('820001cb9');
+    // The full 41-char SHA is not emitted, only the short prefix.
+    expect(out).not.toContain('820001cb9e3d269692d4460d2e72c8031fb1aec5');
   });
 
   it('truncates a verbose displayTitle so one row cannot dominate', () => {
