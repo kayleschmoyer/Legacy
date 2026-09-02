@@ -377,7 +377,10 @@ server.tool(
     'against exactly the given files — never the whole repo diff — so it carries none of ' +
     "pc-format's auto-amend-already-pushed-commit risk (LS-8367) or full per-file-listing " +
     `overflow risk (LS-8423). Capped at ${PRETTIER_MAX_FILES} files — for broader formatting use ` +
-    'nx_run_pc_chunk({ chunk: "pc-format" }) instead.',
+    'nx_run_pc_chunk({ chunk: "pc-format" }) instead. Works on any file in the repo, including ' +
+    'files outside every Nx project (e.g. top-level scripts/, like scripts/modules-pool/link.mjs) ' +
+    '— there is no Nx project resolution here at all, just prettier run directly against the ' +
+    'given paths.',
   {
     files: z
       .array(z.string())
@@ -416,7 +419,10 @@ server.tool(
     'you want a narrow report; use nx_run({ project, target: "lint" }) for a whole project (it ' +
     'is Nx-cached) and nx_run_pc_chunk({ chunk: "pc-lint" }) for the repo. Note: typecheck ' +
     'cannot be file-scoped at all — tsc rejects explicit source files combined with -p — so use ' +
-    'nx_run({ target: "typecheck" }) for project-granular type checking.',
+    'nx_run({ target: "typecheck" }) for project-granular type checking. Works on any file in the ' +
+    'repo, including files outside every Nx project (e.g. top-level scripts/, like ' +
+    'scripts/modules-pool/link.mjs) — the config-root walk above is filesystem-based, not the Nx ' +
+    'project graph, so it falls back to the repo-root eslint.config.* when no nearer one exists.',
   {
     files: z
       .array(z.string())

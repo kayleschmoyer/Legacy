@@ -137,4 +137,21 @@ describe('runPrettier', () => {
     expect(result.isError).toBe(true);
     expect(mockRunPnpm).not.toHaveBeenCalled();
   });
+
+  it('formats a file outside every Nx project (top-level scripts/) the same as any other file — there is no project scoping here at all (LS-9574)', async () => {
+    mockRunPnpm.mockResolvedValue('');
+
+    const result = await runPrettier({
+      files: ['scripts/modules-pool/link.mjs'],
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockRunPnpm).toHaveBeenCalledWith(
+      ['exec', 'prettier', '--check', 'scripts/modules-pool/link.mjs'],
+      '/repo',
+      expect.any(Number),
+      undefined,
+      true,
+    );
+  });
 });

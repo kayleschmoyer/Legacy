@@ -281,6 +281,24 @@ describe('runESLint', () => {
       true,
     );
   });
+
+  it('lints a file outside every Nx project (top-level scripts/) via the root config, same as any other file (LS-9574)', async () => {
+    setConfigRoots([ROOT]);
+    mockRunPnpm.mockResolvedValue('');
+
+    const result = await runESLint({
+      files: ['scripts/modules-pool/link.mjs'],
+    });
+
+    expect(result.isError).toBeUndefined();
+    expect(mockRunPnpm).toHaveBeenCalledWith(
+      ['exec', 'eslint', '--max-warnings=0', 'scripts/modules-pool/link.mjs'],
+      ROOT,
+      expect.any(Number),
+      undefined,
+      true,
+    );
+  });
 });
 
 describe('describeFailure', () => {
