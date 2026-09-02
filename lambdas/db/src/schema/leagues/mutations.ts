@@ -2308,7 +2308,8 @@ builder.mutationField('deleteLeague', (t) =>
 );
 
 /**
- * Atomically delete a set of leagues in a deadlock-safe order (LS-8099).
+ * Atomically delete a set of leagues in a deadlock-safe order (LS-8099,
+ * LS-8125).
  *
  * `deleteAllLeagues` previously issued a single
  * `DELETE FROM leagues WHERE id IN (...)`. Each league delete CASCADEs to ~18
@@ -2320,8 +2321,22 @@ builder.mutationField('deleteLeague', (t) =>
  * Deleting the leagues one at a time in ascending-id order inside a single
  * transaction makes every concurrent transaction acquire each league's lock set
  * in the same global order and hold it until commit, so no deadlock cycle can
- * form. Atomicity is preserved by the surrounding transaction; child rows are
- * still removed by the existing CASCADE constraints.
+ * form for the `leagues` CASCADE tree itself.
+ *
+ * `league_scoring_profiles.copied_from_profile_id` is a self-referential FK
+ * (ON DELETE SET NULL, LS-8137) that can point to a profile in a *different*
+ * league than the one being deleted — the profile-id lock order it implies has
+ * no relationship to the ascending league-id order above. Two concurrent
+ * deletes over leagues whose scoring profiles cross-reference each other could
+ * still deadlock: each transaction deletes its own leagues in id order while
+ * implicitly SET-NULL-locking the other transaction's not-yet-deleted profile
+ * row, producing a lock cycle across the two unrelated lock orders (Rollbar
+ * item 155, pgCode 40P01, deadlock on two `ShareLock`-on-transaction waits).
+ * Clearing every such cross-reference up front in one bulk, single-statement
+ * UPDATE — before the per-league delete loop — removes that second, unordered
+ * lock class entirely: concurrent transactions targeting overlapping profile
+ * sets now contend on the same single statement (and therefore the same row
+ * scan order) instead of on interleaved per-row CASCADE triggers.
  */
 export async function deleteLeaguesAtomically(
   db: Context['db'],
@@ -2335,6 +2350,25 @@ export async function deleteLeaguesAtomically(
   const orderedIds = [...leagueIds].sort((a, b) => a - b);
 
   await db.transaction(async (tx) => {
+    // Break cross-league copy-provenance pointers before touching any league
+    // row, in one deterministic statement, so the SET NULL cascade can't
+    // interleave with the per-league delete loop below and introduce a second,
+    // unordered lock path (LS-8125).
+    await tx
+      .update(PublicSchema.leagueScoringProfiles)
+      .set({ copiedFromProfileId: null })
+      .where(
+        inArray(
+          PublicSchema.leagueScoringProfiles.copiedFromProfileId,
+          tx
+            .select({ id: PublicSchema.leagueScoringProfiles.id })
+            .from(PublicSchema.leagueScoringProfiles)
+            .where(
+              inArray(PublicSchema.leagueScoringProfiles.leagueId, orderedIds),
+            ),
+        ),
+      );
+
     for (const leagueId of orderedIds) {
       await tx
         .delete(PublicSchema.leagues)
