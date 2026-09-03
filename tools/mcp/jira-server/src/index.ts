@@ -409,7 +409,7 @@ server.tool(
 // --- jira_list_children ---
 server.tool(
   'jira_list_children',
-  'List child tickets of an epic or story. Returns paginated results (default 25 per page). Pass pageToken=<nextPageToken> from a previous response to fetch the next page. Set paginate: true to fetch ALL children in one call (returns compact JSON with key + summary + status, capped at 500 items).',
+  'List child tickets of an epic or story. Paginated, default 25/page — pass pageToken for the next page. compact: true drops priority/created. paginate: true fetches all pages as JSON, capped at `limit` (cap 500).',
   {
     key: z
       .string()
@@ -428,22 +428,30 @@ server.tool(
       .positive()
       .max(100)
       .default(25)
-      .describe('Max results per page (default: 25, max: 100)'),
+      .describe(
+        'Max per page (default 25, max 100); also bounds the total with paginate: true.',
+      ),
     pageToken: z
       .string()
       .optional()
-      .describe('Cursor token from a previous response to fetch the next page'),
+      .describe('Cursor from a previous response to fetch the next page'),
     paginate: z
       .boolean()
       .optional()
       .describe(
-        'When true, fetches all children across all pages automatically. Returns compact JSON { parent, total, children: [{key, summary, status}], truncated? }. Hard-capped at 500 children.',
+        'Fetch all pages up to `limit` (cap 500) as { parent, total, children: [{key, summary, status}], truncated? }.',
       ),
     includeBlockers: z
       .boolean()
       .default(false)
       .describe(
-        'Annotate every child with blocker state — `blocked` / `blockers` columns in table mode, `blocked` / `blockers[]` fields in paginate mode. Costs no extra Jira request. Use this instead of looping jira_check_blockers over the children.',
+        'Annotate every child with blocker state, no extra Jira request, instead of looping jira_check_blockers.',
+      ),
+    compact: z
+      .boolean()
+      .default(false)
+      .describe(
+        'Table mode: key/summary/status/type instead of full columns (mirrors jira_search compact).',
       ),
   },
   async (params) => listChildren(params),

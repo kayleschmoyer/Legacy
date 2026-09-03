@@ -202,8 +202,7 @@ export function createMcpServer(): McpServer {
   );
   server.tool(
     'jira_list_children',
-    'List child tickets of an epic or story. Set includeBlockers=true to annotate every child with blocker state inline ' +
-      '(no extra Jira request) instead of following up with per-ticket jira_check_blockers calls.',
+    'List child tickets of an epic or story. Paginated, default 25/page — pass pageToken for the next page. compact: true drops priority/created. paginate: true fetches all pages as JSON, capped at `limit` (cap 500).',
     {
       key: z.string().regex(/^[A-Z][A-Z0-9_]+-\d+$/),
       status: z.string().optional(),
@@ -211,6 +210,7 @@ export function createMcpServer(): McpServer {
       pageToken: z.string().optional(),
       paginate: z.boolean().optional(),
       includeBlockers: z.boolean().default(false),
+      compact: z.boolean().default(false),
     },
     async (p) => listChildren(p),
   );

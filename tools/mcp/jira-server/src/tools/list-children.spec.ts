@@ -88,6 +88,48 @@ describe('listChildren', () => {
     expect(mockSearchJql).not.toHaveBeenCalled();
   });
 
+  describe('compact: true', () => {
+    it('renders only key/summary/status/type and requests fewer fields', async () => {
+      mockSearchJql.mockResolvedValueOnce({ issues: children });
+
+      const out = text(await listChildren({ key: 'LS-1', compact: true }));
+
+      expect(mockSearchJql).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: ['summary', 'status', 'issuetype'],
+        }),
+      );
+      expect(out).toContain('key|summary|status|type');
+      expect(out).toContain('LS-100|Child one|To Do|Task');
+      expect(out).toContain('LS-101|Child two|Done|Bug');
+      expect(out).not.toContain('priority');
+      expect(out).not.toContain('created');
+      expect(out).not.toContain('High');
+    });
+
+    it('combines with includeBlockers', async () => {
+      mockSearchJql.mockResolvedValueOnce({ issues: children });
+
+      const out = text(
+        await listChildren({
+          key: 'LS-1',
+          compact: true,
+          includeBlockers: true,
+        }),
+      );
+
+      expect(out).toContain('key|summary|status|type|blocked|blockers');
+    });
+
+    it('is off by default — full columns returned', async () => {
+      mockSearchJql.mockResolvedValueOnce({ issues: children });
+
+      const out = text(await listChildren({ key: 'LS-1' }));
+
+      expect(out).toContain('key|summary|status|type|priority|created');
+    });
+  });
+
   describe('paginate: true', () => {
     it('fetches all pages and returns compact JSON', async () => {
       mockSearchJql
@@ -109,7 +151,7 @@ describe('listChildren', () => {
       expect(mockSearchJql).toHaveBeenCalledTimes(2);
     });
 
-    it('stops at 500-item cap and sets truncated: true', async () => {
+    it('stops at the 500-item hard cap and sets truncated: true', async () => {
       const bigPage = Array.from({ length: 100 }, (_, i) => ({
         key: `LS-${200 + i}`,
         fields: {
@@ -121,7 +163,70 @@ describe('listChildren', () => {
         },
       }));
 
-      // 6 pages of 100 = 600 items, should cap at 500
+      // 6 pages of 100 = 600 items, should cap at the hard 500 ceiling even
+      // though limit (1000) is higher.
+      mockSearchJql.mockResolvedValue({
+        issues: bigPage,
+        nextPageToken: 'NEXT',
+      });
+
+      const result = await listChildren({
+        key: 'LS-1',
+        paginate: true,
+        limit: 1000,
+      });
+      const payload = JSON.parse(text(result)) as PaginatedChildrenPayload;
+
+      expect(payload.total).toBe(500);
+      expect(payload.children).toHaveLength(500);
+      expect(payload.truncated).toBe(true);
+      // Should have stopped after 5 pages (500 items)
+      expect(mockSearchJql).toHaveBeenCalledTimes(5);
+    });
+
+    it('bounds the total to `limit` (not just the 500 hard cap)', async () => {
+      const bigPage = Array.from({ length: 100 }, (_, i) => ({
+        key: `LS-${200 + i}`,
+        fields: {
+          summary: `Child ${i}`,
+          status: { name: 'To Do' },
+          issuetype: { name: 'Task' },
+          priority: null,
+          created: '2026-06-01T00:00:00.000-0400',
+        },
+      }));
+
+      mockSearchJql.mockResolvedValue({
+        issues: bigPage,
+        nextPageToken: 'NEXT',
+      });
+
+      const result = await listChildren({
+        key: 'LS-1',
+        paginate: true,
+        limit: 30,
+      });
+      const payload = JSON.parse(text(result)) as PaginatedChildrenPayload;
+
+      expect(payload.total).toBe(30);
+      expect(payload.children).toHaveLength(30);
+      expect(payload.truncated).toBe(true);
+      // Only needed 1 page (100 items) to reach the 30-item limit.
+      expect(mockSearchJql).toHaveBeenCalledTimes(1);
+    });
+
+    it('defaults the paginate total cap to 25 when limit is omitted', async () => {
+      const bigPage = Array.from({ length: 100 }, (_, i) => ({
+        key: `LS-${200 + i}`,
+        fields: {
+          summary: `Child ${i}`,
+          status: { name: 'To Do' },
+          issuetype: { name: 'Task' },
+          priority: null,
+          created: '2026-06-01T00:00:00.000-0400',
+        },
+      }));
+
       mockSearchJql.mockResolvedValue({
         issues: bigPage,
         nextPageToken: 'NEXT',
@@ -130,11 +235,8 @@ describe('listChildren', () => {
       const result = await listChildren({ key: 'LS-1', paginate: true });
       const payload = JSON.parse(text(result)) as PaginatedChildrenPayload;
 
-      expect(payload.total).toBe(500);
-      expect(payload.children).toHaveLength(500);
+      expect(payload.total).toBe(25);
       expect(payload.truncated).toBe(true);
-      // Should have stopped after 5 pages (500 items)
-      expect(mockSearchJql).toHaveBeenCalledTimes(5);
     });
 
     it('includes status filter in JQL when status is provided', async () => {
@@ -256,7 +358,7 @@ describe('listChildren', () => {
 
       expect(mockSearchJql).toHaveBeenCalledWith(
         expect.not.objectContaining({
-          fields: expect.arrayContaining(['issuelinks']),
+          fields: expect.arrayContaining(['issuelinks']) as string[],
         }),
       );
       expect(out).not.toContain('blocked');

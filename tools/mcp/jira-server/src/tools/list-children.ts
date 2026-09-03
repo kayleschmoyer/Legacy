@@ -1,8 +1,8 @@
 import {
+  type FlatRecord,
   markdownTable,
   minifiedJson,
   pickFields,
-  type FlatRecord,
 } from '@legacy-sports/mcp-format';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
@@ -12,7 +12,11 @@ import {
   blockerColumns,
   type JiraIssueLink,
 } from '../blockers.js';
-import { CHILD_COLUMNS, withNextPageHint } from '../format.js';
+import {
+  CHILD_COLUMNS,
+  CHILD_COMPACT_COLUMNS,
+  withNextPageHint,
+} from '../format.js';
 import { searchJql } from '../jql-search.js';
 
 const PAGINATE_PAGE_SIZE = 100;
@@ -25,6 +29,7 @@ interface ListChildrenParams {
   pageToken?: string;
   paginate?: boolean;
   includeBlockers?: boolean;
+  compact?: boolean;
 }
 
 interface ChildFields {
@@ -49,6 +54,7 @@ export async function listChildren(
     pageToken,
     paginate = false,
     includeBlockers = false,
+    compact = false,
   } = params;
 
   if (!JIRA_KEY_RE.test(key)) {
@@ -70,11 +76,13 @@ export async function listChildren(
     : `parent = ${quotedKey} ORDER BY created DESC`;
 
   if (paginate) {
-    return listAllChildren(key, jql, includeBlockers);
+    return listAllChildren(key, jql, includeBlockers, limit);
   }
 
   try {
-    const fields = ['summary', 'status', 'issuetype', 'priority', 'created'];
+    const fields = compact
+      ? ['summary', 'status', 'issuetype']
+      : ['summary', 'status', 'issuetype', 'priority', 'created'];
     if (includeBlockers) fields.push(BLOCKER_FIELD);
 
     const result = await searchJql<ChildFields>({
@@ -85,18 +93,28 @@ export async function listChildren(
     });
 
     const columns: string[] = includeBlockers
-      ? [...CHILD_COLUMNS, ...BLOCKER_COLUMNS]
-      : [...CHILD_COLUMNS];
+      ? [
+          ...(compact ? CHILD_COMPACT_COLUMNS : CHILD_COLUMNS),
+          ...BLOCKER_COLUMNS,
+        ]
+      : [...(compact ? CHILD_COMPACT_COLUMNS : CHILD_COLUMNS)];
 
     const children: FlatRecord[] = result.issues.map((issue) => {
-      const row: FlatRecord = {
-        key: issue.key,
-        summary: issue.fields.summary,
-        status: issue.fields.status.name,
-        type: issue.fields.issuetype.name,
-        priority: issue.fields.priority?.name ?? '',
-        created: issue.fields.created,
-      };
+      const row: FlatRecord = compact
+        ? {
+            key: issue.key,
+            summary: issue.fields.summary,
+            status: issue.fields.status.name,
+            type: issue.fields.issuetype.name,
+          }
+        : {
+            key: issue.key,
+            summary: issue.fields.summary,
+            status: issue.fields.status.name,
+            type: issue.fields.issuetype.name,
+            priority: issue.fields.priority?.name ?? '',
+            created: issue.fields.created,
+          };
       return includeBlockers
         ? { ...row, ...blockerColumns(issue.fields.issuelinks) }
         : row;
@@ -126,15 +144,17 @@ export async function listChildren(
 }
 
 /**
- * Fetch all children by paginating internally until exhausted or the 500-item
- * cap is reached. Returns compact JSON (key + summary + status, plus blocked /
- * blockers[] when includeBlockers is set) to keep token usage predictable
- * regardless of child count.
+ * Fetch all children by paginating internally until exhausted or `limit` is
+ * reached (hard-ceilinged at PAGINATE_CAP regardless of `limit`). Returns
+ * compact JSON (key + summary + status, plus blocked / blockers[] when
+ * includeBlockers is set) to keep token usage predictable regardless of
+ * child count.
  */
 async function listAllChildren(
   key: string,
   jql: string,
   includeBlockers: boolean,
+  limit: number,
 ): Promise<CallToolResult> {
   interface CompactChild {
     key: string;
@@ -143,6 +163,8 @@ async function listAllChildren(
     blocked?: boolean;
     blockers?: Array<{ key: string; status: string }>;
   }
+
+  const cap = Math.min(limit, PAGINATE_CAP);
 
   try {
     const all: CompactChild[] = [];
@@ -171,7 +193,7 @@ async function listAllChildren(
           child.blockers = active;
         }
         all.push(child);
-        if (all.length >= PAGINATE_CAP) {
+        if (all.length >= cap) {
           truncated = true;
           break;
         }

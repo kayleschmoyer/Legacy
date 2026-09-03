@@ -28,6 +28,14 @@ export const CHILD_COLUMNS = [
   'created',
 ] as const;
 
+/** jira_list_children (compact): just enough for a duplicate-check or triage pass. */
+export const CHILD_COMPACT_COLUMNS = [
+  'key',
+  'summary',
+  'status',
+  'type',
+] as const;
+
 /**
  * jira_view (include: ['comments']): `updated` is dropped — it equals `created`
  * for the vast majority of comments and agents read author/body/created. `body`
