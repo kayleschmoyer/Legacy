@@ -1567,6 +1567,11 @@
                 "max 500"
               ],
               "description": "Max number of matched lines to return when `grep` is provided (default: 50, max: 500)."
+            },
+            "outputPath": {
+              "type": "string",
+              "optional": true,
+              "description": "Absolute path to write raw bytes to instead of returning content (metadata-only response). Must be under worktree root or OS temp dir. Exclusive with `grep`/`startLine`/`endLine`."
             }
           },
           "transports": [
@@ -4573,6 +4578,11 @@
               "type": "string",
               "optional": true,
               "description": "Branch name, tag, or commit SHA (defaults to \"main\")."
+            },
+            "outputPath": {
+              "type": "string",
+              "optional": true,
+              "description": "Absolute path to write raw bytes to instead of returning content (metadata-only response). Must be under repo root (non-Lambda) or OS temp dir (always allowed)."
             }
           },
           "transports": [

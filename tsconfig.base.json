@@ -40,6 +40,7 @@
       ],
       "@legacy-sports/mcp-format": ["lib/mcp-format/src/index.ts"],
       "@legacy-sports/mcp-jobs": ["lib/mcp-jobs/src/index.ts"],
+      "@legacy-sports/mcp-path-safety": ["lib/mcp-path-safety/src/index.ts"],
       "@legacy-sports/mlb-client": ["lib/mlb-client/src/index.ts"],
       "@legacy-sports/pfr-client": ["lib/pfr-client/src/index.ts"],
       "@legacy-sports/narrative": ["lib/narrative/src/index.ts"],

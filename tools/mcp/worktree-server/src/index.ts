@@ -77,6 +77,7 @@ import {
   minifiedJson,
   pickFields,
 } from '@legacy-sports/mcp-format';
+import { validateOutputPath } from '@legacy-sports/mcp-path-safety';
 
 // ---------------------------------------------------------------------------
 // Constants & state
@@ -1974,6 +1975,13 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             maximum: 500,
             description:
               'Max number of matched lines to return when `grep` is provided (default: 50, max: 500).',
+          },
+          outputPath: {
+            type: 'string',
+            description:
+              'Absolute path to write raw bytes to instead of returning content (metadata-only ' +
+              'response). Must be under worktree root or OS temp dir. Exclusive with ' +
+              '`grep`/`startLine`/`endLine`.',
           },
         },
         required: ['path'],
@@ -7651,6 +7659,7 @@ const handleCallTool = async (
         endLine: endLineArg,
         grep: grepPattern,
         maxMatches: grepMaxMatches,
+        outputPath: rawOutputPath,
       } = args as {
         ref?: string;
         path: string;
@@ -7659,6 +7668,7 @@ const handleCallTool = async (
         endLine?: number;
         grep?: string;
         maxMatches?: number;
+        outputPath?: string;
       };
 
       // grep is mutually exclusive with line ranges
@@ -7671,6 +7681,25 @@ const handleCallTool = async (
             {
               type: 'text',
               text: '`grep` is mutually exclusive with `startLine`/`endLine` — pick one or the other.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // outputPath is mutually exclusive with grep/line-range — it always
+      // writes the full raw `git show` output, so partial-content modes don't apply.
+      if (
+        rawOutputPath !== undefined &&
+        (grepPattern !== undefined ||
+          startLineArg !== undefined ||
+          endLineArg !== undefined)
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: '`outputPath` is mutually exclusive with `grep`/`startLine`/`endLine` — it always writes the full file.',
             },
           ],
           isError: true,
@@ -7691,6 +7720,20 @@ const handleCallTool = async (
         cwd = activeWorktree;
       } else {
         cwd = MAIN_REPO;
+      }
+
+      // Validate outputPath: must be absolute and contained within the
+      // worktree root or the OS temp/scratch dir — never elsewhere.
+      let resolvedOutputPath: string | undefined;
+      if (rawOutputPath !== undefined) {
+        const pathResult = validateOutputPath(rawOutputPath, [cwd, tmpdir()]);
+        if (!pathResult.ok) {
+          return {
+            content: [{ type: 'text', text: pathResult.error }],
+            isError: true,
+          };
+        }
+        resolvedOutputPath = pathResult.resolved;
       }
 
       // Default ref to HEAD when omitted (common when worktree is specified)
@@ -7792,6 +7835,42 @@ const handleCallTool = async (
 
       try {
         let content = runGit(['show', `${ref}:${filePath}`], cwd);
+
+        // Write-to-disk mode: skip context entirely, return metadata only.
+        if (resolvedOutputPath !== undefined) {
+          try {
+            mkdirSync(dirname(resolvedOutputPath), { recursive: true });
+            writeFileSync(resolvedOutputPath, content);
+          } catch (writeError) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `Failed to write file to ${resolvedOutputPath}: ${writeError instanceof Error ? writeError.message : String(writeError)}`,
+                },
+              ],
+              isError: true,
+            };
+          }
+          const blobSha = runGit(
+            ['rev-parse', `${ref}:${filePath}`],
+            cwd,
+          ).trim();
+          return {
+            content: [
+              {
+                type: 'text',
+                text: minifiedJson({
+                  ref,
+                  path: filePath,
+                  outputPath: resolvedOutputPath,
+                  bytesWritten: Buffer.byteLength(content),
+                  sha: blobSha,
+                }),
+              },
+            ],
+          };
+        }
 
         // Apply grep filter if provided (mutually exclusive with line range,
         // already validated above)

@@ -1827,6 +1827,8 @@ importers:
 
   lib/mcp-jobs: {}
 
+  lib/mcp-path-safety: {}
+
   lib/mlb-client:
     dependencies:
       '@legacy-sports/logging':

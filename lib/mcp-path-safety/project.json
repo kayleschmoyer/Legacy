@@ -1,0 +1,22 @@
+{
+  "name": "mcp-path-safety",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "lib/mcp-path-safety/src",
+  "projectType": "library",
+  "tags": ["platform:shared", "scope:lib", "type:util"],
+  "targets": {
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/lib/mcp-path-safety"],
+      "options": {
+        "jestConfig": "lib/mcp-path-safety/jest.config.cts"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
+    }
+  }
+}

@@ -1992,6 +1992,13 @@ export function createServer(): McpServer {
         .string()
         .optional()
         .describe('Branch name, tag, or commit SHA (defaults to "main").'),
+      outputPath: z
+        .string()
+        .optional()
+        .describe(
+          'Absolute path to write raw bytes to instead of returning content (metadata-only ' +
+            'response). Must be under repo root (non-Lambda) or OS temp dir (always allowed).',
+        ),
     },
     async (params) => getFileContent(params),
   );
