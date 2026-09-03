@@ -256,11 +256,8 @@ test.describe('Matchup Detail – loading state @regression', () => {
     await page.route(
       (url) => isGraphQLEndpoint(url),
       async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
-        if (
-          postData.includes('getmatchupbyid') ||
-          postData.includes('matchupbyid')
-        ) {
+        const operation = extractOperationName(route).toLowerCase();
+        if (operation === 'getmatchupbyid' || operation === 'getmatchuprecap') {
           // Hold the response until we've asserted the loading state
           await matchupGate;
           await route.fulfill({
@@ -297,11 +294,8 @@ test.describe('Matchup Detail – loading state @regression', () => {
 test.describe('Matchup Detail – error state @regression', () => {
   test.beforeEach(async ({ page, matchupPage }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (
-        postData.includes('getmatchupbyid') ||
-        postData.includes('matchupbyid')
-      ) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getmatchupbyid' || operation === 'getmatchuprecap') {
         // GraphQL errors array present — Apollo's default errorPolicy
         // ('none') always surfaces this as the `error` branch, regardless
         // of `data.getMatchupById`.
@@ -345,11 +339,8 @@ test.describe('Matchup Detail – error state @regression', () => {
 test.describe('Matchup Detail – not-found state @regression', () => {
   test.beforeEach(async ({ page, matchupPage }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (
-        postData.includes('getmatchupbyid') ||
-        postData.includes('matchupbyid')
-      ) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getmatchupbyid' || operation === 'getmatchuprecap') {
         // No errors array — exercises the true `!matchup` not-found branch,
         // distinct from the GraphQL-error branch above.
         await route.fulfill({

@@ -34,8 +34,8 @@ function readSubmittedDivisions(postData: string): number | undefined {
 /** Mock a successful createLeagueAndTeams response */
 async function mockCreateLeagueSuccess(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
-    if (postData.includes('createleagueandteams')) {
+    const operation = extractOperationName(route).toLowerCase();
+    if (operation === 'createleagueandteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -829,8 +829,8 @@ test.describe('League Creation — Advanced Settings @regression', () => {
     leaguePage,
   }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('createleagueandteams')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'createleagueandteams') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -914,8 +914,8 @@ test.describe('League Creation — Advanced Settings @regression', () => {
   }) => {
     // Delay the response so we can catch the loading state
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('createleagueandteams')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'createleagueandteams') {
         await new Promise((r) => setTimeout(r, 500));
         await route.fulfill({
           status: 200,

@@ -13,7 +13,10 @@
  */
 
 import { expect, leagueTest as test, unauthTest } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 test.describe('League Creation @critical', () => {
@@ -81,9 +84,9 @@ test.describe('League Creation @critical', () => {
   }) => {
     // Mock the createLeagueAndTeams GraphQL mutation
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (postData.includes('createleagueandteams')) {
+      if (operation === 'createleagueandteams') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -149,10 +152,10 @@ test.describe('League Creation @critical', () => {
   }) => {
     // Mock GraphQL error response
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
       // Intercept createLeagueAndTeams mutation
-      if (postData.includes('createleagueandteams')) {
+      if (operation === 'createleagueandteams') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -397,9 +400,9 @@ test.describe('League Creation @critical', () => {
   }) => {
     // Mock slow GraphQL response to test loading state
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (postData.includes('createleagueandteams')) {
+      if (operation === 'createleagueandteams') {
         // Add delay to simulate slow response
         await new Promise((resolve) => setTimeout(resolve, 1000));
 

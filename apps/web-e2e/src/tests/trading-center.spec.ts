@@ -12,7 +12,10 @@
 import type { WebSocketRoute } from '@playwright/test';
 import { injectWebSocketUrl } from './helpers/websocket-test-utils';
 import { expect, test } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // Page-object migration (LS-8456 / ADR-0015/0016): all trades selectors live on
@@ -220,15 +223,15 @@ async function mockTradesGraphQL(
   );
 
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (postData.includes('"getteamtradeoffers"')) {
+    if (operation === 'getteamtradeoffers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { teamTradeOffers: pendingOffers } }),
       });
-    } else if (postData.includes('getleaguetradeoffers')) {
+    } else if (operation === 'getleaguetradeoffers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -238,13 +241,13 @@ async function mockTradesGraphQL(
       // generic `getleague` branch below — "getleaguetradeblock" contains the
       // substring "getleague", so the league-detail branch would otherwise
       // swallow the trade-block request and the block would render empty.
-    } else if (postData.includes('getleaguetradeblock')) {
+    } else if (operation === 'getleaguetradeblock') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTradeBlock: tradeBlock } }),
       });
-    } else if (postData.includes('"settradeblock"')) {
+    } else if (operation === 'settradeblock') {
       // Stateful mutation: mirror the change into `tradeBlock` so the
       // refetched GetLeagueTradeBlock reflects the new asking price / removal.
       const vars =
@@ -282,28 +285,25 @@ async function mockTradesGraphQL(
           },
         }),
       });
-    } else if (postData.includes('getleagueteams')) {
+    } else if (operation === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (
-      postData.includes('getleaguebyid') ||
-      postData.includes('getleague')
-    ) {
+    } else if (operation === 'getleaguebyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
       });
-    } else if (postData.includes('getpositionsforleague')) {
+    } else if (operation === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
       });
-    } else if (postData.includes('getuserteamid')) {
+    } else if (operation === 'getuserteamid') {
       // V2 schema: userTeamId is a scalar Int? (not a wrapped object).
       // myTeamId = 1 makes Alpha Squad the viewing team, which is the
       // receiver of MOCK_INCOMING_PENDING and the proposer of
@@ -313,10 +313,7 @@ async function mockTradesGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
-    } else if (
-      postData.includes('getusers') ||
-      postData.includes('getuserleagues')
-    ) {
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -566,8 +563,8 @@ test.describe('Trades tab — WebSocket real-time refresh @critical', () => {
     // Override only GetTeamTradeOffers with stateful responses; fall through
     // for everything else so mockTradesGraphQL handles it.
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('"getteamtradeoffers"')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getteamtradeoffers') {
         teamTradeOffersCallCount++;
         const offers =
           teamTradeOffersCallCount <= 1 ? [MOCK_OUTGOING_PENDING] : [];

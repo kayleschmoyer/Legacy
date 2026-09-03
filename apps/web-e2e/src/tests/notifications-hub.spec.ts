@@ -11,7 +11,10 @@
  */
 
 import { expect, test } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { agoIso, FIXED_NOW_ISO } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -95,9 +98,9 @@ async function mockNotificationsGraphQL(
   } = opts;
 
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (postData.includes('getnotificationhistory')) {
+    if (operation === 'getnotificationhistory') {
       if (historyError) {
         await route.fulfill({
           status: 200,
@@ -124,7 +127,7 @@ async function mockNotificationsGraphQL(
           }),
         });
       }
-    } else if (postData.includes('getunreadnotificationcount')) {
+    } else if (operation === 'getunreadnotificationcount') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -132,7 +135,7 @@ async function mockNotificationsGraphQL(
           data: { getUnreadNotificationCount: empty ? 0 : unreadCount },
         }),
       });
-    } else if (postData.includes('markallnotificationsasread')) {
+    } else if (operation === 'markallnotificationsasread') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -140,7 +143,7 @@ async function mockNotificationsGraphQL(
           data: { markAllNotificationsAsRead: markAllReadSuccess },
         }),
       });
-    } else if (postData.includes('marknotificationasread')) {
+    } else if (operation === 'marknotificationasread') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -148,7 +151,7 @@ async function mockNotificationsGraphQL(
           data: { markNotificationAsRead: markReadSuccess },
         }),
       });
-    } else if (postData.includes('getusernotificationpreferences')) {
+    } else if (operation === 'getusernotificationpreferences') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -281,9 +284,9 @@ test.describe('Notifications Hub – empty state @regression', () => {
     let capturedUnreadCount: number | null = null;
 
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (postData.includes('getunreadnotificationcount')) {
+      if (operation === 'getunreadnotificationcount') {
         capturedUnreadCount = 0;
         await route.fulfill({
           status: 200,
@@ -319,9 +322,9 @@ test.describe('Notifications Hub – mark as read @regression', () => {
     let markReadCalled = false;
 
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (postData.includes('marknotificationasread')) {
+      if (operation === 'marknotificationasread') {
         markReadCalled = true;
         await route.fulfill({
           status: 200,
@@ -365,9 +368,9 @@ test.describe('Notifications Hub – mark as read @regression', () => {
     let markAllReadCalled = false;
 
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (postData.includes('markallnotificationsasread')) {
+      if (operation === 'markallnotificationsasread') {
         markAllReadCalled = true;
         await route.fulfill({
           status: 200,

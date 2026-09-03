@@ -7,7 +7,10 @@
  */
 
 import { expect, test, unauthTest } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,44 +76,41 @@ async function setupGraphQL(
   capture?: { initializeMockDraftVariables?: Record<string, unknown> },
 ) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
     // GetUserById (premium) is served by the shared premium-by-default
     // baseline (LS-8058); the ad-hoc premium mock was removed.
-    if (
-      postData.includes('getleaguebyid') ||
-      postData.includes('"getleague"')
-    ) {
+    if (operation === 'getleaguebyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
       });
-    } else if (postData.includes('getleagueteams')) {
+    } else if (operation === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (postData.includes('getpositionsforleague')) {
+    } else if (operation === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
       });
-    } else if (postData.includes('getuserteamid')) {
+    } else if (operation === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
-    } else if (postData.includes('getuserleagues')) {
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [MOCK_LEAGUE] } }),
       });
-    } else if (postData.includes('"getmymockdraftusage"')) {
+    } else if (operation === 'getmymockdraftusage') {
       // Premium user → unlimited weekly mock drafts, so the setup form
       // renders (never the LimitReachedScreen) and no usage label is shown
       // (LS-5178). Without this mock the query falls through to the
@@ -131,7 +131,7 @@ async function setupGraphQL(
           },
         }),
       });
-    } else if (postData.includes('initializemockdraft')) {
+    } else if (operation === 'initializemockdraft') {
       if (capture) {
         const body = route.request().postDataJSON() as {
           variables?: Record<string, unknown>;
@@ -150,13 +150,13 @@ async function setupGraphQL(
           },
         }),
       });
-    } else if (postData.includes('getleaguedraft')) {
+    } else if (operation === 'getleaguedraft') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueDraft: null } }),
       });
-    } else if (postData.includes('getdraftteamorder')) {
+    } else if (operation === 'getdraftteamorder') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

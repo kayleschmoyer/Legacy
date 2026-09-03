@@ -14,6 +14,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { extractOperationName } from '../fixtures/shared-mocks';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -111,9 +112,15 @@ async function mockOnThisDay(
     (url) =>
       url.toString().includes('/graphql') && !url.toString().includes('/@fs/'),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (postData.includes('getonthisday') && !postData.includes('events')) {
+      // The pre-LS-9794 form was
+      // `postData.includes('getonthisday') && !postData.includes('events')`:
+      // the negated guard existed only to stop the broad substring from also
+      // swallowing GetOnThisDayEvents. Exact equality excludes that operation
+      // by construction, so the guard is redundant and is dropped rather than
+      // translated. GetOnThisDayEvents is handled by its own branch below.
+      if (operation === 'getonthisday') {
         if (entriesError) {
           await route.fulfill({
             status: 200,
@@ -130,7 +137,7 @@ async function mockOnThisDay(
             body: JSON.stringify({ data: { onThisDay: entries } }),
           });
         }
-      } else if (postData.includes('getonthisdayevents')) {
+      } else if (operation === 'getonthisdayevents') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

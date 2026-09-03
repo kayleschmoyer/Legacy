@@ -13,7 +13,10 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -56,9 +59,9 @@ async function setupDisclosureMocks(
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (postData.includes('"activedisclosuregame"')) {
+      if (operation === 'activedisclosuregame') {
         // Resume check fired on mount (LS-4816). No in-progress game →
         // the idle screen shows "Start Game" with no Resume CTA.
         // Match the quoted operationName to avoid matching other payloads.
@@ -69,7 +72,7 @@ async function setupDisclosureMocks(
             data: { activeDisclosureGame: null },
           }),
         });
-      } else if (postData.includes('startdisclosuregame')) {
+      } else if (operation === 'startdisclosuregame') {
         void route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -83,7 +86,7 @@ async function setupDisclosureMocks(
             },
           }),
         });
-      } else if (postData.includes('nextclue')) {
+      } else if (operation === 'nextclue') {
         clueIndex += 1;
         const isLast = clueIndex >= TOTAL_CLUES;
         void route.fulfill({
@@ -93,7 +96,7 @@ async function setupDisclosureMocks(
             data: { nextClue: makeClue(clueIndex, isLast) },
           }),
         });
-      } else if (postData.includes('submitguess')) {
+      } else if (operation === 'submitguess') {
         if (guessCorrect) {
           void route.fulfill({
             status: 200,
@@ -127,7 +130,7 @@ async function setupDisclosureMocks(
             }),
           });
         }
-      } else if (postData.includes('giveupdisclosuregame')) {
+      } else if (operation === 'giveupdisclosuregame') {
         void route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -140,7 +143,7 @@ async function setupDisclosureMocks(
             },
           }),
         });
-      } else if (postData.includes('searchplayersfordisclosure')) {
+      } else if (operation === 'searchplayersfordisclosure') {
         void route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -306,9 +309,9 @@ test.describe('Progressive Disclosure Game @minigame', () => {
     await page.route(
       (url) => isGraphQLEndpoint(url),
       async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
+        const operation = extractOperationName(route).toLowerCase();
 
-        if (postData.includes('"activedisclosuregame"')) {
+        if (operation === 'activedisclosuregame') {
           // Resume check fired on mount (LS-4816). No in-progress game.
           // Match the quoted operationName to avoid matching other payloads.
           void route.fulfill({
@@ -318,7 +321,7 @@ test.describe('Progressive Disclosure Game @minigame', () => {
               data: { activeDisclosureGame: null },
             }),
           });
-        } else if (postData.includes('startdisclosuregame')) {
+        } else if (operation === 'startdisclosuregame') {
           void route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -332,7 +335,7 @@ test.describe('Progressive Disclosure Game @minigame', () => {
               },
             }),
           });
-        } else if (postData.includes('nextclue')) {
+        } else if (operation === 'nextclue') {
           clueIndex += 1;
           const isLast = clueIndex >= TOTAL_CLUES;
           void route.fulfill({
@@ -342,7 +345,7 @@ test.describe('Progressive Disclosure Game @minigame', () => {
               data: { nextClue: makeClue(clueIndex, isLast) },
             }),
           });
-        } else if (postData.includes('submitguess')) {
+        } else if (operation === 'submitguess') {
           // Wrong guess after all clues revealed — server signals isLastClue
           void route.fulfill({
             status: 200,
@@ -359,7 +362,7 @@ test.describe('Progressive Disclosure Game @minigame', () => {
               },
             }),
           });
-        } else if (postData.includes('searchplayersfordisclosure')) {
+        } else if (operation === 'searchplayersfordisclosure') {
           void route.fulfill({
             status: 200,
             contentType: 'application/json',

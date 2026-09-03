@@ -14,7 +14,10 @@
  */
 
 import { expect, test } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -427,27 +430,24 @@ async function setupMocks(
     (url) =>
       url.toString().includes('/graphql') && !url.toString().includes('/@fs/'),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (
-        postData.includes('getplayercareerarc') ||
-        postData.includes('careerarcquery')
-      ) {
+      if (operation === 'getplayercareerarc') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(careerArcBody),
         });
-      } else if (postData.includes('getallplayerseasonsta')) {
+      } else if (operation === 'getallplayerseasonstats') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(seasonStatsBody),
         });
       } else if (
-        postData.includes('getcareerbattingsta') ||
-        postData.includes('getallplayers') ||
-        postData.includes('getplayerswithstat')
+        operation === 'getcareerbattingstats' ||
+        operation === 'getallplayers' ||
+        operation === 'getplayerswithstats'
       ) {
         await route.fulfill({
           status: 200,

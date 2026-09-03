@@ -14,6 +14,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -61,21 +62,28 @@ async function mockPlayersGraphQL(page: import('@playwright/test').Page) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (postData.includes('getallplayers')) {
+      if (operation === 'getallplayers') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { players: MOCK_PLAYERS } }),
         });
-      } else if (postData.includes('getplayerswithstats')) {
+      } else if (operation === 'getplayerswithstats') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { playersWithStats: MOCK_PLAYERS } }),
         });
-      } else if (postData.includes('searchplayers')) {
+        // All three SearchPlayersFor* operations select the same `searchPlayers`
+        // field, so this payload answers each correctly. The pre-LS-9794 substring
+        // matched all three; listing them preserves that without the ambiguity.
+      } else if (
+        operation === 'searchplayersfordisclosure' ||
+        operation === 'searchplayersfordraft' ||
+        operation === 'searchplayersfortwentyquestions'
+      ) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

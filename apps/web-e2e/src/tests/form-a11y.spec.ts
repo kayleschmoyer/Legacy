@@ -7,6 +7,7 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
+import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** URL predicate that matches GraphQL API endpoints but not source file imports */
@@ -135,8 +136,8 @@ async function setupLeagueCreationMock(page: import('@playwright/test').Page) {
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('createleagueandteams')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'createleagueandteams') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

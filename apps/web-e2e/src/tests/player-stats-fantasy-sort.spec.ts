@@ -11,7 +11,10 @@
  */
 
 import { expect, test } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const MOCK_PAGE_INFO = {
@@ -100,9 +103,9 @@ async function mockPlayerStatsGraphQL(
   page: import('@playwright/test').Page,
 ): Promise<void> {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (postData.includes('"getcareerbattingstats"')) {
+    if (operation === 'getcareerbattingstats') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -117,13 +120,13 @@ async function mockPlayerStatsGraphQL(
           },
         }),
       });
-    } else if (postData.includes('"getcareerpitchingstatscount"')) {
+    } else if (operation === 'getcareerpitchingstatscount') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { careerPitchingStatsCount: 1 } }),
       });
-    } else if (postData.includes('"getcareerpitchingstats"')) {
+    } else if (operation === 'getcareerpitchingstats') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -131,10 +134,7 @@ async function mockPlayerStatsGraphQL(
           data: { careerPitchingStats: [CLEMENS_PITCHING] },
         }),
       });
-    } else if (
-      postData.includes('"getusers"') ||
-      postData.includes('"getuserleagues"')
-    ) {
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

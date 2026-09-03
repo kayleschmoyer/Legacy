@@ -10,7 +10,10 @@
  */
 
 import { test } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { agoIso } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -81,9 +84,9 @@ async function mockNotifications(
   const { empty = false, historyError = false, unreadCount = 2 } = opts;
 
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (postData.includes('getnotificationhistory')) {
+    if (operation === 'getnotificationhistory') {
       if (historyError) {
         await route.fulfill({
           status: 200,
@@ -111,7 +114,7 @@ async function mockNotifications(
       return;
     }
 
-    if (postData.includes('getunreadnotificationcount')) {
+    if (operation === 'getunreadnotificationcount') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -175,8 +178,8 @@ test.describe('Notifications page — /notifications @regression', () => {
     // PAGE_SIZE+1 items means a next page exists.
     const items = makeMockNotifications(PAGE_SIZE + 1);
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('getnotificationhistory')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getnotificationhistory') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -184,7 +187,7 @@ test.describe('Notifications page — /notifications @regression', () => {
         });
         return;
       }
-      if (postData.includes('getunreadnotificationcount')) {
+      if (operation === 'getunreadnotificationcount') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -209,8 +212,8 @@ test.describe('Notifications page — /notifications @regression', () => {
     // incorrectly inferred hasNextPage=true from notifications.length===PAGE_SIZE.
     const items = makeMockNotifications(PAGE_SIZE);
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('getnotificationhistory')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getnotificationhistory') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -218,7 +221,7 @@ test.describe('Notifications page — /notifications @regression', () => {
         });
         return;
       }
-      if (postData.includes('getunreadnotificationcount')) {
+      if (operation === 'getunreadnotificationcount') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

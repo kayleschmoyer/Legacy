@@ -10,7 +10,10 @@
  */
 
 import { expect, test, unauthTest } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** URL predicate for the GraphQL API endpoint */
@@ -148,9 +151,9 @@ async function mockPlayerStatsGraphQL(
   } = {},
 ) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (postData.includes('"getcareerbattingstats"')) {
+    if (operation === 'getcareerbattingstats') {
       if (opts.battingError) {
         await route.fulfill({
           status: 200,
@@ -191,7 +194,7 @@ async function mockPlayerStatsGraphQL(
           }),
         });
       }
-    } else if (postData.includes('"getcareerpitchingstatscount"')) {
+    } else if (operation === 'getcareerpitchingstatscount') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -199,7 +202,7 @@ async function mockPlayerStatsGraphQL(
           data: { careerPitchingStatsCount: opts.pitchingEmpty ? 0 : 1 },
         }),
       });
-    } else if (postData.includes('"getcareerpitchingstats"')) {
+    } else if (operation === 'getcareerpitchingstats') {
       if (opts.pitchingError) {
         await route.fulfill({
           status: 200,
@@ -224,10 +227,7 @@ async function mockPlayerStatsGraphQL(
           }),
         });
       }
-    } else if (
-      postData.includes('"getusers"') ||
-      postData.includes('"getuserleagues"')
-    ) {
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

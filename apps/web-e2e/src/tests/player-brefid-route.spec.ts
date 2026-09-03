@@ -10,6 +10,7 @@
  */
 
 import { test } from '../fixtures/pages';
+import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -121,24 +122,21 @@ async function setupBrefIdMocks(
   const { brefIdResponse = BREF_ID_FOUND_RESPONSE } = opts;
 
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (postData.includes('getplayeridbybrefid')) {
+    if (operation === 'getplayeridbybrefid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(brefIdResponse),
       });
-    } else if (
-      postData.includes('getplayercareerarc') ||
-      postData.includes('careerarcquery')
-    ) {
+    } else if (operation === 'getplayercareerarc') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(CAREER_ARC_RESPONSE),
       });
-    } else if (postData.includes('getallplayerseasonsta')) {
+    } else if (operation === 'getallplayerseasonstats') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -201,8 +199,8 @@ test.describe('Player Detail Page — brefId route @regression', () => {
   }) => {
     // Delay the brefId response so we can catch the loading state
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
-      if (postData.includes('getplayeridbybrefid')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getplayeridbybrefid') {
         await new Promise<void>((resolve) => setTimeout(resolve, 1500));
         await route.fulfill({
           status: 200,

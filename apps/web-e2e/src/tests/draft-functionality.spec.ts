@@ -1,4 +1,5 @@
 import { expect, test } from '../fixtures/auth';
+import { extractOperationName } from '../fixtures/shared-mocks';
 import { mockDraft } from '../mocks/graphql/draft.mocks';
 import { leagueByIdResponse } from '../mocks/graphql/league.mocks';
 
@@ -38,9 +39,9 @@ test.describe('Draft Status Web UI Tests @critical', () => {
     await page.route(
       (url) => url.toString().includes('/graphql'),
       async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
+        const operation = extractOperationName(route).toLowerCase();
 
-        if (postData.includes('initializedraft')) {
+        if (operation === 'initializedraft') {
           draftStatus = 'queued';
           void route.fulfill({
             status: 200,
@@ -54,7 +55,7 @@ test.describe('Draft Status Web UI Tests @critical', () => {
               },
             }),
           });
-        } else if (postData.includes('getleaguebyid')) {
+        } else if (operation === 'getleaguebyid') {
           // Return league with current (possibly mutated) draftStatus
           void route.fulfill({
             status: 200,

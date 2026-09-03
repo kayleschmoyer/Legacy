@@ -18,7 +18,7 @@ import {
   test,
   unauthTest,
 } from '../fixtures/pages';
-import { useTier } from '../fixtures/shared-mocks';
+import { extractOperationName, useTier } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -175,32 +175,22 @@ async function mockPlayerComparisonGraphQL(
   await page.route(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
-      if (
-        postData.includes('getplayerswithstats') ||
-        postData.includes('playerswithstats')
-      ) {
+      if (operation === 'getplayerswithstats') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify(makeMockPlayersResponse()),
         });
-      } else if (
-        postData.includes('getallplayerseasonstats') ||
-        postData.includes('allplayerseasonstats') ||
-        postData.includes('playerseasonstats')
-      ) {
+      } else if (operation === 'getallplayerseasonstats') {
         // Season-by-season breakdown query fired after players are selected
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { playerSeasonStats: [] } }),
         });
-      } else if (
-        postData.includes('getmysubscription') ||
-        postData.includes('mysubscription')
-      ) {
+      } else if (operation === 'getmysubscription') {
         // PremiumGate requires an active premium subscription
         await route.fulfill({
           status: 200,
@@ -464,11 +454,8 @@ freeUserTest.describe('Player Comparison – premium gate @regression', () => {
     await page.route(
       (url) => isGraphQLEndpoint(url),
       async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
-        if (
-          postData.includes('getmysubscription') ||
-          postData.includes('mysubscription')
-        ) {
+        const operation = extractOperationName(route).toLowerCase();
+        if (operation === 'getmysubscription') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',

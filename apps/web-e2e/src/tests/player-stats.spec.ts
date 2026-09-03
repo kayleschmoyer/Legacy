@@ -1,5 +1,8 @@
 import { expect, test } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -124,12 +127,12 @@ test.describe('Player Statistics Page @regression', () => {
   test.beforeEach(async ({ page, playersPage }) => {
     // Mock GraphQL endpoints with player data so the stats page has data to render
     await page.route(isGraphQLEndpoint, async (route) => {
-      const postData = route.request().postData()?.toLowerCase() ?? '';
+      const operation = extractOperationName(route).toLowerCase();
 
       if (
-        postData.includes('getcareerbattingsta') ||
-        postData.includes('getallplayers') ||
-        postData.includes('getplayerswithstat')
+        operation === 'getcareerbattingstats' ||
+        operation === 'getallplayers' ||
+        operation === 'getplayerswithstats'
       ) {
         await route.fulfill({
           status: 200,

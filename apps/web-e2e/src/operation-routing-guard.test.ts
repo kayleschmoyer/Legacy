@@ -47,39 +47,19 @@ const KNOWN_AMBIGUOUS: readonly string[] = [
   'auction-draft.spec.ts::getleaguedraft',
   'auction-draft.spec.ts::getleagueteams',
   'auction-draft.spec.ts::getuserleagues',
-  'combobox-search-a11y.spec.ts::getallplayers',
-  'combobox-search-a11y.spec.ts::searchplayers',
   'matchup-week-navigation.spec.ts::getleagueteams',
   'matchup-week-navigation.spec.ts::leagueteams',
   'matchup-week-navigation.spec.ts::matchupplayers',
   'mid-draft-trades.spec.ts::autopick',
   'mid-draft-trades.spec.ts::draftqueue',
   'mid-draft-trades.spec.ts::getleagueteams',
-  'mock-draft-simulator.spec.ts::getleaguedraft',
-  'mock-draft-simulator.spec.ts::getleagueteams',
-  'mock-draft-simulator.spec.ts::getuserleagues',
-  'on-this-day.spec.ts::getonthisday',
-  'player-detail-bio-career-arc.spec.ts::getallplayers',
-  'player-detail-hero-stats-chips.spec.ts::getallplayers',
-  'player-detail-modal.spec.ts::getallplayers',
-  'player-stats.spec.ts::getallplayers',
   'pre-draft-lobby-trades.spec.ts::autopick',
   'pre-draft-lobby-trades.spec.ts::careerpitchingstats',
   'pre-draft-lobby-trades.spec.ts::draftqueue',
   'pre-draft-lobby-trades.spec.ts::getleagueteams',
-  'roster-management.spec.ts::getleague',
-  'roster-management.spec.ts::getleagueteams',
-  'roster-management.spec.ts::getuserleagues',
-  'roster-management.spec.ts::getusers',
   'season-renewal.ts::announcement',
   'season-renewal.ts::chat',
   'season-renewal.ts::messages',
-  'team-detail-info-roster-branding.spec.ts::getleagueteams',
-  'team-detail.spec.ts::getleagueteams',
-  'trading-center.spec.ts::getleague',
-  'trading-center.spec.ts::getleagueteams',
-  'trading-center.spec.ts::getuserleagues',
-  'trading-center.spec.ts::getusers',
   'websocket-realtime-updates.spec.ts::getleagueteams',
   'websocket-realtime-updates.spec.ts::getuserleagues',
   'websocket-realtime-updates.spec.ts::getusers',
@@ -175,6 +155,17 @@ function routingSites(repoRoot: string): RoutingSite[] {
     readFileSync(file, 'utf8')
       .split(/\r?\n/)
       .forEach((line, index) => {
+        // Skip comments. Migrated files routinely quote the old
+        // `postData.includes('...')` form to explain what was replaced and
+        // why — documenting the pattern must not read as using it.
+        const trimmed = line.trimStart();
+        if (
+          trimmed.startsWith('//') ||
+          trimmed.startsWith('*') ||
+          trimmed.startsWith('/*')
+        ) {
+          return;
+        }
         for (const match of line.matchAll(ROUTING_CALL)) {
           const raw = match[2];
           const quoteDelimited =

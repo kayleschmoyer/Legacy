@@ -8,7 +8,10 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 /** URL predicate for the GraphQL API endpoint */
@@ -101,8 +104,8 @@ test.describe('Skip link coverage across major pages @regression', () => {
     await page.route(
       (url) => isGraphQLEndpoint(url),
       async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
-        if (postData.includes('getnotificationhistory')) {
+        const operation = extractOperationName(route).toLowerCase();
+        if (operation === 'getnotificationhistory') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -110,7 +113,7 @@ test.describe('Skip link coverage across major pages @regression', () => {
               data: { getNotificationHistory: [] },
             }),
           });
-        } else if (postData.includes('markallnotificationsasread')) {
+        } else if (operation === 'markallnotificationsasread') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -118,7 +121,7 @@ test.describe('Skip link coverage across major pages @regression', () => {
               data: { markAllNotificationsAsRead: true },
             }),
           });
-        } else if (postData.includes('marknotificationasread')) {
+        } else if (operation === 'marknotificationasread') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -146,8 +149,8 @@ test.describe('Skip link coverage across major pages @regression', () => {
     await page.route(
       (url) => isGraphQLEndpoint(url),
       async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
-        if (postData.includes('getpublicleagues')) {
+        const operation = extractOperationName(route).toLowerCase();
+        if (operation === 'getpublicleagues') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',

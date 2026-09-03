@@ -12,6 +12,7 @@
  */
 
 import { test } from '../fixtures/pages';
+import { extractOperationName } from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -288,18 +289,15 @@ async function setupPlayerDetailMocks(
     opts.careerArcBody ?? deriveCareerArcBody(seasonStatsBody);
 
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (
-      postData.includes('getplayercareerarc') ||
-      postData.includes('careerarcquery')
-    ) {
+    if (operation === 'getplayercareerarc') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(careerArcBody),
       });
-    } else if (postData.includes('getallplayerseasonsta')) {
+    } else if (operation === 'getallplayerseasonstats') {
       if (seasonStatsDelay) {
         await new Promise<void>((resolve) =>
           setTimeout(resolve, seasonStatsDelay),
@@ -311,9 +309,9 @@ async function setupPlayerDetailMocks(
         body: JSON.stringify(seasonStatsBody),
       });
     } else if (
-      postData.includes('getcareerbattingsta') ||
-      postData.includes('getallplayers') ||
-      postData.includes('getplayerswithstat')
+      operation === 'getcareerbattingstats' ||
+      operation === 'getallplayers' ||
+      operation === 'getplayerswithstats'
     ) {
       // Return a minimal player list with one player so rows render.
       await route.fulfill({
