@@ -7,6 +7,10 @@ jest.mock('../auth', () => ({
   getRepoOwnerName: jest.fn(),
 }));
 
+jest.mock('@legacy-sports/logging/server', () => ({
+  LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
+
 import { getJobLogs } from './get-job-logs';
 
 const { githubGetArrayBuffer: mockGetArrayBuffer, githubRest: mockRest } =
@@ -25,6 +29,28 @@ function makeLogBuffer(content: string): ArrayBuffer {
 
 function parse(text: string): Record<string, unknown> {
   return JSON.parse(text) as Record<string, unknown>;
+}
+
+/** Build a STORED (uncompressed) ZIP local file entry with real header sizes. */
+function buildStoredZipEntry(name: string, text: string): Buffer {
+  const nameBuf = Buffer.from(name, 'utf-8');
+  const data = Buffer.from(text, 'utf-8');
+  const header = Buffer.alloc(30);
+  header.writeUInt32LE(0x04034b50, 0); // local file header signature
+  header.writeUInt16LE(20, 4); // version needed to extract
+  header.writeUInt16LE(0, 6); // general purpose bit flag (no data descriptor)
+  header.writeUInt16LE(0, 8); // compression method: stored
+  header.writeUInt32LE(0, 14); // crc-32 (unchecked by extractZipEntries)
+  header.writeUInt32LE(data.length, 18); // compressed size
+  header.writeUInt32LE(data.length, 22); // uncompressed size
+  header.writeUInt16LE(nameBuf.length, 26); // file name length
+  header.writeUInt16LE(0, 28); // extra field length
+  return Buffer.concat([header, nameBuf, data]);
+}
+
+function makeZipBuffer(entries: Buffer[]): ArrayBuffer {
+  const buf = Buffer.concat(entries);
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
 
 beforeEach(() => {
@@ -245,6 +271,98 @@ describe('getJobLogs', () => {
     });
   });
 
+  describe('failing-step scoping (LS-9644)', () => {
+    it('scopes job_id logs to the step GitHub marked as failed', async () => {
+      const zip = makeZipBuffer([
+        buildStoredZipEntry('1_Set up job.txt', 'setup output, all fine\n'),
+        buildStoredZipEntry(
+          '2_Run tests.txt',
+          'FAIL src/foo.spec.ts\nExpect failure here\n',
+        ),
+        buildStoredZipEntry('3_Cleanup.txt', 'cleanup noise\n'),
+      ]);
+      mockGetArrayBuffer.mockResolvedValue(zip);
+      mockRest.mockResolvedValue({
+        id: 42,
+        name: 'test',
+        conclusion: 'failure',
+        steps: [
+          { name: 'Set up job', conclusion: 'success', number: 1 },
+          { name: 'Run tests', conclusion: 'failure', number: 2 },
+          { name: 'Cleanup', conclusion: 'success', number: 3 },
+        ],
+      });
+
+      const result = await getJobLogs({ jobId: 42 });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.scopedToFailingStep).toBe(true);
+      expect(payload.failingSteps).toEqual(['Run tests']);
+      expect(payload.logs as string).toContain('Expect failure here');
+      expect(payload.logs as string).not.toContain('setup output');
+      expect(payload.logs as string).not.toContain('cleanup noise');
+    });
+
+    it('falls back to the whole log when no step is marked failed', async () => {
+      const zip = makeZipBuffer([
+        buildStoredZipEntry('1_Set up job.txt', 'setup output\n'),
+        buildStoredZipEntry('2_Run tests.txt', 'all good\n'),
+      ]);
+      mockGetArrayBuffer.mockResolvedValue(zip);
+      mockRest.mockResolvedValue({
+        id: 43,
+        name: 'test',
+        conclusion: 'cancelled',
+        steps: [
+          { name: 'Set up job', conclusion: 'success', number: 1 },
+          { name: 'Run tests', conclusion: 'cancelled', number: 2 },
+        ],
+      });
+
+      const result = await getJobLogs({ jobId: 43 });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.scopedToFailingStep).toBe(false);
+      expect(payload.failingSteps).toBeUndefined();
+      expect(payload.logs as string).toContain('setup output');
+      expect(payload.logs as string).toContain('all good');
+    });
+
+    it('falls back to the whole log for a plain-text (non-ZIP) log response', async () => {
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer('plain text log\n'));
+
+      const result = await getJobLogs({ jobId: 44 });
+
+      expect(result.isError).toBeFalsy();
+      expect(mockRest).not.toHaveBeenCalled();
+      const payload = parse(result.content[0].text);
+      expect(payload.scopedToFailingStep).toBe(false);
+      expect(payload.logs as string).toContain('plain text log');
+    });
+
+    it('surfaces returnedFrom: "tail" and returnedLines only when truncated', async () => {
+      const manyLines = Array.from({ length: 300 }, (_, i) => `line ${i}`);
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(manyLines.join('\n')));
+
+      const truncatedResult = await getJobLogs({ jobId: 1, tailLines: 50 });
+      const truncatedPayload = parse(truncatedResult.content[0].text);
+      expect(truncatedPayload.truncated).toBe(true);
+      expect(truncatedPayload.returnedFrom).toBe('tail');
+      expect(truncatedPayload.returnedLines).toBe(50);
+
+      const untruncatedResult = await getJobLogs({
+        jobId: 1,
+        tailLines: 1000,
+      });
+      const untruncatedPayload = parse(untruncatedResult.content[0].text);
+      expect(untruncatedPayload.truncated).toBe(false);
+      expect(untruncatedPayload.returnedFrom).toBeUndefined();
+      expect(untruncatedPayload.returnedLines).toBe(300);
+    });
+  });
+
   describe('run_id path', () => {
     function makeJobsResponse(
       jobs: Array<{ id: number; name: string; conclusion: string | null }>,
@@ -282,6 +400,39 @@ describe('getJobLogs', () => {
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toMatch(/no failed jobs/i);
       expect(mockGetArrayBuffer).not.toHaveBeenCalled();
+    });
+
+    it('scopes to the failing step using steps already present on the jobs-list response (LS-9644, no extra fetch)', async () => {
+      mockRest.mockResolvedValue({
+        total_count: 1,
+        jobs: [
+          {
+            id: 10,
+            name: 'build',
+            conclusion: 'failure',
+            steps: [
+              { name: 'Set up job', conclusion: 'success', number: 1 },
+              { name: 'Build', conclusion: 'failure', number: 2 },
+            ],
+          },
+        ],
+      });
+      const zip = makeZipBuffer([
+        buildStoredZipEntry('1_Set up job.txt', 'setup output\n'),
+        buildStoredZipEntry('2_Build.txt', 'build error here\n'),
+      ]);
+      mockGetArrayBuffer.mockResolvedValue(zip);
+
+      const result = await getJobLogs({ runId: 99, failedOnly: true });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.scopedToFailingStep).toBe(true);
+      expect(payload.failingSteps).toEqual(['Build']);
+      expect(payload.logs as string).toContain('build error here');
+      expect(payload.logs as string).not.toContain('setup output');
+      // Only the jobs-list call — no separate per-job detail fetch needed.
+      expect(mockRest).toHaveBeenCalledTimes(1);
     });
   });
 

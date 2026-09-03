@@ -1,3 +1,4 @@
+import { LOGGER } from '@legacy-sports/logging/server';
 import { inflateRawSync } from 'node:zlib';
 
 import { getRepoOwnerName } from '../auth.js';
@@ -20,10 +21,25 @@ const DEFAULT_MAX_CHARS = 10_000;
 /** Default number of tail lines when tail_lines is not specified. */
 const DEFAULT_TAIL_LINES = 200;
 
+interface GitHubJobStep {
+  name: string;
+  conclusion: string | null;
+  number: number;
+}
+
 interface GitHubJob {
   id: number;
   name: string;
   conclusion: string | null;
+  /**
+   * Present on both the "list jobs for a workflow run" and "get a job for a
+   * workflow run" REST responses. Used (LS-9644) to scope a job's log down
+   * to the step GitHub itself marked as failing, instead of blindly tailing
+   * the whole concatenated log — a plain tail can land entirely inside an
+   * unrelated later step (e.g. a cleanup step) and never reach the failing
+   * step's own output.
+   */
+  steps?: GitHubJobStep[];
 }
 
 interface GitHubJobsResponse {
@@ -34,14 +50,23 @@ interface GitHubJobsResponse {
 /** Maximum uncompressed size per ZIP entry (50 MB) to prevent resource exhaustion. */
 const MAX_UNCOMPRESSED_ENTRY_BYTES = 50 * 1024 * 1024;
 
+/** One entry (a step's raw output) extracted from a job's log ZIP archive. */
+interface ZipEntry {
+  name: string;
+  text: string;
+}
+
 /**
- * Extract concatenated text content from a ZIP archive buffer.
+ * Extract every entry (name + decompressed text) from a ZIP archive buffer.
  * Uses Node built-in zlib to decompress individual deflated entries.
  * Skips entries whose declared uncompressed size exceeds MAX_UNCOMPRESSED_ENTRY_BYTES.
+ * GitHub Actions names each entry `<step-number>_<step-name>.txt`, which
+ * `scopeEntriesToFailingSteps` relies on to slice a job's log down to only
+ * the step that failed (mirrors the ci-server LS-9556 pattern).
  */
-function extractTextFromZip(buffer: ArrayBuffer): string {
+function extractZipEntries(buffer: ArrayBuffer): ZipEntry[] {
   const data = Buffer.from(buffer);
-  const texts: string[] = [];
+  const entries: ZipEntry[] = [];
   let offset = 0;
 
   while (offset + 30 <= data.length) {
@@ -52,12 +77,17 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
     const uncompressedSize = data.readUInt32LE(offset + 22);
     const fileNameLength = data.readUInt16LE(offset + 26);
     const extraFieldLength = data.readUInt16LE(offset + 28);
-    const dataOffset = offset + 30 + fileNameLength + extraFieldLength;
+    const nameStart = offset + 30;
+    const nameEnd = nameStart + fileNameLength;
+    if (nameEnd > data.length) break;
+    const name = data.subarray(nameStart, nameEnd).toString('utf-8');
+    const dataOffset = nameEnd + extraFieldLength;
 
     if (compressedSize > 0 && dataOffset + compressedSize <= data.length) {
       if (uncompressedSize > MAX_UNCOMPRESSED_ENTRY_BYTES) {
-        process.stderr.write(
-          `[get-job-logs] skipping ZIP entry: uncompressed size ${uncompressedSize} exceeds ${MAX_UNCOMPRESSED_ENTRY_BYTES} byte limit\n`,
+        LOGGER.error(
+          `[get-job-logs] skipping ZIP entry: uncompressed size ${uncompressedSize} exceeds ${MAX_UNCOMPRESSED_ENTRY_BYTES} byte limit`,
+          new Error('ZIP entry exceeds uncompressed size limit'),
         );
       } else {
         const compressed = data.subarray(
@@ -66,13 +96,17 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
         );
         try {
           if (compressionMethod === 8) {
-            texts.push(inflateRawSync(compressed).toString('utf-8'));
+            entries.push({
+              name,
+              text: inflateRawSync(compressed).toString('utf-8'),
+            });
           } else if (compressionMethod === 0) {
-            texts.push(compressed.toString('utf-8'));
+            entries.push({ name, text: compressed.toString('utf-8') });
           }
         } catch (err) {
-          process.stderr.write(
-            `[get-job-logs] failed to decompress ZIP entry: ${err instanceof Error ? err.message : String(err)}\n`,
+          LOGGER.error(
+            '[get-job-logs] failed to decompress ZIP entry',
+            err instanceof Error ? err : new Error(String(err)),
           );
         }
       }
@@ -81,18 +115,55 @@ function extractTextFromZip(buffer: ArrayBuffer): string {
     offset = dataOffset + compressedSize;
   }
 
-  return texts.join('');
+  return entries;
+}
+
+/** Parse the leading `<n>_` step-number prefix from a ZIP entry name (e.g.
+ * "3_Lint.txt" -> 3). Returns null when the name doesn't follow this
+ * convention (defensive — callers fall back to no step-scoping). */
+function stepNumberFromEntryName(name: string): number | null {
+  const match = /^(\d+)_/.exec(name);
+  return match ? Number(match[1]) : null;
 }
 
 /**
- * Fetch the raw log text for a single GitHub Actions job.
- * The endpoint returns a 302 redirect to the log archive (ZIP or plain text).
+ * Scope a job's log entries down to only the step(s) GitHub marked
+ * `conclusion: "failure"` (LS-9644, mirroring the ci-server LS-9556 fix).
+ * Returns null when step data is unavailable, no step failed, or no ZIP
+ * entry could be matched to a failing step number — callers fall back to
+ * the whole job log in that case.
  */
-async function fetchJobLog(
+function scopeEntriesToFailingSteps(
+  entries: ZipEntry[],
+  steps: GitHubJobStep[] | undefined,
+): { text: string; stepNames: string[] } | null {
+  if (!steps || steps.length === 0) return null;
+  const failingSteps = steps.filter((s) => s.conclusion === 'failure');
+  if (failingSteps.length === 0) return null;
+
+  const failingNumbers = new Set(failingSteps.map((s) => s.number));
+  const matched = entries.filter((e) => {
+    const n = stepNumberFromEntryName(e.name);
+    return n !== null && failingNumbers.has(n);
+  });
+  if (matched.length === 0) return null;
+
+  return {
+    text: matched.map((e) => e.text).join('\n'),
+    stepNames: failingSteps.map((s) => s.name),
+  };
+}
+
+/**
+ * Fetch the raw log content for a single GitHub Actions job, split into its
+ * per-step ZIP entries when the archive is a ZIP. `entries` is null for the
+ * (rare) plain-text log response, in which case no step-scoping is possible.
+ */
+async function fetchJobLogEntries(
   owner: string,
   repo: string,
   jobId: number,
-): Promise<string> {
+): Promise<{ entries: ZipEntry[] | null; text: string }> {
   const buffer = await githubGetArrayBuffer(
     owner,
     repo,
@@ -106,10 +177,76 @@ async function fetchJobLog(
     header[2] === 0x03 &&
     header[3] === 0x04
   ) {
-    return extractTextFromZip(buffer);
+    const entries = extractZipEntries(buffer);
+    return { entries, text: entries.map((e) => e.text).join('') };
   }
 
-  return Buffer.from(buffer).toString('utf-8');
+  return { entries: null, text: Buffer.from(buffer).toString('utf-8') };
+}
+
+/**
+ * Fetch a single job's detail (including its `steps` array) directly by id.
+ * Used on the job_id path (LS-9644) to get step-conclusion data for
+ * scoping — a run_id-scoped fetch already has this from the jobs-list
+ * response and skips this extra lookup entirely. Best-effort: callers
+ * swallow failures and fall back to no step-scoping.
+ */
+async function fetchJobDetail(
+  owner: string,
+  repo: string,
+  jobId: number,
+): Promise<GitHubJob | undefined> {
+  return githubRest<GitHubJob>({
+    method: 'GET',
+    path: `/repos/${owner}/${repo}/actions/jobs/${jobId}`,
+  });
+}
+
+/**
+ * Fetch a job's log text, scoped to its failing step(s) when step data is
+ * available and a ZIP entry matches (LS-9644). Falls back to the full job
+ * log text (previous behaviour) whenever scoping isn't possible — e.g. a
+ * plain-text log response, a job with no distinct failing step (cancelled
+ * at the job level), or missing step data.
+ */
+async function fetchScopedJobLog(
+  owner: string,
+  repo: string,
+  jobId: number,
+  knownSteps?: GitHubJobStep[],
+): Promise<{
+  text: string;
+  scopedToFailingStep: boolean;
+  stepNames: string[];
+}> {
+  const { entries, text } = await fetchJobLogEntries(owner, repo, jobId);
+  if (!entries) {
+    return { text, scopedToFailingStep: false, stepNames: [] };
+  }
+
+  let steps = knownSteps;
+  if (!steps) {
+    try {
+      const detail = await fetchJobDetail(owner, repo, jobId);
+      steps = detail?.steps;
+    } catch (err) {
+      LOGGER.warn(
+        `[get-job-logs] failed to fetch job detail for step-scoping, falling back to whole log (job ${jobId})`,
+        err instanceof Error ? err : new Error(String(err)),
+      );
+      steps = undefined;
+    }
+  }
+
+  const scoped = scopeEntriesToFailingSteps(entries, steps);
+  if (scoped) {
+    return {
+      text: scoped.text,
+      scopedToFailingStep: true,
+      stepNames: scoped.stepNames,
+    };
+  }
+  return { text, scopedToFailingStep: false, stepNames: [] };
 }
 
 /**
@@ -201,14 +338,20 @@ function extractErrorSummary(allLines: string[]): string[] {
 
 /**
  * Apply tail-lines, per-line, and maxChars limits to a set of log lines.
- * Returns the processed text and whether truncation occurred.
+ * Returns the processed text, whether truncation occurred, the total byte
+ * size of the untruncated input, and the number of lines actually returned.
  */
 function applyLimits(
   lines: string[],
   tailLines: number,
   maxChars: number,
   truncateLineLength?: number,
-): { text: string; truncated: boolean; totalBytes: number } {
+): {
+  text: string;
+  truncated: boolean;
+  totalBytes: number;
+  returnedLines: number;
+} {
   const totalBytes = lines.reduce((n, l) => n + l.length + 1, 0);
   const tailed = lines.length > tailLines ? lines.slice(-tailLines) : lines;
 
@@ -236,7 +379,12 @@ function applyLimits(
     ? `\n... [truncated, ${totalBytes} total bytes]`
     : '';
 
-  return { text: out.join('\n') + indicator, truncated, totalBytes };
+  return {
+    text: out.join('\n') + indicator,
+    truncated,
+    totalBytes,
+    returnedLines: out.length,
+  };
 }
 
 export async function getJobLogs(
@@ -262,9 +410,14 @@ export async function getJobLogs(
   try {
     let rawText: string;
     let jobLabel: string;
+    let scopedToFailingStep = false;
+    let failingSteps: string[] = [];
 
     if (params.jobId) {
-      rawText = await fetchJobLog(owner, name, params.jobId);
+      const scoped = await fetchScopedJobLog(owner, name, params.jobId);
+      rawText = scoped.text;
+      scopedToFailingStep = scoped.scopedToFailingStep;
+      failingSteps = scoped.stepNames;
       jobLabel = `job ${params.jobId}`;
     } else {
       if (!params.runId) {
@@ -283,16 +436,27 @@ export async function getJobLogs(
           ],
         };
       }
+      const stepNamesByJob = new Set<string>();
       const parts = await Promise.all(
         jobs.map(async (job) => {
           try {
-            const text = await fetchJobLog(owner, name, job.id);
-            return `${job.name}\n${text}`;
+            const scoped = await fetchScopedJobLog(
+              owner,
+              name,
+              job.id,
+              job.steps,
+            );
+            if (scoped.scopedToFailingStep) {
+              scopedToFailingStep = true;
+              for (const s of scoped.stepNames) stepNamesByJob.add(s);
+            }
+            return `${job.name}\n${scoped.text}`;
           } catch {
             return `${job.name}\n(Failed to fetch logs for this job)`;
           }
         }),
       );
+      failingSteps = [...stepNamesByJob];
       rawText = parts.join('\n\n');
       jobLabel = `run ${params.runId}`;
     }
@@ -301,7 +465,7 @@ export async function getJobLogs(
 
     if (params.errorSummary) {
       const errorLines = extractErrorSummary(allLines);
-      const { text, truncated, totalBytes } = applyLimits(
+      const { text, truncated, totalBytes, returnedLines } = applyLimits(
         errorLines,
         tailLines,
         maxChars,
@@ -317,7 +481,11 @@ export async function getJobLogs(
                 errorSummary: true,
                 totalLogLines: allLines.length,
                 errorLines: errorLines.length,
+                scopedToFailingStep,
+                ...(scopedToFailingStep ? { failingSteps } : {}),
                 truncated,
+                returnedLines,
+                ...(truncated ? { returnedFrom: 'tail' } : {}),
                 totalBytes,
                 logs: text,
               },
@@ -329,7 +497,7 @@ export async function getJobLogs(
       };
     }
 
-    const { text, truncated, totalBytes } = applyLimits(
+    const { text, truncated, totalBytes, returnedLines } = applyLimits(
       allLines,
       tailLines,
       maxChars,
@@ -345,7 +513,11 @@ export async function getJobLogs(
               jobLabel,
               totalLines: allLines.length,
               tailLines,
+              scopedToFailingStep,
+              ...(scopedToFailingStep ? { failingSteps } : {}),
               truncated,
+              returnedLines,
+              ...(truncated ? { returnedFrom: 'tail' } : {}),
               totalBytes,
               logs: text,
             },
