@@ -504,8 +504,10 @@ test.describe('Player Detail — dynamic tab bar: auto-switch to first available
     // Batting tab must not appear — no batting seasons for a pitcher
     await playersPage.detail.expectTabHidden('Batting');
 
-    // Career Arc tab is present; explicitly switch to it and confirm content loads
-    await playersPage.detail.switchTab('Career Arc');
+    // Career Arc tab is present AND active by default — asserted without
+    // clicking it. The explicit switchTab this test used to perform made the
+    // "defaults to" in its name unverified (LS-9829).
+    await playersPage.detail.expectTabVisible('Career Arc');
     await playersPage.detail.expectText('Peak ERA+');
   });
 });

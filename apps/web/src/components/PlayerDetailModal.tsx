@@ -216,6 +216,12 @@ interface SeasonRow {
 
 type StatsTab = 'career-arc' | 'batting' | 'pitching' | 'fielding';
 
+/**
+ * Tab shown before any query has resolved and before the user picks one. Career
+ * Arc leads the tab strip, so it is also the default whenever arc data exists.
+ */
+const DEFAULT_STATS_TAB: StatsTab = 'career-arc';
+
 interface CareerTile {
   label: string;
   value: string | number;
@@ -770,7 +776,15 @@ export function PlayerDetailModal({
 }: PlayerDetailModalProps) {
   LOGGER.debug('[PlayerDetailModal] render', { playerId, playerName, open });
 
-  const [activeTab, setActiveTab] = useState<StatsTab>('career-arc');
+  // The tab the user explicitly picked, or null while the modal is still showing
+  // its default. Keeping "no choice yet" distinct from a concrete tab is what
+  // makes the default deterministic (LS-9829): `availableTabs` grows as the
+  // season-stats and career-arc queries resolve, in whichever order the network
+  // delivers them, and the previous code latched the transient fallback into
+  // state from an effect. A player whose season stats landed first was pinned to
+  // Batting/Pitching; one whose arc data landed first opened on Career Arc —
+  // same build, same player, different tab per load.
+  const [selectedTab, setSelectedTab] = useState<StatsTab | null>(null);
   const [arcMode, setArcMode] = useState<CareerArcMode>('batting');
   const { isPremium } = useIsPremiumStatus();
   // Premium plans grant every catalog entitlement, so these advanced-stats gates
@@ -1236,20 +1250,15 @@ export function PlayerDetailModal({
 
   // Derive the displayed tab synchronously (LS-6992): useMemo prevents the
   // one-frame flash of empty content that occurred with a post-render useEffect.
+  // The user's pick wins while it is still available; otherwise fall back to the
+  // first available tab, recomputed on every render rather than latched, so late
+  // arc data reinstates the declared default instead of being overridden by
+  // whatever was showing when the season-stats query happened to win the race.
   const effectiveActiveTab = useMemo((): StatsTab => {
-    if (availableTabs.length === 0) return activeTab;
-    return availableTabs.some((t) => t.key === activeTab)
-      ? activeTab
-      : availableTabs[0].key;
-  }, [availableTabs, activeTab]);
-
-  // Sync state after fallback so stale activeTab doesn't cause later renders to
-  // jump back to an unexpected tab when availableTabs grows (e.g. arc data loads).
-  useEffect(() => {
-    if (effectiveActiveTab !== activeTab) {
-      setActiveTab(effectiveActiveTab);
-    }
-  }, [effectiveActiveTab, activeTab]);
+    if (selectedTab && availableTabs.some((t) => t.key === selectedTab))
+      return selectedTab;
+    return availableTabs[0]?.key ?? DEFAULT_STATS_TAB;
+  }, [availableTabs, selectedTab]);
 
   // ------ Focus restoration (LS-6966) ------
   // BaseModal uses hideHeader so the X button calls onOpenChange(false) directly
@@ -1700,7 +1709,7 @@ export function PlayerDetailModal({
                       label={tab.label}
                       tabKey={tab.key}
                       active={effectiveActiveTab === tab.key}
-                      onPress={() => setActiveTab(tab.key)}
+                      onPress={() => setSelectedTab(tab.key)}
                     />
                   ))}
                 </XStack>

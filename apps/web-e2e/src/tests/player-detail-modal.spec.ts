@@ -562,18 +562,25 @@ test.describe('Player Detail Modal – Pitcher @regression', () => {
     // Career Pitching card
     await playersPage.detail.expectCareerPitchingCard();
 
-    // Pitching hero chips
-    await playersPage.detail.expectText('W-L');
-    await playersPage.detail.expectText('SO');
+    // Pitching hero chips — the labels actually rendered in hero-stats-pitching.
+    // 'W-L' and 'SO' used to be asserted here under a "hero chips" comment, but
+    // neither is a chip label: both are season-by-season table headers, so the
+    // assertions raced the default-tab selection (LS-9829).
+    await playersPage.detail.expectText('Record');
+    await playersPage.detail.expectText('Strikeouts');
 
     // Click the Pitching tab to show season-by-season table
     await playersPage.detail.switchTab('Pitching');
-    await playersPage.detail.expectText('ERA');
 
-    // Season-by-season pitching table headers
+    // Season-by-season pitching table headers. These render only while the
+    // Pitching tab is active, so they must be asserted after switchTab. 'SO' is
+    // matched exactly: substring matching let it pass off "Seasons" in the
+    // modal eyebrow no matter which tab was showing.
+    await playersPage.detail.expectText('W-L');
     await playersPage.detail.expectText('ERA');
     await playersPage.detail.expectText('IP');
     await playersPage.detail.expectText('BB');
+    await playersPage.detail.expectText('SO', { exact: true });
   });
 });
 

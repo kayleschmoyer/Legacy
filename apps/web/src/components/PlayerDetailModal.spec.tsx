@@ -101,8 +101,16 @@ jest.mock('@tanstack/react-virtual', () => ({
 }));
 
 jest.mock('tamagui', () => {
-  const Pass = ({ children, ...rest }: React.HTMLAttributes<HTMLElement>) => (
-    <div {...rest}>{children}</div>
+  // Stacks forward `onPress` to `onClick` the way Button and Text below do, so
+  // pressable elements built on a stack (the stat tabs) are clickable here.
+  const Pass = ({
+    children,
+    onPress,
+    ...rest
+  }: React.HTMLAttributes<HTMLElement> & { onPress?: () => void }) => (
+    <div onClick={onPress} {...rest}>
+      {children}
+    </div>
   );
   const TooltipTrigger = ({ children }: React.HTMLAttributes<HTMLElement>) => (
     <div>{children}</div>
@@ -822,8 +830,56 @@ describe('PlayerDetailModal — active tab reset (LS-6992)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('preserves the active tab when switching to a player who also has that tab', () => {
-    // Render a pitching-only player so activeTab syncs to 'pitching'
+  it('preserves a user-picked tab when switching to a player who also has that tab', () => {
+    // Two-way player, so both tabs exist and Batting is the default.
+    mockUseAllPlayerSeasonStats.mockReturnValue({
+      ...EMPTY_SEASON,
+      data: {
+        ...EMPTY_SEASON.data,
+        playerSeasonBatting: [battingSeason()],
+        playerSeasonPitching: [pitchingSeason()],
+      },
+    });
+    const { rerender } = render(
+      <PlayerDetailModal
+        playerId={1}
+        playerName="Two-Way One"
+        position="SP"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Season by Season · Batting')).toBeInTheDocument();
+
+    // The user explicitly picks Pitching. Clicked by label rather than testID:
+    // Tamagui drops testID in the jest environment, and the tab's press handler
+    // lives on the wrapper, so the click bubbles up from the label node.
+    fireEvent.click(screen.getByText('Pitching'));
+    expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
+
+    // Switch to another two-way player — Pitching is still available.
+    rerender(
+      <PlayerDetailModal
+        playerId={2}
+        playerName="Two-Way Two"
+        position="SP"
+        open
+        onOpenChange={jest.fn()}
+      />,
+    );
+
+    // The user's pick survives: only an explicit choice is sticky.
+    expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Season by Season · Batting'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not let an auto-selected tab pin the next player (LS-9829)', () => {
+    // A pitching-only player has exactly one tab, so Pitching is auto-selected
+    // rather than chosen. The modal used to latch that into state from an
+    // effect, which is what made the default nondeterministic once a second
+    // query could grow the tab list underneath it.
     mockUseAllPlayerSeasonStats.mockReturnValue({
       ...EMPTY_SEASON,
       data: { ...EMPTY_SEASON.data, playerSeasonPitching: [pitchingSeason()] },
@@ -839,7 +895,8 @@ describe('PlayerDetailModal — active tab reset (LS-6992)', () => {
     );
     expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
 
-    // Switch to a two-way player — pitching tab is still available
+    // Switch to a two-way player. Batting now leads the tab list, and since the
+    // user never picked Pitching, the new player gets the default.
     mockUseAllPlayerSeasonStats.mockReturnValue({
       ...EMPTY_SEASON,
       data: {
@@ -858,10 +915,9 @@ describe('PlayerDetailModal — active tab reset (LS-6992)', () => {
       />,
     );
 
-    // Pitching was the synced activeTab and is still available — it should persist
-    expect(screen.getByText('Season by Season · Pitching')).toBeInTheDocument();
+    expect(screen.getByText('Season by Season · Batting')).toBeInTheDocument();
     expect(
-      screen.queryByText('Season by Season · Batting'),
+      screen.queryByText('Season by Season · Pitching'),
     ).not.toBeInTheDocument();
   });
 

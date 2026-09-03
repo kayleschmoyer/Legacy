@@ -505,10 +505,10 @@ test.describe('Player Detail Modal – bio display @smoke', () => {
 // ── Tests: Career Arc tab ───────────────────────────────────────────────────
 
 test.describe('Player Detail Modal – Career Arc tab @regression', () => {
-  // Helper: navigate to player modal and switch to Career Arc tab.
-  // Due to query timing, GetAllPlayerSeasonStats may resolve before
-  // GetPlayerCareerArc, causing the component to fall back to Batting.
-  // Explicitly clicking the Career Arc tab avoids the race.
+  // Helper: navigate to player modal and switch to Career Arc tab. The tab is
+  // also the default once arc data exists (LS-9829 made that deterministic), but
+  // clicking it explicitly keeps these content assertions independent of the
+  // default-selection rule — the default itself is covered by the test below.
   async function openCareerArc(
     page: import('@playwright/test').Page,
     playersPage: import('../pages').PlayersPage,
@@ -527,7 +527,14 @@ test.describe('Player Detail Modal – Career Arc tab @regression', () => {
     page,
     playersPage,
   }) => {
-    await openCareerArc(page, playersPage);
+    // Deliberately does NOT click the tab. This test used to route through the
+    // openCareerArc helper, which clicks Career Arc first — so it asserted
+    // nothing about the default and hid the nondeterminism in LS-9829.
+    await setupMocks(page);
+    await playersPage.gotoDetail(1, 'networkidle');
+
+    await playersPage.detail.expectOpen();
+    await playersPage.detail.expectNotLoading();
 
     // Career Arc content should be visible (renders Peak OPS)
     await playersPage.detail.expectText('Peak OPS');
@@ -586,7 +593,8 @@ test.describe('Player Detail Modal – two-way player Career Arc @regression', (
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
 
-    // Click Career Arc tab explicitly (race condition may default to Batting)
+    // Click Career Arc tab explicitly. It is now also the default (LS-9829), but
+    // this test is about the arc mode toggle, not about which tab opens first.
     await playersPage.detail.switchTab('Career Arc');
     // Wait for a Career Arc–specific metric to confirm the panel has rendered
     // (avoids a no-op wait on 'Batting' which may already be visible from the tabs)
