@@ -271,6 +271,101 @@ describe('getJobLogs', () => {
     });
   });
 
+  describe('grep_pattern (LS-9633)', () => {
+    it('extracts only matching lines plus 2 lines of context', async () => {
+      const lines = [
+        'noise line 1',
+        'noise line 2',
+        'noise line 3',
+        'noise line 4',
+        'noise line 5',
+        '5 passed, 1 failed',
+        'noise line 6',
+        'noise line 7',
+        'noise line 8',
+      ];
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(lines.join('\n')));
+
+      const result = await getJobLogs({ jobId: 1, grepPattern: 'failed' });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.grepPattern).toBe('failed');
+      expect(payload.totalLogLines).toBe(lines.length);
+      expect(payload.matchedLines).toBe(5);
+      expect(payload.logs as string).toContain('5 passed, 1 failed');
+      expect(payload.logs as string).toContain('noise line 4');
+      expect(payload.logs as string).toContain('noise line 6');
+      expect(payload.logs as string).not.toContain('noise line 1');
+      expect(payload.logs as string).not.toContain('noise line 8');
+    });
+
+    it('matches case-insensitively', async () => {
+      mockGetArrayBuffer.mockResolvedValue(
+        makeLogBuffer('Some FAILURE happened'),
+      );
+
+      const result = await getJobLogs({ jobId: 1, grepPattern: 'failure' });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.logs as string).toContain('Some FAILURE happened');
+    });
+
+    it('still applies tail_lines/max_chars/truncate_line_length to matched lines', async () => {
+      const lines = Array.from({ length: 50 }, (_, i) => `error ${i}`);
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(lines.join('\n')));
+
+      const result = await getJobLogs({
+        jobId: 1,
+        grepPattern: 'error',
+        tailLines: 5,
+        maxChars: 1_000_000,
+      });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.truncated).toBe(true);
+      expect(payload.returnedLines).toBe(5);
+    });
+
+    it('rejects an overly long grep_pattern', async () => {
+      const result = await getJobLogs({
+        jobId: 1,
+        grepPattern: 'x'.repeat(201),
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('too long');
+      expect(mockGetArrayBuffer).not.toHaveBeenCalled();
+    });
+
+    it('treats a regex-special character in grep_pattern as a literal', async () => {
+      const lines = ['a.b', 'gap 1', 'gap 2', 'gap 3', 'gap 4', 'axb'];
+      mockGetArrayBuffer.mockResolvedValue(makeLogBuffer(lines.join('\n')));
+
+      const result = await getJobLogs({ jobId: 1, grepPattern: 'a.b' });
+
+      expect(result.isError).toBeFalsy();
+      const payload = parse(result.content[0].text);
+      expect(payload.matchedLines).toBe(3);
+      expect(payload.logs as string).toContain('a.b');
+      expect(payload.logs as string).not.toContain('axb');
+    });
+
+    it('rejects grep_pattern combined with error_summary', async () => {
+      const result = await getJobLogs({
+        jobId: 1,
+        grepPattern: 'error',
+        errorSummary: true,
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('mutually exclusive');
+      expect(mockGetArrayBuffer).not.toHaveBeenCalled();
+    });
+  });
+
   describe('failing-step scoping (LS-9644)', () => {
     it('scopes job_id logs to the step GitHub marked as failed', async () => {
       const zip = makeZipBuffer([

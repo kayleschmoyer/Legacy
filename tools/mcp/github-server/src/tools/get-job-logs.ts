@@ -13,6 +13,7 @@ export interface GetJobLogsParams {
   maxChars?: number;
   errorSummary?: boolean;
   truncateLineLength?: number;
+  grepPattern?: string;
 }
 
 /** Default hard cap on output characters to prevent context window overflow. */
@@ -337,6 +338,80 @@ function extractErrorSummary(allLines: string[]): string[] {
 }
 
 /**
+ * Hard cap on a user-supplied grep_pattern. Mirrors the ci-server
+ * ci_search_logs convention (LS-9633) — log-search patterns are short by
+ * nature, and a very long pattern is both unnecessary and a ReDoS smell.
+ */
+const MAX_GREP_PATTERN_LENGTH = 200;
+
+/**
+ * Validate a grep_pattern. Returns a human-readable rejection reason, or
+ * null when acceptable. grep_pattern is a literal substring match only (no
+ * regex option), which sidesteps ReDoS entirely — a caller needing regex
+ * search should reach for the ci-server's ci_search_logs instead.
+ */
+function validateGrepPattern(pattern: string): string | null {
+  if (pattern.length > MAX_GREP_PATTERN_LENGTH) {
+    return `grep_pattern too long (${pattern.length} > ${MAX_GREP_PATTERN_LENGTH} characters).`;
+  }
+  return null;
+}
+
+/**
+ * Build a case-insensitive literal-substring line matcher for grep_pattern.
+ */
+function buildGrepMatcher(pattern: string): (line: string) => boolean {
+  const needle = pattern.toLowerCase();
+  return (line: string) => line.toLowerCase().includes(needle);
+}
+
+/** Number of context lines surrounding each grep_pattern match. */
+const GREP_CONTEXT_LINES = 2;
+
+/**
+ * Extract lines matching `isMatch`, with `GREP_CONTEXT_LINES` of surrounding
+ * context on each side, deduplicated (LS-9633) — lets a caller pull just the
+ * pass/fail summary or a specific test name out of a large job log instead
+ * of relying on tail_lines alone, which can land entirely inside an
+ * unrelated section (e.g. a live-reporter's ANSI-overwritten progress
+ * lines). Mirrors extractErrorSummary's windowing, minus the Nx
+ * "Failed tasks" special-casing that only applies to the fixed error
+ * pattern.
+ */
+function extractGrepMatches(
+  allLines: string[],
+  isMatch: (line: string) => boolean,
+): string[] {
+  const result: string[] = [];
+
+  for (let i = 0; i < allLines.length; i++) {
+    if (!isMatch(allLines[i])) continue;
+
+    for (let j = Math.max(0, i - GREP_CONTEXT_LINES); j < i; j++) {
+      result.push(allLines[j]);
+    }
+    result.push(allLines[i]);
+    for (
+      let j = i + 1;
+      j <= Math.min(allLines.length - 1, i + GREP_CONTEXT_LINES);
+      j++
+    ) {
+      result.push(allLines[j]);
+    }
+  }
+
+  const seen = new Set<string>();
+  const deduped: string[] = [];
+  for (const line of result) {
+    if (!seen.has(line)) {
+      seen.add(line);
+      deduped.push(line);
+    }
+  }
+  return deduped;
+}
+
+/**
  * Apply tail-lines, per-line, and maxChars limits to a set of log lines.
  * Returns the processed text, whether truncation occurred, the total byte
  * size of the untruncated input, and the number of lines actually returned.
@@ -402,6 +477,25 @@ export async function getJobLogs(
     };
   }
 
+  if (params.grepPattern && params.errorSummary) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'grep_pattern and error_summary are mutually exclusive — use grep_pattern to search for a custom pattern, or error_summary for the built-in error/failure heuristic.',
+        },
+      ],
+    };
+  }
+
+  if (params.grepPattern) {
+    const reason = validateGrepPattern(params.grepPattern);
+    if (reason) {
+      return { isError: true, content: [{ type: 'text', text: reason }] };
+    }
+  }
+
   const { owner, name } = await getRepoOwnerName();
   const tailLines = params.tailLines ?? DEFAULT_TAIL_LINES;
   const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
@@ -462,6 +556,41 @@ export async function getJobLogs(
     }
 
     const allLines = rawText.split(/\r?\n/);
+
+    if (params.grepPattern) {
+      const matcher = buildGrepMatcher(params.grepPattern);
+      const matchedLines = extractGrepMatches(allLines, matcher);
+      const { text, truncated, totalBytes, returnedLines } = applyLimits(
+        matchedLines,
+        tailLines,
+        maxChars,
+        params.truncateLineLength,
+      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                jobLabel,
+                grepPattern: params.grepPattern,
+                totalLogLines: allLines.length,
+                matchedLines: matchedLines.length,
+                scopedToFailingStep,
+                ...(scopedToFailingStep ? { failingSteps } : {}),
+                truncated,
+                returnedLines,
+                ...(truncated ? { returnedFrom: 'tail' } : {}),
+                totalBytes,
+                logs: text,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
 
     if (params.errorSummary) {
       const errorLines = extractErrorSummary(allLines);

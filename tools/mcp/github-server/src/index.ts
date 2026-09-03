@@ -2131,7 +2131,7 @@ export function createServer(): McpServer {
 
   server.tool(
     'get_job_logs',
-    'Fetch GitHub Actions job logs with server-side truncation. When a step is marked failed, the log is scoped to that step (scopedToFailingStep + failingSteps) before tail/char limits apply; otherwise falls back to the whole log. Returns the last tail_lines lines (default 200), capped at max_chars (default 10 000). Use truncate_line_length to cap one long line, error_summary for error/failure lines only. Provide job_id for a single job or run_id (with optional failed_only) for all jobs.',
+    'Fetch GitHub Actions job logs with server-side truncation. When a step is marked failed, the log is scoped to that step (scopedToFailingStep + failingSteps) before tail/char limits apply; otherwise falls back to the whole log. Returns the last tail_lines lines (default 200), capped at max_chars (default 10 000). Use truncate_line_length to cap one long line, error_summary for error/failure lines only, or grep_pattern for a substring search. Provide job_id for a single job or run_id (with optional failed_only) for all jobs.',
     {
       job_id: z.coerce
         .number()
@@ -2159,7 +2159,7 @@ export function createServer(): McpServer {
         .positive()
         .default(200)
         .describe(
-          'Maximum number of lines to return from the end of the log (default: 200). The tool always truncates server-side before returning, so the response is bounded regardless of log size.',
+          'Max lines from the end of the log (default: 200); always applied server-side.',
         ),
       max_chars: z.coerce
         .number()
@@ -2167,13 +2167,13 @@ export function createServer(): McpServer {
         .positive()
         .default(10_000)
         .describe(
-          'Hard cap on total output characters (default: 10 000). Truncated output is suffixed with "... [truncated, N total bytes]".',
+          'Hard cap on output characters (default: 10 000); truncated output is suffixed with the total byte count.',
         ),
       error_summary: z
         .boolean()
         .default(false)
         .describe(
-          'When true, extract only lines matching error/failure patterns (error, FAIL, failed, exit code, etc.) plus 2 lines of context. Dramatically reduces token usage for CI-diagnosis tasks.',
+          'Extract only error/failure lines (plus 2 lines of context) instead of tailing.',
         ),
       truncate_line_length: z.coerce
         .number()
@@ -2181,7 +2181,16 @@ export function createServer(): McpServer {
         .positive()
         .optional()
         .describe(
-          'Truncate individual lines longer than this many characters (e.g. 500). Useful when a log line is pathologically long (e.g. a single line of embedded ANSI or minified output), so it cannot alone consume the entire max_chars budget. Truncated lines are suffixed with ...[line truncated].',
+          "Truncate lines longer than this many characters (e.g. 500), so one pathologically long line can't alone consume the max_chars budget.",
+        ),
+      grep_pattern: z
+        .string()
+        .trim()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe(
+          'Substring search (plus 2 lines context) instead of tailing. Case-insensitive; excl. error_summary.',
         ),
     },
     async (params) =>
@@ -2193,6 +2202,7 @@ export function createServer(): McpServer {
         maxChars: params.max_chars,
         errorSummary: params.error_summary,
         truncateLineLength: params.truncate_line_length,
+        grepPattern: params.grep_pattern,
       }),
   );
 
