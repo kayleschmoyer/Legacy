@@ -83,3 +83,101 @@ describe('listPRs (LS-8021 token-efficient output)', () => {
     expect(text).toBe('No PRs found matching filters.');
   });
 });
+
+describe('listPRs paths filter (LS-9634)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedRepo.mockResolvedValue({ owner: 'o', name: 'r' });
+  });
+
+  it('includes only PRs whose files match a given path pattern', async () => {
+    mockedGraphQL.mockResolvedValueOnce(
+      page([
+        prNode({
+          number: 1,
+          files: {
+            totalCount: 1,
+            nodes: [{ path: 'docs/mcp/api-reference.json' }],
+          },
+        }),
+        prNode({
+          number: 2,
+          files: { totalCount: 1, nodes: [{ path: 'apps/web/src/foo.tsx' }] },
+        }),
+      ]),
+    );
+
+    const text = (await listPRs({ paths: ['docs/mcp/api-reference'] }))
+      .content[0].text;
+
+    expect(text).toContain('1|feat(x): do the thing');
+    expect(text).not.toContain('2|feat(x): do the thing');
+    expect(text).toContain('_total: 1_');
+  });
+
+  it('requests the files field in the same paginated query, not a per-PR fan-out', async () => {
+    mockedGraphQL.mockResolvedValueOnce(page([]));
+
+    await listPRs({ paths: ['docs/'] });
+
+    expect(mockedGraphQL).toHaveBeenCalledTimes(1);
+    const [query] = mockedGraphQL.mock.calls[0];
+    expect(query).toContain('files(first: 100)');
+  });
+
+  it('does not request the files field when paths is omitted', async () => {
+    mockedGraphQL.mockResolvedValueOnce(page([prNode()]));
+
+    await listPRs({});
+
+    const [query] = mockedGraphQL.mock.calls[0];
+    expect(query).not.toContain('files(first: 100)');
+  });
+
+  it('adds a matchedPaths column listing the matching files', async () => {
+    mockedGraphQL.mockResolvedValueOnce(
+      page([
+        prNode({
+          files: {
+            totalCount: 2,
+            nodes: [
+              { path: 'docs/mcp/api-reference.json' },
+              { path: 'apps/web/src/foo.tsx' },
+            ],
+          },
+        }),
+      ]),
+    );
+
+    const text = (await listPRs({ paths: ['docs/mcp/api-reference'] }))
+      .content[0].text;
+
+    expect(text).toContain('matchedPaths');
+    expect(text).toContain('docs/mcp/api-reference.json');
+    expect(text).not.toContain('apps/web/src/foo.tsx');
+  });
+
+  it('returns a clear error for an invalid regex pattern', async () => {
+    const result = await listPRs({ paths: ['('] });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Invalid path pattern');
+    expect(mockedGraphQL).not.toHaveBeenCalled();
+  });
+
+  it('rejects a pattern with catastrophic-backtracking risk (ReDoS)', async () => {
+    const result = await listPRs({ paths: ['(a+)+$'] });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('catastrophic backtracking');
+    expect(mockedGraphQL).not.toHaveBeenCalled();
+  });
+
+  it('rejects a pattern longer than the max allowed length', async () => {
+    const result = await listPRs({ paths: ['a'.repeat(201)] });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('too long');
+    expect(mockedGraphQL).not.toHaveBeenCalled();
+  });
+});

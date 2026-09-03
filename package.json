@@ -207,6 +207,7 @@
     "react-router-dom": "6.29.0",
     "recharts": "^3.8.0",
     "rollbar": "^2.26.4",
+    "safe-regex": "^2.1.1",
     "solito": "^4.4.1",
     "stripe": "^20.4.1",
     "tamagui": "1.144.4",

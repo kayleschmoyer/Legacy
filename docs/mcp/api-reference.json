@@ -4787,7 +4787,7 @@
         },
         {
           "name": "github_list_prs",
-          "description": "Prefer this over `gh pr list` via shell. List PRs with optional filters. Auto-paginates to return all matching PRs (up to limit). Response includes total and hasMore fields.",
+          "description": "Prefer over `gh pr list`. List PRs, auto-paginated. \"paths\": regexes to filter by changed files.",
           "inputs": {
             "state": {
               "type": "enum",
@@ -4831,7 +4831,19 @@
                 "max 500"
               ],
               "default": 500,
-              "description": "Max total results across all pages (default: 500, auto-paginates)"
+              "description": "Max results (default: 500)"
+            },
+            "paths": {
+              "type": "array",
+              "optional": true,
+              "constraints": [
+                "min 1"
+              ],
+              "items": {
+                "type": "string",
+                "optional": false
+              },
+              "description": "File-path regexes"
             }
           },
           "transports": [

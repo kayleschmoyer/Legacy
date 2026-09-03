@@ -493,7 +493,7 @@ export function createServer(): McpServer {
   // --- github_list_prs ---
   server.tool(
     'github_list_prs',
-    'Prefer this over `gh pr list` via shell. List PRs with optional filters. Auto-paginates to return all matching PRs (up to limit). Response includes total and hasMore fields.',
+    'Prefer over `gh pr list`. List PRs, auto-paginated. "paths": regexes to filter by changed files.',
     {
       state: z
         .enum(['open', 'closed', 'merged', 'all'])
@@ -509,9 +509,12 @@ export function createServer(): McpServer {
         .positive()
         .max(500)
         .default(500)
-        .describe(
-          'Max total results across all pages (default: 500, auto-paginates)',
-        ),
+        .describe('Max results (default: 500)'),
+      paths: z
+        .array(z.string())
+        .min(1)
+        .optional()
+        .describe('File-path regexes'),
     },
     async (params) => listPRs(params),
   );

@@ -1,4 +1,5 @@
 import { markdownTable, truncate } from '@legacy-sports/mcp-format';
+import safeRegex from 'safe-regex';
 import { getRepoOwnerName } from '../auth.js';
 import { githubGraphQL, type GraphQLResult } from '../github-api.js';
 import type { ToolResult } from '../types.js';
@@ -10,6 +11,11 @@ interface ListPRsParams {
   label?: string;
   search?: string;
   limit?: number;
+  paths?: string[];
+}
+
+interface PRFileNode {
+  path: string;
 }
 
 interface PRNode {
@@ -26,6 +32,7 @@ interface PRNode {
   isDraft: boolean;
   mergedAt: string | null;
   reviewDecision: string | null;
+  files?: { totalCount: number; nodes: PRFileNode[] };
 }
 
 interface PRSummary {
@@ -42,6 +49,7 @@ interface PRSummary {
   isDraft: boolean;
   mergedAt: string | null;
   reviewDecision: string | null;
+  files?: { totalCount: number; nodes: PRFileNode[] };
 }
 
 // GraphQL state enum values
@@ -60,6 +68,15 @@ function mapState(state: string): string[] {
   }
 }
 
+// `files` is a per-PR connection fetched inline in the same paginated query —
+// not a per-PR fan-out call — but it does add cost to every request, so it is
+// only included in the field selection when a `paths` filter was requested
+// (LS-9634). Capped at 100 files/PR: enough for the shared/generated-artifact
+// collision case this exists for (a handful of regenerated files per PR), not
+// a general-purpose diff tool.
+const FILES_FIELD = `
+        files(first: 100) { totalCount nodes { path } }`;
+
 const PR_FIELDS = `
         number
         title
@@ -75,7 +92,8 @@ const PR_FIELDS = `
         mergedAt
         reviewDecision`;
 
-const LIST_PRS_QUERY = `
+function listPrsQuery(withFiles: boolean): string {
+  return `
 query($owner: String!, $repo: String!, $states: [PullRequestState!], $headRefName: String, $labels: [String!], $first: Int!, $after: String) {
   repository(owner: $owner, name: $repo) {
     pullRequests(first: $first, after: $after, states: $states, headRefName: $headRefName, labels: $labels, orderBy: {field: UPDATED_AT, direction: DESC}) {
@@ -83,13 +101,15 @@ query($owner: String!, $repo: String!, $states: [PullRequestState!], $headRefNam
         hasNextPage
         endCursor
       }
-      nodes {${PR_FIELDS}
+      nodes {${PR_FIELDS}${withFiles ? FILES_FIELD : ''}
       }
     }
   }
 }`;
+}
 
-const SEARCH_PRS_QUERY = `
+function searchPrsQuery(withFiles: boolean): string {
+  return `
 query($query: String!, $first: Int!, $after: String) {
   search(query: $query, type: ISSUE, first: $first, after: $after) {
     pageInfo {
@@ -97,11 +117,12 @@ query($query: String!, $first: Int!, $after: String) {
       endCursor
     }
     nodes {
-      ... on PullRequest {${PR_FIELDS}
+      ... on PullRequest {${PR_FIELDS}${withFiles ? FILES_FIELD : ''}
       }
     }
   }
 }`;
+}
 
 interface PageInfo {
   hasNextPage: boolean;
@@ -139,7 +160,52 @@ function nodeToSummary(node: PRNode): PRSummary {
     isDraft: node.isDraft,
     mergedAt: node.mergedAt,
     reviewDecision: node.reviewDecision,
+    files: node.files,
   };
+}
+
+// Guards against ReDoS from a pathological `paths` pattern: file paths come
+// from PR contents an external contributor controls, so a pattern with
+// catastrophic-backtracking risk (e.g. "(a+)+") tested against an
+// adversarial file name could hang the MCP server process.
+const MAX_PATTERN_LENGTH = 200;
+
+/**
+ * `paths` entries are regex source strings (not shell globs) tested against
+ * each PR's changed file paths — the same `test("a|b")` pattern the LS-9634
+ * gap report used with `gh pr list --json files`. An invalid or unsafe
+ * pattern throws so the caller sees a clear error rather than a silently-empty
+ * result or a hung server.
+ */
+function compilePathPatterns(paths: string[]): RegExp[] {
+  return paths.map((p) => {
+    if (p.length > MAX_PATTERN_LENGTH) {
+      throw new Error(
+        `Path pattern too long (${p.length} > ${MAX_PATTERN_LENGTH} chars): "${p.slice(0, 40)}..."`,
+      );
+    }
+    let re: RegExp;
+    try {
+      re = new RegExp(p);
+    } catch (error) {
+      throw new Error(
+        `Invalid path pattern "${p}": ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    if (!safeRegex(re)) {
+      throw new Error(
+        `Path pattern "${p}" risks catastrophic backtracking (ReDoS) — simplify it (e.g. avoid nested quantifiers like "(a+)+").`,
+      );
+    }
+    return re;
+  });
+}
+
+function matchingFilePaths(pr: PRSummary, patterns: RegExp[]): string[] {
+  const files = pr.files?.nodes ?? [];
+  return files
+    .filter((f) => patterns.some((re) => re.test(f.path)))
+    .map((f) => f.path);
 }
 
 const PAGE_SIZE = 100;
@@ -164,8 +230,16 @@ const LIST_PRS_COLUMNS = [
   'url',
 ] as const;
 
-function toRow(pr: PRSummary): Record<string, unknown> {
-  return {
+const LIST_PRS_COLUMNS_WITH_PATHS = [
+  ...LIST_PRS_COLUMNS,
+  'matchedPaths',
+] as const;
+
+function toRow(
+  pr: PRSummary,
+  matchPatterns?: RegExp[],
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
     number: pr.number,
     title: truncate(pr.title, 80),
     state: pr.state,
@@ -179,12 +253,18 @@ function toRow(pr: PRSummary): Record<string, unknown> {
     updatedAt: pr.updatedAt,
     url: pr.url,
   };
+  if (matchPatterns) {
+    base['matchedPaths'] = matchingFilePaths(pr, matchPatterns).join(',');
+  }
+  return base;
 }
 
 export async function listPRs(params: ListPRsParams): Promise<ToolResult> {
   try {
     const repo = await getRepoOwnerName();
     const limit = params.limit ?? 500;
+    const withFiles = Boolean(params.paths?.length);
+    const pathPatterns = params.paths ? compilePathPatterns(params.paths) : [];
 
     const allPrs: PRSummary[] = [];
     let after: string | null = null;
@@ -217,11 +297,14 @@ export async function listPRs(params: ListPRsParams): Promise<ToolResult> {
       while (allPrs.length < limit) {
         const pageSize = Math.min(PAGE_SIZE, limit - allPrs.length);
         const result: GraphQLResult<SearchPRsGraphQLResponse> =
-          await githubGraphQL<SearchPRsGraphQLResponse>(SEARCH_PRS_QUERY, {
-            query: searchQuery,
-            first: pageSize,
-            after,
-          });
+          await githubGraphQL<SearchPRsGraphQLResponse>(
+            searchPrsQuery(withFiles),
+            {
+              query: searchQuery,
+              first: pageSize,
+              after,
+            },
+          );
 
         const page: SearchPRsGraphQLResponse['search'] = result.data.search;
         allPrs.push(
@@ -251,7 +334,7 @@ export async function listPRs(params: ListPRsParams): Promise<ToolResult> {
       while (allPrs.length < limit) {
         const pageSize = Math.min(PAGE_SIZE, limit - allPrs.length);
         const result: GraphQLResult<ListPRsGraphQLResponse> =
-          await githubGraphQL<ListPRsGraphQLResponse>(LIST_PRS_QUERY, {
+          await githubGraphQL<ListPRsGraphQLResponse>(listPrsQuery(withFiles), {
             ...baseVars,
             first: pageSize,
             after,
@@ -270,10 +353,23 @@ export async function listPRs(params: ListPRsParams): Promise<ToolResult> {
       }
     }
 
+    const matchedPrs = withFiles
+      ? allPrs.filter((pr) => matchingFilePaths(pr, pathPatterns).length > 0)
+      : allPrs;
+
     const text =
-      allPrs.length === 0
+      matchedPrs.length === 0
         ? 'No PRs found matching filters.'
-        : `${markdownTable(allPrs.map(toRow), { columns: LIST_PRS_COLUMNS })}\n\n_total: ${allPrs.length}${hasMore ? ` (limit ${limit} reached — more may exist)` : ''}_`;
+        : `${markdownTable(
+            matchedPrs.map((pr) =>
+              toRow(pr, withFiles ? pathPatterns : undefined),
+            ),
+            {
+              columns: withFiles
+                ? LIST_PRS_COLUMNS_WITH_PATHS
+                : LIST_PRS_COLUMNS,
+            },
+          )}\n\n_total: ${matchedPrs.length}${hasMore ? ` (limit ${limit} reached on the unfiltered scan — more may exist; narrow with author/label/branch or raise limit)` : ''}_`;
 
     return {
       content: [{ type: 'text', text }],
