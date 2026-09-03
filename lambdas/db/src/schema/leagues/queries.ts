@@ -921,7 +921,7 @@ builder.queryField('teamById', (t) =>
           sql`CASE ${PublicSchema.leagueMembers.permissionLevel}
             WHEN 'commissioner' THEN 1
             WHEN 'general_manager' THEN 2
-            WHEN 'team_manager' THEN 3
+            WHEN 'assistant_manager' THEN 3
             ELSE 4
           END`,
         )
