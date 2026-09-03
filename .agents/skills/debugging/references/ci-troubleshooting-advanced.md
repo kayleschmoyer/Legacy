@@ -97,8 +97,10 @@ ci_search_logs(runId: RUN_ID, pattern: "Nx CLI not available|node_modules.*not f
 
 ```bash
 make clean-cache
-git commit --allow-empty -m "chore: bust CI cache"
-git push origin HEAD
+```
+
+```
+worktree_commit({ message: "chore: bust CI cache", allowEmpty: true }) + worktree_push()
 ```
 
 ### A5. Terraform state lock conflicts

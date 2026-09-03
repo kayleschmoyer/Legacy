@@ -56,6 +56,7 @@ import { executeWorktreeMv } from './move-file-utils';
 import { mergeFromMain } from './merge-from-main';
 import { rebaseOntoMain } from './rebase-onto-main';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
+import { resolveCommitArgs } from './resolve-commit-args';
 import { resolveCommitish } from './resolve-commitish';
 import { resolveMainRepoPath } from './resolve-main-repo';
 import { runOnRef } from './run-on-ref';
@@ -1288,7 +1289,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
     {
       name: 'worktree_commit',
       description:
-        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Auto-appends Co-Authored-By.',
+        'Stage and commit. Pass `files` (string or string[]) to stage only specific paths (default: all). Refuses main. Refuses .env/credentials. Supports amend. Pass `resetAuthor: true` with `amend: true` to run `--reset-author` (fixes commit author in cloud sessions). Pass `addAll: true` with `amend: true` (and no `files`) to fold newly-added untracked files into the amended commit (git add -A instead of the default tracked-only git add -u); alternatively pass `files` explicitly for surgical control over exactly which untracked paths to include. Pass `allowEmpty: true` to permit a commit with no staged changes. Auto-appends Co-Authored-By.',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -1333,6 +1334,11 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             type: 'boolean',
             description:
               "When combined with amend: true and no explicit files, stages tracked-modified AND untracked files (git add -A) before amending, instead of the default tracked-only git add -u — use this to fold newly-added files into the amended commit without enumerating every path. Has no effect without amend: true, and is ignored whenever files is provided (files already stages exactly the given paths, tracked or untracked — use it instead of addAll for surgical control). Default: false, preserving today's tracked-only amend behavior.",
+          },
+          allowEmpty: {
+            type: 'boolean',
+            description:
+              'Pass --allow-empty to git commit, permitting a commit with no staged changes (e.g. an empty files list or a clean tree). Default: false. Use to retrigger CI, unstick a reviewer-bot cycle, or republish a changelog-only commit.',
           },
         },
         required: [],
@@ -3323,6 +3329,7 @@ const handleCallTool = async (
         amend,
         resetAuthor,
         addAll,
+        allowEmpty,
       } = args as {
         message?: string;
         files?: unknown;
@@ -3332,6 +3339,7 @@ const handleCallTool = async (
         amend?: boolean;
         resetAuthor?: boolean;
         addAll?: boolean;
+        allowEmpty?: boolean;
       };
       // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
       // from older documentation or habit).
@@ -3662,7 +3670,7 @@ const handleCallTool = async (
         } else {
           // Stage all modified files, but check for dangerous files first
           const status = run('git status --porcelain', cwd).trim();
-          if (!status && !amend) {
+          if (!status && !amend && !allowEmpty) {
             return {
               content: [
                 {
@@ -3727,8 +3735,12 @@ const handleCallTool = async (
           );
           writeFileSync(msgPath, fullMessage, 'utf-8');
           try {
-            const amendArgs = ['commit', '--amend', '-F', msgPath];
-            if (resetAuthor) amendArgs.push('--reset-author');
+            const amendArgs = resolveCommitArgs({
+              amend: true,
+              msgPath,
+              resetAuthor,
+              allowEmpty,
+            });
             runGit(amendArgs, cwd, {
               env: NON_INTERACTIVE_COMMIT_ENV,
             });
@@ -3740,8 +3752,11 @@ const handleCallTool = async (
             }
           }
         } else if (amend) {
-          const amendArgs = ['commit', '--amend', '--no-edit'];
-          if (resetAuthor) amendArgs.push('--reset-author');
+          const amendArgs = resolveCommitArgs({
+            amend: true,
+            resetAuthor,
+            allowEmpty,
+          });
           runGit(amendArgs, cwd, {
             env: NON_INTERACTIVE_COMMIT_ENV,
           });
@@ -3754,7 +3769,12 @@ const handleCallTool = async (
           );
           writeFileSync(msgPath, fullMessage, 'utf-8');
           try {
-            runGit(['commit', '-F', msgPath], cwd, {
+            const commitArgs = resolveCommitArgs({
+              amend: false,
+              msgPath,
+              allowEmpty,
+            });
+            runGit(commitArgs, cwd, {
               env: NON_INTERACTIVE_COMMIT_ENV,
             });
           } finally {
@@ -3783,6 +3803,7 @@ const handleCallTool = async (
           filesChanged: filesChanged.split('\n').filter(Boolean),
           ...(amend ? { amended: true } : {}),
           ...(resetAuthor ? { resetAuthor: true } : {}),
+          ...(allowEmpty ? { allowEmpty: true } : {}),
         };
 
         return {

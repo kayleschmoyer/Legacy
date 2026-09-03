@@ -132,10 +132,10 @@ A `workflow_dispatch` run on any other branch produces `sub = repo:bkrupa/legacy
 **Fix:** fire a genuine `pull_request` event instead — push a new commit to the PR branch:
 
 ```
-worktree_commit({ message: "chore: retrigger ci" }) + worktree_push()
+worktree_commit({ message: "chore: retrigger ci", allowEmpty: true }) + worktree_push()
 ```
 
-(or `git commit --allow-empty -m "chore: retrigger ci" && git push`). This is exactly what unblocked PR #6622: empty commit `4bc07bf92` on `claude/adoring-hopper-0achdg` fired a fresh `pull_request` event and passed.
+This is exactly what unblocked PR #6622: empty commit `4bc07bf92` on `claude/adoring-hopper-0achdg` fired a fresh `pull_request` event and passed.
 
 `ci_dispatch_workflow` itself fails fast with an explanation (no wasted OIDC retries) when called with `workflow: "check-migrations-applied.yml"` or `workflow: "terraform-plan.yml"` and a non-`main` `ref` — see `OIDC_PLAN_ROLE_MAIN_ONLY_WORKFLOWS` in `tools/mcp/ci-server/src/tools/dispatch-workflow.ts`. Any other OIDC-gated `pull_request`-triggered workflow added later should be added to that set in lockstep.
 
@@ -151,7 +151,7 @@ Every job in `ci-pipeline.yml` — **including `summarize`** — carries `!conta
 **Recovery — the event type matters:**
 
 1. Remove the label: `github_manage_labels(prs: [PR#], remove: ["skip-ci"])`.
-2. Trigger a **`pull_request`-scoped** run: push a commit (`git commit --allow-empty -m "chore: retrigger ci"` and push) or close/reopen the PR.
+2. Trigger a **`pull_request`-scoped** run: push a commit (`worktree_commit({ message: "chore: retrigger ci", allowEmpty: true })` + `worktree_push()`) or close/reopen the PR.
 
 The `ci:run` label is **not** sufficient for a missing `CI Gate`: `ci-run-label.yml` translates it into a `workflow_dispatch` of the orchestrator, and on `workflow_dispatch` there is no `pull_request` payload — the granular jobs run and post check runs, but the "Post CI Gate aggregate status" step (`if: github.event.pull_request.number`) skips and `postCiGate` no-ops (`no-pr`). Use `ci:run` when the missing pieces are **check runs**; use a new push when the missing piece is a **commit status**.
 
