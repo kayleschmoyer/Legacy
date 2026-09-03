@@ -31,6 +31,7 @@ import {
   createEligiblePositionsLoader,
   createLeaguePayrollConfigLoader,
   createLeaguePositionByIdLoader,
+  createPlayerClubLoader,
   createPlayersLoader,
   createTeamPayrollLoader,
   createTeamsLoader,
@@ -60,7 +61,10 @@ export {
 } from './statistics-loaders';
 
 // Re-export cache utilities
-export { clearEligiblePositionsCache } from './entity-loaders';
+export {
+  clearEligiblePositionsCache,
+  clearPlayerClubCache,
+} from './entity-loaders';
 
 /**
  * Create all loaders for GraphQL context
@@ -78,6 +82,7 @@ export const createLoaders = (db: GenericDatabase<typeof PublicSchema>) => ({
   users: createUsersLoader(db),
   matchupPlayerGames: createMatchupPlayerGamesLoader(db),
   eligiblePositions: createEligiblePositionsLoader(db),
+  playerClub: createPlayerClubLoader(db),
   matchupPlayersById: createMatchupPlayersLoader(db),
   matchupsById: createMatchupsLoader(db),
   leagueWeekPlayerSeasons: createLeagueWeekPlayerSeasonsLoader(db),

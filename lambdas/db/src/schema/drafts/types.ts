@@ -204,6 +204,19 @@ DraftPlayer.implement({
         return context.loaders.eligiblePositions.load(parent.id);
       },
     }),
+    club: t.string({
+      nullable: true,
+      description:
+        "The franchise the player is most associated with (e.g. 'NYY', " +
+        "'BRO'), derived from season rows as the club they played the most " +
+        'games for, tie-broken by most recent season. This is the career ' +
+        'franchise, not the present-day one: unlike `players.mlb_team` it is ' +
+        'not restricted to the 30 current teams, so defunct and relocated ' +
+        'clubs are represented. Null when no season rows are on file.',
+      resolve: async (parent, _args, context) => {
+        return context.loaders.playerClub.load(parent.id);
+      },
+    }),
     careerBatting: t.field({
       description: 'Career batting statistics for the player',
       type: CareerBattingRef,

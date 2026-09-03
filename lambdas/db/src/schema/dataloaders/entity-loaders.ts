@@ -48,6 +48,32 @@ export function clearEligiblePositionsCache(): void {
   eligiblePositionsCache.clear();
 }
 
+// ---------------------------------------------------------------------------
+// Module-level player-club cache (LS-9832)
+//
+// A player's club is derived from completed season rows, so it only changes
+// when a bulk stats-load run adds a season. Same TTL and rationale as the
+// eligible-positions cache above.
+// ---------------------------------------------------------------------------
+
+/** Cache entry: resolved club code (or null when the player has no seasons) */
+interface ClubCacheEntry {
+  club: string | null;
+  expiresAt: number;
+}
+
+const PLAYER_CLUB_CACHE_TTL_MS = 30 * 60 * 1_000; // 30 minutes
+
+const playerClubCache = new Map<number, ClubCacheEntry>();
+
+/**
+ * Clear the module-level player-club cache. Call after a bulk stats load so
+ * the next DataLoader batch re-derives clubs from the new season rows.
+ */
+export function clearPlayerClubCache(): void {
+  playerClubCache.clear();
+}
+
 /**
  * DataLoader for teams
  * Key: teamId (number)
@@ -357,4 +383,143 @@ export const createEligiblePositionsLoader = (
 
     // Return results in the same order as the input keys
     return keys.map((key) => hitMap.get(key) ?? []);
+  });
+
+/**
+ * DataLoader for a player's club (franchise abbreviation) — LS-9832.
+ * Key: playerId (number)
+ * Returns: club code (e.g. 'NYY', 'BRO'), or null when the player has no
+ * season rows to derive one from.
+ *
+ * Baseball clubs are *derived* rather than read from `players.mlb_team`.
+ * That column (LS-8597) is `VARCHAR(3)` with an FK to `mlb_teams.abbreviation`,
+ * which holds only the 30 current franchises, so it can represent a player's
+ * present-day club but not the one they actually played for: of the 185
+ * distinct codes in `season_batting`, only 25 exist in `mlb_teams`. Storing
+ * Jackie Robinson's 'BRO' or Mel Ott's 'NYG' there would violate the FK. The
+ * draft board wants the career franchise, so it comes from the season rows.
+ *
+ * Primary club = most games played for that club, tie-broken by the most
+ * recent season. Batting and pitching games are summed per club so two-way
+ * and pitcher-only players resolve from whichever table has their rows.
+ *
+ * Football players carry a single current club on `players.nfl_team`, which is
+ * already populated and FK-checked, so that is read directly.
+ *
+ * Returns null — never a fabricated code — when nothing is on file, so the
+ * client renders an em-dash (the LS-9473 fabricated-zero precedent).
+ */
+export const createPlayerClubLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, string | null>(async (keys) => {
+    const now = Date.now();
+
+    const missing: number[] = [];
+    const hitMap = new Map<number, string | null>();
+
+    for (const key of keys) {
+      const entry = playerClubCache.get(key);
+      if (entry !== undefined && entry.expiresAt > now) {
+        hitMap.set(key, entry.club);
+      } else {
+        missing.push(key);
+      }
+    }
+
+    if (missing.length > 0) {
+      const ids = [...new Set(missing)];
+
+      const [battingRows, pitchingRows, footballRows] = await Promise.all([
+        db
+          .select({
+            playerId: PublicSchema.seasonBatting.playerId,
+            team: PublicSchema.seasonBatting.team,
+            games: sum(PublicSchema.seasonBatting.g).mapWith(Number),
+            lastSeason: sql<number>`MAX(${PublicSchema.seasonBatting.season})`,
+          })
+          .from(PublicSchema.seasonBatting)
+          .where(inArray(PublicSchema.seasonBatting.playerId, ids))
+          .groupBy(
+            PublicSchema.seasonBatting.playerId,
+            PublicSchema.seasonBatting.team,
+          ),
+        db
+          .select({
+            playerId: PublicSchema.seasonPitching.playerId,
+            team: PublicSchema.seasonPitching.team,
+            games: sum(PublicSchema.seasonPitching.g).mapWith(Number),
+            lastSeason: sql<number>`MAX(${PublicSchema.seasonPitching.season})`,
+          })
+          .from(PublicSchema.seasonPitching)
+          .where(inArray(PublicSchema.seasonPitching.playerId, ids))
+          .groupBy(
+            PublicSchema.seasonPitching.playerId,
+            PublicSchema.seasonPitching.team,
+          ),
+        db
+          .select({
+            id: PublicSchema.players.id,
+            nflTeam: PublicSchema.players.nflTeam,
+          })
+          .from(PublicSchema.players)
+          .where(inArray(PublicSchema.players.id, ids)),
+      ]);
+
+      // Sum games per (player, club) across both baseball tables so a pitcher
+      // who also batted is counted once per club rather than twice.
+      const totals = new Map<
+        number,
+        Map<string, { games: number; lastSeason: number }>
+      >();
+      for (const row of [...battingRows, ...pitchingRows]) {
+        if (row.team === null) continue;
+        let byClub = totals.get(row.playerId);
+        if (!byClub) {
+          byClub = new Map();
+          totals.set(row.playerId, byClub);
+        }
+        const prev = byClub.get(row.team);
+        // `g` is nullable, so an all-null club still ranks by its last season.
+        const games = Number.isFinite(row.games) ? row.games : 0;
+        byClub.set(row.team, {
+          games: (prev?.games ?? 0) + games,
+          lastSeason: Math.max(prev?.lastSeason ?? 0, row.lastSeason),
+        });
+      }
+
+      const nflByPlayer = new Map<number, string | null>();
+      for (const row of footballRows) {
+        nflByPlayer.set(row.id, row.nflTeam);
+      }
+
+      const expiresAt = now + PLAYER_CLUB_CACHE_TTL_MS;
+      for (const id of ids) {
+        const byClub = totals.get(id);
+        let club: string | null = null;
+
+        if (byClub !== undefined && byClub.size > 0) {
+          let best: { club: string; games: number; lastSeason: number } | null =
+            null;
+          for (const [code, agg] of byClub) {
+            if (
+              best === null ||
+              agg.games > best.games ||
+              (agg.games === best.games && agg.lastSeason > best.lastSeason)
+            ) {
+              best = { club: code, ...agg };
+            }
+          }
+          club = best?.club ?? null;
+        } else {
+          // No baseball seasons — fall back to the football club.
+          club = nflByPlayer.get(id) ?? null;
+        }
+
+        playerClubCache.set(id, { club, expiresAt });
+        hitMap.set(id, club);
+      }
+    }
+
+    return keys.map((key) => hitMap.get(key) ?? null);
   });

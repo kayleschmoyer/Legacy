@@ -41,6 +41,12 @@ export interface DraftPlayer {
   careerEndYear?: number | null;
   /** Stack-rank ADP fallback — see AvailableDraftPlayer.adp. Stable across the draft (not the player's index in the remaining/undrafted list). */
   adp?: number | null;
+  /** Franchise the player is most associated with (e.g. 'NYY', 'BRO'),
+   * derived server-side from season rows (most games played, tie-broken by
+   * latest season). Career club, not present-day — defunct and relocated
+   * franchises are represented. Null when no seasons are on file, which the
+   * board renders as an em-dash rather than a fabricated code (LS-9832). */
+  club?: string | null;
   // Football stat fields (LS-9478), sourced from getDraftFootballPlayerStats.
   // Undefined — never 0 — when the player has no career row in that stat
   // category, so STAT_COLUMNS_BY_SPORT renders an em-dash rather than a
@@ -89,6 +95,12 @@ export interface AvailableDraftPlayer {
    * collected yet.
    */
   adp?: number | null;
+  /** Franchise the player is most associated with (e.g. 'NYY', 'BRO'),
+   * derived server-side from season rows (most games played, tie-broken by
+   * latest season). Career club, not present-day — defunct and relocated
+   * franchises are represented. Null when no seasons are on file, which the
+   * board renders as an em-dash rather than a fabricated code (LS-9832). */
+  club?: string | null;
 }
 
 /** Stats lookup entry built from careerBattingStats connection */
@@ -154,6 +166,8 @@ export interface DraftPickRecord {
     eligiblePositions?: string[] | null;
     /** MLB Stats API id — keys the spectator splash headshot (img.mlbstatic.com). */
     mlbPlayerId?: number | null;
+    /** Career franchise abbreviation — see DraftPlayer.club (LS-9832). */
+    club?: string | null;
   } | null;
 }
 

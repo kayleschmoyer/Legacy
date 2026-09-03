@@ -192,6 +192,20 @@ PlayerRef.implement({
       description:
         'Current MLB team abbreviation for baseball players (LS-8597), sourced from the MLB Stats API. Null until synced.',
     }),
+    club: t.string({
+      nullable: true,
+      description:
+        "The franchise the player is most associated with (e.g. 'NYY', " +
+        "'BRO'), derived from season rows as the club they played the most " +
+        'games for, tie-broken by most recent season. Distinct from ' +
+        '`mlbTeam`: that is the present-day club and is constrained by FK to ' +
+        'the 30 current franchises, whereas this is the career club and so ' +
+        'also covers defunct and relocated ones. Null when no season rows ' +
+        'are on file (LS-9832).',
+      resolve: async (parent, _args, context) => {
+        return context.loaders.playerClub.load(parent.id);
+      },
+    }),
     jerseyNumber: t.exposeInt('jerseyNumber', {
       nullable: true,
       description:

@@ -64,8 +64,8 @@
       "title": "Draft Board",
       "slug": "legacy-sports-draft-board",
       "status": "active",
-      "lastSyncedHash": "sha256-80ad257b4cb33954bcfeec6589952f6bdb3bac167ee23ba3bc473b8167b6361b",
-      "lastSyncedAt": "2026-08-04T15:23:01.238Z",
+      "lastSyncedHash": "sha256-15c870e81a44c33d5189b3b525ad206d5bf00029e08967df17ee229075e0888e",
+      "lastSyncedAt": "2026-09-03T00:00:00.000Z",
       "jiraKey": "LS-8961",
       "source": "designsync-local"
     },

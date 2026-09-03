@@ -158,6 +158,7 @@ export function usePlayerData({
         gamesStarted: ps?.gamesStarted,
         ppg: ap.projectedMatchupPoints ?? null,
         adp: ap.adp ?? null,
+        club: ap.club ?? null,
         ...footballStatFields(
           isFootball ? footballStatsMap.get(ap.id) : undefined,
         ),
@@ -182,6 +183,7 @@ export function usePlayerData({
             pick.player.eligiblePositions?.[0] ??
             (ps ? (ps.gamesStarted >= ps.games / 2 ? 'SP' : 'RP') : 'P'),
           eligiblePositions: pick.player.eligiblePositions ?? undefined,
+          club: pick.player.club ?? null,
           avg: 0,
           hr: 0,
           rbi: 0,
@@ -266,6 +268,7 @@ export function usePlayerData({
         gamesStarted: ps?.gamesStarted,
         ppg: ap.projectedMatchupPoints ?? null,
         adp: ap.adp ?? null,
+        club: ap.club ?? null,
         ...footballStatFields(
           isFootball ? footballStatsMap.get(ap.id) : undefined,
         ),

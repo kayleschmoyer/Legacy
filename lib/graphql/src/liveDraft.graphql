@@ -290,6 +290,7 @@ query GetDraftPicks($draftId: Int!) {
       lastName
       eligiblePositions
       mlbPlayerId
+      club
     }
   }
 }
@@ -335,6 +336,7 @@ query GetAvailableDraftPlayers(
     pitchingAvgPointsPerGame
     projectedMatchupPoints
     adp
+    club
   }
 }
 

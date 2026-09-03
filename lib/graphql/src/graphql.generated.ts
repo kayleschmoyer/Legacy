@@ -740,6 +740,8 @@ export type DraftPlayer = {
   brefId?: Maybe<Scalars['String']['output']>;
   /** Career batting statistics for the player */
   careerBatting?: Maybe<CareerBatting>;
+  /** The franchise the player is most associated with (e.g. 'NYY', 'BRO'), derived from season rows as the club they played the most games for, tie-broken by most recent season. This is the career franchise, not the present-day one: unlike `players.mlb_team` it is not restricted to the 30 current teams, so defunct and relocated clubs are represented. Null when no season rows are on file. */
+  club?: Maybe<Scalars['String']['output']>;
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
@@ -3123,6 +3125,8 @@ export type Player = {
   careerBatting?: Maybe<CareerBatting>;
   /** Career pitching statistics for the player */
   careerPitching?: Maybe<CareerPitching>;
+  /** The franchise the player is most associated with (e.g. 'NYY', 'BRO'), derived from season rows as the club they played the most games for, tie-broken by most recent season. Distinct from `mlbTeam`: that is the present-day club and is constrained by FK to the 30 current franchises, whereas this is the career club and so also covers defunct and relocated ones. Null when no season rows are on file (LS-9832). */
+  club?: Maybe<Scalars['String']['output']>;
   /** List of positions this player is eligible to play (e.g. SP, RP, 1B, SS) */
   eligiblePositions?: Maybe<Array<Scalars['String']['output']>>;
   firstName?: Maybe<Scalars['String']['output']>;
@@ -12863,6 +12867,7 @@ export type GetDraftPicksQuery = {
       lastName?: string | null;
       eligiblePositions?: Array<string> | null;
       mlbPlayerId?: number | null;
+      club?: string | null;
     } | null;
   }> | null;
 };
@@ -12911,6 +12916,7 @@ export type GetAvailableDraftPlayersQuery = {
     pitchingAvgPointsPerGame?: number | null;
     projectedMatchupPoints?: number | null;
     adp?: number | null;
+    club?: string | null;
   }> | null;
 };
 
@@ -32336,6 +32342,7 @@ export const GetDraftPicks = gql`
         lastName
         eligiblePositions
         mlbPlayerId
+        club
       }
     }
   }
@@ -32549,6 +32556,7 @@ export const GetAvailableDraftPlayers = gql`
       pitchingAvgPointsPerGame
       projectedMatchupPoints
       adp
+      club
     }
   }
 `;

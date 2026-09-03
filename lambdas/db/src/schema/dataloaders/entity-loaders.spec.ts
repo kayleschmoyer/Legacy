@@ -33,6 +33,22 @@ jest.mock('@legacy-sports/db-client', () => ({
       playerId: 'fpep.playerId',
       position: 'fpep.position',
     },
+    seasonBatting: {
+      playerId: 'sb.playerId',
+      team: 'sb.team',
+      g: 'sb.g',
+      season: 'sb.season',
+    },
+    seasonPitching: {
+      playerId: 'sp.playerId',
+      team: 'sp.team',
+      g: 'sp.g',
+      season: 'sp.season',
+    },
+    players: {
+      id: 'players.id',
+      nflTeam: 'players.nflTeam',
+    },
   },
   // Minimal stand-in mirroring Helpers.ts's real `withPoolTimeoutRetry` (retry
   // up to 2x on the pool's connection-timeout message) so the loader-level
@@ -61,9 +77,11 @@ jest.mock('@legacy-sports/db-client', () => ({
 
 import {
   clearEligiblePositionsCache,
+  clearPlayerClubCache,
   createEligiblePositionsLoader,
   createLeaguePayrollConfigLoader,
   createLeaguePositionByIdLoader,
+  createPlayerClubLoader,
   createTeamPayrollLoader,
 } from './entity-loaders';
 
@@ -301,5 +319,106 @@ describe('createEligiblePositionsLoader — multi-sport (LS-9474)', () => {
     const loader = createEligiblePositionsLoader(db);
 
     await expect(loader.load(999)).resolves.toEqual([]);
+  });
+});
+
+describe('createPlayerClubLoader (LS-9832)', () => {
+  beforeEach(() => clearPlayerClubCache());
+
+  /** Mocked PublicSchema entries are plain objects — identify the relation by
+   *  the table prefix on one of its column markers. */
+  const relationOf = (t: unknown): string =>
+    (t as { playerId?: string; id?: string })?.playerId?.split('.')[0] ??
+    (t as { id?: string })?.id?.split('.')[0] ??
+    'unknown';
+
+  it('picks the club with the most games played', async () => {
+    const { db } = makeMockDb((state) =>
+      relationOf(state.table) === 'sb'
+        ? [
+            { playerId: 1, team: 'BOS', games: 391, lastSeason: 1919 },
+            { playerId: 1, team: 'NYY', games: 2084, lastSeason: 1934 },
+          ]
+        : [],
+    );
+
+    await expect(createPlayerClubLoader(db).load(1)).resolves.toBe('NYY');
+  });
+
+  it('sums batting and pitching games for the same club', async () => {
+    // A two-way player: neither table alone outranks the other club, but the
+    // combined total does. Summing per club is what makes BOS win here.
+    const { db } = makeMockDb((state) => {
+      const rel = relationOf(state.table);
+      if (rel === 'sb') {
+        return [
+          { playerId: 2, team: 'BOS', games: 60, lastSeason: 1918 },
+          { playerId: 2, team: 'NYY', games: 90, lastSeason: 1920 },
+        ];
+      }
+      if (rel === 'sp') {
+        return [{ playerId: 2, team: 'BOS', games: 70, lastSeason: 1918 }];
+      }
+      return [];
+    });
+
+    await expect(createPlayerClubLoader(db).load(2)).resolves.toBe('BOS');
+  });
+
+  it('breaks a games tie on the most recent season', async () => {
+    const { db } = makeMockDb((state) =>
+      relationOf(state.table) === 'sb'
+        ? [
+            { playerId: 3, team: 'BRO', games: 100, lastSeason: 1950 },
+            { playerId: 3, team: 'NYG', games: 100, lastSeason: 1955 },
+          ]
+        : [],
+    );
+
+    await expect(createPlayerClubLoader(db).load(3)).resolves.toBe('NYG');
+  });
+
+  it('returns a defunct franchise code, which players.mlb_team cannot hold', async () => {
+    // The FK on players.mlb_team only admits the 30 current franchises, so
+    // 'BRO' is exactly the case that column could not represent.
+    const { db } = makeMockDb((state) =>
+      relationOf(state.table) === 'sb'
+        ? [{ playerId: 4, team: 'BRO', games: 1382, lastSeason: 1956 }]
+        : [],
+    );
+
+    await expect(createPlayerClubLoader(db).load(4)).resolves.toBe('BRO');
+  });
+
+  it('falls back to the football club when there are no baseball seasons', async () => {
+    const { db } = makeMockDb((state) =>
+      relationOf(state.table) === 'players' ? [{ id: 5, nflTeam: 'GB' }] : [],
+    );
+
+    await expect(createPlayerClubLoader(db).load(5)).resolves.toBe('GB');
+  });
+
+  it('returns null rather than a fabricated code when nothing is on file', async () => {
+    const { db } = makeMockDb(() => []);
+
+    await expect(createPlayerClubLoader(db).load(999)).resolves.toBeNull();
+  });
+
+  it('batches every requested player into one query per relation', async () => {
+    const { db, calls } = makeMockDb((state) =>
+      relationOf(state.table) === 'sb'
+        ? [
+            { playerId: 10, team: 'STL', games: 10, lastSeason: 1960 },
+            { playerId: 11, team: 'PIT', games: 20, lastSeason: 1965 },
+          ]
+        : [],
+    );
+    const loader = createPlayerClubLoader(db);
+
+    await expect(
+      Promise.all([loader.load(10), loader.load(11)]),
+    ).resolves.toEqual(['STL', 'PIT']);
+    // Three relations consulted, one query each — not one per player.
+    expect(calls).toHaveLength(3);
   });
 });
