@@ -7,7 +7,10 @@
  */
 
 import { createCustomAuthTest, expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { agoIso, FIXED_NOW_ISO } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -139,36 +142,33 @@ async function setupGraphQL(
   let currentAnnouncements = [...initialAnnouncements];
 
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (
-      postData.includes('getleaguebyid') ||
-      postData.includes('"getleague"')
-    ) {
+    if (operation === 'getleaguebyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league } }),
       });
-    } else if (postData.includes('getleagueteams')) {
+    } else if (operation === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (postData.includes('getpositionsforleague')) {
+    } else if (operation === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
       });
-    } else if (postData.includes('getuserteamid')) {
+    } else if (operation === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
-    } else if (postData.includes('getleagueannouncements')) {
+    } else if (operation === 'getleagueannouncements') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -176,7 +176,7 @@ async function setupGraphQL(
           data: { getLeagueAnnouncements: currentAnnouncements },
         }),
       });
-    } else if (postData.includes('postleagueannouncement')) {
+    } else if (operation === 'postleagueannouncement') {
       // Parse the messageText from the request body to build the new announcement.
       let messageText = 'Test announcement';
       try {
@@ -206,7 +206,7 @@ async function setupGraphQL(
           data: { postLeagueAnnouncement: newAnnouncement },
         }),
       });
-    } else if (postData.includes('deleteleagueannouncement')) {
+    } else if (operation === 'deleteleagueannouncement') {
       // Parse the id from the request body
       let deleteId = 0;
       try {
@@ -234,7 +234,7 @@ async function setupGraphQL(
           data: { deleteLeagueAnnouncement: success },
         }),
       });
-    } else if (postData.includes('updateleagueannouncement')) {
+    } else if (operation === 'updateleagueannouncement') {
       // Parse the updated fields from the request body
       let updateId = '0';
       let updatedText = '';
@@ -264,65 +264,49 @@ async function setupGraphQL(
           data: { updateLeagueAnnouncement: updated ?? null },
         }),
       });
-    } else if (
-      postData.includes('getteammembers') ||
-      postData.includes('teammembers')
-    ) {
+    } else if (operation === 'getteammembers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { teamMembers: [] } }),
       });
-    } else if (
-      postData.includes('getleagueactivity') ||
-      postData.includes('leagueactivity')
-    ) {
+    } else if (operation === 'getleagueactivity') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueActivity: [] } }),
       });
     } else if (
-      postData.includes('getleaguechatmessages') ||
-      postData.includes('getleaguemessages')
+      operation === 'getleaguechatmessages' ||
+      operation === 'getleaguemessages'
     ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueMessages: [] } }),
       });
-    } else if (
-      postData.includes('getteamwaiverclaims') ||
-      postData.includes('teamwaiverclaims')
-    ) {
+    } else if (operation === 'getteamwaiverclaims') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { teamWaiverClaims: [] } }),
       });
-    } else if (
-      postData.includes('getleaguestandings') ||
-      postData.includes('leaguestandings')
-    ) {
+    } else if (operation === 'getleaguestandings') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueStandings: [] } }),
       });
-    } else if (
-      postData.includes('getuserleagues') ||
-      postData.includes('getusers')
-    ) {
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [league] } }),
       });
     } else if (
-      postData.includes('getcurrentmatchup') ||
-      postData.includes('getmatchupbyid') ||
-      postData.includes('getmatchupsforleague') ||
-      postData.includes('getmatchupplayers')
+      operation === 'getmatchupbyid' ||
+      operation === 'getmatchupsforleague' ||
+      operation === 'getmatchupplayers'
     ) {
       await route.fulfill({
         status: 200,
@@ -330,22 +314,13 @@ async function setupGraphQL(
         body: JSON.stringify({ data: null }),
       });
     } else if (
-      postData.includes('getleaguescoring') ||
-      postData.includes('leaguescoringprofile')
+      operation === 'getleaguescoringprofile' ||
+      operation === 'updateleaguescoringprofile'
     ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueScoringProfile: null } }),
-      });
-    } else if (
-      postData.includes('getpendingtradeoffers') ||
-      postData.includes('pendingtradeoffers')
-    ) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { pendingTradeOffers: [] } }),
       });
     } else {
       await unmockedGraphQLFallback(route);

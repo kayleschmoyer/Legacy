@@ -24,7 +24,10 @@ import type { Page } from '@playwright/test';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import type { MockLeagueAtWeek } from '../mocks/graphql/league.mocks';
 import {
   mockLeagueAtWeek,
@@ -283,31 +286,28 @@ async function setupSeasonGraphQL(
   phaseRef: { current: SeasonPhase },
 ): Promise<void> {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
     const phase = phaseRef.current;
 
-    if (
-      postData.includes('getleaguebyid') ||
-      postData.includes('"getleague"')
-    ) {
+    if (operation === 'getleaguebyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: getLeagueForPhase(phase) } }),
       });
-    } else if (postData.includes('getleagueteams')) {
+    } else if (operation === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (postData.includes('getpositionsforleague')) {
+    } else if (operation === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
       });
-    } else if (postData.includes('getuserteamid')) {
+    } else if (operation === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -315,7 +315,7 @@ async function setupSeasonGraphQL(
           data: { userTeamId: { __typename: 'UserTeamId', teamId: 1 } },
         }),
       });
-    } else if (postData.includes('getmatchupsforleague')) {
+    } else if (operation === 'getmatchupsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -323,9 +323,15 @@ async function setupSeasonGraphQL(
           data: { getMatchupsForLeague: getMatchupsForPhase(phase) },
         }),
       });
+      // GetMatchupRecap is a DIFFERENT operation that selects the same root
+      // field (`getMatchupById`), so this payload answers it correctly. The
+      // pre-LS-9794 branch matched it only by accident — `includes('matchupbyid')`
+      // hit the field name in the query TEXT, never the operation name — so
+      // narrowing to exact equality dropped it and the matchup page's Phase 5
+      // recap fetch went unmocked. Listed explicitly instead.
     } else if (
-      postData.includes('getmatchupbyid') ||
-      postData.includes('matchupbyid')
+      operation === 'getmatchupbyid' ||
+      operation === 'getmatchuprecap'
     ) {
       await route.fulfill({
         status: 200,
@@ -334,7 +340,7 @@ async function setupSeasonGraphQL(
           data: { getMatchupById: getMatchupByIdForPhase(phase) },
         }),
       });
-    } else if (postData.includes('getcurrentweekforleague')) {
+    } else if (operation === 'getcurrentweekforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -342,15 +348,7 @@ async function setupSeasonGraphQL(
           data: { getCurrentWeekForLeague: getCurrentWeekForPhase(phase) },
         }),
       });
-    } else if (postData.includes('getcurrentmatchup')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: { currentMatchup: getMatchupByIdForPhase(phase) },
-        }),
-      });
-    } else if (postData.includes('getleaguestandings')) {
+    } else if (operation === 'getleaguestandings') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -358,7 +356,7 @@ async function setupSeasonGraphQL(
           data: { getLeagueStandings: getStandingsForPhase(phase) },
         }),
       });
-    } else if (postData.includes('getplayoffbracket')) {
+    } else if (operation === 'getplayoffbracket') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -366,7 +364,7 @@ async function setupSeasonGraphQL(
           data: { playoffBracket: getPlayoffBracketForPhase(phase) },
         }),
       });
-    } else if (postData.includes('getmatchupplayers')) {
+    } else if (operation === 'getmatchupplayers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

@@ -272,45 +272,39 @@ const MOCK_PITCHING_STATS = [
 
 async function mockStandingsGraphQL(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (
-      postData.includes('getleaguebyid') ||
-      postData.includes('"getleague"')
-    ) {
+    if (operation === 'getleaguebyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
       });
-    } else if (postData.includes('getleagueteams')) {
+    } else if (operation === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (postData.includes('getleaguestandings')) {
+    } else if (operation === 'getleaguestandings') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueStandings: MOCK_STANDINGS } }),
       });
-    } else if (postData.includes('getpositionsforleague')) {
+    } else if (operation === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
       });
-    } else if (postData.includes('getuserteamid')) {
+    } else if (operation === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
-    } else if (
-      postData.includes('getusers') ||
-      postData.includes('getuserleagues')
-    ) {
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -324,9 +318,9 @@ async function mockStandingsGraphQL(page: import('@playwright/test').Page) {
 
 async function mockPlayerStatsGraphQL(page: import('@playwright/test').Page) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (postData.includes('getcareerbattingstats')) {
+    if (operation === 'getcareerbattingstats') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -341,13 +335,13 @@ async function mockPlayerStatsGraphQL(page: import('@playwright/test').Page) {
           },
         }),
       });
-    } else if (postData.includes('getcareerpitchingstatscount')) {
+    } else if (operation === 'getcareerpitchingstatscount') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { careerPitchingStatsCount: 1 } }),
       });
-    } else if (postData.includes('getcareerpitchingstats')) {
+    } else if (operation === 'getcareerpitchingstats') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
