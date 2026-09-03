@@ -31,6 +31,9 @@ is needed to true it up (filed as a note on LS-9094; do not let the next
 `/pull-design` or `/sync-designs` run silently overwrite this fix with the
 stale Claude Design copy before that push happens).
 
+**Closed (2026-09-03)**: pushed `ui_kits/web/index.html` and `ui_kits/web/styles.css`
+to the Claude Design project via `/push-design`. Source and repo are back in step.
+
 Changed: `legacy-sports-design-system/project/ui_kits/web/index.html`,
 `legacy-sports-design-system/project/ui_kits/web/styles.css` — added a
 top-of-file `BREAKPOINTS` annotation claiming all seven canonical bands

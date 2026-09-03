@@ -49,6 +49,9 @@ is therefore stale relative to this bundle for these two comments — a follow-u
 `/push-design qtqqKYxMFf1A8GY5NL9GNQ` should push this annotation fix up so the source
 and the repo stay in step.
 
+**Closed (2026-09-03)**: pushed `stats.css` and `stats.jsx` to the Claude Design project
+via `/push-design`. Source and repo are back in step.
+
 ## Skipped / truncated files
 
 None — all fetches succeeded, nothing truncated.

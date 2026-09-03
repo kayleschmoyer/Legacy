@@ -25,6 +25,10 @@ a local session should push these same changes to the Claude Design project
 (`projectId 3b56ca5b-71bb-4a97-a3c6-d91c453a73d1`) via `/push-design HI6N3yPYUzeh981B5SkXmw` so the
 source of truth doesn't drift from the repo copy.
 
+**Closed (2026-09-03)**: pushed `shared.css`, `Create League - Page.html`, and
+`Create League - Modal.html` to the Claude Design project via `/push-design`. Source and
+repo are back in step.
+
 Fixed:
 
 - Consolidated `shared.css`'s three invented `@container` thresholds (`960px`/`720px`/`480px`) into two

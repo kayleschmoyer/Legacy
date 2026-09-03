@@ -28,6 +28,8 @@ Source-level fix for LS-8965 (LS-8954 audit, HIGH/MED findings) applied directly
 
 **Deviation from the usual write-then-pull flow**: this fix was applied directly to the repo copy (`legacy-sports-preferences/project/uploads/PROMPT.md`) rather than via `DesignSync.write_files` against the Claude Design project — the `DesignSync` MCP tool requires an interactive `/design-login` that this cloud session cannot run (`get_project` returned a design-system-authorization error). The bundle hash above is therefore **not** re-derived from a fresh pull; it still reflects the LS-8965 sync. A follow-up local session should push this same `PROMPT.md` fix up to the Claude Design project (`projectId 019de99b-c7df-7e9d-9f09-20f8b65fcf1d`) via `/push-design UUCswUjg_28Xzcqii7Rt2Q` (or the DesignSync write flow directly) so the source stays in step, then `/pull-design` to re-derive the hash. Until then, the *next* full re-pull of this project will overwrite this repo-side fix unless the source has also been updated.
 
+**Closed (2026-09-03)**: pushed `uploads/PROMPT.md` to the Claude Design project via `/push-design`; verified via `get_file` that the live copy now contains the seven-band `## Breakpoints` section. Source and repo are back in step.
+
 Redesigning `project/scratch/mockups/preferences.html` itself to add the missing xs/sm/md/lg/xl frames or `BREAKPOINTS` annotations is out of scope for this ticket — LS-9086's closure AC is the `PROMPT.md` fix; a follow-up design pass against the corrected checklist covers the mockup itself.
 
 ## Pages

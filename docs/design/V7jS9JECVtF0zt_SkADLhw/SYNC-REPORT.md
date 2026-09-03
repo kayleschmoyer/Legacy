@@ -30,6 +30,9 @@ should apply the same comment at the source (project
 `/push-design` (or the DesignSync write flow) so a subsequent `/pull-design`
 doesn't silently revert this fix.
 
+**Closed (2026-09-03)**: pushed `scratch/mockups/help.html` to the Claude Design project
+via `/push-design`. Source and repo are back in step.
+
 ## What changed (vs previous hash `564894d973bbc0a9e76e10d9821dba433f441d87e5b6a1e1f6994cbf8bef9335`)
 
 LS-8966 — re-ran the mechanical fixes from the LS-8954 audit at the DesignSync source (`scratch/mockups/help.html` only; all other bundle files unchanged):

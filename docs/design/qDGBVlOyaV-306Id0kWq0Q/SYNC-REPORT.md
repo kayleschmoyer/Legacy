@@ -23,6 +23,10 @@ a cloud session. **A follow-up local session should `/push-design 2e2f8052-6cc9-
 this fix up to Claude Design and then `/pull-design` to reconcile the source and the manifest hash**
 — until then, Claude Design's copy still has the old invented breakpoints.
 
+**Closed (2026-09-03)**: pushed `league-styles.css` and all 10 page/tab HTML files
+(`League Detail.html` + the 9 `Tab *.html` files) to the Claude Design project via
+`/push-design`. Source and repo are back in step.
+
 - **`league-styles.css`** — reflow thresholds remapped from `1100/780/600/380px` to the canonical
   bands `979/859/799/659px` (each "one pixel below the next band's start," per
   `lib/design-tokens/src/lib/breakpoints.ts`: xs=660, sm=800, md=860, lg=980, xl=1120, xxl=1280).

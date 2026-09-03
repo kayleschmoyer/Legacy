@@ -23,6 +23,8 @@ Rationale + full audit: LS-8958 (findings from LS-8954, which rated this bundle 
 
 **Deviation from the standard design-source-fix pattern**: the `DesignSync` MCP tool requires an interactive `/design-login` that this cloud session cannot run (LS-9000 — DesignSync is local-only). This fix was therefore applied directly to the repo bundle rather than at the Claude Design source first. It is annotation-only (no visual/layout change), so the risk of drift is low, but **the Claude Design project (`02fe66a1-9396-4158-a52e-56a7487d4262`) itself was not updated** — a follow-up local session should run `/push-design 1tmNnzBvKmDjeJOie3JNkg` to push this same fix up so the source stays in step, per the write-flow rule in `.agents/skills/design-sync/references/designsync-tool.md`. `lastSyncedHash` in `manifest.json` is intentionally left unchanged (no real pull occurred).
 
+**Closed (2026-09-03)**: pushed `Legacy Sports - Public Leagues.html` to the Claude Design project via `/push-design` from a local session; verified via `get_file` that the live copy now matches this repo bundle. Source and repo are back in step — no manifest hash change (content already matched).
+
 `legacy-sports-public-leagues/project/Legacy Sports - Public Leagues.html`: fixed missing Breakpoints coverage flagged by LS-9024's audit. The two existing `BREAKPOINTS:` comments only described review-scaffold stacking behavior and never explicitly claimed the `sm`–`xl` (800–1279px) bands shared a designed layout. Changes:
 
 - Reworded the `@media (max-width: 799px)` annotation to explicitly claim `xxs`–`xs` (0–799px) coverage (combined with the existing `.m-scroll`-scoped mobile-frame rules).

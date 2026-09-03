@@ -31,6 +31,11 @@ and stops short of the push half — `source: "repo-direct-pending-push"` in
 the `repo-direct-pending-push` marker. Until then, do not run `/pull-design` against
 this project — it would overwrite this fix with the still-stale source.
 
+**Closed (2026-09-03)**: pushed `Legacy Minigames.html`, `styles.css`, and `styles-game.css`
+to the Claude Design project via `/push-design`; verified via `get_file` that the live
+`Legacy Minigames.html` now contains the `BreakpointToggle` component. Source and repo are
+back in step; `manifest.json`'s `repo-direct-pending-push` marker has been cleared.
+
 ## What changed in this pass (LS-9082)
 
 - **`Legacy Minigames.html`**: added a `BreakpointToggle` component (button-tab

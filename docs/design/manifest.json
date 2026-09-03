@@ -31,7 +31,7 @@
       "lastSyncedHash": "sha256-61c6636f87cb8204d296c083825469f69ed47afd0a2cf555c083b21d602550f9",
       "lastSyncedAt": "2026-08-09T05:50:35.000Z",
       "jiraKey": "LS-9082",
-      "source": "repo-direct-pending-push"
+      "source": "designsync-local"
     },
     {
       "id": "4k4RdTqqAbEop0ZqmEDuOg",
@@ -137,7 +137,7 @@
       "slug": "legacy-sports-notifications",
       "status": "active",
       "lastSyncedHash": "sha256-2656d51536df5ed188a2cbc8d9c279b75e8a87e81a476ae1af76122f345d12dd",
-      "lastSyncedAt": "2026-08-04T12:00:00.000Z",
+      "lastSyncedAt": "2026-08-04T16:30:00.000Z",
       "jiraKey": "LS-8967"
     },
     {

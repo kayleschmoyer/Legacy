@@ -33,6 +33,8 @@ Follow-up to LS-9019 (Nav Bar core states + static mockup conversion), completed
 - All fetched non-binary files reported `truncated: false`.
 - **Rebase reconciliation (this sync, onto main after the LS-9088 addendum below landed)**: main had a repo-only stopgap fix (LS-9088 addendum, kept below) applied directly to `Nav Bar System.html` after this DesignSync pull's base but before this branch was rebased. Verified post-rebase that the stopgap's caption/annotation edits survived the merge intact — `Nav Bar System.html` still contains the `Canonical bands xs–lg (660–1119px)` caption and both `BREAKPOINTS:` annotations for §01 and §03; the invented "900–1100px" caption does not reappear. The LS-9088 addendum's own follow-up instruction (apply the fix in Claude Design or `/push-design` to reconcile source-of-truth) still stands — this sync did not push anything back to Claude Design.
 
+**Closed (2026-09-03)**: pushed `Nav Bar System.html` to the Claude Design project via `/push-design`; verified via `get_file` that the live copy now contains the "Canonical bands xs–lg (660–1119px)" caption and the corrected `BREAKPOINTS:` annotations. Source and repo are back in step.
+
 ```
 legacy-sports-nav-bar/README.md
 legacy-sports-nav-bar/chats/chat1.md
