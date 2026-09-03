@@ -112,7 +112,7 @@ describe('runCustomChecks', () => {
       'echo "about to fail"; exit 1',
     );
 
-    const result = await runCustomChecks({});
+    const result = await runCustomChecks({ verbosity: 'full' });
     expect(result.isError).toBe(true); // one of two scripts failed
     const body = payload(result) as {
       total: number;
@@ -161,5 +161,70 @@ describe('runCustomChecks', () => {
     const result = await runCustomChecks({ worktreePath: 'relative/path' });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('must be an absolute path');
+  });
+
+  it('defaults to "failures" verbosity: omits output for passing scripts, keeps it for failing ones', async () => {
+    writeCheckScript(checksDir, 'a-pass-tests.sh', 'echo "a passed"');
+    writeCheckScript(
+      checksDir,
+      'b-fail-tests.sh',
+      'echo "about to fail"; exit 1',
+    );
+
+    const result = await runCustomChecks({});
+    const body = payload(result) as {
+      verbosity: string;
+      results: Array<{ script: string; passed: boolean; output?: string }>;
+    };
+    expect(body.verbosity).toBe('failures');
+    const byName = Object.fromEntries(body.results.map((r) => [r.script, r]));
+    expect(byName['a-pass-tests.sh'].output).toBeUndefined();
+    expect(byName['b-fail-tests.sh'].output).toContain('about to fail');
+  });
+
+  it('"summary" verbosity omits output for every script, passing or failing', async () => {
+    writeCheckScript(checksDir, 'a-pass-tests.sh', 'echo "a passed"');
+    writeCheckScript(
+      checksDir,
+      'b-fail-tests.sh',
+      'echo "about to fail"; exit 1',
+    );
+
+    const result = await runCustomChecks({ verbosity: 'summary' });
+    const body = payload(result) as {
+      results: Array<{ script: string; passed: boolean; output?: string }>;
+    };
+    for (const r of body.results) {
+      expect(r.output).toBeUndefined();
+    }
+    // The failing script's name and status survive even with no output.
+    const byName = Object.fromEntries(body.results.map((r) => [r.script, r]));
+    expect(byName['b-fail-tests.sh'].passed).toBe(false);
+  });
+
+  it('"full" verbosity includes output for passing scripts too', async () => {
+    writeCheckScript(checksDir, 'a-pass-tests.sh', 'echo "a passed"');
+
+    const result = await runCustomChecks({ verbosity: 'full' });
+    const body = payload(result) as {
+      results: Array<{ script: string; passed: boolean; output?: string }>;
+    };
+    expect(body.results[0].output).toContain('a passed');
+  });
+
+  it('applies maxOutputChars to capped output', async () => {
+    writeCheckScript(
+      checksDir,
+      'b-fail-tests.sh',
+      'printf "%0.sx" {1..1000}; exit 1',
+    );
+
+    const result = await runCustomChecks({ maxOutputChars: 100 });
+    const body = payload(result) as {
+      results: Array<{ script: string; output?: string }>;
+    };
+    const output = body.results[0].output ?? '';
+    expect(output.length).toBeLessThan(300); // capped, plus the omission-notice text
+    expect(output).toContain('characters omitted');
   });
 });

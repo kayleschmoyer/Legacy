@@ -1778,7 +1778,7 @@
       "tools": [
         {
           "name": "ci_run_custom_checks",
-          "description": "Discover and run this repo's own `.github/checks/*.sh` custom-check scripts locally — the same scripts the 🚀 CI Pipeline / custom-checks job runs (ci-failure-capture-tests.sh, format-check-pipefail-tests.sh, integration-select-tests.sh, etc.). Each script is a cheap, self-contained `node --test` runner with no external deps. Prefer this over raw `bash .github/checks/<name>.sh` or `node --test <path>` via shell — it discovers every script automatically and reports pass/fail per script in one call, instead of stopping at the first failure the way the CI step does. Running the relevant check before pushing catches failures (e.g. a missing e2e-surface-map.json entry) that would otherwise cost a CI round-trip. Pass `scripts` to run a named subset (e.g. [\"integration-select-tests\"] — the .sh suffix is optional); omit it to run every discovered script.",
+          "description": "Discover and run this repo's own `.github/checks/*.sh` custom-check scripts locally — the same scripts the 🚀 CI Pipeline / custom-checks job runs (ci-failure-capture-tests.sh, format-check-pipefail-tests.sh, integration-select-tests.sh, etc.). Each script is a cheap, self-contained `node --test` runner with no external deps. Prefer this over raw `bash .github/checks/<name>.sh` or `node --test <path>` via shell — it discovers every script automatically and reports pass/fail per script in one call, instead of stopping at the first failure the way the CI step does. Running the relevant check before pushing catches failures (e.g. a missing e2e-surface-map.json entry) that would otherwise cost a CI round-trip. Pass `scripts` to run a named subset (e.g. [\"integration-select-tests\"] — the .sh suffix is optional); omit it to run every discovered script. Defaults to `verbosity: \"failures\"` to keep full runs small.",
           "inputs": {
             "worktreePath": {
               "type": "string",
@@ -1805,6 +1805,25 @@
                 "> 0"
               ],
               "description": "Per-script timeout in milliseconds (default: 120000)."
+            },
+            "verbosity": {
+              "type": "enum",
+              "optional": true,
+              "enum": [
+                "summary",
+                "failures",
+                "full"
+              ],
+              "description": "Output verbosity (default: \"failures\"): \"summary\" — name/passed/durationMs rows only, no output text. \"failures\" (default) — output only for failed scripts. \"full\" — output for every script."
+            },
+            "maxOutputChars": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "integer",
+                "> 0"
+              ],
+              "description": "Per-script output cap in characters (default: 5000)."
             }
           },
           "transports": [

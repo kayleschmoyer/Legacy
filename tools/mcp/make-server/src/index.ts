@@ -628,7 +628,8 @@ server.tool(
     'runner with no external deps. Prefer this over raw `bash .github/checks/<name>.sh` or `node --test <path>` via shell — it discovers every script ' +
     'automatically and reports pass/fail per script in one call, instead of stopping at the first failure the way the CI step does. ' +
     'Running the relevant check before pushing catches failures (e.g. a missing e2e-surface-map.json entry) that would otherwise cost a CI round-trip. ' +
-    'Pass `scripts` to run a named subset (e.g. ["integration-select-tests"] — the .sh suffix is optional); omit it to run every discovered script.',
+    'Pass `scripts` to run a named subset (e.g. ["integration-select-tests"] — the .sh suffix is optional); omit it to run every discovered script. ' +
+    'Defaults to `verbosity: "failures"` to keep full runs small.',
   {
     worktreePath: z
       .string()
@@ -648,6 +649,19 @@ server.tool(
       .positive()
       .optional()
       .describe('Per-script timeout in milliseconds (default: 120000).'),
+    verbosity: z
+      .enum(['summary', 'failures', 'full'])
+      .optional()
+      .describe(
+        'Output verbosity (default: "failures"): "summary" — name/passed/durationMs rows only, no output text. ' +
+          '"failures" (default) — output only for failed scripts. "full" — output for every script.',
+      ),
+    maxOutputChars: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe('Per-script output cap in characters (default: 5000).'),
   },
   async (params) => runCustomChecks(params),
 );

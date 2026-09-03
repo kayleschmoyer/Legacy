@@ -6,6 +6,9 @@ import { getRepoRoot, runCommand } from '../run-command.js';
 import { resolveBashExecutable } from '../resolve-bash.js';
 import type { ToolResult } from '../types.js';
 
+/** How much per-script output to include in the response. */
+type Verbosity = 'summary' | 'failures' | 'full';
+
 interface RunCustomChecksParams {
   /** Repo or worktree root (default: repo root). */
   worktreePath?: string;
@@ -13,13 +16,21 @@ interface RunCustomChecksParams {
   scripts?: string[];
   /** Per-script timeout in milliseconds (default: 120000). */
   timeoutMs?: number;
+  /**
+   * Output verbosity: "summary" (name/passed/durationMs rows only, no output text),
+   * "failures" (output included only for failed scripts — default), or "full"
+   * (output included for every script, passing or failing).
+   */
+  verbosity?: Verbosity;
+  /** Per-script output cap in characters when output is included (default: 5000). */
+  maxOutputChars?: number;
 }
 
 interface CheckResult {
   script: string;
   passed: boolean;
   durationMs: number;
-  output: string;
+  output?: string;
 }
 
 /** Directory holding the repo's custom CI check scripts, relative to repo/worktree root. */
@@ -33,6 +44,13 @@ const MAX_SCRIPT_OUTPUT_CHARS = 5_000;
 
 function err(message: string): ToolResult {
   return { isError: true, content: [{ type: 'text', text: message }] };
+}
+
+/** Whether a script's output should be included in its result row, per verbosity mode. */
+function shouldIncludeOutput(passed: boolean, verbosity: Verbosity): boolean {
+  if (verbosity === 'summary') return false;
+  if (verbosity === 'full') return true;
+  return !passed; // 'failures' (default): only failing scripts carry output.
 }
 
 /** List discoverable check script basenames (e.g. "ci-failure-capture-tests.sh"), sorted. */
@@ -120,6 +138,8 @@ export async function runCustomChecks(
   }
 
   const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const verbosity = params.verbosity ?? 'failures';
+  const maxOutputChars = params.maxOutputChars ?? MAX_SCRIPT_OUTPUT_CHARS;
   const results: CheckResult[] = [];
 
   for (const script of toRun) {
@@ -139,7 +159,9 @@ export async function runCustomChecks(
         script,
         passed: true,
         durationMs: Date.now() - start,
-        output: truncateOutput(output, MAX_SCRIPT_OUTPUT_CHARS),
+        ...(shouldIncludeOutput(true, verbosity)
+          ? { output: truncateOutput(output, maxOutputChars) }
+          : {}),
       });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -147,7 +169,12 @@ export async function runCustomChecks(
         script,
         passed: false,
         durationMs: Date.now() - start,
-        output: truncateOutput(msg, MAX_SCRIPT_OUTPUT_CHARS),
+        // Failing-script output is never suppressed regardless of verbosity —
+        // the failure detail (and the failing name itself) is the one thing a
+        // caller always needs; only "summary" mode omits it.
+        ...(shouldIncludeOutput(false, verbosity)
+          ? { output: truncateOutput(msg, maxOutputChars) }
+          : {}),
       });
     }
   }
@@ -165,6 +192,7 @@ export async function runCustomChecks(
           passed,
           failed,
           allPassed: failed === 0,
+          verbosity,
           results,
         }),
       },
