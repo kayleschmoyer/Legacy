@@ -330,7 +330,6 @@ const ls9794GrandfatheredFiles = [
   'draft-functionality.spec.ts',
   'draft-graphql-integration.spec.ts',
   'form-a11y.spec.ts',
-  'full-season-ui.spec.ts',
   'join-league.spec.ts',
   'league-creation-advanced.spec.ts',
   'league-creation.spec.ts',

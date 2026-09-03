@@ -285,17 +285,17 @@ const TEAM_2_MEMBERS = [
 interface MockConfig {
   league: ReturnType<typeof mockLeague>;
   teamMembers?: typeof TEAM_1_MEMBERS;
-  /** Additional handler; return true if handled. */
-  extra?: (postData: string) => { handled: true; body: unknown } | undefined;
+  /** Additional handler, keyed on the lowercased GraphQL operation name; return true if handled. */
+  extra?: (operation: string) => { handled: true; body: unknown } | undefined;
 }
 
 async function installGraphQLMocks(page: Page, cfg: MockConfig) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
     // Let the extra handler run first
     if (cfg.extra) {
-      const result = cfg.extra(postData);
+      const result = cfg.extra(operation);
       if (result?.handled) {
         await route.fulfill({
           status: 200,
@@ -306,22 +306,19 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
       }
     }
 
-    if (
-      postData.includes('getleaguebyid') ||
-      postData.includes('"getleague"')
-    ) {
+    if (operation === 'getleaguebyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: cfg.league } }),
       });
-    } else if (postData.includes('getleagueteams')) {
+    } else if (operation === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: mockTeams() } }),
       });
-    } else if (postData.includes('getpositionsforleague')) {
+    } else if (operation === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -329,16 +326,13 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
           data: { leaguePositions: mockPositions() },
         }),
       });
-    } else if (postData.includes('getuserteamid')) {
+    } else if (operation === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: TEAM_1.id } }),
       });
-    } else if (
-      postData.includes('getteammembers') ||
-      postData.includes('teammembers')
-    ) {
+    } else if (operation === 'getteammembers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -346,62 +340,56 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
           data: { teamMembers: cfg.teamMembers ?? TEAM_1_MEMBERS },
         }),
       });
-    } else if (
-      postData.includes('getleagueactivity') ||
-      postData.includes('leagueactivity')
-    ) {
+    } else if (operation === 'getleagueactivity') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueActivity: [] } }),
       });
     } else if (
-      postData.includes('getleaguechatmessages') ||
-      postData.includes('getleaguemessages')
+      operation === 'getleaguechatmessages' ||
+      operation === 'getleaguemessages'
     ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueMessages: [] } }),
       });
-    } else if (postData.includes('getleagueannouncements')) {
+    } else if (operation === 'getleagueannouncements') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueAnnouncements: [] } }),
       });
-    } else if (
-      postData.includes('getteamwaiverclaims') ||
-      postData.includes('teamwaiverclaims')
-    ) {
+    } else if (operation === 'getteamwaiverclaims') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { teamWaiverClaims: [] } }),
       });
-    } else if (
-      postData.includes('getleaguestandings') ||
-      postData.includes('leaguestandings')
-    ) {
+    } else if (operation === 'getleaguestandings') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueStandings: [] } }),
       });
-    } else if (
-      postData.includes('getuserleagues') ||
-      postData.includes('getusers')
-    ) {
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [cfg.league] } }),
       });
+      // GetMatchupRecap selects the root field `getMatchupById`, so the
+      // pre-LS-9794 `includes('getmatchupbyid')` matched it through the query
+      // TEXT rather than the operation name. Narrowing to exact equality would
+      // drop it, leaving the matchup page's recap fetch unmocked — the failure
+      // this exact pattern caused in season-progression.spec.ts (#7513).
+      // Listed explicitly so the branch keeps serving what it always served.
     } else if (
-      postData.includes('getcurrentmatchup') ||
-      postData.includes('getmatchupbyid') ||
-      postData.includes('getmatchupsforleague') ||
-      postData.includes('getmatchupplayers')
+      operation === 'getmatchupbyid' ||
+      operation === 'getmatchuprecap' ||
+      operation === 'getmatchupsforleague' ||
+      operation === 'getmatchupplayers'
     ) {
       await route.fulfill({
         status: 200,
@@ -409,8 +397,8 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
         body: JSON.stringify({ data: null }),
       });
     } else if (
-      postData.includes('getleaguescoring') ||
-      postData.includes('leaguescoringprofile')
+      operation === 'getleaguescoringprofile' ||
+      operation === 'updateleaguescoringprofile'
     ) {
       await route.fulfill({
         status: 200,
@@ -418,10 +406,8 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
         body: JSON.stringify({ data: { leagueScoringProfile: null } }),
       });
     } else if (
-      postData.includes('getpendingtradeoffers') ||
-      postData.includes('pendingtradeoffers') ||
-      postData.includes('getleaguetradeoffers') ||
-      postData.includes('getteamtradeoffers')
+      operation === 'getleaguetradeoffers' ||
+      operation === 'getteamtradeoffers'
     ) {
       await route.fulfill({
         status: 200,
@@ -430,7 +416,7 @@ async function installGraphQLMocks(page: Page, cfg: MockConfig) {
           data: { pendingTradeOffers: [], leagueTradeOffers: [] },
         }),
       });
-    } else if (postData.includes('"getplayerswithstats"')) {
+    } else if (operation === 'getplayerswithstats') {
       // GetPlayersWithStats returns the `players` field (see
       // graphql.generated.ts) — not `playersWithStats`. The Free Agents
       // page reads `data?.players`, so an incorrectly-named root field
@@ -548,8 +534,8 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
 
     await test.step('Mock createLeagueAndTeams and submit', async () => {
       await page.route(isGraphQLEndpoint, async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
-        if (postData.includes('createleagueandteams')) {
+        const operation = extractOperationName(route).toLowerCase();
+        if (operation === 'createleagueandteams') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -585,8 +571,8 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
   test('Phase 2: Join league via invite code', async ({ page }) => {
     await test.step('Navigate to join page with invite code', async () => {
       await page.route(isGraphQLEndpoint, async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
-        if (postData.includes('validateinvitecode')) {
+        const operation = extractOperationName(route).toLowerCase();
+        if (operation === 'validateinvitecode') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -600,7 +586,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
               },
             }),
           });
-        } else if (postData.includes('joinleaguebycode')) {
+        } else if (operation === 'joinleaguebycode') {
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -725,7 +711,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
     await test.step('Mock draft data and navigate', async () => {
       // Route on the EXACT operation name, never on a substring of the
       // request body (LS-9792). This chain previously tested
-      // `postData.includes('getdraft')` *before* its own more specific
+      // `operation === 'getdraft'` *before* its own more specific
       // branches, and `'getdraftpicks'.includes('getdraft')` is true — so the
       // broad branch swallowed every GetDraft* operation. GetDraftPicks and
       // GetAvailableDraftPlayers could never reach their own handlers, and
@@ -855,8 +841,8 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
 
     await installGraphQLMocks(page, {
       league: mockLeague({ draftStatus: 'completed', currentMatchup: 1 }),
-      extra: (postData) => {
-        if (postData.includes('claimfreeagent')) {
+      extra: (operation) => {
+        if (operation === 'claimfreeagent') {
           claimSubmitted = true;
           return {
             handled: true,
@@ -928,10 +914,10 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
         currentMatchup: 1,
         currentWeek: 1,
       }),
-      extra: (postData) => {
+      extra: (operation) => {
         if (
-          postData.includes('getmatchupsforleague') ||
-          postData.includes('getmatchupbyid')
+          operation === 'getmatchupsforleague' ||
+          operation === 'getmatchupbyid'
         ) {
           return {
             handled: true,
@@ -956,7 +942,7 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
             },
           };
         }
-        if (postData.includes('getmatchupplayers')) {
+        if (operation === 'getmatchupplayers') {
           return {
             handled: true,
             body: { data: { matchupPlayers: [] } },
@@ -1030,11 +1016,8 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
         currentMatchup: 3,
         currentWeek: 3,
       }),
-      extra: (postData) => {
-        if (
-          postData.includes('getleaguestandings') ||
-          postData.includes('leaguestandings')
-        ) {
+      extra: (operation) => {
+        if (operation === 'getleaguestandings') {
           return {
             handled: true,
             body: {
@@ -1128,11 +1111,8 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
   test('Phase 12: Interact with league chat', async ({ page }) => {
     await installGraphQLMocks(page, {
       league: mockLeague({ draftStatus: 'completed', currentMatchup: 1 }),
-      extra: (postData) => {
-        if (
-          postData.includes('sendleaguemessage') ||
-          postData.includes('sendmessage')
-        ) {
+      extra: (operation) => {
+        if (operation === 'sendleaguemessage') {
           return {
             handled: true,
             body: {
