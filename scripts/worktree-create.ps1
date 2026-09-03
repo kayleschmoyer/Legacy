@@ -45,6 +45,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Base-ref resolution helpers (LS-9791). See scripts/lib/worktree-base.ps1 for
+# why the branch must be pre-created rather than left to `twig worktree create`.
+. (Join-Path $PSScriptRoot "lib/worktree-base.ps1")
+
 # ---------------------------------------------------------------------------
 # Resolve parent: if a bare Jira key is given (e.g. LS-473), find the
 # matching branch so twig branch depend gets an actual branch name.
@@ -141,12 +145,64 @@ if ($resolvedParent -ne "main" -and $resolvedParent -ne "none") {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Resolve the base ref and pre-create the branch there (LS-9791).
+#
+# `twig worktree create` takes no base ref -- for a branch that does not yet
+# exist it cuts from the main repo's checked-out HEAD (local main), so the
+# fetch above updated origin/main and nothing consumed it. Creating the branch
+# at origin/<parent> first makes twig report "Using existing branch" and adopt
+# it, which is what the pre-fetch was always meant to achieve.
+# ---------------------------------------------------------------------------
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$base = Resolve-WorktreeBase -RepoPath $repoRoot -Parent $resolvedParent
+
+if ($base.Source -eq 'none') {
+    Write-Host "" -ForegroundColor Red
+    Write-Host "[ERROR] Could not resolve a base commit for parent '$($base.Parent)'." -ForegroundColor Red
+    Write-Host "        Neither origin/$($base.Parent) nor a local $($base.Parent) branch exists." -ForegroundColor Red
+    Write-Host "        Check network connectivity, then retry:  git fetch origin" -ForegroundColor Yellow
+    Write-Host ""
+    exit 1
+}
+
+if ($base.Source -eq 'local') {
+    # The stacked-parent guard above already proved the parent IS on origin, so
+    # a missing remote-tracking ref there means the fetch failed. Basing a
+    # stacked child off a local-only ref is exactly the silent-wrong-diff
+    # failure that guard exists to prevent -- refuse rather than guess.
+    if ($base.Parent -ne 'main') {
+        Write-Host "" -ForegroundColor Red
+        Write-Host "[ERROR] origin/$($base.Parent) is missing locally even though the branch exists on origin." -ForegroundColor Red
+        Write-Host "        The earlier 'git fetch origin' must have failed; a stacked child" -ForegroundColor Red
+        Write-Host "        must be cut from the pushed parent, not a local-only ref." -ForegroundColor Red
+        Write-Host "        Fix the fetch, then retry:  git fetch origin" -ForegroundColor Yellow
+        Write-Host ""
+        exit 1
+    }
+    Write-Host "[WARN] origin/$($base.Parent) is unavailable -- falling back to local '$($base.Parent)'." -ForegroundColor Yellow
+    Write-Host "       The worktree may start from a stale base. Rebase once you are online:" -ForegroundColor Yellow
+    Write-Host "       worktree_rebase_onto_main()" -ForegroundColor Yellow
+}
+
+if ($base.IsStale) {
+    # Informational, not an error: we are about to do the right thing anyway.
+    # Surfaced because it explains why local main looks different afterwards.
+    Write-Host "[INFO] Local '$($base.Parent)' is behind/diverged from origin/$($base.Parent) -- basing the worktree on origin/$($base.Parent)." -ForegroundColor Yellow
+}
+
+$branchResult = New-WorktreeBranchAtBase -RepoPath $repoRoot -Branch $branchName -BaseRef $base.Ref
+if ($branchResult.AlreadyExisted -and -not $branchResult.MatchesBase) {
+    Write-Host "[INFO] Branch '$branchName' already exists at $($branchResult.Sha.Substring(0,7)) -- leaving it where it is." -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Worktree Create" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  Branch : $branchName" -ForegroundColor White
 Write-Host "  Parent : $resolvedParent" -ForegroundColor White
+Write-Host "  Base   : $($base.Ref) @ $($base.Sha.Substring(0,7))" -ForegroundColor White
 Write-Host ""
 
 # ---------------------------------------------------------------------------
@@ -198,6 +254,28 @@ $wtPath = git worktree list --porcelain 2>$null |
     Where-Object { $_ -match [regex]::Escape($TicketKey) } |
     ForEach-Object { ($_ -replace '^worktree\s+', '').Trim() } |
     Select-Object -First 1
+
+# ---------------------------------------------------------------------------
+# Verify the worktree actually landed on the intended base (LS-9791).
+# The pre-created branch should make this a no-op, but a stale base is silent
+# and expensive to diagnose after the fact, so assert it rather than assume it.
+# ---------------------------------------------------------------------------
+if ($wtPath) {
+    $headSha = Get-RefSha -RepoPath $wtPath -Ref 'HEAD'
+    if ($headSha -and $headSha -ne $base.Sha) {
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Red
+        Write-Host "  [WARN] Worktree base is NOT $($base.Ref)" -ForegroundColor Red
+        Write-Host "========================================" -ForegroundColor Red
+        Write-Host "  HEAD          : $($headSha.Substring(0,7))" -ForegroundColor Red
+        Write-Host "  $($base.Ref) : $($base.Sha.Substring(0,7))" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "  Files merged after $($headSha.Substring(0,7)) will be MISSING, and a PR" -ForegroundColor Yellow
+        Write-Host "  opened from here runs CI against an old merge base. Fix before working:" -ForegroundColor Yellow
+        Write-Host "    worktree_rebase_onto_main({ worktree: '$TicketKey' })" -ForegroundColor Yellow
+        Write-Host ""
+    }
+}
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green

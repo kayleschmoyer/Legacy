@@ -124,9 +124,17 @@ jira_transition(key: "LS-####", status: "In Progress")
 Use `make worktree` — it fetches origin, creates the branch, worktree, registers the parent dependency, and
 auto-adds to the VS Code workspace in one atomic command:
 
-> `make worktree` automatically runs `git fetch origin` before creating the branch, so the
-> worktree is always cut from the latest remote state. If you fall back to manual creation
-> (see below), you **must** fetch first yourself.
+> `make worktree` runs `git fetch origin` and then creates the branch **at
+> `origin/<parent>`**, so the worktree is always cut from the latest remote state — even when
+> the local `main` ref is behind. It prints the resolved base (`Base : origin/main @ <sha>`)
+> and warns loudly if the finished worktree's HEAD does not match it.
+>
+> Both halves matter. Until LS-9791 the fetch ran but nothing consumed it: `twig worktree
+create` takes no base ref and cut the branch from the main repo's checked-out HEAD, i.e. the
+> **local** `main`. A worktree opened right after merging a PR therefore started behind
+> `origin/main`, and files from the gap were silently missing — the symptom being a "no such
+> file or directory" on a file that had definitely just landed. If you fall back to manual
+> creation (see below), branch from `origin/main` explicitly, not from local `main`.
 
 **Independent ticket (parent = main):**
 
@@ -178,7 +186,11 @@ twig worktree list
 > If `make worktree` fails (e.g. `twig` not found), fall back to manual creation:
 >
 > ```powershell
-> git fetch origin   # ensure branch is cut from latest origin/main
+> git fetch origin
+> # Create the branch AT origin/main first — `twig worktree create` takes no base ref and
+> # would otherwise cut from the local main ref, which may be behind (LS-9791). twig then
+> # reports "Using existing branch" and adopts it.
+> git branch LS-####/short-description origin/main   # or origin/<parent-branch>
 > twig worktree create LS-####/short-description
 > twig branch depend LS-####/short-description main   # or the actual parent branch
 > twig worktree list
