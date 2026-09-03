@@ -8,6 +8,10 @@ jest.mock('./get-active-sprint', () => ({
   getActiveSprintId: jest.fn(() => Promise.resolve(42)),
 }));
 
+jest.mock('@legacy-sports/logging/server', () => ({
+  LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
+
 const { jiraRequest: mockJiraRequest } = jest.requireMock<{
   jiraRequest: jest.Mock;
 }>('../jira-api');
@@ -111,5 +115,77 @@ describe('bulkEdit', () => {
     const result = await bulkEdit({ tickets });
     expect(result.isError).toBe(true);
     expect(mockJiraRequest).not.toHaveBeenCalled();
+  });
+});
+
+describe('bulkEdit — assignee (LS-9607)', () => {
+  it('assigns each ticket via assigneeAccountId, with no status transition calls', async () => {
+    const result = await bulkEdit({
+      tickets: [
+        { key: 'LS-1', assigneeAccountId: 'acct-1' },
+        { key: 'LS-2', assigneeAccountId: 'acct-2' },
+      ],
+    });
+
+    const parsed = parseResult(result);
+    expect(parsed.success).toBe(true);
+    expect(
+      parsed.succeeded.map((s) => ({
+        key: s.key,
+        updatedFields: s.updatedFields,
+      })),
+    ).toEqual([
+      { key: 'LS-1', updatedFields: ['assignee'] },
+      { key: 'LS-2', updatedFields: ['assignee'] },
+    ]);
+
+    const assigneeCalls = (
+      mockJiraRequest.mock.calls as Array<
+        [{ method: string; path: string; body?: Record<string, unknown> }]
+      >
+    ).filter(([opts]) => opts.path.includes('/assignee'));
+    expect(assigneeCalls).toHaveLength(2);
+    expect(assigneeCalls.map(([opts]) => opts.body)).toEqual([
+      { accountId: 'acct-1' },
+      { accountId: 'acct-2' },
+    ]);
+    expect(
+      mockJiraRequest.mock.calls.some(([opts]: [{ path: string }]) =>
+        opts.path.includes('/transitions'),
+      ),
+    ).toBe(false);
+  });
+
+  it('unassigns a ticket when assignee is empty, combined with a field update', async () => {
+    const result = await bulkEdit({
+      tickets: [{ key: 'LS-1', summary: 'renamed', assignee: '' }],
+    });
+
+    const parsed = parseResult(result);
+    expect(parsed.success).toBe(true);
+    expect(parsed.succeeded).toEqual([
+      { key: 'LS-1', updatedFields: ['summary', 'assignee'] },
+    ]);
+
+    expect(mockJiraRequest).toHaveBeenCalledWith({
+      method: 'PUT',
+      path: '/rest/api/3/issue/LS-1',
+      body: { fields: { summary: 'renamed' } },
+    });
+    expect(mockJiraRequest).toHaveBeenCalledWith({
+      method: 'PUT',
+      path: '/rest/api/3/issue/LS-1/assignee',
+      body: { accountId: null },
+    });
+  });
+
+  it('accepts an assignee-only ticket without the "at least one field" error', async () => {
+    const result = await bulkEdit({
+      tickets: [{ key: 'LS-1', assigneeAccountId: 'acct-1' }],
+    });
+
+    const parsed = parseResult(result);
+    expect(parsed.failed).toHaveLength(0);
+    expect(parsed.succeeded).toHaveLength(1);
   });
 });

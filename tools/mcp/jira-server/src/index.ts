@@ -225,7 +225,7 @@ server.tool(
 // --- jira_edit_ticket ---
 server.tool(
   'jira_edit_ticket',
-  'Update fields on a ticket. Provide at least one field.',
+  'Update fields on a ticket. Provide at least one field. No transition side effects.',
   {
     key: z
       .string()
@@ -250,6 +250,20 @@ server.tool(
       .array(z.string())
       .optional()
       .describe('Labels to remove (additive — other labels are preserved)'),
+    assignee: z
+      .union([z.string().email(), z.literal('')])
+      .optional()
+      .nullable()
+      .describe(
+        'Assignee email. Null/"" (with assigneeAccountId also empty) unassigns. Overridden by assigneeAccountId.',
+      ),
+    assigneeAccountId: z
+      .string()
+      .optional()
+      .nullable()
+      .describe(
+        'Assignee accountId, no lookup. Null/"" (with assignee also empty) unassigns. Takes precedence over assignee.',
+      ),
   },
   async (params) => editTicket(params),
 );
@@ -279,11 +293,27 @@ const bulkEditTicketSchema = z.object({
     .regex(/^[A-Z][A-Z0-9_]+-\d+$/)
     .optional()
     .describe('Parent epic key (e.g. LS-1234)'),
+  assignee: z
+    .union([z.string().email(), z.literal('')])
+    .optional()
+    .nullable()
+    .describe(
+      'Assignee email. Null/"" (with assigneeAccountId also empty) unassigns. Overridden by assigneeAccountId.',
+    ),
+  assigneeAccountId: z
+    .string()
+    .optional()
+    .nullable()
+    .describe(
+      'Assignee accountId, no lookup. Null/"" (with assignee also empty) unassigns. Takes precedence over assignee.',
+    ),
 });
 
 server.tool(
   'jira_bulk_edit',
-  'Edit up to 50 Jira tickets in one call. Each ticket must specify `key` plus at least one field (summary, description, type, sprint, parent). Returns { total, succeeded, failed } — one ticket erroring never fails the whole batch. Use when assigning N tickets to a sprint, re-parenting children, or applying any field change across multiple tickets.',
+  'Edit up to 50 Jira tickets in one call. Each ticket must specify `key` plus at least one field ' +
+    '(summary, description, type, sprint, parent, assignee, assigneeAccountId). Returns { total, succeeded, failed } ' +
+    '— one ticket erroring never fails the whole batch. No transition side effects.',
   {
     tickets: z
       .array(bulkEditTicketSchema)

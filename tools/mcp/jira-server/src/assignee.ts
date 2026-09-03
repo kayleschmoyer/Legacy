@@ -10,6 +10,11 @@ export interface ResolveAndAssignParams {
   explicitAssigneeAccountId?: string;
   /** Tool name used to prefix log lines (e.g. 'jira_transition'). */
   toolName: string;
+  /**
+   * Clear the ticket's assignee instead of resolving/assigning a user. Skips
+   * every resolution path (no email/env lookups) and PUTs `accountId: null`.
+   */
+  unassign?: boolean;
 }
 
 export interface ResolveAndAssignResult {
@@ -158,6 +163,40 @@ export function _resetAssigneeCache(): void {
   emailResolutionCache.clear();
 }
 
+export interface ApplyAssigneeChangeParams {
+  key: string;
+  /** Assignee email from the caller's tool params. Null/"" means "not a value". */
+  assignee?: string | null;
+  /** Assignee accountId from the caller's tool params. Null/"" means "not a value". */
+  assigneeAccountId?: string | null;
+  toolName: string;
+}
+
+/**
+ * Standalone assignee editing entry point for `jira_edit_ticket` /
+ * `jira_bulk_edit` (LS-9607). Assigns via {@link resolveAndAssign} when either
+ * param carries a non-empty value (accountId takes precedence); unassigns
+ * (`accountId: null`) when both are null/empty/omitted-together. Callers
+ * gate on `assignee !== undefined || assigneeAccountId !== undefined` first
+ * — this only decides which `resolveAndAssign` branch to take.
+ */
+export async function applyAssigneeChange({
+  key,
+  assignee,
+  assigneeAccountId,
+  toolName,
+}: ApplyAssigneeChangeParams): Promise<ResolveAndAssignResult> {
+  const hasAssignValue = Boolean(assigneeAccountId) || Boolean(assignee);
+  return hasAssignValue
+    ? resolveAndAssign({
+        key,
+        explicitAssignee: assignee ?? undefined,
+        explicitAssigneeAccountId: assigneeAccountId ?? undefined,
+        toolName,
+      })
+    : resolveAndAssign({ key, toolName, unassign: true });
+}
+
 /**
  * Resolve an assignee accountId and PUT it onto the ticket.
  *
@@ -178,8 +217,31 @@ export async function resolveAndAssign({
   explicitAssignee,
   explicitAssigneeAccountId,
   toolName,
+  unassign,
 }: ResolveAndAssignParams): Promise<ResolveAndAssignResult> {
   const warnings: string[] = [];
+
+  if (unassign) {
+    try {
+      await jiraRequest({
+        method: 'PUT',
+        path: `/rest/api/3/issue/${key}/assignee`,
+        body: { accountId: null },
+      });
+    } catch (unassignErr) {
+      const msg =
+        unassignErr instanceof Error
+          ? unassignErr.message
+          : String(unassignErr);
+      LOGGER.error(
+        `${toolName}: unassign failed (non-fatal)`,
+        unassignErr instanceof Error ? unassignErr : new Error(msg),
+        { key },
+      );
+      warnings.push(`Failed to unassign ${key}: ${msg}`);
+    }
+    return { accountId: undefined, displayName: undefined, warnings };
+  }
 
   let accountId: string | undefined;
   let emailToLookUp: string | undefined;

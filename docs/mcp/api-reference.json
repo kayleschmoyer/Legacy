@@ -6048,7 +6048,7 @@
         },
         {
           "name": "jira_bulk_edit",
-          "description": "Edit up to 50 Jira tickets in one call. Each ticket must specify `key` plus at least one field (summary, description, type, sprint, parent). Returns { total, succeeded, failed } — one ticket erroring never fails the whole batch. Use when assigning N tickets to a sprint, re-parenting children, or applying any field change across multiple tickets.",
+          "description": "Edit up to 50 Jira tickets in one call. Each ticket must specify `key` plus at least one field (summary, description, type, sprint, parent, assignee, assigneeAccountId). Returns { total, succeeded, failed } — one ticket erroring never fails the whole batch. No transition side effects.",
           "inputs": {
             "tickets": {
               "type": "array",
@@ -6105,6 +6105,34 @@
                       "matches /^[A-Z][A-Z0-9_]+-\\d+$/"
                     ],
                     "description": "Parent epic key (e.g. LS-1234)"
+                  },
+                  "assignee": {
+                    "type": "union",
+                    "optional": true,
+                    "variants": [
+                      {
+                        "type": "string",
+                        "optional": false,
+                        "constraints": [
+                          "email"
+                        ]
+                      },
+                      {
+                        "type": "literal",
+                        "optional": false,
+                        "enum": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "nullable": true,
+                    "description": "Assignee email. Null/\"\" (with assigneeAccountId also empty) unassigns. Overridden by assigneeAccountId."
+                  },
+                  "assigneeAccountId": {
+                    "type": "string",
+                    "optional": true,
+                    "nullable": true,
+                    "description": "Assignee accountId, no lookup. Null/\"\" (with assignee also empty) unassigns. Takes precedence over assignee."
                   }
                 }
               },
@@ -6356,7 +6384,7 @@
         },
         {
           "name": "jira_edit_ticket",
-          "description": "Update fields on a ticket. Provide at least one field.",
+          "description": "Update fields on a ticket. Provide at least one field. No transition side effects.",
           "inputs": {
             "key": {
               "type": "string",
@@ -6412,6 +6440,34 @@
                 "optional": false
               },
               "description": "Labels to remove (additive — other labels are preserved)"
+            },
+            "assignee": {
+              "type": "union",
+              "optional": true,
+              "variants": [
+                {
+                  "type": "string",
+                  "optional": false,
+                  "constraints": [
+                    "email"
+                  ]
+                },
+                {
+                  "type": "literal",
+                  "optional": false,
+                  "enum": [
+                    ""
+                  ]
+                }
+              ],
+              "nullable": true,
+              "description": "Assignee email. Null/\"\" (with assigneeAccountId also empty) unassigns. Overridden by assigneeAccountId."
+            },
+            "assigneeAccountId": {
+              "type": "string",
+              "optional": true,
+              "nullable": true,
+              "description": "Assignee accountId, no lookup. Null/\"\" (with assignee also empty) unassigns. Takes precedence over assignee."
             }
           },
           "transports": [

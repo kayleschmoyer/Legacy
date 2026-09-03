@@ -220,3 +220,54 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     expect(lookups).toHaveLength(0);
   });
 });
+
+describe('resolveAndAssign — unassign (LS-9607)', () => {
+  it('PUTs accountId: null and skips all resolution when unassign is true', async () => {
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      toolName: 'jira_edit_ticket',
+      unassign: true,
+    });
+
+    expect(result.accountId).toBeUndefined();
+    expect(result.displayName).toBeUndefined();
+    expect(result.warnings).toEqual([]);
+    expect(mockSearchJql).not.toHaveBeenCalled();
+    expect(putAssigneeCalls()).toHaveLength(1);
+    expect(putAssigneeCalls()[0][0].body).toEqual({ accountId: null });
+  });
+
+  it('ignores explicit assignee/assigneeAccountId params when unassign is true', async () => {
+    await resolveAndAssign({
+      key: 'LS-1',
+      explicitAssignee: 'agent@example.com',
+      explicitAssigneeAccountId: 'acct-1',
+      toolName: 'jira_edit_ticket',
+      unassign: true,
+    });
+
+    expect(mockSearchJql).not.toHaveBeenCalled();
+    expect(putAssigneeCalls()).toHaveLength(1);
+    expect(putAssigneeCalls()[0][0].body).toEqual({ accountId: null });
+  });
+
+  it('returns a non-fatal warning when the unassign PUT fails', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'PUT' && opts.path.includes('/assignee')) {
+          return Promise.reject(new Error('Jira API PUT failed (404)'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      toolName: 'jira_edit_ticket',
+      unassign: true,
+    });
+
+    expect(result.accountId).toBeUndefined();
+    expect(result.warnings.join(' ')).toContain('Failed to unassign LS-1');
+  });
+});

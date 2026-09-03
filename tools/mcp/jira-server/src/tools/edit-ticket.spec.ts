@@ -4,6 +4,10 @@ jest.mock('../jira-api', () => ({
   jiraRequest: jest.fn(),
 }));
 
+jest.mock('@legacy-sports/logging/server', () => ({
+  LOGGER: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
+
 interface MockJiraRequestOpts {
   method: string;
   path?: string;
@@ -185,5 +189,96 @@ describe('editTicket — existing behavior unaffected', () => {
       path: '/rest/api/3/issue/LS-1',
       body: { fields: { summary: 'Renamed' } },
     });
+  });
+});
+
+describe('editTicket — assignee (LS-9607)', () => {
+  it('assigns via assigneeAccountId with no status transition call', async () => {
+    mockJiraRequest.mockResolvedValue(undefined);
+
+    const result = await editTicket({
+      key: 'LS-1',
+      assigneeAccountId: 'acct-1',
+    });
+    const data = parse(result);
+
+    expect(data['success']).toBe(true);
+    expect(data['updatedFields']).toEqual(['assignee']);
+    expect(mockJiraRequest).toHaveBeenCalledWith({
+      method: 'PUT',
+      path: '/rest/api/3/issue/LS-1/assignee',
+      body: { accountId: 'acct-1' },
+    });
+    // No status-transition endpoint touched.
+    expect(
+      mockJiraRequest.mock.calls.some(([opts]) =>
+        (opts.path ?? '').includes('/transitions'),
+      ),
+    ).toBe(false);
+  });
+
+  it('unassigns when assignee is passed as an empty string', async () => {
+    mockJiraRequest.mockResolvedValue(undefined);
+
+    const result = await editTicket({ key: 'LS-1', assignee: '' });
+    const data = parse(result);
+
+    expect(data['success']).toBe(true);
+    expect(data['updatedFields']).toEqual(['assignee']);
+    expect(data['assignee']).toBeNull();
+    expect(mockJiraRequest).toHaveBeenCalledWith({
+      method: 'PUT',
+      path: '/rest/api/3/issue/LS-1/assignee',
+      body: { accountId: null },
+    });
+  });
+
+  it('unassigns when assignee is passed as null', async () => {
+    mockJiraRequest.mockResolvedValue(undefined);
+
+    const result = await editTicket({ key: 'LS-1', assignee: null });
+    const data = parse(result);
+
+    expect(data['success']).toBe(true);
+    expect(mockJiraRequest).toHaveBeenCalledWith({
+      method: 'PUT',
+      path: '/rest/api/3/issue/LS-1/assignee',
+      body: { accountId: null },
+    });
+  });
+
+  it('combines an assignee change with another field update in one call', async () => {
+    mockJiraRequest.mockResolvedValue(undefined);
+
+    const result = await editTicket({
+      key: 'LS-1',
+      summary: 'Renamed',
+      assigneeAccountId: 'acct-1',
+    });
+    const data = parse(result);
+
+    expect(data['success']).toBe(true);
+    expect(data['updatedFields']).toEqual(['summary', 'assignee']);
+    expect(mockJiraRequest).toHaveBeenCalledWith({
+      method: 'PUT',
+      path: '/rest/api/3/issue/LS-1',
+      body: { fields: { summary: 'Renamed' } },
+    });
+    expect(mockJiraRequest).toHaveBeenCalledWith({
+      method: 'PUT',
+      path: '/rest/api/3/issue/LS-1/assignee',
+      body: { accountId: 'acct-1' },
+    });
+  });
+
+  it('accepts an assignee-only request without the "at least one field" error', async () => {
+    mockJiraRequest.mockResolvedValue(undefined);
+
+    const result = await editTicket({
+      key: 'LS-1',
+      assigneeAccountId: 'acct-1',
+    });
+
+    expect(result.isError).toBeUndefined();
   });
 });

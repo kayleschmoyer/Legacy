@@ -1,6 +1,7 @@
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { getActiveSprintId } from './get-active-sprint.js';
 import { jiraRequest } from '../jira-api.js';
+import { applyAssigneeChange } from '../assignee.js';
 
 export interface BulkEditTicketInput {
   key: string;
@@ -9,6 +10,10 @@ export interface BulkEditTicketInput {
   type?: string;
   sprint?: string;
   parent?: string;
+  /** Assignee email. Pass null/"" (with assigneeAccountId also empty) to unassign. */
+  assignee?: string | null;
+  /** Assignee accountId — takes precedence over `assignee`. Pass null/"" to unassign. */
+  assigneeAccountId?: string | null;
 }
 
 interface BulkEditParams {
@@ -18,6 +23,7 @@ interface BulkEditParams {
 interface SucceededEntry {
   key: string;
   updatedFields: string[];
+  warnings?: string[];
 }
 
 interface FailedEntry {
@@ -68,7 +74,16 @@ export async function bulkEdit(
   const failed: FailedEntry[] = [];
 
   async function runOne(ticket: BulkEditTicketInput): Promise<void> {
-    const { key, summary, description, type, sprint, parent } = ticket;
+    const {
+      key,
+      summary,
+      description,
+      type,
+      sprint,
+      parent,
+      assignee,
+      assigneeAccountId,
+    } = ticket;
     const fields: Record<string, unknown> = {};
     const updatedFields: string[] = [];
 
@@ -110,22 +125,44 @@ export async function bulkEdit(
       updatedFields.push('parent');
     }
 
+    const assigneeRequested =
+      assignee !== undefined || assigneeAccountId !== undefined;
+    if (assigneeRequested) {
+      updatedFields.push('assignee');
+    }
+
     if (updatedFields.length === 0) {
       failed.push({
         key,
         error:
-          'At least one field must be provided (summary, description, type, sprint, or parent).',
+          'At least one field must be provided (summary, description, type, sprint, parent, assignee, or assigneeAccountId).',
       });
       return;
     }
 
     try {
-      await jiraRequest({
-        method: 'PUT',
-        path: `/rest/api/3/issue/${encodeURIComponent(key)}`,
-        body: { fields },
-      });
-      succeeded.push({ key, updatedFields });
+      if (Object.keys(fields).length > 0) {
+        await jiraRequest({
+          method: 'PUT',
+          path: `/rest/api/3/issue/${encodeURIComponent(key)}`,
+          body: { fields },
+        });
+      }
+
+      let warnings: string[] | undefined;
+      if (assigneeRequested) {
+        // No transition side effects — same resolveAndAssign machinery as
+        // jira_transition/jira_start_work, wired through per-ticket.
+        const result = await applyAssigneeChange({
+          key,
+          assignee,
+          assigneeAccountId,
+          toolName: 'jira_bulk_edit',
+        });
+        if (result.warnings.length > 0) warnings = result.warnings;
+      }
+
+      succeeded.push({ key, updatedFields, ...(warnings ? { warnings } : {}) });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       failed.push({ key, error: message });

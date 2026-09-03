@@ -1,6 +1,7 @@
 import { getActiveSprintId } from './get-active-sprint.js';
 import { buildStructuredDescription } from '../adf.js';
 import { jiraRequest } from '../jira-api.js';
+import { applyAssigneeChange } from '../assignee.js';
 import type { ToolResult } from '../types.js';
 
 interface EditTicketParams {
@@ -11,6 +12,10 @@ interface EditTicketParams {
   sprint?: string;
   addLabels?: string[];
   removeLabels?: string[];
+  /** Assignee email. Pass null/"" (with assigneeAccountId also empty) to unassign. */
+  assignee?: string | null;
+  /** Assignee accountId — takes precedence over `assignee`. Pass null/"" to unassign. */
+  assigneeAccountId?: string | null;
 }
 
 /** Fetch just the labels field for a ticket — avoids the full issue payload. */
@@ -31,8 +36,17 @@ async function fetchLabels(key: string): Promise<string[]> {
 export async function editTicket(
   params: EditTicketParams,
 ): Promise<ToolResult> {
-  const { key, summary, description, type, sprint, addLabels, removeLabels } =
-    params;
+  const {
+    key,
+    summary,
+    description,
+    type,
+    sprint,
+    addLabels,
+    removeLabels,
+    assignee,
+    assigneeAccountId,
+  } = params;
 
   const fields: Record<string, unknown> = {};
   const updatedFields: string[] = [];
@@ -140,7 +154,9 @@ export async function editTicket(
   }
 
   const labelsRequested = addLabels !== undefined || removeLabels !== undefined;
-  if (updatedFields.length === 0 && !labelsRequested) {
+  const assigneeRequested =
+    assignee !== undefined || assigneeAccountId !== undefined;
+  if (updatedFields.length === 0 && !labelsRequested && !assigneeRequested) {
     return {
       isError: true,
       content: [
@@ -149,11 +165,27 @@ export async function editTicket(
           text: JSON.stringify({
             success: false,
             error:
-              'At least one field must be provided (summary, description, type, sprint, addLabels, or removeLabels)',
+              'At least one field must be provided (summary, description, type, sprint, addLabels, removeLabels, assignee, or assigneeAccountId)',
           }),
         },
       ],
     };
+  }
+
+  let assigneeWarnings: string[] = [];
+  let assigneeDisplayName: string | undefined;
+  if (assigneeRequested) {
+    // No transition side effects — this only touches the assignee field, via
+    // the same resolveAndAssign machinery jira_transition/jira_start_work use.
+    const result = await applyAssigneeChange({
+      key,
+      assignee,
+      assigneeAccountId,
+      toolName: 'jira_edit_ticket',
+    });
+    assigneeWarnings = result.warnings;
+    assigneeDisplayName = result.displayName ?? result.accountId;
+    updatedFields.push('assignee');
   }
 
   try {
@@ -187,6 +219,12 @@ export async function editTicket(
             key,
             updatedFields,
             ...(resultLabels !== undefined ? { labels: resultLabels } : {}),
+            ...(assigneeRequested
+              ? { assignee: assigneeDisplayName ?? null }
+              : {}),
+            ...(assigneeWarnings.length > 0
+              ? { warnings: assigneeWarnings }
+              : {}),
             message:
               updatedFields.length > 0
                 ? `Updated ${updatedFields.join(', ')} on ${key}`
