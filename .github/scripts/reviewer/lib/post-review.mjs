@@ -606,11 +606,11 @@ export async function postInfraErrorReview(prNumber) {
 
 /**
  * Post a categorized author-facing failure review when the LLM call fails for
- * a known, identifiable reason (rate-limit, daily quota, auth, cost-cap,
- * context-too-large). Distinct from postInfraErrorReview, which is a
+ * a known, identifiable reason (rate-limit, daily quota, billing, auth,
+ * cost-cap, context-too-large). Distinct from postInfraErrorReview, which is a
  * catch-all "we don't know what went wrong" message.
  *
- * Transient, non-author-actionable kinds (rate-limit, quota, auth) post
+ * Transient, non-author-actionable kinds (rate-limit, quota, billing, auth) post
  * COMMENT — nothing was actually read, so the review must not set
  * `reviewDecision` or block the merge gate (LS-9568). Author-actionable kinds
  * (cost-cap, context-too-large) post REQUEST_CHANGES because they describe a
@@ -620,7 +620,7 @@ export async function postInfraErrorReview(prNumber) {
  *
  * @param {object} params
  * @param {number} params.prNumber
- * @param {'rate-limit'|'quota'|'auth'|'cost-cap'|'context-too-large'} params.kind
+ * @param {'rate-limit'|'quota'|'billing'|'auth'|'cost-cap'|'context-too-large'} params.kind
  * @param {object} [params.details]
  * @param {number} [params.details.retryAfterSeconds]
  * @param {number} [params.details.cumulativeUsd]
@@ -755,6 +755,20 @@ export function buildKnownFailureBody(kind, details = {}) {
           '_This is not a code issue — no review was posted because the LLM API throttled the request._',
       };
     }
+    case 'billing':
+      return {
+        // COMMENT for the same reason as rate-limit: nothing was read, so this
+        // must not set reviewDecision or block the merge gate (LS-9568).
+        event: 'COMMENT',
+        body:
+          '## Reviewer billing credits exhausted\n\n' +
+          '<!-- bot-infra-failure: true -->\n' +
+          'The Gemini API rejected this run with HTTP 429 `RESOURCE_EXHAUSTED` because **the billing account behind the API key has no usable credit** — usually depleted prepayment credits, sometimes a disabled or suspended billing account. This is a billing state, not a rate limit.\n\n' +
+          '> [!IMPORTANT]\n' +
+          '> **Waiting will not help, and re-applying `bot:ready-for-review` will not help.** Every retry fails identically until billing is topped up. The in-job retry ladder is skipped for this failure class for the same reason.\n\n' +
+          '**Account owner action required**: top up the prepayment credits (or fix the billing account) for the Google Cloud project tied to `GEMINI_CODE_REVIEW_API_KEY` at https://aistudio.google.com/apikey. Once credits are restored, re-apply the `bot:ready-for-review` label (remove and add it again) to run the review.\n\n' +
+          '_This is not a code issue — no review was posted because the reviewer has no API credits._',
+      };
     case 'quota':
       return {
         event: 'COMMENT',

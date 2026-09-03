@@ -320,6 +320,77 @@ describe('buildKnownFailureBody infra-failure marker', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// buildKnownFailureBody — billing vs rate-limit messaging (LS-9812)
+// Credit depletion and a per-minute throttle are both HTTP 429
+// RESOURCE_EXHAUSTED. The notice is the only thing that tells an agent which
+// one happened without opening the run log, so the two bodies must not give
+// the same advice.
+// ---------------------------------------------------------------------------
+
+describe('buildKnownFailureBody — billing (LS-9812)', () => {
+  it('billing body contains the infra-failure marker (not a code issue)', () => {
+    const { body } = buildKnownFailureBody('billing');
+    assert.ok(
+      body.includes(INFRA_ERROR_MARKER),
+      `expected '${INFRA_ERROR_MARKER}' in billing body`,
+    );
+  });
+
+  it('billing uses COMMENT event (nothing was read — must not block the merge gate)', () => {
+    const { event } = buildKnownFailureBody('billing');
+    assert.strictEqual(event, 'COMMENT');
+  });
+
+  it('billing body states that credits are depleted', () => {
+    const { body } = buildKnownFailureBody('billing');
+    assert.match(body, /credits/i);
+    assert.match(body, /depleted/i);
+  });
+
+  it('billing body says re-applying the label will NOT help', () => {
+    const { body } = buildKnownFailureBody('billing');
+    assert.match(body, /will not help/i);
+    assert.ok(
+      /re-applying `bot:ready-for-review` will not help/i.test(body),
+      'expected the body to name the label that does not help',
+    );
+  });
+
+  it('billing body directs an account owner to top up billing', () => {
+    const { body } = buildKnownFailureBody('billing');
+    assert.match(body, /account owner/i);
+    assert.match(body, /top up/i);
+  });
+
+  it('billing body does NOT tell the reader to wait (the rate-limit remedy)', () => {
+    const { body } = buildKnownFailureBody('billing');
+    assert.ok(
+      !/wait a minute/i.test(body),
+      'billing notice must not repeat the per-minute-throttle advice',
+    );
+  });
+
+  it('billing and rate-limit notices are distinguishable by heading', () => {
+    const billing = buildKnownFailureBody('billing').body;
+    const rateLimit = buildKnownFailureBody('rate-limit').body;
+    assert.ok(billing.startsWith('## Reviewer billing credits exhausted'));
+    assert.ok(rateLimit.startsWith('## Reviewer rate-limited'));
+    assert.notStrictEqual(billing, rateLimit);
+  });
+
+  // LS-9568 guard: the retryable path must keep saying "wait, then re-apply".
+  it('rate-limit body still tells the author to wait and re-apply the label', () => {
+    const { body } = buildKnownFailureBody('rate-limit');
+    assert.match(body, /wait a minute/i);
+    assert.match(body, /bot:ready-for-review/);
+    assert.ok(
+      !/will not help/i.test(body),
+      'rate-limit notice must keep advertising the retry as useful',
+    );
+  });
+});
+
 describe('buildInlineComments', () => {
   it('returns an empty array when no findings have file+line', () => {
     const findings = [

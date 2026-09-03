@@ -24,6 +24,13 @@
   color: "d93f0b"
   description: "Reviewer infrastructure failed after retry — re-applying label retriggers W1"
 
+# LS-9812: distinct from review-bot-degraded because the remedy is different.
+# Degraded means "retry me"; this means "escalate to a human with the billing
+# account". Re-applying bot:ready-for-review cannot clear it — only a top-up can.
+- name: review-bot-billing
+  color: "b60205"
+  description: "Reviewer LLM credits depleted — account owner must top up billing; retrying will not help"
+
 - name: ci-stuck
   color: "d93f0b"
   description: "Operator-applied marker: CI pipeline is stuck and requires manual intervention"

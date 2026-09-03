@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { withRetry } from '../retry.mjs';
+import { classifyHttpError } from '../providers/gemini.mjs';
 
 describe('withRetry', () => {
   it('returns the result immediately when fn succeeds on first attempt', async () => {
@@ -185,5 +186,73 @@ describe('withRetry', () => {
       { message: 'soft' },
     );
     assert.strictEqual(calls, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// LS-9812: end-to-end guard that a real billing-class 429 skips the ladder.
+// The generic retryable=false case is covered above; this pins the wiring
+// between classifyHttpError and withRetry so a future change that marks
+// billing retryable again cannot pass silently. The observed cost of getting
+// this wrong was ~6 minutes of runner time per attempt (36s/92s/304s) on a
+// ladder that fails identically every time.
+// ---------------------------------------------------------------------------
+
+describe('withRetry + Gemini 429 classification (LS-9812)', () => {
+  const billingBody = JSON.stringify({
+    error: {
+      code: 429,
+      status: 'RESOURCE_EXHAUSTED',
+      message: 'Your prepayment credits are depleted.',
+    },
+  });
+  // No "Please retry in Xs" hint: withRetry honours that hint via
+  // Math.max(delay, retryAfterMs), which would make this test sleep for real.
+  // The hint's own handling is covered by the jitter/backoff tests above.
+  const throttleBody = JSON.stringify({
+    error: {
+      code: 429,
+      status: 'RESOURCE_EXHAUSTED',
+      message:
+        "Quota exceeded for quota metric 'GenerateRequestsPerMinutePerProjectPerModel'.",
+    },
+  });
+
+  it('makes exactly one attempt for a depleted-credits 429', async () => {
+    let calls = 0;
+    const origWrite = process.stderr.write;
+    process.stderr.write = () => true;
+    try {
+      await assert.rejects(
+        () =>
+          withRetry(async () => {
+            calls++;
+            throw classifyHttpError(429, billingBody);
+          }, [0, 0, 0]),
+        (err) => err.kind === 'billing',
+      );
+    } finally {
+      process.stderr.write = origWrite;
+    }
+    assert.strictEqual(calls, 1, 'billing 429 must not enter the retry ladder');
+  });
+
+  it('still exhausts the ladder for a throttle 429 (LS-9568 path unchanged)', async () => {
+    let calls = 0;
+    const origWrite = process.stderr.write;
+    process.stderr.write = () => true;
+    try {
+      await assert.rejects(
+        () =>
+          withRetry(async () => {
+            calls++;
+            throw classifyHttpError(429, throttleBody);
+          }, [0, 0, 0]),
+        (err) => err.kind === 'rate-limit',
+      );
+    } finally {
+      process.stderr.write = origWrite;
+    }
+    assert.strictEqual(calls, 4, '1 initial + 3 retries');
   });
 });

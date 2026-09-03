@@ -279,12 +279,25 @@ for ctx in ("bot-review", "CI Gate"):
 
 # --- Label transitions (post-baseline only; adds of escalation/CI labels) ---
 WATCHED_ADD = {"needs-human-arbitration", "needs-human-security-review",
-               "needs-human-review", "review-bot-degraded", "ci-stuck"}
+               "needs-human-review", "review-bot-degraded", "review-bot-billing",
+               "ci-stuck"}
+# LS-9812: review-bot-billing is the one watched label whose remedy is NOT
+# "retry the bot" — the reviewer has no API credits, so re-applying
+# bot:ready-for-review just burns another run. Say so explicitly rather than
+# routing it to the generic triage doc.
+LABEL_ADD_HINTS = {
+    "review-bot-billing":
+        "label: 'review-bot-billing' added to PR #{pr} — the Reviewer Bot's LLM "
+        "credits are depleted. Do NOT re-apply bot:ready-for-review; it cannot "
+        "succeed. Escalate to the account owner to top up billing.",
+}
 if not baseline and not rebaseline:
     for lbl in sorted(labels - prev_labels):
         if lbl in WATCHED_ADD or (lbl.startswith("CI: ") and lbl != "CI: Conflicts"):
+            hint = LABEL_ADD_HINTS.get(lbl)
             emit_once(f"label-add:{lbl}:{sha}",
-                      f"label: '{lbl}' added to PR #{pr} — triage per ci-event-response.md.")
+                      hint.format(pr=pr) if hint
+                      else f"label: '{lbl}' added to PR #{pr} — triage per ci-event-response.md.")
     if "merge-when-ready" in prev_labels and "merge-when-ready" not in labels:
         emit_once(f"mwr-removed:{sha}",
                   f"label: merge-when-ready removed from PR #{pr} — a required check went red or the gate stripped it; fix the upstream cause, never re-add manually.")

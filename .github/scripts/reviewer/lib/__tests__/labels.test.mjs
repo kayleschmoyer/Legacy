@@ -6,7 +6,7 @@ describe('OPERATIONAL_LABELS', () => {
   it('contains exactly the labels that every terminal state must clear', () => {
     assert.deepStrictEqual(
       [...OPERATIONAL_LABELS],
-      ['bot:ready-for-review', 'review-bot-degraded'],
+      ['bot:ready-for-review', 'review-bot-degraded', 'review-bot-billing'],
     );
   });
 
@@ -25,6 +25,7 @@ describe('cleanupOperationalLabels', () => {
     assert.deepStrictEqual(calls, [
       [42, 'bot:ready-for-review'],
       [42, 'review-bot-degraded'],
+      [42, 'review-bot-billing'],
     ]);
   });
 
@@ -37,7 +38,10 @@ describe('cleanupOperationalLabels', () => {
       except: 'review-bot-degraded',
       removeLabel,
     });
-    assert.deepStrictEqual(calls, ['bot:ready-for-review']);
+    assert.deepStrictEqual(calls, [
+      'bot:ready-for-review',
+      'review-bot-billing',
+    ]);
   });
 
   it('skips only the matching label — others still cycle when `except` is set', () => {
@@ -49,7 +53,10 @@ describe('cleanupOperationalLabels', () => {
       except: 'bot:ready-for-review',
       removeLabel,
     });
-    assert.deepStrictEqual(calls, ['review-bot-degraded']);
+    assert.deepStrictEqual(calls, [
+      'review-bot-degraded',
+      'review-bot-billing',
+    ]);
   });
 
   it('continues to subsequent labels when one removal throws', () => {
@@ -74,6 +81,7 @@ describe('cleanupOperationalLabels', () => {
     assert.deepStrictEqual(calls, [
       'bot:ready-for-review',
       'review-bot-degraded',
+      'review-bot-billing',
     ]);
     assert.ok(
       stderr.some((line) =>
@@ -102,7 +110,10 @@ describe('cleanupOperationalLabels', () => {
       calls.push(label);
     };
     cleanupOperationalLabels(5, { preserveReadyLabel: true, removeLabel });
-    assert.deepStrictEqual(calls, ['review-bot-degraded']);
+    assert.deepStrictEqual(calls, [
+      'review-bot-degraded',
+      'review-bot-billing',
+    ]);
   });
 
   it('still removes bot:ready-for-review when preserveReadyLabel is false', () => {
@@ -114,6 +125,7 @@ describe('cleanupOperationalLabels', () => {
     assert.deepStrictEqual(calls, [
       'bot:ready-for-review',
       'review-bot-degraded',
+      'review-bot-billing',
     ]);
   });
 
@@ -127,7 +139,7 @@ describe('cleanupOperationalLabels', () => {
       preserveReadyLabel: true,
       removeLabel,
     });
-    assert.deepStrictEqual(calls, []);
+    assert.deepStrictEqual(calls, ['review-bot-billing']);
   });
 });
 

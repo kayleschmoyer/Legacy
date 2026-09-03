@@ -135,14 +135,14 @@ cycle = count(formal reviews where author == legacy-sports-review-bot[bot]
 
 Two review types are **excluded** from the count and do not advance the cycle:
 
-1. **Infrastructure-failure reviews** — reviews posted when the LLM API fails (rate limits, auth errors, API errors, or exhausting all retries). These carry `<!-- bot-infra-failure: true -->` in their body. Excluding them prevents transient outages from triggering false escalation to `needs-human-arbitration`. The `review-bot-degraded` label and W4 alert still fire so operators are notified. See LS-4108.
+1. **Infrastructure-failure reviews** — reviews posted when the LLM API fails (rate limits, daily quota, depleted billing credits, auth errors, API errors, or exhausting all retries). These carry `<!-- bot-infra-failure: true -->` in their body. Excluding them prevents transient outages from triggering false escalation to `needs-human-arbitration`. The `review-bot-degraded` label (or `review-bot-billing`, per LS-9812) and W4 alert still fire so operators are notified. See LS-4108.
 2. **DISMISSED reviews** — reviews dismissed by GitHub's "dismiss stale approvals on push" policy are no longer relevant to the current diff.
 
 Author-actionable failures (`cost-cap`, `context-too-large`) are **not** excluded — they represent real feedback requiring the author to reduce PR size.
 
 #### Terminal-State Label Cleanup
 
-At every terminal state (success, escalation, infra failure, cost cap), the reviewer cleans up operational labels (`bot:ready-for-review`, `review-bot-degraded`) to prevent contradictory label combinations like `bot:ready-for-review` + `needs-human-arbitration`. See LS-4125.
+At every terminal state (success, escalation, infra failure, cost cap), the reviewer cleans up operational labels (`bot:ready-for-review`, `review-bot-degraded`, `review-bot-billing`) to prevent contradictory label combinations like `bot:ready-for-review` + `needs-human-arbitration`. See LS-4125.
 
 ### `bot-review` Commit Status
 

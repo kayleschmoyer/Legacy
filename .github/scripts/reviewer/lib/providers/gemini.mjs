@@ -118,6 +118,8 @@ const PRICING = {
  * - `auth`              → API key missing/invalid/revoked. Maintainer issue, never retry.
  * - `rate-limit`        → Per-minute RPM cap hit. Retry after Retry-After hint.
  * - `quota`             → Per-day RPD or token quota exhausted. Don't retry — won't recover today.
+ * - `billing`           → Paid-tier credits depleted / billing disabled. Don't retry — only an
+ *                         account owner topping up billing can recover it (LS-9812).
  * - `invalid-request`   → Malformed request (400). Don't retry.
  * - `context-too-large` → Input exceeds model context window. Don't retry — PR too big.
  * - `transient`         → 5xx / network errors. Retry.
@@ -697,12 +699,47 @@ export class GeminiProvider {
 }
 
 /**
+ * Signals that a 429 RESOURCE_EXHAUSTED is a *billing* failure rather than a
+ * throttle. Deliberately narrow: each pattern names credits, a billing
+ * account, or a suspended consumer explicitly, so neither of the two
+ * retry/wait-class messages can match —
+ *   throttle: "Resource exhausted. Please retry in 12.5s."
+ *   free-tier daily cap: "Quota exceeded for quota metric
+ *                         'GenerateRequestsPerDayPerProjectPerModel-FreeTier'…"
+ * Widening these (e.g. a bare /billing/) would swallow the daily-cap notice,
+ * whose own remedy text mentions enabling billing.
+ */
+const BILLING_EXHAUSTION_PATTERNS = [
+  // Paid-tier prepay: "Your prepayment credits are depleted."
+  /prepay(?:ment)?\s+credits?/i,
+  // Generic credit depletion, incl. "credits have been exhausted".
+  /credits?\s+(?:are\s+|has\s+|have\s+)?(?:been\s+)?(?:depleted|exhausted|run\s+out)/i,
+  // Billing account disabled / not enabled / closed on the Cloud project.
+  /billing\s+account[^.]*\b(?:disabled|closed|suspended|not\s+(?:enabled|active|found))/i,
+  /billing\s+(?:is\s+)?(?:not\s+enabled|disabled)/i,
+  // Structured google.rpc.ErrorInfo reasons for the same conditions.
+  /\bBILLING_DISABLED\b/,
+  /\bACCOUNT_STATE_INVALID\b/,
+  /\bCONSUMER_SUSPENDED\b/,
+];
+
+/**
+ * @param {string} haystack  Error message plus any structured detail reasons.
+ * @returns {boolean}
+ */
+function isBillingExhaustion(haystack) {
+  return BILLING_EXHAUSTION_PATTERNS.some((re) => re.test(haystack));
+}
+
+/**
  * Map an HTTP error response to a typed GeminiError. Recognizes Google's
  * standard error envelope:
  *   { error: { code, message, status, details: [{ '@type', reason, ... }] } }
  *
  * The `status` and `reason` fields are how Google distinguishes RPM (rate
- * limit) from RPD (daily quota) — both surface as HTTP 429.
+ * limit) from RPD (daily quota) from depleted billing credits — all three
+ * surface as HTTP 429 RESOURCE_EXHAUSTED, and only the message/details text
+ * tells them apart.
  *
  * @param {number} httpStatus
  * @param {string} rawBody
@@ -743,6 +780,28 @@ export function classifyHttpError(httpStatus, rawBody) {
       .filter(Boolean)
       .join(',');
     const detailHaystack = `${quotaIds} ${apiMessage}`;
+
+    // Billing-class 429s (LS-9812): the paid tier reports depleted prepayment
+    // credits — and a disabled/suspended billing account — with the same
+    // HTTP 429 RESOURCE_EXHAUSTED envelope as a per-minute throttle. It is not
+    // a throttle: no amount of waiting or retrying recovers it, only an
+    // account owner topping up billing does. Classified before the PerDay
+    // check so the credit-depletion message can never be mistaken for a
+    // free-tier daily cap, whose remedy ("wait for the Pacific-midnight
+    // reset") is equally wrong here.
+    const billingReasons = (errObj.details ?? [])
+      .map((d) => d?.reason)
+      .filter(Boolean)
+      .join(',');
+    if (isBillingExhaustion(`${apiMessage} ${billingReasons} ${quotaIds}`)) {
+      return new GeminiError(baseMessage, {
+        kind: 'billing',
+        retryable: false,
+        status: httpStatus,
+        raw: snippet,
+      });
+    }
+
     const isDaily =
       /per[\s_-]*day/i.test(detailHaystack) ||
       /perday/i.test(detailHaystack) ||

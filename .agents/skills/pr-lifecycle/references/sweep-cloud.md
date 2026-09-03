@@ -28,6 +28,7 @@ Returns `summary` counts, a `prs[]` array (`mergeable`, `ciStatus`, `reviewDecis
 
 - `bot:ready-for-review` missing on current HEAD → `github_manage_labels(prs: [<PR#>], add: ["bot:ready-for-review"])`
 - `review-bot-degraded` present (rate-limited cycle) → remove then re-add `bot:ready-for-review`
+- `review-bot-billing` present (LLM credits depleted) → **do not retry**; report it for an account owner to top up billing
 - Verdict still CHANGES_REQUESTED → the PR needs code work; defer to a local sweep in the report.
 
 ## Step 3: Re-run transient CI failures

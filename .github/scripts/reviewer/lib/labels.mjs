@@ -12,10 +12,15 @@ import { removeLabel as _removeLabel } from './github.mjs';
  * - `bot:ready-for-review` triggers the reviewer workflow.
  * - `review-bot-degraded` is applied on transient infra failure to allow a
  *   labeled-event self-heal retry.
+ * - `review-bot-billing` is applied when the LLM provider's credits are
+ *   depleted (LS-9812). Unlike the other two it is not a trigger label — it
+ *   is listed here purely so it self-clears on the next terminal state, i.e.
+ *   the first run that succeeds after an account owner tops up billing.
  */
 export const OPERATIONAL_LABELS = Object.freeze([
   'bot:ready-for-review',
   'review-bot-degraded',
+  'review-bot-billing',
 ]);
 
 /**
@@ -27,8 +32,8 @@ export const OPERATIONAL_LABELS = Object.freeze([
  * outcome, so a failure to apply that label leaves the operational labels
  * intact and the workflow can self-heal on the next labeled event. Pass
  * `{ except }` when the terminal label itself is an operational label
- * (currently only `review-bot-degraded` from the infra-failure paths) so the
- * just-applied label is not removed.
+ * (`review-bot-degraded` or `review-bot-billing` from the infra-failure
+ * paths) so the just-applied label is not removed.
  *
  * Pass `{ preserveReadyLabel: true }` to keep `bot:ready-for-review` on the
  * PR. The reviewer workflow fires on `synchronize` events when this label is

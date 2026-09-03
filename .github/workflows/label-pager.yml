@@ -29,7 +29,7 @@ permissions:
 jobs:
   page:
     if: >-
-      contains(fromJson('["needs-human-arbitration","needs-human-security-review","needs-human-review","review-bot-degraded","ci-stuck"]'),
+      contains(fromJson('["needs-human-arbitration","needs-human-security-review","needs-human-review","review-bot-degraded","review-bot-billing","ci-stuck"]'),
         github.event_name == 'workflow_dispatch' && inputs.label_name || github.event.label.name)
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 2

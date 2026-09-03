@@ -252,7 +252,7 @@ React to each event as it arrives. Handle each event:
 
 When the Reviewer Bot APPROVEs, it labels the PR with `merge-when-ready` itself and the merge queue (`.github/workflows/merge-queue.yml`) picks it up automatically. **Precondition for the merge step**: wait for the Bot's label rather than applying `merge-when-ready` yourself; manual application bypasses the gate that holds back PRs the Bot has rejected. Use `github_merge_pr` only when the workflow explicitly calls for an admin merge (`strategy: "direct"`) — the default path is the merge queue. See [Label Ownership](../SKILL.md#label-ownership).
 
-If a clean PR sits without `merge-when-ready` for more than one Reviewer Bot cycle, the upstream cause is either (a) `bot:ready-for-review` was not (re-)applied after the last push, (b) the Reviewer Bot is rate-limited (`review-bot-degraded` label present), or (c) the Reviewer Bot's verdict is still CHANGES_REQUESTED. Fix the upstream cause — do not paper over with the label.
+If a clean PR sits without `merge-when-ready` for more than one Reviewer Bot cycle, the upstream cause is either (a) `bot:ready-for-review` was not (re-)applied after the last push, (b) the Reviewer Bot is rate-limited (`review-bot-degraded` label present), (c) the Reviewer Bot is out of LLM credits (`review-bot-billing` label present — retrying cannot help; escalate to the account owner), or (d) the Reviewer Bot's verdict is still CHANGES_REQUESTED. Fix the upstream cause — do not paper over with the label.
 
 After handling an event, continue until `merged` or `closed`.
 

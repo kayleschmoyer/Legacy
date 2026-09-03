@@ -556,6 +556,129 @@ describe('GeminiProvider', () => {
       );
     });
 
+    // LS-9812: credit depletion and a per-minute throttle both arrive as
+    // HTTP 429 RESOURCE_EXHAUSTED. They must not be conflated: retrying the
+    // throttle works, retrying the billing failure burns ~6 minutes of runner
+    // time on a ladder that cannot succeed.
+    it('throws GeminiError(kind=billing, retryable=false) on 429 with depleted prepayment credits', async () => {
+      const p = new GeminiProvider({
+        apiKey: 'stub',
+        useExplicitCache: false,
+      });
+      stubFetch(() =>
+        rawResponse(
+          JSON.stringify({
+            error: {
+              code: 429,
+              status: 'RESOURCE_EXHAUSTED',
+              message: 'Your prepayment credits are depleted.',
+            },
+          }),
+          { status: 429 },
+        ),
+      );
+      await assert.rejects(
+        () => p.review({ system: 's', user: 'u' }),
+        (err) => {
+          assert.ok(err instanceof GeminiError);
+          assert.strictEqual(err.kind, 'billing');
+          // retryable:false is what makes withRetry skip the ladder entirely.
+          assert.strictEqual(err.retryable, false);
+          return true;
+        },
+      );
+    });
+
+    it('classifies 429 as billing from a structured BILLING_DISABLED reason', async () => {
+      const p = new GeminiProvider({
+        apiKey: 'stub',
+        useExplicitCache: false,
+      });
+      stubFetch(() =>
+        rawResponse(
+          JSON.stringify({
+            error: {
+              code: 429,
+              status: 'RESOURCE_EXHAUSTED',
+              message: 'Resource exhausted.',
+              details: [
+                {
+                  '@type': 'type.googleapis.com/google.rpc.ErrorInfo',
+                  reason: 'BILLING_DISABLED',
+                },
+              ],
+            },
+          }),
+          { status: 429 },
+        ),
+      );
+      await assert.rejects(
+        () => p.review({ system: 's', user: 'u' }),
+        (err) => {
+          assert.strictEqual(err.kind, 'billing');
+          assert.strictEqual(err.retryable, false);
+          return true;
+        },
+      );
+    });
+
+    it('does NOT classify a per-minute throttle as billing (LS-9568 retry path intact)', async () => {
+      const p = new GeminiProvider({
+        apiKey: 'stub',
+        useExplicitCache: false,
+      });
+      stubFetch(() =>
+        rawResponse(
+          JSON.stringify({
+            error: {
+              code: 429,
+              status: 'RESOURCE_EXHAUSTED',
+              message:
+                "Quota exceeded for quota metric 'GenerateRequestsPerMinutePerProjectPerModel' of service 'generativelanguage.googleapis.com'. Please retry in 36.2s.",
+            },
+          }),
+          { status: 429 },
+        ),
+      );
+      await assert.rejects(
+        () => p.review({ system: 's', user: 'u' }),
+        (err) => {
+          assert.strictEqual(err.kind, 'rate-limit');
+          assert.strictEqual(err.retryable, true);
+          assert.strictEqual(err.retryAfterSeconds, 36.2);
+          return true;
+        },
+      );
+    });
+
+    it('does NOT classify the free-tier daily cap as billing, even though its remedy mentions billing', async () => {
+      const p = new GeminiProvider({
+        apiKey: 'stub',
+        useExplicitCache: false,
+      });
+      stubFetch(() =>
+        rawResponse(
+          JSON.stringify({
+            error: {
+              code: 429,
+              status: 'RESOURCE_EXHAUSTED',
+              message:
+                "Quota exceeded for quota metric 'GenerateRequestsPerDayPerProjectPerModel-FreeTier'. To raise it, enable billing on your project.",
+            },
+          }),
+          { status: 429 },
+        ),
+      );
+      await assert.rejects(
+        () => p.review({ system: 's', user: 'u' }),
+        (err) => {
+          assert.strictEqual(err.kind, 'quota');
+          assert.strictEqual(err.retryable, false);
+          return true;
+        },
+      );
+    });
+
     it('throws GeminiError(kind=quota, retryable=false) on 429 with PerDay quota', async () => {
       const p = new GeminiProvider({
         apiKey: 'stub',

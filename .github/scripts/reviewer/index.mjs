@@ -145,6 +145,12 @@ const NEEDS_HUMAN_ARBITRATION_LABEL = 'needs-human-arbitration';
 const NEEDS_HUMAN_SECURITY_REVIEW_LABEL = 'needs-human-security-review';
 const NEEDS_HUMAN_REVIEW_LABEL = 'needs-human-review';
 const CYCLE_RESET_LABEL = 'bot:reset-cycle-counter';
+// Terminal marker for "the reviewer is out of API credits" (LS-9812). Kept
+// distinct from `review-bot-degraded` so /unblock-prs, the watch scripts, and
+// agents can tell "retry me" apart from "escalate to a human" without reading
+// the run log. Deliberately NOT a trigger label in review.yml — re-applying it
+// must not re-fire a run that cannot succeed.
+const REVIEW_BOT_BILLING_LABEL = 'review-bot-billing';
 
 /**
  * Write a failure bot-review status UNLESS a human maintainer APPROVE now
@@ -1553,7 +1559,7 @@ function _classifyInitError(err, providerName) {
  * categorized (treated as generic infra failures).
  *
  * @param {unknown} err
- * @returns {'rate-limit'|'quota'|'auth'|'context-too-large'|'cost-cap'|null}
+ * @returns {'rate-limit'|'quota'|'billing'|'auth'|'context-too-large'|'cost-cap'|null}
  */
 function classifyProviderError(err) {
   if (!err || typeof err !== 'object') return null;
@@ -1562,6 +1568,7 @@ function classifyProviderError(err) {
   if (
     k === 'rate-limit' ||
     k === 'quota' ||
+    k === 'billing' ||
     k === 'auth' ||
     k === 'context-too-large'
   ) {
@@ -1583,6 +1590,8 @@ function statusDescriptionForFailure(kind) {
   switch (kind) {
     case 'rate-limit':
       return 'Reviewer rate-limited (per-minute quota); re-apply bot:ready-for-review to retry';
+    case 'billing':
+      return 'Reviewer billing credits depleted — account owner must top up; retrying will not help';
     case 'quota':
       return 'Reviewer daily quota exhausted (free tier)';
     case 'auth':
@@ -1652,10 +1661,17 @@ async function handleLlmFailure(prNumber, err, ctx = null) {
 
   // Cost-cap abort requires human review (split the PR or raise the cap) —
   // not a transient failure, so review-bot-degraded self-heal retry is wrong.
-  // All other failure kinds get review-bot-degraded so the labeled trigger
-  // can self-heal on retry.
+  // Billing exhaustion is likewise un-retryable, but needs its own label
+  // rather than needs-human-review: the PR is fine, the reviewer's funding is
+  // not, and the fix is an account-owner top-up (LS-9812). All other failure
+  // kinds get review-bot-degraded so the labeled trigger can self-heal on
+  // retry.
   const failureLabel =
-    kind === 'cost-cap' ? NEEDS_HUMAN_REVIEW_LABEL : 'review-bot-degraded';
+    kind === 'cost-cap'
+      ? NEEDS_HUMAN_REVIEW_LABEL
+      : kind === 'billing'
+        ? REVIEW_BOT_BILLING_LABEL
+        : 'review-bot-degraded';
   // Apply the terminal label first; only clean up the operational labels
   // after it sticks. If `addLabelAsApp` fails the operational labels stay
   // intact so the labeled-event self-heal trigger can still fire on retry.
@@ -1722,13 +1738,14 @@ async function handleLlmFailure(prNumber, err, ctx = null) {
  * <!-- bot-infra-failure --> marker and are excluded from the cycle counter.
  * Author-actionable failures (cost-cap, context-too-large) return false.
  *
- * @param {'rate-limit'|'quota'|'auth'|'context-too-large'|'cost-cap'|null} kind
+ * @param {'rate-limit'|'quota'|'billing'|'auth'|'context-too-large'|'cost-cap'|null} kind
  * @returns {boolean}
  */
 function _isTransientFailureKind(kind) {
   return (
     kind === 'rate-limit' ||
     kind === 'quota' ||
+    kind === 'billing' ||
     kind === 'auth' ||
     kind === null
   );
@@ -1738,11 +1755,16 @@ function _isTransientFailureKind(kind) {
  * Map a transient failure kind to its bot_review_infra_failures metric cause label.
  * Only call this when _isTransientFailureKind(kind) is true.
  *
- * @param {'rate-limit'|'quota'|'auth'|null} kind
- * @returns {'rate_limit'|'api_error'}
+ * @param {'rate-limit'|'quota'|'billing'|'auth'|null} kind
+ * @returns {'rate_limit'|'billing'|'api_error'}
  */
 function _infraFailureCauseForKind(kind) {
-  return kind === 'rate-limit' ? 'rate_limit' : 'api_error';
+  if (kind === 'rate-limit') return 'rate_limit';
+  // Billing gets its own cause so bot_review_infra_failures separates
+  // "provider throttled us" from "we ran out of money" — the two have
+  // completely different remediations (LS-9812).
+  if (kind === 'billing') return 'billing';
+  return 'api_error';
 }
 
 main().catch((err) => {
