@@ -49,6 +49,7 @@ The monthly shape matters too: **44 (Mar) → 147 (Apr) → 137 (May) → 38 (Ju
 | `API isolation caught N unmocked GraphQL request(s)`                    | [§4.1](#41-unmocked-operations-two-different-failures)                                                         |
 | A gate test passes for the wrong reason (free user sees premium)        | [§4.2](#42-the-baseline-answers-permissively)                                                                  |
 | Mock returns data but the UI ignores it                                 | [§4.3](#43-mock-shape-and-enum-drift)                                                                          |
+| A mocked query resolves with another query's payload                    | [§4.6](#46-substring-operation-routing-sends-the-wrong-payload-to-the-wrong-query)                             |
 | Test lands on the sign-in page mid-run                                  | [§5.1](#51-the-switchuser-race)                                                                                |
 | WebSocket canary reports zero frames                                    | [§3.5](#35-listeners-registered-after-the-thing-they-listen-for)                                               |
 | Fails only on Mobile Chrome / Mobile Safari                             | [§6](#6-viewport-and-the-mobile-projects)                                                                      |
@@ -149,7 +150,18 @@ Banned in page objects and helpers (LS-4456) and in hermetic specs (LS-9660) —
 
 Note the exception recorded in [testing/SKILL.md Critical Rule 6](../SKILL.md#critical-rules): `page.waitForURL(pattern, { waitUntil: 'networkidle' })` _does_ fully commit a navigation, and is the sanctioned use — except where the app fires a second client-side navigation to the same URL during mount, which `waitForURL` latches onto while `#root` is still empty.
 
-**~283 `networkidle` references remain under `apps/web-e2e/src`.** Most are in grandfathered files. Do not add more.
+**~283 `networkidle` references remain under `apps/web-e2e/src`** — 110 in files on the LS-9660 grandfather lists, and **173 in files the rules are supposed to be enforcing on today.** Do not add more.
+
+> **The ban has a hole — do not assume a green lint means no `networkidle` (LS-9793).** Both bans are AST selectors that require a **literal** argument:
+>
+> ```
+> CallExpression[callee.property.name='waitForLoadState'][arguments.0.value='networkidle']
+> Property[key.name='waitUntil'][value.value='networkidle']
+> ```
+>
+> `apps/web-e2e/src/pages/players.page.ts` takes the value as a **parameter** — `gotoDetail(id, waitUntil = 'load')` / `gotoBrefId(...)` calling `page.waitForLoadState(waitUntil)`. `arguments.0` is an Identifier, not a Literal, so neither rule fires: not on the page object, and not on the ~170 spec call sites that pass `'networkidle'` into it as an ordinary string argument. Almost the entire non-grandfathered residue is the player-detail family reaching `waitForLoadState` this way. The integration suite's own file-scan backstop (`src/integration/determinism-guards.test.ts`) does not cover them either — its documented scope is `src/integration/tests` only.
+>
+> Generalise it: **an AST rule that matches on a literal is bypassed by any indirection**, and a page-object parameter is the most natural indirection in this suite. When you rely on a lint rule to hold an invariant, check whether the invariant can be reached through a variable.
 
 ### 3.3 Missing an explicit wait for a navigation the app performs synchronously
 
@@ -233,6 +245,31 @@ LS-8433: "Switch to Pitchers view" asserted the first `Add <player>` free-agent 
 
 **Right fix:** assert a signal that is synchronous and unique to the state under test — here the pitcher-only **WHIP** column header, which the Pitchers view renders on toggle and the Hitters view never renders. No timeout bump, no skip; row-level claimability stayed covered by the next phase's real waiver claim.
 
+### 4.6 Substring operation routing sends the wrong payload to the wrong query
+
+Route handlers commonly branch on `postData.includes('someoperation')`. Because operation names nest — `GetDraft` is a substring of `GetDraftPicks`, `GetDraftTeamOrder`, `GetDraftPlayerStats` and six more — a broad branch placed **before** a specific one in the same `else if` chain makes the specific branch unreachable, and answers every nested operation with the broad branch's payload.
+
+The failure mode is the quiet one from [§4.2](#42-the-baseline-answers-permissively): the query **resolves** with wrong-shaped data instead of erroring, so the UI renders an empty or incorrect state and the failure surfaces somewhere unrelated — or not at all.
+
+The review bot flagged this HIGH on PR #7097; LS-9413 fixed it in `waiver-claims.spec.ts` (~17 branches) and the class was never burned down. A suite-wide audit found **601 substring-routing sites against 104 using the correct exact-match pattern**, with **121 sites across 31 files** testing a substring that matches more than one real operation (`'getleague'` matches 21 real operations; `'league'` matches 52).
+
+```ts
+// ❌ Bad — 'getdraftpicks'.includes('getdraft') is true, so the branch below is dead code
+} else if (postData.includes('getdraft')) {
+  /* answers GetDraftPicks, GetDraftTeamOrder, GetDraftPlayerStats, … with the draft object */
+} else if (postData.includes('getdraftpicks')) {
+  /* UNREACHABLE */
+}
+
+// ✅ Good — exact match on the parsed operation name (the LS-9413 pattern, used in shared-mocks.ts)
+const op = extractOperationName(route).toLowerCase();
+if (op === 'getdraftpicks') { … }
+```
+
+**Right fix:** exact equality on `extractOperationName(route)`. If a chain must stay substring-based as an interim, order every specific branch before the broad one and guard the broad branch explicitly — `on-this-day.spec.ts:116` does this correctly with `includes('getonthisday') && !includes('events')`.
+
+Live instance: **LS-9792** (`full-season-ui.spec.ts:690`). Class burn-down: **LS-9794**.
+
 ---
 
 ## 5. Identity, auth and sessions
@@ -247,7 +284,16 @@ The fix has been known since March and is written **in the helper's own docstrin
 
 It recurred twelve times because **every ticket migrated only the phase that happened to fail that night.** LS-9486 (2026-08-23) migrated waiver-processing Phase 9 — Phases 2, 5 and 6 of the same file had been migrated by three earlier tickets in the chain.
 
-**12 call sites across 9 integration specs remain.** Burn-down: **LS-9790**. If you are in one of those files for any reason, migrate the call site while you're there.
+**Four call sites across two integration specs remain** — and they are not four of the same thing. Burn-down: **LS-9790**. If you are in one of these files for any reason, deal with the site while you're there:
+
+| Site                                               | Shape                                                       | Verdict                                                                          |
+| -------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `full-season-ui.integration.spec.ts:919`           | swaps identity **and** navigates to a protected route       | **Migrate** to `managerPage2` — this is the shape the docstring warns about      |
+| `full-season-ui.integration.spec.ts:937`           | restore-to-commissioner, but passes a URL so it navigates   | **Judgement call** — migrate, or drop the URL and navigate separately            |
+| `league-scoring-editor-ui.integration.spec.ts:327` | swaps identity **and** navigates to a protected route       | **Migrate** to `managerPage1`                                                    |
+| `league-scoring-editor-ui.integration.spec.ts:344` | `switchUser(page, commissionerJwt)` — no URL, no navigation | **Keep** — the docstring's sanctioned case. Add the inline justification comment |
+
+> This count was published as "12 call sites across 9 integration specs" in the first cut of this document (LS-9789) and corrected in LS-9796. The original grep excluded `export async function` and JSDoc `*` lines but not `//` comments, and 36 of the 43 `switchUser` mentions under `apps/web-e2e/src` are comments — mostly notes recording that a phase was _already_ migrated. The `grep -rln` that produced "9 files" counted those comment-only files. **The count of tickets in the chain (12) is separate and was re-verified as correct.** The lesson generalises: a grep over a codebase that documents its own history in comments will over-count the history as if it were the present. Filter comments, then read the survivors.
 
 > **Scope note for reviewers.** `switchUser` lives in `apps/web-e2e/src/integration/fixtures/ui.ts` — Playwright fixture code that exists only to drive the live-backend integration suite. It is not imported by `apps/web`, `apps/app` or any lambda, and ships in no application bundle. The race is a **test-reliability** defect (an integration phase lands on the sign-in page and the phase fails), not an application authentication weakness: the `AUTH_LOGOUT`-on-refresh behaviour it collides with is the product working correctly, and no user-facing auth path calls this helper. It is listed here because it is the most-repeated root cause in the fix history, not because it is exploitable.
 
@@ -380,7 +426,7 @@ What separates the fixes that held from the ones that came back.
 
 | Chain                       | Tickets | What finally ended it                                                                    |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------- |
-| `switchUser` JWT race       | 12      | Nothing yet — 12 call sites remain (LS-9790)                                             |
+| `switchUser` JWT race       | 12      | Nothing yet — but only 4 call sites remain, 1 of them legitimate (LS-9790)               |
 | "URL stuck on /league/join" | 6       | LS-4447 moved the whole orchestration into `joinLeagueAsManager()`                       |
 | `waitForSeasonActive`       | 10      | LS-4344 migrated **every** caller to the backend-poll path after LS-4321 stopped halfway |
 | `GetAwardVotingPeriod`      | 5       | One baseline entry in `shared-mocks.ts`                                                  |
@@ -404,9 +450,18 @@ Done right: LS-9718 audited every `mockLeague({...})` call site, not just the re
 
 ## Provenance and maintenance
 
-Built from all 412 E2E fix commits merged 2026-02 → 2026-08 (LS-9789), extending the Jul–Aug-only evaluation in LS-9788. Counts in "Where the failures actually are" come from subject-line classification and are indicative, not exact; the per-entry claims each cite a specific commit or ticket and are exact. Suite-debt figures were censused on `main` @ `ae09e9409` — re-census before quoting them:
+Built from all 412 E2E fix commits merged 2026-02 → 2026-08 (LS-9789), extending the Jul–Aug-only evaluation in LS-9788, and corrected in LS-9796 after a full-suite review re-derived the figures. Counts in "Where the failures actually are" come from subject-line classification and are indicative, not exact; the per-entry claims each cite a specific commit or ticket and are exact.
+
+**Every census command here filters comment lines.** The `switchUser` count in the first cut of this document did not, and over-reported by 3× — this suite documents its own history in comments, so an unfiltered grep counts the past as the present:
 
 ```bash
-grep -rn "switchUser(" apps/web-e2e/src/integration/tests --include=*.ts | wc -l
-grep -rn "force: true" apps/web-e2e/src --include=*.ts | wc -l
+# the filter is the important part, not the pattern
+nocomment() { grep -vE ':[0-9]+: *(\*|//|/\*)'; }
+
+grep -rn "switchUser(" apps/web-e2e/src --include=*.ts | nocomment \
+  | grep -v 'export async function' | grep -v ':import'   # -> 4
+grep -rn "force: true"  apps/web-e2e/src --include=*.ts | nocomment | wc -l   # -> 38
+grep -rn "networkidle"  apps/web-e2e/src --include=*.ts | nocomment | wc -l   # -> 283
 ```
+
+Suite-debt figures were censused on `main` @ `04af1b463`. Re-census before quoting them, and **read the survivors before reporting a number** — of the pattern matches this document's own audit produced, five whole classes were rejected on inspection (correct LIFO route layering, a correctly-placed WebSocket listener, safe `expect.poll` bodies, conditional capability skips, and a guarded broad match branch). A grep hit is a candidate, not a finding.
