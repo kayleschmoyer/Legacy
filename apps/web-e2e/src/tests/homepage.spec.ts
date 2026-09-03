@@ -92,10 +92,10 @@ test.describe('Homepage @smoke', () => {
   });
 
   test('features section is present', async ({ page }) => {
-    // The homepage includes content sections: sport picker and/or history feed
-    await expect(
-      page.getByText(/choose your sport|on this day/i).first(),
-    ).toBeVisible();
+    // The dashboard renders the On This Day history feed; its header Text is
+    // matched exactly so the assertion cannot resolve a longer string that
+    // merely contains the phrase (e.g. the feed's own entry copy).
+    await expect(page.getByText('On This Day', { exact: true })).toBeVisible();
   });
 
   test('page is accessible with skip navigation link', async ({ page }) => {

@@ -122,7 +122,9 @@ test.describe('Join Football League CTA — hub empty state @critical', () => {
   test('Join League CTA is visible in the empty-state layout', async ({
     page,
   }) => {
-    await expect(page.getByText('Join League').first()).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /join a football league/i }),
+    ).toBeVisible();
   });
 
   test('clicking Join League CTA in empty state navigates to /football/league/join', async ({

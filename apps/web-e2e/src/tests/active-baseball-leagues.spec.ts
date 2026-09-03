@@ -135,9 +135,7 @@ test.describe('Active Baseball Leagues List (LS-5332) @regression', () => {
     await search.pressSequentially('Sluggers');
 
     const leaguesGrid = page.getByTestId('leagues-grid');
-    await expect(
-      leaguesGrid.getByText('Active Sluggers').first(),
-    ).toBeVisible();
+    await expect(leaguesGrid.getByText('Active Sluggers')).toBeVisible();
     await expect(leaguesGrid.getByText('Pre-Draft Warriors')).not.toBeVisible();
     await expect(leaguesGrid.getByText('Mid-Draft Rockets')).not.toBeVisible();
   });

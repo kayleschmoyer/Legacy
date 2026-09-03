@@ -150,7 +150,7 @@ test.describe('Heading hierarchy — /help @regression', () => {
 test.describe('Heading hierarchy — /baseball/league/1/overview @regression', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/baseball/league/1/overview');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
     await waitForPageContent(page);
     // waitForPageContent is satisfied by the loading spinner inside #main-content.
     // For data-driven pages, we must also wait for the league title h1 to render

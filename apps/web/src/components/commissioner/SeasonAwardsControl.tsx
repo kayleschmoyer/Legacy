@@ -590,6 +590,7 @@ export function SeasonAwardsControl({
 
   return (
     <Card
+      data-testid="season-awards-panel"
       backgroundColor="$surfacePanel"
       borderColor="$surfacePanelBorder"
       padding="$5"

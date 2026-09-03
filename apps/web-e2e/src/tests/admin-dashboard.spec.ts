@@ -194,7 +194,13 @@ adminTest.describe('Admin Dashboard – users section @regression', () => {
   adminTest('shows Total Users stat with the user count', async ({ page }) => {
     // Redesigned /admin shows a "Total Users" StatCard fed by GetUsersCount.
     await expect(page.getByText('Total Users')).toBeVisible();
-    await expect(page.getByText('3', { exact: true }).first()).toBeVisible();
+    // Scoped to the Total Users stat card so the count is unambiguous —
+    // a bare exact "3" can match unrelated numerics elsewhere on /admin.
+    await expect(
+      page
+        .getByTestId('admin-stat-total-users')
+        .getByText('3', { exact: true }),
+    ).toBeVisible();
   });
 
   adminTest('shows recent-signup email addresses', async ({ page }) => {

@@ -131,11 +131,15 @@ interface StatCardProps {
   label: string;
   value: string;
   accent?: string;
+  /** Addresses the card (label + value together) from E2E specs, so a bare
+   *  numeric value never has to be matched page-wide (LS-9676). */
+  testId?: string;
 }
 
-function StatCard({ label, value, accent }: StatCardProps) {
+function StatCard({ label, value, accent, testId }: StatCardProps) {
   return (
     <YStack
+      data-testid={testId}
       gap={4}
       padding={14}
       borderRadius={8}
@@ -964,6 +968,7 @@ export function AdminPage(): React.JSX.Element | null {
         <YStack gap={12} marginBottom={24}>
           <XStack gap={10} flexWrap="wrap">
             <StatCard
+              testId="admin-stat-total-users"
               label="Total Users"
               value={totalUsers > 0 ? String(totalUsers) : '—'}
             />

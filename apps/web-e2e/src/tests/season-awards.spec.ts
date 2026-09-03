@@ -361,9 +361,13 @@ test.describe('Season Awards — accordion panel @regression', () => {
 
     await expandSeasonAwards(page);
 
-    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText
+    // Tamagui H4 inside Card renders as <p>, not <h4> — use getByText,
+    // scoped to the panel so it cannot resolve the accordion toggle button
+    // (which carries the same exact label).
     await expect(
-      page.getByText('Season Awards', { exact: true }).first(),
+      page
+        .getByTestId('season-awards-panel')
+        .getByText('Season Awards', { exact: true }),
     ).toBeVisible();
   });
 });

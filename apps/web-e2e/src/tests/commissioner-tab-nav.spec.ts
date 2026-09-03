@@ -430,10 +430,10 @@ test.describe('Commissioner Tab — non-commissioner access @regression', () => 
     await page.goto('/baseball/league/1/overview');
     await page.waitForLoadState('load');
 
-    // Wait for tabs to render
-    await expect(
-      page.getByText('Overview', { exact: false }).first(),
-    ).toBeVisible();
+    // Wait for tabs to render — addressed by role + accessible name so the
+    // match is the Overview tab itself, not any "Overview" copy in the page
+    // chrome that a substring text match would also hit.
+    await expect(page.getByRole('tab', { name: /overview/i })).toBeVisible();
 
     // V2: the Commissioner tab is filtered out of the DOM entirely for non-commissioners
     // (TabBar uses TABS.filter(...commishOnly) — it's never rendered, not just hidden)

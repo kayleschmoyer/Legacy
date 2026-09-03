@@ -194,8 +194,12 @@ adminTest.describe(
           await page.goto('/admin');
           await page.waitForLoadState('load');
 
+          // Scoped to the admin nav hub so the match is the "Users" nav card
+          // and not any other exact "Users" string elsewhere on the page.
           await expect(
-            page.getByText('Users', { exact: true }).first(),
+            page
+              .getByRole('navigation', { name: 'Admin navigation' })
+              .getByText('Users', { exact: true }),
           ).toBeVisible();
         },
       );

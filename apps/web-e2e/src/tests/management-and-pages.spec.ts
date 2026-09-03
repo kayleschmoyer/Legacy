@@ -274,7 +274,7 @@ test.describe('Player Stats Page — static elements @smoke', () => {
 
   test('shows the MLB Player Statistics heading', async ({ page }) => {
     // Title is rendered as a styled <Text> (not a semantic heading element)
-    await expect(page.getByText(/player statistics/i).first()).toBeVisible();
+    await expect(page.getByText(/player statistics/i)).toBeVisible();
   });
 
   test('shows the player search input', async ({ page, isMobile }) => {

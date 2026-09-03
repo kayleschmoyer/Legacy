@@ -54,8 +54,10 @@ test.describe('Preferences page – theme section renders @smoke', () => {
   });
 
   test('Theme label is visible', async ({ page }) => {
-    // getByText is substring-based, so use .first() to pick the label paragraph
-    await expect(page.getByText('Theme').first()).toBeVisible({
+    // getByText is substring-based: a bare 'Theme' also matches the section
+    // meta line ("Theme · Animations"), which precedes the label in DOM
+    // order. exact:true resolves the label paragraph alone.
+    await expect(page.getByText('Theme', { exact: true })).toBeVisible({
       timeout: 15000,
     });
   });

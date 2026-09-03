@@ -532,10 +532,14 @@ test.describe('Commissioner Announcements — commissioner view @regression', ()
     await expect(
       page.getByText(announcement.sender.username, { exact: true }),
     ).toBeVisible();
-    // "Commissioner" badge (scoped to main so the nav league-switcher
-    // "Current league: ..." button is not matched)
+    // "Commissioner" badge, scoped to the announcement row itself. Scoping to
+    // `main` is not enough: three exact "Commissioner" spans live there (the
+    // league header chip and the "League sections" nav both carry one), and
+    // the DOM-first of those is not this announcement's badge.
     await expect(
-      page.getByRole('main').getByText('Commissioner', { exact: true }).first(),
+      page
+        .getByTestId(`announcement-row-${announcement.id}`)
+        .getByText('Commissioner', { exact: true }),
     ).toBeVisible();
   });
 });

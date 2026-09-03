@@ -69,7 +69,7 @@ test.describe('Sport-aware player list — football context @regression', () => 
   test('shows NFL Player Statistics heading in football context', async ({
     page,
   }) => {
-    await expect(page.getByText('NFL Player Statistics').first()).toBeVisible();
+    await expect(page.getByText('NFL Player Statistics')).toBeVisible();
   });
 
   test('position filter shows core football positions (QB, RB, WR, TE)', async ({

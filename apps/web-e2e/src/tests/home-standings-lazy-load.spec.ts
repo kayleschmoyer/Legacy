@@ -126,7 +126,10 @@ test.describe('Home standings lazy-load @critical', () => {
     // The defect this ticket exists to avoid: a 6-2 league reading "0-0" and
     // then correcting itself. The card shows an em dash in the meantime.
     await expect(page.getByText('0-0')).toHaveCount(0);
-    await expect(heroCard.getByText('—').first()).toBeVisible();
+    // exact:true so this resolves the standing stat's em-dash placeholder
+    // alone — a substring match also hits every card string containing an
+    // em dash (the era descriptor, the stub label).
+    await expect(heroCard.getByText('—', { exact: true })).toBeVisible();
 
     // ...and the real values land once the throttled query resolves. Scoped to
     // the card because the header's aggregate renders "6-2" too — asserting

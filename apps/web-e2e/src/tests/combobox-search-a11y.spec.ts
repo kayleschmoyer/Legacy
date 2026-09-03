@@ -182,8 +182,11 @@ test.describe('Combobox/search accessibility @regression', () => {
     await searchInput.focus();
     await searchInput.type('a');
 
-    // Allow any async suggestion rendering to settle.
-    await page.waitForTimeout(300);
+    // The controlled input committing the typed value is the render gate the
+    // old fixed sleep stood in for. A single character is below the search
+    // field's 2-char threshold, so no SearchPlayers request fires here and
+    // there is no network signal to await — the value landing is the signal.
+    await expect(searchInput).toHaveValue('a');
 
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('ArrowDown');
