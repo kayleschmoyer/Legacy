@@ -58,6 +58,7 @@ import { rebaseOntoMain } from './rebase-onto-main';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitish } from './resolve-commitish';
 import { resolveMainRepoPath } from './resolve-main-repo';
+import { runOnRef } from './run-on-ref';
 import {
   type BranchEntry,
   formatBranchList,
@@ -1733,6 +1734,39 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               `Process-level timeout in seconds (default ${WORKTREE_RUN_LONG_DEFAULT_TIMEOUT_MS / 1000}, ` +
               `max ${WORKTREE_RUN_LONG_MAX_TIMEOUT_MS / 1000}).`,
+          },
+        },
+        required: ['command'],
+      },
+    },
+    {
+      name: 'worktree_run_on_ref',
+      description:
+        'Run a command against a throwaway detached checkout of a ref (default origin/main), ' +
+        'auto-linking node_modules and auto-cleaning up. Use to check whether a failure is ' +
+        "pre-existing on the base branch, independent of this PR's diff. Not for ticket " +
+        'development — prefer worktree_run/worktree_attach for that.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          command: {
+            type: 'string',
+            description: 'Shell command to run against the ref checkout',
+          },
+          ref: {
+            type: 'string',
+            description:
+              'Ref to check out (branch/tag/SHA/remote ref). Default "origin/main".',
+          },
+          skipModulesLink: {
+            type: 'boolean',
+            description: 'Skip linking node_modules (default false).',
+          },
+          timeoutSeconds: {
+            type: 'number',
+            exclusiveMinimum: 0,
+            maximum: 300,
+            description: 'Command timeout in seconds (default 180, max 300).',
           },
         },
         required: ['command'],
@@ -6364,6 +6398,61 @@ const handleCallTool = async (
         JOB_SYNC_BUDGET_MS,
       );
       return formatWorktreeRunSnapshot(snapshot);
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_run_on_ref (LS-9636)
+    // -----------------------------------------------------------------------
+    case 'worktree_run_on_ref': {
+      const { command, ref, skipModulesLink, timeoutSeconds } = args as {
+        command: string;
+        ref?: string;
+        skipModulesLink?: boolean;
+        timeoutSeconds?: number;
+      };
+
+      return runOnRef(
+        { command, ref, skipModulesLink, timeoutSeconds },
+        {
+          runGit,
+          exec: (file, execArgs, opts) =>
+            execFileSync(file, execArgs, {
+              cwd: opts.cwd,
+              encoding: 'utf-8',
+              timeout: opts.timeout,
+              maxBuffer: 10 * 1024 * 1024,
+              windowsHide: true,
+            }),
+          ensureSufficientDepth: (cwd) =>
+            ensureSufficientDepth({ runGit }, cwd),
+          linkScriptPath: join(
+            MAIN_REPO,
+            'scripts',
+            'modules-pool',
+            'link.mjs',
+          ),
+          execPath: process.execPath,
+          resolveShell: () => {
+            const shell =
+              process.platform === 'win32' ? resolveWindowsShell() : '/bin/sh';
+            const isCmdShell =
+              process.platform === 'win32' &&
+              shell.toLowerCase().endsWith('cmd.exe');
+            return {
+              shell,
+              buildArgs: (cmd) =>
+                isCmdShell ? ['/d', '/s', '/c', cmd] : ['-c', cmd],
+            };
+          },
+          mainRepo: MAIN_REPO,
+          tmpWorktreePath: () =>
+            join(
+              tmpdir(),
+              `legacy-sports-ref-check-${Date.now()}-${randomUUID().slice(0, 8)}`,
+            ),
+          rmSync,
+        },
+      );
     }
 
     // -----------------------------------------------------------------------

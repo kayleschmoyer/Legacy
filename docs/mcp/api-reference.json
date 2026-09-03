@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 11,
-  "toolCount": 248,
+  "toolCount": 249,
   "servers": [
     {
       "dir": "worktree-server",
@@ -14,7 +14,7 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 60,
+      "toolCount": 61,
       "tools": [
         {
           "name": "auth_check_all",
@@ -1367,6 +1367,38 @@
             "timeoutSeconds": {
               "type": "number",
               "optional": true
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "worktree_run_on_ref",
+          "description": "Run a command against a throwaway detached checkout of a ref (default origin/main), auto-linking node_modules and auto-cleaning up. Use to check whether a failure is pre-existing on the base branch, independent of this PR's diff. Not for ticket development — prefer worktree_run/worktree_attach for that.",
+          "inputs": {
+            "command": {
+              "type": "string",
+              "optional": false,
+              "description": "Shell command to run against the ref checkout"
+            },
+            "ref": {
+              "type": "string",
+              "optional": true,
+              "description": "Ref to check out (branch/tag/SHA/remote ref). Default \"origin/main\"."
+            },
+            "skipModulesLink": {
+              "type": "boolean",
+              "optional": true,
+              "description": "Skip linking node_modules (default false)."
+            },
+            "timeoutSeconds": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "max 300"
+              ],
+              "description": "Command timeout in seconds (default 180, max 300)."
             }
           },
           "transports": [
