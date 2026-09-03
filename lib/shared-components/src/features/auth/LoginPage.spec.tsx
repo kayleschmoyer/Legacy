@@ -78,7 +78,9 @@ jest.mock('tamagui', () => {
     Card: View,
     YStack: View,
     XStack: View,
-    Text: ({ children }: Children) => <span>{children}</span>,
+    Text: ({ children, testID }: ViewProps) => (
+      <span data-testid={testID}>{children}</span>
+    ),
     Spinner: () => <span>spinner</span>,
     Button,
     Input,
@@ -309,5 +311,103 @@ describe('LoginPage error banner (LGN-027)', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+});
+
+describe('LoginPage fullBleed variant (LS-9433 — mobile sign-in redesign)', () => {
+  it('renders the brand block, sign-in label, and Google button', () => {
+    render(<LoginPage variant="fullBleed" onGoogleSignIn={jest.fn()} />);
+
+    expect(screen.getByTestId('login-title')).toHaveTextContent(
+      'LEGACY SPORTS',
+    );
+    expect(screen.getByText('Where history plays on.')).toBeTruthy();
+    expect(screen.getByText('SIGN IN TO CONTINUE')).toBeTruthy();
+    expect(screen.getByTestId('login-button')).toBeTruthy();
+  });
+
+  it('renders the legal text', () => {
+    render(<LoginPage variant="fullBleed" onGoogleSignIn={jest.fn()} />);
+
+    expect(
+      screen.getByText(
+        'By continuing, you agree to our Terms of Service and Privacy Policy.',
+      ),
+    ).toBeTruthy();
+  });
+
+  it('never renders the Discord button, even when onDiscordSignIn is passed', () => {
+    render(
+      <LoginPage
+        variant="fullBleed"
+        onGoogleSignIn={jest.fn()}
+        onDiscordSignIn={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByLabelText('Continue with Discord')).toBeNull();
+  });
+
+  it('renders the Apple button when onAppleSignIn is provided', () => {
+    render(
+      <LoginPage
+        variant="fullBleed"
+        onGoogleSignIn={jest.fn()}
+        onAppleSignIn={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('apple-login-button')).toBeTruthy();
+  });
+
+  it('does not render the Apple button when onAppleSignIn is omitted', () => {
+    render(<LoginPage variant="fullBleed" onGoogleSignIn={jest.fn()} />);
+
+    expect(screen.queryByTestId('apple-login-button')).toBeNull();
+  });
+
+  it('renders the email/password form when onEmailPasswordSignIn is provided', () => {
+    render(
+      <LoginPage
+        variant="fullBleed"
+        onGoogleSignIn={jest.fn()}
+        onEmailPasswordSignIn={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('login-email-input')).toBeTruthy();
+    expect(screen.getByTestId('login-password-input')).toBeTruthy();
+  });
+
+  it('renders the error banner', () => {
+    render(
+      <LoginPage
+        variant="fullBleed"
+        onGoogleSignIn={jest.fn()}
+        errorMessage="Sign-in failed."
+      />,
+    );
+
+    expect(screen.getByTestId('login-error')).toBeTruthy();
+  });
+
+  it('renders composed children (e.g. the mobile biometric button) below the sign-in buttons', () => {
+    render(
+      <LoginPage variant="fullBleed" onGoogleSignIn={jest.fn()}>
+        <button type="button" data-testid="biometric-login-button">
+          Sign in with Face ID / Fingerprint
+        </button>
+      </LoginPage>,
+    );
+
+    expect(screen.getByTestId('biometric-login-button')).toBeTruthy();
+  });
+
+  it('defaults to the card variant when no variant prop is passed', () => {
+    render(<LoginPage onGoogleSignIn={jest.fn()} />);
+
+    expect(screen.getByTestId('login-title')).toHaveTextContent(
+      'Step up to the plate',
+    );
   });
 });

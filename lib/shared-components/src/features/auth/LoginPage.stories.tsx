@@ -10,12 +10,13 @@ const meta: Meta<typeof LoginPage> = {
     docs: {
       description: {
         component:
-          'Shared auth card used by both web and mobile login screens. Accepts callbacks for Google and Discord sign-in and renders the presentational card UI. When onEmailPasswordSignIn is provided (web only), an email + password form renders above the OAuth buttons (LGN-017).',
+          'Shared auth screen. `variant="card"` (default) is the bounded card used on the web landing/sign-in page — accepts callbacks for Google, Discord, and email/password sign-in (LGN-017). `variant="fullBleed"` is the full-screen mobile sign-in surface ("2a — Lifted Abstract", LS-9433) — brand lockup matching BrandedSplash, no card, no Discord, legal text pinned to the bottom.',
       },
     },
   },
   tags: ['autodocs'],
   argTypes: {
+    variant: { control: 'radio', options: ['card', 'fullBleed'] },
     onGoogleSignIn: { action: 'google-sign-in' },
     onEmailPasswordSignIn: { action: 'email-password-sign-in' },
     onDiscordSignIn: { action: 'discord-sign-in' },
@@ -160,6 +161,49 @@ export const WithDismissibleError: Story = {
       description: {
         story:
           'Error banner with a dismiss (×) control. Passing onDismissError also enables an auto-dismiss timer that clears the banner after a few seconds.',
+      },
+    },
+  },
+};
+
+// ── fullBleed variant (LS-9433 — mobile sign-in redesign, "2a — Lifted Abstract") ──
+
+export const MobileFullBleed: Story = {
+  args: {
+    variant: 'fullBleed',
+    onGoogleSignIn: fn(),
+    style: { width: 390, height: 844 },
+  },
+  parameters: {
+    layout: 'fullscreen',
+    // The meta-level `argTypesRegex: '^on[A-Z].*'` actions binding would
+    // otherwise auto-inject a spy for every optional on* handler (including
+    // onEmailPasswordSignIn/onAppleSignIn), rendering elements login.tsx never
+    // passes. Disabled here so this story matches the real mobile screen.
+    actions: { disable: true },
+    docs: {
+      description: {
+        story:
+          'Mobile sign-in screen (apps/app login.tsx). Full-bleed brand lockup matching BrandedSplash, Google-only OAuth, legal text pinned to the bottom via a flex spacer. Rendered at the 390×844 design reference canvas.',
+      },
+    },
+  },
+};
+
+export const MobileFullBleedWithError: Story = {
+  args: {
+    variant: 'fullBleed',
+    onGoogleSignIn: fn(),
+    errorMessage: 'Sign-in failed. Please try again.',
+    onDismissError: fn(),
+    style: { width: 390, height: 844 },
+  },
+  parameters: {
+    layout: 'fullscreen',
+    actions: { disable: true },
+    docs: {
+      description: {
+        story: 'Mobile full-bleed variant with a dismissible error banner.',
       },
     },
   },

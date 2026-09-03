@@ -8,7 +8,6 @@ import { useAuthHandlers } from '../common/auth/AuthHooks';
 import { isAppleAuthAvailable } from '../common/auth/appleAuth';
 import { resolvePostLoginDestination } from '../common/auth/postLoginDestination';
 import { getLastVisitedLeague } from '../common/utilities/lastVisitedLeague';
-import { getMobileOAuthConfig } from '../common/auth/mobileOAuthConfig';
 import {
   type BiometricState,
   checkBiometricState,
@@ -24,7 +23,6 @@ const Login: React.FC = () => {
   const pathname = usePathname();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isAppleLoading, setIsAppleLoading] = useState(false);
-  const [isDiscordLoading, setIsDiscordLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | undefined>(
     undefined,
@@ -46,10 +44,6 @@ const Login: React.FC = () => {
     if (!isAuthenticated || !token) return;
     void storeJwtForBiometric(token);
   }, [isAuthenticated, token]);
-
-  // Discord login is gated on a configured client ID, mirroring the web app.
-  // The config is static at module load, so resolve availability once.
-  const discordAvailable = !!getMobileOAuthConfig().discordClientId;
 
   // Apple App Store guideline 4.8 requires "Sign in with Apple" wherever a
   // third-party social login is offered. The native framework is only present
@@ -117,17 +111,15 @@ const Login: React.FC = () => {
     router.replace('/');
   }, [router, pathname]);
 
-  const { googleLogin, appleLogin, discordLogin } = useAuthHandlers({
+  const { googleLogin, appleLogin } = useAuthHandlers({
     onFailure: (err) => {
       setIsGoogleLoading(false);
       setIsAppleLoading(false);
-      setIsDiscordLoading(false);
       setErrorMessage(err);
     },
     onSuccess: () => {
       setIsGoogleLoading(false);
       setIsAppleLoading(false);
-      setIsDiscordLoading(false);
       void redirectAfterLogin();
     },
   });
@@ -142,12 +134,6 @@ const Login: React.FC = () => {
     setErrorMessage(undefined);
     setIsAppleLoading(true);
     void appleLogin();
-  };
-
-  const handleDiscordSignIn = () => {
-    setErrorMessage(undefined);
-    setIsDiscordLoading(true);
-    void discordLogin();
   };
 
   const handleBiometricSignIn = useCallback(async () => {
@@ -196,57 +182,48 @@ const Login: React.FC = () => {
     biometricState.isEnrolled &&
     biometricState.hasStoredToken;
 
-  const isAnyLoading =
-    isGoogleLoading || isAppleLoading || isDiscordLoading || isBiometricLoading;
+  const isAnyLoading = isGoogleLoading || isAppleLoading || isBiometricLoading;
 
   return (
     // This OAuth-only screen has no text inputs, so it never raises a soft
     // keyboard — a KeyboardAvoidingView wrapper would be dead code. Per
     // LS-6656 the app is OAuth-only (no email/password parity to autofill),
     // so a plain layout container is used here.
-    <YStack
-      testID="login-screen"
-      flex={1}
-      justifyContent="center"
-      padding="$5"
-      backgroundColor="$background"
-      gap="$4"
-    >
+    <YStack testID="login-screen" flex={1}>
       <LoginPage
+        variant="fullBleed"
         onGoogleSignIn={handleGoogleSignIn}
         onAppleSignIn={appleAvailable ? handleAppleSignIn : undefined}
-        onDiscordSignIn={discordAvailable ? handleDiscordSignIn : undefined}
         isGoogleLoading={isGoogleLoading}
         isAppleLoading={isAppleLoading}
-        isDiscordLoading={isDiscordLoading}
         errorMessage={errorMessage}
-      />
-
-      {canUseBiometric ? (
-        <Button
-          testID="biometric-login-button"
-          height={52}
-          backgroundColor="$brandNavy"
-          borderColor="$accentMuted"
-          borderWidth={1}
-          borderRadius={12}
-          disabled={isAnyLoading}
-          opacity={isAnyLoading ? 0.7 : 1}
-          onPress={() => {
-            void handleBiometricSignIn();
-          }}
-          aria-label="Sign in with biometrics"
-          pressStyle={{ backgroundColor: '$brandNavyDark' }}
-        >
-          {isBiometricLoading ? (
-            <Spinner size="small" color="$brandGold" />
-          ) : (
-            <Text color="$brandGold" fontWeight="700" fontSize={14}>
-              Sign in with Face ID / Fingerprint
-            </Text>
-          )}
-        </Button>
-      ) : null}
+      >
+        {canUseBiometric ? (
+          <Button
+            testID="biometric-login-button"
+            height={52}
+            backgroundColor="$brandNavy"
+            borderColor="$accentMuted"
+            borderWidth={1}
+            borderRadius={12}
+            disabled={isAnyLoading}
+            opacity={isAnyLoading ? 0.7 : 1}
+            onPress={() => {
+              void handleBiometricSignIn();
+            }}
+            aria-label="Sign in with biometrics"
+            pressStyle={{ backgroundColor: '$brandNavyDark' }}
+          >
+            {isBiometricLoading ? (
+              <Spinner size="small" color="$brandGold" />
+            ) : (
+              <Text color="$brandGold" fontWeight="700" fontSize={14}>
+                Sign in with Face ID / Fingerprint
+              </Text>
+            )}
+          </Button>
+        ) : null}
+      </LoginPage>
     </YStack>
   );
 };
