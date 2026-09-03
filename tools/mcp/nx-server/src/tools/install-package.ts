@@ -146,7 +146,7 @@ export async function installPackage(
             error: 'SYMLINK_DETECTED',
             message:
               'node_modules is a symlink into a shared, immutable content-addressable pool slot. Running pnpm add here would mutate a slot other worktrees may be running. ' +
-              'To add a package: remove the symlink first (rm -rf node_modules in Git Bash), run `pnpm add -w <pkg>` (this rewrites the lockfile), then `make install` (or `node scripts/modules-pool/link.mjs`) to materialise and link the new slot.',
+              'To add a package: remove the symlink first (`rm node_modules` in Git Bash — no -r, and NEVER a trailing slash, which deletes through the link into the shared slot), run `pnpm add -w <pkg>` (this rewrites the lockfile), then `make install` (or `node scripts/modules-pool/link.mjs`) to materialise and link the new slot. The risk guard allows `pnpm add` once the symlink is gone, so no `# risk-ok` marker is needed.',
             cwd,
           }),
         },

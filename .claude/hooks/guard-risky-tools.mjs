@@ -121,11 +121,34 @@ function isLinkedWorktree(root) {
 }
 
 /**
+ * pnpm subcommands that rewrite `package.json` + `pnpm-lock.yaml`. Because the
+ * pool slot hash is sha256(pnpm-lock.yaml) (+ the pinned `packageManager`),
+ * these are exactly the commands that mint a NEW slot rather than mutating the
+ * current one — which is why they are the sanctioned way to change a
+ * worktree's dependency set once it has detached from the pool.
+ */
+const PNPM_MANIFEST_WRITE = /(^|[;&|\s])pnpm\s+(add|remove|update)\b/;
+
+/**
+ * `pnpm install --lockfile-only` resolves and rewrites `pnpm-lock.yaml` without
+ * materialising a `node_modules` tree at all. Same slot-minting effect as the
+ * verbs above, so it belongs on the same side of the gate — it is how you
+ * refresh a `pnpmfileChecksum` after editing `.pnpmfile.cjs`.
+ */
+const PNPM_LOCKFILE_ONLY =
+  /(^|[;&|\s])pnpm\s+(install|i)\b[^\n]*\s--lockfile-only\b/;
+
+/**
  * `pnpm-install-symlink` only applies where its rationale does: pnpm writing
  * through a worktree symlink rewrites the shared pool slot every other worktree
  * on the machine is linked to. In a main-repo or Claude Code Remote
  * direct-branch checkout node_modules is a real directory, so installing there
  * is exactly the right move — blocking it was a false positive (LS-8731).
+ *
+ * The mirror-image false positive is the DETACHED state (LS-9828): step 1 of
+ * install-packages.md removes the symlink precisely so pnpm can write a private
+ * tree, and step 2 is `pnpm add -w <pkg>`. Firing there blocked our own
+ * documented procedure at the step that makes it work.
  */
 function pnpmInstallGate() {
   const root = projectDir(input);
@@ -137,16 +160,27 @@ function pnpmInstallGate() {
       : { fire: false };
   } catch (err) {
     if (err?.code !== 'ENOENT') return { fire: false }; // fail open
-    // No node_modules yet. In a worktree the pool link is the intended
-    // bootstrap; in the main repo a real install is the legitimate one.
-    return isLinkedWorktree(root)
-      ? {
-          fire: true,
-          message:
-            'This worktree has no node_modules yet — `pnpm install` would build it a private tree ' +
-            'instead of linking the shared pool. Run `node scripts/modules-pool/link.mjs` first.',
-        }
-      : { fire: false };
+    // No node_modules. In the main repo a real install is the legitimate one.
+    if (!isLinkedWorktree(root)) return { fire: false };
+    // A linked worktree with no node_modules is the detached state. Nothing
+    // here can reach the shared slot — the symlink is already gone — and a
+    // lockfile-rewriting command is the documented next step, so let it run.
+    if (
+      PNPM_MANIFEST_WRITE.test(scannable) ||
+      PNPM_LOCKFILE_ONLY.test(scannable)
+    ) {
+      return { fire: false };
+    }
+    // Bare `pnpm install` is different: the dependency set is not changing, so
+    // there is a slot for this lockfile already and linking beats reinstalling.
+    return {
+      fire: true,
+      message:
+        'This worktree has no node_modules yet — `pnpm install` would build it a private tree ' +
+        'instead of linking the shared pool. Run `node scripts/modules-pool/link.mjs` first. ' +
+        '(Adding a package is different: `pnpm add -w <pkg>` here is the sanctioned step 2 of ' +
+        '.agents/skills/repo-tooling/references/install-packages.md and is allowed.)',
+    };
   }
 }
 

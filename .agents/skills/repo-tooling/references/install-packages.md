@@ -27,11 +27,21 @@ Each worktree's `node_modules` is a directory symlink into an **immutable** cont
    powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"
    ```
 
-2. **Add the package** to the root `package.json` (always `-w`) — this rewrites `pnpm-lock.yaml`:
+   From the Bash tool / Git Bash, remove the link itself — **never with a trailing slash**:
+
+   ```bash
+   rm node_modules
+   ```
+
+   > `rm -rf node_modules/` with a trailing slash resolves _through_ the junction and deletes the shared pool slot's contents out from under every other worktree linked to it. That is the single most common way slots end up quarantined as `<hash>.corrupt-<ts>`. No `-r` and no trailing slash: the link is not a directory.
+
+2. **Add the package** to the root `package.json` (always `-w`) — this rewrites `pnpm-lock.yaml`, which is what mints a new slot hash:
 
    ```powershell
    pnpm add -w <package-name>
    ```
+
+   This step is deliberately allowed by the risk guard once step 1 has run — the symlink is gone, so pnpm writes a private tree that cannot reach any shared slot (LS-9828). No `# risk-ok` marker is needed. A bare `pnpm install` here **is** still blocked, correctly: use step 3 instead.
 
 3. **Re-link to the new pool slot** — `make install` (or `node scripts/modules-pool/link.mjs`) hashes the updated lockfile, materialises the new slot, and points `node_modules` at it:
 
@@ -40,6 +50,8 @@ Each worktree's `node_modules` is a directory symlink into an **immutable** cont
    ```
 
 > Adding a package in a worktree never touches the main repo or any other worktree: each consumer links to the slot matching _its own_ lockfile, and slots are immutable. There is no longer a shared `node_modules` to corrupt — the old "never install in main while worktrees are symlinked" hazard is gone.
+
+> **Why editing `package.json` alone is not enough.** The slot hash is `sha256(pnpm-lock.yaml)` plus the pinned `packageManager` string — nothing else in `package.json` feeds it ([`link.mjs`](../../../../scripts/modules-pool/link.mjs) `computeHash`). A manifest edit declares intent; the lockfile is the resolved graph the slot was built from. Until the lockfile is regenerated, `link.mjs` computes the same hash, reports a cache hit, and links you straight back to the tree you were trying to change.
 
 ### Recovering a broken pool slot from a worktree
 
@@ -130,12 +142,14 @@ If it prints a `.d.ts` path, types are bundled and you do **not** need `@types/<
 After installing, always verify the workspace is healthy:
 
 ```powershell
-# Quick check -- ensure lockfile is in sync
-pnpm install
+# Quick check -- ensure node_modules matches the lockfile
+node scripts/modules-pool/link.mjs
 
 # Full validation
 pnpm exec nx affected -t typecheck
 ```
+
+> **In a worktree, `node scripts/modules-pool/link.mjs` replaces every bare `pnpm install` below.** It hashes the lockfile, links an existing healthy slot in milliseconds, and materialises a fresh one only when the lockfile has no slot yet — which is exactly what "make node_modules match the lockfile" means here. Running `pnpm install` through a live symlink instead rewrites a slot other worktrees are executing from, and the risk guard blocks it.
 
 ## Dependency Categories
 
@@ -157,16 +171,24 @@ pnpm add -w <package-name>
 
 ### Lockfile Out of Sync
 
+If `node_modules` simply doesn't match the lockfile, relink — the slot for that lockfile already exists or will be built:
+
 ```powershell
-pnpm install
+node scripts/modules-pool/link.mjs
+```
+
+If the **lockfile itself** is stale against `package.json` (CI's `lockfile-check`, or a `.pnpmfile.cjs` edit invalidating `pnpmfileChecksum`), detach first, rewrite only the lockfile, then relink:
+
+```bash
+rm node_modules && pnpm install --lockfile-only && node scripts/modules-pool/link.mjs
 ```
 
 ### Module Not Found After Install
 
 ```powershell
-# Reset Nx cache (re-links the pool symlink afterward) and re-verify
+# Reset Nx cache, then re-link the pool symlink and re-verify
 make clean-cache
-pnpm install
+node scripts/modules-pool/link.mjs
 pnpm exec nx affected -t typecheck
 ```
 
@@ -247,44 +269,55 @@ This causes **silent runtime crashes** when a library initialises global state i
 ### When Upgrading a Shared Package (Checklist)
 
 ```powershell
+# 0. Detach from the pool slot first (worktrees only) -- see "Installing in a Worktree"
+powershell -NoProfile -Command "Remove-Item -Path node_modules -Force"
+
 # 1. Update root version
 pnpm add -w <package>@<new-version>
 
 # 2. Check/update lib package.json files
 Select-String -Path lib/*/package.json -Pattern '"<package>"'
 
-# 3. Regenerate lockfile
-pnpm install
+# 3. Regenerate lockfile after any manual package.json edit in step 2
+pnpm install --lockfile-only
 
-# 4. Verify no nested copies
+# 4. Materialise + link the new slot
+node scripts/modules-pool/link.mjs
+
+# 5. Verify no nested copies
 Get-ChildItem lib/*/node_modules -ErrorAction SilentlyContinue
 
-# 5. Typecheck + build
+# 6. Typecheck + build
 pnpm exec nx affected -t typecheck
 pnpm exec nx affected -t build
 ```
 
 ## Lockfile Management
 
+> Every command in this section rewrites `pnpm-lock.yaml`, which changes the pool slot hash. **In a worktree, detach first** (`rm node_modules`, no trailing slash) and finish with `node scripts/modules-pool/link.mjs` to materialise and link the new slot. `--lockfile-only` keeps these steps from building a tree that step 3 would only throw away.
+
 ### Sync Lockfile After package.json Changes
 
 ```powershell
-pnpm install   # Updates pnpm-lock.yaml to match package.json
+pnpm install --lockfile-only   # Updates pnpm-lock.yaml to match package.json
+node scripts/modules-pool/link.mjs
 ```
 
 ### Resolve Lockfile Merge Conflicts
 
 ```powershell
 git checkout --theirs pnpm-lock.yaml   # Accept one side
-pnpm install                            # Regenerate from merged package.json
+pnpm install --lockfile-only           # Regenerate from merged package.json
 git add pnpm-lock.yaml
+node scripts/modules-pool/link.mjs
 ```
 
 ### Recreate Lockfile from Scratch
 
 ```powershell
 Remove-Item pnpm-lock.yaml
-pnpm install
+pnpm install --lockfile-only
+node scripts/modules-pool/link.mjs
 ```
 
 ### Check for Outdated Packages

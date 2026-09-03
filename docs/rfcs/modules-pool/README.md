@@ -176,7 +176,7 @@ Immutability is a convention, not a filesystem guarantee: a `pnpm install` run i
 
    If the quarantine rename fails (Windows: a process holds files in the slot open), stop stale processes (`make kill-stale`) and re-run.
 
-> **Editing `.pnpmfile.cjs`?** pnpm records a `pnpmfileChecksum` in `pnpm-lock.yaml`; any edit to the hook file invalidates it and every `--frozen-lockfile` install (all of CI) fails with "lockfile out of sync". Refresh it in the same commit: detach the pool symlink (`cmd /c "rmdir node_modules"`), run `pnpm install --lockfile-only` (writes only the lockfile; the guards deliberately allow this flag), re-link with `node scripts/modules-pool/link.mjs`, and commit the one-line lockfile change.
+> **Editing `.pnpmfile.cjs`?** pnpm records a `pnpmfileChecksum` in `pnpm-lock.yaml`; any edit to the hook file invalidates it and every `--frozen-lockfile` install (all of CI) fails with "lockfile out of sync". Refresh it in the same commit: detach the pool symlink (`cmd /c "rmdir node_modules"`), run `pnpm install --lockfile-only` (writes only the lockfile, never a tree), re-link with `node scripts/modules-pool/link.mjs`, and commit the one-line lockfile change. The detach is not optional: the risk guard keys on whether `node_modules` is a symlink and never inspects flags, so `--lockfile-only` is blocked like any other `pnpm install` while the link is live, and allowed once it is gone (LS-9828).
 
 ## 5. Open questions
 
