@@ -124,7 +124,12 @@ describe('rerun', () => {
       await rerun({ runId: 123, failedOnly: false });
       await rerun({ runId: 123, jobId: 987 });
 
-      expect(mockGithubGet).not.toHaveBeenCalled();
+      // githubGet is still called once per rerun for the stale-merge-ref
+      // check (LS-9638), but never with the cancelled-jobs lookup's args.
+      expect(mockGithubGet).not.toHaveBeenCalledWith(
+        '/actions/runs/123/jobs',
+        expect.anything(),
+      );
     });
   });
 
@@ -203,7 +208,12 @@ describe('rerun', () => {
     it('prefers jobId over jobName when both are given', async () => {
       await rerun({ runId: 123, jobId: 987, jobName: 'ignored' });
 
-      expect(mockGithubGet).not.toHaveBeenCalled();
+      // jobName resolution is skipped, but the stale-merge-ref check
+      // (LS-9638) still issues its own githubGet call after the rerun.
+      expect(mockGithubGet).not.toHaveBeenCalledWith(
+        '/actions/runs/123/jobs',
+        expect.anything(),
+      );
       expect(mockPostWithRetry).toHaveBeenCalledWith('/actions/jobs/987/rerun');
     });
 
@@ -222,7 +232,8 @@ describe('rerun', () => {
 
       const result = await rerun({ runId: 123, jobName: 'summarize' });
 
-      expect(mockGithubGet).toHaveBeenCalledTimes(2);
+      // A 3rd call follows for the stale-merge-ref check (LS-9638).
+      expect(mockGithubGet).toHaveBeenCalledTimes(3);
       expect(mockGithubGet).toHaveBeenNthCalledWith(
         1,
         '/actions/runs/123/jobs',
@@ -243,6 +254,47 @@ describe('rerun', () => {
       );
       expect(mockPostWithRetry).toHaveBeenCalledWith('/actions/jobs/101/rerun');
       expect(result.isError).toBeUndefined();
+    });
+  });
+
+  describe('stale merge-ref warning (LS-9638)', () => {
+    it('includes a warning when the run replays a stale merge-ref', async () => {
+      mockGithubGet
+        .mockResolvedValueOnce({ jobs: [] }) // hasCancelledDependencyJobs
+        .mockResolvedValueOnce({
+          head_sha: 'abc123def456abc123def456abc123def456abc',
+          event: 'pull_request',
+          pull_requests: [{ number: 7300 }],
+        }) // checkStaleMergeRef: run info
+        .mockResolvedValueOnce({
+          merge_commit_sha: 'fedcba987654fedcba987654fedcba987654fed',
+          state: 'open',
+        }); // checkStaleMergeRef: PR info
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      const payload = JSON.parse(result.content[0].text) as {
+        warning?: string;
+      };
+      expect(payload.warning).toMatch(/refs\/pull\/7300\/merge/);
+    });
+
+    it('omits the warning field when the merge-ref is current', async () => {
+      mockGithubGet
+        .mockResolvedValueOnce({ jobs: [] })
+        .mockResolvedValueOnce({
+          head_sha: 'abc123',
+          event: 'pull_request',
+          pull_requests: [{ number: 7300 }],
+        })
+        .mockResolvedValueOnce({ merge_commit_sha: 'abc123', state: 'open' });
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      const payload = JSON.parse(result.content[0].text) as {
+        warning?: string;
+      };
+      expect(payload.warning).toBeUndefined();
     });
   });
 

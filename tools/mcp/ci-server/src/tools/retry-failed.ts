@@ -1,7 +1,8 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { githubGet, postWithRetryOnAlreadyRunning } from '../github-api.js';
 import { fetchRunLogsRing } from '../logs.js';
+import { checkStaleMergeRef } from '../merge-ref-staleness.js';
 import type { ToolResult } from '../types.js';
-import { minifiedJson } from '@legacy-sports/mcp-format';
 
 interface RetryFailedParams {
   runId: number;
@@ -160,6 +161,7 @@ export async function retryFailed(
     const updatedRun = await githubGet<GitHubWorkflowRun>(
       `/actions/runs/${params.runId}`,
     );
+    const staleMergeRefWarning = await checkStaleMergeRef(params.runId);
 
     const payload = {
       originalRunId: params.runId,
@@ -181,6 +183,7 @@ export async function retryFailed(
               `to fetch fresh failure logs.`,
           }
         : {}),
+      ...(staleMergeRefWarning ? { warning: staleMergeRefWarning } : {}),
       note:
         'GitHub reruns reuse the same run id and increment run_attempt; ' +
         'newRunId equals originalRunId by design — use newAttempt to disambiguate.',

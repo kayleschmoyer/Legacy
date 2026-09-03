@@ -1,4 +1,5 @@
 import { githubGet, postWithRetryOnAlreadyRunning } from '../github-api.js';
+import { checkStaleMergeRef } from '../merge-ref-staleness.js';
 import type { ToolResult } from '../types.js';
 
 interface RerunParams {
@@ -155,6 +156,8 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
       );
     }
 
+    const staleMergeRefWarning = await checkStaleMergeRef(params.runId);
+
     return {
       content: [
         {
@@ -177,6 +180,9 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
                   'this run had job(s) left `cancelled` by an upstream dependency failure ' +
                   '— rerun-failed-jobs would not have rescheduled them (LS-9212).'
                 : 'Rerun requested successfully.',
+              ...(staleMergeRefWarning
+                ? { warning: staleMergeRefWarning }
+                : {}),
             },
             null,
             2,

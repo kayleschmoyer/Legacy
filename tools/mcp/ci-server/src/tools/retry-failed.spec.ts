@@ -158,6 +158,43 @@ describe('retryFailed', () => {
     });
   });
 
+  describe('stale merge-ref warning (LS-9638)', () => {
+    it('includes a warning when the run replays a stale merge-ref', async () => {
+      mockGet.mockImplementation((path: string) => {
+        if (path === '/actions/runs/999') {
+          return Promise.resolve(
+            runResponse({
+              run_attempt: 1,
+              event: 'pull_request',
+              pull_requests: [{ number: 7300 }],
+              head_sha: 'abc123def456abc123def456abc123def456abc',
+            }),
+          );
+        }
+        if (path === '/actions/runs/999/jobs') {
+          return Promise.resolve({
+            total_count: 1,
+            jobs: [job(2, 'test', 'failure')],
+          });
+        }
+        if (path === '/pulls/7300') {
+          return Promise.resolve({
+            merge_commit_sha: 'fedcba987654fedcba987654fedcba987654fed',
+            state: 'open',
+          });
+        }
+        throw new Error(`unexpected path ${path}`);
+      });
+
+      const result = await retryFailed({ runId: 999 });
+
+      const payload = JSON.parse(result.content[0].text) as {
+        warning?: string;
+      };
+      expect(payload.warning).toMatch(/refs\/pull\/7300\/merge/);
+    });
+  });
+
   describe('pagination', () => {
     it('paginates jobs when a run has more than 100 of them', async () => {
       // Page 1: 100 successful jobs (full page → must request page 2)
