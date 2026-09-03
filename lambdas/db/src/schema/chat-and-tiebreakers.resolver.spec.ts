@@ -657,6 +657,66 @@ describe('Chat and Tiebreakers Resolver', () => {
       expect(result).toMatchObject({ matchupId: 1 });
     });
 
+    // ── profanity check (LS-9622) ────────────────────────────────────────
+
+    it('flags a message containing profanity and persists containsProfanity', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]); // matchup found
+      mockDb.returning.mockResolvedValueOnce([
+        makeMessage({
+          message: 'you fucking idiot',
+          containsProfanity: true,
+        }),
+      ]);
+
+      const resolver = getMutation('sendMatchupMessage');
+      const result = (await resolver(
+        {},
+        { matchupId: 1, message: 'you fucking idiot' },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({ containsProfanity: true }),
+      );
+      expect(result).toMatchObject({ containsProfanity: true });
+    });
+
+    it('does not flag a clean message', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]); // matchup found
+      mockDb.returning.mockResolvedValueOnce([makeMessage()]);
+
+      const resolver = getMutation('sendMatchupMessage');
+      const result = (await resolver(
+        {},
+        { matchupId: 1, message: 'Good luck this week!' },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({ containsProfanity: false }),
+      );
+      expect(result).toMatchObject({ containsProfanity: false });
+    });
+
+    it('does not flag a word that merely contains a profane substring', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]); // matchup found
+      mockDb.returning.mockResolvedValueOnce([makeMessage()]);
+
+      const resolver = getMutation('sendMatchupMessage');
+      await resolver(
+        {},
+        { matchupId: 1, message: 'This class is a great assessment' },
+        mockContext,
+        undefined as never,
+      );
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({ containsProfanity: false }),
+      );
+    });
+
     // ── gifUrl allowlist (LS-9619 / FLD-047 follow-up) ──────────────────
 
     it('rejects a non-https gifUrl', async () => {

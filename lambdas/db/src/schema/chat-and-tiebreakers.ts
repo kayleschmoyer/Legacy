@@ -963,7 +963,7 @@ builder.mutationField('sendMatchupMessage', (t) =>
           message: args.message,
           gifUrl,
           metadata: {},
-          containsProfanity: false,
+          containsProfanity: detectProfanity(args.message),
           isFlagged: false,
           replyToMessageId: args.replyToMessageId ?? null,
         })
