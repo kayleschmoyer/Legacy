@@ -33,6 +33,18 @@ The hosted DB MCP server is the only DB MCP server. It reaches the dev RDS over 
 | Pre-flight health check        | `pnpm --prefix lib/db-client run db:status` (reports DB reachability + pending migration count)                                                                                                                        |
 | Look up a user                 | `db_query` with a SELECT on `users` (no dedicated tool)                                                                                                                                                                |
 
+## `db_query` Failure Payloads (LS-9536)
+
+`db_query` failures are classified so the right action is obvious without guessing between "retry" and "rewrite" (before this, both a statement-timeout cancellation and a genuine transport outage surfaced identically as opaque strings like `Error POSTing to endpoint: {"message":"Service Unavailable"}` or `Query failed: write CONNECT_TIMEOUT undefined:undefined`). A failure returns `{ error, elapsedMs, message, hint }`:
+
+| `error`                | Meaning                                                                                               | Action                                                                                                                                                                                      |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `statement_timeout`    | The query hit the server-side `statement_timeout` (default 30s, SQLSTATE 57014)                       | **Rewrite, don't retry unchanged.** Prefer a `LATERAL` join over `DISTINCT ON` on large tables, add a narrowing predicate, or split the query into smaller pieces that each fit the budget. |
+| `sql_error`            | The query itself is wrong (syntax, missing relation/column, etc.)                                     | Fix the query.                                                                                                                                                                              |
+| `upstream_unavailable` | A transport/connection failure (Lambda, API Gateway, or the DB connection) before the query completed | Safe to retry once; a repeated failure means the server is actually down.                                                                                                                   |
+
+`elapsedMs` is reported on every failure so query cost is visible before it becomes a timeout. There is still no session/temp-table affordance for multi-stage analysis — an expensive CTE re-derived across several queries has no way to be materialized once; the `sql_error`/`statement_timeout` split at least tells you which end to attack, not how to avoid the re-derivation itself.
+
 ## Decision Tree
 
 | Situation                                | Reference                                                                                                 |

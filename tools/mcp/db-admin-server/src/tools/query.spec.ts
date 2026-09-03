@@ -1,3 +1,4 @@
+import postgres from 'postgres';
 import { query } from './query';
 import { getReadonlySql } from '../db.js';
 
@@ -27,6 +28,10 @@ interface QueryPayload {
   columns?: string[];
   available?: boolean;
   reason?: string;
+  error?: string;
+  elapsedMs?: number;
+  message?: string;
+  hint?: string;
 }
 
 function parseBody(text: string): QueryPayload {
@@ -76,18 +81,53 @@ describe('db_query (hosted, read-only)', () => {
     expect(result.content[0].text).toBe('(0 rows)');
   });
 
-  it('returns an error result when the query fails', async () => {
-    const sql = {
-      begin: jest.fn(() =>
-        Promise.reject(new Error('relation "nope" does not exist')),
-      ),
-    };
+  it('classifies a statement_timeout (SQLSTATE 57014) distinctly from a transport failure', async () => {
+    const timeoutError = new postgres.PostgresError({
+      message: 'canceling statement due to statement timeout',
+      code: '57014',
+    } as never);
+    const sql = { begin: jest.fn(() => Promise.reject(timeoutError)) };
+    mockGetReadonlySql.mockResolvedValue(sql as never);
+
+    const result = await query({ query: 'SELECT * FROM game_batting' });
+
+    expect(result.isError).toBe(true);
+    const payload = parseBody(result.content[0].text);
+    expect(payload.error).toBe('statement_timeout');
+    expect(typeof payload.elapsedMs).toBe('number');
+    expect(payload.hint).toContain('Rewrite');
+  });
+
+  it('classifies a non-timeout Postgres error as sql_error', async () => {
+    const relationError = new postgres.PostgresError({
+      message: 'relation "nope" does not exist',
+      code: '42P01',
+    } as never);
+    const sql = { begin: jest.fn(() => Promise.reject(relationError)) };
     mockGetReadonlySql.mockResolvedValue(sql as never);
 
     const result = await query({ query: 'SELECT * FROM nope' });
 
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Query failed');
+    const payload = parseBody(result.content[0].text);
+    expect(payload.error).toBe('sql_error');
+    expect(payload.message).toContain('relation "nope" does not exist');
+  });
+
+  it('classifies a non-Postgres error (transport/connection failure) as upstream_unavailable', async () => {
+    const transportError = Object.assign(
+      new Error('write CONNECT_TIMEOUT undefined:undefined'),
+      { code: 'CONNECT_TIMEOUT' },
+    );
+    const sql = { begin: jest.fn(() => Promise.reject(transportError)) };
+    mockGetReadonlySql.mockResolvedValue(sql as never);
+
+    const result = await query({ query: 'SELECT 1 AS ok' });
+
+    expect(result.isError).toBe(true);
+    const payload = parseBody(result.content[0].text);
+    expect(payload.error).toBe('upstream_unavailable');
+    expect(payload.hint).toContain('Retry');
   });
 
   it('reports unavailable when the connection cannot be established', async () => {

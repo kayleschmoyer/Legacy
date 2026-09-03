@@ -30,12 +30,12 @@ function createMcpServer(caller: McpCaller): McpServer {
 
   server.tool(
     'db_query',
-    'Execute a read-only SQL query against the dev database over HTTPS (no SSM tunnel). ' +
-      'Connects as a SELECT-only Postgres role, so writes/DDL are rejected by the database engine, ' +
-      'and a server-side statement_timeout (default 30s) bounds runaway queries. ' +
-      'The SQL is executed verbatim (this is a console for trusted mcp/db-scoped agents — not user input); ' +
-      'parameterization does not apply since the whole statement is the input. ' +
-      'Returns { rows, rowCount, columns }.',
+    'Execute a read-only SQL query against the dev database over HTTPS. ' +
+      'Connects as a SELECT-only Postgres role (writes/DDL rejected engine-side); ' +
+      'a server-side statement_timeout (default 30s) bounds runaway queries. ' +
+      'SQL runs verbatim for trusted mcp/db-scoped agents, not user input. ' +
+      'Returns { rows, rowCount, columns }; failures return ' +
+      '{ error: statement_timeout|sql_error|upstream_unavailable, elapsedMs, message, hint }.',
     {
       query: z
         .string()
