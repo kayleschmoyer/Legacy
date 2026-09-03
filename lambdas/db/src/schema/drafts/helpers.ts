@@ -120,9 +120,9 @@ export const ALLOWED_POSITIONS_FOR_AUTO_PICK = ALLOWED_POSITIONS;
  * Shared by autoProcessDraftPicks (scheduled-mutations.ts) and the
  * makeDraftPick auto-pick chain (mutations.ts).
  *
- * `sport` defaults to 'baseball' for backward compatibility with callers
- * that haven't yet been updated to pass it (LS-9523 tracks the scheduled
- * auto-pick path, which still doesn't). Football reads eligibility from
+ * `sport` defaults to 'baseball' for backward compatibility with any caller
+ * that hasn't been updated to pass it — scheduled-mutations.ts (LS-9523) now
+ * does. Football reads eligibility from
  * `football_player_eligible_positions` (LS-9479) — the baseball-only
  * `playerEligiblePositions` table has zero football rows (LS-9474
  * postmortem), so without this branch a football team's drafted players

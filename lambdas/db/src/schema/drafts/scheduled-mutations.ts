@@ -126,6 +126,7 @@ export async function predictAutoPick(
       draftId,
       currentPickInfo.teamId,
       draftLeagueId,
+      candidatePool.league.sport,
     );
 
     const { playerId: autoPlayerId, reason: autoPickReason } =
@@ -138,6 +139,7 @@ export async function predictAutoPick(
         bestBenchPick: candidatePool.bestBenchPick,
         currentPickInfo,
         unfilledPositionTypes,
+        sport: candidatePool.league.sport,
       });
 
     return {
@@ -335,6 +337,7 @@ export async function runAutoPickLockedTransaction(params: {
         draftId,
         currentPickInfo.teamId,
         draftLeagueId,
+        league.sport,
       );
 
       LOGGER.info('[autoProcessDraftPicks] Unfilled position types for team', {
@@ -361,6 +364,7 @@ export async function runAutoPickLockedTransaction(params: {
         bestBenchPick: candidatePool.bestBenchPick,
         currentPickInfo,
         unfilledPositionTypes,
+        sport: league.sport,
       });
       autoPlayerId = selected.playerId;
       autoPickReason = selected.reason;
