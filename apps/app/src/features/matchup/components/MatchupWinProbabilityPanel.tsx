@@ -16,6 +16,7 @@ import {
   useGetMatchupWinProbabilityQuery,
 } from '@legacy-sports/graphql';
 import { brand } from '@legacy-sports/design-tokens';
+import { roundPercentagesTo100 } from '@legacy-sports/utils';
 import { useLeagueScoringSettings } from '../../../common/scoring';
 import {
   mapBattingStats,
@@ -66,10 +67,17 @@ function ProbabilityBar({
   team1Name: string;
   team2Name: string;
 }) {
-  const t1Pct = Math.round(team1Prob * 100);
-  const t2Pct = Math.round(team2Prob * 100);
-  const tiePct = Math.round(tieProb * 100);
-  const showTieHint = tieProb > 0.01;
+  // Round as a set, not independently: the three probabilities are mutually
+  // exclusive and exhaustive, so `Math.round` on each could render totals like
+  // 50 / 50 / 1 or 49 / 50 / 0 that visibly fail to add up to 100 (LS-9838).
+  const [t1Pct = 0, t2Pct = 0, tiePct = 0] = roundPercentagesTo100([
+    team1Prob,
+    team2Prob,
+    tieProb,
+  ]);
+  // Show the tie share whenever it claims a whole point, so the three numbers
+  // on screen always add up to 100.
+  const showTieHint = tiePct > 0;
 
   return (
     <YStack gap="$2">
@@ -132,6 +140,16 @@ function ProbabilityBar({
           backgroundColor={brand.navyLight}
           animation="quick"
         />
+        {/* Neutral tie segment — without it the flexed team-2 fill absorbs the
+            tie share and overstates team 2 by `tiePct` points. */}
+        {tiePct > 0 && (
+          <YStack
+            height="100%"
+            width={`${tiePct}%`}
+            backgroundColor="$gray8"
+            animation="quick"
+          />
+        )}
         <YStack
           height="100%"
           flex={1}

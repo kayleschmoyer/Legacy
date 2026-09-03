@@ -16,6 +16,7 @@ export * from './lib/league-utils';
 export * from './lib/lineup-optimizer';
 export * from './lib/notification-copy';
 export * from './lib/notification-types';
+export * from './lib/percentage';
 export * from './lib/sanitize-name';
 export * from './lib/scoring-math';
 export * from './lib/season-constants';

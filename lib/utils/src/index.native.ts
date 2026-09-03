@@ -9,4 +9,5 @@ export * from './lib/DbOptions.native';
 export * from './lib/format-draft-date';
 export * from './lib/help-content';
 export * from './lib/notification-types';
+export * from './lib/percentage';
 export * from './lib/sport-defaults';

@@ -17,6 +17,11 @@ export * from './lib/ErrorHandling';
 export * from './lib/format-draft-date';
 export * from './lib/help-content';
 export * from './lib/notification-types';
+// Pure, Hermes-safe percentage rounding consumed by the mobile matchup
+// win-probability panel. Metro resolves '@legacy-sports/utils' to this file
+// via the package "react-native" field, so omitting it here makes
+// roundPercentagesTo100 `undefined` on device.
+export * from './lib/percentage';
 // Pure roster/lineup defaults consumed by shared-components' `config/sports.ts`
 // at module-evaluation time (DEFAULT_LINEUP_BY_SPORT). Missing here they are
 // silently `undefined` on device rather than throwing at import — same

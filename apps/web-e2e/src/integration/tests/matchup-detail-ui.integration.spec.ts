@@ -342,12 +342,23 @@ test.describe
     });
 
     await test.step('Probability percentages sum to 100', async () => {
-      // Find the win-probability pair: two percentages that sum to 100.
+      // The panel's percentages are team1 / team2 / tie — mutually exclusive
+      // and exhaustive — so ALL of them sum to 100, not some pair of them.
+      // The previous assertion looked for a pair summing to exactly 100, which
+      // fails outright whenever the Monte Carlo simulation returns a
+      // non-negligible tie share (t1 + t2 = 100 - tie). Data-dependent, so it
+      // passed most runs (LS-9838).
+      //
+      // The +/-1 tolerance is required, not slack: the integration suite always
+      // runs against the already-deployed frontend, which rounds the three
+      // values independently and so can render a 99 or 101 total. Largest-
+      // remainder rounding (LS-9838) makes the total exactly 100 once deployed,
+      // and that still satisfies this assertion.
       const nums = await panelPercents();
-      const hasPairSumTo100 = nums.some((n, i) =>
-        nums.some((m, j) => i !== j && n + m === 100),
-      );
-      expect(hasPairSumTo100).toBe(true);
+      const sum = nums.reduce((acc, n) => acc + n, 0);
+      const detail = `panel percentages: [${nums.join(', ')}]`;
+      expect(sum, detail).toBeGreaterThanOrEqual(99);
+      expect(sum, detail).toBeLessThanOrEqual(101);
     });
   });
 

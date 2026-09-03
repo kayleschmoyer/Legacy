@@ -212,7 +212,7 @@ describe('MatchupWinProbabilityPanel', () => {
     );
   });
 
-  it('renders a tie-probability hint when the tie probability exceeds 1%', () => {
+  it('renders a tie-probability hint when the tie share rounds to at least one point', () => {
     primeProjectionMocks();
     mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
       data: {
@@ -241,6 +241,33 @@ describe('MatchupWinProbabilityPanel', () => {
     render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
 
     expect(screen.queryByText(/% tie/)).toBeNull();
+  });
+
+  it('renders whole percentages that add up to 100 when independent rounding would not (LS-9838)', () => {
+    primeProjectionMocks();
+    mockUseGetMatchupWinProbabilityQuery.mockReturnValue({
+      data: {
+        getMatchupById: {
+          winProbability: {
+            // Rounding each value on its own gives 50 / 50 / 1 = 101.
+            team1WinProbability: 0.495,
+            team2WinProbability: 0.495,
+            tiesProbability: 0.01,
+            team1ProjectedScore: 100.5,
+            team2ProjectedScore: 100.4,
+            simulationCount: 5000,
+          },
+        },
+      },
+    });
+
+    render(<MatchupWinProbabilityPanel matchup={makeMatchup()} />);
+
+    expect(screen.getByText('50%')).toBeTruthy();
+    expect(screen.getByText('49%')).toBeTruthy();
+    // A tie share worth a whole point is always shown, so the numbers on screen
+    // add up to 100 instead of reading 50 / 49 with a point unaccounted for.
+    expect(screen.getByText('1% tie')).toBeTruthy();
   });
 
   it('renders nothing for completed matchups', () => {
