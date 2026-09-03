@@ -251,7 +251,13 @@ Route handlers commonly branch on `postData.includes('someoperation')`. Because 
 
 The failure mode is the quiet one from [§4.2](#42-the-baseline-answers-permissively): the query **resolves** with wrong-shaped data instead of erroring, so the UI renders an empty or incorrect state and the failure surfaces somewhere unrelated — or not at all.
 
-The review bot flagged this HIGH on PR #7097; LS-9413 fixed it in `waiver-claims.spec.ts` (~17 branches) and the class was never burned down. A suite-wide audit found **601 substring-routing sites against 104 using the correct exact-match pattern**, with **121 sites across 31 files** testing a substring that matches more than one real operation (`'getleague'` matches 21 real operations; `'league'` matches 52).
+The review bot flagged this HIGH on PR #7097; LS-9413 fixed it in `waiver-claims.spec.ts` (~17 branches) and the class was never burned down. The LS-9794 audit measured **713 substring-routing sites across 53 files**, of which **143 sites in 33 files** test a substring that matches more than one real operation (`'league'` matches 52 real operations, `'getdraft'` 9, `'getuserleagues'` 3).
+
+Two refinements the original audit missed:
+
+- **The receiver is not always the raw body.** `op.includes('league')` and `opName.includes('getleaguedraft')` are the same bug on the _extracted_ name, and account for ~120 sites. Using `extractOperationName` is not the fix by itself; **exact equality** is. The worst site in the suite, `draft-graphql-integration.spec.ts:42`, uses the helper and then substring-matches `'league'` against 52 operations.
+
+- **`postData.includes('"getleague"')` is a different hazard, not ambiguity.** Embedding the JSON quotes makes the match quote-delimited, so it can only hit an operation named exactly `GetLeague`. No such operation exists — so all 24 sites using that idiom are **dead branches** that never fire, and the operation silently falls through to the baseline instead. Dead branches are tracked separately from ambiguity.
 
 ```ts
 // ❌ Bad — 'getdraftpicks'.includes('getdraft') is true, so the branch below is dead code
@@ -267,6 +273,11 @@ if (op === 'getdraftpicks') { … }
 ```
 
 **Right fix:** exact equality on `extractOperationName(route)`. If a chain must stay substring-based as an interim, order every specific branch before the broad one and guard the broad branch explicitly — `on-this-day.spec.ts:116` does this correctly with `includes('getonthisday') && !includes('events')`.
+
+**Enforcement (LS-9794).** Two guards make this an invariant rather than a burn-down:
+
+- `apps/web-e2e/eslint.config.mjs` bans `postData`/`op`/`opName`/`operationName` `.includes(...)` under `apps/web-e2e/src` via `no-restricted-properties`. Files that already violated it are grandfathered by basename in `ls9794GrandfatheredFiles`; **that list may only shrink** — migrate the file instead of adding to it.
+- `apps/web-e2e/src/operation-routing-guard.test.ts` cross-references every tested substring against the operation names in `lib/graphql/src/**/*.graphql` and fails when one matches more than one operation. Its `KNOWN_AMBIGUOUS` baseline is a ratchet: the test also fails on a _stale_ entry, so the list cannot silently stop shrinking. This is what fires when someone adds a new query whose name contains an already-tested substring.
 
 Live instance: **LS-9792** (`full-season-ui.spec.ts:690`). Class burn-down: **LS-9794**.
 

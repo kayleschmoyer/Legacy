@@ -430,10 +430,16 @@ export function resolveBaselineResponse(
  * `getUserById`, `getUnreadNotificationCount`) and records any truly unmocked
  * operations as a post-test assertion error so nothing slips through silently.
  *
+ * Route on the extracted operation name with EXACT equality — never on a
+ * substring of the raw post body. `postData.includes('getmyleague')` also
+ * matches `GetMyLeagueStandings`, so the first branch wins and fulfills the
+ * route with the wrong response shape, which resolves rather than errors
+ * (LS-9794).
+ *
  * @example
  * await page.route(isGraphQLEndpoint, async (route) => {
- *   const op = route.request().postData()?.toLowerCase() ?? '';
- *   if (op.includes('getmyleague')) {
+ *   const operation = extractOperationName(route).toLowerCase();
+ *   if (operation === 'getmyleague') {
  *     await route.fulfill({ ... });
  *     return;
  *   }

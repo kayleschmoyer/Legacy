@@ -127,6 +127,37 @@ const ls9660HermeticWaitRules = [
   },
 ];
 
+// LS-9794 ban substring matching for GraphQL operation routing. Hermetic
+// specs mock responses by testing the request for an operation name; the only
+// correct form is exact equality on the extracted name:
+//
+//   const op = extractOperationName(route).toLowerCase();
+//   if (op === 'getleaguebyid') { ... }
+//
+// `postData.includes('getleague')` instead matches 21 real operations, and
+// `op.includes('league')` matches 52. The first branch that matches wins and
+// fulfills the route with another operation's response shape — which RESOLVES
+// rather than errors, so the spec fails somewhere unrelated or passes
+// vacuously (LS-9413, flagged HIGH on PR #7097). It stays latent only while
+// operation names happen not to collide, and adding a query whose name
+// contains an already-tested substring is a routine change.
+//
+// Deliberately `no-restricted-properties` rather than `no-restricted-syntax`:
+// this file composes `no-restricted-syntax` across seven overlapping override
+// blocks, and flat config replaces (never merges) a rule on the last matching
+// block, so adding a selector there would require duplicating every union
+// (the LS-7947 clobber hazard). A distinct rule name composes independently.
+const ls9794NoSubstringOperationRoutingRules = [
+  'postData',
+  'op',
+  'opName',
+  'operationName',
+].map((object) => ({
+  object,
+  property: 'includes',
+  message: `LS-9794: substring matching on \`${object}\` is banned for GraphQL operation routing — the substring can match more than one real operation and silently fulfills the route with the wrong response shape. Use exact equality on the extracted name instead: \`const op = extractOperationName(route).toLowerCase(); if (op === '<operation>')\`. See apps/web-e2e/src/operation-routing-guard.test.ts.`,
+}));
+
 const ls4461IntegrationRules = [
   {
     selector:
@@ -281,6 +312,69 @@ const ls9660GrandfatheredIntegrationFiles = [
   'trade-flow-ui.integration.spec.ts',
   'wait-for-join-page.ts', // integration/helpers — matched via the pages/helpers overlay
   'waiver-processing-ui.integration.spec.ts',
+].map((basename) => `**/${basename}`);
+
+// LS-9794 grandfather list — files that already route GraphQL operations by
+// substring at rollout time. The ban applies to every OTHER file under src/
+// immediately. Do NOT add files here: new substring routing is the bug this
+// rule exists to prevent. As each file is migrated to exact
+// `extractOperationName(route)` equality, delete its entry (and its
+// KNOWN_AMBIGUOUS entries in src/operation-routing-guard.test.ts) so the ban
+// locks in; once the list is empty, delete it and the `ignores` key with it.
+const ls9794GrandfatheredFiles = [
+  'auction-draft.spec.ts',
+  'combobox-search-a11y.spec.ts',
+  'commissioner-announcements.spec.ts',
+  'commissioner-audit-delete.spec.ts',
+  'commissioner-game-selection.spec.ts',
+  'commissioner-tab-nav.spec.ts',
+  'commissioner-waiver-errors.spec.ts',
+  'create-league.ts',
+  'disclosure-game.spec.ts',
+  'donate-page.spec.ts',
+  'draft-functionality.spec.ts',
+  'draft-graphql-integration.spec.ts',
+  'form-a11y.spec.ts',
+  'full-season-ui.spec.ts',
+  'gif-picker.spec.ts',
+  'join-league.spec.ts',
+  'league-chat-activity.spec.ts',
+  'league-creation-advanced.spec.ts',
+  'league-creation.spec.ts',
+  'league-detail-tabs.spec.ts',
+  'league-discovery.spec.ts',
+  'matchup-detail.spec.ts',
+  'matchup-week-navigation.spec.ts',
+  'mid-draft-trades.spec.ts',
+  'mock-draft-simulator.spec.ts',
+  'notifications-hub.spec.ts',
+  'notifications-page.spec.ts',
+  'on-this-day.spec.ts',
+  'player-brefid-route.spec.ts',
+  'player-comparison.spec.ts',
+  'player-detail-bio-career-arc.spec.ts',
+  'player-detail-hero-stats-chips.spec.ts',
+  'player-detail-modal.spec.ts',
+  'player-detail-season-fielding.spec.ts',
+  'player-stats-fantasy-sort.spec.ts',
+  'player-stats-mobile-card-feed.spec.ts',
+  'player-stats-mocked.spec.ts',
+  'player-stats.spec.ts',
+  'playoff-bracket.spec.ts',
+  'pre-draft-lobby-trades.spec.ts',
+  'roster-management.spec.ts',
+  'season-awards.spec.ts',
+  'season-progression.spec.ts',
+  'season-renewal.ts',
+  'skip-link-pages-a11y.spec.ts',
+  'standings.spec.ts',
+  'subscription.spec.ts',
+  'table-a11y.spec.ts',
+  'team-detail-info-roster-branding.spec.ts',
+  'team-detail.spec.ts',
+  'trading-center.spec.ts',
+  'websocket-realtime-updates.spec.ts',
+  'websocket-realtime.spec.ts',
 ].map((basename) => `**/${basename}`);
 
 export default [
@@ -444,6 +538,27 @@ export default [
         // must be clean of both).
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9660HermeticWaitRules,
+      ],
+    },
+  },
+  {
+    // LS-9794 ban substring operation routing across ALL of src/ — specs,
+    // fixtures, mocks, and helpers alike. Uses `no-restricted-properties`, a
+    // rule no other block configures, so it composes with (rather than
+    // clobbers) the `no-restricted-syntax` unions above and needs no
+    // per-tier overlay.
+    //
+    // `ls9794GrandfatheredFiles` are the files that already violated the rule
+    // when it was introduced; they keep their pre-existing rule set until
+    // migrated. The list may only SHRINK — never add a file to it. Migrating
+    // a file means deleting its entry here AND deleting its entries from
+    // KNOWN_AMBIGUOUS in operation-routing-guard.test.ts.
+    files: ['**/src/**/*.ts'],
+    ignores: ls9794GrandfatheredFiles,
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        ...ls9794NoSubstringOperationRoutingRules,
       ],
     },
   },
