@@ -1527,83 +1527,35 @@ jobs:
             const prNumber = context.issue.number;
             if (!prNumber) return;
 
-            // Map CI stage results to label names
-            const labelMap = {
-              'CI: Migration Immutability': '${{ needs.custom-checks.result }}',
-              'CI: Test Failure':           '${{ needs.test.result }}',
-              'CI: Build Failure':          '${{ needs.build.result }}',
-              'CI: E2E Failure':            '${{ needs.e2e.result }}',
-            };
-
-            // Determine which labels to add (failed)
-            const labelsToAdd = [];
-
-            for (const [label, result] of Object.entries(labelMap)) {
-              if (result === 'failure' || result === 'cancelled') {
-                labelsToAdd.push(label);
-              }
-              // Empty/missing results are left alone (don't add or remove)
-            }
+            // LS-9637: pulled out of this inline block into its own module so
+            // the "replace the whole CI: * label set every run" logic (the
+            // mechanism that lets a stale failure label get cleared once its
+            // check turns green) is unit-tested — see
+            // .github/scripts/ci-failure-labels.js and
+            // .github/scripts/__tests__/ci-failure-labels.test.mjs.
+            const { applyCiFailureLabels } = require('./.github/scripts/ci-failure-labels.js');
 
             // LS-8901: lint and format now share one job (ci-pipeline.yml's
             // `lint` job) — its two failure-excerpt outputs are only populated
-            // when that specific step actually failed, so use them to keep
+            // when that specific step actually failed, so they keep
             // 'CI: Lint Failure' / 'CI: Formatting' independently accurate
             // instead of both firing off the merged job's single result.
-            const lintResult = '${{ needs.lint.result }}';
-            const lintExcerpt = `${{ needs.lint.outputs.lint-failure-excerpt }}`;
-            const formatExcerpt = `${{ needs.lint.outputs.format-failure-excerpt }}`;
-            // The job can fail/cancel before either step's capture ran (e.g.
-            // cancellation, a setup failure) — neither excerpt is populated
-            // then. Fall back to flagging both rather than silently dropping
-            // the failure from PR labels.
-            const excerptsUnknown = !lintExcerpt && !formatExcerpt;
-            const jobFailedOrCancelled = lintResult === 'failure' || lintResult === 'cancelled';
-            if (lintExcerpt || (excerptsUnknown && jobFailedOrCancelled)) {
-              labelsToAdd.push('CI: Lint Failure');
-            }
-            if (formatExcerpt || (excerptsUnknown && jobFailedOrCancelled)) {
-              labelsToAdd.push('CI: Formatting');
-            }
-
-            // Get existing labels on the PR
-            const { data: pr } = await github.rest.pulls.get({
+            await applyCiFailureLabels({
+              github,
+              core,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: prNumber,
+              prNumber,
+              jobResults: {
+                'custom-checks': '${{ needs.custom-checks.result }}',
+                test:            '${{ needs.test.result }}',
+                build:           '${{ needs.build.result }}',
+                e2e:             '${{ needs.e2e.result }}',
+                lint:            '${{ needs.lint.result }}',
+              },
+              lintExcerpt: `${{ needs.lint.outputs.lint-failure-excerpt }}`,
+              formatExcerpt: `${{ needs.lint.outputs.format-failure-excerpt }}`,
             });
-            const existingLabels = pr.labels.map(l => l.name);
-
-            // Compute final desired label set: preserve non-CI labels, replace CI
-            // labels entirely with labelsToAdd. A single PUT avoids the N sequential
-            // DELETEs that trigger GitHub's secondary rate limit.
-            // Include legacy rollup label names so they are cleared from PRs that had them.
-            const allCiLabels = new Set([...Object.keys(labelMap), 'CI: Lint & Format', 'CI: Quality Gates', 'CI: Type Error']);
-            const nonCiLabels = existingLabels.filter(l => !allCiLabels.has(l));
-            const finalLabels = [...nonCiLabels, ...labelsToAdd];
-
-            async function withRetry(fn, retries = 3) {
-              for (let i = 0; i < retries; i++) {
-                try { return await fn(); }
-                catch (e) {
-                  const isPrimaryRateLimit = e.status === 429;
-                  const isSecondaryRateLimit = e.status === 403 && /secondary rate limit/i.test(typeof e.message === 'string' ? e.message : '');
-                  if ((isPrimaryRateLimit || isSecondaryRateLimit) && i < retries - 1) {
-                    const delay = Math.pow(2, i) * 1000;
-                    core.warning(`Rate limited (${e.status}), retrying in ${delay}ms…`);
-                    await new Promise(r => setTimeout(r, delay));
-                  } else throw e;
-                }
-              }
-            }
-
-            await withRetry(() => github.rest.issues.setLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              labels: finalLabels,
-            }));
-            core.info(`Labels set: [${finalLabels.join(', ')}]`);
 
       - name: "Discord CI Failure"
         if: >-
