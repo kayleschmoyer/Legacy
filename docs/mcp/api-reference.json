@@ -4823,7 +4823,7 @@
         },
         {
           "name": "github_list_runners",
-          "description": "List self-hosted GitHub Actions runners for this repository. Returns id, name, OS, status (online/offline), busy flag, and labels.",
+          "description": "List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage.",
           "inputs": {
             "status": {
               "type": "enum",
@@ -4832,7 +4832,17 @@
                 "online",
                 "offline"
               ],
-              "description": "Filter by runner status. Omit to return all runners regardless of status."
+              "description": "Filter rows by status."
+            },
+            "busy": {
+              "type": "boolean",
+              "optional": true,
+              "description": "Filter rows by busy."
+            },
+            "summaryOnly": {
+              "type": "boolean",
+              "optional": true,
+              "description": "Return only summary counts."
             }
           },
           "transports": [

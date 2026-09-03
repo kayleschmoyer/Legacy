@@ -1829,14 +1829,17 @@ export function createServer(): McpServer {
   // --- github_list_runners ---
   server.tool(
     'github_list_runners',
-    'List self-hosted GitHub Actions runners for this repository. Returns id, name, OS, status (online/offline), busy flag, and labels.',
+    'List self-hosted GitHub Actions runners: id, name, OS, status, busy, labels. Also returns a full-pool summary (counts + per-label) for capacity triage.',
     {
       status: z
         .enum(['online', 'offline'])
         .optional()
-        .describe(
-          'Filter by runner status. Omit to return all runners regardless of status.',
-        ),
+        .describe('Filter rows by status.'),
+      busy: z.boolean().optional().describe('Filter rows by busy.'),
+      summaryOnly: z
+        .boolean()
+        .optional()
+        .describe('Return only summary counts.'),
     },
     async (params) => listRunners(params),
   );

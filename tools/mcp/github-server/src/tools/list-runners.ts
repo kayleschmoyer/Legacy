@@ -30,6 +30,68 @@ interface RunnersResponse {
 
 export interface ListRunnersParams {
   status?: 'online' | 'offline';
+  /** Filter by the runner's busy flag, composable with `status`. */
+  busy?: boolean;
+  /** Skip the per-runner rows and return only the summary counts. */
+  summaryOnly?: boolean;
+}
+
+interface LabelCounts {
+  total: number;
+  online: number;
+  offline: number;
+  busy: number;
+  idle: number;
+}
+
+export interface RunnerSummary {
+  total: number;
+  online: number;
+  offline: number;
+  busy: number;
+  idle: number;
+  byLabel: Record<string, LabelCounts>;
+}
+
+function emptyLabelCounts(): LabelCounts {
+  return { total: 0, online: 0, offline: 0, busy: 0, idle: 0 };
+}
+
+/**
+ * Summary always reflects the *entire* runner pool, independent of the
+ * `status`/`busy` filters applied to the returned rows (LS-9548) — the
+ * capacity-triage question ("does the pool have spare capacity right now?")
+ * needs the full-pool counts, not just whatever subset the caller filtered
+ * the row table down to.
+ */
+export function summarizeRunners(runners: GitHubRunner[]): RunnerSummary {
+  const summary: RunnerSummary = {
+    total: runners.length,
+    online: 0,
+    offline: 0,
+    busy: 0,
+    idle: 0,
+    byLabel: {},
+  };
+
+  for (const r of runners) {
+    const online = r.status === 'online';
+    if (online) summary.online++;
+    else summary.offline++;
+    if (r.busy) summary.busy++;
+    else summary.idle++;
+
+    for (const label of r.labels) {
+      const counts = (summary.byLabel[label.name] ??= emptyLabelCounts());
+      counts.total++;
+      if (online) counts.online++;
+      else counts.offline++;
+      if (r.busy) counts.busy++;
+      else counts.idle++;
+    }
+  }
+
+  return summary;
 }
 
 export async function listRunners(
@@ -38,26 +100,37 @@ export async function listRunners(
   try {
     const repo = await getRepoOwnerName();
 
-    const baseQuery: Record<string, string> = { per_page: '100' };
-    if (params.status) baseQuery.status = params.status;
-
+    // Always fetch the full, unfiltered pool — the summary must cover every
+    // runner regardless of the `status`/`busy` row filters (LS-9548).
     const allRunners: GitHubRunner[] = [];
-    let totalCount = 0;
     let page = 1;
 
     while (true) {
       const data = await githubRest<RunnersResponse>({
         method: 'GET',
         path: `/repos/${repo.owner}/${repo.name}/actions/runners`,
-        query: { ...baseQuery, page: String(page) },
+        query: { per_page: '100', page: String(page) },
       });
-      totalCount = data.total_count;
       allRunners.push(...data.runners);
-      if (allRunners.length >= totalCount || data.runners.length === 0) break;
+      if (allRunners.length >= data.total_count || data.runners.length === 0)
+        break;
       page++;
     }
 
-    const runners = allRunners.map((r) => ({
+    const summary = summarizeRunners(allRunners);
+    const summaryLine = `_summary: ${minifiedJson(summary)}_`;
+
+    if (params.summaryOnly) {
+      return { content: [{ type: 'text', text: summaryLine }] };
+    }
+
+    const filtered = allRunners.filter(
+      (r) =>
+        (params.status === undefined || r.status === params.status) &&
+        (params.busy === undefined || r.busy === params.busy),
+    );
+
+    const runners = filtered.map((r) => ({
       id: r.id,
       name: r.name,
       os: r.os,
@@ -68,8 +141,8 @@ export async function listRunners(
 
     const text =
       runners.length === 0
-        ? 'No runners found.'
-        : `${markdownTable(runners, { columns: RUNNER_COLUMNS })}\n\n_totalCount: ${totalCount}_`;
+        ? `No runners found.\n\n${summaryLine}`
+        : `${markdownTable(runners, { columns: RUNNER_COLUMNS })}\n\n${summaryLine}`;
 
     return {
       content: [{ type: 'text', text }],
