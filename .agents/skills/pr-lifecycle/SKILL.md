@@ -367,6 +367,24 @@ When the merge queue rejects a PR with **"Repository rule violations found: A co
 
 4. **Wait for the next merge queue cycle** — the PR will be re-evaluated automatically after the commit status updates. No manual re-enqueue is needed unless the PR was removed from the queue.
 
+<a id="withholding--could-not-post-status-is-a-rate-limit-signature-not-a-verdict-ls-9570"></a>
+
+## "Withholding / could not post status" is a rate-limit signature, not a verdict (LS-9570)
+
+A CI gate or workflow step can compute the correct result and still fail to report it. Recognize this pattern:
+
+- `actions/github-script` steps die with `API rate limit exceeded for installation`.
+- A gate script (e.g. `ci-gate.js`) logs that it computed a verdict but explicitly withholds posting it (e.g. `withholding 'success' ... (run-lookup-failed)`) because an API call it needed for corroboration 403'd.
+- A step logs `Setting commit status: success - ...` immediately followed by the actual `POST /statuses/...` call 403ing and the job then `setFailed`.
+
+All three **look like a verdict was reached and something else went wrong** — they are not. They are the installation GitHub App token's rate limit being exhausted mid-run. Don't spend time reproducing the underlying check, re-running the summarize/reporting job immediately, or bumping the SHA to force a rebuild — none of those touch the actual cause and the retry will 403 identically seconds later.
+
+**Confirm and remedy:**
+
+1. Call `ci_installation_rate_limit` (not `gh api rate_limit` — that reports a different token's bucket and will misleadingly show plenty of headroom; see [mcp-first § Installation rate limit vs. `gh api rate_limit`](../mcp-first/SKILL.md#installation-vs-user-rate-limit-ls-9570)). A low/zero `remaining` confirms this failure mode.
+2. Wait until the returned `resetsAt`.
+3. Re-run only the reporting/summarize job that failed to post (`ci_rerun`/`github_retrigger_check` as appropriate) — do not push a new commit or otherwise widen the PR to "fix" it.
+
 ## Critical Rules
 
 1.  **Always self-review before mark-ready (Tier 2 gate)** -- Phase 1 is mandatory. Read every changed file in full, check all 20 common review patterns, and produce a Self-Review Summary before marking the PR ready — and before any push to a Ready (non-draft) PR. Draft-checkpoint pushes may precede it (the spine opens the draft PR before validation). Skipping this is the #1 cause of avoidable Copilot review cycles.

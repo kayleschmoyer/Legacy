@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 11,
-  "toolCount": 250,
+  "toolCount": 251,
   "servers": [
     {
       "dir": "worktree-server",
@@ -2783,7 +2783,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 20,
+      "toolCount": 21,
       "tools": [
         {
           "name": "ci_audit_session_bash",
@@ -2845,7 +2845,7 @@
         },
         {
           "name": "ci_auth_status",
-          "description": "Check if the CI server is authenticated with GitHub. Returns token source (GH_TOKEN, GITHUB_TOKEN, github-app, or gh-cli), authenticated user login, and rate limit info. Call this first to verify credentials are working before using other ci_* tools. Also see github_auth_status for basic GitHub auth status without rate limit info.",
+          "description": "Check if the CI server is authenticated with GitHub. Returns token source (GH_TOKEN, GITHUB_TOKEN, github-app, or gh-cli), authenticated user login, and rate limit info for whichever token that source resolved to. Call this first to verify credentials are working before using other ci_* tools. Also see github_auth_status for basic GitHub auth status without rate limit info. NOTE: rateLimit here is not guaranteed to be the installation bucket (GH_TOKEN/GITHUB_TOKEN take precedence when set) — use ci_installation_rate_limit for that specifically.",
           "inputs": {},
           "transports": [
             "stdio"
@@ -3263,6 +3263,14 @@
               "description": "Reserved for future use. gh-pages mode applies a fixed 4000-char per-field cap; s3 presigned URLs are never truncated."
             }
           },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "ci_installation_rate_limit",
+          "description": "Report the GitHub App installation token's core rate limit (remaining/limit/reset) — the SAME budget secrets.GITHUB_TOKEN draws from in workflows. Always mints a fresh installation token via AGENT_AUTHOR_APP_PRIVATE_KEY and queries GET /rate_limit directly, bypassing GH_TOKEN/GITHUB_TOKEN env precedence, so it's always the installation bucket — unlike ci_auth_status's rateLimit field. `gh api rate_limit` reports a DIFFERENT bucket (the CLI's own user/PAT token) and does not answer \"is CI rate limited?\" (LS-9570). Call this when a CI step failed with \"API rate limit exceeded for installation\", or silently withheld a status/verdict it otherwise computed correctly (a rate-limit signature, not a real verdict). Remedy: wait until resetsAt, then re-run — not an immediate retry.",
+          "inputs": {},
           "transports": [
             "stdio"
           ]

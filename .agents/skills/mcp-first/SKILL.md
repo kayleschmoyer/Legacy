@@ -148,6 +148,16 @@ Chunk order and the full per-platform decision tree are owned by AGENTS.md and [
 - **Session-resume caveat**: if a bounded wait was in-flight when the session was interrupted, only that one ≤20s call is lost — the run itself is unaffected. Re-find the run with `ci_list_runs({ workflow, branch, limit: 5 })`, then re-attach with `ci_wait_run({ runId })`. Do not re-dispatch.
 - **Waiting on a remote ref change or deletion** (e.g. `main` advancing after a queue merge, a PR branch being deleted post-merge): never `git ls-remote origin <ref> | sleep 20` — use `github_await_ref({ ref, changedFrom?, deleted?, maxWaitSeconds? })` on `legacy-sports-github` instead. Same bounded-wait contract as `ci_wait_run`: each call polls for up to 55s and returns `{ status: "unchanged", hint }` (never an error) if the condition hasn't occurred yet — re-invoke per the hint. `{ status: "changed" | "deleted" }` on success.
 
+<a id="installation-vs-user-rate-limit-ls-9570"></a>
+
+### Installation rate limit vs. `gh api rate_limit` (LS-9570)
+
+`gh api rate_limit` reports the **CLI's own user/PAT token** bucket. Workflow steps authenticate as the **GitHub App installation token** minted from `secrets.AGENT_AUTHOR_APP_PRIVATE_KEY` (`actions/create-github-app-token`, app id 3158619) — a **completely separate budget**. These two buckets can be in opposite states at the same time: a healthy `gh api rate_limit` result does **not** mean CI's own API calls aren't rate limited, and does not answer "is CI rate limited?" at all. Running `gh api rate_limit`, seeing a healthy number, and concluding a workflow's 403s were a transient blip is the exact wrong-decision failure mode this gap produces (observed on PR #7232 / LS-9528 — a ~90-minute stall on what was purely an installation-token rate limit).
+
+Use `ci_installation_rate_limit` (`legacy-sports-ci`/`legacy-sports-ci-local`) instead — it always mints a fresh installation token via `AGENT_AUTHOR_APP_PRIVATE_KEY` and queries `GET /rate_limit` with it directly, bypassing `GH_TOKEN`/`GITHUB_TOKEN` env precedence, so the result is guaranteed to be the installation bucket regardless of what other credentials the session has. (`ci_auth_status`'s own `rateLimit` field is not a substitute for this — it reflects whichever token source `getToken()` actually resolved, which may not be the installation token.)
+
+A CI step that computes a verdict but can't post it — GitHub App API calls failing with `API rate limit exceeded for installation`, or a gate/status step logging its computed result and then silently withholding the actual `POST`/status update — is a **rate-limit signature, not a real verdict**. See [pr-lifecycle troubleshooting](../pr-lifecycle/SKILL.md#withholding--could-not-post-status-is-a-rate-limit-signature-not-a-verdict-ls-9570) for the failure pattern and remedy.
+
 ## Auth Model
 
 This section absorbed the former `credentials` skill (2026-07-02). One rule dominates everything below:

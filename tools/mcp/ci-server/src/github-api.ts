@@ -290,6 +290,65 @@ export async function getToken(): Promise<string> {
   return (await resolveToken()).token;
 }
 
+/**
+ * Query the GitHub App installation token's core rate limit directly (LS-9570).
+ *
+ * Always mints a fresh installation token via `generateGitHubAppToken()`
+ * (`AGENT_AUTHOR_APP_PRIVATE_KEY`) instead of going through `resolveToken()`'s
+ * GH_TOKEN/GITHUB_TOKEN-first precedence — so the result is guaranteed to be
+ * the installation bucket, never whatever token a caller's env happens to
+ * have set. Workflow steps authenticate with tokens minted from the same App
+ * (`actions/create-github-app-token` + `secrets.AGENT_AUTHOR_APP_PRIVATE_KEY`,
+ * app id 3158619 — see `.github/workflows/check-schema.yml`), so this reports
+ * the exact budget `secrets.GITHUB_TOKEN` draws from in those steps. This is
+ * a different bucket from `gh api rate_limit`, which reports whatever token
+ * the CLI is authenticated as (a user or PAT token) — a healthy number there
+ * says nothing about whether the installation bucket workflows depend on is
+ * exhausted.
+ *
+ * Throws if AGENT_AUTHOR_APP_PRIVATE_KEY isn't configured or the API call
+ * fails — callers should surface this as "installation rate limit unknown",
+ * not silently fall back to a different token's bucket.
+ */
+export async function getInstallationRateLimit(): Promise<{
+  limit: number;
+  remaining: number;
+  resetsAt: string;
+}> {
+  const appResult = await generateGitHubAppToken();
+  if (!appResult) {
+    throw new Error(
+      'AGENT_AUTHOR_APP_PRIVATE_KEY is not configured — cannot mint a GitHub App ' +
+        'installation token to check its rate limit. The main resolved token ' +
+        '(getToken()) may come from a different source and does not substitute ' +
+        'for this: it does not answer "is the installation bucket rate limited?".',
+    );
+  }
+
+  const res = await fetch(`${GITHUB_API}/rate_limit`, {
+    headers: buildHeaders(appResult.token),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
+  }
+
+  const data = (await res.json()) as {
+    rate?: { limit: number; remaining: number; reset: number };
+  };
+  if (!data.rate) {
+    throw new Error('GET /rate_limit response is missing the "rate" field');
+  }
+
+  return {
+    limit: data.rate.limit,
+    remaining: data.rate.remaining,
+    resetsAt: new Date(data.rate.reset * 1000).toISOString(),
+  };
+}
+
 // Cache for the deploys-repo token (generated via PREVIEW_APP credentials)
 let cachedDeploysToken: string | undefined;
 let cachedDeploysTokenExpiry: Date | undefined;

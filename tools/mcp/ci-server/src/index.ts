@@ -20,7 +20,12 @@ import { waitRun } from './tools/wait-run.js';
 import { viewRunJobs } from './tools/view-run-jobs.js';
 import { workflowInfo } from './tools/workflow-info.js';
 import { workflowSetState } from './tools/workflow-state.js';
-import { buildHeaders, getToken, sanitizeErrorBody } from './github-api.js';
+import {
+  buildHeaders,
+  getInstallationRateLimit,
+  getToken,
+  sanitizeErrorBody,
+} from './github-api.js';
 
 /**
  * Shared Zod schema for boolean parameters. Accepts a real boolean OR a
@@ -888,7 +893,8 @@ export function createServer(): McpServer {
 
   server.tool(
     'ci_auth_status',
-    'Check if the CI server is authenticated with GitHub. Returns token source (GH_TOKEN, GITHUB_TOKEN, github-app, or gh-cli), authenticated user login, and rate limit info. Call this first to verify credentials are working before using other ci_* tools. Also see github_auth_status for basic GitHub auth status without rate limit info.',
+    'Check if the CI server is authenticated with GitHub. Returns token source (GH_TOKEN, GITHUB_TOKEN, github-app, or gh-cli), authenticated user login, and rate limit info for whichever token that source resolved to. Call this first to verify credentials are working before using other ci_* tools. Also see github_auth_status for basic GitHub auth status without rate limit info. ' +
+      'NOTE: rateLimit here is not guaranteed to be the installation bucket (GH_TOKEN/GITHUB_TOKEN take precedence when set) — use ci_installation_rate_limit for that specifically.',
     {},
     async () => {
       const GITHUB_API = 'https://api.github.com';
@@ -1068,6 +1074,60 @@ export function createServer(): McpServer {
                   configured: false,
                   source,
                   error: err instanceof Error ? err.message : String(err),
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+    },
+  );
+
+  server.tool(
+    'ci_installation_rate_limit',
+    "Report the GitHub App installation token's core rate limit (remaining/limit/reset) — the SAME budget " +
+      'secrets.GITHUB_TOKEN draws from in workflows. Always mints a fresh installation token via ' +
+      'AGENT_AUTHOR_APP_PRIVATE_KEY and queries GET /rate_limit directly, bypassing GH_TOKEN/GITHUB_TOKEN env ' +
+      "precedence, so it's always the installation bucket — unlike ci_auth_status's rateLimit field. " +
+      "`gh api rate_limit` reports a DIFFERENT bucket (the CLI's own user/PAT token) and does not answer " +
+      '"is CI rate limited?" (LS-9570). Call this when a CI step failed with "API rate limit exceeded for ' +
+      'installation", or silently withheld a status/verdict it otherwise computed correctly (a rate-limit ' +
+      'signature, not a real verdict). Remedy: wait until resetsAt, then re-run — not an immediate retry.',
+    {},
+    async () => {
+      try {
+        const rateLimit = await getInstallationRateLimit();
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  configured: true,
+                  source: 'github-app-installation',
+                  rateLimit,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  configured: false,
+                  error: err instanceof Error ? err.message : String(err),
+                  hint:
+                    'Set AGENT_AUTHOR_APP_PRIVATE_KEY in cloud env settings to enable installation-bucket ' +
+                    'rate-limit checks. Do not fall back to `gh api rate_limit` — it reports a different ' +
+                    "bucket (the CLI's own user/PAT token), not the installation budget workflows draw from.",
                 },
                 null,
                 2,

@@ -7765,6 +7765,7 @@ export type SwapMatchupPlayerPositionsMutation = {
     season?: number | null;
     swapId?: string | null;
     numberOfGames?: number | null;
+    footballSeasonFppg?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;
@@ -8105,6 +8106,7 @@ export type SetOptimalLineupMutation = {
     season?: number | null;
     swapId?: string | null;
     numberOfGames?: number | null;
+    footballSeasonFppg?: number | null;
     player?: {
       __typename?: 'Player';
       id?: number | null;

@@ -520,6 +520,109 @@ describe('getDeploysToken (LS-8322)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// getInstallationRateLimit (LS-9570)
+// ---------------------------------------------------------------------------
+
+describe('getInstallationRateLimit (LS-9570)', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+  const savedFetch = global.fetch;
+  let appPrivateKeyPem: string;
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) savedEnv[key] = process.env[key];
+    for (const key of ENV_KEYS) delete process.env[key];
+    jest.resetModules();
+
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    appPrivateKeyPem = privateKey
+      .export({ type: 'pkcs1', format: 'pem' })
+      .toString();
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    global.fetch = savedFetch;
+  });
+
+  it('throws without hitting the network when AGENT_AUTHOR_APP_PRIVATE_KEY is not configured', async () => {
+    const mockFetch = jest.fn<typeof fetch>();
+    global.fetch = mockFetch;
+
+    const { getInstallationRateLimit } = await import('./github-api.js');
+
+    await expect(getInstallationRateLimit()).rejects.toThrow(
+      /AGENT_AUTHOR_APP_PRIVATE_KEY is not configured/,
+    );
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('mints an installation token and reports its rate limit, ignoring a GH_TOKEN set in env', async () => {
+    process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = appPrivateKeyPem;
+    // A GH_TOKEN is also set — getInstallationRateLimit must not use it or
+    // resolveToken()'s precedence; it always mints the App's own token.
+    process.env['GH_TOKEN'] = 'ghp_unrelated_user_token';
+
+    const resetEpoch = Math.floor(Date.now() / 1000) + 3600;
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      // POST /app/installations/<id>/access_tokens
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'ghs_installation_token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      )
+      // GET /rate_limit
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          rate: { limit: 5000, remaining: 12, reset: resetEpoch },
+        }),
+      );
+    global.fetch = mockFetch;
+
+    const { getInstallationRateLimit } = await import('./github-api.js');
+    const result = await getInstallationRateLimit();
+
+    expect(result).toEqual({
+      limit: 5000,
+      remaining: 12,
+      resetsAt: new Date(resetEpoch * 1000).toISOString(),
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[1][0]).toBe(
+      'https://api.github.com/rate_limit',
+    );
+    expect(mockFetch.mock.calls[1][1]?.headers).toMatchObject({
+      Authorization: 'Bearer ghs_installation_token',
+    });
+  });
+
+  it('throws with the GitHub API error body when the /rate_limit call itself fails', async () => {
+    process.env['AGENT_AUTHOR_APP_PRIVATE_KEY'] = appPrivateKeyPem;
+
+    const mockFetch = jest.fn<typeof fetch>();
+    mockFetch
+      .mockResolvedValueOnce(
+        makeJsonResponse(200, {
+          token: 'ghs_installation_token',
+          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        }),
+      )
+      .mockResolvedValueOnce(
+        makeJsonResponse(403, { message: 'API rate limit exceeded' }),
+      );
+    global.fetch = mockFetch;
+
+    const { getInstallationRateLimit } = await import('./github-api.js');
+
+    await expect(getInstallationRateLimit()).rejects.toThrow(/GitHub API 403/);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Token self-healing (LS-8551)
 //
 // legacy-sports-ci-local (the stdio server run locally) shares this module
