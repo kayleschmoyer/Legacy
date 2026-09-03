@@ -11,6 +11,7 @@ import {
 } from './graphql-errors';
 import { validateGifUrl } from './validate-gif-url';
 import { insertActivityLog } from '../services/activity-log';
+import { detectProfanity } from '../services/profanity-filter';
 
 /**
  * Chat System & Tiebreaker Rules Schema (LS-90)
@@ -376,6 +377,7 @@ const LeagueChatMessage = builder.objectRef<{
   metadata: Record<string, unknown> | null;
   gifUrl: string | null;
   mentionedUserIds: number[] | null;
+  containsProfanity: boolean;
 }>('LeagueChatMessage');
 
 builder.objectType(LeagueChatMessage, {
@@ -401,6 +403,11 @@ builder.objectType(LeagueChatMessage, {
     mentionedUserIds: t.exposeIntList('mentionedUserIds', {
       nullable: true,
       description: 'User ids @mentioned in this message (LS-9216)',
+    }),
+    containsProfanity: t.exposeBoolean('containsProfanity', {
+      nullable: false,
+      description:
+        'Server-side profanity check result (LS-6296), parity with MatchupMessage.containsProfanity',
     }),
     sender: t.field({
       type: 'User',
@@ -815,6 +822,7 @@ builder.queryField('getLeagueMessages', (t) =>
           gifUrl: msg.gifUrl ?? null,
           metadata: msg.metadata ?? null,
           mentionedUserIds: msg.mentionedUserIds ?? null,
+          containsProfanity: msg.containsProfanity,
         }));
     },
   }),
@@ -1087,6 +1095,7 @@ builder.mutationField('sendLeagueMessage', (t) =>
           gifUrl: gifUrl,
           mentionedUserIds:
             mentionedManagerIds.length > 0 ? mentionedManagerIds : null,
+          containsProfanity: detectProfanity(text),
         })
         .returning();
 
@@ -1162,6 +1171,7 @@ builder.mutationField('sendLeagueMessage', (t) =>
         gifUrl: msg.gifUrl ?? null,
         metadata: null,
         mentionedUserIds: msg.mentionedUserIds ?? null,
+        containsProfanity: msg.containsProfanity,
       };
     },
   }),
@@ -1388,6 +1398,7 @@ builder.queryField('getLeagueAnnouncements', (t) =>
         gifUrl: msg.gifUrl ?? null,
         metadata: msg.metadata ?? null,
         mentionedUserIds: msg.mentionedUserIds ?? null,
+        containsProfanity: msg.containsProfanity,
       }));
     },
   }),
@@ -1487,6 +1498,7 @@ builder.mutationField('postLeagueAnnouncement', (t) =>
         gifUrl: null,
         metadata: null,
         mentionedUserIds: null,
+        containsProfanity: msg.containsProfanity,
       };
     },
   }),
@@ -1571,6 +1583,7 @@ builder.mutationField('updateLeagueAnnouncement', (t) =>
         gifUrl: null,
         metadata: null,
         mentionedUserIds: null,
+        containsProfanity: msg.containsProfanity,
       };
     },
   }),

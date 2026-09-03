@@ -1863,6 +1863,10 @@ type LeagueAnalytics {
 A message posted to the league-wide chat room
 """
 type LeagueChatMessage {
+  """
+  Server-side profanity check result (LS-6296), parity with MatchupMessage.containsProfanity
+  """
+  containsProfanity: Boolean!
   gifUrl: String
   id: ID
   leagueId: Int

@@ -342,6 +342,8 @@ export const leagueMessages = pgTable(
     gifUrl: text('gif_url'),
     /** User ids @mentioned in this message, resolved server-side from `@TeamName` tokens (LS-9216). Null when no mentions. */
     mentionedUserIds: jsonb('mentioned_user_ids').$type<number[]>(),
+    /** Server-side profanity check result (LS-6296), mirrors matchup_messages.contains_profanity. */
+    containsProfanity: boolean('contains_profanity').notNull().default(false),
   },
   (table) => {
     return {

@@ -1585,6 +1585,8 @@ export type LeagueAnalytics = {
 /** A message posted to the league-wide chat room */
 export type LeagueChatMessage = {
   __typename?: 'LeagueChatMessage';
+  /** Server-side profanity check result (LS-6296), parity with MatchupMessage.containsProfanity */
+  containsProfanity: Scalars['Boolean']['output'];
   gifUrl?: Maybe<Scalars['String']['output']>;
   id?: Maybe<Scalars['ID']['output']>;
   leagueId?: Maybe<Scalars['Int']['output']>;
