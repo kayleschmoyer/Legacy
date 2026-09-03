@@ -534,7 +534,7 @@ test.describe('Season Fielding Stats Table — column headers @regression', () =
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -555,7 +555,7 @@ test.describe('Season Fielding Stats Table — column headers @regression', () =
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -566,7 +566,7 @@ test.describe('Season Fielding Stats Table — column headers @regression', () =
 
   test('column headers are sortable buttons', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -586,7 +586,7 @@ test.describe('Season Fielding Stats Table — data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -603,7 +603,7 @@ test.describe('Season Fielding Stats Table — data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -617,7 +617,7 @@ test.describe('Season Fielding Stats Table — data values @regression', () => {
 
   test('G column shows games played (140)', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -634,7 +634,7 @@ test.describe('Season Fielding Stats Table — data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -648,7 +648,7 @@ test.describe('Season Fielding Stats Table — data values @regression', () => {
 
   test('PO column shows putouts (380)', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -662,7 +662,7 @@ test.describe('Season Fielding Stats Table — data values @regression', () => {
 
   test('A column shows assists (8)', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -676,7 +676,7 @@ test.describe('Season Fielding Stats Table — data values @regression', () => {
 
   test('E column shows errors (2)', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -697,7 +697,7 @@ test.describe('Season Fielding Stats Table — multiple seasons @regression', ()
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: BATTER_TWO_FIELDING_SEASONS });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -715,7 +715,7 @@ test.describe('Season Fielding Stats Table — multiple seasons @regression', ()
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: BATTER_TWO_FIELDING_SEASONS });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -734,7 +734,7 @@ test.describe('Season Fielding Stats Table — multiple seasons @regression', ()
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: BATTER_TWO_FIELDING_SEASONS });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -755,7 +755,7 @@ test.describe('Season Fielding Stats Table — multi-position per-row breakdown 
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: MULTI_POSITION_SAME_SEASON });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -775,7 +775,7 @@ test.describe('Season Fielding Stats Table — multi-position per-row breakdown 
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: MULTI_POSITION_SAME_SEASON });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -793,7 +793,7 @@ test.describe('Season Fielding Stats Table — multi-position per-row breakdown 
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: MULTI_POSITION_SAME_SEASON });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -816,7 +816,7 @@ test.describe('Season Fielding Stats Table — INN baseball notation @regression
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: MULTI_POSITION_FRACTIONAL_INN });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -843,7 +843,7 @@ test.describe('Season Fielding Stats Table — pitcher has no fielding tab @regr
       seasonStatsBody: PITCHER_NO_FIELDING,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();

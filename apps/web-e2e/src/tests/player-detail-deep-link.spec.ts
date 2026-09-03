@@ -637,7 +637,7 @@ test.describe('Player Detail Deep Link — from Roster @regression', () => {
 
     // Simulate a user who copies a player URL while browsing the roster and
     // navigates to it directly (also covers Android intent deep links).
-    await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
+    await playersPage.gotoDetail(PLAYER_ID);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -661,7 +661,7 @@ test.describe('Player Detail Deep Link — from Free Agents @regression', () => 
     await openFreeAgentsSurface(freeAgentsPage, leaguePage);
 
     // Now follow a deep link (copy URL / Android intent) to the player detail
-    await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
+    await playersPage.gotoDetail(PLAYER_ID);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -679,7 +679,7 @@ test.describe('Player Detail Deep Link — from Free Agents @regression', () => 
 
     await openFreeAgentsSurface(freeAgentsPage, leaguePage);
 
-    await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
+    await playersPage.gotoDetail(PLAYER_ID);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -723,7 +723,7 @@ test.describe('Player Detail Deep Link — from Draft Board @regression', () => 
 
     // Navigate to the player detail URL (simulates the deep-link a user follows
     // from the draft board, e.g. copying a player URL or using an Android intent)
-    await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
+    await playersPage.gotoDetail(PLAYER_ID);
 
     // The player detail modal should be open
     await playersPage.detail.expectOpen();
@@ -738,7 +738,7 @@ test.describe('Player Detail Deep Link — from Draft Board @regression', () => 
     await installPlayerDetailMocks(page);
 
     // Simulate a user who copies a player URL while on the draft board
-    await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
+    await playersPage.gotoDetail(PLAYER_ID);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -761,7 +761,7 @@ test.describe('Player Detail Deep Link — from Matchup @regression', () => {
     await openMatchupSurface(matchupPage);
 
     // Follow a deep link to the player detail (from sharing or Android intent)
-    await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
+    await playersPage.gotoDetail(PLAYER_ID);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -778,7 +778,7 @@ test.describe('Player Detail Deep Link — from Matchup @regression', () => {
 
     await openMatchupSurface(matchupPage);
 
-    await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
+    await playersPage.gotoDetail(PLAYER_ID);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -799,7 +799,7 @@ test.describe('Player Detail Deep Link — back navigation @regression', () => {
     await installPlayerDetailMocks(page);
 
     // Simulate an Android intent / share-link opening /players/:id with no prior history
-    await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
+    await playersPage.gotoDetail(PLAYER_ID);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectBackButton();

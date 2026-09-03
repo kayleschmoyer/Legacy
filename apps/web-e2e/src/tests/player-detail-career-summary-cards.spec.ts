@@ -470,7 +470,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -483,7 +483,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -496,7 +496,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -517,7 +517,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
   }) => {
     // AVG = (165 + 155) / (550 + 520) = 320 / 1070 ≈ 0.299
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -529,7 +529,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
   test('shows total career games (285)', async ({ page, playersPage }) => {
     // 145 + 140 = 285
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -541,7 +541,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
   test('shows total career home runs (53)', async ({ page, playersPage }) => {
     // 28 + 25 = 53
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -553,7 +553,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
   test('shows total career RBI (165)', async ({ page, playersPage }) => {
     // 85 + 80 = 165
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -565,7 +565,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
   test('shows total career hits (320)', async ({ page, playersPage }) => {
     // 165 + 155 = 320
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -580,7 +580,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
   }) => {
     // 12 + 10 = 22
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -594,7 +594,7 @@ test.describe('Career Summary Cards — hitter @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -614,7 +614,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -630,7 +630,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -646,7 +646,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -667,7 +667,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -684,7 +684,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -700,7 +700,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -714,7 +714,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -731,7 +731,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -747,7 +747,7 @@ test.describe('Career Summary Cards — pitcher @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -772,7 +772,7 @@ test.describe('Career Summary Cards — two-way player @regression', () => {
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -789,7 +789,7 @@ test.describe('Career Summary Cards — two-way player @regression', () => {
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -808,7 +808,7 @@ test.describe('Career Summary Cards — two-way player @regression', () => {
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -837,7 +837,7 @@ test.describe('Career Summary Cards — hidden when no stats @regression', () =>
         },
       },
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -862,7 +862,7 @@ test.describe('Career Summary Cards — hidden when no stats @regression', () =>
         },
       },
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -883,7 +883,7 @@ test.describe('Career Summary Cards — advanced batting entitlement @regression
   }) => {
     // Default tier is premium — no useTier() call needed
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -904,7 +904,7 @@ test.describe('Career Summary Cards — advanced batting entitlement @regression
     //   OPS+  = (142×620 + 135×590) / 1210 = 138.6 → 139
     //   BABIP = (320−53) / (1070−215−53) = 267/802 = 0.333
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -924,7 +924,15 @@ test.describe('Career Summary Cards — advanced batting entitlement @regression
   }) => {
     await setupMocks(page);
     await useTier(page, 'free');
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
+
+    // LS-9793: gate the absence assertions on a POSITIVE readiness signal.
+    // The free-tier PremiumGate panel becoming visible proves the route
+    // settled into its gated state, so the `not.toBeVisible()` checks below
+    // read the final DOM rather than a not-yet-rendered one. (This replaces
+    // a `waitUntil: 'networkidle'` pass-through, which never reliably
+    // settles under Apollo polling.)
+    await playersPage.premiumGate.expectVisible();
 
     // PlayerDetailPage gates the entire PlayerDetailModal behind
     // advanced_search_filters (premium). Free users see a PremiumGate

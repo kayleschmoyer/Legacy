@@ -242,7 +242,7 @@ test.describe('Player Detail Modal — Auto-open @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
   });
@@ -254,7 +254,7 @@ test.describe('Player Detail Modal — Player Header @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -268,7 +268,7 @@ test.describe('Player Detail Modal — Player Header @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -282,7 +282,7 @@ test.describe('Player Detail Modal — Player Header @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -297,7 +297,7 @@ test.describe('Player Detail Modal — Player Header @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -309,7 +309,7 @@ test.describe('Player Detail Modal — Player Header @regression', () => {
 
   test('shows player initials in the avatar', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -325,7 +325,7 @@ test.describe('Player Detail Modal — Dismiss @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.close();
@@ -339,7 +339,7 @@ test.describe('Player Detail Modal — Dismiss @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.pressEscape();
@@ -353,7 +353,7 @@ test.describe('Player Detail Modal — Dismiss @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectBackButton();
@@ -402,7 +402,7 @@ test.describe('Player Detail Modal — Error State @regression', () => {
         errors: [{ message: 'Internal server error' }],
       },
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -418,7 +418,7 @@ test.describe('Player Detail Modal — Error State @regression', () => {
         errors: [{ message: 'Internal server error' }],
       },
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectErrorState();
@@ -557,7 +557,7 @@ test.describe('Player Detail Modal — Mid-year trade (LS-6984) @regression', ()
       seasonStatsBody: TRADE_SEASON_STATS,
       careerArcBody: TRADE_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -579,7 +579,7 @@ test.describe('Player Detail Modal — Mid-year trade (LS-6984) @regression', ()
       seasonStatsBody: TRADE_SEASON_STATS,
       careerArcBody: TRADE_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();

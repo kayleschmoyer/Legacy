@@ -46,7 +46,9 @@ import { PremiumGate } from '../components/premium-gate.component';
  *     premium-overlay component still extends `BaseComponent`); web-only.
  *   • `gotoDetail` / `gotoBrefId` — `page.goto` + `waitForLoadState(waitUntil)`;
  *     `waitUntil` is a browser navigation semantic (specs freeze the loading
- *     state), so these stay on the Page until the detail surface migrates.
+ *     state), so these stay on the Page until the detail surface migrates. Its
+ *     type is `'load' | 'domcontentloaded'` only — never `'networkidle'`
+ *     (LS-9793).
  *   • `detail` — the player-detail modal is exercised only by web specs; its
  *     web-only remainder is `page.keyboard` (Escape-to-close), bfcache-aware
  *     `waitForURL(…, { waitUntil: 'commit' })`, the filter-by-descendant
@@ -142,10 +144,19 @@ export class PlayersPage {
    * resolve; defaults to `'load'`. WEB-ONLY: `waitUntil` is a browser
    * navigation semantic (specs use it to freeze the loading state), so this
    * stays on the Page until the detail surface migrates (LS-8305 stage 4).
+   *
+   * LS-9793: the type deliberately EXCLUDES `'networkidle'`. This parameter
+   * was the repo's largest `networkidle` bypass — `waitForLoadState(waitUntil)`
+   * passes an Identifier rather than a literal, so the LS-4456/LS-9660 AST
+   * bans fired neither here nor on the 191 specs that passed the string in.
+   * Do not re-widen the union: an ESLint rule now rejects `'networkidle'` in a
+   * type position too. Gate on a stable test id instead
+   * (`detail.expectOpen()` / `expectNotLoading()`) — which nearly every call
+   * site already did on the very next line.
    */
   async gotoDetail(
     playerId: number,
-    waitUntil: 'load' | 'domcontentloaded' | 'networkidle' = 'load',
+    waitUntil: 'load' | 'domcontentloaded' = 'load',
   ): Promise<void> {
     const page = this.#requireWebPage();
     await page.goto(`/players/${playerId}`);
@@ -155,7 +166,7 @@ export class PlayersPage {
   /** Navigate to a player-detail brefId deep link (`/players/:brefId`). */
   async gotoBrefId(
     brefId: string,
-    waitUntil: 'load' | 'domcontentloaded' | 'networkidle' = 'load',
+    waitUntil: 'load' | 'domcontentloaded' = 'load',
   ): Promise<void> {
     const page = this.#requireWebPage();
     await page.goto(`/players/${brefId}`);

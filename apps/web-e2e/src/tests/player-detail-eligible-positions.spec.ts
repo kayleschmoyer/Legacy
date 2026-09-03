@@ -282,7 +282,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -295,7 +295,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -308,7 +308,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -322,7 +322,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page, PITCHER_RESPONSE);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -337,7 +337,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page, TWO_WAY_RESPONSE);
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -352,7 +352,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -366,7 +366,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page, NO_POSITIONS_RESPONSE);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -383,7 +383,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page, { errors: [{ message: 'Internal server error' }] });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -397,7 +397,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -414,7 +414,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -432,7 +432,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -458,7 +458,7 @@ test.describe('Player Detail – Eligible Positions Badges @regression', () => {
         { message: 'UNAUTHENTICATED', extensions: { code: 'UNAUTHENTICATED' } },
       ],
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();

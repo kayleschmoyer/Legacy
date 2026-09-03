@@ -357,7 +357,7 @@ async function setupMocks(
 test.describe('Season Batting Table — column headers @regression', () => {
   test('renders all expected column headers', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -382,7 +382,7 @@ test.describe('Season Batting Table — column headers @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -398,7 +398,7 @@ test.describe('Season Batting Table — row data @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -413,7 +413,7 @@ test.describe('Season Batting Table — row data @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -433,7 +433,7 @@ test.describe('Season Batting Table — row data @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -454,7 +454,7 @@ test.describe('Season Batting Table — row data @regression', () => {
       seasonStatsBody: SINGLE_SEASON_BATTER,
       careerArcBody: SINGLE_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -475,7 +475,7 @@ test.describe('Season Batting Table — sort order @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -508,7 +508,7 @@ test.describe('Season Batting Table — calculated stats @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -524,7 +524,7 @@ test.describe('Season Batting Table — calculated stats @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -540,7 +540,7 @@ test.describe('Season Batting Table — calculated stats @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -556,7 +556,7 @@ test.describe('Season Batting Table — calculated stats @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -572,7 +572,7 @@ test.describe('Season Batting Table — calculated stats @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -588,7 +588,7 @@ test.describe('Season Batting Table — calculated stats @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -676,7 +676,7 @@ test.describe('Season Batting Table — multiple seasons @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -690,7 +690,7 @@ test.describe('Season Batting Table — multiple seasons @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -717,7 +717,7 @@ test.describe('Season Batting Table — advanced batting columns (premium) @regr
   }) => {
     // Premium is the default tier — no useTier() call needed.
     await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -736,7 +736,15 @@ test.describe('Season Batting Table — advanced batting columns (premium) @regr
     // useTier registered after setupMocks so it runs first in Playwright LIFO chain
     // and intercepts GetUserById before the baseline fallback can return premium.
     await useTier(page, 'free');
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
+
+    // LS-9793: gate the absence assertions on a POSITIVE readiness signal.
+    // Waiting for the PremiumGate panel proves the route settled into its
+    // gated state, so `toHaveCount(0)` below reads the final DOM rather
+    // than a not-yet-rendered one. (This replaces a `waitUntil:
+    // 'networkidle'` pass-through, which never reliably settles under
+    // Apollo polling.)
+    await playersPage.premiumGate.expectVisible();
 
     // Free users at /players/:id see a PremiumGate panel instead of the
     // PlayerDetailModal dialog — the advanced columns live inside the modal,
@@ -751,7 +759,7 @@ test.describe('Season Batting Table — advanced batting columns (premium) @regr
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -766,7 +774,7 @@ test.describe('Season Batting Table — advanced batting columns (premium) @regr
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -781,7 +789,7 @@ test.describe('Season Batting Table — advanced batting columns (premium) @regr
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -796,7 +804,7 @@ test.describe('Season Batting Table — advanced batting columns (premium) @regr
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -811,7 +819,7 @@ test.describe('Season Batting Table — advanced batting columns (premium) @regr
     playersPage,
   }) => {
     await setupMocks(page, { seasonStatsBody: ADVANCED_BATTER });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();

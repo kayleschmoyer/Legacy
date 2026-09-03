@@ -196,7 +196,7 @@ test.describe('Player Detail – back navigation: URL fallback @regression', () 
   }) => {
     await setupMocks(page);
     // Direct URL navigation sets location.key === 'default'
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectBackButton();
@@ -209,7 +209,7 @@ test.describe('Player Detail – back navigation: URL fallback @regression', () 
     await setupMocks(page);
     // Direct URL navigation sets location.key === 'default', triggering the
     // /players/stats fallback instead of navigate(-1)
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectBackButton();

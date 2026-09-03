@@ -399,7 +399,7 @@ test.describe('Player Detail Modal @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     // The modal is always open on the /players/:id route
     await playersPage.detail.expectOpen();
@@ -410,7 +410,7 @@ test.describe('Player Detail Modal @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
 
@@ -428,7 +428,7 @@ test.describe('Player Detail Modal @regression', () => {
 
   test('shows eligible position badges', async ({ page, playersPage }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -443,7 +443,7 @@ test.describe('Player Detail Modal @regression', () => {
 
   test('shows Career Batting summary card', async ({ page, playersPage }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -462,7 +462,7 @@ test.describe('Player Detail Modal @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -492,7 +492,7 @@ test.describe('Player Detail Modal @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -529,7 +529,7 @@ test.describe('Player Detail Modal @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
 
@@ -549,7 +549,7 @@ test.describe('Player Detail Modal – Pitcher @regression', () => {
     await setupPlayerDetailMocks(page, {
       seasonStatsBody: PITCHER_SEASON_STATS_RESPONSE,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -590,7 +590,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     await setupPlayerDetailMocks(page, {
       seasonStatsBody: EMPTY_STATS_RESPONSE,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -607,7 +607,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
         errors: [{ message: 'Internal server error' }],
       },
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -620,7 +620,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
 
@@ -635,7 +635,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
 
@@ -658,7 +658,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -680,7 +680,7 @@ test.describe('Player Detail Modal — Edge Cases @regression', () => {
     playersPage,
   }) => {
     await setupPlayerDetailMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();

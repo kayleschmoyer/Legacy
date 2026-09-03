@@ -364,7 +364,7 @@ test.describe('Hero Stats Chips — batter labels @smoke', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -377,7 +377,7 @@ test.describe('Hero Stats Chips — batter labels @smoke', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -390,7 +390,7 @@ test.describe('Hero Stats Chips — batter labels @smoke', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -403,7 +403,7 @@ test.describe('Hero Stats Chips — batter labels @smoke', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -422,7 +422,7 @@ test.describe('Hero Stats Chips — batter values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -436,7 +436,7 @@ test.describe('Hero Stats Chips — batter values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -450,7 +450,7 @@ test.describe('Hero Stats Chips — batter values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -579,7 +579,7 @@ test.describe('Hero Stats Chips — batter values @regression', () => {
       seasonStatsBody: twoSeasonBatterStats,
       careerArcBody: twoSeasonCareerArc,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -600,7 +600,7 @@ test.describe('Hero Stats Chips — pitcher labels @smoke', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -616,7 +616,7 @@ test.describe('Hero Stats Chips — pitcher labels @smoke', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -632,7 +632,7 @@ test.describe('Hero Stats Chips — pitcher labels @smoke', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -648,7 +648,7 @@ test.describe('Hero Stats Chips — pitcher labels @smoke', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -670,7 +670,7 @@ test.describe('Hero Stats Chips — pitcher values @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -687,7 +687,7 @@ test.describe('Hero Stats Chips — pitcher values @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -704,7 +704,7 @@ test.describe('Hero Stats Chips — pitcher values @regression', () => {
       seasonStatsBody: PITCHER_SEASON_STATS,
       careerArcBody: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -742,7 +742,7 @@ test.describe('Hero Stats Chips — loading and empty states @regression', () =>
       seasonStatsBody: EMPTY_STATS,
       careerArcBody: EMPTY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -759,7 +759,7 @@ test.describe('Hero Stats Chips — loading and empty states @regression', () =>
       seasonStatsBody: { errors: [{ message: 'Internal server error' }] },
       careerArcBody: EMPTY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -890,7 +890,7 @@ test.describe('Hero Stats Chips — two-way player @regression', () => {
       seasonStatsBody: twoWayStats,
       careerArcBody: twoWayCareerArc,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -1006,7 +1006,7 @@ test.describe('Hero Stats Chips — two-way player @regression', () => {
       seasonStatsBody: twoWayStats,
       careerArcBody: twoWayCareerArcValue,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();

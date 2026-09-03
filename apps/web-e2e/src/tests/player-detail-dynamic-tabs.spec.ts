@@ -356,7 +356,7 @@ test.describe('Player Detail — dynamic tab bar: tab presence @regression', () 
       seasonStats: BATTER_SEASON_STATS,
       careerArc: BATTER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -375,7 +375,7 @@ test.describe('Player Detail — dynamic tab bar: tab presence @regression', () 
       seasonStats: PITCHER_SEASON_STATS,
       careerArc: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -394,7 +394,7 @@ test.describe('Player Detail — dynamic tab bar: tab presence @regression', () 
       seasonStats: TWO_WAY_SEASON_STATS,
       careerArc: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -417,7 +417,7 @@ test.describe('Player Detail — dynamic tab bar: Career Arc tab visibility @reg
       seasonStats: BATTER_SEASON_STATS,
       careerArc: BATTER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -433,7 +433,7 @@ test.describe('Player Detail — dynamic tab bar: Career Arc tab visibility @reg
       seasonStats: PITCHER_SEASON_STATS,
       careerArc: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -449,7 +449,7 @@ test.describe('Player Detail — dynamic tab bar: Career Arc tab visibility @reg
       seasonStats: BATTER_SEASON_STATS,
       careerArc: NO_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -472,7 +472,7 @@ test.describe('Player Detail — dynamic tab bar: auto-switch to first available
       seasonStats: BATTER_SEASON_STATS,
       careerArc: NO_CAREER_ARC,
     });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -496,7 +496,7 @@ test.describe('Player Detail — dynamic tab bar: auto-switch to first available
       seasonStats: PITCHER_SEASON_STATS,
       careerArc: PITCHER_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();

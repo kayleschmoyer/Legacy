@@ -493,7 +493,7 @@ async function openCareerArc(
   playersPage: import('../pages').PlayersPage,
   playerId = 1,
 ) {
-  await playersPage.gotoDetail(playerId, 'networkidle');
+  await playersPage.gotoDetail(playerId);
   await playersPage.detail.expectOpen();
   await playersPage.detail.expectNotLoading();
   await playersPage.detail.switchTab('Career Arc');

@@ -96,6 +96,34 @@ const ls9795NoForceTrueRules = [
   },
 ];
 
+// LS-9793 belt-and-braces: ban the bare string `'networkidle'` EVERYWHERE it
+// can reach Playwright, not just as a literal argument to `waitForLoadState`
+// or a literal `waitUntil:` property. The LS-4456/LS-9660 selectors both
+// require a *literal* at the call site, so a page object that takes the value
+// as a PARAMETER routes around them entirely: neither
+// `gotoDetail(id, waitUntil = 'load')` (the parameter is an Identifier at
+// `page.waitForLoadState(waitUntil)`) nor its 191 callers passing
+// `'networkidle'` matched any rule. Banning the literal itself — as an
+// argument to ANY call, as ANY property value, and in a type position — closes
+// the pass-through and stops a future signature from re-opening it.
+const ls9793NoNetworkidleLiteralRules = [
+  {
+    selector: "CallExpression > Literal[value='networkidle']",
+    message:
+      "LS-9793: the string 'networkidle' must not be passed to any call — including through a page-object parameter (e.g. `gotoDetail(1, 'networkidle')`). Playwright officially discourages networkidle and Apollo polling/WebSocket heartbeats defeat it; under 4-worker CI load it can stall past the whole expect budget (LS-9457). Gate on a stable test id instead. See .agents/skills/testing/SKILL.md.",
+  },
+  {
+    selector: "Property[value.value='networkidle']",
+    message:
+      "LS-9793: 'networkidle' must not be used as an options value (e.g. `{ waitUntil: 'networkidle' }`). Use the default 'load' / 'domcontentloaded' and gate on a stable test id. See .agents/skills/testing/SKILL.md.",
+  },
+  {
+    selector: "TSLiteralType > Literal[value='networkidle']",
+    message:
+      "LS-9793: do not widen a wait-state type to accept 'networkidle'. Page-object navigation helpers take `'load' | 'domcontentloaded'` — adding 'networkidle' back re-opens the parameter pass-through this rule exists to close. See .agents/skills/testing/SKILL.md.",
+  },
+];
+
 // LS-8096 ban selector-based queries in spec files — enforces the semantic
 // Page Object Model from ADR-0015. Selectors are allowed only in the page
 // object layer (base/, components/, pages/); spec files call semantic verbs
@@ -453,13 +481,22 @@ export default [
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9790NoSwitchUserRules,
         ...ls9795NoForceTrueRules,
+        // LS-9793: the networkidle-literal ban is a baseline for every file
+        // class no later block matches (base/, components/, fixtures/,
+        // mocks/, utils/, support/, driver/, root-level src files).
+        ...ls9793NoNetworkidleLiteralRules,
       ],
     },
   },
   {
-    // Integration suite: enforce both LS-4461 (no raw HTTP) and LS-4458
-    // (no conditional UI guards). Expanded inline because the LS-4458
-    // override below would otherwise override-replace these selectors.
+    // Integration suite: enforce LS-4461 (no raw HTTP), LS-4458 (no
+    // conditional UI guards) and LS-9793 (no bare 'networkidle' token).
+    // Expanded inline because the LS-4458 override below would otherwise
+    // override-replace these selectors. The LS-9660 hard-wait bans still do
+    // NOT apply here — the live-backend suite keeps its own determinism
+    // guards and its `waitForTimeout` pacing — but LS-9793 does: this suite's
+    // guard already banned `waitForLoadState('networkidle')`, and the
+    // parameter pass-through it could not see is banned everywhere.
     files: [
       '**/src/integration/tests/**/*.ts',
       '**/src/integration/fixtures/**/*.ts',
@@ -477,6 +514,7 @@ export default [
         ...ls4458SpecRules,
         ...ls9790NoSwitchUserRules,
         ...ls9795NoForceTrueRules,
+        ...ls9793NoNetworkidleLiteralRules,
       ],
     },
   },
@@ -503,6 +541,7 @@ export default [
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9790NoSwitchUserRules,
         ...ls9795NoForceTrueRules,
+        ...ls9793NoNetworkidleLiteralRules,
       ],
     },
   },
@@ -534,11 +573,15 @@ export default [
         ...ls9660HermeticWaitRules,
         ...ls9790NoSwitchUserRules,
         ...ls9795NoForceTrueRules,
+        ...ls9793NoNetworkidleLiteralRules,
       ],
     },
   },
   {
-    // LS-4456 page objects + helpers: ban hard sleeps and `networkidle`.
+    // LS-4456 page objects + helpers: ban hard sleeps and `networkidle`,
+    // plus the LS-9793 bare-token ban (this is where the pass-through was
+    // DECLARED — `players.page.ts` — so the type-position selector matters
+    // most here).
     // Disjoint from the integration/hermetic spec overrides above —
     // `pages/**` and `**/helpers/**` do not overlap with `tests/`,
     // `fixtures/`, or `src/integration/*.ts`, so the legacy-config
@@ -551,6 +594,7 @@ export default [
         ...ls4456PageObjectRules,
         ...ls9790NoSwitchUserRules,
         ...ls9795NoForceTrueRules,
+        ...ls9793NoNetworkidleLiteralRules,
       ],
     },
   },
@@ -567,6 +611,7 @@ export default [
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9790NoSwitchUserRules,
         ...ls9795NoForceTrueRules,
+        ...ls9793NoNetworkidleLiteralRules,
       ],
     },
   },
@@ -595,6 +640,7 @@ export default [
         ...ls9660HermeticWaitRules,
         ...ls9790NoSwitchUserRules,
         ...ls9795NoForceTrueRules,
+        ...ls9793NoNetworkidleLiteralRules,
       ],
     },
   },

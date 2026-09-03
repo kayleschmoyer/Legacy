@@ -171,22 +171,30 @@ Legitimate siblings: LS-8399 (a two-hop query waterfall where `getPositionsForLe
 
 ### 3.2 `networkidle` is not a readiness signal
 
-Banned in page objects and helpers (LS-4456) and in hermetic specs (LS-9660) — Apollo polling and WebSocket heartbeats defeat it, and under 4-worker load it can stall past the whole `expect` budget before the post-navigation assertion even starts polling (LS-9457, which stripped `waitUntil: 'networkidle'` from all 16 `waitForURL` calls in the file rather than the two that were observed failing; LS-8012 had made the identical fix earlier in a different file).
+Banned in page objects and helpers (LS-4456), in hermetic specs (LS-9660), and as a bare token anywhere under `apps/web-e2e/src` (LS-9793) — Apollo polling and WebSocket heartbeats defeat it, and under 4-worker load it can stall past the whole `expect` budget before the post-navigation assertion even starts polling (LS-9457, which stripped `waitUntil: 'networkidle'` from all 16 `waitForURL` calls in the file rather than the two that were observed failing; LS-8012 had made the identical fix earlier in a different file).
 
-Note the exception recorded in [testing/SKILL.md Critical Rule 6](../SKILL.md#critical-rules): `page.waitForURL(pattern, { waitUntil: 'networkidle' })` _does_ fully commit a navigation, and is the sanctioned use — except where the app fires a second client-side navigation to the same URL during mount, which `waitForURL` latches onto while `#root` is still empty.
+There is **no sanctioned `networkidle` use left.** The old carve-out for `page.waitForURL(pattern, { waitUntil: 'networkidle' })` was removed by LS-9793 — the repo had zero callers of it, and the one `waitForURL` that genuinely needs navigation commitment (`PlayerDetailSurface.waitForStatsList`) already uses `waitUntil: 'commit'`, which also survives a bfcache restore that fires no `load` event. Use `'commit'`.
 
-**~283 `networkidle` references remain under `apps/web-e2e/src`** — 110 in files on the LS-9660 grandfather lists, and **173 in files the rules are supposed to be enforcing on today.** Do not add more.
+**The hole, and how it was closed (LS-9793).** Both original bans were AST selectors requiring a **literal** argument:
 
-> **The ban has a hole — do not assume a green lint means no `networkidle` (LS-9793).** Both bans are AST selectors that require a **literal** argument:
->
-> ```
-> CallExpression[callee.property.name='waitForLoadState'][arguments.0.value='networkidle']
-> Property[key.name='waitUntil'][value.value='networkidle']
-> ```
->
-> `apps/web-e2e/src/pages/players.page.ts` takes the value as a **parameter** — `gotoDetail(id, waitUntil = 'load')` / `gotoBrefId(...)` calling `page.waitForLoadState(waitUntil)`. `arguments.0` is an Identifier, not a Literal, so neither rule fires: not on the page object, and not on the ~170 spec call sites that pass `'networkidle'` into it as an ordinary string argument. Almost the entire non-grandfathered residue is the player-detail family reaching `waitForLoadState` this way. The integration suite's own file-scan backstop (`src/integration/determinism-guards.test.ts`) does not cover them either — its documented scope is `src/integration/tests` only.
->
-> Generalise it: **an AST rule that matches on a literal is bypassed by any indirection**, and a page-object parameter is the most natural indirection in this suite. When you rely on a lint rule to hold an invariant, check whether the invariant can be reached through a variable.
+```
+CallExpression[callee.property.name='waitForLoadState'][arguments.0.value='networkidle']
+Property[key.name='waitUntil'][value.value='networkidle']
+```
+
+`apps/web-e2e/src/pages/players.page.ts` took the value as a **parameter** — `gotoDetail(id, waitUntil = 'load')` / `gotoBrefId(...)` calling `page.waitForLoadState(waitUntil)`. `arguments.0` was an Identifier, not a Literal, so neither rule fired: not on the page object, and not on the **191** spec call sites passing `'networkidle'` into it as an ordinary string argument. Almost the entire non-grandfathered residue was the player-detail family reaching `waitForLoadState` this way.
+
+LS-9793 closed it three ways:
+
+1. **Type.** `gotoDetail` / `gotoBrefId` take `'load' | 'domcontentloaded'`; `'networkidle'` is a typecheck error at every call site.
+2. **Lint.** `ls9793NoNetworkidleLiteralRules` bans the bare token as an argument to **any** call, as **any** property value, and **in a type position** — so no wrapper, alias, or re-widened signature can reopen it. Spread into every enforcing override block in `apps/web-e2e/eslint.config.mjs`.
+3. **File scan.** `apps/web-e2e/src/hermetic-determinism-guards.test.ts` greps `src/tests/` for the token regardless of lint-override composition, with a self-checking LS-9676 burn-down allowlist: a listed file that no longer violates **fails** the test, so the list can only shrink.
+
+The burn-down itself was safe because **188 of the 191 call sites already asserted `detail.expectOpen()` on the very next line** — the `networkidle` wait was pure dead wall-clock in front of an auto-retrying assertion. The three that did not were absence assertions (`toHaveCount(0)` / `not.toBeVisible()` for free-tier gating), and those got a **positive** signal first (`playersPage.premiumGate.expectVisible()`) rather than a deleted wait.
+
+**Census after LS-9793: 93 references under `apps/web-e2e/src`** — 87 in files on the LS-9660 grandfather lists (the LS-9676 burn-down) and 6 that are the two determinism guards' own matching machinery. **Zero real waits outside the grandfather list.** Do not add more.
+
+> Generalise it: **an AST rule that matches on a literal is bypassed by any indirection**, and a page-object parameter is the most natural indirection in this suite. When you rely on a lint rule to hold an invariant, check whether the invariant can be reached through a variable — and consider pairing the rule with a token-level file scan, which no signature change can route around.
 
 ### 3.3 Missing an explicit wait for a navigation the app performs synchronously
 
@@ -510,7 +518,7 @@ grep -rn "switchUser(" apps/web-e2e/src --include=*.ts | nocomment \
 grep -rn "force: true"  apps/web-e2e/src --include=*.ts | nocomment | wc -l   # -> 5 after LS-9795
 # ...of which 3 are fs.rmSync(dir, { recursive: true, force: true }), not Playwright.
 # Only 2 are real Playwright suppressions, and both are lint-grandfathered.
-grep -rn "networkidle"  apps/web-e2e/src --include=*.ts | nocomment | wc -l   # -> 283
+grep -rn "networkidle"  apps/web-e2e/src --include=*.ts | nocomment | wc -l   # -> 92 (was 283 before LS-9793; 86 grandfathered + 6 guard internals)
 ```
 
 Suite-debt figures were censused on `main` @ `04af1b463`. Re-census before quoting them, and **read the survivors before reporting a number** — of the pattern matches this document's own audit produced, five whole classes were rejected on inspection (correct LIFO route layering, a correctly-placed WebSocket listener, safe `expect.poll` bodies, conditional capability skips, and a guarded broad match branch). A grep hit is a candidate, not a finding.

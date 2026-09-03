@@ -156,7 +156,7 @@ test.describe('Player Detail Page — brefId route @regression', () => {
     playersPage,
   }) => {
     await setupBrefIdMocks(page);
-    await playersPage.gotoBrefId('troutmi01', 'networkidle');
+    await playersPage.gotoBrefId('troutmi01');
 
     // Modal must be visible once brefId resolves to a numeric id
     await playersPage.detail.expectOpen();
@@ -170,7 +170,7 @@ test.describe('Player Detail Page — brefId route @regression', () => {
     playersPage,
   }) => {
     await setupBrefIdMocks(page);
-    await playersPage.gotoBrefId('troutmi01', 'networkidle');
+    await playersPage.gotoBrefId('troutmi01');
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -187,7 +187,7 @@ test.describe('Player Detail Page — brefId route @regression', () => {
   }) => {
     await setupBrefIdMocks(page);
     // The page lowercases the param before querying; same mock applies
-    await playersPage.gotoBrefId('TroutMi01', 'networkidle');
+    await playersPage.gotoBrefId('TroutMi01');
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectText('Mike Trout');
@@ -225,7 +225,7 @@ test.describe('Player Detail Page — brefId route @regression', () => {
     await setupBrefIdMocks(page, {
       brefIdResponse: BREF_ID_NOT_FOUND_RESPONSE,
     });
-    await playersPage.gotoBrefId('unknownxx99', 'networkidle');
+    await playersPage.gotoBrefId('unknownxx99');
 
     // The "No player found" alert must be visible
     await playersPage.detail.expectNotFoundAlert();
@@ -239,7 +239,7 @@ test.describe('Player Detail Page — brefId route @regression', () => {
     playersPage,
   }) => {
     await setupBrefIdMocks(page);
-    await playersPage.gotoBrefId('troutmi01', 'networkidle');
+    await playersPage.gotoBrefId('troutmi01');
 
     await playersPage.detail.expectOpen();
 

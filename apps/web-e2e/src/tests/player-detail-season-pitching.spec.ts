@@ -370,7 +370,7 @@ async function setupMocks(
 test.describe('Season Pitching Stats Table – column headers @regression', () => {
   test('shows all required column headers', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -390,7 +390,7 @@ test.describe('Season Pitching Stats Table – column headers @regression', () =
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -411,7 +411,7 @@ test.describe('Season Pitching Stats Table – data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -426,7 +426,7 @@ test.describe('Season Pitching Stats Table – data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -442,7 +442,7 @@ test.describe('Season Pitching Stats Table – data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -454,7 +454,7 @@ test.describe('Season Pitching Stats Table – data values @regression', () => {
 
   test('shows correct games (G) count', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -466,7 +466,7 @@ test.describe('Season Pitching Stats Table – data values @regression', () => {
 
   test('shows innings pitched (IP) value', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -478,7 +478,7 @@ test.describe('Season Pitching Stats Table – data values @regression', () => {
 
   test('shows strikeouts (SO) count', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -490,7 +490,7 @@ test.describe('Season Pitching Stats Table – data values @regression', () => {
 
   test('shows walks (BB) count', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -512,7 +512,7 @@ test.describe('Season Pitching Stats Table – multi-season @regression', () => 
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -531,7 +531,7 @@ test.describe('Season Pitching Stats Table – multi-season @regression', () => 
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -550,7 +550,7 @@ test.describe('Season Pitching Stats Table – multi-season @regression', () => 
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -569,7 +569,7 @@ test.describe('Season Pitching Stats Table – multi-season @regression', () => 
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -590,7 +590,7 @@ test.describe('Season Pitching Stats Table – two-way player @regression', () =
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -608,7 +608,7 @@ test.describe('Season Pitching Stats Table – two-way player @regression', () =
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -626,7 +626,7 @@ test.describe('Season Pitching Stats Table – two-way player @regression', () =
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -644,7 +644,7 @@ test.describe('Season Pitching Stats Table – two-way player @regression', () =
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -666,7 +666,7 @@ test.describe('Season Pitching Stats Table – two-way player @regression', () =
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -693,7 +693,7 @@ test.describe('Season Pitching Stats Table – sorting @regression', () => {
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -713,7 +713,7 @@ test.describe('Season Pitching Stats Table – sorting @regression', () => {
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -737,7 +737,7 @@ test.describe('Season Pitching Stats Table – sorting @regression', () => {
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -758,7 +758,7 @@ test.describe('Season Pitching Stats Table – sorting @regression', () => {
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -781,7 +781,7 @@ test.describe('Season Pitching Stats Table – sorting @regression', () => {
       seasonStatsBody: MULTI_SEASON_PITCHER_STATS,
       careerArcBody: MULTI_SEASON_CAREER_ARC,
     });
-    await playersPage.gotoDetail(3, 'networkidle');
+    await playersPage.gotoDetail(3);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -802,7 +802,7 @@ test.describe('Season Pitching Stats Table – tab navigation @regression', () =
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -815,7 +815,7 @@ test.describe('Season Pitching Stats Table – tab navigation @regression', () =
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -829,7 +829,7 @@ test.describe('Season Pitching Stats Table – tab navigation @regression', () =
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -846,7 +846,7 @@ test.describe('Season Pitching Stats Table – tab navigation @regression', () =
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -860,7 +860,7 @@ test.describe('Season Pitching Stats Table – tab navigation @regression', () =
     await playersPage.detail.waitForStatsList();
 
     // Reopen the same player
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
 

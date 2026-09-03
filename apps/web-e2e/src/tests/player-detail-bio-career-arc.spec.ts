@@ -466,7 +466,7 @@ async function setupMocks(
 test.describe('Player Detail Modal – bio display @smoke', () => {
   test('displays player name in modal title', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -480,7 +480,7 @@ test.describe('Player Detail Modal – bio display @smoke', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -492,7 +492,7 @@ test.describe('Player Detail Modal – bio display @smoke', () => {
 
   test('shows season count subtitle', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -514,7 +514,7 @@ test.describe('Player Detail Modal – Career Arc tab @regression', () => {
     playersPage: import('../pages').PlayersPage,
   ) {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -531,7 +531,7 @@ test.describe('Player Detail Modal – Career Arc tab @regression', () => {
     // openCareerArc helper, which clicks Career Arc first — so it asserted
     // nothing about the default and hid the nondeterminism in LS-9829.
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -588,7 +588,7 @@ test.describe('Player Detail Modal – two-way player Career Arc @regression', (
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -610,7 +610,7 @@ test.describe('Player Detail Modal – two-way player Career Arc @regression', (
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -626,7 +626,7 @@ test.describe('Player Detail Modal – two-way player Career Arc @regression', (
       seasonStatsBody: TWO_WAY_SEASON_STATS,
       careerArcBody: TWO_WAY_CAREER_ARC,
     });
-    await playersPage.gotoDetail(2, 'networkidle');
+    await playersPage.gotoDetail(2);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -650,7 +650,7 @@ test.describe('Player Detail Modal – stat data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -667,7 +667,7 @@ test.describe('Player Detail Modal – stat data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -678,7 +678,7 @@ test.describe('Player Detail Modal – stat data values @regression', () => {
 
   test('career batting card shows total RBI', async ({ page, playersPage }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -692,7 +692,7 @@ test.describe('Player Detail Modal – stat data values @regression', () => {
     playersPage,
   }) => {
     await setupMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -715,7 +715,7 @@ test.describe('Player Detail Modal – duplicate season deduplication @regressio
     playersPage,
   }) => {
     await setupMocks(page, { careerArcBody: DUPLICATE_SEASON_CAREER_ARC });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
@@ -734,7 +734,7 @@ test.describe('Player Detail Modal – duplicate season deduplication @regressio
     playersPage,
   }) => {
     await setupMocks(page, { careerArcBody: DUPLICATE_SEASON_CAREER_ARC });
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();

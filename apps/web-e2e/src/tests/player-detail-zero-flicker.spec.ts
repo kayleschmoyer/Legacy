@@ -413,7 +413,7 @@ test.describe('Player Detail – zero-flicker player switching @regression', () 
     // chance to render a loading spinner (or `displayData` = previousData holds
     // stale data on SPA re-renders). Either way no loading indicator is shown.
     await setupSwitchingMocks(page);
-    await playersPage.gotoDetail(1, 'networkidle');
+    await playersPage.gotoDetail(1);
 
     await playersPage.detail.expectOpen();
     await playersPage.detail.expectNotLoading();
