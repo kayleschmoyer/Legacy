@@ -75,7 +75,7 @@ const BASE_BASEBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'trades', label: 'Trades' },
   { id: 'standings', label: 'Standings' },
   { id: 'history', label: 'History' },
-  { id: 'chat', label: 'Chat' },
+  { id: 'chat', label: 'Chat', memberOnly: true },
   { id: 'commissioner', label: 'Settings', commishOnly: true },
 ];
 
@@ -932,7 +932,7 @@ export default function LeagueId(): React.JSX.Element {
           </YStack>
         )}
 
-        {visitedTabs.has('chat') && (
+        {visitedTabs.has('chat') && isMember && (
           <YStack flex={1} display={selectedTab === 'chat' ? 'flex' : 'none'}>
             <LeagueChatTab
               leagueId={numLeagueId}

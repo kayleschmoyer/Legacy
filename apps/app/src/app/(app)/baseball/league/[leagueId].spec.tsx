@@ -723,6 +723,58 @@ describe('BaseballLeagueId', () => {
     });
   });
 
+  describe('chat tab visibility for non-members (LS-9614 / LS-6295)', () => {
+    afterEach(() => {
+      // Restore the default searchParams mock — otherwise the `initialTab:
+      // 'chat'` override set below leaks into later tests that assume the
+      // page defaults to the Overview tab.
+      jest
+        .requireMock<{ useLocalSearchParams: jest.Mock }>('expo-router')
+        .useLocalSearchParams.mockReturnValue({ leagueId: '42' });
+    });
+
+    const asNonMember = () => {
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: null }, loading: false },
+      ]);
+    };
+
+    it('does not render the Chat tab for a non-member', () => {
+      asNonMember();
+      render(<BaseballLeagueId />);
+      expect(screen.queryByText('Chat')).toBeNull();
+    });
+
+    it('does not mount LeagueChatTab (and its failing getLeagueMessages query) for a non-member even via deep link', () => {
+      asNonMember();
+      const { useLocalSearchParams } = jest.requireMock<{
+        useLocalSearchParams: jest.Mock;
+      }>('expo-router');
+      useLocalSearchParams.mockReturnValue({
+        leagueId: '42',
+        initialTab: 'chat',
+      });
+
+      render(<BaseballLeagueId />);
+      expect(screen.queryByTestId('league-chat-tab')).toBeNull();
+    });
+
+    it('renders the Chat tab and mounts LeagueChatTab for a member', () => {
+      const { useLocalSearchParams } = jest.requireMock<{
+        useLocalSearchParams: jest.Mock;
+      }>('expo-router');
+      useLocalSearchParams.mockReturnValue({
+        leagueId: '42',
+        initialTab: 'chat',
+      });
+
+      render(<BaseballLeagueId />);
+      expect(screen.getByText('Chat')).toBeTruthy();
+      expect(screen.getByTestId('league-chat-tab')).toBeTruthy();
+    });
+  });
+
   describe('WebSocket token effect (LS-7627)', () => {
     type LifecycleProps = { token?: string; url?: string; leagueId?: number };
 
