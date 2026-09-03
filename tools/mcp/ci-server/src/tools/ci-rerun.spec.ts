@@ -65,17 +65,49 @@ describe('ciRerun', () => {
     });
   });
 
-  it('rejects scope="job" without jobId', async () => {
-    const result = await ciRerun({ runId: 101, scope: 'job' });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/jobId is required/);
-    expect(mockRerun).not.toHaveBeenCalled();
-  });
-
   it('rejects jobId without scope="job"', async () => {
     const result = await ciRerun({ runId: 101, jobId: 5 });
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/jobId requires scope="job"/);
+    expect(result.content[0].text).toMatch(
+      /jobId\/jobName requires scope="job"/,
+    );
+  });
+
+  it('scope="job" delegates jobName through (LS-9608)', async () => {
+    await ciRerun({ runId: 101, scope: 'job', jobName: 'Summarize' });
+    expect(mockRerun).toHaveBeenCalledWith({
+      runId: 101,
+      failedOnly: true,
+      jobId: undefined,
+      jobName: 'Summarize',
+      debug: undefined,
+    });
+  });
+
+  it('rejects scope="job" without jobId or jobName', async () => {
+    const result = await ciRerun({ runId: 101, scope: 'job' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/jobId or jobName is required/);
+    expect(mockRerun).not.toHaveBeenCalled();
+  });
+
+  it('rejects jobName without scope="job"', async () => {
+    const result = await ciRerun({ runId: 101, jobName: 'Summarize' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(
+      /jobId\/jobName requires scope="job"/,
+    );
+  });
+
+  it('rejects runIds combined with jobName', async () => {
+    const result = await ciRerun({
+      runIds: [1, 2],
+      scope: 'job',
+      jobName: 'Summarize',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/single-run only/);
+    expect(mockRerunBatch).not.toHaveBeenCalled();
   });
 
   it('withDiagnostics delegates to retryFailed', async () => {

@@ -8,6 +8,7 @@ interface CiRerunParams {
   runIds?: number[];
   scope?: 'failed' | 'job' | 'all';
   jobId?: number;
+  jobName?: string;
   withDiagnostics?: boolean;
   withFreshLogs?: boolean;
   debug?: boolean;
@@ -29,6 +30,7 @@ export async function ciRerun(params: CiRerunParams): Promise<ToolResult> {
     runIds,
     scope = 'failed',
     jobId,
+    jobName,
     withDiagnostics = false,
     withFreshLogs,
     debug,
@@ -39,9 +41,9 @@ export async function ciRerun(params: CiRerunParams): Promise<ToolResult> {
   }
 
   if (runIds !== undefined) {
-    if (scope === 'job' || jobId !== undefined) {
+    if (scope === 'job' || jobId !== undefined || jobName !== undefined) {
       return paramError(
-        'scope="job"/jobId is single-run only; not supported with runIds.',
+        'scope="job"/jobId/jobName is single-run only; not supported with runIds.',
       );
     }
     if (withDiagnostics) {
@@ -52,11 +54,11 @@ export async function ciRerun(params: CiRerunParams): Promise<ToolResult> {
     return rerunBatch({ runIds, failedOnly: scope !== 'all', debug });
   }
 
-  if (scope === 'job' && jobId === undefined) {
-    return paramError('jobId is required when scope="job".');
+  if (scope === 'job' && jobId === undefined && jobName === undefined) {
+    return paramError('jobId or jobName is required when scope="job".');
   }
-  if (jobId !== undefined && scope !== 'job') {
-    return paramError('jobId requires scope="job".');
+  if ((jobId !== undefined || jobName !== undefined) && scope !== 'job') {
+    return paramError('jobId/jobName requires scope="job".');
   }
 
   if (withDiagnostics) {
@@ -72,6 +74,7 @@ export async function ciRerun(params: CiRerunParams): Promise<ToolResult> {
     runId: runId as number,
     failedOnly: scope !== 'all',
     jobId: scope === 'job' ? jobId : undefined,
+    jobName: scope === 'job' ? jobName : undefined,
     debug,
   });
 }

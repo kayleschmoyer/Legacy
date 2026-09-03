@@ -145,6 +145,107 @@ describe('rerun', () => {
     });
   });
 
+  describe('jobName resolution (LS-9608)', () => {
+    it('resolves a jobName to its jobId and reruns that job', async () => {
+      mockGithubGet.mockResolvedValue({
+        jobs: [
+          { id: 1, name: 'Lint', conclusion: 'success' },
+          { id: 2, name: 'Summarize & Report', conclusion: 'success' },
+        ],
+      });
+
+      const result = await rerun({ runId: 123, jobName: 'summarize' });
+
+      expect(mockGithubGet).toHaveBeenCalledWith('/actions/runs/123/jobs', {
+        per_page: '100',
+        page: '1',
+        filter: 'latest',
+      });
+      expect(mockPostWithRetry).toHaveBeenCalledWith('/actions/jobs/2/rerun');
+      expect(result.isError).toBeUndefined();
+      const payload = JSON.parse(result.content[0].text) as {
+        scope: string;
+        jobId: number;
+        jobName: string;
+      };
+      expect(payload.scope).toBe('job');
+      expect(payload.jobId).toBe(2);
+      expect(payload.jobName).toBe('summarize');
+    });
+
+    it('errors when jobName matches no job', async () => {
+      mockGithubGet.mockResolvedValue({
+        jobs: [{ id: 1, name: 'Lint', conclusion: 'success' }],
+      });
+
+      const result = await rerun({ runId: 123, jobName: 'does-not-exist' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/No job matching jobName/);
+      expect(mockPostWithRetry).not.toHaveBeenCalled();
+    });
+
+    it('errors when jobName matches more than one job', async () => {
+      mockGithubGet.mockResolvedValue({
+        jobs: [
+          { id: 1, name: 'test-web', conclusion: 'success' },
+          { id: 2, name: 'test-app', conclusion: 'success' },
+        ],
+      });
+
+      const result = await rerun({ runId: 123, jobName: 'test' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/ambiguous/);
+      expect(mockPostWithRetry).not.toHaveBeenCalled();
+    });
+
+    it('prefers jobId over jobName when both are given', async () => {
+      await rerun({ runId: 123, jobId: 987, jobName: 'ignored' });
+
+      expect(mockGithubGet).not.toHaveBeenCalled();
+      expect(mockPostWithRetry).toHaveBeenCalledWith('/actions/jobs/987/rerun');
+    });
+
+    it('paginates past 100 jobs to find a match beyond the first page', async () => {
+      const firstPage = Array.from({ length: 100 }, (_, i) => ({
+        id: i + 1,
+        name: `job-${i + 1}`,
+        conclusion: 'success',
+      }));
+      const secondPage = [
+        { id: 101, name: 'Summarize & Report', conclusion: 'success' },
+      ];
+      mockGithubGet
+        .mockResolvedValueOnce({ jobs: firstPage })
+        .mockResolvedValueOnce({ jobs: secondPage });
+
+      const result = await rerun({ runId: 123, jobName: 'summarize' });
+
+      expect(mockGithubGet).toHaveBeenCalledTimes(2);
+      expect(mockGithubGet).toHaveBeenNthCalledWith(
+        1,
+        '/actions/runs/123/jobs',
+        {
+          per_page: '100',
+          page: '1',
+          filter: 'latest',
+        },
+      );
+      expect(mockGithubGet).toHaveBeenNthCalledWith(
+        2,
+        '/actions/runs/123/jobs',
+        {
+          per_page: '100',
+          page: '2',
+          filter: 'latest',
+        },
+      );
+      expect(mockPostWithRetry).toHaveBeenCalledWith('/actions/jobs/101/rerun');
+      expect(result.isError).toBeUndefined();
+    });
+  });
+
   describe('validation', () => {
     it('returns an error for a non-positive runId', async () => {
       const result = await rerun({ runId: -1, failedOnly: true });

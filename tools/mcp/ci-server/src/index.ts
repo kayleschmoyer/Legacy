@@ -172,12 +172,12 @@ export function createServer(): McpServer {
     'Prefer this over `gh run rerun` via shell. Rerun failed jobs, a specific job, the whole run, or up to 50 runs in one batch call. ' +
       'scope: "failed" (default) reruns only failed jobs, auto-escalating to a full run rerun when a job was left `cancelled` by an ' +
       "upstream dependency failure — GitHub's rerun-failed-jobs endpoint never reschedules those (LS-9212); check the response " +
-      '`scope`/`message` for `"run (escalated from failed-jobs)"`. scope: "job" reruns a single job via jobId (single-run only). ' +
-      'scope: "all" reruns the entire run. Pass runIds (1-50) instead of runId to rerun several runs independently in one call — ' +
-      'scope "job" and withDiagnostics are single-run only; batch results use the standard partial-failure shape ' +
-      '{ success, total, succeeded, failed }. withDiagnostics: true (single-run, scope "failed" only) is the triage-then-rerun ' +
-      'one-shot: fetches a short failure-log snippet and richer per-job payload before rerunning, and errors clearly ' +
-      '(never a silent no-op) when there are no failed jobs to rerun.',
+      '`scope`/`message` for `"run (escalated from failed-jobs)"`. scope: "job" reruns a single job via jobId or jobName ' +
+      '(single-run only; see jobName param). scope: "all" reruns the entire run. Pass runIds (1-50) instead of runId to rerun ' +
+      'several runs independently in one call — scope "job" and withDiagnostics are single-run only; batch results use the ' +
+      'standard partial-failure shape { success, total, succeeded, failed }. withDiagnostics: true (single-run, scope "failed" ' +
+      'only) is the triage-then-rerun one-shot: fetches a short failure-log snippet and richer per-job payload before rerunning, ' +
+      'and errors clearly (never a silent no-op) when there are no failed jobs to rerun.',
     {
       runId: z.coerce
         .number()
@@ -199,15 +199,20 @@ export function createServer(): McpServer {
         .enum(['failed', 'job', 'all'])
         .default('failed')
         .describe(
-          'What to rerun: "failed" (default), "job" (needs jobId, single-run only), or "all".',
+          'What to rerun: "failed" (default), "job" (needs jobId/jobName, single-run only), or "all".',
         ),
       jobId: z.coerce
         .number()
         .int()
         .positive()
         .optional()
+        .describe('Job ID to rerun; scope="job", single-run only.'),
+      jobName: z
+        .string()
+        .optional()
         .describe(
-          'Specific job ID to rerun; required with scope="job", single-run only.',
+          'jobId alternative for scope="job": case-insensitive substring match against the run\'s job list; errors ' +
+            'on zero or multiple matches.',
         ),
       withDiagnostics: coercedBoolean
         .default(false)

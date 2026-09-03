@@ -5,16 +5,74 @@ interface RerunParams {
   runId: number;
   failedOnly?: boolean;
   jobId?: number;
+  jobName?: string;
   debug?: boolean;
 }
 
 interface GitHubJob {
   id: number;
+  name: string;
   conclusion: string | null;
 }
 
 interface GitHubJobsResponse {
   jobs: GitHubJob[];
+}
+
+const JOBS_PER_PAGE = 100;
+
+/**
+ * Fetch every job on a run, paginating past GitHub's 100-per-page cap —
+ * large matrix workflows (e.g. DB integration tests) can have well over 100
+ * jobs, and a single unpaginated page would silently miss a match beyond
+ * the first 100 (review finding on LS-9608). Mirrors fetchAllJobs in
+ * retry-failed.ts.
+ */
+async function fetchAllJobs(runId: number): Promise<GitHubJob[]> {
+  const all: GitHubJob[] = [];
+  let page = 1;
+  for (;;) {
+    const { jobs } = await githubGet<GitHubJobsResponse>(
+      `/actions/runs/${runId}/jobs`,
+      { per_page: String(JOBS_PER_PAGE), page: String(page), filter: 'latest' },
+    );
+    all.push(...jobs);
+    if (jobs.length < JOBS_PER_PAGE) break;
+    page += 1;
+  }
+  return all;
+}
+
+/**
+ * Resolve a job name to its numeric id via a case-insensitive substring
+ * match against the run's job list — mirrors the jobName resolution already
+ * used by ci_get_logs (logs.ts). Throws (caught by the caller's try/catch)
+ * with a message naming the candidates on no match or an ambiguous match,
+ * since a single-job rerun must target exactly one job.
+ */
+async function resolveJobIdByName(
+  runId: number,
+  jobName: string,
+): Promise<number> {
+  const jobs = await fetchAllJobs(runId);
+  const nameLower = jobName.toLowerCase();
+  const matches = jobs.filter((j) => j.name.toLowerCase().includes(nameLower));
+
+  if (matches.length === 0) {
+    throw new Error(
+      `No job matching jobName "${jobName}" found in run ${runId}. ` +
+        `Available jobs: ${jobs.map((j) => j.name).join(', ') || '(none)'}.`,
+    );
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `jobName "${jobName}" matched ${matches.length} jobs in run ${runId} — ` +
+        `ambiguous. Matches: ${matches.map((j) => `${j.name} (${j.id})`).join(', ')}. ` +
+        `Pass jobId instead to disambiguate.`,
+    );
+  }
+
+  return matches[0].id;
 }
 
 /**
@@ -63,10 +121,16 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
   try {
     let escalatedToFullRerun = false;
 
-    if (params.jobId) {
+    const effectiveJobId = params.jobId
+      ? params.jobId
+      : params.jobName
+        ? await resolveJobIdByName(params.runId, params.jobName)
+        : undefined;
+
+    if (effectiveJobId) {
       // Rerun a specific job
       await postWithRetryOnAlreadyRunning(
-        `/actions/jobs/${params.jobId}/rerun`,
+        `/actions/jobs/${effectiveJobId}/rerun`,
       );
     } else if (params.failedOnly !== false) {
       // GitHub's rerun-failed-jobs endpoint only reschedules jobs with
@@ -98,8 +162,9 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
           text: JSON.stringify(
             {
               runId: params.runId,
-              jobId: params.jobId ?? null,
-              scope: params.jobId
+              jobId: effectiveJobId ?? null,
+              jobName: params.jobName ?? null,
+              scope: effectiveJobId
                 ? 'job'
                 : params.failedOnly === false
                   ? 'run'
