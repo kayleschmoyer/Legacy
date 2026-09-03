@@ -8170,15 +8170,17 @@
         },
         {
           "name": "browser_dev_stop",
-          "description": "Stop a tracked dev server. Specify by port, worktreePath, or set all=true to stop every tracked server. Uses taskkill on Windows to kill the entire process tree.",
+          "description": "Stop a tracked dev server by port, worktreePath, or all=true for every one. An untracked port falls back to an OS-level kill to free a stale process.",
           "inputs": {
             "port": {
               "type": "number",
               "optional": true,
               "constraints": [
-                "integer"
+                "integer",
+                "min 1",
+                "max 65535"
               ],
-              "description": "Port of the dev server to stop."
+              "description": "Port to stop."
             },
             "worktreePath": {
               "type": "string",

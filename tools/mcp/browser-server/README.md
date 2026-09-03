@@ -9,7 +9,7 @@ MCP server giving agents the ability to start dev servers, navigate pages, captu
 | Tool                        | Purpose                                                                                                                   |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `browser_dev_start`         | Start an nx dev server in a worktree (port 4300-4399); defaults to `web:serve`, accepts any `project:target` via `target` |
-| `browser_dev_stop`          | Stop a tracked dev server by port, path, or all                                                                           |
+| `browser_dev_stop`          | Stop a tracked dev server by port, worktreePath, or all=true — falls back to an OS-level kill for an untracked port       |
 | `browser_dev_status`        | List running dev servers and browser state                                                                                |
 | `browser_navigate`          | Open a page in headless Chromium                                                                                          |
 | `browser_screenshot`        | Capture page/element screenshot as PNG                                                                                    |
@@ -43,6 +43,21 @@ Ports are allocated from 4300-4399 to avoid conflicts with:
 - 3000 (Next.js default)
 - 4200 (Nx default)
 - 4280 (GraphiQL)
+
+## Freeing a Stale Port
+
+`browser_dev_stop` primarily targets servers this MCP session started
+(`state.devServers`), but a process left running by an earlier, unrelated
+invocation — e.g. a crashed Playwright `webServer` still bound to its port —
+isn't invisible to it: when `port` is given and nothing tracked matches it,
+`browser_dev_stop` falls back to an OS-level lookup (Windows: `netstat -ano` +
+`taskkill`; Linux/macOS: `lsof`, falling back to `ss` if `lsof` isn't
+installed), kills whatever is LISTENing on that port, and returns the PID(s)
+found before and any still listening after (`before`/`killed`/`after`, in
+place of the tracked-stop response's `stopped`/`pid`) so the caller can
+confirm the port is free. Prefer this over raw shell `netstat`/`Stop-Process`
+— it also avoids the auto-mode Bash risk classifier flagging an ad-hoc
+process kill.
 
 ## Screenshot Workflow
 

@@ -55,13 +55,15 @@ server.tool(
 // Tool 2: browser_dev_stop
 server.tool(
   'browser_dev_stop',
-  'Stop a tracked dev server. Specify by port, worktreePath, or set all=true to stop every tracked server. Uses taskkill on Windows to kill the entire process tree.',
+  'Stop a tracked dev server by port, worktreePath, or all=true for every one. An untracked port falls back to an OS-level kill to free a stale process.',
   {
     port: z
       .number()
       .int()
+      .min(1)
+      .max(65535)
       .optional()
-      .describe('Port of the dev server to stop.'),
+      .describe('Port to stop.'),
     worktreePath: z
       .string()
       .optional()
