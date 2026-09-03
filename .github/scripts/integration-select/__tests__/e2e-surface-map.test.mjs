@@ -153,6 +153,46 @@ describe('e2e surface-map selection', () => {
     );
   });
 
+  it('runs ALL specs when a shared E2E harness file changes (LS-9787)', () => {
+    // Page objects, mock factories, fixtures, component wrappers, drivers and
+    // the POM base classes are shared by dozens of specs each, so a change to
+    // any of them can break any spec — exactly what runAllWhenChanged is for.
+    // Before LS-9787 only utils/, global-setup.ts and playwright.config.ts were
+    // listed, so `players.page.ts` (which 107 specs reach) selected ZERO specs.
+    for (const file of [
+      'apps/web-e2e/src/pages/players.page.ts',
+      'apps/web-e2e/src/mocks/graphql/league.mocks.ts',
+      'apps/web-e2e/src/fixtures/shared-mocks.ts',
+      'apps/web-e2e/src/components/nav-header.component.ts',
+      'apps/web-e2e/src/driver/playwright-web.driver.ts',
+      'apps/web-e2e/src/base/base.page.ts',
+      'apps/web-e2e/src/support/canonical-routes.ts',
+    ]) {
+      const r = selectSpecs({ changedFiles: [file], manifest });
+      assert.equal(r.runAll, true, `expected runAll for ${file}`);
+    }
+  });
+
+  it('selects player-stats.spec.ts for an LS-9036-shaped features/players change (LS-9787)', () => {
+    // LS-8920 dropped features/players/** from runAllWhenChanged after verifying
+    // per-spec coverage at SUBFOLDER granularity: 9 specs mapped features/players,
+    // but not player-stats.spec.ts — whose page object asserts testIDs owned by
+    // features/players/shell/StateCards.tsx. LS-9036 renamed two of them and the
+    // spec landed deterministically red on main (fixed separately as LS-9762).
+    const r = selectSpecs({
+      changedFiles: [
+        'lib/shared-components/src/features/players/shell/StateCards.tsx',
+        'lib/shared-components/src/features/players/shell/StatsDataGrid.tsx',
+      ],
+      manifest,
+    });
+    assert.equal(r.runAll, false);
+    assert.ok(
+      r.specs.includes('apps/web-e2e/src/tests/player-stats.spec.ts'),
+      `expected player-stats.spec.ts in selection, got: ${r.specs.join(', ')}`,
+    );
+  });
+
   it('selects nothing for a docs-only change', () => {
     const r = selectSpecs({ changedFiles: ['README.md'], manifest });
     assert.equal(r.runAll, false);

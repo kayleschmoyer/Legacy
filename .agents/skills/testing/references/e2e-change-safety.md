@@ -72,13 +72,13 @@ Three of these deserve their own rule, because each produces a test that _passes
 
 The most important thing to internalise: **a green CI run on your PR does not mean the specs that cover your change ran.** PR CI runs the specs the surface map selects for your changed files, plus the always-on `@critical` net — and the live map under-selects on exactly the changes that break the suite.
 
-Reproduced against the live selector (`apps/web-e2e/src/e2e-surface-map.json`, the manifest `ci-pipeline.yml` actually uses):
+Reproduced against the live selector (`apps/web-e2e/src/e2e-surface-map.json`, the manifest `ci-pipeline.yml` actually uses), before and after LS-9787:
 
-| Change                                                                 | Live map selects                         | Graph-derived map (shadow) selects |
-| ---------------------------------------------------------------------- | ---------------------------------------- | ---------------------------------- |
-| `apps/web-e2e/src/pages/players.page.ts` only                          | **0 specs**                              | 107 specs                          |
-| LS-9036's changed files (`features/players/shell/StateCards.tsx` etc.) | 6 specs — **not** `player-stats.spec.ts` | 189 specs, including it            |
-| LS-9655's changed files (`mocks/graphql/league.mocks.ts` etc.)         | 2 specs — only the two edited spec files | `runAll` (217)                     |
+| Change                                                                 | Before LS-9787                           | Now (live map)        | Graph-derived map (shadow) |
+| ---------------------------------------------------------------------- | ---------------------------------------- | --------------------- | -------------------------- |
+| `apps/web-e2e/src/pages/players.page.ts` only                          | **0 specs**                              | `runAll` (218)        | 107 specs                  |
+| LS-9036's changed files (`features/players/shell/StateCards.tsx` etc.) | 6 specs — **not** `player-stats.spec.ts` | 7 specs, including it | 189 specs, including it    |
+| LS-9655's changed files (`mocks/graphql/league.mocks.ts` etc.)         | 2 specs — only the two edited spec files | `runAll` (218)        | `runAll` (217)             |
 
 Check it yourself for your own diff before you trust a green run:
 
@@ -86,12 +86,22 @@ Check it yourself for your own diff before you trust a green run:
 git diff --name-only origin/main...HEAD | node .github/scripts/integration-select/select-specs.mjs --manifest apps/web-e2e/src/e2e-surface-map.json --changed-from-stdin --json
 ```
 
-Two causes, both real and both currently open:
+**LS-9787 closed the shared-harness hole.** `pages/**`, `mocks/**`, `fixtures/**`, `components/**`, `driver/**`, `base/**` and `support/**` are now in `runAllWhenChanged` alongside `utils/**`, so a page object or mock-factory edit forces the full suite instead of selecting nothing. Measured cost on a 80-PR sample: full-suite trip rate 22.5% → 23.8%.
 
-1. **The shared E2E harness is not in `runAllWhenChanged`.** It lists `apps/web-e2e/src/utils/**`, `global-setup.ts` and `playwright.config.ts` — but not `pages/**`, `mocks/**`, `fixtures/**`, `components/**` or `driver/**`. A change to a page object or a mock factory therefore selects nothing.
-2. **LS-8920 dropped ten `lib/shared-components/src/features/*` directories from `runAllWhenChanged`** (`analytics`, `auth`, `baseball`, `elite-draft`, `football`, `leagues`, `matchup`, `players`, `roster`, `stats`) after verifying each had per-spec coverage. That verification was at _subfolder_ granularity: nine specs map `features/players`, but not `player-stats.spec.ts`, the one that broke.
+**One hole is still open, and it is the one that bit LS-9036.** LS-8920 dropped ten `lib/shared-components/src/features/*` directories from `runAllWhenChanged` (`analytics`, `auth`, `baseball`, `elite-draft`, `football`, `leagues`, `matchup`, `players`, `roster`, `stats`) after verifying each had per-spec coverage — at _subfolder_ granularity. LS-9787 re-audited that at spec granularity, using testID ownership as the oracle (a testID defined only inside a dropped subfolder and referenced by an e2e page object is a real, invisible coupling):
 
-The graph-derived map (LS-9661) closes all three cases and already runs in CI — but in **shadow mode only** (`ci-pipeline.yml` → "Shadow: graph-derived E2E selection"). The flip is tracked by LS-9689, which is closed `Done` without the flip having landed. Both the flip and the interim `runAllWhenChanged` patch are now tracked by **LS-9787**.
+| Dropped subfolder                                 | Specs coupled but unmapped | Cost to restore (80-PR sample) | LS-9787 action                      |
+| ------------------------------------------------- | -------------------------- | ------------------------------ | ----------------------------------- |
+| `leagues`                                         | 103                        | 0 PRs                          | **restored** to `runAllWhenChanged` |
+| `players`                                         | 101                        | 4 PRs (5.0pp)                  | **not restored** — see below        |
+| `baseball`                                        | 2                          | 0 PRs                          | **restored**                        |
+| `football`                                        | 1                          | 0 PRs                          | **restored**                        |
+| `elite-draft`                                     | 0                          | 2 PRs (2.5pp)                  | left dropped (LS-8920 was right)    |
+| `analytics`, `auth`, `matchup`, `roster`, `stats` | 0                          | 0 PRs                          | left dropped                        |
+
+`features/players/**` is the expensive one: 101 specs reach a players-owned testID through `players.page.ts`, but restoring it to run-all costs 5pp of full-suite escalation. LS-9787 took the surgical half instead — `player-stats.spec.ts` now carries the `features/players/**` glob its nine sibling player specs already had, which is the exact entry LS-8920 missed and LS-9762 paid for. **The residual 100-spec exposure is real and still open**: a change to `lib/shared-components/src/features/players/**` still selects far fewer specs than actually depend on it. That, and the derived-map cutover, are tracked by the LS-9689 successor.
+
+The graph-derived map (LS-9661) closes the residual properly and already runs in CI — but in **shadow mode only** (`ci-pipeline.yml` → "Shadow: graph-derived E2E selection"). The flip is tracked by LS-9689, which is closed `Done` without the flip having landed; its successor owns the cutover.
 
 Until that lands, the compensating control is you: **run the specs your reverse lookup found, locally, regardless of what CI selected.**
 
@@ -196,4 +206,4 @@ Before pushing a change to `apps/web`, `lib/shared-components`, or the E2E harne
 
 ## Provenance and maintenance
 
-Derived from an evaluation of the ~41 E2E fix commits merged 2026-07-01 → 2026-08-31 (LS-9788), then corrected and extended against the full 412-commit fix history (LS-9789 — which added the baseline-mock-value shape, the two-outcome unmocked-operation semantics, the enum-drift rule, and the `DESKTOP_GRID_ONLY_SPECS` note). Every claim traces to a cited commit or ticket. The Part 2 selection numbers were reproduced locally against `main` at `ae09e9409`; re-run the `select-specs.mjs` command above to re-verify them, and delete Part 2's first two causes once **LS-9787** lands.
+Derived from an evaluation of the ~41 E2E fix commits merged 2026-07-01 → 2026-08-31 (LS-9788), then corrected and extended against the full 412-commit fix history (LS-9789 — which added the baseline-mock-value shape, the two-outcome unmocked-operation semantics, the enum-drift rule, and the `DESKTOP_GRID_ONLY_SPECS` note). Every claim traces to a cited commit or ticket. The Part 2 selection numbers were re-measured against `main` at `624b97be1` when **LS-9787** landed the shared-harness `runAllWhenChanged` patch and the spec-granularity re-audit; re-run the `select-specs.mjs` command above to re-verify them. Delete Part 2's remaining `features/players/**` caveat once the LS-9689 successor flips selection to the derived map.
