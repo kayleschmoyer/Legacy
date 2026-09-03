@@ -450,6 +450,16 @@ export const CreateMatchupInput = builder.inputType('CreateMatchupInput', {
   }),
 });
 
+// Input type for setMatchupLineup — one player's target position within a
+// bulk lineup save (LS-6374). Omitting positionId (or passing null) benches
+// the player.
+export const LineupPositionInput = builder.inputType('LineupPositionInput', {
+  fields: (t) => ({
+    matchupPlayerId: t.int({ required: true }),
+    positionId: t.int({ required: false }),
+  }),
+});
+
 // ── Advance League Week Response ─────────────────────────────────────────────
 
 // Response type for advanceLeagueWeek

@@ -1993,6 +1993,11 @@ type LeagueSeasonSummary {
   totalMatchups: Int
 }
 
+input LineupPositionInput {
+  matchupPlayerId: Int!
+  positionId: Int
+}
+
 """
 A head-to-head matchup between two teams in a league
 """
@@ -2939,6 +2944,11 @@ type Mutation {
   Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear.
   """
   setDraftQueue(draftId: Int!, playerIds: [Int!]!): [DraftQueueEntry!]
+  setMatchupLineup(
+    matchupId: Int!
+    positions: [LineupPositionInput!]!
+    teamId: Int!
+  ): [MatchupPlayer!]
 
   """
   Set or clear a custom nickname for a player on your roster. Pass null or empty string to remove the nickname.

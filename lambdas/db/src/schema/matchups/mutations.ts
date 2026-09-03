@@ -25,6 +25,7 @@ import { randomUUID } from 'crypto';
 import {
   AdvanceLeagueWeekResponse,
   CreateMatchupInput,
+  LineupPositionInput,
   Matchup,
   MatchupPlayer,
   MatchupStatus,
@@ -1642,6 +1643,283 @@ builder.mutationField('setOptimalLineup', (t) =>
         leaguePositions,
         optimizerPlayers,
       });
+
+      return updated.map((r) => ({
+        ...r,
+        positionId: r.positionId ?? null,
+        season: seasonMap.get(r.playerId) ?? null,
+      }));
+    },
+  }),
+);
+
+/**
+ * Atomically apply a full set of position assignments for one team's matchup
+ * roster in a single transaction (LS-6374 / FMD-017).
+ *
+ * Reorganizing N players previously required N separate
+ * `updateMatchupPlayerPosition` round-trips. This applies the same
+ * clear-then-evict-then-assign approach as
+ * `performMatchupPlayerPositionSwap`, generalized to an arbitrary-length
+ * batch: clear every row being touched first, evict any row outside the
+ * batch still holding one of the target slots (e.g. left behind by a
+ * concurrent roster-tab sync), then assign the new positions — avoiding
+ * collisions with the `matchup_players_unique_slot_idx` partial unique index
+ * (LS-8412) the same way the pairwise swap does.
+ *
+ * Exported standalone so it can be exercised directly against a real
+ * Postgres instance in integration tests.
+ */
+export async function performSetMatchupLineup(
+  db: GenericDatabase<typeof PublicSchema>,
+  params: {
+    matchupId: number;
+    teamId: number;
+    positions: Array<{ matchupPlayerId: number; positionId: number | null }>;
+  },
+): Promise<
+  Array<{
+    id: number;
+    matchupId: number;
+    playerId: number;
+    teamId: number;
+    positionId: number | null;
+  }>
+> {
+  const { matchupId, teamId, positions } = params;
+  const matchupPlayerIds = positions.map((p) => p.matchupPlayerId);
+
+  return db.transaction(async (tx) => {
+    // Clear every row being touched first to avoid unique constraint
+    // violations when assignments below re-shuffle slots.
+    await tx
+      .update(PublicSchema.matchupPlayers)
+      .set({ positionId: null })
+      .where(inArray(PublicSchema.matchupPlayers.id, matchupPlayerIds));
+
+    // A row outside this batch (e.g. from a concurrent roster-tab sync) may
+    // still hold one of the target slots — evict it first so the
+    // assignments below can't collide with matchup_players_unique_slot_idx.
+    const targetPositionIds = positions
+      .map((p) => p.positionId)
+      .filter((positionId): positionId is number => positionId != null);
+
+    if (targetPositionIds.length > 0) {
+      await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: null })
+        .where(
+          and(
+            eq(PublicSchema.matchupPlayers.matchupId, matchupId),
+            eq(PublicSchema.matchupPlayers.teamId, teamId),
+            inArray(PublicSchema.matchupPlayers.positionId, targetPositionIds),
+            not(inArray(PublicSchema.matchupPlayers.id, matchupPlayerIds)),
+          ),
+        );
+    }
+
+    // Assign new positions and mark every touched row as manually edited so
+    // future roster-tab propagation does not overwrite these intentional
+    // choices.
+    const updated: Array<{
+      id: number;
+      matchupId: number;
+      playerId: number;
+      teamId: number;
+      positionId: number | null;
+    }> = [];
+
+    for (const { matchupPlayerId, positionId } of positions) {
+      const [row] = await tx
+        .update(PublicSchema.matchupPlayers)
+        .set({ positionId: positionId ?? null, manuallyEdited: true })
+        .where(eq(PublicSchema.matchupPlayers.id, matchupPlayerId))
+        .returning({
+          id: PublicSchema.matchupPlayers.id,
+          matchupId: PublicSchema.matchupPlayers.matchupId,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          teamId: PublicSchema.matchupPlayers.teamId,
+          positionId: PublicSchema.matchupPlayers.positionId,
+        });
+
+      if (!row) {
+        throw NotFoundError(
+          `Failed to set matchup lineup: matchup player ${matchupPlayerId} no longer exists`,
+        );
+      }
+      updated.push(row);
+    }
+
+    return updated;
+  });
+}
+
+// Mutation: setMatchupLineup
+// Bulk-saves an entire team's matchup lineup in a single round-trip and
+// transaction, instead of one `updateMatchupPlayerPosition` call per player
+// (LS-6374 / FMD-017).
+builder.mutationField('setMatchupLineup', (t) =>
+  t.field({
+    type: [MatchupPlayer],
+    args: {
+      matchupId: t.arg.int({ required: true }),
+      teamId: t.arg.int({ required: true }),
+      positions: t.arg({ type: [LineupPositionInput], required: true }),
+    },
+    resolve: async (_parent, args, context) => {
+      if (!context.user) {
+        throw AuthenticationError();
+      }
+
+      const { matchupId, teamId, positions } = args;
+
+      if (positions.length === 0) {
+        throw UserInputError('positions must contain at least one entry');
+      }
+
+      const matchupPlayerIds = positions.map((p) => p.matchupPlayerId);
+      if (new Set(matchupPlayerIds).size !== matchupPlayerIds.length) {
+        throw UserInputError(
+          'positions contains duplicate matchupPlayerId values',
+        );
+      }
+
+      const targetPositionIds = positions
+        .map((p) => p.positionId)
+        .filter((positionId): positionId is number => positionId != null);
+      if (new Set(targetPositionIds).size !== targetPositionIds.length) {
+        throw UserInputError('positions contains duplicate positionId values');
+      }
+
+      const db = context.db;
+
+      const matchupResult = await db
+        .select({
+          id: PublicSchema.matchups.id,
+          leagueId: PublicSchema.matchups.leagueId,
+          weekNumber: PublicSchema.matchups.weekNumber,
+          status: PublicSchema.matchups.status,
+        })
+        .from(PublicSchema.matchups)
+        .where(eq(PublicSchema.matchups.id, matchupId))
+        .limit(1);
+
+      if (!matchupResult[0]) {
+        throw NotFoundError('Matchup not found');
+      }
+      const matchup = matchupResult[0];
+
+      // Only allow edits when matchup is scheduled (not yet locked)
+      if (matchup.status !== 'scheduled') {
+        throw MatchupLockedError(matchup.status);
+      }
+
+      // Verify the caller may edit this team's roster: either they own the
+      // team, or they hold a commissioner/GM/assistant_manager bypass.
+      const memberResult = await db
+        .select({
+          teamId: PublicSchema.leagueMembers.teamId,
+          permissionLevel: PublicSchema.leagueMembers.permissionLevel,
+        })
+        .from(PublicSchema.leagueMembers)
+        .where(
+          and(
+            eq(PublicSchema.leagueMembers.leagueId, matchup.leagueId),
+            eq(PublicSchema.leagueMembers.userId, context.user.id),
+          ),
+        )
+        .limit(1);
+
+      if (memberResult.length === 0) {
+        throw ForbiddenError('Not a member of this league');
+      }
+
+      const isCommissioner =
+        memberResult[0].permissionLevel === 'commissioner' ||
+        memberResult[0].permissionLevel === 'general_manager' ||
+        memberResult[0].permissionLevel === 'assistant_manager';
+
+      if (!isCommissioner && memberResult[0].teamId !== teamId) {
+        throw ForbiddenError('You can only modify your own team roster');
+      }
+
+      const isCommissionerBypass =
+        isCommissioner && memberResult[0].teamId !== teamId;
+
+      // Verify every matchup player being edited actually belongs to this
+      // matchup + team — prevents cross-team/cross-matchup edits via a
+      // crafted matchupPlayerId list, and gives us the "before" state for
+      // commissioner-bypass audit logging.
+      const existingRows = await db
+        .select({
+          id: PublicSchema.matchupPlayers.id,
+          playerId: PublicSchema.matchupPlayers.playerId,
+          positionId: PublicSchema.matchupPlayers.positionId,
+        })
+        .from(PublicSchema.matchupPlayers)
+        .where(
+          and(
+            inArray(PublicSchema.matchupPlayers.id, matchupPlayerIds),
+            eq(PublicSchema.matchupPlayers.matchupId, matchupId),
+            eq(PublicSchema.matchupPlayers.teamId, teamId),
+          ),
+        );
+
+      if (existingRows.length !== matchupPlayerIds.length) {
+        throw NotFoundError(
+          'One or more matchup players do not belong to the given matchup and team',
+        );
+      }
+
+      const beforeById = new Map(existingRows.map((r) => [r.id, r]));
+
+      const updated = await performSetMatchupLineup(db, {
+        matchupId,
+        teamId,
+        positions: positions.map((p) => ({
+          matchupPlayerId: p.matchupPlayerId,
+          positionId: p.positionId ?? null,
+        })),
+      });
+
+      if (isCommissionerBypass) {
+        await Promise.all(
+          updated.map((row) => {
+            const before = beforeById.get(row.id);
+            return auditAndNotifyCommissionerBypass(context, {
+              leagueId: matchup.leagueId,
+              targetTeamId: teamId,
+              matchupPlayerId: row.id,
+              playerId: row.playerId,
+              before: { positionId: before?.positionId ?? null },
+              after: { positionId: row.positionId ?? null },
+            });
+          }),
+        );
+      }
+
+      // Resolve seasons for response
+      const playerIds = updated.map((r) => r.playerId);
+      const seasonsResults = await db
+        .select({
+          playerId: PublicSchema.leagueWeekPlayerSeasons.playerId,
+          season: PublicSchema.leagueWeekPlayerSeasons.season,
+        })
+        .from(PublicSchema.leagueWeekPlayerSeasons)
+        .where(
+          and(
+            eq(PublicSchema.leagueWeekPlayerSeasons.leagueId, matchup.leagueId),
+            eq(
+              PublicSchema.leagueWeekPlayerSeasons.weekNumber,
+              matchup.weekNumber,
+            ),
+            inArray(PublicSchema.leagueWeekPlayerSeasons.playerId, playerIds),
+          ),
+        );
+
+      const seasonMap = new Map(
+        seasonsResults.map((s) => [s.playerId, s.season]),
+      );
 
       return updated.map((r) => ({
         ...r,

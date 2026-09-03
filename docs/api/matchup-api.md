@@ -28,6 +28,7 @@ Every matchup query and most mutations require an authenticated user
 | `updateMatchupStatus`           | Admin or system request                                               |
 | `updateMatchupPlayerPosition`   | Owner of the team or commissioner                                     |
 | `swapMatchupPlayerPositions`    | Owner of the team or commissioner                                     |
+| `setMatchupLineup`              | Owner of the team or commissioner                                     |
 | `autoSelectGames`               | System request, admin, or league-scoped commissioner / GM / assistant |
 | `autoAdvanceMatchups`           | System request, admin, or league-scoped commissioner / GM / assistant |
 
@@ -239,12 +240,31 @@ type Mutation {
     positionIdA: Int
     positionIdB: Int
   ): [MatchupPlayer!]
+  setMatchupLineup(
+    matchupId: Int!
+    teamId: Int!
+    positions: [LineupPositionInput!]!
+  ): [MatchupPlayer!]
+}
+
+input LineupPositionInput {
+  matchupPlayerId: Int!
+  positionId: Int
 }
 ```
 
-Both verify the caller owns the team via `verifyMatchupTeamOwnership` (or
-the caller is the league commissioner). Setting `position_id` flips
+All three verify the caller owns the team via `verifyMatchupTeamOwnership` /
+the equivalent team-membership check (or the caller is the league
+commissioner, GM, or assistant manager). Setting `position_id` flips
 `manually_edited = true` so the row is preserved across roster propagation.
+
+`setMatchupLineup` (LS-6374 / FMD-017) saves an entire team's lineup — an
+arbitrary-length array of `{matchupPlayerId, positionId}` — in a single
+round-trip and transaction, instead of one `updateMatchupPlayerPosition`
+call per player. Every `matchupPlayerId` in `positions` must belong to the
+given `matchupId` + `teamId`; `positionId` values in the array must be
+unique (no two players targeting the same slot in one call). Omitting
+`positionId` (or passing `null`) benches that player.
 
 ### Scheduled / system mutations
 
@@ -391,10 +411,10 @@ mutation MovePlayer($matchupPlayerId: Int!, $positionId: Int!) {
 > server-side roster propagation only. See
 > [Schema and roster](../architecture/matchup-system.md#1-schema-and-roster-lib-db-clientsrcdrizzlepublicmodelsmatchupsts).
 >
-> **Lineup window.** Both `updateMatchupPlayerPosition` and
-> `swapMatchupPlayerPositions` require `matchup.status === 'scheduled'` —
-> they throw once the contest has started (`in_progress`) or finished
-> (`completed`). See
+> **Lineup window.** `updateMatchupPlayerPosition`,
+> `swapMatchupPlayerPositions`, and `setMatchupLineup` all require
+> `matchup.status === 'scheduled'` — they throw once the contest has
+> started (`in_progress`) or finished (`completed`). See
 > [Status machine and automated progression](../architecture/matchup-system.md#4-status-machine-and-automated-progression)
 > for who flips `scheduled → in_progress`.
 

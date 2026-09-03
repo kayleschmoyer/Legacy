@@ -1690,6 +1690,11 @@ export type LeagueSeasonSummary = {
   totalMatchups?: Maybe<Scalars['Int']['output']>;
 };
 
+export type LineupPositionInput = {
+  matchupPlayerId: Scalars['Int']['input'];
+  positionId?: InputMaybe<Scalars['Int']['input']>;
+};
+
 /** A head-to-head matchup between two teams in a league */
 export type Matchup = {
   __typename?: 'Matchup';
@@ -2150,6 +2155,7 @@ export type Mutation = {
   setDraftOrder?: Maybe<Draft>;
   /** Replace the current user's draft queue for a draft. The order of playerIds defines pick priority (index 0 = first pick). Pass an empty array to clear. */
   setDraftQueue?: Maybe<Array<DraftQueueEntry>>;
+  setMatchupLineup?: Maybe<Array<MatchupPlayer>>;
   /** Set or clear a custom nickname for a player on your roster. Pass null or empty string to remove the nickname. */
   setNickname?: Maybe<TeamMember>;
   /** Premium (LS-6378): sets a football team’s starting lineup to the combination of rostered players that maximizes total projected points for the matchup week, respecting each starting slot’s position eligibility. Requires ENTITLEMENTS.optimal_lineup and team ownership; only available while the matchup is scheduled. */
@@ -2727,6 +2733,12 @@ export type MutationSetDraftOrderArgs = {
 export type MutationSetDraftQueueArgs = {
   draftId: Scalars['Int']['input'];
   playerIds: Array<Scalars['Int']['input']>;
+};
+
+export type MutationSetMatchupLineupArgs = {
+  matchupId: Scalars['Int']['input'];
+  positions: Array<LineupPositionInput>;
+  teamId: Scalars['Int']['input'];
 };
 
 export type MutationSetNicknameArgs = {
