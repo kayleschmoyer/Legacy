@@ -213,6 +213,8 @@ worktree_push()
 
 ### Step 6: Event handling loop
 
+Wake-source choice, cadence, and what to do on a wake that needs no action are owned by **[mcp-first / waiting-and-wakeups](../../mcp-first/references/waiting-and-wakeups.md)** — including the [Periodic Wake Protocol](../../mcp-first/references/waiting-and-wakeups.md#periodic-wake-protocol) for sessions without `gh`.
+
 After fixing all known issues, **arm the canonical PR watch, then idle** — the watch re-invokes this session on the next actionable event:
 
 ```
@@ -224,7 +226,7 @@ The script path must be **absolute** — `Monitor` is not guaranteed to run with
 
 > **Precondition for waiting on PR events (LS-8544)**: never end a turn with the PR in a non-terminal state unless the watch is armed. The watch polls harness-side (zero tokens) and emits only actionable transitions — red required contexts, corroborated conflicts, new reviews, escalation labels, SKIPPED-pipeline stalls, MERGED/CLOSED — and heartbeats `.claude/.pr-watch-armed-<PR#>` so the stop guard permits idling. Native push notifications remain a bonus accelerant, but they are not load-bearing: **merge-conflict transitions from main advancing are never delivered natively**, and CI/review notifications have observably failed to arrive (stuck PRs #6161/#6163). Treat `github_view_pr` and `ci_view_run` as one-shot lookups (e.g. to fetch a `runId` after a failure event), never poll targets — `Start-Sleep`/`sleep` + repeated reads are still banned. See the [mcp-first CI Operations section](../../mcp-first/SKILL.md#ci-operations).
 >
-> **On every wake-up**, re-check overall PR state via `github_pr_why_blocked` before assuming the last known state still holds — events can supersede each other while the session is idle.
+> **On every wake-up**, re-check state before assuming the last known state still holds — events can supersede each other while the session is idle. Use the two-call wake procedure in [waiting-and-wakeups](../../mcp-first/references/waiting-and-wakeups.md#wake-procedure--one-turn-two-calls) (`github_pr_batch_status` + the state file); reach for `github_pr_why_blocked` only when that shows a blocker you cannot classify.
 >
 > **And a watch/notification only helps a bound, PR-branch session** — see the `worktree_set` gotcha below. If this session never completed Step 4 (PR-branch checkout + `worktree_set`) — e.g. it is a chip or cloud session still on its auto-generated `claude/<name>` branch — do not enter this loop at all: re-arm `bot:ready-for-review`, report the hand-off, and stop.
 

@@ -16,7 +16,7 @@ Before responding to any event:
 2. **Identify the check or actor** — the check name or comment author determines which triage branch to follow.
 3. **Read state once, act once** — use `github_view_pr` and `github_get_review_threads` as one-shot lookups. Do not call them in a loop. See Critical Rule #11 in [pr-lifecycle](../SKILL.md).
 4. **Batch all known fixes into one push** — if a failing check AND unresolved review threads are both present, fix both before pushing. Separate pushes trigger separate CI and review cycles.
-5. **Handling (or skipping) an event is not a stopping point.** Acting on one event, replying to a review, or deciding an event is a no-op does **not** end your responsibility for the PR. Keep watching until the PR reaches a [terminal state](drive.md#terminal-states-the-only-places-this-loop-may-stop): `MERGED`, `CLOSED`, or a human-only blocker you have surfaced with a label **and** an explicit message. A session that processes one event and exits while the PR is still `CHANGES_REQUESTED` or has a red/`SKIPPED` pipeline is the top cause of "the PR got a review but nothing happened." See [When to Skip](#when-to-skip-no-action) for why skip ≠ done.
+5. **Handling (or skipping) an event is not a stopping point.** Acting on one event, replying to a review, or deciding an event is a no-op does **not** end your responsibility for the PR. Keep watching until the PR reaches a [terminal state](drive.md#terminal-states-the-only-places-this-loop-may-stop): `MERGED`, `CLOSED`, or a human-only blocker you have surfaced with a label **and** an explicit message. **Ending the _turn_ is not abandoning the _loop_.** With the next wake armed — watch monitor, or a one-shot reminder per the [Periodic Wake Protocol](../../mcp-first/references/waiting-and-wakeups.md#periodic-wake-protocol) — ending your turn silently is correct and expected: it is what makes a no-op wake cost nothing. The failure is ending a turn with **nothing armed** while the PR is still `CHANGES_REQUESTED` or has a red/`SKIPPED` pipeline — that is the top cause of "the PR got a review but nothing happened." See [When to Skip](#when-to-skip-no-action) for why skip ≠ done.
 
 ---
 
@@ -177,9 +177,17 @@ Read carefully. If the comment contains instructions or a question directed at t
 
 ---
 
+## Wakes and re-arming
+
+How this session is woken, at what cadence, and what to do on a wake that needs no action — including the **Periodic Wake Protocol** for environments without `gh` (CCR) — live in **[mcp-first / waiting-and-wakeups](../../mcp-first/references/waiting-and-wakeups.md)**. That file is the single home for wake doctrine; this one owns event _triage_ only.
+
+Two rules from there govern every branch below: **re-arm conditionally** (terminal and wedge branches do not re-arm) and **silent branches are silent** (no prose, no PR comment, no status post).
+
+---
+
 ## When to Skip (No Action)
 
-> **"Skip" means "this event needs no action" — not "the PR is done."** After skipping, keep watching for the next event. Only stop at a [terminal state](drive.md#terminal-states-the-only-places-this-loop-may-stop) (MERGED / CLOSED / surfaced human-only blocker). Ending your turn just because the last event was a no-op, while the PR is still `CHANGES_REQUESTED` or its pipeline is red/`SKIPPED`, is the abandonment failure this skill exists to prevent.
+> **"Skip" means "this event needs no action" — not "the PR is done."** After skipping, keep watching for the next event. Only stop at a [terminal state](drive.md#terminal-states-the-only-places-this-loop-may-stop) (MERGED / CLOSED / surfaced human-only blocker). Ending your turn on a no-op is fine — expected, even — **so long as the next wake is armed**; see [Invariant 3](../../mcp-first/references/waiting-and-wakeups.md#invariants), which requires those turns be silent. What this skill exists to prevent is ending a turn with **nothing armed** while the PR is still `CHANGES_REQUESTED` or its pipeline is red/`SKIPPED`.
 
 Not every event requires a response. Skip when:
 

@@ -36,7 +36,11 @@ const SPINE_FILE = join(
 
 // Tool names retired from the MCP servers / harness. Mentions are warnings,
 // not errors, because docs may legitimately name them when documenting the
-// retirement (e.g. "ScheduleWakeup was replaced by Monitor").
+// retirement (e.g. "github_pr_files was replaced by github_pr_diff").
+// NOTE: ScheduleWakeup was listed here but is NOT retired — it still ships as a
+// harness tool scoped to /loop dynamic pacing (verified 2026-09-03). It is simply
+// not a PR/CI wait primitive; that rule lives in
+// .agents/skills/mcp-first/references/waiting-and-wakeups.md.
 const RETIRED_TOOL_PATTERNS = [
   { name: 'github_list_review_threads', re: /\bgithub_list_review_threads\b/ },
   {
@@ -44,7 +48,6 @@ const RETIRED_TOOL_PATTERNS = [
     re: /\bgithub_resolve_thread\b(?!s)/,
   },
   { name: 'github_pr_files', re: /\bgithub_pr_files\b/ },
-  { name: 'ScheduleWakeup', re: /\bScheduleWakeup\b/ },
 ];
 
 // Skip third-party skills managed via skills-lock.json — they may use
