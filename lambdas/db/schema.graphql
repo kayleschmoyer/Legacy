@@ -2014,6 +2014,11 @@ type Matchup {
   recap: MatchupRecap
 
   """
+  Whether this matchup's persisted score was computed before the league's current scoring settings. Null when the matchup has no persisted score.
+  """
+  scoringIsStale: Boolean
+
+  """
   Number of unique games selected for this matchup
   """
   selectedGamesCount: Int

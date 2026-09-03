@@ -66,6 +66,16 @@ export const matchups = pgTable(
      * subsequent fetches read the cached JSON instead of regenerating (LS-5878).
      */
     recapJson: jsonb('recap_json').$type<Record<string, unknown>>(),
+    /**
+     * When team1_score / team2_score were last computed (LS-9665).
+     *
+     * NULL means the score predates scoring provenance, or was never computed.
+     * Distinct from `updatedAt`, which any write to the row bumps — including
+     * status and statsLoadingStatus transitions that leave the score untouched.
+     * Every writer of the score columns must stamp this; see
+     * `updateMatchupScore` in PublicDbClient.
+     */
+    scoredAt: timestamp('scored_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

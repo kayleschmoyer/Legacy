@@ -357,6 +357,10 @@ builder.mutationField('editMatchupScore', (t) =>
           team1Score: String(team1Score),
           team2Score: String(team2Score),
           updatedAt: new Date(),
+          // Every writer of the score columns stamps scoring provenance
+          // (LS-9665). A commissioner's hand-entered score is current as of the
+          // moment it was entered, so it is not stale.
+          scoredAt: new Date(),
         })
         .where(eq(PublicSchema.matchups.id, matchupId));
 
@@ -824,10 +828,11 @@ builder.mutationField('recalculateLeagueMatchupScores', (t) =>
           recalculated++;
         } catch (err) {
           failed++;
-          LOGGER.error('Failed to recalculate matchup score', {
-            matchupId: matchup.id,
-            error: err instanceof Error ? err.message : String(err),
-          });
+          LOGGER.error(
+            'Failed to recalculate matchup score',
+            err instanceof Error ? err : new Error(String(err)),
+            { matchupId: matchup.id },
+          );
         }
       }
 

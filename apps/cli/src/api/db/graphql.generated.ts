@@ -1702,6 +1702,8 @@ export type Matchup = {
   pitcherStartsPerMatchup?: Maybe<Scalars['Int']['output']>;
   /** Auto-generated narrative recap, only available for completed matchups. */
   recap?: Maybe<MatchupRecap>;
+  /** Whether this matchup's persisted score was computed before the league's current scoring settings. Null when the matchup has no persisted score. */
+  scoringIsStale?: Maybe<Scalars['Boolean']['output']>;
   /** Number of unique games selected for this matchup */
   selectedGamesCount?: Maybe<Scalars['Int']['output']>;
   startTime?: Maybe<Scalars['String']['output']>;

@@ -4,7 +4,11 @@
 
 import DataLoader from 'dataloader';
 import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
-import { type GenericDatabase, PublicSchema } from '@legacy-sports/db-client';
+import {
+  type GenericDatabase,
+  getLatestScoringChangeAtByLeague,
+  PublicSchema,
+} from '@legacy-sports/db-client';
 import {
   type FootballScoringSettings,
   getDefaultFootballScoringSettings,
@@ -472,4 +476,27 @@ export const createPlayoffMatchupsByBracketLoader = (
     }
 
     return keys.map((key) => matchupsMap.get(key) ?? []);
+  });
+
+/**
+ * DataLoader for the latest scoring-settings change per league (LS-9665).
+ *
+ * Key: leagueId (number)
+ * Returns: the most recent `league_scoring_change_log.changed_at` for the
+ *   league's active scoring profile, or null if its scoring has never changed.
+ *
+ * Backs `Matchup.scoringIsStale`. Keyed by league rather than by matchup so a
+ * week of matchups — or a whole season page — costs one query for the leagues
+ * involved instead of one per matchup.
+ */
+export const createLatestScoringChangeAtLoader = (
+  db: GenericDatabase<typeof PublicSchema>,
+) =>
+  new DataLoader<number, Date | null>(async (keys) => {
+    const leagueIds = [...new Set(keys)] as number[];
+    const changeAtByLeague = await getLatestScoringChangeAtByLeague(
+      db,
+      leagueIds,
+    );
+    return keys.map((key) => changeAtByLeague.get(key) ?? null);
   });

@@ -16,6 +16,10 @@ export * from './lib/DraftService';
 
 // Matchup utilities (shared between lambdas)
 export * from './lib/matchup-utils';
+
+// Scoring provenance / staleness (LS-9665) — shared by the GraphQL resolver,
+// the league-chat system messages, the UI indicator and the one-time rescore.
+export * from './lib/scoring-staleness';
 export * from './lib/client/matchup-queries-optimized';
 
 // Type-safe query utilities

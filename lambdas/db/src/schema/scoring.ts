@@ -832,6 +832,7 @@ builder.mutationField('updateLeagueScoringPositionBonuses', (t) =>
               ? update.isEnabled
               : undefined,
         })),
+        context.user.id,
       );
 
       // Invalidate the player scoring cache for this league so the next

@@ -154,6 +154,7 @@ export class ScoringService {
   async updatePositionBonuses(
     leagueId: number,
     updates: LeagueScoringPositionBonusUpdateInput[],
+    changedBy?: number | null,
   ): Promise<LeagueScoringPositionBonus[]> {
     if (!Number.isFinite(leagueId)) {
       throw new Error('A valid leagueId is required');
@@ -168,7 +169,12 @@ export class ScoringService {
         );
       }
 
-      return updateLeagueScoringPositionBonuses(db, profile.id, updates);
+      return updateLeagueScoringPositionBonuses(
+        db,
+        profile.id,
+        updates,
+        changedBy,
+      );
     });
   }
 }

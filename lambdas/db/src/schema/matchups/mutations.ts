@@ -195,13 +195,25 @@ builder.mutationField('updateMatchupScore', (t) =>
         );
       }
 
-      const updateData: { team1Score?: string; team2Score?: string } = {};
+      const updateData: {
+        team1Score?: string;
+        team2Score?: string;
+        scoredAt?: Date;
+      } = {};
 
       if (args.team1Score !== null && args.team1Score !== undefined) {
         updateData.team1Score = args.team1Score.toString();
       }
       if (args.team2Score !== null && args.team2Score !== undefined) {
         updateData.team2Score = args.team2Score.toString();
+      }
+
+      // Every writer of the score columns stamps scoring provenance (LS-9665).
+      // This mutation takes the number from an admin or the scoring system
+      // rather than computing one, but the persisted score is still current as
+      // of now — leaving it unstamped would report it stale forever.
+      if (Object.keys(updateData).length > 0) {
+        updateData.scoredAt = new Date();
       }
 
       const results = await context.db

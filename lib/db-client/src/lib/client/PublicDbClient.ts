@@ -567,13 +567,36 @@ export async function createMatchup(
   return results[0];
 }
 
+/**
+ * Persist a matchup's computed score.
+ *
+ * This is the single write site for `matchups.team1_score` / `team2_score` on
+ * the *scoring* paths — the baseball stats-lambda, the football stats-lambda,
+ * the game-selection all-cached path and the commissioner recalculate tool all
+ * funnel through here — so it is where scoring provenance is stamped (LS-9665).
+ * Stamping here rather than inside the sport-specific scoring engines covers
+ * both sports; the football handler computes its score with a different engine
+ * but persists it through this function.
+ *
+ * The two writers that do *not* come through here both take a score as input
+ * rather than computing one: the admin/system `updateMatchupScore` GraphQL
+ * mutation (`matchups/mutations.ts`) and the commissioner's `editMatchupScore`
+ * tool (`commissioner-tools.ts`). They stamp `scoredAt` inline for the same
+ * reason a computed score does — the persisted value is current as of the
+ * moment it was written, and leaving it unstamped would report it stale
+ * forever.
+ */
 export async function updateMatchupScore(
   db: PublicDb,
   matchupId: number,
   team1Score?: number | null,
   team2Score?: number | null,
 ): Promise<Matchup> {
-  const updateData: { team1Score?: string; team2Score?: string } = {};
+  const updateData: {
+    team1Score?: string;
+    team2Score?: string;
+    scoredAt?: Date;
+  } = {};
 
   if (team1Score !== null && team1Score !== undefined) {
     updateData.team1Score = team1Score.toString();
@@ -584,6 +607,7 @@ export async function updateMatchupScore(
 
   // When both scores are null/undefined, updateData is empty and Drizzle's
   // .set({}) returns 0 rows — skip the update and return the existing row.
+  // Nothing was scored, so nothing is stamped.
   if (Object.keys(updateData).length === 0) {
     const existing = await db
       .select()
@@ -595,6 +619,11 @@ export async function updateMatchupScore(
     }
     return existing;
   }
+
+  // A score was computed, so record when. Read by `Matchup.scoringIsStale`
+  // (LS-9665) to tell a score computed under the current scoring settings from
+  // one computed before they last changed.
+  updateData.scoredAt = new Date();
 
   const results = await db
     .update(Schema.matchups)
@@ -1386,7 +1415,17 @@ export async function updateLeagueScoringProfileEntries(
         ]),
       });
 
-    // Write audit entries to the change log
+    // Write audit entries to the change log, in the same transaction as the
+    // upsert above (LS-9665). One row per *changed* multiplier: a save that
+    // re-sends a value identical to the one already in force logs nothing.
+    //
+    // "Changed" is measured against the multiplier actually in force before
+    // this write — the existing entry if there is one, otherwise the stat
+    // definition's default — not against the presence of an entry row. A first
+    // save that merely materialises the defaults changes no scoring input, so
+    // it must not log: `Matchup.scoringIsStale` and the LS-9666 chat messages
+    // both read this table as "the scoring inputs changed at this time", and a
+    // no-op row would mark every already-scored matchup in the league stale.
     const changeLogEntries = statDefinitionIds
       .map((statDefinitionId) => {
         const existing = existingByDefinitionId.get(statDefinitionId);
@@ -1402,10 +1441,21 @@ export async function updateLeagueScoringProfileEntries(
           normalizeNumeric(existing?.multiplier) ??
           normalizeNumeric(definition.defaultMultiplier);
 
-        const action: 'created' | 'updated' | 'disabled' = !existing
-          ? 'created'
-          : update.isEnabled === false
-            ? 'disabled'
+        const previousIsEnabled = existing ? existing.isEnabled : true;
+        const newIsEnabled = update.isEnabled ?? previousIsEnabled;
+
+        const multiplierChanged = previousMultiplier !== newMultiplier;
+        const enabledChanged = previousIsEnabled !== newIsEnabled;
+
+        if (!multiplierChanged && !enabledChanged) return null;
+
+        // `scoring_change_action` has no 're-enabled' label, so re-enabling a
+        // stat records as 'updated'. 'created' is reserved for a first-time
+        // override of a stat that had no entry row.
+        const action: 'created' | 'updated' | 'disabled' = !newIsEnabled
+          ? 'disabled'
+          : !existing
+            ? 'created'
             : 'updated';
 
         return {
@@ -1417,18 +1467,7 @@ export async function updateLeagueScoringProfileEntries(
           action,
         };
       })
-      .filter(
-        (
-          entry,
-        ): entry is {
-          profileId: number;
-          statDefinitionId: number;
-          previousMultiplier: string | null;
-          newMultiplier: string | null;
-          changedBy: number | null;
-          action: 'created' | 'updated' | 'disabled';
-        } => entry !== null,
-      );
+      .filter((entry) => entry !== null);
 
     if (changeLogEntries.length > 0) {
       await tx.insert(Schema.leagueScoringChangeLog).values(changeLogEntries);
@@ -1455,13 +1494,24 @@ export async function getScoringPositionBonusesForProfile(
  * Upsert position-scoped scoring bonuses for a league's active profile
  * (LS-9104). Mirrors `updateLeagueScoringProfileEntries`'s merge/upsert
  * shape but keys on (profileId, statDefinitionId, position) — the unique
- * index backing `league_scoring_position_bonuses` — and does not write to
- * `league_scoring_change_log`, which has no position column.
+ * index backing `league_scoring_position_bonuses`.
+ *
+ * Position bonuses ARE in scope for `league_scoring_change_log` (LS-9665 AC4).
+ * A bonus change alters the multipliers a matchup is scored with exactly as a
+ * base multiplier change does, so omitting it would make `Matchup.scoringIsStale`
+ * silently answer "not stale" for a league whose scoring inputs just changed.
+ *
+ * The table has no `position` column, so the position is carried in
+ * `change_reason` as `position_bonus:<POSITION>`. That is lossless for the
+ * staleness signal (which reads only `changed_at`) and keeps the audit row
+ * attributable; a dedicated column would be a schema change beyond this ticket
+ * and is tracked separately.
  */
 export async function updateLeagueScoringPositionBonuses(
   db: PublicDb,
   profileId: number,
   updates: LeagueScoringPositionBonusUpdateInput[],
+  changedBy?: number | null,
 ): Promise<LeagueScoringPositionBonus[]> {
   if (updates.length === 0) {
     return getScoringPositionBonusesForProfile(db, profileId);
@@ -1556,6 +1606,48 @@ export async function updateLeagueScoringPositionBonuses(
           'createdAt',
         ]),
       });
+
+    // One change-log row per *changed* bonus, in the same transaction as the
+    // upsert (LS-9665). Same effective-change rule as the base multipliers: a
+    // re-sent value identical to the one already in force logs nothing.
+    // Absent bonus == no bonus, so the baseline for a new row is 0.
+    const bonusChangeLogEntries = Array.from(mergedUpdates.entries())
+      .map(([key, update]) => {
+        const existing = existingByKey.get(key);
+
+        const previousBonus = normalizeNumeric(existing?.bonusMultiplier) ?? 0;
+        const newBonus = update.bonusMultiplier ?? previousBonus;
+
+        const previousIsEnabled = existing ? existing.isEnabled : true;
+        const newIsEnabled = update.isEnabled ?? previousIsEnabled;
+
+        if (previousBonus === newBonus && previousIsEnabled === newIsEnabled) {
+          return null;
+        }
+
+        const action: 'created' | 'updated' | 'disabled' = !newIsEnabled
+          ? 'disabled'
+          : !existing
+            ? 'created'
+            : 'updated';
+
+        return {
+          profileId,
+          statDefinitionId: update.statDefinitionId,
+          previousMultiplier: previousBonus.toString(),
+          newMultiplier: newBonus.toString(),
+          changedBy: changedBy ?? null,
+          changeReason: `position_bonus:${update.position}`,
+          action,
+        };
+      })
+      .filter((entry) => entry !== null);
+
+    if (bonusChangeLogEntries.length > 0) {
+      await tx
+        .insert(Schema.leagueScoringChangeLog)
+        .values(bonusChangeLogEntries);
+    }
 
     return tx
       .select()

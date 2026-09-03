@@ -21,8 +21,18 @@ function makeSelectChain(rows: any[]): any {
   return chain;
 }
 
-function makeUpdateChain(returning: any[]): any {
-  const chain: any = {
+// Shape of the chainable update test double. Typed so callers (and the
+// `updateChain` handle exposed by `makeDb`) get a concrete surface instead of
+// `any` when asserting on the recorded `.set()` payload.
+interface UpdateChain {
+  update: jest.Mock;
+  set: jest.Mock;
+  where: jest.Mock;
+  returning: jest.Mock;
+}
+
+function makeUpdateChain(returning: any[]): UpdateChain {
+  const chain: UpdateChain = {
     update: jest.fn(),
     set: jest.fn(),
     where: jest.fn(),
@@ -37,7 +47,9 @@ function makeUpdateChain(returning: any[]): any {
 function makeDb(existingRow: any, returning: any[] = []): any {
   const sel = makeSelectChain(existingRow !== undefined ? [existingRow] : []);
   const upd = makeUpdateChain(returning);
-  return { select: sel.select, update: upd.update };
+  // `updateChain` is exposed so tests can assert on the .set() payload; it is
+  // not part of the Drizzle surface updateMatchupScore uses.
+  return { select: sel.select, update: upd.update, updateChain: upd };
 }
 
 const matchupRow = {
@@ -110,5 +122,71 @@ describe('updateMatchupScore', () => {
     await expect(updateMatchupScore(db, 7, 5, 3)).rejects.toThrow(
       'Matchup 7 not found',
     );
+  });
+});
+
+/**
+ * LS-9665 — scoring provenance.
+ *
+ * updateMatchupScore is the single write site for matchups.team1_score /
+ * team2_score on every *scoring* path (baseball stats-lambda, football
+ * stats-lambda, game-selection, commissioner recalculate), so stamping here
+ * covers both sports without each engine having to remember to.
+ */
+describe('updateMatchupScore — scored_at stamping', () => {
+  // The payload handed to Drizzle's .set(); typed here so the assertions below
+  // read real properties rather than `any`.
+  const setPayload = (db: {
+    updateChain: UpdateChain;
+  }): Record<string, unknown> =>
+    db.updateChain.set.mock.calls[0][0] as Record<string, unknown>;
+
+  it('stamps scoredAt when team1Score is written', async () => {
+    const db = makeDb(matchupRow, [matchupRow]);
+
+    await updateMatchupScore(db, 1, 15, null);
+
+    expect(setPayload(db).scoredAt).toBeInstanceOf(Date);
+  });
+
+  it('stamps scoredAt when both scores are written', async () => {
+    const db = makeDb(matchupRow, [matchupRow]);
+
+    await updateMatchupScore(db, 1, 10, 8);
+
+    const payload = setPayload(db);
+    expect(payload).toMatchObject({ team1Score: '10', team2Score: '8' });
+    expect(payload.scoredAt).toBeInstanceOf(Date);
+  });
+
+  it('stamps a score of zero — 0 is a computed score, not a missing one', async () => {
+    const db = makeDb(matchupRow, [matchupRow]);
+
+    await updateMatchupScore(db, 1, 0, 0);
+
+    const payload = setPayload(db);
+    expect(payload).toMatchObject({ team1Score: '0', team2Score: '0' });
+    expect(payload.scoredAt).toBeInstanceOf(Date);
+  });
+
+  it('does not stamp when nothing is scored', async () => {
+    const db = makeDb(matchupRow);
+
+    await updateMatchupScore(db, 1, null, null);
+
+    // No UPDATE at all — a no-op call must not move the provenance timestamp
+    // forward and make an old score look freshly computed.
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('stamps close to now', async () => {
+    const db = makeDb(matchupRow, [matchupRow]);
+    const before = Date.now();
+
+    await updateMatchupScore(db, 1, 5, 3);
+
+    const stamped = setPayload(db).scoredAt as Date;
+    expect(stamped.getTime()).toBeGreaterThanOrEqual(before);
+    expect(stamped.getTime()).toBeLessThanOrEqual(Date.now());
   });
 });

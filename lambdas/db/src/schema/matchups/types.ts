@@ -2,7 +2,7 @@
  * Matchups domain — GraphQL type definitions
  */
 
-import { PublicSchema } from '@legacy-sports/db-client';
+import { isScoringStale, PublicSchema } from '@legacy-sports/db-client';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   generateMatchupRecap,
@@ -94,6 +94,7 @@ export const Matchup = builder.objectRef<{
   endTime: string | null;
   recapJson: Record<string, unknown> | null;
   updatedAt: Date;
+  scoredAt: Date | null;
 }>('Matchup');
 
 // MatchupRecap ref — declared here so the Matchup.recap field can reference it.
@@ -153,6 +154,33 @@ builder.objectType(Matchup, {
     // stale snapshot after a mobile network switch.
     updatedAt: t.string({
       resolve: (matchup) => matchup.updatedAt.toISOString(),
+    }),
+    // Scoring provenance (LS-9665). Null when the matchup has no persisted
+    // score at all — nothing has been computed, so there is nothing whose
+    // provenance could be stale, and badging every scheduled matchup would be
+    // a false positive. True when the score predates the scored_at column, or
+    // when the league's active scoring profile changed after it was computed.
+    //
+    // Batched by league via the latestScoringChangeAt loader: a week — or a
+    // season — of matchups costs one query for the leagues involved, not one
+    // per matchup. The staleness rule itself lives in @legacy-sports/db-client
+    // so LS-9666 (chat messages), LS-9667 (UI indicator) and LS-9668 (one-time
+    // rescore) share it rather than each re-deriving it here.
+    scoringIsStale: t.boolean({
+      nullable: true,
+      description:
+        "Whether this matchup's persisted score was computed before the league's current scoring settings. Null when the matchup has no persisted score.",
+      resolve: async (matchup, _args, context) => {
+        const lastScoringChangeAt =
+          await context.loaders.latestScoringChangeAt.load(matchup.leagueId);
+
+        return isScoringStale({
+          scoredAt: matchup.scoredAt,
+          lastScoringChangeAt,
+          hasPersistedScore:
+            matchup.team1Score !== null || matchup.team2Score !== null,
+        });
+      },
     }),
     // Relational fields - using Team type imported from leagues.ts
     team1: t.field({
@@ -448,6 +476,7 @@ export const AdvanceLeagueWeekResponse = builder.objectRef<{
     endTime: string | null;
     recapJson: Record<string, unknown> | null;
     updatedAt: Date;
+    scoredAt: Date | null;
   }>;
   currentMatchupId: number | null;
 }>('AdvanceLeagueWeekResponse');
