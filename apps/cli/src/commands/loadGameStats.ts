@@ -8,11 +8,13 @@ import {
 } from '@legacy-sports/db-client';
 import { getDbOptions } from '@legacy-sports/utils/node';
 import { and, eq } from 'drizzle-orm';
+// Retrosheet-in-S3 with a Baseball Reference fallback (LS-9817) — keeps this
+// command byte-for-byte equivalent to the Lambda's loading path.
 import {
   getAllGameBattingStats,
   getAllGameFieldingStats,
   getAllGamePitchingStats,
-} from '@legacy-sports/bref-client';
+} from '@legacy-sports/game-stats-provider';
 
 interface HandleLoadGameStatsArgs {
   player: string;

@@ -3,10 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@aws-sdk/client-s3": "*",
     "@legacy-sports/bref-client": "workspace:*",
     "@legacy-sports/data-loaders": "workspace:*",
     "@legacy-sports/db-client": "workspace:*",
     "@legacy-sports/env-utilities": "workspace:*",
+    "@legacy-sports/game-stats-provider": "workspace:*",
     "@legacy-sports/logging": "workspace:*",
     "@legacy-sports/pfr-client": "workspace:*",
     "@legacy-sports/rollbar": "workspace:*",

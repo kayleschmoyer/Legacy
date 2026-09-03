@@ -28,6 +28,7 @@ import { handleTestDb } from './commands/testDb';
 import { handleTestRawConnection } from './commands/testRawConnection';
 import { handleDecodeJwt } from './commands/decodeJwt';
 import { handleSetUserType } from './commands/setUserType';
+import { handleIngestRetrosheet } from './commands/ingestRetrosheet';
 import { handleListUsers } from './commands/listUsers';
 import { handleAddUser } from './commands/addUser';
 import { handleAuth } from './commands/auth';
@@ -186,6 +187,31 @@ export function buildProgram(): Command {
           position: options.position,
         });
       },
+    );
+
+  program
+    .command('ingest-retrosheet')
+    .description(
+      'Stage the Retrosheet corpus (1897-2025) in S3, one object per player-season',
+    )
+    .option(
+      '-b, --bucket <name>',
+      'Target S3 bucket (default $RETROSHEET_S3_BUCKET)',
+    )
+    .option('--prefix <prefix>', 'Key prefix (default $RETROSHEET_S3_PREFIX)')
+    .option('--from <year>', 'First season (default 1897)', parseInt)
+    .option('--to <year>', 'Last season (default 2025)', parseInt)
+    .option('--force', 'Re-upload objects that already exist')
+    .option('--dry-run', 'Parse and report without writing to S3')
+    .action(
+      (options: {
+        bucket?: string;
+        prefix?: string;
+        from?: number;
+        to?: number;
+        force?: boolean;
+        dryRun?: boolean;
+      }) => handleIngestRetrosheet(options),
     );
 
   program

@@ -1,11 +1,15 @@
 import { and, eq } from 'drizzle-orm';
 import { LOGGER } from '@legacy-sports/logging';
 import { Player, PublicDb, PublicSchema } from '@legacy-sports/db-client';
+// Retrosheet-in-S3 with a Baseball Reference fallback (LS-9817). Drop-in
+// replacements for the identically-named bref-client exports: the scraper is
+// capped at 15 req/min globally, which ceilinged this pipeline at ~37
+// matchups/hour (LS-9809).
 import {
   getAllGameBattingStats,
   getAllGameFieldingStats,
   getAllGamePitchingStats,
-} from '@legacy-sports/bref-client';
+} from '@legacy-sports/game-stats-provider';
 import type { WebSocketNotificationService } from '@legacy-sports/aws-utils';
 
 import type {

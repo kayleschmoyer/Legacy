@@ -190,6 +190,12 @@ resource "aws_lambda_function" "stats" {
 
       SQS_LOAD_SEASON_STATS_URL = aws_sqs_queue.load_season_stats.url
       SQS_LOAD_GAME_STATS_URL   = aws_sqs_queue.load_game_stats.url
+
+      # Retrosheet corpus (LS-9817). When unset, the game-stats provider
+      # reports every lookup as a miss and falls back to the Baseball
+      # Reference scraper, so an environment without this bucket keeps the
+      # previous behaviour unchanged.
+      RETROSHEET_S3_BUCKET = aws_s3_bucket.retrosheet_corpus.bucket
       # Legacy support - keep SQS_QUEUE_URL for backward compatibility
       SQS_QUEUE_URL = aws_sqs_queue.load_season_stats.url
 

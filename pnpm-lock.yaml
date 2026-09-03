@@ -977,6 +977,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: '*'
+        version: 3.1110.0
       '@legacy-sports/bref-client':
         specifier: workspace:*
         version: link:../../lib/bref-client
@@ -989,6 +992,9 @@ importers:
       '@legacy-sports/env-utilities':
         specifier: workspace:*
         version: link:../../lib/env-utilities
+      '@legacy-sports/game-stats-provider':
+        specifier: workspace:*
+        version: link:../../lib/game-stats-provider
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
@@ -1615,6 +1621,9 @@ importers:
       '@legacy-sports/env-utilities':
         specifier: workspace:*
         version: link:../../lib/env-utilities
+      '@legacy-sports/game-stats-provider':
+        specifier: workspace:*
+        version: link:../../lib/game-stats-provider
       '@legacy-sports/logging':
         specifier: workspace:*
         version: link:../../lib/logging
@@ -1807,6 +1816,24 @@ importers:
 
   lib/env-utilities:
     dependencies:
+      tslib:
+        specifier: '*'
+        version: 2.8.1
+
+  lib/game-stats-provider:
+    dependencies:
+      '@aws-sdk/client-s3':
+        specifier: '*'
+        version: 3.1110.0
+      '@legacy-sports/bref-client':
+        specifier: workspace:*
+        version: link:../bref-client
+      '@legacy-sports/db-client':
+        specifier: workspace:*
+        version: link:../db-client
+      '@legacy-sports/logging':
+        specifier: workspace:*
+        version: link:../logging
       tslib:
         specifier: '*'
         version: 2.8.1
