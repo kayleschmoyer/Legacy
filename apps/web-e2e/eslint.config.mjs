@@ -53,6 +53,49 @@ const ls4456PageObjectRules = [
   },
 ];
 
+// LS-9795 ban `{ force: true }` on Playwright actions across apps/web-e2e/src.
+// `force` skips the ENTIRE actionability contract — stable, visible, enabled and
+// hit-targetable — so it can hide a real product defect just as easily as a test
+// bug. Every condition has masked a genuine defect in this repo: LS-8501 (fixed
+// width overflowing a phone viewport, a form row behind the fixed MobileBottomBar,
+// an overlay positioned against the document instead of the viewport), LS-3620 (a
+// translateX ticker defeating the stability check) and LS-8393 (a click on a
+// genuinely disabled element, whose 10s timeout read as a missing element).
+//
+// The selector is scoped to Playwright action methods so unrelated `force: true`
+// options are untouched — notably `fs.rmSync(dir, { recursive: true, force: true })`
+// in resolve-pw-browser.test.ts, which is not a Playwright call at all.
+//
+// Surviving sites are grandfathered by basename in the two blocks at the very end
+// of this file. The list may only shrink: a new `force: true` must either be
+// justified in review and added there, or — far better — the underlying product or
+// test defect gets fixed instead.
+const ls9795ForceActionMethods =
+  'click|dblclick|fill|clear|check|uncheck|setChecked|hover|tap|press|' +
+  'selectOption|selectText|dragTo|focus|blur|scrollIntoViewIfNeeded';
+
+const ls9795ForceMessage =
+  'LS-9795: `{ force: true }` is banned in apps/web-e2e/src — it skips the entire ' +
+  'Playwright actionability contract (stable, visible, enabled, hit-targetable), so it ' +
+  'hides real product defects as readily as test bugs (LS-8501, LS-3620, LS-8393). ' +
+  'Triage instead: if an overlay intercepts the pointer, fix the overlay; if the ' +
+  'element is genuinely disabled, assert toBeDisabled(); if it is animating, make ' +
+  'the component honour prefers-reduced-motion. If the suppression is genuinely ' +
+  'correct, add the file basename to the LS-9795 grandfather blocks at the end of ' +
+  'apps/web-e2e/eslint.config.mjs with a comment naming WHICH condition is ' +
+  'suppressed and why. See .agents/skills/testing/references/e2e-failure-atlas.md.';
+
+const ls9795NoForceTrueRules = [
+  {
+    selector: `CallExpression[callee.property.name=/^(${ls9795ForceActionMethods})$/] > ObjectExpression > Property[key.name='force'][value.value=true]`,
+    message: ls9795ForceMessage,
+  },
+  {
+    selector: `CallExpression[callee.property.name=/^(${ls9795ForceActionMethods})$/] > ObjectExpression > Property[key.value='force'][value.value=true]`,
+    message: ls9795ForceMessage,
+  },
+];
+
 // LS-8096 ban selector-based queries in spec files — enforces the semantic
 // Page Object Model from ADR-0015. Selectors are allowed only in the page
 // object layer (base/, components/, pages/); spec files call semantic verbs
@@ -409,6 +452,7 @@ export default [
         'error',
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9790NoSwitchUserRules,
+        ...ls9795NoForceTrueRules,
       ],
     },
   },
@@ -432,6 +476,7 @@ export default [
         ...ls4461IntegrationRules,
         ...ls4458SpecRules,
         ...ls9790NoSwitchUserRules,
+        ...ls9795NoForceTrueRules,
       ],
     },
   },
@@ -457,6 +502,7 @@ export default [
         ...ls4458SpecRules,
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9790NoSwitchUserRules,
+        ...ls9795NoForceTrueRules,
       ],
     },
   },
@@ -469,6 +515,7 @@ export default [
         'error',
         ...ls4458SpecRules,
         ...ls9790NoSwitchUserRules,
+        ...ls9795NoForceTrueRules,
       ],
     },
   },
@@ -486,6 +533,7 @@ export default [
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9660HermeticWaitRules,
         ...ls9790NoSwitchUserRules,
+        ...ls9795NoForceTrueRules,
       ],
     },
   },
@@ -502,6 +550,7 @@ export default [
         'error',
         ...ls4456PageObjectRules,
         ...ls9790NoSwitchUserRules,
+        ...ls9795NoForceTrueRules,
       ],
     },
   },
@@ -517,6 +566,7 @@ export default [
         ...ls4456PageObjectRules,
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9790NoSwitchUserRules,
+        ...ls9795NoForceTrueRules,
       ],
     },
   },
@@ -544,6 +594,7 @@ export default [
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9660HermeticWaitRules,
         ...ls9790NoSwitchUserRules,
+        ...ls9795NoForceTrueRules,
       ],
     },
   },
@@ -565,6 +616,45 @@ export default [
       'no-restricted-properties': [
         'error',
         ...ls9794NoSubstringOperationRoutingRules,
+      ],
+    },
+  },
+  {
+    // ── LS-9795 grandfather: `force: true` sites that are genuinely correct ──
+    // Each re-spreads exactly the rule union its file would otherwise receive,
+    // MINUS ls9795NoForceTrueRules. Listed last so they win the legacy-config
+    // "last-override-wins" replacement of `no-restricted-syntax`.
+    //
+    // live-draft-ui.integration.spec.ts — one site. Suppresses stability and
+    // hit-target while claiming a pick: the live draft board re-renders
+    // continuously as WebSocket pick events land (and the z-9999
+    // PickAnnouncement overlay can be mid-flight), so the button rarely holds a
+    // fixed box for two consecutive frames, and the pick clock makes waiting for
+    // quiescence impossible. The click is bounded at 8s and its effect is
+    // verified (`wasAccepted`), so a click that does not register is detected
+    // rather than assumed. Grandfathered for ls9660 too, so that rule stays off.
+    files: ['**/live-draft-ui.integration.spec.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...ls4461IntegrationRules,
+        ...ls4458SpecRules,
+      ],
+    },
+  },
+  {
+    // draft-board-overlay.ts — one site. Suppresses stability only:
+    // PickAnnouncement mounts with Tamagui `animation="quick"` driving opacity
+    // and does not wire `prefers-reduced-motion`, so the config-wide
+    // `reducedMotion: 'reduce'` (LS-3620) does not quiet it. The overlay is the
+    // click target itself and is topmost (`position: fixed; inset: 0;
+    // zIndex: 9999`), so there is nothing it could be occluded by.
+    files: ['**/draft-board-overlay.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...ls4456PageObjectRules,
+        ...ls9660NoPositionalTextLocatorRules,
       ],
     },
   },

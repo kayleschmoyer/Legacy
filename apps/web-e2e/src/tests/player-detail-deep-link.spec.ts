@@ -613,12 +613,14 @@ test.describe('Player Detail Deep Link — from Roster @regression', () => {
       timeout: 15000,
     });
 
-    // Click the "View {player} detail" chevron button on the roster row
+    // Click the "View {player} detail" chevron button on the roster row.
+    // LS-9795: carried an unexplained `{ force: true }`; the roster row's
+    // chevron is an ordinary top-most button and clicks cleanly without it.
     await page
       .getByRole('button', {
         name: `View ${PLAYER_FIRST} ${PLAYER_LAST} detail`,
       })
-      .click({ force: true });
+      .click();
 
     // The click navigates to /players/:id
     await page.waitForURL(`**/players/${PLAYER_ID}`, { timeout: 15000 });

@@ -316,7 +316,11 @@ adminTest.describe(
       value: string,
     ): Promise<void> {
       await locator.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-      await locator.fill(value, { force: true });
+      // LS-9795: `fill()` had `{ force: true }`, presumably mirroring the
+      // bottom-bar workaround in tapCentered above. It cannot serve that
+      // purpose — Playwright gates fill() on visible/enabled/editable and
+      // never hit-tests it, so force only suppressed those three checks.
+      await locator.fill(value);
     }
 
     async function openJwtDecoder(

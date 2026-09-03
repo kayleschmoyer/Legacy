@@ -307,11 +307,16 @@ test.describe
       await expect(
         dialog.getByText('Select the team you want to trade with'),
       ).toBeVisible({ timeout: 5_000 });
+      // LS-9795: all six `force: true` clicks in this ProposeTradeDialog flow
+      // are dropped. They predate LS-8501, when the dialog overlay was
+      // `position: absolute; inset: 0` and so covered the viewport while the
+      // card itself rendered off-fold. The overlay is `position: fixed` on web
+      // now and is an ancestor of these controls, so it cannot intercept them.
       const teamBtn = dialog.getByRole('button', {
         name: new RegExp(state.teams[1], 'i'),
       });
       await expect(teamBtn.first()).toBeVisible({ timeout: 5_000 });
-      await teamBtn.first().click({ force: true });
+      await teamBtn.first().click();
     });
 
     await test.step('Select players to offer', async () => {
@@ -328,7 +333,7 @@ test.describe
       for (let i = 0; i < count; i++) {
         const text = await playerRows.nth(i).innerText();
         if (/next|review|send|back|cancel/i.test(text)) continue;
-        await playerRows.nth(i).click({ force: true });
+        await playerRows.nth(i).click();
         break;
       }
 
@@ -336,7 +341,7 @@ test.describe
         name: /Next.*Select Their Players/i,
       });
       await expect(nextBtn).toBeVisible({ timeout: 5_000 });
-      await nextBtn.click({ force: true });
+      await nextBtn.click();
     });
 
     await test.step('Select players to request', async () => {
@@ -353,7 +358,7 @@ test.describe
       for (let i = 0; i < count; i++) {
         const text = await playerRows.nth(i).innerText();
         if (/next|review|send|back|cancel/i.test(text)) continue;
-        await playerRows.nth(i).click({ force: true });
+        await playerRows.nth(i).click();
         break;
       }
 
@@ -361,7 +366,7 @@ test.describe
         name: /Review Trade/i,
       });
       await expect(reviewBtn).toBeVisible({ timeout: 5_000 });
-      await reviewBtn.click({ force: true });
+      await reviewBtn.click();
     });
 
     await test.step('Send trade offer', async () => {
@@ -381,7 +386,7 @@ test.describe
         name: /Send Trade Offer/i,
       });
       await expect(sendBtn).toBeVisible({ timeout: 5_000 });
-      await sendBtn.click({ force: true });
+      await sendBtn.click();
       // Dialog closes once the createTradeOffer mutation returns — that is
       // the deterministic signal the trade was submitted (LS-4457).
       await expect(dialog).toBeHidden({ timeout: 15_000 });

@@ -795,13 +795,19 @@ test.describe
       await expect(
         dialog.getByText('Select the team you want to trade with'),
       ).toBeVisible({ timeout: 5000 });
-      // Click on the second team (manager 2's team)
-      // Use force:true — custom dialog backdrop intercepts Playwright hit test
+      // Click on the second team (manager 2's team).
+      // LS-9795: dropped `force: true` ("custom dialog backdrop intercepts
+      // Playwright hit test"). That was true before LS-8501 — the overlay was
+      // `position: absolute; inset: 0`, so on a tall page it spanned the
+      // document and centred the card off the current fold, leaving the
+      // backdrop over the viewport. LS-8501 made it `position: fixed` on web;
+      // the backdrop is now the button's own ancestor, and an ancestor never
+      // intercepts the hit test for its descendant.
       const teamBtn = dialog.getByRole('button', {
         name: new RegExp(state.teams[1], 'i'),
       });
       await expect(teamBtn.first()).toBeVisible({ timeout: 5000 });
-      await teamBtn.first().click({ force: true });
+      await teamBtn.first().click();
     });
 
     await test.step('Step 2: Select players to offer', async () => {

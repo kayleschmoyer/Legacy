@@ -577,6 +577,13 @@ test.describe
               : page
                   .getByRole('button', { name: ariaLabel, exact: true })
                   .first();
+            // LS-9795 — KEPT. Suppresses **stability** and **hit-target**. The
+            // live board re-renders continuously as WebSocket pick events land
+            // (and the z-9999 PickAnnouncement overlay can be mid-flight), so
+            // the button rarely holds a fixed box for two consecutive frames.
+            // The pick clock makes waiting for quiescence impossible, and the
+            // 8s bound plus the wasAccepted check below mean a click that does
+            // not register is detected rather than silently assumed.
             await pickButton
               .click({ force: true, timeout: 8_000 })
               .catch((e: Error) => {

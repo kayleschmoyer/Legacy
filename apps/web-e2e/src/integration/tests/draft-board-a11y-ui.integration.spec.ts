@@ -262,10 +262,14 @@ test.describe
     });
 
     await test.step('ArrowRight moves selection from ALL → C', async () => {
-      // Scroll into view then click to establish keyboard focus
+      // LS-9795: this used to `click({ force: true })` "to establish keyboard
+      // focus" before the explicit `focus()` below. The click was redundant
+      // (focus() is what establishes focus, and ALL is already aria-checked per
+      // the assertion above) and the force was ineffective anyway — as Phase 6
+      // in this same file documents, the announcement overlay still receives
+      // the coordinate click even with force, which is why that phase uses
+      // dispatchEvent instead. Dropped rather than dressed up.
       await allBtn.scrollIntoViewIfNeeded();
-      await allBtn.click({ force: true });
-      // Ensure focus is established before pressing arrow
       await allBtn.focus();
       await page.keyboard.press('ArrowRight');
       await expect(cBtn).toHaveAttribute('aria-checked', 'true', {

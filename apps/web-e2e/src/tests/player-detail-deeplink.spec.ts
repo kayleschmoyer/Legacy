@@ -609,8 +609,10 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await expect(page.getByText('Gerrit Cole').first()).toBeVisible({
         timeout: 15_000,
       });
-      // force: true — matchup table stat-overlay cells intercept pointer events on the text node
-      await page.getByText('Gerrit Cole').first().click({ force: true });
+      // LS-9795: the removed `{ force: true }` claimed matchup stat-overlay
+      // cells intercept the pointer on this text node. They do not — the
+      // plain click passes on every project, desktop and mobile viewport.
+      await page.getByText('Gerrit Cole').first().click();
 
       await expect(page.locator('div[role="dialog"]')).toBeVisible({
         timeout: 10_000,
@@ -627,8 +629,10 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await expect(page.getByText('Gerrit Cole').first()).toBeVisible({
         timeout: 15_000,
       });
-      // force: true — matchup table stat-overlay cells intercept pointer events on the text node
-      await page.getByText('Gerrit Cole').first().click({ force: true });
+      // LS-9795: the removed `{ force: true }` claimed matchup stat-overlay
+      // cells intercept the pointer on this text node. They do not — the
+      // plain click passes on every project, desktop and mobile viewport.
+      await page.getByText('Gerrit Cole').first().click();
 
       const dialog = page.locator('div[role="dialog"]');
       await expect(dialog).toBeVisible({ timeout: 10_000 });
@@ -636,8 +640,10 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await dialog
         .getByRole('button', { name: /close/i })
         .first()
-        // force: true — the open matchup page may layer elements over the dialog's close button
-        .click({ force: true });
+        // LS-9795: the removed `{ force: true }` hedged that the matchup page
+        // "may layer elements over" this close button. Nothing does — the
+        // dialog is topmost, so the hit-target check is live again.
+        .click();
       await expect(dialog).not.toBeVisible();
       await expect(page).toHaveURL(MATCHUP_URL);
     });
@@ -653,8 +659,10 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await expect(page.getByText('Gerrit Cole').first()).toBeVisible({
         timeout: 15_000,
       });
-      // force: true — matchup table stat-overlay cells intercept pointer events on the text node
-      await page.getByText('Gerrit Cole').first().click({ force: true });
+      // LS-9795: the removed `{ force: true }` claimed matchup stat-overlay
+      // cells intercept the pointer on this text node. They do not — the
+      // plain click passes on every project, desktop and mobile viewport.
+      await page.getByText('Gerrit Cole').first().click();
 
       await expect(page.locator('div[role="dialog"]')).toBeVisible({
         timeout: 10_000,
@@ -672,8 +680,10 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await expect(page.getByText('Gerrit Cole').first()).toBeVisible({
         timeout: 15_000,
       });
-      // force: true — matchup table stat-overlay cells intercept pointer events on the text node
-      await page.getByText('Gerrit Cole').first().click({ force: true });
+      // LS-9795: the removed `{ force: true }` claimed matchup stat-overlay
+      // cells intercept the pointer on this text node. They do not — the
+      // plain click passes on every project, desktop and mobile viewport.
+      await page.getByText('Gerrit Cole').first().click();
 
       const dialog = page.locator('div[role="dialog"]');
       await expect(dialog).toBeVisible({ timeout: 10_000 });
@@ -681,8 +691,10 @@ test.describe('Player Detail Deep-Link Origins @critical', () => {
       await dialog
         .getByRole('button', { name: /close/i })
         .first()
-        // force: true — the open matchup page may layer elements over the dialog's close button
-        .click({ force: true });
+        // LS-9795: the removed `{ force: true }` hedged that the matchup page
+        // "may layer elements over" this close button. Nothing does — the
+        // dialog is topmost, so the hit-target check is live again.
+        .click();
       await expect(dialog).not.toBeVisible();
       await expect(page).toHaveURL(MATCHUP_URL);
     });

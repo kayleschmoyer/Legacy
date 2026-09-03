@@ -608,10 +608,14 @@ test.describe('Career Arc Chart — two-way player arc mode switching @regressio
 
     // Switch to pitching mode via the arc-mode toggle.
     // "Pitching" appears twice in the dialog: nth(0)=stats nav tab, nth(1)=arc toggle.
+    // LS-9795: the `{ force: true }` on these toggle clicks was cargo-culted
+    // from the compare surface (same lineage as the bypass already dropped
+    // from PlayerDetailSurface.switchTab). The arc toggle sits inside the
+    // dialog content, above the overlay — nothing intercepts it.
     await playersPage.detail.dialog
       .getByText('Pitching', { exact: true })
       .nth(1)
-      .click({ force: true });
+      .click();
 
     // Now ERA+ metrics should be visible
     await playersPage.detail.expectText('Peak ERA+');
@@ -632,7 +636,7 @@ test.describe('Career Arc Chart — two-way player arc mode switching @regressio
     await playersPage.detail.dialog
       .getByText('Pitching', { exact: true })
       .nth(1)
-      .click({ force: true });
+      .click();
 
     // Only one pitching season: ERA+ 185
     await playersPage.detail.expectText('185');
@@ -655,13 +659,13 @@ test.describe('Career Arc Chart — two-way player arc mode switching @regressio
     await playersPage.detail.dialog
       .getByText('Pitching', { exact: true })
       .nth(1)
-      .click({ force: true });
+      .click();
     await playersPage.detail.expectText('Peak ERA+');
 
     await playersPage.detail.dialog
       .getByText('Batting', { exact: true })
       .nth(1)
-      .click({ force: true });
+      .click();
     await playersPage.detail.expectText('Peak OPS');
   });
 
@@ -694,7 +698,7 @@ test.describe('Career Arc Chart — two-way player arc mode switching @regressio
     await playersPage.detail.dialog
       .getByText('Pitching', { exact: true })
       .nth(1)
-      .click({ force: true });
+      .click();
 
     // 2022 pitching season has CYA award
     await playersPage.detail.expectText(/Cy Young/);

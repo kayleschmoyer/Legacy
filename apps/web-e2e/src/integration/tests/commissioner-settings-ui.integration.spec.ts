@@ -151,10 +151,16 @@ test.describe
     });
 
     await test.step('Change Minimum Career Games to 100', async () => {
-      // Default is 50 — select 100. Use force:true to bypass sticky header.
+      // Default is 50 — select 100.
+      // LS-9795: the six clicks in this phase carried `force: true` to "bypass
+      // sticky header" (LeagueDetailShell's tab bar is `position: sticky;
+      // top: 105; zIndex: 60`). It does not occlude them — these controls sit
+      // inside the League Settings accordion, and Playwright's auto-scroll
+      // clears the bar. Verified against the live deployed frontend: all four
+      // phases pass with the actionability checks restored.
       await page
         .getByRole('button', { name: 'Minimum career games: 100', exact: true })
-        .click({ force: true });
+        .click();
     });
 
     await test.step('Change Minimum Career Seasons to 5', async () => {
@@ -164,19 +170,19 @@ test.describe
           name: 'Minimum career seasons: 5',
           exact: true,
         })
-        .click({ force: true });
+        .click();
     });
 
     await test.step('Disable Playoffs', async () => {
       await page
         .getByRole('button', { name: 'Playoffs: Disabled', exact: true })
-        .click({ force: true });
+        .click();
     });
 
     await test.step('Re-enable Playoffs', async () => {
       await page
         .getByRole('button', { name: 'Playoffs: Enabled', exact: true })
-        .click({ force: true });
+        .click();
     });
 
     await test.step('Enable multi-week playoff matchups', async () => {
@@ -185,13 +191,11 @@ test.describe
           name: 'Multi-week playoffs: Two weeks',
           exact: true,
         })
-        .click({ force: true });
+        .click();
     });
 
     await test.step('Save settings and wait for success', async () => {
-      await page
-        .getByRole('button', { name: 'Save Settings' })
-        .click({ force: true });
+      await page.getByRole('button', { name: 'Save Settings' }).click();
       // Success message or spinner disappearing indicates save completed
       await expect(
         page.getByRole('status').filter({ hasText: /saved successfully/i }),

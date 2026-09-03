@@ -53,10 +53,12 @@ import { PremiumGate } from '../components/premium-gate.component';
  *     sort-table helpers, and the raw-`Locator` `dialog` / position-badge
  *     getters a few specs use for compound or `toHaveCSS` assertions. Its
  *     driver-typed reads/actions still work on any driver.
- *   • `compare` — driver-typed with a slim web-only remainder: `force: true`
- *     (the intentional premium-gate overlay bypass), `blur()` / `focus()` /
- *     `toBeFocused()`, `toHaveText(RegExp)`, and a negated contains-text cell
- *     assertion — none of which have a portable driver verb. The chip
+ *   • `compare` — driver-typed with a slim web-only remainder: `blur()` /
+ *     `focus()` / `toBeFocused()`, `toHaveText(RegExp)`, and a negated
+ *     contains-text cell assertion — none of which have a portable driver
+ *     verb. (LS-9795 removed the last `force: true` here: LS-7012 dropped the
+ *     blur/pointer-events overlay for free users, so there is no longer a
+ *     gate to force through.) The chip
  *     slot-color regression moved out of the spec entirely to
  *     PlayerComparison.stories.tsx (Chromatic); slot *identity* stays here as a
  *     platform-neutral `aria-label="Slot N"` check (LS-8352 stage 5).
@@ -958,10 +960,9 @@ class PlayerCompareSurface {
   }
 
   /**
-   * The search input as a raw `Locator` — WEB-ONLY escape hatch for the
-   * `force: true` premium-gate bypass, `blur()`, and `toBeFocused()` below,
-   * none of which have a portable driver verb. Resolves by the same accessible
-   * label the driver-typed `#search` uses.
+   * The search input as a raw `Locator` — WEB-ONLY escape hatch for `blur()`
+   * and `toBeFocused()` below, neither of which has a portable driver verb.
+   * Resolves by the same accessible label the driver-typed `#search` uses.
    */
   #searchInput(): Locator {
     return this.#requireWebPage().getByLabel('Search players to compare');
@@ -983,26 +984,6 @@ class PlayerCompareSurface {
       await this.#search.fill(searchTerm);
       await result.expectVisible({ timeout: 5000 });
       await result.tap();
-    }).toPass({ timeout: 15000 });
-  }
-
-  /**
-   * As {@link addPlayer} but forces each interaction past the gate overlay.
-   * WEB-ONLY: `force: true` bypasses the PremiumGate overlay's `pointerEvents:
-   * 'none'` on blurred content for non-premium users (an intentional gate, not
-   * the LS-5807 overlay bug) — there is no portable "click through an overlay"
-   * driver verb, so this stays on the raw `Locator`.
-   */
-  async addPlayerForce(searchTerm: string, fullName: string): Promise<void> {
-    const page = this.#requireWebPage();
-    const search = this.#searchInput();
-    await expect(async () => {
-      await search.clear({ force: true });
-      await search.fill(searchTerm, { force: true });
-      await expect(page.getByText(fullName)).toBeVisible({
-        timeout: 5000,
-      });
-      await page.getByText(fullName).click({ force: true, timeout: 5000 });
     }).toPass({ timeout: 15000 });
   }
 
@@ -1754,12 +1735,17 @@ class FootballPlayersSurface {
 
   /**
    * Select a team-filter option by value (a team abbreviation or one of the
-   * sentinels `All` / `FREE_AGENT` / `AFC` / `NFC`). `force` matches the
-   * pre-migration specs — the styled native select can sit behind a Tamagui
-   * decoration layer that intercepts hit-testing.
+   * sentinels `All` / `FREE_AGENT` / `AFC` / `NFC`).
+   *
+   * LS-9795: previously `{ force: true }`, justified as "a Tamagui decoration
+   * layer intercepts hit-testing". It does not — the only element painted over
+   * the `<select>` is the `▾` chevron, which already sets
+   * `pointerEvents: 'none'` (footballStatsConfig.tsx). Dropping `force` here
+   * restores the visible/stable/enabled/hit-target checks for all 15 call
+   * sites across the three football filter specs.
    */
   async selectTeam(value: string): Promise<void> {
-    await this.#teamSelect.selectOption(value, { force: true });
+    await this.#teamSelect.selectOption(value);
   }
 
   /** Click a position pill ("All", "QB", "RB", …) in the toggle group. */

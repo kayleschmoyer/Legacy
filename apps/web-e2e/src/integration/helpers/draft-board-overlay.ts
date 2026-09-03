@@ -12,6 +12,14 @@ export async function dismissPickAnnouncementOverlay(
 ): Promise<void> {
   const overlay = page.getByTestId('draft-announce-overlay');
   if (await overlay.isVisible({ timeout: 3_000 }).catch(() => false)) {
+    // LS-9795 — KEPT. Suppresses only the **stability** check. PickAnnouncement
+    // mounts with Tamagui `animation="quick"` driving `opacity` 0→1 (and 1→0 on
+    // leave) and does not wire `prefers-reduced-motion`, so the config-wide
+    // `reducedMotion: 'reduce'` (LS-3620) does not quiet it — the overlay is
+    // still transforming when we need to dismiss it. The other conditions are
+    // satisfied by construction: it is the topmost element (`position: fixed`,
+    // `inset: 0`, `zIndex: 9999`), visible per the check above, and it is
+    // itself the click target, so there is nothing for it to be occluded by.
     await overlay.click({ force: true });
     await overlay.waitFor({ state: 'hidden', timeout: 5_000 });
   }

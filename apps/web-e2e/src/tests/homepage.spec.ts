@@ -41,13 +41,14 @@ test.describe('Homepage @smoke', () => {
     page,
   }) => {
     // HomePage renders baseball onboarding CTA buttons (Create League, Join League).
-    // V2 hero overlays a `<div role="presentation">` decoration above the
-    // CTA strip that intercepts pointer events on the first click attempt;
-    // force-click bypasses the actionability check (the underlying button
-    // is enabled and stable per the call log).
+    // LS-9795: the former `{ force: true }` here cited a V2-hero
+    // `<div role="presentation">` decoration intercepting the first click. No
+    // such interception occurs — the plain click passes on all five projects
+    // (chromium/firefox/webkit/Mobile Chrome/Mobile Safari), so the hit-target
+    // check is now live on the landing page's primary CTA.
     const cta = page.getByRole('button', { name: /join league/i });
     await expect(cta).toBeVisible();
-    await cta.click({ force: true });
+    await cta.click();
     // waitForURL is more reliable than waitForLoadState + toHaveURL for SPA
     // navigation where the load event may fire before the router updates.
     await page.waitForURL('/baseball/league/join', { timeout: 10000 });
@@ -83,7 +84,7 @@ test.describe('Homepage @smoke', () => {
   }) => {
     const cta = page.getByRole('button', { name: /join league/i }).first();
     await expect(cta).toBeVisible();
-    await cta.click({ force: true });
+    await cta.click();
     await page.waitForURL('/baseball/league/join', { timeout: 10000 });
 
     await page.getByRole('button', { name: /cancel/i }).click();

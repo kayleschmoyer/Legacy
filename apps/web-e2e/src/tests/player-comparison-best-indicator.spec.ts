@@ -677,10 +677,15 @@ adminTest.describe(
       await playersPage.gotoCompare();
       await playersPage.compare.expectSearchVisible();
 
-      // Force-interact to simulate a user who has bypassed the pointer-events
-      // gate (e.g. via browser DevTools) and added players to the comparison.
-      await playersPage.compare.addPlayerForce('Aa', 'Aaron Judge');
-      await playersPage.compare.addPlayerForce('Sh', 'Shohei Ohtani');
+      // LS-9795: these used to go through `addPlayerForce`, a `force: true`
+      // variant added when the compare page wrapped its content in a blurred
+      // PremiumGate with `pointerEvents: 'none'`. LS-7012 removed that overlay
+      // — free users now get the fully interactive page plus an inline
+      // PremiumBanner — so the ordinary path works and the actionability
+      // checks are back in force. The assertion below is unchanged: a free
+      // user can build a comparison, but the BEST markers stay out of the DOM.
+      await playersPage.compare.addPlayer('Aa', 'Aaron Judge');
+      await playersPage.compare.addPlayer('Sh', 'Shohei Ohtani');
     });
 
     adminTest(

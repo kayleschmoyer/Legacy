@@ -120,6 +120,31 @@ LS-8577 asserted `BATTERS`, `PITCHERS`, `Actual`, `Proj`, `Pos`. The redesign re
 
 **A passing sibling assertion is not evidence the DOM is unchanged.** When one exact-text assertion fails, diff the rendered labels before assuming a timing problem.
 
+### 2.5 Scraping numbers out of panel text and asserting a relationship between them
+
+`matchup-detail-ui.integration.spec.ts` reads every `\d+%` token out of the
+win-probability panel and asserts that **some pair sums to exactly 100**. The panel
+renders **three** text percentages — `{t1Pct}%`, `{tiePct}% tie`, `{t2Pct}%`
+(`MatchupWinProbabilityPanel.tsx:134/149/164`), each independently `Math.round`ed —
+and the tie line renders whenever `tieProb > 0.01`. Because the three sum to ~100, no
+_pair_ can sum to 100 unless the tie rounds to 0. The test therefore fails **precisely
+when the live Monte Carlo returns a tie probability above 1%**: not random, but
+data-dependent, which is why it passes most runs and looks like a flake.
+
+Two lessons. First, a regex over `innerText()` cannot tell you _which_ value it
+matched — when the panel grew a third percentage, the assertion silently changed
+meaning. Scope to per-value test ids instead. Second, when values are rounded
+independently, any exact-total assertion is wrong by construction; assert a tolerance,
+or make the product use largest-remainder rounding so the displayed parts really do
+total 100.
+
+Fixed by LS-9838, which did both halves: `roundPercentagesTo100` (largest-remainder) so
+the displayed parts really do total 100, and an assertion on the tie-inclusive total
+instead of a pair. Note what the old assertion cost — it failed on nothing worse than an
+evenly-matched matchup, and only for some live data, so it read as a flake and was
+re-hardened three times (LS-7869, LS-8138, LS-8419) without anyone questioning the
+assertion itself.
+
 ### 2.4 Accessible names that change with state
 
 A locator matching on accessible name can silently change its match set as the UI's state changes.
@@ -176,7 +201,14 @@ Playwright's actionability check requires an element to be **stable** (not anima
 - **Off-screen by size.** A confirm dialog with a fixed `width={520}` overflowed 375px and pushed its right-aligned button off-screen; a `DateTimePicker` popover ~700px tall could not fit a 667px viewport and could not be scrolled (LS-8501). Again fixed in the product.
 - **Genuinely disabled.** See §2.2 — assert `toBeDisabled()`, don't click.
 
-**`{ force: true }` is not on this list.** It skips the actionability check, which means it skips the bug. LS-989 used it for a save button; LS-8501 explicitly refused to. **38 `force: true` uses remain** — treat each as unreviewed debt, not precedent.
+**`{ force: true }` is not on this list.** It skips the actionability check, which means it skips the bug. LS-989 used it for a save button; LS-8501 explicitly refused to.
+
+**LS-9795 triaged all 35 Playwright sites and left 2.** Thirty-three were removed after verification, and the pattern was overwhelmingly the same: _the force outlived the defect it was added for_. `addPlayerForce` still bypassed a `PremiumGate` overlay that LS-7012 had deleted; seven trade-dialog clicks still bypassed the `position: absolute` overlay that LS-8501 had already made `position: fixed`. Two more lessons worth keeping:
+
+- **An ancestor never intercepts the hit test for its own descendant.** A backdrop that _wraps_ the control it is blamed for blocking is not the blocker.
+- **`fill()` and `clear()` never hit-test at all** — Playwright gates them on visible/enabled/editable only. `force` on them cannot be bypassing an overlay; it is only hiding those three checks (in one case, a genuine remount race).
+
+A `no-restricted-syntax` rule in `apps/web-e2e/eslint.config.mjs` now bans `force: true` across `apps/web-e2e/src`, with the 2 survivors grandfathered by basename, so the count can only shrink. Adding a new one means adding a basename and naming _which_ actionability condition is suppressed and why.
 
 ### 3.5 Listeners registered after the thing they listen for
 
@@ -475,7 +507,9 @@ nocomment() { grep -vE ':[0-9]+: *(\*|//|/\*)'; }
 
 grep -rn "switchUser(" apps/web-e2e/src --include=*.ts | nocomment \
   | grep -v 'export async function' | grep -v ':import'   # -> 4
-grep -rn "force: true"  apps/web-e2e/src --include=*.ts | nocomment | wc -l   # -> 38
+grep -rn "force: true"  apps/web-e2e/src --include=*.ts | nocomment | wc -l   # -> 5 after LS-9795
+# ...of which 3 are fs.rmSync(dir, { recursive: true, force: true }), not Playwright.
+# Only 2 are real Playwright suppressions, and both are lint-grandfathered.
 grep -rn "networkidle"  apps/web-e2e/src --include=*.ts | nocomment | wc -l   # -> 283
 ```
 
