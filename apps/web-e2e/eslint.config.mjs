@@ -358,7 +358,6 @@ const ls9794GrandfatheredFiles = [
   'disclosure-game.spec.ts',
   'donate-page.spec.ts',
   'draft-functionality.spec.ts',
-  'draft-graphql-integration.spec.ts',
   'form-a11y.spec.ts',
   'join-league.spec.ts',
   'league-creation-advanced.spec.ts',

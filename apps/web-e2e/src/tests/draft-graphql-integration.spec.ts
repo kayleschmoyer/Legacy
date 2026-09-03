@@ -34,25 +34,26 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
    * Build a mock response for the given operation based on the POST body.
    * Returns a per-operation mock so the page can render correctly.
    */
-  function buildMockResponse(body: GraphQLRequest): GraphQLResponse | null {
-    const op = (body.operationName ?? body.query ?? '').toLowerCase();
+  /**
+   * Operations the draft page issues incidentally. They must resolve, but
+   * their contents shape nothing the spec asserts, so an empty envelope is
+   * the honest mock. Listed explicitly rather than substring-matched so a
+   * new operation cannot silently join the set (LS-9794).
+   */
+  const EMPTY_ENVELOPE_OPERATIONS = new Set([
+    'getcurrentweekforleague',
+    'getleaguestandings',
+    'getleagueactivity',
+    'getleaguechatmessages',
+    'getleaguemessages',
+    'getleagueannouncements',
+    'getteamwaiverclaims',
+  ]);
 
-    if (
-      op.includes('getleaguebyid') ||
-      (op.includes('league') &&
-        !op.includes('team') &&
-        !op.includes('position') &&
-        !op.includes('matchup') &&
-        !op.includes('scoring') &&
-        !op.includes('user') &&
-        !op.includes('activity') &&
-        !op.includes('chat') &&
-        !op.includes('announcement') &&
-        !op.includes('standing') &&
-        !op.includes('trade') &&
-        !op.includes('waiver') &&
-        !op.includes('draft'))
-    ) {
+  function buildMockResponse(body: GraphQLRequest): GraphQLResponse | null {
+    const op = (body.operationName ?? '').toLowerCase();
+
+    if (op === 'getleaguebyid') {
       return {
         data: {
           league: mockLeague({
@@ -70,7 +71,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       };
     }
 
-    if (op.includes('startdraft') || op.includes('initializedraft')) {
+    if (op === 'startdraft' || op === 'initializedraft') {
       return {
         data: {
           initializeDraft: {
@@ -92,7 +93,7 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       };
     }
 
-    if (op.includes('position')) {
+    if (op === 'getleaguepositions' || op === 'getpositionsforleague') {
       return {
         data: {
           leaguePositions: [
@@ -107,15 +108,15 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       };
     }
 
-    if (op.includes('teammembers') || op.includes('getteammembers')) {
+    if (op === 'getteammembers') {
       return { data: { teamMembers: [] } };
     }
 
-    if (op.includes('userteamid')) {
+    if (op === 'getuserteamid') {
       return { data: { userTeamId: { __typename: 'UserTeamId', teamId: 1 } } };
     }
 
-    if (op.includes('getleagueteams')) {
+    if (op === 'getleagueteams') {
       return {
         data: {
           leagueTeams: [
@@ -125,42 +126,31 @@ test.describe('Draft GraphQL Integration Tests @regression', () => {
       };
     }
 
-    if (op.includes('matchup')) {
-      if (op.includes('current'))
-        return { data: { currentMatchupForLeague: null } };
-      if (op.includes('byid')) return { data: { matchup: null } };
+    if (op === 'getmatchupbyid') return { data: { matchup: null } };
+    if (op === 'getmatchupsforleague') {
       return { data: { matchupsForLeague: [] } };
     }
 
-    if (op.includes('scoring')) {
+    if (op === 'getleaguescoringprofile') {
       return { data: { leagueScoringProfile: null } };
     }
 
-    if (op.includes('getleaguedraft') || op.includes('leaguedraft')) {
+    if (op === 'getleaguedraft') {
       return { data: { getLeagueDraft: null } };
     }
 
-    if (op.includes('getdraftteamorder') || op.includes('draftteamorder')) {
+    if (op === 'getdraftteamorder') {
       return { data: { getDraftTeamOrder: [] } };
     }
 
-    if (
-      op.includes('getcurrentweek') ||
-      op.includes('currentweek') ||
-      op.includes('getmatchupsforleague') ||
-      op.includes('getleaguestandings') ||
-      op.includes('getleagueactivity') ||
-      op.includes('leagueactivity') ||
-      op.includes('getleaguechatmessages') ||
-      op.includes('getleaguemessages') ||
-      op.includes('getleagueannouncements') ||
-      op.includes('getteamwaiverclaims') ||
-      op.includes('getpendingtradeoffers')
-    ) {
+    // Ancillary league-page queries the draft flow triggers but does not
+    // assert on: answer with an empty envelope so they resolve without
+    // shaping any assertion.
+    if (EMPTY_ENVELOPE_OPERATIONS.has(op)) {
       return { data: {} };
     }
 
-    if (op.includes('getuserleagues')) {
+    if (op === 'getuserleagues') {
       return { data: { userLeagues: [] } };
     }
 

@@ -49,24 +49,6 @@ const KNOWN_AMBIGUOUS: readonly string[] = [
   'auction-draft.spec.ts::getuserleagues',
   'combobox-search-a11y.spec.ts::getallplayers',
   'combobox-search-a11y.spec.ts::searchplayers',
-  'draft-graphql-integration.spec.ts::announcement',
-  'draft-graphql-integration.spec.ts::byid',
-  'draft-graphql-integration.spec.ts::chat',
-  'draft-graphql-integration.spec.ts::current',
-  'draft-graphql-integration.spec.ts::draft',
-  'draft-graphql-integration.spec.ts::getleaguedraft',
-  'draft-graphql-integration.spec.ts::getleagueteams',
-  'draft-graphql-integration.spec.ts::getuserleagues',
-  'draft-graphql-integration.spec.ts::league',
-  'draft-graphql-integration.spec.ts::leaguedraft',
-  'draft-graphql-integration.spec.ts::matchup',
-  'draft-graphql-integration.spec.ts::position',
-  'draft-graphql-integration.spec.ts::scoring',
-  'draft-graphql-integration.spec.ts::standing',
-  'draft-graphql-integration.spec.ts::team',
-  'draft-graphql-integration.spec.ts::trade',
-  'draft-graphql-integration.spec.ts::user',
-  'draft-graphql-integration.spec.ts::waiver',
   'matchup-week-navigation.spec.ts::getleagueteams',
   'matchup-week-navigation.spec.ts::leagueteams',
   'matchup-week-navigation.spec.ts::matchupplayers',
@@ -113,8 +95,13 @@ const KNOWN_AMBIGUOUS: readonly string[] = [
 /** Identifiers that hold a GraphQL operation name (or the raw request body). */
 const OPERATION_RECEIVERS = ['postData', 'opName', 'operationName', 'op'];
 
+// The receiver must be a bare identifier, never a property access: a leading
+// `.` is excluded so `req.operationName?.includes('League')` — an assertion
+// over captured requests, not route dispatch — is not mistaken for routing.
+// This matches the ESLint rule's semantics exactly; `no-restricted-properties`
+// only fires when the object is an Identifier.
 const ROUTING_CALL = new RegExp(
-  `(?:^|[^A-Za-z0-9_$])(${OPERATION_RECEIVERS.join('|')})` +
+  `(?:^|[^A-Za-z0-9_$.])(${OPERATION_RECEIVERS.join('|')})` +
     String.raw`\??(?:\(\))?\.includes\(\s*'([^']*)'\s*\)`,
   'g',
 );
