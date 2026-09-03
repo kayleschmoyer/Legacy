@@ -455,9 +455,13 @@ export class LeaguePage extends BaseScreen {
     await this.driver.open(path);
   }
 
-  /** Navigate to the league discovery page and wait for its heading. */
-  async gotoDiscovery(): Promise<void> {
-    await this.driver.open('/baseball/leagues');
+  /**
+   * Navigate to the league discovery page for `sport` and wait for its
+   * heading. Defaults to `'baseball'`; pass `'football'` for football
+   * discovery specs (LS-7634).
+   */
+  async gotoDiscovery(sport: Sport = 'baseball'): Promise<void> {
+    await this.driver.open(`/${sport}/leagues`);
     await this.discoveryHeading.expectVisible({ timeout: 30000 });
   }
 
