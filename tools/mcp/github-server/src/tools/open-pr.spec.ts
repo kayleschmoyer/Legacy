@@ -18,6 +18,7 @@ jest.mock('node:child_process', () => ({
 
 jest.mock('node:fs', () => ({
   existsSync: jest.fn(),
+  readFileSync: jest.fn(),
 }));
 
 const { githubRest: mockGithubRest, githubGraphQL: mockGithubGraphQL } =
@@ -39,9 +40,11 @@ const {
 const { execFile: mockExecFile } = jest.requireMock<{
   execFile: jest.Mock;
 }>('node:child_process');
-const { existsSync: mockExistsSync } = jest.requireMock<{
-  existsSync: jest.Mock;
-}>('node:fs');
+const { existsSync: mockExistsSync, readFileSync: mockReadFileSync } =
+  jest.requireMock<{
+    existsSync: jest.Mock;
+    readFileSync: jest.Mock;
+  }>('node:fs');
 
 type ExecFileCallback = (
   error: Error | null,
@@ -398,6 +401,122 @@ describe('openPR', () => {
       expect(result.isError).toBeUndefined();
       expect(result.content[0].text).toContain('"noJiraLabelApplied":false');
       expect(result.content[0].text).toContain('403 label forbidden');
+    });
+  });
+
+  describe('bodyFile (LS-9581)', () => {
+    it('errors when both body and bodyFile are provided', async () => {
+      const result = await openPR({
+        title: 'LS-9581 test',
+        body: 'inline body',
+        bodyFile: 'scratch/pr-body.md',
+        head: 'feature-branch',
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/not both/);
+    });
+
+    it('errors when neither body nor bodyFile is provided', async () => {
+      const result = await openPR({
+        title: 'LS-9581 test',
+        head: 'feature-branch',
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/either `body` or `bodyFile`/);
+    });
+
+    it('reads bodyFile content verbatim and uses it as the PR body', async () => {
+      makeExecFileSuccess('feature-branch');
+      mockReadFileSync.mockReturnValue('# Evidence\n\nBefore/after numbers.');
+      const result = await openPR({
+        title: 'LS-9581 test',
+        bodyFile: 'scratch/pr-body.md',
+        head: 'feature-branch',
+        draft: true,
+        push: false,
+      });
+      expect(result.isError).toBeFalsy();
+      expect(mockReadFileSync).toHaveBeenCalledWith(
+        '/tmp/test-repo-root/scratch/pr-body.md',
+        'utf-8',
+      );
+      const calls = mockGithubRest.mock.calls as unknown as Array<
+        [{ body: { body: string } }]
+      >;
+      expect(calls[0][0].body.body).toContain('Before/after numbers.');
+    });
+
+    it('resolves a relative bodyFile against worktreePath when provided', async () => {
+      makeExecFileSuccess('feature-branch');
+      mockReadFileSync.mockReturnValue('worktree evidence');
+      const result = await openPR({
+        title: 'LS-9581 test',
+        bodyFile: 'pr-body.md',
+        worktreePath: '/tmp/test-repo-root/sub-wt',
+        head: 'feature-branch',
+        draft: true,
+        push: false,
+      });
+      expect(result.isError).toBeFalsy();
+      expect(mockReadFileSync).toHaveBeenCalledWith(
+        '/tmp/test-repo-root/sub-wt/pr-body.md',
+        'utf-8',
+      );
+    });
+
+    it('errors with a clear message when bodyFile cannot be read', async () => {
+      mockReadFileSync.mockImplementation(() => {
+        throw new Error('ENOENT: no such file or directory');
+      });
+      const result = await openPR({
+        title: 'LS-9581 test',
+        bodyFile: 'missing.md',
+        head: 'feature-branch',
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Cannot read bodyFile');
+      expect(result.content[0].text).toContain('ENOENT');
+    });
+
+    it('refuses bodyFile in Lambda mode with a clear error', async () => {
+      mockIsLambda.mockReturnValue(true);
+      const result = await openPR({
+        title: 'LS-9581 test',
+        bodyFile: 'scratch/pr-body.md',
+        head: 'feature-branch',
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/Lambda mode/);
+      expect(result.content[0].text).toContain('scratch/pr-body.md');
+      expect(mockReadFileSync).not.toHaveBeenCalled();
+    });
+
+    it('refuses an absolute bodyFile outside the repository root', async () => {
+      const result = await openPR({
+        title: 'LS-9581 test',
+        bodyFile: '/home/user/.ssh/id_rsa',
+        head: 'feature-branch',
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/outside the repository root/);
+      expect(mockReadFileSync).not.toHaveBeenCalled();
+    });
+
+    it('refuses a relative bodyFile that escapes the repository root via ../', async () => {
+      const result = await openPR({
+        title: 'LS-9581 test',
+        bodyFile: '../../etc/passwd',
+        head: 'feature-branch',
+        push: false,
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/outside the repository root/);
+      expect(mockReadFileSync).not.toHaveBeenCalled();
     });
   });
 });

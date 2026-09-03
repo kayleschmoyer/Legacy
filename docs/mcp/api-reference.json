@@ -4265,6 +4265,14 @@
               "type": "string",
               "optional": true,
               "description": "New PR body (markdown)"
+            },
+            "bodyFile": {
+              "type": "string",
+              "optional": true,
+              "constraints": [
+                "min 1"
+              ],
+              "description": "Repo-relative file path replacing PR body (contents become public); exclusive with body, no Lambda support"
             }
           },
           "transports": [
@@ -4977,8 +4985,16 @@
             },
             "body": {
               "type": "string",
-              "optional": false,
+              "optional": true,
               "description": "PR body (markdown)"
+            },
+            "bodyFile": {
+              "type": "string",
+              "optional": true,
+              "constraints": [
+                "min 1"
+              ],
+              "description": "Repo-relative file path for PR body (contents become public); exclusive with body, no Lambda support"
             },
             "base": {
               "type": "string",

@@ -1,17 +1,28 @@
 jest.mock('../github-api', () => ({ githubRest: jest.fn() }));
-jest.mock('../auth', () => ({ getRepoOwnerName: jest.fn() }));
+jest.mock('../auth', () => ({
+  getRepoOwnerName: jest.fn(),
+  getRepoRoot: jest.fn(() => '/tmp/test-repo-root'),
+  isLambda: jest.fn(() => false),
+}));
+jest.mock('node:fs', () => ({ readFileSync: jest.fn() }));
 
+import { readFileSync } from 'node:fs';
 import { editPR } from './edit-pr';
 import { githubRest } from '../github-api';
-import { getRepoOwnerName } from '../auth';
+import { getRepoOwnerName, getRepoRoot, isLambda } from '../auth';
 
 const mockedRest = githubRest as jest.MockedFunction<typeof githubRest>;
 const mockedRepo = getRepoOwnerName as jest.MockedFunction<
   typeof getRepoOwnerName
 >;
+const mockedRepoRoot = getRepoRoot as jest.MockedFunction<typeof getRepoRoot>;
+const mockedIsLambda = isLambda as jest.MockedFunction<typeof isLambda>;
+const mockedReadFileSync = readFileSync as unknown as jest.Mock;
 
 beforeEach(() => {
   mockedRepo.mockResolvedValue({ owner: 'org', name: 'repo' });
+  mockedRepoRoot.mockReturnValue('/tmp/test-repo-root');
+  mockedIsLambda.mockReturnValue(false);
 });
 
 afterEach(() => jest.resetAllMocks());
@@ -194,5 +205,84 @@ describe('editPR — jira-link marker preservation', () => {
     const patchBodyC = patchCall[0].body as Record<string, string>;
     expect(patchBodyC.body).toBe(newBody);
     expect(patchBodyC.body).not.toContain('<!-- jira-link');
+  });
+});
+
+describe('editPR — bodyFile (LS-9581)', () => {
+  it('errors when both body and bodyFile are provided', async () => {
+    const result = await editPR({
+      number: 20,
+      body: 'inline',
+      bodyFile: 'scratch/pr-body.md',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/not both/);
+  });
+
+  it('reads bodyFile content verbatim and uses it as the new body', async () => {
+    mockedReadFileSync.mockReturnValue('# Evidence\n\nBefore/after numbers.');
+    mockedRest.mockResolvedValue({
+      number: 21,
+      title: 'PR',
+      body: '# Evidence\n\nBefore/after numbers.',
+      html_url: 'https://github.com/o/r/pull/21',
+    });
+
+    const result = await editPR({ number: 21, bodyFile: 'scratch/pr-body.md' });
+    expect(result.isError).toBeFalsy();
+    expect(mockedReadFileSync).toHaveBeenCalledWith(
+      '/tmp/test-repo-root/scratch/pr-body.md',
+      'utf-8',
+    );
+    const patchCall = mockedRest.mock.calls.find(
+      (call) => call[0].method === 'PATCH',
+    );
+    const patchBody = patchCall?.[0].body as Record<string, string>;
+    expect(patchBody.body).toContain('Before/after numbers.');
+  });
+
+  it('errors with a clear message when bodyFile cannot be read', async () => {
+    mockedReadFileSync.mockImplementation(() => {
+      throw new Error('ENOENT: no such file or directory');
+    });
+
+    const result = await editPR({ number: 22, bodyFile: 'missing.md' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Cannot read bodyFile');
+    expect(result.content[0].text).toContain('ENOENT');
+    expect(mockedRest).not.toHaveBeenCalled();
+  });
+
+  it('refuses bodyFile in Lambda mode with a clear error', async () => {
+    mockedIsLambda.mockReturnValue(true);
+
+    const result = await editPR({ number: 23, bodyFile: 'scratch/pr-body.md' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/Lambda mode/);
+    expect(result.content[0].text).toContain('scratch/pr-body.md');
+    expect(mockedReadFileSync).not.toHaveBeenCalled();
+    expect(mockedRest).not.toHaveBeenCalled();
+  });
+
+  it('refuses an absolute bodyFile outside the repository root', async () => {
+    const result = await editPR({
+      number: 24,
+      bodyFile: '/home/user/.ssh/id_rsa',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/outside the repository root/);
+    expect(mockedReadFileSync).not.toHaveBeenCalled();
+    expect(mockedRest).not.toHaveBeenCalled();
+  });
+
+  it('refuses a relative bodyFile that escapes the repository root via ../', async () => {
+    const result = await editPR({
+      number: 25,
+      bodyFile: '../../etc/passwd',
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toMatch(/outside the repository root/);
+    expect(mockedReadFileSync).not.toHaveBeenCalled();
+    expect(mockedRest).not.toHaveBeenCalled();
   });
 });

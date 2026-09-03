@@ -756,6 +756,14 @@ export function createServer(): McpServer {
         .describe('Alias for "number" — use either, not both'),
       title: z.string().trim().min(1).optional().describe('New PR title'),
       body: z.string().optional().describe('New PR body (markdown)'),
+      bodyFile: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Repo-relative file path replacing PR body (contents become public); exclusive with body, no Lambda support',
+        ),
     },
     async (params) => {
       const resolved = params.number ?? params.prNumber;
@@ -774,6 +782,7 @@ export function createServer(): McpServer {
         number: resolved,
         title: params.title,
         body: params.body,
+        bodyFile: params.bodyFile,
       });
     },
   );
@@ -2109,7 +2118,15 @@ export function createServer(): McpServer {
       'Budgeted to ~45s of synchronous work: a slow git push returns { jobId, status: "running" } — poll with github_job_wait until it returns the final result. Do NOT re-run the command while the job is in progress.',
     {
       title: z.string().trim().min(1).describe('PR title'),
-      body: z.string().describe('PR body (markdown)'),
+      body: z.string().optional().describe('PR body (markdown)'),
+      bodyFile: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe(
+          'Repo-relative file path for PR body (contents become public); exclusive with body, no Lambda support',
+        ),
       base: z
         .string()
         .trim()

@@ -1,6 +1,6 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import {
   ensureJiraLinkMarker,
@@ -21,7 +21,14 @@ import type { ToolResult } from '../types.js';
 
 export interface OpenPRParams {
   title: string;
-  body: string;
+  /** PR body markdown. Mutually exclusive with bodyFile. */
+  body?: string;
+  /**
+   * Path (absolute, or relative to worktreePath/repo root) to a file whose
+   * contents become the PR body verbatim. Mutually exclusive with body.
+   * Not supported in Lambda mode — the server has no local filesystem.
+   */
+  bodyFile?: string;
   base?: string;
   /** Leave PR in draft state — skips mark-ready and bot:ready-for-review label. */
   draft?: boolean;
@@ -190,6 +197,43 @@ async function openPRWorker(
     );
   }
 
+  // Resolve body vs bodyFile — mutually exclusive.
+  if (params.body !== undefined && params.bodyFile !== undefined) {
+    return err('Provide either `body` or `bodyFile`, not both.');
+  }
+  if (params.body === undefined && params.bodyFile === undefined) {
+    return err('Provide either `body` or `bodyFile`.');
+  }
+  let body: string;
+  if (params.bodyFile !== undefined) {
+    if (lambda) {
+      return err(
+        `bodyFile is not supported in Lambda mode — the server has no local filesystem and cannot read "${params.bodyFile}"; that path only exists on the caller's filesystem, not the Lambda server's. Pass \`body\` with the content inline instead.`,
+      );
+    }
+    const resolvedBodyFile = isAbsolute(params.bodyFile)
+      ? params.bodyFile
+      : resolve(cwd, params.bodyFile);
+    // Containment check: bodyFile becomes the publicly-visible PR body, so it
+    // must live inside the repo — never an arbitrary path like ~/.ssh/id_rsa
+    // or ~/.aws/credentials (LS-9581 review finding).
+    const bodyFileRel = relative(repoRoot, resolvedBodyFile);
+    if (bodyFileRel.startsWith('..') || isAbsolute(bodyFileRel)) {
+      return err(
+        `bodyFile "${resolvedBodyFile}" is outside the repository root "${repoRoot}". Refusing to read it — its contents would become the PR body, which is publicly visible. Only paths within the repository are allowed.`,
+      );
+    }
+    try {
+      body = readFileSync(resolvedBodyFile, 'utf-8');
+    } catch (e) {
+      return err(
+        `Cannot read bodyFile "${resolvedBodyFile}": ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  } else {
+    body = params.body as string;
+  }
+
   // Resolve the PR-authoring token up front — must be the
   // legacy-sports-code-bot GitHub App token, never a human's personal
   // credential (LS-8333). Resolved before the push below so a session
@@ -252,7 +296,7 @@ async function openPRWorker(
   // marker alone (body-only) isn't sufficient.
   const primary = params.jiraKey ?? extractPrimaryKey(params.title) ?? 'none';
   const title = ensureTitleHasPrimaryKey(params.title, primary);
-  const prBody = ensureJiraLinkMarker(params.body, { primary, related: [] });
+  const prBody = ensureJiraLinkMarker(body, { primary, related: [] });
 
   try {
     const repo = await getRepoOwnerName();

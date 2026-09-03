@@ -1,17 +1,26 @@
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { readFileSync } from 'node:fs';
+import { isAbsolute, relative, resolve } from 'node:path';
 import {
   extractJiraLinkBlock,
   stripJiraLinkBlocks,
   validateJiraLinkMarker,
 } from './jira-link.js';
-import { getRepoOwnerName } from '../auth.js';
+import { getRepoOwnerName, getRepoRoot, isLambda } from '../auth.js';
 import { githubRest } from '../github-api.js';
 import type { ToolResult } from '../types.js';
 
 interface EditPRParams {
   number: number;
   title?: string;
+  /** New PR body (markdown). Mutually exclusive with bodyFile. */
   body?: string;
+  /**
+   * Path (absolute, or relative to the repo root) to a file whose contents
+   * replace the PR body verbatim. Mutually exclusive with body. Not
+   * supported in Lambda mode — the server has no local filesystem.
+   */
+  bodyFile?: string;
 }
 
 interface PullRequest {
@@ -31,18 +40,84 @@ const MARKER_FIXIT =
 
 /** Update a pull request's title and/or body. */
 export async function editPR(params: EditPRParams): Promise<ToolResult> {
-  const { number, title, body } = params;
+  const { number, title } = params;
 
-  if (title === undefined && body === undefined) {
+  if (params.body !== undefined && params.bodyFile !== undefined) {
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: 'At least one of title or body must be provided.',
+          text: 'Provide either `body` or `bodyFile`, not both.',
         },
       ],
     };
+  }
+
+  if (
+    title === undefined &&
+    params.body === undefined &&
+    params.bodyFile === undefined
+  ) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: 'At least one of title or body (or bodyFile) must be provided.',
+        },
+      ],
+    };
+  }
+
+  let body = params.body;
+  if (params.bodyFile !== undefined) {
+    if (isLambda()) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text:
+              `bodyFile is not supported in Lambda mode — the server has no local filesystem ` +
+              `and cannot read "${params.bodyFile}"; that path only exists on the caller's ` +
+              "filesystem, not the Lambda server's. Pass `body` with the content inline instead.",
+          },
+        ],
+      };
+    }
+    const repoRoot = getRepoRoot();
+    const resolvedBodyFile = isAbsolute(params.bodyFile)
+      ? params.bodyFile
+      : resolve(repoRoot, params.bodyFile);
+    // Containment check: bodyFile becomes the publicly-visible PR body, so it
+    // must live inside the repo — never an arbitrary path like ~/.ssh/id_rsa
+    // or ~/.aws/credentials (LS-9581 review finding).
+    const bodyFileRel = relative(repoRoot, resolvedBodyFile);
+    if (bodyFileRel.startsWith('..') || isAbsolute(bodyFileRel)) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `bodyFile "${resolvedBodyFile}" is outside the repository root "${repoRoot}". Refusing to read it — its contents would become the PR body, which is publicly visible. Only paths within the repository are allowed.`,
+          },
+        ],
+      };
+    }
+    try {
+      body = readFileSync(resolvedBodyFile, 'utf-8');
+    } catch (e) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Cannot read bodyFile "${resolvedBodyFile}": ${e instanceof Error ? e.message : String(e)}`,
+          },
+        ],
+      };
+    }
   }
 
   try {
