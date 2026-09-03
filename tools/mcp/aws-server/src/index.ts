@@ -147,6 +147,14 @@ server.tool(
       .describe(
         'Cap output to the last N lines (default: 500, maximum: 1000). Use a smaller value for high-volume log groups to avoid token overflow.',
       ),
+    maxBytes: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(150_000)
+      .describe(
+        'Byte-cap on logs, in addition to maxLines (default: 150000). Truncates cleanly instead of erroring.',
+      ),
     format: z
       .enum(['markdown', 'json'])
       .default('markdown')

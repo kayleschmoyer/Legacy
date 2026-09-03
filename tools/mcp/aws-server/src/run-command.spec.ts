@@ -21,4 +21,21 @@ describe('runCommand', () => {
     expect(output).toBe(parametersJson);
     expect(() => JSON.parse(output)).not.toThrow();
   });
+
+  it('resolves with the partial output instead of rejecting when stdout exceeds maxBuffer', async () => {
+    // Regression for LS-5211: Node's default execFile maxBuffer error hands
+    // back the buffered stdout as the *error message*, which upstream tools
+    // then wrap verbatim as `{ ok: false, error: <huge dump> }`. Resolving
+    // instead lets callers apply their own truncation/size caps.
+    const output = await runCommand(
+      'node',
+      ['-e', 'process.stdout.write("a".repeat(2000))'],
+      process.cwd(),
+      {},
+      undefined,
+      1000,
+    );
+
+    expect(output.length).toBe(1000);
+  });
 });

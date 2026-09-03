@@ -11,6 +11,7 @@ import {
   extractErrorLines,
   logsTail,
   renderLogsAsMarkdown,
+  truncateToByteLimit,
   type CommandRunner,
 } from './logs-tail.js';
 
@@ -178,6 +179,95 @@ describe('logsTail (singular)', () => {
     expect(isError).toBe(true);
     expect(body.ok).toBe(false);
     expect(body.remedy).toMatch(/aws sso login/);
+  });
+});
+
+describe('truncateToByteLimit', () => {
+  it('returns the input unchanged when under the byte limit', () => {
+    expect(truncateToByteLimit('short text', 1000)).toBe('short text');
+  });
+
+  it('keeps the tail and drops the leading partial line when over the limit', () => {
+    const lines = Array.from({ length: 50 }, (_, i) => `line-${i}`);
+    const text = lines.join('\n');
+    const truncated = truncateToByteLimit(text, 40);
+    expect(Buffer.byteLength(truncated, 'utf8')).toBeLessThanOrEqual(40);
+    expect(truncated.endsWith('line-49')).toBe(true);
+    expect(truncated.startsWith('line-')).toBe(true);
+  });
+});
+
+describe('logsTail maxBytes cap', () => {
+  it('truncates a payload that exceeds maxBytes and reports truncated: true instead of erroring', async () => {
+    // Simulate a high-volume log group: individually large multi-line JSON
+    // blocks that stay well under maxLines but blow past a small maxBytes cap.
+    const bigBlock = 'x'.repeat(500);
+    const manyLines = Array.from(
+      { length: 50 },
+      (_, i) => `${i} ${bigBlock}`,
+    ).join('\n');
+    const runner: CommandRunner = jest.fn().mockResolvedValue(manyLines);
+
+    const { body, isError } = unwrap(
+      await logsTail(
+        { ...baseParams, maxLines: 500, maxBytes: 1000, function: 'graphql' },
+        runner,
+      ),
+    );
+
+    expect(isError).toBe(false);
+    expect(body.ok).not.toBe(false);
+    expect(body.truncated).toBe(true);
+    expect(Buffer.byteLength(body.logs as string, 'utf8')).toBeLessThanOrEqual(
+      1000,
+    );
+    // Keeps the most recent content (the tail), not the start.
+    expect((body.logs as string).includes('49 ')).toBe(true);
+  });
+
+  it('applies maxBytes on top of maxLines when both would truncate', async () => {
+    const bigBlock = 'y'.repeat(500);
+    const manyLines = Array.from(
+      { length: 600 },
+      (_, i) => `${i} ${bigBlock}`,
+    ).join('\n');
+    const runner: CommandRunner = jest.fn().mockResolvedValue(manyLines);
+
+    const { body } = unwrap(
+      await logsTail(
+        { ...baseParams, maxLines: 100, maxBytes: 2000, function: 'graphql' },
+        runner,
+      ),
+    );
+
+    expect(body.truncated).toBe(true);
+    expect(Buffer.byteLength(body.logs as string, 'utf8')).toBeLessThanOrEqual(
+      2000,
+    );
+  });
+
+  it('does not truncate when the payload fits within maxBytes', async () => {
+    const runner: CommandRunner = jest.fn().mockResolvedValue('small output');
+    const { body } = unwrap(
+      await logsTail(
+        { ...baseParams, maxBytes: 150_000, function: 'graphql' },
+        runner,
+      ),
+    );
+    expect(body.truncated).toBe(false);
+    expect(body.logs).toBe('small output');
+  });
+
+  it('passes a large maxBuffer to the runner so big fetches are not cut short before the byte cap applies', async () => {
+    const runner: CommandRunner = jest.fn().mockResolvedValue('ok');
+    await logsTail({ ...baseParams, function: 'graphql' }, runner);
+    const [, , , maxBuffer] = (runner as jest.Mock).mock.calls[0] as [
+      string,
+      string[],
+      string,
+      number,
+    ];
+    expect(maxBuffer).toBeGreaterThan(1024 * 1024);
   });
 });
 

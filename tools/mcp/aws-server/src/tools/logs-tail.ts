@@ -36,6 +36,23 @@ export const BATCH_CONCURRENCY = 5;
 export const RECENT_LINES = 50;
 
 /**
+ * Default hard byte-size cap on the returned `logs` payload, applied in
+ * addition to `maxLines`. High-volume log groups can produce entries that
+ * are individually large multi-line JSON blocks, so a line-count cap alone
+ * doesn't bound response size — this guards the tool/response budget
+ * independently.
+ */
+export const DEFAULT_MAX_BYTES = 150_000;
+
+/**
+ * Buffer allotted to the underlying `aws logs tail` process, well above
+ * `DEFAULT_MAX_BYTES`/`maxBytes` so a genuinely large fetch is captured in
+ * full before this module's own byte cap truncates it — rather than being
+ * cut off mid-stream by the child process's own stdout buffer limit.
+ */
+const CLI_MAX_BUFFER = 20 * 1024 * 1024;
+
+/**
  * Lines matching this pattern are extracted into the markdown `### Errors`
  * section. Covers AWS Lambda runtime errors (`ERROR`, `Error:`), warnings
  * (`WARN`), and thrown exception traces (`Exception`).
@@ -51,10 +68,11 @@ export type CommandRunner = (
   command: string,
   args: string[],
   cwd: string,
+  maxBuffer?: number,
 ) => Promise<string>;
 
-const defaultRunner: CommandRunner = (cmd, args, cwd) =>
-  runCommand(cmd, args, cwd);
+const defaultRunner: CommandRunner = (cmd, args, cwd, maxBuffer) =>
+  runCommand(cmd, args, cwd, {}, undefined, maxBuffer);
 
 interface CommonParams {
   since: string;
@@ -63,6 +81,8 @@ interface CommonParams {
   filter?: string;
   environment: string;
   maxLines: number;
+  /** Hard byte-cap on the returned `logs` payload (default: {@link DEFAULT_MAX_BYTES}). */
+  maxBytes?: number;
   format?: LogsTailFormat;
 }
 
@@ -218,6 +238,21 @@ function renderSingleResultAsMarkdown(
   });
 }
 
+/**
+ * Trim `text` down to at most `maxBytes` UTF-8 bytes, keeping the tail (most
+ * recent content) and dropping the leading partial line so the result never
+ * starts mid-line. Never errors on oversized input — the whole point of the
+ * byte cap is a clean truncation instead of an overflow.
+ */
+export function truncateToByteLimit(text: string, maxBytes: number): string {
+  const buf = Buffer.from(text, 'utf8');
+  if (buf.byteLength <= maxBytes) return text;
+  const sliced = buf.subarray(buf.byteLength - maxBytes);
+  const decoded = sliced.toString('utf8');
+  const firstNewline = decoded.indexOf('\n');
+  return firstNewline === -1 ? decoded : decoded.slice(firstNewline + 1);
+}
+
 async function fetchOne(
   fn: string,
   params: CommonParams,
@@ -240,12 +275,35 @@ async function fetchOne(
   }
 
   try {
-    const output = await runner('aws', args, repoRoot);
+    const output = await runner('aws', args, repoRoot, CLI_MAX_BUFFER);
     const rawText = output || '(no log events found in the given time range)';
     const MAX_LINES = params.maxLines;
+    const MAX_BYTES = params.maxBytes ?? DEFAULT_MAX_BYTES;
     const lines = rawText.split('\n');
-    const truncated = lines.length > MAX_LINES;
-    const logLines = truncated ? lines.slice(lines.length - MAX_LINES) : lines;
+    const truncatedByLines = lines.length > MAX_LINES;
+    const lineLimited = truncatedByLines
+      ? lines.slice(lines.length - MAX_LINES)
+      : lines;
+    const totalLines = lines.length;
+
+    let logsText = lineLimited.join('\n');
+    let truncated = truncatedByLines;
+    let truncatedByBytes = false;
+    if (Buffer.byteLength(logsText, 'utf8') > MAX_BYTES) {
+      logsText = truncateToByteLimit(logsText, MAX_BYTES);
+      truncated = true;
+      truncatedByBytes = true;
+    }
+    const shownLines = logsText.split('\n').length;
+
+    const noticeParts: string[] = [];
+    if (truncatedByLines) {
+      noticeParts.push(`capped to last ${MAX_LINES} lines of ${totalLines}`);
+    }
+    if (truncatedByBytes) {
+      noticeParts.push(`capped to last ${MAX_BYTES} bytes`);
+    }
+
     return {
       logGroup,
       since: params.since,
@@ -255,12 +313,12 @@ async function fetchOne(
       truncated,
       ...(truncated
         ? {
-            totalLines: lines.length,
-            shownLines: logLines.length,
-            truncationNotice: `Showing last ${logLines.length} of ${lines.length} lines`,
+            totalLines,
+            shownLines,
+            truncationNotice: `Showing last ${shownLines} of ${totalLines} lines (${noticeParts.join('; ')})`,
           }
         : {}),
-      logs: logLines.join('\n'),
+      logs: logsText,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -276,10 +334,10 @@ async function fetchOne(
       remedy: isSsoError
         ? 'Run `aws sso login` to re-authenticate, then retry.'
         : isUnknownOptionsError
-          ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, functions, since, startTime, endTime, filter, environment, maxLines, format. Check that no unexpected fields were passed.'
+          ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, functions, since, startTime, endTime, filter, environment, maxLines, maxBytes, format. Check that no unexpected fields were passed.'
           : null,
       hint: isUnknownOptionsError
-        ? 'Retry with only the documented aws_logs_tail input fields (function | functions, since [default: 1h], startTime [ISO-8601, optional], endTime [ISO-8601, optional], filter [optional], environment [dev|prod, default: dev], maxLines [optional], format [markdown|json, default: markdown]). Remove any extra or misspelled fields.'
+        ? 'Retry with only the documented aws_logs_tail input fields (function | functions, since [default: 1h], startTime [ISO-8601, optional], endTime [ISO-8601, optional], filter [optional], environment [dev|prod, default: dev], maxLines [optional], maxBytes [optional], format [markdown|json, default: markdown]). Remove any extra or misspelled fields.'
         : null,
     };
   }
