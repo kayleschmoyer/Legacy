@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
-  "serverCount": 11,
-  "toolCount": 255,
+  "serverCount": 12,
+  "toolCount": 260,
   "servers": [
     {
       "dir": "worktree-server",
@@ -9216,6 +9216,235 @@
               "type": "string",
               "optional": true,
               "description": "Repo or worktree root (default: auto-detected)"
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        }
+      ]
+    },
+    {
+      "dir": "android-server",
+      "id": "legacy-sports-android",
+      "label": "Android",
+      "summary": "Android device/emulator connectivity, app install/launch, adb-backed screenshots, filtered logcat, and Gradle builds. Local-only — no SDK in any cloud agent environment.",
+      "version": "1.0.0",
+      "packageDir": "tools/mcp/android-server",
+      "transports": [
+        "stdio"
+      ],
+      "toolCount": 5,
+      "tools": [
+        {
+          "name": "android_app",
+          "description": "Install or launch the app on a connected Android device/emulator. action=\"install\" wraps `adb install`. action=\"launch\" force-stops (default) then wraps `adb shell am start`. Call android_device({ action: \"list\" }) first to confirm a device is online.",
+          "inputs": {
+            "action": {
+              "type": "enum",
+              "optional": false,
+              "enum": [
+                "install",
+                "launch"
+              ],
+              "description": "Which app operation to perform."
+            },
+            "apkPath": {
+              "type": "string",
+              "optional": true,
+              "description": "action=\"install\" only (required). Path to the .apk to install."
+            },
+            "reinstall": {
+              "type": "boolean",
+              "optional": true,
+              "default": true,
+              "description": "action=\"install\" only. Pass -r to adb install (keep app data)."
+            },
+            "allowDowngrade": {
+              "type": "boolean",
+              "optional": true,
+              "default": false,
+              "description": "action=\"install\" only. Pass -d to allow a versionCode downgrade (avoids INSTALL_FAILED_VERSION_DOWNGRADE)."
+            },
+            "package": {
+              "type": "string",
+              "optional": true,
+              "default": "com.legacysports.app",
+              "description": "action=\"launch\" only. Android application ID."
+            },
+            "activity": {
+              "type": "string",
+              "optional": true,
+              "default": ".MainActivity",
+              "description": "action=\"launch\" only. Activity to start."
+            },
+            "forceStop": {
+              "type": "boolean",
+              "optional": true,
+              "default": true,
+              "description": "action=\"launch\" only. Force-stop the app before starting it, clearing prior in-memory state."
+            },
+            "serial": {
+              "type": "string",
+              "optional": true,
+              "description": "Target a specific device (adb -s). Defaults to the sole online device."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "android_build",
+          "description": "Build the Android app via Gradle (wraps `gradlew app:assembleDebug`/`app:assembleRelease`). Sets a fresh GITHUB_RUN_NUMBER-shaped versionCode automatically (current epoch seconds) so a local build reinstalling over a device with a newer CI build does not hit INSTALL_FAILED_VERSION_DOWNGRADE — pass versionCode to pin a specific value instead.",
+          "inputs": {
+            "variant": {
+              "type": "enum",
+              "optional": true,
+              "enum": [
+                "debug",
+                "release"
+              ],
+              "default": "debug",
+              "description": "Gradle build variant."
+            },
+            "arch": {
+              "type": "string",
+              "optional": true,
+              "description": "Restrict the native build to one ABI via -PreactNativeArchitectures, e.g. \"x86_64\" for a faster emulator-only build."
+            },
+            "versionCode": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "integer",
+                "> 0"
+              ],
+              "description": "Pin GITHUB_RUN_NUMBER (and therefore the Gradle versionCode) to this value instead of the auto-generated epoch-seconds default."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "android_device",
+          "description": "Android device/emulator connectivity. Resolves the SDK path itself (ANDROID_HOME/ANDROID_SDK_ROOT/default install dir) — never export PATH by hand. action=\"list\" wraps `adb devices`. action=\"start_emulator\" boots an AVD and blocks on sys.boot_completed (up to ~45s per call — re-call to keep waiting, it never spawns a second emulator while one is already booting); no-ops if a device is already connected. action=\"reverse\" wraps `adb reverse` to point a device at a local Metro dev server.",
+          "inputs": {
+            "action": {
+              "type": "enum",
+              "optional": true,
+              "enum": [
+                "list",
+                "start_emulator",
+                "reverse"
+              ],
+              "default": "list",
+              "description": "Which device operation to perform."
+            },
+            "avd": {
+              "type": "string",
+              "optional": true,
+              "description": "action=\"start_emulator\" only. AVD name to boot. Defaults to $ANDROID_AVD, then the only installed AVD."
+            },
+            "waitForBoot": {
+              "type": "boolean",
+              "optional": true,
+              "default": true,
+              "description": "action=\"start_emulator\" only. Block until sys.boot_completed=1 (bounded per call — see description). Pass false to just kick off the boot."
+            },
+            "timeoutMs": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "integer",
+                "> 0"
+              ],
+              "description": "action=\"start_emulator\" only. Per-call boot-wait budget in ms (default 45000). Cold boot can take minutes — re-call to keep waiting."
+            },
+            "devicePort": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "integer",
+                "> 0"
+              ],
+              "description": "action=\"reverse\" only. Port on the device to forward."
+            },
+            "hostPort": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "integer",
+                "> 0"
+              ],
+              "description": "action=\"reverse\" only. Port on the host that devicePort forwards to, e.g. 8081 for Metro."
+            },
+            "serial": {
+              "type": "string",
+              "optional": true,
+              "description": "Target a specific device (adb -s). Defaults to the sole online device."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "android_logcat",
+          "description": "Filtered `adb logcat` crash/debug triage — avoids dumping the full noisy buffer (mostly unrelated GMS/artd/ziparchive lines). Pass tags as `adb` filter specs (e.g. [\"AndroidRuntime:E\", \"ReactNativeJS:*\"]) — everything else is silenced (*:S appended automatically) unless a catch-all filter is already present.",
+          "inputs": {
+            "tags": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "string",
+                "optional": false
+              },
+              "description": "adb logcat filter specs, e.g. [\"AndroidRuntime:E\", \"ReactNativeJS:*\"]. Omit to dump the unfiltered buffer."
+            },
+            "sinceClear": {
+              "type": "boolean",
+              "optional": true,
+              "default": false,
+              "description": "Clear the log buffer (adb logcat -c) before capturing, so only new lines are returned."
+            },
+            "maxLines": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "integer",
+                "> 0"
+              ],
+              "default": 200,
+              "description": "Keep at most this many of the most recent lines."
+            },
+            "serial": {
+              "type": "string",
+              "optional": true,
+              "description": "Target a specific device (adb -s). Defaults to the sole online device."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "android_screenshot",
+          "description": "Capture a screenshot of the connected device/emulator (wraps `adb exec-out screencap -p`) and return it inline — the mobile counterpart to browser_screenshot, for the visual before/after evidence the debugging and work-ticket skills require on mobile UI tickets. Saves to {repoRoot}/.screenshots/ unless outputPath is given.",
+          "inputs": {
+            "outputPath": {
+              "type": "string",
+              "optional": true,
+              "constraints": [
+                "matches ABSOLUTE_PATH_REGEX"
+              ],
+              "description": "Absolute path to save the PNG to (default: repo .screenshots/ dir with a timestamped name)."
+            },
+            "serial": {
+              "type": "string",
+              "optional": true,
+              "description": "Target a specific device (adb -s). Defaults to the sole online device."
             }
           },
           "transports": [

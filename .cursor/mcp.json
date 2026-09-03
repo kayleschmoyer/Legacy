@@ -87,6 +87,18 @@
       ],
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env.local"
+    },
+    "legacy-sports-android": {
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/android-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
     }
   }
 }

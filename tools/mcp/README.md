@@ -244,6 +244,25 @@ Agent-driven browser debugging and screenshot capture:
 
 See `.agents/skills/pr-lifecycle/references/agent-screenshots.md` for the end-to-end screenshot workflow.
 
+### android-server
+
+> **Server ID:** `legacy-sports-android`
+
+Android device/emulator/build tooling — the Android counterpart to
+`browser-server`'s dev-server/screenshot lifecycle, closing the mobile
+before/after visual-evidence gate without hand-rolled `adb`/`emulator`/
+`gradlew` shell plumbing (LS-8815):
+
+- **android_device** — `list` connected devices / `start_emulator` (boots an AVD, blocks on `sys.boot_completed`, bounded per call) / `reverse` (port-forward to a local Metro dev server); resolves the SDK path itself
+- **android_app** — `install` an APK (`adb install`) / `launch` the app (force-stop then `adb shell am start`)
+- **android_screenshot** — capture and return a PNG inline (`adb exec-out screencap -p`), mirroring `browser_screenshot`
+- **android_logcat** — filtered `adb logcat -d` crash triage (tag filters, buffer clear, line cap)
+- **android_build** — `gradlew app:assemble<Variant>`, with an auto-generated `versionCode` override to avoid `INSTALL_FAILED_VERSION_DOWNGRADE`
+
+Reuses SDK-path resolution and `adb`/`emulator` output parsing from
+`scripts/run-android-dev.mjs` rather than reimplementing it. See
+`tools/mcp/android-server/README.md`.
+
 ### rollbar-server
 
 > **Server ID:** `legacy-sports-rollbar`
@@ -277,3 +296,4 @@ Some servers depend on infrastructure that is unavailable in the GitHub Copilot 
 | `legacy-sports-aws`      |         ✅          |          ❌           | No AWS SSO or OIDC credentials in cloud; no CloudWatch access — use GitHub Actions/CI logs via `legacy-sports-ci` (`ci_get_logs`) instead                                    |
 | `legacy-sports-browser`  |         ✅          |          ✅           | Requires Playwright browsers installed; cloud needs `npx playwright install chromium` in setup steps                                                                         |
 | `legacy-sports-rollbar`  |         ✅          |  ✅ (needs secrets)   | Requires `ROLLBAR_READ_ACCESS_TOKEN` (Rollbar `read`-scope token) in the environment; cloud has it only if the secret is provided                                            |
+| `legacy-sports-android`  |   ✅ (needs SDK)    |          ❌           | No Android SDK/emulator/device in any cloud agent environment (Copilot, Claude Code Remote) — every tool returns a structured error rather than crashing                     |

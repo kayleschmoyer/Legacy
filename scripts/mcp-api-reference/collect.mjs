@@ -92,6 +92,13 @@ const SERVERS = [
     summary:
       'RFCs, ADRs, postmortems, test plans, reproduction capture, and cross-session continuation checkpoints.',
   },
+  {
+    dir: 'android-server',
+    id: 'legacy-sports-android',
+    label: 'Android',
+    summary:
+      'Android device/emulator connectivity, app install/launch, adb-backed screenshots, filtered logcat, and Gradle builds. Local-only — no SDK in any cloud agent environment.',
+  },
 ];
 
 const TRANSPORT_SOURCES = [

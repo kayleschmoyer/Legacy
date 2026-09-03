@@ -99,6 +99,19 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env.local"
     },
+    "legacy-sports-android": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/android-server/src/index.ts"
+      ],
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env.local"
+    },
     "legacy-sports-rollbar": {
       "type": "http",
       "url": "https://kvffp31pag.execute-api.us-east-1.amazonaws.com",

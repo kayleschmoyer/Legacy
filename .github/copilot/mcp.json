@@ -75,6 +75,17 @@
         "tools/mcp/browser-server/src/index.ts"
       ]
     },
+    "legacy-sports-android": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        ".github/copilot/hooks/mcp-bootstrap.mjs",
+        "node",
+        "--import",
+        "tsx",
+        "tools/mcp/android-server/src/index.ts"
+      ]
+    },
     "legacy-sports-rollbar": {
       "type": "http",
       "url": "$MCP_ROLLBAR_URL",

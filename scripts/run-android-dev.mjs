@@ -265,10 +265,18 @@ async function main() {
   startExpo(checkMode, expoArgs);
 }
 
-// Only run the flow when executed directly (not when imported by tests).
+// Only run the flow when executed directly (not when imported by tests, or by
+// tools/mcp/android-server which reuses the pure helpers above — LS-8815).
+// A promise chain instead of a top-level `await main()` keeps this file
+// importable by CommonJS-transpiling test runners (Jest/swc), which cannot
+// parse top-level await; process.exitCode preserves the non-zero exit on
+// failure that an uncaught rejection would otherwise have produced.
 const isMain =
   process.argv[1] &&
   import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 if (isMain) {
-  await main();
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
 }

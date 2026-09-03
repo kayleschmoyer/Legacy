@@ -40,7 +40,16 @@ export default [
           // vite.config.ts so Vite's own config loader — which runs before
           // any Nx/tsconfig-paths resolution is available — can load it with
           // bare Node ESM resolution. See tools/mcp/rollbar-server/vite.config.ts.
-          allow: ['../../vite-configs'],
+          //
+          // scripts/run-android-dev.mjs is a plain Node script (no
+          // project.json), not an MCP server package — tools/mcp/android-server
+          // imports its already-unit-tested SDK-path/adb/AVD-parsing helpers
+          // by relative path rather than reimplementing them (LS-8815). See
+          // tools/mcp/android-server/src/android-env.ts.
+          allow: [
+            '../../vite-configs',
+            '../../../../scripts/run-android-dev.mjs',
+          ],
           depConstraints: [
             {
               sourceTag: '*',
