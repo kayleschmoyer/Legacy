@@ -16,7 +16,10 @@
 import type { Page } from '@playwright/test';
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { FIXED_NOW_ISO } from '../mocks/time';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
@@ -211,6 +214,55 @@ const PLAYER_B = mockPlayer(202, 'Derek', 'Torres', '1B');
 const PLAYER_C = mockPlayer(203, 'Cal', 'Brooks', 'SS');
 const PLAYER_D = mockPlayer(204, 'Ken', 'Griffey', 'OF');
 const PLAYER_E = mockPlayer(205, 'Sandy', 'Koufax', 'SP');
+
+/**
+ * Live-draft header record.
+ *
+ * Field set mirrors the GetLiveDraftLeagueDraft / GetDraft selection sets in
+ * `lib/graphql/src/liveDraft.graphql`. The previous inline mock invented
+ * `status` / `currentRound` / `currentTeamId` / `totalRounds` /
+ * `pickTimeLimit` — none of which the client selects — and omitted every
+ * field it does select, so the draft board read `undefined` for all of them.
+ */
+function mockDraft() {
+  return {
+    __typename: 'Draft',
+    id: 1,
+    leagueId: LEAGUE_ID,
+    draftMode: 'live',
+    selectionMethod: 'snake',
+    draftOrder: `${TEAM_1.id},${TEAM_2.id}`,
+    currentPick: 1,
+    pickTimeLimitSeconds: 60,
+    currentPickDeadline: null,
+    draftStartedAt: FIXED_NOW_ISO,
+    draftCompletedAt: null,
+    scheduledAt: null,
+    createdAt: FIXED_NOW_ISO,
+    autoPickDisabled: false,
+  };
+}
+
+/**
+ * Undrafted player pool. Shape matches the `DraftPlayer` selection set of
+ * GetAvailableDraftPlayers — which is not the same shape as `mockPlayer()`
+ * (no `primaryPosition` / `careerGames`; position comes from
+ * `eligiblePositions`).
+ */
+function mockAvailableDraftPlayers() {
+  return [PLAYER_A, PLAYER_B, PLAYER_C, PLAYER_D, PLAYER_E].map((p) => ({
+    __typename: 'DraftPlayer',
+    id: p.id,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    brefId: p.brefId,
+    eligiblePositions: [p.primaryPosition],
+    hitterAvgPointsPerGame: 4.2,
+    pitchingAvgPointsPerGame: 0,
+    projectedMatchupPoints: 25.5,
+    adp: 10,
+  }));
+}
 
 const TEAM_1_MEMBERS = [
   mockTeamMember(1, TEAM_1.id, PLAYER_A, 1),
@@ -671,88 +723,65 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
 
   test('Phase 5: Navigate to draft board', async ({ page }) => {
     await test.step('Mock draft data and navigate', async () => {
+      // Route on the EXACT operation name, never on a substring of the
+      // request body (LS-9792). This chain previously tested
+      // `postData.includes('getdraft')` *before* its own more specific
+      // branches, and `'getdraftpicks'.includes('getdraft')` is true — so the
+      // broad branch swallowed every GetDraft* operation. GetDraftPicks and
+      // GetAvailableDraftPlayers could never reach their own handlers, and
+      // GetDraftPlayerStats / GetDraftPitchingStats were answered with a draft
+      // object. Nothing errored: the queries resolved with the wrong shape, the
+      // board rendered empty, and the assertions below passed vacuously.
+      // Exact matching (the LS-9413 pattern, as in shared-mocks' `useTier`)
+      // removes the whole class structurally rather than by branch ordering.
       await page.route(isGraphQLEndpoint, async (route) => {
-        const postData = route.request().postData()?.toLowerCase() ?? '';
-        if (
-          postData.includes('getleaguebyid') ||
-          postData.includes('"getleague"')
-        ) {
-          await route.fulfill({
+        const op = extractOperationName(route).toLowerCase();
+        const json = (data: unknown) =>
+          route.fulfill({
             status: 200,
             contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                league: mockLeague({ draftStatus: 'in-progress' }),
-              },
-            }),
+            body: JSON.stringify({ data }),
           });
+
+        if (op === 'getleaguebyid' || op === 'getleague') {
+          await json({ league: mockLeague({ draftStatus: 'in-progress' }) });
+        } else if (op === 'getlivedraftleaguedraft') {
+          await json({ getLeagueDraft: mockDraft() });
+        } else if (op === 'getdraft') {
+          await json({ getDraft: mockDraft() });
+        } else if (op === 'getdraftpicks') {
+          await json({ getDraftPicks: [] });
+        } else if (op === 'getcurrentdraftpick') {
+          await json({
+            getCurrentDraftPick: {
+              __typename: 'CurrentDraftPick',
+              draftId: 1,
+              teamId: TEAM_1.id,
+              round: 1,
+              pickNumber: 1,
+              overallPick: 1,
+              isComplete: false,
+            },
+          });
+        } else if (op === 'getmydraftqueue') {
+          await json({ getMyDraftQueue: [] });
+        } else if (op === 'getdraftrecommendations') {
+          await json({ getDraftRecommendations: [] });
+        } else if (op === 'getavailabledraftplayers') {
+          await json({ getAvailableDraftPlayers: mockAvailableDraftPlayers() });
+        } else if (op === 'getdraftplayerstats') {
+          await json({ careerBattingStats: [] });
         } else if (
-          postData.includes('getdraft') ||
-          postData.includes('getlivedraftleaguedraft')
+          op === 'getdraftpitchingstats' ||
+          op === 'getdraftpitcherstats'
         ) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                draft: {
-                  id: 1,
-                  leagueId: LEAGUE_ID,
-                  status: 'in-progress',
-                  currentRound: 1,
-                  currentPick: 1,
-                  currentTeamId: TEAM_1.id,
-                  totalRounds: 25,
-                  pickTimeLimit: 60,
-                },
-              },
-            }),
-          });
-        } else if (postData.includes('getdraftpicks')) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { draftPicks: [] } }),
-          });
-        } else if (
-          postData.includes('getavailabledraftplayers') ||
-          postData.includes('getdraftavailableplayers')
-        ) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: {
-                draftAvailablePlayers: [
-                  PLAYER_A,
-                  PLAYER_B,
-                  PLAYER_C,
-                  PLAYER_D,
-                  PLAYER_E,
-                ],
-              },
-            }),
-          });
-        } else if (postData.includes('getleagueteams')) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { leagueTeams: mockTeams() } }),
-          });
-        } else if (postData.includes('getpositionsforleague')) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              data: { leaguePositions: mockPositions() },
-            }),
-          });
-        } else if (postData.includes('getuserteamid')) {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ data: { userTeamId: TEAM_1.id } }),
-          });
+          await json({ careerPitchingStats: [] });
+        } else if (op === 'getleagueteams') {
+          await json({ leagueTeams: mockTeams() });
+        } else if (op === 'getpositionsforleague') {
+          await json({ leaguePositions: mockPositions() });
+        } else if (op === 'getuserteamid') {
+          await json({ userTeamId: TEAM_1.id });
         } else {
           await unmockedGraphQLFallback(route);
         }
@@ -767,8 +796,16 @@ test.describe.serial('Full Season UI Lifecycle @e2e @critical @slow', () => {
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
       );
-      // Wait for some draft content to appear
-      await page.waitForTimeout(2000);
+      // Assert on content that can only reach the screen through the draft
+      // operations themselves (LS-9792). The previous check — "no error page"
+      // plus a fixed 2s sleep — passed just as happily when every GetDraft*
+      // query was answered with the wrong payload and the board rendered no
+      // draft at all, which is exactly how the shadowed-branch bug survived.
+      await expect(page.getByText('LIVE DRAFT').first()).toBeVisible();
+      // Sourced from GetAvailableDraftPlayers — the branch that used to be
+      // unreachable, and whose query never even fired before the fix because
+      // the draft header it depends on resolved empty.
+      await expect(page.getByText('Mike Johnson').first()).toBeVisible();
     });
   });
 
