@@ -99,6 +99,9 @@ interface ParsedViewPRResult {
   body?: string;
   files?: Array<{ path: string; status: string }>;
   reviews?: Array<{ state: string }>;
+  mergedAt: string | null;
+  mergeCommit: { oid: string } | null;
+  mergedBy: { login: string; isBot: boolean } | null;
   checksSummary: {
     total: number;
     passed: number;
@@ -136,6 +139,49 @@ describe('viewPR — compact default', () => {
     expect(parsed.title).toBe('feat: big feature');
     expect(parsed.state).toBe('OPEN');
     expect(parsed.isDraft).toBe(false);
+  });
+
+  it('returns null mergedAt/mergeCommit/mergedBy for an open PR', async () => {
+    mockedGraphQL.mockResolvedValue(gqlResponse(makePR()));
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
+    expect(parsed.mergedAt).toBeNull();
+    expect(parsed.mergeCommit).toBeNull();
+    expect(parsed.mergedBy).toBeNull();
+  });
+
+  it('includes mergedAt, mergeCommit.oid, and mergedBy for a merged PR', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          state: 'MERGED',
+          mergedAt: '2026-01-03T00:00:00Z',
+          mergeCommit: { oid: 'abc1234' },
+          mergedBy: { login: 'alice', __typename: 'User' },
+        }),
+      ),
+    );
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
+    expect(parsed.mergedAt).toBe('2026-01-03T00:00:00Z');
+    expect(parsed.mergeCommit).toEqual({ oid: 'abc1234' });
+    expect(parsed.mergedBy).toEqual({ login: 'alice', isBot: false });
+  });
+
+  it('flags mergedBy as a bot when merged by a bot actor', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          state: 'MERGED',
+          mergedAt: '2026-01-03T00:00:00Z',
+          mergeCommit: { oid: 'def5678' },
+          mergedBy: { login: 'merge-queue[bot]', __typename: 'Bot' },
+        }),
+      ),
+    );
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
+    expect(parsed.mergedBy).toEqual({ login: 'merge-queue[bot]', isBot: true });
   });
 });
 

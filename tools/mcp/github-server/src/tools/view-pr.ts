@@ -17,8 +17,9 @@ type ViewPRField = 'body' | 'files' | 'reviews' | 'assignees' | 'milestone';
 interface ViewPRParams {
   number: number;
   /** Opt-in fields to include beyond the compact default. Compact default: number, title, state,
-   *  isDraft, headRefName, baseRefName, url, labels, additions, deletions, changedFiles,
-   *  commits.totalCount, checksSummary. Pass e.g. ["body","files"] for richer output. */
+   *  isDraft, headRefName, baseRefName, url, labels, mergedAt, mergeCommit, mergedBy, additions,
+   *  deletions, changedFiles, commits.totalCount, checksSummary. Pass e.g. ["body","files"] for
+   *  richer output. */
   fields?: ViewPRField[];
 }
 
@@ -43,6 +44,8 @@ interface PRGraphQLResponse {
       updatedAt: string;
       mergedAt: string | null;
       closedAt: string | null;
+      mergeCommit: { oid: string } | null;
+      mergedBy: { login: string; __typename: string } | null;
       url: string;
       labels: { nodes: Array<{ name: string }> };
       isDraft: boolean;
@@ -96,6 +99,11 @@ query($owner: String!, $repo: String!, $number: Int!) {
       updatedAt
       mergedAt
       closedAt
+      mergeCommit { oid }
+      mergedBy {
+        login
+        __typename
+      }
       url
       labels(first: 20) { nodes { name } }
       isDraft
@@ -398,6 +406,11 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
       baseRefName: pr.baseRefName,
       url: pr.url,
       labels: pr.labels.nodes,
+      mergedAt: pr.mergedAt,
+      mergeCommit: pr.mergeCommit ? { oid: pr.mergeCommit.oid } : null,
+      mergedBy: pr.mergedBy
+        ? { login: pr.mergedBy.login, isBot: pr.mergedBy.__typename === 'Bot' }
+        : null,
       // Derived from each reviewer's latest review, not the raw GraphQL field
       // (can stay stale after a CHANGES_REQUESTED review is superseded by an
       // APPROVED one from the same author — LS-8364, LS-8708).

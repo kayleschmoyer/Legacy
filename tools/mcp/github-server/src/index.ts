@@ -1492,7 +1492,7 @@ export function createServer(): McpServer {
   // --- github_view_pr ---
   server.tool(
     'github_view_pr',
-    'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. By default returns a compact card: number, title, state, isDraft, headRefName, baseRefName, url, labels, reviewDecision, additions, deletions, changedFiles, commits.totalCount, and checksSummary. Pass optional "fields" array to opt-in to heavy fields: "body" (full PR description), "files" (changed-files list), "reviews", "assignees", "milestone". Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    'Prefer this over `gh pr view` or `gh pr diff --name-only` via shell. By default returns a compact card: number, title, state, isDraft, headRefName, baseRefName, url, labels, reviewDecision, additions, deletions, changedFiles, commits.totalCount, checksSummary, mergedAt, mergeCommit, mergedBy (null unless merged). Pass optional "fields" array to opt-in to heavy fields: "body", "files", "reviews", "assignees", "milestone". Pass the PR number as "number" (preferred) or "prNumber" (alias).',
     {
       number: z.coerce
         .number()
