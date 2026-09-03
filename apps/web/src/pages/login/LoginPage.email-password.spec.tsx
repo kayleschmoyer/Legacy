@@ -148,8 +148,48 @@ it('guards against a synchronous double-submit — login is called once', async 
   });
 });
 
-it('shows and logs an error when login rejects', async () => {
-  mockLogin.mockRejectedValueOnce(new Error('Invalid email or password'));
+it('shows the error and logs it as a warning when login rejects with invalid credentials (LS-9751)', async () => {
+  // A 401 (wrong password / unknown email) is a routine, expected user
+  // outcome — it must not be logged at `error` level, or it gets reported to
+  // Rollbar as an application error (LS-9751).
+  const credentialError = new Error('Invalid email or password') as Error & {
+    status?: number;
+  };
+  credentialError.status = 401;
+  mockLogin.mockRejectedValueOnce(credentialError);
+  const errorSpy = jest
+    .spyOn(LOGGER, 'error')
+    .mockImplementation(() => undefined);
+  const warnSpy = jest
+    .spyOn(LOGGER, 'warn')
+    .mockImplementation(() => undefined);
+
+  renderPage();
+
+  await act(async () => {
+    fireEvent.click(
+      screen.getByRole('button', { name: /trigger-email-password/i }),
+    );
+    await Promise.resolve();
+  });
+
+  await waitFor(() =>
+    expect(screen.getByText('Invalid email or password')).toBeTruthy(),
+  );
+  expect(warnSpy).toHaveBeenCalledWith(
+    'Email/password sign-in failed on login page:',
+    expect.any(Error),
+  );
+  expect(errorSpy).not.toHaveBeenCalled();
+
+  errorSpy.mockRestore();
+  warnSpy.mockRestore();
+});
+
+it('shows the error and logs it at error level when login rejects with an unexpected (non-4xx) failure', async () => {
+  mockLogin.mockRejectedValueOnce(
+    new Error('Authentication service temporarily unavailable'),
+  );
   const errorSpy = jest
     .spyOn(LOGGER, 'error')
     .mockImplementation(() => undefined);
@@ -164,7 +204,9 @@ it('shows and logs an error when login rejects', async () => {
   });
 
   await waitFor(() =>
-    expect(screen.getByText('Invalid email or password')).toBeTruthy(),
+    expect(
+      screen.getByText('Authentication service temporarily unavailable'),
+    ).toBeTruthy(),
   );
   expect(errorSpy).toHaveBeenCalledWith(
     'Email/password sign-in failed on login page:',

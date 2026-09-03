@@ -9,6 +9,7 @@ import type {
   OAuthConfig,
   OAuthResponse,
 } from '../../../platform-components/types';
+import { isClientRejection } from '../../../utils/httpErrors';
 
 // Re-exported for backward compatibility: the canonical definition now lives in
 // `googleAuthExchange` alongside the transport that throws it.
@@ -140,7 +141,7 @@ export class AuthService {
       };
       const status = errorWithStatus.status ?? errorWithStatus.statusCode;
 
-      if (typeof status === 'number' && status >= 400 && status < 500) {
+      if (isClientRejection(status)) {
         LOGGER.warn(
           'AuthService: Secure OAuth authentication failed:',
           error instanceof Error ? error : String(error),
@@ -355,7 +356,14 @@ export class AuthService {
           message?: string;
           error?: string;
         };
-        throw new Error(errorData.message || errorData.error || 'Login failed');
+        const loginError = new Error(
+          errorData.message || errorData.error || 'Login failed',
+        ) as Error & { status?: number };
+        // Carry the HTTP status so the catch block below (and callers) can
+        // distinguish an expected client rejection (e.g. wrong password,
+        // 401) from an actual service failure (LS-9751).
+        loginError.status = response.status;
+        throw loginError;
       }
 
       const result = (await response.json()) as {
@@ -381,13 +389,33 @@ export class AuthService {
 
       return user;
     } catch (error) {
-      LOGGER.error(
-        'AuthService: Email authentication failed:',
-        error instanceof Error ? error : String(error),
-      );
-      throw new Error(
+      // A 4xx here (wrong password, unknown email, locked account, …) is a
+      // routine, expected user outcome — not an application error — so it is
+      // logged at `warn` rather than `error` to keep it out of Rollbar's error
+      // stream. Anything else (network failure, 5xx) is unexpected and stays
+      // at `error` (LS-9751).
+      const status = (error as { status?: number }).status;
+
+      if (isClientRejection(status)) {
+        LOGGER.warn(
+          'AuthService: Email authentication failed:',
+          error instanceof Error ? error : String(error),
+        );
+      } else {
+        LOGGER.error(
+          'AuthService: Email authentication failed:',
+          error instanceof Error ? error : String(error),
+        );
+      }
+
+      const rethrown = new Error(
         error instanceof Error ? error.message : 'Email login failed',
-      );
+      ) as Error & { status?: number };
+      // Preserve the status on the rethrown error so callers further up the
+      // chain (e.g. the login page) can also tell a routine credential
+      // rejection apart from an unexpected failure without re-deriving it.
+      if (typeof status === 'number') rethrown.status = status;
+      throw rethrown;
     }
   }
 

@@ -231,6 +231,76 @@ describe('AuthService MFA methods', () => {
   });
 });
 
+describe('AuthService.authenticateWithEmail (LS-9751)', () => {
+  let service: AuthService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new AuthService(testConfig);
+  });
+
+  it('logs a wrong-password (401) rejection at warn, not error', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: jest.fn().mockResolvedValue({ error: 'Invalid credentials' }),
+    });
+
+    await expect(
+      service.authenticateWithEmail('user@test.com', 'wrong-password'),
+    ).rejects.toThrow('Invalid credentials');
+
+    expect(mockLogger.error.mock.calls).toHaveLength(0);
+    expect(mockLogger.warn.mock.calls).toHaveLength(1);
+    expect(mockLogger.warn.mock.calls[0][0]).toBe(
+      'AuthService: Email authentication failed:',
+    );
+  });
+
+  it('preserves the HTTP status on the rethrown error so callers can also branch on it', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: jest.fn().mockResolvedValue({ error: 'Invalid credentials' }),
+    });
+
+    await expect(
+      service.authenticateWithEmail('user@test.com', 'wrong-password'),
+    ).rejects.toMatchObject({ status: 401 });
+  });
+
+  it('logs an unexpected (500) failure at error level', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: jest.fn().mockResolvedValue({ error: 'Internal Server Error' }),
+    });
+
+    await expect(
+      service.authenticateWithEmail('user@test.com', 'any-password'),
+    ).rejects.toThrow('Internal Server Error');
+
+    expect(mockLogger.warn.mock.calls).toHaveLength(0);
+    expect(mockLogger.error.mock.calls).toHaveLength(1);
+    expect(mockLogger.error.mock.calls[0][0]).toBe(
+      'AuthService: Email authentication failed:',
+    );
+  });
+
+  it('logs a network failure (no status) at error level', async () => {
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(
+      service.authenticateWithEmail('user@test.com', 'any-password'),
+    ).rejects.toThrow();
+
+    expect(mockLogger.warn.mock.calls).toHaveLength(0);
+    expect(mockLogger.error.mock.calls).toHaveLength(1);
+  });
+});
+
 describe('AuthService.unlinkProvider', () => {
   let service: AuthService;
 

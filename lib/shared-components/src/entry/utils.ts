@@ -16,5 +16,6 @@ export * from '../utils/colors';
 export * from '../utils/typography';
 export * from '../utils/mapGraphQLToScoringFormat';
 export * from '../utils/SecureStorage';
+export * from '../utils/httpErrors';
 export * from '../constants/presets';
 export * from '../hooks/useReducedMotion';

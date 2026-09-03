@@ -11,7 +11,10 @@ import {
   OAuthProvider,
 } from '@legacy-sports/shared-components/ui';
 import { useAuth } from '@legacy-sports/shared-components/auth';
-import { lastVisitedLeaguePath } from '@legacy-sports/shared-components/utils';
+import {
+  isClientRejection,
+  lastVisitedLeaguePath,
+} from '@legacy-sports/shared-components/utils';
 import { LoginPage as AuthCard } from '@legacy-sports/shared-components/auth';
 import { BrandLogo } from '@legacy-sports/shared-components/ui';
 import {
@@ -501,10 +504,20 @@ export function LoginPage(): React.JSX.Element {
       try {
         await login(email, password);
       } catch (error) {
-        LOGGER.error(
+        // A 4xx (wrong password, unknown email, …) is a routine, expected
+        // user outcome, not an application error — log it at `warn` so it
+        // doesn't get reported to Rollbar as an error (LS-9751). Anything
+        // else (network failure, 5xx) is unexpected and stays at `error`.
+        const status = (error as { status?: number } | undefined)?.status;
+        const logArgs = [
           'Email/password sign-in failed on login page:',
           error instanceof Error ? error : String(error),
-        );
+        ] as const;
+        if (isClientRejection(status)) {
+          LOGGER.warn(...logArgs);
+        } else {
+          LOGGER.error(...logArgs);
+        }
         setErrorMessage(
           error instanceof Error
             ? error.message
