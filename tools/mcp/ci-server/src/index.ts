@@ -7,6 +7,7 @@ import { ciCancelRun } from './tools/ci-cancel-run.js';
 import { ciRerun } from './tools/ci-rerun.js';
 import { ciViewRun } from './tools/ci-view-run.js';
 import { dispatchWorkflow } from './tools/dispatch-workflow.js';
+import { downloadArtifact } from './tools/download-artifact.js';
 import { findSession } from './tools/find-session.js';
 import { getLogs } from './tools/get-logs.js';
 import { getPlaywrightReport } from './tools/get-playwright-report.js';
@@ -146,6 +147,35 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => getLogs(params),
+  );
+
+  server.tool(
+    'ci_download_artifact',
+    'Prefer this over `gh run download` via shell. Download a named GitHub Actions artifact ' +
+      '(uploaded via actions/upload-artifact) from a workflow run. Without outDir, file contents ' +
+      'are returned inline in the response (UTF-8 text where safe, base64 for binary, capped at ' +
+      '~200KB total across all files — the only option in hosted sessions with no shared filesystem). ' +
+      'With outDir, every file is extracted to that local directory instead and only their paths are returned.',
+    {
+      runId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe('Workflow run ID that produced the artifact'),
+      artifactName: z
+        .string()
+        .min(1)
+        .describe(
+          'Exact artifact name as uploaded via actions/upload-artifact (falls back to a case-insensitive match if no exact match is found)',
+        ),
+      outDir: z
+        .string()
+        .optional()
+        .describe(
+          'Local directory to extract the artifact into. Omit to get file contents back inline instead.',
+        ),
+    },
+    async (params) => downloadArtifact(params),
   );
 
   server.tool(

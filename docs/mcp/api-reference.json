@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 11,
-  "toolCount": 251,
+  "toolCount": 252,
   "servers": [
     {
       "dir": "worktree-server",
@@ -2783,7 +2783,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 21,
+      "toolCount": 22,
       "tools": [
         {
           "name": "ci_audit_session_bash",
@@ -2989,6 +2989,38 @@
               ],
               "default": 600,
               "description": "Deprecated — the per-call wait is always clamped to ~20s (this Lambda-hosted server's own execution timeout, not the MCP transport deadline). Kept for backward compatibility; longer waits are re-armed via ci_wait_run."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "ci_download_artifact",
+          "description": "Prefer this over `gh run download` via shell. Download a named GitHub Actions artifact (uploaded via actions/upload-artifact) from a workflow run. Without outDir, file contents are returned inline in the response (UTF-8 text where safe, base64 for binary, capped at ~200KB total across all files — the only option in hosted sessions with no shared filesystem). With outDir, every file is extracted to that local directory instead and only their paths are returned.",
+          "inputs": {
+            "runId": {
+              "type": "number",
+              "optional": false,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0"
+              ],
+              "description": "Workflow run ID that produced the artifact"
+            },
+            "artifactName": {
+              "type": "string",
+              "optional": false,
+              "constraints": [
+                "min 1"
+              ],
+              "description": "Exact artifact name as uploaded via actions/upload-artifact (falls back to a case-insensitive match if no exact match is found)"
+            },
+            "outDir": {
+              "type": "string",
+              "optional": true,
+              "description": "Local directory to extract the artifact into. Omit to get file contents back inline instead."
             }
           },
           "transports": [

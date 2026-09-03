@@ -161,16 +161,29 @@ interface ZipEntry {
 }
 
 /**
- * Extract every entry (name + decompressed text) from a ZIP archive buffer.
- * Uses Node built-in zlib (inflateRawSync) to decompress individual ZIP entries.
- * Skips entries whose declared uncompressed size exceeds MAX_UNCOMPRESSED_ENTRY_BYTES.
- * GitHub Actions names each entry `<step-number>_<step-name>.txt`, which
- * `scopeEntriesToFailingSteps` (LS-9556) relies on to slice a job's log down
- * to only the step that failed.
+ * One entry extracted from a ZIP archive, keeping its raw decompressed bytes
+ * instead of forcing a UTF-8 decode — used by callers that need to preserve
+ * binary content (e.g. writing an Actions artifact's files back to disk
+ * unchanged) rather than read it as log text.
  */
-function extractZipEntries(buffer: ArrayBuffer): ZipEntry[] {
+export interface RawZipEntry {
+  name: string;
+  data: Buffer;
+}
+
+/**
+ * Extract every entry (name + raw decompressed bytes) from a ZIP archive
+ * buffer. Uses Node built-in zlib (inflateRawSync) to decompress individual
+ * ZIP entries. Skips entries whose declared uncompressed size exceeds
+ * MAX_UNCOMPRESSED_ENTRY_BYTES. GitHub Actions names each job-log entry
+ * `<step-number>_<step-name>.txt`, which `scopeEntriesToFailingSteps`
+ * (LS-9556) relies on to slice a job's log down to only the step that failed;
+ * Actions artifact ZIPs (a different producer) use the uploaded file's own
+ * relative path as the entry name instead.
+ */
+export function extractZipEntriesRaw(buffer: ArrayBuffer): RawZipEntry[] {
   const data = Buffer.from(buffer);
-  const entries: ZipEntry[] = [];
+  const entries: RawZipEntry[] = [];
 
   // Parse ZIP local file headers (signature 0x04034b50)
   let offset = 0;
@@ -224,14 +237,14 @@ function extractZipEntries(buffer: ArrayBuffer): ZipEntry[] {
             // length is unknown) are harmlessly ignored past the stream end.
             entries.push({
               name,
-              text: inflateRawSync(compressedData, {
+              data: inflateRawSync(compressedData, {
                 maxOutputLength: MAX_UNCOMPRESSED_ENTRY_BYTES,
-              }).toString('utf-8'),
+              }),
             });
           } else if (compressionMethod === 0 && !streamed) {
             // Stored (no compression) — only trustworthy when the header's
             // size fields are real, i.e. not a streamed entry.
-            entries.push({ name, text: compressedData.toString('utf-8') });
+            entries.push({ name, data: Buffer.from(compressedData) });
           }
         } catch {
           // Skip entries that fail to decompress
@@ -243,6 +256,18 @@ function extractZipEntries(buffer: ArrayBuffer): ZipEntry[] {
   }
 
   return entries;
+}
+
+/**
+ * Extract every entry (name + decompressed text) from a ZIP archive buffer.
+ * Thin UTF-8-decoding wrapper around {@link extractZipEntriesRaw} for
+ * callers (job log parsing) that only ever deal with text content.
+ */
+function extractZipEntries(buffer: ArrayBuffer): ZipEntry[] {
+  return extractZipEntriesRaw(buffer).map(({ name, data }) => ({
+    name,
+    text: data.toString('utf-8'),
+  }));
 }
 
 /** Parse the leading `<n>_` step-number prefix from a ZIP entry name (e.g.
