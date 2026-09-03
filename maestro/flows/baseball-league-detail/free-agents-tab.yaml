@@ -1,0 +1,20 @@
+# Free Agents tab (LS-9618): open first league, switch to the top-level
+# Free Agents tab, verify the free-agent list renders.
+# League-detail tab bar has no per-tab testIDs — tabs are tapped by visible text.
+appId: com.legacysports.app
+tags:
+  - baseball-league-detail
+  - free-agents
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- takeScreenshot: maestro/artifacts/baseball-league-detail/01-overview-tab
+- tapOn: "Free Agents"
+- extendedWaitUntil:
+    visible:
+      id: "sort-by-projection"
+    timeout: 20000
+- takeScreenshot: maestro/artifacts/baseball-league-detail/05-free-agents-tab

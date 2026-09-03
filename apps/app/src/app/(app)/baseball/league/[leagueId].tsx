@@ -40,6 +40,7 @@ import {
 } from '@legacy-sports/graphql';
 import { LeagueRosterManagement } from '../../../../features/roster/LeagueRosterManagement';
 import { LeagueChatTab } from '../../../../features/leagues/LeagueChatTab';
+import { LeagueFreeAgents } from '../../FreeAgents';
 import {
   LeagueGuidedHomeTab,
   type NextAction,
@@ -65,6 +66,11 @@ import { useLeagueWebSocket } from '../../../../hooks/useLeagueWebSocket';
 const BASE_BASEBALL_LEAGUE_TABS: readonly LeagueTabDef[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'roster', label: 'Roster' },
+  // Top-level Free Agents tab (LS-9618, mirroring LS-6309/FLD-026 on football)
+  // — previously only reachable via the conditional Waivers tab's "Browse
+  // Free Agents" button, which meant leagues without waivers enabled had no
+  // path to it at all.
+  { id: 'free-agents', label: 'Free Agents' },
   { id: 'matchups', label: 'Matchups' },
   { id: 'trades', label: 'Trades' },
   { id: 'standings', label: 'Standings' },
@@ -772,6 +778,23 @@ export default function LeagueId(): React.JSX.Element {
               salaryCapEnabled={league?.salaryCapEnabled}
               capSpace={capTeamData?.team?.capSpace}
             />
+          </YStack>
+        )}
+
+        {visitedTabs.has('free-agents') && (
+          <YStack
+            flex={1}
+            display={selectedTab === 'free-agents' ? 'flex' : 'none'}
+          >
+            {userTeamId != null ? (
+              <LeagueFreeAgents leagueId={numLeagueId} />
+            ) : (
+              <YStack flex={1} padding="$3">
+                <Text color="$textMuted">
+                  Join this league to browse free agents and submit claims.
+                </Text>
+              </YStack>
+            )}
           </YStack>
         )}
 

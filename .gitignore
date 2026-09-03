@@ -368,6 +368,9 @@ scratch/*
 # PR-watch armed heartbeat flags (runtime, written by scripts/watch-pr.sh)
 .claude/.pr-watch-armed-*
 
+# Periodic Wake Protocol PR-state classification files (runtime, per-PR)
+.claude/.pr-state-*
+
 # Copilot CLI session marker (runtime file written by session-start hook)
 .copilot-session
 .twig
