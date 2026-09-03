@@ -15,6 +15,7 @@ import { listRuns } from './tools/list-runs.js';
 import { retryRunnerFlake } from './tools/retry-runner-flake.js';
 import { searchLogs } from './tools/search-logs.js';
 import { sessionStats } from './tools/session-stats.js';
+import { unwedgeOrchestrator } from './tools/unwedge-orchestrator.js';
 import { waitRun } from './tools/wait-run.js';
 import { viewRunJobs } from './tools/view-run-jobs.js';
 import { workflowInfo } from './tools/workflow-info.js';
@@ -324,6 +325,50 @@ export function createServer(): McpServer {
         ),
     },
     async (params) => retryRunnerFlake(params),
+  );
+
+  server.tool(
+    'ci_unwedge_orchestrator',
+    'Prefer this over the raw `gh run list`/`gh api .../jobs`/`gh run view` cancel+ci:run-label sequence. Detects and recovers a ' +
+      'wedged ci-orchestrator.yml run: stuck `pending` with 0 jobs, holding the `orchestrator-<PR#>` concurrency group so CI Gate ' +
+      "never posts (LS-7752). Finds the PR's stalest pending 0-job run older than staleAfterSeconds (default 300s), cancels it, " +
+      'polls for confirmed cancellation, then applies the "ci:run" label to redispatch via workflow_dispatch. Bounded ~12s per call ' +
+      '— an unconfirmed cancellation returns { status: "cancelling", runId, hint } (never an error); re-invoke with that runId to ' +
+      'resume without re-discovering/re-cancelling. Other outcomes: "clean" (no wedge found), "unnecessary" (run finished on its ' +
+      'own, not wedged), "redispatched" (recovered).',
+    {
+      prNumber: z.coerce
+        .number()
+        .int()
+        .positive()
+        .describe('PR number whose ci-orchestrator.yml run may be wedged.'),
+      runId: z.coerce
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Resume mode: runId from a prior { status: "cancelling" } response. Skips discovery/re-cancellation.',
+        ),
+      staleAfterSeconds: z.coerce
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe(
+          'Min age (s) before a pending 0-job run counts as wedged. Default 300.',
+        ),
+      maxWaitSeconds: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(12)
+        .optional()
+        .describe(
+          'Max wait for cancellation confirmation per call (default/cap: 12s).',
+        ),
+    },
+    async (params) => unwedgeOrchestrator(params),
   );
 
   server.tool(

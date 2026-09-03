@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 11,
-  "toolCount": 249,
+  "toolCount": 250,
   "servers": [
     {
       "dir": "worktree-server",
@@ -2783,7 +2783,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 19,
+      "toolCount": 20,
       "tools": [
         {
           "name": "ci_audit_session_bash",
@@ -3570,6 +3570,56 @@
               "optional": true,
               "default": false,
               "description": "Aggregate subagent stats into the parent totals and return per-subagent breakdowns (default: false)."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "ci_unwedge_orchestrator",
+          "description": "Prefer this over the raw `gh run list`/`gh api .../jobs`/`gh run view` cancel+ci:run-label sequence. Detects and recovers a wedged ci-orchestrator.yml run: stuck `pending` with 0 jobs, holding the `orchestrator-<PR#>` concurrency group so CI Gate never posts (LS-7752). Finds the PR's stalest pending 0-job run older than staleAfterSeconds (default 300s), cancels it, polls for confirmed cancellation, then applies the \"ci:run\" label to redispatch via workflow_dispatch. Bounded ~12s per call — an unconfirmed cancellation returns { status: \"cancelling\", runId, hint } (never an error); re-invoke with that runId to resume without re-discovering/re-cancelling. Other outcomes: \"clean\" (no wedge found), \"unnecessary\" (run finished on its own, not wedged), \"redispatched\" (recovered).",
+          "inputs": {
+            "prNumber": {
+              "type": "number",
+              "optional": false,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0"
+              ],
+              "description": "PR number whose ci-orchestrator.yml run may be wedged."
+            },
+            "runId": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0"
+              ],
+              "description": "Resume mode: runId from a prior { status: \"cancelling\" } response. Skips discovery/re-cancellation."
+            },
+            "staleAfterSeconds": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                ">= 0"
+              ],
+              "description": "Min age (s) before a pending 0-job run counts as wedged. Default 300."
+            },
+            "maxWaitSeconds": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0",
+                "max 12"
+              ],
+              "description": "Max wait for cancellation confirmation per call (default/cap: 12s)."
             }
           },
           "transports": [
