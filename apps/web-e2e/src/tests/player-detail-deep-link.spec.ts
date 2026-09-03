@@ -16,6 +16,7 @@
 
 import { test } from '../fixtures/pages';
 import { createGraphQLRouter, fulfillJson } from '../mocks/graphql/router';
+import type { FreeAgentsPage, LeaguePage, MatchupPage } from '../pages';
 import { DESKTOP_VIEWPORT } from '../utils/viewport';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -27,9 +28,7 @@ const PLAYER_LAST = 'Ruth';
 const MATCHUP_ID = 10;
 
 const ROSTER_URL = `/baseball/league/${LEAGUE_ID}/roster`;
-const FREE_AGENTS_URL = `/baseball/league/${LEAGUE_ID}/free-agents`;
 const DRAFT_URL = `/baseball/league/${LEAGUE_ID}/draft`;
-const MATCHUP_URL = `/baseball/league/${LEAGUE_ID}/matchups/${MATCHUP_ID}`;
 
 // ── Shared mock data ──────────────────────────────────────────────────────────
 
@@ -542,6 +541,58 @@ async function installMatchupMocks(
   });
 }
 
+// ── Origin-surface helpers ─────────────────────────────────────────
+
+/**
+ * Why these helpers gate on rendered content instead of `waitForLoadState`
+ * (LS-9839).
+ *
+ * The deep-link tests browse an origin surface first, then follow a
+ * `/players/:id` URL. `page.goto(origin)` + `waitForLoadState('load')` only
+ * resolves the document `load` event — React is still resolving that route's
+ * lazily-imported chunk (`apps/web/src/utils/lazyWithRetry.ts`). Starting the
+ * deep-link navigation while that import is in flight aborts the chunk
+ * request; `lazyWithRetry` cannot tell an abort from the stale-chunk 404 it
+ * was built for, so it calls `window.location.reload()`. That reload is a
+ * second navigation back to the origin surface, and it interrupts the deep
+ * link:
+ *
+ *   page.goto: Navigation to ".../players/101" is interrupted by another
+ *   navigation to ".../baseball/league/1/matchups/10"
+ *
+ * WebKit and Mobile Safari load chunks slowly enough to lose this race; the
+ * other projects usually win it, which is why the failures were WebKit-only
+ * and a different subset failed on each run. Waiting for the origin route to
+ * actually render proves its chunk resolved, so there is no in-flight import
+ * left for the deep link to abort.
+ *
+ * The one deep-link test that never flaked — "player in draft pool can be
+ * deep-linked from draft board context" — already gated this way.
+ */
+
+/**
+ * Open the free-agents surface and wait until its route has rendered.
+ *
+ * Gated on the league-detail `<h1>` rather than on a free-agent row: the tab
+ * reads `GetPlayersWithStats`, which these specs do not stub, so the list
+ * itself renders empty. The heading still proves the lazily-imported
+ * league-detail route resolved and committed, which is what the deep link
+ * needs.
+ */
+async function openFreeAgentsSurface(
+  freeAgentsPage: FreeAgentsPage,
+  leaguePage: LeaguePage,
+): Promise<void> {
+  await freeAgentsPage.goto(LEAGUE_ID);
+  await leaguePage.expectDetailLoaded(MOCK_LEAGUE.name);
+}
+
+/** Open the matchup-detail surface and wait until its route has rendered. */
+async function openMatchupSurface(matchupPage: MatchupPage): Promise<void> {
+  await matchupPage.goto(LEAGUE_ID, MATCHUP_ID);
+  await matchupPage.mainRegion.expectVisible();
+}
+
 // ── Tests: deep link from roster ──────────────────────────────────────────────
 
 test.describe('Player Detail Deep Link — from Roster @regression', () => {
@@ -597,14 +648,15 @@ test.describe('Player Detail Deep Link — from Roster @regression', () => {
 test.describe('Player Detail Deep Link — from Free Agents @regression', () => {
   test('URL deep link to /players/:id from free-agents context opens player modal', async ({
     page,
+    freeAgentsPage,
+    leaguePage,
     playersPage,
   }) => {
     await installFreeAgentsMocks(page);
     await installPlayerDetailMocks(page);
 
     // Navigate to the free-agents surface first (simulates the browsing context)
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await openFreeAgentsSurface(freeAgentsPage, leaguePage);
 
     // Now follow a deep link (copy URL / Android intent) to the player detail
     await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
@@ -616,13 +668,14 @@ test.describe('Player Detail Deep Link — from Free Agents @regression', () => 
 
   test('player detail modal shows stats when reached via deep link from FA context', async ({
     page,
+    freeAgentsPage,
+    leaguePage,
     playersPage,
   }) => {
     await installFreeAgentsMocks(page);
     await installPlayerDetailMocks(page);
 
-    await page.goto(FREE_AGENTS_URL);
-    await page.waitForLoadState('load');
+    await openFreeAgentsSurface(freeAgentsPage, leaguePage);
 
     await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
 
@@ -696,14 +749,14 @@ test.describe('Player Detail Deep Link — from Draft Board @regression', () => 
 test.describe('Player Detail Deep Link — from Matchup @regression', () => {
   test('URL deep link to /players/:id from matchup context opens player modal', async ({
     page,
+    matchupPage,
     playersPage,
   }) => {
     await installMatchupMocks(page);
     await installPlayerDetailMocks(page);
 
     // Navigate to the matchup surface first (simulates the browsing context)
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await openMatchupSurface(matchupPage);
 
     // Follow a deep link to the player detail (from sharing or Android intent)
     await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
@@ -715,13 +768,13 @@ test.describe('Player Detail Deep Link — from Matchup @regression', () => {
 
   test('player detail modal loads career stats when reached from matchup deep link', async ({
     page,
+    matchupPage,
     playersPage,
   }) => {
     await installMatchupMocks(page);
     await installPlayerDetailMocks(page);
 
-    await page.goto(MATCHUP_URL);
-    await page.waitForLoadState('load');
+    await openMatchupSurface(matchupPage);
 
     await playersPage.gotoDetail(PLAYER_ID, 'networkidle');
 
