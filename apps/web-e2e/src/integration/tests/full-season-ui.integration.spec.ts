@@ -29,7 +29,7 @@ import { reloadUntilVisible } from '../helpers/reload-until-visible';
 import { joinLeagueAsManager } from '../helpers/wait-for-join-page';
 import { waitForSeasonActive } from '../helpers/wait-for-season-active';
 import { selectDropPlayerIfRosterFull } from '../helpers/waiver-claim-drop';
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 
 /**
  * Season-length config — drives Phase 10 and Phase 13 cycle counts.
@@ -767,11 +767,7 @@ test.describe
   // PHASE 9 — TRADING (UI propose + UI reject via token swap)
   // -----------------------------------------------------------------
 
-  test('Phase 9: Trading', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt2,
-  }) => {
+  test('Phase 9: Trading', async ({ commissionerPage: page, managerPage2 }) => {
     await test.step('Navigate to Trades tab', async () => {
       await page.goto(`/baseball/league/${state.leagueId}/trades`);
       await page.waitForLoadState('load');
@@ -915,16 +911,24 @@ test.describe
     });
 
     await test.step('User2 rejects the trade via UI', async () => {
-      // Switch to manager 2's identity and navigate to trades
-      await switchUser(
-        page,
-        managerJwt2,
-        `/baseball/league/${state.leagueId}/trades`,
-      );
-      await page.waitForLoadState('load');
+      // LS-9790: manager 2 acts in their own fixture browser context, whose
+      // cookies and localStorage are set at context-creation time. The previous
+      // switchUser() swap on the commissioner's page raced the background JWT
+      // refresh's AUTH_LOGOUT and could land on the sign-in page instead of
+      // /trades (LS-3672, LS-3705). Using managerPage2 leaves no race window,
+      // and the commissioner's page keeps its identity, so no restore is needed.
+      await managerPage2.goto(`/baseball/league/${state.leagueId}/trades`);
+      await managerPage2.waitForLoadState('load');
+      // The Trading Center heading proves manager 2 landed on the authenticated
+      // trades route rather than the sign-in page — the exact failure the old
+      // switchUser race produced, which the Reject lookup below would have
+      // reported only as a confusing timeout.
+      await expect(
+        managerPage2.getByTestId('trade-center-heading'),
+      ).toBeVisible({ timeout: 30000 });
 
       // Find and click the Reject button on the incoming trade
-      const rejectBtn = page.getByRole('button', { name: /Reject/i });
+      const rejectBtn = managerPage2.getByRole('button', { name: /Reject/i });
       await expect(rejectBtn.first()).toBeVisible({ timeout: 15000 });
       await rejectBtn.first().click();
 
@@ -932,17 +936,17 @@ test.describe
       // rejectTradeOffer mutation returns. Waiting for it to be detached
       // replaces a 2s wall-clock guess with a deterministic UI signal.
       await expect(rejectBtn.first()).toBeHidden({ timeout: 15_000 });
-
-      // Restore commissioner identity
-      await switchUser(
-        page,
-        commissionerJwt,
-        `/baseball/league/${state.leagueId}/trades`,
-      );
     });
 
     await test.step('Verify trade status updated in UI', async () => {
+      // The commissioner's page never left /trades, so it only needs a reload to
+      // observe manager 2's rejection. The removed switchUser restore call used
+      // to perform this navigation as a side effect (LS-9790).
+      await page.reload();
       await page.waitForLoadState('load');
+      await expect(page.getByTestId('trade-center-heading')).toBeVisible({
+        timeout: 30000,
+      });
       await expect(page.locator('body')).not.toContainText(
         'Unexpected Application Error',
       );

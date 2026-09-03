@@ -22,7 +22,7 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 import { cleanupLeague } from '../helpers/cleanup-league';
 import { createLeagueViaUI } from '../helpers/create-league';
-import { switchUser, test } from '../fixtures/ui';
+import { test } from '../fixtures/ui';
 import { gqlFetch } from '../helpers/gql-fetch';
 
 // ---------------------------------------------------------------------------
@@ -319,28 +319,40 @@ test.describe
   // -----------------------------------------------------------------------
 
   test('Phase 6: Non-commissioner does not see the Scoring accordion section', async ({
-    commissionerPage: page,
-    commissionerJwt,
-    managerJwt1,
+    managerPage1,
   }) => {
-    await test.step('Switch to manager and navigate to the league commissioner tab', async () => {
-      await switchUser(
-        page,
-        managerJwt1,
+    await test.step('Open the league commissioner tab as a regular member', async () => {
+      // LS-9790: manager 1 uses their own fixture browser context, authenticated
+      // at context-creation time. The previous switchUser() swap on the
+      // commissioner's page raced the background JWT refresh's AUTH_LOGOUT
+      // (LS-3672, LS-3705); when it lost, the page rendered sign-in — which
+      // satisfies the negative assertion below for entirely the wrong reason.
+      await managerPage1.goto(
         `/baseball/league/${state.leagueId}/commissioner`,
       );
-      await page.waitForLoadState('load');
+      await managerPage1.waitForLoadState('load');
     });
 
     await test.step('Scoring accordion section is not visible to a regular member', async () => {
+      // Anchor on proof that manager 1 is still signed in: the user menu
+      // renders only when `auth.isAuthenticated && auth.user`
+      // (UserProfileDropdown.tsx), which is exactly the state the old
+      // switchUser race destroyed, and it is app chrome so it does not depend
+      // on league membership (manager 1 never joins this league — that is the
+      // point of the phase). Without it the negative assertion below passes
+      // just as happily on a signed-out page as on a correctly-denied one.
+      await expect(
+        managerPage1.getByTestId('user-profile-trigger'),
+      ).toBeVisible({ timeout: 15_000 });
+
       // A non-commissioner should not see the Commissioner tab content at all,
       // or at minimum should not see the Scoring accordion header.
       await expect(
-        page.getByRole('button', { name: 'Scoring Rules', exact: true }),
+        managerPage1.getByRole('button', {
+          name: 'Scoring Rules',
+          exact: true,
+        }),
       ).not.toBeVisible({ timeout: 10_000 });
     });
-
-    // Restore commissioner identity.
-    await switchUser(page, commissionerJwt);
   });
 });

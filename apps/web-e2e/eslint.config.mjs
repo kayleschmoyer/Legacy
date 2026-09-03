@@ -158,6 +158,36 @@ const ls9794NoSubstringOperationRoutingRules = [
   message: `LS-9794: substring matching on \`${object}\` is banned for GraphQL operation routing — the substring can match more than one real operation and silently fulfills the route with the wrong response shape. Use exact equality on the extracted name instead: \`const op = extractOperationName(route).toLowerCase(); if (op === '<operation>')\`. See apps/web-e2e/src/operation-routing-guard.test.ts.`,
 }));
 
+// LS-9790 ban `switchUser` — the in-place auth swap deleted from
+// `src/integration/fixtures/ui.ts` in LS-9790. It set cookies + localStorage
+// *after* the first navigation, so the background JWT refresh could dispatch
+// AUTH_LOGOUT and clear localStorage mid-swap, leaving the reload on the
+// sign-in page instead of the intended protected route. That single race
+// produced twelve tickets between 2026-03 and 2026-08 (LS-1504, LS-3672,
+// LS-3705, LS-3724, LS-3735, LS-3744, LS-3767, LS-3768, LS-4270, LS-4298,
+// LS-4305, LS-9486) because each fix migrated only the phase that failed that
+// night. Multi-identity tests use one dedicated fixture context per identity
+// (commissionerPage / managerPage1-3 / freePage), whose storage state is
+// applied at context-creation time, leaving no window for the race.
+//
+// There is NO grandfather list: the LS-9790 burn-down took the call-site count
+// to zero and deleted the helper, so any match is a re-introduction. Spread
+// into every `no-restricted-syntax` block below — flat config replaces the
+// rule wholesale on the last matching block, so a block that omits these
+// selectors would silently reopen the hole for the files it matches.
+const ls9790NoSwitchUserRules = [
+  {
+    selector: "CallExpression[callee.name='switchUser']",
+    message:
+      'LS-9790: switchUser() is banned — swapping auth on an existing page races the background JWT refresh (AUTH_LOGOUT clears localStorage after the swap), which renders the sign-in page instead of the target route. Use a dedicated fixture browser context instead (commissionerPage, managerPage1/2/3, freePage from src/integration/fixtures/ui.ts); their storage state is set at context-creation time. See .agents/skills/testing/references/e2e-failure-atlas.md section 5.1.',
+  },
+  {
+    selector: "ImportSpecifier[imported.name='switchUser']",
+    message:
+      'LS-9790: switchUser was deleted from src/integration/fixtures/ui.ts — do not re-introduce it. Use a dedicated fixture browser context per identity (commissionerPage, managerPage1/2/3, freePage). See .agents/skills/testing/references/e2e-failure-atlas.md section 5.1.',
+  },
+];
+
 const ls4461IntegrationRules = [
   {
     selector:
@@ -402,7 +432,11 @@ export default [
     // driver/, root-level src files).
     files: ['**/src/**/*.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...ls9660NoPositionalTextLocatorRules],
+      'no-restricted-syntax': [
+        'error',
+        ...ls9660NoPositionalTextLocatorRules,
+        ...ls9790NoSwitchUserRules,
+      ],
     },
   },
   {
@@ -424,6 +458,7 @@ export default [
         'error',
         ...ls4461IntegrationRules,
         ...ls4458SpecRules,
+        ...ls9790NoSwitchUserRules,
       ],
     },
   },
@@ -448,6 +483,7 @@ export default [
         ...ls4461IntegrationRules,
         ...ls4458SpecRules,
         ...ls9660NoPositionalTextLocatorRules,
+        ...ls9790NoSwitchUserRules,
       ],
     },
   },
@@ -456,7 +492,11 @@ export default [
     // hermetic specs use `page.route` mocking instead of `gqlFetch`.
     files: ['**/src/tests/**/*.spec.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...ls4458SpecRules],
+      'no-restricted-syntax': [
+        'error',
+        ...ls4458SpecRules,
+        ...ls9790NoSwitchUserRules,
+      ],
     },
   },
   {
@@ -472,6 +512,7 @@ export default [
         ...ls4458SpecRules,
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9660HermeticWaitRules,
+        ...ls9790NoSwitchUserRules,
       ],
     },
   },
@@ -484,7 +525,11 @@ export default [
     // affect those suites.
     files: ['**/src/pages/**/*.ts', '**/src/**/helpers/**/*.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...ls4456PageObjectRules],
+      'no-restricted-syntax': [
+        'error',
+        ...ls4456PageObjectRules,
+        ...ls9790NoSwitchUserRules,
+      ],
     },
   },
   {
@@ -498,6 +543,7 @@ export default [
         'error',
         ...ls4456PageObjectRules,
         ...ls9660NoPositionalTextLocatorRules,
+        ...ls9790NoSwitchUserRules,
       ],
     },
   },
@@ -524,6 +570,7 @@ export default [
         // must be clean of both).
         ...ls9660NoPositionalTextLocatorRules,
         ...ls9660HermeticWaitRules,
+        ...ls9790NoSwitchUserRules,
       ],
     },
   },

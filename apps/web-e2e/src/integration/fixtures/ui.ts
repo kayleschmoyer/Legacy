@@ -44,8 +44,13 @@ import { loginAs } from '../../utils/test-user-auth';
  *   `adminJwt`. A dedicated admin browser context can be added here if a UI spec
  *   ever needs an admin user that is NOT the league creator.
  *
- *   Tests can swap tokens in cookies/localStorage via `switchUser()` to act
- *   as different users within one browser context.
+ *   Tests that need to act as more than one identity use one dedicated fixture
+ *   page per identity (e.g. `commissionerPage` + `managerPage1`). The former
+ *   in-place token swap, `switchUser()`, was deleted in LS-9790: it set cookies
+ *   and localStorage after the first navigation, so the background JWT refresh
+ *   could dispatch AUTH_LOGOUT and clear localStorage mid-swap, landing the test
+ *   on the sign-in page. `buildIntegrationStorageState` is applied at
+ *   context-creation time instead, which leaves no such window.
  *
  * Provides:
  * - `commissionerPage` — browser context authenticated as the premium+admin commissioner
@@ -387,112 +392,3 @@ export const test = base.extend<UIIntegrationFixtures>({
 });
 
 export { expect } from '@playwright/test';
-
-/**
- * Switch the authenticated user in an existing browser page by updating the
- * HttpOnly `ls_jwt` cookie, cached user profile, and CSRF token.
- *
- * After LS-775 moved auth from localStorage to HttpOnly cookies, the old
- * approach of setting `localStorage['auth_jwt']` no longer works — the
- * `useAuth` hook treats it as an invalid impersonation attempt and removes it.
- *
- * This helper mirrors `buildIntegrationStorageState` for an existing context:
- * it replaces the `ls_jwt` cookie, updates `ls_user_profile` and
- * `ls_token_expiry` in localStorage, and ensures no stale `auth_jwt` key
- * triggers the broken impersonation path.
- *
- * ⚠️  KNOWN RACE CONDITION (LS-3672, LS-3705): the background JWT refresh
- * triggered by the first `page.goto` can dispatch AUTH_LOGOUT and clear
- * localStorage *after* `page.evaluate()` sets the new user profile, causing
- * the subsequent `page.reload()` to start with empty localStorage and render
- * the login page instead of the intended route.
- *
- * Prefer using a dedicated fixture browser context (e.g. `managerPage1`) for
- * tests that navigate to protected routes as the swapped-in user.
- * `buildIntegrationStorageState` sets cookies *and* localStorage at context
- * creation time, so there is no window for AUTH_LOGOUT to race.
- * Use `switchUser` only when the test truly needs to reuse the same page
- * instance (e.g. switching back to the commissioner after completing a step).
- */
-export async function switchUser(
-  page: Page,
-  jwt: string,
-  url?: string,
-): Promise<void> {
-  const payload = JSON.parse(
-    Buffer.from(jwt.split('.')[1], 'base64url').toString(),
-  ) as {
-    id?: number;
-    email?: string;
-    username?: string;
-    accessLevel?: string;
-    exp?: number;
-  };
-
-  const userProfile = {
-    id: payload.id ?? 1,
-    email: payload.email ?? 'user@test.com',
-    username: payload.username ?? 'testuser',
-    accessLevel: payload.accessLevel ?? 'none',
-  };
-
-  const expiry = payload.exp ?? Math.floor(Date.now() / 1000) + 3600;
-  const webUrl = new URL(WEB_BASE);
-  const isIpAddress = /^\d{1,3}(\.\d{1,3}){3}$/.test(webUrl.hostname);
-  const isHostOnly =
-    webUrl.hostname === 'localhost' ||
-    !webUrl.hostname.includes('.') ||
-    isIpAddress;
-  const cookieDomain = isHostOnly ? webUrl.hostname : `.${webUrl.hostname}`;
-  const sameSiteSwitch = webUrl.protocol === 'https:' ? 'None' : 'Lax';
-  const secureSwitch = webUrl.protocol === 'https:';
-
-  // Update cookies in the browser context
-  await page.context().addCookies([
-    {
-      name: 'ls_jwt',
-      value: jwt,
-      domain: cookieDomain,
-      path: '/',
-      httpOnly: true,
-      secure: secureSwitch,
-      sameSite: sameSiteSwitch,
-      expires: expiry,
-    },
-    {
-      name: 'ls_csrf',
-      value: 'integration-csrf-token',
-      domain: cookieDomain,
-      path: '/',
-      httpOnly: false,
-      secure: secureSwitch,
-      sameSite: sameSiteSwitch,
-      expires: expiry,
-    },
-  ]);
-
-  // Navigate to the target URL (or WEB_BASE) to establish the correct origin
-  // before accessing localStorage. On a fresh newPage() the page is
-  // about:blank and any localStorage access would throw a SecurityError.
-  const targetUrl = url ?? WEB_BASE;
-  await page.goto(targetUrl);
-  await page.waitForLoadState('domcontentloaded');
-
-  // Update localStorage: user profile, expiry, CSRF token, and remove stale
-  // auth_jwt to prevent the useAuth hook from entering the broken impersonation
-  // code path.
-  await page.evaluate(
-    ({ profile, exp }) => {
-      localStorage.setItem('ls_user_profile', JSON.stringify(profile));
-      localStorage.setItem('ls_token_expiry', String(exp));
-      localStorage.setItem('ls_csrf_token', 'integration-csrf-token');
-      localStorage.removeItem('auth_jwt');
-      localStorage.removeItem('ls_admin_profile');
-    },
-    { profile: userProfile, exp: expiry },
-  );
-
-  // Reload so the app re-initializes with the new auth state.
-  await page.reload();
-  await page.waitForLoadState('domcontentloaded');
-}

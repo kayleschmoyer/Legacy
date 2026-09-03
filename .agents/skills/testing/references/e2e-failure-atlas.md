@@ -291,18 +291,22 @@ Live instance: **LS-9792** (`full-season-ui.spec.ts:690`). Class burn-down: **LS
 
 `switchUser()` swaps a page's auth cookie and `localStorage` in place. The background JWT refresh triggered by the first `page.goto` can dispatch `AUTH_LOGOUT` and clear `localStorage` **after** `page.evaluate()` has set the new profile, so the subsequent reload starts empty and renders the sign-in page instead of the intended route. LS-4127's `LeagueDetailPageV2` added background Apollo activity that widened the window enough to reproduce on every nightly.
 
-The fix has been known since March and is written **in the helper's own docstring** (`apps/web-e2e/src/integration/fixtures/ui.ts`): use a dedicated fixture browser context (`managerPage1`/`2`/`3`, `commissionerPage`), whose storage state is set at context-creation time so no window exists. `switchUser` is legitimate only when a test genuinely must reuse the same page instance.
+The fix was known since March and was written **in the helper's own docstring** (`apps/web-e2e/src/integration/fixtures/ui.ts`): use a dedicated fixture browser context (`managerPage1`/`2`/`3`, `commissionerPage`), whose storage state is set at context-creation time so no window exists.
 
 It recurred twelve times because **every ticket migrated only the phase that happened to fail that night.** LS-9486 (2026-08-23) migrated waiver-processing Phase 9 — Phases 2, 5 and 6 of the same file had been migrated by three earlier tickets in the chain.
 
-**Four call sites across two integration specs remain** — and they are not four of the same thing. Burn-down: **LS-9790**. If you are in one of these files for any reason, deal with the site while you're there:
+**Closed by LS-9790 (2026-09).** The final four call sites are gone and `switchUser` has been deleted from the fixtures; an ESLint rule in `apps/web-e2e/eslint.config.mjs` now fails the build on any re-introduction, with **no grandfather list** — the count reached zero, so every match is a regression.
 
-| Site                                               | Shape                                                       | Verdict                                                                          |
-| -------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `full-season-ui.integration.spec.ts:919`           | swaps identity **and** navigates to a protected route       | **Migrate** to `managerPage2` — this is the shape the docstring warns about      |
-| `full-season-ui.integration.spec.ts:937`           | restore-to-commissioner, but passes a URL so it navigates   | **Judgement call** — migrate, or drop the URL and navigate separately            |
-| `league-scoring-editor-ui.integration.spec.ts:327` | swaps identity **and** navigates to a protected route       | **Migrate** to `managerPage1`                                                    |
-| `league-scoring-editor-ui.integration.spec.ts:344` | `switchUser(page, commissionerJwt)` — no URL, no navigation | **Keep** — the docstring's sanctioned case. Add the inline justification comment |
+The burn-down turned out to be two migrations, not four. The two `switchUser` calls that looked like independent survivors were _restores_ — they existed only to undo the swap performed a few lines above them:
+
+| Site                                               | Shape                                                     | Outcome                                                                                                                                                 |
+| -------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `full-season-ui.integration.spec.ts:919`           | swaps identity **and** navigates to a protected route     | **Migrated** to `managerPage2` — the shape the docstring warned about                                                                                   |
+| `full-season-ui.integration.spec.ts:937`           | restore-to-commissioner, but passes a URL so it navigates | **Deleted** — with the swap gone the commissioner page never lost its identity; a `reload()` replaces the navigation the restore performed incidentally |
+| `league-scoring-editor-ui.integration.spec.ts:327` | swaps identity **and** navigates to a protected route     | **Migrated** to `managerPage1`                                                                                                                          |
+| `league-scoring-editor-ui.integration.spec.ts:344` | `switchUser(page, commissionerJwt)` — no URL              | **Deleted** — see below; not the sanctioned case it appeared to be                                                                                      |
+
+> **Why the last site was not a legitimate keeper.** It was triaged as the docstring's sanctioned "switch back to the commissioner mid-test" case. Two facts overturned that. First, `switchUser` _always_ navigated — `page.goto(url ?? WEB_BASE)` followed by `page.reload()` — so "no URL" never meant "no navigation". Second, every fixture in `fixtures/ui.ts` is **test-scoped**, not worker-scoped: each test gets a fresh `commissionerPage`, and both `test.afterAll` hooks use `apiCommissioner` rather than the page. The restore was therefore repairing an identity that nothing downstream would ever read. Once site 327 moved to `managerPage1`, it was repairing a swap that no longer happened. **Generalisable check:** before granting a helper call an exemption, confirm the state it repairs is actually observed by something after it — fixture scope decides that, and a restore paired with a migrated swap dies with its partner.
 
 > This count was published as "12 call sites across 9 integration specs" in the first cut of this document (LS-9789) and corrected in LS-9796. The original grep excluded `export async function` and JSDoc `*` lines but not `//` comments, and 36 of the 43 `switchUser` mentions under `apps/web-e2e/src` are comments — mostly notes recording that a phase was _already_ migrated. The `grep -rln` that produced "9 files" counted those comment-only files. **The count of tickets in the chain (12) is separate and was re-verified as correct.** The lesson generalises: a grep over a codebase that documents its own history in comments will over-count the history as if it were the present. Filter comments, then read the survivors.
 
@@ -437,7 +441,7 @@ What separates the fixes that held from the ones that came back.
 
 | Chain                       | Tickets | What finally ended it                                                                    |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------- |
-| `switchUser` JWT race       | 12      | Nothing yet — but only 4 call sites remain, 1 of them legitimate (LS-9790)               |
+| `switchUser` JWT race       | 12      | **Closed (LS-9790)** — 0 call sites, helper deleted, ESLint ban with no grandfather list |
 | "URL stuck on /league/join" | 6       | LS-4447 moved the whole orchestration into `joinLeagueAsManager()`                       |
 | `waitForSeasonActive`       | 10      | LS-4344 migrated **every** caller to the backend-poll path after LS-4321 stopped halfway |
 | `GetAwardVotingPeriod`      | 5       | One baseline entry in `shared-mocks.ts`                                                  |
