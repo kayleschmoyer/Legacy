@@ -656,6 +656,71 @@ describe('Chat and Tiebreakers Resolver', () => {
 
       expect(result).toMatchObject({ matchupId: 1 });
     });
+
+    // ── gifUrl allowlist (LS-9619 / FLD-047 follow-up) ──────────────────
+
+    it('rejects a non-https gifUrl', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]); // matchup found
+
+      const resolver = getMutation('sendMatchupMessage');
+      await expect(
+        resolver(
+          {},
+          { matchupId: 1, message: 'hi', gifUrl: 'javascript:alert(1)' },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('gifUrl must use HTTPS');
+    });
+
+    it('rejects a gifUrl not hosted on giphy.com or tenor.com', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]); // matchup found
+
+      const resolver = getMutation('sendMatchupMessage');
+      await expect(
+        resolver(
+          {},
+          {
+            matchupId: 1,
+            message: 'hi',
+            gifUrl: 'https://malicious.example/track.gif',
+          },
+          mockContext,
+          undefined as never,
+        ),
+      ).rejects.toThrow('gifUrl must be hosted on giphy.com or tenor.com');
+
+      expect(mockDb.values).not.toHaveBeenCalled();
+    });
+
+    it('sends a matchup message with an allowlisted giphy.com gifUrl', async () => {
+      const msg = makeMessage({
+        messageType: 'gif',
+        gifUrl: 'https://media0.giphy.com/media/abc/giphy.gif',
+      });
+      mockDb.limit.mockResolvedValueOnce([{ leagueId: 1 }]); // matchup found
+      mockDb.returning.mockResolvedValueOnce([msg]);
+
+      const resolver = getMutation('sendMatchupMessage');
+      const result = (await resolver(
+        {},
+        {
+          matchupId: 1,
+          message: 'hi',
+          gifUrl: 'https://media0.giphy.com/media/abc/giphy.gif',
+        },
+        mockContext,
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(mockDb.values).toHaveBeenCalledWith(
+        expect.objectContaining({
+          messageType: 'gif',
+          gifUrl: 'https://media0.giphy.com/media/abc/giphy.gif',
+        }),
+      );
+      expect(result).toMatchObject({ gifUrl: msg.gifUrl });
+    });
   });
 
   // ── createTiebreakerRules ──────────────────────────────────────────────────

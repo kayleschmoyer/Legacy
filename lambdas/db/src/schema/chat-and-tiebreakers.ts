@@ -951,15 +951,17 @@ builder.mutationField('sendMatchupMessage', (t) =>
         throw new Error('Matchup not found');
       }
 
+      const gifUrl = validateGifUrl(args.gifUrl);
+
       const results = await context.db
         .insert(PublicSchema.matchupMessages)
         .values({
           matchupId: args.matchupId,
           leagueId: matchup[0].leagueId,
           senderId: context.user.id,
-          messageType: args.gifUrl ? 'gif' : 'text',
+          messageType: gifUrl ? 'gif' : 'text',
           message: args.message,
-          gifUrl: args.gifUrl ?? null,
+          gifUrl,
           metadata: {},
           containsProfanity: false,
           isFlagged: false,
