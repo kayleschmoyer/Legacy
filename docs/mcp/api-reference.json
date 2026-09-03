@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 11,
-  "toolCount": 252,
+  "toolCount": 255,
   "servers": [
     {
       "dir": "worktree-server",
@@ -3893,7 +3893,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 55,
+      "toolCount": 58,
       "tools": [
         {
           "name": "get_job_logs",
@@ -5831,6 +5831,71 @@
               ],
               "default": 30,
               "description": "Minimum age in minutes for a claim to be considered stale (default: 30)"
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "github_variable_delete",
+          "description": "Delete a GitHub Actions repo variable (Settings > Secrets and variables > Actions > Variables).",
+          "inputs": {
+            "name": {
+              "type": "string",
+              "optional": false,
+              "constraints": [
+                "matches /^[A-Za-z_][A-Za-z0-9_]*$/"
+              ],
+              "description": "Variable name to delete"
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "github_variable_set",
+          "description": "Create or update a GitHub Actions repo variable (Settings > Secrets and variables > Actions > Variables), e.g. flipping a feature-flag or rollout-gate flag consumed by a workflow via `vars.NAME`. Unlike secrets, the value is not encrypted — do not use this for credentials.",
+          "inputs": {
+            "name": {
+              "type": "string",
+              "optional": false,
+              "constraints": [
+                "matches /^[A-Za-z_][A-Za-z0-9_]*$/"
+              ],
+              "description": "Variable name (e.g. \"JIRA_AUDIT_AUTO_REPAIR\")"
+            },
+            "value": {
+              "type": "string",
+              "optional": true,
+              "description": "Variable value (prefer valueFile)"
+            },
+            "valueFile": {
+              "type": "string",
+              "optional": true,
+              "description": "Relative path (no absolute paths or \"..\" segments) to a file containing the variable value"
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "github_variables_check",
+          "description": "List all repo Actions variable names or check specific variables (Settings > Secrets and variables > Actions > Variables). Unlike secrets, variables are not encrypted — returns names, values, createdAt, updatedAt. When names are omitted, lists all; when provided, returns per-variable exists status and value.",
+          "inputs": {
+            "names": {
+              "type": "array",
+              "optional": true,
+              "constraints": [
+                "min 1"
+              ],
+              "items": {
+                "type": "string",
+                "optional": false
+              },
+              "description": "Specific variable names to check for existence. Omit entirely to list all variables — an empty array is rejected, not treated as \"omitted\"."
             }
           },
           "transports": [

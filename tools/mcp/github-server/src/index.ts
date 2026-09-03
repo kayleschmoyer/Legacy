@@ -37,6 +37,9 @@ import { secretSet } from './tools/secret-set.js';
 import { requestReview } from './tools/request-review.js';
 import { resolveThreads } from './tools/resolve-threads.js';
 import { secretsCheck } from './tools/secrets-check.js';
+import { variablesCheck } from './tools/variables-check.js';
+import { variableSet } from './tools/variable-set.js';
+import { variableDelete } from './tools/variable-delete.js';
 import { ensureSweepLabels } from './tools/ensure-sweep-labels.js';
 import { sweepStaleClaims } from './tools/sweep-stale-claims.js';
 import { viewPR } from './tools/view-pr.js';
@@ -1436,6 +1439,22 @@ export function createServer(): McpServer {
     async (params) => secretsCheck(params),
   );
 
+  // --- github_variables_check ---
+  server.tool(
+    'github_variables_check',
+    'List all repo Actions variable names or check specific variables (Settings > Secrets and variables > Actions > Variables). Unlike secrets, variables are not encrypted — returns names, values, createdAt, updatedAt. When names are omitted, lists all; when provided, returns per-variable exists status and value.',
+    {
+      names: z
+        .array(z.string())
+        .min(1)
+        .optional()
+        .describe(
+          'Specific variable names to check for existence. Omit entirely to list all variables — an empty array is rejected, not treated as "omitted".',
+        ),
+    },
+    async (params) => variablesCheck(params),
+  );
+
   // --- github_pr_commits ---
   server.tool(
     'github_pr_commits',
@@ -1585,6 +1604,63 @@ export function createServer(): McpServer {
         .describe('Path to file containing secret value'),
     },
     async (params) => secretSet(params),
+  );
+
+  // --- github_variable_delete ---
+  server.tool(
+    'github_variable_delete',
+    'Delete a GitHub Actions repo variable (Settings > Secrets and variables > Actions > Variables).',
+    {
+      name: z
+        .string()
+        .trim()
+        .regex(
+          /^[A-Za-z_][A-Za-z0-9_]*$/,
+          'Variable name must start with a letter or underscore and contain only alphanumeric characters and underscores',
+        )
+        .refine((n) => !n.startsWith('GITHUB_'), {
+          message: 'Variable names cannot start with GITHUB_',
+        })
+        .describe('Variable name to delete'),
+    },
+    async (params) => variableDelete(params),
+  );
+
+  // --- github_variable_set ---
+  server.tool(
+    'github_variable_set',
+    'Create or update a GitHub Actions repo variable (Settings > Secrets and variables > Actions > Variables), e.g. flipping a feature-flag or rollout-gate flag consumed by a workflow via `vars.NAME`. Unlike secrets, the value is not encrypted — do not use this for credentials.',
+    {
+      name: z
+        .string()
+        .trim()
+        .regex(
+          /^[A-Za-z_][A-Za-z0-9_]*$/,
+          'Variable name must start with a letter or underscore and contain only alphanumeric characters and underscores',
+        )
+        .refine((n) => !n.startsWith('GITHUB_'), {
+          message: 'Variable names cannot start with GITHUB_',
+        })
+        .describe('Variable name (e.g. "JIRA_AUDIT_AUTO_REPAIR")'),
+      value: z
+        .string()
+        .optional()
+        .describe('Variable value (prefer valueFile)'),
+      valueFile: z
+        .string()
+        .optional()
+        .refine(
+          (p) => p === undefined || (!p.startsWith('/') && !p.includes('..')),
+          {
+            message:
+              'valueFile must be a relative path without ".." segments (no absolute paths or path traversal)',
+          },
+        )
+        .describe(
+          'Relative path (no absolute paths or ".." segments) to a file containing the variable value',
+        ),
+    },
+    async (params) => variableSet(params),
   );
 
   // --- github_retrigger_check ---

@@ -53,6 +53,12 @@ The git-heavy tools (`github_bulk_rebase`, `github_open_pr`'s push phase) run un
 - **github_secret_set** — Set a GitHub Actions secret
 - **github_secret_delete** — Delete a GitHub Actions secret
 
+### Variables
+
+- **github_variables_check** — List all repo Actions variables (`vars.*`) or check if specific ones exist (returns names, values, and timestamps — unlike secrets, variables are not encrypted)
+- **github_variable_set** — Create or update a GitHub Actions repo variable
+- **github_variable_delete** — Delete a GitHub Actions repo variable
+
 ### CI & Checks
 
 - **github_list_commit_statuses** — List commit statuses (Statuses API) for a commit SHA or PR HEAD; accepts sha, prNumber/number, and optional context filter
