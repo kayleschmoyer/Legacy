@@ -162,6 +162,47 @@ describe('listRuns (LS-9589)', () => {
     expect(result.content[0].text).toContain('Legacy Sports CI Orchestrator');
   });
 
+  it('sorts runs by createdAt descending regardless of the order the API returns them in (LS-9426 AC1/AC3)', async () => {
+    const makeRun = (id: number, createdAt: string) => ({
+      id,
+      run_number: id,
+      run_attempt: 1,
+      conclusion: 'success',
+      created_at: createdAt,
+      display_title: `run-${id}`,
+      event: 'schedule',
+      head_branch: 'main',
+      head_sha: `${id}`.repeat(40).slice(0, 40),
+      name: 'Terraform Lock Watchdog',
+      status: 'completed',
+      updated_at: createdAt,
+      html_url: `https://github.com/x/y/actions/runs/${id}`,
+      workflow_id: 9,
+    });
+
+    // Deliberately out of chronological order — a stale/newest-last run in
+    // the middle of month-old rows, mirroring the LS-9426 observation where
+    // same-day runs were missing from a response full of older ones.
+    mockGithubGet.mockResolvedValue({
+      total_count: 3,
+      workflow_runs: [
+        makeRun(1, '2026-07-11T00:00:00Z'),
+        makeRun(3, '2026-08-13T07:02:00Z'),
+        makeRun(2, '2026-07-14T00:00:00Z'),
+      ],
+    });
+
+    const result = await listRuns({ branch: 'main', limit: 2 });
+
+    expect(result.isError).toBeUndefined();
+    const text = result.content[0].text;
+    // Newest run (3) must appear before the next-newest (2); the oldest (1)
+    // must be dropped entirely since limit is applied after sorting.
+    expect(text.indexOf('run-3')).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf('run-2')).toBeGreaterThan(text.indexOf('run-3'));
+    expect(text).not.toContain('run-1');
+  });
+
   it('returns the plain empty message when neither the workflow nor broader filters match any runs', async () => {
     mockGithubGet.mockImplementation((path: string) => {
       if (path.startsWith('/actions/workflows?')) {

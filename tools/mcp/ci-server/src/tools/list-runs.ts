@@ -213,7 +213,20 @@ export async function listRuns(params: ListRunsParams): Promise<ToolResult> {
       : '/actions/runs';
 
     const data = await githubGet<GitHubRunsResponse>(path, queryParams);
-    const runs = data.workflow_runs.slice(0, limit).map(mapRun);
+    // GitHub's list-runs endpoints don't document a guaranteed sort order
+    // (unlike the search API's explicit `sort` param) — LS-9426 observed a
+    // response where month-old scheduled runs preceded same-day runs for the
+    // same branch. Sort explicitly by createdAt descending instead of
+    // trusting whatever order the API happens to return, so a client-side
+    // ordering fluke can't hide the newest runs behind stale ones.
+    const runs = data.workflow_runs
+      .slice()
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      )
+      .slice(0, limit)
+      .map(mapRun);
 
     if (runs.length === 0 && workflowId) {
       // The workflow name resolved to a real workflow, but the combination
