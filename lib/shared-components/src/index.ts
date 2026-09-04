@@ -154,7 +154,6 @@ export {
 
 // Roster management
 export * from './features/roster/rosterUtils';
-export * from './features/roster/LineupEditor';
 export * from './features/roster/MatchupRosterComparison';
 export * from './features/roster/MatchupRosterEditorView';
 
