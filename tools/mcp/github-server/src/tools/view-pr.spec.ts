@@ -105,6 +105,7 @@ interface ParsedViewPRResult {
   checksSummary: {
     total: number;
     passed: number;
+    pending: number;
     failed: number;
     failedNames: string[];
   };
@@ -258,6 +259,190 @@ describe('viewPR — checksSummary dedup (LS-8667)', () => {
     expect(parsed.checksSummary.passed).toBe(3);
     expect(parsed.checksSummary.failed).toBe(0);
     expect(parsed.checksSummary.failedNames).toEqual([]);
+  });
+});
+
+describe('viewPR — checksSummary CANCELLED/STALE handling (LS-9384)', () => {
+  it('does not count a CANCELLED check run as failed', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          commits: {
+            totalCount: 1,
+            nodes: [
+              {
+                commit: {
+                  statusCheckRollup: {
+                    contexts: {
+                      nodes: [
+                        {
+                          __typename: 'CheckRun',
+                          name: 'process-merge-queue',
+                          status: 'COMPLETED',
+                          conclusion: 'CANCELLED',
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
+
+    expect(parsed.checksSummary.total).toBe(1);
+    expect(parsed.checksSummary.passed).toBe(1);
+    expect(parsed.checksSummary.failed).toBe(0);
+    expect(parsed.checksSummary.failedNames).toEqual([]);
+  });
+
+  it('does not count a STALE check run as failed', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          commits: {
+            totalCount: 1,
+            nodes: [
+              {
+                commit: {
+                  statusCheckRollup: {
+                    contexts: {
+                      nodes: [
+                        {
+                          __typename: 'CheckRun',
+                          name: 'GraphQL Schema & Codegen',
+                          status: 'COMPLETED',
+                          conclusion: 'STALE',
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
+
+    expect(parsed.checksSummary.total).toBe(1);
+    expect(parsed.checksSummary.passed).toBe(1);
+    expect(parsed.checksSummary.failed).toBe(0);
+    expect(parsed.checksSummary.failedNames).toEqual([]);
+  });
+
+  it('still counts a genuine FAILURE conclusion as failed', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          commits: {
+            totalCount: 1,
+            nodes: [
+              {
+                commit: {
+                  statusCheckRollup: {
+                    contexts: {
+                      nodes: [
+                        {
+                          __typename: 'CheckRun',
+                          name: 'lint',
+                          status: 'COMPLETED',
+                          conclusion: 'FAILURE',
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
+
+    expect(parsed.checksSummary.total).toBe(1);
+    expect(parsed.checksSummary.passed).toBe(0);
+    expect(parsed.checksSummary.failed).toBe(1);
+    expect(parsed.checksSummary.failedNames).toEqual(['lint']);
+  });
+
+  it('correctly counts a mixed set of cancelled, stale, failed, pending, and passed checks', async () => {
+    mockedGraphQL.mockResolvedValue(
+      gqlResponse(
+        makePR({
+          commits: {
+            totalCount: 1,
+            nodes: [
+              {
+                commit: {
+                  statusCheckRollup: {
+                    contexts: {
+                      nodes: [
+                        {
+                          __typename: 'CheckRun',
+                          name: 'process-merge-queue',
+                          status: 'COMPLETED',
+                          conclusion: 'CANCELLED',
+                        },
+                        {
+                          __typename: 'CheckRun',
+                          name: 'GraphQL Schema & Codegen',
+                          status: 'COMPLETED',
+                          conclusion: 'STALE',
+                        },
+                        {
+                          __typename: 'CheckRun',
+                          name: 'lint',
+                          status: 'COMPLETED',
+                          conclusion: 'FAILURE',
+                        },
+                        {
+                          __typename: 'CheckRun',
+                          name: 'build',
+                          status: 'COMPLETED',
+                          conclusion: 'SUCCESS',
+                        },
+                        {
+                          __typename: 'CheckRun',
+                          name: 'test',
+                          status: 'IN_PROGRESS',
+                          conclusion: null,
+                        },
+                      ],
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    const result = await viewPR({ number: 42 });
+    const parsed = JSON.parse(result.content[0].text) as ParsedViewPRResult;
+
+    expect(parsed.checksSummary.total).toBe(5);
+    expect(parsed.checksSummary.passed).toBe(3); // cancelled + stale + success
+    expect(parsed.checksSummary.pending).toBe(1);
+    expect(parsed.checksSummary.failed).toBe(1);
+    expect(parsed.checksSummary.failedNames).toEqual(['lint']);
+    expect(
+      parsed.checksSummary.passed +
+        parsed.checksSummary.pending +
+        parsed.checksSummary.failed,
+    ).toBe(parsed.checksSummary.total);
   });
 });
 

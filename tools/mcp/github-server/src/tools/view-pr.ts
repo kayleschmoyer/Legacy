@@ -12,6 +12,21 @@ import {
   fetchAllReviews,
 } from '../utils/github-reviews.js';
 
+// GraphQL CheckConclusionState values that represent a genuine failure for
+// `checksSummary`. CANCELLED and STALE are deliberately excluded: both mean the
+// run was superseded by a newer run on the same SHA (concurrency dedup, a later
+// push invalidating a stale check) rather than a real failure, and folding them
+// into `failed` misleads the drive-to-green loop into diagnosing CI failures
+// that do not exist (LS-9384). Expressed as an explicit failure allow-list
+// (rather than excluding known-benign conclusions) so an unrecognized future
+// conclusion value defaults to "not a failure" instead of silently failing.
+const FAILURE_CONCLUSIONS = new Set([
+  'FAILURE',
+  'TIMED_OUT',
+  'ACTION_REQUIRED',
+  'STARTUP_FAILURE',
+]);
+
 type ViewPRField = 'body' | 'files' | 'reviews' | 'assignees' | 'milestone';
 
 interface ViewPRParams {
@@ -383,18 +398,11 @@ export async function viewPR(params: ViewPRParams): Promise<ToolResult> {
 
     const checksRaw = dedupeLatestByName(normalizeChecks(checkNodes));
     const failed = checksRaw.filter(
-      (c) =>
-        c.conclusion &&
-        c.conclusion !== 'SUCCESS' &&
-        c.conclusion !== 'SKIPPED' &&
-        c.conclusion !== 'NEUTRAL',
+      (c) => c.conclusion !== null && FAILURE_CONCLUSIONS.has(c.conclusion),
     );
     const pending = checksRaw.filter((c) => !c.conclusion);
     const passed = checksRaw.filter(
-      (c) =>
-        c.conclusion === 'SUCCESS' ||
-        c.conclusion === 'SKIPPED' ||
-        c.conclusion === 'NEUTRAL',
+      (c) => c.conclusion !== null && !FAILURE_CONCLUSIONS.has(c.conclusion),
     );
 
     const output: Record<string, unknown> = {
