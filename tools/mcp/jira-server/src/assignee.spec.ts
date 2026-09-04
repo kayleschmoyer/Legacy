@@ -135,6 +135,32 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
     // The JQL fallback's blind spot is called out so it isn't read as
     // "this user does not exist".
     expect(result.warnings.join(' ')).toContain('at least one issue assigned');
+    // LS-9428 AC4: the warning names a concrete remedy, not just the failure.
+    expect(result.warnings.join(' ')).toContain('assigneeAccountId');
+  });
+
+  it('warns with a concrete remedy (not the raw error) when the JQL fallback itself throws (LS-9428)', async () => {
+    mockJiraRequest.mockImplementation((opts: { path: string }) => {
+      if (opts.path === '/rest/api/3/user/search')
+        return Promise.reject(scopeError);
+      return Promise.resolve(undefined);
+    });
+    mockSearchJql.mockRejectedValue(
+      new Error(
+        'Jira API POST /rest/api/3/search/jql failed (400): {"errorMessages":["bad jql"]}',
+      ),
+    );
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      explicitAssignee: 'agent@example.com',
+      toolName: 'jira_transition',
+    });
+
+    expect(result.accountId).toBeUndefined();
+    expect(putAssigneeCalls()).toHaveLength(0);
+    expect(result.warnings.join(' ')).toContain('no Jira user found');
+    expect(result.warnings.join(' ')).toContain('assigneeAccountId');
   });
 
   it('escapes quotes in the email before interpolating it into JQL', async () => {
@@ -203,6 +229,29 @@ describe('resolveAndAssign — email resolution (LS-9513)', () => {
 
     expect(result.accountId).toBe('acct-env');
     expect(result.warnings[0]).toContain('JIRA_ASSIGNEE_EMAIL');
+  });
+
+  it('names a concrete remedy when the assignee PUT itself fails (LS-9428)', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'PUT' && opts.path.includes('/assignee')) {
+          return Promise.reject(new Error('Jira API PUT failed (403)'));
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await resolveAndAssign({
+      key: 'LS-1',
+      explicitAssigneeAccountId: 'acct-direct',
+      toolName: 'jira_transition',
+    });
+
+    expect(result.accountId).toBeUndefined();
+    expect(result.warnings.join(' ')).toContain('Assignee update failed');
+    // A remedy that fits this failure mode, not a generic "pass assigneeAccountId"
+    // (the caller already did) — verifying the accountId/scope is the real next step.
+    expect(result.warnings.join(' ')).toContain('verify the accountId');
   });
 
   it('skips every lookup when an explicit accountId is passed', async () => {

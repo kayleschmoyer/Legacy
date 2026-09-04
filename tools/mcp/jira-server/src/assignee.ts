@@ -149,7 +149,17 @@ async function resolveEmailToAccountId(
   }
 
   if (!resolved) {
-    resolved = await resolveEmailViaJql(email);
+    try {
+      resolved = await resolveEmailViaJql(email);
+    } catch (err) {
+      LOGGER.warn(
+        `${toolName}: JQL email fallback also failed for assignee lookup`,
+        {
+          assigneeEmail: email,
+          error: err instanceof Error ? err : String(err),
+        },
+      );
+    }
   }
 
   if (resolved) {
@@ -273,7 +283,9 @@ export async function resolveAndAssign({
         warnings.push(
           `Could not assign ticket: no Jira user found for email "${emailToLookUp}". ` +
             'Email resolution falls back to a JQL lookup, which only finds users who ' +
-            'already have at least one issue assigned to them.',
+            'already have at least one issue assigned to them. Remedy: pass ' +
+            '`assigneeAccountId` explicitly instead of `assignee` to skip email ' +
+            'resolution entirely.',
         );
       }
     } else if (accountId === undefined) {
@@ -308,7 +320,16 @@ export async function resolveAndAssign({
       assignErr instanceof Error ? assignErr : new Error(msg),
       { key },
     );
-    warnings.push(`Assignee update failed (non-fatal): ${msg}`);
+    const remedy =
+      accountId === undefined
+        ? 'pass `assigneeAccountId` explicitly instead of `assignee` to bypass ' +
+          'email lookup entirely'
+        : 'the PUT to /issue/{key}/assignee itself failed — verify the ' +
+          'accountId is valid and the token has write:jira-work';
+    warnings.push(
+      `Assignee update failed (non-fatal): ${msg} Remedy: ${remedy}, or set ` +
+        'the assignee manually in Jira.',
+    );
     return { accountId: undefined, displayName: undefined, warnings };
   }
 }
