@@ -46,7 +46,13 @@ resource "aws_iam_role_policy_attachment" "mcp_db_lambda_vpc" {
 }
 
 resource "aws_iam_policy" "mcp_db_lambda_secrets" {
-  name        = "${local.name_prefix}-mcp-db-lambda-secrets"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy — IAM has no update API for either — so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-mcp-db-lambda-secrets-"
   description = "Allows the MCP DB Lambda to read DB credentials, the mcp_readonly/mcp_write role secrets, and the Rollbar token from Secrets Manager"
 
   policy = jsonencode({
@@ -66,11 +72,22 @@ resource "aws_iam_policy" "mcp_db_lambda_secrets" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "mcp_db_lambda_secrets" {
   policy_arn = aws_iam_policy.mcp_db_lambda_secrets.arn
   role       = aws_iam_role.mcp_db_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # its secrets policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Self-invoke permission for the async db_migrate worker (LS-8563): the submit
