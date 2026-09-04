@@ -9,6 +9,7 @@
  */
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
+import { CombinedGraphQLErrors } from '@apollo/client';
 import { GetDraftRecommendations } from '@legacy-sports/graphql';
 import { DraftIntelligence } from './DraftIntelligence';
 import { MockedProvider } from '../../test-utils/MockedProvider';
@@ -37,6 +38,20 @@ const makeRec = (
     },
   ],
 });
+
+function makeErrorMock(
+  code: string,
+  message: string,
+): Parameters<typeof MockedProvider>[0]['mocks'] {
+  return [
+    {
+      request: { query: GetDraftRecommendations, variables },
+      error: new CombinedGraphQLErrors({
+        errors: [{ message, extensions: { code } }],
+      }),
+    },
+  ];
+}
 
 function makeMock(
   recs: ReturnType<typeof makeRec>[],
@@ -150,5 +165,80 @@ describe('DraftIntelligence signal chip', () => {
       expect(screen.getByText('Lou Gehrig')).toBeTruthy();
     });
     expect(screen.queryByText('SOME_FUTURE_SIGNAL')).toBeNull();
+  });
+});
+
+/**
+ * LS-9861: `getDraftRecommendations` is gated server-side on
+ * ENTITLEMENTS.draft_recommendations, so an unentitled caller gets a
+ * PREMIUM_REQUIRED rejection with no data. The panel used to drop that on the
+ * floor (it never destructured `error`) and return null, making the premium
+ * rejection indistinguishable from "no recommendations right now" — the whole
+ * feature silently vanished with no upsell.
+ */
+describe('DraftIntelligence premium gating', () => {
+  it('renders the shared PremiumGate locked card on PREMIUM_REQUIRED', async () => {
+    render(
+      <MockedProvider
+        mocks={makeErrorMock(
+          'PREMIUM_REQUIRED',
+          'Draft recommendations requires a Premium subscription',
+        )}
+        addTypename={false}
+      >
+        <DraftIntelligence draftId={1} teamId={2} currentOverallPick={0} />
+      </MockedProvider>,
+    );
+    // "Draft recommendations" is ENTITLEMENT_LABELS.draft_recommendations —
+    // the same catalog string the server's gate error uses.
+    await waitFor(() => {
+      expect(screen.getByText('Draft recommendations')).toBeTruthy();
+    });
+    expect(screen.getByText('Available with Premium leagues.')).toBeTruthy();
+  });
+
+  it('renders nothing for an entitled user with no recommendations, so the empty state stays distinguishable from the gate', async () => {
+    const { container } = render(
+      <MockedProvider mocks={makeMock([])} addTypename={false}>
+        <DraftIntelligence draftId={1} teamId={2} currentOverallPick={0} />
+      </MockedProvider>,
+    );
+    await waitFor(() => {
+      expect(container).toBeEmptyDOMElement();
+    });
+    expect(screen.queryByText('Draft recommendations')).toBeNull();
+  });
+
+  it('does not swallow other error classes into the upsell', async () => {
+    const { container } = render(
+      <MockedProvider
+        mocks={makeErrorMock('INTERNAL_SERVER_ERROR', 'Internal server error')}
+        addTypename={false}
+      >
+        <DraftIntelligence draftId={1} teamId={2} currentOverallPick={0} />
+      </MockedProvider>,
+    );
+    await waitFor(() => {
+      expect(container).toBeEmptyDOMElement();
+    });
+    expect(screen.queryByText('Draft recommendations')).toBeNull();
+  });
+
+  it('does not show the upsell for ENTITLEMENTS_STALE, which is a token-refresh signal rather than a not-entitled verdict', async () => {
+    // Both Apollo links absorb ENTITLEMENTS_STALE with a bounded re-mint +
+    // replay (LS-9067). If one ever reaches the component, it must not be
+    // mislabelled as a downgrade — the user may well be entitled.
+    const { container } = render(
+      <MockedProvider
+        mocks={makeErrorMock('ENTITLEMENTS_STALE', 'Entitlements are stale')}
+        addTypename={false}
+      >
+        <DraftIntelligence draftId={1} teamId={2} currentOverallPick={0} />
+      </MockedProvider>,
+    );
+    await waitFor(() => {
+      expect(container).toBeEmptyDOMElement();
+    });
+    expect(screen.queryByText('Draft recommendations')).toBeNull();
   });
 });

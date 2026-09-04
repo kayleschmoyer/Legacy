@@ -6,7 +6,10 @@ import {
   type GetDraftRecommendationsQuery,
   type GetDraftRecommendationsQueryVariables,
 } from '@legacy-sports/graphql';
+import { ENTITLEMENT_LABELS, ENTITLEMENTS } from '@legacy-sports/utils';
 import { getPositionColor } from './utils';
+import { PremiumGate } from '../../components/PremiumGate';
+import { hasErrorCode } from '../../utils/graphql-errors';
 import {
   AMBER_WARM,
   BLUE_LIGHTER,
@@ -21,6 +24,15 @@ import {
   withAlpha,
 } from '../../utils/colors';
 import { tamaguiStyled } from '../../utils/tamaguiStyled';
+
+/**
+ * Locked-card copy for the free/unentitled state (LS-9861). Mirrors the
+ * mock's one-line description under the "Draft Intelligence ✦ PREMIUM"
+ * header (docs/design/.../mockups/draft.html) so the upsell explains what is
+ * behind the lock rather than just naming it.
+ */
+const PREMIUM_GATE_DESCRIPTION =
+  'Ranked picks tailored to your roster holes and the pool’s tier breaks, with the reasoning behind each one.';
 
 // ---------------------------------------------------------------------------
 // Draft Intelligence Panel — server-driven (LS-467)
@@ -177,7 +189,7 @@ export function DraftIntelligence({
 }) {
   const skip = !draftId || !teamId;
 
-  const { data, loading, refetch } = useQuery<
+  const { data, error, loading, refetch } = useQuery<
     GetDraftRecommendationsQuery,
     GetDraftRecommendationsQueryVariables
   >(GET_DRAFT_RECOMMENDATIONS, {
@@ -215,6 +227,39 @@ export function DraftIntelligence({
   useEffect(() => {
     setPendingConfirm(null);
   }, [currentOverallPick]);
+
+  // Premium gating (LS-9861). `getDraftRecommendations` is gated server-side
+  // on ENTITLEMENTS.draft_recommendations — `requireEntitlement` runs before
+  // any DB read in lambdas/db/src/schema/drafts/queries.ts — so an unentitled
+  // caller gets a PREMIUM_REQUIRED rejection and no data. Before this the
+  // component never destructured `error`, so that rejection was
+  // indistinguishable from "no recommendations right now": both fell through
+  // to `return null` and the whole feature silently vanished, with nothing
+  // prompting an upgrade at the moment the feature is most valuable.
+  //
+  // Only PREMIUM_REQUIRED maps to the upsell:
+  //
+  // - ENTITLEMENTS_STALE is deliberately excluded. It is a token-refresh
+  //   control signal, not a not-entitled verdict, and both Apollo links
+  //   already absorb it with a bounded re-mint + replay (LS-9067:
+  //   apps/web/src/lib/apollo-client.ts, apps/app/src/common/auth/DbClient.ts).
+  //   Rendering an upsell for it would mislabel a transient Stripe
+  //   webhook-propagation race as a downgrade.
+  // - Every other error class keeps the existing render-nothing behaviour. The
+  //   shared errorLink already toasts those and reports them to Rollbar, so
+  //   folding them into the gate would both hide a real failure and fabricate
+  //   an upsell the entitlement state does not justify.
+  if (hasErrorCode(error, 'PREMIUM_REQUIRED')) {
+    return (
+      <PremiumGate
+        isPremium={false}
+        featureName={ENTITLEMENT_LABELS[ENTITLEMENTS.draft_recommendations]}
+        featureDescription={PREMIUM_GATE_DESCRIPTION}
+      >
+        {null}
+      </PremiumGate>
+    );
+  }
 
   // Show nothing while the very first load is in-flight (no cached data yet).
   if (loading && recommendations.length === 0) return null;
