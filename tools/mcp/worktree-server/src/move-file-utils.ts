@@ -5,9 +5,9 @@
 // result-shaping logic can be unit-tested without spawning git.
 // ---------------------------------------------------------------------------
 
-import { dirname, resolve } from 'node:path';
-import { validateTrackedPaths } from './file-mode-utils';
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { validateTrackedPaths } from './file-mode-utils';
+import { pathModuleFor } from './path-platform-utils';
 
 /** MCP tool response envelope (subset used by this tool). */
 export interface ToolResponse {
@@ -124,7 +124,13 @@ export function executeWorktreeMv(args: MvArgs, deps: MvDeps): ToolResponse {
     const toNorm = normalizePath(to);
 
     try {
-      deps.mkdirSync(dirname(resolve(cwd, toNorm)), { recursive: true });
+      // Pick the path module by `cwd`'s shape (see path-platform-utils) so
+      // this matches the destination directory `validateTrackedPaths` above
+      // already validated against, regardless of host OS.
+      const pathModule = pathModuleFor(cwd);
+      deps.mkdirSync(pathModule.dirname(pathModule.resolve(cwd, toNorm)), {
+        recursive: true,
+      });
       deps.runGit(['mv', '--', fromNorm, toNorm], cwd, { timeout: 15_000 });
     } catch (err: unknown) {
       const e = err as { stderr?: string; message?: string };

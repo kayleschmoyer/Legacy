@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
-import { resolve } from 'node:path';
+
+import { pathModuleFor } from './path-platform-utils';
 
 /** Runs `git rev-parse --git-common-dir` and returns its raw stdout. */
 export type GitCommonDirRunner = () => string;
@@ -46,7 +47,11 @@ export function resolveMainRepoPath(
       if (gitCommonDir === '.git') {
         return process.cwd();
       }
-      return resolve(gitCommonDir, '..');
+      // Select the path module by the shape of `gitCommonDir` rather than
+      // the host OS: this keeps behavior deterministic for POSIX-style test
+      // fixtures run on a Windows host, while real absolute paths still
+      // resolve exactly as they did before (see path-platform-utils).
+      return pathModuleFor(gitCommonDir).resolve(gitCommonDir, '..');
     } catch (err) {
       lastError = err;
     }

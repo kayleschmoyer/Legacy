@@ -5,8 +5,9 @@
 // parsing, and result-shaping logic can be unit-tested without spawning git.
 // ---------------------------------------------------------------------------
 
-import { isAbsolute, resolve, sep } from 'node:path';
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { isAbsolute } from 'node:path';
+import { pathModuleFor } from './path-platform-utils';
 
 /** MCP tool response envelope (subset used by these tools). */
 export interface ToolResponse {
@@ -85,8 +86,13 @@ export function validateTrackedPaths(
     ) {
       return `Invalid path: "${p}". Paths must not escape the worktree root (no '..' segments).`;
     }
-    const resolved = resolve(cwd, pNorm);
-    if (!resolved.startsWith(cwd + sep) && resolved !== cwd) {
+    // `cwd` may be a POSIX-style path (e.g. a test fixture) even when this
+    // process runs on Windows, so pick the path module by `cwd`'s shape
+    // rather than the host OS — otherwise `resolve`/`sep` mismatch it and
+    // every path is wrongly flagged as escaping the worktree root.
+    const pathModule = pathModuleFor(cwd);
+    const resolved = pathModule.resolve(cwd, pNorm);
+    if (!resolved.startsWith(cwd + pathModule.sep) && resolved !== cwd) {
       return `Invalid path: "${p}". Path escapes worktree root.`;
     }
   }
