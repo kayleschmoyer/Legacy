@@ -12,6 +12,11 @@ import { DraftDetailsPanel } from './DraftDetailsPanel';
 import type { DraftDetailsSettings } from './draftDetails';
 import { getPositionColor } from './utils';
 import { isPlayerEligibleForSlot } from './draftDnd';
+// Platform-resolved: Metro picks DraftOrderControl.native.tsx on native,
+// bundlers take the web (@dnd-kit) variant. Imported by module path rather
+// than the commissioner barrel so the draft bundle doesn't pull in every
+// other commissioner control (LS-9859).
+import { DraftOrderControl } from '../commissioner/DraftOrderControl';
 import type { Sport } from '../../utils/colors';
 import {
   BRAND_GOLD,
@@ -284,6 +289,15 @@ interface DraftRailProps {
   draggedPlayer?: DraftPlayer | null;
   /** Read-only league/draft settings summary (LS-9857). Omitted → panel hidden. */
   draftDetails?: DraftDetailsSettings | null;
+  /** LS-9859: render the commissioner-only Draft Pick Order panel. Callers pass
+   *  the same expression that gates the pause/resume/comm-pick bar
+   *  (`showCommissionerBar` in EliteDraftBoardScreen) so mock drafts — where the
+   *  solo human is auto-registered as commissioner — never surface it. */
+  showCommissionerControls?: boolean;
+  /** League id for the Draft Pick Order panel. Null → panel hidden. */
+  leagueId?: number | null;
+  /** League draft status, forwarded to DraftOrderControl's own lock logic. */
+  draftStatus?: string | null;
   // Chat
   chatOpen: boolean;
   // Actions
@@ -339,6 +353,9 @@ export function DraftRail({
   teamNameById,
   draggedPlayer = null,
   draftDetails = null,
+  showCommissionerControls = false,
+  leagueId = null,
+  draftStatus = null,
   chatOpen,
   onShowToast,
   onDraftPlayer,
@@ -618,6 +635,27 @@ export function DraftRail({
 
         {/* Draft Details — read-only settings summary (LS-9857). */}
         {draftDetails && <DraftDetailsPanel settings={draftDetails} />}
+
+        {/* Draft Pick Order — commissioner only (LS-9859). The shared control
+            owns its own edit/lock semantics via useDraftOrder.isOrderLocked:
+            editable while the draft is 'not-started'/'queued', read-only once
+            it is underway. Because this rail only mounts for 'in-progress' /
+            'paused' drafts, in practice it renders the read-only list here —
+            a deliberate decision, since reordering a live snake draft would
+            invalidate picks already computed from the old order. Editing stays
+            pre-draft (PreDraftLobby / LeagueDetailPage). No pixel widths: the
+            panel fills the rail so LS-9860's breakpoint work can move it. */}
+        {showCommissionerControls && leagueId !== null && (
+          <YStack testID="draft-order-rail-panel" width="100%" flexShrink={0}>
+            <DraftOrderControl
+              leagueId={leagueId}
+              draftStatus={draftStatus}
+              isPremium={isPremium}
+              onSuccess={onShowToast}
+              onError={(err: Error) => onShowToast(err.message)}
+            />
+          </YStack>
+        )}
 
         {/* Pick History */}
         {pickHistory.length > 0 && (

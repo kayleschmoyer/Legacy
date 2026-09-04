@@ -72,6 +72,14 @@ jest.mock('tamagui', () => {
     XStack: passthrough('div'),
     Text: passthrough('span'),
     ScrollView: passthrough('div'),
+    // LS-9859: the commissioner Draft Pick Order panel now renders in the
+    // rail, pulling PremiumGate + DraftOrderControl into this tree — both
+    // use Tamagui primitives this stub previously didn't cover, which
+    // rendered as `undefined` element types.
+    Button: passthrough('button'),
+    Card: passthrough('div'),
+    H4: passthrough('h4'),
+    Separator: passthrough('hr'),
     Input,
     Spinner: () => ReactActual.createElement('span', { role: 'status' }),
     styled: (Component: unknown) => Component,

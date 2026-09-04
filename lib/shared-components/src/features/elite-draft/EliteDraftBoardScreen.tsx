@@ -1140,6 +1140,11 @@ export function EliteDraftBoardScreen({
   // progress — real leagues intentionally omit this (other drafters are
   // waiting on you), but a mock draft has no one to leave hanging.
   const isMockDraft = queries.league?.isMockDraft === true;
+  // LS-9859: same gate the compact shell's commissioner bar uses
+  // (`showCommissionerBar` in CompactLiveDraftBoard) — commissioner, but not a
+  // mock draft, where the solo human is auto-registered as "commissioner"
+  // (LS-9242). Drives the rail's Draft Pick Order panel.
+  const showCommissionerControls = queries.isCommissioner && !isMockDraft;
   // Premium Control All Teams mode (LS-9253): the human picks for every
   // team, so every turn should be pickable regardless of whose seat it is.
   const controlAllTeams = queries.league?.controlAllTeams === true;
@@ -1660,6 +1665,9 @@ export function EliteDraftBoardScreen({
           onRefresh={handleRefresh}
           draggedPlayer={draggedPlayer}
           draftDetails={draftDetails}
+          showCommissionerControls={showCommissionerControls}
+          leagueId={leagueId}
+          draftStatus={queries.league?.draftStatus ?? null}
         />
       </div>
 
