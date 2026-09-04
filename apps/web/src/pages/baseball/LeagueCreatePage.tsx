@@ -26,12 +26,13 @@ import { Copy } from '@tamagui/lucide-icons/icons/Copy';
 import { Lock } from '@tamagui/lucide-icons/icons/Lock';
 import { Upload } from '@tamagui/lucide-icons/icons/Upload';
 import { Zap } from '@tamagui/lucide-icons/icons/Zap';
-import { Button, DateTimePicker } from '@legacy-sports/shared-components/ui';
 import {
+  Button,
+  DateTimePicker,
   Dialog,
   Skeleton,
   StatusBadge,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/ui';
 import { LOGGER } from '@legacy-sports/logging';
 import { stripInvisibleAndControlChars } from '@legacy-sports/utils';
 import {

@@ -13,7 +13,7 @@ jest.mock('react-router-dom', () => ({
 jest.mock('../../hooks/useStandings');
 const mockUseStandings = jest.mocked(useStandings);
 
-jest.mock('@legacy-sports/shared-components', () => ({
+jest.mock('@legacy-sports/shared-components/matchup', () => ({
   StandingsTable: () => <div data-testid="standings-table" />,
 }));
 

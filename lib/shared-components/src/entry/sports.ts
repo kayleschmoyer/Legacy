@@ -4,3 +4,4 @@
 export * from '../features/sports/SportHome';
 export * from '../features/sports/SportScreens';
 export * from '../config/sports';
+export * from '../features/home/HomeScreen';

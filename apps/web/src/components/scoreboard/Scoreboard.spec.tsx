@@ -5,7 +5,7 @@
  * Regression coverage for LS-4838: postponed games were being lumped into
  * the "Upcoming" section even though they will not be played that day.
  */
-import type { ScoreboardGame } from '@legacy-sports/shared-components';
+import type { ScoreboardGame } from '@legacy-sports/shared-components/scoreboard';
 import { partitionScoreboardGames } from './Scoreboard';
 
 function makeGame(

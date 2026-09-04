@@ -1,4 +1,4 @@
-import type { LeagueTabDef } from '@legacy-sports/shared-components';
+import type { LeagueTabDef } from '@legacy-sports/shared-components/leagues';
 
 /**
  * Canonical tab identifiers for the baseball league-detail v2 page. Kept here

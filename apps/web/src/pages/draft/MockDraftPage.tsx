@@ -5,10 +5,10 @@ import {
   Button,
   H1,
   Paragraph,
+  Skeleton,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { Skeleton } from '@legacy-sports/shared-components';
 import {
   MockDraftInviteCard,
   type MockDraftSettings,

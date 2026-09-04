@@ -58,7 +58,7 @@ const EXPECTED_FEATURE_DESCRIPTION =
 
 // Shared PlayerComparison — stubbed; exposes onSignIn and onUpgrade callbacks
 // via buttons so the wrapper's navigation/modal wiring can be asserted.
-jest.mock('@legacy-sports/shared-components', () => ({
+jest.mock('@legacy-sports/shared-components/players', () => ({
   PLAYER_COMPARISON_FEATURE_DESCRIPTION:
     'Compare up to 4 players side-by-side with career stats, scoring projections, and season breakdowns.',
   PlayerComparison: ({

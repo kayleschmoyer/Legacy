@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ScrollView, Text, XStack, YStack } from 'tamagui';
 import { ChevronLeft } from '@tamagui/lucide-icons/icons/ChevronLeft';
 import { LOGGER } from '@legacy-sports/logging';
-import { Dialog } from '@legacy-sports/shared-components';
+import { Dialog } from '@legacy-sports/shared-components/ui';
 import {
   GetUserLeagues,
   DefensiveFormat as GqlDefensiveFormat,

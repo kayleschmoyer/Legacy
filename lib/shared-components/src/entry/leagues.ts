@@ -7,6 +7,7 @@ export * from '../config/sports';
 // native OAuth provider, which the mobile jest environment cannot transform
 // (LS-9528).
 export {
+  computePrimarySport,
   type HomeLeagueSummary,
   type LeagueStandingsEntry,
   mergeLeagueStandings,
@@ -16,6 +17,7 @@ export * from '../features/leagues/create-wizard';
 export * from '../features/leagues/CreateLeagueModal';
 export * from '../features/leagues/KeeperDesignationPanel';
 export * from '../features/leagues/LeagueActivityFeed';
+export * from '../features/leagues/LeagueDetailShell';
 export * from '../features/leagues/LeagueScoringSummary';
 export * from '../features/leagues/LeaguesLedgerScreen';
 export * from '../features/leagues/OnThisDayFeed';
@@ -23,3 +25,5 @@ export * from '../features/leagues/premium';
 export * from '../features/leagues/PremiumTradeTools';
 export * from '../features/leagues/submitError';
 export * from '../features/leagues/TradingCenter';
+export { LeagueCard } from '../components/LeagueCard';
+export type { LeagueCardProps, League } from '../components/LeagueCard';

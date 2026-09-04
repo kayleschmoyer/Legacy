@@ -7,10 +7,10 @@ import {
 import {
   computePrimarySport,
   type HomeLeagueSummary,
-  HomeScreen,
   mergeLeagueStandings,
-} from '@legacy-sports/shared-components';
-import { OnThisDayFeed } from '@legacy-sports/shared-components/leagues';
+  OnThisDayFeed,
+} from '@legacy-sports/shared-components/leagues';
+import { HomeScreen } from '@legacy-sports/shared-components/sports';
 import {
   useGetArchivedUserLeagueSummariesLazyQuery,
   useGetArchivedUserLeagueSummariesQuery,

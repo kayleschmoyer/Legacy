@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LOGGER } from '@legacy-sports/logging';
 import {
   Button,
+  PremiumGate,
   Separator,
   XStack,
   YStack,
@@ -34,7 +35,6 @@ import {
   type GetLeagueScoringProfileQuery,
   useUpdateLeagueScoringProfileMutation,
 } from '@legacy-sports/graphql';
-import { PremiumGate } from '@legacy-sports/shared-components';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import {
   BLACK,

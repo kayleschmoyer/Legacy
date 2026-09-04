@@ -149,41 +149,6 @@ jest.mock('@legacy-sports/shared-components/leagues', () => {
   };
 });
 
-jest.mock('@legacy-sports/shared-components', () => ({
-  Dialog: ({
-    open,
-    title,
-    description,
-    confirmLabel = 'Confirm',
-    cancelLabel = 'Cancel',
-    onConfirm,
-    onCancel,
-    children,
-  }: any) =>
-    open ? (
-      <div role="alertdialog" aria-label={title}>
-        <span>{description}</span>
-        {children}
-        <button type="button" onClick={onConfirm}>
-          {confirmLabel}
-        </button>
-        <button type="button" onClick={onCancel}>
-          {cancelLabel}
-        </button>
-      </div>
-    ) : null,
-  StatusBadge: ({ label }: { label: string }) => (
-    <span data-testid="status-badge">{label}</span>
-  ),
-  Skeleton: ({ width, height }: { width?: number; height?: number }) => (
-    <span
-      data-testid="skeleton-block"
-      data-width={width}
-      data-height={height}
-    />
-  ),
-}));
-
 let mockIsPremium = false;
 let mockIsPremiumLoading = false;
 jest.mock('../../hooks/useIsPremium', () => ({
@@ -245,6 +210,38 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
       onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
         onChange?.(new Date(e.target.value))
       }
+    />
+  ),
+  Dialog: ({
+    open,
+    title,
+    description,
+    confirmLabel = 'Confirm',
+    cancelLabel = 'Cancel',
+    onConfirm,
+    onCancel,
+    children,
+  }: any) =>
+    open ? (
+      <div role="alertdialog" aria-label={title}>
+        <span>{description}</span>
+        {children}
+        <button type="button" onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+        <button type="button" onClick={onCancel}>
+          {cancelLabel}
+        </button>
+      </div>
+    ) : null,
+  StatusBadge: ({ label }: { label: string }) => (
+    <span data-testid="status-badge">{label}</span>
+  ),
+  Skeleton: ({ width, height }: { width?: number; height?: number }) => (
+    <span
+      data-testid="skeleton-block"
+      data-width={width}
+      data-height={height}
     />
   ),
 }));

@@ -143,6 +143,41 @@ export default [
     ignores: ['**/graphql.generated.ts'],
   },
   {
+    // apps/web-scoped: forbid importing the shared-components root barrel
+    // (LS-9422/LS-9420). The root barrel star-exports the entire library, so
+    // one added import silently re-inflates whatever chunk pulls it in —
+    // invisible in review. Subpath entries (e.g.
+    // '@legacy-sports/shared-components/ui') tree-shake correctly instead.
+    //
+    // This block matches the same `**/*.ts`/`**/*.tsx` glob as the global
+    // `no-restricted-imports` override above, so flat config's last-one-wins
+    // merge would otherwise silently replace (not merge with) that block's
+    // `@apollo/client` gql restriction for every file under apps/web/src —
+    // the exact rule-key clobber this repo has hit before. The apollo/client
+    // entry is repeated here so apps/web keeps both restrictions.
+    files: ['apps/web/src/**/*.ts', 'apps/web/src/**/*.tsx'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@apollo/client',
+              importNames: ['gql'],
+              message:
+                'Do not use inline gql tags. Define queries in .graphql files and import generated hooks from graphql.generated.ts.',
+            },
+            {
+              name: '@legacy-sports/shared-components',
+              message:
+                "Import from a subpath entry instead (e.g. '@legacy-sports/shared-components/ui'). The root barrel re-exports the entire library and defeats route-level code splitting — see LS-9420.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // LS-8614: flag *.spec.ts files with no import/export (i.e. files that
     // aren't actually a module — usually a sign the file's tests got
     // deleted/moved but the file itself was left behind).

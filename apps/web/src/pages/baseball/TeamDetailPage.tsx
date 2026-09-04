@@ -15,7 +15,7 @@ import {
   YStack,
 } from 'tamagui';
 import type { TamaguiElement } from 'tamagui';
-import { Skeleton } from '@legacy-sports/shared-components';
+import { Skeleton } from '@legacy-sports/shared-components/ui';
 import {
   LeaguePositionFragment,
   TeamMemberFragment,
@@ -28,11 +28,11 @@ import {
   useUpdateTeamBrandingMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
-import { RosterBoard } from '@legacy-sports/shared-components/roster';
 import {
   normalizeTeamColor,
+  RosterBoard,
   TEAM_BRANDING_PRESET_COLORS,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/roster';
 import { LOGGER } from '@legacy-sports/logging';
 import { validateBrandingUrl } from './validate-branding-url';
 import { PageMeta } from '../../components/PageMeta';

@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { useTeamBranding } from '@legacy-sports/shared-components';
+import { useTeamBranding } from '@legacy-sports/shared-components/roster';
 
 import { TeamTab } from './Team';
 
@@ -16,7 +16,7 @@ jest.mock('@legacy-sports/graphql', () => ({
   },
 }));
 
-jest.mock('@legacy-sports/shared-components', () => ({
+jest.mock('@legacy-sports/shared-components/roster', () => ({
   useTeamBranding: jest.fn(),
 }));
 

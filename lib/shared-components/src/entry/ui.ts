@@ -19,6 +19,12 @@ export * from '../components/EmptyState';
 export * from '../components/ErrorState';
 export * from '../components/PanelCard';
 export * from '../components/UnifiedLoadingPanel';
+export { Dialog } from '../components/Dialog';
+export type { DialogProps } from '../components/Dialog';
+export { Skeleton, SkeletonRow } from '../components/Spinner';
+export type { SkeletonProps } from '../components/Spinner';
+export { PremiumGate } from '../components/PremiumGate';
+export type { PremiumGateProps } from '../components/PremiumGate';
 // Design-system MatchupCard (LS-4719). Not re-exported from the root barrel
 // (which prioritizes the features/matchup MatchupCard of the same name for
 // raw-fragment consumers) or from `./matchup` (same collision) — this is its

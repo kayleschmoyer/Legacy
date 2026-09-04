@@ -4,7 +4,7 @@ import { Button, H2, Separator, Spinner, Text, XStack, YStack } from 'tamagui';
 import {
   PlayoffBracket,
   StandingsTable,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/matchup';
 import { useGetPlayoffBracketQuery } from '@legacy-sports/graphql';
 import { useStandings } from '../../hooks/useStandings';
 

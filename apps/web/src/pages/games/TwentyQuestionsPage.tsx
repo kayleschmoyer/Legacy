@@ -1,5 +1,5 @@
 import React from 'react';
-import { TwentyQuestionsGame } from '@legacy-sports/shared-components';
+import { TwentyQuestionsGame } from '@legacy-sports/shared-components/games';
 import { PageMeta } from '../../components/PageMeta';
 
 /**

@@ -13,3 +13,4 @@ export * from '../features/roster/MatchupRosterComparison';
 export * from '../features/roster/MatchupRosterEditorView';
 export * from '../features/roster/PendingTradeOffers';
 export * from '../features/roster/PendingWaiverClaims';
+export * from '../features/teams/useTeamBranding';

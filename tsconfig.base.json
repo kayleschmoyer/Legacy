@@ -95,6 +95,9 @@
       "@legacy-sports/shared-components/roster": [
         "lib/shared-components/src/entry/roster.ts"
       ],
+      "@legacy-sports/shared-components/scoreboard": [
+        "lib/shared-components/src/entry/scoreboard.ts"
+      ],
       "@legacy-sports/shared-components/season-draft": [
         "lib/shared-components/src/entry/season-draft.ts"
       ],
@@ -103,6 +106,9 @@
       ],
       "@legacy-sports/shared-components/football": [
         "lib/shared-components/src/entry/football.ts"
+      ],
+      "@legacy-sports/shared-components/games": [
+        "lib/shared-components/src/entry/games.ts"
       ],
       "@legacy-sports/shared-components/sports": [
         "lib/shared-components/src/entry/sports.ts"

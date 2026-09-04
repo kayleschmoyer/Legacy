@@ -18,12 +18,12 @@ import {
   type SportKey,
   todayISO,
   useScoreboardLivePolling,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/scoreboard';
 import { useGetScoreboardQuery } from '@legacy-sports/graphql';
 
 // Re-export so existing unit tests (and callers) can keep importing the pure
 // bucketing helper from this module; the implementation now lives in shared.
-export { partitionScoreboardGames } from '@legacy-sports/shared-components';
+export { partitionScoreboardGames } from '@legacy-sports/shared-components/scoreboard';
 
 // ─── DateNav (web-only date picker) ─────────────────────────────────────────
 

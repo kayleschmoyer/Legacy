@@ -73,10 +73,6 @@ jest.mock('@tamagui/lucide-icons', () => ({
   Lock: () => <span data-testid="icon-lock" />,
 }));
 
-jest.mock('@legacy-sports/shared-components', () => ({
-  Skeleton: () => <div data-testid="mock-draft-skeleton" />,
-}));
-
 // The interactive settings form lives in shared-components (LS-7711); these
 // page tests cover MockDraftPage's state selection (skeleton vs limit-reached
 // vs form) and the usage-label wiring, so we stub the shared form to surface
@@ -141,6 +137,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => ({
   ),
   H1: ({ children }: MockProps) => <h1>{children}</h1>,
   Paragraph: ({ children }: MockProps) => <p>{children}</p>,
+  Skeleton: () => <div data-testid="mock-draft-skeleton" />,
   XStack: ({ children }: MockProps) => <div>{children}</div>,
   YStack: ({ children, ...rest }: MockProps) => (
     <div data-testid={asStr(rest['data-testid'])}>{children}</div>

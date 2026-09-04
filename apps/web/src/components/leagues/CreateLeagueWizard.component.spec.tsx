@@ -221,7 +221,7 @@ jest.mock('./wizard/StepDefensiveFormat', () => ({
   ),
 }));
 
-jest.mock('@legacy-sports/shared-components', () => ({
+jest.mock('@legacy-sports/shared-components/ui', () => ({
   Dialog: ({
     open,
     title,

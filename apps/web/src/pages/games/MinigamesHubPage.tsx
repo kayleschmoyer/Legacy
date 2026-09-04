@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MinigamesHub } from '@legacy-sports/shared-components';
+import { MinigamesHub } from '@legacy-sports/shared-components/games';
 import { PageMeta } from '../../components/PageMeta';
 
 /**

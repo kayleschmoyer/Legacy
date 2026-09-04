@@ -4,7 +4,7 @@ import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   LeagueDetailShell,
   type LeagueRole,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/leagues';
 import { LOGGER } from '@legacy-sports/logging';
 import './styles.css';
 import {

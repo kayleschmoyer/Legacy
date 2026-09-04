@@ -58,6 +58,22 @@ jest.mock('../../features/baseball/TeamAssistantManagerSettings', () => ({
 }));
 
 jest.mock('@legacy-sports/shared-components/roster', () => ({
+  TEAM_BRANDING_PRESET_COLORS: [
+    '#1B3A5C',
+    '#C41E3A',
+    '#2D6A4F',
+    '#8B6F47',
+    '#7C6CAE',
+    '#C5A55A',
+    '#0E7490',
+    '#9F1239',
+  ],
+  normalizeTeamColor: (c: string | null | undefined, fallback: string) => {
+    if (!c) return fallback;
+    if (c.startsWith('#')) return c.toUpperCase();
+    if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c.toUpperCase()}`;
+    return c;
+  },
   RosterBoard: ({
     readOnly,
     error,
@@ -85,24 +101,8 @@ jest.mock('@legacy-sports/shared-components/roster', () => ({
 // LS-6046: real (pure, side-effect-free) implementations — mocked per the
 // established convention (Team.spec.tsx) since the package root also
 // exports native-only components that jest can't resolve in this suite.
-jest.mock('@legacy-sports/shared-components', () => ({
+jest.mock('@legacy-sports/shared-components/ui', () => ({
   Skeleton: () => <div data-testid="settings-skeleton" />,
-  TEAM_BRANDING_PRESET_COLORS: [
-    '#1B3A5C',
-    '#C41E3A',
-    '#2D6A4F',
-    '#8B6F47',
-    '#7C6CAE',
-    '#C5A55A',
-    '#0E7490',
-    '#9F1239',
-  ],
-  normalizeTeamColor: (c: string | null | undefined, fallback: string) => {
-    if (!c) return fallback;
-    if (c.startsWith('#')) return c.toUpperCase();
-    if (/^[0-9A-Fa-f]{6}$/.test(c)) return `#${c.toUpperCase()}`;
-    return c;
-  },
 }));
 
 // ── GraphQL ───────────────────────────────────────────────────────────────────

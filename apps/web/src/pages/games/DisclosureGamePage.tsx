@@ -1,5 +1,5 @@
 import React from 'react';
-import { DisclosureGame } from '@legacy-sports/shared-components';
+import { DisclosureGame } from '@legacy-sports/shared-components/games';
 import { PageMeta } from '../../components/PageMeta';
 
 /**

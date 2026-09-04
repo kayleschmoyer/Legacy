@@ -28,6 +28,7 @@ jest.mock('@legacy-sports/shared-components/ui', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factory needs runtime require
   const React = require('react');
   return {
+    BrandLogo: () => <div data-testid="brand-logo" />,
     OAuthProvider: {
       configure: jest.fn(() => Promise.resolve()),
       signIn: jest.fn(),

@@ -16,7 +16,7 @@ let mockBracket: Record<string, unknown> | null = null;
 let mockCurrentWeek: number | null = null;
 
 const mockStandingsTable = jest.fn(() => null);
-jest.mock('@legacy-sports/shared-components', () => ({
+jest.mock('@legacy-sports/shared-components/matchup', () => ({
   StandingsTable: (props: any) => mockStandingsTable(props),
   PlayoffBracket: jest.fn(() => <div data-testid="playoff-bracket" />),
 }));

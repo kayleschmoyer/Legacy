@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useTeamBranding } from '@legacy-sports/shared-components';
+import { useTeamBranding } from '@legacy-sports/shared-components/roster';
 import { KeeperDesignationPanel } from '@legacy-sports/shared-components/leagues';
 import {
   type LeagueFragment,

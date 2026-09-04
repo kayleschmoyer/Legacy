@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   PLAYER_COMPARISON_FEATURE_DESCRIPTION as FEATURE_DESCRIPTION,
   PlayerComparison,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/players';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import { UpgradeModal } from '../../components/UpgradeModal';

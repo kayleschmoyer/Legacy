@@ -43,9 +43,11 @@ jest.mock('@legacy-sports/logging', () => ({
   },
 }));
 
+const mockUseWebSocket = jest.fn<undefined, [UseWebSocketOptions]>();
 jest.mock('@legacy-sports/shared-components/ui', () => ({
   H1: ({ children }: ChildrenProps) => <h1>{children}</h1>,
   Paragraph: ({ children }: ChildrenProps) => <p>{children}</p>,
+  useWebSocket: (opts: UseWebSocketOptions) => mockUseWebSocket(opts),
   XStack: ({ children }: ChildrenProps) => <div>{children}</div>,
   YStack: ({ children }: ChildrenProps) => <div>{children}</div>,
 }));
@@ -160,11 +162,6 @@ type UseWebSocketOptions = {
   autoConnect?: boolean;
   onSubscriptionUpdated?: () => void;
 };
-
-const mockUseWebSocket = jest.fn<undefined, [UseWebSocketOptions]>();
-jest.mock('@legacy-sports/shared-components', () => ({
-  useWebSocket: (opts: UseWebSocketOptions) => mockUseWebSocket(opts),
-}));
 
 jest.mock('@legacy-sports/shared-components/auth', () => {
   const actual = jest.requireActual<Record<string, unknown>>(

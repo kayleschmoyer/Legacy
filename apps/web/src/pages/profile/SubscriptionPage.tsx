@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   H1,
   Paragraph,
+  useWebSocket,
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
@@ -14,7 +15,6 @@ import { RefreshCw } from '@tamagui/lucide-icons/icons/RefreshCw';
 import { Zap } from '@tamagui/lucide-icons/icons/Zap';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { LOGGER } from '@legacy-sports/logging';
-import { useWebSocket } from '@legacy-sports/shared-components';
 import { useAuth, useStepUpGate } from '@legacy-sports/shared-components/auth';
 import {
   useCreateBillingPortalSessionMutation,

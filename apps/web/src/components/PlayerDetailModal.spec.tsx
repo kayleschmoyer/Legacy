@@ -75,7 +75,7 @@ jest.mock('../constants/colors', () => ({
   withAlpha: (color: string, _alpha: number) => color,
 }));
 
-jest.mock('@legacy-sports/shared-components', () => ({
+jest.mock('@legacy-sports/shared-components/utils', () => ({
   getPositionColor: () => '#position',
 }));
 

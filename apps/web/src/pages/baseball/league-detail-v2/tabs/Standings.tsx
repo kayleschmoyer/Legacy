@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   PlayoffBracket,
   StandingsTable,
-} from '@legacy-sports/shared-components';
+} from '@legacy-sports/shared-components/matchup';
 import {
   type LeagueFragment,
   Sport,

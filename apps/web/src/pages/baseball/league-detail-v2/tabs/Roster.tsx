@@ -8,7 +8,7 @@ import {
   type RosterScorelineTeam,
   RosterStatusBanners,
 } from '@legacy-sports/shared-components/roster';
-import { PendingTradeOfferBanner } from '@legacy-sports/shared-components';
+import { PendingTradeOfferBanner } from '@legacy-sports/shared-components/matchup';
 import { type SeasonStats } from '@legacy-sports/scoring';
 import {
   type LeagueFragment,

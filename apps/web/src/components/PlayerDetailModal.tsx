@@ -22,7 +22,7 @@ import {
   useGetAllPlayerSeasonStatsQuery,
   useGetPlayerCareerArcQuery,
 } from '@legacy-sports/graphql';
-import { getPositionColor } from '@legacy-sports/shared-components';
+import { getPositionColor } from '@legacy-sports/shared-components/utils';
 import { BaseModal } from './BaseModal';
 import type { CareerArcMode } from './CareerArcChart';
 import { useIsPremiumStatus } from '../hooks/useIsPremium';
