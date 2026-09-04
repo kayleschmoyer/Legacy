@@ -70,6 +70,21 @@ function resolveHostPort(): { host: string; port: number } {
 }
 
 let readonlySql: postgres.Sql | null = null;
+let readonlyConnectionInfo: { host: string; port: number } | null = null;
+
+/**
+ * The host/port the readonly connection was last opened against — known to
+ * this client at connect time, unlike the `postgres` driver's own
+ * CONNECT_TIMEOUT error, which can report `undefined:undefined` when the
+ * failure happens before its internal socket options are populated (LS-9590).
+ * `query.ts` uses this to fill in a legible host:port on that error path.
+ */
+export function getReadonlyConnectionInfo(): {
+  host: string;
+  port: number;
+} | null {
+  return readonlyConnectionInfo;
+}
 
 /**
  * Lazily create (and cache across warm Lambda invocations) a postgres
@@ -86,6 +101,7 @@ export async function getReadonlySql(): Promise<postgres.Sql> {
 
   const creds = await readRoleSecret(requireEnv('MCP_READONLY_SECRET_NAME'));
   const { host, port } = resolveHostPort();
+  readonlyConnectionInfo = { host, port };
   const statementTimeoutMs = parseInt(
     process.env['DB_STATEMENT_TIMEOUT_MS'] ?? '30000',
     10,

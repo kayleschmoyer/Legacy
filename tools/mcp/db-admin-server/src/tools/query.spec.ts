@@ -1,12 +1,16 @@
 import postgres from 'postgres';
 import { query } from './query';
-import { getReadonlySql } from '../db.js';
+import { getReadonlyConnectionInfo, getReadonlySql } from '../db.js';
 
 jest.mock('../db.js');
 
 const mockGetReadonlySql = getReadonlySql as jest.MockedFunction<
   typeof getReadonlySql
 >;
+const mockGetReadonlyConnectionInfo =
+  getReadonlyConnectionInfo as jest.MockedFunction<
+    typeof getReadonlyConnectionInfo
+  >;
 
 /** Build a fake postgres `sql` whose `begin('READ ONLY', fn)` runs fn with a tx
  *  whose `unsafe()` resolves to the given rows. Records the begin mode. */
@@ -121,6 +125,10 @@ describe('db_query (hosted, read-only)', () => {
     );
     const sql = { begin: jest.fn(() => Promise.reject(transportError)) };
     mockGetReadonlySql.mockResolvedValue(sql as never);
+    mockGetReadonlyConnectionInfo.mockReturnValue({
+      host: 'dev-rds.internal',
+      port: 5432,
+    });
 
     const result = await query({ query: 'SELECT 1 AS ok' });
 
@@ -128,6 +136,39 @@ describe('db_query (hosted, read-only)', () => {
     const payload = parseBody(result.content[0].text);
     expect(payload.error).toBe('upstream_unavailable');
     expect(payload.hint).toContain('Retry');
+  });
+
+  it('fills in the real host:port on a CONNECT_TIMEOUT message that reports undefined:undefined', async () => {
+    const transportError = Object.assign(
+      new Error('write CONNECT_TIMEOUT undefined:undefined'),
+      { code: 'CONNECT_TIMEOUT' },
+    );
+    const sql = { begin: jest.fn(() => Promise.reject(transportError)) };
+    mockGetReadonlySql.mockResolvedValue(sql as never);
+    mockGetReadonlyConnectionInfo.mockReturnValue({
+      host: 'dev-rds.internal',
+      port: 5432,
+    });
+
+    const result = await query({ query: 'SELECT 1 AS ok' });
+
+    const payload = parseBody(result.content[0].text);
+    expect(payload.message).toBe('write CONNECT_TIMEOUT dev-rds.internal:5432');
+  });
+
+  it('leaves the message unchanged when connection info is not yet known', async () => {
+    const transportError = Object.assign(
+      new Error('write CONNECT_TIMEOUT undefined:undefined'),
+      { code: 'CONNECT_TIMEOUT' },
+    );
+    const sql = { begin: jest.fn(() => Promise.reject(transportError)) };
+    mockGetReadonlySql.mockResolvedValue(sql as never);
+    mockGetReadonlyConnectionInfo.mockReturnValue(null);
+
+    const result = await query({ query: 'SELECT 1 AS ok' });
+
+    const payload = parseBody(result.content[0].text);
+    expect(payload.message).toBe('write CONNECT_TIMEOUT undefined:undefined');
   });
 
   it('reports unavailable when the connection cannot be established', async () => {

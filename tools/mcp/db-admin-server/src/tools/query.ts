@@ -1,7 +1,11 @@
 import { markdownTable } from '@legacy-sports/mcp-format';
 import postgres from 'postgres';
-import { getReadonlySql } from '../db.js';
+import { getReadonlyConnectionInfo, getReadonlySql } from '../db.js';
 import { errorMessage, jsonResult, type ToolResult } from '../types.js';
+
+/** Placeholder the `postgres` driver emits in a CONNECT_TIMEOUT message when
+ * the failure happens before its internal socket options are populated. */
+const UNKNOWN_HOST_PORT = 'undefined:undefined';
 
 interface QueryParams {
   query: string;
@@ -86,11 +90,24 @@ function classifyQueryError(error: unknown, elapsedMs: number): ToolResult {
     {
       error: 'upstream_unavailable',
       elapsedMs,
-      message: errorMessage(error),
+      message: enrichConnectErrorMessage(errorMessage(error)),
       hint: 'The MCP transport (Lambda, API Gateway, or the database connection itself) failed before the query could complete — this is not a statement timeout. Retry once; if it fails again, the server may be down.',
     },
     true,
   );
+}
+
+/**
+ * Fill in the real host:port on a driver error whose message contains the
+ * `undefined:undefined` placeholder (LS-9590) — the client always knows the
+ * host/port it last connected with, even when the driver's own error message
+ * doesn't.
+ */
+function enrichConnectErrorMessage(message: string): string {
+  if (!message.includes(UNKNOWN_HOST_PORT)) return message;
+  const info = getReadonlyConnectionInfo();
+  if (!info) return message;
+  return message.split(UNKNOWN_HOST_PORT).join(`${info.host}:${info.port}`);
 }
 
 function formatResult(
