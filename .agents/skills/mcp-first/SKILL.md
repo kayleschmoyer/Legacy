@@ -103,6 +103,24 @@ The two lists intentionally-or-not disagree (verified 2026-08-10):
 
 Separately, `settings.json#permissions.allow` pre-approves _tool calls_ (e.g. `mcp__legacy-sports-github__*`) — that governs permission prompts, not server startup.
 
+> **No stdio `legacy-sports-jira` entry — intentional, do not add one (LS-9370).** `.mcp.json` has never carried a stdio-launched `jira-server` entry alongside the hosted `legacy-sports-jira` connector, even though `tools/mcp/jira-server` exists as a buildable stdio server (it also backs the hosted Lambda deployment and the Copilot/CCR machine-bearer paths). Registering it as a second, always-local stdio source would put two independently-authenticated servers behind the same `jira_*` tool names in the same session — whichever one wins isn't predictable, and it duplicates the OAuth-vs-stdio-credential split the connector migration (LS-4595, see above) was meant to collapse into one path. The late-attach cost documented below is real, but the fix is re-probing for the hosted connector, not standing up a second registration surface for it.
+
+<a id="hosted-connector-late-attach-ls-9370"></a>
+
+### Hosted connectors absent at session start, attach later (local launcher-worktree, LS-9370)
+
+Distinct from both the LS-9576 "never registers at all" case and a mid-session 401: in local launcher-worktree sessions, the hosted connectors (`legacy-sports-jira`, `-github`, `-ci`, `-db`/`-db-admin`, `-rollbar`) routinely report unavailable in the deferred-tools roster **at session start** — either silently absent, or with an explicit `Incompatible auth server: does not support dynamic client registration` / `CONNECTION_CLOSED` reason — and then connect successfully **later in the same session**, sometimes 60–90 minutes in (observed recurring: LS-9366, LS-9371, LS-9839/PR #7536, LS-9859/PR #7584). Two consequences, both costly if unhandled:
+
+1. **The whole ticket lifecycle falls back to REST/`acli`/`gh` unnecessarily.** An agent that checks tool availability once at Step 0b and treats that as final for the session keeps using CLI/REST fallbacks for claim, transition, comment, and PR creation even after the real tools would have worked — `gh pr create` in particular skips the jira-link marker `github_open_pr` auto-inserts, which is its own documented footgun (see [PR Creation Routing](#pr-creation-routing)).
+2. **The late attach can use a different tool prefix than the configured server name.** Observed live (2026-09-03): the same tools attached under UUID-prefixed aliases (`mcp__<uuid>__jira_*`, `mcp__<uuid>__github_*`, …) rather than `mcp__legacy-sports-jira__*` / `mcp__legacy-sports-github__*`, while the configured names stayed in the failed-to-connect list for the rest of the session. Guidance like "use the `jira_*` tools from `legacy-sports-jira`" doesn't help locate these — they're only discoverable by the bare tool name.
+
+**Sanctioned response — re-probe by bare tool name before each lifecycle step, not just once at Step 0b:**
+
+- Do not treat the Step 0b (or any single) `ToolSearch`/connection-error result as final for the session's lifetime. Before each subsequent Jira- or GitHub-touching step (claim/transition, comment, PR create, PR ready, label management), re-run `ToolSearch` on the **bare** tool name you need (`select:jira_view`, `select:jira_transition`, `select:github_open_pr`, …) rather than a server-prefixed query — a UUID-aliased late attach matches the bare-name search but not a `legacy-sports-jira`-scoped one.
+- If the re-probe finds the tool (under its configured name or a UUID alias), use it — switch off any REST/`acli`/`gh` fallback already in flight for the rest of the session.
+- If the re-probe still finds nothing, proceed with the documented fallback for the failure shape you're seeing (`configured: false` → Step 0b's stop condition; `Incompatible auth server…` → [Auth per surface](#auth-per-surface) row below; entirely absent for the session → the [LS-9576 substitution table](#jira-github-hosted-servers-absent-in-ccr-ls-9576), which applies here too even though this failure mode isn't CCR-specific), and note in the MCP gap audit which lifecycle steps ran on the fallback so a late attach mid-lifecycle is visible in the record.
+- This costs one extra `ToolSearch` call per lifecycle step against the alternative of running the entire claim → PR → merge path on REST/CLI fallbacks — cheap by comparison, and it's the only way to recover the real tools once they attach.
+
 ## Tool Routing Rules
 
 ### PR Creation Routing
