@@ -2828,6 +2828,11 @@
               "optional": true,
               "description": "Base directory holding project session folders. Overrides auto-detection — needed when the server process's home does not match the session location (some CCR topologies)."
             },
+            "transcriptContent": {
+              "type": "string",
+              "optional": true,
+              "description": "Raw transcript JSONL; bypasses path resolution (no shared filesystem case, LS-9362)."
+            },
             "includeMcp": {
               "type": "boolean",
               "optional": true,

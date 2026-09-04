@@ -257,4 +257,110 @@ describe('auditSessionBash (node-native)', () => {
     expect(result.isError).toBe(true);
     expect(resultText(result)).toContain('no JSONL files found');
   });
+
+  describe('transcriptContent (LS-9362)', () => {
+    // Regression coverage for the LS-9362 recurrence: a hosted MCP server
+    // process has no shared filesystem with a local Windows client at all, so
+    // no projectsDir/env-var/homedir value could ever resolve the transcript
+    // server-side (a structurally different failure than the CCR
+    // cross-container cases LS-8867/LS-9458/LS-9538 fix, which at least share
+    // a mount namespace). The caller instead reads its own transcript (e.g.
+    // via the Bash tool) and passes the JSONL text directly, so these tests
+    // deliberately break every path-resolution input to prove it's unused.
+    const transcriptContent = [
+      bashRecord('git status', '2026-07-26T12:00:00.000Z', 't1'),
+      bashRecord(
+        'curl -s https://example.com',
+        '2026-07-26T12:00:01.000Z',
+        't2',
+      ),
+      JSON.stringify({
+        timestamp: '2026-07-26T12:00:02.000Z',
+        sessionId: SESSION_ID,
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'ci_get_logs',
+              id: 'mcp1',
+              input: { runId: 7 },
+            },
+            {
+              type: 'tool_result',
+              tool_use_id: 'mcp1',
+              content: 'result exceeds maximum allowed tokens (25000)',
+            },
+          ],
+        },
+      }),
+    ].join('\n');
+
+    beforeEach(() => {
+      // Prove none of the path-resolution machinery is consulted: point every
+      // input at nonexistent locations.
+      delete process.env.CLAUDE_PROJECTS_DIR;
+    });
+
+    it('parses bash calls straight from the supplied content, ignoring projectsDir entirely', () => {
+      const result = auditSessionBash({
+        transcriptContent,
+        projectsDir: join(projectsDir, 'does-not-exist'),
+      });
+
+      expect(result.isError).toBeUndefined();
+      const report = JSON.parse(resultText(result)) as {
+        session_id: string;
+        project?: string;
+        bash_commands: Array<Record<string, unknown>>;
+        total: number;
+      };
+      expect(report.session_id).toBe(SESSION_ID);
+      expect(report.project).toBeUndefined();
+      expect(report.total).toBe(2);
+      expect(report.bash_commands.map((c) => c.command)).toEqual([
+        'git status',
+        'curl -s https://example.com',
+      ]);
+      expect(execFile).not.toHaveBeenCalled();
+    });
+
+    it('honors an explicit sessionId override', () => {
+      const result = auditSessionBash({
+        transcriptContent,
+        sessionId: 'explicit-override-id',
+      });
+      const report = JSON.parse(resultText(result)) as { session_id: string };
+      expect(report.session_id).toBe('explicit-override-id');
+    });
+
+    it('includes MCP overflow issues when includeMcp is set', () => {
+      const result = auditSessionBash({ transcriptContent, includeMcp: true });
+      const report = JSON.parse(resultText(result)) as {
+        mcp_issues: Array<Record<string, unknown>>;
+      };
+      expect(report.mcp_issues).toHaveLength(1);
+      expect(report.mcp_issues[0]).toMatchObject({
+        name: 'ci_get_logs',
+        is_overflow: true,
+      });
+    });
+
+    it('produces the gapsOnly and auditMode reports without touching the filesystem', () => {
+      const gaps = auditSessionBash({ transcriptContent, gapsOnly: true });
+      expect(gaps.isError).toBeUndefined();
+      expect(resultText(gaps)).toContain(`Session: ${SESSION_ID}`);
+
+      const audit = auditSessionBash({ transcriptContent, auditMode: true });
+      expect(audit.isError).toBeUndefined();
+      const report = JSON.parse(resultText(audit)) as {
+        session_id: string;
+        summary: Record<string, number>;
+      };
+      expect(report.session_id).toBe(SESSION_ID);
+      expect(report.summary.total_bash_commands).toBe(2);
+      expect(report.summary.mcp_overflows).toBe(1);
+      expect(execFile).not.toHaveBeenCalled();
+      expect(execFileSync).not.toHaveBeenCalled();
+    });
+  });
 });

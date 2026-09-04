@@ -28,7 +28,7 @@ GitHub Actions workflow run triage and management for Legacy Sports.
 
 - **ci_find_session** — Locate a Claude/Copilot agent session by ID
 - **ci_session_stats** — Session-level statistics
-- **ci_audit_session_bash** — Audit bash commands from agent sessions for MCP gap analysis
+- **ci_audit_session_bash** — Audit bash commands from agent sessions for MCP gap analysis. Auto-detects the transcript via the server process's own filesystem (`projectsDir` override for CCR path/permission mismatches); when the server has no shared filesystem with the client at all (e.g. a local Windows session against a hosted server, LS-9362), pass `transcriptContent` with the JSONL text read client-side instead — see `.agents/skills/mcp-first/references/audit-workflow.md`.
 - **ci_auto_fix** — Classify a CI failure with confidence, evidence, and fix recommendation
 - **ci_get_playwright_report** — Retrieve a Playwright HTML test report
 

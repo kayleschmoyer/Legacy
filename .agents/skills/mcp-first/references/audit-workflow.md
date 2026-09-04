@@ -147,9 +147,32 @@ permission to read it (`EACCES` — e.g. a `0700` root-owned
 `~/.claude/projects` while the server runs as a sandboxed user), the error
 says "permission denied, not not-found" instead of the generic message. That
 wording means no `projectsDir` value will fix it — stop retrying path
-variations and go straight to the manual fallback below.
+variations and go straight to a fallback below.
 
-When you hit that error:
+**A local Windows session against a hosted/remote `legacy-sports-ci` MCP
+server process is a structurally different failure (LS-9362)**: there, the
+server and client share no filesystem or mount namespace at all — the
+transcript lives at e.g. `C:\Users\<user>\.claude\projects\...` on the
+client, and the server's own `$HOME`/`os.homedir()` can never resolve to
+that path no matter what `projectsDir` value is passed. For this case, skip
+straight to the `transcriptContent` param instead of retrying path
+variations:
+
+1. Read your own transcript JSONL directly, e.g. `Read` or `Bash cat` on
+   `~/.claude/projects/<slug>/<sessionId>.jsonl` (or the Windows-native path
+   under `%APPDATA%\Claude\projects\...`).
+2. Pass its contents straight through: `ci_audit_session_bash({ auditMode:
+true, transcriptContent: "<the JSONL text>" })`. This bypasses
+   `findClaudeProjectsDir`/`resolveProjectSlug`/session-file discovery
+   entirely — no server-side path resolution is involved.
+3. Subagent transcripts are not included this way (only the one file you
+   pass is parsed) — upload each subagent JSONL separately with its own call
+   if subagent coverage matters for this session's audit, or accept parent-
+   only coverage and note the gap in your summary.
+
+When neither `projectsDir` nor `transcriptContent` gets you a working audit
+(e.g. the CCR cross-container case where the server can't read _any_
+directory you point it at, LS-9458/LS-9538):
 
 1. Confirm the transcript exists from the agent's own Bash tool (`ls -la
 ~/.claude/projects/<slug>/`) — if it's actually absent, that's a

@@ -15,10 +15,10 @@
  * JSONL discovery lives in ../session-files.ts (the pre-existing TS half).
  */
 
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /** One Bash tool_use call extracted from a session transcript. */
 export interface BashCall {
@@ -65,20 +65,14 @@ function asString(value: unknown): string {
 }
 
 /**
- * Read a JSONL file into parsed records, skipping blank and malformed lines
+ * Parse raw JSONL text into records, skipping blank and malformed lines
  * (tolerant parse, mirroring the Python json.JSONDecodeError skip).
- * Line numbers are 1-based positions in the original file.
+ * Line numbers are 1-based positions in the original text.
  */
-function readJsonlRecords(
-  jsonlPath: string,
+function parseJsonlContent(
+  raw: string,
 ): Array<{ record: JsonRecord; lineNum: number }> {
   const out: Array<{ record: JsonRecord; lineNum: number }> = [];
-  let raw: string;
-  try {
-    raw = readFileSync(jsonlPath, 'utf8');
-  } catch {
-    return out;
-  }
   const lines = raw.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -104,22 +98,30 @@ function contentBlocks(record: JsonRecord): unknown[] | null {
   return content as unknown[];
 }
 
-/** Extract Bash tool_use calls from a JSONL file. */
-export function extractBashCalls(
-  jsonlPath: string,
+/**
+ * Extract Bash tool_use calls from already-loaded JSONL text.
+ *
+ * This is the path-agnostic core of extractBashCalls, split out so a caller
+ * that already has the transcript content in hand (e.g. a client-supplied
+ * `transcriptContent` param, uploaded because the MCP server process cannot
+ * see the client's local `~/.claude/projects/` at all — see
+ * findClaudeProjectsDir in session-files.ts) can skip filesystem resolution
+ * entirely (LS-9362).
+ */
+export function extractBashCallsFromContent(
+  rawContent: string,
   source = 'parent',
 ): BashCall[] {
   const results: BashCall[] = [];
-  if (!existsSync(jsonlPath)) return results;
 
-  for (const { record, lineNum } of readJsonlRecords(jsonlPath)) {
-    const content = contentBlocks(record);
-    if (!content) continue;
+  for (const { record, lineNum } of parseJsonlContent(rawContent)) {
+    const blocks = contentBlocks(record);
+    if (!blocks) continue;
 
     const timestamp = asString(record['timestamp']);
     const sessionId = asString(record['sessionId']);
 
-    for (const block of content) {
+    for (const block of blocks) {
       if (!isRecord(block)) continue;
       if (block['type'] !== 'tool_use') continue;
       if (block['name'] !== 'Bash') continue;
@@ -140,17 +142,33 @@ export function extractBashCalls(
   return results;
 }
 
+/** Extract Bash tool_use calls from a JSONL file on disk. */
+export function extractBashCalls(
+  jsonlPath: string,
+  source = 'parent',
+): BashCall[] {
+  if (!existsSync(jsonlPath)) return [];
+  let raw: string;
+  try {
+    raw = readFileSync(jsonlPath, 'utf8');
+  } catch {
+    return [];
+  }
+  return extractBashCallsFromContent(raw, source);
+}
+
 /**
  * Extract non-Bash tool_use calls that resulted in overflows or errors from
- * a JSONL file. Calls are matched to their tool_result by tool_use_id; only
- * calls whose result overflowed or errored are returned, in first-seen order.
+ * already-loaded JSONL text. Calls are matched to their tool_result by
+ * tool_use_id; only calls whose result overflowed or errored are returned,
+ * in first-seen order. Path-agnostic core of extractMcpCalls — see
+ * extractBashCallsFromContent for why this split exists (LS-9362).
  */
-export function extractMcpCalls(
-  jsonlPath: string,
+export function extractMcpCallsFromContent(
+  rawContent: string,
   source = 'parent',
 ): McpIssue[] {
   const results: McpIssue[] = [];
-  if (!existsSync(jsonlPath)) return results;
 
   const toolCalls = new Map<
     string,
@@ -161,13 +179,13 @@ export function extractMcpCalls(
   >();
   const toolResults = new Map<string, { text: string; is_error: boolean }>();
 
-  for (const { record, lineNum } of readJsonlRecords(jsonlPath)) {
-    const content = contentBlocks(record);
-    if (!content) continue;
+  for (const { record, lineNum } of parseJsonlContent(rawContent)) {
+    const blocks = contentBlocks(record);
+    if (!blocks) continue;
 
     const timestamp = asString(record['timestamp']);
 
-    for (const block of content) {
+    for (const block of blocks) {
       if (!isRecord(block)) continue;
 
       if (block['type'] === 'tool_use' && block['name'] !== 'Bash') {
@@ -224,6 +242,21 @@ export function extractMcpCalls(
   }
 
   return results;
+}
+
+/** Extract non-Bash tool_use overflows/failures from a JSONL file on disk. */
+export function extractMcpCalls(
+  jsonlPath: string,
+  source = 'parent',
+): McpIssue[] {
+  if (!existsSync(jsonlPath)) return [];
+  let raw: string;
+  try {
+    raw = readFileSync(jsonlPath, 'utf8');
+  } catch {
+    return [];
+  }
+  return extractMcpCallsFromContent(raw, source);
 }
 
 const SUBPROCESS_RE =

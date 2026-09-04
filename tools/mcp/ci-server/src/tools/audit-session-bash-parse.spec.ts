@@ -8,7 +8,9 @@ import {
   classifyGapType,
   commandPattern,
   extractBashCalls,
+  extractBashCallsFromContent,
   extractMcpCalls,
+  extractMcpCallsFromContent,
   extractScratchSubprocessCalls,
   formatAudit,
   formatGapsOnly,
@@ -132,6 +134,44 @@ describe('audit-session-bash-parse', () => {
     });
   });
 
+  describe('extractBashCallsFromContent (LS-9362)', () => {
+    // extractBashCalls (file path) is a thin wrapper over this; assert the
+    // content-based entry point works standalone, with no filesystem access,
+    // for the caller-uploads-the-transcript flow (a hosted MCP server process
+    // with no shared filesystem with the client at all cannot resolve any
+    // path — see findClaudeProjectsDir in session-files.ts).
+    it('extracts Bash calls directly from in-memory JSONL text', () => {
+      const content = toJsonl([
+        bashUseRecord('git status', { description: 'Check tree state' }),
+        bashUseRecord('pnpm exec nx run ci-server:test'),
+      ]);
+
+      const calls = extractBashCallsFromContent(content, 'parent');
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toMatchObject({
+        command: 'git status',
+        description: 'Check tree state',
+        source: 'parent',
+        session_id: 'session-1',
+        line: 1,
+      });
+      expect(calls[1].command).toBe('pnpm exec nx run ci-server:test');
+    });
+
+    it('produces the same result as extractBashCalls for the same content', () => {
+      const jsonlPath = join(fixtureDir, 'session.jsonl');
+      const content = toJsonl([
+        bashUseRecord('echo hi'),
+        bashUseRecord('ls -la'),
+      ]);
+      writeFileSync(jsonlPath, content);
+
+      expect(extractBashCallsFromContent(content, 'parent')).toEqual(
+        extractBashCalls(jsonlPath, 'parent'),
+      );
+    });
+  });
+
   describe('extractMcpCalls', () => {
     it('returns only non-Bash tool calls whose results overflowed or errored', () => {
       const jsonlPath = join(fixtureDir, 'session.jsonl');
@@ -239,6 +279,40 @@ describe('audit-session-bash-parse', () => {
       const issues = extractMcpCalls(jsonlPath);
       expect(issues).toHaveLength(1);
       expect(issues[0].is_overflow).toBe(true);
+    });
+  });
+
+  describe('extractMcpCallsFromContent (LS-9362)', () => {
+    it('produces the same result as extractMcpCalls for the same content', () => {
+      const jsonlPath = join(fixtureDir, 'session.jsonl');
+      const content = toJsonl([
+        {
+          timestamp: '2026-07-26T12:00:00.000Z',
+          message: {
+            content: [
+              { type: 'tool_use', name: 'ci_get_logs', id: 'ovf', input: {} },
+            ],
+          },
+        },
+        {
+          timestamp: '2026-07-26T12:00:01.000Z',
+          message: {
+            content: [
+              {
+                type: 'tool_result',
+                tool_use_id: 'ovf',
+                content: 'result exceeds maximum allowed tokens (25000)',
+              },
+            ],
+          },
+        },
+      ]);
+      writeFileSync(jsonlPath, content);
+
+      expect(extractMcpCallsFromContent(content, 'parent')).toEqual(
+        extractMcpCalls(jsonlPath, 'parent'),
+      );
+      expect(extractMcpCallsFromContent(content, 'parent')).toHaveLength(1);
     });
   });
 

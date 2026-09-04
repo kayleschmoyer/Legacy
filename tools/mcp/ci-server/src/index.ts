@@ -823,6 +823,12 @@ export function createServer(): McpServer {
           'Base directory holding project session folders. Overrides auto-detection — needed when the ' +
             "server process's home does not match the session location (some CCR topologies).",
         ),
+      transcriptContent: z
+        .string()
+        .optional()
+        .describe(
+          'Raw transcript JSONL; bypasses path resolution (no shared filesystem case, LS-9362).',
+        ),
       includeMcp: coercedBoolean
         .default(false)
         .describe(

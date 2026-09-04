@@ -1,9 +1,12 @@
+import { minifiedJson } from '@legacy-sports/mcp-format';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import {
   type BashCall,
   extractBashCalls,
+  extractBashCallsFromContent,
   extractMcpCalls,
+  extractMcpCallsFromContent,
   extractScratchSubprocessCalls,
   findLatestSession,
   findSessionByPid,
@@ -15,7 +18,6 @@ import {
 import { getRepoRoot } from '../github-api.js';
 import { findClaudeProjectsDir, resolveProjectSlug } from '../session-files.js';
 import type { ToolResult } from '../types.js';
-import { minifiedJson } from '@legacy-sports/mcp-format';
 
 /**
  * Strict allow-list for project slug basenames. Mirrors assertSafeSlug in session-files.ts.
@@ -48,6 +50,7 @@ export interface AuditSessionBashParams {
   gapsOnly?: boolean;
   scanScratch?: boolean;
   auditMode?: boolean;
+  transcriptContent?: string;
 }
 
 function textError(text: string): ToolResult {
@@ -66,84 +69,111 @@ function textError(text: string): ToolResult {
  * Linux containers with no Python at all, and hosted server environments
  * where the server process PATH differs from the user shell PATH.
  *
+ * `transcriptContent` (LS-9362) bypasses all of the above filesystem
+ * resolution: when a hosted MCP server process has no shared filesystem with
+ * the client at all — e.g. a local Windows session whose transcript lives at
+ * `C:\Users\<user>\.claude\projects\...` while the tool call is served by a
+ * remote/hosted process whose own $HOME/os.homedir() can never see that path
+ * (a structurally different failure than the CCR cross-container cases fixed
+ * by LS-8867/LS-9458/LS-9538, which at least share a mount namespace or user)
+ * — the caller reads its own transcript JSONL directly (e.g. via the Bash
+ * tool) and passes the content straight through, skipping
+ * findClaudeProjectsDir/resolveProjectSlug/session-file-discovery entirely.
+ * Subagent transcripts are not covered in this mode (the caller would need to
+ * upload each one separately); pass gapsOnly/auditMode without subagent
+ * coverage for the audit, or fall back to the path-based flow when the server
+ * can reach the transcript directory.
+ *
  * Output modes match the Python script's:
  *   - default: structured JSON report with full command details
  *   - gapsOnly: compact plain-text frequency table
  *   - auditMode: structured JSON audit report with pre-classified gaps
  */
 export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
-  let projectsDir: string;
-  try {
-    projectsDir = findClaudeProjectsDir(params.projectsDir);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    return textError(`audit-session-bash failed: ${message}`);
-  }
+  // auditMode implies includeMcp
+  const includeMcp = Boolean(params.includeMcp || params.auditMode);
 
-  let projectSlug: string;
-  if (params.project) {
-    const safe = validateProjectSlug(params.project);
-    if (!safe) {
-      return textError(
-        `Invalid project slug: ${JSON.stringify(params.project)}. ` +
-          'Must match /^[A-Za-z0-9._-]+$/ with no path separators or ".." components.',
-      );
-    }
-    projectSlug = safe;
+  let sessionId: string;
+  let projectSlug: string | null;
+  let bashCalls: BashCall[];
+  let mcpIssues: McpIssue[];
+
+  if (params.transcriptContent !== undefined) {
+    bashCalls = extractBashCallsFromContent(params.transcriptContent, 'parent');
+    mcpIssues = includeMcp
+      ? extractMcpCallsFromContent(params.transcriptContent, 'parent')
+      : [];
+    sessionId = params.sessionId || bashCalls[0]?.session_id || 'unknown';
+    projectSlug = null;
   } else {
+    let projectsDir: string;
     try {
-      projectSlug = resolveProjectSlug(projectsDir);
+      projectsDir = findClaudeProjectsDir(params.projectsDir);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return textError(`audit-session-bash failed: ${message}`);
     }
-  }
 
-  const projectDir = join(projectsDir, projectSlug);
-  if (!existsSync(projectDir) || !statSync(projectDir).isDirectory()) {
-    return textError(`Error: project directory not found: ${projectDir}`);
-  }
-
-  // Resolve session ID: explicit param > PID lookup > most recent JSONL.
-  let sessionId = params.sessionId;
-  if (!sessionId && params.pid !== undefined) {
-    const fromPid = findSessionByPid(params.pid);
-    if (!fromPid) {
-      return textError(`Error: no session found for PID ${params.pid}`);
+    if (params.project) {
+      const safe = validateProjectSlug(params.project);
+      if (!safe) {
+        return textError(
+          `Invalid project slug: ${JSON.stringify(params.project)}. ` +
+            'Must match /^[A-Za-z0-9._-]+$/ with no path separators or ".." components.',
+        );
+      }
+      projectSlug = safe;
+    } else {
+      try {
+        projectSlug = resolveProjectSlug(projectsDir);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return textError(`audit-session-bash failed: ${message}`);
+      }
     }
-    sessionId = fromPid;
-  }
-  if (!sessionId) {
-    try {
-      sessionId = findLatestSession(projectDir);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return textError(message);
+
+    const projectDir = join(projectsDir, projectSlug);
+    if (!existsSync(projectDir) || !statSync(projectDir).isDirectory()) {
+      return textError(`Error: project directory not found: ${projectDir}`);
     }
-  }
 
-  // auditMode implies includeMcp
-  const includeMcp = Boolean(params.includeMcp || params.auditMode);
+    // Resolve session ID: explicit param > PID lookup > most recent JSONL.
+    let resolvedSessionId = params.sessionId;
+    if (!resolvedSessionId && params.pid !== undefined) {
+      const fromPid = findSessionByPid(params.pid);
+      if (!fromPid) {
+        return textError(`Error: no session found for PID ${params.pid}`);
+      }
+      resolvedSessionId = fromPid;
+    }
+    if (!resolvedSessionId) {
+      try {
+        resolvedSessionId = findLatestSession(projectDir);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return textError(message);
+      }
+    }
+    sessionId = resolvedSessionId;
 
-  // Parse parent JSONL
-  const parentJsonl = join(projectDir, `${sessionId}.jsonl`);
-  const bashCalls: BashCall[] = extractBashCalls(parentJsonl, 'parent');
-  const mcpIssues: McpIssue[] = includeMcp
-    ? extractMcpCalls(parentJsonl, 'parent')
-    : [];
+    // Parse parent JSONL
+    const parentJsonl = join(projectDir, `${sessionId}.jsonl`);
+    bashCalls = extractBashCalls(parentJsonl, 'parent');
+    mcpIssues = includeMcp ? extractMcpCalls(parentJsonl, 'parent') : [];
 
-  // Parse subagent JSONLs
-  const subagentDir = join(projectDir, sessionId, 'subagents');
-  if (existsSync(subagentDir) && statSync(subagentDir).isDirectory()) {
-    const subagentFiles = readdirSync(subagentDir)
-      .filter((f) => f.endsWith('.jsonl'))
-      .sort();
-    for (const saFile of subagentFiles) {
-      const sourceName = saFile.replace(/\.jsonl$/, '');
-      const saPath = join(subagentDir, saFile);
-      bashCalls.push(...extractBashCalls(saPath, sourceName));
-      if (includeMcp) {
-        mcpIssues.push(...extractMcpCalls(saPath, sourceName));
+    // Parse subagent JSONLs
+    const subagentDir = join(projectDir, sessionId, 'subagents');
+    if (existsSync(subagentDir) && statSync(subagentDir).isDirectory()) {
+      const subagentFiles = readdirSync(subagentDir)
+        .filter((f) => f.endsWith('.jsonl'))
+        .sort();
+      for (const saFile of subagentFiles) {
+        const sourceName = saFile.replace(/\.jsonl$/, '');
+        const saPath = join(subagentDir, saFile);
+        bashCalls.push(...extractBashCalls(saPath, sourceName));
+        if (includeMcp) {
+          mcpIssues.push(...extractMcpCalls(saPath, sourceName));
+        }
       }
     }
   }
@@ -186,10 +216,12 @@ export function auditSessionBash(params: AuditSessionBashParams): ToolResult {
 
   const output: Record<string, unknown> = {
     session_id: sessionId,
-    project: projectSlug,
     bash_commands: bashCalls,
     total: bashCalls.length,
   };
+  if (projectSlug !== null) {
+    output['project'] = projectSlug;
+  }
   if (includeMcp) {
     output['mcp_issues'] = mcpIssues;
   }
