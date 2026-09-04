@@ -17,6 +17,12 @@ The Football Team Detail page's Roster tab groups a team's roster into
 football position slots (QB, RB, WR, TE, FLEX, K, DST — or DL/LB/DB in place
 of DST for IDP leagues) with player name and position-badge labels per slot.
 
+## Platform coverage
+
+| Platform | Harness | Spec / Flow                                          | Status                                                                                                                       |
+| -------- | ------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| android  | Maestro | `maestro/flows/football-team-detail/roster-tab.yaml` | visual sweep (screenshot-judged, /mobile-qa; ADR-0016) — does not close android functional coverage. See "Known gaps" below. |
+
 ## Source
 
 Extracted from: `docs/agents/pages/teams/football-team-detail.md`
@@ -50,17 +56,28 @@ row (`apps/app/src/features/leagues/LeagueOverviewTab.tsx`,
 
 ## Test Coverage
 
-### Maestro flow (Android)
+### Maestro flow (Android) — visual sweep only (LS-9615)
 
 File: `maestro/flows/football-team-detail/roster-tab.yaml`
 
+Part of the `/mobile-qa` visual/AI-judging sweep (ADR-0016) — screenshot
+capture for vision-rubric judging, not a functional assertion suite. It does
+**not** close android functional coverage for this feature or its Team
+Detail siblings (LS-5444, LS-5445, LS-5447); that is owned by the dual-mode
+Playwright specs under LS-8444 (see LS-5444's coverage plan).
+
 - Opens the first league, presses a Quick Standings row on Overview to reach
-  Team Detail, and taps the "Roster" tab
-- Asserts the `QB` slot section renders (`qb-card`)
-- Scrolls to and asserts the `K` slot section renders (`k-card`)
-- Asserts whichever defensive slot the league's format uses — `dst-card`
+  Team Detail (shared `maestro/subflows/open-own-team.yaml`), and taps the
+  "Roster" tab
+- Screenshots the `QB` slot section (`qb-card`)
+- Scrolls to and screenshots the `K` slot section (`k-card`)
+- Screenshots whichever defensive slot the league's format uses — `dst-card`
   (standard) or `dl-card`/`db-card` (IDP)
-- Scrolls to and asserts the Bench slot section renders (`bn-card`)
+- Scrolls to and screenshots the Bench slot section (`bn-card`)
+
+Sibling visual-sweep flows for the same page's other tabs (not this
+feature's scope): `maestro/flows/football-team-detail/lineup-tab.yaml`,
+`maestro/flows/football-team-detail/matchup-tab.yaml`.
 
 ### Unit tests
 
@@ -76,6 +93,10 @@ File: `maestro/flows/football-team-detail/roster-tab.yaml`
 
 - No Playwright/web coverage — no web implementation exists to test
   ([LS-6438](https://bkrupa.atlassian.net/browse/LS-6438))
+- Android functional coverage (does the Roster tab actually let a GM assign,
+  bench, or swap players correctly?) is not provided by the Maestro flow
+  above — it is owned by the dual-mode Playwright specs under LS-8444, per
+  the LS-9615 re-scope.
 
 ## Related
 

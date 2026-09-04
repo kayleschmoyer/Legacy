@@ -1,0 +1,52 @@
+# Football Team Detail — Lineup tab (LS-9615): from the league Overview tab's
+# Quick Standings, drill into a team's Team Detail page, switch to the Lineup
+# tab, and verify the shared RosterBoard renders (starters + bench sections,
+# replacing the football Lineup tab's screen after LS-9649).
+#
+# Visual sweep only, part of /mobile-qa (ADR-0016; see
+# .agents/skills/mobile-qa/SKILL.md) — this does not provide android
+# functional coverage; that is owned by the dual-mode Playwright specs under
+# LS-8444. Do not add lineup-editing assertions (assign/bench/swap) here —
+# that belongs in the dual-mode specs (see LS-5444's coverage plan).
+#
+# Team Detail has no per-tab testIDs on its own tab bar, so "Lineup" is
+# tapped by visible text (see roster-tab.yaml). RosterBoard renders
+# `roster-section-starters` / `roster-section-bench` for football
+# (RosterBoard.tsx) — distinct from the Roster tab's `<slot>-card` testIDs
+# (FootballLeagueRosterScreen.tsx), since the two tabs render different
+# components for the same underlying roster.
+appId: com.legacysports.app
+tags:
+  - football-team-detail
+  - lineup
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- takeScreenshot: maestro/artifacts/football-team-detail/01-before-open-team
+- runFlow:
+    file: ../../subflows/open-own-team.yaml
+# open-own-team.yaml no-ops when Quick Standings isn't rendered (standings-less
+# test account) — guard the rest of the flow on "Roster" so it degrades
+# gracefully instead of hard-failing on that environment/fixture gap.
+- runFlow:
+    when:
+      visible: "Roster"
+    commands:
+      - takeScreenshot: maestro/artifacts/football-team-detail/02-after-open-team
+      - takeScreenshot: maestro/artifacts/football-team-detail/03-before-lineup-tab
+      - tapOn: "Lineup"
+      - extendedWaitUntil:
+          visible:
+            id: "roster-section-starters"
+          timeout: 20000
+      - takeScreenshot: maestro/artifacts/football-team-detail/04-after-lineup-tab
+      - scrollUntilVisible:
+          element:
+            id: "roster-section-bench"
+          direction: DOWN
+          timeout: 15000
+          optional: true
+      - takeScreenshot: maestro/artifacts/football-team-detail/05-lineup-bench

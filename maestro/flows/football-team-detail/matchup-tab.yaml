@@ -1,0 +1,64 @@
+# Football Team Detail — Matchup tab (LS-9615): from the league Overview
+# tab's Quick Standings, drill into a team's Team Detail page, switch to the
+# Matchup tab, and screenshot whichever state renders — a live/upcoming
+# matchup card, or the "No matchup scheduled this week" empty state. Both are
+# genuinely data-dependent (bye week, off-season, pre-draft league) so this
+# degrades gracefully instead of asserting either one.
+#
+# Visual sweep only, part of /mobile-qa (ADR-0016; see
+# .agents/skills/mobile-qa/SKILL.md) — this does not provide android
+# functional coverage; that is owned by the dual-mode Playwright specs under
+# LS-8444.
+#
+# Team Detail has no per-tab testIDs on its own tab bar, so "Matchup" is
+# tapped by visible text (see roster-tab.yaml). MatchupTab
+# ([teamId].tsx) wraps every terminal render (error / no-matchup / card) in a
+# shared `matchup-tab-content` testID (added in this ticket) so the flow has
+# a single mandatory-landing anchor to wait on regardless of which state the
+# tab lands in — the loading spinner has no testID and is not waited on
+# directly. The live-matchup branch additionally exposes `matchup-card`
+# (MatchupCard.tsx, same convention as
+# maestro/flows/football-matchup-detail/matchup-states.yaml).
+appId: com.legacysports.app
+tags:
+  - football-team-detail
+  - matchup
+  - authenticated
+---
+- runFlow:
+    file: ../../subflows/launch-authenticated.yaml
+- runFlow:
+    file: ../../subflows/open-first-league.yaml
+- takeScreenshot: maestro/artifacts/football-team-detail/01-before-open-team
+- runFlow:
+    file: ../../subflows/open-own-team.yaml
+# open-own-team.yaml no-ops when Quick Standings isn't rendered (standings-less
+# test account) — guard the rest of the flow on "Roster" so it degrades
+# gracefully instead of hard-failing on that environment/fixture gap.
+- runFlow:
+    when:
+      visible: "Roster"
+    commands:
+      - takeScreenshot: maestro/artifacts/football-team-detail/02-after-open-team
+      - takeScreenshot: maestro/artifacts/football-team-detail/03-before-matchup-tab
+      - tapOn: "Matchup"
+      - extendedWaitUntil:
+          visible:
+            id: "matchup-tab-content"
+          timeout: 20000
+      - takeScreenshot: maestro/artifacts/football-team-detail/04-after-matchup-tab
+      # With a live/upcoming matchup: the MatchupCard renders — screenshot it
+      # distinctly from the generic landing shot above.
+      - runFlow:
+          when:
+            visible:
+              id: "matchup-card"
+          commands:
+            - takeScreenshot: maestro/artifacts/football-team-detail/05-matchup-card
+      # Without one: the empty state renders instead — screenshot that too so
+      # the judge sees both branches when a run happens to land on it.
+      - runFlow:
+          when:
+            visible: "No matchup scheduled this week"
+          commands:
+            - takeScreenshot: maestro/artifacts/football-team-detail/05-matchup-empty

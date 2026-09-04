@@ -239,7 +239,7 @@ function MatchupTab({
 
   if (error) {
     return (
-      <YStack padding="$4">
+      <YStack padding="$4" testID="matchup-tab-content">
         <Text color="$red10">Could not load matchup.</Text>
       </YStack>
     );
@@ -247,14 +247,14 @@ function MatchupTab({
 
   if (!matchup) {
     return (
-      <YStack padding="$4">
+      <YStack padding="$4" testID="matchup-tab-content">
         <Text color="$gray10">No matchup scheduled this week.</Text>
       </YStack>
     );
   }
 
   return (
-    <YStack padding="$4">
+    <YStack padding="$4" testID="matchup-tab-content">
       <MatchupCard
         matchup={matchup}
         onPress={() =>

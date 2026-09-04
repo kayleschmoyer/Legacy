@@ -1,0 +1,22 @@
+# Subflow: from a football league's Overview tab, drill into the signed-in
+# user's own team Team Detail page via the Quick Standings row.
+#
+# The Overview → Quick Standings row is the only real navigation entry point
+# into Team Detail (added by LS-5446 — the mobile app has no other UI path to
+# `/football/team/[teamId]`; see maestro/flows/football-team-detail/roster-tab.yaml
+# for the original discovery). Quick Standings only renders once the league has
+# ranked standings (LeagueOverviewTab.tsx), so this guards on the row testID
+# and no-ops for a standings-less test account instead of hard-failing on an
+# environment/fixture gap (callers should follow with a `when: visible: "Roster"`
+# guard before relying on Team Detail content being on screen).
+- runFlow:
+    when:
+      visible:
+        id: "overview-standings-row-.*"
+    commands:
+      - tapOn:
+          id: "overview-standings-row-.*"
+          index: 0
+      - extendedWaitUntil:
+          visible: "Roster"
+          timeout: 20000
