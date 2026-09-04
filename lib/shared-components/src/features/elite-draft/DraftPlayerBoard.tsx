@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { Input, ScrollView, Spinner, Text, XStack, YStack } from 'tamagui';
+import { breakpoints } from '@legacy-sports/design-tokens';
 import {
   ALLOWED_POSITIONS_BY_SPORT,
   DEFAULT_ROSTER_SIZE_BY_SPORT,
@@ -14,6 +16,7 @@ import { DraftGrid } from './DraftGrid';
 import { PlayerCard } from './PlayerCard';
 import { getPositionColor } from './utils';
 import { STAT_COLUMNS_BY_SPORT } from './statColumns';
+import { useDraftViewportTier } from './hooks/useDraftViewport';
 import type { SportKind } from '../../config/sports';
 import { getPositionLabel, isPitcherSlot } from '../roster/rosterEligibility';
 import { csp } from '../players/crossPlatformStyle';
@@ -95,9 +98,20 @@ function positionPillsForSport(
 // ── Styled primitives ───────────────────────────────────────────────────────
 // tamaguiStyled() isolates Tamagui's any-typed styled() API from strict lint;
 // casting the result to a concrete component type keeps call sites lint-clean.
-// $md breakpoint keys mirror the ≤768px rules in the original styles.ts
-// (.d-main / .d-controls / .d-search-wrap / .d-view-tabs / .d-view-tab /
-// .d-pills / .d-pill), and $lg mirrors the 1200/900px depth-grid rules.
+// The $md breakpoint keys below mirror the tightening `styles.ts` applies to
+// .d-main / .d-controls / .d-search-wrap / .d-view-tabs / .d-view-tab /
+// .d-pills / .d-pill on narrow viewports.
+//
+// Caveat worth knowing before adding more of them (LS-9860): the workspace
+// runs @tamagui/config's default media set, where `$md` is `maxWidth: 1020` —
+// NOT the design-token `$md` band (860–979) the mock is annotated against,
+// and there is no `$xxl` at all. These keys are therefore approximate, which
+// is tolerable because every one of them is cosmetic (padding, gap, wrap,
+// overflow). Anything *structural* — which layout applies at which width —
+// must read `useDraftViewportTier()` or a `styles.ts` breakpoint instead,
+// both of which derive from @legacy-sports/design-tokens. Aligning the global
+// Tamagui media config to that scale would move 264 style props across lib/
+// and apps/, so it is tracked as separate work.
 type StyledComponent = React.ComponentType<Record<string, unknown>>;
 
 const MainContainer = tamaguiStyled(YStack, {
@@ -167,8 +181,8 @@ const DepthGrid = tamaguiStyled(YStack, {
   gap: 10,
   // Column count itself is driven by `depthGridColumns` (`useDepthGridColumns()`
   // below) since Tamagui's `styled()` breakpoints can't express a
-  // percentage that depends on more than two tiers; these two keys still
-  // carry the ≤900px / ≤768px gap tightening from the original CSS.
+  // percentage that depends on more than two tiers; these two keys only
+  // carry the narrow-viewport gap tightening from the original CSS.
   $gtSm: {
     gap: 10,
   },
@@ -354,35 +368,30 @@ const VIEW_TABS: Array<{ mode: ViewMode; label: string }> = [
 ];
 
 /**
- * Depth-grid column count, mirroring the original CSS's 1200px/900px
- * `grid-template-columns` breakpoints. Uses a local `window.matchMedia`
- * listener (the `useIsNarrow()` custom-breakpoint pattern from
- * `.agents/skills/shared-components-first/SKILL.md`) rather than Tamagui's
- * `useMedia()`, which reads from a `TamaguiProvider` context this component's
- * consumers don't all supply (e.g. `apps/web/src/components/
- * EliteDraftBoard.a11y.spec.tsx` renders it bare).
+ * Depth-grid column count, kept in lockstep with the `.d-depth-grid`
+ * `grid-template-columns` rules in `styles.ts` — both now derive their
+ * boundaries from the same design-token breakpoints (LS-9860), where before
+ * this hook used ad-hoc 1201/901/641px `matchMedia` queries that did not line
+ * up with the stylesheet's 1200/900px ones.
+ *
+ * Reads `useDraftViewportTier()` rather than Tamagui's `useMedia()`, which
+ * needs a `TamaguiProvider` context this component's consumers don't all
+ * supply (e.g. `apps/web/src/components/EliteDraftBoard.a11y.spec.tsx`
+ * renders it bare); the tier hook is provider-free and works on native too.
+ *
+ * The `desktop` tier splits once more internally — the mock gives $lg
+ * (980–1119) three columns and $xl/$xxl (1120+) four — which is the one place
+ * this feature needs a finer distinction than the three named tiers carry.
+ * Below `desktop` there is no such split: `.d-depth-grid` has a single
+ * two-column rule covering both the tablet and phone tiers, and this returns
+ * the same, where the old hook dropped to one column below 641px and so
+ * disagreed with its own stylesheet.
  */
 function useDepthGridColumns(): number {
-  const [columns, setColumns] = useState(4);
-  useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const gtLg = window.matchMedia('(min-width: 1201px)');
-    const gtMd = window.matchMedia('(min-width: 901px)');
-    const gtSm = window.matchMedia('(min-width: 641px)');
-    const update = () => {
-      setColumns(gtLg.matches ? 4 : gtMd.matches ? 3 : gtSm.matches ? 2 : 1);
-    };
-    update();
-    gtLg.addEventListener('change', update);
-    gtMd.addEventListener('change', update);
-    gtSm.addEventListener('change', update);
-    return () => {
-      gtLg.removeEventListener('change', update);
-      gtMd.removeEventListener('change', update);
-      gtSm.removeEventListener('change', update);
-    };
-  }, []);
-  return columns;
+  const tier = useDraftViewportTier();
+  const { width } = useWindowDimensions();
+  if (tier !== 'desktop') return 2;
+  return width >= breakpoints.xl ? 4 : 3;
 }
 
 // Colors are sourced exclusively from the CSS custom properties `styles.ts`

@@ -16,4 +16,8 @@ export {
   SPECTATOR_POLL_INTERVAL_MS,
 } from './useSpectatorDraftData';
 export { useSpectatorScreenState } from './useSpectatorScreenState';
-export { useIsCompactDraftViewport } from './useDraftViewport';
+export {
+  useDraftViewportTier,
+  resolveDraftViewportTier,
+  type DraftViewportTier,
+} from './useDraftViewport';

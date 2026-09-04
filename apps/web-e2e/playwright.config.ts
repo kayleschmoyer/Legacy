@@ -79,10 +79,10 @@ const DESKTOP_GRID_ONLY_SPECS = [
 ];
 
 /**
- * useIsCompactDraftViewport() switches EliteDraftBoardScreen to
- * CompactLiveDraftBoard below the `$sm` breakpoint (≤640px) — well above
- * both mobile projects' 375px viewport, so the draft board always renders
- * in compact mode there. CompactLiveDraftBoard has no equivalent of
+ * useDraftViewportTier() switches EliteDraftBoardScreen to
+ * CompactLiveDraftBoard on its `phone` tier (below 800px — the design-token
+ * `$sm` lower bound), well above both mobile projects' 375px viewport, so the
+ * draft board always renders in compact mode there. CompactLiveDraftBoard has no equivalent of
  * DraftTopBand's `data-testid="current-pick"` (LS-9488); specs asserting on
  * it only make sense against the desktop `chromium`/`firefox`/`webkit`
  * projects.

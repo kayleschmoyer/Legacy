@@ -9,8 +9,8 @@ import {
   useDraftQueries,
   useDraftTimer,
   useDraftUIState,
+  useDraftViewportTier,
   useDraftWebSocket,
-  useIsCompactDraftViewport,
   usePlayerData,
 } from './hooks';
 import type { DraftPickRecord, DraftPlayer, LeagueTeam } from './types';
@@ -94,7 +94,7 @@ jest.mock('./hooks', () => ({
   useDraftTimer: jest.fn(),
   useDraftUIState: jest.fn(),
   useDraftWebSocket: jest.fn(),
-  useIsCompactDraftViewport: jest.fn(),
+  useDraftViewportTier: jest.fn(),
   usePlayerData: jest.fn(),
 }));
 
@@ -330,7 +330,7 @@ const mockUseDraftUIState = jest.mocked(useDraftUIState);
 const mockUseDraftQueries = jest.mocked(useDraftQueries);
 const mockUsePlayerData = jest.mocked(usePlayerData);
 const mockUseDraftActions = jest.mocked(useDraftActions);
-const mockUseIsCompactDraftViewport = jest.mocked(useIsCompactDraftViewport);
+const mockUseDraftViewportTier = jest.mocked(useDraftViewportTier);
 
 function makeBaseUI(
   overrides: Partial<ReturnType<typeof useDraftUIState>> = {},
@@ -492,7 +492,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({
     user: { id: 1, accessLevel: 'member' },
   } as unknown as ReturnType<typeof useAuth>);
-  mockUseIsCompactDraftViewport.mockReturnValue(false);
+  mockUseDraftViewportTier.mockReturnValue('desktop');
   mockUseDraftUIState.mockReturnValue(makeBaseUI());
   mockUseDraftQueries.mockReturnValue(makeBaseQueries());
   mockUseDraftActions.mockReturnValue(makeBaseActions());
@@ -753,7 +753,7 @@ describe('EliteDraftBoardScreen — draft completion paths (LS-4268 regression g
 // place of the pre-v2 DraftCompleteView; the wide branch is untouched.
 describe('EliteDraftBoardScreen — draft-complete recap viewport swap (LS-9402)', () => {
   it('renders DraftRoomRecap (not DraftCompleteView) on the compact viewport', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(true);
+    mockUseDraftViewportTier.mockReturnValue('phone');
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: true }));
 
     const { getByTestId, queryByTestId } = render(
@@ -765,7 +765,7 @@ describe('EliteDraftBoardScreen — draft-complete recap viewport swap (LS-9402)
   });
 
   it('keeps rendering DraftCompleteView (not DraftRoomRecap) on the wide viewport', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftViewportTier.mockReturnValue('desktop');
     mockUseDraftUIState.mockReturnValue(makeBaseUI({ draftComplete: true }));
 
     const { getByTestId, queryByTestId } = render(
@@ -1302,7 +1302,7 @@ describe('EliteDraftBoardScreen — lost league access (LS-8863)', () => {
 // EliteDraftBoardScreen.native.tsx fork. Early-return states (loading,
 // errors, pre-draft lobby, draft complete) are shared across viewports and
 // already covered above; these tests exercise the compact live-board JSX
-// that only renders when useIsCompactDraftViewport() is true.
+// that only renders when useDraftViewportTier() returns 'phone'.
 // ---------------------------------------------------------------------------
 const TEAMS: LeagueTeam[] = [
   { id: '1', name: 'Dinger Dynasty', leagueId: 1 },
@@ -1358,7 +1358,7 @@ function setupCompactLiveDraft({
   ui?: Partial<ReturnType<typeof useDraftUIState>>;
   queries?: Record<string, unknown>;
 } = {}) {
-  mockUseIsCompactDraftViewport.mockReturnValue(true);
+  mockUseDraftViewportTier.mockReturnValue('phone');
   mockUseDraftUIState.mockReturnValue({ ...makeBaseUI(), ...ui });
   mockUseDraftQueries.mockReturnValue({
     ...makeBaseQueries(),
@@ -1402,8 +1402,8 @@ describe('EliteDraftBoardScreen — compact viewport branch selection', () => {
     expect(queryByTestId('flatlist')).toBeTruthy();
   });
 
-  it('renders the wide board when useIsCompactDraftViewport is false (default)', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(false);
+  it("renders the wide board when useDraftViewportTier is not 'phone' (default)", () => {
+    mockUseDraftViewportTier.mockReturnValue('desktop');
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
     );
@@ -2036,7 +2036,7 @@ describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
 
   it('wide: shows Exit Draft for a mock draft and navigates to /baseball on click', () => {
     const onNavigate = jest.fn();
-    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftViewportTier.mockReturnValue('desktop');
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({
         leagueTeams: TEAMS,
@@ -2060,7 +2060,7 @@ describe('EliteDraftBoardScreen — Exit Draft control (LS-9238)', () => {
   });
 
   it('wide: hides Exit Draft for a real league draft', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftViewportTier.mockReturnValue('desktop');
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
     );
@@ -2140,7 +2140,7 @@ describe('EliteDraftBoardScreen — compact viewport, Draft Room v2 overlays (LS
 // platform, so it reuses the same AuctionNotSupportedScreen at any width.
 describe('EliteDraftBoardScreen — compact viewport, auction draft', () => {
   it('shows the auction-not-supported state instead of AuctionDraftRoom', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(true);
+    mockUseDraftViewportTier.mockReturnValue('phone');
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({
         leagueDraft: {
@@ -2180,7 +2180,7 @@ describe('EliteDraftBoardScreen — connection state (LS-9856)', () => {
   };
 
   it('shows nothing extra while the socket is online', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftViewportTier.mockReturnValue('desktop');
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
     );
@@ -2198,7 +2198,7 @@ describe('EliteDraftBoardScreen — connection state (LS-9856)', () => {
   });
 
   it('banners the wide board and marks the pick clock stale while reconnecting', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftViewportTier.mockReturnValue('desktop');
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
     );
@@ -2227,7 +2227,7 @@ describe('EliteDraftBoardScreen — connection state (LS-9856)', () => {
   });
 
   it('replaces the board with the Connection Lost state on a sustained drop', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftViewportTier.mockReturnValue('desktop');
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
     );
@@ -2244,7 +2244,7 @@ describe('EliteDraftBoardScreen — connection state (LS-9856)', () => {
   });
 
   it('wires the Connection Lost Retry action to a fresh handshake', () => {
-    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftViewportTier.mockReturnValue('desktop');
     mockUseDraftQueries.mockReturnValue(
       makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
     );

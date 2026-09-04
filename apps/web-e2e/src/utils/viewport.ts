@@ -41,9 +41,12 @@
  *   2. **Player stats.** LS-9075 replaced the desktop data grid with
  *      `PlayersCardFeed` at phone widths, dropping sortable column headers, the
  *      format/column picker, and the Share/Export actions.
- *   3. **Draft board.** `useIsCompactDraftViewport()` swaps
- *      `EliteDraftBoardScreen`'s wide board for `CompactLiveDraftBoard` at or
- *      below `$sm` (640px).
+ *   3. **Draft board.** `useDraftViewportTier()` swaps
+ *      `EliteDraftBoardScreen`'s wide board for `CompactLiveDraftBoard` on its
+ *      `phone` tier (below 800px). Its other two tiers — `tablet` (800–979)
+ *      and `desktop` (980+) — both render the wide board and differ only in
+ *      the CSS applied to it, so `DESKTOP_VIEWPORT` (1280) exercises the
+ *      desktop tier and a pin is only needed to leave the phone tier.
  *
  * ## Usage
  *

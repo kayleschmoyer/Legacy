@@ -12,6 +12,7 @@ import { DraftDetailsPanel } from './DraftDetailsPanel';
 import type { DraftDetailsSettings } from './draftDetails';
 import { getPositionColor } from './utils';
 import { isPlayerEligibleForSlot } from './draftDnd';
+import { useDraftViewportTier } from './hooks/useDraftViewport';
 // Platform-resolved: Metro picks DraftOrderControl.native.tsx on native,
 // bundlers take the web (@dnd-kit) variant. Imported by module path rather
 // than the commissioner barrel so the draft bundle doesn't pull in every
@@ -50,15 +51,35 @@ const TRACK_BG = withAlpha(WHITE, 0.05);
 const HOVER_BORDER = withAlpha(WHITE, 0.1);
 
 // Rail root + mobile toggle + content — the one responsive surface in this
-// component (mirrors the original @media (max-width: 900px) block for
-// .d-rail / .d-rail-mobile-toggle / .d-rail.collapsed in styles.ts).
-// Border/padding are CSS-only via the $md breakpoint config; the
-// collapse-driven maxHeight/overflow/visibility (which depend on the
-// `mobileCollapsed` state, not just viewport width) are expressed as a
-// Tamagui `collapsed` variant rather than a `useMedia()` hook call — the
-// hook requires the app's TamaguiProvider/config to be bootstrapped, which
-// isolated component tests (e.g. EliteDraftBoard.a11y.spec.tsx) don't set
-// up, while declarative $md style props resolve without it.
+// component, mirroring the .d-rail / .d-rail-mobile-toggle / .d-rail.collapsed
+// rules in styles.ts. The mock's tablet tier is where the rail stops being a
+// side column and becomes a collapsible shelf above the player pool.
+//
+// Driven by an explicit `mode` variant rather than the `$md` breakpoint key
+// this used to carry (LS-9860). `$md` resolves to `maxWidth: 1020` under
+// @tamagui/config's default media set, while styles.ts stacks `.d-layout` at
+// the design-token tablet boundary of 979 — so the two disagreed across a
+// whole band, rendering shelf chrome (a "Draft panel" toggle, a 280px
+// max-height) inside a desktop side-rail layout. Folding the viewport tier
+// and the `mobileCollapsed` state into one three-state variant keeps both
+// inputs in a single place and keeps them on the same scale as the CSS.
+//
+// The tier comes from `useDraftViewportTier()`, not Tamagui's `useMedia()`:
+// the latter needs a TamaguiProvider/config that isolated component tests
+// (e.g. EliteDraftBoard.a11y.spec.tsx) don't bootstrap, whereas the tier hook
+// reads `useWindowDimensions` and needs no provider.
+
+// Shared by both shelf modes: the rail's border moves from its left edge to
+// its top edge and the padding tightens, exactly as `.d-rail` does inside
+// the tablet media query in styles.ts.
+const SHELF_CHROME = {
+  borderLeftWidth: 0,
+  borderTopWidth: 1,
+  borderTopColor: BORDER_HAIRLINE,
+  paddingHorizontal: 14,
+  paddingVertical: 8,
+} as const;
+
 const RailRoot = tamaguiStyled(YStack, {
   // Docks this component into the still-CSS-Grid `.d-layout` container in
   // EliteDraftBoardScreen.tsx (raw HTML/CSS, out of scope for this ticket —
@@ -73,17 +94,24 @@ const RailRoot = tamaguiStyled(YStack, {
   padding: 14,
   gap: 12,
   overflow: 'scroll',
-  $md: {
-    borderLeftWidth: 0,
-    borderTopWidth: 1,
-    borderTopColor: BORDER_HAIRLINE,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
   variants: {
-    collapsed: {
-      true: { $md: { maxHeight: undefined, overflow: 'visible' } },
-      false: { $md: { maxHeight: 280, overflow: 'scroll' } },
+    // 'column' is the desktop side rail (the base styles above, untouched).
+    // The two shelf modes add the stacked chrome; which one applies depends
+    // on the toggle, mirroring `.d-rail.collapsed { max-height: none;
+    // overflow: visible; }` — a collapsed shelf hides its content, so it
+    // needs no height cap, while an expanded one scrolls within 280px.
+    mode: {
+      column: {},
+      'shelf-expanded': {
+        ...SHELF_CHROME,
+        maxHeight: 280,
+        overflow: 'scroll',
+      },
+      'shelf-collapsed': {
+        ...SHELF_CHROME,
+        maxHeight: undefined,
+        overflow: 'visible',
+      },
     },
   } as const,
 }) as StyledComponent;
@@ -92,18 +120,23 @@ const RailMobileToggle = tamaguiStyled(XStack, {
   tag: 'button',
   display: 'none',
   cursor: 'pointer',
-  $md: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 36,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: SURFACE_OVERLAY_SUBTLE,
-    borderWidth: 1,
-    borderColor: BORDER_HAIRLINE,
-    borderRadius: 6,
-  },
+  variants: {
+    shelf: {
+      true: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minHeight: 36,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        backgroundColor: SURFACE_OVERLAY_SUBTLE,
+        borderWidth: 1,
+        borderColor: BORDER_HAIRLINE,
+        borderRadius: 6,
+      },
+      false: {},
+    },
+  } as const,
 }) as StyledComponent;
 
 const RailContent = tamaguiStyled(YStack, {
@@ -111,8 +144,11 @@ const RailContent = tamaguiStyled(YStack, {
   minHeight: 0,
   flex: 1,
   variants: {
-    collapsed: {
-      true: { $md: { display: 'none' } },
+    // Only a *shelf* can be collapsed; the desktop rail is always open, so
+    // this is passed `isShelf && mobileCollapsed` rather than the raw toggle
+    // state (previously the `$md` key inside the variant did that gating).
+    contentHidden: {
+      true: { display: 'none' },
       false: {},
     },
   } as const,
@@ -394,13 +430,12 @@ export function DraftRail({
     }
   };
 
-  // LS-4824: on mobile the rail sits above the player pool and consumes the
-  // top of the viewport. Default to collapsed so mobile users can see the
-  // draft board first, and provide a toggle. Desktop ignores this — the
-  // `collapsed` variant's nested $md mirrors the original @media
-  // (max-width: 900px) rule (nearest defined breakpoint; see AGENTS.md
-  // responsive-token diagnostic).
+  // LS-4824: below the desktop tier the rail sits above the player pool and
+  // consumes the top of the viewport. Default to collapsed so those users see
+  // the draft board first, and provide a toggle. The desktop side rail
+  // ignores the toggle entirely.
   const [mobileCollapsed, setMobileCollapsed] = React.useState(true);
+  const isShelf = useDraftViewportTier() !== 'desktop';
 
   return (
     <RailRoot
@@ -409,10 +444,17 @@ export function DraftRail({
       aria-label="Draft panel"
       testID="draft-rail"
       data-collapsed={mobileCollapsed ? 'true' : 'false'}
-      collapsed={mobileCollapsed}
+      mode={
+        isShelf
+          ? mobileCollapsed
+            ? 'shelf-collapsed'
+            : 'shelf-expanded'
+          : 'column'
+      }
       style={{ gridArea: 'rail' }}
     >
       <RailMobileToggle
+        shelf={isShelf}
         tag="button"
         type="button"
         role="button"
@@ -435,7 +477,10 @@ export function DraftRail({
         </Text>
       </RailMobileToggle>
 
-      <RailContent id="d-rail-content" collapsed={mobileCollapsed}>
+      <RailContent
+        id="d-rail-content"
+        contentHidden={isShelf && mobileCollapsed}
+      >
         {/* Current-pick edge states — the top band's on-the-clock slab covers
             the normal case, but a failed load or a not-yet-initialized draft
             order needs the retry / Generate Order affordances the sidebar

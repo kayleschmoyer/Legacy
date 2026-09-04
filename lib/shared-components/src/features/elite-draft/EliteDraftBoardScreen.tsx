@@ -42,8 +42,8 @@ import {
   useDraftQueries,
   useDraftTimer,
   useDraftUIState,
+  useDraftViewportTier,
   useDraftWebSocket,
-  useIsCompactDraftViewport,
   usePlayerData,
 } from './hooks';
 import { DraftChatOverlay } from './DraftChatOverlay';
@@ -307,8 +307,8 @@ function PlayerRow({
 // actually mounts. `EliteDraftBoardScreen` calling useDraftPalette()
 // unconditionally at its own top level previously crashed apps/web's test
 // environment (no useThemeName mock there) even though the wide branch never
-// used it — this render path is only reachable when useIsCompactDraftViewport()
-// is true (LS-9207 review fix).
+// used it — this render path is only reachable when useDraftViewportTier()
+// returns 'phone' (LS-9207 review fix).
 // ---------------------------------------------------------------------------
 interface CompactLiveDraftBoardProps {
   ui: ReturnType<typeof useDraftUIState>;
@@ -929,7 +929,10 @@ export function EliteDraftBoardScreen({
   const { user, token: authToken } = useAuth();
   const userId = user?.id ?? 0;
   const isAuthenticated = !!user;
-  const isCompact = useIsCompactDraftViewport();
+  // `phone` is the only tier that swaps the whole board for
+  // `CompactLiveDraftBoard`; `tablet` and `desktop` both render the wide
+  // branch below and differ only in the CSS `styles.ts` applies to it.
+  const isCompact = useDraftViewportTier() === 'phone';
 
   const { data: userSubscriptionData } = useGetUserByIdQuery({
     variables: { id: userId },

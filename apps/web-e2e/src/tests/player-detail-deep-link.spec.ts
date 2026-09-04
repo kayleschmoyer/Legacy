@@ -694,8 +694,9 @@ test.describe('Player Detail Deep Link — from Free Agents @regression', () => 
 
 /**
  * Waits on `draft-board`, the wide `DraftPlayerBoard` root.
- * `useIsCompactDraftViewport()` swaps in `CompactLiveDraftBoard` at or below
- * `$sm`, which renders `DraftPlayersTab` and carries no such hook. Pinned
+ * `useDraftViewportTier()` swaps in `CompactLiveDraftBoard` on its `phone`
+ * tier (below 800px), which renders `DraftPlayersTab` and carries no such
+ * hook. Pinned
  * rather than skipped; compact draft-board coverage is tracked as LS-9732
  * (LS-9712).
  */

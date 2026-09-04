@@ -1,6 +1,8 @@
 // Manual mock for react-native to avoid Jest resolver issues with react-native-web
 // This provides a minimal mock of react-native functionality for tests
 
+const mockWindowDimensions = { width: 1024, height: 768 };
+
 const mockStyleSheet = {
   create: (styles) => styles,
   hairlineWidth: 1,
@@ -19,10 +21,18 @@ module.exports = {
   // Styling
   StyleSheet: mockStyleSheet,
   Dimensions: {
-    get: () => ({ width: 1024, height: 768 }),
+    get: () => ({ ...mockWindowDimensions }),
     addEventListener: jest.fn(),
     removeEventListener: jest.fn(),
   },
+  // Real react-native(-web) exports this alongside Dimensions, and shared
+  // components use it as their cross-platform viewport-width source (e.g.
+  // elite-draft's useDraftViewportTier, PlayerComparison, PlayoffBracket).
+  // Without it those components throw "useWindowDimensions is not a function"
+  // the moment they render here. Returns the same object Dimensions.get()
+  // does so a test can't see the two disagree; 1024 lands in the desktop
+  // tier, which is the wide-viewport layout these specs assert against.
+  useWindowDimensions: () => ({ ...mockWindowDimensions }),
   PixelRatio: {
     get: () => 1,
     getPixelSizeForLayoutSize: (size) => size,

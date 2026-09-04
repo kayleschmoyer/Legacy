@@ -2,8 +2,28 @@
 // Component-scoped CSS for EliteDraftBoard
 // ---------------------------------------------------------------------------
 
+import { breakpoints } from '@legacy-sports/design-tokens';
+
 const NAV_HEIGHT_PX = 75;
 const NAV_Z_INDEX = 200;
+
+// Responsive breakpoints, interpolated from the design-token scale rather
+// than written as ad-hoc pixel literals, so this stylesheet and
+// `hooks/useDraftViewport.ts` cannot drift apart (LS-9860). Each
+// `breakpoints.*` value is the *lower bound* of its band, so a `max-width`
+// query stops one pixel short of the next band.
+//
+// The bands map onto the mock's `vp-group` tiers as follows (docs/design/
+// B8P9BQz8s6NZ9Q-FqWI_yA/legacy-sports-draft-board/project/scratch/mockups/
+// draft.html, `@container vp (...)` block at the end of its stylesheet):
+//
+//   ≤799   $xxs/$xs  phone   — `CompactLiveDraftBoard` replaces this layout
+//   ≤979   $sm/$md   tablet  — rail stacks under main as a shelf
+//   ≤1119  $lg       land    — side rail returns, narrower; 3-col depth
+//   1120+  $xl/$xxl  desktop — full-width rail, 4-col depth
+const BP_PHONE_MAX = breakpoints.sm - 1; // 799
+const BP_TABLET_MAX = breakpoints.lg - 1; // 979
+const BP_LAND_MAX = breakpoints.xl - 1; // 1119
 
 export const CSS = `
 /* ===== Custom Properties (aligned with Legacy Sports theme) ===== */
@@ -994,47 +1014,23 @@ export const CSS = `
   box-shadow: 0 8px 24px rgba(124,58,237,0.5);
 }
 
-/* ===== Mobile Draft Banner (visible only on small screens) ===== */
-.d-mobile-banner {
-  display: none;
-}
-@media (max-width: 768px) {
-  .d-mobile-banner {
-    display: flex; align-items: center; gap: 12px;
-    position: sticky; top: 0; z-index: 100;
-    background: linear-gradient(135deg, rgba(17,27,47,0.96) 0%, rgba(10,15,26,0.98) 100%);
-    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    padding: 10px 14px;
-  }
-  .d-mobile-timer {
-    flex-shrink: 0; width: 48px; height: 48px;
-    display: flex; align-items: center; justify-content: center;
-    border-radius: 50%;
-    font-size: 16px; font-weight: 800; font-family: 'Big Shoulders Display', sans-serif;
-    font-variant-numeric: tabular-nums; color: #fff;
-  }
-  .d-mobile-timer.safe  { background: linear-gradient(135deg,#10b981,#059669); }
-  .d-mobile-timer.warn  { background: linear-gradient(135deg,#f59e0b,#d97706); }
-  .d-mobile-timer.danger{ background: linear-gradient(135deg,#ef4444,#dc2626); animation: timerWarn 0.6s ease-in-out infinite; }
-  .d-mobile-timer.paused{ background: rgba(245,158,11,0.25); color: #f59e0b; font-size: 20px; }
-  .d-mobile-pick-info { flex: 1; min-width: 0; }
-  .d-mobile-pick-team {
-    font-size: 14px; font-weight: 700; color: #f1f5f9;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .d-mobile-pick-team.my-turn { color: #10b981; }
-  .d-mobile-pick-detail {
-    font-size: 11px; color: var(--d-text-muted); margin-top: 1px;
-  }
-}
-
 /* ===== Responsive ===== */
-@media (max-width: 1200px) {
+/* $lg — tablet landscape. Effective band 980–1119: this is a max-width
+   query, so it also matches below 980, where the tablet block that follows
+   overrides the rules it sets. The side rail is still a column here, but
+   narrower, and the depth chart drops to three. Was \`max-width: 1200px\`:
+   moved onto the token boundary so 1120–1199 keeps the wide-desktop rail the
+   mock specifies for its $xl band rather than the narrow one (LS-9860). */
+@media (max-width: ${BP_LAND_MAX}px) {
   .d-layout { grid-template-columns: 1fr 280px; }
   .d-depth-grid { grid-template-columns: repeat(3, 1fr); }
 }
-@media (max-width: 900px) {
+/* $sm/$md — tablet (800–979). The rail stops being a column and becomes a
+   collapsible shelf above the player pool. Was \`max-width: 900px\`, which
+   left 901–979 rendering the desktop side-rail layout where the mock's
+   \`@container vp (max-width: 979px)\` block specifies the stacked
+   treatment — the defect LS-9860 exists to fix. */
+@media (max-width: ${BP_TABLET_MAX}px) {
   .d-layout {
     grid-template-columns: 1fr;
     grid-template-rows: auto auto 1fr;
@@ -1070,7 +1066,13 @@ export const CSS = `
   .d-depth-grid { grid-template-columns: repeat(2, 1fr); }
   .d-topband { grid-template-columns: 1fr auto; grid-template-rows: auto auto; }
 }
-@media (max-width: 768px) {
+/* $xxs/$xs — phone (≤799). \`EliteDraftBoardScreen\` swaps the whole board
+   for \`CompactLiveDraftBoard\` at this tier, so these rules only bite for
+   consumers that mount the wide board's controls outside that gate (e.g.
+   \`apps/web/src/components/EliteDraftBoard.a11y.spec.tsx\` renders
+   \`DraftPlayerBoard\` bare). Kept as a safety net, retargeted from the
+   ad-hoc 768px onto the token boundary. */
+@media (max-width: ${BP_PHONE_MAX}px) {
   .d-main { padding: 12px 14px; }
   .d-controls { flex-direction: column; align-items: stretch; padding: 12px; }
   .d-search-wrap { min-width: 0; }
@@ -1894,7 +1896,8 @@ export const CSS = `
   position: relative;
   z-index: 1;
 }
-@media (max-width: 900px) {
+/* Spectator board stacks on the same tablet boundary as \`.d-layout\`. */
+@media (max-width: ${BP_TABLET_MAX}px) {
   .d-spec-layout {
     grid-template-columns: 1fr;
     grid-template-areas:

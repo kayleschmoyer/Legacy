@@ -1,3 +1,5 @@
+import { breakpoints } from '@legacy-sports/design-tokens';
+
 import { CSS } from './styles';
 
 // LS-4852: the .d-root fixed-position wrapper sits below the nav so dropdown
@@ -29,5 +31,37 @@ describe('elite-draft .d-controls does not collapse (LS-8106)', () => {
       throw new Error('.d-controls rule not found in CSS');
     }
     expect(match[1]).toMatch(/flex-shrink:\s*0/);
+  });
+});
+
+// LS-9860: the stylesheet's breakpoints are interpolated from the
+// design-token scale, so they cannot silently drift from
+// `useDraftViewportTier()`. Before this the tablet stacking rule sat at an
+// ad-hoc `max-width: 900px`, leaving 901–979 on the desktop side-rail layout
+// where the mock's `@container vp (max-width: 979px)` block specifies the
+// stacked treatment.
+describe('elite-draft responsive breakpoints (LS-9860)', () => {
+  const mediaQueryWidths = [
+    ...CSS.matchAll(/@media \(max-width: (\d+)px\)/g),
+  ].map((m) => Number(m[1]));
+
+  it('stacks .d-layout at the tablet boundary, not the old 900px', () => {
+    const stackRule = CSS.match(
+      /@media \(max-width: (\d+)px\) \{\s*\.d-layout \{\s*grid-template-columns: 1fr;/,
+    );
+    if (!stackRule) {
+      throw new Error('.d-layout stacking media query not found in CSS');
+    }
+    expect(Number(stackRule[1])).toBe(breakpoints.lg - 1);
+  });
+
+  it('uses only design-token boundaries for its width queries', () => {
+    const allowed = new Set([
+      breakpoints.sm - 1,
+      breakpoints.lg - 1,
+      breakpoints.xl - 1,
+    ]);
+    expect(mediaQueryWidths.length).toBeGreaterThan(0);
+    expect(mediaQueryWidths.filter((w) => !allowed.has(w))).toEqual([]);
   });
 });

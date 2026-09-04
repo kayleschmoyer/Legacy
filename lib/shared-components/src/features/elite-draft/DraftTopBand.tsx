@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Text, XStack, YStack } from 'tamagui';
 import { formatPickClock } from './pickClock';
 import type { CurrentDraftPickInfo, LeagueTeam } from './types';
+import { useDraftViewportTier } from './hooks/useDraftViewport';
 import {
   BRAND_GOLD,
   BRAND_SEAM_RED,
@@ -118,11 +119,22 @@ const TopBandRoot = tamaguiStyled(XStack, {
   flexWrap: 'wrap',
   flexShrink: 0,
   gap: 14,
-  $md: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    rowGap: 12,
-  },
+  variants: {
+    // The mock's tablet tier tightens the band's padding and lets it wrap
+    // onto two rows (`.topband { row-gap: 12px }`). Driven by the viewport
+    // tier rather than a `$md` breakpoint key (LS-9860): `$md` resolves to
+    // `maxWidth: 1020` under @tamagui/config's default media set, so it
+    // would have applied these across 980–1020, where styles.ts has already
+    // switched `.d-layout` back to the desktop side-rail form.
+    stacked: {
+      true: {
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        rowGap: 12,
+      },
+      false: {},
+    },
+  } as const,
 }) as StyledComponent;
 
 const StatusBlock = tamaguiStyled(YStack, { gap: 2 }) as StyledComponent;
@@ -163,7 +175,10 @@ const Divider = tamaguiStyled(YStack, {
   height: 52,
   backgroundColor: '$surfacePanelBorder',
   flexShrink: 0,
-  $md: { display: 'none' },
+  variants: {
+    // `.topband .tb-divider { display: none; }` in the mock's tablet block.
+    stacked: { true: { display: 'none' }, false: {} },
+  } as const,
 }) as StyledComponent;
 
 const TimerBlock = tamaguiStyled(XStack, {
@@ -207,7 +222,11 @@ const ClockSlab = tamaguiStyled(XStack, {
   paddingVertical: 10,
   paddingHorizontal: 14,
   minWidth: 0,
-  $md: { flexBasis: '100%' },
+  variants: {
+    // `.tb-clock { grid-column: 1 / -1; }` in the mock's tablet block — the
+    // on-the-clock slab takes a row of its own once the band wraps.
+    stacked: { true: { flexBasis: '100%' }, false: {} },
+  } as const,
 }) as StyledComponent;
 
 const ClockEyebrow = tamaguiStyled(Text, {
@@ -413,6 +432,11 @@ export function DraftTopBand({
     ? teamNameById(currentPickInfo.teamId)
     : null;
 
+  // Below the desktop tier the band wraps onto two rows and drops its
+  // dividers — see the `stacked` variants on TopBandRoot / Divider /
+  // ClockSlab above.
+  const stacked = useDraftViewportTier() !== 'desktop';
+
   const showCommish = isCommissioner && !!draftId && !isMockDraft;
   const showAutopick = draftId !== null && myTeamId !== null;
 
@@ -420,6 +444,7 @@ export function DraftTopBand({
     <TopBandRoot
       role="banner"
       aria-label="Draft status"
+      stacked={stacked}
       style={{ gridArea: 'topband' }}
     >
       {/* Pick status */}
@@ -448,7 +473,7 @@ export function DraftTopBand({
           the offline flow should show no pick timer at all. */}
       {!untimed && (
         <>
-          <Divider aria-hidden="true" />
+          <Divider aria-hidden="true" stacked={stacked} />
           <TimerBlock
             role="timer"
             aria-label={connectionStale ? 'Pick timer (stale)' : 'Pick timer'}
@@ -521,6 +546,7 @@ export function DraftTopBand({
 
       {/* On-the-clock slab (stretches to fill) */}
       <ClockSlab
+        stacked={stacked}
         borderColor={
           isMyPick ? withAlpha(BRAND_GOLD, 0.5) : withAlpha(BRAND_GOLD, 0.3)
         }
