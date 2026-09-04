@@ -167,13 +167,21 @@ jobs:
     name: Verify CI Status
     needs: [trigger-ci]
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
-    if: >-
-      always() &&
-      (needs.trigger-ci.result == 'success' || needs.trigger-ci.result == 'skipped') &&
-      inputs['skip-ci-check'] != true
+    # LS-9600: this job's own result (not merely whether it runs) is the single
+    # signal `detect` gates on, so it must run whenever a check is required —
+    # including when trigger-ci failed — rather than being skipped in that case.
+    # A skipped verify-ci must mean exactly one thing: no check was requested.
+    if: always() && inputs['skip-ci-check'] != true
     timeout-minutes: 5
     steps:
+      - name: Check Trigger CI Pipeline Result
+        if: needs.trigger-ci.result == 'failure'
+        run: |
+          echo "::error::Trigger CI Pipeline failed — CI was not verified for this commit. Fix CI before deploying, or use skip-ci-check=true to bypass (not recommended)."
+          exit 1
+
       - name: Check CI Pipeline Status
+        if: needs.trigger-ci.result != 'failure'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
