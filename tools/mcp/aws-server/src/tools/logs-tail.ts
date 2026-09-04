@@ -1,3 +1,4 @@
+import { CLI_NOT_FOUND_PATTERN, cliNotFoundRemedy } from '../aws-error.js';
 import { getRepoRoot, runCommand } from '../run-command.js';
 import type { ToolResult } from '../types.js';
 
@@ -327,15 +328,18 @@ async function fetchOne(
         message,
       );
     const isUnknownOptionsError = /unknown options?:/i.test(message);
+    const isCliNotFoundError = CLI_NOT_FOUND_PATTERN.test(message);
     return {
       ok: false,
       logGroup,
       error: message,
       remedy: isSsoError
         ? 'Run `aws sso login` to re-authenticate, then retry.'
-        : isUnknownOptionsError
-          ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, functions, since, startTime, endTime, filter, environment, maxLines, maxBytes, format. Check that no unexpected fields were passed.'
-          : null,
+        : isCliNotFoundError
+          ? cliNotFoundRemedy()
+          : isUnknownOptionsError
+            ? 'The AWS CLI received an unrecognized option. Valid parameters for aws_logs_tail are: function, functions, since, startTime, endTime, filter, environment, maxLines, maxBytes, format. Check that no unexpected fields were passed.'
+            : null,
       hint: isUnknownOptionsError
         ? 'Retry with only the documented aws_logs_tail input fields (function | functions, since [default: 1h], startTime [ISO-8601, optional], endTime [ISO-8601, optional], filter [optional], environment [dev|prod, default: dev], maxLines [optional], maxBytes [optional], format [markdown|json, default: markdown]). Remove any extra or misspelled fields.'
         : null,

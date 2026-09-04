@@ -38,4 +38,16 @@ describe('runCommand', () => {
 
     expect(output.length).toBe(1000);
   });
+
+  it('rewrites a spawn ENOENT into an actionable message naming the missing binary (LS-9537)', async () => {
+    // Regression for LS-9537: Claude Code Remote sessions don't have the AWS
+    // CLI on PATH, so every aws_* tool previously surfaced the raw, cryptic
+    // `spawn aws ENOENT` instead of an explanation. A nonexistent binary name
+    // reproduces the same `err.code === 'ENOENT'` Node reports for `aws`.
+    await expect(
+      runCommand('definitely-not-a-real-binary', [], process.cwd()),
+    ).rejects.toThrow(
+      /definitely-not-a-real-binary CLI not found \(spawn definitely-not-a-real-binary ENOENT\).*Claude Code Remote/s,
+    );
+  });
 });

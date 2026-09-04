@@ -72,6 +72,25 @@ export function runCommand(
             resolve((stdout || '').trim());
             return;
           }
+          // `err.code === 'ENOENT'` means the OS couldn't find the `command`
+          // binary at all (not a non-zero exit from a found binary) — Node's
+          // raw message is the cryptic `spawn aws ENOENT`. This is the normal
+          // case in Claude Code Remote (CCR) sessions, which don't have the
+          // AWS CLI (or Terraform) on PATH, so every aws_* tool otherwise
+          // fails with the same unexplained ENOENT (LS-9537). Rewrite it into
+          // an actionable message before it reaches any caller's own
+          // remedy/hint parsing.
+          if (err.code === 'ENOENT') {
+            reject(
+              new Error(
+                `${command} CLI not found (spawn ${command} ENOENT): the "${command}" binary is not installed ` +
+                  `or not on PATH in this environment. This is expected in Claude Code Remote (CCR) sessions, ` +
+                  `which do not have the AWS CLI or Terraform installed — aws-server MCP tools cannot run there. ` +
+                  `If running locally, install and configure the ${command} CLI.`,
+              ),
+            );
+            return;
+          }
           const msg = stderr?.trim() || stdout?.trim() || err.message;
           reject(new Error(msg));
           return;

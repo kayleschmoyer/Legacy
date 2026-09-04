@@ -180,6 +180,22 @@ describe('logsTail (singular)', () => {
     expect(body.ok).toBe(false);
     expect(body.remedy).toMatch(/aws sso login/);
   });
+
+  it('attaches the CLI-not-found remedy for the runCommand ENOENT rewrite (LS-9537)', async () => {
+    const runner: CommandRunner = jest
+      .fn()
+      .mockRejectedValue(
+        new Error(
+          'aws CLI not found (spawn aws ENOENT): the "aws" binary is not installed or not on PATH in this environment.',
+        ),
+      );
+    const { body, isError } = unwrap(
+      await logsTail({ ...baseParams, function: 'graphql' }, runner),
+    );
+    expect(isError).toBe(true);
+    expect(body.ok).toBe(false);
+    expect(body.remedy).toMatch(/Claude Code Remote/);
+  });
 });
 
 describe('truncateToByteLimit', () => {
