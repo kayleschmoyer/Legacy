@@ -15,6 +15,12 @@
 # without knowing why.  This script surfaces the failure proactively so the agent
 # can report and request a repair rather than proceeding with degraded tooling.
 #
+# tsx alone under-detects a half-installed node_modules (LS-9577): an install
+# that dies partway through can leave tsx present while node_modules/.modules.yaml
+# and node_modules/.bin/nx are still missing, so every nx-backed pc-* chunk fails
+# even though this check would otherwise report healthy. All three artifacts are
+# checked together below.
+#
 # Non-blocking — prints warnings but never fails the session (exits 0).
 
 WORKTREE="${CLAUDE_PROJECT_DIR:-$(pwd)}"
@@ -37,13 +43,32 @@ fi
 
 WARNINGS=()
 
-# --- 1. node_modules/.bin/tsx -----------------------------------------------
+# --- 1. node_modules/.bin/tsx, node_modules/.modules.yaml, node_modules/.bin/nx
 # Use -f (follows symlinks) rather than "! -f && ! -L" so that a broken symlink
 # (pnpm stores binaries as symlinks) also triggers the warning. With "! -L",
 # a broken symlink would pass silently: -L is true for any symlink, broken or not.
+#
+# tsx alone is not a reliable install-health signal (LS-9577): a `pnpm install`
+# that dies partway through (e.g. puppeteer's postinstall failing to download
+# Chrome in a network-sandboxed container) can leave tsx materialised while
+# node_modules/.modules.yaml — what nx's pnpm-lockfile parser keys on — and
+# node_modules/.bin/nx are still missing or broken, so every nx-backed pc-*
+# chunk fails even though the tsx check alone would report healthy. Check all
+# three.
 TSX="$WORKTREE/node_modules/.bin/tsx"
-if [ ! -f "$TSX" ]; then
-  WARNINGS+=("[MCP WARNING] node_modules/.bin/tsx is missing — stdio MCP servers will fail to connect silently.")
+MODULES_YAML="$WORKTREE/node_modules/.modules.yaml"
+NX_BIN="$WORKTREE/node_modules/.bin/nx"
+MISSING_ARTIFACTS=()
+[ ! -f "$TSX" ] && MISSING_ARTIFACTS+=("node_modules/.bin/tsx")
+[ ! -f "$MODULES_YAML" ] && MISSING_ARTIFACTS+=("node_modules/.modules.yaml")
+[ ! -f "$NX_BIN" ] && MISSING_ARTIFACTS+=("node_modules/.bin/nx")
+
+if [ ${#MISSING_ARTIFACTS[@]} -gt 0 ]; then
+  MISSING_LIST=$(
+    IFS=,
+    echo "${MISSING_ARTIFACTS[*]}" | sed 's/,/, /g'
+  )
+  WARNINGS+=("[MCP WARNING] missing: $MISSING_LIST — stdio MCP servers and/or nx-backed pc-* chunks will fail.")
   if [ "$IS_WORKTREE" = "true" ]; then
     WIN_WT=$(echo "$WORKTREE" | sed 's|/d/|D:\\|; s|/|\\|g' 2>/dev/null || echo "$WORKTREE")
     WIN_MAIN=$(echo "$MAIN_REPO" | sed 's|/d/|D:\\|; s|/|\\|g' 2>/dev/null || echo "$MAIN_REPO")
@@ -55,25 +80,40 @@ if [ ! -f "$TSX" ]; then
     # Non-worktree sessions (cloud agents, Claude Code Remote, or a local
     # checkout run without the worktree checkbox) can hit this at the exact
     # moment this hook fires because `pnpm install` runs in parallel with
-    # SessionStart hooks during container/session boot (LS-9154) — tsx may
-    # not exist yet even though it is about to. Do not add a retry/poll loop
-    # here to paper over that: LS-4505 already tried bounded polling for this
-    # same file and rejected it, because the race window is unbounded (a
-    # cold-lockfile pnpm install can take minutes, not seconds) — see
-    # docs/dev-process/session-startup.md § Why not just add retries?.
+    # SessionStart hooks during container/session boot (LS-9154) — the
+    # artifacts above may not exist yet even though they are about to. Do not
+    # add a retry/poll loop here to paper over that: LS-4505 already tried
+    # bounded polling for this same file and rejected it, because the race
+    # window is unbounded (a cold-lockfile pnpm install can take minutes, not
+    # seconds) — see docs/dev-process/session-startup.md § Why not just add
+    # retries?.
     #
-    # mcp-bootstrap.mjs (LS-8539) independently re-checks tsx on every stdio
-    # MCP server launch attempt and runs `corepack pnpm install
+    # Distinguish "still installing" from "genuinely broken" with a real
+    # signal instead of a timing guess: is a pnpm install actually running
+    # right now? mcp-bootstrap.mjs (LS-8539) independently re-checks tsx on
+    # every stdio MCP server launch attempt and runs `corepack pnpm install
     # --frozen-lockfile` itself when it's still missing, so a transient miss
-    # here usually self-heals within a few minutes with no action and no
-    # session restart — telling the agent/user to restart is misleading in
-    # that case, since the servers connect on their own once install
-    # finishes. Only recommend `make install` as a fallback for when that
-    # auto-repair has had time to run and tsx is still absent.
-    WARNINGS+=("  Note:   this can be transient at session start — node_modules install may still be finishing.")
-    WARNINGS+=("  Self-heal: mcp-bootstrap.mjs re-checks tsx on every stdio MCP server launch attempt and installs it automatically; no restart needed.")
-    WARNINGS+=("  Next:   retry ToolSearch for a stdio server (e.g. 'select:worktree_ping') after a few minutes before concluding servers are broken.")
-    WARNINGS+=("  If still missing after several minutes: run 'make install' in the project root.")
+    # here can self-heal with no action and no session restart — but only
+    # while a repair process is actually in flight. If nothing is running,
+    # the install did not just start; it stopped (LS-9577: most often
+    # puppeteer's postinstall Chrome download dying in a network-sandboxed
+    # container before node_modules/.modules.yaml gets written) and needs a
+    # manual repair, not a wait.
+    # Match only an actual install repair (mcp-bootstrap.mjs's `corepack pnpm
+    # install ...`, cloud-setup.sh's `pnpm install ...`, link.mjs's pnpmInstall()
+    # spawning `pnpm install ...` directly) — never `pnpm exec ...`, which runs
+    # constantly for ordinary nx/tooling invocations and would otherwise make
+    # "BROKEN" nearly unreachable via false-positive matches.
+    if command -v pgrep >/dev/null 2>&1 && pgrep -f 'pnpm[^ ]* install( |$)' >/dev/null 2>&1; then
+      WARNINGS+=("  Status: an install process is currently running — likely still finishing, not broken.")
+      WARNINGS+=("  Self-heal: mcp-bootstrap.mjs re-checks these artifacts on every stdio MCP server launch attempt; no restart needed.")
+      WARNINGS+=("  Next:   retry ToolSearch for a stdio server (e.g. 'select:worktree_ping') after it completes before concluding servers are broken.")
+    else
+      WARNINGS+=("  Status: BROKEN — no install process is currently running, so this is not transient.")
+      WARNINGS+=("  Likely cause: a prior 'pnpm install --frozen-lockfile' died partway through (commonly puppeteer's postinstall Chrome download in a network-sandboxed container), leaving node_modules half-installed.")
+      WARNINGS+=("  Fix:    run 'make install' in the project root — it now sets PUPPETEER_SKIP_DOWNLOAD=1/PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 so the Chrome download no longer aborts the install (LS-9577).")
+      WARNINGS+=("  If nx still fails after that: rm -rf .nx/cache .nx/workspace-data (stale project-graph cache, LS-8936) and retry.")
+    fi
   fi
 fi
 

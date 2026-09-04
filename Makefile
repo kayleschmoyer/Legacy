@@ -114,7 +114,7 @@ install: ## Install all dependencies (Node.js and Python)
 ifeq ($(DETECTED_OS),Windows)
 	@node scripts/modules-pool/link.mjs
 else
-	pnpm install --frozen-lockfile
+	PUPPETEER_SKIP_DOWNLOAD=1 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 pnpm install --frozen-lockfile
 endif
 	@$(CHECK_POETRY)
 	@$(MAKE) setup-hooks
@@ -135,7 +135,7 @@ else
 	@$(call echo_blue,Removing node_modules...)
 	@$(RM_DIR) node_modules $(NULL_REDIRECT) || echo No node_modules to remove
 	@$(call echo_blue,Installing fresh dependencies...)
-	pnpm install --frozen-lockfile
+	PUPPETEER_SKIP_DOWNLOAD=1 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 pnpm install --frozen-lockfile
 endif
 	@$(CHECK_POETRY)
 	@$(MAKE) setup-hooks

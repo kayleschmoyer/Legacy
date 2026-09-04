@@ -855,6 +855,16 @@ function pnpmInstall(cwdDir, noFrozen = false, retrying = false) {
     encoding: 'utf-8',
     timeout: 30 * 60_000,
     windowsHide: true,
+    // Skip puppeteer's post-install Chrome download — it fails outright in
+    // network-sandboxed cloud/CCR containers, aborting the install before
+    // node_modules/.modules.yaml is written and leaving a half-installed
+    // tree (LS-9577). Chromium is pre-installed at /opt/pw-browsers there,
+    // so the download is pure waste even where network access succeeds.
+    env: {
+      ...process.env,
+      PUPPETEER_SKIP_DOWNLOAD: '1',
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: '1',
+    },
   };
   try {
     const out =

@@ -171,7 +171,7 @@ else
       # and re-extracts them, instead of trusting a directory that already
       # "exists" but is broken.
       node scripts/modules-pool/link.mjs --heal-path="$REPO_DIR/node_modules" || true
-      pnpm install --frozen-lockfile 2>&1 | tail -5
+      PUPPETEER_SKIP_DOWNLOAD=1 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=1 pnpm install --frozen-lockfile 2>&1 | tail -5
       if node_modules_healthy; then
         echo "Dependencies installed — node_modules/.bin/tsx confirmed present and structural health check passed"
         break
