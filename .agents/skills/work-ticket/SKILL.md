@@ -81,6 +81,8 @@ jira_auth_status()
 
 **If `jira_auth_status` returns a connection error** (the MCP server itself didn't start), wait ~10 seconds and retry once — the `legacy-sports-jira` server sometimes needs a moment to initialize. If it still fails, this is an MCP startup issue, not a credential issue; see the node_modules symlink note in AGENTS.md.
 
+**If `jira_auth_status` doesn't exist at all** (`ToolSearch("select:jira_auth_status")` returns nothing, no error) — distinct from the connection-error case above, this means the `legacy-sports-jira` connector never registered for this session (observed in CCR sessions, LS-9576). Retry the `ToolSearch` once after a few seconds first. If it's still absent, this evaluates as `configured: false` below, and the same applies to `legacy-sports-github`'s tools for the rest of this workflow — see the [CCR substitution table](../mcp-first/SKILL.md#jira-github-hosted-servers-absent-in-ccr-ls-9576) for the per-tool fallback and which guardrails you need to compensate for by hand.
+
 **If `configured: false`**, stop immediately. The error message depends on your environment:
 
 - **Copilot Coding Agent**: "Jira credentials are missing. Add `JIRA_EMAIL` + `JIRA_API_TOKEN` (Basic Auth) or `JIRA_CLIENT_ID` + `JIRA_CLIENT_SECRET` + `JIRA_CLOUD_ID` (OAuth 2.0) to Settings → Environments → `copilot` → Environment secrets, then re-run the task."
