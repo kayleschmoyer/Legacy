@@ -535,6 +535,102 @@ export function buildAuthChallengeResponse(
   };
 }
 
+// ── Transport-level error handling ────────────────────────────────────────
+//
+// The MCP Lambda handlers (github / jira / ci / db-admin / rollbar) each
+// build a WebStandardStreamableHTTPServerTransport, connect their MCP
+// server to it, and call `transport.handleRequest(request)`. None of that
+// was wrapped in a try/catch: any exception escaping it (a transient
+// SecretsManager/GitHub API blip during `server.connect`, an SDK bug, or
+// any other unhandled error) propagated out of the Lambda handler entirely.
+// API Gateway/the Lambda Function URL then returns its own generic
+// `{"message":"Internal Server Error"}` with zero diagnostic detail — the
+// exact opaque 500 reported against ci_get_logs/get_job_logs (LS-9583),
+// which forced a raw `gh` CLI fallback because the real failure reason was
+// never surfaced. `runMcpTransport` is the shared fix: it mirrors the
+// JSON-RPC-envelope pattern `authenticateMcpRequest` already uses so a
+// transport-level failure gives the client the same actionable, parseable
+// error shape as an auth failure, instead of an opaque platform 500.
+
+/** JSON-RPC error code for an unhandled MCP transport/tool-execution failure. */
+export const MCP_TRANSPORT_ERROR_CODE = -32603;
+
+/** Hard cap on the sanitized error message returned to the client. */
+const MAX_TRANSPORT_ERROR_MESSAGE_LEN = 500;
+
+/**
+ * Redact obvious credential material from an error message before it goes
+ * into a client-facing response, and cap its length. Mirrors the
+ * `sanitizeErrorBody` pattern already used for upstream GitHub API error
+ * bodies (`tools/mcp/ci-server/src/http-retry.ts`) — an unhandled exception
+ * here can originate from a token-exchange or Secrets Manager call, so the
+ * same bearer/PAT-shaped patterns are worth stripping even though this path
+ * only ever reaches a caller that already holds a valid MCP bearer for this
+ * server (LS-9583 code review).
+ */
+export function sanitizeTransportErrorMessage(
+  message: string,
+  maxLen = MAX_TRANSPORT_ERROR_MESSAGE_LEN,
+): string {
+  let sanitized = message
+    .replace(/Bearer\s+[A-Za-z0-9_\-.]+/gi, 'Bearer ***')
+    .replace(/Basic\s+[A-Za-z0-9+/=]+/gi, 'Basic ***')
+    .replace(/token\s+[A-Za-z0-9_\-.]+/gi, 'token ***')
+    .replace(/ghp_[A-Za-z0-9_]+/g, 'ghp_***')
+    .replace(/gho_[A-Za-z0-9_]+/g, 'gho_***')
+    .replace(/ghs_[A-Za-z0-9_]+/g, 'ghs_***')
+    .replace(/ghu_[A-Za-z0-9_]+/g, 'ghu_***')
+    .replace(/github_pat_[A-Za-z0-9_]+/g, 'github_pat_***');
+  if (sanitized.length > maxLen) {
+    const suffix = '... (truncated)';
+    sanitized = sanitized.slice(0, maxLen - suffix.length) + suffix;
+  }
+  return sanitized;
+}
+
+/**
+ * Run the connect+handleRequest sequence for an MCP Lambda, converting any
+ * thrown error into a well-formed JSON-RPC 500 response instead of letting
+ * it crash the Lambda invocation. `run` should perform `server.connect(transport)`
+ * followed by `transport.handleRequest(request)` and return its `Response`;
+ * `close` should close the MCP server. `close` always runs (even on error),
+ * mirroring the previous per-server `finally` cleanup.
+ *
+ * The full, unredacted error is always written to stderr (→ CloudWatch) for
+ * operator diagnosis; only the sanitized/capped message goes back to the
+ * client, since a caller reaching this path has already passed bearer auth
+ * but the underlying error could still originate from a credential exchange
+ * (e.g. a Secrets Manager or token-endpoint failure) and echo raw secret
+ * material otherwise.
+ */
+export async function runMcpTransport(
+  run: () => Promise<Response>,
+  close: () => Promise<void>,
+): Promise<APIGatewayProxyResultV2> {
+  try {
+    const response = await run();
+    const responseBody = await response.text();
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    return { statusCode: response.status, headers, body: responseBody };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[mcp-transport] unhandled error: ${message}\n`);
+    return buildJsonResponse(500, {
+      jsonrpc: '2.0',
+      id: null,
+      error: {
+        code: MCP_TRANSPORT_ERROR_CODE,
+        message: `MCP server error: ${sanitizeTransportErrorMessage(message)}`,
+      },
+    });
+  } finally {
+    await close().catch(() => undefined);
+  }
+}
+
 // Re-exported for test ergonomics so spec files don't need a second import.
 export { createLocalJWKSet };
 export type { JSONWebKeySet };

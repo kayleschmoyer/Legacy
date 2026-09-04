@@ -9,6 +9,7 @@ import {
   authenticateMcpRequest,
   handleOAuthMetadataRequest,
   MCP_SCOPE,
+  runMcpTransport,
 } from '@legacy-sports/mcp-bearer-auth';
 import { handleMcpDocsRequest } from '@legacy-sports/mcp-docs';
 import {
@@ -265,16 +266,12 @@ export const handler = async (
   });
 
   const server = createMcpServer();
-  await server.connect(transport);
 
-  const response = await transport.handleRequest(request);
-  await server.close();
-
-  const responseBody = await response.text();
-  const headers: Record<string, string> = {};
-  response.headers.forEach((value, key) => {
-    headers[key] = value;
-  });
-
-  return { statusCode: response.status, headers, body: responseBody };
+  return runMcpTransport(
+    async () => {
+      await server.connect(transport);
+      return transport.handleRequest(request);
+    },
+    () => server.close(),
+  );
 };

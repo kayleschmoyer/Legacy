@@ -15,6 +15,25 @@ jest.mock('@legacy-sports/mcp-bearer-auth', () => ({
   authenticateMcpRequest: () => mockAuthenticate(),
   handleOAuthMetadataRequest: () => null,
   extractCaller: () => null,
+  runMcpTransport: async (
+    run: () => Promise<Response>,
+    close: () => Promise<void>,
+  ) => {
+    try {
+      const response = await run();
+      const headers: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      return {
+        statusCode: response.status,
+        headers,
+        body: await response.text(),
+      };
+    } finally {
+      await close().catch(() => undefined);
+    }
+  },
 }));
 
 const docsEvent = (method = 'GET', rawPath = '/docs') =>

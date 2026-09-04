@@ -11,7 +11,10 @@ import {
   type JSONWebKeySet,
   MCP_AUTH_ERROR_CODE,
   MCP_SCOPE,
+  MCP_TRANSPORT_ERROR_CODE,
   OAUTH_PROTECTED_RESOURCE_PATH,
+  runMcpTransport,
+  sanitizeTransportErrorMessage,
   tokenLogClaims,
   verifyBearerToken,
 } from './index';
@@ -644,6 +647,101 @@ describe('OAuth 2.0 Authorization surface (Track B)', () => {
     expect(result.statusCode).toBe(401);
     expect((result.headers ?? {})['WWW-Authenticate']).toContain(
       `resource_metadata="https://${API_GW_DOMAIN}${OAUTH_PROTECTED_RESOURCE_PATH}"`,
+    );
+  });
+});
+
+describe('runMcpTransport', () => {
+  it('returns the transport response verbatim on success', async () => {
+    const close = jest.fn().mockResolvedValue(undefined);
+    const response = new Response('{"jsonrpc":"2.0","result":{}}', {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+    const result = await runMcpTransport(
+      () => Promise.resolve(response),
+      close,
+    );
+    if (typeof result === 'string') throw new Error('unexpected string');
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toBe('{"jsonrpc":"2.0","result":{}}');
+    expect(result.headers?.['content-type']).toBe('application/json');
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('converts an unhandled error into a JSON-RPC 500 instead of throwing (LS-9583)', async () => {
+    const close = jest.fn().mockResolvedValue(undefined);
+    const result = await runMcpTransport(
+      () => Promise.reject(new Error('Internal Server Error')),
+      close,
+    );
+    if (typeof result === 'string') throw new Error('unexpected string');
+    expect(result.statusCode).toBe(500);
+    const body = parseBody(result.body);
+    expect(body.error.code).toBe(MCP_TRANSPORT_ERROR_CODE);
+    expect(body.error.message).toContain('Internal Server Error');
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('still closes the server when the run callback throws', async () => {
+    const close = jest.fn().mockResolvedValue(undefined);
+    await runMcpTransport(() => Promise.reject(new Error('boom')), close);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows a close() failure so it never masks the original error', async () => {
+    const close = jest.fn().mockRejectedValue(new Error('close failed'));
+    const result = await runMcpTransport(
+      () => Promise.reject(new Error('run failed')),
+      close,
+    );
+    if (typeof result === 'string') throw new Error('unexpected string');
+    expect(result.statusCode).toBe(500);
+    expect(parseBody(result.body).error.message).toContain('run failed');
+  });
+
+  it('redacts credential-shaped substrings from the client-facing error message', async () => {
+    const close = jest.fn().mockResolvedValue(undefined);
+    const result = await runMcpTransport(
+      () =>
+        Promise.reject(
+          new Error(
+            'GitHub API 401: Authorization: Bearer ghp_abcdEFGH1234567890 rejected',
+          ),
+        ),
+      close,
+    );
+    if (typeof result === 'string') throw new Error('unexpected string');
+    const message = parseBody(result.body).error.message;
+    expect(message).not.toContain('ghp_abcdEFGH1234567890');
+    expect(message).toContain('Bearer ***');
+  });
+});
+
+describe('sanitizeTransportErrorMessage', () => {
+  it('redacts Bearer/Basic/token values and known GitHub token prefixes', () => {
+    expect(sanitizeTransportErrorMessage('Bearer sekret.value-1')).toBe(
+      'Bearer ***',
+    );
+    expect(sanitizeTransportErrorMessage('Basic dXNlcjpwYXNz')).toBe(
+      'Basic ***',
+    );
+    expect(sanitizeTransportErrorMessage('token abc123')).toBe('token ***');
+    expect(sanitizeTransportErrorMessage('ghp_abcdefghijklmnop')).toBe(
+      'ghp_***',
+    );
+  });
+
+  it('truncates messages past the max length', () => {
+    const long = 'x'.repeat(1000);
+    const result = sanitizeTransportErrorMessage(long, 50);
+    expect(result.length).toBe(50);
+    expect(result.endsWith('... (truncated)')).toBe(true);
+  });
+
+  it('leaves an ordinary message unchanged', () => {
+    expect(sanitizeTransportErrorMessage('secret rejected')).toBe(
+      'secret rejected',
     );
   });
 });
