@@ -8,7 +8,7 @@ import React, {
 } from 'react';
 import { Button, Spinner, Text, YStack } from 'tamagui';
 import { ShoppingCart } from '@tamagui/lucide-icons/icons/ShoppingCart';
-import { Alert, ScrollView, Share } from 'react-native';
+import { Alert, Platform, ScrollView, Share } from 'react-native';
 import { LOGGER } from '@legacy-sports/logging';
 import { config } from '@legacy-sports/app-config/native';
 import {
@@ -378,7 +378,7 @@ export default function LeagueId(): React.JSX.Element {
   const inviteCode = league?.inviteCode ?? '';
   const appBaseUrl = config.appBaseUrl ?? 'https://legacysports.app';
   const inviteUrl = inviteCode
-    ? `${appBaseUrl}/baseball/league/join/${inviteCode}`
+    ? `${appBaseUrl}/baseball/league/join/${inviteCode}?src=share&platform=${Platform.OS}`
     : '';
 
   const handleInviteShare = useCallback(async () => {

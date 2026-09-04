@@ -1015,9 +1015,9 @@ describe('BaseballLeagueId', () => {
       expect(mockShareFn).toHaveBeenCalledWith({
         message:
           'Join my league "Test Baseball League" on Legacy Sports!\n\n' +
-          'https://legacysports.app/baseball/league/join/TESTCODE',
+          'https://legacysports.app/baseball/league/join/TESTCODE?src=share&platform=ios',
         title: 'Join Test Baseball League',
-        url: 'https://legacysports.app/baseball/league/join/TESTCODE',
+        url: 'https://legacysports.app/baseball/league/join/TESTCODE?src=share&platform=ios',
       });
     });
 
@@ -1029,7 +1029,7 @@ describe('BaseballLeagueId', () => {
       await waitFor(() => expect(mockShareFn).toHaveBeenCalledTimes(1));
       expect(mockShareFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: 'https://staging.legacysports.app/baseball/league/join/TESTCODE',
+          url: 'https://staging.legacysports.app/baseball/league/join/TESTCODE?src=share&platform=ios',
         }),
       );
     });
@@ -1046,7 +1046,7 @@ describe('BaseballLeagueId', () => {
       await waitFor(() => expect(mockShareFn).toHaveBeenCalledTimes(1));
       expect(mockShareFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: 'https://legacysports.app/baseball/league/join/TESTCODE',
+          url: 'https://legacysports.app/baseball/league/join/TESTCODE?src=share&platform=ios',
         }),
       );
     });
