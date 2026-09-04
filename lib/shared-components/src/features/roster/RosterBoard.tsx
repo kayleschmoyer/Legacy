@@ -422,6 +422,7 @@ function subLineFromStats(stats: RosterPlayerStats): string | null {
 
 interface SlotRowProps {
   sport: 'baseball' | 'football';
+  positionId: number | null | undefined;
   positionType: string;
   assignedName: string | null;
   assignedEligible: readonly string[];
@@ -445,6 +446,7 @@ interface SlotRowProps {
 
 function SlotRow({
   sport,
+  positionId,
   positionType,
   assignedName,
   assignedEligible,
@@ -494,8 +496,12 @@ function SlotRow({
     ? (assignedPrimaryPosition ?? posType)
     : posType;
 
-  return (
+  // Suggested testID scheme (LS-9654): `roster-slot-${positionId}`.
+  const rowTestId = `roster-slot-${positionId}`;
+
+  const row = (
     <XStack
+      testID={rowTestId}
       role="button"
       aria-pressed={state === 'selected'}
       aria-disabled={effectiveReadOnly}
@@ -640,10 +646,18 @@ function SlotRow({
       )}
     </XStack>
   );
+
+  // Tamagui drops `data-testid` on animated XStacks with onPress in Chromium
+  // (LS-4133, LS-4215) — a web-only `<div>` wrapper guarantees the attribute
+  // reaches the real DOM for Playwright. RN has no view config for a
+  // lowercase `div` host tag, so the wrapper must stay web-only; native reads
+  // `testID` straight off the XStack (LS-9163 pattern, LS-9654).
+  return isWeb ? <div data-testid={rowTestId}>{row}</div> : row;
 }
 
 interface BenchRowProps {
   sport: 'baseball' | 'football';
+  playerId: number | null | undefined;
   name: string;
   eligible: readonly string[];
   primaryPosition: string;
@@ -661,6 +675,7 @@ interface BenchRowProps {
 
 function BenchRow({
   sport,
+  playerId,
   name,
   eligible,
   primaryPosition,
@@ -678,8 +693,13 @@ function BenchRow({
   const railColor = positionAccent(sport, primaryPosition);
   const effectiveReadOnly = readOnly || isLocked;
   const statsSub = stats ? subLineFromStats(stats) : null;
-  return (
+
+  // Suggested testID scheme (LS-9654): `roster-bench-${playerId}`.
+  const rowTestId = `roster-bench-${playerId}`;
+
+  const row = (
     <XStack
+      testID={rowTestId}
       role="button"
       aria-pressed={selected}
       aria-disabled={effectiveReadOnly}
@@ -777,6 +797,13 @@ function BenchRow({
       )}
     </XStack>
   );
+
+  // Tamagui drops `data-testid` on animated XStacks with onPress in Chromium
+  // (LS-4133, LS-4215) — a web-only `<div>` wrapper guarantees the attribute
+  // reaches the real DOM for Playwright. RN has no view config for a
+  // lowercase `div` host tag, so the wrapper must stay web-only; native reads
+  // `testID` straight off the XStack (LS-9163 pattern, LS-9654).
+  return isWeb ? <div data-testid={rowTestId}>{row}</div> : row;
 }
 
 // ── Section card ────────────────────────────────────────────────────────────
@@ -1144,6 +1171,7 @@ export function RosterBoard<
       <YStack key={position.id}>
         <SlotRow
           sport={sport}
+          positionId={position.id}
           positionType={position.positionType ?? ''}
           assignedName={assigned ? getPlayerName(assigned) : null}
           assignedEligible={assigned?.player?.eligiblePositions ?? []}
@@ -1241,6 +1269,7 @@ export function RosterBoard<
     <BenchRow
       key={p.id}
       sport={sport}
+      playerId={p.id}
       name={getPlayerName(p)}
       eligible={p.player?.eligiblePositions ?? []}
       primaryPosition={p.player?.eligiblePositions?.[0] ?? ''}
@@ -1281,6 +1310,7 @@ export function RosterBoard<
           </Text>
         </YStack>
         <Text
+          testID="roster-cancel-selection"
           role="button"
           aria-label="Cancel selection"
           tabIndex={0}
@@ -1409,6 +1439,7 @@ export function RosterBoard<
           )}
           {moveToBenchEnabled && selected && (
             <Text
+              testID="roster-move-to-bench"
               role="button"
               aria-label={`Move ${selectedName} to bench`}
               tabIndex={0}

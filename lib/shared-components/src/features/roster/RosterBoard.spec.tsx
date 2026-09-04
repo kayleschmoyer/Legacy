@@ -516,4 +516,73 @@ describe('RosterBoard', () => {
       expect(screen.getAllByText('On Bye Week')).toHaveLength(1);
     });
   });
+
+  describe('stable testIDs on interactive rows and controls (LS-9654)', () => {
+    // Mirrors the MatchupRosterEditorView `data-testid` regression test
+    // (LS-4133): Tamagui drops `data-testid` on animated XStacks with
+    // onPress in Chromium, so the slot/bench rows use the same web-only
+    // `<div>` wrapper workaround. This test fails immediately if that
+    // wrapper (or the `testID` prop) is ever removed.
+    it('emits data-testid="roster-slot-{positionId}" on lineup slot rows', () => {
+      const { container } = render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+        />,
+      );
+      expect(
+        container.querySelector('[data-testid="roster-slot-1"]'),
+      ).not.toBeNull();
+    });
+
+    it('emits data-testid="roster-bench-{playerId}" on bench rows', () => {
+      const { container } = render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+        />,
+      );
+      expect(
+        container.querySelector('[data-testid="roster-bench-102"]'),
+      ).not.toBeNull();
+    });
+
+    it('emits data-testid="roster-cancel-selection" on the cancel control', () => {
+      const { container } = render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: /Wade Boggs — bench/ }),
+      );
+      expect(
+        container.querySelector('[data-testid="roster-cancel-selection"]'),
+      ).not.toBeNull();
+    });
+
+    it('emits data-testid="roster-move-to-bench" when a starter is selected', () => {
+      const { container } = render(
+        <RosterBoard
+          positions={POSITIONS}
+          teamPlayers={PLAYERS}
+          onPlayerAssign={noop}
+          onPlayerRemove={noop}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole('button', { name: /Mike Johnson at C/ }),
+      );
+      expect(
+        container.querySelector('[data-testid="roster-move-to-bench"]'),
+      ).not.toBeNull();
+    });
+  });
 });
