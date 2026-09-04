@@ -45,6 +45,15 @@ set -uo pipefail
 #    REST or GraphQL call 403s no matter the endpoint. This script fails fast
 #    and loud instead; callers in that environment must not arm it at all (see
 #    AGENTS.md's Tier-2 PR-watch rule, which branches on gh availability).
+#  - Nothing in the per-poll body may crash the loop raw (LS-9337 regression of
+#    LS-8805): the LS-8805 fix only wrapped the json.load of the gh payload,
+#    leaving every other line — argv parsing, an unexpected-but-valid payload
+#    shape, any latent bug in the diff/emit logic — able to raise an uncaught
+#    traceback that kills the watch exactly like the original bug, just from a
+#    different call site. The whole per-poll body now runs inside one
+#    try/except Exception (SystemExit still propagates for the terminal-state
+#    and parse-failure exits), so any single bad poll degrades to a logged,
+#    skip-and-retry diagnostic — never a silent or raw death.
 
 PR_NUMBER="${1:?usage: watch-pr.sh <PR#> [interval-seconds]}"
 INTERVAL="${2:-90}"
@@ -174,9 +183,25 @@ import json, os, sys
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-state_file, cur_json_file, pr, now_ts, rebaseline, stall_secs = (
-    sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5] == "1", int(sys.argv[6]))
+try:
+    state_file, cur_json_file, pr, now_ts, rebaseline, stall_secs = (
+        sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4]), sys.argv[5] == "1", int(sys.argv[6]))
+except (IndexError, ValueError) as e:
+    print(f"watch: malformed poll arguments this cycle ({e}) — skipping, will retry next interval.")
+    sys.exit(2)
 
+# Everything below processes one gh poll response. A single bad or
+# unexpectedly-shaped payload (empty body, non-JSON text, valid JSON of the
+# wrong type, an unforeseen field shape) must never crash this loop raw — a
+# raw traceback here is indistinguishable, from the arming agent's side, from
+# the original LS-8805 bug, and kills the mandated watch just the same
+# (LS-9337: the narrower json.load-only guard added for LS-8805 left every
+# other line in this block unguarded, so the same "watch dies mid-poll"
+# symptom recurred from a different, unguarded exception). Catch anything
+# unexpected, print one diagnostic line so the Monitor event stream and
+# output file both carry the reason, and exit 2 so the bash loop counts it
+# toward consec_failures — a persistent regression still trips the existing
+# "watch is DEAD" safety net; a single bad poll never does.
 try:
     with open(cur_json_file, encoding="utf-8") as f:
         cur = json.load(f)
@@ -184,188 +209,203 @@ except (OSError, json.JSONDecodeError) as e:
     print(f"watch #{pr}: malformed gh payload this poll ({e}) — skipping, will retry next interval.")
     sys.exit(2)
 
-prev = {}
-if os.path.exists(state_file):
-    try:
-        with open(state_file) as f:
-            prev = json.load(f)
-    except Exception:
-        prev = {}
-baseline = not prev  # first successful poll after arming
+if not isinstance(cur, dict):
+    print(f"watch #{pr}: unexpected gh payload shape this poll (got {type(cur).__name__}, expected object) — skipping, will retry next interval.")
+    sys.exit(2)
 
-sha = (cur.get("headRefOid") or "")[:7]
-emitted = set(prev.get("emitted", []))
-pending = dict(prev.get("pending", {}))  # condition-key -> consecutive-poll count
-events = []
 
-def emit_once(key, line):
-    if key not in emitted:
-        events.append(line)
-        emitted.add(key)
+def _poll_body(cur, state_file, pr, now_ts, rebaseline, stall_secs):
+    prev = {}
+    if os.path.exists(state_file):
+        try:
+            with open(state_file) as f:
+                prev = json.load(f)
+        except Exception:
+            prev = {}
+    baseline = not prev  # first successful poll after arming
 
-def emit_debounced(key, line, active):
-    """Emit after the condition holds for 2 consecutive polls; reset when clear."""
-    if not active:
-        pending.pop(key, None)
-        return
-    pending[key] = pending.get(key, 0) + 1
-    if pending[key] >= 2:
-        emit_once(key, line)
+    sha = (cur.get("headRefOid") or "")[:7]
+    emitted = set(prev.get("emitted", []))
+    pending = dict(prev.get("pending", {}))  # condition-key -> consecutive-poll count
+    events = []
 
-# --- Terminal states (computed from current state alone; ignore rebaseline) ---
-state = cur.get("state", "")
-if state == "MERGED":
-    print(f"PR #{pr} MERGED — terminal. Proceed to post-merge steps: verify Jira Done, complete tracking tasks, MCP gap audit.")
-    sys.exit(10)
-if state == "CLOSED":
-    print(f"PR #{pr} CLOSED without merge — terminal. Report and stop.")
-    sys.exit(10)
+    def emit_once(key, line):
+        if key not in emitted:
+            events.append(line)
+            emitted.add(key)
 
-# --- Normalize the merge-gate picture from statusCheckRollup ---
-# CheckRun nodes can appear more than once per name (Actions job run + the
-# sweep's API-owned run live in different suites); newest startedAt wins —
-# matching the newest-run-wins semantics of the merge gate and the sweep.
-checks = {}      # name -> node (newest)
-statuses = {}    # context -> state
-for node in (cur.get("statusCheckRollup") or []):
-    t = node.get("__typename", "")
-    if t == "CheckRun":
-        name = node.get("name", "")
-        prev_node = checks.get(name)
-        if prev_node is None or (node.get("startedAt") or "") >= (prev_node.get("startedAt") or ""):
-            checks[name] = node
-    elif t == "StatusContext":
-        statuses[node.get("context", "")] = node.get("state", "")
+    def emit_debounced(key, line, active):
+        """Emit after the condition holds for 2 consecutive polls; reset when clear."""
+        if not active:
+            pending.pop(key, None)
+            return
+        pending[key] = pending.get(key, 0) + 1
+        if pending[key] >= 2:
+            emit_once(key, line)
 
-labels = {l.get("name", "") for l in (cur.get("labels") or [])}
-prev_labels = set(prev.get("labels", []))
+    # --- Terminal states (computed from current state alone; ignore rebaseline) ---
+    state = cur.get("state", "")
+    if state == "MERGED":
+        print(f"PR #{pr} MERGED — terminal. Proceed to post-merge steps: verify Jira Done, complete tracking tasks, MCP gap audit.")
+        sys.exit(10)
+    if state == "CLOSED":
+        print(f"PR #{pr} CLOSED without merge — terminal. Report and stop.")
+        sys.exit(10)
 
-# --- Conflict (corroborated + debounced; label is never the trigger) ---
-nmc = checks.get("No Merge Conflicts")
-nmc_red = bool(nmc and nmc.get("conclusion") == "FAILURE")
-conflicting = cur.get("mergeable") == "CONFLICTING" or nmc_red
-emit_debounced(
-    f"conflict:{sha}",
-    f"conflict: PR #{pr} has merge conflicts with main on {sha} "
-    f"(mergeable={cur.get('mergeable')}, No Merge Conflicts={'red' if nmc_red else 'n/a'}). "
-    f"Run /rebase now: resolve, push --force-with-lease, re-apply bot:ready-for-review.",
-    conflicting,
-)
+    # --- Normalize the merge-gate picture from statusCheckRollup ---
+    # CheckRun nodes can appear more than once per name (Actions job run + the
+    # sweep's API-owned run live in different suites); newest startedAt wins —
+    # matching the newest-run-wins semantics of the merge gate and the sweep.
+    checks = {}      # name -> node (newest)
+    statuses = {}    # context -> state
+    for node in (cur.get("statusCheckRollup") or []):
+        t = node.get("__typename", "")
+        if t == "CheckRun":
+            name = node.get("name", "")
+            prev_node = checks.get(name)
+            if prev_node is None or (node.get("startedAt") or "") >= (prev_node.get("startedAt") or ""):
+                checks[name] = node
+        elif t == "StatusContext":
+            statuses[node.get("context", "")] = node.get("state", "")
 
-# --- Red required contexts + early-signal CI Pipeline checks (debounced) ---
-RED_CHECK = {"FAILURE", "TIMED_OUT"}
-for name, node in checks.items():
-    if name == "No Merge Conflicts":
-        continue  # handled above
-    required = name == "Verify All Migrations Applied"
-    early = name.startswith("\U0001F680 CI Pipeline /")
-    if (required or early) and node.get("conclusion") in RED_CHECK:
-        emit_debounced(
-            f"red:{name}:{sha}",
-            f"check red: '{name}' = {node.get('conclusion')} on {sha} — triage per ci-event-response.md (ci_list_runs → ci_get_logs).",
-            True,
-        )
-    else:
-        pending.pop(f"red:{name}:{sha}", None)
-for ctx in ("bot-review", "CI Gate"):
-    st = statuses.get(ctx)
+    labels = {l.get("name", "") for l in (cur.get("labels") or [])}
+    prev_labels = set(prev.get("labels", []))
+
+    # --- Conflict (corroborated + debounced; label is never the trigger) ---
+    nmc = checks.get("No Merge Conflicts")
+    nmc_red = bool(nmc and nmc.get("conclusion") == "FAILURE")
+    conflicting = cur.get("mergeable") == "CONFLICTING" or nmc_red
     emit_debounced(
-        f"red-status:{ctx}:{sha}",
-        f"status red: '{ctx}' = {st} on {sha} — "
-        + ("fetch review threads and respond per Author Agent Contract." if ctx == "bot-review"
-           else "the CI pipeline failed; triage per ci-event-response.md."),
-        st in ("FAILURE", "ERROR"),
+        f"conflict:{sha}",
+        f"conflict: PR #{pr} has merge conflicts with main on {sha} "
+        f"(mergeable={cur.get('mergeable')}, No Merge Conflicts={'red' if nmc_red else 'n/a'}). "
+        f"Run /rebase now: resolve, push --force-with-lease, re-apply bot:ready-for-review.",
+        conflicting,
     )
 
-# --- Label transitions (post-baseline only; adds of escalation/CI labels) ---
-WATCHED_ADD = {"needs-human-arbitration", "needs-human-security-review",
-               "needs-human-review", "review-bot-degraded", "review-bot-billing",
-               "ci-stuck"}
-# LS-9812: review-bot-billing is the one watched label whose remedy is NOT
-# "retry the bot" — the reviewer has no API credits, so re-applying
-# bot:ready-for-review just burns another run. Say so explicitly rather than
-# routing it to the generic triage doc.
-LABEL_ADD_HINTS = {
-    "review-bot-billing":
-        "label: 'review-bot-billing' added to PR #{pr} — the Reviewer Bot's LLM "
-        "credits are depleted. Do NOT re-apply bot:ready-for-review; it cannot "
-        "succeed. Escalate to the account owner to top up billing.",
-}
-if not baseline and not rebaseline:
-    for lbl in sorted(labels - prev_labels):
-        if lbl in WATCHED_ADD or (lbl.startswith("CI: ") and lbl != "CI: Conflicts"):
-            hint = LABEL_ADD_HINTS.get(lbl)
-            emit_once(f"label-add:{lbl}:{sha}",
-                      hint.format(pr=pr) if hint
-                      else f"label: '{lbl}' added to PR #{pr} — triage per ci-event-response.md.")
-    if "merge-when-ready" in prev_labels and "merge-when-ready" not in labels:
-        emit_once(f"mwr-removed:{sha}",
-                  f"label: merge-when-ready removed from PR #{pr} — a required check went red or the gate stripped it; fix the upstream cause, never re-add manually.")
+    # --- Red required contexts + early-signal CI Pipeline checks (debounced) ---
+    RED_CHECK = {"FAILURE", "TIMED_OUT"}
+    for name, node in checks.items():
+        if name == "No Merge Conflicts":
+            continue  # handled above
+        required = name == "Verify All Migrations Applied"
+        early = name.startswith("\U0001F680 CI Pipeline /")
+        if (required or early) and node.get("conclusion") in RED_CHECK:
+            emit_debounced(
+                f"red:{name}:{sha}",
+                f"check red: '{name}' = {node.get('conclusion')} on {sha} — triage per ci-event-response.md (ci_list_runs → ci_get_logs).",
+                True,
+            )
+        else:
+            pending.pop(f"red:{name}:{sha}", None)
+    for ctx in ("bot-review", "CI Gate"):
+        st = statuses.get(ctx)
+        emit_debounced(
+            f"red-status:{ctx}:{sha}",
+            f"status red: '{ctx}' = {st} on {sha} — "
+            + ("fetch review threads and respond per Author Agent Contract." if ctx == "bot-review"
+               else "the CI pipeline failed; triage per ci-event-response.md."),
+            st in ("FAILURE", "ERROR"),
+        )
 
-# --- New reviews (post-baseline only) ---
-def review_key(r):
-    return f"{r.get('author', {}).get('login', '?')}:{r.get('state', '?')}:{r.get('submittedAt', '?')}"
-cur_reviews = {review_key(r) for r in (cur.get("latestReviews") or [])}
-prev_reviews = set(prev.get("reviews", []))
-if not baseline and not rebaseline:
-    for r in (cur.get("latestReviews") or []):
-        k = review_key(r)
-        if k not in prev_reviews:
-            emit_once(f"review:{k}",
-                      f"review: {r.get('author', {}).get('login', '?')} submitted {r.get('state', '?')} on PR #{pr} — respond per Author Agent Contract (FIX:/JUSTIFY:), then re-apply bot:ready-for-review.")
+    # --- Label transitions (post-baseline only; adds of escalation/CI labels) ---
+    WATCHED_ADD = {"needs-human-arbitration", "needs-human-security-review",
+                   "needs-human-review", "review-bot-degraded", "review-bot-billing",
+                   "ci-stuck"}
+    # LS-9812: review-bot-billing is the one watched label whose remedy is NOT
+    # "retry the bot" — the reviewer has no API credits, so re-applying
+    # bot:ready-for-review just burns another run. Say so explicitly rather than
+    # routing it to the generic triage doc.
+    LABEL_ADD_HINTS = {
+        "review-bot-billing":
+            "label: 'review-bot-billing' added to PR #{pr} — the Reviewer Bot's LLM "
+            "credits are depleted. Do NOT re-apply bot:ready-for-review; it cannot "
+            "succeed. Escalate to the account owner to top up billing.",
+    }
+    if not baseline and not rebaseline:
+        for lbl in sorted(labels - prev_labels):
+            if lbl in WATCHED_ADD or (lbl.startswith("CI: ") and lbl != "CI: Conflicts"):
+                hint = LABEL_ADD_HINTS.get(lbl)
+                emit_once(f"label-add:{lbl}:{sha}",
+                          hint.format(pr=pr) if hint
+                          else f"label: '{lbl}' added to PR #{pr} — triage per ci-event-response.md.")
+        if "merge-when-ready" in prev_labels and "merge-when-ready" not in labels:
+            emit_once(f"mwr-removed:{sha}",
+                      f"label: merge-when-ready removed from PR #{pr} — a required check went red or the gate stripped it; fix the upstream cause, never re-add manually.")
 
-# --- All-required-terminal summary (once per head SHA) ---
-REQUIRED_STATUSES = ("bot-review", "CI Gate")
-REQUIRED_CHECKS = ("No Merge Conflicts", "Verify All Migrations Applied")
-gate = {}
-all_terminal = True
-for ctx in REQUIRED_STATUSES:
-    st = statuses.get(ctx, "ABSENT")
-    gate[ctx] = st
-    if st in ("ABSENT", "PENDING", "EXPECTED"):
-        all_terminal = False
-for name in REQUIRED_CHECKS:
-    node = checks.get(name)
-    concl = (node or {}).get("conclusion") or "ABSENT"
-    gate[name] = concl
-    if concl in ("ABSENT", "") or (node or {}).get("status") not in ("COMPLETED", None):
-        all_terminal = False
-if all_terminal and not cur.get("isDraft"):
-    summary = ", ".join(f"{k}={v}" for k, v in gate.items())
-    emit_once(f"gate-terminal:{sha}",
-              f"gate complete on {sha}: {summary} — evaluate merge readiness (if all green, the Reviewer Bot applies merge-when-ready itself; if any red, fix it).")
+    # --- New reviews (post-baseline only) ---
+    def review_key(r):
+        return f"{r.get('author', {}).get('login', '?')}:{r.get('state', '?')}:{r.get('submittedAt', '?')}"
+    cur_reviews = {review_key(r) for r in (cur.get("latestReviews") or [])}
+    prev_reviews = set(prev.get("reviews", []))
+    if not baseline and not rebaseline:
+        for r in (cur.get("latestReviews") or []):
+            k = review_key(r)
+            if k not in prev_reviews:
+                emit_once(f"review:{k}",
+                          f"review: {r.get('author', {}).get('login', '?')} submitted {r.get('state', '?')} on PR #{pr} — respond per Author Agent Contract (FIX:/JUSTIFY:), then re-apply bot:ready-for-review.")
 
-# --- Stall detection: required statuses absent/pending with no progress ---
-# This is the SKIPPED-pipeline stall (ci-event-response.md "Pipeline Skipped /
-# Never Ran"): bot-review and CI Gate never go red when the pipeline never
-# fires — they stay absent. Nothing else would ever emit, so the watch must.
-fingerprint = json.dumps({"c": {k: (v.get("status"), v.get("conclusion")) for k, v in sorted(checks.items())},
-                          "s": dict(sorted(statuses.items()))}, sort_keys=True)
-if fingerprint != prev.get("fingerprint") or sha != prev.get("sha"):
-    progress_ts = now_ts
-else:
-    progress_ts = prev.get("progress_ts", now_ts)
-gate_incomplete = not all_terminal
-if (gate_incomplete and not cur.get("isDraft")
-        and now_ts - progress_ts > stall_secs and not rebaseline):
-    missing = [k for k, v in gate.items() if v in ("ABSENT", "PENDING", "EXPECTED", "")]
-    emit_once(f"stall:{sha}:{progress_ts}",
-              f"stall: no merge-gate progress on {sha} for {(now_ts - progress_ts) // 60} min (incomplete: {', '.join(missing) or 'unknown'}) — probable SKIPPED pipeline; re-apply bot:ready-for-review as the LAST label op, then confirm the pipeline starts.")
+    # --- All-required-terminal summary (once per head SHA) ---
+    REQUIRED_STATUSES = ("bot-review", "CI Gate")
+    REQUIRED_CHECKS = ("No Merge Conflicts", "Verify All Migrations Applied")
+    gate = {}
+    all_terminal = True
+    for ctx in REQUIRED_STATUSES:
+        st = statuses.get(ctx, "ABSENT")
+        gate[ctx] = st
+        if st in ("ABSENT", "PENDING", "EXPECTED"):
+            all_terminal = False
+    for name in REQUIRED_CHECKS:
+        node = checks.get(name)
+        concl = (node or {}).get("conclusion") or "ABSENT"
+        gate[name] = concl
+        if concl in ("ABSENT", "") or (node or {}).get("status") not in ("COMPLETED", None):
+            all_terminal = False
+    if all_terminal and not cur.get("isDraft"):
+        summary = ", ".join(f"{k}={v}" for k, v in gate.items())
+        emit_once(f"gate-terminal:{sha}",
+                  f"gate complete on {sha}: {summary} — evaluate merge readiness (if all green, the Reviewer Bot applies merge-when-ready itself; if any red, fix it).")
 
-# --- Persist state ---
-with open(state_file, "w") as f:
-    json.dump({
-        "sha": sha,
-        "labels": sorted(labels),
-        "reviews": sorted(cur_reviews),
-        "emitted": sorted(emitted),
-        "pending": pending,
-        "fingerprint": fingerprint,
-        "progress_ts": progress_ts,
-    }, f)
+    # --- Stall detection: required statuses absent/pending with no progress ---
+    # This is the SKIPPED-pipeline stall (ci-event-response.md "Pipeline Skipped /
+    # Never Ran"): bot-review and CI Gate never go red when the pipeline never
+    # fires — they stay absent. Nothing else would ever emit, so the watch must.
+    fingerprint = json.dumps({"c": {k: (v.get("status"), v.get("conclusion")) for k, v in sorted(checks.items())},
+                              "s": dict(sorted(statuses.items()))}, sort_keys=True)
+    if fingerprint != prev.get("fingerprint") or sha != prev.get("sha"):
+        progress_ts = now_ts
+    else:
+        progress_ts = prev.get("progress_ts", now_ts)
+    gate_incomplete = not all_terminal
+    if (gate_incomplete and not cur.get("isDraft")
+            and now_ts - progress_ts > stall_secs and not rebaseline):
+        missing = [k for k, v in gate.items() if v in ("ABSENT", "PENDING", "EXPECTED", "")]
+        emit_once(f"stall:{sha}:{progress_ts}",
+                  f"stall: no merge-gate progress on {sha} for {(now_ts - progress_ts) // 60} min (incomplete: {', '.join(missing) or 'unknown'}) — probable SKIPPED pipeline; re-apply bot:ready-for-review as the LAST label op, then confirm the pipeline starts.")
 
-for line in events:
-    print(line)
+    # --- Persist state ---
+    with open(state_file, "w") as f:
+        json.dump({
+            "sha": sha,
+            "labels": sorted(labels),
+            "reviews": sorted(cur_reviews),
+            "emitted": sorted(emitted),
+            "pending": pending,
+            "fingerprint": fingerprint,
+            "progress_ts": progress_ts,
+        }, f)
+
+    for line in events:
+        print(line)
+
+
+try:
+    _poll_body(cur, state_file, pr, now_ts, rebaseline, stall_secs)
+except SystemExit:
+    raise
+except Exception as e:
+    print(f"watch #{pr}: unexpected error processing this poll ({type(e).__name__}: {e}) — skipping, will retry next interval.")
+    sys.exit(2)
 PYEOF
   py_rc=$?
   if [ $py_rc -eq 10 ]; then
