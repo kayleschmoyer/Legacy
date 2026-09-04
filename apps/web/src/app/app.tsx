@@ -11,6 +11,7 @@ import { styled } from 'tamagui';
 import { Menu } from '@tamagui/lucide-icons/icons/Menu';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { prefetchHomePage } from '../utils/prefetchHomePage';
+import { PlayersStatsRedirectPage } from '../pages/players/PlayersStatsRedirectPage';
 import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { NotificationDropdown } from '../components/layout/NotificationDropdown';
@@ -51,11 +52,6 @@ const PlayerStatsPage = lazyWithRetry(() =>
 const PlayerDetailPage = lazyWithRetry(() =>
   import('../pages/players/PlayerStatsPage').then((m) => ({
     default: m.PlayerDetailPage,
-  })),
-);
-const PlayersStatsRedirectPage = lazyWithRetry(() =>
-  import('../pages/players/PlayersStatsRedirectPage').then((m) => ({
-    default: m.PlayersStatsRedirectPage,
   })),
 );
 const PlayerComparisonPage = lazyWithRetry(() =>
@@ -862,6 +858,13 @@ function App() {
                 (LS-9076) — /players/stats redirects here, preserving the
                 query string. */}
             <Route path="/players" element={<PlayerStatsPage />} />
+            {/* Statically imported (LS-9360) rather than lazyWithRetry'd like
+                its siblings: this route does nothing but call <Navigate>, so
+                code-splitting it added a chunk-fetch (Suspense fallback +
+                network round trip) to the critical path of a redirect that
+                should be instantaneous — the likely cause of the flaky
+                15s-timeout E2E failures on the /players/stats → /players
+                assertion. */}
             <Route
               path="/players/stats"
               element={<PlayersStatsRedirectPage />}
