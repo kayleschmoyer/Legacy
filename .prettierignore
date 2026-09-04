@@ -5,6 +5,10 @@
 /.modules-pool
 /.nx/cache
 /.nx/workspace-data
+# Nx cache directory (NX_CACHE_DIRECTORY in CI) — generated during the run itself,
+# so it can never satisfy prettier and false-reds workflow_dispatch runs on main
+# where the whole-repo path (no PR base SHA) picks it up (LS-9601)
+/.nx-cache
 # Static bundles are checked in but should not be reformatted automatically
 static/environment.js
 static/main.js
