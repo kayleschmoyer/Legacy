@@ -345,10 +345,25 @@ function linkWorktreeToSlot(target) {
  * workspace package genuinely has no deps). Non-fatal: nested linking is only
  * required for native/Metro builds, not the common web/lambda dev path, so a
  * failure here must never abort node_modules linking, which already succeeded.
+ *
+ * IMPORTANT (LS-9563): the outer per-package `node_modules` dir is never
+ * symlinked wholesale to the shared pool slot. A slot is shared by every
+ * worktree on the same lockfile hash, but the `@legacy-sports/*`
+ * workspace-protocol entries inside a captured nested dir were created by
+ * pnpm inside whichever worktree first materialised the slot — on Windows
+ * those are absolute symlinks pointing at THAT worktree's own lib/apps
+ * source. Sharing the captured dir as-is means every other worktree hitting
+ * the slot silently resolves workspace-package imports (and jest.mock()'s
+ * "real" module) to a different worktree's source tree, with no error.
+ * Instead `dest` is a real, per-worktree directory, and each workspace-
+ * package entry inside it is individually (re)linked straight at THIS
+ * worktree's own source, using the captured dir only to learn which entries
+ * need linking — never as the symlink target.
  */
 function linkNestedWorkspaceModules(slot) {
   const nestedRoot = join(slot, 'nested');
   if (!existsSync(nestedRoot)) return;
+  const pkgNameToPath = buildWorkspacePackageNameMap();
   let linked = 0;
   for (const rel of nestedNodeModulesRelPaths(lockfilePath)) {
     const src = join(nestedRoot, rel, 'node_modules');
@@ -356,8 +371,12 @@ function linkNestedWorkspaceModules(slot) {
     const dest = join(worktree, rel, 'node_modules');
     try {
       mkdirSync(dirname(dest), { recursive: true });
-      ensureDirSymlink(dest, src, `${rel}/node_modules`);
-      linked++;
+      linked += relinkNestedNodeModulesDir(
+        dest,
+        src,
+        pkgNameToPath,
+        `${rel}/node_modules`,
+      );
     } catch (err) {
       console.warn(
         `[warn] ${rel}/node_modules: failed to link nested workspace module: ${String(err.message ?? err)}`,
@@ -366,9 +385,80 @@ function linkNestedWorkspaceModules(slot) {
   }
   if (linked > 0) {
     console.log(
-      `[ok] ${linked} nested workspace node_modules dir(s) linked (needed for native/Metro builds).`,
+      `[ok] ${linked} nested workspace node_modules entr(y/ies) linked to this worktree's own source (needed for native/Metro builds).`,
     );
   }
+}
+
+/**
+ * Map every workspace package's `package.json` `name` (e.g.
+ * "@legacy-sports/shared-components") to its ABSOLUTE path in THIS worktree
+ * (e.g. "<worktree>/lib/shared-components"). Built from the same importer
+ * list `nestedNodeModulesRelPaths` already trusts, so it covers exactly the
+ * workspace packages pnpm actually resolved for this lockfile. Best-effort
+ * per package: a member missing/unreadable `package.json` is simply absent
+ * from the map, and callers fall back to the slot's own (possibly stale)
+ * capture for anything not found here.
+ */
+function buildWorkspacePackageNameMap() {
+  const map = new Map();
+  for (const rel of nestedNodeModulesRelPaths(lockfilePath)) {
+    let name;
+    try {
+      name = JSON.parse(
+        readFileSync(join(worktree, rel, 'package.json'), 'utf-8'),
+      ).name;
+    } catch {
+      continue;
+    }
+    if (typeof name === 'string' && name.length > 0) {
+      map.set(name, resolve(worktree, rel));
+    }
+  }
+  return map;
+}
+
+/**
+ * Repopulate one per-package `node_modules` dir (`dest`, e.g.
+ * "<worktree>/apps/web/node_modules") as a real, worktree-local directory
+ * mirroring the entries captured in the pool slot (`src`). Scoped entries
+ * (`@legacy-sports/<pkg>`) are linked straight at `pkgNameToPath`'s
+ * worktree-local path for that package name when known — never at the
+ * slot's own copy of the symlink, which may point at a different worktree
+ * entirely (LS-9563). Any other captured entry (unexpected in practice — see
+ * the file-header comment — but handled for forward-compatibility) falls
+ * back to linking at the slot's copy, matching the previous whole-dir-link
+ * behaviour. Returns the number of entries linked.
+ */
+function relinkNestedNodeModulesDir(dest, src, pkgNameToPath, label) {
+  // A prior run of this script (pre-LS-9563) may have left `dest` as a
+  // whole-dir symlink straight into the pool slot — drop it so `dest`
+  // becomes a real directory we own.
+  const destSt = safeLstat(dest);
+  if (destSt && destSt.isSymbolicLink()) {
+    removeNodeModulesEntry(dest);
+  }
+  mkdirSync(dest, { recursive: true });
+
+  let linked = 0;
+  for (const entry of readdirSync(src)) {
+    const entrySrc = join(src, entry);
+    if (!entry.startsWith('@')) {
+      // Not a scoped workspace-package entry — preserve prior behaviour.
+      ensureDirSymlink(join(dest, entry), entrySrc, `${label}/${entry}`);
+      linked++;
+      continue;
+    }
+    const scopeDir = join(dest, entry);
+    mkdirSync(scopeDir, { recursive: true });
+    for (const pkg of safeReaddirNames(entrySrc)) {
+      const key = `${entry}/${pkg}`;
+      const target = pkgNameToPath.get(key) ?? join(entrySrc, pkg);
+      ensureDirSymlink(join(scopeDir, pkg), target, `${label}/${key}`);
+      linked++;
+    }
+  }
+  return linked;
 }
 
 /**

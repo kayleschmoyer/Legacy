@@ -20,6 +20,7 @@ import {
   rmSync,
   existsSync,
   lstatSync,
+  statSync,
   realpathSync,
   utimesSync,
   readdirSync,
@@ -1094,6 +1095,15 @@ test(
     const root = freshMainRepo();
     try {
       const wt = makeWorktree(root, 'nested-wt', LOCK_WORKSPACE);
+      // Give the workspace member a real package.json so
+      // buildWorkspacePackageNameMap() can resolve
+      // "@legacy-sports/shared-components" straight to this worktree's own
+      // lib/shared-components — the whole point of LS-9563.
+      mkdirSync(join(wt, 'lib', 'shared-components'), { recursive: true });
+      writeFileSync(
+        join(wt, 'lib', 'shared-components', 'package.json'),
+        JSON.stringify({ name: '@legacy-sports/shared-components' }),
+      );
       const hash = runLink([
         `--worktree=${wt}`,
         `--main-repo=${root}`,
@@ -1120,21 +1130,91 @@ test(
         'nested node_modules must be captured into the slot',
       );
 
+      // The outer per-package node_modules dir must be a REAL, worktree-local
+      // directory — never a symlink straight into the shared pool slot
+      // (LS-9563: the slot's own nested capture may belong to a different
+      // worktree).
       const appNm = join(wt, 'apps', 'app', 'node_modules');
       assert.ok(
-        lstatSync(appNm).isSymbolicLink(),
-        'apps/app/node_modules must be a symlink',
+        !lstatSync(appNm).isSymbolicLink() && statSync(appNm).isDirectory(),
+        'apps/app/node_modules must be a real, worktree-local directory',
+      );
+      const linkedPkg = join(appNm, '@legacy-sports', 'shared-components');
+      assert.ok(
+        lstatSync(linkedPkg).isSymbolicLink(),
+        'the individual @legacy-sports/shared-components entry must be a symlink',
       );
       assert.equal(
-        realpathSync(appNm),
-        realpathSync(join(slotNested, 'apps', 'app', 'node_modules')),
-        'apps/app/node_modules must point into the slot',
+        realpathSync(linkedPkg),
+        realpathSync(join(wt, 'lib', 'shared-components')),
+        "nested @legacy-sports/shared-components must link straight at THIS worktree's own source, not the pool slot",
       );
 
       const libNm = join(wt, 'lib', 'shared-components', 'node_modules');
       assert.ok(
-        lstatSync(libNm).isSymbolicLink(),
-        'lib/shared-components/node_modules must be a symlink too',
+        !lstatSync(libNm).isSymbolicLink() && statSync(libNm).isDirectory(),
+        'lib/shared-components/node_modules must be a real, worktree-local directory too',
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'nested @legacy-sports symlinks always resolve to the CURRENT worktree, never a sibling worktree sharing the pool slot (LS-9563)',
+  { skip: SYMLINK_OK ? false : 'no symlink capability' },
+  () => {
+    const root = freshMainRepo();
+    try {
+      const wt1 = makeWorktree(root, 'wt1-nested', LOCK_WORKSPACE);
+      const wt2 = makeWorktree(root, 'wt2-nested', LOCK_WORKSPACE);
+      for (const wt of [wt1, wt2]) {
+        mkdirSync(join(wt, 'lib', 'shared-components'), { recursive: true });
+        writeFileSync(
+          join(wt, 'lib', 'shared-components', 'package.json'),
+          JSON.stringify({ name: '@legacy-sports/shared-components' }),
+        );
+      }
+
+      const shim = join(root, 'fake-bin');
+      makeFakePnpmWithNested(shim);
+      // wt1 materialises the shared pool slot (pool miss).
+      runLink([`--worktree=${wt1}`, `--main-repo=${root}`], fakePnpmEnv(shim));
+      // wt2 shares the same lockfile hash — a pool HIT against the slot wt1
+      // just built.
+      runLink([`--worktree=${wt2}`, `--main-repo=${root}`]);
+
+      const link1 = join(
+        wt1,
+        'apps',
+        'app',
+        'node_modules',
+        '@legacy-sports',
+        'shared-components',
+      );
+      const link2 = join(
+        wt2,
+        'apps',
+        'app',
+        'node_modules',
+        '@legacy-sports',
+        'shared-components',
+      );
+      assert.equal(
+        realpathSync(link1),
+        realpathSync(join(wt1, 'lib', 'shared-components')),
+        "wt1's nested symlink must resolve to wt1's own source",
+      );
+      assert.equal(
+        realpathSync(link2),
+        realpathSync(join(wt2, 'lib', 'shared-components')),
+        "wt2's nested symlink must resolve to wt2's own source, not wt1's (LS-9563)",
+      );
+      assert.notEqual(
+        realpathSync(link1),
+        realpathSync(link2),
+        'sibling worktrees sharing a pool slot must never resolve a workspace package to the same source directory',
       );
     } finally {
       rmSync(root, { recursive: true, force: true });
@@ -1170,16 +1250,26 @@ test(
 
       runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
 
+      // The outer dir is real and worktree-local (LS-9563); the individual
+      // captured entry is what gets linked.
       const appNm = join(wt, 'apps', 'app', 'node_modules');
       assert.ok(
-        lstatSync(appNm).isSymbolicLink(),
-        'apps/app/node_modules must be linked on a cache hit too',
+        !lstatSync(appNm).isSymbolicLink() && statSync(appNm).isDirectory(),
+        'apps/app/node_modules must be a real, worktree-local directory on a cache hit too',
       );
-      assert.equal(realpathSync(appNm), realpathSync(slotNested));
+      const markerLink = join(appNm, 'marker.txt');
+      assert.ok(lstatSync(markerLink).isSymbolicLink());
+      assert.equal(
+        realpathSync(markerLink),
+        realpathSync(join(slotNested, 'marker.txt')),
+      );
 
       // Idempotent.
       runLink([`--worktree=${wt}`, `--main-repo=${root}`]);
-      assert.equal(realpathSync(appNm), realpathSync(slotNested));
+      assert.equal(
+        realpathSync(markerLink),
+        realpathSync(join(slotNested, 'marker.txt')),
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
