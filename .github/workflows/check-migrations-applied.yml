@@ -241,6 +241,9 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           MIGRATION_OUTCOME: ${{ steps.migration-check.outcome }}
+          MIGRATION_STATUS: ${{ steps.migration-check.outputs.migration_status }}
+          MIGRATION_PENDING: ${{ steps.migration-check.outputs.pending_migrations }}
+          MIGRATION_ERROR: ${{ steps.migration-check.outputs.migration_error }}
           MIGRATION_LOG: ${{ runner.temp }}/migrations.log
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -263,21 +266,52 @@ jobs:
 
             let log = '';
             try { log = fs.readFileSync(process.env.MIGRATION_LOG, 'utf8'); } catch {}
-            const { summary, excerpt } = distill({ tool: 'generic', text: log, runUrl });
+            const { excerpt } = distill({ tool: 'generic', text: log, runUrl });
             const headSha = context.payload.pull_request?.head?.sha || context.sha;
 
-            const content = [
-              statusHeading('Migrations', 'fail', summary || 'unapplied migrations', headSha),
-              '',
-              detailsBlock({
-                check: 'migrations',
-                label: 'migrations not applied',
-                sublabel: summary || '',
-                excerpt,
-              }),
-              '',
-              fixLine('apply the pending migrations to the database', runUrl),
-            ].join('\n').trim();
+            // LS-9599: only claim "unapplied migrations" when the script actually
+            // connected, compared applied-vs-disk state, and found a gap
+            // (migration_status === 'pending'). Any other outcome — a connect,
+            // auth, or timeout failure classified as 'infra', an unexpected
+            // 'error', or a missing status from an older/crashed run — means the
+            // script never established that basis, so it must not point an agent
+            // at "apply the pending migrations" for what may be a pure infra flake.
+            const status = process.env.MIGRATION_STATUS || '';
+            let content;
+
+            if (status === 'pending') {
+              const pendingList = (process.env.MIGRATION_PENDING || '')
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+              const summary = `${pendingList.length} migration${pendingList.length === 1 ? '' : 's'} not applied`;
+              content = [
+                statusHeading('Migrations', 'fail', summary, headSha),
+                '',
+                detailsBlock({
+                  check: 'migrations',
+                  label: 'migrations not applied',
+                  sublabel: pendingList.length ? pendingList.join(', ') : summary,
+                  excerpt,
+                }),
+                '',
+                fixLine('apply the pending migrations to the database', runUrl),
+              ].join('\n').trim();
+            } else {
+              const summary = 'could not determine migration state (infra)';
+              content = [
+                statusHeading('Migrations', 'fail', summary, headSha),
+                '',
+                detailsBlock({
+                  check: 'migrations',
+                  label: 'could not determine migration state',
+                  sublabel: process.env.MIGRATION_ERROR || '',
+                  excerpt,
+                }),
+                '',
+                fixLine('re-run; check RDS reachability from the runner', runUrl),
+              ].join('\n').trim();
+            }
 
             await applySection({
               github, context, prNumber,
