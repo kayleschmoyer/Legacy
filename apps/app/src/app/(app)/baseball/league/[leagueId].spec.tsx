@@ -635,6 +635,26 @@ describe('BaseballLeagueId', () => {
     });
   });
 
+  // LS-9501 (follow-up to LS-6332 / FLD-019) — spectators / non-members have
+  // no userTeamId; the roster tab must not render the management UI (with its
+  // assign/remove/swap affordances) for them.
+  describe('roster tab for non-members (LS-9501)', () => {
+    it('shows a join prompt instead of roster management when userTeamId is null', () => {
+      mockGetUserTeamIdLazyQuery.mockReturnValue([
+        jest.fn(),
+        { data: { userTeamId: null }, loading: false },
+      ]);
+
+      render(<BaseballLeagueId />);
+      fireEvent.press(screen.getByTestId('tab-roster'));
+
+      expect(screen.queryByTestId('league-roster-management')).toBeNull();
+      expect(
+        screen.getByText('Join this league to manage a roster.'),
+      ).toBeTruthy();
+    });
+  });
+
   describe('cap-remaining data fetch (LS-6338)', () => {
     it('skips useGetTeamByIdQuery when the league is not a salary-cap league', () => {
       mockGetLeagueByIdQuery.mockReturnValue({

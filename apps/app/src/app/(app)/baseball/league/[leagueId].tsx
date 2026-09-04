@@ -751,33 +751,41 @@ export default function LeagueId(): React.JSX.Element {
 
         {visitedTabs.has('roster') && (
           <YStack flex={1} display={selectedTab === 'roster' ? 'flex' : 'none'}>
-            <LeagueRosterManagement
-              positions={positionsData?.leaguePositions || []}
-              teamPlayers={
-                (teamMembersData?.teamMembers?.filter(
-                  (member) => member !== null,
-                ) as AppTeamMemberFragment[]) || []
-              }
-              onPlayerAssign={(player, position) => {
-                void handlePlayerAssign(player, position);
-              }}
-              onPlayerRemove={(position) => {
-                void handlePlayerRemove(position);
-              }}
-              onPlayerSwap={(incoming, target, displaced) => {
-                void handlePlayerSwap(incoming, target, displaced);
-              }}
-              loading={
-                positionsLoading || teamMembersLoading || userTeamLoading
-              }
-              leagueId={numLeagueId}
-              currentWeek={league?.currentWeekNumber}
-              totalWeeks={league?.totalMatchups}
-              myTeamId={userTeamId}
-              refreshControl={rosterRefresh.refreshControl}
-              salaryCapEnabled={league?.salaryCapEnabled}
-              capSpace={capTeamData?.team?.capSpace}
-            />
+            {userTeamId != null ? (
+              <LeagueRosterManagement
+                positions={positionsData?.leaguePositions || []}
+                teamPlayers={
+                  (teamMembersData?.teamMembers?.filter(
+                    (member) => member !== null,
+                  ) as AppTeamMemberFragment[]) || []
+                }
+                onPlayerAssign={(player, position) => {
+                  void handlePlayerAssign(player, position);
+                }}
+                onPlayerRemove={(position) => {
+                  void handlePlayerRemove(position);
+                }}
+                onPlayerSwap={(incoming, target, displaced) => {
+                  void handlePlayerSwap(incoming, target, displaced);
+                }}
+                loading={
+                  positionsLoading || teamMembersLoading || userTeamLoading
+                }
+                leagueId={numLeagueId}
+                currentWeek={league?.currentWeekNumber}
+                totalWeeks={league?.totalMatchups}
+                myTeamId={userTeamId}
+                refreshControl={rosterRefresh.refreshControl}
+                salaryCapEnabled={league?.salaryCapEnabled}
+                capSpace={capTeamData?.team?.capSpace}
+              />
+            ) : (
+              <YStack flex={1} padding="$3">
+                <Text color="$textMuted">
+                  Join this league to manage a roster.
+                </Text>
+              </YStack>
+            )}
           </YStack>
         )}
 
