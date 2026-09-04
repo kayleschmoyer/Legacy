@@ -225,3 +225,34 @@ describe('PreDraftLobby — overlay positioning is platform-safe (LS-9392)', () 
     ).not.toThrow();
   });
 });
+
+// LS-9858 — the pre-draft state is presented as an event when the draft has a
+// scheduled start, and is left exactly as it was when it does not.
+describe('PreDraftLobby — Opening Day countdown (LS-9858)', () => {
+  it('shows the Opening Day block, countdown and summary when a start is scheduled', () => {
+    const scheduledAt = new Date(Date.now() + 3_600_000).toISOString();
+    const { getByText } = render(
+      <PreDraftLobby
+        {...makeProps({
+          leagueTeams: TEAMS,
+          scheduledAt,
+          roundCount: 23,
+        })}
+      />,
+    );
+    expect(getByText('Opening Day')).toBeTruthy();
+    expect(getByText(/^Your draft opens /)).toBeTruthy();
+    expect(getByText('2 managers locked in · 23 rounds')).toBeTruthy();
+  });
+
+  it('omits the Opening Day block entirely when no start is scheduled', () => {
+    const { queryByText, getByText } = render(
+      <PreDraftLobby {...makeProps({ leagueTeams: TEAMS })} />,
+    );
+    expect(queryByText('Opening Day')).toBeNull();
+    expect(queryByText(/managers locked in/)).toBeNull();
+    // Existing lobby behaviour is untouched.
+    expect(getByText('Dead Ball Dynasty')).toBeTruthy();
+    expect(getByText('Teams (2)')).toBeTruthy();
+  });
+});

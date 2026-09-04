@@ -1386,6 +1386,8 @@ export function EliteDraftBoardScreen({
         onDraftSlotTradeExecuted={() => {
           void queries.refetchDraftTeamOrder();
         }}
+        scheduledAt={queries.leagueDraft?.scheduledAt}
+        roundCount={queries.league?.maxRosterSize}
       />
     );
   }

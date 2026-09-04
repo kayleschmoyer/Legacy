@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { Button, ScrollView, Text, useMedia, XStack, YStack } from 'tamagui';
 import type { LeagueTeam } from './types';
 import { DraftSlotTradePanel } from './DraftSlotTradePanel';
+import { OpeningDayBanner } from './OpeningDayBanner';
 import type { SportKind } from '../../config/sports';
 
 interface PreDraftLobbyProps {
@@ -32,6 +33,15 @@ interface PreDraftLobbyProps {
   onInitializeDraft: (order: 'snake' | 'linear') => Promise<void>;
   /** Fired after a draft slot trade executes, so the caller can refresh draft order data. */
   onDraftSlotTradeExecuted?: () => void;
+  /**
+   * ISO scheduled draft start (`drafts.scheduled_at`, via
+   * `getLeagueDraft.scheduledAt`). Null/undefined for a league with no
+   * scheduled start — the Opening Day block is then omitted entirely rather
+   * than rendering an empty countdown (LS-9858).
+   */
+  scheduledAt?: string | null;
+  /** Draft rounds (the league's roster size), shown alongside the manager count. */
+  roundCount?: number | null;
 }
 
 const LOBBY_CHROME: Record<
@@ -151,6 +161,8 @@ export function PreDraftLobby({
   initDraftLoading,
   onInitializeDraft,
   onDraftSlotTradeExecuted,
+  scheduledAt,
+  roundCount,
 }: PreDraftLobbyProps): React.JSX.Element {
   const showTrading =
     Boolean(league?.allowDraftSlotTrading) &&
@@ -248,6 +260,14 @@ export function PreDraftLobby({
                   : 'Waiting for the commissioner to start the live draft.'}
             </Text>
           </YStack>
+
+          {scheduledAt && (
+            <OpeningDayBanner
+              scheduledAt={scheduledAt}
+              managerCount={leagueTeams.length}
+              roundCount={roundCount}
+            />
+          )}
 
           {leagueTeams.length > 0 && (
             <YStack
