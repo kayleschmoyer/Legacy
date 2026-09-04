@@ -16,7 +16,9 @@
  *  - The session's designated scratchpad directory (.../scratchpad/): the system
  *    prompt designates it for temporary files agents write and read back.
  *
- * Exits 2 to block the Read call.
+ * Writes to both stdout and stderr (this harness only surfaces stderr to the
+ * agent on a PreToolUse block; stdout is kept too in case another consumer
+ * reads it). Exits 2 to block the Read call.
  */
 
 import { readFileSync } from 'fs';
@@ -56,16 +58,18 @@ const ALLOWED = [
 
 if (ALLOWED.some((pattern) => pattern.test(filePath))) process.exit(0);
 
-process.stdout.write(
+const message =
   `[POLLING BLOCKED] Do not poll harness-internal files under /tmp/claude*.\n\n` +
-    `Reading ${filePath} returns partial output that causes agents to\n` +
-    `loop waiting for more data, stalling mid-validation.\n\n` +
-    `Instead: wait for the push notification that fires when the background\n` +
-    `task completes. It will surface the full result without polling.\n\n` +
-    `Allowed paths: a background task's tasks/<id>.output file and the\n` +
-    `session's designated scratchpad directory — this path is neither.\n` +
-    `If you need to check on a running task, use TaskGet({ taskId }) to read\n` +
-    `its current status — not the raw output file.\n`,
-);
+  `Reading ${filePath} returns partial output that causes agents to\n` +
+  `loop waiting for more data, stalling mid-validation.\n\n` +
+  `Instead: wait for the push notification that fires when the background\n` +
+  `task completes. It will surface the full result without polling.\n\n` +
+  `Allowed paths: a background task's tasks/<id>.output file and the\n` +
+  `session's designated scratchpad directory — this path is neither.\n` +
+  `If you need to check on a running task, use TaskGet({ taskId }) to read\n` +
+  `its current status — not the raw output file.\n`;
+
+process.stdout.write(message);
+process.stderr.write(message);
 
 process.exit(2);

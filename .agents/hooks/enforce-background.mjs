@@ -17,7 +17,9 @@
  * For pc-validation, prefer nx_run_pc_chunk MCP tool instead — it has a 5-minute
  * timeout and returns structured pass/fail results.
  *
- * Always writes to stdout (shown in agent context). Exits 2 to block the tool call.
+ * Writes to both stdout and stderr (this harness only surfaces stderr to the
+ * agent on a PreToolUse block; stdout is kept too in case another consumer
+ * reads it). Exits 2 to block the tool call.
  */
 
 import { readFileSync } from 'fs';
@@ -69,17 +71,19 @@ if (!LONG_RUNNING.test(unquoted)) process.exit(0);
 
 const snippet = firstLine.trim().slice(0, 150);
 
-process.stdout.write(
+const message =
   `[BACKGROUND REQUIRED] This command exceeds the Bash tool's ~120s timeout when run inline.\n` +
-    `It will be killed mid-run, causing stalls and output-polling loops.\n\n` +
-    `Options:\n` +
-    `  1. Use nx MCP tools (preferred — structured results, 5-min timeout):\n` +
-    `       nx_run_pc_chunk({ chunk: "pc-typecheck" })   ← pc-validation chunks\n` +
-    `       nx_run_affected({ target: "test" })          ← affected tests\n` +
-    `       nx_run_affected({ target: "lint" })          ← affected lint\n` +
-    `  2. Resubmit with run_in_background: true and wait for the push notification.\n\n` +
-    `Blocked command: ${snippet}\n\n` +
-    `If inline execution is genuinely safe here, add \`# bg-ok\` to the command.\n`,
-);
+  `It will be killed mid-run, causing stalls and output-polling loops.\n\n` +
+  `Options:\n` +
+  `  1. Use nx MCP tools (preferred — structured results, 5-min timeout):\n` +
+  `       nx_run_pc_chunk({ chunk: "pc-typecheck" })   ← pc-validation chunks\n` +
+  `       nx_run_affected({ target: "test" })          ← affected tests\n` +
+  `       nx_run_affected({ target: "lint" })          ← affected lint\n` +
+  `  2. Resubmit with run_in_background: true and wait for the push notification.\n\n` +
+  `Blocked command: ${snippet}\n\n` +
+  `If inline execution is genuinely safe here, add \`# bg-ok\` to the command.\n`;
+
+process.stdout.write(message);
+process.stderr.write(message);
 
 process.exit(2);

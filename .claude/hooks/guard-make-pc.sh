@@ -14,8 +14,9 @@
 #
 # A warn-only version of this hook let agents run `make pc` anyway (observed
 # stalling recovery sessions twice in a row — the printed warning was simply
-# ignored). Exits 2 to actually block the tool call; only stdout/stderr is
-# shown to the agent, so the message doubles as the block reason.
+# ignored). Exits 2 to actually block the tool call; only stderr is shown to
+# the agent on a blocked PreToolUse call (stdout is discarded), so the
+# message doubles as the block reason.
 # Add `# pc-ok` to a Bash command to bypass when you've confirmed a genuinely
 # non-timeout-prone local run.
 
