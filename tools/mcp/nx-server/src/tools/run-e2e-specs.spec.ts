@@ -389,6 +389,46 @@ describe('runE2ESpecs', () => {
       expect(opts.env?.['E2E_PORT']).toMatch(/^\d+$/);
     });
 
+    it('forwards spec paths to playwright with forward slashes only, never backslashes (LS-9330)', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(PASSING_REPORT);
+
+      await runE2ESpecs({
+        specs: ['src\\tests\\player-detail-modal.spec.ts'],
+      });
+
+      const specArg = jobCallOpts().args.find((a) =>
+        a.endsWith('player-detail-modal.spec.ts'),
+      );
+      expect(specArg).toBeDefined();
+      expect(specArg).not.toMatch(/\\/);
+      expect(specArg).toMatch(/\/tests\/player-detail-modal\.spec\.ts$/);
+    });
+
+    it('treats a Playwright run that matches zero tests as an error, not a silent pass (LS-9330)', async () => {
+      setupJob('');
+      mockReadFile.mockResolvedValue(
+        JSON.stringify({
+          stats: { expected: 0, unexpected: 0, flaky: 0, skipped: 0 },
+          suites: [],
+        }),
+      );
+
+      const result = await runE2ESpecs({
+        specs: ['src/tests/player-detail-modal.spec.ts'],
+      });
+
+      expect(result.isError).toBe(true);
+      const payload = JSON.parse(result.content[0].text) as {
+        success: boolean;
+        error?: string;
+        stats: { total: number };
+      };
+      expect(payload.success).toBe(false);
+      expect(payload.stats.total).toBe(0);
+      expect(payload.error).toMatch(/matched 0 tests/);
+    });
+
     it('appends --grep flag when grep option is provided', async () => {
       setupJob('');
       mockReadFile.mockResolvedValue(PASSING_REPORT);

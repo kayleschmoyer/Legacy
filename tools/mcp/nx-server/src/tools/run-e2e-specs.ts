@@ -391,6 +391,19 @@ export async function runE2ESpecs(
   await rm(resultsFile, { force: true });
 
   // Resolve spec paths relative to apps/web-e2e and guard against path traversal.
+  //
+  // Playwright turns each positional spec argument into `new RegExp(arg, 'gi')`
+  // (see createFileFiltersFromArguments/forceRegExp in playwright/lib/util.js)
+  // with no escaping. On Windows, path.join/path.normalize produce backslash
+  // separators, and backslashes in a regex are escape sequences (`\s`, `\t`,
+  // ...) rather than literal path separators — the resulting pattern is
+  // silently corrupted and matches zero files, which is why this tool
+  // returned "No tests found" / stats.total === 0 despite valid, existing
+  // spec paths (LS-9330). Forward slashes are not regex metacharacters, and
+  // Playwright's own file matcher additionally tests patterns against a
+  // `file://` URL form of the path on win32 (which also uses forward
+  // slashes), so passing posix-style paths as args matches correctly on both
+  // platforms.
   const resolvedSpecs: string[] = [];
   for (const spec of params.specs) {
     const fullPath = path.isAbsolute(spec) ? spec : path.join(e2eAppDir, spec);
@@ -409,7 +422,12 @@ export async function runE2ESpecs(
         isError: true,
       };
     }
-    resolvedSpecs.push(normalized);
+    // Use a literal backslash replace rather than path.sep — path.sep is '/'
+    // on the CI/dev machines that run this server, but a caller-supplied
+    // absolute Windows path (e.g. "D:\\code\\...\\spec.ts") still carries
+    // literal backslashes that need converting regardless of the current
+    // platform's separator.
+    resolvedSpecs.push(normalized.replace(/\\/g, '/'));
   }
 
   const args = [
@@ -579,6 +597,7 @@ async function buildE2eResult(
   const failed = stats.unexpected ?? 0;
   const flaky = stats.flaky ?? 0;
   const skipped = stats.skipped ?? 0;
+  const total = passed + failed + flaky + skipped;
 
   // Trace artifacts (either mode, when withTracing was set) and, for
   // integration mode, a GraphQL error summary.
@@ -588,14 +607,32 @@ async function buildE2eResult(
     ? extractGraphqlErrors(combinedOutput)
     : undefined;
 
+  // Specs are a required, non-empty param (min 1), so a matched-and-ran
+  // Playwright process that reports zero total tests means the requested
+  // spec/project/grep combination matched nothing — almost always a caller
+  // or tool-side arg bug, not "nothing to test". Reporting success:true here
+  // (as this tool used to) is the dangerous case: a caller that trusts the
+  // return value concludes the suite passed when it never actually ran
+  // (LS-9330).
+  const zeroTestsRequested = total === 0;
+
   return {
     body: {
-      success: failed === 0 && flaky === 0,
+      success: !zeroTestsRequested && failed === 0 && flaky === 0,
       mode: integration ? 'integration' : 'hermetic',
       ...(port != null ? { port } : {}),
       ...(preconditionWarnings.length > 0 ? { preconditionWarnings } : {}),
+      ...(zeroTestsRequested
+        ? {
+            error:
+              'Playwright ran but matched 0 tests for the given specs/project/grep — ' +
+              'this almost always means the spec path, project, or grep filter did not ' +
+              'match anything, not that the suite passed. Check the spec paths exist ' +
+              'under apps/web-e2e/ and that project/grep are correct.',
+          }
+        : {}),
       stats: {
-        total: passed + failed + flaky + skipped,
+        total,
         passed,
         failed,
         flaky,
@@ -608,8 +645,9 @@ async function buildE2eResult(
       output: combinedOutput,
     },
     // Failing tests are reported via success:false in the body, not as a tool
-    // error — matches the pre-conversion contract.
-    isError: false,
+    // error — matches the pre-conversion contract. Zero-tests-matched is
+    // promoted to a tool error since it means the run never happened.
+    isError: zeroTestsRequested,
   };
 }
 
