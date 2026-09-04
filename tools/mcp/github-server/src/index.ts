@@ -47,6 +47,7 @@ import { listLabels } from './tools/list-labels.js';
 import { listRunners } from './tools/list-runners.js';
 import { webhookList, webhookPing, webhookUpdate } from './tools/webhooks.js';
 import { prCommits } from './tools/pr-commits.js';
+import { prTimeline } from './tools/pr-timeline.js';
 import { prBatchStatus } from './tools/pr-batch-status.js';
 import { prWhyBlocked } from './tools/pr-why-blocked.js';
 import { listPRComments } from './tools/list-pr-comments.js';
@@ -1489,6 +1490,49 @@ export function createServer(): McpServer {
         };
       }
       return prCommits({ number: resolved, limit: params.limit });
+    },
+  );
+
+  // --- github_pr_timeline ---
+  server.tool(
+    'github_pr_timeline',
+    'List issue/PR timeline events (thin wrapper over GET /repos/{owner}/{repo}/issues/{number}/timeline), paginated fully. Use for historical questions the live GraphQL state cannot answer, e.g. "who was asked to review, when, and was that request satisfied or withdrawn" — reviewRequests only shows currently-open requests. Returns event, createdAt, actor, requestedReviewer (user login, or "team:<name>" for team reviewers), and label per row. Defaults to review_requested/review_request_removed/labeled/unlabeled; pass "events" to filter to a different subset. Pass the PR number as "number" (preferred) or "prNumber" (alias).',
+    {
+      number: prNumberField('number').optional().describe('PR number'),
+      prNumber: prNumberField('prNumber')
+        .optional()
+        .describe('Alias for "number" — use either, not both'),
+      events: stringList()
+        .optional()
+        .describe(
+          'Timeline event types to include (e.g. ["review_requested", "review_request_removed"]). Defaults to review_requested, review_request_removed, labeled, unlabeled — not the full chatty timeline.',
+        ),
+      limit: z.coerce
+        .number()
+        .int()
+        .positive()
+        .max(500)
+        .default(100)
+        .describe('Max matching events to return (default: 100, max: 500).'),
+    },
+    async (params) => {
+      const resolved = params.number ?? params.prNumber;
+      if (!resolved) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required parameter: provide "number" (or alias "prNumber") with a positive integer PR number.',
+            },
+          ],
+        };
+      }
+      return prTimeline({
+        number: resolved,
+        events: params.events,
+        limit: params.limit,
+      });
     },
   );
 

@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 12,
-  "toolCount": 261,
+  "toolCount": 262,
   "servers": [
     {
       "dir": "worktree-server",
@@ -3933,7 +3933,7 @@
         "stdio",
         "hosted"
       ],
-      "toolCount": 58,
+      "toolCount": 59,
       "tools": [
         {
           "name": "get_job_logs",
@@ -5476,6 +5476,52 @@
                 ]
               },
               "description": "Exclude PRs that have any of these labels. Useful for filtering out sweep-claimed PRs. Default: no exclusions."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "github_pr_timeline",
+          "description": "List issue/PR timeline events (thin wrapper over GET /repos/{owner}/{repo}/issues/{number}/timeline), paginated fully. Use for historical questions the live GraphQL state cannot answer, e.g. \"who was asked to review, when, and was that request satisfied or withdrawn\" — reviewRequests only shows currently-open requests. Returns event, createdAt, actor, requestedReviewer (user login, or \"team:<name>\" for team reviewers), and label per row. Defaults to review_requested/review_request_removed/labeled/unlabeled; pass \"events\" to filter to a different subset. Pass the PR number as \"number\" (preferred) or \"prNumber\" (alias).",
+          "inputs": {
+            "number": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced"
+              ],
+              "description": "PR number"
+            },
+            "prNumber": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced"
+              ],
+              "description": "Alias for \"number\" — use either, not both"
+            },
+            "events": {
+              "type": "array",
+              "optional": true,
+              "items": {
+                "type": "string",
+                "optional": false
+              },
+              "description": "Timeline event types to include (e.g. [\"review_requested\", \"review_request_removed\"]). Defaults to review_requested, review_request_removed, labeled, unlabeled — not the full chatty timeline."
+            },
+            "limit": {
+              "type": "number",
+              "optional": true,
+              "constraints": [
+                "coerced",
+                "integer",
+                "> 0",
+                "max 500"
+              ],
+              "default": 100,
+              "description": "Max matching events to return (default: 100, max: 500)."
             }
           },
           "transports": [

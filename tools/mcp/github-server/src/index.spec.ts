@@ -8,6 +8,7 @@ import { listReviews } from './tools/list-reviews';
 import { commentPR } from './tools/comment-pr';
 import { editPR } from './tools/edit-pr';
 import { prCommits } from './tools/pr-commits';
+import { prTimeline } from './tools/pr-timeline';
 import { setCommitStatus } from './tools/set-commit-status';
 import { finishFixRound } from './tools/finish-fix-round';
 import { resolveThreads } from './tools/resolve-threads';
@@ -22,6 +23,7 @@ jest.mock('./tools/list-reviews');
 jest.mock('./tools/comment-pr');
 jest.mock('./tools/edit-pr');
 jest.mock('./tools/pr-commits');
+jest.mock('./tools/pr-timeline');
 jest.mock('./tools/set-commit-status');
 jest.mock('./tools/finish-fix-round');
 jest.mock('./tools/resolve-threads');
@@ -84,6 +86,7 @@ describe('index tool registration — prNumber alias resolution', () => {
     jest.mocked(commentPR).mockResolvedValue(okResult);
     jest.mocked(editPR).mockResolvedValue(okResult);
     jest.mocked(prCommits).mockResolvedValue(okResult);
+    jest.mocked(prTimeline).mockResolvedValue(okResult);
     jest.mocked(setCommitStatus).mockResolvedValue(okResult);
     jest.mocked(finishFixRound).mockResolvedValue(okResult);
     jest.mocked(resolveThreads).mockResolvedValue(okResult);
@@ -403,6 +406,67 @@ describe('index tool registration — prNumber alias resolution', () => {
         { type: 'text', text: MISSING_PARAM_ERROR },
       ]);
       expect(prCommits).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('github_pr_timeline', () => {
+    it('accepts "number" and forwards it to the handler', async () => {
+      const result = await client.callTool({
+        name: 'github_pr_timeline',
+        arguments: { number: 123 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(prTimeline).toHaveBeenCalledWith({
+        number: 123,
+        events: undefined,
+        limit: 100,
+      });
+    });
+
+    it('accepts the "prNumber" alias and forwards it as "number"', async () => {
+      const result = await client.callTool({
+        name: 'github_pr_timeline',
+        arguments: { prNumber: 456 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(prTimeline).toHaveBeenCalledWith({
+        number: 456,
+        events: undefined,
+        limit: 100,
+      });
+    });
+
+    it('forwards "events" and "limit"', async () => {
+      const result = await client.callTool({
+        name: 'github_pr_timeline',
+        arguments: {
+          number: 123,
+          events: ['review_requested', 'review_request_removed'],
+          limit: 50,
+        },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(prTimeline).toHaveBeenCalledWith({
+        number: 123,
+        events: ['review_requested', 'review_request_removed'],
+        limit: 50,
+      });
+    });
+
+    it('returns the named missing-parameter error when neither is provided', async () => {
+      const result = await client.callTool({
+        name: 'github_pr_timeline',
+        arguments: {},
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content).toEqual([
+        { type: 'text', text: MISSING_PARAM_ERROR },
+      ]);
+      expect(prTimeline).not.toHaveBeenCalled();
     });
   });
 

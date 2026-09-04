@@ -22,6 +22,7 @@ Pull request and review lifecycle management via the GitHub REST and GraphQL API
 - **github_merge_pr** — Merge a PR (default: queue; or direct with --admin)
 - **github_mark_pr_ready** — Convert a draft PR to ready for review and apply the `bot:ready-for-review` trigger label (set `applyReadyLabel: false` to skip the label)
 - **github_pr_commits** — List commits on a PR
+- **github_pr_timeline** — List issue/PR timeline events (`review_requested`, `review_request_removed`, `labeled`, `unlabeled` by default), fully paginated. Use for historical questions live GraphQL state can't answer, e.g. who was asked to review, when, and whether that request was satisfied or withdrawn.
 
 ### Background Jobs (stdio only)
 
