@@ -13,6 +13,7 @@ import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
 import { DraftBoardGrid } from './DraftBoardGrid';
 import { DraftHeaderBand } from './DraftHeaderBand';
+import { DraftConnectionBanner } from './DraftConnectionBanner';
 import { DraftLastPickTicker } from './DraftLastPickTicker';
 import { DraftBottomNav } from './DraftBottomNav';
 import { DraftPlayersTab } from './DraftPlayersTab';
@@ -27,6 +28,7 @@ import { getPositionColor } from './utils';
 import {
   AuctionNotSupportedScreen,
   AutomatedDraftScreen,
+  ConnectionLostScreen,
   LeagueErrorScreen,
   LoadingScreen,
   NoLeagueScreen,
@@ -329,6 +331,14 @@ interface CompactLiveDraftBoardProps {
   controlAllTeams: boolean;
   /** Bottom safe-area inset reserved under the persistent bottom nav (LS-9444). */
   bottomInset: number;
+  /**
+   * True while the live socket has been down long enough to warn about but
+   * not long enough to replace the board (LS-9856) — renders the reconnecting
+   * banner and marks the pick clock stale.
+   */
+  connectionStale: boolean;
+  /** Forces a fresh socket handshake from the banner's Retry action. */
+  onRetryConnection: () => void;
   onExitDraft: () => void;
   onDraftPlayer: (id: number) => void;
   onCommissionerPick: (id: number) => void;
@@ -356,6 +366,8 @@ function CompactLiveDraftBoard({
   isMockDraft,
   controlAllTeams,
   bottomInset,
+  connectionStale,
+  onRetryConnection,
   onExitDraft,
   onDraftPlayer,
   onCommissionerPick,
@@ -508,7 +520,9 @@ function CompactLiveDraftBoard({
 
   return (
     <YStack flex={1} backgroundColor="$background">
+      {connectionStale && <DraftConnectionBanner onRetry={onRetryConnection} />}
       <DraftHeaderBand
+        connectionStale={connectionStale}
         isMyPick={isMyPick}
         draftPaused={ui.draftPaused}
         untimed={untimed}
@@ -1036,7 +1050,7 @@ export function EliteDraftBoardScreen({
     autoPickTeamIds: queries.autoPickTeamIds,
   });
 
-  useDraftWebSocket({
+  const { connectionStatus, retryConnection } = useDraftWebSocket({
     leagueId,
     draftId: queries.draftId,
     isAuthenticated,
@@ -1091,6 +1105,12 @@ export function EliteDraftBoardScreen({
     }
     onNavigate('/baseball');
   }, [onExitDraft, onNavigate]);
+
+  // Connection treatment (LS-9856). Two tiers, both driven by the debounced
+  // status out of useDraftWebSocket: `reconnecting` leaves the board up but
+  // banners it and marks the pick clock stale; `lost` replaces the board
+  // entirely (below, once the live-draft branches are reached).
+  const connectionStale = connectionStatus === 'reconnecting';
 
   const { timeRemaining } = useDraftTimer({
     draftId: queries.draftId,
@@ -1413,6 +1433,19 @@ export function EliteDraftBoardScreen({
     return <AutomatedDraftScreen />;
   }
 
+  // A sustained outage replaces the live board outright (LS-9856). Placed
+  // after every non-live branch on purpose: the pre-draft lobby, the recap,
+  // and the error screens carry no live state, so a dead socket is not a
+  // reason to hide them.
+  if (connectionStatus === 'lost') {
+    return (
+      <ConnectionLostScreen
+        onRetry={retryConnection}
+        onBack={handleExitDraft}
+      />
+    );
+  }
+
   // ---- Main Live Draft UI: compact (narrow-viewport) branch ----
   if (isCompact) {
     return (
@@ -1431,6 +1464,8 @@ export function EliteDraftBoardScreen({
         isMockDraft={isMockDraft}
         controlAllTeams={controlAllTeams}
         bottomInset={bottomInset}
+        connectionStale={connectionStale}
+        onRetryConnection={retryConnection}
         onExitDraft={handleExitDraft}
         onDraftPlayer={handleDraftPlayer}
         onCommissionerPick={handleCommissionerPick}
@@ -1447,8 +1482,22 @@ export function EliteDraftBoardScreen({
     <div className="d-root" data-sport={sport}>
       <style>{CSS}</style>
       <div className="d-bg-fx" />
+      {connectionStale && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 300,
+          }}
+        >
+          <DraftConnectionBanner onRetry={retryConnection} />
+        </div>
+      )}
       <div className="d-layout">
         <DraftTopBand
+          connectionStale={connectionStale}
           draftPaused={ui.draftPaused}
           currentPick={currentPick}
           round={round}

@@ -12,12 +12,13 @@ import React from 'react';
 import {
   AuctionNotSupportedScreen,
   AutomatedDraftScreen,
+  ConnectionLostScreen,
   LeagueErrorScreen,
   LoadingScreen,
   NoLeagueScreen,
   PlayersErrorScreen,
 } from './DraftStateScreens';
-import { render } from '../../test-utils';
+import { fireEvent, render } from '../../test-utils';
 import { Platform } from '../../platform-components';
 
 // LS-9364's CSS Grid assertion checks an inline `display: grid` /
@@ -170,5 +171,34 @@ describe('AuctionNotSupportedScreen (LS-9207)', () => {
 
     getByText('Back to League').click();
     expect(onNavigate).toHaveBeenCalledWith('/baseball');
+  });
+});
+
+describe('ConnectionLostScreen (LS-9856)', () => {
+  it("renders the mock's heading, explanatory line, and both actions", () => {
+    const { getByText, getByTestId } = render(
+      <ConnectionLostScreen onRetry={jest.fn()} onBack={jest.fn()} />,
+    );
+
+    expect(getByTestId('draft-connection-lost')).toBeTruthy();
+    expect(getByText('Connection Lost')).toBeTruthy();
+    expect(getByText("Can't reach the draft room")).toBeTruthy();
+    expect(getByText(/no longer up to date/)).toBeTruthy();
+    expect(getByText('Retry')).toBeTruthy();
+    expect(getByText('Back')).toBeTruthy();
+  });
+
+  it('wires Retry and Back to their callbacks', () => {
+    const onRetry = jest.fn();
+    const onBack = jest.fn();
+    const { getByText } = render(
+      <ConnectionLostScreen onRetry={onRetry} onBack={onBack} />,
+    );
+
+    fireEvent.click(getByText('Retry'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(getByText('Back'));
+    expect(onBack).toHaveBeenCalledTimes(1);
   });
 });

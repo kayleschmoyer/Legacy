@@ -20,6 +20,12 @@ interface DraftTopBandProps {
   round: number;
   timeRemaining: number;
   pickTimeLimitSeconds: number;
+  /**
+   * True while the live socket is down (LS-9856). The clock keeps counting
+   * locally off the last known deadline, which is exactly the trap — dim it
+   * and label it so a running timer can't be mistaken for live state.
+   */
+  connectionStale?: boolean;
   /** Offline mock draft mode (LS-9144): no clock, no pressure. */
   untimed?: boolean;
   /**
@@ -351,6 +357,7 @@ export function DraftTopBand({
   round,
   timeRemaining,
   pickTimeLimitSeconds,
+  connectionStale = false,
   untimed = false,
   isMockDraft = false,
   onExitDraft,
@@ -442,7 +449,12 @@ export function DraftTopBand({
       {!untimed && (
         <>
           <Divider aria-hidden="true" />
-          <TimerBlock role="timer" aria-label="Pick timer" aria-live="off">
+          <TimerBlock
+            role="timer"
+            aria-label={connectionStale ? 'Pick timer (stale)' : 'Pick timer'}
+            aria-live="off"
+            opacity={connectionStale ? 0.45 : 1}
+          >
             <RingWrap aria-hidden="true">
               <svg
                 width="58"
@@ -485,9 +497,11 @@ export function DraftTopBand({
                 color={ringTimeColor}
                 zIndex={1}
                 aria-label={
-                  draftPaused
-                    ? 'Draft paused'
-                    : `${formatPickClock(timeRemaining, pickTimeLimitSeconds)} remaining`
+                  connectionStale
+                    ? 'Pick clock out of date — reconnecting'
+                    : draftPaused
+                      ? 'Draft paused'
+                      : `${formatPickClock(timeRemaining, pickTimeLimitSeconds)} remaining`
                 }
               >
                 {draftPaused
@@ -496,7 +510,7 @@ export function DraftTopBand({
               </Text>
             </RingWrap>
             <TimerInfo>
-              <TimerCap>Time left</TimerCap>
+              <TimerCap>{connectionStale ? 'Stale' : 'Time left'}</TimerCap>
               <TimerOf>
                 of {formatPickClock(pickTimeLimitSeconds, pickTimeLimitSeconds)}
               </TimerOf>

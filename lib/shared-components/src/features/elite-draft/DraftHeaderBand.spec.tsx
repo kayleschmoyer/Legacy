@@ -79,3 +79,23 @@ describe('DraftHeaderBand', () => {
     expect(screen.queryByTestId('draft-header-band-autopick-hint')).toBeNull();
   });
 });
+
+describe('DraftHeaderBand connection staleness (LS-9856)', () => {
+  it('swaps the eyebrow and dims the clock while disconnected', () => {
+    render(<DraftHeaderBand {...baseProps} connectionStale />);
+
+    expect(
+      screen.getByText('Reconnecting — clock may be out of date'),
+    ).toBeTruthy();
+    expect(screen.queryByText('On the clock')).toBeNull();
+    // The clock still renders — the user needs to see what it last said —
+    // but it must no longer read as live.
+    expect(screen.getByText('0:45')).toBeTruthy();
+  });
+
+  it('leaves the live eyebrow alone when connected', () => {
+    render(<DraftHeaderBand {...baseProps} connectionStale={false} />);
+
+    expect(screen.getByText('On the clock')).toBeTruthy();
+  });
+});

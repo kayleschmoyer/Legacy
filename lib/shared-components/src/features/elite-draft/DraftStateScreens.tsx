@@ -77,22 +77,39 @@ function DraftRootShell({
 interface StateScreenProps {
   icon: string;
   iconLabel: string;
+  /**
+   * Optional small-caps label above the title (LS-9856) — the mock's
+   * `eyebrow` element, used by the Connection Lost state to name the failure
+   * class separately from the human-readable heading.
+   */
+  eyebrow?: string;
   title: string;
   description: string;
   buttonText?: string;
   onButtonClick?: () => void;
+  /**
+   * Optional second, lower-emphasis action rendered beside the primary one —
+   * the mock's ghost button (e.g. "Back" next to "Retry").
+   */
+  secondaryButtonText?: string;
+  onSecondaryButtonClick?: () => void;
+  testID?: string;
 }
 
 function StateScreen({
   icon,
   iconLabel,
+  eyebrow,
   title,
   description,
   buttonText,
   onButtonClick,
+  secondaryButtonText,
+  onSecondaryButtonClick,
+  testID,
 }: StateScreenProps): React.JSX.Element {
   return (
-    <DraftRootShell>
+    <DraftRootShell testID={testID}>
       <YStack
         flex={1}
         alignItems="center"
@@ -105,6 +122,18 @@ function StateScreen({
         <Text fontSize={56} lineHeight={56} role="img" aria-label={iconLabel}>
           {icon}
         </Text>
+        {eyebrow && (
+          <Text
+            fontSize={12}
+            fontWeight="700"
+            letterSpacing={2}
+            textTransform="uppercase"
+            color="$brandSeamRedLight"
+            textAlign="center"
+          >
+            {eyebrow}
+          </Text>
+        )}
         <Text
           fontFamily="$heading"
           fontWeight="800"
@@ -124,22 +153,42 @@ function StateScreen({
         >
           {description}
         </Text>
-        {buttonText && onButtonClick && (
-          <Button
-            onPress={onButtonClick}
-            backgroundColor="$brandGold"
-            color="white"
-            fontWeight="700"
-            fontSize={14}
-            height={44}
-            paddingHorizontal={28}
-            borderRadius="$4"
-            pressStyle={{ scale: 0.98 }}
-            hoverStyle={{ backgroundColor: '$brandGoldDark' }}
-          >
-            {buttonText}
-          </Button>
-        )}
+        <XStack gap="$3" flexWrap="wrap" justifyContent="center">
+          {buttonText && onButtonClick && (
+            <Button
+              onPress={onButtonClick}
+              backgroundColor="$brandGold"
+              color="white"
+              fontWeight="700"
+              fontSize={14}
+              height={44}
+              paddingHorizontal={28}
+              borderRadius="$4"
+              pressStyle={{ scale: 0.98 }}
+              hoverStyle={{ backgroundColor: '$brandGoldDark' }}
+            >
+              {buttonText}
+            </Button>
+          )}
+          {secondaryButtonText && onSecondaryButtonClick && (
+            <Button
+              onPress={onSecondaryButtonClick}
+              backgroundColor="transparent"
+              borderWidth={1}
+              borderColor="$borderColor"
+              color="$color"
+              fontWeight="700"
+              fontSize={14}
+              height={44}
+              paddingHorizontal={28}
+              borderRadius="$4"
+              pressStyle={{ scale: 0.98 }}
+              hoverStyle={{ backgroundColor: '$surfacePanel' }}
+            >
+              {secondaryButtonText}
+            </Button>
+          )}
+        </XStack>
       </YStack>
     </DraftRootShell>
   );
@@ -423,6 +472,39 @@ export function AuctionNotSupportedScreen({
       onButtonClick={() =>
         onNavigate(leagueId ? `/baseball/league/${leagueId}` : '/baseball')
       }
+    />
+  );
+}
+
+/**
+ * Sustained draft-socket outage (LS-9856) — the mock's Connection Lost state.
+ *
+ * Shown only after `DRAFT_CONNECTION_LOST_DELAY_MS` of continuous
+ * disconnection, replacing the board outright: past that point the picks and
+ * the running pick clock underneath are stale, and leaving them on screen
+ * behind a banner invites the user to act on data the client can no longer
+ * vouch for. Retry forces a fresh handshake instead of waiting out the
+ * backoff ladder; Back leaves the room.
+ */
+export function ConnectionLostScreen({
+  onRetry,
+  onBack,
+}: {
+  onRetry: () => void;
+  onBack: () => void;
+}): React.JSX.Element {
+  return (
+    <StateScreen
+      testID="draft-connection-lost"
+      icon="📡"
+      iconLabel="satellite antenna"
+      eyebrow="Connection Lost"
+      title="Can't reach the draft room"
+      description="We lost the live feed, so the board and the pick clock are no longer up to date. Your team is unaffected — reconnect to pick up where the draft actually is."
+      buttonText="Retry"
+      onButtonClick={onRetry}
+      secondaryButtonText="Back"
+      onSecondaryButtonClick={onBack}
     />
   );
 }

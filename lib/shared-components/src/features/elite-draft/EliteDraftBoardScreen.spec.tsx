@@ -129,13 +129,16 @@ jest.mock('./DraftTopBand', () => ({
   DraftTopBand: ({
     isMockDraft,
     onExitDraft,
+    connectionStale,
   }: {
     isMockDraft?: boolean;
     onExitDraft?: () => void;
+    connectionStale?: boolean;
   }) => (
     <div
       data-testid="draft-top-band"
       data-is-mock-draft={String(!!isMockDraft)}
+      data-connection-stale={String(!!connectionStale)}
     >
       {isMockDraft && onExitDraft && (
         <button onClick={onExitDraft}>Exit Draft</button>
@@ -169,6 +172,7 @@ jest.mock('./DraftHeaderBand', () => ({
     pickTimeLimitSeconds,
     onClockTeamName,
     topQueuedPlayerName,
+    connectionStale,
   }: {
     isMyPick: boolean;
     draftPaused: boolean;
@@ -178,9 +182,11 @@ jest.mock('./DraftHeaderBand', () => ({
     pickTimeLimitSeconds: number;
     onClockTeamName: string | null;
     topQueuedPlayerName: string | null;
+    connectionStale?: boolean;
   }) => (
     <div
       data-testid="draft-header-band"
+      data-connection-stale={String(!!connectionStale)}
       data-is-my-pick={String(!!isMyPick)}
       data-draft-paused={String(!!draftPaused)}
       data-round={round}
@@ -496,11 +502,13 @@ beforeEach(() => {
     myTeamPicks: [],
     statsLookup: new Map(),
   } as unknown as ReturnType<typeof usePlayerData>);
-  jest
-    .mocked(useDraftWebSocket)
-    .mockReturnValue(
-      undefined as unknown as ReturnType<typeof useDraftWebSocket>,
-    );
+  // LS-9856: the screen now destructures the connection state off this hook,
+  // so the mock has to return the real shape rather than undefined.
+  jest.mocked(useDraftWebSocket).mockReturnValue({
+    wsConnected: true,
+    connectionStatus: 'online',
+    retryConnection: jest.fn(),
+  } as unknown as ReturnType<typeof useDraftWebSocket>);
   jest
     .mocked(useDraftTimer)
     .mockReturnValue({ timeRemaining: null } as unknown as ReturnType<
@@ -2150,5 +2158,102 @@ describe('EliteDraftBoardScreen — compact viewport, auction draft', () => {
 
     expect(getByText('Auction Draft')).toBeTruthy();
     expect(queryByTestId('auction-draft-room')).toBeNull();
+  });
+});
+
+/**
+ * LS-9856 — the shell must actually consume the socket state. Before this,
+ * `wsConnected` was returned by useDraftWebSocket and read by nobody, so a
+ * drop left the board showing stale picks under a running clock with no
+ * signal at all.
+ */
+describe('EliteDraftBoardScreen — connection state (LS-9856)', () => {
+  const withConnectionStatus = (
+    connectionStatus: 'online' | 'reconnecting' | 'lost',
+    retryConnection: () => void = jest.fn(),
+  ) => {
+    jest.mocked(useDraftWebSocket).mockReturnValue({
+      wsConnected: connectionStatus === 'online',
+      connectionStatus,
+      retryConnection,
+    });
+  };
+
+  it('shows nothing extra while the socket is online', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
+    );
+    withConnectionStatus('online');
+
+    const { getByTestId, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(queryByTestId('draft-connection-banner')).toBeNull();
+    expect(queryByTestId('draft-connection-lost')).toBeNull();
+    expect(
+      getByTestId('draft-top-band').getAttribute('data-connection-stale'),
+    ).toBe('false');
+  });
+
+  it('banners the wide board and marks the pick clock stale while reconnecting', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
+    );
+    withConnectionStatus('reconnecting');
+
+    const { getByTestId } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByTestId('draft-connection-banner')).toBeTruthy();
+    expect(
+      getByTestId('draft-top-band').getAttribute('data-connection-stale'),
+    ).toBe('true');
+    // The board itself stays up — recovery is still the likely outcome.
+    expect(getByTestId('draft-player-board')).toBeTruthy();
+  });
+
+  it('banners the compact board and marks its clock stale while reconnecting', () => {
+    setupCompactLiveDraft();
+    withConnectionStatus('reconnecting');
+
+    const { getByTestId } = render(<EliteDraftBoardScreen {...defaultProps} />);
+
+    expect(getByTestId('draft-connection-banner')).toBeTruthy();
+    expect(
+      getByTestId('draft-header-band').getAttribute('data-connection-stale'),
+    ).toBe('true');
+  });
+
+  it('replaces the board with the Connection Lost state on a sustained drop', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
+    );
+    withConnectionStatus('lost');
+
+    const { getByTestId, getByText, queryByTestId } = render(
+      <EliteDraftBoardScreen {...defaultProps} />,
+    );
+
+    expect(getByTestId('draft-connection-lost')).toBeTruthy();
+    expect(getByText("Can't reach the draft room")).toBeTruthy();
+    expect(queryByTestId('draft-player-board')).toBeNull();
+    expect(queryByTestId('draft-top-band')).toBeNull();
+  });
+
+  it('wires the Connection Lost Retry action to a fresh handshake', () => {
+    mockUseIsCompactDraftViewport.mockReturnValue(false);
+    mockUseDraftQueries.mockReturnValue(
+      makeBaseQueries({ leagueTeams: TEAMS, boardOrderedTeams: TEAMS }),
+    );
+    const retryConnection = jest.fn();
+    withConnectionStatus('lost', retryConnection);
+
+    const { getByText } = render(<EliteDraftBoardScreen {...defaultProps} />);
+    fireEvent.click(getByText('Retry'));
+
+    expect(retryConnection).toHaveBeenCalledTimes(1);
   });
 });

@@ -15,6 +15,12 @@ export interface DraftHeaderBandProps {
   roundPickNumber: number;
   timeRemaining: number;
   pickTimeLimitSeconds: number;
+  /**
+   * True while the live socket is down (LS-9856). The clock keeps ticking
+   * off the last known deadline, so dim it and swap the eyebrow rather than
+   * letting a stale countdown read as live.
+   */
+  connectionStale?: boolean;
   onClockTeamName: string | null;
   /**
    * Top queued player, for the auto-pick hint strip. `null` hides the strip
@@ -51,21 +57,30 @@ export function DraftHeaderBand({
   roundPickNumber,
   timeRemaining,
   pickTimeLimitSeconds,
+  connectionStale = false,
   onClockTeamName,
   topQueuedPlayerName,
 }: DraftHeaderBandProps): React.JSX.Element {
   const palette = useDraftPalette();
+  // A stale clock must not breathe — the pulse is the board's strongest
+  // "act now" signal and it has no business firing off data we can't trust.
   const breathing = useClockBreath(
-    isMyPick && !draftPaused && !untimed && timeRemaining <= 10,
+    isMyPick &&
+      !draftPaused &&
+      !untimed &&
+      !connectionStale &&
+      timeRemaining <= 10,
   );
 
-  const eyebrowText = draftPaused
-    ? 'Draft paused'
-    : untimed && isMyPick
-      ? 'Your pick — take your time'
-      : isMyPick
-        ? "YOU'RE ON THE CLOCK!"
-        : 'On the clock';
+  const eyebrowText = connectionStale
+    ? 'Reconnecting — clock may be out of date'
+    : draftPaused
+      ? 'Draft paused'
+      : untimed && isMyPick
+        ? 'Your pick — take your time'
+        : isMyPick
+          ? "YOU'RE ON THE CLOCK!"
+          : 'On the clock';
 
   const primaryColor = isMyPick ? ACCENT_INK : palette.text.fg1;
   const secondaryColor = isMyPick
@@ -97,6 +112,7 @@ export function DraftHeaderBand({
               fontSize={26}
               fontWeight="800"
               color={primaryColor}
+              opacity={connectionStale ? 0.45 : 1}
               scale={breathing ? 1.08 : 1}
               animation="quick"
             >

@@ -11,6 +11,7 @@ import type {
   PickSplashQueueItem,
   PickToastQueueItem,
 } from './useDraftUIState';
+import { useDraftConnectionStatus } from './useDraftConnectionStatus';
 import {
   type DraftCompletedNotification,
   type DraftPausedNotification,
@@ -437,6 +438,11 @@ export function useDraftWebSocket({
     [setOnlineUserIds],
   );
 
+  // Whether a live socket is expected at all. Auction drafts and the
+  // signed-out / league-less states never open one, so "not connected" is
+  // their correct resting state and must not read as an outage (LS-9856).
+  const socketExpected = !!leagueId && isAuthenticated && !isAuctionDraft;
+
   const {
     connected: wsConnected,
     connect: wsConnect,
@@ -447,7 +453,7 @@ export function useDraftWebSocket({
     token,
     leagueId: leagueId ?? undefined,
     viewContext: 'league',
-    autoConnect: !!leagueId && isAuthenticated && !isAuctionDraft,
+    autoConnect: socketExpected,
     heartbeatMs: DRAFT_HEARTBEAT_MS,
     onDraftStarted: handleDraftStarted,
     onDraftPickMade: handleDraftPickMade,
@@ -641,5 +647,26 @@ export function useDraftWebSocket({
     refetchQueue,
   ]);
 
-  return { wsConnected } as const;
+  /**
+   * Debounced, renderable view of the socket state (LS-9856). The raw
+   * `wsConnected` flag flips on every micro-blip; this is what the UI reads.
+   */
+  const connectionStatus = useDraftConnectionStatus({
+    connected: wsConnected,
+    enabled: socketExpected,
+  });
+
+  /**
+   * User-initiated reconnect for the Retry actions. Deliberately a
+   * disconnect + connect rather than a bare `connect()`: a zombie socket
+   * still reports `readyState === OPEN`, so `connect()` alone would no-op
+   * with "Already connected" and the Retry button would do nothing visible —
+   * the same trap the BFCache handler above works around.
+   */
+  const retryConnection = useCallback(() => {
+    wsDisconnect();
+    wsConnect();
+  }, [wsConnect, wsDisconnect]);
+
+  return { wsConnected, connectionStatus, retryConnection } as const;
 }

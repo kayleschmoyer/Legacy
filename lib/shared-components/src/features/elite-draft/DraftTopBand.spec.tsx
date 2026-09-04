@@ -285,3 +285,28 @@ describe('DraftTopBand untimed (offline) mode (LS-9144, LS-9243)', () => {
     expect(getByRole('button', { name: /pause/i })).toBeTruthy();
   });
 });
+
+describe('DraftTopBand connection staleness (LS-9856)', () => {
+  it('marks the pick timer stale while disconnected', () => {
+    const { getByLabelText, getByText } = render(
+      <DraftTopBand
+        {...baseProps}
+        isCommissioner={false}
+        isOwner={false}
+        connectionStale
+      />,
+    );
+
+    expect(getByLabelText('Pick timer (stale)')).toBeTruthy();
+    expect(getByText('Stale')).toBeTruthy();
+  });
+
+  it('shows the normal timer caption when connected', () => {
+    const { getByLabelText, getByText } = render(
+      <DraftTopBand {...baseProps} isCommissioner={false} isOwner={false} />,
+    );
+
+    expect(getByLabelText('Pick timer')).toBeTruthy();
+    expect(getByText('Time left')).toBeTruthy();
+  });
+});

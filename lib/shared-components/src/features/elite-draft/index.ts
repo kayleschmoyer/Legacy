@@ -34,6 +34,18 @@ export {
 export { DraftTeamTab, type DraftTeamTabProps } from './DraftTeamTab';
 export { DraftQueueTab, type DraftQueueTabProps } from './DraftQueueTab';
 
+// Connection-state surface (LS-9856)
+export {
+  DraftConnectionBanner,
+  type DraftConnectionBannerProps,
+} from './DraftConnectionBanner';
+export { ConnectionLostScreen } from './DraftStateScreens';
+export {
+  DRAFT_CONNECTION_LOST_DELAY_MS,
+  DRAFT_RECONNECTING_DELAY_MS,
+  type DraftConnectionStatus,
+} from './hooks';
+
 // Chat overlay types for render prop
 export type { DraftChatProps, DraftChatRenderer } from './DraftChatOverlay';
 
