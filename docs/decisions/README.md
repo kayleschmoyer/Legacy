@@ -31,3 +31,4 @@ for authoring guidance and the immutability rule.
 | [0018](0018-appium-native-driver.md)                     | AppiumNativeDriver: the native implementation of ADR-0016's platform seam             | Accepted |
 | [0019](0019-realtime-reliability-hardening.md)           | Realtime reliability: subsystem ownership, binding rules, no-mocked-neighbour testing | Accepted |
 | [0020](0020-native-websocket-fan-out-stays-manual.md)    | Native-emulator WebSocket fan-out coverage stays manual until mock server speaks WS   | Accepted |
+| [0021](0021-native-route-parity-seam.md)                 | Native route-parity seam: a driver-level translation table for tab-addressed routes   | Accepted |

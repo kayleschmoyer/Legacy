@@ -9,6 +9,7 @@ import {
   testIdSelector,
   textSelector,
 } from './native-selectors';
+import { resolveNativeRoute } from './native-route-map';
 import type {
   AppDriver,
   DriverCapabilities,
@@ -595,11 +596,20 @@ export class AppiumNativeDriver implements AppDriver {
     this.#timeout = options?.defaultTimeout ?? DEFAULT_TIMEOUT_MS;
   }
 
-  /** Open an app route via deep link (expo-router routes are URL-shaped). */
+  /**
+   * Open an app route via deep link. Most expo-router routes are URL-shaped
+   * on native too, so the neutral path deep-links unchanged; the small set
+   * that isn't (tab-addressed league screens, sport-scoped discovery) is
+   * rewritten first by {@link resolveNativeRoute} (ADR-0016 amendment —
+   * LS-9653) — the seam that keeps that translation out of page objects.
+   */
   async open(path: string): Promise<void> {
     const android = this.browser as unknown as AndroidCommands;
     await android.executeScript('mobile: deepLink', [
-      { url: buildDeepLink(this.#scheme, path), package: this.#appPackage },
+      {
+        url: buildDeepLink(this.#scheme, resolveNativeRoute(path)),
+        package: this.#appPackage,
+      },
     ]);
   }
 

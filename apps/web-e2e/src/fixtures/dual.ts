@@ -19,7 +19,7 @@ import {
   getAuthJwt,
   WEB_BASE,
 } from '../integration/fixtures/ui';
-import { DraftPage, LeaguePage, PlayersPage } from '../pages';
+import { DraftPage, LeaguePage, PlayersPage, RosterPage } from '../pages';
 import { NavHeader } from '../components';
 import {
   type AppDriver,
@@ -85,6 +85,7 @@ export interface DualFixtures {
   draftPage: DraftPage;
   leaguePage: LeaguePage;
   playersPage: PlayersPage;
+  rosterPage: RosterPage;
   navHeader: NavHeader;
   _backendEnv: void;
   _coverage: void;
@@ -301,6 +302,12 @@ export const test = base.extend<
     use: (pageObject: PlayersPage) => Promise<void>,
   ) => {
     await use(new PlayersPage(driver));
+  },
+  rosterPage: async (
+    { driver }: { driver: AppDriver },
+    use: (pageObject: RosterPage) => Promise<void>,
+  ) => {
+    await use(new RosterPage(driver));
   },
   navHeader: async (
     { page }: { page: Page },

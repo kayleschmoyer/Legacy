@@ -25,3 +25,10 @@ export {
   NATIVE_APP_SCHEME,
 } from './appium-native.driver';
 export type { AppiumNativeDriverOptions } from './appium-native.driver';
+// The native route-parity seam (ADR-0016 amendment — LS-9653): pure and
+// dependency-free, so it is safe to import from the hermetic web path too
+// (e.g. a spec asserting the mapping directly) without pulling in wdio.
+export {
+  resolveNativeRoute,
+  UnmappedNativeRouteError,
+} from './native-route-map';

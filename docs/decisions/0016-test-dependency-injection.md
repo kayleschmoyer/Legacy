@@ -171,7 +171,11 @@ mock server ([ADR-0017](0017-native-graphql-mock-server.md), LS-8448), the
 `platform: 'native'` fixture seam (LS-8449), and the scheduled, watched
 login → league-list emulator job
 (`.github/workflows/e2e-native-android.yml`,
-`apps/web-e2e/src/driver/native-emulator-ci.md`, LS-8450).
+`apps/web-e2e/src/driver/native-emulator-ci.md`, LS-8450). Its "app routes are
+URL-shaped on both platforms" premise (Context, point 1) is corrected by
+[ADR-0021](0021-native-route-parity-seam.md) for tab-addressed routes — this
+ADR's text is left as originally accepted per the immutability rule; ADR-0021
+is the current statement of native route resolution.
 
 ## Rollout
 
