@@ -8,7 +8,9 @@
    exactly one designed layout — nothing is left to invented thresholds.
 
      Band   Range           Layout tier                              Frame
-     xxs    0–659px         @659 + @799 + @859 + @979 (most compact)  fully designed
+     xxs    0–659px         @659 + @799 + @859 + @979 (most compact)  fully designed; @390 adds one scoped
+                                                                       .ls-player-row override (Tamagui $xxs,
+                                                                       LS-9419) — full sub-660 coverage is LS-9418
      xs     660–799px       @799 + @859 + @979 (stacked, no @659)     shares xxs's mobile chrome, hero less compressed
      sm     800–859px       @859 + @979 (no @799/@659)                nav tabs hidden, mobile padding
      md     860–979px       @979 only                                 overview grid → 1-col, snapshot → 3-col
@@ -639,6 +641,10 @@ input, textarea, select { font-family: inherit; }
   .ls-hero-metaitem .value { font-size: 13px; }
   .ls-hero-actions { display: none; }
   .ls-hero-crest { display: none; }
+  /* Commissioner badge goes icon-only to fit the tightened hero-top row.
+     `aria-label` on the chip (LeagueHero.jsx) keeps it announced as a role,
+     not decoration, once the visible label is hidden here. */
+  .ls-chip-commish-label { display: none; }
 }
 /* BREAKPOINTS: serves xxs only (0–659px, strictly below xs's 660px
    start) — the fully designed 375px frame: tightest padding, smallest
@@ -651,4 +657,16 @@ input, textarea, select { font-family: inherit; }
   .ls-hero-crest svg { width: 24px; height: 24px; }
   .ls-hero-meta { gap: 12px 18px; }
   .ls-snapshot { grid-template-columns: 1fr 1fr; }
+}
+/* BREAKPOINTS: serves Tamagui's `$xxs` (≤390px) — the smallest-phone tier,
+   below every band in the table above (LS-9418 tracks giving this prototype
+   full sub-660 coverage; this is the one scoped override needed for the
+   `.ls-player-row` action-wrapping fix below, not a general xxs pass). Steps
+   `.ls-player-row`'s gap/padding down one space token so its own action row
+   (`.ls-player-actions`, already isolated onto its own grid row by the 859
+   tier above) has room to stay on a single line down to 320px. */
+@media (max-width: 390px) {
+  .ls-player-row { gap: 8px; padding: 8px 10px; }
+  .ls-player-slot { min-width: 32px; }
+  .ls-player-actions { flex-wrap: nowrap; flex-shrink: 0; }
 }

@@ -44,8 +44,10 @@ const LeagueHero = ({ league, onBack, onInvite, isCommissioner }) => {
           <span
             className="ls-chip ls-chip-commish"
             style={{ marginLeft: 'auto' }}
+            aria-label="Commissioner"
           >
-            <I.Crown size={12} /> Commissioner
+            <I.Crown size={12} />{' '}
+            <span className="ls-chip-commish-label">Commissioner</span>
           </span>
         )}
       </div>

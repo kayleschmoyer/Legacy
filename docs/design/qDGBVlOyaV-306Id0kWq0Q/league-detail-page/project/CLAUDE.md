@@ -38,11 +38,11 @@ Sport, scoring format, team count, invite code, and season-status chip are const
 every tab, so they live on Overview and appear in no other tab's header. This is the worked
 example behind the app-wide "cut repeated content" rule.
 
-## Known gaps at `$xxs` (not yet addressed)
+## Resolved gaps (LS-9419)
 
-- `.ls-player-row` wraps actions to a second line at ~340px.
-- Commissioner badge is icon-only at `$xs` and reads as decoration rather than a role.
-
-Both are tracked in LS-9414. Note that the hit-target fixes there must use the padded-wrapper
-pattern from the reference — the prototype's `::after` inset technique is web-only and has no
-effect on native.
+- `.ls-player-row` keeps `.ls-player-actions` on one line down to 320px via a scoped
+  `@media (max-width: 390px)` override (gap/padding stepped down one space token).
+- The commissioner badge (`LeagueHero.jsx`) goes icon-only below `$xs` (799px tier) — its label
+  text is wrapped in `.ls-chip-commish-label` and hidden there, but the chip carries
+  `aria-label="Commissioner"` so it still reads as a role, not decoration. No `::after`/`::before`
+  hit-area technique was introduced — the badge isn't interactive, so it has no hit target to size.
