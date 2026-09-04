@@ -37,29 +37,10 @@
  * Exit code 0 if all icons match (--check) or were written, 1 otherwise.
  */
 
-import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-const require = createRequire(import.meta.url);
-
-/**
- * sharp is not a declared workspace dependency — it is present transitively and this
- * script is a hand-run maintenance tool, not part of the build or CI. Declaring it at
- * the root re-resolves the lockfile (semver 7.7.4 -> 7.8.5 across 8 entries), which does
- * not belong in an asset change. Tracked separately in LS-9553.
- */
-let sharp;
-try {
-  sharp = require('sharp');
-} catch {
-  console.error(
-    'sharp is required to regenerate the web icons but could not be resolved.\n' +
-      'Run `node scripts/modules-pool/link.mjs` (worktree) or `pnpm install` first.',
-  );
-  process.exit(1);
-}
+import sharp from 'sharp';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const MASTER = resolve(ROOT, 'apps/web/brand/logo-master.png');
