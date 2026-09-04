@@ -1,8 +1,10 @@
 # MCP DB Server Lambda
-# Hosts the tools/mcp/db-admin-server as an HTTP API Lambda for tunnel-free,
-# read-only database access (LS-8114). Like the other hosted MCP servers it is
-# reached via the HTTP API Gateway (lambda-mcp-api-gateway.tf) with a
-# Cognito-issued bearer carrying the `mcp/db` scope.
+# Hosts the tools/mcp/db-admin-server as an HTTP API Lambda for tunnel-free
+# database access (LS-8114): read-only queries, versioned migrations, and
+# (LS-9358) ad-hoc DML writes via the DML-only mcp_write role. Like the other
+# hosted MCP servers it is reached via the HTTP API Gateway
+# (lambda-mcp-api-gateway.tf) with a Cognito-issued bearer carrying the
+# `mcp/db` scope.
 #
 # Unlike the Jira/GitHub/CI MCP Lambdas, this one runs *inside the VPC* (mirrors
 # lambda-graphql.tf) so it can reach the private RDS instance directly. It
@@ -45,7 +47,7 @@ resource "aws_iam_role_policy_attachment" "mcp_db_lambda_vpc" {
 
 resource "aws_iam_policy" "mcp_db_lambda_secrets" {
   name        = "${local.name_prefix}-mcp-db-lambda-secrets"
-  description = "Allows the MCP DB Lambda to read DB credentials, the mcp_readonly role secret, and the Rollbar token from Secrets Manager"
+  description = "Allows the MCP DB Lambda to read DB credentials, the mcp_readonly/mcp_write role secrets, and the Rollbar token from Secrets Manager"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -56,6 +58,7 @@ resource "aws_iam_policy" "mcp_db_lambda_secrets" {
         Resource = [
           aws_secretsmanager_secret.database_credentials.arn,
           aws_secretsmanager_secret.mcp_readonly_db_credentials.arn,
+          aws_secretsmanager_secret.mcp_write_db_credentials.arn,
           aws_secretsmanager_secret.rollbar_access_token.arn,
         ]
       }
@@ -145,6 +148,8 @@ resource "aws_lambda_function" "mcp_db" {
       DB_HOST                  = aws_db_instance.postgres.endpoint
       DB_SECRET_NAME           = aws_secretsmanager_secret.database_credentials.name
       MCP_READONLY_SECRET_NAME = aws_secretsmanager_secret.mcp_readonly_db_credentials.name
+      # DML-only role for db_execute (LS-9358) — see mcp_write_db_credentials.
+      MCP_WRITE_SECRET_NAME = aws_secretsmanager_secret.mcp_write_db_credentials.name
 
       # Worker DDL statement_timeout: just below the function timeout so
       # runaway DDL fails cleanly inside the worker's lifetime (LS-8563).

@@ -190,8 +190,12 @@ export function evalMigrationModule(jsSource: string): MigrationModule {
   return exported as MigrationModule;
 }
 
-/** Throw unless the Lambda is running in a permitted (dev) environment. */
-function assertDevEnvironment(): void {
+/**
+ * Throw unless the Lambda is running in a permitted (dev) environment.
+ * Exported so `db_execute` (../tools/execute.ts) can reuse the same guard —
+ * both are write paths that must never run outside dev.
+ */
+export function assertDevEnvironment(): void {
   const env = process.env['NODE_ENV'];
   if (!env || !DEV_ENVIRONMENTS.has(env)) {
     throw new Error(
@@ -301,7 +305,11 @@ function validatePayload(migrations: NormalizedMigrationItem[]): void {
   }
 }
 
-function auditPrincipal(caller: McpCaller): string {
+/**
+ * Format a caller's audit identity for a log line. Exported so `db_execute`
+ * (../tools/execute.ts) logs with the same principal shape as `db_migrate`.
+ */
+export function auditPrincipal(caller: McpCaller): string {
   return `client_id=${caller.clientId ?? 'unknown'} sub=${caller.sub ?? 'unknown'}`;
 }
 

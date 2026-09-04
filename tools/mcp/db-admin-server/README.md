@@ -43,6 +43,7 @@ via `@legacy-sports/mcp-bearer-auth`. Clients mint the bearer per-connect with
 | `db_query`            | Read-only SQL. Connects as the SELECT-only `mcp_readonly` role inside a `READ ONLY` txn.                          |
 | `db_migration_status` | Applied vs pending diff (pass local filenames), or async job polling (pass `jobId`).                              |
 | `db_migrate`          | Submit UNMERGED local migrations as an async job; poll `db_migration_status({ jobId })` for the result. Dev-only. |
+| `db_execute`          | Ad-hoc single-statement DML (INSERT/UPDATE/DELETE). Connects as the DML-only `mcp_write` role. Dev-only.          |
 
 ### `db_migrate` (remote DDL — handle with care)
 
@@ -102,14 +103,46 @@ invocation, and no intermediate script, is needed. (The
 produces a `jsSource`-shaped payload — but `tsSource` is the simpler path now
 that the server does the transpile.)
 
+### `db_execute` (ad-hoc data writes)
+
+`db_execute` fills the gap between `db_query` (read-only) and `db_migrate`
+(write-capable, but only for versioned schema migrations): a single
+INSERT/UPDATE/DELETE statement, run synchronously, no migration file, no
+tunnel (LS-9358). It exists because agents repeatedly needed to write or read
+rows in `app_internal.*` tables (e.g. `app_internal.subscriptions`,
+`app_internal.users`) that aren't exposed via the `public.*` views
+`db_query`'s `mcp_readonly` role can see, and aren't schema changes so
+`db_migrate` doesn't apply — the only prior path was a fully manual
+SSM-tunnel-plus-throwaway-script workaround, which has since become
+unworkable entirely (the DB-superuser secret fetch it needs is blocked by
+session auto-mode classifiers).
+
+It connects as the **DML-only `mcp_write` role** — INSERT/UPDATE/DELETE/SELECT
+on `public` and `app_internal` (current and future tables), **no
+CREATE/ALTER/DROP grants at all** — so any DDL is rejected by the database
+engine, the same layered model `db_query` uses for its SELECT-only role. A
+single-statement guard rejects `;`-stacked queries as a second, app-level
+layer. Like `db_migrate`, it is dev-only (`NODE_ENV` guard) and every
+statement is logged with the calling Cognito principal (`client_id` / `sub`).
+
+The SQL statement structure itself is executed verbatim (this is a console for
+trusted `mcp/db`-scoped agents, not user input) — but always bind values via
+`params` (`$1`/`$2`/... placeholders) rather than interpolating them into the
+`sql` string, to keep the statement injection-safe.
+`db_execute({ sql: "INSERT INTO app_internal.subscriptions
+(user_id, tier) VALUES ($1, $2) RETURNING id", params: [userId, tier] })`
+returns any `RETURNING` rows plus the affected `rowCount`.
+
 ## Environment (set by Terraform — see `terraform/main/lambda-mcp-db.tf`)
 
 - `MCP_COGNITO_ISSUER`, `MCP_COGNITO_AUDIENCE`, `MCP_OAUTH_SCOPES="openid mcp/db"`
 - `MCP_READONLY_SECRET_NAME` — Secrets Manager secret `{ username, password }` for `mcp_readonly`
+- `MCP_WRITE_SECRET_NAME` — Secrets Manager secret `{ username, password }` for `mcp_write` (used by `db_execute`)
 - `DB_HOST` (RDS instance endpoint `host:5432`), `DB_PORT`, `DB_NAME`
 - `DB_SECRET_NAME` — migration_user creds (used by `db_migrate`)
-- `NODE_ENV` — environment name; `db_migrate` refuses to run unless this is `dev`/`development`
+- `NODE_ENV` — environment name; `db_migrate`/`db_execute` refuse to run unless this is `dev`/`development`
 - `DB_MIGRATION_STATEMENT_TIMEOUT_MS` — worker DDL statement_timeout (default 840000; Terraform wires it to the function timeout minus 60s)
+- `DB_WRITE_STATEMENT_TIMEOUT_MS` — `db_execute` connection statement_timeout (default 30000)
 - `DB_MIGRATE_JOB_STALE_MS` — heartbeat age past which a `running` job is treated as dead (default 960000)
 - `AWS_LAMBDA_FUNCTION_NAME` — runtime-provided; used for the async self-invoke
 

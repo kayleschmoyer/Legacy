@@ -643,3 +643,40 @@ resource "aws_secretsmanager_secret_version" "mcp_readonly_db_credentials" {
     database = var.database_name
   })
 }
+
+# =============================================================================
+# MCP WRITE DATABASE CREDENTIALS
+# =============================================================================
+# A DML-only (INSERT/UPDATE/DELETE, no DDL) PostgreSQL user used by the hosted
+# DB-admin MCP server's db_execute tool (LS-9358) to run ad-hoc data writes
+# against public + app_internal without a tunnel or a versioned migration.
+# The mcp_write role is created by migration 20260902_120100_add_mcp_write_role.ts.
+
+resource "random_password" "mcp_write_db_password" {
+  length  = 32
+  special = false # Avoid special chars that can break PostgreSQL connection strings
+}
+
+resource "aws_secretsmanager_secret" "mcp_write_db_credentials" {
+  name_prefix = "${local.name_prefix}-mcp-write-db-creds-"
+  description = "DML-only DB credentials for the hosted DB-admin MCP server (mcp_write Postgres role)"
+
+  # TODO: Automatic rotation requires a rotation Lambda and a mechanism to
+  # ALTER the mcp_write Postgres role password in sync. See LS-784.
+
+  tags = merge(local.common_tags, {
+    Component = "mcp"
+    Purpose   = "db-admin-write"
+  })
+}
+
+resource "aws_secretsmanager_secret_version" "mcp_write_db_credentials" {
+  secret_id = aws_secretsmanager_secret.mcp_write_db_credentials.id
+  secret_string = jsonencode({
+    username = "mcp_write"
+    password = random_password.mcp_write_db_password.result
+    host     = aws_db_instance.postgres.address
+    port     = 5432
+    database = var.database_name
+  })
+}

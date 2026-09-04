@@ -15,6 +15,9 @@ import {
  *     migration DDL. This role CAN write — `db_migrate` is gated separately by
  *     the `mcp/db` scope, a dev-only environment guard, and audit logging.
  *
+ *   - `MCP_WRITE_SECRET_NAME` → the DML-only `mcp_write` role (INSERT/UPDATE/
+ *     DELETE/SELECT, no DDL), used by `db_execute` for ad-hoc data writes.
+ *
  * Host/port/database come from `DB_HOST` / `DB_PORT` / `DB_NAME`, wired by
  * Terraform. `DB_HOST` is the RDS instance endpoint, which is formatted as
  * `host:5432`, so it is split here.
@@ -158,4 +161,47 @@ export async function getMigrationSql(): Promise<postgres.Sql> {
   });
 
   return migrationSql;
+}
+
+let writeSql: postgres.Sql | null = null;
+
+/**
+ * Lazily create (and cache across warm Lambda invocations) a postgres
+ * connection authenticated as the DML-only `mcp_write` role for `db_execute`.
+ *
+ * Unlike `getMigrationSql`, this role has no DDL grants at all — it can only
+ * INSERT/UPDATE/DELETE/SELECT on the public and app_internal schemas. Access
+ * is gated by `db_execute`'s own guards (the `mcp/db` scope, the dev-only
+ * environment check, and audit logging), same as `db_migrate`.
+ *
+ * `statement_timeout` defaults short (unlike the migration connection) since
+ * `db_execute` runs a single ad-hoc statement, not long-running DDL/backfills.
+ */
+export async function getWriteSql(): Promise<postgres.Sql> {
+  if (writeSql) return writeSql;
+
+  const creds = await readRoleSecret(requireEnv('MCP_WRITE_SECRET_NAME'));
+  const { host, port } = resolveHostPort();
+  const statementTimeoutMs = parseInt(
+    process.env['DB_WRITE_STATEMENT_TIMEOUT_MS'] ?? '30000',
+    10,
+  );
+
+  writeSql = postgres({
+    host,
+    port,
+    database: process.env['DB_NAME'] ?? 'postgres',
+    username: creds.username,
+    password: creds.password,
+    ssl: 'require',
+    max: 2,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    prepare: false,
+    connection: {
+      statement_timeout: statementTimeoutMs,
+    },
+  });
+
+  return writeSql;
 }

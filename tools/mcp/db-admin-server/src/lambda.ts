@@ -15,6 +15,7 @@ import { PAGE as DOCS_PAGE } from '@legacy-sports/mcp-docs/pages/db-admin';
 import { query } from './tools/query.js';
 import { migrationStatus } from './tools/migration-status.js';
 import { migrate } from './tools/migrate.js';
+import { execute } from './tools/execute.js';
 import { extractCaller, type McpCaller } from './audit.js';
 import {
   type DbMigrateWorkerEvent,
@@ -109,6 +110,34 @@ function createMcpServer(caller: McpCaller): McpServer {
         .describe('Pending migrations to apply, ordered by timestamp.'),
     },
     async (params) => migrate(params, caller),
+  );
+
+  server.tool(
+    'db_execute',
+    'Run a single ad-hoc DML statement (INSERT/UPDATE/DELETE) against the dev database over HTTPS ' +
+      '(no SSM tunnel), for data an agent needs to write directly and cannot reach through a versioned ' +
+      'migration (db_migrate) or the read-only public schema (db_query) — e.g. app_internal.* rows. ' +
+      'Connects as the DML-only mcp_write Postgres role (INSERT/UPDATE/DELETE/SELECT on public + ' +
+      'app_internal, no CREATE/ALTER/DROP grants at all), so DDL is rejected by the database engine. ' +
+      'Exactly one statement per call (no ";"-stacked queries). Structure is trusted verbatim (console ' +
+      'for mcp/db-scoped agents, not user input) — bind values via params ($1/$2/...), never ' +
+      'interpolate into sql. Returns any RETURNING rows plus row count. Dev-only, like db_migrate.',
+    {
+      sql: z
+        .string()
+        .describe(
+          'Single DML statement (INSERT / UPDATE / DELETE), optionally with a RETURNING clause.',
+        ),
+      params: z
+        .array(z.unknown())
+        .default([])
+        .describe('Bind values for $1/$2/... placeholders in the statement.'),
+      format: z
+        .enum(['table', 'json'])
+        .default('json')
+        .describe('Output format (default: json).'),
+    },
+    async (params) => execute(params, caller),
   );
 
   return server;
