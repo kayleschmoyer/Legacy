@@ -31,6 +31,12 @@ name: Deploy
 # triggerable via workflow_run off "Upload Lambdas" completing, for manual
 # one-off upload-lambdas.yml dispatches. See lambda-terraform-apply.yml's own
 # header for the full trigger inventory.
+#
+# detect-changes emits a separate `terraform` boolean alongside `lambdas`
+# (LS-9871). Apply Lambda Infrastructure runs on `lambdas || terraform`, while
+# Upload Lambdas stays on `lambdas` alone — so a terraform-only push applies
+# infrastructure without rebuilding and re-uploading all 18 lambda bundles for
+# zero new SSM versions.
 # =============================================================================
 
 on:
@@ -86,6 +92,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       lambdas: ${{ steps.result.outputs.lambdas }}
+      terraform: ${{ steps.result.outputs.terraform }}
       web: ${{ steps.result.outputs.web }}
       storybook: ${{ steps.result.outputs.storybook }}
 
@@ -123,6 +130,21 @@ jobs:
               - '.github/workflows/upload-lambdas.yml'
               - '.github/workflows/lambda-terraform-apply.yml'
               - '.github/workflows/deploy.yml'
+            # Infrastructure-only signal (LS-9871). Kept SEPARATE from
+            # `lambdas` on purpose: a terraform-only change ships no new
+            # lambda code, so forcing it through `lambdas` would rebuild and
+            # re-upload all 18 lambda bundles (~the slowest part of a deploy)
+            # to produce zero new SSM versions. Gating Apply Lambda
+            # Infrastructure on `lambdas || terraform` instead lets a
+            # terraform-only push apply directly, while a lambda push keeps
+            # the existing upload-then-apply ordering. Scoped to
+            # terraform/main/** because that is the only state
+            # lambda-terraform-apply.yml touches; terraform/runners/** has its
+            # own workflow (runner-terraform-apply.yml).
+            terraform:
+              - 'terraform/main/**'
+              - '.github/workflows/lambda-terraform-apply.yml'
+              - '.github/workflows/deploy.yml'
             web:
               - 'apps/web/**'
               - 'lib/shared-components/**'
@@ -140,11 +162,16 @@ jobs:
           # force-* inputs are only defined on workflow_dispatch events; on push
           # they resolve to the empty string and are a no-op.
           LAMBDAS="${{ steps.filter.outputs.lambdas }}"
+          TERRAFORM="${{ steps.filter.outputs.terraform }}"
           WEB="${{ steps.filter.outputs.web }}"
           STORYBOOK="${{ steps.filter.outputs.storybook }}"
 
+          # force-lambdas forces the terraform apply too, so the manual
+          # `gh workflow run deploy.yml -f force-lambdas=true` escape hatch
+          # keeps applying infrastructure exactly as it did before LS-9871.
           if [ "${{ inputs['force-lambdas'] }}" = "true" ]; then
             LAMBDAS="true"
+            TERRAFORM="true"
           fi
           if [ "${{ inputs['force-web'] }}" = "true" ]; then
             WEB="true"
@@ -154,6 +181,7 @@ jobs:
           fi
 
           echo "lambdas=$LAMBDAS" >> "$GITHUB_OUTPUT"
+          echo "terraform=$TERRAFORM" >> "$GITHUB_OUTPUT"
           echo "web=$WEB" >> "$GITHUB_OUTPUT"
           echo "storybook=$STORYBOOK" >> "$GITHUB_OUTPUT"
 
@@ -163,6 +191,7 @@ jobs:
             echo "| Target | Affected |"
             echo "| --- | --- |"
             echo "| Lambdas | $LAMBDAS |"
+            echo "| Terraform | $TERRAFORM |"
             echo "| Web | $WEB |"
             echo "| Storybook | $STORYBOOK |"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -197,7 +226,20 @@ jobs:
   apply-lambda-infrastructure:
     name: Apply Lambda Infrastructure
     needs: [detect-changes, upload-lambdas]
-    if: needs.detect-changes.outputs.lambdas == 'true'
+    # `!cancelled()` is load-bearing (LS-9871): without a status-check function
+    # the job carries an implicit `success()` over every `needs`, so a SKIPPED
+    # upload-lambdas would skip this job too — which is exactly what a
+    # terraform-only push produces. With it, the dependency states are checked
+    # explicitly instead: apply runs when infrastructure was targeted and the
+    # upload either succeeded or was legitimately skipped, and is held back
+    # when the upload failed or was cancelled (partial SSM state the plan step
+    # must not act on).
+    if: >-
+      !cancelled() &&
+      (needs.detect-changes.outputs.lambdas == 'true' ||
+      needs.detect-changes.outputs.terraform == 'true') &&
+      (needs.upload-lambdas.result == 'success' ||
+      needs.upload-lambdas.result == 'skipped')
     permissions:
       id-token: write # AWS OIDC
       contents: read
@@ -221,14 +263,30 @@ jobs:
   # ---------------------------------------------------------------------------
   deploy-web:
     name: Deploy Web
-    needs: [detect-changes, apply-lambda-infrastructure]
-    # Gate on Apply Lambda Infrastructure's result, not just detect-changes:
-    # 'success' (lambdas targeted and applied) or 'skipped' (lambdas not
-    # targeted this push — the dependency's own `if` didn't run it) both mean
+    needs: [detect-changes, upload-lambdas, apply-lambda-infrastructure]
+    # Gate on the lambda children's results, not just detect-changes: 'success'
+    # (targeted and shipped) or 'skipped' (not targeted this push) both mean
     # it's safe to proceed. 'failure'/'cancelled' block Deploy Web entirely —
     # see the umbrella header comment for why this ordering exists.
+    #
+    # `!cancelled()` is required for that 'skipped' allowance to be reachable
+    # at all (LS-9871). A job whose `if` contains no status-check function
+    # carries an implicit `success()` over its `needs`, and `success()` is
+    # false when a needed job was skipped — so the old condition skipped
+    # Deploy Web on EVERY push where Apply Lambda Infrastructure did not run,
+    # including every push where it skipped because of the dead
+    # `workflow_call` clause.
+    #
+    # upload-lambdas is in `needs` so a FAILED lambda upload can be told apart
+    # from a legitimately skipped one. Without it, "apply was skipped" would
+    # read as safe even when it was skipped precisely because the lambda
+    # upload failed — re-opening the client-ahead-of-server race this
+    # ordering exists to close.
     if: >-
+      !cancelled() &&
       needs.detect-changes.outputs.web == 'true' &&
+      (needs.upload-lambdas.result == 'success' ||
+      needs.upload-lambdas.result == 'skipped') &&
       (needs.apply-lambda-infrastructure.result == 'success' ||
       needs.apply-lambda-infrastructure.result == 'skipped')
     permissions:
@@ -278,6 +336,7 @@ jobs:
         env:
           DETECT_CHANGES_RESULT: ${{ needs.detect-changes.result }}
           LAMBDAS_TARGETED: ${{ needs.detect-changes.outputs.lambdas }}
+          TERRAFORM_TARGETED: ${{ needs.detect-changes.outputs.terraform }}
           WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
           STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
           LAMBDAS_UPLOAD_RESULT: ${{ needs.upload-lambdas.result }}
@@ -320,8 +379,18 @@ jobs:
             echo "success"
           }
 
+          # Apply Lambda Infrastructure is targeted by lambdas OR terraform
+          # (LS-9871) — a terraform-only push applies without uploading, so
+          # reporting the apply against LAMBDAS_TARGETED alone would mislabel a
+          # real apply as "not-targeted".
+          if [ "$LAMBDAS_TARGETED" = "true" ] || [ "$TERRAFORM_TARGETED" = "true" ]; then
+            INFRA_TARGETED="true"
+          else
+            INFRA_TARGETED="false"
+          fi
+
           LAMBDAS_UPLOAD_STATE=$(translate "$LAMBDAS_TARGETED" "$LAMBDAS_UPLOAD_RESULT")
-          LAMBDAS_APPLY_STATE=$(translate "$LAMBDAS_TARGETED" "$LAMBDAS_APPLY_RESULT")
+          LAMBDAS_APPLY_STATE=$(translate "$INFRA_TARGETED" "$LAMBDAS_APPLY_RESULT")
           LAMBDAS_STATE=$(worse_of "$LAMBDAS_UPLOAD_STATE" "$LAMBDAS_APPLY_STATE")
           WEB_STATE=$(translate "$WEB_TARGETED" "$WEB_RESULT")
           STORYBOOK_STATE=$(translate "$STORYBOOK_TARGETED" "$STORYBOOK_RESULT")
@@ -475,6 +544,7 @@ jobs:
         env:
           WEB_TARGETED: ${{ needs.detect-changes.outputs.web }}
           LAMBDAS_TARGETED: ${{ needs.detect-changes.outputs.lambdas }}
+          TERRAFORM_TARGETED: ${{ needs.detect-changes.outputs.terraform }}
           STORYBOOK_TARGETED: ${{ needs.detect-changes.outputs.storybook }}
           WEB_VERSION: ${{ needs.deploy-web.outputs.version }}
           WEB_BUILD: ${{ needs.deploy-web.outputs.build_number }}
@@ -492,6 +562,8 @@ jobs:
           fi
           if [ "$LAMBDAS_TARGETED" = "true" ]; then
             LINES+=("**Lambdas** uploaded — Terraform applied")
+          elif [ "$TERRAFORM_TARGETED" = "true" ]; then
+            LINES+=("**Terraform** applied")
           fi
           if [ "$STORYBOOK_TARGETED" = "true" ]; then
             LINES+=("**Storybook** deployed")

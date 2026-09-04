@@ -79,24 +79,38 @@ jobs:
     name: Apply Lambda Infrastructure
     runs-on: ${{ vars.CI_RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
-    # Run for manual dispatches, for the synchronous workflow_call from the
-    # umbrella Deploy workflow (always — Deploy's own detect-changes gate
-    # already decided lambdas were targeted), and for completed standalone
-    # "Upload Lambdas" runs unless that run was cancelled or skipped. This
-    # preserves apply behavior when Upload Lambdas has already bumped SSM
-    # versions but concludes with a non-success terminal state such as
-    # failure, timed_out, action_required, neutral, or stale — all of those
-    # leave SSM parameters in a state that still needs reconciling. Only
-    # cancelled/skipped Upload Lambdas runs are excluded, since those can
-    # terminate mid-upload and leave partial state that the plan step should
-    # not attempt to act on. The SSM no-op check in the plan step ensures we
-    # exit cleanly if no lambda versions actually changed.
+    # Run for every invocation EXCEPT a "Upload Lambdas" workflow_run that was
+    # cancelled or skipped.
+    #
+    # Do NOT reintroduce a `github.event_name == 'workflow_call'` clause here
+    # (LS-9871). GitHub never sets `github.event_name` to 'workflow_call': a
+    # reusable workflow invoked with `uses:` inherits the CALLER's event, which
+    # for the umbrella Deploy workflow on push-to-main is 'push'. That clause
+    # could therefore never match, so every automatic push-to-main deploy
+    # silently skipped this job — and because a skipped job is not a failure,
+    # Deploy still reported success while no terraform change ever applied.
+    # Only manual dispatches worked, because those DO inherit
+    # event_name = 'workflow_dispatch'. Inverting the test to "not a
+    # workflow_run" covers the workflow_call path under any inherited event as
+    # well as a direct workflow_dispatch, without enumerating caller events.
+    #
+    # The workflow_call path needs no additional condition: deploy.yml's own
+    # apply-lambda-infrastructure gate already decided infrastructure was
+    # targeted before invoking this workflow.
+    #
+    # The workflow_run exclusions are deliberate and preserved. Apply still
+    # runs when the triggering "Upload Lambdas" run concluded with a
+    # non-success terminal state such as failure, timed_out, action_required,
+    # neutral, or stale — all of those can leave SSM parameters bumped and in
+    # a state that still needs reconciling. Only cancelled/skipped Upload
+    # Lambdas runs are excluded, since those can terminate mid-upload and leave
+    # partial state the plan step should not attempt to act on. The SSM no-op
+    # check in the plan step ensures we exit cleanly if no lambda versions
+    # actually changed.
     if: >-
       ${{
-        github.event_name == 'workflow_dispatch' ||
-        github.event_name == 'workflow_call' ||
+        github.event_name != 'workflow_run' ||
         (
-          github.event_name == 'workflow_run' &&
           github.event.workflow_run.conclusion != 'cancelled' &&
           github.event.workflow_run.conclusion != 'skipped'
         )
