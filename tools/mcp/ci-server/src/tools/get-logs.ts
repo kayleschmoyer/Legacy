@@ -1,7 +1,9 @@
 import {
   AmbiguousJobNameError,
   fetchRunLogsRing,
+  PRIORITY_LINES_CAP,
   stripAnsiCodes,
+  unsafePatternReason,
 } from '../logs.js';
 import { formatBatchLogPayload, formatLogPayload } from '../format.js';
 import type { ToolResult } from '../types.js';
@@ -19,6 +21,8 @@ interface GetLogsParams {
   jobName?: string;
   exact?: boolean;
   offset?: number;
+  grep?: string;
+  caseSensitive?: boolean;
 }
 
 /**
@@ -357,6 +361,25 @@ function applyCharLimits(
 /** Deadline for a single ci_get_logs call — leaves ~5 s buffer before Lambda 30 s timeout. */
 const LOG_FETCH_TIMEOUT_MS = 20_000;
 
+/**
+ * Builds a line matcher for the `grep` param (LS-9430). Unlike `errorSummary`'s
+ * fixed ERROR_PATTERNS heuristic, `grep` is caller-supplied — always compiled
+ * as a regex (matching the tool's name and how the gap ticket's own example
+ * call used it, e.g. `"foo|bar|baz"` alternation), case-insensitive unless
+ * `caseSensitive` is set, tested against the ANSI-stripped line so codes
+ * inserted by GitHub Actions colourization can never split a match. The
+ * caller (`getLogs`) validates the pattern with `unsafePatternReason` and a
+ * trial `new RegExp` compile before this is invoked, so construction here
+ * cannot throw.
+ */
+function buildGrepMatcher(
+  pattern: string,
+  caseSensitive: boolean | undefined,
+): (line: string) => boolean {
+  const regex = new RegExp(pattern, caseSensitive ? '' : 'i');
+  return (line: string) => regex.test(stripAnsiCodes(line));
+}
+
 /** A run's log result split into scalar metadata and the raw log text. */
 interface RunPayload {
   meta: Record<string, unknown>;
@@ -375,7 +398,11 @@ async function buildRunPayload(
   params: GetLogsParams,
   signal?: AbortSignal,
 ): Promise<RunPayload> {
-  const defaultLimit = params.errorSummary ? 10_000 : 500;
+  const grepMatcher = params.grep
+    ? buildGrepMatcher(params.grep, params.caseSensitive)
+    : undefined;
+
+  const defaultLimit = params.errorSummary || grepMatcher ? 10_000 : 500;
   const maxLines = params.maxLines ?? defaultLimit;
   const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
   const streamLimit = maxLines > 0 ? maxLines : 10_000;
@@ -398,7 +425,11 @@ async function buildRunPayload(
       signal,
     },
     streamLimit,
-    params.errorSummary ? isPriorityFailureLine : undefined,
+    // grep (LS-9430) takes precedence over errorSummary when both are set —
+    // grepMatcher scans the FULL log independent of the maxLines ring-buffer
+    // tail, same mechanism errorSummary relies on, so a match anywhere in the
+    // log is found regardless of where in the file it falls.
+    grepMatcher ?? (params.errorSummary ? isPriorityFailureLine : undefined),
   );
 
   const base = {
@@ -414,6 +445,56 @@ async function buildRunPayload(
     failedOnly: params.failedOnly !== false,
     attempt: params.attempt ?? null,
   };
+
+  if (grepMatcher) {
+    // priorityLines are the grep matches, collected across the FULL log by
+    // fetchRunLogsRing (independent of the maxLines ring-buffer tail) — this
+    // is the actual fix for LS-9430: previously `grep` wasn't a recognized
+    // param at all, so it was silently dropped and every call fell back to
+    // the same generic ring-buffer tail regardless of pattern.
+    const matched = priorityLines ?? [];
+    const strippedMatched = matched.map(stripAnsiCodes);
+    const grepOffset = params.offset ?? 0;
+    const windowedMatched =
+      grepOffset > 0 ? strippedMatched.slice(grepOffset) : strippedMatched;
+    const { processedLines, charTruncated } = applyCharLimits(
+      windowedMatched,
+      params.truncateLineLength,
+      maxChars,
+    );
+    const hints: string[] = [];
+    if (matched.length === 0) {
+      hints.push(
+        'No lines matched the grep pattern — check the pattern targets this run/job scope, or try errorSummary: true instead',
+      );
+    } else if (matched.length >= PRIORITY_LINES_CAP) {
+      hints.push(
+        `grep matches capped at ${PRIORITY_LINES_CAP} lines — narrow the pattern or use jobName/jobId to scope further`,
+      );
+    }
+    return {
+      meta: {
+        ...base,
+        grep: params.grep,
+        totalLogLines: totalLines,
+        grepMatches: matched.length,
+        offset: grepOffset,
+        charTruncated,
+        ...(skippedJobs
+          ? {
+              skippedJobs,
+              hint: [
+                `${skippedJobs} job(s) omitted — use jobName or jobId to fetch specific job logs`,
+                ...hints,
+              ].join('; '),
+            }
+          : hints.length > 0
+            ? { hint: hints.join('; ') }
+            : {}),
+      },
+      logs: processedLines.join('\n'),
+    };
+  }
 
   if (params.errorSummary) {
     const summary = extractErrorSummary(lines, priorityLines);
@@ -526,6 +607,32 @@ async function mapWithConcurrency<T, R>(
 }
 
 export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
+  // Validate grep once up front (LS-9430) — before any fetch, and independent
+  // of singular vs. batch mode, so an unsafe/invalid pattern fails fast with
+  // one clear error instead of surfacing per-run inside batch `missing[]`.
+  if (params.grep !== undefined) {
+    const reason = unsafePatternReason(params.grep);
+    if (reason) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: `Unsafe grep pattern: ${reason}.` }],
+      };
+    }
+    try {
+      buildGrepMatcher(params.grep, params.caseSensitive);
+    } catch (error) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: `Invalid grep pattern "${params.grep}": ${error instanceof Error ? error.message : String(error)}`,
+          },
+        ],
+      };
+    }
+  }
+
   const hasRunIds = Array.isArray(params.runIds) && params.runIds.length > 0;
 
   if (hasRunIds) {

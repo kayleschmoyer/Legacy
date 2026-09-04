@@ -145,6 +145,15 @@ export function createServer(): McpServer {
         .describe(
           'Skip this many lines from the start of the fetched window before applying maxChars, like Read offset. Pages a log across calls; response meta returns hint/linesRemainingInWindow with the next offset.',
         ),
+      grep: z
+        .string()
+        .optional()
+        .describe(
+          'Regex filter over the full log, e.g. "foo|bar" (not just the maxLines tail). Overrides errorSummary. Case-insensitive unless caseSensitive. Capped at 300 matches.',
+        ),
+      caseSensitive: coercedBoolean
+        .default(false)
+        .describe('Case-sensitive grep (default false).'),
     },
     async (params) => getLogs(params),
   );

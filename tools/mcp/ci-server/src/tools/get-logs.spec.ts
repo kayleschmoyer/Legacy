@@ -18,10 +18,26 @@ jest.mock('../logs.js', () => {
       this.candidates = candidates;
     }
   }
+  // Real unsafePatternReason implementation (same ReDoS-guard shape as the
+  // actual logs.ts, duplicated here for the same import.meta.url reason as
+  // stripAnsiCodes above).
+  const MAX_PATTERN_LENGTH = 1000;
+  function unsafePatternReason(pattern: string): string | null {
+    if (pattern.length > MAX_PATTERN_LENGTH) {
+      return `pattern too long (${pattern.length} > ${MAX_PATTERN_LENGTH} characters)`;
+    }
+    const nestedQuantifier = /\([^()]*[+*{][^()]*\)[+*{]/;
+    if (nestedQuantifier.test(pattern)) {
+      return 'pattern contains nested quantifiers (possible ReDoS); simplify the pattern or set isRegex=false for a literal substring search';
+    }
+    return null;
+  }
   return {
     fetchRunLogsRing: jest.fn(),
     stripAnsiCodes: (text: string) => text.replace(ANSI_ESCAPE_SEQUENCE, ''),
     AmbiguousJobNameError,
+    unsafePatternReason,
+    PRIORITY_LINES_CAP: 300,
   };
 });
 
@@ -258,6 +274,129 @@ describe('getLogs', () => {
       const header = parseHeader(text);
       expect(header.offset).toBe(1);
       expect(parseLogs(text)).toBe('err 2\nerr 3');
+    });
+  });
+
+  describe('grep (LS-9430)', () => {
+    it('actually filters output to lines matching the pattern, unlike before the fix', async () => {
+      mockFetch.mockResolvedValue({
+        lines: ['unrelated tail line 1', 'unrelated tail line 2'],
+        totalLines: 2,
+        priorityLines: ['Scoreboard Ticker failed: Timeout'],
+      });
+
+      const result = await getLogs({
+        runId: 1,
+        grep: 'Scoreboard Ticker|Timeout',
+      });
+
+      expect(result.isError).toBeUndefined();
+      const text = result.content[0].text;
+      const header = parseHeader(text);
+      expect(header.grep).toBe('Scoreboard Ticker|Timeout');
+      expect(header.grepMatches).toBe(1);
+      // Must return the matched lines, not the unrelated ring-buffer tail —
+      // this is the exact regression the ticket reported (identical generic
+      // tail regardless of pattern).
+      expect(parseLogs(text)).toBe('Scoreboard Ticker failed: Timeout');
+    });
+
+    it('passes fetchRunLogsRing a matcher compiled from the pattern, scanning the full log', async () => {
+      mockFetch.mockResolvedValue({
+        lines: [],
+        totalLines: 0,
+        priorityLines: [],
+      });
+
+      await getLogs({ runId: 1, grep: 'foo|bar' });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.objectContaining({ runId: 1 }),
+        expect.any(Number),
+        expect.any(Function),
+      );
+      const matcher = mockFetch.mock.calls[0][2] as (line: string) => boolean;
+      expect(matcher('a foo line')).toBe(true);
+      expect(matcher('a bar line')).toBe(true);
+      expect(matcher('neither')).toBe(false);
+      // Default is case-insensitive.
+      expect(matcher('a FOO line')).toBe(true);
+    });
+
+    it('honors caseSensitive: true', async () => {
+      mockFetch.mockResolvedValue({
+        lines: [],
+        totalLines: 0,
+        priorityLines: [],
+      });
+
+      await getLogs({ runId: 1, grep: 'Foo', caseSensitive: true });
+
+      const matcher = mockFetch.mock.calls[0][2] as (line: string) => boolean;
+      expect(matcher('Foo')).toBe(true);
+      expect(matcher('foo')).toBe(false);
+    });
+
+    it('takes precedence over errorSummary when both are set', async () => {
+      mockFetch.mockResolvedValue({
+        lines: [],
+        totalLines: 0,
+        priorityLines: ['grep match only'],
+      });
+
+      const result = await getLogs({
+        runId: 1,
+        grep: 'match',
+        errorSummary: true,
+      });
+
+      const text = result.content[0].text;
+      expect(parseLogs(text)).toBe('grep match only');
+      expect(parseHeader(text).grep).toBe('match');
+    });
+
+    it('hints when nothing matches, instead of silently returning an unrelated tail', async () => {
+      mockFetch.mockResolvedValue({
+        lines: [],
+        totalLines: 0,
+        priorityLines: [],
+      });
+
+      const result = await getLogs({ runId: 1, grep: 'nope' });
+
+      const header = parseHeader(result.content[0].text);
+      expect(header.grepMatches).toBe(0);
+      expect(header.hint).toMatch(/No lines matched/);
+    });
+
+    it('rejects an unsafe (ReDoS-prone) grep pattern before fetching', async () => {
+      const result = await getLogs({ runId: 1, grep: '(a+)+' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/Unsafe grep pattern/);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid regex pattern before fetching', async () => {
+      const result = await getLogs({ runId: 1, grep: '(unclosed' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/Invalid grep pattern/);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('strips ANSI codes before matching so colorized log lines still match', async () => {
+      mockFetch.mockResolvedValue({
+        lines: [],
+        totalLines: 0,
+        priorityLines: [],
+      });
+
+      await getLogs({ runId: 1, grep: 'Timeout' });
+
+      const matcher = mockFetch.mock.calls[0][2] as (line: string) => boolean;
+      const ansiWrapped = `${String.fromCharCode(27)}[31mTimeout${String.fromCharCode(27)}[0m`;
+      expect(matcher(ansiWrapped)).toBe(true);
     });
   });
 

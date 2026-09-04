@@ -7,9 +7,23 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 jest.mock('../logs.js', () => {
   const ESC = String.fromCharCode(27);
   const ANSI_ESCAPE_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
+  // Real unsafePatternReason implementation (same reason as stripAnsiCodes
+  // above — requireActual transitively breaks under ts-jest's CJS transform).
+  const MAX_PATTERN_LENGTH = 1000;
+  function unsafePatternReason(pattern: string): string | null {
+    if (pattern.length > MAX_PATTERN_LENGTH) {
+      return `pattern too long (${pattern.length} > ${MAX_PATTERN_LENGTH} characters)`;
+    }
+    const nestedQuantifier = /\([^()]*[+*{][^()]*\)[+*{]/;
+    if (nestedQuantifier.test(pattern)) {
+      return 'pattern contains nested quantifiers (possible ReDoS); simplify the pattern or set isRegex=false for a literal substring search';
+    }
+    return null;
+  }
   return {
     fetchRunLogs: jest.fn(),
     stripAnsiCodes: (text: string) => text.replace(ANSI_ESCAPE_SEQUENCE, ''),
+    unsafePatternReason,
   };
 });
 

@@ -1,5 +1,5 @@
 import { formatLogSearch, type LogMatch } from '../format.js';
-import { fetchRunLogs, stripAnsiCodes } from '../logs.js';
+import { fetchRunLogs, stripAnsiCodes, unsafePatternReason } from '../logs.js';
 import type { ToolResult } from '../types.js';
 
 /** Deadline for a single ci_search_logs call — leaves ~5 s buffer before Lambda 30 s timeout. */
@@ -18,34 +18,6 @@ interface SearchLogsParams {
   limitMatches?: number;
   truncateLineLength?: number;
   maxChars?: number;
-}
-
-/**
- * Hard cap on a user-supplied regex pattern. Log-search patterns are short by
- * nature; a very long pattern is both unnecessary and a ReDoS smell.
- */
-const MAX_PATTERN_LENGTH = 1000;
-
-/**
- * Heuristic guard against catastrophic-backtracking (ReDoS) patterns. Node has
- * no synchronous way to time-box a regex execution, so we reject the pattern
- * *shapes* that cause exponential backtracking before compiling: a parenthesised
- * group that itself contains an unbounded quantifier and is in turn quantified
- * (e.g. `(a+)+`, `(a*)*`, `(a+)*`, `(a+){2,}`). Returns a human-readable reason,
- * or `null` when the pattern is acceptable. Only applies when `isRegex` is set —
- * literal substring search (the default) carries no backtracking risk.
- */
-function unsafePatternReason(pattern: string): string | null {
-  if (pattern.length > MAX_PATTERN_LENGTH) {
-    return `pattern too long (${pattern.length} > ${MAX_PATTERN_LENGTH} characters)`;
-  }
-  // A group containing an unbounded quantifier (`+`, `*`, or `{`), immediately
-  // followed by another unbounded quantifier — the classic ReDoS shape.
-  const nestedQuantifier = /\([^()]*[+*{][^()]*\)[+*{]/;
-  if (nestedQuantifier.test(pattern)) {
-    return 'pattern contains nested quantifiers (possible ReDoS); simplify the pattern or set isRegex=false for a literal substring search';
-  }
-  return null;
 }
 
 function buildMatcher(params: SearchLogsParams): (line: string) => boolean {

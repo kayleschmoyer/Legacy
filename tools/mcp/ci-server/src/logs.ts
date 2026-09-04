@@ -42,6 +42,36 @@ export function stripAnsiCodes(text: string): string {
   return text.replace(ANSI_ESCAPE_SEQUENCE, '');
 }
 
+/**
+ * Hard cap on a user-supplied regex pattern (ci_search_logs' `pattern`,
+ * ci_get_logs' `grep`). Log-search patterns are short by nature; a very long
+ * pattern is both unnecessary and a ReDoS smell.
+ */
+const MAX_PATTERN_LENGTH = 1000;
+
+/**
+ * Heuristic guard against catastrophic-backtracking (ReDoS) patterns. Node has
+ * no synchronous way to time-box a regex execution, so we reject the pattern
+ * *shapes* that cause exponential backtracking before compiling: a parenthesised
+ * group that itself contains an unbounded quantifier and is in turn quantified
+ * (e.g. `(a+)+`, `(a*)*`, `(a+)*`, `(a+){2,}`). Returns a human-readable reason,
+ * or `null` when the pattern is acceptable. Shared by ci_search_logs (only
+ * when `isRegex` is set — its literal substring mode carries no backtracking
+ * risk) and ci_get_logs' `grep` (always regex).
+ */
+export function unsafePatternReason(pattern: string): string | null {
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    return `pattern too long (${pattern.length} > ${MAX_PATTERN_LENGTH} characters)`;
+  }
+  // A group containing an unbounded quantifier (`+`, `*`, or `{`), immediately
+  // followed by another unbounded quantifier — the classic ReDoS shape.
+  const nestedQuantifier = /\([^()]*[+*{][^()]*\)[+*{]/;
+  if (nestedQuantifier.test(pattern)) {
+    return 'pattern contains nested quantifiers (possible ReDoS); simplify the pattern or set isRegex=false for a literal substring search';
+  }
+  return null;
+}
+
 export interface FetchRunLogsParams {
   runId?: number;
   jobId?: number;
@@ -72,7 +102,7 @@ const MAX_LOG_JOBS = 10;
  * Bounds memory for a pathological log with an unusually large number of
  * matches; real jest failure summaries are far smaller than this.
  */
-const PRIORITY_LINES_CAP = 300;
+export const PRIORITY_LINES_CAP = 300;
 
 interface GitHubJobStep {
   name: string;
