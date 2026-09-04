@@ -32,6 +32,18 @@ export {
   type DraftRosterSlotRowProps,
 } from './DraftRosterSlotRow';
 export { DraftTeamTab, type DraftTeamTabProps } from './DraftTeamTab';
+
+// Draft Details settings summary (LS-9857) — rendered in the wide branch's
+// rail and the compact branch's Team tab.
+export {
+  DraftDetailsPanel,
+  type DraftDetailsPanelProps,
+} from './DraftDetailsPanel';
+export {
+  buildDraftDetailRows,
+  type DraftDetailRow,
+  type DraftDetailsSettings,
+} from './draftDetails';
 export { DraftQueueTab, type DraftQueueTabProps } from './DraftQueueTab';
 
 // Connection-state surface (LS-9856)

@@ -50,6 +50,12 @@ export interface DraftTeamTabProps {
   leaguePositions: ReadonlyArray<{ positionType: string }>;
   sport: SportKind;
   maxRosterSize: number | null;
+  /**
+   * Rendered below the roster slots, inside the same scroll container
+   * (LS-9857: the compact branch's home for the Draft Details panel, which
+   * the wide branch shows in the rail).
+   */
+  footer?: React.ReactNode;
 }
 
 export function DraftTeamTab({
@@ -62,6 +68,7 @@ export function DraftTeamTab({
   leaguePositions,
   sport,
   maxRosterSize,
+  footer = null,
 }: DraftTeamTabProps): React.JSX.Element {
   const palette = useDraftPalette();
   const viewedTeamId = selectedTeamId ?? myTeamId;
@@ -191,6 +198,7 @@ export function DraftTeamTab({
               pick={row.pick}
             />
           ))}
+          {footer}
         </YStack>
       </ScrollView>
     </YStack>

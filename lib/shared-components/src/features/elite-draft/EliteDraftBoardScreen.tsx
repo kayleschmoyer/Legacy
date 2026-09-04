@@ -11,6 +11,8 @@ import { AuctionDraftRoom } from './auction/AuctionDraftRoom';
 import { PreDraftLobby } from './PreDraftLobby';
 import { DraftTopBand } from './DraftTopBand';
 import { DraftRail } from './DraftRail';
+import { DraftDetailsPanel } from './DraftDetailsPanel';
+import type { DraftDetailsSettings } from './draftDetails';
 import { DraftBoardGrid } from './DraftBoardGrid';
 import { DraftHeaderBand } from './DraftHeaderBand';
 import { DraftConnectionBanner } from './DraftConnectionBanner';
@@ -331,6 +333,8 @@ interface CompactLiveDraftBoardProps {
   controlAllTeams: boolean;
   /** Bottom safe-area inset reserved under the persistent bottom nav (LS-9444). */
   bottomInset: number;
+  /** Read-only league/draft settings summary rendered under the Team tab (LS-9857). */
+  draftDetails: DraftDetailsSettings;
   /**
    * True while the live socket has been down long enough to warn about but
    * not long enough to replace the board (LS-9856) — renders the reconnecting
@@ -366,6 +370,7 @@ function CompactLiveDraftBoard({
   isMockDraft,
   controlAllTeams,
   bottomInset,
+  draftDetails,
   connectionStale,
   onRetryConnection,
   onExitDraft,
@@ -601,6 +606,14 @@ function CompactLiveDraftBoard({
           leaguePositions={queries.leaguePositions}
           sport={sport}
           maxRosterSize={queries.league?.maxRosterSize ?? null}
+          footer={
+            <YStack marginTop="$3">
+              <DraftDetailsPanel
+                settings={draftDetails}
+                testID="draft-details-panel-compact"
+              />
+            </YStack>
+          }
         />
       ) : ui.activeTab === 'chat' && !hasChatTab ? (
         <YStack
@@ -1091,6 +1104,38 @@ export function EliteDraftBoardScreen({
   // own turn. Only meaningful for mock drafts — undefined/false for real leagues.
   const untimed = queries.league?.isOfflineDraft === true;
 
+  // Draft Details rail panel (LS-9857) — read-only summary built entirely from
+  // settings the board already fetches (league row + draft row). `untimed`
+  // (offline mock drafts, LS-9144) has no pick clock at all, so it reports as
+  // such rather than echoing a limit that never fires.
+  const draftDetails: DraftDetailsSettings = useMemo(
+    () => ({
+      sport,
+      draftOrder: queries.leagueDraft?.draftOrder ?? null,
+      maxRosterSize: queries.league?.maxRosterSize ?? null,
+      pickTimeLimitSeconds: untimed ? 0 : ui.pickTimeLimitSeconds,
+      autoPickDisabled: ui.autoPickDisabled,
+      eraFilter: queries.league?.eraFilter ?? null,
+      customEraStartYear: queries.league?.customEraStartYear ?? null,
+      customEraEndYear: queries.league?.customEraEndYear ?? null,
+      minCareerGames: queries.league?.minCareerGames ?? null,
+      baseballHofOnly: queries.league?.baseballHofOnly ?? null,
+    }),
+    [
+      sport,
+      untimed,
+      ui.pickTimeLimitSeconds,
+      ui.autoPickDisabled,
+      queries.leagueDraft?.draftOrder,
+      queries.league?.maxRosterSize,
+      queries.league?.eraFilter,
+      queries.league?.customEraStartYear,
+      queries.league?.customEraEndYear,
+      queries.league?.minCareerGames,
+      queries.league?.baseballHofOnly,
+    ],
+  );
+
   // LS-9238: the live board otherwise has no way to leave a mock draft in
   // progress — real leagues intentionally omit this (other drafters are
   // waiting on you), but a mock draft has no one to leave hanging.
@@ -1464,6 +1509,7 @@ export function EliteDraftBoardScreen({
         isMockDraft={isMockDraft}
         controlAllTeams={controlAllTeams}
         bottomInset={bottomInset}
+        draftDetails={draftDetails}
         connectionStale={connectionStale}
         onRetryConnection={retryConnection}
         onExitDraft={handleExitDraft}
@@ -1613,6 +1659,7 @@ export function EliteDraftBoardScreen({
           onToggleChat={() => ui.setChatOpen(!ui.chatOpen)}
           onRefresh={handleRefresh}
           draggedPlayer={draggedPlayer}
+          draftDetails={draftDetails}
         />
       </div>
 

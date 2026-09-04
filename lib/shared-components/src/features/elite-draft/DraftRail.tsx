@@ -8,6 +8,8 @@ import type {
 import { DraftIntelligence } from './DraftIntelligence';
 import { DraftQueuePanel } from './DraftQueuePanel';
 import { CurrentPickPanel } from './CurrentPickPanel';
+import { DraftDetailsPanel } from './DraftDetailsPanel';
+import type { DraftDetailsSettings } from './draftDetails';
 import { getPositionColor } from './utils';
 import { isPlayerEligibleForSlot } from './draftDnd';
 import type { Sport } from '../../utils/colors';
@@ -280,6 +282,8 @@ interface DraftRailProps {
   teamNameById: (teamId: number | null | undefined) => string;
   /** Drag-to-draft (LS-8068): the player card currently being dragged, or null. */
   draggedPlayer?: DraftPlayer | null;
+  /** Read-only league/draft settings summary (LS-9857). Omitted → panel hidden. */
+  draftDetails?: DraftDetailsSettings | null;
   // Chat
   chatOpen: boolean;
   // Actions
@@ -334,6 +338,7 @@ export function DraftRail({
   statsLookup,
   teamNameById,
   draggedPlayer = null,
+  draftDetails = null,
   chatOpen,
   onShowToast,
   onDraftPlayer,
@@ -610,6 +615,9 @@ export function DraftRail({
             })}
           </YStack>
         </RailPanel>
+
+        {/* Draft Details — read-only settings summary (LS-9857). */}
+        {draftDetails && <DraftDetailsPanel settings={draftDetails} />}
 
         {/* Pick History */}
         {pickHistory.length > 0 && (
