@@ -28,7 +28,11 @@ import type { WebSocketRoute } from '@playwright/test';
 import { injectWebSocketUrl } from './helpers/websocket-test-utils';
 import { expect } from '../fixtures/auth-enhanced';
 import { test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  extractRequestOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { FIXED_NOW_ISO, fromNowIso } from '../mocks/time';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -185,12 +189,14 @@ async function setupGraphQL(
   let leagueCallCount = 0;
 
   await page.route(isGraphQL, async (route) => {
-    const postData = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (
-      postData.includes('getleaguebyid') ||
-      postData.includes('"getleague"')
-    ) {
+    // LS-9866: exact equality on the extracted operation name. `postData`
+    // held the whole POST body, so every test below also searched the query
+    // TEXT — see the getmatchupbyid branch for what that reached.
+    // `'"getleague"'` was the quote-delimited idiom, which can only hit an
+    // operation named exactly GetLeague; none exists, so it was a dead branch.
+    if (operation === 'getleaguebyid') {
       leagueCallCount++;
       const respondWith =
         draftStartsOnRefetch && leagueCallCount > 1
@@ -201,31 +207,33 @@ async function setupGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: respondWith } }),
       });
-    } else if (postData.includes('getleagueteams')) {
+      // LS-9866: 'getleagueteams' also matched GetLeagueTeamsForDM, which is
+      // declared in the .graphql corpus but issued by no app code.
+    } else if (operation === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (postData.includes('getpositionsforleague')) {
+    } else if (operation === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
       });
-    } else if (postData.includes('getuserteamid')) {
+    } else if (operation === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: TEAM_1_ID } }),
       });
-    } else if (postData.includes('getcurrentweekforleague')) {
+    } else if (operation === 'getcurrentweekforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getCurrentWeekForLeague: 1 } }),
       });
-    } else if (postData.includes('getmatchupsforleague')) {
+    } else if (operation === 'getmatchupsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -233,7 +241,7 @@ async function setupGraphQL(
           data: { getMatchupsForLeague: [mockMatchup()] },
         }),
       });
-    } else if (postData.includes('getmatchupsbyweek')) {
+    } else if (operation === 'getmatchupsbyweek') {
       matchupsByWeekCallCount++;
       const m =
         matchupAfterRefetch !== null && matchupsByWeekCallCount > 1
@@ -244,7 +252,18 @@ async function setupGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { getMatchupsByWeek: [m] } }),
       });
-    } else if (postData.includes('getmatchupbyid')) {
+      // LS-9866: as a substring of the POST body, 'getmatchupbyid' also
+      // matched GetMatchupRecap and GetMatchupWinProbability through the query
+      // TEXT — both select the `getMatchupById` root field while neither NAME
+      // contains the string. This is the class that broke season-progression on
+      // #7513. Neither needs this branch: GetMatchupWinProbability is served by
+      // BASELINE_GRAPHQL_RESPONSES with the id-echoing payload LS-5907 requires
+      // (a flat null clobbers the cached Matchup entity), and GetMatchupRecap is
+      // never fired here because MatchupRecapPanel renders only for a completed
+      // matchup while mockMatchup() is 'in_progress'. Narrowing also stops those
+      // requests from inflating matchupByIdCallCount, which decides whether this
+      // branch serves the initial or the post-refetch scores.
+    } else if (operation === 'getmatchupbyid') {
       matchupByIdCallCount++;
       const m =
         matchupAfterRefetch !== null && matchupByIdCallCount > 1
@@ -255,7 +274,7 @@ async function setupGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { getMatchupById: m } }),
       });
-    } else if (postData.includes('getmatchupplayers')) {
+    } else if (operation === 'getmatchupplayers') {
       // Return null (not []) so computeMatchupScores hits the !players fallback
       // path and reads scores directly from matchup.team1Score/team2Score.
       // An empty array bypasses this fallback (empty arrays are truthy) and
@@ -266,54 +285,49 @@ async function setupGraphQL(
         body: JSON.stringify({ data: { getMatchupPlayers: null } }),
       });
     } else if (
-      postData.includes('getleaguechatmessages') ||
-      postData.includes('getleaguemessages')
+      operation === 'getleaguechatmessages' ||
+      operation === 'getleaguemessages'
     ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueMessages: [] } }),
       });
-    } else if (
-      postData.includes('getteammembers') ||
-      postData.includes('teammembers')
-    ) {
+    } else if (operation === 'getteammembers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { teamMembers: [] } }),
       });
-    } else if (
-      postData.includes('getleagueactivity') ||
-      postData.includes('leagueactivity')
-    ) {
+    } else if (operation === 'getleagueactivity') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueActivity: [] } }),
       });
-    } else if (
-      postData.includes('getleaguestandings') ||
-      postData.includes('leaguestandings')
-    ) {
+      // LS-9866: 'leaguestandings' also matched GetUserLeagueStandings, which
+      // selects a different root field and is served by the shared baseline.
+    } else if (operation === 'getleaguestandings') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueStandings: [] } }),
       });
-    } else if (
-      postData.includes('getuserleagues') ||
-      postData.includes('getusers')
-    ) {
+      // LS-9866: this payload is `{ userLeagues }`, which only GetUserLeagues
+      // returns — 'getusers' matched GetUsersCount and AdminGetUsers, and
+      // 'getuserleagues' also matched GetUserLeagueSummaries and
+      // GetUserLeagueStandings (plus GetMyLeagues through the query text). All
+      // of those select different root fields and are baseline-served.
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [league] } }),
       });
-    } else if (
-      postData.includes('getleaguescoring') ||
-      postData.includes('leaguescoringprofile')
-    ) {
+      // LS-9866: full operation name. 'getleaguescoring' was a prefix of it and
+      // 'leaguescoringprofile' also matched the UpdateLeagueScoringProfile
+      // mutation, which this null payload never answered.
+    } else if (operation === 'getleaguescoringprofile') {
       // Returning null causes MatchupScoreboard to fall back to the raw
       // team1Score/team2Score fields on the matchup (no calculation needed).
       await route.fulfill({
@@ -321,25 +335,16 @@ async function setupGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueScoringProfile: null } }),
       });
-    } else if (
-      postData.includes('getpendingtradeoffers') ||
-      postData.includes('pendingtradeoffers')
-    ) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { pendingTradeOffers: [] } }),
-      });
-    } else if (
-      postData.includes('getteamwaiverclaims') ||
-      postData.includes('teamwaiverclaims')
-    ) {
+      // LS-9866: the GetPendingTradeOffers branch was deleted — no operation of
+      // that name exists in the corpus, and no operation's query text contains
+      // 'pendingtradeoffers' either, so it could never fire.
+    } else if (operation === 'getteamwaiverclaims') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { teamWaiverClaims: [] } }),
       });
-    } else if (postData.includes('getleagueannouncements')) {
+    } else if (operation === 'getleagueannouncements') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -461,8 +466,12 @@ test.describe('WebSocket real-time updates @critical', () => {
       (resp) =>
         resp.url().includes('/graphql') &&
         !resp.url().includes('/@fs/') &&
-        (resp.request().postData()?.toLowerCase().includes('getmatchupbyid') ??
-          false),
+        // Match the operation NAME, not the body: a body-wide
+        // `includes('getmatchupbyid')` also matches GetMatchupWinProbability,
+        // whose response would settle this promise instead of the refetch
+        // (LS-9866).
+        extractRequestOperationName(resp.request()).toLowerCase() ===
+          'getmatchupbyid',
     );
     wsRoute.send(
       wsNotification({
@@ -532,8 +541,8 @@ test.describe('WebSocket real-time updates @critical', () => {
       (resp) =>
         resp.url().includes('/graphql') &&
         !resp.url().includes('/@fs/') &&
-        (resp.request().postData()?.toLowerCase().includes('getleaguebyid') ??
-          false),
+        extractRequestOperationName(resp.request()).toLowerCase() ===
+          'getleaguebyid',
     );
     wsRoute.send(
       wsNotification({

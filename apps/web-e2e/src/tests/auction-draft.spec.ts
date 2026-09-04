@@ -275,7 +275,10 @@ async function mockAuctionDraftGraphQL(
       return;
     }
 
-    if (opName.includes('getleagueteams')) {
+    // LS-9866: `opName.includes('getleagueteams')` also matched
+    // GetLeagueTeamsForDM, which is declared in the .graphql corpus but issued
+    // by no app code, so narrowing to exact equality drops nothing.
+    if (opName === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -284,7 +287,7 @@ async function mockAuctionDraftGraphQL(
       return;
     }
 
-    if (opName.includes('getuserteamid')) {
+    if (opName === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -297,11 +300,12 @@ async function mockAuctionDraftGraphQL(
     // served by the shared premium-by-default baseline (LS-8058) — the ad-hoc
     // premium mock here was removed in favor of that single source of truth.
 
-    // Draft query — returns auction selection method to trigger AuctionDraftRoom
-    if (
-      opName.includes('getlivedraftleaguedraft') ||
-      opName.includes('getleaguedraft')
-    ) {
+    // Draft query — returns auction selection method to trigger AuctionDraftRoom.
+    // LS-9866: `includes('getleaguedraft')` also matched GetLeagueDraftSlotTrades,
+    // which is fired only by DraftSlotTradePanel inside PreDraftLobby — never by
+    // the auction draft room — and which selects a different root field, so the
+    // payload below never fit it anyway.
+    if (opName === 'getlivedraftleaguedraft' || opName === 'getleaguedraft') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -311,7 +315,7 @@ async function mockAuctionDraftGraphQL(
     }
 
     // Auction-specific queries
-    if (opName.includes('getauctionstate')) {
+    if (opName === 'getauctionstate') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -320,7 +324,7 @@ async function mockAuctionDraftGraphQL(
       return;
     }
 
-    if (opName.includes('getauctionbudgets')) {
+    if (opName === 'getauctionbudgets') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -330,7 +334,7 @@ async function mockAuctionDraftGraphQL(
     }
 
     // Mutations
-    if (opName.includes('nominateplayer')) {
+    if (opName === 'nominateplayer') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -341,7 +345,7 @@ async function mockAuctionDraftGraphQL(
       return;
     }
 
-    if (opName.includes('placebid')) {
+    if (opName === 'placebid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -352,8 +356,12 @@ async function mockAuctionDraftGraphQL(
       return;
     }
 
-    // User leagues (app shell)
-    if (opName.includes('getuserleagues')) {
+    // User leagues (app shell).
+    // LS-9866: `includes('getuserleagues')` also matched GetUserLeagueSummaries
+    // and GetUserLeagueStandings, which select different root fields and are
+    // already served by the shared baseline (BASELINE_GRAPHQL_RESPONSES), so
+    // they fall through correctly now instead of getting a userLeagues payload.
+    if (opName === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -363,7 +371,7 @@ async function mockAuctionDraftGraphQL(
     }
 
     // Draft player stats (fired by draft room)
-    if (opName.includes('getdraftplayerstats')) {
+    if (opName === 'getdraftplayerstats') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -372,7 +380,7 @@ async function mockAuctionDraftGraphQL(
       return;
     }
 
-    if (opName.includes('getdraftpitchingstats')) {
+    if (opName === 'getdraftpitchingstats') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -502,7 +510,7 @@ test.describe('Auction Draft — budget tracking updates @regression', () => {
       }
       const opName = (body?.operationName ?? '').toLowerCase();
 
-      if (opName.includes('getauctionbudgets')) {
+      if (opName === 'getauctionbudgets') {
         pollCount++;
         const budgets = pollCount <= 1 ? MOCK_BUDGETS : MOCK_BUDGETS_AFTER_WIN;
         await route.fulfill({

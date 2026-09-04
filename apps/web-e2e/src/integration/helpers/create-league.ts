@@ -1,9 +1,31 @@
-import type { Page } from '@playwright/test';
+import type { Page, Request } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 export interface CreateLeagueResult {
   leagueId: number;
   inviteCode: string;
+}
+
+/**
+ * The GraphQL `operationName` from a request's POST body, or `''` when the body
+ * is absent or not JSON.
+ *
+ * LS-9866: matched for exact equality rather than
+ * `postData.includes('createLeagueAndTeams')`. The POST body carries the whole
+ * document, so that substring also matched the mobile app's `CreateLeague`
+ * mutation, which selects the same `createLeagueAndTeams` root field. Kept
+ * local rather than imported from `fixtures/shared-mocks` so this live-backend
+ * helper takes no dependency on the hermetic mock fixtures.
+ */
+function operationNameOf(request: Request): string {
+  try {
+    const body = JSON.parse(request.postData() ?? '') as {
+      operationName?: string;
+    };
+    return body.operationName ?? '';
+  } catch {
+    return '';
+  }
 }
 
 /** Plain timer sleep (used for retry backoffs — no Playwright frame coupling). */
@@ -55,12 +77,7 @@ export async function createLeagueViaUI(
           if (!r.url().includes('graphql') || r.request().method() !== 'POST') {
             return false;
           }
-          try {
-            const postData = r.request().postData();
-            return postData?.includes('createLeagueAndTeams') ?? false;
-          } catch {
-            return false;
-          }
+          return operationNameOf(r.request()) === 'CreateLeagueAndTeams';
         },
         { timeout: 45_000 },
       )

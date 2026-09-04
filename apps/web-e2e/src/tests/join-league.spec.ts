@@ -17,7 +17,10 @@
  */
 
 import { expect, leagueTest as test, unauthTest } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import {
   joinLeagueByCodeResponse,
   validateInviteCodeNotFoundResponse,
@@ -28,6 +31,10 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 // ── helpers ───────────────────────────────────────────────────────
 
 /** Route all GraphQL requests through a per-operation handler map.
+ *  Keys are FULL GraphQL operation names, matched case-insensitively for exact
+ *  equality against the extracted operation name (LS-9794/LS-9866); a substring
+ *  test on the raw POST body can match more than one operation and fulfill the
+ *  route with the wrong response shape.
  *  Unrecognised operations are fulfilled with a diagnostic error via unmockedGraphQLFallback().
  */
 async function routeGraphQL(
@@ -35,10 +42,10 @@ async function routeGraphQL(
   handlers: Record<string, unknown>,
 ) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const op = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
 
     for (const [key, body] of Object.entries(handlers)) {
-      if (op.includes(key.toLowerCase())) {
+      if (operation === key.toLowerCase()) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -355,8 +362,8 @@ test.describe('Join League — error handling @regression', () => {
     });
 
     await page.route(isGraphQLEndpoint, async (route) => {
-      const op = route.request().postData()?.toLowerCase() ?? '';
-      if (op.includes('joinleaguebycode')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'joinleaguebycode') {
         await route.abort('failed');
         return;
       }

@@ -258,7 +258,7 @@ async function mockDraftGraphQL(
     const opName = extractOperationName(route).toLowerCase();
 
     // --- Draft queries ---
-    if (opName.includes('getlivedraftleaguedraft')) {
+    if (opName === 'getlivedraftleaguedraft') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -289,13 +289,13 @@ async function mockDraftGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueDraft: MOCK_DRAFT } }),
       });
-    } else if (opName.includes('getdraftteamorder')) {
+    } else if (opName === 'getdraftteamorder') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getDraftTeamOrder: MOCK_DRAFT_ORDER } }),
       });
-    } else if (opName.includes('getcurrentdraftpick')) {
+    } else if (opName === 'getcurrentdraftpick') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -303,7 +303,7 @@ async function mockDraftGraphQL(
           data: { getCurrentDraftPick: MOCK_CURRENT_PICK },
         }),
       });
-    } else if (opName.includes('getavailabledraftplayers')) {
+    } else if (opName === 'getavailabledraftplayers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -311,13 +311,13 @@ async function mockDraftGraphQL(
           data: { getAvailableDraftPlayers: MOCK_AVAILABLE_PLAYERS },
         }),
       });
-    } else if (opName.includes('getdraftpicks')) {
+    } else if (opName === 'getdraftpicks') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { draftPicks: MOCK_PICK_HISTORY } }),
       });
-    } else if (opName.includes('getdraftrecommendations')) {
+    } else if (opName === 'getdraftrecommendations') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -326,30 +326,24 @@ async function mockDraftGraphQL(
         }),
       });
       // --- Trade queries ---
-    } else if (
-      opName.includes('getteamtradeoffers') ||
-      opName.includes('getpendingtradeoffers')
-    ) {
+      // LS-9866: no GetPendingTradeOffers operation exists in the .graphql
+      // corpus, so that alternative — and the `pendingTradeOffers` key it was
+      // paired with — never selected anything.
+    } else if (opName === 'getteamtradeoffers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            teamTradeOffers: tradeOffers,
-            pendingTradeOffers: tradeOffers,
-          },
-        }),
+        body: JSON.stringify({ data: { teamTradeOffers: tradeOffers } }),
       });
-    } else if (opName.includes('getleaguetradeoffers')) {
+    } else if (opName === 'getleaguetradeoffers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTradeOffers: tradeOffers } }),
       });
-    } else if (
-      opName.includes('createtradeoffer') ||
-      opName.includes('proposetrade')
-    ) {
+      // LS-9866: 'createtradeoffer' is the mutation's root FIELD, not an
+      // operation name — ProposeTrade is the only operation that reaches here.
+    } else if (opName === 'proposetrade') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -358,49 +352,53 @@ async function mockDraftGraphQL(
         }),
       });
       // --- League queries ---
-    } else if (opName === 'getleaguebyid' || opName === 'getleague') {
+    } else if (opName === 'getleaguebyid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
       });
-    } else if (opName.includes('getleagueteams')) {
+      // LS-9866: 'getleagueteams' also matched GetLeagueTeamsForDM, which is
+      // declared in the .graphql corpus but issued by no app code.
+    } else if (opName === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (opName.includes('getleaguebyid') || opName === 'getleague') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { league: MOCK_LEAGUE } }),
-      });
-    } else if (opName.includes('getpositionsforleague')) {
+    } else if (opName === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leaguePositions: MOCK_POSITIONS } }),
       });
-    } else if (opName.includes('getuserteamid')) {
+    } else if (opName === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: 1 } }),
       });
-    } else if (opName.includes('autopick')) {
+      // LS-9866: 'autopick' matched five operations. Only
+      // GetDraftTeamAutoPickStatuses is fired by the draft board
+      // (useDraftQueries), and it selects `getDraftTeamAutoPickStatuses` — the
+      // old `autoPickStatuses` key matched no selection set, so the hook was
+      // silently falling back to its `?? []` default.
+    } else if (opName === 'getdraftteamautopickstatuses') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { autoPickStatuses: [] } }),
+        body: JSON.stringify({ data: { getDraftTeamAutoPickStatuses: [] } }),
       });
-    } else if (opName.includes('draftqueue')) {
+      // LS-9866: 'draftqueue' matched five operations. GetMyDraftQueue is the
+      // only one the draft board issues, and it selects `getMyDraftQueue` — the
+      // old `draftQueueEntries` key matched no selection set.
+    } else if (opName === 'getmydraftqueue') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { draftQueueEntries: [] } }),
+        body: JSON.stringify({ data: { getMyDraftQueue: [] } }),
       });
-    } else if (opName.includes('nudgeexpireddraftpick')) {
+    } else if (opName === 'nudgeexpireddraftpick') {
       // Fired automatically by useDraftTimer when the pick countdown hits
       // 0:00 (LS-9488) — a no-op response is enough since this test doesn't
       // assert on the nudge outcome, only that the trade flow works.
@@ -413,16 +411,11 @@ async function mockDraftGraphQL(
           },
         }),
       });
-    } else if (
-      opName.includes('getplayerstats') ||
-      opName.includes('getbattingstats') ||
-      opName.includes('getpitchingstats')
-    ) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { playerStats: [] } }),
-      });
+      // LS-9866: the GetPlayerStats / GetBattingStats / GetPitchingStats branch
+      // was deleted — no operation by any of those names exists in the corpus.
+      // The draft board's real stats queries are GetDraftPlayerStats and
+      // GetDraftPitchingStats, neither of which contains those substrings, and
+      // both are served by BASELINE_GRAPHQL_RESPONSES.
     } else {
       // Let the baseline fixture handle anything else
       await unmockedGraphQLFallback(route);

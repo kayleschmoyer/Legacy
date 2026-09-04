@@ -17,7 +17,11 @@
 import type { WebSocketRoute } from '@playwright/test';
 import { injectWebSocketUrl, isGraphQL } from './helpers/websocket-test-utils';
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  extractRequestOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { FIXED_NOW_ISO, fromNowIso } from '../mocks/time';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -140,14 +144,15 @@ async function setupGraphQL(
   let leagueCallCount = 0;
 
   await page.route(isGraphQL, async (route) => {
-    const rawPostData = route.request().postData();
-    const postData =
-      typeof rawPostData === 'string' ? rawPostData.toLowerCase() : '';
+    const operation = extractOperationName(route).toLowerCase();
 
-    if (
-      postData.includes('getleaguebyid') ||
-      postData.includes('"getleague"')
-    ) {
+    // LS-9866: exact equality on the extracted operation name. `postData` held
+    // the whole POST body, so every test below also searched the query TEXT —
+    // the class that reached GetMatchupRecap through the `getMatchupById` root
+    // field on #7513. `'"getleague"'` was the quote-delimited idiom, which can
+    // only hit an operation named exactly GetLeague; none exists, so it was a
+    // dead branch.
+    if (operation === 'getleaguebyid') {
       leagueCallCount++;
       const respondWith =
         draftStartsOnRefetch && leagueCallCount > 1
@@ -158,13 +163,15 @@ async function setupGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { league: respondWith } }),
       });
-    } else if (postData.includes('getleagueteams')) {
+      // LS-9866: 'getleagueteams' also matched GetLeagueTeamsForDM, which is
+      // declared in the .graphql corpus but issued by no app code.
+    } else if (operation === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (postData.includes('getpositionsforleague')) {
+    } else if (operation === 'getpositionsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -181,43 +188,40 @@ async function setupGraphQL(
           },
         }),
       });
-    } else if (postData.includes('getuserteamid')) {
+    } else if (operation === 'getuserteamid') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userTeamId: TEAM_1_ID } }),
       });
-    } else if (postData.includes('getcurrentweekforleague')) {
+    } else if (operation === 'getcurrentweekforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getCurrentWeekForLeague: 1 } }),
       });
-    } else if (postData.includes('getmatchupsforleague')) {
+    } else if (operation === 'getmatchupsforleague') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getMatchupsForLeague: [] } }),
       });
-    } else if (postData.includes('getmatchupplayers')) {
+    } else if (operation === 'getmatchupplayers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getMatchupPlayers: [] } }),
       });
     } else if (
-      postData.includes('getleaguechatmessages') ||
-      postData.includes('getleaguemessages')
+      operation === 'getleaguechatmessages' ||
+      operation === 'getleaguemessages'
     ) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueMessages: [] } }),
       });
-    } else if (
-      postData.includes('getleagueactivity') ||
-      postData.includes('leagueactivity')
-    ) {
+    } else if (operation === 'getleagueactivity') {
       activityCallCount++;
       const items =
         activityAppearsOnRefetch && activityCallCount > 1
@@ -228,61 +232,50 @@ async function setupGraphQL(
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueActivity: items } }),
       });
-    } else if (
-      postData.includes('getleaguestandings') ||
-      postData.includes('leaguestandings')
-    ) {
+      // LS-9866: 'leaguestandings' also matched GetUserLeagueStandings, which
+      // selects a different root field and is served by the shared baseline.
+    } else if (operation === 'getleaguestandings') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueStandings: [] } }),
       });
-    } else if (
-      postData.includes('getuserleagues') ||
-      postData.includes('getusers')
-    ) {
+      // LS-9866: this payload is `{ userLeagues }`, which only GetUserLeagues
+      // returns — 'getusers' matched GetUsersCount and AdminGetUsers, and
+      // 'getuserleagues' also matched GetUserLeagueSummaries and
+      // GetUserLeagueStandings (plus GetMyLeagues through the query text). All
+      // of those select different root fields and are baseline-served.
+    } else if (operation === 'getuserleagues') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { userLeagues: [league] } }),
       });
-    } else if (
-      postData.includes('getleaguescoring') ||
-      postData.includes('leaguescoringprofile')
-    ) {
+      // LS-9866: full operation name. 'getleaguescoring' was a prefix of it and
+      // 'leaguescoringprofile' also matched the UpdateLeagueScoringProfile
+      // mutation, which this null payload never answered.
+    } else if (operation === 'getleaguescoringprofile') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueScoringProfile: null } }),
       });
-    } else if (
-      postData.includes('getpendingtradeoffers') ||
-      postData.includes('pendingtradeoffers')
-    ) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { pendingTradeOffers: [] } }),
-      });
-    } else if (
-      postData.includes('getteamwaiverclaims') ||
-      postData.includes('teamwaiverclaims')
-    ) {
+      // LS-9866: the GetPendingTradeOffers branch was deleted — no operation of
+      // that name exists in the corpus, and no operation's query text contains
+      // 'pendingtradeoffers' either, so it could never fire.
+    } else if (operation === 'getteamwaiverclaims') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { teamWaiverClaims: [] } }),
       });
-    } else if (postData.includes('getleagueannouncements')) {
+    } else if (operation === 'getleagueannouncements') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getLeagueAnnouncements: [] } }),
       });
-    } else if (
-      postData.includes('getteammembers') ||
-      postData.includes('teammembers')
-    ) {
+    } else if (operation === 'getteammembers') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -462,8 +455,8 @@ test.describe('WebSocket – multiple notifications @regression', () => {
       return (
         url.includes('/graphql') &&
         !url.includes('/@fs/') &&
-        (resp.request().postData()?.toLowerCase().includes('getleaguebyid') ??
-          false)
+        extractRequestOperationName(resp.request()).toLowerCase() ===
+          'getleaguebyid'
       );
     });
 
@@ -638,8 +631,8 @@ test.describe('WebSocket – draft status transition @regression', () => {
       return (
         url.includes('/graphql') &&
         !url.includes('/@fs/') &&
-        (resp.request().postData()?.toLowerCase().includes('getleaguebyid') ??
-          false)
+        extractRequestOperationName(resp.request()).toLowerCase() ===
+          'getleaguebyid'
       );
     });
 

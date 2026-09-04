@@ -1,5 +1,5 @@
 /**
- * LS-9794: operation-routing ambiguity invariant.
+ * LS-9794 / LS-9866: operation-routing ambiguity invariant.
  *
  * Hermetic specs route mocked GraphQL responses by testing the request for an
  * operation name. The correct form is exact equality on the extracted name:
@@ -7,7 +7,7 @@
  *   const op = extractOperationName(route).toLowerCase();
  *   if (op === 'getleaguebyid') { ... }
  *
- * A large amount of the suite still routes by substring instead
+ * The suite used to route by substring instead
  * (`postData.includes('getleague')`, `op.includes('league')`). Substring
  * routing is silently wrong whenever the tested substring is contained in
  * more than one real operation name: the first matching branch wins and
@@ -23,9 +23,9 @@
  * names declared in `lib/graphql/src/**\/*.graphql` and fails when one matches
  * more than one operation.
  *
- * KNOWN_AMBIGUOUS is the burn-down baseline and is a RATCHET — it may only
- * shrink. Adding an entry is never the fix; migrate the site to exact
- * `extractOperationName(route)` equality instead.
+ * KNOWN_AMBIGUOUS was the burn-down baseline and is now empty (LS-9866), so
+ * this test fails on ANY ambiguous site. Adding an entry is never the fix;
+ * migrate the site to exact `extractOperationName(route)` equality instead.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,41 +36,15 @@ import { basename, join, resolve, sep } from 'node:path';
  * Sites whose tested substring matches more than one real operation name
  * today. Format: `<spec basename>::<tested substring, lowercased>`.
  *
- * Keyed by basename + substring (not line number) so the baseline survives
- * unrelated edits to a file. One entry covers every occurrence of that
- * substring in that file — the entry becomes removable only once they are
- * all migrated.
+ * EMPTY, and it stays empty: LS-9866 finished the LS-9794 burn-down, so every
+ * routing site in the suite uses exact `extractOperationName(route)` equality
+ * and the ESLint ban in `apps/web-e2e/eslint.config.mjs` now runs with no
+ * grandfather list. The assertions below are a plain invariant rather than a
+ * ratchet — any ambiguous site is a new one.
  *
- * DO NOT ADD ENTRIES. This list only shrinks (LS-9794 burn-down).
+ * DO NOT ADD ENTRIES. Adding one is never the fix; migrate the site instead.
  */
-const KNOWN_AMBIGUOUS: readonly string[] = [
-  'auction-draft.spec.ts::getleaguedraft',
-  'auction-draft.spec.ts::getleagueteams',
-  'auction-draft.spec.ts::getuserleagues',
-  'matchup-week-navigation.spec.ts::getleagueteams',
-  'matchup-week-navigation.spec.ts::leagueteams',
-  'matchup-week-navigation.spec.ts::matchupplayers',
-  'mid-draft-trades.spec.ts::autopick',
-  'mid-draft-trades.spec.ts::draftqueue',
-  'mid-draft-trades.spec.ts::getleagueteams',
-  'pre-draft-lobby-trades.spec.ts::autopick',
-  'pre-draft-lobby-trades.spec.ts::careerpitchingstats',
-  'pre-draft-lobby-trades.spec.ts::draftqueue',
-  'pre-draft-lobby-trades.spec.ts::getleagueteams',
-  'season-renewal.ts::announcement',
-  'season-renewal.ts::chat',
-  'season-renewal.ts::messages',
-  'websocket-realtime-updates.spec.ts::getleagueteams',
-  'websocket-realtime-updates.spec.ts::getuserleagues',
-  'websocket-realtime-updates.spec.ts::getusers',
-  'websocket-realtime-updates.spec.ts::leaguescoringprofile',
-  'websocket-realtime-updates.spec.ts::leaguestandings',
-  'websocket-realtime.spec.ts::getleagueteams',
-  'websocket-realtime.spec.ts::getuserleagues',
-  'websocket-realtime.spec.ts::getusers',
-  'websocket-realtime.spec.ts::leaguescoringprofile',
-  'websocket-realtime.spec.ts::leaguestandings',
-];
+const KNOWN_AMBIGUOUS: readonly string[] = [];
 
 /** Identifiers that hold a GraphQL operation name (or the raw request body). */
 const OPERATION_RECEIVERS = ['postData', 'opName', 'operationName', 'op'];

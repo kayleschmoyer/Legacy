@@ -14,7 +14,11 @@
 // native-ready. `page` is retained only for GraphQL route mocking / useTier
 // (web-only capabilities) and URL assertions.
 import { customAuthTest, expect, test } from '../fixtures/pages';
-import { unmockedGraphQLFallback, useTier } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+  useTier,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 // ---------------------------------------------------------------------------
@@ -227,15 +231,16 @@ async function mockMatchupGraphQL(
     (url) => isGraphQLEndpoint(url),
     async (route) => {
       const postData = route.request().postData() ?? '';
-      let opName = '';
-      try {
-        const body = JSON.parse(postData) as { operationName?: string };
-        opName = (body.operationName ?? '').toLowerCase();
-      } catch {
-        opName = postData.toLowerCase();
-      }
+      // LS-9866: exact equality on the extracted operation name. The old
+      // `catch` arm fell back to the whole lowercased POST body, which made
+      // every `includes()` below a query-TEXT test — that is how
+      // `includes('matchupbyid')` reached GetMatchupRecap on #7513, since that
+      // operation selects the `getMatchupById` root field while its NAME
+      // contains no such string. extractOperationName() parses the body and
+      // falls back to the `?ref=` parameter instead of the raw text.
+      const opName = extractOperationName(route).toLowerCase();
 
-      if (opName.includes('getmatchupbyid') || opName.includes('matchupbyid')) {
+      if (opName === 'getmatchupbyid') {
         // Parse the matchupId from variables to return the right matchup
         let requestedId: number | null = null;
         try {
@@ -254,10 +259,7 @@ async function mockMatchupGraphQL(
           contentType: 'application/json',
           body: JSON.stringify({ data: { getMatchupById: found } }),
         });
-      } else if (
-        opName.includes('getmatchupsforleague') ||
-        opName.includes('matchupsforleague')
-      ) {
+      } else if (opName === 'getmatchupsforleague') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -265,10 +267,7 @@ async function mockMatchupGraphQL(
             data: { getMatchupsForLeague: ALL_MATCHUPS },
           }),
         });
-      } else if (
-        opName.includes('getmatchupsbyweek') ||
-        opName.includes('matchupsbyweek')
-      ) {
+      } else if (opName === 'getmatchupsbyweek') {
         let weekNumber: number | null = null;
         try {
           const body = JSON.parse(postData) as {
@@ -288,37 +287,30 @@ async function mockMatchupGraphQL(
             data: { getMatchupsByWeek: weekMatchups },
           }),
         });
-      } else if (
-        opName.includes('getcurrentweekforleague') ||
-        opName.includes('currentweek')
-      ) {
+      } else if (opName === 'getcurrentweekforleague') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { getCurrentWeekForLeague: 3 } }),
         });
-      } else if (
-        opName.includes('getuserteamid') ||
-        opName.includes('userteamid')
-      ) {
+      } else if (opName === 'getuserteamid') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { userTeamId: 1 } }),
         });
-      } else if (
-        opName.includes('getleagueteams') ||
-        opName.includes('leagueteams')
-      ) {
+        // LS-9866: 'leagueteams' also matched GetLeagueTeamsForDM, which is
+        // declared in the .graphql corpus but issued by no app code.
+      } else if (opName === 'getleagueteams') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
         });
-      } else if (
-        opName.includes('getmatchupplayers') ||
-        opName.includes('matchupplayers')
-      ) {
+        // LS-9866: 'matchupplayers' also matched the UndoMatchupPlayerSwap
+        // mutation (roster editor only — never fired by week navigation), whose
+        // response shape this getMatchupPlayers payload never fit anyway.
+      } else if (opName === 'getmatchupplayers') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -326,7 +318,7 @@ async function mockMatchupGraphQL(
             data: { getMatchupPlayers: MOCK_MATCHUP_PLAYERS },
           }),
         });
-      } else if (opName.includes('getmatchupwinprobability')) {
+      } else if (opName === 'getmatchupwinprobability') {
         // LS-5907: win probability is now a server-gated field — the panel
         // renders only what this query returns, mirroring what the real
         // resolver would produce for an entitled vs. non-entitled caller.
@@ -357,10 +349,7 @@ async function mockMatchupGraphQL(
             },
           }),
         });
-      } else if (
-        opName.includes('getmysubscription') ||
-        opName.includes('mysubscription')
-      ) {
+      } else if (opName === 'getmysubscription') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

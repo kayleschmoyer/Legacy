@@ -20,7 +20,10 @@
  */
 
 import { expect, leagueTest as test } from '../fixtures/pages';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import {
   joinPublicLeagueResponse,
   mockPublicLeague,
@@ -32,15 +35,22 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 /** Matches GraphQL API calls but not source-file imports. */
 type GraphQLHandlers = Record<string, unknown>;
 
-/** Route GraphQL requests through a per-operation handler map. */
+/**
+ * Route GraphQL requests through a per-operation handler map.
+ *
+ * Keys are FULL GraphQL operation names, compared case-insensitively for
+ * exact equality against the extracted operation name (LS-9794/LS-9866) —
+ * a substring test on the raw POST body can match more than one operation
+ * and fulfill the route with the wrong response shape.
+ */
 async function routeGraphQL(
   page: import('@playwright/test').Page,
   handlers: GraphQLHandlers,
 ) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const op = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
     for (const [key, body] of Object.entries(handlers)) {
-      if (op.includes(key.toLowerCase())) {
+      if (operation === key.toLowerCase()) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -405,8 +415,8 @@ test.describe('League Discovery — filters @regression', () => {
     let callCount = 0;
 
     await page.route(isGraphQLEndpoint, async (route) => {
-      const op = route.request().postData()?.toLowerCase() ?? '';
-      if (op.includes('getpublicleagues')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getpublicleagues') {
         callCount++;
         await route.fulfill({
           status: 200,

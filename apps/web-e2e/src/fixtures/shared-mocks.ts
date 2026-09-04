@@ -1,4 +1,4 @@
-import type { Page, Route } from '@playwright/test';
+import type { Page, Request, Route } from '@playwright/test';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 
 import {
@@ -532,11 +532,15 @@ export async function enableFootball(page: Page): Promise<void> {
 }
 
 /**
- * Extract the GraphQL operationName from a Playwright Route's POST body.
+ * Extract the GraphQL operationName from a Playwright Request's POST body.
  * Falls back to the `?ref=` query parameter, or returns `'unknown'`.
+ *
+ * The request-level form exists for `page.waitForResponse` predicates, which
+ * are handed a Response rather than a Route (LS-9866). Route handlers should
+ * call `extractOperationName(route)` below.
  */
-export function extractOperationName(route: Route): string {
-  const postData = route.request().postData() ?? '';
+export function extractRequestOperationName(request: Request): string {
+  const postData = request.postData() ?? '';
   try {
     const body = JSON.parse(postData) as { operationName?: string };
     if (body.operationName) return body.operationName;
@@ -545,11 +549,18 @@ export function extractOperationName(route: Route): string {
   }
 
   // Fallback: try to extract from ?ref= query parameter
-  const url = route.request().url();
-  const refMatch = /[?&]ref=([^&]+)/.exec(url);
+  const refMatch = /[?&]ref=([^&]+)/.exec(request.url());
   if (refMatch) return refMatch[1];
 
   return 'unknown';
+}
+
+/**
+ * Extract the GraphQL operationName from a Playwright Route's POST body.
+ * Falls back to the `?ref=` query parameter, or returns `'unknown'`.
+ */
+export function extractOperationName(route: Route): string {
+  return extractRequestOperationName(route.request());
 }
 
 /** GraphQL request variables, parsed from the route's POST body (`{}` if absent/unparseable). */

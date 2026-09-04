@@ -10,7 +10,10 @@
  */
 
 import { expect, test } from '../fixtures/auth-enhanced';
-import { unmockedGraphQLFallback } from '../fixtures/shared-mocks';
+import {
+  extractOperationName,
+  unmockedGraphQLFallback,
+} from '../fixtures/shared-mocks';
 import { isGraphQLEndpoint } from '../mocks/graphql/router';
 
 const UNAVAILABLE_HEADLINE = /could not load donation link/i;
@@ -21,8 +24,8 @@ test.describe('Donate page — donation link failure @regression', () => {
     page,
   }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
-      const op = route.request().postData()?.toLowerCase() ?? '';
-      if (op.includes('getdonationpaymentlink')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getdonationpaymentlink') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -48,8 +51,8 @@ test.describe('Donate page — donation link failure @regression', () => {
     page,
   }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
-      const op = route.request().postData()?.toLowerCase() ?? '';
-      if (op.includes('getdonationpaymentlink')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getdonationpaymentlink') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

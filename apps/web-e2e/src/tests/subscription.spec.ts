@@ -37,15 +37,22 @@ import { isGraphQLEndpoint } from '../mocks/graphql/router';
 /** Matches the app's GraphQL endpoint but not source-file imports. */
 type GraphQLHandlers = Record<string, unknown>;
 
-/** Route GraphQL operations to controlled response bodies. */
+/**
+ * Route GraphQL operations to controlled response bodies.
+ *
+ * Keys are FULL GraphQL operation names, compared case-insensitively for exact
+ * equality against the extracted operation name (LS-9794/LS-9866) — a substring
+ * test on the raw POST body can match more than one operation and fulfill the
+ * route with the wrong response shape.
+ */
 async function routeGraphQL(
   page: import('@playwright/test').Page,
   handlers: GraphQLHandlers,
 ) {
   await page.route(isGraphQLEndpoint, async (route) => {
-    const op = route.request().postData()?.toLowerCase() ?? '';
+    const operation = extractOperationName(route).toLowerCase();
     for (const [key, body] of Object.entries(handlers)) {
-      if (op.includes(key.toLowerCase())) {
+      if (operation === key.toLowerCase()) {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -88,10 +95,10 @@ test.describe('PremiumGate — free user @critical', () => {
       // Return no subscription (free tier) so the page renders in free mode.
       await routeGraphQL(page, {
         getmysubscription: myFreeSubscriptionResponse(),
-        mysubscription: myFreeSubscriptionResponse(),
-        currentuser: { data: { currentUser: null } },
         // Minimal player comparison stubs so the page shell renders
-        getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
+        getplayerswithstats: {
+          data: { players: { nodes: [], totalCount: 0 } },
+        },
       });
       await useTier(page, 'free');
 
@@ -110,9 +117,9 @@ test.describe('PremiumGate — free user @critical', () => {
     async ({ page }) => {
       await routeGraphQL(page, {
         getmysubscription: myFreeSubscriptionResponse(),
-        mysubscription: myFreeSubscriptionResponse(),
-        currentuser: { data: { currentUser: null } },
-        getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
+        getplayerswithstats: {
+          data: { players: { nodes: [], totalCount: 0 } },
+        },
       });
       await useTier(page, 'free');
 
@@ -134,9 +141,9 @@ test.describe('PremiumGate — free user @critical', () => {
     async ({ page }) => {
       await routeGraphQL(page, {
         getmysubscription: myFreeSubscriptionResponse(),
-        mysubscription: myFreeSubscriptionResponse(),
-        currentuser: { data: { currentUser: null } },
-        getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
+        getplayerswithstats: {
+          data: { players: { nodes: [], totalCount: 0 } },
+        },
         getstripeprices: {
           data: {
             stripePrices: {
@@ -172,9 +179,7 @@ test.describe('PremiumGate — premium user @critical', () => {
   }) => {
     await routeGraphQL(page, {
       getmysubscription: myPremiumSubscriptionResponse(),
-      mysubscription: myPremiumSubscriptionResponse(),
-      currentuser: { data: { currentUser: null } },
-      getplayers: { data: { players: { nodes: [], totalCount: 0 } } },
+      getplayerswithstats: { data: { players: { nodes: [], totalCount: 0 } } },
     });
 
     await page.goto('/players/compare');
@@ -204,7 +209,6 @@ test.describe('SubscriptionPage — free tier @regression', () => {
   }) => {
     await routeGraphQL(page, {
       getmysubscription: myFreeSubscriptionResponse(),
-      mysubscription: myFreeSubscriptionResponse(),
     });
 
     await page.goto('/profile/subscription');
@@ -223,7 +227,6 @@ test.describe('SubscriptionPage — free tier @regression', () => {
   test('shows free tier feature list items', async ({ page }) => {
     await routeGraphQL(page, {
       getmysubscription: myFreeSubscriptionResponse(),
-      mysubscription: myFreeSubscriptionResponse(),
     });
 
     await page.goto('/profile/subscription');
@@ -238,7 +241,6 @@ test.describe('SubscriptionPage — active premium @regression', () => {
   test('renders current plan details for premium users', async ({ page }) => {
     await routeGraphQL(page, {
       getmysubscription: myPremiumSubscriptionResponse(),
-      mysubscription: myPremiumSubscriptionResponse(),
     });
 
     await page.goto('/profile/subscription');
@@ -263,13 +265,12 @@ test.describe('SubscriptionPage — active premium @regression', () => {
     let billingMutationCalled = false;
     await routeGraphQL(page, {
       getmysubscription: myPremiumSubscriptionResponse(),
-      mysubscription: myPremiumSubscriptionResponse(),
     });
 
     // Mock the portal session mutation — flag is only set when the request actually fires
     await page.route(isGraphQLEndpoint, async (route) => {
-      const op = route.request().postData()?.toLowerCase() ?? '';
-      if (op.includes('createbillingportalsession')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'createbillingportalsession') {
         billingMutationCalled = true;
         await route.fulfill({
           status: 200,
@@ -301,7 +302,6 @@ test.describe('SubscriptionPage — past due @regression', () => {
   }) => {
     await routeGraphQL(page, {
       getmysubscription: myPastDueSubscriptionResponse(),
-      mysubscription: myPastDueSubscriptionResponse(),
     });
 
     await page.goto('/profile/subscription');
@@ -319,7 +319,6 @@ test.describe('SubscriptionPage — canceled @regression', () => {
   }) => {
     await routeGraphQL(page, {
       getmysubscription: myCanceledSubscriptionResponse(),
-      mysubscription: myCanceledSubscriptionResponse(),
     });
 
     await page.goto('/profile/subscription');
@@ -348,8 +347,8 @@ test.describe('Subscription upgrade flow @critical', () => {
     page,
   }) => {
     await page.route(isGraphQLEndpoint, async (route) => {
-      const op = route.request().postData()?.toLowerCase() ?? '';
-      if (op.includes('mysubscription') || op.includes('getmysubscription')) {
+      const operation = extractOperationName(route).toLowerCase();
+      if (operation === 'getmysubscription') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -357,7 +356,7 @@ test.describe('Subscription upgrade flow @critical', () => {
         });
         return;
       }
-      if (op.includes('getstripeprices') || op.includes('stripeprices')) {
+      if (operation === 'getstripeprices') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -374,7 +373,7 @@ test.describe('Subscription upgrade flow @critical', () => {
         });
         return;
       }
-      if (op.includes('createcheckoutsession')) {
+      if (operation === 'createcheckoutsession') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',

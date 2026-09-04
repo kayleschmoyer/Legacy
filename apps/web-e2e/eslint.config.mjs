@@ -415,28 +415,6 @@ const ls9660GrandfatheredIntegrationFiles = [
   'waiver-processing-ui.integration.spec.ts',
 ].map((basename) => `**/${basename}`);
 
-// LS-9794 grandfather list — files that already route GraphQL operations by
-// substring at rollout time. The ban applies to every OTHER file under src/
-// immediately. Do NOT add files here: new substring routing is the bug this
-// rule exists to prevent. As each file is migrated to exact
-// `extractOperationName(route)` equality, delete its entry (and its
-// KNOWN_AMBIGUOUS entries in src/operation-routing-guard.test.ts) so the ban
-// locks in; once the list is empty, delete it and the `ignores` key with it.
-const ls9794GrandfatheredFiles = [
-  'auction-draft.spec.ts',
-  'create-league.ts',
-  'donate-page.spec.ts',
-  'join-league.spec.ts',
-  'league-discovery.spec.ts',
-  'matchup-week-navigation.spec.ts',
-  'mid-draft-trades.spec.ts',
-  'pre-draft-lobby-trades.spec.ts',
-  'season-renewal.ts',
-  'subscription.spec.ts',
-  'websocket-realtime-updates.spec.ts',
-  'websocket-realtime.spec.ts',
-].map((basename) => `**/${basename}`);
-
 export default [
   ...baseConfig,
   {
@@ -651,13 +629,13 @@ export default [
     // clobbers) the `no-restricted-syntax` unions above and needs no
     // per-tier overlay.
     //
-    // `ls9794GrandfatheredFiles` are the files that already violated the rule
-    // when it was introduced; they keep their pre-existing rule set until
-    // migrated. The list may only SHRINK — never add a file to it. Migrating
-    // a file means deleting its entry here AND deleting its entries from
-    // KNOWN_AMBIGUOUS in operation-routing-guard.test.ts.
+    // The rollout grandfather list and its `ignores` key are GONE: LS-9866
+    // migrated the last twelve files, so the ban now applies to every file
+    // under src/ with no exceptions. Do not reintroduce a grandfather list —
+    // new substring routing is the bug this rule exists to prevent, and
+    // KNOWN_AMBIGUOUS in operation-routing-guard.test.ts is empty for the
+    // same reason.
     files: ['**/src/**/*.ts'],
-    ignores: ls9794GrandfatheredFiles,
     rules: {
       'no-restricted-properties': [
         'error',

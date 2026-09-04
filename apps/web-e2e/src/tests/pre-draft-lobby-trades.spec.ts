@@ -144,13 +144,15 @@ async function mockLobbyGraphQL(
           },
         }),
       });
-    } else if (opName.includes('getleagueteams')) {
+      // LS-9866: 'getleagueteams' also matched GetLeagueTeamsForDM, which is
+      // declared in the .graphql corpus but issued by no app code.
+    } else if (opName === 'getleagueteams') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueTeams: MOCK_TEAMS } }),
       });
-    } else if (opName.includes('getlivedraftleaguedraft')) {
+    } else if (opName === 'getlivedraftleaguedraft') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -175,20 +177,20 @@ async function mockLobbyGraphQL(
           },
         }),
       });
-    } else if (opName.includes('getdraftteamorder')) {
+    } else if (opName === 'getdraftteamorder') {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { getDraftTeamOrder: draftOrder } }),
       });
-    } else if (opName.includes('getleaguedraftslottrades')) {
+    } else if (opName === 'getleaguedraftslottrades') {
       const trades = state.status === 'none' ? [] : [makeTrade(state)];
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { leagueDraftSlotTrades: trades } }),
       });
-    } else if (opName.includes('proposedraftslottrade')) {
+    } else if (opName === 'proposedraftslottrade') {
       const variables = route.request().postDataJSON() as {
         variables?: { leagueId?: number; counterpartTeamId?: number };
       };
@@ -204,7 +206,7 @@ async function mockLobbyGraphQL(
           data: { proposeDraftSlotTrade: makeTrade(state) },
         }),
       });
-    } else if (opName.includes('approvedraftslottrade')) {
+    } else if (opName === 'approvedraftslottrade') {
       const variables = route.request().postDataJSON() as {
         variables?: { tradeId?: number };
       };
@@ -219,17 +221,22 @@ async function mockLobbyGraphQL(
           data: { approveDraftSlotTrade: makeTrade(state) },
         }),
       });
+      // Noise from the draft board's own data hooks — the lobby renders it but
+      // these tests assert only on the slot-trade panel, so an empty payload is
+      // enough. LS-9866: exact names, and the list is now only the operations
+      // that BASELINE_GRAPHQL_RESPONSES does not already cover. Dropped from it:
+      // 'autopick' and the two career-stats needles (ambiguous — 'autopick'
+      // matched five operations and 'careerpitchingstats' two — and the baseline
+      // serves GetDraftTeamAutoPickStatuses, GetCareerBattingStats,
+      // GetCareerPitchingStats and GetCareerPitchingStatsCount with their real
+      // response shapes, which is strictly better than `{ data: {} }`), plus
+      // 'getplayerstats' / 'getbattingstats' / 'getpitchingstats', which name no
+      // operation in the corpus at all.
     } else if (
-      opName.includes('getavailabledraftplayers') ||
-      opName.includes('getdraftpicks') ||
-      opName.includes('getcurrentdraftpick') ||
-      opName.includes('autopick') ||
-      opName.includes('draftqueue') ||
-      opName.includes('getplayerstats') ||
-      opName.includes('getbattingstats') ||
-      opName.includes('getpitchingstats') ||
-      opName.includes('careerbattingstats') ||
-      opName.includes('careerpitchingstats')
+      opName === 'getavailabledraftplayers' ||
+      opName === 'getdraftpicks' ||
+      opName === 'getcurrentdraftpick' ||
+      opName === 'getmydraftqueue'
     ) {
       await route.fulfill({
         status: 200,

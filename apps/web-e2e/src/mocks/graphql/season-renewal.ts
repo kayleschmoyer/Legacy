@@ -187,6 +187,29 @@ export interface SeasonRenewalMockOptions {
 }
 
 /**
+ * Root field each activity/chat/announcement operation selects, keyed by
+ * lowercased operation name.
+ *
+ * LS-9866: replaces `op.includes('chat' | 'messages' | 'announcement')`, which
+ * picked the response key by substring. Those needles are ambiguous on their
+ * own — 'announcement' matches four operations (GetLeagueAnnouncements,
+ * PostLeagueAnnouncement, UpdateLeagueAnnouncement, DeleteLeagueAnnouncement)
+ * and 'messages' matches three — and only stayed correct because the enclosing
+ * branch had already narrowed to these five names. An explicit map keeps the
+ * mapping true when a sixth operation is added.
+ *
+ * `GetLeagueChatMessages` and `GetLeagueMessages` are two operations over the
+ * same `getLeagueMessages` root field, so both map to that key.
+ */
+const ACTIVITY_RESPONSE_KEY: Readonly<Record<string, string>> = {
+  getleagueactivity: 'leagueActivity',
+  leagueactivity: 'leagueActivity',
+  getleaguechatmessages: 'getLeagueMessages',
+  getleaguemessages: 'getLeagueMessages',
+  getleagueannouncements: 'getLeagueAnnouncements',
+};
+
+/**
  * Register the shared GraphQL routes used by season-renewal specs.
  * Specs supply override callbacks (e.g. `onRenewLeague`) and alternate
  * team/league fixtures via `opts`.
@@ -333,23 +356,12 @@ export async function setupSeasonRenewalGraphQL(
     }
 
     // ── Activity / chat / announcements ───────────────────────────
-    if (
-      op === 'getleagueactivity' ||
-      op === 'leagueactivity' ||
-      op === 'getleaguechatmessages' ||
-      op === 'getleaguemessages' ||
-      op === 'getleagueannouncements'
-    ) {
-      const key =
-        op.includes('chat') || op.includes('messages')
-          ? 'getLeagueMessages'
-          : op.includes('announcement')
-            ? 'getLeagueAnnouncements'
-            : 'leagueActivity';
+    const activityKey = ACTIVITY_RESPONSE_KEY[op];
+    if (activityKey) {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { [key]: [] } }),
+        body: JSON.stringify({ data: { [activityKey]: [] } }),
       });
       return;
     }
