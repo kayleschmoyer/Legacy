@@ -60,14 +60,13 @@ describe('design-tokens', () => {
     expect(radii.pill).toBe(9999);
   });
 
-  it('mirrors @tamagui/config breakpoint thresholds', () => {
+  it('exposes the design-tokens band scale (independent of @tamagui/config media)', () => {
     expect(breakpoints.xxs).toBe(0);
     expect(breakpoints.xs).toBe(660);
     expect(breakpoints.sm).toBe(800);
     expect(breakpoints.md).toBe(860);
     expect(breakpoints.lg).toBe(980);
     expect(breakpoints.xl).toBe(1120);
-    expect(breakpoints.xxl).toBe(1280);
   });
 
   it('exposes position colors for the five baseball roles', () => {

@@ -33,18 +33,22 @@ compile against `@tamagui/config`'s own `media` export, not this file, and the t
 | `md`  | 860          | **≤1020**                                 |
 | `lg`  | 980          | **≤1280**                                 |
 | `xl`  | 1120         | **≤1650**                                 |
-| `xxl` | 1280         | **no such token**                         |
 
-Two consequences worth knowing before you write a media prop:
+`md`/`lg`/`xl` fire at different widths than this file implies — e.g. `$md` fires 160px later
+than the number above suggests, so layout written against 860 will not reflow where you expect.
 
-- Writing `$xxl={{ … }}` in JSX compiles, typechecks, lints, and does nothing.
-- `$md` fires 160px later than this file implies. Layout written against 860 will not reflow
-  where you expect.
-
-The comment in `src/lib/breakpoints.ts` claiming these mirror the Tamagui defaults is
-inaccurate for `md`/`lg`/`xl`/`xxl`. Reconciling the values is deliberately deferred —
-consumers may depend on the current numbers, so re-pointing them is a layout change needing
-its own validation. Tracked in LS-9416.
+**LS-9416 resolution:** this package's band scale and Tamagui's `media` config are two
+deliberately separate vocabularies (option (c) from that ticket — see its comments for the
+consumer audit). `breakpoints`/`mediaQueries` stay the source for raw numbers in non-Tamagui
+contexts; they are not renamed, since `src/lib/breakpoints.ts` and this README already say
+outright that they don't govern `$token` behavior. What did change: the `xxl` band and the
+`gtXxs` / `gtXl` media queries were removed. Neither has a real `@tamagui/config` counterpart
+(no `xxl` media key exists at all, and Tamagui has no `gtXxs` — its first `gt*` query is
+`gtXs`), so keeping them was a silent no-op trap: `$xxl={{ … }}` compiled, typechecked, linted,
+and did nothing. An audit of `breakpoints`/`mediaQueries` consumers (`grep -rn
+"breakpoints\.\|mediaQueries\." lib apps`, recorded on LS-9416) found no code depending on
+either, only tests. The comment in `src/lib/breakpoints.ts` previously claimed these values
+mirror the Tamagui defaults; it's corrected to say they're an independent scale.
 
 **For media props, use the tier table in
 [`.agents/skills/ui/references/responsive-density.md`](../../.agents/skills/ui/references/responsive-density.md).**

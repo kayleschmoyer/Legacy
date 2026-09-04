@@ -37,7 +37,7 @@ These are the media tokens Tamagui actually compiles, read from `@tamagui/config
 
 Two things that bite:
 
-- **There is no `$xxl` and no `$gtXxs`.** `lib/design-tokens/src/lib/breakpoints.ts` defines both. Tamagui has no equivalent, so `$xxl={{ … }}` in JSX is silently inert — it compiles, lints, and does nothing. See [Known drift](#known-drift) before trusting that file.
+- **There is no `$xxl` and no `$gtXxs`.** Tamagui has no equivalent for either, so `$xxl={{ … }}` in JSX is silently inert — it compiles, lints, and does nothing. `lib/design-tokens/src/lib/breakpoints.ts` used to define both anyway (a trap for anyone pattern-matching off that file); LS-9416 removed them from there too. See [Known drift](#known-drift) before trusting that file for anything else.
 - **`$xxs` does not default to active.** Every other tier is treated as matching before measurement (`mediaQueryDefaultActive.xxs === false`); `$xxs` is not. So the first paint, SSR output, and jest renders all take the non-`$xxs` branch. Never put content-critical rendering behind `$xxs` alone — use it to tighten, never to reveal.
 
 ## 1. Chrome shrinks before content
@@ -162,15 +162,17 @@ Consequences to plan around:
 
 ## Known drift
 
-`lib/design-tokens/src/lib/breakpoints.ts` says it mirrors `@tamagui/config`. It partly does not:
+`lib/design-tokens/src/lib/breakpoints.ts` is a deliberately separate band scale from
+`@tamagui/config`, not a mirror of it — resolved in LS-9416 (option (c): keep both
+vocabularies, correct the file's own comment, drop the two exports that had no real Tamagui
+counterpart). The values still don't line up:
 
-| Token | design-tokens | Tamagui (real)    |
-| ----- | ------------- | ----------------- |
-| `xs`  | 660           | 660 ✅            |
-| `sm`  | 800           | 800 ✅            |
-| `md`  | 860           | **1020**          |
-| `lg`  | 980           | **1280**          |
-| `xl`  | 1120          | **1650**          |
-| `xxl` | 1280          | **no such token** |
+| Token | design-tokens | Tamagui (real) |
+| ----- | ------------- | -------------- |
+| `xs`  | 660           | 660 ✅         |
+| `sm`  | 800           | 800 ✅         |
+| `md`  | 860           | **1020**       |
+| `lg`  | 980           | **1280**       |
+| `xl`  | 1120          | **1650**       |
 
-That file is the right source for **raw numbers in non-Tamagui contexts** (web-only CSS, canvas, native measurement). It is _not_ a guide to what `$md`/`$lg` do in JSX. When writing media props, this page's table wins. Reconciliation is tracked separately — see LS-9416.
+That file is the right source for **raw numbers in non-Tamagui contexts** (web-only CSS, canvas, native measurement). It is _not_ a guide to what `$md`/`$lg` do in JSX. When writing media props, this page's table wins.
