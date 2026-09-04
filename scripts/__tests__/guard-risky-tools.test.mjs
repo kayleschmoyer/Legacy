@@ -241,3 +241,91 @@ test('# risk-ok does not bypass a CATASTROPHIC rule', () => {
   );
   assert.equal(code, 2, 'push-to-main has no bypass');
 });
+
+// --- worktree-remove gate (LS-9606) ------------------------------------------
+//
+// The rule guards against destroying a node_modules pool symlink — a hazard
+// that only exists when the worktree being removed actually has one. Cloud/CCR
+// sessions never have twig or the pool at all, so a scratch worktree there
+// (e.g. `/tmp/main-check`, LS-9606's own example) has nothing to protect and
+// the `twig worktree clean` fix in the block message is unusable anyway.
+
+test(
+  'blocks git worktree remove when the target has a live pool symlink',
+  { skip: !SYMLINK_OK },
+  () => {
+    const root = mkdtempSync(join(tmpdir(), 'grt-root-'));
+    const target = join(root, 'wt1');
+    mkdirSync(target);
+    const slot = join(root, 'slot');
+    mkdirSync(slot);
+    makeDirSymlink(join(target, 'node_modules'), slot);
+    try {
+      const { code, stderr } = runHook(`git worktree remove ${target}`, root);
+      assert.equal(code, 2, 'expected a block');
+      assert.match(stderr, /worktree-remove/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test('allows git worktree remove on a scratch worktree with no node_modules', () => {
+  const root = mkdtempSync(join(tmpdir(), 'grt-root-'));
+  const target = join(root, 'main-check');
+  mkdirSync(target);
+  try {
+    const { code, stderr } = runHook(`git worktree remove ${target}`, root);
+    assert.equal(code, 0, `expected no block, got stderr: ${stderr}`);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('allows git worktree remove --force on a scratch worktree with no node_modules', () => {
+  // LS-9606's own trigger case: `git worktree remove /tmp/main-check --force`.
+  const root = mkdtempSync(join(tmpdir(), 'grt-root-'));
+  const target = join(root, 'main-check');
+  mkdirSync(target);
+  try {
+    const { code } = runHook(`git worktree remove ${target} --force`, root);
+    assert.equal(code, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('allows git worktree remove when the target node_modules is a real directory', () => {
+  const root = mkdtempSync(join(tmpdir(), 'grt-root-'));
+  const target = join(root, 'wt1');
+  mkdirSync(target);
+  mkdirSync(join(target, 'node_modules'));
+  try {
+    const { code } = runHook(`git worktree remove ${target}`, root);
+    assert.equal(code, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test(
+  '# risk-ok still bypasses git worktree remove through a live pool symlink',
+  { skip: !SYMLINK_OK },
+  () => {
+    const root = mkdtempSync(join(tmpdir(), 'grt-root-'));
+    const target = join(root, 'wt1');
+    mkdirSync(target);
+    const slot = join(root, 'slot');
+    mkdirSync(slot);
+    makeDirSymlink(join(target, 'node_modules'), slot);
+    try {
+      const { code } = runHook(
+        `git worktree remove ${target} # risk-ok: pool already migrated`,
+        root,
+      );
+      assert.equal(code, 0, 'GUARDED rules are bypassable');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);

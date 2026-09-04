@@ -31,7 +31,7 @@
  */
 
 import { lstatSync, statSync } from 'fs';
-import { join } from 'path';
+import { isAbsolute, join } from 'path';
 import {
   readHookInput,
   appendJsonl,
@@ -184,6 +184,37 @@ function pnpmInstallGate() {
   }
 }
 
+/**
+ * `git worktree remove` only destroys a node_modules pool symlink when the
+ * worktree being removed actually has one. The pool itself is Windows-only
+ * (scripts/modules-pool/link.mjs junctions node_modules, gated on
+ * `process.platform === 'win32'`) and cloud/CCR sessions have no twig or
+ * worktree pooling at all (AGENTS.md: "Cloud agent: Ubuntu Linux — no
+ * worktrees/twig"). So a plain `git worktree add` scratch checkout — e.g. a
+ * throwaway `/tmp` clone of origin/main used to isolation-test a failing
+ * test (LS-9606) — has nothing for this rule to protect, and the `twig
+ * worktree clean` fix in the block message is unusable in exactly the
+ * environment where that scratch pattern is most common. Fire only when the
+ * target actually has a symlinked node_modules; fail open (allow) whenever
+ * the target can't be determined or has no pooled node_modules to lose.
+ */
+function worktreeRemoveGate() {
+  const m = scannable.match(
+    /git\s+(?:-C\s+\S+\s+)*worktree\s+remove\s+(?:--force\s+|-f\s+)*(\S+)/,
+  );
+  const target = m?.[1];
+  if (!target || target.startsWith('-')) return { fire: false };
+  const root = projectDir(input);
+  const resolved = isAbsolute(target) ? target : join(root, target);
+  try {
+    return lstatSync(join(resolved, 'node_modules')).isSymbolicLink()
+      ? { fire: true }
+      : { fire: false };
+  } catch {
+    return { fire: false };
+  }
+}
+
 const findings = [];
 
 // --- Secret scan (raw text, all tools) ---
@@ -230,6 +261,7 @@ if (command) {
       /git\s+worktree\s+remove\b/,
       'worktree-remove',
       'Never manually remove worktrees — it destroys node_modules pool symlinks. Use `twig worktree clean` instead (AGENTS.md Tier 2).',
+      worktreeRemoveGate,
     ],
     [
       /(pnpm\s+exec\s+nx|(^|[;&|\s])nx)\s+reset\b/,
