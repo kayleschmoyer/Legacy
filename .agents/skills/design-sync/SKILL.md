@@ -86,6 +86,18 @@ Local sessions cannot WebFetch design URLs (share URLs → 403, handoff URLs →
 - **Fixing designs at the source** — never hand-patch `docs/design/` bundle bytes and stop there: the next pull overwrites them. Either fix in Claude Design itself (read files, apply the fix, `finalize_plan` → `write_files`) and finish with a pull so the repo catches up, or fix in the repo bundle and `/push-design` it up so Claude Design stays in step. `finalize_plan` is the user-approval boundary; keep write sets minimal and incremental.
 - `list_projects` only lists design-system projects — page projects must come from user-supplied share URLs or `projectId` fields; `get_file` is capped at 256 KiB per file (check `truncated` on every read).
 
+### Large files: size the pull before you make it
+
+`get_file` is capped at 256 KiB per file **and returns content inline** — there is no `outputPath` / `out_dir` option, so every byte of a pulled file lands in the model context. A file at the cap costs roughly **65k tokens to read, plus 65k again to write it back out** — about 130k tokens for a single file. State that cost out loud before pulling: it is a tradeoff to decide, not a surprise to discover halfway through.
+
+> `DesignSync` is a Claude Code built-in, not one of this repo's MCP servers, so we cannot add `outputPath` to it. The analogous gap on our own surface was closed in LS-9429, when `worktree_show_file` and `github_get_file_content` gained `outputPath`; the design-sync path has no equivalent, so the workaround below is the whole remedy.
+
+1. **Size the pull first.** `list_files` returns structure only — it carries no byte sizes. Where a prior sync exists, use the local bundle as the proxy: `worktree_file_info` (or `wc -c`) over `docs/design/<id>/<slug>/`. For a design with no local copy you are pulling blind — take the small files first and treat an unexpectedly large response as the signal to stop and re-plan.
+2. **Anything within ~10% of the cap (≳236 KiB) does not go through `get_file`.** Route it to the user-assisted **Export → Project HTML (.zip)** path through the logged-in Chrome fallback — see [references/designsync-tool.md](references/designsync-tool.md) (access matrix and "When to use what"). Ask the user for the export; do not spend the context proving the file is too big.
+3. **A deliberately skipped file MUST be recorded in the SYNC-REPORT** under a `## Not pulled` heading (the worked example titles it `## Not pulled in this pass`), with its path and the reason. Skipping one means the bundle is knowingly **not byte-exact** with the remote, and that has to be visible rather than silent — otherwise the completeness gate passes on a bundle it has no grounds to trust. [`docs/design/B8P9BQz8s6NZ9Q-FqWI_yA/SYNC-REPORT.md`](../../../docs/design/B8P9BQz8s6NZ9Q-FqWI_yA/SYNC-REPORT.md) is the worked example — `project/scratch/mockups/draft.html` at 259,625 bytes, within 1% of the cap.
+
+Truncation is the outcome this avoids: a `truncated: true` response means you have already paid the full context cost _and_ come away with a file you must not write into `docs/design/`.
+
 ## Phase 2: Consume (local agent)
 
 > Full prompt: [`.claude/commands/implement-design.md`](../../../.claude/commands/implement-design.md)
@@ -116,14 +128,15 @@ Once addressed, run `/sync-designs` from a cloud session (or `/pull-design <shar
 
 ## Common failure modes and recoveries
 
-| Failure                                         | Recovery                                                                                                                                                                     |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `WebFetch` returns 401/403/404 for a design URL | Expected, not a failure to recover from — `WebFetch` cannot reach Claude Design from any environment (LS-9000). Use `/pull-design` locally instead; do not retry `WebFetch`. |
-| Bucket epic not registered                      | Stop and instruct the user to `jira_set_bucket_epic({ bucket: "design-sync", epicKey: "..." })`.                                                                             |
-| Listing endpoint absent and manifest empty      | Stop and ask the user to seed at least one URL in `manifest.designs[].url`.                                                                                                  |
-| Open sync PR from prior run                     | Stop, link to that PR, ask the user whether to abandon (close the open PR) or pick it up via `/drive-pr`.                                                                    |
-| Bundle hash differs but file diff is empty      | Hash algorithm bug. Fall back to a literal file-tree diff; if also empty, mark `unchanged`. File a `design-sync` ticket noting the discrepancy.                              |
-| Consumer can't resolve `designId` from ticket   | Notify on the ticket with "ticket description missing `Design:` line — manual recovery needed". Do not guess.                                                                |
+| Failure                                         | Recovery                                                                                                                                                                                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `WebFetch` returns 401/403/404 for a design URL | Expected, not a failure to recover from — `WebFetch` cannot reach Claude Design from any environment (LS-9000). Use `/pull-design` locally instead; do not retry `WebFetch`.                                                                            |
+| Bucket epic not registered                      | Stop and instruct the user to `jira_set_bucket_epic({ bucket: "design-sync", epicKey: "..." })`.                                                                                                                                                        |
+| Listing endpoint absent and manifest empty      | Stop and ask the user to seed at least one URL in `manifest.designs[].url`.                                                                                                                                                                             |
+| Open sync PR from prior run                     | Stop, link to that PR, ask the user whether to abandon (close the open PR) or pick it up via `/drive-pr`.                                                                                                                                               |
+| File at or near the 256 KiB `get_file` cap      | Do not pull it through `get_file` — route it to the Chrome Export → Project HTML (.zip) fallback, or skip it and record the path and reason under `## Not pulled` in the SYNC-REPORT. See [Large files](#large-files-size-the-pull-before-you-make-it). |
+| Bundle hash differs but file diff is empty      | Hash algorithm bug. Fall back to a literal file-tree diff; if also empty, mark `unchanged`. File a `design-sync` ticket noting the discrepancy.                                                                                                         |
+| Consumer can't resolve `designId` from ticket   | Notify on the ticket with "ticket description missing `Design:` line — manual recovery needed". Do not guess.                                                                                                                                           |
 
 ## See also
 
