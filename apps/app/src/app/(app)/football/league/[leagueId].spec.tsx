@@ -1044,6 +1044,23 @@ describe('FootballLeagueId', () => {
       expect(screen.getByText('IDP')).toBeTruthy();
     });
 
+    // Pins the exact league shape (playoffFormat: '6-team', nothing else
+    // premium) that caused the LS-9545 outage — the row was previously
+    // reached only incidentally, via FLD-017 bracket-toggle tests that happen
+    // to set this same playoffFormat.
+    it('renders the playoff chip for a league whose only premium feature is a 6-team bracket', () => {
+      mockGetLeagueByIdQuery.mockReturnValue({
+        data: { league: { ...mockLeague, playoffFormat: '6-team' } },
+        loading: false,
+      });
+      render(<FootballLeagueId />);
+      expect(screen.getByText('Premium Configuration')).toBeTruthy();
+      expect(screen.getByText('6-Team Playoff')).toBeTruthy();
+      expect(screen.queryByText('FAAB')).toBeNull();
+      expect(screen.queryByText('Salary Cap')).toBeNull();
+      expect(screen.queryByText('IDP')).toBeNull();
+    });
+
     it('omits the Premium Configuration section when no paid feature is active', () => {
       render(<FootballLeagueId />);
       expect(screen.queryByText('Premium Configuration')).toBeNull();
