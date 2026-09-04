@@ -249,9 +249,6 @@ describe('withRetryOnAlreadyRunning', () => {
       .mockRejectedValueOnce(
         new Error('GitHub API 403: This workflow is already running.'),
       )
-      .mockRejectedValueOnce(
-        new Error('GitHub API 403: This workflow is already running.'),
-      )
       .mockResolvedValueOnce('ok');
 
     const resultPromise = withRetryOnAlreadyRunning(attemptFn);
@@ -259,7 +256,7 @@ describe('withRetryOnAlreadyRunning', () => {
     const result = await resultPromise;
 
     expect(result).toBe('ok');
-    expect(attemptFn).toHaveBeenCalledTimes(3);
+    expect(attemptFn).toHaveBeenCalledTimes(2);
   });
 
   it('does not retry a non-matching error — throws immediately', async () => {
@@ -284,21 +281,24 @@ describe('withRetryOnAlreadyRunning', () => {
 
     const assertion = expect(
       withRetryOnAlreadyRunning(attemptFn),
-    ).rejects.toThrow(/gave up after 3 attempts/);
+    ).rejects.toThrow(/gave up after 2 attempts/);
 
     await jest.runAllTimersAsync();
     await assertion;
 
-    expect(attemptFn).toHaveBeenCalledTimes(3);
+    expect(attemptFn).toHaveBeenCalledTimes(2);
   });
 
-  it('backs off ~10s then ~20s between retries', async () => {
+  // Deliberately short (2 attempts, ~8s backoff) so the whole retry budget
+  // stays well under the ci-server Lambda's 30s hard timeout — a 3-attempt/
+  // ~30s budget left no headroom for the HTTP round trips themselves
+  // (LS-9647). Once this short budget is exhausted, rerun.ts hands off to
+  // the transport-safe ci_wait_run bounded-wait/re-invoke pattern instead of
+  // retrying blindly in-process.
+  it('backs off ~8s between retries, well under the 30s Lambda timeout', async () => {
     const setSpy = jest.spyOn(global, 'setTimeout');
     const attemptFn = jest
       .fn<() => Promise<string>>()
-      .mockRejectedValueOnce(
-        new Error('GitHub API 403: This workflow is already running.'),
-      )
       .mockRejectedValueOnce(
         new Error('GitHub API 403: This workflow is already running.'),
       )
@@ -309,8 +309,8 @@ describe('withRetryOnAlreadyRunning', () => {
     await resultPromise;
 
     const backoffDelays = setSpy.mock.calls.map((c) => c[1]);
-    expect(backoffDelays).toContain(10_000);
-    expect(backoffDelays).toContain(20_000);
+    expect(backoffDelays).toContain(8_000);
+    expect(Math.max(...(backoffDelays as number[]))).toBeLessThan(30_000);
 
     setSpy.mockRestore();
   });

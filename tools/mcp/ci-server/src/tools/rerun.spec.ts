@@ -307,17 +307,25 @@ describe('rerun', () => {
   });
 
   describe('already-running 403 surfaced by the retry wrapper', () => {
-    it('surfaces a final "gave up after N attempts" error as a tool error', async () => {
+    it('hands off to ci_wait_run instead of a bare error once the retry wrapper gives up (LS-9647)', async () => {
       mockPostWithRetry.mockRejectedValue(
         new Error(
-          'GitHub API 403: This workflow is already running. (gave up after 3 attempts waiting for the run to settle)',
+          'GitHub API 403: This workflow is already running. (gave up after 2 attempts waiting for the run to settle)',
         ),
       );
 
       const result = await rerun({ runId: 123, failedOnly: true });
 
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toMatch(/gave up after 3 attempts/);
+      expect(result.isError).toBeUndefined();
+      const payload = JSON.parse(result.content[0].text) as {
+        runId: number;
+        status: string;
+        hint: string;
+      };
+      expect(payload.runId).toBe(123);
+      expect(payload.status).toBe('not_yet_reschedulable');
+      expect(payload.hint).toMatch(/ci_wait_run\(\{ runId: 123 \}\)/);
+      expect(payload.hint).toMatch(/status: "completed"/);
     });
 
     it('still fails fast on a non-matching 403 (e.g. permissions)', async () => {

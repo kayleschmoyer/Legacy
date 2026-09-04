@@ -1,4 +1,5 @@
 import { githubGet, postWithRetryOnAlreadyRunning } from '../github-api.js';
+import { isAlreadyRunningError } from '../http-retry.js';
 import { checkStaleMergeRef } from '../merge-ref-staleness.js';
 import type { ToolResult } from '../types.js';
 
@@ -191,12 +192,50 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
       ],
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    // The retry wrapper (withRetryOnAlreadyRunning) already absorbed the
+    // short-lived version of this race; a match here means the run is still
+    // rejecting reruns after that budget — most likely trailing jobs (e.g.
+    // "Summarize & Report", "Remove Merge Label on Failure") haven't been
+    // scheduled/picked up yet even though the substantive build/test/E2E
+    // jobs are done. rerun-failed-jobs gates on the run's overall status,
+    // not any individual job's, so blindly re-guessing here wastes calls
+    // (LS-9647) — hand the caller the cheap, definitive check instead of a
+    // bare error: ci_wait_run already polls the run's top-level status,
+    // which only reaches "completed" once every job, cleanup included, has
+    // finished.
+    if (isAlreadyRunningError(message)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                runId: params.runId,
+                status: 'not_yet_reschedulable',
+                message,
+                hint:
+                  `Run ${params.runId} still rejects reruns as "already running" — this usually means trailing ` +
+                  'jobs (cleanup/summarize steps) are still queued even though the substantive jobs finished. ' +
+                  `Call ci_wait_run({ runId: ${params.runId} }) and re-invoke it per its hint until it returns ` +
+                  'status: "completed" (that field only flips once every job on the run, including cleanup, is ' +
+                  'done) — then retry this rerun call.',
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
     return {
       isError: true,
       content: [
         {
           type: 'text',
-          text: `Failed to rerun workflow run ${params.runId}: ${error instanceof Error ? error.message : String(error)}`,
+          text: `Failed to rerun workflow run ${params.runId}: ${message}`,
         },
       ],
     };

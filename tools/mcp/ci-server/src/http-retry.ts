@@ -112,14 +112,27 @@ export async function fetchWithRetry(
   );
 }
 
-const ALREADY_RUNNING_MAX_ATTEMPTS = 3;
-const ALREADY_RUNNING_BACKOFF_MS = 10_000;
+const ALREADY_RUNNING_MAX_ATTEMPTS = 2;
+const ALREADY_RUNNING_BACKOFF_MS = 8_000;
 
 /**
  * Runs `attemptFn` (a POST call) with retry-with-backoff when it rejects with
- * the "already running" 403 race (see isAlreadyRunningError). Up to 3
- * attempts, waiting 10s/20s between them (~30s total). Any other error —
- * including non-matching 403s — rethrows immediately, unchanged.
+ * the "already running" 403 race (see isAlreadyRunningError). Up to 2
+ * attempts, waiting ~8s between them. Any other error — including
+ * non-matching 403s — rethrows immediately, unchanged.
+ *
+ * Deliberately short: this server runs on a Lambda with a 30s hard timeout
+ * (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout — see the identical
+ * constraint documented in wait-run.ts). The race this retries is a run-level
+ * status lag behind the per-job status a caller already checked (LS-9647) —
+ * when the run is stuck behind slow trailing jobs (cleanup/summarize steps
+ * that can take minutes to be scheduled), no in-Lambda retry budget can wait
+ * it out without risking the whole invocation being SIGKILLed by the
+ * platform timeout before it can return a clean response. A prior version of
+ * this constant retried 3x over ~30s, which left no headroom at all. Once the
+ * short retry budget here is exhausted, the caller (rerun.ts) hands off to
+ * the transport-safe bounded-wait pattern (`ci_wait_run`) instead of
+ * retrying blindly in-process.
  *
  * Takes the attempt as a callback rather than a URL/path so it can wrap
  * github-api.ts's githubPost (which has import.meta.url / auth dependencies
