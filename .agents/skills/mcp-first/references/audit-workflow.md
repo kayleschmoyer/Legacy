@@ -141,6 +141,14 @@ detects this case and raises an actionable error naming it, rather than the
 generic "Could not find" message — but there is no code-level fix for a
 transcript the server process genuinely cannot read.
 
+`findClaudeProjectsDir` also distinguishes _why_ a candidate is unreadable
+(LS-9538): when the directory exists but the server process's OS user lacks
+permission to read it (`EACCES` — e.g. a `0700` root-owned
+`~/.claude/projects` while the server runs as a sandboxed user), the error
+says "permission denied, not not-found" instead of the generic message. That
+wording means no `projectsDir` value will fix it — stop retrying path
+variations and go straight to the manual fallback below.
+
 When you hit that error:
 
 1. Confirm the transcript exists from the agent's own Bash tool (`ls -la

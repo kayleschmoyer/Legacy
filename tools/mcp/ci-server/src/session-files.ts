@@ -14,6 +14,39 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { basename, join, resolve, sep } from 'node:path';
 
 /**
+ * Result of probing one projects-directory candidate: either it resolved to
+ * a readable directory, or it failed with a specific reason.
+ *
+ * `stat` throwing EACCES (candidate exists but this process's uid/gid can't
+ * traverse it — the CCR cross-user-boundary case, LS-9538) is a materially
+ * different failure than ENOENT (candidate genuinely absent) — one is
+ * unrecoverable by retrying paths, the other means "wrong path". `existsSync`
+ * collapses both to `false`, so probing must call `statSync` directly and
+ * inspect `err.code` to tell them apart.
+ */
+interface ProbeResult {
+  dir: string;
+  ok: boolean;
+  /** 'EACCES' | 'ENOENT' | other errno code | undefined when ok is true. */
+  code?: string;
+}
+
+function probeDir(dir: string): ProbeResult {
+  try {
+    if (statSync(dir).isDirectory()) {
+      return { dir, ok: true };
+    }
+    return { dir, ok: false, code: 'ENOTDIR' };
+  } catch (err) {
+    const code =
+      err instanceof Error && 'code' in err
+        ? String((err as NodeJS.ErrnoException).code)
+        : 'UNKNOWN';
+    return { dir, ok: false, code };
+  }
+}
+
+/**
  * Locate the Claude Code projects directory, probing platform-appropriate
  * paths so the tool works in both local Windows sessions and Linux/macOS/cloud
  * environments.
@@ -53,23 +86,46 @@ export function findClaudeProjectsDir(explicit?: string): string {
     candidates.push(join(appData, 'Claude', 'projects'));
   }
 
+  const probes: ProbeResult[] = [];
   for (const dir of candidates) {
-    if (existsSync(dir)) {
+    const probe = probeDir(dir);
+    if (probe.ok) {
       return dir;
     }
+    probes.push(probe);
   }
 
   // An explicit override that still can't be read is a distinct failure mode
   // from "nothing was configured": the caller (often a human, quoting the
   // path from their own Bash tool) has confirmed the directory exists and is
-  // readable from their side. If the MCP server still can't see it, the
-  // server process is most likely running under a different user/mount
-  // namespace than the agent's shell — a known limitation in some CCR
-  // topologies (LS-9458) that no path-resolution change here can work
-  // around. Say so explicitly instead of repeating the generic
-  // "could not find" message, so the caller doesn't retry the same override
-  // expecting a different result.
+  // readable from their side. Two root causes surface identically to
+  // `existsSync` (both just report "not found") but call for different next
+  // steps, so probe with `statSync` and branch on the errno (LS-9538):
+  //
+  //   - EACCES: the directory exists but this process's uid/gid can't read
+  //     it — a permission boundary, not a path problem (e.g. the MCP server
+  //     runs as a sandboxed user like sbx_user1051 while the agent's Bash
+  //     tool runs as root against a 0700 directory). No projectsDir value
+  //     will ever fix this; retrying path variations wastes turns.
+  //   - anything else (ENOENT, ENOTDIR, ...): the path genuinely isn't there
+  //     from the server's point of view, which *can* be fixed by supplying a
+  //     different path, or points at the cross-container/mount-namespace
+  //     mismatch documented for LS-9458.
   if (explicit) {
+    const explicitProbe = probes.find((p) => p.dir === explicit);
+    if (explicitProbe?.code === 'EACCES') {
+      throw new Error(
+        `Could not find Claude projects directory. The explicit override ` +
+          `"${explicit}" exists but is not readable *from the MCP server process* ` +
+          `(permission denied, not not-found — the server is running as a different ` +
+          `OS user than your Bash tool and lacks read access to this directory, a known ` +
+          `CCR limitation, LS-9538/LS-9458). No projectsDir value can work around this; ` +
+          `retrying path variations will not help. ` +
+          `Fall back to a manual review of the session's Bash history for the gap audit ` +
+          `(see .agents/skills/mcp-first/references/audit-workflow.md#manual-fallback-when-the-server-cannot-see-the-transcript). ` +
+          `All candidates tried: ${candidates.join(', ')}`,
+      );
+    }
     throw new Error(
       `Could not find Claude projects directory. The explicit override ` +
         `"${explicit}" does not exist or is not readable *from the MCP server process* ` +
@@ -78,6 +134,17 @@ export function findClaudeProjectsDir(explicit?: string): string {
         `Fall back to a manual review of the session's Bash history for the gap audit ` +
         `(see .agents/skills/mcp-first/references/audit-workflow.md#manual-fallback-when-the-server-cannot-see-the-transcript). ` +
         `All candidates tried: ${candidates.join(', ')}`,
+    );
+  }
+
+  const permissionDenied = probes.filter((p) => p.code === 'EACCES');
+  if (permissionDenied.length > 0) {
+    throw new Error(
+      `Could not find Claude projects directory. Tried: ${candidates.join(', ')}. ` +
+        `Permission denied (not not-found) on: ${permissionDenied.map((p) => p.dir).join(', ')} ` +
+        `— the MCP server process's OS user lacks read access to this directory, a known ` +
+        `CCR limitation (LS-9538). Pass an explicit projectsDir override only if it points ` +
+        `to a directory the server process itself can read; otherwise no override will help.`,
     );
   }
 

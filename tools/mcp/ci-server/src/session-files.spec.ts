@@ -8,7 +8,7 @@ import {
   it,
   jest,
 } from '@jest/globals';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { findClaudeProjectsDir, resolveProjectSlug } from './session-files.js';
@@ -21,6 +21,17 @@ import { findClaudeProjectsDir, resolveProjectSlug } from './session-files.js';
 jest.mock('node:os', () => {
   const actual: typeof import('node:os') = jest.requireActual('node:os');
   return { ...actual, homedir: jest.fn(actual.homedir) };
+});
+
+// statSync is wrapped (not chmod-based permission bits) because the test
+// runner commonly runs as root, where the OS permission check that would
+// normally raise EACCES is bypassed entirely — chmod 0000 on a real
+// directory would not reproduce the failure under test. Wrapping lets the
+// LS-9538 test below inject a real EACCES-shaped error deterministically,
+// while every other test keeps exercising the real statSync.
+jest.mock('node:fs', () => {
+  const actual: typeof import('node:fs') = jest.requireActual('node:fs');
+  return { ...actual, statSync: jest.fn(actual.statSync) };
 });
 
 describe('findClaudeProjectsDir', () => {
@@ -147,6 +158,39 @@ describe('findClaudeProjectsDir', () => {
     expect(thrown?.message).toContain(
       "manual review of the session's Bash history",
     );
+  });
+
+  it('distinguishes permission-denied from not-found on an unreadable explicit override (LS-9538)', () => {
+    // Simulates the LS-9538 recurrence: the explicit projectsDir exists (the
+    // caller confirmed it via their own Bash tool) but the MCP server
+    // process's OS user (e.g. sbx_user1051) lacks read access to it (e.g. a
+    // 0700 directory owned by root) — a permission boundary, not a missing
+    // path. The error must say "permission denied" and cite LS-9538, not
+    // repeat the generic "does not exist" message that would send the
+    // caller retrying path variations that were never going to work.
+    (homedir as jest.Mock).mockReturnValueOnce(join(tmpDir, 'no-such-homedir'));
+    const restricted = join(tmpDir, 'permission-denied-dir');
+    const eacces = Object.assign(new Error('EACCES: permission denied'), {
+      code: 'EACCES',
+    });
+    (statSync as jest.Mock).mockImplementationOnce((...args: unknown[]) => {
+      const path = args[0];
+      if (path === restricted) throw eacces;
+      return jest
+        .requireActual<typeof import('node:fs')>('node:fs')
+        .statSync(path as string);
+    });
+
+    let thrown: Error | undefined;
+    try {
+      findClaudeProjectsDir(restricted);
+    } catch (err) {
+      thrown = err as Error;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown?.message).toContain('permission denied, not not-found');
+    expect(thrown?.message).toContain('LS-9538');
+    expect(thrown?.message).not.toMatch(/does not exist or is not readable/);
   });
 
   it('throws with all candidate paths listed when none exist', () => {
