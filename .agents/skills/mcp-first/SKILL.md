@@ -60,6 +60,8 @@ The same `tools/mcp/*-server` code deployed to AWS Lambda behind API Gateway, re
 
 **Auth**: per-user OAuth ("Track B") in Claude Code; Cognito machine bearers ("Track A") on Copilot. See [Auth Model](#auth-model).
 
+> **Self-served tool reference (`GET /docs`, LS-9593)**: each of the five hosted servers exposes its own tool reference at `GET /docs`, behind the same Cognito bearer its other tools require, generated at build time and redeployed with the server. Fetch it with `make mcp-docs SERVER=<ci|github|jira|db-admin|rollbar>` (`scripts/mcp-docs.mjs`). For a no-token offline copy covering all eleven servers (stdio + hosted), see `docs/mcp/api-reference.html`.
+
 ### Surface 3 — platform built-ins
 
 - **Harness tools** (always present in Claude Code): `Bash`, `Grep`, `Glob`, `Read`, `ToolSearch`, and `Monitor` (the wait-on-condition tool). `ScheduleWakeup` still exists but is scoped to `/loop` dynamic pacing — it is **not** a PR/CI wait primitive; use `Monitor` or the [Periodic Wake Protocol](references/waiting-and-wakeups.md#periodic-wake-protocol) for those (verified 2026-09-03).
