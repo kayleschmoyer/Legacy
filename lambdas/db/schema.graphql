@@ -936,7 +936,22 @@ type DraftRecommendation {
   position: String
   reason: String
   score: Float
+
+  """
+  Signal chip classifying why this player is recommended. Null when no signal applies; `reason` remains the human-readable rationale.
+  """
+  signal: DraftRecommendationSignal
   topStats: [DraftRecommendationStat!]
+}
+
+"""
+Why the Draft Intelligence algorithm surfaced a recommendation, as a short labelled chip: ROSTER_FIT (fills an empty or under-quota slot on your roster), POS_RUN (the pool at this position is nearly exhausted), TIER_BREAK (last player before a cliff in production at this position), or VALUE (no roster need, but top-of-pool production). Nullable — absent when none applies. (LS-9855)
+"""
+enum DraftRecommendationSignal {
+  POS_RUN
+  ROSTER_FIT
+  TIER_BREAK
+  VALUE
 }
 
 """

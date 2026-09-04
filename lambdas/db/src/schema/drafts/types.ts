@@ -2,6 +2,10 @@
  * Draft domain — GraphQL type definitions
  */
 
+import {
+  DRAFT_RECOMMENDATION_SIGNALS,
+  type DraftRecommendationSignal,
+} from './draft-recommendation-signals';
 import { builder } from '../builder';
 import { Team } from '../leagues/types';
 import { CareerBattingRef } from '../statistics';
@@ -362,6 +366,20 @@ DraftRecommendationStat.implement({
 });
 
 /**
+ * DraftRecommendationSignal — the labelled chip classifying why a
+ * recommendation was surfaced (LS-9855). Derivation and precedence live in
+ * draft-recommendation-signals.ts; keep the vocabulary there and here in step.
+ */
+export const DraftRecommendationSignalEnum = builder.enumType(
+  'DraftRecommendationSignal',
+  {
+    description:
+      'Why the Draft Intelligence algorithm surfaced a recommendation, as a short labelled chip: ROSTER_FIT (fills an empty or under-quota slot on your roster), POS_RUN (the pool at this position is nearly exhausted), TIER_BREAK (last player before a cliff in production at this position), or VALUE (no roster need, but top-of-pool production). Nullable — absent when none applies. (LS-9855)',
+    values: DRAFT_RECOMMENDATION_SIGNALS,
+  },
+);
+
+/**
  * DraftRecommendation — one player recommendation from the Draft Intelligence algorithm
  * (stat value 50% + positional need 30% + scarcity 20%)
  */
@@ -371,6 +389,7 @@ export const DraftRecommendation = builder.objectRef<{
   position: string;
   score: number;
   reason: string;
+  signal?: DraftRecommendationSignal | null;
   topStats: Array<{ label: string; value: string }>;
 }>('DraftRecommendation');
 
@@ -383,6 +402,15 @@ DraftRecommendation.implement({
     position: t.exposeString('position'),
     score: t.exposeFloat('score'),
     reason: t.exposeString('reason'),
+    // Nullable by design: the panel omits the chip entirely rather than
+    // rendering a fabricated catch-all label (LS-9473 precedent).
+    signal: t.field({
+      type: DraftRecommendationSignalEnum,
+      nullable: true,
+      description:
+        'Signal chip classifying why this player is recommended. Null when no signal applies; `reason` remains the human-readable rationale.',
+      resolve: (rec) => rec.signal ?? null,
+    }),
     topStats: t.field({
       type: [DraftRecommendationStat],
       resolve: (rec) => rec.topStats,

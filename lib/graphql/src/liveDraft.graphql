@@ -438,6 +438,7 @@ query GetDraftRecommendations($draftId: Int!, $teamId: Int!) {
     position
     score
     reason
+    signal
     topStats {
       label
       value

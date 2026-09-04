@@ -8,9 +8,12 @@ import {
 } from '@legacy-sports/graphql';
 import { getPositionColor } from './utils';
 import {
+  AMBER_WARM,
+  BLUE_LIGHTER,
   BRAND_GOLD,
   BRAND_NAVY,
   EMERALD,
+  EMERALD_LIGHTER,
   SURFACE_SUBTLE,
   TEXT_MUTED,
   TEXT_PRIMARY,
@@ -78,6 +81,52 @@ const ScoreBarTrack = tamaguiStyled(YStack, {
   backgroundColor: SURFACE_OVERLAY_FAINT,
   borderRadius: 2,
   overflow: 'hidden',
+}) as StyledComponent;
+
+/**
+ * Signal chips (LS-9855) — the labelled POS RUN / TIER BREAK / ROSTER FIT /
+ * VALUE tag the mock renders above the player name, so the panel is scannable
+ * at a glance mid-pick rather than requiring a read of the italic rationale.
+ *
+ * Keyed by the raw enum value rather than the generated TS enum so a signal
+ * this client doesn't know yet (a server deployed ahead of the app) renders no
+ * chip instead of a raw `SOME_NEW_TOKEN` string. The server's `signal` is
+ * already nullable and the chip is omitted when absent — the panel must never
+ * show a fabricated label (LS-9473 precedent).
+ */
+const SIGNAL_CHIPS: Record<
+  string,
+  { label: string; color: string; backgroundColor: string }
+> = {
+  POS_RUN: {
+    label: 'POS RUN',
+    color: BRAND_GOLD,
+    backgroundColor: withAlpha(BRAND_GOLD, 0.14),
+  },
+  TIER_BREAK: {
+    label: 'TIER BREAK',
+    color: BLUE_LIGHTER,
+    backgroundColor: withAlpha(BRAND_NAVY, 0.25),
+  },
+  ROSTER_FIT: {
+    label: 'ROSTER FIT',
+    color: EMERALD_LIGHTER,
+    backgroundColor: withAlpha(EMERALD, 0.16),
+  },
+  VALUE: {
+    label: 'VALUE',
+    color: AMBER_WARM,
+    backgroundColor: withAlpha(AMBER_WARM, 0.14),
+  },
+};
+
+const SignalChip = tamaguiStyled(XStack, {
+  alignSelf: 'flex-start',
+  alignItems: 'center',
+  paddingHorizontal: 6,
+  paddingVertical: 3,
+  borderRadius: 4,
+  flexShrink: 0,
 }) as StyledComponent;
 
 const DraftBtn = tamaguiStyled(XStack, {
@@ -186,8 +235,21 @@ export function DraftIntelligence({
       <YStack gap={6}>
         {recommendations.map((rec, i) => {
           if (!rec) return null;
+          const chip = rec.signal ? SIGNAL_CHIPS[rec.signal] : undefined;
           return (
             <IntelItem key={rec.playerId}>
+              {chip ? (
+                <SignalChip backgroundColor={chip.backgroundColor}>
+                  <Text
+                    fontSize={9}
+                    fontWeight="800"
+                    letterSpacing={1.3}
+                    color={chip.color}
+                  >
+                    {chip.label}
+                  </Text>
+                </SignalChip>
+              ) : null}
               <XStack alignItems="center" gap={6}>
                 <Text
                   fontSize={10}

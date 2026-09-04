@@ -14,6 +14,11 @@ import { getDefaultRosterPositions } from '@legacy-sports/utils';
 
 import type { PlayerDraftInfo } from './candidate-pool';
 import {
+  deriveDraftRecommendationSignal,
+  type DraftRecommendationSignal,
+  findTierBreakCandidateIds,
+} from './draft-recommendation-signals';
+import {
   countRecentMockDrafts,
   eligibleStatPositionsForUnfilledSlots,
   getCurrentDraftPickInfo,
@@ -1111,6 +1116,8 @@ type DraftRecommendationOutput = {
   position: string;
   score: number;
   reason: string;
+  /** Signal chip classifying the recommendation; null when none applies. */
+  signal: DraftRecommendationSignal | null;
   topStats: Array<{ label: string; value: string }>;
 };
 
@@ -1267,12 +1274,33 @@ export async function getFootballDraftRecommendations(
     return 1 - count / maxCountAnyPos;
   };
 
-  return candidates
-    .map((c) => {
-      const statScore = normFpg(c.fpg);
+  // normFpg() re-derives the pool min/max on every call, so the stat score is
+  // computed once per candidate here and reused by both the tier-break pass
+  // and the scoring pass below rather than twice per candidate (LS-9855).
+  const scored = candidates.map((c) => ({ c, statScore: normFpg(c.fpg) }));
+
+  // Tier breaks are computed across the whole remaining pool at each position,
+  // before the top-5 slice, because the production cliff that matters is the
+  // one to the next player a drafter could actually take (LS-9855).
+  const tierBreakIds = findTierBreakCandidateIds(
+    scored.map(({ c, statScore }) => ({
+      id: c.id,
+      position: c.position,
+      statScore,
+    })),
+  );
+
+  return scored
+    .map(({ c, statScore }) => {
       const posNeed = getPositionalNeed(c.position);
       const scarcity = getScarcity(c.position);
       const score = statScore * 0.5 + posNeed * 0.3 + scarcity * 0.2;
+      const signal = deriveDraftRecommendationSignal({
+        positionalNeed: posNeed,
+        scarcity,
+        statScore,
+        isTierBreak: tierBreakIds.has(c.id),
+      });
 
       const topStats: Array<{ label: string; value: string }> = [
         { label: 'Position', value: c.position },
@@ -1298,6 +1326,7 @@ export async function getFootballDraftRecommendations(
         position: c.position,
         score,
         reason,
+        signal,
         topStats,
       };
     })
@@ -1678,11 +1707,28 @@ builder.queryField('getDraftRecommendations', (t) =>
         }
       }
 
+      // Tier breaks are computed across the whole scored pool at each position,
+      // before the top-5 slice, because the production cliff that matters is
+      // the one to the next player a drafter could actually take (LS-9855).
+      const tierBreakIds = findTierBreakCandidateIds(
+        scored.map(({ player, statScore }) => ({
+          id: player.id,
+          position: player.position,
+          statScore,
+        })),
+      );
+
       return scored
         .map(({ player, statScore }) => {
           const posNeed = getPositionalNeed(player.position);
           const scarcity = getScarcity(player.position);
           const score = statScore * 0.5 + posNeed * 0.3 + scarcity * 0.2;
+          const signal = deriveDraftRecommendationSignal({
+            positionalNeed: posNeed,
+            scarcity,
+            statScore,
+            isTierBreak: tierBreakIds.has(player.id),
+          });
 
           const topStats = player.isPitcher
             ? [
@@ -1711,6 +1757,7 @@ builder.queryField('getDraftRecommendations', (t) =>
             position: player.position,
             score,
             reason,
+            signal,
             topStats,
           };
         })

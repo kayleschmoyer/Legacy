@@ -151,6 +151,7 @@ const MOCK_PICK_HISTORY = [
 const MOCK_AI_RECOMMENDATIONS = [
   {
     __typename: 'DraftRecommendation',
+    signal: null,
     playerId: 101,
     playerName: 'Mike Trout',
     position: 'CF',
@@ -159,6 +160,7 @@ const MOCK_AI_RECOMMENDATIONS = [
   },
   {
     __typename: 'DraftRecommendation',
+    signal: null,
     playerId: 105,
     playerName: 'Freddie Freeman',
     position: '1B',
@@ -167,6 +169,7 @@ const MOCK_AI_RECOMMENDATIONS = [
   },
   {
     __typename: 'DraftRecommendation',
+    signal: null,
     playerId: 103,
     playerName: 'Aaron Judge',
     position: 'RF',

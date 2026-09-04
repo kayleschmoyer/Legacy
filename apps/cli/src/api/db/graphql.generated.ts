@@ -768,8 +768,18 @@ export type DraftRecommendation = {
   position?: Maybe<Scalars['String']['output']>;
   reason?: Maybe<Scalars['String']['output']>;
   score?: Maybe<Scalars['Float']['output']>;
+  /** Signal chip classifying why this player is recommended. Null when no signal applies; `reason` remains the human-readable rationale. */
+  signal?: Maybe<DraftRecommendationSignal>;
   topStats?: Maybe<Array<DraftRecommendationStat>>;
 };
+
+/** Why the Draft Intelligence algorithm surfaced a recommendation, as a short labelled chip: ROSTER_FIT (fills an empty or under-quota slot on your roster), POS_RUN (the pool at this position is nearly exhausted), TIER_BREAK (last player before a cliff in production at this position), or VALUE (no roster need, but top-of-pool production). Nullable — absent when none applies. (LS-9855) */
+export enum DraftRecommendationSignal {
+  PosRun = 'POS_RUN',
+  RosterFit = 'ROSTER_FIT',
+  TierBreak = 'TIER_BREAK',
+  Value = 'VALUE',
+}
 
 /** A stat label/value pair displayed on a draft recommendation */
 export type DraftRecommendationStat = {

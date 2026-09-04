@@ -20,6 +20,7 @@ const makeRec = (
   playerName: string,
   score: number,
   position = '1B',
+  signal: string | null = null,
 ) => ({
   __typename: 'DraftRecommendation' as const,
   playerId,
@@ -27,6 +28,7 @@ const makeRec = (
   position,
   score,
   reason: `score ${score}`,
+  signal,
   topStats: [
     {
       __typename: 'DraftRecommendationStat' as const,
@@ -92,5 +94,61 @@ describe('DraftIntelligence sort', () => {
       'Freddie Freeman',
       'Aaron Judge',
     ]);
+  });
+});
+
+/**
+ * Signal chip coverage (LS-9855).
+ *
+ * The chip is the panel's at-a-glance label; it must render the mapped text
+ * for a known signal, and render nothing at all when the server sends none —
+ * a fabricated fallback label would read as a real finding (LS-9473).
+ */
+describe('DraftIntelligence signal chip', () => {
+  it.each([
+    ['POS_RUN', 'POS RUN'],
+    ['TIER_BREAK', 'TIER BREAK'],
+    ['ROSTER_FIT', 'ROSTER FIT'],
+    ['VALUE', 'VALUE'],
+  ])('renders the %s chip as "%s"', async (signal, label) => {
+    const recs = [makeRec(1, 'Lou Gehrig', 95, '1B', signal)];
+    render(
+      <MockedProvider mocks={makeMock(recs)} addTypename={false}>
+        <DraftIntelligence draftId={1} teamId={2} currentOverallPick={0} />
+      </MockedProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Lou Gehrig')).toBeTruthy();
+    });
+    expect(screen.getByText(label)).toBeTruthy();
+  });
+
+  it('omits the chip entirely when the signal is null', async () => {
+    const recs = [makeRec(1, 'Lou Gehrig', 95, '1B', null)];
+    render(
+      <MockedProvider mocks={makeMock(recs)} addTypename={false}>
+        <DraftIntelligence draftId={1} teamId={2} currentOverallPick={0} />
+      </MockedProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Lou Gehrig')).toBeTruthy();
+    });
+    for (const label of ['POS RUN', 'TIER BREAK', 'ROSTER FIT', 'VALUE']) {
+      expect(screen.queryByText(label)).toBeNull();
+    }
+  });
+
+  it('omits the chip for a signal value this client does not know', async () => {
+    // A server deployed ahead of the app must not surface a raw enum token.
+    const recs = [makeRec(1, 'Lou Gehrig', 95, '1B', 'SOME_FUTURE_SIGNAL')];
+    render(
+      <MockedProvider mocks={makeMock(recs)} addTypename={false}>
+        <DraftIntelligence draftId={1} teamId={2} currentOverallPick={0} />
+      </MockedProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText('Lou Gehrig')).toBeTruthy();
+    });
+    expect(screen.queryByText('SOME_FUTURE_SIGNAL')).toBeNull();
   });
 });
