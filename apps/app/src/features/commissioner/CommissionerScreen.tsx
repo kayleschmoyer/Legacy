@@ -22,6 +22,7 @@ import {
 import { Sport } from '@legacy-sports/graphql';
 import type { AppLeagueFragment } from '@legacy-sports/graphql';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
+import { useStepUpGate } from '@legacy-sports/shared-components/auth';
 import { LeagueDuesSetup } from './LeagueDuesSetup';
 import { LeagueScoringEditor } from '../scoring/LeagueScoringEditor';
 import { useLeagueScoringSettings } from '../../common/scoring/LeagueScoringProvider';
@@ -31,6 +32,8 @@ import {
 } from '../matchup/hooks/useMatchup';
 import { useSubscription } from '../subscription';
 import { useHasEntitlement } from '../subscription/useSubscription';
+import { StepUpModal } from '../subscription/StepUpModal';
+import { useCurrentUserInfo } from '../../common/auth/AuthHooks';
 
 interface CommissionerAccordionSection {
   id: string;
@@ -94,6 +97,16 @@ export function CommissionerScreen({
     ENTITLEMENTS.custom_scoring_multipliers,
   );
   const isFootball = league.sport === Sport.Football;
+
+  const { data: currentUser } = useCurrentUserInfo();
+  const {
+    isPrompting: isStepUpPrompting,
+    requireStepUp,
+    onVerified: onStepUpVerified,
+    onDismiss: onStepUpDismiss,
+  } = useStepUpGate();
+  const isLeagueOwner = league.owner === currentUser?.id;
+  const isAdminUser = currentUser?.isAdmin === true;
 
   const {
     profile: scoringProfile,
@@ -321,6 +334,9 @@ export function CommissionerScreen({
             <DeleteLeagueControl
               leagueId={leagueId}
               leagueName={league.name ?? ''}
+              isOwner={isLeagueOwner}
+              isAdmin={isAdminUser}
+              requireStepUp={requireStepUp}
               onDeleted={() => {
                 Alert.alert('Deleted', 'League has been permanently deleted.');
                 onLeagueDeleted();
@@ -340,6 +356,14 @@ export function CommissionerScreen({
 
   return (
     <ScrollView>
+      {isStepUpPrompting && (
+        <StepUpModal
+          onSuccess={onStepUpVerified}
+          onDismiss={onStepUpDismiss}
+          mfaEnabled={currentUser?.mfaEnabled ?? false}
+          hasPassword={currentUser?.hasPassword ?? true}
+        />
+      )}
       <YStack padding="$4" gap="$4">
         <H3>Commissioner Settings</H3>
 

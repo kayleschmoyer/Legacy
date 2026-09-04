@@ -21,6 +21,15 @@ jest.mock('react-router-dom', () => ({
 // --- auth ------------------------------------------------------------------
 jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({ user: { id: 42 } }),
+  useStepUpGate: () => ({
+    isPrompting: false,
+    requireStepUp: (action: () => void) => action(),
+    onVerified: jest.fn(),
+    onDismiss: jest.fn(),
+  }),
+}));
+jest.mock('../../../../components/StepUpModal', () => ({
+  StepUpModal: () => <div data-testid="step-up-modal" />,
 }));
 
 // --- hooks -----------------------------------------------------------------

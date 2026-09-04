@@ -104,6 +104,29 @@ jest.mock('../matchup/hooks/useMatchup', () => ({
   useCurrentWeek: jest.fn(() => ({ currentWeek: null })),
 }));
 
+jest.mock('@legacy-sports/shared-components/auth', () => ({
+  useStepUpGate: jest.fn(() => ({
+    isPrompting: false,
+    requireStepUp: (action: () => void) => action(),
+    onVerified: jest.fn(),
+    onDismiss: jest.fn(),
+  })),
+}));
+
+jest.mock('../../common/auth/AuthHooks', () => ({
+  useCurrentUserInfo: jest.fn(() => ({
+    data: { id: 1, isAdmin: false, mfaEnabled: false, hasPassword: true },
+    loading: false,
+  })),
+}));
+
+jest.mock('../subscription/StepUpModal', () => {
+  const { View } = jest.requireActual<RNComponents>('react-native');
+  return {
+    StepUpModal: () => <View testID="step-up-modal" />,
+  };
+});
+
 jest.mock('../subscription', () => ({
   useSubscription: jest.fn(() => ({ isPremium: false })),
 }));

@@ -19,6 +19,21 @@ export interface DeleteLeagueControlProps {
   seasonNumber?: number;
   onSuccess?: () => void;
   onError?: (error: Error) => void;
+  /**
+   * Whether the current user owns this league. Omitted (or true) matches
+   * pre-LS-9626 behavior: no step-up challenge, just the typed-name confirm.
+   */
+  isOwner?: boolean;
+  /** Whether the current user is an admin (checkAdminInDb). */
+  isAdmin?: boolean;
+  /**
+   * Gates an action behind fresh re-authentication (LGN-022 / LS-7834
+   * step-up). Required to actually gate the delete when `isAdmin && !isOwner`
+   * — the caller owns `useStepUpGate()` and renders `<StepUpModal>` (same
+   * pattern as CommissionerToolsControl.tsx). Omitted means the delete fires
+   * directly.
+   */
+  requireStepUp?: (action: () => void | Promise<void>) => void;
 }
 
 /**
@@ -26,7 +41,9 @@ export interface DeleteLeagueControlProps {
  *
  * Features:
  * - Requires league name confirmation to prevent accidental deletion
- * - Only available to league General Manager
+ * - Available to the league's owner, or an admin who isn't the owner behind
+ *   a step-up re-authentication gate (LS-9626, via `isOwner`/`isAdmin`/
+ *   `requireStepUp`)
  * - Deletes all associated data (teams, matchups, drafts, etc.)
  * - Redirects to home after successful deletion
  */
@@ -37,6 +54,9 @@ export function DeleteLeagueControl({
   seasonNumber,
   onSuccess,
   onError,
+  isOwner,
+  isAdmin,
+  requireStepUp,
 }: DeleteLeagueControlProps) {
   const navigate = useNavigate();
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -63,16 +83,7 @@ export function DeleteLeagueControl({
     setConfirmationText('');
   };
 
-  const handleConfirm = async () => {
-    if (confirmationText !== leagueName) {
-      onError?.(
-        new Error(
-          'League name does not match. Please type the exact league name to confirm deletion.',
-        ),
-      );
-      return;
-    }
-
+  const performDelete = async () => {
     setLoading(true);
 
     try {
@@ -117,6 +128,27 @@ export function DeleteLeagueControl({
         err instanceof Error ? err.message : 'Unknown error occurred';
       onError?.(new Error(errorMessage));
     }
+  };
+
+  const handleConfirm = async () => {
+    if (confirmationText !== leagueName) {
+      onError?.(
+        new Error(
+          'League name does not match. Please type the exact league name to confirm deletion.',
+        ),
+      );
+      return;
+    }
+
+    // Admin deleting a league they don't own: require a fresh step-up
+    // re-auth before the mutation fires (LS-9626). Owner deletes are
+    // unchanged.
+    if (isAdmin && isOwner === false && requireStepUp) {
+      requireStepUp(() => performDelete());
+      return;
+    }
+
+    await performDelete();
   };
 
   const isConfirmDisabled = confirmationText !== leagueName;

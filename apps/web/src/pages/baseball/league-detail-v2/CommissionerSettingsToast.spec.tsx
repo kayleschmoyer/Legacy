@@ -34,6 +34,16 @@ import { CommishTab } from './tabs/Commish';
 // span is enough.
 jest.mock('@legacy-sports/shared-components/auth', () => ({
   useAuth: () => ({ user: { id: 42 } }),
+  useStepUpGate: () => ({
+    isPrompting: false,
+    requireStepUp: (action: () => void) => action(),
+    onVerified: jest.fn(),
+    onDismiss: jest.fn(),
+  }),
+}));
+
+jest.mock('../../../components/StepUpModal', () => ({
+  StepUpModal: () => <div data-testid="step-up-modal" />,
 }));
 
 jest.mock('@tamagui/lucide-icons', () => {

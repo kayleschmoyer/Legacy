@@ -18,6 +18,21 @@ export interface DeleteLeagueControlProps {
   leagueName: string;
   onDeleted?: () => void;
   onError?: (error: Error) => void;
+  /**
+   * Whether the current user owns this league. Omitted (or true) matches
+   * pre-LS-9626 behavior: no step-up challenge, just the typed-name confirm.
+   */
+  isOwner?: boolean;
+  /** Whether the current user is an admin (checkAdminInDb). */
+  isAdmin?: boolean;
+  /**
+   * Gates an action behind fresh re-authentication (LGN-022 / LS-7834
+   * step-up). Required to actually gate the delete when `isAdmin && !isOwner`
+   * — the caller owns `useStepUpGate()` and renders the platform-specific
+   * `<StepUpModal>`, since this component is cross-platform and cannot import
+   * either. Omitted means the delete fires directly.
+   */
+  requireStepUp?: (action: () => void | Promise<void>) => void;
 }
 
 /**
@@ -31,6 +46,9 @@ export function DeleteLeagueControl({
   leagueName,
   onDeleted,
   onError,
+  isOwner,
+  isAdmin,
+  requireStepUp,
 }: DeleteLeagueControlProps) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmationText, setConfirmationText] = useState('');
@@ -38,12 +56,7 @@ export function DeleteLeagueControl({
 
   const [deleteLeague] = useDeleteLeagueMutation();
 
-  const handleConfirm = async () => {
-    if (confirmationText !== leagueName) {
-      onError?.(new Error('League name does not match.'));
-      return;
-    }
-
+  const performDelete = async () => {
     setLoading(true);
 
     try {
@@ -69,6 +82,23 @@ export function DeleteLeagueControl({
       LOGGER.error('Failed to delete league', error);
       onError?.(error);
     }
+  };
+
+  const handleConfirm = async () => {
+    if (confirmationText !== leagueName) {
+      onError?.(new Error('League name does not match.'));
+      return;
+    }
+
+    // Admin deleting a league they don't own: require a fresh step-up
+    // re-auth before the mutation fires (LS-9626). Owner deletes are
+    // unchanged.
+    if (isAdmin && isOwner === false && requireStepUp) {
+      requireStepUp(() => performDelete());
+      return;
+    }
+
+    await performDelete();
   };
 
   const isConfirmDisabled = confirmationText !== leagueName;

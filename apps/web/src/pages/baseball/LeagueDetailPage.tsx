@@ -9,7 +9,7 @@ import React, {
 import { LOGGER } from '@legacy-sports/logging';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button, XStack, YStack } from '@legacy-sports/shared-components/ui';
-import { useAuth } from '@legacy-sports/shared-components/auth';
+import { useAuth, useStepUpGate } from '@legacy-sports/shared-components/auth';
 import {
   Card,
   H1,
@@ -139,6 +139,7 @@ import {
   WaiverProcessControl,
 } from '../../features/commissioner';
 import { DeleteLeagueControl } from '../../features/commissioner/DeleteLeagueControl';
+import { StepUpModal } from '../../components/StepUpModal';
 import {
   useCurrentWeek,
   useMatchupById,
@@ -521,6 +522,12 @@ export function LeagueDetailPage(): React.JSX.Element {
 
   const { user, token: authToken } = useAuth();
   const isPremium = useIsPremium();
+  const {
+    isPrompting: isStepUpPrompting,
+    requireStepUp,
+    onVerified: onStepUpVerified,
+    onDismiss: onStepUpDismiss,
+  } = useStepUpGate();
 
   // Ref to hold refetchCurrentWeek so WebSocket callbacks can call it
   // without creating a hook-ordering dependency
@@ -881,10 +888,9 @@ export function LeagueDetailPage(): React.JSX.Element {
           secondaryColor: t.secondaryColor ?? null,
         }));
 
-  const isCommissioner =
-    reduxIsCommissioner ||
-    league?.owner === user?.id ||
-    user?.accessLevel === 'admin';
+  const isLeagueOwner = league?.owner === user?.id;
+  const isAdminUser = user?.accessLevel === 'admin';
+  const isCommissioner = reduxIsCommissioner || isLeagueOwner || isAdminUser;
 
   // Spectator mode: authenticated user viewing a public league they are not a member of.
   // Check both data.league.userMembership (Apollo cache) AND userTeamId (from the separate
@@ -3694,6 +3700,9 @@ export function LeagueDetailPage(): React.JSX.Element {
             leagueName={league.name ?? 'Unknown League'}
             teamCount={leagueTeams.length}
             seasonNumber={league.seasonNumber ?? undefined}
+            isOwner={isLeagueOwner}
+            isAdmin={isAdminUser}
+            requireStepUp={requireStepUp}
             onSuccess={() => {
               // Handled by DeleteLeagueControl
             }}
@@ -3811,6 +3820,12 @@ export function LeagueDetailPage(): React.JSX.Element {
       value={{ client: wsClient, connected: wsConnected }}
     >
       <PageContainer role="main" aria-labelledby="league-title">
+        {isStepUpPrompting && (
+          <StepUpModal
+            onSuccess={onStepUpVerified}
+            onDismiss={onStepUpDismiss}
+          />
+        )}
         <PageMeta
           title={league.name ?? 'League'}
           description={`Manage your ${league.name ?? 'fantasy baseball'} league on Legacy Sports — view rosters, standings, matchups, and trades.`}

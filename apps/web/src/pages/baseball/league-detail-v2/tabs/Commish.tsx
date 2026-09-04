@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@legacy-sports/shared-components/auth';
+import { useAuth, useStepUpGate } from '@legacy-sports/shared-components/auth';
 import {
   type LeagueFragment,
   Sport,
@@ -23,6 +23,7 @@ import { SeasonAwardsControl } from '../../../../components/commissioner/SeasonA
 import { LeagueScoringEditor } from '../../../../features/baseball/LeagueScoringEditor';
 import { ScoringSettingsEditor } from '../../../../components/leagues/ScoringSettingsEditor';
 import { DeleteLeagueControl } from '../../../../features/commissioner/DeleteLeagueControl';
+import { StepUpModal } from '../../../../components/StepUpModal';
 import { LeagueSettingsControl } from '../../../../components/commissioner/LeagueSettingsControl';
 import { WaiverProcessControl } from '../../../../features/commissioner';
 import { PremiumGate } from '../../../../components/PremiumGate';
@@ -211,6 +212,14 @@ export const CommishTab: React.FC<CommishTabProps> = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPremium = useIsPremium();
+  const {
+    isPrompting: isStepUpPrompting,
+    requireStepUp,
+    onVerified: onStepUpVerified,
+    onDismiss: onStepUpDismiss,
+  } = useStepUpGate();
+  const isLeagueOwner = league.owner === user?.id;
+  const isAdminUser = user?.accessLevel === 'admin';
   const isFootball = league.sport === Sport.Football;
   const [openId, setOpenId] = useState<string>('next-step');
   const [nextStepError, setNextStepError] = useState<string | null>(null);
@@ -485,6 +494,9 @@ export const CommishTab: React.FC<CommishTabProps> = ({
             leagueName={league.name ?? 'this league'}
             teamCount={teams.length}
             seasonNumber={league.seasonNumber ?? undefined}
+            isOwner={isLeagueOwner}
+            isAdmin={isAdminUser}
+            requireStepUp={requireStepUp}
           />
         ) : (
           <div
@@ -538,6 +550,9 @@ export const CommishTab: React.FC<CommishTabProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {isStepUpPrompting && (
+        <StepUpModal onSuccess={onStepUpVerified} onDismiss={onStepUpDismiss} />
+      )}
       {nextStepError ? (
         <div
           role="alert"

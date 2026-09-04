@@ -276,3 +276,105 @@ describe('DeleteLeagueControl — LS-4030 double-delete guard', () => {
     expect(mockNavigate).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('DeleteLeagueControl — LS-9626 admin-not-owner step-up gate', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+    mockNavigate.mockClear();
+    mockDeleteLeague.mockClear();
+    mockResolveMutation = null;
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const confirmDelete = () => {
+    fireEvent.click(getOuterDeleteButton());
+    fireEvent.change(screen.getByPlaceholderText('Test League'), {
+      target: { value: 'Test League' },
+    });
+    fireEvent.click(getConfirmDeleteButton());
+  };
+
+  it('owner path: does not call requireStepUp and deletes directly', () => {
+    const requireStepUp = jest.fn();
+    render(
+      <DeleteLeagueControl
+        leagueId={42}
+        leagueName="Test League"
+        isOwner
+        isAdmin={false}
+        requireStepUp={requireStepUp}
+      />,
+    );
+
+    confirmDelete();
+
+    expect(requireStepUp).not.toHaveBeenCalled();
+    expect(mockDeleteLeague).toHaveBeenCalledTimes(1);
+  });
+
+  it('admin-not-owner: routes the delete through requireStepUp instead of calling it directly', () => {
+    const requireStepUp = jest.fn();
+    render(
+      <DeleteLeagueControl
+        leagueId={42}
+        leagueName="Test League"
+        isOwner={false}
+        isAdmin
+        requireStepUp={requireStepUp}
+      />,
+    );
+
+    confirmDelete();
+
+    expect(requireStepUp).toHaveBeenCalledTimes(1);
+    expect(mockDeleteLeague).not.toHaveBeenCalled();
+  });
+
+  it('admin-not-owner: deletes once the gated action fires (step-up verified)', () => {
+    let gatedAction: (() => void | Promise<void>) | null = null;
+    const requireStepUp = jest.fn((action: () => void | Promise<void>) => {
+      gatedAction = action;
+    });
+    render(
+      <DeleteLeagueControl
+        leagueId={42}
+        leagueName="Test League"
+        isOwner={false}
+        isAdmin
+        requireStepUp={requireStepUp}
+      />,
+    );
+
+    confirmDelete();
+    expect(mockDeleteLeague).not.toHaveBeenCalled();
+
+    // Simulate the caller's useStepUpGate firing the deferred action after a
+    // successful step-up verification.
+    act(() => {
+      void gatedAction?.();
+    });
+
+    expect(mockDeleteLeague).toHaveBeenCalledTimes(1);
+  });
+
+  it('admin-not-owner: no delete fires if the step-up modal is dismissed (gated action never invoked)', () => {
+    const requireStepUp = jest.fn(); // never invokes the deferred action, mirrors onDismiss
+    render(
+      <DeleteLeagueControl
+        leagueId={42}
+        leagueName="Test League"
+        isOwner={false}
+        isAdmin
+        requireStepUp={requireStepUp}
+      />,
+    );
+
+    confirmDelete();
+
+    expect(requireStepUp).toHaveBeenCalledTimes(1);
+    expect(mockDeleteLeague).not.toHaveBeenCalled();
+  });
+});
