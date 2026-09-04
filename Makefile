@@ -1007,37 +1007,18 @@ _PC_BUILD_CMD = pnpm exec nx affected -t build --base=$(NX_BASE)
 # permission classifier blocks as history-rewrite tunneling, with no
 # non-destructive recovery path. A new commit reaches the remote with a normal
 # fast-forward push. Matches the existing `make format-commit` target.
-ifeq ($(DETECTED_OS),Windows)
+#
+# Implemented as a single cross-platform script (scripts/pc-format-commit.js,
+# LS-9598) rather than separate bash/PowerShell recipes: it stages only the
+# files prettier itself reports as needing formatting (`--list-different`,
+# then a scoped `git add -- <those files>`) instead of `git add -A`. This
+# step is routinely backgrounded in cloud/degraded sessions and can run for
+# minutes; scoping the commit to prettier's own file list means an unrelated
+# edit the agent makes while it runs is never swept into the formatting
+# commit, however it happened to be dirty when the commit was made.
 define _PC_FORMAT_RECIPE
-@powershell -NoProfile -Command "$$preState = @(git status --porcelain -uno); pnpm exec prettier --write --ignore-unknown .; if ($$LASTEXITCODE -ne 0) { exit $$LASTEXITCODE }; $$changed = @(git status --porcelain -uno); $$newChanges = @(); foreach ($$line in $$changed) { if (-not ($$preState -contains $$line)) { $$newChanges += $$line } }; if ($$newChanges.Count -eq 0) { $$diffFiles = @(git diff --name-only); if ($$diffFiles.Count -gt 0) { $$newChanges = $$diffFiles | ForEach-Object { '?? ' + $$_ } } }; if ($$newChanges.Count -gt 0) { if ($$preState.Count -gt 0) { Write-Host ''; Write-Host 'ERROR: Formatting rewrote the following files:' -ForegroundColor Red; $$newChanges | ForEach-Object { Write-Host ('  ' + $$_.Substring(3)) -ForegroundColor Yellow }; Write-Host ''; Write-Host 'You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc.' -ForegroundColor Red; exit 1 } else { Write-Host '  Formatting changed files; committing as a new commit...' -ForegroundColor Yellow; git add -A; git commit -m 'style: apply formatting'; Write-Host '  ✓ Format fixes committed as a new commit.' -ForegroundColor Green } }"
+@node scripts/pc-format-commit.js
 endef
-else
-define _PC_FORMAT_RECIPE
-@pre_state=$$(git status --porcelain -uno); \
-pnpm exec prettier --write --ignore-unknown .; \
-post_state=$$(git status --porcelain -uno); \
-changed=$$(comm -13 <(echo "$$pre_state" | sort) <(echo "$$post_state" | sort)); \
-if [ -z "$$changed" ]; then \
-	diff_files=$$(git diff --name-only); \
-	if [ -n "$$diff_files" ]; then changed="$$diff_files"; fi; \
-fi; \
-if [ -n "$$changed" ]; then \
-	if [ -n "$$pre_state" ]; then \
-		echo ""; \
-		echo "ERROR: Formatting rewrote the following files:"; \
-		echo "$$changed" | sed 's/^.../  /'; \
-		echo ""; \
-		echo "You have other uncommitted changes alongside the format fixes. Commit or stash them first, then re-run make pc."; \
-		exit 1; \
-	else \
-		echo "  Formatting changed files; committing as a new commit..."; \
-		git add -A; \
-		git commit -m 'style: apply formatting'; \
-		echo "  ✓ Format fixes committed as a new commit."; \
-	fi; \
-fi
-endef
-endif
 
 pre-commit: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pre-commit: ## Run all pre-commit validation checks
