@@ -77,11 +77,16 @@ on:
 # shared group to avoid a duplicate pipeline: check-prior-success's anyActive
 # check below already treats an in-flight "🚀 CI Pipeline /" check run on the
 # same SHA as "already running" and skips re-triggering ci-pipeline (LS-8402).
-# Remaining risk is narrow: two determine-scope evaluations landing in the
-# same few-second gap between a push's ci-pipeline job being dispatched and
-# its first check run appearing as in_progress — accepted as a rare, low-cost
-# race (worst case: one extra pipeline run) in exchange for eliminating the
-# deterministic livelock.
+# That blind window was originally documented here as "a few seconds" between
+# a push's ci-pipeline job being dispatched and its first check run appearing
+# — a rare, low-cost race. It is not: on self-hosted runners under contention
+# the orchestrator's own determine-scope job can sit queued for many minutes
+# before publishing any check run (16.5 minutes on PR #7585 / LS-9860), and
+# every approval or thread-resolution review event arriving in that window
+# dispatched a full duplicate pipeline. check-prior-success now also treats a
+# queued/in-progress sibling orchestrator run on the same head SHA as evidence
+# that CI is already coming, which closes the window at the run level rather
+# than the check-run level.
 concurrency:
   group: >-
     ${{ github.event_name == 'pull_request_review' &&
@@ -530,12 +535,68 @@ jobs:
               const CI_PIPELINE_PREFIX = '🚀 CI Pipeline /';
               const anyActive = [...activeNames].some(name => name.startsWith(CI_PIPELINE_PREFIX));
 
+              // LS-9887: check runs are only evidence once the pipeline's
+              // jobs EXIST. A sibling orchestrator run that is still queued has
+              // published no check runs at all, so anyActive is blind to it.
+              // The comment on the concurrency group above assumed that blind
+              // window was "a few seconds" between dispatch and its first
+              // check run appearing — on self-hosted runners it is not. On PR
+              // #7585 (LS-9860) the push-triggered run 33897265747 was created
+              // at 16:49:27 and its very first job did not start until 17:05:57:
+              // a 16.5-minute window in which the SHA had zero CI Pipeline
+              // check runs. The approval event at 16:52:35 evaluated this
+              // guard, saw nothing active, and dispatched a full duplicate
+              // pipeline — six extra E2E shards. The same shape repeated on
+              // head 0ef4397ab (runs 33900887705 / 33901245857).
+              //
+              // Close the window at the RUN level: a sibling orchestrator run
+              // on this exact head SHA that is queued or in progress will
+              // dispatch (or is dispatching) CI itself. Only push-shaped
+              // events count — a sibling pull_request_review run may itself
+              // have short-circuited via this very guard, so treating it as
+              // evidence could leave the SHA with no pipeline at all.
+              // Fail-safe direction is preserved: any error here falls
+              // through to the check-run logic rather than skipping CI.
+              let siblingDispatching = null;
+              if (!allPassed && !anyActive) {
+                try {
+                  const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                    owner,
+                    repo,
+                    workflow_id: 'ci-orchestrator.yml',
+                    head_sha: sha,
+                    per_page: 100,
+                  });
+                  const ACTIVE_RUN_STATUSES = new Set(['queued', 'in_progress', 'waiting', 'requested', 'pending']);
+                  const DISPATCHING_EVENTS = new Set(['pull_request', 'workflow_dispatch']);
+                  siblingDispatching = runs.find(
+                    r =>
+                      String(r.id) !== String(context.runId) &&
+                      ACTIVE_RUN_STATUSES.has(r.status) &&
+                      DISPATCHING_EVENTS.has(r.event)
+                  ) ?? null;
+                } catch (siblingErr) {
+                  core.warning(
+                    `check-prior-success: could not list sibling orchestrator runs for ${sha} ` +
+                      `(${siblingErr.message}) — falling back to check-run evidence only.`
+                  );
+                }
+              }
+
               if (allPassed) {
                 core.info(`All required contexts already green for SHA ${sha} — skipping CI re-run.`);
                 core.setOutput('ci-already-passed', 'true');
               } else if (anyActive) {
                 const active = [...activeNames].filter(name => name.startsWith(CI_PIPELINE_PREFIX));
                 core.info(`CI already running for SHA ${sha} (${active.join(', ')}) — skipping re-run to avoid a duplicate pipeline.`);
+                core.setOutput('ci-already-passed', 'true');
+              } else if (siblingDispatching) {
+                core.info(
+                  `Orchestrator run ${siblingDispatching.id} (${siblingDispatching.event}, ` +
+                    `${siblingDispatching.status}) is already handling SHA ${sha} but has not ` +
+                    'published its CI Pipeline check runs yet — skipping re-run to avoid a ' +
+                    'duplicate pipeline.'
+                );
                 core.setOutput('ci-already-passed', 'true');
               } else {
                 const pendingRuns = checkRunContexts.filter(name => !passedNames.has(name) && !activeNames.has(name));

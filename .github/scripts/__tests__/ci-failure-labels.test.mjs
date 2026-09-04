@@ -30,7 +30,10 @@ const require = createRequire(import.meta.url);
 const {
   JOB_RESULT_LABEL_MAP,
   ALL_CI_LABELS,
+  LABEL_CHECK_RUN_PREFIXES,
   computeDesiredCiLabels,
+  latestCompletedConclusionByName,
+  filterSupersededLabels,
   computeFinalLabelSet,
   isRetryableLabelError,
   applyCiFailureLabels,
@@ -82,12 +85,29 @@ describe('computeDesiredCiLabels', () => {
     assert.deepEqual(desired, ['CI: Custom Checks']);
   });
 
-  it('treats cancelled the same as failure', () => {
+  it('never labels a cancelled job (PR #7585 / LS-9860)', () => {
+    // A job cancelled by GitHub's concurrency group — or by a self-hosted
+    // runner shutting down — is not a test failure. Labelling it as one is
+    // what produced `CI: E2E Failure` on a PR whose every other shard on the
+    // same head SHA was green. Runner-shutdown cancellations keep their own
+    // accurate label (`CI: Runner Flake`) from ci-orchestrator.yml.
     const desired = computeDesiredCiLabels({
-      'custom-checks': 'success',
+      'custom-checks': 'cancelled',
       test: 'cancelled',
-      build: 'success',
-      e2e: 'success',
+      build: 'cancelled',
+      e2e: 'cancelled',
+      lint: 'cancelled',
+    });
+    assert.deepEqual(desired, []);
+  });
+
+  it('still labels a real failure alongside a cancelled sibling job', () => {
+    // The cancellation must not suppress the genuine failure next to it.
+    const desired = computeDesiredCiLabels({
+      'custom-checks': 'cancelled',
+      test: 'failure',
+      build: 'cancelled',
+      e2e: 'cancelled',
       lint: 'success',
     });
     assert.deepEqual(desired, ['CI: Test Failure']);
@@ -127,12 +147,22 @@ describe('computeDesiredCiLabels', () => {
     assert.deepEqual(both, ['CI: Lint Failure', 'CI: Formatting']);
   });
 
-  it('flags both lint labels when the job failed/cancelled but neither excerpt captured', () => {
+  it('flags both lint labels when the job failed but neither excerpt captured', () => {
+    const desired = computeDesiredCiLabels(
+      { lint: 'failure' },
+      { lintExcerpt: '', formatExcerpt: '' },
+    );
+    assert.deepEqual(desired, ['CI: Lint Failure', 'CI: Formatting']);
+  });
+
+  it('flags neither lint label when the lint job was cancelled', () => {
+    // The excerpts-unknown fallback must not fire on a cancellation, or a
+    // concurrency-cancelled lint job re-reds a green PR with two labels.
     const desired = computeDesiredCiLabels(
       { lint: 'cancelled' },
       { lintExcerpt: '', formatExcerpt: '' },
     );
-    assert.deepEqual(desired, ['CI: Lint Failure', 'CI: Formatting']);
+    assert.deepEqual(desired, []);
   });
 
   it('does not flag lint labels when the lint job passed with no excerpts', () => {
@@ -392,5 +422,331 @@ describe('applyCiFailureLabels', () => {
         }),
       /Not Found/,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Supersession guard (PR #7585 / LS-9860).
+//
+// Two orchestrator runs can execute for the SAME head SHA. Each run's
+// summarize job PUTs the whole `CI: *` set, so whichever finishes LAST decides
+// the labels — even when it is the older, runner-starved run whose shards were
+// cancelled out from under it by the newer one. These tests pin the rule that
+// makes labels a function of the head SHA's real state instead: a candidate
+// label survives only if the most recent COMPLETED check run for its context
+// actually failed.
+// ---------------------------------------------------------------------------
+
+const CI = '\u{1F680} CI Pipeline /';
+
+/** Terse check-run factory: name, conclusion, and a completion timestamp. */
+function checkRun(name, conclusion, completedAt, status = 'completed') {
+  return {
+    name,
+    status,
+    conclusion,
+    started_at: completedAt,
+    completed_at: conclusion === null ? null : completedAt,
+  };
+}
+
+describe('latestCompletedConclusionByName', () => {
+  it('keeps the newest completed conclusion per check name', () => {
+    const latest = latestCompletedConclusionByName([
+      checkRun(`${CI} test`, 'failure', '2026-09-04T17:00:00Z'),
+      checkRun(`${CI} test`, 'success', '2026-09-04T17:20:00Z'),
+    ]);
+    assert.equal(latest.get(`${CI} test`), 'success');
+  });
+
+  it('is insensitive to array order (newest wins, not last-seen)', () => {
+    const latest = latestCompletedConclusionByName([
+      checkRun(`${CI} test`, 'success', '2026-09-04T17:20:00Z'),
+      checkRun(`${CI} test`, 'failure', '2026-09-04T17:00:00Z'),
+    ]);
+    assert.equal(latest.get(`${CI} test`), 'success');
+  });
+
+  it('ignores in-flight check runs entirely', () => {
+    const latest = latestCompletedConclusionByName([
+      checkRun(`${CI} build`, null, '2026-09-04T17:30:00Z', 'in_progress'),
+      checkRun(`${CI} build`, 'failure', '2026-09-04T17:00:00Z'),
+    ]);
+    assert.equal(latest.get(`${CI} build`), 'failure');
+  });
+});
+
+describe('filterSupersededLabels', () => {
+  it('drops CI: Custom Checks when the head SHA already has it green', () => {
+    // Incident 1: `CI: Custom Checks` applied at 17:04 while the live head's
+    // custom-checks check run had completed `success` at 16:55.
+    const kept = filterSupersededLabels(
+      ['CI: Custom Checks'],
+      [checkRun(`${CI} custom-checks`, 'success', '2026-09-04T16:55:00Z')],
+    );
+    assert.deepEqual(kept, []);
+  });
+
+  it('drops CI: E2E Failure when every shard is green or merely cancelled', () => {
+    // Incident 2: the only non-green shard on the live head was cancelled by
+    // the concurrency group; all others passed.
+    const kept = filterSupersededLabels(
+      ['CI: E2E Failure'],
+      [
+        checkRun(
+          `${CI} E2E Tests (Shard 1/3)`,
+          'success',
+          '2026-09-04T17:25:20Z',
+        ),
+        checkRun(
+          `${CI} E2E Tests (Shard 2/3)`,
+          'cancelled',
+          '2026-09-04T17:16:10Z',
+        ),
+        checkRun(
+          `${CI} E2E Tests (Shard 3/3)`,
+          'success',
+          '2026-09-04T17:27:59Z',
+        ),
+      ],
+    );
+    assert.deepEqual(kept, []);
+  });
+
+  it('keeps CI: E2E Failure when any shard genuinely failed', () => {
+    const kept = filterSupersededLabels(
+      ['CI: E2E Failure'],
+      [
+        checkRun(
+          `${CI} E2E Tests (Shard 1/3)`,
+          'success',
+          '2026-09-04T17:25:20Z',
+        ),
+        checkRun(
+          `${CI} E2E Tests (Shard 2/3)`,
+          'failure',
+          '2026-09-04T17:26:00Z',
+        ),
+      ],
+    );
+    assert.deepEqual(kept, ['CI: E2E Failure']);
+  });
+
+  it('resolves a superseded run against the NEWER completed check run', () => {
+    // The exact PR #7585 shape: the older run's shard was cancelled at 17:16,
+    // the newer run's same-named shard passed at 17:16:56, and the older run
+    // then finishes at 17:34 and tries to label. Latest-completed wins.
+    const kept = filterSupersededLabels(
+      ['CI: E2E Failure'],
+      [
+        checkRun(
+          `${CI} E2E Tests (Shard 2/3)`,
+          'failure',
+          '2026-09-04T17:16:10Z',
+        ),
+        checkRun(
+          `${CI} E2E Tests (Shard 2/3)`,
+          'success',
+          '2026-09-04T17:16:56Z',
+        ),
+      ],
+    );
+    assert.deepEqual(kept, []);
+  });
+
+  it('keeps a label whose context never reported on the head SHA', () => {
+    // Fail-safe: absence of evidence is not evidence of green.
+    const kept = filterSupersededLabels(
+      ['CI: Build Failure'],
+      [checkRun(`${CI} test`, 'success', '2026-09-04T17:00:00Z')],
+    );
+    assert.deepEqual(kept, ['CI: Build Failure']);
+  });
+
+  it('keeps a label while a newer attempt is still in flight after a real failure', () => {
+    const kept = filterSupersededLabels(
+      ['CI: Test Failure'],
+      [
+        checkRun(`${CI} test`, 'failure', '2026-09-04T17:00:00Z'),
+        checkRun(`${CI} test`, null, '2026-09-04T17:30:00Z', 'in_progress'),
+      ],
+    );
+    assert.deepEqual(kept, ['CI: Test Failure']);
+  });
+
+  it('treats timed_out as a genuine failure', () => {
+    const kept = filterSupersededLabels(
+      ['CI: Test Failure'],
+      [checkRun(`${CI} test`, 'timed_out', '2026-09-04T17:00:00Z')],
+    );
+    assert.deepEqual(kept, ['CI: Test Failure']);
+  });
+
+  it('maps lint and formatting to the shared lint & format check run', () => {
+    const green = [
+      checkRun(`${CI} lint & format`, 'success', '2026-09-04T17:00:00Z'),
+    ];
+    assert.deepEqual(
+      filterSupersededLabels(['CI: Lint Failure', 'CI: Formatting'], green),
+      [],
+    );
+    const red = [
+      checkRun(`${CI} lint & format`, 'failure', '2026-09-04T17:00:00Z'),
+    ];
+    assert.deepEqual(
+      filterSupersededLabels(['CI: Lint Failure', 'CI: Formatting'], red),
+      ['CI: Lint Failure', 'CI: Formatting'],
+    );
+  });
+
+  it('returns the candidates unchanged when no check runs could be read', () => {
+    assert.deepEqual(filterSupersededLabels(['CI: Test Failure'], []), [
+      'CI: Test Failure',
+    ]);
+  });
+
+  it('every JOB_RESULT_LABEL_MAP label has a check-run mapping', () => {
+    // Otherwise a label silently opts out of the supersession guard.
+    for (const label of Object.keys(JOB_RESULT_LABEL_MAP)) {
+      assert.ok(
+        LABEL_CHECK_RUN_PREFIXES[label],
+        `expected a check-run prefix mapping for ${label}`,
+      );
+    }
+    assert.ok(LABEL_CHECK_RUN_PREFIXES['CI: Lint Failure']);
+    assert.ok(LABEL_CHECK_RUN_PREFIXES['CI: Formatting']);
+  });
+});
+
+describe('applyCiFailureLabels + headSha supersession', () => {
+  function fakeGithubWithChecks({ existingLabels, checkRuns, setLabelsCalls }) {
+    const listForRef = () => ({ data: { check_runs: checkRuns } });
+    return {
+      paginate: async (route, params) => {
+        assert.equal(route, listForRef);
+        assert.equal(params.ref, 'deadbeef');
+        return checkRuns;
+      },
+      rest: {
+        pulls: {
+          get: async () => ({
+            data: { labels: existingLabels.map((name) => ({ name })) },
+          }),
+        },
+        checks: { listForRef },
+        issues: {
+          setLabels: async (args) => {
+            setLabelsCalls.push(args);
+            return { data: {} };
+          },
+        },
+      },
+    };
+  }
+
+  it('does not relabel a PR whose live head is green (PR #7585 regression)', async () => {
+    const setLabelsCalls = [];
+    // The superseded run saw its own e2e job as `failure` (its shards were
+    // cancelled), but the live head is fully green.
+    const result = await applyCiFailureLabels({
+      github: fakeGithubWithChecks({
+        existingLabels: ['bot:ready-for-review'],
+        checkRuns: [
+          checkRun(
+            `${CI} E2E Tests (Shard 1/3)`,
+            'success',
+            '2026-09-04T17:16:00Z',
+          ),
+          checkRun(
+            `${CI} E2E Tests (Shard 2/3)`,
+            'success',
+            '2026-09-04T17:16:56Z',
+          ),
+        ],
+        setLabelsCalls,
+      }),
+      owner: 'bkrupa',
+      repo: 'legacy-sports',
+      prNumber: 7585,
+      jobResults: { e2e: 'failure' },
+      headSha: 'deadbeef',
+    });
+
+    assert.deepEqual(result.desiredCiLabels, []);
+    assert.deepEqual(setLabelsCalls[0].labels, ['bot:ready-for-review']);
+  });
+
+  it('still applies a label the live head confirms', async () => {
+    const setLabelsCalls = [];
+    await applyCiFailureLabels({
+      github: fakeGithubWithChecks({
+        existingLabels: ['bot:ready-for-review'],
+        checkRuns: [checkRun(`${CI} test`, 'failure', '2026-09-04T17:16:00Z')],
+        setLabelsCalls,
+      }),
+      owner: 'bkrupa',
+      repo: 'legacy-sports',
+      prNumber: 7585,
+      jobResults: { test: 'failure' },
+      headSha: 'deadbeef',
+    });
+    assert.deepEqual(setLabelsCalls[0].labels, [
+      'bot:ready-for-review',
+      'CI: Test Failure',
+    ]);
+  });
+
+  it('applies labels unverified when the check-runs read fails', async () => {
+    const setLabelsCalls = [];
+    const github = fakeGithubWithChecks({
+      existingLabels: [],
+      checkRuns: [],
+      setLabelsCalls,
+    });
+    github.paginate = async () => {
+      throw new Error('checks API down');
+    };
+    const warnings = [];
+    const infos = [];
+    await applyCiFailureLabels({
+      github,
+      core: {
+        info: (m) => infos.push(m),
+        warning: (m) => warnings.push(m),
+      },
+      owner: 'bkrupa',
+      repo: 'legacy-sports',
+      prNumber: 7585,
+      jobResults: { test: 'failure' },
+      headSha: 'deadbeef',
+    });
+    // Doubt means "do not drop" — the run's own verdict stands.
+    assert.deepEqual(setLabelsCalls[0].labels, ['CI: Test Failure']);
+    assert.equal(warnings.length, 1);
+  });
+
+  it('skips the check-runs read entirely when there is nothing to verify', async () => {
+    const setLabelsCalls = [];
+    const github = fakeGithubWithChecks({
+      existingLabels: ['CI: Test Failure'],
+      checkRuns: [],
+      setLabelsCalls,
+    });
+    let paginateCalls = 0;
+    github.paginate = async () => {
+      paginateCalls++;
+      return [];
+    };
+    await applyCiFailureLabels({
+      github,
+      owner: 'bkrupa',
+      repo: 'legacy-sports',
+      prNumber: 7585,
+      jobResults: { test: 'success' },
+      headSha: 'deadbeef',
+    });
+    assert.equal(paginateCalls, 0, 'no candidates means no API call');
+    // The now-green label is still cleared by the wholesale PUT.
+    assert.deepEqual(setLabelsCalls[0].labels, []);
   });
 });

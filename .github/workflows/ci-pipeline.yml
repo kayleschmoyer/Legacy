@@ -1555,6 +1555,10 @@ jobs:
               },
               lintExcerpt: `${{ needs.lint.outputs.lint-failure-excerpt }}`,
               formatExcerpt: `${{ needs.lint.outputs.format-failure-excerpt }}`,
+              // Verify each candidate label against the live check runs on
+              // the head SHA before asserting it, so a superseded run cannot
+              // relabel a PR whose head is green (LS-9887; PR #7585 / LS-9860).
+              headSha: '${{ github.event.pull_request.head.sha || github.sha }}',
             });
 
       - name: "Discord CI Failure"

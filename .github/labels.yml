@@ -93,9 +93,17 @@
   color: "e11d48"
   description: "CI failed due to code formatting issues"
 
+# Deliberately generic: the custom-checks job runs ~10 independent scripts
+# (migration immutability, skill lint, workflow validation, touch-map lint,
+# every .github/checks/*.sh, ...), so naming one mislabels the other nine
+# (LS-9630). GitHub caps label descriptions at 100 characters — a longer one
+# is rejected with a 422 and the label silently keeps GitHub's auto-created
+# grey/no-description defaults, which is exactly how this label came to read
+# as a non-failure scope label. `validate_descriptions` in
+# .github/scripts/sync-labels.py now enforces the cap pre-merge.
 - name: "CI: Custom Checks"
   color: "e11d48"
-  description: "CI failed due to a custom-checks job failure (migration immutability, skill lint, workflow validation, touch-map lint, or another .github/checks/*.sh script) — see the run for which check failed"
+  description: "CI failed in the custom-checks job — see the run for which check failed"
 
 # Applied by .github/workflows/check-migrations-applied.yml
 - name: "CI: Migration"

@@ -18,6 +18,29 @@
  * Pulled out of the inline `actions/github-script` block into its own module
  * (mirroring ci-gate.js) so this logic is unit-testable — see
  * __tests__/ci-failure-labels.test.mjs and .github/checks/ci-failure-labels-tests.sh.
+ *
+ * CANCELLED IS NOT A FAILURE (LS-9887). `computeDesiredCiLabels` used to label on
+ * `result === 'failure' || result === 'cancelled'`. But a job cancelled by
+ * GitHub's concurrency group — or by a self-hosted runner shutting down
+ * mid-run — is not a test failure, and labelling it as one is actively
+ * misleading: on PR #7585 (LS-9860) an E2E shard cancelled by concurrency
+ * produced `CI: E2E Failure` while every other shard on the same head SHA was
+ * green. Runner-shutdown cancellations already have their own, accurate label
+ * (`CI: Runner Flake`, applied by ci-orchestrator.yml), so dropping
+ * `cancelled` here does not lose the signal.
+ *
+ * LAST WRITER MUST NOT WIN (LS-9887). Two orchestrator runs can execute for the SAME
+ * head SHA (see ci-orchestrator.yml's check-prior-success guard and its
+ * runner-starvation hole). Each run's `summarize` job PUTs the whole `CI: *`
+ * set, so whichever finishes LAST decides the labels — even when it is the
+ * older, superseded run whose shards were cancelled out from under it. On
+ * PR #7585 the newer run passed all six E2E shards at 17:16 and the older
+ * (runner-starved) run then finished at 17:34 and relabelled the PR red.
+ * `filterSupersededLabels` closes this: before PUTting, every candidate label
+ * is re-checked against the LIVE check runs on the head SHA, and a label is
+ * dropped unless the most recent COMPLETED check run for its context actually
+ * failed. This makes the label a function of the head SHA's real state rather
+ * than of which run happened to finish last.
  */
 
 const { isRetryableStatusError } = require('./ci-gate.js');
@@ -78,28 +101,137 @@ function computeDesiredCiLabels(
   const desired = [];
   for (const [label, jobKey] of Object.entries(JOB_RESULT_LABEL_MAP)) {
     const result = jobResults ? jobResults[jobKey] : undefined;
-    if (result === 'failure' || result === 'cancelled') {
+    if (result === 'failure') {
       desired.push(label);
     }
-    // Empty/missing/success/skipped results are left off (don't add).
+    // Empty/missing/success/skipped/cancelled results are left off. See
+    // the CANCELLED-IS-NOT-A-FAILURE note in this file's header for why.
   }
 
-  // The job can fail/cancel before either excerpt-capture step ran (e.g.
-  // cancellation, a setup failure) — neither excerpt is populated then. Fall
-  // back to flagging both rather than silently dropping the failure from PR
-  // labels.
+  // The job can fail before either excerpt-capture step ran (e.g. a setup
+  // failure) — neither excerpt is populated then. Fall back to flagging both
+  // rather than silently dropping the failure from PR labels. A *cancelled*
+  // lint job no longer reaches here at all.
   const lintResult = jobResults ? jobResults.lint : undefined;
   const excerptsUnknown = !lintExcerpt && !formatExcerpt;
-  const jobFailedOrCancelled =
-    lintResult === 'failure' || lintResult === 'cancelled';
-  if (lintExcerpt || (excerptsUnknown && jobFailedOrCancelled)) {
+  const jobFailed = lintResult === 'failure';
+  if (lintExcerpt || (excerptsUnknown && jobFailed)) {
     desired.push('CI: Lint Failure');
   }
-  if (formatExcerpt || (excerptsUnknown && jobFailedOrCancelled)) {
+  if (formatExcerpt || (excerptsUnknown && jobFailed)) {
     desired.push('CI: Formatting');
   }
 
   return desired;
+}
+
+// Maps each `CI: *` label to the check-run name prefix(es) that carry its
+// real verdict on the head SHA. These are the job names ci-pipeline.yml
+// publishes through the orchestrator's `🚀 CI Pipeline` job — e.g.
+// "🚀 CI Pipeline / custom-checks", "🚀 CI Pipeline / E2E Tests (Shard 1/3)",
+// "🚀 CI Pipeline / lint & format". Prefix matching (not equality) is
+// deliberate: the E2E matrix fans out to six differently-named shard check
+// runs, and lint/format share one job whose name may gain suffixes.
+//
+// Legacy labels are intentionally absent: they have no live check run, so
+// they are never re-applied by this module anyway (only cleared).
+const CI_PIPELINE_PREFIX = '🚀 CI Pipeline /';
+const LABEL_CHECK_RUN_PREFIXES = Object.freeze({
+  'CI: Custom Checks': [`${CI_PIPELINE_PREFIX} custom-checks`],
+  'CI: Test Failure': [`${CI_PIPELINE_PREFIX} test`],
+  'CI: Build Failure': [`${CI_PIPELINE_PREFIX} build`],
+  'CI: E2E Failure': [`${CI_PIPELINE_PREFIX} E2E Tests`],
+  'CI: Lint Failure': [`${CI_PIPELINE_PREFIX} lint`],
+  'CI: Formatting': [`${CI_PIPELINE_PREFIX} lint`],
+});
+
+// Check-run conclusions that represent a genuine red result. `cancelled`,
+// `skipped`, `neutral` and `success` are all NOT failures — see the
+// CANCELLED IS NOT A FAILURE note in this file's header.
+const FAILING_CONCLUSIONS = new Set([
+  'failure',
+  'timed_out',
+  'action_required',
+]);
+
+/**
+ * Reduce a head SHA's check runs to the most recent COMPLETED run per check
+ * name. GitHub returns every attempt (and every duplicate run's copy) of a
+ * given name, so "did this context fail?" is only well-defined once you pick
+ * the latest completed one per name — the same latest-wins rule GitHub's own
+ * ruleset evaluator applies to commit statuses.
+ *
+ * In-flight (`queued`/`in_progress`) check runs are ignored rather than
+ * treated as green: a context whose only completed result is a failure keeps
+ * its label while a newer attempt is still running.
+ *
+ * @param {Array<{name: string, status: string, conclusion: string|null, completed_at?: string, started_at?: string}>} checkRuns
+ * @returns {Map<string, string|null>} check name → latest completed conclusion.
+ */
+function latestCompletedConclusionByName(checkRuns) {
+  const latest = new Map();
+  const stamps = new Map();
+  for (const cr of checkRuns || []) {
+    if (!cr || cr.status !== 'completed') continue;
+    const at = Date.parse(cr.completed_at || cr.started_at || 0) || 0;
+    if (!stamps.has(cr.name) || at >= stamps.get(cr.name)) {
+      stamps.set(cr.name, at);
+      latest.set(cr.name, cr.conclusion ?? null);
+    }
+  }
+  return latest;
+}
+
+/**
+ * Drop any candidate label the head SHA's live check runs contradict.
+ *
+ * A label survives only if the most recent completed check run for at least
+ * one of its contexts has a failing conclusion. A label whose contexts are
+ * all green, all cancelled, or entirely absent from the head SHA is dropped —
+ * that is precisely the false-label shape from PR #7585, where a superseded
+ * run relabelled a PR whose live head was green.
+ *
+ * Fail-safe direction is deliberately INVERTED relative to check-prior-success:
+ * there, doubt means "run CI"; here, doubt means "do not assert a failure".
+ * A label is only ever dropped on positive evidence (a completed non-failing
+ * check run for that context). When a label has no mapped context at all, or
+ * the head SHA has no check runs whatsoever (an API read we could not make),
+ * the caller keeps the computed label rather than silently going green.
+ *
+ * @param {string[]} desiredCiLabels from computeDesiredCiLabels.
+ * @param {Array<object>} checkRuns check runs on the PR's head SHA.
+ * @param {{ core?: object }} [opts]
+ * @returns {string[]} the subset of labels the head SHA actually supports.
+ */
+function filterSupersededLabels(desiredCiLabels, checkRuns, { core } = {}) {
+  if (!checkRuns || checkRuns.length === 0) return [...(desiredCiLabels || [])];
+  const latest = latestCompletedConclusionByName(checkRuns);
+
+  return (desiredCiLabels || []).filter((label) => {
+    const prefixes = LABEL_CHECK_RUN_PREFIXES[label];
+    // No mapped context (legacy labels) — nothing to contradict it with.
+    if (!prefixes) return true;
+
+    const matches = [...latest.entries()].filter(([name]) =>
+      prefixes.some((prefix) => name.startsWith(prefix)),
+    );
+    // The context never reported on this SHA: keep the label rather than
+    // inventing a green verdict from missing data.
+    if (matches.length === 0) return true;
+
+    const stillFailing = matches.some(([, conclusion]) =>
+      FAILING_CONCLUSIONS.has(conclusion),
+    );
+    if (!stillFailing && core) {
+      core.info(
+        `Dropping '${label}': the latest completed check run(s) for this ` +
+          `context on the head SHA are [${matches
+            .map(([name, conclusion]) => `${name}=${conclusion}`)
+            .join(', ')}] — no failure. This run is superseded.`,
+      );
+    }
+    return stillFailing;
+  });
 }
 
 /**
@@ -168,6 +300,9 @@ async function withLabelRetry(fn, { core, retries = 3 } = {}) {
  * @param {Record<string, string|undefined>} params.jobResults
  * @param {string} [params.lintExcerpt]
  * @param {string} [params.formatExcerpt]
+ * @param {string} [params.headSha] the PR's head SHA. When given, candidate
+ *   labels are verified against that SHA's live check runs so a superseded
+ *   run cannot relabel a PR whose head is actually green.
  * @returns {Promise<{finalLabels: string[]|null, desiredCiLabels: string[], skipped?: boolean}>}
  *   `skipped: true` (finalLabels: null) means a rate-limit/5xx error survived
  *   retries and the label update was skipped for this run rather than thrown
@@ -182,11 +317,43 @@ async function applyCiFailureLabels({
   jobResults,
   lintExcerpt,
   formatExcerpt,
+  headSha,
 }) {
-  const desiredCiLabels = computeDesiredCiLabels(jobResults, {
+  const computedCiLabels = computeDesiredCiLabels(jobResults, {
     lintExcerpt,
     formatExcerpt,
   });
+
+  // LAST WRITER MUST NOT WIN (see header): re-check every candidate label
+  // against the live check runs on the head SHA before asserting it. Without
+  // `headSha` this degrades to the old, unverified behaviour rather than
+  // failing — the caller in ci-pipeline.yml always supplies it.
+  let desiredCiLabels = computedCiLabels;
+  if (headSha && computedCiLabels.length > 0) {
+    try {
+      const checkRuns = await withLabelRetry(
+        () =>
+          github.paginate(github.rest.checks.listForRef, {
+            owner,
+            repo,
+            ref: headSha,
+            per_page: 100,
+          }),
+        { core },
+      );
+      desiredCiLabels = filterSupersededLabels(computedCiLabels, checkRuns, {
+        core,
+      });
+    } catch (err) {
+      // Doubt means "do not drop" — keep this run's own verdict.
+      if (core) {
+        core.warning(
+          `Could not read check runs for ${headSha} (${err.message}) — ` +
+            'applying the labels from this run unverified.',
+        );
+      }
+    }
+  }
 
   // LS-9591: pulls.get and setLabels previously ran unguarded — a GitHub App
   // installation rate-limit blip here threw unhandled and marked the whole
@@ -240,7 +407,11 @@ module.exports = {
   JOB_RESULT_LABEL_MAP,
   LEGACY_CI_LABELS,
   ALL_CI_LABELS,
+  LABEL_CHECK_RUN_PREFIXES,
+  FAILING_CONCLUSIONS,
   computeDesiredCiLabels,
+  latestCompletedConclusionByName,
+  filterSupersededLabels,
   computeFinalLabelSet,
   isRetryableLabelError,
   withLabelRetry,
