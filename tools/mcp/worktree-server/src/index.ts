@@ -33,6 +33,7 @@ import {
 import { homedir, tmpdir } from 'node:os';
 import { checkJiraAuth } from './auth-checks';
 import { executeWorktreeBranch } from './branch-ops';
+import { classifyForceRemoveFailure } from './classify-force-remove-failure';
 import {
   getConflictInfo,
   scanStagedForConflictMarkers,
@@ -9412,6 +9413,7 @@ const handleCallTool = async (
 
       const branch = wt.branch;
       const results: string[] = [];
+      let partialSuccessNote: string | undefined;
 
       // Use twig worktree remove for symlink-safe removal (60s timeout).
       let twigFailed = false;
@@ -9593,25 +9595,71 @@ const handleCallTool = async (
               }
             }
           } else {
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(
-                    {
-                      success: false,
-                      branch,
-                      path: targetPath,
-                      error: `Both twig and git worktree remove failed: ${gitMsg.trim()}`,
-                      hint: 'Manually delete the worktree directory and run `git worktree prune`.',
-                    },
-                    null,
-                    2,
-                  ),
-                },
-              ],
-              isError: true,
-            };
+            // `git worktree remove` can successfully unlink the worktree (drop
+            // it from `git worktree list` and remove its .git admin dir) and
+            // then fail only on the final rmdir of the now-empty top-level
+            // directory — e.g. a Windows file-lock from the calling shell
+            // still having that directory as its cwd. Detect that partial-
+            // success state instead of reporting a blanket failure.
+            const stillRegistered = getWorktrees().some((w) => {
+              const a = resolve(w.path);
+              const b = resolve(targetPath);
+              return process.platform === 'win32'
+                ? a.toLowerCase() === b.toLowerCase()
+                : a === b;
+            });
+            const { partial, leftoverEmptyDir } = classifyForceRemoveFailure({
+              stillRegistered,
+              pathExists: existsSync(targetPath),
+              isEmptyDir: () => {
+                try {
+                  return readdirSync(targetPath).length === 0;
+                } catch {
+                  // If we can't even list it, treat it as a genuine failure below.
+                  return false;
+                }
+              },
+            });
+
+            if (partial) {
+              results.push(
+                `Removed worktree via git (force fallback after twig ${twigTimedOut ? 'timeout' : 'failure'}): ${branch}`,
+              );
+              try {
+                execFileSync('git', ['worktree', 'prune'], {
+                  cwd: MAIN_REPO,
+                  encoding: 'utf-8',
+                  timeout: 30_000,
+                  windowsHide: true,
+                });
+              } catch {
+                // prune failure is non-fatal
+              }
+              if (leftoverEmptyDir) {
+                partialSuccessNote = `worktree deregistered; leftover empty directory could not be removed (likely a lock from the calling shell's cwd): ${gitMsg.trim()}`;
+                results.push(partialSuccessNote);
+              }
+            } else {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(
+                      {
+                        success: false,
+                        branch,
+                        path: targetPath,
+                        error: `Both twig and git worktree remove failed: ${gitMsg.trim()}`,
+                        hint: 'Manually delete the worktree directory and run `git worktree prune`.',
+                      },
+                      null,
+                      2,
+                    ),
+                  },
+                ],
+                isError: true,
+              };
+            }
           }
         }
       }
@@ -9671,6 +9719,7 @@ const handleCallTool = async (
                 branch,
                 path: targetPath,
                 details: results,
+                ...(partialSuccessNote ? { note: partialSuccessNote } : {}),
               },
               null,
               2,
