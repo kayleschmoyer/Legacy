@@ -28,6 +28,7 @@ import {
   measureDefinitionTokens,
 } from './mcp-api-reference/budget.mjs';
 import { collect } from './mcp-api-reference/collect.mjs';
+import { computeInlineCsp } from './mcp-api-reference/csp.mjs';
 import { render } from './mcp-api-reference/render.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -42,8 +43,8 @@ function pageKey(server) {
   return server.packageDir.replace(/^tools\/mcp\//, '').replace(/-server$/, '');
 }
 
-/** Wrap a page in a TypeScript module the Lambda bundle can import. */
-function pageModule(server, html) {
+/** Wrap a page (and its matching CSP) in a TypeScript module the Lambda bundle can import. */
+function pageModule(server, html, csp) {
   return [
     '// GENERATED FILE — DO NOT EDIT.',
     '//',
@@ -52,6 +53,10 @@ function pageModule(server, html) {
     '// `make mcp-api-reference`; CI fails on drift.',
     '',
     `export const PAGE = ${JSON.stringify(html)};`,
+    '',
+    '// sha256 hash-sources for every inline <style>/<script> block in PAGE, so',
+    "// the served CSP can name them exactly instead of allowing 'unsafe-inline'.",
+    `export const CSP = ${JSON.stringify(csp, null, 2)};`,
     '',
   ].join('\n');
 }
@@ -108,9 +113,10 @@ function main() {
     const html = render(scopedModel, {
       scope: { label: server.label, totalServers: model.serverCount },
     });
+    const csp = computeInlineCsp(html);
     outputs.push({
       path: join(PAGES_DIR, `${pageKey(server)}.generated.ts`),
-      content: pageModule(server, html),
+      content: pageModule(server, html, csp),
     });
   }
 

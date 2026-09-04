@@ -11,7 +11,10 @@ import {
   MCP_SCOPE,
 } from '@legacy-sports/mcp-bearer-auth';
 import { handleMcpDocsRequest } from '@legacy-sports/mcp-docs';
-import { PAGE as DOCS_PAGE } from '@legacy-sports/mcp-docs/pages/db-admin';
+import {
+  CSP as DOCS_CSP,
+  PAGE as DOCS_PAGE,
+} from '@legacy-sports/mcp-docs/pages/db-admin';
 import { query } from './tools/query.js';
 import { migrationStatus } from './tools/migration-status.js';
 import { migrate } from './tools/migrate.js';
@@ -176,7 +179,7 @@ export const handler = async (
   // GET /docs. Placed after the auth check on purpose: tool descriptions
   // name internal buckets, workflows, and ticket keys, so the page needs the
   // same bearer the tools do. Fetch it with `make mcp-docs SERVER=db-admin`.
-  const docsResponse = handleMcpDocsRequest(event, DOCS_PAGE);
+  const docsResponse = handleMcpDocsRequest(event, DOCS_PAGE, DOCS_CSP);
   if (docsResponse) return docsResponse;
 
   const domainName = event.requestContext.domainName ?? 'localhost';

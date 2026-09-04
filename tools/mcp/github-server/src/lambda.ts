@@ -13,7 +13,10 @@ import {
   MCP_SCOPE,
 } from '@legacy-sports/mcp-bearer-auth';
 import { handleMcpDocsRequest } from '@legacy-sports/mcp-docs';
-import { PAGE as DOCS_PAGE } from '@legacy-sports/mcp-docs/pages/github';
+import {
+  CSP as DOCS_CSP,
+  PAGE as DOCS_PAGE,
+} from '@legacy-sports/mcp-docs/pages/github';
 import { createServer } from './index.js';
 
 const sm = new SecretsManagerClient({});
@@ -73,7 +76,7 @@ export const handler = async (
   // GET /docs. Placed after the auth check on purpose: tool descriptions
   // name internal buckets, workflows, and ticket keys, so the page needs the
   // same bearer the tools do. Fetch it with `make mcp-docs SERVER=github`.
-  const docsResponse = handleMcpDocsRequest(event, DOCS_PAGE);
+  const docsResponse = handleMcpDocsRequest(event, DOCS_PAGE, DOCS_CSP);
   if (docsResponse) return docsResponse;
 
   await ensureCredentials();
