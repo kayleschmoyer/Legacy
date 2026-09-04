@@ -143,9 +143,13 @@ async function withRetry(fn, retries = 4) {
       return await fn();
     } catch (err) {
       const status = err.status || err.response?.status || 0;
-      const secondary =
-        status === 403 && /secondary rate limit/i.test(err.message || '');
-      if (attempt < retries && (status >= 500 || status === 429 || secondary)) {
+      // Matches both the primary installation-wide rate limit ("API rate
+      // limit exceeded for installation", LS-9641) and the narrower
+      // secondary rate limit — both carry "rate limit" in the message.
+      const rateLimited =
+        (status === 403 || status === 429) &&
+        /rate limit/i.test(err.message || '');
+      if (attempt < retries && (status >= 500 || rateLimited)) {
         await new Promise((r) => setTimeout(r, attempt * 1500));
       } else {
         throw err;
@@ -250,4 +254,5 @@ module.exports = {
   upsertSection,
   removeSection,
   applySection,
+  withRetry,
 };

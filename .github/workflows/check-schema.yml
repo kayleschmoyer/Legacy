@@ -274,6 +274,10 @@ jobs:
 
       - name: "Label PR on Schema Drift"
         if: always() && github.event.pull_request.number
+        # LS-9641: reporting-only step — never let a failure here (e.g. the
+        # installation-wide GitHub API rate limit) fail a job whose real
+        # checks (drift/codegen/contract gate above) already concluded.
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -296,9 +300,13 @@ jobs:
               for (let i = 0; i < retries; i++) {
                 try { return await fn(); }
                 catch (e) {
-                  const isPrimaryRateLimit = e.status === 429;
-                  const isSecondaryRateLimit = e.status === 403 && /secondary rate limit/i.test(typeof e.message === 'string' ? e.message : '');
-                  if ((isPrimaryRateLimit || isSecondaryRateLimit) && i < retries - 1) {
+                  // LS-9641: the installation-wide primary rate limit returns
+                  // 403 with a message containing "rate limit" (not the
+                  // narrower "secondary rate limit" text this used to require
+                  // to retry) — match the pattern already used by the
+                  // security gate's withRateLimitRetry.
+                  const isRateLimit = (e.status === 403 || e.status === 429) && /rate limit/i.test(typeof e.message === 'string' ? e.message : '');
+                  if (isRateLimit && i < retries - 1) {
                     const delay = Math.pow(2, i) * 1000;
                     core.warning(`Rate limited (${e.status}), retrying in ${delay}ms…`);
                     await new Promise(r => setTimeout(r, delay));
@@ -329,6 +337,8 @@ jobs:
 
       - name: "Update CI status comment (schema section)"
         if: always() && github.event.pull_request.number
+        # LS-9641: reporting-only step — see "Label PR on Schema Drift" above.
+        continue-on-error: true
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           DRIFT: ${{ steps.drift-check.outputs.drift }}

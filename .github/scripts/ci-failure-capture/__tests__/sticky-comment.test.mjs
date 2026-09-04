@@ -24,6 +24,7 @@ const {
   upsertSection,
   removeSection,
   applySection,
+  withRetry,
 } = sticky;
 
 describe('section string ops', () => {
@@ -106,6 +107,68 @@ describe('section string ops', () => {
     const tricky = 'has a `<!-- comment -->` and ``` fences ```';
     body = upsertSection(body, 'pipeline', tricky, 'ci-pipeline');
     assert.equal(parseSections(body)[0].content, tricky);
+  });
+});
+
+// ── withRetry (LS-9641: installation-wide primary rate limit) ──────────────
+
+describe('withRetry', () => {
+  it('retries the primary installation rate limit (403, "API rate limit exceeded")', async () => {
+    let calls = 0;
+    const result = await withRetry(async () => {
+      calls++;
+      if (calls === 1) {
+        const err = new Error('API rate limit exceeded for installation');
+        err.status = 403;
+        throw err;
+      }
+      return 'ok';
+    });
+    assert.equal(result, 'ok');
+    assert.equal(calls, 2);
+  });
+
+  it('still retries the secondary rate limit', async () => {
+    let calls = 0;
+    const result = await withRetry(async () => {
+      calls++;
+      if (calls === 1) {
+        const err = new Error('You have exceeded a secondary rate limit');
+        err.status = 403;
+        throw err;
+      }
+      return 'ok';
+    });
+    assert.equal(result, 'ok');
+    assert.equal(calls, 2);
+  });
+
+  it('does not retry a non-rate-limit 403 (e.g. permissions)', async () => {
+    let calls = 0;
+    await assert.rejects(
+      withRetry(async () => {
+        calls++;
+        const err = new Error('Resource not accessible by integration');
+        err.status = 403;
+        throw err;
+      }),
+      /not accessible/,
+    );
+    assert.equal(calls, 1);
+  });
+
+  it('throws once retries are exhausted', async () => {
+    let calls = 0;
+    await assert.rejects(
+      withRetry(async () => {
+        calls++;
+        const err = new Error('API rate limit exceeded for installation');
+        err.status = 403;
+        throw err;
+      }, 2),
+      /rate limit/i,
+    );
+    assert.equal(calls, 2);
   });
 });
 
@@ -231,5 +294,33 @@ describe('applySection', () => {
       parseSections(body).map((s) => s.key),
       ['pipeline'],
     );
+  });
+
+  it('survives a transient primary rate limit on the underlying API call (LS-9641)', async () => {
+    const { github, comments, calls } = makeGithub();
+    const realPaginate = github.paginate;
+    let paginateAttempts = 0;
+    github.paginate = async (...args) => {
+      paginateAttempts++;
+      if (paginateAttempts === 1) {
+        const err = new Error('API rate limit exceeded for installation');
+        err.status = 403;
+        throw err;
+      }
+      return realPaginate(...args);
+    };
+
+    const id = await applySection({
+      github,
+      context,
+      prNumber: 7,
+      key: 'schema',
+      content: 'schema drift detail',
+      producer: 'check-schema',
+    });
+
+    assert.ok(id);
+    assert.equal(calls.create, 1);
+    assert.match(comments[0].body, /schema drift detail/);
   });
 });
