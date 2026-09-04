@@ -14,6 +14,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import {
   fetchWithRetry,
   isAlreadyRunningError,
+  isTransientServerError,
   withRetryOnAlreadyRunning,
 } from './http-retry.js';
 
@@ -223,6 +224,34 @@ describe('isAlreadyRunningError', () => {
   });
 });
 
+describe('isTransientServerError', () => {
+  it('matches a 503 "Service Unavailable" message', () => {
+    expect(
+      isTransientServerError(
+        'GitHub API 503: {"message":"Service Unavailable"}',
+      ),
+    ).toBe(true);
+  });
+
+  it('matches a 502 message', () => {
+    expect(isTransientServerError('GitHub API 502: bad gateway')).toBe(true);
+  });
+
+  it('matches a 504 message', () => {
+    expect(isTransientServerError('GitHub API 504: gateway timeout')).toBe(
+      true,
+    );
+  });
+
+  it('does not match a non-transient status (e.g. 404)', () => {
+    expect(isTransientServerError('GitHub API 404: Not Found')).toBe(false);
+  });
+
+  it('does not match a message that is not the GitHub API error shape', () => {
+    expect(isTransientServerError('Service Unavailable')).toBe(false);
+  });
+});
+
 describe('withRetryOnAlreadyRunning', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -230,6 +259,73 @@ describe('withRetryOnAlreadyRunning', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it('retries on a transient 503 "Service Unavailable" and succeeds once GitHub recovers (LS-9646)', async () => {
+    const attemptFn = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(
+        new Error('GitHub API 503: {"message":"Service Unavailable"}'),
+      )
+      .mockResolvedValueOnce('ok');
+
+    const resultPromise = withRetryOnAlreadyRunning(attemptFn);
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+
+    expect(result).toBe('ok');
+    expect(attemptFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after exhausting attempts on a persistent 503, message names the reason', async () => {
+    const attemptFn = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValue(
+        new Error('GitHub API 503: {"message":"Service Unavailable"}'),
+      );
+
+    const assertion = expect(
+      withRetryOnAlreadyRunning(attemptFn),
+    ).rejects.toThrow(/gave up after 3 attempts waiting for GitHub to recover/);
+
+    await jest.runAllTimersAsync();
+    await assertion;
+
+    expect(attemptFn).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not retry a non-transient 4xx error — throws immediately', async () => {
+    const attemptFn = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValue(new Error('GitHub API 404: Not Found'));
+
+    await expect(withRetryOnAlreadyRunning(attemptFn)).rejects.toThrow(
+      /GitHub API 404/,
+    );
+    expect(attemptFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('backs off ~2s then ~4s between retries on a transient 503', async () => {
+    const setSpy = jest.spyOn(global, 'setTimeout');
+    const attemptFn = jest
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(
+        new Error('GitHub API 503: {"message":"Service Unavailable"}'),
+      )
+      .mockRejectedValueOnce(
+        new Error('GitHub API 503: {"message":"Service Unavailable"}'),
+      )
+      .mockResolvedValueOnce('ok');
+
+    const resultPromise = withRetryOnAlreadyRunning(attemptFn);
+    await jest.runAllTimersAsync();
+    await resultPromise;
+
+    const backoffDelays = setSpy.mock.calls.map((c) => c[1]);
+    expect(backoffDelays).toContain(2000);
+    expect(backoffDelays).toContain(4000);
+
+    setSpy.mockRestore();
   });
 
   it('returns the result immediately on first-attempt success (no retry)', async () => {

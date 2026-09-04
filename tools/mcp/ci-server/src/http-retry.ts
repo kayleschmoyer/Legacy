@@ -116,23 +116,49 @@ const ALREADY_RUNNING_MAX_ATTEMPTS = 2;
 const ALREADY_RUNNING_BACKOFF_MS = 8_000;
 
 /**
+ * GitHub API error message shape thrown by github-api.ts's githubPost/githubGet
+ * (`GitHub API ${status}: ${body}`) for a transient gateway/service error.
+ * Mirrors RETRIABLE_STATUSES' 502/503/504 above, scoped to this message
+ * format rather than a raw Response so it can be checked from a caught Error.
+ */
+const TRANSIENT_SERVER_ERROR_STATUS = /^GitHub API (502|503|504)\b/;
+const TRANSIENT_SERVER_ERROR_MAX_ATTEMPTS = 3;
+const TRANSIENT_SERVER_ERROR_BACKOFF_MS = 2_000;
+
+/**
+ * True when a GitHub API error message is a transient gateway/service error
+ * (502/503/504) — including the intermittent 503 "Service Unavailable"
+ * GitHub Actions' rerun endpoints return on the first 1-3 attempts against
+ * some runs, then succeed identically on a bare retry with no changed
+ * arguments (LS-9646). Other statuses (4xx, or a message that doesn't match
+ * this GitHub API error shape) are not retried here.
+ */
+export function isTransientServerError(message: string): boolean {
+  return TRANSIENT_SERVER_ERROR_STATUS.test(message);
+}
+
+/**
  * Runs `attemptFn` (a POST call) with retry-with-backoff when it rejects with
- * the "already running" 403 race (see isAlreadyRunningError). Up to 2
- * attempts, waiting ~8s between them. Any other error — including
- * non-matching 403s — rethrows immediately, unchanged.
+ * either the "already running" 403 race (see isAlreadyRunningError; up to 2
+ * attempts, waiting ~8s between them) or a transient 502/503/504 from GitHub
+ * (see isTransientServerError; up to 3 attempts, waiting 2s/4s between them,
+ * ~6s total, LS-9646). Any other error — including non-matching 403s and
+ * non-transient statuses — rethrows immediately, unchanged, on the first
+ * attempt.
  *
- * Deliberately short: this server runs on a Lambda with a 30s hard timeout
- * (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout — see the identical
- * constraint documented in wait-run.ts). The race this retries is a run-level
- * status lag behind the per-job status a caller already checked (LS-9647) —
- * when the run is stuck behind slow trailing jobs (cleanup/summarize steps
- * that can take minutes to be scheduled), no in-Lambda retry budget can wait
- * it out without risking the whole invocation being SIGKILLed by the
- * platform timeout before it can return a clean response. A prior version of
- * this constant retried 3x over ~30s, which left no headroom at all. Once the
- * short retry budget here is exhausted, the caller (rerun.ts) hands off to
- * the transport-safe bounded-wait pattern (`ci_wait_run`) instead of
- * retrying blindly in-process.
+ * Both budgets are deliberately short: this server runs on a Lambda with a
+ * 30s hard timeout (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout —
+ * see the identical constraint documented in wait-run.ts), so a call could
+ * otherwise be silently SIGKILLed mid-retry rather than returning a clean
+ * response. The already-running race is a run-level status lag behind the
+ * per-job status a caller already checked (LS-9647) — when the run is stuck
+ * behind slow trailing jobs (cleanup/summarize steps that can take minutes to
+ * be scheduled), no in-Lambda retry budget can wait it out; once that short
+ * budget is exhausted, the caller (rerun.ts) hands off to the transport-safe
+ * bounded-wait pattern (`ci_wait_run`) instead of retrying blindly
+ * in-process. The transient-5xx budget is unrelated — it targets GitHub
+ * itself returning a "Service Unavailable"-class error on the rerun
+ * endpoint, which clears up on a bare retry rather than needing a wait.
  *
  * Takes the attempt as a callback rather than a URL/path so it can wrap
  * github-api.ts's githubPost (which has import.meta.url / auth dependencies
@@ -142,27 +168,41 @@ const ALREADY_RUNNING_BACKOFF_MS = 8_000;
 export async function withRetryOnAlreadyRunning<T>(
   attemptFn: () => Promise<T>,
 ): Promise<T> {
-  for (let attempt = 1; attempt <= ALREADY_RUNNING_MAX_ATTEMPTS; attempt++) {
+  const maxAttempts = Math.max(
+    ALREADY_RUNNING_MAX_ATTEMPTS,
+    TRANSIENT_SERVER_ERROR_MAX_ATTEMPTS,
+  );
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       return await attemptFn();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (!isAlreadyRunningError(message)) {
+      const alreadyRunning = isAlreadyRunningError(message);
+      const transientServerError =
+        !alreadyRunning && isTransientServerError(message);
+      if (!alreadyRunning && !transientServerError) {
         throw error;
       }
-      if (attempt === ALREADY_RUNNING_MAX_ATTEMPTS) {
+
+      const limit = alreadyRunning
+        ? ALREADY_RUNNING_MAX_ATTEMPTS
+        : TRANSIENT_SERVER_ERROR_MAX_ATTEMPTS;
+      if (attempt >= limit) {
         throw new Error(
-          `${message} (gave up after ${attempt} attempts waiting for the run to settle)`,
+          `${message} (gave up after ${attempt} attempts waiting for ` +
+            `${alreadyRunning ? 'the run to settle' : 'GitHub to recover'})`,
         );
       }
-      await new Promise((r) =>
-        setTimeout(r, ALREADY_RUNNING_BACKOFF_MS * attempt),
-      );
+
+      const backoffMs = alreadyRunning
+        ? ALREADY_RUNNING_BACKOFF_MS * attempt
+        : TRANSIENT_SERVER_ERROR_BACKOFF_MS * attempt;
+      await new Promise((r) => setTimeout(r, backoffMs));
     }
   }
 
   // Unreachable but satisfies TypeScript
   throw new Error(
-    `already-running retry loop exited without returning after ${ALREADY_RUNNING_MAX_ATTEMPTS} attempts`,
+    `retry loop exited without returning after ${maxAttempts} attempts`,
   );
 }

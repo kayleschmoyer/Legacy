@@ -780,11 +780,16 @@ export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
 
 /**
  * POST wrapper for the GitHub Actions rerun endpoints. Retries with backoff
- * when GitHub rejects the request with the "already running" 403 race — the
- * run-level status those endpoints gate on lags the per-job status callers
- * already checked via ci_view_run_jobs. All other errors (including other
- * 403s) rethrow on the first attempt, unchanged. See withRetryOnAlreadyRunning
- * in http-retry.ts for the retry policy itself.
+ * on two known-transient conditions:
+ *   - the "already running" 403 race — the run-level status those endpoints
+ *     gate on lags the per-job status callers already checked via
+ *     ci_view_run_jobs.
+ *   - a transient 502/503/504 from GitHub, most commonly the "Service
+ *     Unavailable" 503 observed against large/partly-in-flight runs that
+ *     clears on a bare retry with no changed arguments (LS-9646).
+ * All other errors (including other 403s and non-transient statuses)
+ * rethrow on the first attempt, unchanged. See withRetryOnAlreadyRunning in
+ * http-retry.ts for the retry policy itself.
  */
 export async function postWithRetryOnAlreadyRunning<T>(
   path: string,
