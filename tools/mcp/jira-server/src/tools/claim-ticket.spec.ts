@@ -491,6 +491,122 @@ describe('claimTicket — duplicate-work guard (LS-9289)', () => {
   });
 });
 
+describe('claimTicket — duplicate-ticket guard (LS-9567)', () => {
+  const LS_9545_SUMMARY =
+    'fix(app): football [leagueId].spec.tsx fails on main — Chip missing from shared-components mock breaks 3 FLD-017 bracket-toggle tests';
+  const LS_9550_SUMMARY =
+    'test(app): main is red — football [leagueId].spec.tsx missing Chip in shared-components mock after LS-6330 + LS-6322 land together';
+
+  /** Route the children-count query to [] and the similarity query to `similar`. */
+  function mockSearchJqlAllByJql(
+    similar: Array<{
+      key: string;
+      fields: { summary: string; status: { name: string } };
+    }>,
+  ) {
+    mockSearchJqlAll.mockImplementation((opts: { jql: string }) => {
+      if (opts.jql.startsWith('project =')) {
+        return Promise.resolve(similar);
+      }
+      return Promise.resolve([]); // parent = "..." children query
+    });
+  }
+
+  it('returns POSSIBLE_DUPLICATE instead of PROCEED when claiming LS-9550 with LS-9545 still open (AC2 reproduction)', async () => {
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          const issue = makeIssue();
+          issue.key = 'LS-9550';
+          issue.fields.summary = LS_9550_SUMMARY;
+          return Promise.resolve(issue);
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+    mockSearchJqlAllByJql([
+      {
+        key: 'LS-9545',
+        fields: { summary: LS_9545_SUMMARY, status: { name: 'In Review' } },
+      },
+    ]);
+
+    const result = await claimTicket({ key: 'LS-9550' });
+    const data = parse(result);
+
+    expect(data['action']).toBe('POSSIBLE_DUPLICATE');
+    expect(data['claimed']).toBe(false);
+    expect(data['reason']).toContain('LS-9545');
+    expect(data['similarTickets']).toEqual([
+      expect.objectContaining({ key: 'LS-9545', status: 'In Review' }),
+    ]);
+
+    // Must not have transitioned or assigned the ticket.
+    const postCalls = (
+      mockJiraRequest.mock.calls as Array<[{ method: string; path: string }]>
+    ).filter(([opts]) => opts.method === 'POST' || opts.method === 'PUT');
+    expect(postCalls).toHaveLength(0);
+  });
+
+  it('proceeds as PROCEED when no similar ticket is found', async () => {
+    mockSearchJqlAllByJql([]);
+
+    const result = await claimTicket({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+  });
+
+  it('does not block the claim when the similarity search itself throws (non-fatal)', async () => {
+    mockSearchJqlAll.mockImplementation((opts: { jql: string }) => {
+      if (opts.jql.startsWith('project =')) {
+        return Promise.reject(new Error('Jira API GET failed (500)'));
+      }
+      return Promise.resolve([]);
+    });
+
+    const result = await claimTicket({ key: 'LS-1' });
+    const data = parse(result);
+
+    expect(data['action']).toBe('PROCEED');
+    expect(data['claimed']).toBe(true);
+    expect((data['warnings'] as string[]).join(' ')).toContain(
+      'Duplicate-ticket check failed',
+    );
+  });
+
+  it('checks for duplicate tickets even when openPrs is empty/omitted', async () => {
+    mockSearchJqlAllByJql([
+      {
+        key: 'LS-9545',
+        fields: { summary: LS_9545_SUMMARY, status: { name: 'To Do' } },
+      },
+    ]);
+    mockJiraRequest.mockImplementation(
+      (opts: { method: string; path: string }) => {
+        if (opts.method === 'GET' && opts.path.endsWith('/transitions')) {
+          return Promise.resolve(makeTransitions());
+        }
+        if (opts.method === 'GET' && opts.path.includes('/issue/')) {
+          const issue = makeIssue();
+          issue.fields.summary = LS_9550_SUMMARY;
+          return Promise.resolve(issue);
+        }
+        return Promise.resolve(undefined);
+      },
+    );
+
+    const result = await claimTicket({ key: 'LS-1', openPrs: [] });
+    const data = parse(result);
+
+    expect(data['action']).toBe('POSSIBLE_DUPLICATE');
+  });
+});
+
 describe('claimTicket — ALREADY_CLAIMED assignee repair (LS-9513)', () => {
   /** Mock sequence for a ticket already In Progress with the given assignee. */
   function mockInProgress(assignee: { displayName: string } | null) {

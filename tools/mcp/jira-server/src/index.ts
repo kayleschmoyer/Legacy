@@ -596,8 +596,8 @@ server.tool(
     'and an actionable error listing the available targets is returned if the workflow disallows it. ' +
     'When using a single key, cascade=true auto-transitions open subtasks to Done. ' +
     "When action='claim' (single key, status='In Progress'), atomically validates blockers, " +
-    'sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/ALREADY_CLAIMED/PR_EXISTS ' +
-    'plus the full ticket details). ' +
+    'sets the assignee, and transitions to In Progress (returns action: PROCEED/STOP/' +
+    'ALREADY_CLAIMED/PR_EXISTS/POSSIBLE_DUPLICATE). ' +
     'Returns `{ success, results: { [key]: { status?, error?, ... } } }`.',
   {
     keys: jiraKeysSchema.optional(),

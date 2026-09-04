@@ -6,6 +6,10 @@ import { searchJqlAll } from '../jql-search.js';
 import { extractAdfText } from '../adf.js';
 import { matchesStatus } from '../locale.js';
 import { resolveAndAssign } from '../assignee.js';
+import {
+  findSimilarTickets,
+  type SimilarTicketCandidate,
+} from '../similarity.js';
 import type { OpenPrRef } from '../schemas.js';
 
 interface ClaimTicketParams {
@@ -228,6 +232,46 @@ export async function claimTicket(
       });
     }
 
+    // --- Guard: a different, still-open ticket looks like the same bug (LS-9567) ---
+    // The openPrs guard above only catches two agents colliding on this exact
+    // key. It is structurally blind when one bug produced several
+    // differently-keyed tickets (LS-9545/9547/9550) — no key-based lookup can
+    // ever surface a different key. This runs unconditionally (self-checked,
+    // no caller input needed) via one cheap JQL round-trip.
+    const projectKey = key.split('-')[0] ?? key;
+    let similarTickets: SimilarTicketCandidate[] = [];
+    try {
+      similarTickets = await findSimilarTickets({
+        key,
+        summary: issue.fields.summary,
+        projectKey,
+      });
+    } catch (error) {
+      // Non-fatal: a failed similarity search should never block a
+      // legitimate claim — just proceed without the extra signal.
+      const msg = error instanceof Error ? error.message : String(error);
+      warnings.push(`Duplicate-ticket check failed (non-fatal): ${msg}`);
+    }
+
+    if (similarTickets.length > 0) {
+      return makeResult({
+        action: 'POSSIBLE_DUPLICATE',
+        reason:
+          `${similarTickets.length} open ticket(s) look like the same bug: ` +
+          similarTickets
+            .map(
+              (t) =>
+                `${t.key} "${t.summary}" (${t.status}, score ${t.score.toFixed(2)})`,
+            )
+            .join('; ') +
+          '. Verify these are not duplicates before claiming — search for an open PR against each key.',
+        claimed: false,
+        ticket: buildTicket(issue, childResult),
+        warnings,
+        similarTickets,
+      });
+    }
+
     // --- Transition to In Progress ---
     const inProgressTransition = transitionsResponse.transitions.find(
       (t) =>
@@ -329,7 +373,12 @@ function buildTicket(
 }
 
 interface ClaimResult {
-  action: 'PROCEED' | 'STOP' | 'ALREADY_CLAIMED' | 'PR_EXISTS';
+  action:
+    | 'PROCEED'
+    | 'STOP'
+    | 'ALREADY_CLAIMED'
+    | 'PR_EXISTS'
+    | 'POSSIBLE_DUPLICATE';
   claimed: boolean;
   reason?: string;
   branchRecommendation?: string;
@@ -337,6 +386,7 @@ interface ClaimResult {
   warnings: string[];
   blockers?: Array<{ key: string; status: string }>;
   openPrs?: OpenPrRef[];
+  similarTickets?: SimilarTicketCandidate[];
 }
 
 function makeResult(result: ClaimResult): CallToolResult {
