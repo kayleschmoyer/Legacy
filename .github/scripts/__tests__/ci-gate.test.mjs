@@ -908,6 +908,127 @@ describe('ci-gate — a success verdict must be current (LS-9378)', () => {
     );
   });
 
+  it("LS-9579: a newer run that COMPLETED but never posted any CI Gate status does not block forever — an older re-run's success comes through", async () => {
+    // The newest run's own `createCommitStatus` call exhausted its retries
+    // (e.g. installation rate limit) and, under continue-on-error, the job
+    // still concluded 'success' having posted NOTHING. That run will never
+    // speak again — so an older re-run computing the same green verdict must
+    // not withhold forever "because the newer run's verdict stands".
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          status: 'completed',
+          conclusion: 'success',
+        },
+      ],
+      existingStatuses: [],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(res.state, 'success');
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it('LS-9579: a newer run still IN PROGRESS has not had its chance yet and still supersedes', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          status: 'in_progress',
+          conclusion: null,
+        },
+      ],
+      existingStatuses: [],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('LS-9579: a newer COMPLETED run that already posted (even a non-terminal state) still supersedes normally', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          status: 'completed',
+          conclusion: 'success',
+        },
+      ],
+      existingStatuses: [gateStatus('pending', NEWER_RUN_ID)],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('LS-9579 safety: a newer COMPLETED run that FAILED and never posted still supersedes — never replay stale success over an unposted real failure', async () => {
+    // A run's `conclusion` can read 'failure' for two reasons that look
+    // identical from the outside: a genuine GATE_INPUT_JOBS failure (lint,
+    // test, build, ...), or an unrelated failure elsewhere in the run (e.g.
+    // the failure-labeling step) while the real CI content passed. Only a
+    // 'success' conclusion proves the latter — a 'failure' conclusion must
+    // never be treated as "silently would have been success", or an older
+    // run's stale green could overwrite a real, unposted red verdict
+    // (exactly the PR #7006 danger LS-9378 exists to prevent).
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW },
+        {
+          id: NEWER_RUN_ID,
+          name: CI_WORKFLOW,
+          status: 'completed',
+          conclusion: 'failure',
+        },
+      ],
+      existingStatuses: [],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(res.supersededBy, NEWER_RUN_ID);
+    assert.strictEqual(
+      calls.statuses.length,
+      0,
+      'must not post a stale success over a completed run that failed and never posted',
+    );
+  });
+
   it('fails CLOSED — withholds success when GITHUB_RUN_ID is unavailable', async () => {
     const saved = process.env.GITHUB_RUN_ID;
     delete process.env.GITHUB_RUN_ID;

@@ -359,6 +359,46 @@ async function assertSuccessIsCurrent({
     return { allowed: false, reason: 'unknown-run-id' };
   }
 
+  // Fetch existing `CI Gate` statuses for the SHA up front — used both to catch
+  // a newer run's already-posted RED verdict (B, below) and, since LS-9579, to
+  // tell whether a newer COMPLETED candidate run in (A) ever actually spoke.
+  let existingGateStatuses;
+  try {
+    const { data } = await withStatusRetry(() =>
+      github.rest.repos.listCommitStatusesForRef({
+        owner,
+        repo,
+        ref: sha,
+        per_page: 100,
+      }),
+    );
+    existingGateStatuses = (data || []).filter(
+      (status) => status.context === CI_GATE_CONTEXT,
+    );
+  } catch (e) {
+    core.warning(
+      `CI Gate: could not list commit statuses for ${sha} (${e.message}) — ` +
+        'withholding the success verdict because currency cannot be confirmed ' +
+        '(not because a newer failure was found).',
+    );
+    return {
+      allowed: false,
+      reason: 'status-lookup-failed',
+      apiFailure: true,
+    };
+  }
+
+  // Run ids that have already posted SOME `CI Gate` status (any state) for this
+  // SHA — used below (LS-9579) to tell a candidate that genuinely has not had
+  // its chance to speak yet from one that already ran to completion and simply
+  // never managed to post (e.g. its own `createCommitStatus` call exhausted
+  // retries under a rate-limited installation token).
+  const postedRunIds = new Set(
+    existingGateStatuses
+      .map((status) => runIdFromTargetUrl(status.target_url))
+      .filter((id) => id !== null),
+  );
+
   // (A) Does a NEWER CI run exist for this SHA that will post its own verdict?
   // If so we are a superseded re-run and our verdict is stale by construction.
   // Runs that can never post are ignored so we do not withhold in favour of a
@@ -414,6 +454,44 @@ async function assertSuccessIsCurrent({
         );
         continue;
       }
+      // LS-9579: a candidate run that has fully finished (`status ===
+      // 'completed'`) but never posted ANY `CI Gate` status for this SHA has
+      // silently failed to post (e.g. `createCommitStatus` itself exhausted
+      // its retries while the installation's REST quota was exhausted) —
+      // continue-on-error hides that from the job's own conclusion, so such
+      // a run will NEVER speak. Treating it as superseding strands the SHA
+      // in the exact deadlock this guard exists to prevent: the newest run
+      // posts nothing, and every older re-run withholds forever "because the
+      // newer run's verdict stands" — except it never will.
+      //
+      // This is ONLY safe to skip past when the candidate's run-level
+      // `conclusion` is `'success'` — none of GATE_INPUT_JOBS run with
+      // JOB-level continue-on-error (only steps inside summarize do), so a
+      // genuine lint/test/build/etc. failure always bubbles the RUN
+      // conclusion to `'failure'`, never `'success'`. A `'success'`
+      // conclusion is therefore a reliable proof that the real CI content
+      // passed and only the post step (or something after it) is what
+      // silently failed. A `'failure'` conclusion must NOT be treated as
+      // silent-and-safe: it could be a genuine GATE_INPUT_JOBS failure whose
+      // own failure-post also got rate-limited, and letting an older run's
+      // stale success through in that case would replay exactly the PR
+      // #7006 danger (LS-9378) this guard exists to prevent — so it still
+      // falls through to superseding below, the pre-existing safe default.
+      // An in-flight run (`status !== 'completed'`) likewise still has not
+      // had its chance to post and must still supersede.
+      if (
+        candidate.status === 'completed' &&
+        candidate.conclusion === 'success' &&
+        !postedRunIds.has(candidate.id)
+      ) {
+        core.info(
+          `CI Gate: ignoring newer run ${candidate.id} for ${sha} — it ` +
+            `completed successfully without posting any '${CI_GATE_CONTEXT}' ` +
+            'status (the post likely failed silently under continue-on-error), ' +
+            'so it will never speak.',
+        );
+        continue;
+      }
       return {
         allowed: false,
         reason: 'superseded-run',
@@ -432,41 +510,17 @@ async function assertSuccessIsCurrent({
   // (B) Has a newer run already posted a RED gate for this SHA? Redundant with
   // (A) when the runs listing is complete, but it survives pagination and API
   // lag — and a red verdict from a newer run is the exact thing we must never
-  // overwrite.
-  try {
-    const { data } = await withStatusRetry(() =>
-      github.rest.repos.listCommitStatusesForRef({
-        owner,
-        repo,
-        ref: sha,
-        per_page: 100,
-      }),
-    );
-    const newerFailure = (data || [])
-      .filter(
-        (status) =>
-          status.context === CI_GATE_CONTEXT && status.state === 'failure',
-      )
-      .map((status) => runIdFromTargetUrl(status.target_url))
-      .filter((id) => id !== null && id > selfRunId)
-      .sort((a, b) => b - a)[0];
-    if (newerFailure !== undefined) {
-      return {
-        allowed: false,
-        reason: 'newer-failure-posted',
-        supersededBy: newerFailure,
-      };
-    }
-  } catch (e) {
-    core.warning(
-      `CI Gate: could not list commit statuses for ${sha} (${e.message}) — ` +
-        'withholding the success verdict because currency cannot be confirmed ' +
-        '(not because a newer failure was found).',
-    );
+  // overwrite. Reuses the statuses fetched above.
+  const newerFailure = existingGateStatuses
+    .filter((status) => status.state === 'failure')
+    .map((status) => runIdFromTargetUrl(status.target_url))
+    .filter((id) => id !== null && id > selfRunId)
+    .sort((a, b) => b - a)[0];
+  if (newerFailure !== undefined) {
     return {
       allowed: false,
-      reason: 'status-lookup-failed',
-      apiFailure: true,
+      reason: 'newer-failure-posted',
+      supersededBy: newerFailure,
     };
   }
 
