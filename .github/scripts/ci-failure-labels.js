@@ -24,8 +24,15 @@
 // Lint/Formatting are handled separately below — they share one CI job
 // (`lint`) whose two failure-excerpt outputs disambiguate which of the two
 // actually failed.
+//
+// 'CI: Custom Checks' is job-level, not check-level: the custom-checks job
+// runs ~10 independent scripts (migration immutability, lint-skills.js,
+// validate-workflows.js, lint-touch-map.js, every .github/checks/*.sh, ...),
+// so it intentionally does not name any one of them — a label naming a
+// specific check (e.g. the former 'CI: Migration Immutability') mislabels
+// the other ~9 when one of those fails instead (LS-9630).
 const JOB_RESULT_LABEL_MAP = Object.freeze({
-  'CI: Migration Immutability': 'custom-checks',
+  'CI: Custom Checks': 'custom-checks',
   'CI: Test Failure': 'test',
   'CI: Build Failure': 'build',
   'CI: E2E Failure': 'e2e',
@@ -38,6 +45,7 @@ const LEGACY_CI_LABELS = Object.freeze([
   'CI: Lint & Format',
   'CI: Quality Gates',
   'CI: Type Error',
+  'CI: Migration Immutability',
 ]);
 
 // The full set of labels this step owns. ANY label in this set is replaced

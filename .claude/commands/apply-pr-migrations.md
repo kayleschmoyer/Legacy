@@ -17,7 +17,7 @@ Confirm `github_auth_status`. The hosted db-admin server authenticates per-conne
 
 ### 2. Find candidates
 
-`github_list_prs(state: "open", label: "CI: Migration")` — server-side exact-label filter, auto-paginates up to 500 (request the next page and merge whenever the response sets `hasMore`). Prefer it over `github_pr_dashboard`, whose 100-PR cap can silently drop candidates. The exact filter excludes PRs labelled only `CI: Migration Immutability` (a different problem — edited committed migration).
+`github_list_prs(state: "open", label: "CI: Migration")` — server-side exact-label filter, auto-paginates up to 500 (request the next page and merge whenever the response sets `hasMore`). Prefer it over `github_pr_dashboard`, whose 100-PR cap can silently drop candidates. The exact filter excludes PRs labelled only `CI: Custom Checks` (a different problem — could be an edited committed migration, or any other unrelated `custom-checks` script failure; see the run log).
 
 ### 3. Confirm each candidate actually adds a migration
 
@@ -44,5 +44,5 @@ One row per PR: applied (migration name + one-line schema summary) / skipped (st
 
 ## Guardrails
 
-- Apply only `CI: Migration` PRs; never act on `CI: Migration Immutability`.
+- Apply only `CI: Migration` PRs; never act on `CI: Custom Checks`.
 - Leave the operator's worktree clean (no staged foreign migration files). $ARGUMENTS

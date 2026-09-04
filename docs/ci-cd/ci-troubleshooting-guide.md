@@ -8,16 +8,16 @@
 
 The `summarize` job applies a specific label for the failing stage:
 
-| Label                        | Failing stage       | First command to run                             |
-| ---------------------------- | ------------------- | ------------------------------------------------ |
-| `CI: Formatting`             | Prettier check      | `pnpm exec nx format:write`                      |
-| `CI: Lint Failure`           | ESLint              | `pnpm exec nx affected -t lint --fix`            |
-| `CI: Type Error`             | TypeScript          | `pnpm exec nx affected -t typecheck`             |
-| `CI: Test Failure`           | Jest tests          | `pnpm exec nx affected -t test`                  |
-| `CI: Build Failure`          | Build validation    | `pnpm exec nx affected -t build`                 |
-| `CI: E2E Failure`            | Playwright          | `pnpm exec nx e2e web-e2e -- --grep='@critical'` |
-| `CI: Quality Gates`          | Setup/infra failure | Rerun the workflow first                         |
-| `CI: Migration Immutability` | Migration edited    | Revert the migration file change                 |
+| Label               | Failing stage                                                                                                        | First command to run                                               |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `CI: Formatting`    | Prettier check                                                                                                       | `pnpm exec nx format:write`                                        |
+| `CI: Lint Failure`  | ESLint                                                                                                               | `pnpm exec nx affected -t lint --fix`                              |
+| `CI: Type Error`    | TypeScript                                                                                                           | `pnpm exec nx affected -t typecheck`                               |
+| `CI: Test Failure`  | Jest tests                                                                                                           | `pnpm exec nx affected -t test`                                    |
+| `CI: Build Failure` | Build validation                                                                                                     | `pnpm exec nx affected -t build`                                   |
+| `CI: E2E Failure`   | Playwright                                                                                                           | `pnpm exec nx e2e web-e2e -- --grep='@critical'`                   |
+| `CI: Quality Gates` | Setup/infra failure                                                                                                  | Rerun the workflow first                                           |
+| `CI: Custom Checks` | Any `custom-checks` job script failed (migration immutability, skill lint, workflow validation, touch-map lint, ...) | Read the run's `custom-checks` job log to find which script failed |
 
 ### Step 2: Read the PR comment
 
@@ -129,11 +129,11 @@ This label fires when the `quality-gates` job fails before sub-checks produce ou
 1. Rerun: `ci_rerun(runId: RUN_ID, failedOnly: true)`
 2. If it fails again, check logs for setup errors like `Nx CLI not available` or `node_modules not found`
 
-### `CI: Migration Immutability`
+### `CI: Custom Checks`
 
-A migration file under `lib/db-client/migrations/` was edited after being merged. Migration files are immutable.
+The `custom-checks` job runs ~10 independent scripts (migration immutability, `lint-skills.js`, `validate-workflows.js`, touch-map lint, every `.github/checks/*.sh`, ...). This label fires job-level — it does not by itself say which script failed. Read the run's `custom-checks` job log (or the PR failure comment) to find the specific failing script before diagnosing.
 
-**Fix:** Revert the change. If schema behavior needs to change, add a new migration file instead.
+One common cause: a migration file under `lib/db-client/migrations/` was edited after being merged (migration files are immutable). **Fix:** revert the change — if schema behavior needs to change, add a new migration file instead. For other `custom-checks` scripts, fix per the script's own output.
 
 ## Bot-Review Failures (`bot-review` status)
 

@@ -93,9 +93,9 @@
   color: "e11d48"
   description: "CI failed due to code formatting issues"
 
-- name: "CI: Migration Immutability"
+- name: "CI: Custom Checks"
   color: "e11d48"
-  description: "CI failed due to modification or deletion of previously-landed migration files"
+  description: "CI failed due to a custom-checks job failure (migration immutability, skill lint, workflow validation, touch-map lint, or another .github/checks/*.sh script) — see the run for which check failed"
 
 # Applied by .github/workflows/check-migrations-applied.yml
 - name: "CI: Migration"

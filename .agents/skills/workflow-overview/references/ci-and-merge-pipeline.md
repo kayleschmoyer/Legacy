@@ -123,19 +123,19 @@ These run independently from the orchestrator, triggered directly by PR events. 
 
 The CI pipeline automatically labels PRs with failure reasons. Labels are added on failure and removed when the check passes:
 
-| Label                        | Source                                                                        |
-| ---------------------------- | ----------------------------------------------------------------------------- |
-| `CI: Migration Immutability` | `custom-checks` job -- a merged migration file was modified                   |
-| `CI: Formatting`             | `lint` job's format step -- Prettier check failed                             |
-| `CI: Lint Failure`           | `lint` job's lint step -- ESLint errors                                       |
-| `CI: Test Failure`           | `test` job -- typecheck or Jest failures                                      |
-| `CI: Build Failure`          | `build` job failed                                                            |
-| `CI: E2E Failure`            | `e2e` job -- Playwright failures                                              |
-| `CI: Security`               | Security scanning failed (applied by the orchestrator's `label-pr` job)       |
-| `CI: Schema Drift`           | `check-schema.yml` -- `schema.graphql` out of sync with Pothos implementation |
-| `CI: Migration`              | `check-migrations-applied.yml` -- migrations not applied to the shared RDS    |
-| `CI: Conflicts`              | `check-conflicts.yml` / base-push sweep -- merge conflicts with base          |
-| `docs: touch-map gap`        | Advisory: code changed without updating a linked required doc                 |
+| Label                 | Source                                                                                                                                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CI: Custom Checks`   | `custom-checks` job -- one of ~10 independent scripts failed (migration immutability, skill lint, workflow validation, touch-map lint, `.github/checks/*.sh`, ...); job-level, does not identify which |
+| `CI: Formatting`      | `lint` job's format step -- Prettier check failed                                                                                                                                                      |
+| `CI: Lint Failure`    | `lint` job's lint step -- ESLint errors                                                                                                                                                                |
+| `CI: Test Failure`    | `test` job -- typecheck or Jest failures                                                                                                                                                               |
+| `CI: Build Failure`   | `build` job failed                                                                                                                                                                                     |
+| `CI: E2E Failure`     | `e2e` job -- Playwright failures                                                                                                                                                                       |
+| `CI: Security`        | Security scanning failed (applied by the orchestrator's `label-pr` job)                                                                                                                                |
+| `CI: Schema Drift`    | `check-schema.yml` -- `schema.graphql` out of sync with Pothos implementation                                                                                                                          |
+| `CI: Migration`       | `check-migrations-applied.yml` -- migrations not applied to the shared RDS                                                                                                                             |
+| `CI: Conflicts`       | `check-conflicts.yml` / base-push sweep -- merge conflicts with base                                                                                                                                   |
+| `docs: touch-map gap` | Advisory: code changed without updating a linked required doc                                                                                                                                          |
 
 Legacy labels (`CI: Type Error`, `CI: Quality Gates`, `CI: Lint & Format`) are no longer applied — the summarize job removes them if present.
 

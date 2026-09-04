@@ -65,6 +65,8 @@ describe('ALL_CI_LABELS', () => {
     assert.ok(ALL_CI_LABELS.has('CI: Lint & Format'));
     assert.ok(ALL_CI_LABELS.has('CI: Quality Gates'));
     assert.ok(ALL_CI_LABELS.has('CI: Type Error'));
+    // LS-9630: retired in favor of 'CI: Custom Checks'.
+    assert.ok(ALL_CI_LABELS.has('CI: Migration Immutability'));
   });
 });
 
@@ -77,7 +79,7 @@ describe('computeDesiredCiLabels', () => {
       e2e: 'success',
       lint: 'success',
     });
-    assert.deepEqual(desired, ['CI: Migration Immutability']);
+    assert.deepEqual(desired, ['CI: Custom Checks']);
   });
 
   it('treats cancelled the same as failure', () => {
@@ -165,7 +167,7 @@ describe('computeFinalLabelSet', () => {
   });
 
   it('removes a stale JOB_RESULT_LABEL_MAP label once its check passes', () => {
-    const existingLabels = ['CI: Migration Immutability', 'CI: Test Failure'];
+    const existingLabels = ['CI: Custom Checks', 'CI: Test Failure'];
     const desiredCiLabels = computeDesiredCiLabels({
       'custom-checks': 'success',
       test: 'failure',

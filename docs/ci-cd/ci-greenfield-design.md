@@ -63,16 +63,16 @@ CI does **not** run on every push. The pipeline is gated behind bot approval or 
 
 The `summarize` job applies labels based on which stage failed:
 
-| Label                        | Stage                                          |
-| ---------------------------- | ---------------------------------------------- |
-| `CI: Formatting`             | Prettier check failed                          |
-| `CI: Lint Failure`           | ESLint failed                                  |
-| `CI: Type Error`             | TypeScript typecheck failed                    |
-| `CI: Test Failure`           | Jest tests failed                              |
-| `CI: Build Failure`          | Build validation failed                        |
-| `CI: E2E Failure`            | Playwright tests failed                        |
-| `CI: Quality Gates`          | Quality-gates job failed before sub-checks ran |
-| `CI: Migration Immutability` | An applied migration file was modified         |
+| Label               | Stage                                                                                                |
+| ------------------- | ---------------------------------------------------------------------------------------------------- |
+| `CI: Formatting`    | Prettier check failed                                                                                |
+| `CI: Lint Failure`  | ESLint failed                                                                                        |
+| `CI: Type Error`    | TypeScript typecheck failed                                                                          |
+| `CI: Test Failure`  | Jest tests failed                                                                                    |
+| `CI: Build Failure` | Build validation failed                                                                              |
+| `CI: E2E Failure`   | Playwright tests failed                                                                              |
+| `CI: Quality Gates` | Quality-gates job failed before sub-checks ran                                                       |
+| `CI: Custom Checks` | Any `custom-checks` job script failed (migration immutability, skill lint, workflow validation, ...) |
 
 ### Key Environment Variables
 
