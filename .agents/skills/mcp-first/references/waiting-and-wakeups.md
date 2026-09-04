@@ -13,13 +13,14 @@ description: 'Single home for how an agent session waits for external work and w
 
 ## Choosing a wake source
 
-| Situation                                                               | Use                                                                                                                                                                                                |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Bounded wait on a known run or job (seconds to minutes)                 | The tool's own blocking wait: `ci_wait_run`, `ci_dispatch_workflow({ waitForCompletion: true })`, `make_run_wait`, `nx_job_wait`, `worktree_job_wait`. Resolves in-turn — cheapest option there is |
-| Long-running local command                                              | `Bash(run_in_background: true)` — the harness re-invokes you on exit. **Never** also schedule a check-in for it                                                                                    |
-| Open PR, `gh` CLI available (local, standard cloud)                     | `Monitor` + `scripts/watch-pr.sh` by **absolute** path — event-filtered, deduped, polls harness-side at zero tokens. The primary wake source wherever it runs                                      |
-| Open PR, no `gh` (Claude Code Remote)                                   | [Periodic Wake Protocol](#periodic-wake-protocol) below — chained one-shot reminders                                                                                                               |
-| Non-PR condition nothing will push (blocker ticket, main-branch health) | `Monitor` long-poll — the sanctioned carve-out. See [e2e-hold Phase D](../../pr-lifecycle/references/e2e-hold.md)                                                                                  |
+| Situation                                                               | Use                                                                                                                                                                                                       |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Bounded wait on a known run or job (seconds to minutes)                 | The tool's own blocking wait: `ci_wait_run`, `ci_dispatch_workflow({ waitForCompletion: true })`, `make_run_wait`, `nx_job_wait`, `worktree_job_wait`. Resolves in-turn — cheapest option there is        |
+| Long-running local command                                              | `Bash(run_in_background: true)` — the harness re-invokes you on exit. **Never** also schedule a check-in for it                                                                                           |
+| Open PR, `gh` CLI available (local, standard cloud)                     | `Monitor` + `scripts/watch-pr.sh` by **absolute** path — event-filtered, deduped, polls harness-side at zero tokens. The primary wake source wherever it runs                                             |
+| Open PR, no `gh` (Claude Code Remote)                                   | [Periodic Wake Protocol](#periodic-wake-protocol) below — chained one-shot reminders                                                                                                                      |
+| User asked for a "trigger" instead of a `Monitor` watch                 | `CronCreate({ recurring: false })`, chained — it fires back into **this** session with full MCP. **Not** a cloud routine: see [Three different scheduling channels](#three-different-scheduling-channels) |
+| Non-PR condition nothing will push (blocker ticket, main-branch health) | `Monitor` long-poll — the sanctioned carve-out. See [e2e-hold Phase D](../../pr-lifecycle/references/e2e-hold.md)                                                                                         |
 
 `watch-pr.sh` cannot run in CCR: `gh` is absent and the proxy injects real GitHub credentials only for pinned `gh`/GitHub-MCP operations, so direct REST/GraphQL 403s. It fails fast and loud there rather than watching silently.
 
@@ -38,7 +39,33 @@ Before citing either, probe the session with `ToolSearch` rather than assuming. 
 
 ### Cadence
 
-Cloud **routines** enforce a **one-hour minimum** on recurring schedules — a recurring 20-minute routine is rejected ([routines docs](https://code.claude.com/docs/en/routines#add-a-schedule-trigger), verified 2026-09-03). Use chained **one-shot** reminders (`send_later` / `run_once_at`, no minimum) at ~20 minutes. `CronCreate` is session-only and in-memory, so it dies with the session — never use it for a watch that must outlive one.
+~20 minutes between wakes. **Which primitive gets you there is the part that has gone wrong in practice** — see below.
+
+### Three different scheduling channels
+
+Several similarly-named primitives can "schedule a check-in", and they differ on **two** axes, not one. Durability is the obvious axis; **MCP reach is the decisive one**, because the [Wake procedure](#wake-procedure--one-turn-two-calls) below — and the on-merge spine steps it hands off to (transition Jira, run the gap audit) — are built entirely out of `mcp__*` calls. A channel without them can report; it can never close the loop.
+
+| Channel                                                     | Where it runs                                       | MCP access                                  | Survives session end                                                                  |
+| ----------------------------------------------------------- | --------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `CronCreate` (harness built-in)                             | locally, fires back into **the current session**    | **Full** — every tool this session has      | **No** — in-memory; dies with the session (its `durable` flag is a documented no-op)  |
+| `mcp__scheduled-tasks__create_scheduled_task` (`fireAt`)    | locally, a **fresh session per run**                | this machine's local MCP config             | Yes — but only while the app runs; a task due while it is closed fires on next launch |
+| `RemoteTrigger` routine (`run_once_at` / `cron_expression`) | Anthropic cloud, isolated checkout                  | **None of this repo's servers** — see below | Yes                                                                                   |
+| `mcp__Claude_Code_Remote__send_later`                       | CCR only — **absent from local and standard cloud** | the CCR session's own surface               | n/a — posts back into the CCR session                                                 |
+
+**Default for PR follow-up: `CronCreate` with `recurring: false`, one link at a time.** It is the only channel that puts the Wake procedure's own tools in reach. Its one stated weakness — dying with the session — is real but orthogonal to a check-in measured in tens of minutes, and the loop is already bounded (`cycleCount >= 12`).
+
+Reach for `scheduled-tasks` (`fireAt`) only when the follow-up genuinely must **outlive** this session, accepting that each run starts cold: no transcript, no context beyond what the prompt and `.claude/.pr-state-<N>.json` carry.
+
+**Do not use a cloud routine for PR follow-up.** Two independent reasons:
+
+- **Reach.** The MCP servers configured in Claude Code — `legacy-sports-*`, `worktree`, `nx`, `make` — are **never** attachable to a routine. Routines can only use **claude.ai** connectors, a separate set the user manages at <https://claude.ai/customize/connectors>. So even on an account with connectors configured, a routine has no `github_pr_batch_status`, no `jira_transition`, no `nx_run_pc_chunk`. (Whether _any_ claude.ai connector is attachable varies by account, and the `schedule` skill cannot always enumerate them — it reports the list as unloadable when the session's login token lacks the MCP-connectors permission. The repo-server exclusion holds either way, which is why it, not the connector count, is the load-bearing fact.)
+- **Cadence.** Recurring routines enforce a **one-hour minimum** ([routines docs](https://code.claude.com/docs/en/routines#add-a-schedule-trigger), verified 2026-09-03); `*/20 * * * *` is rejected. Only `run_once_at` escapes it, which forces chaining anyway.
+
+### If you do need a routine: the `environment_id` trap
+
+For legitimately cloud-shaped work (a nightly sweep, anything that must run with this machine off), the `RemoteTrigger` create schema and the account's environment IDs live in the **`schedule` skill** — `Skill(skill: "schedule")` — not here. One trap it documents and the tool description does not:
+
+`job_config.ccr.environment_id` is **required**, but `RemoteTrigger`'s own tool description omits it, and a create without it fails with `job_config must set ccr.environment_id`. You cannot recover the shape from `action: "list"` either: pre-existing routines were created under the **v1** `job_config` schema and carry no `environment_id`, and the server translates v1→v2 on read — so copying a listed routine's shape yields a body that `create` rejects. Take the schema from the skill, not from a listing.
 
 ### Wake procedure — one turn, two calls
 
@@ -102,4 +129,7 @@ Re-verify volatile facts:
 
 - Routines one-hour minimum and GitHub-trigger event list: <https://code.claude.com/docs/en/routines>
 - Whether `subscribe_pr_activity` can be disabled from a CCR session: `ToolSearch("subscribe pr activity unsubscribe")` in a live CCR session — **OPEN as of 2026-09-03**
+- Whether a cloud routine can reach any MCP tooling on **this** account: `Skill(skill: "schedule")` and read its Setup Notes. This repo's own MCP servers are excluded unconditionally; the claude.ai connector list is account-scoped, and was unloadable when checked 2026-09-04
 - `watch-pr.sh` emission contract: header comment in `scripts/watch-pr.sh`
+
+2026-09-04 (LS-9835): §Cadence previously ranked scheduling channels on durability alone, named `send_later` / `run_once_at` (a CCR-only tool and a cloud-routine field, neither reachable from a local session), and mentioned `CronCreate` only as a disqualifier — so it steered a local session to a cloud routine, which structurally cannot run the Wake procedure defined three sections below it. Replaced with the three-channel comparison above, modelled on [Two different `subscribe_pr_activity` tools](#two-different-subscribe_pr_activity-tools).
