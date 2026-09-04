@@ -91,8 +91,12 @@ export async function navigate(params: NavigateParams): Promise<ToolResult> {
       timeout: 30_000,
     });
 
-    // Inject snapshot prep CSS
-    await state.page.addStyleTag({ content: SNAPSHOT_PREP_CSS });
+    // Inject snapshot prep CSS — skipped for non-HTML documents (e.g. a bare
+    // .svg/.xml file rendered natively), which have no <head> to append to.
+    const hasHead = await state.page.evaluate(() => document.head !== null);
+    if (hasHead) {
+      await state.page.addStyleTag({ content: SNAPSHOT_PREP_CSS });
+    }
 
     const status = response?.status() ?? null;
     const title = await state.page.title();
@@ -106,12 +110,14 @@ export async function navigate(params: NavigateParams): Promise<ToolResult> {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    const isFileUrl = url.startsWith('file://');
     return jsonResult(
       {
         ok: false,
         error: `Navigation failed: ${message}`,
-        remedy:
-          'Ensure the dev server is running (browser_dev_start) and the URL is correct.',
+        remedy: isFileUrl
+          ? 'Verify the file:// path exists and is readable.'
+          : 'Ensure the dev server is running (browser_dev_start) and the URL is correct.',
       },
       true,
     );
