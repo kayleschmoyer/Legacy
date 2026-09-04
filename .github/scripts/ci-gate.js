@@ -341,7 +341,7 @@ function runIdFromTargetUrl(targetUrl) {
  *
  * @param {object} params
  * @param {number} params.selfRunId this run's `GITHUB_RUN_ID`.
- * @returns {Promise<{allowed: boolean, reason?: string, supersededBy?: number}>}
+ * @returns {Promise<{allowed: boolean, reason?: string, supersededBy?: number, apiFailure?: boolean}>}
  */
 async function assertSuccessIsCurrent({
   github,
@@ -365,12 +365,14 @@ async function assertSuccessIsCurrent({
   // run that will never speak — at the run level (CONCLUSIONS_THAT_POST_NO_VERDICT)
   // and, since LS-9565, at the job level too (CI_PIPELINE_JOB_NAME skipped).
   try {
-    const { data } = await github.rest.actions.listWorkflowRunsForRepo({
-      owner,
-      repo,
-      head_sha: sha,
-      per_page: 100,
-    });
+    const { data } = await withStatusRetry(() =>
+      github.rest.actions.listWorkflowRunsForRepo({
+        owner,
+        repo,
+        head_sha: sha,
+        per_page: 100,
+      }),
+    );
     const candidates = (data.workflow_runs || [])
       .filter(
         (run) =>
@@ -421,9 +423,10 @@ async function assertSuccessIsCurrent({
   } catch (e) {
     core.warning(
       `CI Gate: could not list CI runs for ${sha} (${e.message}) — withholding ` +
-        'the success verdict rather than risk overwriting a newer failure.',
+        'the success verdict because currency cannot be confirmed (not because ' +
+        'a newer run was found).',
     );
-    return { allowed: false, reason: 'run-lookup-failed' };
+    return { allowed: false, reason: 'run-lookup-failed', apiFailure: true };
   }
 
   // (B) Has a newer run already posted a RED gate for this SHA? Redundant with
@@ -431,12 +434,14 @@ async function assertSuccessIsCurrent({
   // lag — and a red verdict from a newer run is the exact thing we must never
   // overwrite.
   try {
-    const { data } = await github.rest.repos.listCommitStatusesForRef({
-      owner,
-      repo,
-      ref: sha,
-      per_page: 100,
-    });
+    const { data } = await withStatusRetry(() =>
+      github.rest.repos.listCommitStatusesForRef({
+        owner,
+        repo,
+        ref: sha,
+        per_page: 100,
+      }),
+    );
     const newerFailure = (data || [])
       .filter(
         (status) =>
@@ -455,10 +460,14 @@ async function assertSuccessIsCurrent({
   } catch (e) {
     core.warning(
       `CI Gate: could not list commit statuses for ${sha} (${e.message}) — ` +
-        'withholding the success verdict rather than risk overwriting a newer ' +
-        'failure.',
+        'withholding the success verdict because currency cannot be confirmed ' +
+        '(not because a newer failure was found).',
     );
-    return { allowed: false, reason: 'status-lookup-failed' };
+    return {
+      allowed: false,
+      reason: 'status-lookup-failed',
+      apiFailure: true,
+    };
   }
 
   return { allowed: true };
@@ -624,6 +633,13 @@ async function postCiGate({
   // on this SHA. Without this, re-running a superseded run replays its stale
   // verdict over a newer run's failure. See assertSuccessIsCurrent.
   const selfRunId = Number(process.env.GITHUB_RUN_ID);
+  let effectiveState = state;
+  let pendingReason;
+  let description =
+    conclusion === 'success'
+      ? 'All CI checks passed'
+      : `Failing: ${failing.join(', ')}`.slice(0, MAX_DESCRIPTION_LENGTH);
+
   if (state === 'success') {
     const currency = await assertSuccessIsCurrent({
       github,
@@ -634,27 +650,49 @@ async function postCiGate({
       selfRunId,
     });
     if (!currency.allowed) {
-      core.info(
-        `CI Gate: withholding 'success' for ${targetSha} on PR #${pr.number} ` +
-          `(${currency.reason}` +
-          (currency.supersededBy
-            ? `, superseded by run ${currency.supersededBy}`
-            : '') +
-          `) — the newer run's verdict stands.`,
-      );
-      return {
-        posted: false,
-        reason: currency.reason,
-        sha: targetSha,
-        supersededBy: currency.supersededBy,
-      };
+      // LS-9591: a currency check that failed because an API call errored
+      // (rate limit / 5xx) has NOT confirmed a newer run exists — it simply
+      // could not look. Withholding silently in that case stranded the SHA
+      // with no `CI Gate` context at all (PR #7243, PR #7323): the merge
+      // queue then waits on a status that will never appear unless a human
+      // notices and manually re-triggers the job. Post a `pending` verdict
+      // instead so the stall is visible on the SHA and can be superseded by
+      // this or any later run's terminal verdict (commit statuses are
+      // last-writer-wins by created_at). A genuinely confirmed newer run
+      // (superseded-run / newer-failure-posted) still gets the pre-existing
+      // silent no-op — that newer run owns posting the verdict for this SHA.
+      if (currency.apiFailure) {
+        effectiveState = 'pending';
+        pendingReason = currency.reason;
+        description =
+          `CI Gate: withheld (${currency.reason}) — retry pending`.slice(
+            0,
+            MAX_DESCRIPTION_LENGTH,
+          );
+        core.info(
+          `CI Gate: posting 'pending' for ${targetSha} on PR #${pr.number} ` +
+            `(${currency.reason}) — currency could not be confirmed due to an ` +
+            'API error, not because a newer run was found. A later run will ' +
+            'supersede this with a terminal verdict.',
+        );
+      } else {
+        core.info(
+          `CI Gate: withholding 'success' for ${targetSha} on PR #${pr.number} ` +
+            `(${currency.reason}` +
+            (currency.supersededBy
+              ? `, superseded by run ${currency.supersededBy}`
+              : '') +
+            `) — the newer run's verdict stands.`,
+        );
+        return {
+          posted: false,
+          reason: currency.reason,
+          sha: targetSha,
+          supersededBy: currency.supersededBy,
+        };
+      }
     }
   }
-
-  const description =
-    conclusion === 'success'
-      ? 'All CI checks passed'
-      : `Failing: ${failing.join(', ')}`.slice(0, MAX_DESCRIPTION_LENGTH);
 
   const target_url = Number.isSafeInteger(selfRunId)
     ? `https://github.com/${owner}/${repo}/actions/runs/${selfRunId}`
@@ -671,7 +709,7 @@ async function postCiGate({
         owner,
         repo,
         sha: targetSha,
-        state,
+        state: effectiveState,
         context: CI_GATE_CONTEXT,
         description,
         target_url,
@@ -679,9 +717,9 @@ async function postCiGate({
     );
   } catch (e) {
     core.warning(
-      `CI Gate: failed to post '${state}' for ${targetSha} on PR #${pr.number} ` +
-        `after retries (${e.message}) — the gate status was not posted; a ` +
-        `subsequent run or manual retrigger will post it.`,
+      `CI Gate: failed to post '${effectiveState}' for ${targetSha} on PR ` +
+        `#${pr.number} after retries (${e.message}) — the gate status was not ` +
+        'posted; a subsequent run or manual retrigger will post it.',
     );
     return {
       posted: false,
@@ -693,9 +731,16 @@ async function postCiGate({
   }
 
   core.info(
-    `CI Gate: posted '${state}' for ${targetSha} on PR #${pr.number} — ${description}`,
+    `CI Gate: posted '${effectiveState}' for ${targetSha} on PR #${pr.number} — ${description}`,
   );
-  return { posted: true, state, sha: targetSha, failing, ignored };
+  return {
+    posted: true,
+    state: effectiveState,
+    sha: targetSha,
+    failing,
+    ignored,
+    ...(pendingReason ? { reason: pendingReason } : {}),
+  };
 }
 
 module.exports = {

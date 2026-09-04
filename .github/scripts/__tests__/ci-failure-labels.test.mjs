@@ -227,9 +227,29 @@ describe('isRetryableLabelError', () => {
     );
   });
 
-  it('does not retry other errors', () => {
-    assert.equal(isRetryableLabelError({ status: 500 }), false);
+  it('does not retry a plain error with no status code', () => {
     assert.equal(isRetryableLabelError(new Error('boom')), false);
+  });
+
+  // LS-9591: isRetryableLabelError now delegates to ci-gate.js's
+  // isRetryableStatusError, which — unlike the original secondary-rate-limit-
+  // only check — also retries a primary GitHub App installation quota 403
+  // ("API rate limit exceeded", the exact failure mode that threw unhandled
+  // out of pulls.get and marked the summarize job failed on PR #7243) and 5xx
+  // server errors.
+  it('LS-9591: retries a primary installation-quota rate limit (403 "API rate limit exceeded")', () => {
+    assert.equal(
+      isRetryableLabelError({
+        status: 403,
+        message: 'API rate limit exceeded for installation ID 12345',
+      }),
+      true,
+    );
+  });
+
+  it('LS-9591: retries 5xx server errors', () => {
+    assert.equal(isRetryableLabelError({ status: 500 }), true);
+    assert.equal(isRetryableLabelError({ status: 503 }), true);
   });
 });
 
@@ -295,6 +315,82 @@ describe('applyCiFailureLabels', () => {
     assert.ok(
       !fixedRun.finalLabels.includes('CI: Lint Failure'),
       'CI: Lint Failure must be removed once lint passes on a later commit',
+    );
+  });
+
+  // LS-9591: PR #7243's "Label PR on Failure" step called pulls.get with no
+  // rate-limit handling — the installation quota 403 threw unhandled and
+  // marked an otherwise fully-green summarize job as failed. pulls.get now
+  // retries transient errors and, once retries are exhausted, degrades to a
+  // skipped no-op instead of throwing.
+  it('LS-9591: degrades to a skipped no-op instead of throwing when pulls.get hits a persistent rate limit', async () => {
+    const warnings = [];
+    const core = { warning: (msg) => warnings.push(msg) };
+    const setLabelsCalls = [];
+    const github = {
+      rest: {
+        pulls: {
+          get: async () => {
+            const err = new Error('API rate limit exceeded');
+            err.status = 403;
+            throw err;
+          },
+        },
+        issues: {
+          setLabels: async (args) => {
+            setLabelsCalls.push(args);
+            return { data: {} };
+          },
+        },
+      },
+    };
+
+    const result = await applyCiFailureLabels({
+      github,
+      core,
+      owner: 'bkrupa',
+      repo: 'legacy-sports',
+      prNumber: 7243,
+      jobResults: { test: 'success' },
+      lintExcerpt: '',
+      formatExcerpt: '',
+    });
+
+    assert.strictEqual(result.skipped, true);
+    assert.strictEqual(result.finalLabels, null);
+    assert.strictEqual(
+      setLabelsCalls.length,
+      0,
+      'setLabels must not be called once pulls.get could not be fetched',
+    );
+    assert.ok(
+      warnings.some((w) => /rate limit/i.test(w)),
+      'expected a warning naming the rate-limit reason the label update was skipped',
+    );
+  });
+
+  it('LS-9591: still throws (does not silently swallow) a non-rate-limit error from pulls.get', async () => {
+    const github = {
+      rest: {
+        pulls: {
+          get: async () => {
+            throw Object.assign(new Error('Not Found'), { status: 404 });
+          },
+        },
+        issues: { setLabels: async () => ({ data: {} }) },
+      },
+    };
+
+    await assert.rejects(
+      () =>
+        applyCiFailureLabels({
+          github,
+          owner: 'bkrupa',
+          repo: 'legacy-sports',
+          prNumber: 7243,
+          jobResults: { test: 'success' },
+        }),
+      /Not Found/,
     );
   });
 });

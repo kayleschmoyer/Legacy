@@ -130,6 +130,11 @@ function makeGithub({
   existingStatuses = [],
   runsError = null,
   statusesError = null,
+  // LS-9591: queue of errors listWorkflowRunsForRepo throws on successive
+  // calls (consumed one per attempt, shift), so a transient rate-limit blip
+  // can be proven to recover via withStatusRetry. Takes precedence over the
+  // simpler always-throws `runsError` above when non-empty.
+  runsErrors = [],
   // LS-9565: per-run job listings, keyed by run id. A run absent from this map
   // resolves to `[]` — no `🚀 CI Pipeline` job row, which reads as "this run
   // runs the pipeline and will post", the pre-LS-9565 behaviour. Also serves
@@ -159,6 +164,7 @@ function makeGithub({
       actions: {
         listWorkflowRunsForRepo: async () => {
           calls.listRuns++;
+          if (runsErrors.length > 0) throw runsErrors.shift();
           if (runsError) throw new Error(runsError);
           return { data: { workflow_runs: runs } };
         },
@@ -825,7 +831,7 @@ describe('ci-gate — a success verdict must be current (LS-9378)', () => {
     assert.strictEqual(calls.statuses.length, 0);
   });
 
-  it('fails CLOSED — withholds success when the runs lookup errors', async () => {
+  it('LS-9591: never posts success when the runs lookup errors, but registers a visible pending verdict rather than leaving the SHA with no CI Gate context at all', async () => {
     const { github, calls } = makeGithub({ runsError: 'API is down' });
     const res = await postCiGate({
       github,
@@ -834,12 +840,17 @@ describe('ci-gate — a success verdict must be current (LS-9378)', () => {
       results: allPass(),
     });
 
-    assert.strictEqual(res.posted, false);
+    // Never a false success — the API error did not confirm currency.
+    assert.notStrictEqual(res.state, 'success');
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(res.state, 'pending');
     assert.strictEqual(res.reason, 'run-lookup-failed');
-    assert.strictEqual(calls.statuses.length, 0);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.match(calls.statuses[0].description, /run-lookup-failed/);
   });
 
-  it('fails CLOSED — withholds success when the statuses lookup errors', async () => {
+  it('LS-9591: never posts success when the statuses lookup errors, but registers a visible pending verdict rather than leaving the SHA with no CI Gate context at all', async () => {
     const { github, calls } = makeGithub({ statusesError: 'API is down' });
     const res = await postCiGate({
       github,
@@ -848,9 +859,53 @@ describe('ci-gate — a success verdict must be current (LS-9378)', () => {
       results: allPass(),
     });
 
-    assert.strictEqual(res.posted, false);
+    assert.notStrictEqual(res.state, 'success');
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(res.state, 'pending');
     assert.strictEqual(res.reason, 'status-lookup-failed');
-    assert.strictEqual(calls.statuses.length, 0);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.match(calls.statuses[0].description, /status-lookup-failed/);
+  });
+
+  it('LS-9591: a transient rate-limit blip on the runs lookup recovers via retry and posts success normally', async () => {
+    const { github, calls } = makeGithub({
+      runsErrors: [statusError(403, 'API rate limit exceeded')],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, true);
+    assert.strictEqual(res.state, 'success');
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'success');
+  });
+
+  it('LS-9591: a confirmed newer run (not an API error) still gets the silent no-op — that run owns the verdict', async () => {
+    const { github, calls } = makeGithub({
+      runs: [
+        { id: SELF_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+        { id: NEWER_RUN_ID, name: CI_WORKFLOW, conclusion: 'success' },
+      ],
+    });
+    const res = await postCiGate({
+      github,
+      context: makeContext(),
+      core,
+      results: allPass(),
+    });
+
+    assert.strictEqual(res.posted, false);
+    assert.strictEqual(res.reason, 'superseded-run');
+    assert.strictEqual(
+      calls.statuses.length,
+      0,
+      'a genuinely superseding run must not get a redundant pending post — it will post its own verdict',
+    );
   });
 
   it('fails CLOSED — withholds success when GITHUB_RUN_ID is unavailable', async () => {

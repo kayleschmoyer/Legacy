@@ -20,6 +20,8 @@
  * __tests__/ci-failure-labels.test.mjs and .github/checks/ci-failure-labels-tests.sh.
  */
 
+const { isRetryableStatusError } = require('./ci-gate.js');
+
 // Maps a `CI: *` label directly to the `needs.<job>.result` that decides it.
 // Lint/Formatting are handled separately below — they share one CI job
 // (`lint`) whose two failure-excerpt outputs disambiguate which of the two
@@ -118,19 +120,15 @@ function computeFinalLabelSet(existingLabels, desiredCiLabels) {
 }
 
 /**
- * Whether a GitHub REST error is a transient primary/secondary rate limit
- * worth retrying.
+ * Whether a GitHub REST error is a transient rate-limit/5xx condition worth
+ * retrying. Delegates to ci-gate.js's classifier (LS-9591) so both scripts
+ * treat a primary-quota 403 ("API rate limit exceeded") the same way as a
+ * secondary-rate-limit 403 or a 429/5xx — this used to only cover the latter
+ * two, so a primary-quota exhaustion (exactly what stranded PR #7243/#7323)
+ * fell through as non-retryable and threw on the first attempt.
  */
 function isRetryableLabelError(err) {
-  const status = err && err.status;
-  if (status === 429) return true;
-  if (
-    status === 403 &&
-    /secondary rate limit/i.test((err && err.message) || '')
-  ) {
-    return true;
-  }
-  return false;
+  return isRetryableStatusError(err);
 }
 
 /**
@@ -170,7 +168,10 @@ async function withLabelRetry(fn, { core, retries = 3 } = {}) {
  * @param {Record<string, string|undefined>} params.jobResults
  * @param {string} [params.lintExcerpt]
  * @param {string} [params.formatExcerpt]
- * @returns {Promise<{finalLabels: string[], desiredCiLabels: string[]}>}
+ * @returns {Promise<{finalLabels: string[]|null, desiredCiLabels: string[], skipped?: boolean}>}
+ *   `skipped: true` (finalLabels: null) means a rate-limit/5xx error survived
+ *   retries and the label update was skipped for this run rather than thrown
+ *   (LS-9591) — see the try/catch below.
  */
 async function applyCiFailureLabels({
   github,
@@ -187,29 +188,52 @@ async function applyCiFailureLabels({
     formatExcerpt,
   });
 
-  const { data: pr } = await github.rest.pulls.get({
-    owner,
-    repo,
-    pull_number: prNumber,
-  });
-  const existingLabels = pr.labels.map((l) => l.name);
-  const finalLabels = computeFinalLabelSet(existingLabels, desiredCiLabels);
+  // LS-9591: pulls.get and setLabels previously ran unguarded — a GitHub App
+  // installation rate-limit blip here threw unhandled and marked the whole
+  // `Label PR on Failure` step (and therefore the summarize job) as failed,
+  // even though every real CI check had already passed (PR #7243). Retry
+  // transient errors with the same classifier ci-gate.js uses for its own
+  // status-post retries; if they persist past retries, degrade to a skipped
+  // no-op rather than crashing the job — a subsequent run relabels normally.
+  try {
+    const { data: pr } = await withLabelRetry(
+      () =>
+        github.rest.pulls.get({
+          owner,
+          repo,
+          pull_number: prNumber,
+        }),
+      { core },
+    );
+    const existingLabels = pr.labels.map((l) => l.name);
+    const finalLabels = computeFinalLabelSet(existingLabels, desiredCiLabels);
 
-  await withLabelRetry(
-    () =>
-      github.rest.issues.setLabels({
-        owner,
-        repo,
-        issue_number: prNumber,
-        labels: finalLabels,
-      }),
-    { core },
-  );
-  if (core) {
-    core.info(`Labels set: [${finalLabels.join(', ')}]`);
+    await withLabelRetry(
+      () =>
+        github.rest.issues.setLabels({
+          owner,
+          repo,
+          issue_number: prNumber,
+          labels: finalLabels,
+        }),
+      { core },
+    );
+    if (core) {
+      core.info(`Labels set: [${finalLabels.join(', ')}]`);
+    }
+
+    return { finalLabels, desiredCiLabels };
+  } catch (e) {
+    if (!isRetryableLabelError(e)) throw e;
+    if (core) {
+      core.warning(
+        `CI failure labels: giving up on PR #${prNumber}'s label update after ` +
+          `retries (${e.message}) — skipping rather than failing the job over ` +
+          'a rate-limit/5xx blip; a subsequent run will relabel normally.',
+      );
+    }
+    return { finalLabels: null, desiredCiLabels, skipped: true };
   }
-
-  return { finalLabels, desiredCiLabels };
 }
 
 module.exports = {
