@@ -89,6 +89,7 @@ const meta: Meta<typeof HomeScreen> = {
     onBrowseStats: fn(),
     onViewSport: fn(),
     onStartMockDraft: fn(),
+    onSeeAllLeagues: fn(),
   },
 };
 

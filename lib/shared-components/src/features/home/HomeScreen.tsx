@@ -2401,22 +2401,25 @@ function LinkAction({
       accessibilityLabel={label}
       onPress={onPress}
       alignItems="center"
-      gap="$1"
+      justifyContent="center"
+      minWidth={44}
+      minHeight={44}
       cursor="pointer"
-      hitSlop={8}
       pressStyle={{ opacity: 0.7 }}
     >
-      <Text
-        fontFamily={DISPLAY_FONT}
-        fontWeight="700"
-        fontSize={12}
-        letterSpacing={1.1}
-        textTransform="uppercase"
-        color="$textMuted"
-      >
-        {label}
-      </Text>
-      <ChevronRight size={14} color="$textMuted" />
+      <XStack alignItems="center" gap="$1">
+        <Text
+          fontFamily={DISPLAY_FONT}
+          fontWeight="700"
+          fontSize={12}
+          letterSpacing={1.1}
+          textTransform="uppercase"
+          color="$textMuted"
+        >
+          {label}
+        </Text>
+        <ChevronRight size={14} color="$textMuted" />
+      </XStack>
     </XStack>
   );
 }
