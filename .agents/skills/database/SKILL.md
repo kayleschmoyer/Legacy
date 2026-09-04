@@ -33,6 +33,8 @@ The hosted DB MCP server is the only DB MCP server. It reaches the dev RDS over 
 | Pre-flight health check        | `pnpm --prefix lib/db-client run db:status` (reports DB reachability + pending migration count)                                                                                                                        |
 | Look up a user                 | `db_query` with a SELECT on `users` (no dedicated tool)                                                                                                                                                                |
 
+> **Ordering matters.** `make codegen` reads the committed `lambdas/db/schema.graphql`, not the live Pothos builder — it does not regenerate that file itself. After adding or changing a query/mutation field in `lambdas/db/src/schema/*.ts` (a Pothos builder file), run `pnpm exec nx run db:print-schema` **first** to refresh `schema.graphql`, then run `make codegen`. Skipping the print-schema step and going straight to `make codegen` fails with a confusing `GraphQL Document Validation failed ... Cannot query field "X" on type "Query"` error, because codegen is validating against the stale SDL rather than your new field.
+
 ## `db_query` Failure Payloads (LS-9536)
 
 `db_query` failures are classified so the right action is obvious without guessing between "retry" and "rewrite" (before this, both a statement-timeout cancellation and a genuine transport outage surfaced identically as opaque strings like `Error POSTing to endpoint: {"message":"Service Unavailable"}` or `Query failed: write CONNECT_TIMEOUT undefined:undefined`). A failure returns `{ error, elapsedMs, message, hint }`:

@@ -57,6 +57,8 @@ powershell -File .\scripts\db-query.ps1 -Query "SELECT * FROM matchups LIMIT 10"
 
 ### Regenerate Schema After Pothos Changes
 
+Step 1 must run before step 2 — `make codegen` alone validates against the committed `schema.graphql`, not the live Pothos builder, so a new/changed field there fails codegen with a confusing `Cannot query field "X" on type "Query"` error until the SDL is regenerated.
+
 1. `pnpm exec nx run db:print-schema` → regenerate schema.graphql
 2. If changed → `make codegen`
 3. Verify: `make typecheck`

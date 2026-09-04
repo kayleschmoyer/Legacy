@@ -111,6 +111,8 @@ make test           # test changed files
 make codegen        # GraphQL codegen
 ```
 
+> **Added/changed a Pothos resolver field?** `make codegen` alone reads the _committed_ `lambdas/db/schema.graphql`, not the live Pothos builder — it does not regenerate that file. If you added or changed a field in `lambdas/db/src/schema/*.ts` and go straight to `make codegen`, it fails with a confusing `Cannot query field "X" on type "Query"` error against the stale SDL. Run `nx_run({ project: "db", target: "print-schema" })` (or `pnpm exec nx run db:print-schema`) first to regenerate `schema.graphql`, **then** `make codegen`. See `.agents/skills/database/SKILL.md`.
+
 Use `scratch/` for ad-hoc output (gitignored). On Windows, write scripts to `scratch/<name>.js` instead of `node -e`.
 
 ## Architecture
