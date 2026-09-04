@@ -3136,7 +3136,7 @@
             "jobName": {
               "type": "string",
               "optional": true,
-              "description": "Case-insensitive substring match on job name — use when you know the name but not the numeric ID."
+              "description": "Job name — exact match preferred, else substring; errors listing candidates if ambiguous."
             },
             "failedOnly": {
               "type": "boolean",

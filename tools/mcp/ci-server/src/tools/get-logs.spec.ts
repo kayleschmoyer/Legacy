@@ -7,9 +7,21 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 jest.mock('../logs.js', () => {
   const ESC = String.fromCharCode(27);
   const ANSI_ESCAPE_SEQUENCE = new RegExp(`${ESC}\\[[0-9;]*[A-Za-z]`, 'g');
+  class AmbiguousJobNameError extends Error {
+    candidates: Array<{ id: number; name: string }>;
+    constructor(
+      jobName: string,
+      candidates: Array<{ id: number; name: string }>,
+    ) {
+      super(`jobName "${jobName}" matches ${candidates.length} jobs`);
+      this.name = 'AmbiguousJobNameError';
+      this.candidates = candidates;
+    }
+  }
   return {
     fetchRunLogsRing: jest.fn(),
     stripAnsiCodes: (text: string) => text.replace(ANSI_ESCAPE_SEQUENCE, ''),
+    AmbiguousJobNameError,
   };
 });
 
@@ -117,6 +129,73 @@ describe('getLogs', () => {
       const result = await getLogs({ runId: 7 });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('boom');
+    });
+  });
+
+  describe('jobName resolution echo / disambiguation (LS-9578)', () => {
+    it('echoes resolvedJobName and resolvedJobId in the metadata header when fetchRunLogsRing resolved jobName to one job', async () => {
+      mockFetch.mockResolvedValue({
+        lines: ['some output'],
+        totalLines: 1,
+        resolvedJobName:
+          '🚀 CI Pipeline / E2E Tests (Mobile Chrome — affected)',
+        resolvedJobId: 2,
+      });
+
+      const result = await getLogs({ runId: 1, jobName: 'Mobile Chrome' });
+
+      const header = parseHeader(result.content[0].text);
+      expect(header.jobName).toBe('Mobile Chrome');
+      expect(header.resolvedJobName).toBe(
+        '🚀 CI Pipeline / E2E Tests (Mobile Chrome — affected)',
+      );
+      expect(header.resolvedJobId).toBe(2);
+    });
+
+    it('does not add resolvedJobName/resolvedJobId when jobName was not given', async () => {
+      mockFetch.mockResolvedValue({ lines: ['line'], totalLines: 1 });
+
+      const result = await getLogs({ runId: 1 });
+
+      const header = parseHeader(result.content[0].text);
+      expect(header).not.toHaveProperty('resolvedJobName');
+      expect(header).not.toHaveProperty('resolvedJobId');
+    });
+
+    it('returns isError with the candidate list when jobName is ambiguous, instead of a fabricated authoritative answer', async () => {
+      mockFetch.mockRejectedValue(
+        new logs.AmbiguousJobNameError('test', [
+          {
+            id: 1,
+            name: '🚀 CI Pipeline / test',
+            status: 'completed',
+            conclusion: 'success',
+          },
+          {
+            id: 2,
+            name: '🚀 CI Pipeline / E2E Tests (Mobile Chrome — affected)',
+            status: 'completed',
+            conclusion: 'failure',
+          },
+        ]),
+      );
+
+      const result = await getLogs({ runId: 1, jobName: 'test' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/matches 2 jobs/);
+    });
+
+    it('passes exact through to fetchRunLogsRing', async () => {
+      mockFetch.mockResolvedValue({ lines: ['line'], totalLines: 1 });
+
+      await getLogs({ runId: 1, jobName: 'test', exact: true });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.objectContaining({ jobName: 'test', exact: true }),
+        expect.anything(),
+        undefined,
+      );
     });
   });
 

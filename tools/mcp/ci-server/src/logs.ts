@@ -48,6 +48,12 @@ export interface FetchRunLogsParams {
   failedOnly?: boolean;
   attempt?: number;
   jobName?: string;
+  /**
+   * When true, `jobName` must exactly (case-insensitively) match a job name
+   * — substring fallback is disabled. Use to force disambiguation without
+   * needing to know the numeric jobId (LS-9578).
+   */
+  exact?: boolean;
   /** Optional abort signal — aborts in-flight log downloads when triggered. */
   signal?: AbortSignal;
 }
@@ -75,7 +81,7 @@ interface GitHubJobStep {
   number: number;
 }
 
-interface GitHubJob {
+export interface GitHubJob {
   id: number;
   name: string;
   status: string;
@@ -429,6 +435,67 @@ function isAbortError(err: unknown): boolean {
   return false;
 }
 
+/**
+ * Thrown by {@link resolveJobsByName} when `jobName` matches more than one
+ * job (LS-9578) — job names in this repo overlap heavily by design (e.g.
+ * "test" is a substring of several distinct job names), so silently picking
+ * one and returning its result as if it were authoritative produced a real
+ * wrong diagnosis (LS-9529 / PR #7235: a runner-provisioning-failure summary
+ * for a completely unrelated job). Callers must disambiguate with jobId, the
+ * exact job name, or `exact: true`.
+ */
+export class AmbiguousJobNameError extends Error {
+  candidates: Array<{ id: number; name: string }>;
+
+  constructor(jobName: string, candidates: GitHubJob[]) {
+    super(
+      `jobName "${jobName}" matches ${candidates.length} jobs: ${candidates
+        .map((j) => `"${j.name}" (id ${j.id})`)
+        .join(
+          ', ',
+        )}. Pass jobId, the exact job name, or exact: true with a name that matches exactly one job to disambiguate.`,
+    );
+    this.name = 'AmbiguousJobNameError';
+    this.candidates = candidates.map((j) => ({ id: j.id, name: j.name }));
+  }
+}
+
+/**
+ * Resolve `jobName` against a run's full job list (LS-9578). A
+ * case-insensitive exact full-name match is always preferred; substring
+ * matching is only used as a fallback when no exact match exists. When more
+ * than one job matches at either stage, throws {@link AmbiguousJobNameError}
+ * listing every candidate instead of silently returning one of them.
+ *
+ * Must be called against the run's *full* job list, before any
+ * `failedOnly` filtering — resolving against an already-filtered list hides
+ * candidates that would otherwise make the match ambiguous (the exact bug
+ * this fixes: the intended job had succeeded and was filtered out first,
+ * leaving a single unrelated failed job as an unflagged "match").
+ */
+export function resolveJobsByName(
+  jobs: GitHubJob[],
+  jobName: string,
+  exact = false,
+): GitHubJob[] {
+  const nameLower = jobName.toLowerCase();
+
+  const exactMatches = jobs.filter((j) => j.name.toLowerCase() === nameLower);
+  if (exactMatches.length === 1) return exactMatches;
+  if (exactMatches.length > 1) {
+    throw new AmbiguousJobNameError(jobName, exactMatches);
+  }
+  if (exact) return [];
+
+  const substringMatches = jobs.filter((j) =>
+    j.name.toLowerCase().includes(nameLower),
+  );
+  if (substringMatches.length > 1) {
+    throw new AmbiguousJobNameError(jobName, substringMatches);
+  }
+  return substringMatches;
+}
+
 /** Result of {@link fetchRunLogs} — log text plus how much of the run it actually covered. */
 export interface FetchRunLogsResult {
   text: string;
@@ -443,6 +510,13 @@ export interface FetchRunLogsResult {
    * result as "pattern absent" when this is true.
    */
   skippedByFailedOnly: boolean;
+  /**
+   * The single job `jobName` resolved to, echoed back so a caller can see
+   * exactly which job answered the query (LS-9578) — present only when
+   * `jobName` was given and resolved to exactly one job.
+   */
+  resolvedJobName?: string;
+  resolvedJobId?: number;
 }
 
 /**
@@ -478,9 +552,14 @@ export async function fetchRunLogs(
   const attemptSuffix = params.attempt ? `/attempts/${params.attempt}` : '';
   let allJobs = await fetchAllJobs(params.runId, attemptSuffix, params.signal);
 
+  let resolvedJobName: string | undefined;
+  let resolvedJobId: number | undefined;
   if (params.jobName) {
-    const nameLower = params.jobName.toLowerCase();
-    allJobs = allJobs.filter((j) => j.name.toLowerCase().includes(nameLower));
+    allJobs = resolveJobsByName(allJobs, params.jobName, params.exact);
+    if (allJobs.length === 1) {
+      resolvedJobName = allJobs[0].name;
+      resolvedJobId = allJobs[0].id;
+    }
   }
 
   const failedOnly = params.failedOnly !== false;
@@ -499,6 +578,8 @@ export async function fetchRunLogs(
       jobsSearched: 0,
       jobsTotal,
       skippedByFailedOnly,
+      resolvedJobName,
+      resolvedJobId,
     };
   }
 
@@ -523,6 +604,8 @@ export async function fetchRunLogs(
     jobsSearched: jobs.length,
     jobsTotal,
     skippedByFailedOnly: false,
+    resolvedJobName,
+    resolvedJobId,
   };
 }
 
@@ -565,6 +648,12 @@ export async function fetchRunLogsRing(
   totalLines: number;
   skippedJobs?: number;
   priorityLines?: string[];
+  /**
+   * The single job `params.jobName` resolved to (LS-9578) — present only
+   * when `jobName` was given and resolved to exactly one job.
+   */
+  resolvedJobName?: string;
+  resolvedJobId?: number;
 }> {
   // Single job — fetch and trim directly
   if (params.jobId) {
@@ -616,21 +705,32 @@ export async function fetchRunLogsRing(
     params.signal,
   );
 
+  // Resolve jobName against the FULL job list, before failedOnly filtering
+  // (LS-9578). Resolving after failedOnly would hide candidates that make
+  // the match ambiguous — this was the exact bug: the intended job had
+  // succeeded and was filtered out first, leaving a single unrelated failed
+  // job as an unflagged "match".
+  let scopedJobs = allJobs;
+  let resolvedJobName: string | undefined;
+  let resolvedJobId: number | undefined;
+  if (params.jobName) {
+    scopedJobs = resolveJobsByName(allJobs, params.jobName, params.exact);
+    if (scopedJobs.length === 1) {
+      resolvedJobName = scopedJobs[0].name;
+      resolvedJobId = scopedJobs[0].id;
+    }
+  }
+
   const failedOnly = params.failedOnly !== false;
   let jobs = failedOnly
-    ? allJobs.filter((j) => j.conclusion !== 'success')
-    : allJobs;
-
-  if (params.jobName) {
-    const nameLower = params.jobName.toLowerCase();
-    jobs = jobs.filter((j) => j.name.toLowerCase().includes(nameLower));
-  }
+    ? scopedJobs.filter((j) => j.conclusion !== 'success')
+    : scopedJobs;
 
   if (jobs.length === 0) {
     const msg = failedOnly
       ? 'No failed jobs found in this workflow run.'
       : 'No jobs found in this workflow run.';
-    return { lines: [msg], totalLines: 1 };
+    return { lines: [msg], totalLines: 1, resolvedJobName, resolvedJobId };
   }
 
   const skippedJobs =
@@ -709,5 +809,7 @@ export async function fetchRunLogsRing(
     totalLines,
     skippedJobs: skippedJobs || undefined,
     priorityLines: priorityMatcher ? priorityLines : undefined,
+    resolvedJobName,
+    resolvedJobId,
   };
 }

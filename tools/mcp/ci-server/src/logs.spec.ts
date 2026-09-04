@@ -7,9 +7,11 @@ jest.mock('./github-api.js', () => ({
 }));
 
 import {
+  AmbiguousJobNameError,
   fetchRunLogs,
   fetchRunLogsRing,
   JOB_NEVER_STARTED_MESSAGE,
+  resolveJobsByName,
   stripAnsiCodes,
 } from './logs.js';
 import * as githubApi from './github-api.js';
@@ -723,5 +725,163 @@ describe('extractTextFromZip streamed (data-descriptor) entries (LS-9229)', () =
     const result = await fetchRunLogs({ jobId: 1 });
 
     expect(result.text).toContain('setup output');
+  });
+});
+
+describe('resolveJobsByName (LS-9578)', () => {
+  const jobs = [
+    {
+      id: 1,
+      name: '🚀 CI Pipeline / test',
+      status: 'completed',
+      conclusion: 'success',
+    },
+    {
+      id: 2,
+      name: '🚀 CI Pipeline / E2E Tests (Mobile Chrome — affected)',
+      status: 'completed',
+      conclusion: 'failure',
+    },
+    {
+      id: 3,
+      name: '🚀 CI Pipeline / E2E Tests (Shard 1/3)',
+      status: 'completed',
+      conclusion: 'failure',
+    },
+  ];
+
+  it('prefers an exact case-insensitive full-name match over substring matches', () => {
+    const result = resolveJobsByName(jobs, '🚀 ci pipeline / test');
+    expect(result).toEqual([jobs[0]]);
+  });
+
+  it('throws AmbiguousJobNameError listing every candidate when multiple jobs substring-match', () => {
+    // Reproduces LS-9578: "test" is a substring of all three job names above.
+    expect(() => resolveJobsByName(jobs, 'test')).toThrow(
+      AmbiguousJobNameError,
+    );
+    try {
+      resolveJobsByName(jobs, 'test');
+      throw new Error('expected resolveJobsByName to throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(AmbiguousJobNameError);
+      const ambiguous = err as AmbiguousJobNameError;
+      expect(ambiguous.candidates).toEqual([
+        { id: 1, name: jobs[0].name },
+        { id: 2, name: jobs[1].name },
+        { id: 3, name: jobs[2].name },
+      ]);
+      expect(ambiguous.message).toContain(jobs[0].name);
+      expect(ambiguous.message).toContain(jobs[1].name);
+      expect(ambiguous.message).toContain(jobs[2].name);
+    }
+  });
+
+  it('returns a single unambiguous substring match', () => {
+    const result = resolveJobsByName(jobs, 'shard 1');
+    expect(result).toEqual([jobs[2]]);
+  });
+
+  it('returns no matches for a name that matches nothing', () => {
+    expect(resolveJobsByName(jobs, 'security scan')).toEqual([]);
+  });
+
+  it('exact: true disables the substring fallback even for an otherwise-unambiguous substring match', () => {
+    expect(resolveJobsByName(jobs, 'shard 1', true)).toEqual([]);
+  });
+});
+
+describe('fetchRunLogs / fetchRunLogsRing jobName disambiguation (LS-9578)', () => {
+  beforeEach(() => {
+    mockGithubGet.mockReset();
+    mockGithubGetArrayBuffer.mockReset();
+  });
+
+  const ambiguousJobs = {
+    total_count: 3,
+    jobs: [
+      {
+        id: 1,
+        name: '🚀 CI Pipeline / test',
+        status: 'completed',
+        conclusion: 'success',
+      },
+      {
+        id: 2,
+        name: '🚀 CI Pipeline / E2E Tests (Mobile Chrome — affected)',
+        status: 'completed',
+        conclusion: 'failure',
+      },
+    ],
+  };
+
+  it('fetchRunLogs rejects an ambiguous jobName instead of silently picking a job', async () => {
+    mockGithubGet.mockResolvedValue(ambiguousJobs);
+
+    await expect(fetchRunLogs({ runId: 1, jobName: 'test' })).rejects.toThrow(
+      AmbiguousJobNameError,
+    );
+    expect(mockGithubGetArrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('fetchRunLogsRing rejects an ambiguous jobName even though the intended job succeeded and would otherwise be filtered out by failedOnly first', async () => {
+    // Reproduces the exact LS-9578 report: the target job ("test") succeeded
+    // so failedOnly would exclude it, and resolving jobName only against the
+    // already-filtered (failedOnly) list left a single unrelated failed job
+    // as an unflagged, silently-returned "match". Resolution must happen
+    // against the full job list so this stays ambiguous and errors instead.
+    mockGithubGet.mockResolvedValue(ambiguousJobs);
+
+    await expect(
+      fetchRunLogsRing({ runId: 1, jobName: 'test' }, 500),
+    ).rejects.toThrow(AmbiguousJobNameError);
+    expect(mockGithubGetArrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('fetchRunLogsRing echoes resolvedJobName/resolvedJobId when jobName resolves to exactly one job', async () => {
+    mockGithubGet.mockResolvedValue({
+      total_count: 1,
+      jobs: [
+        {
+          id: 2,
+          name: '🚀 CI Pipeline / E2E Tests (Mobile Chrome — affected)',
+          status: 'completed',
+          conclusion: 'failure',
+        },
+      ],
+    });
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      textToArrayBuffer('some log output'),
+    );
+
+    const result = await fetchRunLogsRing(
+      { runId: 1, jobName: 'Mobile Chrome' },
+      500,
+    );
+
+    expect(result.resolvedJobName).toBe(
+      '🚀 CI Pipeline / E2E Tests (Mobile Chrome — affected)',
+    );
+    expect(result.resolvedJobId).toBe(2);
+  });
+
+  it('fetchRunLogsRing with exact: true finds the exact-named job even when it would otherwise substring-match ambiguously', async () => {
+    mockGithubGet.mockResolvedValue(ambiguousJobs);
+    mockGithubGetArrayBuffer.mockResolvedValue(
+      textToArrayBuffer('the test job output'),
+    );
+
+    const result = await fetchRunLogsRing(
+      {
+        runId: 1,
+        jobName: '🚀 CI Pipeline / test',
+        exact: true,
+        failedOnly: false,
+      },
+      500,
+    );
+
+    expect(result.resolvedJobName).toBe('🚀 CI Pipeline / test');
+    expect(result.resolvedJobId).toBe(1);
   });
 });

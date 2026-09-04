@@ -94,7 +94,7 @@ export function createServer(): McpServer {
         .string()
         .optional()
         .describe(
-          'Case-insensitive substring match on job name — use when you know the name but not the numeric ID.',
+          'Job name — exact match preferred, else substring; errors listing candidates if ambiguous.',
         ),
       failedOnly: coercedBoolean
         .default(true)

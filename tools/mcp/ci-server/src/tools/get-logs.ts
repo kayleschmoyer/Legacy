@@ -1,4 +1,8 @@
-import { fetchRunLogsRing, stripAnsiCodes } from '../logs.js';
+import {
+  AmbiguousJobNameError,
+  fetchRunLogsRing,
+  stripAnsiCodes,
+} from '../logs.js';
 import { formatBatchLogPayload, formatLogPayload } from '../format.js';
 import type { ToolResult } from '../types.js';
 
@@ -13,6 +17,7 @@ interface GetLogsParams {
   truncateLineLength?: number;
   errorSummary?: boolean;
   jobName?: string;
+  exact?: boolean;
   offset?: number;
 }
 
@@ -375,24 +380,37 @@ async function buildRunPayload(
   const maxChars = params.maxChars ?? DEFAULT_MAX_CHARS;
   const streamLimit = maxLines > 0 ? maxLines : 10_000;
 
-  const { lines, totalLines, skippedJobs, priorityLines } =
-    await fetchRunLogsRing(
-      {
-        runId,
-        jobId: params.jobId,
-        failedOnly: params.failedOnly,
-        attempt: params.attempt,
-        jobName: params.jobName,
-        signal,
-      },
-      streamLimit,
-      params.errorSummary ? isPriorityFailureLine : undefined,
-    );
+  const {
+    lines,
+    totalLines,
+    skippedJobs,
+    priorityLines,
+    resolvedJobName,
+    resolvedJobId,
+  } = await fetchRunLogsRing(
+    {
+      runId,
+      jobId: params.jobId,
+      failedOnly: params.failedOnly,
+      attempt: params.attempt,
+      jobName: params.jobName,
+      exact: params.exact,
+      signal,
+    },
+    streamLimit,
+    params.errorSummary ? isPriorityFailureLine : undefined,
+  );
 
   const base = {
     runId: runId ?? null,
     jobId: params.jobId ?? null,
+    // jobName echoes the caller's query string; resolvedJobName/resolvedJobId
+    // (present only when jobName resolved to exactly one job) are the actual
+    // identity the logs came from, so a mismatch between the two is always
+    // visible (LS-9578) instead of silently trusted.
     jobName: params.jobName ?? null,
+    ...(resolvedJobName !== undefined ? { resolvedJobName } : {}),
+    ...(resolvedJobId !== undefined ? { resolvedJobId } : {}),
     failedOnly: params.failedOnly !== false,
     attempt: params.attempt ?? null,
   };
@@ -612,6 +630,12 @@ export async function getLogs(params: GetLogsParams): Promise<ToolResult> {
     );
     return { content: [{ type: 'text', text }] };
   } catch (error) {
+    if (error instanceof AmbiguousJobNameError) {
+      return {
+        isError: true,
+        content: [{ type: 'text', text: error.message }],
+      };
+    }
     const isTimeout =
       error instanceof Error &&
       (error.name === 'TimeoutError' || error.name === 'AbortError');
