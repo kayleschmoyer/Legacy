@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Separator, Tabs, Text, XStack, YStack } from 'tamagui';
 import { Alert, Image, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
@@ -11,6 +11,10 @@ import {
   type TeamBrandingTeam,
   UnifiedLoadingPanel,
 } from '@legacy-sports/shared-components';
+import {
+  RosterBoard,
+  type RosterPlayerStats,
+} from '@legacy-sports/shared-components/roster';
 import { ENTITLEMENTS } from '@legacy-sports/utils';
 import { config } from '@legacy-sports/app-config/native';
 import {
@@ -22,7 +26,9 @@ import {
   useGetMatchupPlayersQuery,
   useGetPositionsForLeagueQuery,
   useGetTeamByIdQuery,
+  useGetTeamMembersQuery,
   useGetUserTeamIdQuery,
+  useSwapTeamMemberPositionsMutation,
   useUpdateTeamMemberPositionMutation,
 } from '@legacy-sports/graphql';
 import { applyMultiplierGroups } from '../../../../common/scoring';
@@ -32,7 +38,6 @@ import {
   isPitcher,
   isPitchingSlot,
 } from '../../../../common/models/Models';
-import { LineupEditor } from '../../../../features/roster/LineupEditor';
 import { PositionSlot } from '../../../../common/models/Models';
 import { handleError } from '../../../../common/utilities/ErrorHandler';
 import { toIntId } from '../../../../common/utilities/RouteUtils';
@@ -72,15 +77,16 @@ interface TabContentProps {
   matchup: AppMatchupFragment | null | undefined;
   selectedTab: Tab;
   rosterSlots: readonly (LeaguePositionFragment | null)[];
-  onPlayerAdded: (
+  onPlayerAssign: (
     player: AppTeamMemberFragment,
     position: LeaguePositionFragment,
   ) => void;
-  onPlayerMoved: (
-    playerOne: AppTeamMemberFragment,
-    playerTwo: AppTeamMemberFragment,
+  onPlayerRemove: (position: LeaguePositionFragment) => void;
+  onPlayerSwap: (
+    incoming: AppTeamMemberFragment,
+    target: LeaguePositionFragment,
+    displaced: AppTeamMemberFragment,
   ) => void;
-  onPlayerRemoved: (position: LeaguePositionFragment) => void;
   team: readonly (AppTeamMemberFragment | null)[];
   isOwner: boolean;
   battingSettings: Partial<Record<string, number>>;
@@ -94,10 +100,10 @@ interface TabContentProps {
 function TabContent(props: TabContentProps): React.JSX.Element | null {
   const {
     team,
-    onPlayerAdded,
-    onPlayerMoved,
+    onPlayerAssign,
+    onPlayerRemove,
+    onPlayerSwap,
     matchup,
-    onPlayerRemoved,
     selectedTab,
     rosterSlots,
     isOwner,
@@ -256,36 +262,56 @@ function TabContent(props: TabContentProps): React.JSX.Element | null {
     return result;
   }, [stats, pitchers, loadingStats, pitchingSettings]);
 
-  const noOp = (): void => {
-    /* read-only view: mutations disabled */
-  };
+  const getHitterStats = useCallback(
+    (player: AppTeamMemberFragment): RosterPlayerStats | null => {
+      if (player.playerId == null) return null;
+      return {
+        actual: hittersActual[player.playerId],
+        projected: isPremium ? hitterProjections[player.playerId] : null,
+      };
+    },
+    [hittersActual, hitterProjections, isPremium],
+  );
+
+  const getPitcherStats = useCallback(
+    (player: AppTeamMemberFragment): RosterPlayerStats | null => {
+      if (player.playerId == null) return null;
+      return {
+        actual: pitchersActual[player.playerId],
+        projected: isPremium ? pitcherProjections[player.playerId] : null,
+      };
+    },
+    [pitchersActual, pitcherProjections, isPremium],
+  );
 
   switch (selectedTab) {
     case 'Lineup':
       return (
-        <LineupEditor
-          availableRosterSlots={lineupSlots}
-          onPlayerAdded={isOwner ? onPlayerAdded : noOp}
-          onPlayerMoved={isOwner ? onPlayerMoved : noOp}
-          onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
-          projections={isPremium ? hitterProjections : {}}
-          team={hitters}
-          actual={hittersActual}
-          sport="baseball"
-        />
+        <YStack padding="$4">
+          <RosterBoard<AppTeamMemberFragment, LeaguePositionFragment>
+            positions={lineupSlots}
+            teamPlayers={hitters}
+            onPlayerAssign={onPlayerAssign}
+            onPlayerRemove={onPlayerRemove}
+            onPlayerSwap={onPlayerSwap}
+            getPlayerStats={getHitterStats}
+            readOnly={!isOwner}
+          />
+        </YStack>
       );
     case 'Rotation':
       return (
-        <LineupEditor
-          availableRosterSlots={pitchingSlots}
-          onPlayerAdded={isOwner ? onPlayerAdded : noOp}
-          onPlayerMoved={isOwner ? onPlayerMoved : noOp}
-          onPlayerRemoved={isOwner ? onPlayerRemoved : noOp}
-          projections={isPremium ? pitcherProjections : {}}
-          team={pitchers}
-          actual={pitchersActual}
-          sport="baseball"
-        />
+        <YStack padding="$4">
+          <RosterBoard<AppTeamMemberFragment, LeaguePositionFragment>
+            positions={pitchingSlots}
+            teamPlayers={pitchers}
+            onPlayerAssign={onPlayerAssign}
+            onPlayerRemove={onPlayerRemove}
+            onPlayerSwap={onPlayerSwap}
+            getPlayerStats={getPitcherStats}
+            readOnly={!isOwner}
+          />
+        </YStack>
       );
     case 'Settings':
       return isOwner ? (
@@ -475,6 +501,15 @@ export default function Team(): React.JSX.Element {
       },
     });
 
+  const { loading: loadingMembers, data: membersData } = useGetTeamMembersQuery(
+    {
+      skip: numTeamId === null,
+      variables: {
+        teamId: numTeamId ?? 0,
+      },
+    },
+  );
+
   const scoringSettings = useMemo(
     () =>
       applyMultiplierGroups(
@@ -488,54 +523,118 @@ export default function Team(): React.JSX.Element {
   const pitchingSettings = scoringSettings.pitching;
 
   const [updateTeamMemberPosition] = useUpdateTeamMemberPositionMutation();
+  const [swapTeamMemberPositions] = useSwapTeamMemberPositionsMutation();
 
   const [selectedTabIdx, setSelectedTabIdx] = useState(0);
 
-  const onPlayerAdded = (
-    player: AppTeamMemberFragment,
-    positionSlot: LeaguePositionFragment,
-  ) => {
-    if (!player.id) return;
+  const teamMembers = membersData?.teamMembers;
 
-    updateTeamMemberPosition({
-      variables: {
-        positionId: positionSlot.id,
-        teamMemberId: player.id,
-      },
-    }).catch(handleError);
-  };
+  const handlePlayerAssign = useCallback(
+    async (player: AppTeamMemberFragment, position: LeaguePositionFragment) => {
+      if (typeof player.id !== 'number') {
+        handleError(new Error('Missing team member identifier'));
+        return;
+      }
+      if (typeof position.id !== 'number') {
+        handleError(new Error('Missing roster slot identifier'));
+        return;
+      }
 
-  const onPlayerRemoved = (_position: LeaguePositionFragment) => {
-    // teamMembers are managed via the LineupEditor's own state; no-op here
-  };
+      const existingMember = teamMembers?.find(
+        (member) => member?.id === player.id,
+      );
 
-  const onPlayerMoved = (
-    playerOne: AppTeamMemberFragment,
-    playerTwo: AppTeamMemberFragment,
-  ) => {
-    if (!playerOne.id || !playerTwo.id) return;
+      try {
+        await updateTeamMemberPosition({
+          variables: {
+            teamMemberId: player.id,
+            positionId: position.id,
+          },
+          optimisticResponse: existingMember
+            ? {
+                updateTeamMemberPosition: {
+                  ...existingMember,
+                  positionId: position.id,
+                },
+              }
+            : undefined,
+        });
+      } catch (error) {
+        handleError(error);
+      }
+    },
+    [updateTeamMemberPosition, teamMembers],
+  );
 
-    updateTeamMemberPosition({
-      variables: {
-        positionId: playerTwo.positionId,
-        teamMemberId: playerOne.id,
-      },
-    }).catch(handleError);
+  const handlePlayerRemove = useCallback(
+    async (position: LeaguePositionFragment) => {
+      if (typeof position.id !== 'number') return;
 
-    updateTeamMemberPosition({
-      variables: {
-        positionId: playerOne.positionId,
-        teamMemberId: playerTwo.id,
-      },
-    }).catch(handleError);
-  };
+      const assignedPlayer = teamMembers?.find(
+        (member) => member?.positionId === position.id,
+      );
+      if (typeof assignedPlayer?.id !== 'number') return;
+
+      try {
+        await updateTeamMemberPosition({
+          variables: {
+            teamMemberId: assignedPlayer.id,
+            positionId: null,
+          },
+          optimisticResponse: {
+            updateTeamMemberPosition: {
+              ...assignedPlayer,
+              positionId: null,
+            },
+          },
+        });
+      } catch (error) {
+        handleError(error);
+      }
+    },
+    [updateTeamMemberPosition, teamMembers],
+  );
+
+  // Single atomic mutation — two independent updates would leave the roster
+  // in an invalid intermediate state if the second one failed.
+  const handlePlayerSwap = useCallback(
+    async (
+      incoming: AppTeamMemberFragment,
+      target: LeaguePositionFragment,
+      displaced: AppTeamMemberFragment,
+    ) => {
+      if (typeof incoming.id !== 'number' || typeof displaced.id !== 'number') {
+        handleError(new Error('Missing team member identifier'));
+        return;
+      }
+      if (typeof target.id !== 'number') {
+        handleError(new Error('Missing roster slot identifier'));
+        return;
+      }
+
+      try {
+        await swapTeamMemberPositions({
+          variables: {
+            teamMemberIdA: incoming.id,
+            positionIdA: target.id,
+            teamMemberIdB: displaced.id,
+            positionIdB: incoming.positionId ?? undefined,
+          },
+        });
+      } catch (error) {
+        handleError(error);
+      }
+    },
+    [swapTeamMemberPositions],
+  );
 
   if (
     loadingTeam ||
     loadingPositions ||
     loadingLeague ||
     loadingLeagueDetails ||
-    loadingScoringProfile
+    loadingScoringProfile ||
+    loadingMembers
   ) {
     return <UnifiedLoadingPanel />;
   }
@@ -579,10 +678,16 @@ export default function Team(): React.JSX.Element {
         <Separator />
         <TabContent
           matchup={null}
-          team={[]}
-          onPlayerAdded={onPlayerAdded}
-          onPlayerMoved={onPlayerMoved}
-          onPlayerRemoved={onPlayerRemoved}
+          team={teamMembers || []}
+          onPlayerAssign={(player, position) => {
+            void handlePlayerAssign(player, position);
+          }}
+          onPlayerRemove={(position) => {
+            void handlePlayerRemove(position);
+          }}
+          onPlayerSwap={(incoming, target, displaced) => {
+            void handlePlayerSwap(incoming, target, displaced);
+          }}
           selectedTab={visibleTabs[selectedTabIdx] ?? visibleTabs[0]}
           rosterSlots={positions?.leaguePositions || []}
           isOwner={isOwner}

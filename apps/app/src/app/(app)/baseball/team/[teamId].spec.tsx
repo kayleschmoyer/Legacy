@@ -62,6 +62,86 @@ jest.mock('@legacy-sports/shared-components', () => {
   };
 });
 
+// The Lineup/Rotation tabs now mount the shared cross-platform RosterBoard
+// (LS-9651), replacing the app-local LineupEditor fork. This double surfaces
+// the props under test and exposes one pressable per interaction so the
+// route's assign / bench / swap wiring is asserted directly.
+type MockRosterSlot = { id: number | null; positionType: string };
+type MockRosterPlayer = {
+  id: number;
+  playerId: number;
+  positionId: number | null;
+};
+type MockRosterBoardProps = {
+  positions: readonly MockRosterSlot[];
+  teamPlayers: readonly MockRosterPlayer[];
+  onPlayerAssign: (player: MockRosterPlayer, position: MockRosterSlot) => void;
+  onPlayerRemove: (position: MockRosterSlot) => void;
+  onPlayerSwap: (
+    incoming: MockRosterPlayer,
+    target: MockRosterSlot,
+    displaced: MockRosterPlayer,
+  ) => void;
+  getPlayerStats?: (
+    player: MockRosterPlayer,
+  ) => { actual?: number | null; projected?: number | null } | null;
+  readOnly?: boolean;
+};
+
+jest.mock('@legacy-sports/shared-components/roster', () => {
+  const { Pressable, Text, View } = jest.requireActual<
+    RNComponents & { Pressable: typeof import('react-native').Pressable }
+  >('react-native');
+  return {
+    RosterBoard: ({
+      positions,
+      teamPlayers,
+      onPlayerAssign,
+      onPlayerRemove,
+      onPlayerSwap,
+      getPlayerStats,
+      readOnly,
+    }: MockRosterBoardProps) => {
+      const slot = positions[0];
+      const benched = teamPlayers.find((p) => p.positionId == null);
+      const occupant = teamPlayers.find((p) => p.positionId === slot?.id);
+      const projected: Record<number, number> = {};
+      for (const p of teamPlayers) {
+        const value = getPlayerStats?.(p)?.projected;
+        if (value != null) projected[p.playerId] = value;
+      }
+      return (
+        <View testID="roster-board">
+          <Text testID="roster-board-readonly">{String(!!readOnly)}</Text>
+          <Text testID="roster-board-slots">
+            {positions.map((p) => p.positionType).join(',')}
+          </Text>
+          <Text testID="roster-board-projected">
+            {JSON.stringify(projected)}
+          </Text>
+          <Pressable
+            testID="roster-board-assign"
+            onPress={() => benched && slot && onPlayerAssign(benched, slot)}
+          />
+          <Pressable
+            testID="roster-board-remove"
+            onPress={() => slot && onPlayerRemove(slot)}
+          />
+          <Pressable
+            testID="roster-board-swap"
+            onPress={() =>
+              benched &&
+              slot &&
+              occupant &&
+              onPlayerSwap(benched, slot, occupant)
+            }
+          />
+        </View>
+      );
+    },
+  };
+});
+
 jest.mock('../../../../common/scoring', () => ({
   applyMultiplierGroups: jest.fn(() => ({
     batting: {},
@@ -70,13 +150,37 @@ jest.mock('../../../../common/scoring', () => ({
   })),
 }));
 
-jest.mock('../../../../common/models/Models', () => ({
-  isBatter: jest.fn(() => false),
-  isBattingSlot: jest.fn(() => false),
-  isPitcher: jest.fn(() => false),
-  isPitchingSlot: jest.fn(() => false),
-  PositionSlot: { Dh: 'DH' },
-}));
+jest.mock('../../../../common/models/Models', () => {
+  const pitchingTypes = new Set(['SP', 'RP']);
+  return {
+    isBatter: (
+      member: { player?: { eligiblePositions?: string[] } } | null,
+    ) => {
+      if (!member) return false;
+      const eligible = member.player?.eligiblePositions ?? [];
+      return (
+        eligible.length === 0 ||
+        eligible.some((pos: string) => !pitchingTypes.has(pos))
+      );
+    },
+    isBattingSlot: (slot: { positionType?: string | null } | null): boolean =>
+      slot !== null &&
+      slot.positionType != null &&
+      !pitchingTypes.has(slot.positionType),
+    isPitcher: (
+      member: { player?: { eligiblePositions?: string[] } } | null,
+    ) => {
+      if (!member) return false;
+      const eligible = member.player?.eligiblePositions ?? [];
+      return eligible.some((pos: string) => pitchingTypes.has(pos));
+    },
+    isPitchingSlot: (slot: { positionType?: string | null } | null): boolean =>
+      slot !== null &&
+      slot.positionType != null &&
+      pitchingTypes.has(slot.positionType),
+    PositionSlot: { Dh: 'DH' },
+  };
+});
 
 jest.mock('../../../../common/utilities/ErrorHandler', () => ({
   handleError: jest.fn(),
@@ -85,25 +189,6 @@ jest.mock('../../../../common/utilities/ErrorHandler', () => ({
 jest.mock('../../../../common/utilities/RouteUtils', () => ({
   toIntId: (v: unknown) => (typeof v === 'string' ? parseInt(v, 10) : null),
 }));
-
-// Captures the projections/sport props from the most recent LineupEditor render.
-let lastProjections: Record<number, number> | undefined;
-let lastLineupEditorSport: string | undefined;
-
-jest.mock('../../../../features/roster/LineupEditor', () => {
-  const { View } = jest.requireActual<RNComponents>('react-native');
-  return {
-    LineupEditor: (props: {
-      projections?: Record<number, number>;
-      sport?: string;
-      [key: string]: unknown;
-    }) => {
-      lastProjections = props.projections;
-      lastLineupEditorSport = props.sport;
-      return <View testID="lineup-editor" />;
-    },
-  };
-});
 
 jest.mock('tamagui', () => {
   const React = jest.requireActual<typeof import('react')>('react');
@@ -175,7 +260,53 @@ const mockTeam = {
   avatarUrl: null,
   bannerUrl: null,
 };
-const mockPositions = [{ id: 1, leagueId: 5, positionType: 'C' }];
+const mockPositions = [
+  { id: 1, leagueId: 5, positionType: 'C' },
+  { id: 2, leagueId: 5, positionType: 'SP' },
+];
+const mockMembers = [
+  {
+    id: 101,
+    playerId: 1,
+    positionId: 1,
+    teamId: 10,
+    leagueId: 5,
+    player: {
+      id: 1,
+      firstName: 'Starting',
+      lastName: 'Catcher',
+      eligiblePositions: ['C'],
+    },
+  },
+  // Benched (positionId === null) — RosterBoard derives bench membership from
+  // a null positionId, so this is the player the assign/swap paths move.
+  {
+    id: 102,
+    playerId: 2,
+    positionId: null,
+    teamId: 10,
+    leagueId: 5,
+    player: {
+      id: 2,
+      firstName: 'Bench',
+      lastName: 'Hitter',
+      eligiblePositions: ['C'],
+    },
+  },
+  {
+    id: 103,
+    playerId: 3,
+    positionId: 2,
+    teamId: 10,
+    leagueId: 5,
+    player: {
+      id: 3,
+      firstName: 'Starting',
+      lastName: 'Pitcher',
+      eligiblePositions: ['SP'],
+    },
+  },
+];
 
 const mockUseGetTeamByIdQuery = jest.fn(() => ({
   loading: false,
@@ -198,7 +329,18 @@ const mockUseGetPositionsForLeagueQuery = jest.fn(() => ({
   loading: false,
   data: { leaguePositions: mockPositions },
 }));
-const mockUseUpdateTeamMemberPositionMutation = jest.fn(() => [jest.fn()]);
+const mockUseGetTeamMembersQuery = jest.fn(() => ({
+  loading: false,
+  data: { teamMembers: mockMembers },
+}));
+const mockUpdateTeamMemberPosition = jest.fn(() => Promise.resolve({}));
+const mockSwapTeamMemberPositions = jest.fn(() => Promise.resolve({}));
+const mockUseUpdateTeamMemberPositionMutation = jest.fn(() => [
+  mockUpdateTeamMemberPosition,
+]);
+const mockUseSwapTeamMemberPositionsMutation = jest.fn(() => [
+  mockSwapTeamMemberPositions,
+]);
 
 jest.mock('@legacy-sports/graphql', () => ({
   useGetTeamByIdQuery: (...args: unknown[]) => mockUseGetTeamByIdQuery(...args),
@@ -212,8 +354,12 @@ jest.mock('@legacy-sports/graphql', () => ({
     mockUseGetMatchupPlayersQuery(...args),
   useGetPositionsForLeagueQuery: (...args: unknown[]) =>
     mockUseGetPositionsForLeagueQuery(...args),
+  useGetTeamMembersQuery: (...args: unknown[]) =>
+    mockUseGetTeamMembersQuery(...args),
   useUpdateTeamMemberPositionMutation: (...args: unknown[]) =>
     mockUseUpdateTeamMemberPositionMutation(...args),
+  useSwapTeamMemberPositionsMutation: (...args: unknown[]) =>
+    mockUseSwapTeamMemberPositionsMutation(...args),
 }));
 
 // ── Subscription mock ─────────────────────────────────────────────────────────
@@ -228,97 +374,124 @@ jest.mock('../../../../features/subscription/useSubscription', () => ({
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe('BaseballTeam route — projection gating', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    lastProjections = undefined;
-    lastLineupEditorSport = undefined;
+function resetMocks() {
+  jest.clearAllMocks();
 
-    mockUseGetTeamByIdQuery.mockReturnValue({
-      loading: false,
-      data: { team: mockTeam },
-    });
-    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
-    mockUseGetLeagueByIdQuery.mockReturnValue({
-      loading: false,
-      data: { league: { userMembership: { permissionLevel: 'owner' } } },
-    });
-    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
-      loading: false,
-      data: { leagueScoringProfile: { multiplierGroups: [] } },
-    });
-    mockUseGetMatchupPlayersQuery.mockReturnValue({
-      loading: false,
-      data: { getMatchupPlayers: [] },
-    });
-    mockUseGetPositionsForLeagueQuery.mockReturnValue({
-      loading: false,
-      data: { leaguePositions: mockPositions },
-    });
-    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
+  mockUseGetTeamByIdQuery.mockReturnValue({
+    loading: false,
+    data: { team: mockTeam },
   });
+  mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
+  mockUseGetLeagueByIdQuery.mockReturnValue({
+    loading: false,
+    data: { league: { userMembership: { permissionLevel: 'owner' } } },
+  });
+  mockUseGetLeagueScoringProfileQuery.mockReturnValue({
+    loading: false,
+    data: { leagueScoringProfile: { multiplierGroups: [] } },
+  });
+  mockUseGetMatchupPlayersQuery.mockReturnValue({
+    loading: false,
+    data: { getMatchupPlayers: [] },
+  });
+  mockUseGetPositionsForLeagueQuery.mockReturnValue({
+    loading: false,
+    data: { leaguePositions: mockPositions },
+  });
+  mockUseGetTeamMembersQuery.mockReturnValue({
+    loading: false,
+    data: { teamMembers: mockMembers },
+  });
+  mockUseUpdateTeamMemberPositionMutation.mockReturnValue([
+    mockUpdateTeamMemberPosition,
+  ]);
+  mockUseSwapTeamMemberPositionsMutation.mockReturnValue([
+    mockSwapTeamMemberPositions,
+  ]);
+  mockUseSubscription.mockReturnValue({ isPremium: true });
+  mockUseHasEntitlement.mockReturnValue(true);
+}
 
-  it('passes empty projections to LineupEditor for free users on Lineup tab', () => {
-    mockUseSubscription.mockReturnValue({ isPremium: false });
+describe('BaseballTeam route — RosterBoard wiring (LS-9651)', () => {
+  beforeEach(resetMocks);
+
+  it('renders the shared RosterBoard on the Lineup tab, scoped to batting slots', () => {
     render(<BaseballTeam />);
-    expect(screen.getByTestId('lineup-editor')).toBeTruthy();
-    expect(lastProjections).toEqual({});
+    expect(screen.getByTestId('roster-board')).toBeTruthy();
+    expect(screen.getByTestId('roster-board-slots')).toHaveTextContent('C');
   });
 
-  it('passes empty projections to LineupEditor for free users on Rotation tab', () => {
-    mockUseSubscription.mockReturnValue({ isPremium: false });
+  it('renders the shared RosterBoard on the Rotation tab, scoped to pitching slots', () => {
     render(<BaseballTeam />);
     fireEvent.press(screen.getByTestId('tab-Rotation'));
-    expect(screen.getByTestId('lineup-editor')).toBeTruthy();
-    expect(lastProjections).toEqual({});
+    expect(screen.getByTestId('roster-board-slots')).toHaveTextContent('SP');
   });
 
-  it("passes sport='baseball' to LineupEditor on both the Lineup and Rotation tabs (LS-6436)", () => {
+  it('leaves the board editable for the team owner', () => {
     render(<BaseballTeam />);
-    expect(lastLineupEditorSport).toBe('baseball');
+    expect(screen.getByTestId('roster-board-readonly')).toHaveTextContent(
+      'false',
+    );
+  });
+
+  it('renders a read-only board for a non-owner on both tabs', () => {
+    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 999 } });
+    render(<BaseballTeam />);
+    expect(screen.getByTestId('roster-board-readonly')).toHaveTextContent(
+      'true',
+    );
     fireEvent.press(screen.getByTestId('tab-Rotation'));
-    expect(lastLineupEditorSport).toBe('baseball');
+    expect(screen.getByTestId('roster-board-readonly')).toHaveTextContent(
+      'true',
+    );
   });
 
-  it('passes empty projections for premium users too (matchup feature dormant — team=[] produces no stats)', () => {
-    mockUseSubscription.mockReturnValue({ isPremium: true });
+  it('assigns a benched hitter to a slot via updateTeamMemberPosition', () => {
     render(<BaseballTeam />);
-    expect(screen.getByTestId('lineup-editor')).toBeTruthy();
-    // The gate opens for premium users but team=[] means hitters=[] → projections still {}
-    expect(lastProjections).toEqual({});
+    fireEvent.press(screen.getByTestId('roster-board-assign'));
+    expect(mockUpdateTeamMemberPosition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: { teamMemberId: 102, positionId: 1 },
+      }),
+    );
+  });
+
+  it('benches a starter by clearing their positionId', () => {
+    render(<BaseballTeam />);
+    fireEvent.press(screen.getByTestId('roster-board-remove'));
+    expect(mockUpdateTeamMemberPosition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: { teamMemberId: 101, positionId: null },
+      }),
+    );
+  });
+
+  it('swaps a starter and a bench player via the atomic swapTeamMemberPositions mutation', () => {
+    render(<BaseballTeam />);
+    fireEvent.press(screen.getByTestId('roster-board-swap'));
+    expect(mockSwapTeamMemberPositions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variables: {
+          teamMemberIdA: 102,
+          positionIdA: 1,
+          teamMemberIdB: 101,
+          positionIdB: undefined,
+        },
+      }),
+    );
+  });
+
+  it('gates projected stats behind the premium subscription on the Lineup tab', () => {
+    mockUseSubscription.mockReturnValue({ isPremium: false });
+    render(<BaseballTeam />);
+    expect(screen.getByTestId('roster-board-projected')).toHaveTextContent(
+      '{}',
+    );
   });
 });
 
 describe('BaseballTeam route — team identity header (LS-8313)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    lastProjections = undefined;
-    lastLineupEditorSport = undefined;
-
-    mockUseGetTeamByIdQuery.mockReturnValue({
-      loading: false,
-      data: { team: mockTeam },
-    });
-    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
-    mockUseGetLeagueByIdQuery.mockReturnValue({
-      loading: false,
-      data: { league: { userMembership: { permissionLevel: 'owner' } } },
-    });
-    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
-      loading: false,
-      data: { leagueScoringProfile: { multiplierGroups: [] } },
-    });
-    mockUseGetMatchupPlayersQuery.mockReturnValue({
-      loading: false,
-      data: { getMatchupPlayers: [] },
-    });
-    mockUseGetPositionsForLeagueQuery.mockReturnValue({
-      loading: false,
-      data: { leaguePositions: mockPositions },
-    });
-    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
-    mockUseSubscription.mockReturnValue({ isPremium: true });
-  });
+  beforeEach(resetMocks);
 
   it('shows a letter fallback avatar and league ID when no avatarUrl is set (AC1, AC2)', () => {
     render(<BaseballTeam />);
@@ -384,34 +557,7 @@ describe('BaseballTeam route — team identity header (LS-8313)', () => {
 });
 
 describe('BaseballTeam route — Settings tab logo-upload gating (LS-7685)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    lastTeamBrandingProps = undefined;
-
-    mockUseGetTeamByIdQuery.mockReturnValue({
-      loading: false,
-      data: { team: mockTeam },
-    });
-    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
-    mockUseGetLeagueByIdQuery.mockReturnValue({
-      loading: false,
-      data: { league: { userMembership: { permissionLevel: 'owner' } } },
-    });
-    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
-      loading: false,
-      data: { leagueScoringProfile: { multiplierGroups: [] } },
-    });
-    mockUseGetMatchupPlayersQuery.mockReturnValue({
-      loading: false,
-      data: { getMatchupPlayers: [] },
-    });
-    mockUseGetPositionsForLeagueQuery.mockReturnValue({
-      loading: false,
-      data: { leaguePositions: mockPositions },
-    });
-    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
-    mockUseSubscription.mockReturnValue({ isPremium: true });
-  });
+  beforeEach(resetMocks);
 
   it('passes canUploadLogo=true to TeamBrandingControl for an entitled (premium) owner', () => {
     mockUseHasEntitlement.mockReturnValue(true);
@@ -443,35 +589,7 @@ describe('BaseballTeam route — Settings tab logo-upload gating (LS-7685)', () 
 });
 
 describe('BaseballTeam route — assistant manager settings parity (LS-6029, AC1)', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    lastProjections = undefined;
-    lastLineupEditorSport = undefined;
-
-    mockUseGetTeamByIdQuery.mockReturnValue({
-      loading: false,
-      data: { team: mockTeam },
-    });
-    mockUseGetUserTeamIdQuery.mockReturnValue({ data: { userTeamId: 10 } });
-    mockUseGetLeagueByIdQuery.mockReturnValue({
-      loading: false,
-      data: { league: { userMembership: { permissionLevel: 'owner' } } },
-    });
-    mockUseGetLeagueScoringProfileQuery.mockReturnValue({
-      loading: false,
-      data: { leagueScoringProfile: { multiplierGroups: [] } },
-    });
-    mockUseGetMatchupPlayersQuery.mockReturnValue({
-      loading: false,
-      data: { getMatchupPlayers: [] },
-    });
-    mockUseGetPositionsForLeagueQuery.mockReturnValue({
-      loading: false,
-      data: { leaguePositions: mockPositions },
-    });
-    mockUseUpdateTeamMemberPositionMutation.mockReturnValue([jest.fn()]);
-    mockUseSubscription.mockReturnValue({ isPremium: true });
-  });
+  beforeEach(resetMocks);
 
   it('renders TeamAssistantManagerSettings in the Settings tab for the team owner', () => {
     render(<BaseballTeam />);
