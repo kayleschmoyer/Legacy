@@ -64,7 +64,25 @@ export async function secretsCheck(
               createdAt: secret.created_at,
               updatedAt: secret.updated_at,
             };
-          } catch {
+          } catch (error) {
+            // A 403 "resource not accessible by integration" means the token
+            // lacks the Secrets: Read permission for this per-secret GET — it
+            // says nothing about whether the secret exists. Blindly folding
+            // that into exists:false (LS-9645) tells callers a live secret is
+            // missing, which risks blocking on a non-issue or creating a
+            // duplicate/misnamed secret. Surface it as a permission gap
+            // instead; only a genuine 404 means exists:false.
+            if (isForbiddenIntegrationError(error)) {
+              return {
+                name,
+                exists: null,
+                error: 'forbidden',
+                hint:
+                  'GitHub 403 "Resource not accessible by integration" — the token ' +
+                  'lacks the "Secrets: Read" permission for this check, so existence ' +
+                  'could not be determined. This is not proof the secret is missing.',
+              };
+            }
             return { name, exists: false };
           }
         }),

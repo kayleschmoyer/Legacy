@@ -1430,7 +1430,7 @@ export function createServer(): McpServer {
   // --- github_secrets_check ---
   server.tool(
     'github_secrets_check',
-    'List secret names or check they exist (never values). environment scopes to an environment; bulk-list 403s degrade instead of throwing.',
+    'List secret names or check they exist (never values). environment scopes to an environment. A 403 degrades: list mode returns degraded:true; per-name returns exists:null/error:forbidden, not a false negative.',
     {
       names: z
         .array(z.string())

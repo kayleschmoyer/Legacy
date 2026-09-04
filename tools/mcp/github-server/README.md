@@ -49,7 +49,7 @@ The git-heavy tools (`github_bulk_rebase`, `github_open_pr`'s push phase) run un
 
 ### Secrets
 
-- **github_secrets_check** — List all secret names or check if specific secrets exist (returns names + timestamps, never values). Pass `environment` to scope to an environment's secrets instead of the repo's. Bulk-list mode degrades gracefully (`degraded: true` + hint) instead of throwing when the token lacks list scope — per-name checks still work.
+- **github_secrets_check** — List all secret names or check if specific secrets exist (returns names + timestamps, never values). Pass `environment` to scope to an environment's secrets instead of the repo's. Bulk-list mode degrades gracefully (`degraded: true` + hint) instead of throwing when the token lacks list scope. A per-name check can hit the same permission gap independently — that result comes back as `exists: null, error: "forbidden"` rather than a false `exists: false`, since a 403 says nothing about whether the secret is actually there.
 - **github_secret_set** — Set a GitHub Actions secret
 - **github_secret_delete** — Delete a GitHub Actions secret
 

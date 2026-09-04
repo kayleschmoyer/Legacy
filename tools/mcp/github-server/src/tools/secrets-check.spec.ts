@@ -74,6 +74,33 @@ describe('secretsCheck', () => {
     });
   });
 
+  it('surfaces a forbidden-integration 403 on a per-secret check as a permission gap, not exists:false', async () => {
+    mockedRest.mockResolvedValueOnce(secret('FOO'));
+    mockedRest.mockRejectedValueOnce(
+      new Error(
+        'GitHub API GET /repos/o/r/actions/secrets/BAR failed (403): {"message":"Resource not accessible by integration"}',
+      ),
+    );
+
+    const text = (await secretsCheck({ names: ['FOO', 'BAR'] })).content[0]
+      .text;
+    const body = parseBody(text);
+    const results = body.results as Array<Record<string, unknown>>;
+    expect(body.checked).toBe(2);
+    expect(results[0]).toEqual({
+      name: 'FOO',
+      exists: true,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    });
+    expect(results[1]).toMatchObject({
+      name: 'BAR',
+      exists: null,
+      error: 'forbidden',
+    });
+    expect(results[1].hint as string).toMatch(/Secrets: Read/);
+  });
+
   it('degrades gracefully instead of throwing when list mode 403s on token scope', async () => {
     mockedRest.mockRejectedValueOnce(
       new Error(
