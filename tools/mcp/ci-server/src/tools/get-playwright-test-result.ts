@@ -8,10 +8,12 @@ import {
   type PlaywrightTestResult,
   reportUrlFor,
 } from '../playwright-report.js';
+import { deploysTokenWasFallback, githubGet } from '../github-api.js';
 import {
   listPlaywrightS3Artifacts,
   type PlaywrightArtifactType,
   resolveRunSha,
+  type S3ArtifactsResult,
 } from '../s3-artifacts.js';
 
 /** Hard cap on any single string field in the response. Prevents a chatty
@@ -67,6 +69,101 @@ interface Candidate {
   file: string;
   outcome: string;
   projectName: string | null;
+}
+
+const ARTIFACT_TYPE_NOTES: Record<PlaywrightArtifactType, string> = {
+  blobs:
+    'Presigned URLs expire in 1 hour. Each artifact is a Playwright blob zip containing test results. Use playwright merge-reports or inspect the zip to extract individual test error-context.md / trace.zip files.',
+  coverage:
+    'Presigned URLs expire in 1 hour. Each artifact is a raw per-spec coverage fragment.',
+  output:
+    'Presigned URLs expire in 1 hour. Each artifact is a raw Playwright output file.',
+};
+
+/** Shared response shape for both the explicit `source: "s3"` path and the
+ * automatic credentials-gap fallback (LS-9592) — the two differ only in
+ * whether `reason` explains why S3 was used instead of GH Pages. */
+function buildS3TestResultResponse(params: {
+  sha: string;
+  runId: number | null;
+  artifactType: PlaywrightArtifactType;
+  s3Result: S3ArtifactsResult;
+  testTitleFilter: string | null;
+  fileNameFilter: string | null;
+  reason?: string;
+}): Record<string, unknown> {
+  const {
+    sha,
+    runId,
+    artifactType,
+    s3Result,
+    testTitleFilter,
+    fileNameFilter,
+    reason,
+  } = params;
+  const ghPagesName = runId != null ? `nightly-${runId}` : null;
+  return {
+    source: 's3' as const,
+    ...(reason ? { reason } : {}),
+    runId,
+    sha,
+    artifactType,
+    ghPagesReportName: ghPagesName,
+    ghPagesNote: ghPagesName
+      ? `If the nightly GH Pages report was deployed, try ci_get_playwright_test_result with reportName="${ghPagesName}".`
+      : undefined,
+    s3Prefix: s3Result.s3Prefix,
+    artifactCount: s3Result.artifacts.length,
+    empty: s3Result.empty,
+    emptyNote: s3Result.empty
+      ? `No ${artifactType} artifacts found. S3 objects expire after 3 days — this run may be too old.`
+      : undefined,
+    testTitleFilter,
+    fileNameFilter,
+    note: ARTIFACT_TYPE_NOTES[artifactType],
+    artifacts: s3Result.artifacts,
+  };
+}
+
+interface GitHubPullRequest {
+  head: { sha: string };
+}
+
+/**
+ * Resolve the commit SHA to use for the automatic S3 fallback (LS-9592),
+ * from whichever identifier the caller originally supplied. Mirrors
+ * `resolveShaForS3Fallback` in get-playwright-report.ts, adapted to this
+ * tool's params (no `prNumber`, but `reportName` is often "pr-N").
+ * Returns null when no SHA can be resolved, so the caller falls through to
+ * its existing error handling unchanged.
+ */
+async function resolveShaForAutoS3Fallback(
+  runIdParam: number | string | undefined,
+  effectiveReportName: string,
+): Promise<{ sha: string; runId: number | null } | null> {
+  try {
+    if (runIdParam != null) {
+      const runId = Number(runIdParam);
+      if (!isNaN(runId)) return { sha: await resolveRunSha(runId), runId };
+    }
+    const prMatch = effectiveReportName.match(/^pr-(\d+)$/);
+    if (prMatch) {
+      const pr = await githubGet<GitHubPullRequest>(`/pulls/${prMatch[1]}`);
+      return { sha: pr.head.sha, runId: null };
+    }
+    const runMatch = effectiveReportName.match(/^(?:nightly|manual)-(\d+)$/);
+    if (runMatch) {
+      const runId = Number(runMatch[1]);
+      return { sha: await resolveRunSha(runId), runId };
+    }
+    if (NUMERIC_ID_RE.test(effectiveReportName)) {
+      const runId = Number(effectiveReportName);
+      return { sha: await resolveRunSha(runId), runId };
+    }
+  } catch {
+    // Resolution failed — caller falls through to the generic GH-Pages error.
+  }
+  return null;
 }
 
 interface TestResultResponse {
@@ -228,33 +325,14 @@ export async function getPlaywrightTestResult(params: {
       };
     }
 
-    const ghPagesName = `nightly-${runId}`;
-    const artifactTypeNotes: Record<PlaywrightArtifactType, string> = {
-      blobs:
-        'Presigned URLs expire in 1 hour. Each artifact is a Playwright blob zip containing test results. Use playwright merge-reports or inspect the zip to extract individual test error-context.md / trace.zip files.',
-      coverage:
-        'Presigned URLs expire in 1 hour. Each artifact is a raw per-spec coverage fragment.',
-      output:
-        'Presigned URLs expire in 1 hour. Each artifact is a raw Playwright output file.',
-    };
-    const response = {
-      source: 's3' as const,
-      runId,
+    const response = buildS3TestResultResponse({
       sha,
+      runId,
       artifactType,
-      ghPagesReportName: ghPagesName,
-      ghPagesNote: `If the nightly GH Pages report was deployed, try ci_get_playwright_test_result with reportName="${ghPagesName}".`,
-      s3Prefix: s3Result.s3Prefix,
-      artifactCount: s3Result.artifacts.length,
-      empty: s3Result.empty,
-      emptyNote: s3Result.empty
-        ? `No ${artifactType} artifacts found. S3 objects expire after 3 days — this run may be too old.`
-        : undefined,
+      s3Result,
       testTitleFilter: testTitle ?? null,
       fileNameFilter: effectiveFileName ?? null,
-      note: artifactTypeNotes[artifactType],
-      artifacts: s3Result.artifacts,
-    };
+    });
 
     return {
       content: [{ type: 'text', text: minifiedJson(response) }],
@@ -286,6 +364,46 @@ export async function getPlaywrightTestResult(params: {
   }
 
   if (!report || 'error' in report) {
+    // When the GH Pages fetch failed because this session lacks
+    // PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID (a credentials gap, not a
+    // missing report — LS-9592), automatically fall back to listing the raw
+    // S3 blob artifacts instead of dead-ending, mirroring the fallback
+    // ci_get_playwright_report already applies for the same root cause.
+    if (deploysTokenWasFallback()) {
+      const resolved = await resolveShaForAutoS3Fallback(
+        runIdParam,
+        effectiveReportName,
+      );
+      if (resolved) {
+        try {
+          const s3Result = await listPlaywrightS3Artifacts(
+            resolved.sha,
+            artifactType,
+          );
+          if (!s3Result.empty) {
+            const response = buildS3TestResultResponse({
+              sha: resolved.sha,
+              runId: resolved.runId,
+              artifactType,
+              s3Result,
+              testTitleFilter: testTitle ?? null,
+              fileNameFilter: effectiveFileName ?? null,
+              reason:
+                'GH Pages report fetch failed with a credentials gap ' +
+                '(PREVIEW_APP_PRIVATE_KEY/PREVIEW_APP_ID are not configured in ' +
+                'this session) — falling back to raw S3 blob artifacts instead ' +
+                'of erroring.',
+            });
+            return {
+              content: [{ type: 'text', text: minifiedJson(response) }],
+            };
+          }
+        } catch {
+          // S3 listing failed too — fall through to the generic error below.
+        }
+      }
+    }
+
     const triedNames = namesToTry.join(', ');
     const baseError =
       report && 'error' in report ? report.error : 'Unknown fetch error';

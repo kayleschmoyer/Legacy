@@ -70,7 +70,12 @@ So in connector/cloud sessions, a `ci_get_playwright_report` /
 `ci_get_playwright_test_result` 404 usually means **the token cannot see the
 repo, not that the report is missing**. The tool error says "credentials gap"
 when this is the case — trust it and do not burn time re-checking whether the
-deploy happened. Instead:
+deploy happened. Both tools (LS-9236, LS-9592) now detect this automatically
+and fall through to the S3 blob artifacts for you — a manual `source: "s3"`
+retry is rarely needed. If the automatic fallback also comes up empty (S3
+objects expire after 3 days) or the run/PR SHA can't be resolved, it falls
+through unchanged to the credentials-gap error. If you still need to reach
+for it manually:
 
 - Confirm the deploy once via the "Deploy Playwright Report" job in CI logs if in doubt.
 - For nightly/integration runs, use `ci_get_playwright_test_result(source: "s3")` with the numeric run ID (S3 access does not use the deploys-repo token).
