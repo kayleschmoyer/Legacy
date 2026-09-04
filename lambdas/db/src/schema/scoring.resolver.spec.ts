@@ -317,6 +317,88 @@ describe('League scoring GraphQL resolvers', () => {
     expect(result.stats?.[0]?.multiplier).toBeCloseTo(3.5);
   });
 
+  it('posts an authorless system_scoring_changed message with before/after metadata (LS-9666)', async () => {
+    const leagueId = 88;
+    const updates = [{ statDefinitionId: 1, multiplier: 6 }];
+
+    const profileDetails = createActiveProfileDetails({
+      leagueId,
+      entries: [
+        {
+          id: 201,
+          profileId: leagueId,
+          statDefinitionId: 1,
+          multiplier: '4',
+          isEnabled: true,
+          createdAt: '2025-01-01T00:00:00Z',
+          updatedAt: '2025-01-01T00:00:00Z',
+        },
+      ],
+    });
+
+    databaseServiceMock.scoring.getActiveProfileDetails.mockResolvedValue(
+      profileDetails,
+    );
+    updateActiveProfileMock.mockResolvedValue(profileDetails);
+
+    const mutationType = schemaUnderTest.getMutationType();
+    const updateField = mutationType?.getFields().updateLeagueScoringProfile;
+    if (!updateField?.resolve) {
+      throw new Error('updateLeagueScoringProfile resolver not found');
+    }
+
+    const valuesMock = jest.fn().mockReturnValue({
+      returning: jest
+        .fn()
+        .mockResolvedValue([{ id: 501, timestamp: new Date().toISOString() }]),
+    });
+    const notifyLeagueChatMessage = jest.fn().mockResolvedValue(undefined);
+    const mockDb = {
+      select: jest.fn().mockReturnThis(),
+      from: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockResolvedValue([{ accessLevel: 'admin' }]),
+      insert: jest.fn().mockReturnValue({ values: valuesMock }),
+    };
+
+    await updateField.resolve(
+      {},
+      { leagueId, updates },
+      {
+        user: { id: 12, username: 'commish', isAdmin: true },
+        db: mockDb,
+        notificationService: { notifyLeagueChatMessage },
+      },
+      undefined as never,
+    );
+
+    expect(valuesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leagueId,
+        userId: null,
+        messageType: 'system_scoring_changed',
+        metadata: expect.objectContaining({
+          changedBy: 'commish',
+          changedByUserId: 12,
+          changes: expect.arrayContaining([
+            expect.objectContaining({
+              statDefinitionId: 1,
+              previousMultiplier: 4,
+              newMultiplier: 6,
+            }),
+          ]),
+        }),
+      }),
+    );
+    expect(notifyLeagueChatMessage).toHaveBeenCalledWith(
+      leagueId,
+      expect.objectContaining({
+        senderId: null,
+        messageType: 'system_scoring_changed',
+      }),
+    );
+  });
+
   type ActiveProfileDetails = {
     profileId: number | null;
     leagueId: number | null;

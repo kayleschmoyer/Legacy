@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, XStack, YStack } from 'tamagui';
+import { SystemMessageNotice } from '@legacy-sports/shared-components/chat';
 import { ArrowLeftRight } from '@tamagui/lucide-icons/icons/ArrowLeftRight';
 import { CheckCircle } from '@tamagui/lucide-icons/icons/CheckCircle';
 import { RotateCcw } from '@tamagui/lucide-icons/icons/RotateCcw';
@@ -107,6 +108,22 @@ export function SystemMessageCard({
   formatTime,
 }: SystemMessageCardProps): React.JSX.Element | null {
   const { messageType, metadata, messageText, createdAt } = message;
+
+  // ── Scoring system notices (LS-9666) ────────────────────────────────────
+  // Authorless (userId is null) — no avatar, no per-type card, just a
+  // generic system notice distinct from a user message bubble.
+  if (
+    messageType === 'system_scoring_changed' ||
+    messageType === 'system_scores_recomputed'
+  ) {
+    return (
+      <SystemMessageNotice
+        messageText={messageText}
+        createdAt={createdAt}
+        formatTime={formatTime}
+      />
+    );
+  }
 
   // ── Trade card ────────────────────────────────────────────────────────────
   if (messageType === 'trade' && metadata) {

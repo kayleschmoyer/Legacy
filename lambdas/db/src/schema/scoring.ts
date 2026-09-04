@@ -24,6 +24,7 @@ import {
   ForbiddenError,
   UserInputError,
 } from './graphql-errors';
+import { postSystemLeagueMessage } from './league-messages-helper';
 
 const dbService = createDatabaseService(getDbOptions());
 
@@ -686,11 +687,21 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
 
       const config = await loadLeagueScoringConfig(args.leagueId);
 
-      // Build a detailed change summary for the chat message
+      // Post one authorless system_scoring_changed chat message (LS-9666) —
+      // structured before/after values live in metadata; messageText is a
+      // human-readable summary for clients that don't special-case the type.
       const userId = context.user.id;
       const username = context.user.username ?? `user_${userId}`;
 
       const changeDescriptions: string[] = [];
+      const changes: Array<{
+        statDefinitionId: number;
+        statName: string;
+        previousMultiplier: number;
+        newMultiplier: number | null;
+        previousEnabled: boolean;
+        newEnabled: boolean | null;
+      }> = [];
       for (const update of updates) {
         const prevStat = previousStatsByDefId.get(update.statDefinitionId);
         if (!prevStat) continue;
@@ -705,6 +716,17 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
             `${statName}: ${prevMultiplier}x → ${update.multiplier}x`,
           );
         }
+
+        changes.push({
+          statDefinitionId: update.statDefinitionId,
+          statName,
+          previousMultiplier: prevMultiplier,
+          newMultiplier:
+            typeof update.multiplier === 'number' ? update.multiplier : null,
+          previousEnabled: prevStat.isEnabled,
+          newEnabled:
+            typeof update.isEnabled === 'boolean' ? update.isEnabled : null,
+        });
       }
 
       const changeSummary =
@@ -714,35 +736,14 @@ builder.mutationField('updateLeagueScoringProfile', (t) =>
             : `${changeDescriptions.slice(0, 5).join(', ')} and ${changeDescriptions.length - 5} more`
           : 'scoring multipliers';
 
-      const notificationText = `⚙️ ${username} updated scoring settings: ${changeSummary}`;
+      const notificationText = `${username} updated scoring settings: ${changeSummary}`;
 
-      const [chatMsg] = await context.db
-        .insert(PublicSchema.leagueMessages)
-        .values({
-          leagueId: args.leagueId,
-          userId,
-          messageText: notificationText,
-        })
-        .returning();
-
-      const notificationService = context.notificationService;
-      if (notificationService) {
-        notificationService
-          .notifyLeagueChatMessage(args.leagueId, {
-            leagueId: args.leagueId,
-            messageId: chatMsg.id,
-            senderId: userId,
-            senderUsername: username,
-            messageText: notificationText,
-            timestamp: chatMsg.timestamp ?? new Date().toISOString(),
-          })
-          .catch((err: unknown) => {
-            LOGGER.warn(
-              'Failed to send league chat WS notification for scoring settings update',
-              { err },
-            );
-          });
-      }
+      await postSystemLeagueMessage(context.db, context.notificationService, {
+        leagueId: args.leagueId,
+        messageType: 'system_scoring_changed',
+        messageText: notificationText,
+        metadata: { changedBy: username, changedByUserId: userId, changes },
+      });
 
       return config;
     },
@@ -795,6 +796,16 @@ builder.mutationField('updateLeagueScoringPositionBonuses', (t) =>
         'Position-scoped scoring bonuses require a premium subscription. Upgrade to unlock custom scoring multipliers.',
       );
 
+      // Fetch the current bonuses BEFORE updating so we can describe what
+      // changed (mirrors updateLeagueScoringProfile above — LS-9666).
+      const previousConfig = await loadLeagueScoringConfig(args.leagueId);
+      const previousBonusByKey = new Map(
+        previousConfig.positionBonuses.map((b) => [
+          `${b.statDefinitionId}:${b.position}`,
+          b,
+        ]),
+      );
+
       for (const update of updates) {
         if (!update.position || update.position.trim() === '') {
           throw UserInputError(
@@ -843,6 +854,72 @@ builder.mutationField('updateLeagueScoringPositionBonuses', (t) =>
         args.leagueId,
         'position bonus update',
       );
+
+      // Post one authorless system_scoring_changed chat message (LS-9666),
+      // mirroring updateLeagueScoringProfile above.
+      const bonusUserId = context.user.id;
+      const bonusUsername = context.user.username ?? `user_${bonusUserId}`;
+
+      const bonusChangeDescriptions: string[] = [];
+      const bonusChanges: Array<{
+        statDefinitionId: number;
+        position: string;
+        statName: string;
+        previousBonusMultiplier: number | null;
+        newBonusMultiplier: number | null;
+        previousEnabled: boolean;
+        newEnabled: boolean | null;
+      }> = [];
+      for (const update of updates) {
+        const key = `${update.statDefinitionId}:${update.position}`;
+        const prevBonus = previousBonusByKey.get(key);
+        const statName =
+          prevBonus?.definition?.displayName ??
+          `stat ${update.statDefinitionId}`;
+        const prevMultiplier = prevBonus?.numericBonusMultiplier ?? null;
+
+        if (typeof update.isEnabled === 'boolean' && !update.isEnabled) {
+          bonusChangeDescriptions.push(
+            `disabled ${statName} (${update.position})`,
+          );
+        } else if (typeof update.bonusMultiplier === 'number') {
+          bonusChangeDescriptions.push(
+            `${statName} (${update.position}): ${prevMultiplier ?? 'none'}x → ${update.bonusMultiplier}x`,
+          );
+        }
+
+        bonusChanges.push({
+          statDefinitionId: update.statDefinitionId,
+          position: update.position,
+          statName,
+          previousBonusMultiplier: prevMultiplier,
+          newBonusMultiplier:
+            typeof update.bonusMultiplier === 'number'
+              ? update.bonusMultiplier
+              : null,
+          previousEnabled: prevBonus ? prevBonus.isEnabled !== false : true,
+          newEnabled:
+            typeof update.isEnabled === 'boolean' ? update.isEnabled : null,
+        });
+      }
+
+      const bonusChangeSummary =
+        bonusChangeDescriptions.length > 0
+          ? bonusChangeDescriptions.length <= 5
+            ? bonusChangeDescriptions.join(', ')
+            : `${bonusChangeDescriptions.slice(0, 5).join(', ')} and ${bonusChangeDescriptions.length - 5} more`
+          : 'position bonuses';
+
+      await postSystemLeagueMessage(context.db, context.notificationService, {
+        leagueId: args.leagueId,
+        messageType: 'system_scoring_changed',
+        messageText: `${bonusUsername} updated scoring settings: ${bonusChangeSummary}`,
+        metadata: {
+          changedBy: bonusUsername,
+          changedByUserId: bonusUserId,
+          changes: bonusChanges,
+        },
+      });
 
       return loadLeagueScoringConfig(args.leagueId);
     },

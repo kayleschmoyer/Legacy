@@ -51,7 +51,11 @@ describe('Commissioner Tools Resolver', () => {
       groupBy: jest.fn().mockReturnThis(),
       insert: jest.fn().mockReturnThis(),
       values: jest.fn().mockReturnThis(),
-      returning: jest.fn().mockReturnThis(),
+      // Terminal call for the system_scores_recomputed chat message insert
+      // (LS-9666) — must resolve to a row, not chain back to mockDb.
+      returning: jest
+        .fn()
+        .mockResolvedValue([{ id: 999, timestamp: new Date().toISOString() }]),
       update: jest.fn().mockReturnThis(),
       set: jest.fn().mockReturnThis(),
       delete: jest.fn().mockReturnThis(),
@@ -659,6 +663,39 @@ describe('Commissioner Tools Resolver', () => {
       expect(result.matchupsRecalculated).toBe(2);
       expect(result.matchupsFailed).toBe(0);
       expect(result.message).toContain('2 matchups');
+    });
+
+    it('posts exactly ONE system_scores_recomputed chat message, never one per matchup (LS-9666)', async () => {
+      mockDb.limit.mockResolvedValueOnce([{ accessLevel: 'admin' }]);
+      mockDb.where.mockReturnValueOnce(mockDb).mockResolvedValueOnce([
+        { id: 1, team1Id: 10, team2Id: 20, gamesPerMatchup: 5, weekNumber: 1 },
+        { id: 2, team1Id: 30, team2Id: 40, gamesPerMatchup: 5, weekNumber: 1 },
+        { id: 3, team1Id: 50, team2Id: 60, gamesPerMatchup: 5, weekNumber: 1 },
+      ]);
+      const notifyLeagueChatMessage = jest.fn().mockResolvedValue(undefined);
+
+      const resolver = getMutation('recalculateLeagueMatchupScores');
+      const result = (await resolver(
+        {},
+        { input: { leagueId: 1 } },
+        { ...mockContext, notificationService: { notifyLeagueChatMessage } },
+        undefined as never,
+      )) as Record<string, unknown>;
+
+      expect(result.matchupsRecalculated).toBe(3);
+
+      const chatMessageCalls = (mockDb.values as jest.Mock).mock.calls.filter(
+        ([values]) =>
+          (values as Record<string, unknown>)?.messageType ===
+          'system_scores_recomputed',
+      );
+      expect(chatMessageCalls).toHaveLength(1);
+      expect(chatMessageCalls[0][0]).toMatchObject({
+        leagueId: 1,
+        userId: null,
+        metadata: expect.objectContaining({ matchupCount: 3 }),
+      });
+      expect(notifyLeagueChatMessage).toHaveBeenCalledTimes(1);
     });
 
     it('recalculates matchups for a specific week', async () => {

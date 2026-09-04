@@ -30,6 +30,7 @@ import { checkAdminInDb, verifyCommissionerAccess } from './authorization';
 import { CommissionerAuditLog } from './leagues';
 import { AuthenticationError, UserInputError } from './graphql-errors';
 import { writeAuditLog } from './audit-log';
+import { postSystemLeagueMessage } from './league-messages-helper';
 import { addPlayerToRoster } from '../services/roster-service';
 
 /**
@@ -849,6 +850,25 @@ builder.mutationField('recalculateLeagueMatchupScores', (t) =>
           failed,
         },
       });
+
+      // Post exactly ONE system_scores_recomputed chat message for this run
+      // (LS-9666) — never one per matchup, however many matchups the loop
+      // above touched.
+      if (recalculated > 0) {
+        const weekLabel = weekNumber != null ? ` for week ${weekNumber}` : '';
+        await postSystemLeagueMessage(db, context.notificationService, {
+          leagueId,
+          messageType: 'system_scores_recomputed',
+          messageText: `Scores were recomputed for ${recalculated} matchup${recalculated === 1 ? '' : 's'}${weekLabel} (commissioner recalculation)`,
+          metadata: {
+            matchupCount: recalculated,
+            failedCount: failed,
+            weekNumber: weekNumber ?? null,
+            reason: 'commissioner_recalculation',
+            triggeredByUserId: context.user.id,
+          },
+        });
+      }
 
       LOGGER.info('Commissioner: recalculated matchup scores', {
         leagueId,

@@ -72,7 +72,13 @@ function isSameDay(a: string, b: string): boolean {
   );
 }
 
-const SYSTEM_TYPES = new Set(['trade', 'waiver', 'draft_settings']);
+const SYSTEM_TYPES = new Set([
+  'trade',
+  'waiver',
+  'draft_settings',
+  'system_scoring_changed',
+  'system_scores_recomputed',
+]);
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
 
 /**

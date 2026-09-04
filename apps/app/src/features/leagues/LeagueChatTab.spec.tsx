@@ -62,6 +62,22 @@ jest.mock('@legacy-sports/shared-components', () => {
         <Text onPress={onClose}>Close GIF Picker</Text>
       </View>
     ),
+    SystemMessageNotice: ({
+      messageText,
+      createdAt,
+      formatTime,
+      testID = 'system-message',
+    }: {
+      messageText: string;
+      createdAt: string;
+      formatTime: (isoString: string) => string;
+      testID?: string;
+    }) => (
+      <View testID={testID}>
+        <Text>{messageText}</Text>
+        <Text>{formatTime(createdAt)}</Text>
+      </View>
+    ),
   };
 });
 
@@ -424,6 +440,46 @@ describe('LeagueChatTab', () => {
       render(<LeagueChatTab {...defaultProps} />);
       expect(screen.getByTestId('system-message')).toBeTruthy();
       expect(screen.getByText('Team A traded with Team B')).toBeTruthy();
+    });
+
+    it('renders scoring settings changed and scores recomputed as system notices (LS-9666)', () => {
+      mockUseLeagueChat.mockReturnValue({
+        messages: [
+          {
+            id: 11,
+            userId: null,
+            username: '',
+            messageText: 'commish updated scoring settings: HR: 4x → 6x',
+            messageType: 'system_scoring_changed',
+            createdAt: '2026-03-31T10:00:00Z',
+          },
+          {
+            id: 12,
+            userId: null,
+            username: '',
+            messageText:
+              'Scores were recomputed for 3 matchups (commissioner recalculation)',
+            messageType: 'system_scores_recomputed',
+            createdAt: '2026-03-31T10:01:00Z',
+          },
+        ],
+        loading: false,
+        sending: false,
+        wsError: null,
+        sendMessage: mockSendMessage,
+        mentionCandidates: [],
+      });
+
+      render(<LeagueChatTab {...defaultProps} />);
+      expect(screen.getAllByTestId('system-message')).toHaveLength(2);
+      expect(
+        screen.getByText('commish updated scoring settings: HR: 4x → 6x'),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(
+          'Scores were recomputed for 3 matchups (commissioner recalculation)',
+        ),
+      ).toBeTruthy();
     });
 
     it('renders a plain text message as a normal bubble, not a system notice', () => {

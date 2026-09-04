@@ -170,6 +170,16 @@ describe('updateLeagueScoringPositionBonuses — premium gate (LS-9104)', () => 
           }),
         };
       }),
+      // Backs the system_scoring_changed chat message insert (LS-9666).
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest
+            .fn()
+            .mockResolvedValue([
+              { id: 1, timestamp: new Date().toISOString() },
+            ]),
+        }),
+      }),
       execute: jest.fn().mockResolvedValue(undefined),
     };
   }
@@ -263,6 +273,41 @@ describe('updateLeagueScoringPositionBonuses — premium gate (LS-9104)', () => 
     expect(mockRefreshPlayerScoringCache).toHaveBeenCalledWith(
       expect.anything(),
       10,
+    );
+  });
+
+  it('posts an authorless system_scoring_changed message (LS-9666)', async () => {
+    stripeYields([ENTITLEMENTS.custom_scoring_multipliers]);
+    const resolve = getMutationResolve();
+    const notifyLeagueChatMessage = jest.fn().mockResolvedValue(undefined);
+    const db = makeDb({
+      permissionLevel: 'commissioner',
+      stripeCustomerId: 'cus_premium',
+    });
+
+    await resolve(
+      {},
+      { leagueId: 10, updates: validUpdates },
+      {
+        user: { id: 1, username: 'gm1', isAdmin: false },
+        db,
+        notificationService: { notifyLeagueChatMessage },
+      },
+      undefined as never,
+    );
+
+    expect(db.insert).toHaveBeenCalled();
+    const valuesCall = db.insert.mock.results[0].value.values;
+    expect(valuesCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        leagueId: 10,
+        userId: null,
+        messageType: 'system_scoring_changed',
+      }),
+    );
+    expect(notifyLeagueChatMessage).toHaveBeenCalledWith(
+      10,
+      expect.objectContaining({ senderId: null }),
     );
   });
 

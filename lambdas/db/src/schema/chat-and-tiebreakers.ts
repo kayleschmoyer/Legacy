@@ -10,6 +10,8 @@ import {
   UserInputError,
 } from './graphql-errors';
 import { validateGifUrl } from './validate-gif-url';
+import { persistAndBroadcastLeagueMessage } from './league-messages-helper';
+import { toUtcIso } from './timestamp-utils';
 import { insertActivityLog } from '../services/activity-log';
 import { detectProfanity } from '../services/profanity-filter';
 
@@ -23,33 +25,6 @@ import { detectProfanity } from '../services/profanity-filter';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/**
- * Normalize a PostgreSQL timestamp string to an ISO 8601 UTC string.
- *
- * Handles two formats returned by the `pg` driver:
- *  - TIMESTAMPTZ: "2024-01-15 14:30:00.123456+00" (after LS-474 migration)
- *  - TIMESTAMP:   "2024-01-15 14:30:00.123456"    (pre-migration rows / legacy)
- *
- * In both cases the value is already UTC; we just need to produce a proper
- * ISO 8601 string with a Z suffix so JavaScript's Date constructor treats it
- * as UTC and toLocaleTimeString() converts to the viewer's local timezone.
- *
- * Node.js Date requires timezone offsets in +HH:MM format (ISO 8601 §5.6).
- * PostgreSQL emits bare +HH (e.g. "+00") without the ":MM" minutes component,
- * which causes `new Date(...)` to return Invalid Date (LS-491).  We expand
- * bare offsets to +HH:00 before parsing.
- */
-function toUtcIso(pgTs: string): string {
-  // Replace PostgreSQL space separator with T.
-  let normalized = pgTs.replace(' ', 'T');
-  // Expand bare +HH / -HH offsets to +HH:00 / -HH:00 so they are valid ISO 8601.
-  normalized = normalized.replace(/([+-]\d{2})$/, '$1:00');
-  if (normalized.endsWith('Z') || normalized.includes('+')) {
-    return new Date(normalized).toISOString();
-  }
-  return new Date(normalized + 'Z').toISOString();
-}
 
 /**
  * Normalize a matchup_chat_blocks row for the MatchupChatBlock GraphQL type.
@@ -1086,46 +1061,26 @@ builder.mutationField('sendLeagueMessage', (t) =>
         mentionedManagerIds = resolveMentionedManagerIds(text, teams);
       }
 
-      // Persist the message
-      const rows = await context.db
-        .insert(PublicSchema.leagueMessages)
-        .values({
+      // Persist the message + broadcast over the existing WebSocket path
+      // (shared tail — LS-9666 — also used by authorless system messages).
+      // Dispatch MUST be awaited so the Lambda execution context is not
+      // frozen before the API Gateway PostToConnection calls complete;
+      // fire-and-forget caused silent notification loss.
+      const msg = await persistAndBroadcastLeagueMessage(
+        context.db,
+        context.notificationService,
+        {
           leagueId: args.leagueId,
           userId: context.user.id,
+          senderUsername: context.user.username ?? `user_${context.user.id}`,
           messageText: text,
           messageType: gifUrl ? 'gif' : 'text',
           gifUrl: gifUrl,
           mentionedUserIds:
             mentionedManagerIds.length > 0 ? mentionedManagerIds : null,
           containsProfanity: detectProfanity(text),
-        })
-        .returning();
-
-      const msg = rows[0];
-
-      // Dispatch WebSocket notification — MUST be awaited so the Lambda
-      // execution context is not frozen before the API Gateway PostToConnection
-      // calls complete.  Fire-and-forget caused silent notification loss.
-      const { notificationService } = context;
-      if (notificationService) {
-        try {
-          await notificationService.notifyLeagueChatMessage(args.leagueId, {
-            leagueId: args.leagueId,
-            messageId: msg.id,
-            senderId: context.user.id,
-            senderUsername: context.user.username ?? `user_${context.user.id}`,
-            messageText: text,
-            timestamp: msg.timestamp
-              ? toUtcIso(msg.timestamp)
-              : new Date().toISOString(),
-            messageType: msg.messageType ?? 'text',
-            gifUrl: msg.gifUrl ?? null,
-          });
-        } catch (err: unknown) {
-          // Never let a notification failure block the mutation response
-          LOGGER.warn('Failed to send league chat WS notification', { err });
-        }
-      }
+        },
+      );
 
       // Push-notify mentioned users who aren't actively viewing the league
       // chat (LS-9216, AC2). Skips the sender (mentioning your own team is
@@ -1139,8 +1094,8 @@ builder.mutationField('sendLeagueMessage', (t) =>
       if (mentionRecipientIds.length > 0 && context.notificationPublisher) {
         for (const recipientId of mentionRecipientIds) {
           try {
-            const isViewing = notificationService
-              ? await notificationService.isUserViewingLeague(
+            const isViewing = context.notificationService
+              ? await context.notificationService.isUserViewingLeague(
                   recipientId,
                   args.leagueId,
                 )

@@ -298,6 +298,7 @@ export * from './constants/teams';
 
 // Chat components
 export * from './features/chat/GifPicker';
+export * from './features/chat/SystemMessageNotice';
 
 // League feature components
 export * from './features/leagues/LeagueDetailShell';

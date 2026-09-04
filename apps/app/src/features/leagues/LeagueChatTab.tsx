@@ -12,7 +12,10 @@ import {
   TextInput,
 } from 'react-native';
 import { Button, Spinner, Text, XStack, YStack } from 'tamagui';
-import { GifPicker } from '@legacy-sports/shared-components';
+import {
+  GifPicker,
+  SystemMessageNotice,
+} from '@legacy-sports/shared-components';
 import { config } from '@legacy-sports/app-config/native';
 import { colors } from '@legacy-sports/design-tokens';
 import { captureError } from '@legacy-sports/rollbar/native';
@@ -45,6 +48,8 @@ const SYSTEM_MESSAGE_TYPES = new Set([
   'trade',
   'waiver',
   'draft_settings',
+  'system_scoring_changed',
+  'system_scores_recomputed',
 ]);
 
 // ---------------------------------------------------------------------------
@@ -295,33 +300,12 @@ export function LeagueChatTab({
                 // a centered notice, not a directional chat bubble.
                 if (isSystemMessage) {
                   return (
-                    <YStack
+                    <SystemMessageNotice
                       key={msg.id}
-                      testID="system-message"
-                      alignItems="center"
-                      marginBottom="$2"
-                      paddingHorizontal="$3"
-                    >
-                      <YStack
-                        backgroundColor="$gray3"
-                        borderRadius="$10"
-                        paddingHorizontal="$3"
-                        paddingVertical="$1"
-                        maxWidth="90%"
-                      >
-                        <Text
-                          color="$gray10"
-                          fontSize="$2"
-                          textAlign="center"
-                          fontStyle="italic"
-                        >
-                          {msg.messageText}
-                        </Text>
-                      </YStack>
-                      <Text fontSize="$1" color="$gray9" marginTop="$1">
-                        {formatTime(msg.createdAt)}
-                      </Text>
-                    </YStack>
+                      messageText={msg.messageText}
+                      createdAt={msg.createdAt}
+                      formatTime={formatTime}
+                    />
                   );
                 }
 
