@@ -137,16 +137,25 @@ export interface LogSearchMeta {
   pattern: string;
   totalMatches: number;
   returnedMatches: number;
+  /**
+   * True when the response is incomplete in *either* sense: more matches
+   * exist than were returned (`totalMatches > returnedMatches`), or the
+   * search itself covered fewer jobs than exist in the run's scope
+   * (`jobsSearched < jobsTotal`, e.g. failedOnly excluding some jobs, or the
+   * per-call job cap) — LS-9389. Either condition means the result is not
+   * safe to read as an authoritative "the pattern is absent".
+   */
   truncated: boolean;
   /** Number of jobs whose logs were actually fetched and searched. */
   jobsSearched: number;
   /** Total number of jobs in scope (after jobName filtering, before failedOnly). */
   jobsTotal: number;
   /**
-   * Present (and non-null) only when `failedOnly` filtered every job out of
-   * scope — i.e. jobs existed but none were searched — so a bare
-   * `totalMatches: 0` is never mistaken for "content was searched and the
-   * pattern is absent" when in fact nothing was searched at all.
+   * Present whenever `jobsSearched < jobsTotal` — either because `failedOnly`
+   * filtered out every job (jobs existed but none were searched) or some
+   * (successful jobs excluded by failedOnly, or jobs beyond the per-call cap)
+   * — so a bare `totalMatches: 0` is never mistaken for "content was searched
+   * and the pattern is absent" (LS-9389, recurrence of LS-8301).
    */
   scopeNote?: string;
 }

@@ -258,6 +258,54 @@ describe('searchLogs zero-scope visibility (LS-8301)', () => {
   });
 });
 
+describe('searchLogs partial job coverage (LS-9389)', () => {
+  beforeEach(() => {
+    mockFetchRunLogs.mockReset();
+  });
+
+  it('flags partial coverage instead of a bare totalMatches: 0 when failedOnly excludes some (not all) jobs', async () => {
+    // Reproduces the LS-9389 repro: an orchestrator run with 16 jobs, 11 of
+    // them contributed by a called (workflow_call) workflow. failedOnly=true
+    // (default) filters to only the 5 non-success jobs, so the pattern —
+    // which lives in a *passing* job (custom-checks) — is never searched.
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult('some-failed-job\nunrelated output', {
+        jobsSearched: 5,
+        jobsTotal: 16,
+        skippedByFailedOnly: false,
+      }),
+    );
+    const result = await searchLogs({
+      runId: 31648029740,
+      pattern: 'reusable-workflow call site',
+    });
+    expect(result.isError).toBeUndefined();
+    const parsed = parseSearchResult(textOf(result));
+    expect(parsed.totalMatches).toBe(0);
+    expect(parsed.jobsSearched).toBe(5);
+    expect(parsed.jobsTotal).toBe(16);
+    // The old bug: totalMatches: 0 with no truncated/scopeNote signal at all.
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.scopeNote).toMatch(/5 of 16 job\(s\) were searched/);
+    expect(parsed.scopeNote).toMatch(/11 job\(s\) were not searched/);
+    expect(parsed.scopeNote).toMatch(/does NOT mean the pattern is absent/);
+  });
+
+  it('does not flag partial coverage when every job in scope was searched', async () => {
+    mockFetchRunLogs.mockResolvedValue(
+      fetchResult('job-a\nMATCH here', {
+        jobsSearched: 3,
+        jobsTotal: 3,
+      }),
+    );
+    const result = await searchLogs({ runId: 1, pattern: 'MATCH' });
+    expect(result.isError).toBeUndefined();
+    const parsed = parseSearchResult(textOf(result));
+    expect(parsed.truncated).toBe(false);
+    expect(parsed.scopeNote).toBeUndefined();
+  });
+});
+
 describe('searchLogs ANSI stripping (LS-9557)', () => {
   // Built from String.fromCharCode rather than a \x1b literal — same
   // no-control-regex rationale as get-logs.ts.

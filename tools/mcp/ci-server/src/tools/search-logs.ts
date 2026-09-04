@@ -108,9 +108,22 @@ export async function searchLogs(
       });
     }
 
+    // LS-9389: `skippedByFailedOnly` only fires when failedOnly filtered out
+    // *every* job (jobs.length === 0), which previously left a partial-scope
+    // search — e.g. failedOnly excluding some (not all) successful jobs, or
+    // the MAX_LOG_JOBS per-call cap — completely unflagged. A caller reading
+    // `totalMatches: 0` alongside `jobsSearched: 5, jobsTotal: 16` had no
+    // signal that 11 unsearched jobs could hold the pattern, which is exactly
+    // what happened in the LS-9389 repro (the match lived in a *passing* job
+    // excluded by failedOnly's default). Any time jobsSearched < jobsTotal,
+    // surface it so a zero-match result is never read as a clean negative.
+    const jobsUnsearched = rawLogs.jobsTotal - rawLogs.jobsSearched;
+    const partialCoverage = jobsUnsearched > 0;
     const scopeNote = rawLogs.skippedByFailedOnly
       ? `0 of ${rawLogs.jobsTotal} job(s) were searched — all were excluded by failedOnly=true (default). Retry with failedOnly=false to search successful-job logs too.`
-      : undefined;
+      : partialCoverage
+        ? `${rawLogs.jobsSearched} of ${rawLogs.jobsTotal} job(s) were searched — ${jobsUnsearched} job(s) were not searched (excluded by failedOnly=true and/or the per-call job cap). A 0-match result does NOT mean the pattern is absent from the run. Retry with failedOnly=false and/or jobName/jobId to cover the remaining job(s).`
+        : undefined;
 
     return {
       content: [
@@ -123,7 +136,7 @@ export async function searchLogs(
               pattern: params.pattern,
               totalMatches,
               returnedMatches: matches.length,
-              truncated: totalMatches > matches.length,
+              truncated: totalMatches > matches.length || partialCoverage,
               jobsSearched: rawLogs.jobsSearched,
               jobsTotal: rawLogs.jobsTotal,
               ...(scopeNote ? { scopeNote } : {}),
