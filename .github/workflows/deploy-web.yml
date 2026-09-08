@@ -284,13 +284,49 @@ jobs:
     # Release creation is non-critical — don't fail the overall deploy
     continue-on-error: true
     outputs:
-      # Only populated when the release action actually succeeded. Callers
-      # should treat an empty value as "release not created" and omit the link.
-      release_url: ${{ steps.release.outputs.url }}
+      # Populated when the release was actually created — either by the action on
+      # the first attempt or by the retry step below. Callers should treat an
+      # empty value as "release not created" and omit the link.
+      release_url: ${{ steps.release.outputs.url || steps.release-retry.outputs.url }}
 
     steps:
+      # Composed once and shared by both the primary action and the `gh api`
+      # retry below, so the two paths cannot drift apart.
+      - name: Compose release body
+        env:
+          VERSION: ${{ needs.setup.outputs.version }}
+          BUILD_NUMBER: ${{ needs.setup.outputs.build_number }}
+          COMMIT_SHA: ${{ needs.setup.outputs.commit_sha }}
+          DEPLOYMENT_URL: ${{ needs.build-and-deploy.outputs.deployment_url }}
+        run: |
+          cat > "${RUNNER_TEMP}/release-body.md" <<EOF
+          ## 🌐 Web Application Release
+
+          **Version:** ${VERSION}  
+          **Build Number:** ${BUILD_NUMBER}  
+          **Commit:** ${COMMIT_SHA}
+
+          ### 🚀 Deployment
+          - **Live URL:** ${DEPLOYMENT_URL}
+          - **Custom Domain:** https://legacy-fantasy.com
+          - **Platform:** GitHub Pages
+
+          ### 📦 Build Information
+          - **Framework:** React + Vite
+          - **UI Library:** Tamagui
+          - **State Management:** Apollo Client (GraphQL)
+          - **Source Maps:** Uploaded to Rollbar
+
+          ### 🔗 Access
+          Visit the live application at:
+          - Production: https://legacy-fantasy.com
+          - GitHub Pages: ${DEPLOYMENT_URL}
+          EOF
+
       - name: Create Release
         id: release
+        # Failure here is handled by the retry step below, not by ending the job.
+        continue-on-error: true
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: web-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
@@ -300,35 +336,83 @@ jobs:
           prerelease: false
           generate_release_notes: true
           make_latest: "false"
-          body: |
-            ## 🌐 Web Application Release
+          body_path: ${{ runner.temp }}/release-body.md
 
-            **Version:** ${{ needs.setup.outputs.version }}  
-            **Build Number:** ${{ needs.setup.outputs.build_number }}  
-            **Commit:** ${{ needs.setup.outputs.commit_sha }}
+      # LS-9907: softprops/action-gh-release classifies *any* 403 as a permanent
+      # permission error and refuses to retry ("Skip retry — your GitHub
+      # token/PAT does not have the required permission to create a release").
+      # The 403 on run 34253648629 was NOT a permission problem: that job's own
+      # `GITHUB_TOKEN Permissions` block logged `Contents: write`, byte-identical
+      # to run 33913901203 where the same step, same action SHA and same
+      # workflow succeeded. It was a transient GitHub App installation throttle
+      # during a burst of five merge-queue merges inside five minutes. Retrying
+      # with backoff recovers the release instead of silently losing it.
+      - name: Retry release creation
+        id: release-retry
+        if: steps.release.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: web-v${{ needs.setup.outputs.version }}-${{ needs.setup.outputs.build_number }}
+          TITLE: "Web Release v${{ needs.setup.outputs.version }} (${{ needs.setup.outputs.commit_sha }})"
+          DEPLOYMENT_URL: ${{ needs.build-and-deploy.outputs.deployment_url }}
+        run: |
+          # Deliberately no `set -e`: a failed attempt inside the loop must fall
+          # through to the next retry rather than abort the step.
+          set -uo pipefail
+          BODY="$(cat "${RUNNER_TEMP}/release-body.md")"
 
-            ### 🚀 Deployment
-            - **Live URL:** ${{ needs.build-and-deploy.outputs.deployment_url }}
-            - **Custom Domain:** https://legacy-fantasy.com
-            - **Platform:** GitHub Pages
+          for attempt in 1 2 3; do
+            backoff=$((attempt * 30))
+            echo "::notice::Release retry ${attempt}/3 — waiting ${backoff}s for the transient failure to clear"
+            sleep "${backoff}"
 
-            ### 📦 Build Information
-            - **Framework:** React + Vite
-            - **UI Library:** Tamagui
-            - **State Management:** Apollo Client (GraphQL)
-            - **Source Maps:** Uploaded to Rollbar
+            # The first attempt can create the release and still report failure,
+            # so check for an existing one before POSTing a duplicate.
+            if url="$(gh release view "${TAG}" --json url --jq .url 2>/dev/null)"; then
+              echo "::notice::Release ${TAG} already exists: ${url}"
+              echo "url=${url}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
 
-            ### 🔗 Access
-            Visit the live application at:
-            - Production: https://legacy-fantasy.com
-            - GitHub Pages: ${{ needs.build-and-deploy.outputs.deployment_url }}
+            if url="$(gh api "repos/${GITHUB_REPOSITORY}/releases" \
+              --method POST \
+              -f tag_name="${TAG}" \
+              -f target_commitish="${GITHUB_SHA}" \
+              -f name="${TITLE}" \
+              -F draft=false \
+              -F prerelease=false \
+              -F generate_release_notes=true \
+              -f make_latest=false \
+              -f body="${BODY}" \
+              --jq .html_url)"; then
+              echo "::notice::Created release ${TAG} on retry ${attempt}: ${url}"
+              echo "url=${url}" >> "${GITHUB_OUTPUT}"
+              exit 0
+            fi
 
+            echo "::warning::Release retry ${attempt}/3 failed for ${TAG}"
+          done
+
+          # Assembled in parts so the annotation stays a single line without
+          # tripping yamllint's 200-character limit.
+          MSG="Could not create GitHub release ${TAG} after 3 retries."
+          MSG="${MSG} THE WEB DEPLOY ITSELF SUCCEEDED — the app is live at"
+          MSG="${MSG} ${DEPLOYMENT_URL} and https://legacy-fantasy.com."
+          MSG="${MSG} Only the release artifact is missing; create it manually"
+          MSG="${MSG} with: gh release create ${TAG} --target ${GITHUB_SHA}"
+          echo "::error::${MSG}"
+          exit 1
+
+      # Only move the pointer tag once a release actually exists for this deploy,
+      # otherwise /releases/tag/web-latest resolves to a tag with no release.
       - name: Checkout for tag push
+        if: steps.release.outcome == 'success' || steps.release-retry.outcome == 'success'
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 1
 
       - name: Update web-latest tag
+        if: steps.release.outcome == 'success' || steps.release-retry.outcome == 'success'
         run: |
           # Force-push a stable pointer tag so /releases/tag/web-latest always
           # resolves to the latest web deploy release. This intentionally overwrites
