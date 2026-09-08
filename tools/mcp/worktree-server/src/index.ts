@@ -4,6 +4,12 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import {
+  markdownTable,
+  minifiedJson,
+  pickFields,
+} from '@legacy-sports/mcp-format';
+import { validateOutputPath } from '@legacy-sports/mcp-path-safety';
 import { execFile, execFileSync, execSync } from 'node:child_process';
 import {
   appendFileSync,
@@ -38,7 +44,11 @@ import {
   getConflictInfo,
   scanStagedForConflictMarkers,
 } from './conflict-markers';
-import { executeWorktreeFetch, type FetchArgs } from './fetch-utils';
+import {
+  executeWorktreeFetch,
+  type FetchArgs,
+  tryRefreshRemoteTrackingRef,
+} from './fetch-utils';
 import { ensureSufficientDepth } from './shallow-utils';
 import {
   executeWorktreeFileMode,
@@ -78,12 +88,6 @@ import {
   type RemoteBranchRow,
   type WorktreeListEntry,
 } from './format';
-import {
-  markdownTable,
-  minifiedJson,
-  pickFields,
-} from '@legacy-sports/mcp-format';
-import { validateOutputPath } from '@legacy-sports/mcp-path-safety';
 
 // ---------------------------------------------------------------------------
 // Constants & state
@@ -1581,6 +1585,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
             description:
               'Timeout in milliseconds for the git push subprocess (default: 120000). Increase when pre-push hooks run slow checks (e.g. terraform validate, pnpm format) that exceed the default.',
           },
+          fetchFirst: { type: 'boolean' },
         },
       },
     },
@@ -2444,7 +2449,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
           items: {
             type: 'array',
             description:
-              'Per-worktree push specs (max 50). Each item accepts the same fields as worktree_push: worktree (required), setUpstream, skipLint, remoteBranch, timeoutMs.',
+              'Per-worktree push specs (max 50). Each item accepts the same fields as worktree_push: worktree (required), setUpstream, skipLint, remoteBranch, timeoutMs, fetchFirst.',
             items: {
               type: 'object',
               properties: {
@@ -2457,6 +2462,7 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
                 skipLint: { type: 'boolean' },
                 remoteBranch: { type: 'string' },
                 timeoutMs: { type: 'number' },
+                fetchFirst: { type: 'boolean' },
               },
               required: ['worktree'],
             },
@@ -4843,6 +4849,7 @@ const handleCallTool = async (
         skipLint: skipLintRaw,
         remoteBranch,
         timeoutMs: timeoutMsRaw,
+        fetchFirst: fetchFirstRaw,
       } = args as {
         worktree?: unknown;
         worktreeKey?: unknown;
@@ -4851,6 +4858,7 @@ const handleCallTool = async (
         skipLint?: unknown;
         remoteBranch?: unknown;
         timeoutMs?: unknown;
+        fetchFirst?: unknown;
       };
       const pushTimeoutMs =
         typeof timeoutMsRaw === 'number' && timeoutMsRaw > 0
@@ -4860,6 +4868,14 @@ const handleCallTool = async (
       // JSON booleans as strings — same class of bug as LS-1907).
       const setUpstream = coerceBool(setUpstreamRaw);
       const skipLint = coerceBool(skipLintRaw);
+      // Default true: refresh the local remote-tracking ref before comparing
+      // it for --force-with-lease. Without this, a stale ref (e.g. left over
+      // from the initial push, before a formatter auto-commit or CI status
+      // commit landed on the remote) causes a spurious "stale info" rejection
+      // on the next push (LS-4898). Pass fetchFirst: false to skip (e.g. to
+      // avoid a network round-trip when the caller already fetched).
+      const fetchFirstRawCoerced = coerceBool(fetchFirstRaw);
+      const fetchFirst = fetchFirstRawCoerced !== false;
       // Accept worktreeId as an alias for worktree (agents sometimes pass worktreeId
       // from older documentation or habit).
       const worktree = worktreeRaw ?? worktreeId;
@@ -5011,6 +5027,21 @@ const handleCallTool = async (
             {
               type: 'text',
               text: `[resolvedWorktree: ${cwd}]\nInvalid argument: skipLint must be a boolean.`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      if (
+        fetchFirstRawCoerced !== undefined &&
+        typeof fetchFirstRawCoerced !== 'boolean'
+      ) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `[resolvedWorktree: ${cwd}]\nInvalid argument: fetchFirst must be a boolean.`,
             },
           ],
           isError: true,
@@ -5180,6 +5211,24 @@ const handleCallTool = async (
         setUpstream === true || normalizedRemoteBranch !== undefined;
       const targetBranchName =
         resolvedRemoteBranch ?? run('git branch --show-current', cwd).trim();
+
+      // Refresh the local remote-tracking ref (refs/remotes/origin/<branch>)
+      // before comparing it for --force-with-lease. Without this, a ref left
+      // stale by a prior push (e.g. a formatter auto-commit, CI status
+      // commit, or merge-queue activity landing on the remote afterward)
+      // causes a spurious "stale info" rejection on the next push (LS-4898).
+      // Best-effort: a fetch failure (offline, transient network) falls
+      // through to the existing reactive retry-without-lease path below
+      // rather than blocking the push outright.
+      if (fetchFirst) {
+        tryRefreshRemoteTrackingRef(
+          runGit,
+          targetBranchName,
+          cwd,
+          Math.min(pushTimeoutMs, 30_000),
+        );
+      }
+
       // --force-with-lease compares against the local remote-tracking ref
       // (refs/remotes/origin/<branch>). On a genuinely new branch that ref
       // doesn't exist yet, and depending on git version/config that can

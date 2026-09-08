@@ -105,6 +105,29 @@ export function buildFetchResult(
  * including the target-resolution error branch and the `git fetch` failure
  * branch — is unit-testable without spawning git.
  */
+/**
+ * Best-effort refresh of the local remote-tracking ref before a
+ * `--force-with-lease` push (LS-4898). Swallows any `git fetch` failure —
+ * an offline caller, a branch not yet on the remote (first push), or a
+ * transient network error should all fall through to the caller's existing
+ * stale-info handling rather than blocking the push. Returns whether the
+ * fetch itself succeeded, purely for logging/testing; callers should not
+ * branch on it.
+ */
+export function tryRefreshRemoteTrackingRef(
+  runGit: (args: string[], cwd: string, opts?: { timeout?: number }) => string,
+  branch: string,
+  cwd: string,
+  timeoutMs: number,
+): boolean {
+  try {
+    runGit(['fetch', 'origin', branch], cwd, { timeout: timeoutMs });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function executeWorktreeFetch(
   args: FetchArgs,
   deps: FetchDeps,

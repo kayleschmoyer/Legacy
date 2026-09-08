@@ -86,10 +86,11 @@ Restore the most recently stashed changes. Equivalent to `git stash pop`.
 
 Push the current branch with `--force-with-lease`. Refuses to push the `main` branch.
 
-| Parameter     | Type    | Required | Description                                  |
-| ------------- | ------- | -------- | -------------------------------------------- |
-| `worktree`    | string  | No       | Ticket key. Uses active worktree if omitted. |
-| `setUpstream` | boolean | No       | If true, adds `-u` to set upstream tracking. |
+| Parameter     | Type    | Required | Description                                                                                                                                                                                        |
+| ------------- | ------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `worktree`    | string  | No       | Ticket key. Uses active worktree if omitted.                                                                                                                                                       |
+| `setUpstream` | boolean | No       | If true, adds `-u` to set upstream tracking.                                                                                                                                                       |
+| `fetchFirst`  | boolean | No       | Refresh the remote-tracking ref before the `--force-with-lease` push (default: `true`). Prevents stale-ref rejections after a formatter auto-commit or other remote activity. Set `false` to skip. |
 
 ## Setup
 

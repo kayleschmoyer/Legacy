@@ -873,6 +873,10 @@
               "type": "number",
               "optional": true,
               "description": "Timeout in milliseconds for the git push subprocess (default: 120000). Increase when pre-push hooks run slow checks (e.g. terraform validate, pnpm format) that exceed the default."
+            },
+            "fetchFirst": {
+              "type": "boolean",
+              "optional": true
             }
           },
           "transports": [
@@ -886,7 +890,7 @@
             "items": {
               "type": "array",
               "optional": false,
-              "description": "Per-worktree push specs (max 50). Each item accepts the same fields as worktree_push: worktree (required), setUpstream, skipLint, remoteBranch, timeoutMs.",
+              "description": "Per-worktree push specs (max 50). Each item accepts the same fields as worktree_push: worktree (required), setUpstream, skipLint, remoteBranch, timeoutMs, fetchFirst.",
               "items": {
                 "type": "object",
                 "optional": true,
@@ -910,6 +914,10 @@
                   },
                   "timeoutMs": {
                     "type": "number",
+                    "optional": true
+                  },
+                  "fetchFirst": {
+                    "type": "boolean",
                     "optional": true
                   }
                 }

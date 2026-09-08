@@ -5,6 +5,7 @@ import {
   buildFetchResult,
   executeWorktreeFetch,
   type FetchDeps,
+  tryRefreshRemoteTrackingRef,
 } from './fetch-utils';
 
 describe('buildFetchArgs', () => {
@@ -102,6 +103,42 @@ describe('buildFetchResult', () => {
     expect(buildFetchResult('upstream', 'develop', 'updated').branch).toBe(
       'develop',
     );
+  });
+});
+
+describe('tryRefreshRemoteTrackingRef', () => {
+  it('runs git fetch for the given branch and returns true on success', () => {
+    const runGit = jest.fn().mockReturnValue('');
+
+    const result = tryRefreshRemoteTrackingRef(
+      runGit,
+      'claude/LS-4898-fix',
+      '/wt',
+      30_000,
+    );
+
+    expect(runGit).toHaveBeenCalledWith(
+      ['fetch', 'origin', 'claude/LS-4898-fix'],
+      '/wt',
+      { timeout: 30_000 },
+    );
+    expect(result).toBe(true);
+  });
+
+  it('swallows a git fetch failure and returns false instead of throwing', () => {
+    const runGit = jest.fn().mockImplementation(() => {
+      throw Object.assign(new Error('Command failed: git fetch origin'), {
+        status: 128,
+        stderr: 'fatal: unable to access remote',
+      });
+    });
+
+    expect(() =>
+      tryRefreshRemoteTrackingRef(runGit, 'claude/LS-4898-fix', '/wt', 30_000),
+    ).not.toThrow();
+    expect(
+      tryRefreshRemoteTrackingRef(runGit, 'claude/LS-4898-fix', '/wt', 30_000),
+    ).toBe(false);
   });
 });
 
