@@ -26,63 +26,202 @@ exports[`App FootballHubPage should match complete football page layout snapshot
       >
         <div
           display="none"
+          gap="0"
+          padding="0"
         >
-          <a
-            aria-label="Legacy Sports home"
-            href="/"
-            style="text-decoration: none; flex-shrink: 0;"
+          <div
+            alignitems="center"
+            backgroundcolor="$background075"
+            borderbottomwidth="1"
+            bordercolor="$glassBorder"
+            gap="$4"
+            height="56"
+            justifycontent="space-between"
+            paddinghorizontal="$4"
+            position="sticky"
+            top="0"
+            width="100%"
+            zindex="100"
           >
             <div
               alignitems="center"
-              cursor="pointer"
               gap="$2"
             >
-              <img
-                alt="Legacy Sports"
-                data-testid="header-logo"
-                src="/logo.png"
-                style="height: 38px; width: auto; display: block; transition: height 200ms ease;"
-              />
-              <div
-                data-testid="brand-text"
-                style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+              <a
+                aria-label="Legacy Sports home"
+                href="/"
+                style="text-decoration: none; flex-shrink: 0;"
               >
-                <span
-                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
+                <div
+                  alignitems="center"
+                  cursor="pointer"
+                  gap="$2"
                 >
-                  LEGACY
+                  <img
+                    alt="Legacy Sports"
+                    data-testid="header-logo"
+                    src="/logo.png"
+                    style="height: 38px; width: auto; display: block; transition: height 200ms ease;"
+                  />
+                  <div
+                    data-testid="brand-text"
+                    style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+                  >
+                    <span
+                      color="$brandGoldLight"
+                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1;"
+                    >
+                      LEGACY
+                    </span>
+                    <span
+                      color="$color12"
+                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1;"
+                    >
+                      SPORTS
+                    </span>
+                  </div>
+                </div>
+              </a>
+            </div>
+            <div>
+              League Switcher
+            </div>
+            <div
+              alignitems="center"
+              backgroundcolor="$surfacePanel"
+              bordercolor="$outlineSubtle"
+              borderradius="9999"
+              borderwidth="1"
+              flex="1"
+              gap="4"
+              justifycontent="center"
+              paddinghorizontal="6"
+              paddingvertical="6"
+            >
+              <div
+                alignitems="center"
+                backgroundcolor="transparent"
+                borderradius="9999"
+                cursor="pointer"
+                gap="7"
+                paddinghorizontal="16"
+                paddingvertical="9"
+                role="link"
+                style="transition: background 120ms ease-out; user-select: none;"
+                tabindex="0"
+              >
+                <svg
+                  aria-hidden="true"
+                  fill="none"
+                  height="16"
+                  role="presentation"
+                  style="display: block; flex-shrink: 0; opacity: 0.8; transition: color 120ms ease-out;"
+                  viewBox="0 0 32 32"
+                  width="16"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="13"
+                    cy="12"
+                    r="4.5"
+                    stroke="var(--textMuted)"
+                    stroke-width="2.2"
+                  />
+                  <path
+                    d="M5 26c0-4.5 3.5-8 8-8s8 3.5 8 8"
+                    stroke="var(--textMuted)"
+                    stroke-linecap="round"
+                    stroke-width="2.2"
+                  />
+                  <circle
+                    cx="21"
+                    cy="11"
+                    opacity="0.45"
+                    r="3.5"
+                    stroke="var(--textMuted)"
+                    stroke-width="1.8000000000000003"
+                  />
+                  <path
+                    d="M24 25c0-3.5-2.5-6-5.5-6"
+                    opacity="0.45"
+                    stroke="var(--textMuted)"
+                    stroke-linecap="round"
+                    stroke-width="1.8000000000000003"
+                  />
+                </svg>
+                <span
+                  color="$textMuted"
+                  font-family="$heading"
+                  font-size="13"
+                  font-weight="700"
+                  letter-spacing="0.78"
+                  style="transition: color 120ms ease-out;"
+                  texttransform="uppercase"
+                >
+                  Players
                 </span>
-                <span
-                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
+              </div>
+              <div
+                alignitems="center"
+                backgroundcolor="transparent"
+                borderradius="9999"
+                cursor="pointer"
+                gap="7"
+                paddinghorizontal="16"
+                paddingvertical="9"
+                role="link"
+                style="transition: background 120ms ease-out; user-select: none;"
+                tabindex="0"
+              >
+                <svg
+                  aria-hidden="true"
+                  fill="none"
+                  height="16"
+                  role="presentation"
+                  style="display: block; flex-shrink: 0; opacity: 0.8; transition: color 120ms ease-out;"
+                  viewBox="0 0 32 32"
+                  width="16"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  SPORTS
+                  <path
+                    d="M18 5L10 17h6l-2 10 8-12h-6l2-10z"
+                    fill="rgba(NaN, NaN, NaN, 0.08)"
+                    stroke="var(--textMuted)"
+                    stroke-linejoin="round"
+                    stroke-width="2.2"
+                  />
+                </svg>
+                <span
+                  color="$textMuted"
+                  font-family="$heading"
+                  font-size="13"
+                  font-weight="700"
+                  letter-spacing="0.78"
+                  style="transition: color 120ms ease-out;"
+                  texttransform="uppercase"
+                >
+                  Minigames
                 </span>
               </div>
             </div>
-          </a>
-          <div>
-            League Switcher
-          </div>
-          <div
-            style="margin-left: auto;"
-          >
-            <nav>
-              Nav Tabs
-            </nav>
-          </div>
-          <div
-            alignitems="center"
-            gap="$2"
-            style="margin-left: 0px;"
-          >
-            <div>
-              Notification Dropdown
-            </div>
-            <button>
-              Help
-            </button>
-            <div>
-              User Profile Dropdown
+            <div
+              alignitems="center"
+              gap="$2"
+            >
+              <div
+                alignitems="center"
+                gap="$2"
+              >
+                <div>
+                  Notification Dropdown
+                </div>
+                <button>
+                  Help
+                </button>
+                <div>
+                  User Profile Dropdown
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -166,63 +305,202 @@ exports[`App Homepage Snapshot should match homepage snapshot 1`] = `
       >
         <div
           display="none"
+          gap="0"
+          padding="0"
         >
-          <a
-            aria-label="Legacy Sports home"
-            href="/"
-            style="text-decoration: none; flex-shrink: 0;"
+          <div
+            alignitems="center"
+            backgroundcolor="$background075"
+            borderbottomwidth="1"
+            bordercolor="$glassBorder"
+            gap="$4"
+            height="56"
+            justifycontent="space-between"
+            paddinghorizontal="$4"
+            position="sticky"
+            top="0"
+            width="100%"
+            zindex="100"
           >
             <div
               alignitems="center"
-              cursor="pointer"
               gap="$2"
             >
-              <img
-                alt="Legacy Sports"
-                data-testid="header-logo"
-                src="/logo.png"
-                style="height: 38px; width: auto; display: block; transition: height 200ms ease;"
-              />
-              <div
-                data-testid="brand-text"
-                style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+              <a
+                aria-label="Legacy Sports home"
+                href="/"
+                style="text-decoration: none; flex-shrink: 0;"
               >
-                <span
-                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
+                <div
+                  alignitems="center"
+                  cursor="pointer"
+                  gap="$2"
                 >
-                  LEGACY
+                  <img
+                    alt="Legacy Sports"
+                    data-testid="header-logo"
+                    src="/logo.png"
+                    style="height: 38px; width: auto; display: block; transition: height 200ms ease;"
+                  />
+                  <div
+                    data-testid="brand-text"
+                    style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+                  >
+                    <span
+                      color="$brandGoldLight"
+                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1;"
+                    >
+                      LEGACY
+                    </span>
+                    <span
+                      color="$color12"
+                      style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1;"
+                    >
+                      SPORTS
+                    </span>
+                  </div>
+                </div>
+              </a>
+            </div>
+            <div>
+              League Switcher
+            </div>
+            <div
+              alignitems="center"
+              backgroundcolor="$surfacePanel"
+              bordercolor="$outlineSubtle"
+              borderradius="9999"
+              borderwidth="1"
+              flex="1"
+              gap="4"
+              justifycontent="center"
+              paddinghorizontal="6"
+              paddingvertical="6"
+            >
+              <div
+                alignitems="center"
+                backgroundcolor="transparent"
+                borderradius="9999"
+                cursor="pointer"
+                gap="7"
+                paddinghorizontal="16"
+                paddingvertical="9"
+                role="link"
+                style="transition: background 120ms ease-out; user-select: none;"
+                tabindex="0"
+              >
+                <svg
+                  aria-hidden="true"
+                  fill="none"
+                  height="16"
+                  role="presentation"
+                  style="display: block; flex-shrink: 0; opacity: 0.8; transition: color 120ms ease-out;"
+                  viewBox="0 0 32 32"
+                  width="16"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <circle
+                    cx="13"
+                    cy="12"
+                    r="4.5"
+                    stroke="var(--textMuted)"
+                    stroke-width="2.2"
+                  />
+                  <path
+                    d="M5 26c0-4.5 3.5-8 8-8s8 3.5 8 8"
+                    stroke="var(--textMuted)"
+                    stroke-linecap="round"
+                    stroke-width="2.2"
+                  />
+                  <circle
+                    cx="21"
+                    cy="11"
+                    opacity="0.45"
+                    r="3.5"
+                    stroke="var(--textMuted)"
+                    stroke-width="1.8000000000000003"
+                  />
+                  <path
+                    d="M24 25c0-3.5-2.5-6-5.5-6"
+                    opacity="0.45"
+                    stroke="var(--textMuted)"
+                    stroke-linecap="round"
+                    stroke-width="1.8000000000000003"
+                  />
+                </svg>
+                <span
+                  color="$textMuted"
+                  font-family="$heading"
+                  font-size="13"
+                  font-weight="700"
+                  letter-spacing="0.78"
+                  style="transition: color 120ms ease-out;"
+                  texttransform="uppercase"
+                >
+                  Players
                 </span>
-                <span
-                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
+              </div>
+              <div
+                alignitems="center"
+                backgroundcolor="transparent"
+                borderradius="9999"
+                cursor="pointer"
+                gap="7"
+                paddinghorizontal="16"
+                paddingvertical="9"
+                role="link"
+                style="transition: background 120ms ease-out; user-select: none;"
+                tabindex="0"
+              >
+                <svg
+                  aria-hidden="true"
+                  fill="none"
+                  height="16"
+                  role="presentation"
+                  style="display: block; flex-shrink: 0; opacity: 0.8; transition: color 120ms ease-out;"
+                  viewBox="0 0 32 32"
+                  width="16"
+                  xmlns="http://www.w3.org/2000/svg"
                 >
-                  SPORTS
+                  <path
+                    d="M18 5L10 17h6l-2 10 8-12h-6l2-10z"
+                    fill="rgba(NaN, NaN, NaN, 0.08)"
+                    stroke="var(--textMuted)"
+                    stroke-linejoin="round"
+                    stroke-width="2.2"
+                  />
+                </svg>
+                <span
+                  color="$textMuted"
+                  font-family="$heading"
+                  font-size="13"
+                  font-weight="700"
+                  letter-spacing="0.78"
+                  style="transition: color 120ms ease-out;"
+                  texttransform="uppercase"
+                >
+                  Minigames
                 </span>
               </div>
             </div>
-          </a>
-          <div>
-            League Switcher
-          </div>
-          <div
-            style="margin-left: auto;"
-          >
-            <nav>
-              Nav Tabs
-            </nav>
-          </div>
-          <div
-            alignitems="center"
-            gap="$2"
-            style="margin-left: 0px;"
-          >
-            <div>
-              Notification Dropdown
-            </div>
-            <button>
-              Help
-            </button>
-            <div>
-              User Profile Dropdown
+            <div
+              alignitems="center"
+              gap="$2"
+            >
+              <div
+                alignitems="center"
+                gap="$2"
+              >
+                <div>
+                  Notification Dropdown
+                </div>
+                <button>
+                  Help
+                </button>
+                <div>
+                  User Profile Dropdown
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -285,63 +563,202 @@ exports[`App Navigation should match navigation snapshot 1`] = `
   >
     <div
       display="none"
+      gap="0"
+      padding="0"
     >
-      <a
-        aria-label="Legacy Sports home"
-        href="/"
-        style="text-decoration: none; flex-shrink: 0;"
+      <div
+        alignitems="center"
+        backgroundcolor="$background075"
+        borderbottomwidth="1"
+        bordercolor="$glassBorder"
+        gap="$4"
+        height="56"
+        justifycontent="space-between"
+        paddinghorizontal="$4"
+        position="sticky"
+        top="0"
+        width="100%"
+        zindex="100"
       >
         <div
           alignitems="center"
-          cursor="pointer"
           gap="$2"
         >
-          <img
-            alt="Legacy Sports"
-            data-testid="header-logo"
-            src="/logo.png"
-            style="height: 38px; width: auto; display: block; transition: height 200ms ease;"
-          />
-          <div
-            data-testid="brand-text"
-            style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+          <a
+            aria-label="Legacy Sports home"
+            href="/"
+            style="text-decoration: none; flex-shrink: 0;"
           >
-            <span
-              style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
+            <div
+              alignitems="center"
+              cursor="pointer"
+              gap="$2"
             >
-              LEGACY
+              <img
+                alt="Legacy Sports"
+                data-testid="header-logo"
+                src="/logo.png"
+                style="height: 38px; width: auto; display: block; transition: height 200ms ease;"
+              />
+              <div
+                data-testid="brand-text"
+                style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+              >
+                <span
+                  color="$brandGoldLight"
+                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1;"
+                >
+                  LEGACY
+                </span>
+                <span
+                  color="$color12"
+                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1;"
+                >
+                  SPORTS
+                </span>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div>
+          League Switcher
+        </div>
+        <div
+          alignitems="center"
+          backgroundcolor="$surfacePanel"
+          bordercolor="$outlineSubtle"
+          borderradius="9999"
+          borderwidth="1"
+          flex="1"
+          gap="4"
+          justifycontent="center"
+          paddinghorizontal="6"
+          paddingvertical="6"
+        >
+          <div
+            alignitems="center"
+            backgroundcolor="transparent"
+            borderradius="9999"
+            cursor="pointer"
+            gap="7"
+            paddinghorizontal="16"
+            paddingvertical="9"
+            role="link"
+            style="transition: background 120ms ease-out; user-select: none;"
+            tabindex="0"
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="16"
+              role="presentation"
+              style="display: block; flex-shrink: 0; opacity: 0.8; transition: color 120ms ease-out;"
+              viewBox="0 0 32 32"
+              width="16"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="13"
+                cy="12"
+                r="4.5"
+                stroke="var(--textMuted)"
+                stroke-width="2.2"
+              />
+              <path
+                d="M5 26c0-4.5 3.5-8 8-8s8 3.5 8 8"
+                stroke="var(--textMuted)"
+                stroke-linecap="round"
+                stroke-width="2.2"
+              />
+              <circle
+                cx="21"
+                cy="11"
+                opacity="0.45"
+                r="3.5"
+                stroke="var(--textMuted)"
+                stroke-width="1.8000000000000003"
+              />
+              <path
+                d="M24 25c0-3.5-2.5-6-5.5-6"
+                opacity="0.45"
+                stroke="var(--textMuted)"
+                stroke-linecap="round"
+                stroke-width="1.8000000000000003"
+              />
+            </svg>
+            <span
+              color="$textMuted"
+              font-family="$heading"
+              font-size="13"
+              font-weight="700"
+              letter-spacing="0.78"
+              style="transition: color 120ms ease-out;"
+              texttransform="uppercase"
+            >
+              Players
             </span>
-            <span
-              style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
+          </div>
+          <div
+            alignitems="center"
+            backgroundcolor="transparent"
+            borderradius="9999"
+            cursor="pointer"
+            gap="7"
+            paddinghorizontal="16"
+            paddingvertical="9"
+            role="link"
+            style="transition: background 120ms ease-out; user-select: none;"
+            tabindex="0"
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="16"
+              role="presentation"
+              style="display: block; flex-shrink: 0; opacity: 0.8; transition: color 120ms ease-out;"
+              viewBox="0 0 32 32"
+              width="16"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              SPORTS
+              <path
+                d="M18 5L10 17h6l-2 10 8-12h-6l2-10z"
+                fill="rgba(NaN, NaN, NaN, 0.08)"
+                stroke="var(--textMuted)"
+                stroke-linejoin="round"
+                stroke-width="2.2"
+              />
+            </svg>
+            <span
+              color="$textMuted"
+              font-family="$heading"
+              font-size="13"
+              font-weight="700"
+              letter-spacing="0.78"
+              style="transition: color 120ms ease-out;"
+              texttransform="uppercase"
+            >
+              Minigames
             </span>
           </div>
         </div>
-      </a>
-      <div>
-        League Switcher
-      </div>
-      <div
-        style="margin-left: auto;"
-      >
-        <nav>
-          Nav Tabs
-        </nav>
-      </div>
-      <div
-        alignitems="center"
-        gap="$2"
-        style="margin-left: 0px;"
-      >
-        <div>
-          Notification Dropdown
-        </div>
-        <button>
-          Help
-        </button>
-        <div>
-          User Profile Dropdown
+        <div
+          alignitems="center"
+          gap="$2"
+        >
+          <div
+            alignitems="center"
+            gap="$2"
+          >
+            <div>
+              Notification Dropdown
+            </div>
+            <button>
+              Help
+            </button>
+            <div>
+              User Profile Dropdown
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -385,63 +802,202 @@ exports[`App Navigation should render navigation with correct links 1`] = `
   >
     <div
       display="none"
+      gap="0"
+      padding="0"
     >
-      <a
-        aria-label="Legacy Sports home"
-        href="/"
-        style="text-decoration: none; flex-shrink: 0;"
+      <div
+        alignitems="center"
+        backgroundcolor="$background075"
+        borderbottomwidth="1"
+        bordercolor="$glassBorder"
+        gap="$4"
+        height="56"
+        justifycontent="space-between"
+        paddinghorizontal="$4"
+        position="sticky"
+        top="0"
+        width="100%"
+        zindex="100"
       >
         <div
           alignitems="center"
-          cursor="pointer"
           gap="$2"
         >
-          <img
-            alt="Legacy Sports"
-            data-testid="header-logo"
-            src="/logo.png"
-            style="height: 38px; width: auto; display: block; transition: height 200ms ease;"
-          />
-          <div
-            data-testid="brand-text"
-            style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+          <a
+            aria-label="Legacy Sports home"
+            href="/"
+            style="text-decoration: none; flex-shrink: 0;"
           >
-            <span
-              style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1; color: rgb(212, 187, 120);"
+            <div
+              alignitems="center"
+              cursor="pointer"
+              gap="$2"
             >
-              LEGACY
+              <img
+                alt="Legacy Sports"
+                data-testid="header-logo"
+                src="/logo.png"
+                style="height: 38px; width: auto; display: block; transition: height 200ms ease;"
+              />
+              <div
+                data-testid="brand-text"
+                style="display: flex; flex-direction: column; user-select: none; line-height: 1;"
+              >
+                <span
+                  color="$brandGoldLight"
+                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 800; font-size: 14px; letter-spacing: 0.04em; line-height: 1;"
+                >
+                  LEGACY
+                </span>
+                <span
+                  color="$color12"
+                  style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1;"
+                >
+                  SPORTS
+                </span>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div>
+          League Switcher
+        </div>
+        <div
+          alignitems="center"
+          backgroundcolor="$surfacePanel"
+          bordercolor="$outlineSubtle"
+          borderradius="9999"
+          borderwidth="1"
+          flex="1"
+          gap="4"
+          justifycontent="center"
+          paddinghorizontal="6"
+          paddingvertical="6"
+        >
+          <div
+            alignitems="center"
+            backgroundcolor="transparent"
+            borderradius="9999"
+            cursor="pointer"
+            gap="7"
+            paddinghorizontal="16"
+            paddingvertical="9"
+            role="link"
+            style="transition: background 120ms ease-out; user-select: none;"
+            tabindex="0"
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="16"
+              role="presentation"
+              style="display: block; flex-shrink: 0; opacity: 0.8; transition: color 120ms ease-out;"
+              viewBox="0 0 32 32"
+              width="16"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                cx="13"
+                cy="12"
+                r="4.5"
+                stroke="var(--textMuted)"
+                stroke-width="2.2"
+              />
+              <path
+                d="M5 26c0-4.5 3.5-8 8-8s8 3.5 8 8"
+                stroke="var(--textMuted)"
+                stroke-linecap="round"
+                stroke-width="2.2"
+              />
+              <circle
+                cx="21"
+                cy="11"
+                opacity="0.45"
+                r="3.5"
+                stroke="var(--textMuted)"
+                stroke-width="1.8000000000000003"
+              />
+              <path
+                d="M24 25c0-3.5-2.5-6-5.5-6"
+                opacity="0.45"
+                stroke="var(--textMuted)"
+                stroke-linecap="round"
+                stroke-width="1.8000000000000003"
+              />
+            </svg>
+            <span
+              color="$textMuted"
+              font-family="$heading"
+              font-size="13"
+              font-weight="700"
+              letter-spacing="0.78"
+              style="transition: color 120ms ease-out;"
+              texttransform="uppercase"
+            >
+              Players
             </span>
-            <span
-              style="font-family: "Big Shoulders Display", system-ui, sans-serif; font-weight: 700; font-size: 11px; letter-spacing: 0.16em; line-height: 1; color: rgb(248, 250, 252);"
+          </div>
+          <div
+            alignitems="center"
+            backgroundcolor="transparent"
+            borderradius="9999"
+            cursor="pointer"
+            gap="7"
+            paddinghorizontal="16"
+            paddingvertical="9"
+            role="link"
+            style="transition: background 120ms ease-out; user-select: none;"
+            tabindex="0"
+          >
+            <svg
+              aria-hidden="true"
+              fill="none"
+              height="16"
+              role="presentation"
+              style="display: block; flex-shrink: 0; opacity: 0.8; transition: color 120ms ease-out;"
+              viewBox="0 0 32 32"
+              width="16"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              SPORTS
+              <path
+                d="M18 5L10 17h6l-2 10 8-12h-6l2-10z"
+                fill="rgba(NaN, NaN, NaN, 0.08)"
+                stroke="var(--textMuted)"
+                stroke-linejoin="round"
+                stroke-width="2.2"
+              />
+            </svg>
+            <span
+              color="$textMuted"
+              font-family="$heading"
+              font-size="13"
+              font-weight="700"
+              letter-spacing="0.78"
+              style="transition: color 120ms ease-out;"
+              texttransform="uppercase"
+            >
+              Minigames
             </span>
           </div>
         </div>
-      </a>
-      <div>
-        League Switcher
-      </div>
-      <div
-        style="margin-left: auto;"
-      >
-        <nav>
-          Nav Tabs
-        </nav>
-      </div>
-      <div
-        alignitems="center"
-        gap="$2"
-        style="margin-left: 0px;"
-      >
-        <div>
-          Notification Dropdown
-        </div>
-        <button>
-          Help
-        </button>
-        <div>
-          User Profile Dropdown
+        <div
+          alignitems="center"
+          gap="$2"
+        >
+          <div
+            alignitems="center"
+            gap="$2"
+          >
+            <div>
+              Notification Dropdown
+            </div>
+            <button>
+              Help
+            </button>
+            <div>
+              User Profile Dropdown
+            </div>
+          </div>
         </div>
       </div>
     </div>

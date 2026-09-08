@@ -265,6 +265,14 @@ export type {
 } from './components/NotificationBell';
 export { NavBar } from './components/NavBar';
 export type { NavBarProps, NavLink } from './components/NavBar';
+export { Form } from './components/Form';
+export type {
+  FormProps,
+  FormField,
+  FormInputField,
+  FormSelectField,
+  FormToggleField,
+} from './components/Form';
 // Aliased for historical reasons (formerly collided with the now-deleted
 // features/players/PlayerCard — LS-9072 converged that one onto PlayerFeedCard).
 export { PlayerCard as DSPlayerCard } from './components/PlayerCard';

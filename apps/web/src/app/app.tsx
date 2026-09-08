@@ -1,5 +1,12 @@
 import React, { Suspense, useEffect, useRef, useState } from 'react';
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import {
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
 import { useAuth } from '@legacy-sports/shared-components/auth';
 import {
   Paragraph,
@@ -7,7 +14,8 @@ import {
   XStack,
   YStack,
 } from '@legacy-sports/shared-components/ui';
-import { styled } from 'tamagui';
+import { NavBar, type NavLink } from '@legacy-sports/shared-components';
+import { styled, Text } from 'tamagui';
 import { Menu } from '@tamagui/lucide-icons/icons/Menu';
 import { lazyWithRetry } from '../utils/lazyWithRetry';
 import { prefetchHomePage } from '../utils/prefetchHomePage';
@@ -16,7 +24,6 @@ import { UserProfileDropdown } from '../components/layout/UserProfileDropdown';
 import { BugReportButton } from '../components/layout/BugReportButton';
 import { NotificationDropdown } from '../components/layout/NotificationDropdown';
 import { LeagueSwitcherChip } from '../components/layout/LeagueSwitcherChip';
-import { NavPillTabs } from '../components/layout/NavPillTabs';
 import { HelpMenuButton } from '../components/layout/HelpMenuButton';
 import { MobileBottomBar } from '../components/layout/MobileBottomBar';
 import { MobileNavDrawer } from '../components/layout/MobileNavDrawer';
@@ -312,9 +319,38 @@ const NavContent = styled(XStack, {
 
 const FONT_DISPLAY = "'Big Shoulders Display', system-ui, sans-serif";
 
+/** Desktop pill-nav destinations — mirrors the mobile drawer's primary links. */
+function useDesktopNavLinks(): NavLink[] {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const playersActive = location.pathname.startsWith('/players');
+  const minigamesActive =
+    location.pathname.startsWith('/games') ||
+    location.pathname.startsWith('/draft');
+
+  return [
+    {
+      label: 'Players',
+      icon: 'users',
+      active: playersActive,
+      href: '/players',
+      onPress: () => navigate('/players'),
+    },
+    {
+      label: 'Minigames',
+      icon: 'zap',
+      active: minigamesActive,
+      href: '/games',
+      onPress: () => navigate('/games'),
+    },
+  ];
+}
+
 function Navigation() {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
+  const navLinks = useDesktopNavLinks();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [bugDialogOpen, setBugDialogOpen] = useState(false);
   const [compact, setCompact] = useState(false);
@@ -370,79 +406,87 @@ function Navigation() {
               : 'rgba(31,45,72,1)',
           }}
         >
-          {/* ── Desktop layout (hidden on mobile) ── */}
-          <NavContent display="none" $gtMd={{ display: 'flex' }}>
-            {/* Brand */}
-            <Link
-              to="/"
-              aria-label="Legacy Sports home"
-              style={{ textDecoration: 'none', flexShrink: 0 }}
-            >
-              <XStack alignItems="center" gap="$2" cursor="pointer">
-                <img
-                  src="/logo.png"
-                  alt="Legacy Sports"
-                  data-testid="header-logo"
-                  style={{
-                    height: compact ? 30 : 38,
-                    width: 'auto',
-                    display: 'block',
-                    transition: 'height 200ms ease',
-                  }}
-                />
-                {!compact && (
-                  <div
-                    data-testid="brand-text"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      userSelect: 'none',
-                      lineHeight: 1,
-                    }}
-                  >
-                    <span
+          {/* ── Desktop layout (hidden on mobile) ──
+              Sticky top nav composed from the design-system NavBar (LS-4652) —
+              brand/logo lives in `logo` (NavBar's own `brand` text is unused,
+              this app keeps its two-line wordmark), league switcher in
+              `afterBrand`, primary tabs in `links`, account cluster in
+              `trailing`. */}
+          <NavContent
+            display="none"
+            $gtMd={{ display: 'flex' }}
+            padding={0}
+            gap={0}
+          >
+            <NavBar
+              brand=""
+              logo={
+                <Link
+                  to="/"
+                  aria-label="Legacy Sports home"
+                  style={{ textDecoration: 'none', flexShrink: 0 }}
+                >
+                  <XStack alignItems="center" gap="$2" cursor="pointer">
+                    <img
+                      src="/logo.png"
+                      alt="Legacy Sports"
+                      data-testid="header-logo"
                       style={{
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: '800',
-                        fontSize: 14,
-                        letterSpacing: '0.04em',
-                        lineHeight: 1,
-                        color: '#D4BB78',
+                        height: compact ? 30 : 38,
+                        width: 'auto',
+                        display: 'block',
+                        transition: 'height 200ms ease',
                       }}
-                    >
-                      LEGACY
-                    </span>
-                    <span
-                      style={{
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: '700',
-                        fontSize: 11,
-                        letterSpacing: '0.16em',
-                        lineHeight: 1,
-                        color: '#F8FAFC',
-                      }}
-                    >
-                      SPORTS
-                    </span>
-                  </div>
-                )}
-              </XStack>
-            </Link>
-
-            {/* League switcher */}
-            <LeagueSwitcherChip />
-
-            {/* Pill tabs — pushed right after the league switcher */}
-            <XStack style={{ marginLeft: 'auto' }}>
-              <NavPillTabs />
-            </XStack>
-
-            {/* Right cluster */}
-            <XStack alignItems="center" gap="$2" style={{ marginLeft: 0 }}>
-              <NotificationDropdown />
-              <HelpMenuButton onBugReport={() => setBugDialogOpen(true)} />
-              <UserProfileDropdown />
-            </XStack>
+                    />
+                    {!compact && (
+                      <div
+                        data-testid="brand-text"
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          userSelect: 'none',
+                          lineHeight: 1,
+                        }}
+                      >
+                        <Text
+                          color="$brandGoldLight"
+                          style={{
+                            fontFamily: FONT_DISPLAY,
+                            fontWeight: '800',
+                            fontSize: 14,
+                            letterSpacing: '0.04em',
+                            lineHeight: 1,
+                          }}
+                        >
+                          LEGACY
+                        </Text>
+                        <Text
+                          color="$color12"
+                          style={{
+                            fontFamily: FONT_DISPLAY,
+                            fontWeight: '700',
+                            fontSize: 11,
+                            letterSpacing: '0.16em',
+                            lineHeight: 1,
+                          }}
+                        >
+                          SPORTS
+                        </Text>
+                      </div>
+                    )}
+                  </XStack>
+                </Link>
+              }
+              afterBrand={<LeagueSwitcherChip />}
+              links={navLinks}
+              trailing={
+                <XStack alignItems="center" gap="$2">
+                  <NotificationDropdown />
+                  <HelpMenuButton onBugReport={() => setBugDialogOpen(true)} />
+                  <UserProfileDropdown />
+                </XStack>
+              }
+            />
           </NavContent>
 
           {/* ── Mobile header (hidden on desktop) ── */}

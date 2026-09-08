@@ -137,10 +137,32 @@ jest.mock('../context/GrowthBookProvider', () => ({
   growthbook: {},
 }));
 
-// Mock the styled function to avoid Tamagui issues
+// Mock the styled function to avoid Tamagui issues. Also stub XStack/Text —
+// NavBar (LS-4652) imports those directly from 'tamagui' rather than
+// through @legacy-sports/shared-components/ui (whose own XStack/YStack are
+// stubbed the same way, below), so without these two this mock left them
+// undefined and NavBar failed to render. (Loading the *real* tamagui via
+// jest.requireActual from inside this factory was tried and rejected — its
+// CJS build's internal circular `require('tamagui')` calls reenter this
+// same mock factory before it finishes initializing, throwing on
+// half-wired internals like `Anchor.cjs`'s `styleable`.)
 jest.mock('tamagui', () => ({
   createTokens: (tokens: unknown) => tokens,
   styled: (component: React.ComponentType<unknown>) => component,
+  XStack: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => <div {...props}>{children}</div>,
+  Text: ({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => <span {...props}>{children}</span>,
 }));
 
 // Mock the layout components
@@ -272,10 +294,6 @@ jest.mock('../hooks/useIsPremium', () => ({
 // Mock new nav components that use Apollo query hooks (require an ApolloProvider)
 jest.mock('../components/layout/LeagueSwitcherChip', () => ({
   LeagueSwitcherChip: () => <div>League Switcher</div>,
-}));
-
-jest.mock('../components/layout/NavPillTabs', () => ({
-  NavPillTabs: () => <nav>Nav Tabs</nav>,
 }));
 
 jest.mock('../components/layout/HelpMenuButton', () => ({
