@@ -807,7 +807,10 @@ export async function getToken(): Promise<string> {
         'This is a token-provisioning failure, NOT a permission/scope issue: a 403 ' +
         '"Resource not accessible by integration" on a specific endpoint would indicate ' +
         'a missing GitHub App permission instead. Interactive sources (.netrc, gh CLI, ' +
-        'device flow) are not available in Lambda.',
+        'device flow) are not available in Lambda. This is a server-side config problem ' +
+        'agents cannot fix themselves — see docs/dev-process/mcp-github-lambda-ops.md for ' +
+        'diagnosis (requires AWS access). For review-thread replies specifically, fall back ' +
+        'to mcp__github__add_reply_to_pull_request_comment rather than a personal token.',
     );
   }
 
