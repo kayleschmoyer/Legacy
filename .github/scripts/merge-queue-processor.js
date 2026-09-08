@@ -1524,6 +1524,37 @@ module.exports = async ({
     }
   }
 
+  // LS-9404: fetch both commits' trees and compare. A squash merge's commit
+  // tree is, by definition, identical to the tree of the head SHA it merged —
+  // any divergence means the merge landed different content than validation
+  // saw. Fails open (returns null → no mismatch reported) on any lookup
+  // error: this is a best-effort detector layered on top of an already-
+  // completed merge, not a gate, and must never throw out of performMerge.
+  async function verifyMergedContent(pr, mergeCommitSha) {
+    try {
+      const [mergedCommit, headCommit] = await Promise.all([
+        github.rest.repos.getCommit({ owner, repo, ref: mergeCommitSha }),
+        github.rest.repos.getCommit({ owner, repo, ref: pr.head.sha }),
+      ]);
+      const mergedTree = mergedCommit.data.commit.tree.sha;
+      const headTree = headCommit.data.commit.tree.sha;
+      if (mergedTree === headTree) {
+        return null;
+      }
+      console.error(
+        `🚨 PR #${pr.number}: merge commit ${mergeCommitSha} tree (${mergedTree}) does ` +
+          `not match validated head ${pr.head.sha}'s tree (${headTree}) — the merged ` +
+          `content diverges from what was reviewed and approved (LS-9404)`,
+      );
+      return { mergedTree, headTree };
+    } catch (e) {
+      console.warn(
+        `⚠️ PR #${pr.number}: could not verify merged content against ${pr.head.sha}: ${e.message}`,
+      );
+      return null;
+    }
+  }
+
   async function performMerge(pr, stalenessVerdict) {
     try {
       console.log(`🚀 Merging PR #${pr.number}...`);
@@ -1569,6 +1600,19 @@ module.exports = async ({
 
       console.log(`✅ Successfully merged PR #${pr.number}`);
 
+      // LS-9404: the sha-pin above relies on GitHub's own view of "current
+      // head" at merge time being correct. An observed incident (PR #7092)
+      // showed the squash-merge commit's actual content matching an earlier
+      // head SHA than the one validated and pinned, with no error from the
+      // merge API — a platform-level staleness the pin alone can't catch.
+      // Since a squash merge's tree is defined to exactly equal the merged
+      // head's tree, comparing the two trees after the fact directly detects
+      // that class of silent content drop, whatever its cause.
+      const contentMismatch = await verifyMergedContent(
+        pr,
+        mergeResult.data.sha,
+      );
+
       await retargetDependentPRs(pr);
       await deleteBranch(pr);
 
@@ -1588,10 +1632,34 @@ module.exports = async ({
         '- Staleness guard: `' +
         (stalenessVerdict ?? 'not-evaluated') +
         '`\n\n' +
+        (contentMismatch
+          ? '## 🚨 Merge Content Mismatch Detected (LS-9404)\n\n' +
+            `The squash-merge commit's tree (\`${contentMismatch.mergedTree}\`) does not match ` +
+            `the validated head \`${pr.head.sha}\`'s tree (\`${contentMismatch.headTree}\`). ` +
+            'The content that landed on the base branch differs from what was reviewed and ' +
+            `approved — **this merge needs immediate human review**. The \`${ARBITRATION_LABEL}\` ` +
+            'label has been applied.\n\n'
+          : '') +
         'Thank you for your contribution! 🚀\n\n' +
         '---\n*Automated message from merge queue system*';
 
       await findOrCreateComment(pr, successComment);
+
+      if (contentMismatch) {
+        try {
+          await github.rest.issues.addLabels({
+            owner,
+            repo,
+            issue_number: pr.number,
+            labels: [ARBITRATION_LABEL],
+          });
+        } catch (labelError) {
+          console.warn(
+            `⚠️ PR #${pr.number}: could not apply '${ARBITRATION_LABEL}' after ` +
+              `detecting a merge content mismatch: ${labelError.message}`,
+          );
+        }
+      }
     } catch (error) {
       // 422 with a head-SHA mismatch message means the branch advanced between
       // our pre-merge check and the merge API call (residual race window). This

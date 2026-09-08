@@ -117,6 +117,11 @@ function makeGithub({
   // LS-9774: when set, reRunWorkflow throws this Error instead of
   // succeeding — used to exercise the "too old to rerun" fallback path.
   reRunWorkflowError = null,
+  // LS-9404: tree SHAs served to getCommit, keyed by commit ref. Defaults to
+  // the same tree for both the merge commit ('merged-sha') and any head SHA,
+  // so existing tests see no content mismatch. Override to exercise the
+  // mismatch-detection path.
+  commitTrees = { 'merged-sha': 'same-tree', [HEAD_SHA]: 'same-tree' },
 } = {}) {
   const calls = {
     merges: [],
@@ -210,6 +215,12 @@ function makeGithub({
           calls.statuses.push(args);
           return { data: {} };
         },
+        // LS-9404: merge-commit / head-commit tree lookup (content verification)
+        getCommit: async (args) => ({
+          data: {
+            commit: { tree: { sha: commitTrees[args.ref] ?? 'unknown-tree' } },
+          },
+        }),
         // LS-9662: gap comparison + merge-base fallback (staleness guard)
         compareCommitsWithBasehead: async (args) => {
           calls.compares.push(args.basehead);
@@ -3113,4 +3124,99 @@ describe('merge-queue-processor — surface-intersection staleness guard (LS-966
       assert.match(logs, /DRY RUN: Would update branch on PR #1/);
     }),
   );
+});
+
+describe('merge-queue-processor — post-merge content verification (LS-9404)', () => {
+  it('reports no mismatch and applies no arbitration label when trees match', async () => {
+    const { github, calls } = makeGithub({
+      commitTrees: { 'merged-sha': 'tree-a', [HEAD_SHA]: 'tree-a' },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.merges.length, 1, 'should merge');
+    assert.strictEqual(
+      calls.labels.length,
+      0,
+      'matching trees should not apply needs-human-arbitration',
+    );
+    assert.ok(
+      calls.comments.some(
+        (c) =>
+          c.body?.includes('Successfully Merged') &&
+          !c.body?.includes('Merge Content Mismatch'),
+      ),
+      'success comment should not carry a mismatch warning',
+    );
+  });
+
+  it('flags a content mismatch and applies needs-human-arbitration when trees diverge', async () => {
+    const { github, calls } = makeGithub({
+      commitTrees: { 'merged-sha': 'tree-stale', [HEAD_SHA]: 'tree-fixed' },
+    });
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(
+      calls.merges.length,
+      1,
+      'merge still proceeds — this is detection, not a gate',
+    );
+    assert.ok(
+      calls.labels.some((l) => l.labels?.includes('needs-human-arbitration')),
+      'a tree mismatch should apply needs-human-arbitration',
+    );
+    assert.ok(
+      calls.comments.some(
+        (c) =>
+          c.body?.includes('Merge Content Mismatch Detected') &&
+          c.body?.includes('tree-stale') &&
+          c.body?.includes('tree-fixed'),
+      ),
+      'success comment should carry the mismatch warning with both tree SHAs',
+    );
+  });
+
+  it('fails open (no mismatch reported) when the commit lookup errors', async () => {
+    const { github: baseGithub, calls } = makeGithub();
+    const github = {
+      ...baseGithub,
+      rest: {
+        ...baseGithub.rest,
+        repos: {
+          ...baseGithub.rest.repos,
+          getCommit: async () => {
+            throw new Error('503 Service Unavailable');
+          },
+        },
+      },
+    };
+
+    await processor({
+      github,
+      context,
+      isDryRun: false,
+      forceCheck: false,
+      isRetry: false,
+    });
+
+    assert.strictEqual(calls.merges.length, 1, 'merge should still complete');
+    assert.strictEqual(
+      calls.labels.length,
+      0,
+      'a lookup error must not itself trigger arbitration',
+    );
+  });
 });
