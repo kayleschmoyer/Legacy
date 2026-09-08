@@ -123,6 +123,12 @@ Distinct from both the LS-9576 "never registers at all" case and a mid-session 4
 
 ## Tool Routing Rules
 
+### Tool-Use Rejections Are a Hard Stop (LS-8761)
+
+A tool-use rejection — the harness/user declining a specific call ("The user doesn't want to proceed with this tool use... STOP what you are doing and wait for the user to [respond]") — is categorically different from a tool _returning_ an error or a `STOP`/`ALREADY_CLAIMED` result field (that's the tool running successfully and reporting a state). A rejection means the call never ran at all. Treat the **first** rejection as a hard stop: halt the current action, surface it to the user, and wait — never resubmit the identical call (same tool, same arguments) expecting a different outcome. Resubmitting an already-rejected call is not a retry, it's the same declined action asked again; nothing about the call's arguments changes between attempts, so nothing about the answer will either. If the call is part of a multi-step flow (e.g. a ticket claim), investigate why it might be wrong _before_ trying again with different arguments (or a different tool) — for a claim rejection, check `github_pr_dashboard` for an existing PR against the ticket key first, per [work-ticket leaf-mode Step 1](../work-ticket/references/leaf-mode.md).
+
+Observed failure mode (LS-8761): ~48 near-identical rejected `jira_transition(action=claim)` calls against an already-in-review ticket in a single session, before the agent finally stopped and found the existing open PR — the investigation that happened after the 48th rejection should have happened after the 1st.
+
 ### PR Creation Routing
 
 **The routing decision — which creation tool per environment, plus the mandatory label sequence — has one home: [pr-lifecycle → PR-creation tool routing](../pr-lifecycle/SKILL.md#pr-creation-tool-routing-one-home--link-here-do-not-restate).** This section holds only the tool-surface facts behind that table:
