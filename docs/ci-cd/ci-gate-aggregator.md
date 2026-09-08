@@ -132,6 +132,47 @@ on the resolved PR head SHA (LS-9378), falling back to run conclusions only when
 no gate status exists — expected solely for commits with no associated PR, since
 the gate is PR-scoped.
 
+## Pending seed at PR open (LS-9543)
+
+`CI Gate` is required, but a **required-and-required** status still has a gap:
+GitHub's ruleset evaluator treats a context that has **never been posted for
+this SHA** the same as one that is `pending` for a non-bypassing merge — both
+block. They are not equivalent for a **bypass actor**, though.
+`.github/ruleset.json`'s `bypass_actors` grants the repo owner an
+unconditional status-check bypass, and when the context is entirely
+**absent** that bypass produces a silent, no-warning merge: there is no
+outstanding requirement to override in the UI, so nothing distinguishes it
+from a PR with no CI configured at all.
+
+PR #7202 landed exactly this way. Its self-hosted runner queue took ~14
+minutes to start the first CI job, while the PR's open→merge window was
+6m21s — so at merge time `CI Gate` simply did not exist yet for the head SHA.
+The owner's merge went through with zero CI signal, and the unformatted
+`LeagueStandings.tsx` reached `main` (LS-9531). Every post-merge net (the CI
+status comment, the `CI: Lint Failure` label, `merge-when-ready` removal)
+fired correctly and was useless — they notify after the fact; they do not
+protect.
+
+**Fix:** `seed-ci-gate`, a job in `ci-orchestrator.yml`, posts a `pending`
+`CI Gate` commit status on the head SHA the instant a PR is opened,
+synchronized, or reopened — via `seedPendingCiGate` in
+[`ci-gate.js`](../../.github/scripts/ci-gate.js). It deliberately runs on a
+GitHub-hosted runner (`ubuntu-latest`), not the self-hosted CI runner label,
+so it is immune to the very runner-queue latency that created the race: it
+only needs to beat the PR open→merge window, not the CI pipeline itself. A
+missing context becomes a `pending` one before any merge attempt can outrun
+CI, so even a bypass-actor merge now requires the explicit "merge without
+waiting for requirements" action — a deliberate, visible override — instead
+of an ordinary merge indistinguishable from a PR with no outstanding checks.
+
+The seed is idempotent and one-directional: it no-ops if **any** `CI Gate`
+status already exists for the SHA (pending, success, or failure), so it can
+never regress a terminal verdict back to pending. The real `postCiGate`
+verdict from the CI Pipeline's `summarize` job always supersedes it once CI
+completes (commit statuses are last-writer-wins by `created_at`). This does
+not touch `bypass_actors` — the owner's emergency escape hatch for genuine
+incidents is unchanged, only now unusable without a visible, deliberate step.
+
 ## Staged ruleset migration (owner-gated)
 
 `.github/ruleset.json` only takes effect when **@bkrupa** runs

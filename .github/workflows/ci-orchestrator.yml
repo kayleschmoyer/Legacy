@@ -121,6 +121,47 @@ permissions:
   id-token: write
 
 jobs:
+  # LS-9543: seed a `pending` CI Gate on the head SHA the instant a PR opens,
+  # synchronizes, or reopens — before determine-scope's runner-access
+  # resolution and before the self-hosted CI Pipeline runner even starts
+  # queuing. PR #7202 squash-merged with zero CI signal on its head SHA
+  # because the self-hosted runner queue (~14 min to first job) was slower
+  # than the open→merge window (6m21s): the required `CI Gate` context simply
+  # did not exist yet, and the owner's `bypass_actors` status-check bypass
+  # (.github/ruleset.json) then merged it with no visible warning, since
+  # there was no outstanding requirement to bypass in the first place. This
+  # job deliberately runs on a GitHub-hosted runner (ubuntu-latest, not
+  # `needs.determine-scope.outputs.runner-label`) so it is immune to the very
+  # self-hosted queue latency that created the race — it only has to win
+  # against the PR open→merge window, which is milliseconds of GitHub-hosted
+  # cold start versus minutes of self-hosted backlog. See
+  # .github/scripts/ci-gate.js (seedPendingCiGate) and
+  # docs/ci-cd/ci-gate-aggregator.md.
+  seed-ci-gate:
+    name: "🌱 Seed Pending CI Gate"
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'pull_request' &&
+      (github.event.action == 'opened' ||
+       github.event.action == 'synchronize' ||
+       github.event.action == 'reopened')
+    timeout-minutes: 2
+    steps:
+      - name: "🚀 Checkout Repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          sparse-checkout: |
+            .github/scripts/ci-gate.js
+          sparse-checkout-cone-mode: false
+
+      - name: "Seed pending CI Gate"
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { seedPendingCiGate } = require('./.github/scripts/ci-gate.js');
+            await seedPendingCiGate({ github, context, core });
+
   # The "🔐 SHA Sanity Check" check-run is owned by .github/workflows/check-conflicts.yml
   # to avoid a duplicate row on PR check rollups (LS-4199). The diagnostic SHA
   # verification still runs here as a step inside determine-scope so coverage on

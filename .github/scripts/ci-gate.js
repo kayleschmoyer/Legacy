@@ -797,6 +797,113 @@ async function postCiGate({
   };
 }
 
+/**
+ * Seed a `pending` `CI Gate` commit status on the PR head SHA as soon as a PR
+ * is opened, synchronized, or reopened (LS-9543).
+ *
+ * WHY: PR #7202 squash-merged to main while `CI Gate` had never been posted
+ * for its head SHA — the self-hosted runner queue (~14 min to first job) was
+ * slower than the open→merge window (6m21s), so at merge time the required
+ * context simply did not exist. `bypass_actors` in .github/ruleset.json grant
+ * the repo owner an unconditional status-check bypass, and with the context
+ * entirely ABSENT that bypass produced a silent, no-warning merge — nothing
+ * in the UI or API surfaced an outstanding requirement to deliberately
+ * override. A `pending` status is not silent: GitHub's merge evaluator
+ * treats it as an unmet requirement like any other in-flight check, so
+ * getting past it (bypass or not) requires the explicit "merge without
+ * waiting for requirements" action rather than an ordinary merge that looks
+ * indistinguishable from one with no outstanding CI at all. This closes the
+ * hole named in LS-9543's acceptance criteria without touching
+ * `bypass_actors` — the owner's emergency escape hatch stays intact, but
+ * using it now leaves a deliberate, visible trail.
+ *
+ * Runs on a GitHub-hosted runner (ci-orchestrator.yml's `seed-ci-gate` job)
+ * specifically so it is NOT subject to the same self-hosted runner queue
+ * latency that created the race in the first place — it must win against the
+ * open→merge window, not just the CI pipeline.
+ *
+ * Idempotent and non-destructive: no-ops if ANY `CI Gate` status already
+ * exists for this SHA (pending, success, or failure), so this can never
+ * regress a terminal verdict back to pending — commit statuses are
+ * last-writer-wins by created_at, and the real `postCiGate` verdict from the
+ * CI Pipeline's `summarize` job supersedes this seed once CI completes.
+ *
+ * Fails closed on lookup errors (skips the seed rather than risking a
+ * duplicate/racing post) and degrades gracefully on post errors — either way
+ * the terminal `postCiGate` call is unaffected and still owns the real
+ * verdict.
+ *
+ * @param {object} params
+ * @returns {Promise<{seeded: boolean, reason?: string, sha?: string}>}
+ */
+async function seedPendingCiGate({ github, context, core }) {
+  const { owner, repo } = context.repo;
+  const pr = context.payload && context.payload.pull_request;
+
+  if (!pr) {
+    core.info(
+      'CI Gate seed: no pull_request in the event payload — skipping (not a PR-scoped run).',
+    );
+    return { seeded: false, reason: 'no-pr' };
+  }
+
+  const sha = pr.head.sha;
+
+  let existingStatuses;
+  try {
+    const { data } = await withStatusRetry(() =>
+      github.rest.repos.listCommitStatusesForRef({
+        owner,
+        repo,
+        ref: sha,
+        per_page: 100,
+      }),
+    );
+    existingStatuses = data || [];
+  } catch (e) {
+    core.warning(
+      `CI Gate seed: could not list commit statuses for ${sha} (${e.message}) — ` +
+        'skipping the seed rather than risking a duplicate/racing post. The ' +
+        "CI Pipeline's terminal verdict is unaffected.",
+    );
+    return { seeded: false, reason: 'status-lookup-failed', sha };
+  }
+
+  const alreadyPosted = existingStatuses.some(
+    (status) => status.context === CI_GATE_CONTEXT,
+  );
+  if (alreadyPosted) {
+    core.info(
+      `CI Gate seed: a '${CI_GATE_CONTEXT}' status already exists for ${sha} — ` +
+        'not overwriting it with pending.',
+    );
+    return { seeded: false, reason: 'already-posted', sha };
+  }
+
+  try {
+    await withStatusRetry(() =>
+      github.rest.repos.createCommitStatus({
+        owner,
+        repo,
+        sha,
+        state: 'pending',
+        context: CI_GATE_CONTEXT,
+        description: 'Waiting for CI Pipeline to report results',
+      }),
+    );
+  } catch (e) {
+    core.warning(
+      `CI Gate seed: failed to post 'pending' for ${sha} on PR #${pr.number} ` +
+        `after retries (${e.message}) — the SHA is unguarded until the CI ` +
+        'Pipeline posts its terminal verdict.',
+    );
+    return { seeded: false, reason: 'status-post-failed', sha };
+  }
+
+  core.info(`CI Gate seed: posted 'pending' for ${sha} on PR #${pr.number}.`);
+  return { seeded: true, sha };
+}
+
 module.exports = {
   CI_GATE_CONTEXT,
   CI_PIPELINE_JOB_NAME,
@@ -811,4 +918,5 @@ module.exports = {
   assertSuccessIsCurrent,
   isRetryableStatusError,
   postCiGate,
+  seedPendingCiGate,
 };

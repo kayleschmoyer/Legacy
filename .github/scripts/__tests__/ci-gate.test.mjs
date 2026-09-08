@@ -39,6 +39,7 @@ const {
   isRetryableStatusError,
   cancelledJobHadRealFailure,
   postCiGate,
+  seedPendingCiGate,
 } = require(
   path.join(path.dirname(fileURLToPath(import.meta.url)), '../ci-gate.js'),
 );
@@ -1456,5 +1457,149 @@ describe('ci-gate — postCiGate survives createCommitStatus rate-limit/5xx blip
     assert.strictEqual(res.posted, false);
     assert.strictEqual(res.reason, 'status-post-failed');
     assert.strictEqual(calls.statuses.length, 0);
+  });
+});
+
+// ── seedPendingCiGate (LS-9543) ─────────────────────────────────────────────
+//
+// PR #7202 squash-merged with no `CI Gate` status ever having existed on its
+// head SHA — the required context was ABSENT, not merely pending, so the
+// owner's status-check bypass produced a silent merge with no outstanding
+// requirement to override. seedPendingCiGate closes that "required context
+// not yet posted" case by posting `pending` the instant a PR opens or is
+// synchronized, before the self-hosted CI Pipeline runner even starts.
+
+describe('ci-gate — seedPendingCiGate seeds a pending status on open/sync (LS-9543)', () => {
+  it('posts pending for the PR head SHA when no CI Gate status exists yet', async () => {
+    const { github, calls } = makeGithub({ existingStatuses: [] });
+
+    const res = await seedPendingCiGate({
+      github,
+      context: makeContext(),
+      core,
+    });
+
+    assert.strictEqual(res.seeded, true);
+    assert.strictEqual(res.sha, HEAD_SHA);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'pending');
+    assert.strictEqual(calls.statuses[0].context, CI_GATE_CONTEXT);
+    assert.strictEqual(calls.statuses[0].sha, HEAD_SHA);
+  });
+
+  it('does not overwrite an existing pending CI Gate status (idempotent re-seed)', async () => {
+    const { github, calls } = makeGithub({
+      existingStatuses: [gateStatus('pending', SELF_RUN_ID)],
+    });
+
+    const res = await seedPendingCiGate({
+      github,
+      context: makeContext(),
+      core,
+    });
+
+    assert.strictEqual(res.seeded, false);
+    assert.strictEqual(res.reason, 'already-posted');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('never regresses a terminal success verdict back to pending', async () => {
+    const { github, calls } = makeGithub({
+      existingStatuses: [gateStatus('success', OLDER_RUN_ID)],
+    });
+
+    const res = await seedPendingCiGate({
+      github,
+      context: makeContext(),
+      core,
+    });
+
+    assert.strictEqual(res.seeded, false);
+    assert.strictEqual(res.reason, 'already-posted');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('never regresses a terminal failure verdict back to pending', async () => {
+    const { github, calls } = makeGithub({
+      existingStatuses: [gateStatus('failure', OLDER_RUN_ID)],
+    });
+
+    const res = await seedPendingCiGate({
+      github,
+      context: makeContext(),
+      core,
+    });
+
+    assert.strictEqual(res.seeded, false);
+    assert.strictEqual(res.reason, 'already-posted');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('no-ops when the event carries no pull_request payload', async () => {
+    const { github, calls } = makeGithub();
+
+    const res = await seedPendingCiGate({
+      github,
+      context: makeContext(null),
+      core,
+    });
+
+    assert.strictEqual(res.seeded, false);
+    assert.strictEqual(res.reason, 'no-pr');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('fails closed (skips the seed) when listing existing statuses errors', async () => {
+    const { github, calls } = makeGithub({ statusesError: 'boom' });
+
+    const res = await seedPendingCiGate({
+      github,
+      context: makeContext(),
+      core,
+    });
+
+    assert.strictEqual(res.seeded, false);
+    assert.strictEqual(res.reason, 'status-lookup-failed');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('degrades to a no-op instead of throwing when the status post fails after retries', async () => {
+    const { github, calls } = makeGithub({
+      existingStatuses: [],
+      createStatusErrors: [
+        statusError(500, 'internal server error'),
+        statusError(500, 'internal server error'),
+        statusError(500, 'internal server error'),
+      ],
+    });
+
+    const res = await seedPendingCiGate({
+      github,
+      context: makeContext(),
+      core,
+    });
+
+    assert.strictEqual(res.seeded, false);
+    assert.strictEqual(res.reason, 'status-post-failed');
+    assert.strictEqual(calls.statuses.length, 0);
+  });
+
+  it('retries a transient rate-limit error on the status post and succeeds', async () => {
+    const { github, calls } = makeGithub({
+      existingStatuses: [],
+      createStatusErrors: [
+        statusError(403, 'API rate limit exceeded for installation'),
+      ],
+    });
+
+    const res = await seedPendingCiGate({
+      github,
+      context: makeContext(),
+      core,
+    });
+
+    assert.strictEqual(res.seeded, true);
+    assert.strictEqual(calls.statuses.length, 1);
+    assert.strictEqual(calls.statuses[0].state, 'pending');
   });
 });
