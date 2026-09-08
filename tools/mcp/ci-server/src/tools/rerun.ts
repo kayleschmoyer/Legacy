@@ -1,5 +1,5 @@
 import { githubGet, postWithRetryOnAlreadyRunning } from '../github-api.js';
-import { isAlreadyRunningError } from '../http-retry.js';
+import { isAlreadyRunningError, isTimeoutError } from '../http-retry.js';
 import { checkStaleMergeRef } from '../merge-ref-staleness.js';
 import type { ToolResult } from '../types.js';
 
@@ -225,6 +225,27 @@ export async function rerun(params: RerunParams): Promise<ToolResult> {
               null,
               2,
             ),
+          },
+        ],
+      };
+    }
+
+    // A client-side per-attempt timeout (LS-8704) — GitHub's rerun endpoint
+    // was taking too long to respond rather than erroring outright. Without
+    // this check the underlying request would have kept running until the
+    // ci-server Lambda's own 30s hard timeout killed it, which the caller
+    // sees as a raw, unparseable "Service Unavailable" transport error
+    // instead of an actionable one. Safe to retry immediately — nothing was
+    // mutated server-side by a request that never got a response.
+    if (isTimeoutError(error)) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text:
+              `Rerun request for run ${params.runId} timed out waiting for GitHub to respond ` +
+              '(client-side guard, not a GitHub error) — safe to retry this same call immediately.',
           },
         ],
       };

@@ -341,4 +341,31 @@ describe('rerun', () => {
       );
     });
   });
+
+  describe('client-side POST timeout (LS-8704)', () => {
+    it('returns an actionable retry hint instead of an opaque failure when the request times out', async () => {
+      const timeoutError = new Error(
+        'The operation was aborted due to timeout',
+      );
+      timeoutError.name = 'TimeoutError';
+      mockPostWithRetry.mockRejectedValue(timeoutError);
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/timed out waiting for GitHub/);
+      expect(result.content[0].text).toMatch(/safe to retry/);
+    });
+
+    it('also recognizes the AbortError name some runtimes throw for the same condition', async () => {
+      const abortError = new Error('This operation was aborted');
+      abortError.name = 'AbortError';
+      mockPostWithRetry.mockRejectedValue(abortError);
+
+      const result = await rerun({ runId: 123, failedOnly: true });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toMatch(/timed out waiting for GitHub/);
+    });
+  });
 });

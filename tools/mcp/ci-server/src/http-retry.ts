@@ -42,6 +42,23 @@ export function isAlreadyRunningError(message: string): boolean {
   );
 }
 
+/**
+ * True when `error` is the DOMException Node's fetch throws when an
+ * `AbortSignal.timeout(...)` fires before the request completes (e.g. the
+ * per-attempt ceiling `githubPost` applies — LS-8704). Distinguishing this
+ * from a generic error lets a caller like `rerun.ts` return an actionable
+ * hint ("the request was taking too long, safe to retry") instead of an
+ * opaque failure — this client-side timeout is what turns a would-be Lambda
+ * SIGKILL (raw, unparseable "Service Unavailable" transport error) into a
+ * clean, catchable one.
+ */
+export function isTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === 'TimeoutError' || error.name === 'AbortError')
+  );
+}
+
 /** Truncate and redact auth tokens from API error response bodies. */
 export function sanitizeErrorBody(text: string, maxLen = 500): string {
   let sanitized = text

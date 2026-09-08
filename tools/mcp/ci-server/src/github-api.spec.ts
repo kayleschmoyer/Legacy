@@ -15,6 +15,7 @@ import {
   fetchWithRetry,
   formatGithubApiError,
   isAlreadyRunningError,
+  isTimeoutError,
   isTransientServerError,
   withRetryOnAlreadyRunning,
 } from './http-retry.js';
@@ -273,6 +274,30 @@ describe('isAlreadyRunningError', () => {
     expect(
       isAlreadyRunningError('GitHub API 409: This workflow is already running'),
     ).toBe(false);
+  });
+});
+
+describe('isTimeoutError', () => {
+  it('matches the DOMException Node throws for a fired AbortSignal.timeout (LS-8704)', () => {
+    const err = new Error('The operation was aborted due to timeout');
+    err.name = 'TimeoutError';
+    expect(isTimeoutError(err)).toBe(true);
+  });
+
+  it('matches the AbortError name some runtimes use for the same condition', () => {
+    const err = new Error('This operation was aborted');
+    err.name = 'AbortError';
+    expect(isTimeoutError(err)).toBe(true);
+  });
+
+  it('does not match a regular GitHub API error', () => {
+    expect(
+      isTimeoutError(new Error('GitHub API 503: Service Unavailable')),
+    ).toBe(false);
+  });
+
+  it('does not match a non-Error value', () => {
+    expect(isTimeoutError('TimeoutError')).toBe(false);
   });
 });
 

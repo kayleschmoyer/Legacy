@@ -747,6 +747,18 @@ export async function githubPut<T>(path: string, body?: unknown): Promise<T> {
   return (await res.json()) as T;
 }
 
+// This server runs on a Lambda with a 30s hard timeout (see the identical
+// constraint documented in wait-run.ts / http-retry.ts). Without a
+// client-side ceiling, a POST that hangs (rather than erroring) on GitHub's
+// side can silently consume the entire remaining budget — especially once
+// postWithRetryOnAlreadyRunning's own backoff waits are added on top — and
+// the Lambda gets SIGKILLed mid-request, which surfaces to the MCP caller as
+// a raw, unparseable "Service Unavailable" transport error instead of a
+// clean, actionable one (LS-8704/LS-8429 shared root cause). Bounding each
+// individual attempt turns that silent kill into a catchable abort error
+// that rerun.ts's existing try/catch already formats cleanly.
+const POST_TIMEOUT_MS = 6_000;
+
 /** Make a POST request to the GitHub REST API. */
 export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetchAuthed(
@@ -758,6 +770,7 @@ export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
         'Content-Type': 'application/json',
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(POST_TIMEOUT_MS),
     }),
   );
 
