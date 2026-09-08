@@ -45,11 +45,37 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
     { errorPolicy: 'all' },
   );
 
-  const { data: bracketData } = useGetPlayoffBracketQuery({
-    variables: { leagueId: league.id ?? 0 },
-    skip: !league.id || !league.playoffEnabled,
-    errorPolicy: 'all',
-  });
+  // Show the bracket whenever one EXISTS — deliberately not gated on
+  // `league.playoffEnabled` (LS-9901). That flag says whether playoffs will be
+  // generated, not whether a bracket is already there: a commissioner who
+  // turns playoffs off mid-season, or a league whose (nullable) flag resolves
+  // to null, would otherwise lose an already-seeded bracket from the UI.
+  // Gating on it also made the query depend on asynchronously refetched league
+  // data — this page refetches the league on every WebSocket reconnect — so a
+  // refetch blip could tear the query down and leave the section blank.
+  //
+  // `cache-and-network` because `getPlayoffBracket` legitimately resolves to
+  // null before a bracket is created, and the default cache-first pins that
+  // null (or any other incomplete cached result) for the rest of the browser
+  // session: the section then never appears, even after remounting the tab,
+  // because no further request is issued. Revalidating on mount also keeps
+  // scores and the champion fresh as the bracket advances.
+  const { data: bracketData, previousData: bracketPreviousData } =
+    useGetPlayoffBracketQuery({
+      variables: { leagueId: league.id ?? 0 },
+      skip: !league.id,
+      fetchPolicy: 'cache-and-network',
+      errorPolicy: 'all',
+    });
+
+  // `errorPolicy: 'all'` surfaces a transient error as `data: null`, so fall
+  // back to the last good result rather than blanking a rendered bracket. No
+  // mutation removes a bracket once created, so this cannot pin a bracket that
+  // legitimately went away.
+  const bracket =
+    bracketData?.getPlayoffBracket ??
+    bracketPreviousData?.getPlayoffBracket ??
+    null;
 
   // Fall back to unsorted team list when no standings exist yet.
   const standingsForTable = useMemo(() => {
@@ -148,9 +174,7 @@ export const StandingsTab: React.FC<StandingsTabProps> = ({
         showMedianRecord={showMedianRecord}
       />
 
-      {bracketData?.getPlayoffBracket ? (
-        <PlayoffBracket bracket={bracketData.getPlayoffBracket} />
-      ) : null}
+      {bracket ? <PlayoffBracket bracket={bracket} /> : null}
     </div>
   );
 };

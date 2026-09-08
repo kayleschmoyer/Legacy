@@ -13,6 +13,7 @@ import { StandingsTab } from './Standings';
 
 let mockStandings: ReadonlyArray<Record<string, unknown>> = [];
 let mockBracket: Record<string, unknown> | null = null;
+let mockBracketPrevious: Record<string, unknown> | null | undefined;
 let mockCurrentWeek: number | null = null;
 
 const mockStandingsTable = jest.fn(() => null);
@@ -25,13 +26,25 @@ const mockUseGetLeagueStandingsQuery = jest.fn((_args?: unknown) => ({
   data: { getLeagueStandings: mockStandings },
   loading: false,
 }));
+
+// Honours `skip` the way Apollo does, so a test that renders a bracket also
+// proves the query was actually allowed to run (LS-9901).
+const mockUseGetPlayoffBracketQuery = jest.fn(
+  (options: { skip?: boolean } = {}) => ({
+    data: options.skip ? undefined : { getPlayoffBracket: mockBracket },
+    previousData: options.skip
+      ? undefined
+      : mockBracketPrevious === undefined
+        ? undefined
+        : { getPlayoffBracket: mockBracketPrevious },
+  }),
+);
 jest.mock('@legacy-sports/graphql', () => ({
   Sport: { Baseball: 'baseball', Football: 'football' },
   useGetLeagueStandingsQuery: (args?: unknown) =>
     mockUseGetLeagueStandingsQuery(args),
-  useGetPlayoffBracketQuery: jest.fn(() => ({
-    data: { getPlayoffBracket: mockBracket },
-  })),
+  useGetPlayoffBracketQuery: (args?: unknown) =>
+    mockUseGetPlayoffBracketQuery(args as { skip?: boolean }),
 }));
 
 jest.mock('../../../../hooks/useMatchup', () => ({
@@ -65,9 +78,11 @@ const makeRow = (overrides: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   mockStandings = [];
   mockBracket = null;
+  mockBracketPrevious = undefined;
   mockCurrentWeek = null;
   mockStandingsTable.mockClear();
   mockUseGetLeagueStandingsQuery.mockClear();
+  mockUseGetPlayoffBracketQuery.mockClear();
 });
 
 describe('StandingsTab', () => {
@@ -230,9 +245,96 @@ describe('StandingsTab', () => {
     expect(screen.getByTestId('playoff-bracket')).toBeInTheDocument();
   });
 
+  // LS-9901: the bracket section silently disappeared on the deployed app even
+  // though `getPlayoffBracket` returned the bracket. Two fragilities caused it:
+  // the query was gated on `league.playoffEnabled` (async league data that the
+  // page refetches on every WebSocket reconnect), and cache-first pinned a
+  // pre-bracket `null` for the rest of the session.
+  describe('bracket resilience (LS-9901)', () => {
+    it('queries the bracket even when playoffEnabled is false', () => {
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={{ ...league, playoffEnabled: false }}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      expect(mockUseGetPlayoffBracketQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: false }),
+      );
+    });
+
+    it('queries the bracket when playoffEnabled is null', () => {
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={{ ...league, playoffEnabled: null }}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      expect(mockUseGetPlayoffBracketQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: false }),
+      );
+    });
+
+    it('skips the bracket query only when the league has no id', () => {
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={{ ...league, id: null }}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      expect(mockUseGetPlayoffBracketQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: true }),
+      );
+    });
+
+    it('revalidates the bracket on mount rather than trusting the cache', () => {
+      mockStandings = [makeRow()];
+      render(
+        <StandingsTab
+          league={league}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      expect(mockUseGetPlayoffBracketQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ fetchPolicy: 'cache-and-network' }),
+      );
+    });
+
+    it('keeps showing the last good bracket when a refetch returns null', () => {
+      mockStandings = [makeRow()];
+      mockBracket = null;
+      mockBracketPrevious = {
+        matchups: [],
+        status: 'scheduled',
+        championTeam: null,
+      };
+      render(
+        <StandingsTab
+          league={league}
+          teams={[]}
+          myTeamId={null}
+          onTeam={jest.fn()}
+        />,
+      );
+      expect(screen.getByTestId('playoff-bracket')).toBeInTheDocument();
+    });
+  });
+
   it('hides the playoff bracket when no bracket data is returned', () => {
     mockStandings = [makeRow()];
     mockBracket = null;
+    mockBracketPrevious = undefined;
     render(
       <StandingsTab
         league={league}
