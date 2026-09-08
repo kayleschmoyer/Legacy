@@ -39,6 +39,8 @@ Secondary confirmation for default CC web: `jira_*` tools absent, `Glob`/`Grep` 
 
 The seven `pc-*` chunks in canonical order — `pc-db-prep` → `pc-typecheck` → `pc-format` → `pc-lint` → `pc-workflows` → `pc-test` → `pc-build` — are the only validation path in cloud. They are the same nine steps as `make pc`, and equivalent to it **only if all seven run in order** (LS-7906). The chunk list's source of truth is `PC_CHUNKS` in `tools/mcp/nx-server/src/tools/run-pc-chunk.ts` and the `pc-*` targets in the Makefile.
 
+**`pc-test` and `scripts/*.ps1` changes (LS-8729)**: `pc-test`'s underlying `_PC_TEST_CMD` (`pnpm exec nx affected -t test --base=$NX_BASE`) never touches root-level `scripts/`, since it is not an Nx project. `classify-changes.js` sets `PC_HAS_PS1=1` whenever a changed file matches `scripts/**/*.ps1`; when that flag is set, `pc-test` additionally runs `pnpm run test:scripts:ps` if `pwsh` is on `PATH`, or prints an explicit `SKIPPED (pwsh not installed)` line otherwise — see [Quirk 11](#quirk-11-pwsh-is-not-preinstalled-pnpm-run-testscriptsps-fails-outright-ls-8729) for installing `pwsh` in this environment so the step actually runs instead of being skipped.
+
 | Platform             | Binding (owner ruling 2026-07-02)                                                                                                                                                                                                                 |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Copilot Coding Agent | `nx_run_pc_chunk({ chunk: "pc-db-prep" })` → … → `({ chunk: "pc-build" })` — **mandatory** wherever the tool exists (30-min runaway backstop, structured pass/fail)                                                                               |
@@ -415,6 +417,23 @@ Environment behaviors that look like bugs but are not. Recognize the symptom and
 **Not fixable in this repo**: same class as [Quirk 6](#quirk-6-stop-hook-git-checksh-false-positives-unverified-on-genuinely-ssh-signed-commits-ls-8589)/[Quirk 7](#quirk-7-bkrupagithubio-connect-blocked-by-the-ccr-egress-proxy-cloudremote-sessions)/[Quirk 9](#quirk-9-auto-modes-permission-classifier-can-block-a-legitimate-single-shot-ci_list_runssend_later-call-ls-8931) — the proxy's credential-injection scope is CCR platform/session-image configuration, not application config; no PR against `bkrupa/legacy-sports` can widen what the proxy authenticates. As a partial mitigation (LS-8740), `github-api.ts`'s and `http-retry.ts`'s GitHub-API error formatting (`formatGithubApiError`, gated on `CLAUDE_CODE_REMOTE=true` and a bare 401 only) now appends this Quirk's diagnosis and fallback directly to the thrown error text, so the failure is self-diagnosing on the next occurrence instead of a bare "Bad credentials" the caller has to research from scratch.
 
 **Fix / workaround**: in a CCR session, don't retry a `legacy-sports-ci-local` tool that 401s this way — it will not succeed no matter which credential source resolves. Fall back immediately to the hosted `legacy-sports-ci` server for the same operation (e.g. `mcp__legacy-sports-ci__ci_retry_failed({ runId })` in place of `ci_retry_runner_flake({ prNumber })` — parse the run ID from the PR's "CI: Runner Flake" bot comment or label first), or to a built-in `mcp__github__*` tool where no hosted equivalent exists. Report the fallback per the [Reporting Protocol](../mcp-first/references/diagnostics.md#reporting-protocol) so it lands in the MCP gap audit rather than being silently absorbed.
+
+### Quirk 11: `pwsh` is not preinstalled — `pnpm run test:scripts:ps` fails outright (LS-8729)
+
+**Symptom**: editing `scripts/*.ps1` or `scripts/lib/*.ps1` (e.g. `scripts/lib/jira-rollup.ps1`, `scripts/sync-jira-status.ps1`) and then running `pnpm run test:scripts:ps` fails with `pwsh: command not found`. Unlike Chromium (preinstalled for Playwright — see the top-level environment notes), the Claude Code Remote Ubuntu image ships no PowerShell runtime. `make pc` / `pc-test` do not surface this either way (see the [`PC_HAS_PS1`](#validation-binding-safety-critical--read-before-running-anything) note below) — a green pipeline gives **no signal** on PowerShell-script correctness unless `pwsh` is installed and run manually.
+
+**Root cause**: PowerShell is not part of the base Ubuntu image and is not installed by any repo setup script (`node scripts/modules-pool/link.mjs` only links `node_modules`); it must be fetched from the upstream PowerShell release feed on demand.
+
+**Fix — install `pwsh` for the session** (Microsoft's supported binary tarball; no root/apt required, works under the CCR egress proxy):
+
+```bash
+curl -sSL -o /tmp/pwsh.tar.gz "https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/powershell-7.4.6-linux-x64.tar.gz"
+mkdir -p /tmp/pwsh && tar -xzf /tmp/pwsh.tar.gz -C /tmp/pwsh
+chmod +x /tmp/pwsh/pwsh
+export PATH="/tmp/pwsh:$PATH"   # session-scoped only; repeat per fresh container
+```
+
+Then `pnpm run test:scripts:ps` (or `pwsh -NoProfile -File scripts/__tests__/run-ps-tests.ps1`) runs normally. This is a per-session workaround, not a persistent install — the tarball and PATH change do not survive a container restart. If the download itself 403s or times out, that is the egress proxy blocking `github.com` release assets for this session (see the proxy README pattern in [Quirk 7](#quirk-7-bkrupagithubio-connect-blocked-by-the-ccr-egress-proxy-cloudremote-sessions)) — report the blocked host rather than retrying in a loop; there is otherwise no PowerShell-capable fallback for local `.ps1` validation in this environment.
 
 ## Cloud-to-Local Teleport
 

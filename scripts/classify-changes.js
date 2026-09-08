@@ -9,11 +9,12 @@
  * Usage: node scripts/classify-changes.js [--print-summary] [--base <ref>]
  *
  * Output (stdout): space-separated KEY=VALUE pairs, e.g.:
- *   PC_HAS_DB=1 PC_HAS_WORKFLOWS=0 PC_DOCS_ONLY=0
+ *   PC_HAS_DB=1 PC_HAS_WORKFLOWS=0 PC_HAS_PS1=0 PC_DOCS_ONLY=0
  *
  * Flags:
  *   PC_HAS_DB        — files in lib/db-client/ or lambdas/db/
  *   PC_HAS_WORKFLOWS — files in .github/workflows/
+ *   PC_HAS_PS1       — files matching scripts/**\/*.ps1 (LS-8729)
  *   PC_DOCS_ONLY     — ALL changed files are docs (.md, .agents/skills/, docs/)
  *
  * Fail-safe: if git diff fails or no changes detected, all flags default to
@@ -57,6 +58,7 @@ function classify(baseRef) {
   const FAIL_SAFE = {
     hasDb: true,
     hasWorkflows: true,
+    hasPs1: true,
     docsOnly: false,
     reason: null,
   };
@@ -85,6 +87,7 @@ function classify(baseRef) {
 
   let hasDb = false;
   let hasWorkflows = false;
+  let hasPs1 = false;
   let allDocs = true;
 
   for (const file of files) {
@@ -103,6 +106,11 @@ function classify(baseRef) {
       hasWorkflows = true;
     }
 
+    // PowerShell script changes (LS-8729) — scripts/*.ps1 and scripts/**/*.ps1
+    if (normalized.startsWith('scripts/') && /\.ps1$/i.test(normalized)) {
+      hasPs1 = true;
+    }
+
     // Docs-only detection: file must be in a docs area OR be a markdown file
     const isDocsArea =
       normalized.startsWith('docs/') ||
@@ -117,7 +125,7 @@ function classify(baseRef) {
   // DB and workflow changes in non-doc files already set allDocs = false
   // via the loop above, so no extra override is needed here.
 
-  return { hasDb, hasWorkflows, docsOnly: allDocs, reason: null };
+  return { hasDb, hasWorkflows, hasPs1, docsOnly: allDocs, reason: null };
 }
 
 function main() {
@@ -126,6 +134,7 @@ function main() {
   const flags = {
     PC_HAS_DB: result.hasDb ? '1' : '0',
     PC_HAS_WORKFLOWS: result.hasWorkflows ? '1' : '0',
+    PC_HAS_PS1: result.hasPs1 ? '1' : '0',
     PC_DOCS_ONLY: result.docsOnly ? '1' : '0',
   };
 
@@ -155,6 +164,11 @@ function main() {
       }
       if (flags.PC_HAS_WORKFLOWS === '0') {
         skips.push('no workflow changes — skipping workflow validation');
+      }
+      if (flags.PC_HAS_PS1 === '0') {
+        skips.push(
+          'no scripts/*.ps1 changes — skipping PowerShell script tests',
+        );
       }
       if (skips.length === 0) {
         process.stdout.write(

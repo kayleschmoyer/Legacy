@@ -145,6 +145,62 @@ test('refreshBaseRef is a no-op for non-origin base refs', () => {
   assert.doesNotThrow(() => refreshBaseRef('HEAD~1'));
 });
 
+/**
+ * PC_HAS_PS1 flag (LS-8729): make pc-test only runs `nx affected -t test`,
+ * which never exercises scripts/__tests__/*.ps1 since scripts/ isn't an Nx
+ * project. classify() must flag scripts/**\/*.ps1 changes so pc-test can
+ * additionally run `pnpm run test:scripts:ps` when relevant.
+ */
+function makeSimpleFixture() {
+  const root = mkdtempSync(join(tmpdir(), 'classify-changes-ps1-'));
+  git(root, ['init', '-q', '--initial-branch=main']);
+  git(root, ['config', 'user.email', 'test@example.com']);
+  git(root, ['config', 'user.name', 'Test']);
+  writeFileSync(join(root, 'base.txt'), 'base');
+  git(root, ['add', '-A']);
+  git(root, ['commit', '-q', '-m', 'base']);
+  git(root, ['checkout', '-q', '-b', 'feature']);
+  return root;
+}
+
+test('classify() sets hasPs1 when a scripts/*.ps1 file changed', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    mkdirSync(join(root, 'scripts', '__tests__'), { recursive: true });
+    writeFileSync(
+      join(root, 'scripts', '__tests__', 'new-thing.test.ps1'),
+      '# ps1 test',
+    );
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'add ps1 test']);
+
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.hasPs1, true);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('classify() leaves hasPs1 false when no .ps1 files changed', () => {
+  const root = makeSimpleFixture();
+  const originalCwd = process.cwd();
+  try {
+    writeFileSync(join(root, 'unrelated.ts'), 'export const x = 1;');
+    git(root, ['add', '-A']);
+    git(root, ['commit', '-q', '-m', 'unrelated change']);
+
+    process.chdir(root);
+    const result = classify('main');
+    assert.equal(result.hasPs1, false);
+  } finally {
+    process.chdir(originalCwd);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('refreshBaseRef does not throw when the fetch fails (offline fail-safe)', () => {
   const root = mkdtempSync(join(tmpdir(), 'classify-changes-noremote-'));
   const originalCwd = process.cwd();

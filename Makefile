@@ -995,6 +995,17 @@ _PC_WORKFLOWS_CMD = node scripts/validate-workflows.js
 _PC_TEST_CMD = pnpm exec nx affected -t test --base=$(NX_BASE) $(if $(MAXWORKERS),-- --maxWorkers=$(MAXWORKERS),)
 _PC_BUILD_CMD = pnpm exec nx affected -t build --base=$(NX_BASE)
 
+# PowerShell script tests (LS-8729): scripts/__tests__/*.ps1 lives outside the
+# Nx project graph, so _PC_TEST_CMD's `nx affected -t test` never runs it — a
+# green pc-test previously gave zero signal on scripts/*.ps1 changes. Folded
+# into the same 8/9 Testing step (not a new numbered step) and gated on
+# PC_HAS_PS1 so it only runs when a .ps1 file actually changed. `pwsh` is not
+# preinstalled in every environment (notably Claude Code Remote cloud
+# sessions); when absent this prints an explicit skip instead of silently
+# doing nothing. See .agents/skills/cloud-agent-mode/SKILL.md Quirk 11 for
+# installing pwsh in a cloud session.
+_PC_TEST_PS_CMD = if command -v pwsh >/dev/null 2>&1; then echo "  Running PowerShell script tests (test:scripts:ps)..." && pnpm run test:scripts:ps; else echo "  PowerShell script tests SKIPPED (pwsh not installed -- see .agents/skills/cloud-agent-mode/SKILL.md Quirk 11)"; fi
+
 # Formatting step (prettier + auto-commit of formatter rewrites as a new commit).
 # Canned recipe so the `pre-commit` pipeline and the standalone `pc-format` target
 # share one implementation.
@@ -1034,6 +1045,7 @@ pre-commit: ## Run all pre-commit validation checks
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,6/9 Linting...) && $(_PC_LINT_CMD),@$(call echo_yellow,6/9 Linting... SKIPPED (docs-only changes)))
 	$(if $(findstring PC_HAS_WORKFLOWS=1,$(_PC_FLAGS)),@$(call echo_plain,7/9 Workflow validation...) && $(_PC_WORKFLOWS_CMD),@$(call echo_yellow,7/9 Workflow validation... SKIPPED (no workflow changes)))
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_HAS_PS1=1,$(_PC_FLAGS)),@$(_PC_TEST_PS_CMD),@true)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,9/9 Building...) && $(_PC_BUILD_CMD),@$(call echo_yellow,9/9 Building... SKIPPED (docs-only changes)))
 	@$(call echo_green,✓ All pre-commit checks passed!)
 
@@ -1071,6 +1083,7 @@ pc-workflows: ## pc step 7: GitHub workflow validation
 pc-test: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pc-test: ## pc step 8: test affected projects. Pass MAXWORKERS=N to cap Jest worker parallelism (avoids OOM on memory-constrained machines)
 	$(if $(findstring PC_DOCS_ONLY=0,$(_PC_FLAGS)),@$(call echo_plain,8/9 Testing...) && $(_PC_TEST_CMD),@$(call echo_yellow,8/9 Testing... SKIPPED (docs-only changes)))
+	$(if $(findstring PC_HAS_PS1=1,$(_PC_FLAGS)),@$(_PC_TEST_PS_CMD),@true)
 
 pc-build: _PC_FLAGS := $(shell node scripts/classify-changes.js --base $(NX_BASE))
 pc-build: ## pc step 9: build affected projects
