@@ -2,11 +2,20 @@
 
 **Design ID**: `F89Q4j6WFCFqqsZpQ4VhlQ`
 **Source**: `DesignSync` MCP tool (local), projectId `019dd2d6-75a1-7916-8566-672f7d4189fa`
-**Synced at**: 2026-08-10T00:00:00.000Z
-**Bundle hash**: `sha256-f69d00a11bfbc79bcca342e07c3e70c927dc32944f2a33c983387dbe6b6e6d92`
-**Ticket**: LS-9090
+**Synced at**: 2026-09-08T00:00:00.000Z
+**Bundle hash**: `sha256-f40cf391b1616303576a9aa9d13268b993484ae0be7b6c2a1dadf4acd44899cd`
+**Ticket**: LS-9905
 
-## What changed vs. the previous sync (2026-08-04, LS-8962) — this sync
+## What changed vs. the previous sync (2026-08-10, LS-9090) — this sync
+
+Mechanical fix per LS-9905 (follow-on from the LS-9418 responsive-design-coverage
+audit): `ds/ui_kits.css` still had one invented `@media (max-width: 900px)`
+breakpoint left over from the LS-9090 pass (which fixed `players.css` and
+`players-data.jsx` but missed this file). Re-pinned to the canonical `lg`
+(980px) boundary — `max-width: 979px` — matching the sm–md tab-hiding tier
+already used in `players.css`. No other files changed.
+
+## What changed vs. the previous sync (2026-08-04, LS-8962) — 2026-08-10 sync (LS-9090)
 
 Fix-at-the-source for the PROMPT.md Breakpoints checklist gap flagged by
 LS-9024/LS-9090: the seven canonical bands

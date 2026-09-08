@@ -896,11 +896,12 @@ body {
    xxl (1280px) — because the underlying page layout has exactly one reflow point (the
    filters grid drops from 6 columns to 2, and the stats table switches to horizontal
    scroll). xs/sm/md (660-979px) share the mobile (xxs) frame's stacked-filter layout;
-   lg/xl (980-1279px) share the desktop (xxl) frame's layout. The @media 900px rule below
-   is the REVIEWER HARNESS's own frame-stacking behavior (stacks the side-by-side
-   mobile+desktop preview panes so both fit in a narrow reviewing window) — it is NOT a
-   product breakpoint and should not be read as an invented threshold. */
-@media (max-width: 900px) {
+   lg/xl (980-1279px) share the desktop (xxl) frame's layout. The rule below is the
+   REVIEWER HARNESS's own frame-stacking behavior (stacks the side-by-side mobile+desktop
+   preview panes so both fit in a narrow reviewing window) — it is NOT a product breakpoint;
+   re-pinned from an invented 900px to the canonical lg (980px) boundary so it never reads
+   as an invented threshold either. */
+@media (max-width: 979px) {
   .stage { grid-template-columns: 1fr !important; padding: 16px; }
   .stage .frame-mobile { margin: 0 auto; }
 }
@@ -920,7 +921,7 @@ Key decisions:
     falls back to the system ui-monospace/monospace stack.
   - :focus-visible added globally (previously absent) per brief requirement; gold is reserved
     for outcomes so a neutral TEXT_PRIMARY outline is used instead.
-  - Breakpoint coverage annotated (see BREAKPOINTS comment above the @media 900px rule) —
+  - Breakpoint coverage annotated (see BREAKPOINTS comment above the @media 979px rule) —
     only xxs/xxl are fully designed frames; intermediate bands share one of the two.
 Deviations: none identified beyond the token/font substitutions above.
 Open questions: see player-compare.html's HANDOFF for the shared multi-series-accent-token

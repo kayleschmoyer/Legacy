@@ -282,10 +282,11 @@ td,th,.stat,.num{font-variant-numeric:tabular-nums}
    xxl (1280px) — because the page layout has exactly one reflow point (portrait/hero-stats
    scale down, career-grid drops from 6 to 3 columns; everything else is fluid). xs/sm/md
    (660-979px) share the mobile (xxs) frame's layout; lg/xl (980-1279px) share the desktop
-   (xxl) frame's layout. The @media 900px rule below is the REVIEWER HARNESS's own
-   frame-stacking behavior (stacks the side-by-side mobile+desktop preview panes), not a
-   product breakpoint — do not read it as an invented threshold. */
-@media (max-width:900px){.stage{grid-template-columns:1fr!important; padding:16px}}
+   (xxl) frame's layout. The rule below is the REVIEWER HARNESS's own frame-stacking
+   behavior (stacks the side-by-side mobile+desktop preview panes), not a product
+   breakpoint — re-pinned from an invented 900px to the canonical lg (980px) boundary so it
+   never reads as an invented threshold either. */
+@media (max-width:979px){.stage{grid-template-columns:1fr!important; padding:16px}}
 
 </style>
 </head>
@@ -303,7 +304,7 @@ Key decisions:
     falls back to the system ui-monospace/monospace stack.
   - :focus-visible added globally (previously absent) per brief requirement; gold is reserved
     for outcomes so a neutral TEXT_PRIMARY outline is used instead.
-  - Breakpoint coverage annotated (see BREAKPOINTS comment above the @media 900px rule).
+  - Breakpoint coverage annotated (see BREAKPOINTS comment above the @media 979px rule).
   - Content fold-in per LS-8970's shipped-UI-ahead-of-mockup findings (this bundle predates
     60 commits of shipped work): added an accessible <table> fallback beside the Career Arc
     SVG (COMPONENT: arc-card, see inline comment), and entitlement-gated PREMIUM advanced

@@ -2,10 +2,26 @@
 
 **Design ID**: `kXxk3B29-DRvoJthw6UifA`
 **Source**: `https://claude.ai/design/p/50ece563-1be9-47b1-842e-28d071cebe3f` (DesignSync, local)
-**Synced at**: 2026-08-04T00:00:00.000Z
-**Bundle hash**: `sha256-870f2524366f76073ba504be5bb243be498d5497e4d78b594b78e20a18434999`
+**Synced at**: 2026-09-08T00:00:00.000Z
+**Bundle hash**: `sha256-75b42740daf65a97fedd2f3fc76522b8740df14c076f60b7cdb302b18cb2447a`
 **Files**: 15
 **Total size**: 851695 bytes
+
+## What changed (LS-9905)
+
+Mechanical fix, follow-on from the LS-9418 responsive-design-coverage audit:
+`player-detail.html`, `player-compare.html`, `player-stats.html` each had a
+`@media (max-width: 900px)` rule driving the reviewer-only `.stage`
+frame-stacking behavior (not a product breakpoint — see the `BREAKPOINTS`
+comment above each rule, added in LS-8970). The LS-8970 pass documented that
+this rule wasn't a product threshold but left the literal `900px` value
+un-repinned; LS-9905's audit still flagged it as a non-canonical number, so
+re-pinned all three to the canonical `lg` (980px) boundary —
+`max-width: 979px` — matching the boundary the `BREAKPOINTS` comments already
+describe (lg/xl share the desktop frame from 980px up). Comment text updated
+to match. `index.html`'s `.wrap { max-width: 900px }` is an unrelated content
+container width (not a `@media` breakpoint) and was left unchanged, consistent
+with this bundle's prior sync noting `index.html` as already compliant.
 
 ## What changed (LS-8970)
 

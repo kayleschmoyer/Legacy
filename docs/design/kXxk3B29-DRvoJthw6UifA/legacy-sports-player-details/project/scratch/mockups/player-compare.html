@@ -314,11 +314,12 @@ td,th,.stat,.num{font-variant-numeric:tabular-nums}
 /* BREAKPOINTS: this reviewer stage only ships two fully-designed frames — xxs (375px) and
    xxl (1280px) — because the page layout has exactly one reflow point (single-column to
    two-column table). xs/sm/md (660-979px) share the mobile (xxs) frame's single-column
-   layout; lg/xl (980-1279px) share the desktop (xxl) frame's layout. The @media 900px rule
-   below is the REVIEWER HARNESS's own frame-stacking behavior (stacks the side-by-side
-   mobile+desktop preview panes so both fit in a narrow reviewing window) — it is NOT a
-   product breakpoint and should not be read as an invented threshold. */
-@media (max-width:900px){.stage{grid-template-columns:1fr!important;padding:16px}}
+   layout; lg/xl (980-1279px) share the desktop (xxl) frame's layout. The rule below is the
+   REVIEWER HARNESS's own frame-stacking behavior (stacks the side-by-side mobile+desktop
+   preview panes so both fit in a narrow reviewing window) — it is NOT a product breakpoint;
+   re-pinned from an invented 900px to the canonical lg (980px) boundary so it never reads
+   as an invented threshold either. */
+@media (max-width:979px){.stage{grid-template-columns:1fr!important;padding:16px}}
 </style>
 </head>
 <body>
@@ -335,7 +336,7 @@ Key decisions:
     no dedicated multi-series comparison-chart palette.
   - :focus-visible added globally (previously absent everywhere) per brief requirement;
     gold is reserved for outcomes so a neutral TEXT_PRIMARY (fg-1) outline is used instead.
-  - Breakpoint coverage annotated (see BREAKPOINTS comment above the @media 900px rule) —
+  - Breakpoint coverage annotated (see BREAKPOINTS comment above the @media 979px rule) —
     only xxs/xxl are fully designed frames; intermediate bands share one of the two.
 Open questions for the implementer:
   - Should the design system define 3-4 first-class "series accent" tokens for multi-entity

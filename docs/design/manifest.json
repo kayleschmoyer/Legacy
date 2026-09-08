@@ -76,9 +76,9 @@
       "title": "Players Page",
       "slug": "legacy-sports-players-page",
       "status": "active",
-      "lastSyncedHash": "sha256-f69d00a11bfbc79bcca342e07c3e70c927dc32944f2a33c983387dbe6b6e6d92",
-      "lastSyncedAt": "2026-08-10T00:00:00.000Z",
-      "jiraKey": "LS-9090",
+      "lastSyncedHash": "sha256-f40cf391b1616303576a9aa9d13268b993484ae0be7b6c2a1dadf4acd44899cd",
+      "lastSyncedAt": "2026-09-08T00:00:00.000Z",
+      "jiraKey": "LS-9905",
       "source": "designsync-local"
     },
     {
@@ -171,9 +171,9 @@
       "title": "Player Details",
       "slug": "legacy-sports-player-details",
       "status": "active",
-      "lastSyncedHash": "sha256-870f2524366f76073ba504be5bb243be498d5497e4d78b594b78e20a18434999",
-      "lastSyncedAt": "2026-08-04T00:00:00.000Z",
-      "jiraKey": "LS-8970",
+      "lastSyncedHash": "sha256-75b42740daf65a97fedd2f3fc76522b8740df14c076f60b7cdb302b18cb2447a",
+      "lastSyncedAt": "2026-09-08T00:00:00.000Z",
+      "jiraKey": "LS-9905",
       "source": "designsync-local"
     },
     {

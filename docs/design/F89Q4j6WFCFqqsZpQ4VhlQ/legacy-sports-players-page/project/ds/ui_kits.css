@@ -174,7 +174,10 @@ body { margin: 0; background: var(--bg); color: var(--fg1); font-family: var(--f
 
 .ls-empty { padding: 48px; text-align: center; color: var(--fg3); }
 
-@media (max-width: 900px) {
+/* BREAKPOINTS: re-pinned from an invented 900px to the canonical lg (980px)
+   boundary — collapses to the single-column/mobile-tab treatment for
+   xxs-md (0-979px), matching the sm-md tab-hiding tier in players.css. */
+@media (max-width: 979px) {
   .ls-feature-grid, .ls-sport-grid { grid-template-columns: 1fr; }
   .ls-matchup-head { grid-template-columns: 1fr; }
   .ls-draft-grid { grid-template-columns: 1fr; }
