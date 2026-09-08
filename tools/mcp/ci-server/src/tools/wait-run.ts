@@ -1,22 +1,30 @@
 import { LOGGER } from '@legacy-sports/logging';
 
-import { githubGet } from '../github-api.js';
-import type { ToolResult } from '../types.js';
 import { minifiedJson } from '@legacy-sports/mcp-format';
+import { githubGet } from '../github-api.js';
+import { getRemainingLambdaMs } from '../lambda-budget.js';
+import type { ToolResult } from '../types.js';
 
-// Hard per-call ceiling. This server runs on a Lambda whose configured
-// timeout is 30s (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout,
-// terraform/main/variables.tf), which is the real constraint — NOT the
-// client-side ~60s MCP transport timeout a prior version of this constant
-// assumed. A wait longer than the Lambda's own timeout gets the whole
-// invocation SIGKILLed by AWS before it can return a response, which the
-// caller sees as a raw "Service Unavailable" transport error rather than the
-// clean { status: "in_progress", hint } snapshot below (LS-8429). 20s leaves
-// headroom under the 30s hard limit for the credential-fetch/auth work that
-// runs before this function is even invoked. Longer waits are re-armed by
-// the caller re-invoking this tool.
+// User-facing per-call ceiling. This server runs on a Lambda whose
+// configured timeout is 30s (terraform/main/lambda-mcp-ci.tf ->
+// var.lambda_timeout, terraform/main/variables.tf), which is the real
+// constraint — NOT the client-side ~60s MCP transport timeout a prior
+// version of this constant assumed. A wait longer than the Lambda's own
+// timeout gets the whole invocation SIGKILLed by AWS before it can return a
+// response, which the caller sees as a raw "Service Unavailable" transport
+// error rather than the clean { status: "in_progress", hint } snapshot below
+// (LS-8429).
 const MAX_WAIT_SECONDS = 20;
 const POLL_INTERVAL_MS = 5000;
+// Reserved for response serialization + the Streamable HTTP write after the
+// poll loop ends. A fixed 20s ceiling alone isn't enough: the pre-handler
+// auth/credential-fetch work (lambda.ts) eats into the same 30s budget by a
+// variable amount (cold starts, GitHub App token latency), so a naive 20s
+// wait can still get SIGKILLed when that overhead runs long — exactly the
+// regression reported against the first fix for this ticket. Clamping the
+// wait to the Lambda's *actual* remaining time (via getRemainingLambdaMs)
+// minus this margin fixes that; outside Lambda it's a no-op (Infinity).
+const RESPONSE_MARGIN_MS = 5000;
 
 interface WaitRunParams {
   runId: number;
@@ -51,11 +59,12 @@ async function sleep(ms: number): Promise<void> {
  * in-flight long-poll to the MCP transport timeout.
  */
 export async function waitRun(params: WaitRunParams): Promise<ToolResult> {
-  const maxWaitSeconds = Math.min(
-    params.maxWaitSeconds ?? MAX_WAIT_SECONDS,
-    MAX_WAIT_SECONDS,
-  );
-  const deadlineMs = Date.now() + maxWaitSeconds * 1000;
+  const requestedMs =
+    Math.min(params.maxWaitSeconds ?? MAX_WAIT_SECONDS, MAX_WAIT_SECONDS) *
+    1000;
+  const lambdaSafeMs = Math.max(getRemainingLambdaMs() - RESPONSE_MARGIN_MS, 0);
+  const maxWaitMs = Math.min(requestedMs, lambdaSafeMs);
+  const deadlineMs = Date.now() + maxWaitMs;
 
   try {
     let run = await githubGet<GitHubWorkflowRun>(

@@ -6,6 +6,7 @@ import {
   it,
   jest,
 } from '@jest/globals';
+import type { Context } from 'aws-lambda';
 
 jest.mock('../github-api.js', () => ({
   githubGet: jest.fn(),
@@ -14,6 +15,13 @@ jest.mock('../github-api.js', () => ({
 
 import { dispatchWorkflow } from './dispatch-workflow.js';
 import * as githubApi from '../github-api.js';
+import { setLambdaContext } from '../lambda-budget.js';
+
+function fakeContext(remainingMs: number): Context {
+  return {
+    getRemainingTimeInMillis: () => remainingMs,
+  } as unknown as Context;
+}
 
 const mockGithubGet = githubApi.githubGet as unknown as jest.MockedFunction<
   (path: string, query?: Record<string, string>) => Promise<unknown>
@@ -170,6 +178,39 @@ describe('dispatchWorkflow', () => {
     expect(result.content[0].text).toContain(
       'Failed to dispatch workflow "ci.yml"',
     );
+  });
+
+  describe('Lambda-remaining-time clamping (LS-8429 regression)', () => {
+    afterEach(() => {
+      setLambdaContext(undefined);
+    });
+
+    it('gives up locating the run once the Lambda-derived deadline passes, even before FIND_RUN_MAX_ATTEMPTS is reached', async () => {
+      mockGithubPost.mockResolvedValue(undefined);
+      mockGithubGet.mockResolvedValue({ workflow_runs: [] });
+      // 9s left minus the 5s response margin -> a 4s effective budget, too
+      // short for even one 3s FIND_RUN_POLL_INTERVAL_MS retry after the
+      // first attempt. Without deadline-awareness in findNewRun this would
+      // still burn through all 4 attempts (~9s) regardless of how little
+      // Lambda time was actually left -- reproducing the SIGKILL.
+      setLambdaContext(fakeContext(9_000));
+
+      jest.useFakeTimers();
+      const resultPromise = dispatchWorkflow({
+        workflow: 'ci.yml',
+        ref: 'my-branch',
+        waitForCompletion: true,
+      });
+      await jest.runAllTimersAsync();
+      const result = await resultPromise;
+      jest.useRealTimers();
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(
+        'Could not locate the triggered run',
+      );
+      expect(mockGithubGet.mock.calls.length).toBeLessThan(4);
+    });
   });
 
   describe('waitForCompletion: true (LS-8429)', () => {

@@ -1,4 +1,12 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from '@jest/globals';
+import type { Context } from 'aws-lambda';
 
 jest.mock('../github-api.js', () => ({
   githubGet: jest.fn(),
@@ -6,6 +14,13 @@ jest.mock('../github-api.js', () => ({
 
 import { waitRun, waitRunHint } from './wait-run.js';
 import * as githubApi from '../github-api.js';
+import { setLambdaContext } from '../lambda-budget.js';
+
+function fakeContext(remainingMs: number): Context {
+  return {
+    getRemainingTimeInMillis: () => remainingMs,
+  } as unknown as Context;
+}
 
 const mockGithubGet = githubApi.githubGet as unknown as jest.MockedFunction<
   (path: string) => Promise<unknown>
@@ -37,6 +52,10 @@ function parseBody(text: string): Record<string, unknown> {
 describe('waitRun', () => {
   beforeEach(() => {
     mockGithubGet.mockReset();
+  });
+
+  afterEach(() => {
+    setLambdaContext(undefined);
   });
 
   it('returns completed immediately when the run is already done', async () => {
@@ -91,6 +110,40 @@ describe('waitRun', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("clamps the wait to the Lambda's actual remaining time, not just the static 20s ceiling, when pre-handler auth/credential-fetch overhead has already eaten into the budget (LS-8429 regression)", async () => {
+    mockGithubGet.mockResolvedValue(makeRun({ status: 'in_progress' }));
+    // 12s left on the clock minus the 5s response margin -> a 7s effective
+    // budget instead of the full 20s ceiling. Poll interval is 5s, so calls
+    // land at t=0,5,7 (3 calls) instead of the 5 a static 20s ceiling would
+    // produce -- the exact gap that let the "Service Unavailable" transport
+    // error recur after the first (static-ceiling-only) fix for this ticket.
+    setLambdaContext(fakeContext(12_000));
+    jest.useFakeTimers();
+
+    try {
+      const resultPromise = waitRun({ runId: 123 });
+      await jest.runAllTimersAsync();
+      const result = await resultPromise;
+
+      expect(result.isError).toBeUndefined();
+      expect(parseBody(result.content[0].text).status).toBe('in_progress');
+      expect(mockGithubGet).toHaveBeenCalledTimes(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('makes only the single initial status check (no polling) when the Lambda has no safe time left, instead of risking a mid-poll SIGKILL', async () => {
+    mockGithubGet.mockResolvedValue(makeRun({ status: 'in_progress' }));
+    setLambdaContext(fakeContext(2_000));
+
+    const result = await waitRun({ runId: 123 });
+
+    expect(result.isError).toBeUndefined();
+    expect(parseBody(result.content[0].text).status).toBe('in_progress');
+    expect(mockGithubGet).toHaveBeenCalledTimes(1);
   });
 
   it('propagates a 404 (bad run ID) immediately as an error, without retrying', async () => {

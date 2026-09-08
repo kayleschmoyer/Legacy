@@ -3,25 +3,33 @@ import { LOGGER } from '@legacy-sports/logging';
 import { resolveWorkflowId } from './list-runs.js';
 import { waitRunHint } from './wait-run.js';
 import { githubGet, githubPost } from '../github-api.js';
+import { getRemainingLambdaMs } from '../lambda-budget.js';
 import type { ToolResult } from '../types.js';
 
-// Hard per-call ceiling. This server runs on a Lambda whose configured
-// timeout is 30s (terraform/main/lambda-mcp-ci.tf -> var.lambda_timeout,
-// terraform/main/variables.tf), which is the real constraint — NOT the
-// client-side ~60s MCP transport timeout a prior version of this constant
-// assumed. A wait longer than the Lambda's own timeout gets the whole
-// invocation SIGKILLed by AWS before it can return a response, which the
-// caller sees as a raw "Service Unavailable" transport error instead of a
-// clean { status: "in_progress", hint } snapshot (LS-8429). 20s leaves
-// headroom under the 30s hard limit for the credential-fetch/auth work that
-// runs before this function is even invoked. Longer waits are re-armed by
-// the caller via ci_wait_run.
+// User-facing per-call ceiling. This server runs on a Lambda whose
+// configured timeout is 30s (terraform/main/lambda-mcp-ci.tf ->
+// var.lambda_timeout, terraform/main/variables.tf), which is the real
+// constraint — NOT the client-side ~60s MCP transport timeout a prior
+// version of this constant assumed. A wait longer than the Lambda's own
+// timeout gets the whole invocation SIGKILLed by AWS before it can return a
+// response, which the caller sees as a raw "Service Unavailable" transport
+// error instead of a clean { status: "in_progress", hint } snapshot
+// (LS-8429). Longer waits are re-armed by the caller via ci_wait_run.
 const TRANSPORT_SAFE_WAIT_MS = 20_000;
+// Reserved for response serialization + the Streamable HTTP write once
+// polling stops. A fixed 20s ceiling alone isn't enough: the pre-handler
+// auth/credential-fetch work (lambda.ts) eats into the same 30s budget by a
+// variable amount (cold starts, GitHub App token latency), so a naive 20s
+// wait can still get SIGKILLed when that overhead runs long — exactly the
+// regression reported against the first fix for this ticket. Both
+// findNewRun and pollUntilComplete below are bounded against a deadline
+// computed from the Lambda's *actual* remaining time (getRemainingLambdaMs)
+// minus this margin; outside Lambda it's a no-op (Infinity).
+const RESPONSE_MARGIN_MS = 5000;
 const FIND_RUN_POLL_INTERVAL_MS = 3000;
-// Worst case (attempts - 1) * FIND_RUN_POLL_INTERVAL_MS must stay well under
-// TRANSPORT_SAFE_WAIT_MS — findNewRun runs BEFORE pollUntilComplete and isn't
-// itself deadline-aware, so an unbounded attempt count here could exhaust the
-// Lambda's timeout on its own before ever reaching the completion poll.
+// Worst-case attempt count when nothing else bounds it first — findNewRun is
+// now also deadline-aware (see above), so this is a courtesy fallback cap,
+// not the only thing standing between it and the Lambda timeout.
 const FIND_RUN_MAX_ATTEMPTS = 4;
 const COMPLETION_POLL_INTERVAL_MS = 5000;
 
@@ -73,11 +81,19 @@ async function findNewRun(
   workflow: string,
   ref: string,
   dispatchedAt: Date,
+  deadlineMs: number,
 ): Promise<GitHubWorkflowRun | null> {
   const cutoff = dispatchedAt.getTime() - 5000; // 5s tolerance for clock skew
   for (let attempt = 0; attempt < FIND_RUN_MAX_ATTEMPTS; attempt++) {
+    if (Date.now() >= deadlineMs) return null;
     if (attempt > 0) {
-      await sleep(FIND_RUN_POLL_INTERVAL_MS);
+      await sleep(
+        Math.min(
+          FIND_RUN_POLL_INTERVAL_MS,
+          Math.max(deadlineMs - Date.now(), 0),
+        ),
+      );
+      if (Date.now() >= deadlineMs) return null;
     }
     try {
       // Filter by event=workflow_dispatch to avoid picking up concurrent push/schedule runs.
@@ -234,14 +250,22 @@ export async function dispatchWorkflow(
     }
 
     // The per-call wait is transport-safe regardless of timeoutSeconds; the
-    // param is kept for backward compatibility but clamped to the ceiling.
-    const timeoutSeconds = Math.min(
-      params.timeoutSeconds ?? TRANSPORT_SAFE_WAIT_MS / 1000,
-      TRANSPORT_SAFE_WAIT_MS / 1000,
+    // param is kept for backward compatibility but clamped to the ceiling —
+    // and, on top of that, to the Lambda's actual remaining execution time
+    // (see RESPONSE_MARGIN_MS above) so pre-handler auth/credential-fetch
+    // overhead can never push this call past the 30s hard timeout.
+    const requestedMs = Math.min(
+      (params.timeoutSeconds ?? TRANSPORT_SAFE_WAIT_MS / 1000) * 1000,
+      TRANSPORT_SAFE_WAIT_MS,
     );
-    const deadlineMs = dispatchedAt.getTime() + timeoutSeconds * 1000;
+    const lambdaSafeMs = Math.max(
+      getRemainingLambdaMs() - RESPONSE_MARGIN_MS,
+      0,
+    );
+    const timeoutMs = Math.min(requestedMs, lambdaSafeMs);
+    const deadlineMs = dispatchedAt.getTime() + timeoutMs;
 
-    const newRun = await findNewRun(workflow, ref, dispatchedAt);
+    const newRun = await findNewRun(workflow, ref, dispatchedAt, deadlineMs);
     if (!newRun) {
       return {
         isError: true,
