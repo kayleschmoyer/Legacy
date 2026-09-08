@@ -4,8 +4,18 @@ name: "Check Migrations Applied"
 # Verifies that every migration file in lib/db-client/migrations/ has been
 # applied to the production database.
 #
-# Runs on PRs targeting main (blocking check) and after pushes to main that
-# touch migration files.  Can also be triggered manually at any time.
+# Runs on PRs targeting main (blocking check). Also declares workflow_dispatch,
+# but that trigger is USABLE ONLY WITH ref: main, not against PR branches: the
+# AWS OIDC role's trust policy authorizes the pull_request-event subject shape
+# (and ref:refs/heads/main), not workflow_dispatch on arbitrary branches.
+# Dispatching against a PR branch fails at AssumeRoleWithWebIdentity ("Not
+# authorized to perform sts:AssumeRoleWithWebIdentity") after ~4 minutes of
+# retries — it is NOT a way to re-trigger this required check on a PR.
+#
+# If this required check gets stuck/cancelled on a PR (e.g. a concurrency-group
+# race with another triggered run), the correct recovery is to push an empty
+# commit to the PR branch to force a fresh `pull_request` synchronize event:
+#   git commit --allow-empty -m "chore: retrigger CI" && git push
 #
 # How it works:
 #   1. Resolves ci_readonly DB credentials from AWS Secrets Manager.
