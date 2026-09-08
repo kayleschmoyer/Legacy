@@ -167,6 +167,32 @@ git add pnpm-lock.yaml
 git commit --amend --no-edit
 ```
 
+#### ⚠️ Not safe in a native-flow worktree: `pnpm install --no-frozen-lockfile` / `--lockfile-only` (LS-4889)
+
+The regeneration command above assumes `node_modules` is a real, local install. In a native-flow worktree (`.claude/worktrees/<name>/`), it isn't — `node_modules` is a symlink into a shared, immutable content-addressable pool slot keyed by the lockfile's hash (see [concurrent-agent-safety.md](../shared/concurrent-agent-safety.md)). Running `pnpm install --no-frozen-lockfile` or `pnpm install --lockfile-only` **through that symlink** makes pnpm see a modules directory it doesn't recognize as its own store link, and it prompts to remove and reinstall the whole tree in place — which destroys the pool slot every other worktree on the same lockfile hash is still pointing to, not just this one. Do not run either command directly in a worktree, even non-interactively (`--no-frozen-lockfile` doesn't skip the removal prompt, it just changes what happens after you answer it).
+
+**When you actually hit this**: not every lockfile conflict needs a full regeneration. The common case after a rebase is narrower — `package.json` gained a dependency (from either side) but `pnpm-lock.yaml`'s `importers.<path>` block for that workspace never picked it up, so `pnpm install --frozen-lockfile` (what `make pc`/CI runs) fails with a frozen-lockfile mismatch naming that one package. If `git diff` on the conflicted `pnpm-lock.yaml` shows only that kind of gap — one importer missing one entry that's already resolved elsewhere in the file — a full regeneration is overkill and the in-place-install risk above isn't worth it. Use the manual edit below instead.
+
+**Safe manual edit for a missing importer entry:**
+
+1. Diff the workspace's `package.json` against the corresponding `importers.<path>` block in `pnpm-lock.yaml` to find the missing package name(s) — e.g. `apps/app/package.json` has `expo-secure-store` under `dependencies`, but `importers['apps/app'].dependencies` has no `expo-secure-store` key.
+2. Search the lockfile's top-level `packages:` (or `snapshots:`, depending on lockfile version) section for `<package-name>@<version>` matching the range in `package.json`. It's almost always already there — the package is already used by some other workspace in the monorepo, which is why the version is resolvable at all without a real install.
+   - **If it is not already there** (genuinely new to the whole monorepo, not just this workspace), stop — this manual pattern doesn't apply. That case needs a real `pnpm install` to resolve a brand-new dependency graph, which must not run through a worktree's symlinked `node_modules`; ask the user to run it from their own primary checkout, or fix it up in a later non-worktree session.
+3. Add the minimal entry under the workspace's importer block, matching the exact key (`dependencies` vs `devDependencies`) and indentation of the sibling entries already there:
+   ```yaml
+   importers:
+     apps/app:
+       dependencies:
+         expo-secure-store:
+           specifier: ~56.0.4 # from package.json
+           version: 56.0.4(expo@56.0.16) # from the existing packages: entry
+   ```
+   Copy the `version` value verbatim from the `packages:`/`snapshots:` entry found in step 2 — don't hand-derive it.
+4. Do not touch the `packages:`/`snapshots:` metadata block itself; only the `importers.<path>` entry changes.
+5. Verify and materialize without touching any other worktree's slot: re-run `node scripts/modules-pool/link.mjs` (or `worktree_install_recover()`, MCP-first). Because the edit changed the lockfile's content hash, this resolves to a **new** pool slot and materializes it via an isolated `pnpm install --frozen-lockfile` — it never writes through the old slot other worktrees still use. If it fails, the manual edit was wrong (bad version/specifier, wrong importer path) — re-check step 3, don't fall back to `--no-frozen-lockfile`/`--lockfile-only` in the worktree.
+
+This is the doc-first response to LS-4889: a `worktree_sync_lockfile` MCP tool was considered but the safe path here doesn't need new tooling — the existing pool-slot resolver (`link.mjs`/`worktree_install_recover`) already does the only safe "regenerate" step once the importer entry itself is fixed by hand.
+
 ### Schema Files (`lib/db-client/src/drizzle/**`)
 
 Accept theirs (the incoming main version) since schema changes should be sequential:
