@@ -511,8 +511,11 @@ export async function updateMatchupStatus(
  * matchup even if the rest of the roster still has that slot unresolved,
  * flipping the matchup to 'completed' prematurely (LS-9517, sibling of the
  * LS-6367 fix for getSelectedGamesCountBatch). A slot counts as resolved
- * when it has a real gameIdentifier assigned, or was intentionally skipped
- * (pitcherStartSkipped).
+ * when it has a real gameIdentifier assigned, was intentionally skipped
+ * (pitcherStartSkipped), or was terminally marked as having no game data
+ * available (noGameDataFound) — that flag means the stats pipeline already
+ * gave up looking for this player/season, so requiring a real
+ * gameIdentifier would block the matchup from ever completing (LS-9925).
  * Returns the appropriate matchup main status.
  */
 export async function checkMatchupCompletion(
@@ -536,7 +539,7 @@ export async function checkMatchupCompletion(
     .select({
       matchupId: PublicSchema.matchupPlayers.matchupId,
       matchupPlayerId: PublicSchema.matchupPlayers.id,
-      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
+      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} OR ${PublicSchema.matchupPlayerGames.noGameDataFound} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
     })
     .from(PublicSchema.matchupPlayers)
     .leftJoin(

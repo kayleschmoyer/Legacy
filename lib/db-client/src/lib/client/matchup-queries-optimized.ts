@@ -278,7 +278,7 @@ export async function getSelectedGamesCount(
     .select({
       matchupId: PublicSchema.matchupPlayers.matchupId,
       matchupPlayerId: PublicSchema.matchupPlayers.id,
-      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
+      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} OR ${PublicSchema.matchupPlayerGames.noGameDataFound} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
     })
     .from(PublicSchema.matchupPlayers)
     .leftJoin(
@@ -309,8 +309,10 @@ export async function getSelectedGamesCount(
  * the roster (e.g. late-window/MNF players) still has that slot unresolved
  * — flipping the matchup to 'completed' while teammates' games are still
  * pending (LS-6367). A slot counts as resolved when it has a real
- * gameIdentifier assigned, or was intentionally skipped
- * (pitcherStartSkipped).
+ * gameIdentifier assigned, was intentionally skipped (pitcherStartSkipped),
+ * or was terminally marked as having no game data available
+ * (noGameDataFound) — that flag means the stats pipeline already gave up
+ * looking, so waiting for it to change would loop forever (LS-9925).
  *
  * Returns a Map<matchupId, count>. Matchups with zero games will have count 0.
  * Uses GROUP BY instead of N separate queries — O(1) round trips.
@@ -327,7 +329,7 @@ export async function getSelectedGamesCountBatch(
     .select({
       matchupId: PublicSchema.matchupPlayers.matchupId,
       matchupPlayerId: PublicSchema.matchupPlayers.id,
-      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
+      count: sql<number>`COUNT(DISTINCT CASE WHEN ${PublicSchema.matchupPlayerGames.gameIdentifier} IS NOT NULL OR ${PublicSchema.matchupPlayerGames.pitcherStartSkipped} OR ${PublicSchema.matchupPlayerGames.noGameDataFound} THEN ${PublicSchema.matchupPlayerGames.gameNum} END)`,
     })
     .from(PublicSchema.matchupPlayers)
     .leftJoin(

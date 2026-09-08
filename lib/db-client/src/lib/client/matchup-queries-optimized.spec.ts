@@ -7,8 +7,24 @@
 
 import {
   getSelectedGamesCount,
+  getSelectedGamesCountBatch,
   minResolvedCountPerMatchup,
 } from './matchup-queries-optimized';
+
+/**
+ * Extracts the literal SQL text a drizzle `sql` template produced, so a test
+ * can assert on the generated CASE WHEN without hitting a real database.
+ * Column-reference chunks are rendered by their column name.
+ */
+function renderSqlChunks(sqlObj: {
+  queryChunks: Array<{ value?: unknown[]; name?: string }>;
+}): string {
+  return sqlObj.queryChunks
+    .map((chunk) =>
+      Array.isArray(chunk.value) ? chunk.value.join('') : (chunk.name ?? ''),
+    )
+    .join('');
+}
 
 interface ResolvedCountRow {
   matchupId: number;
@@ -17,17 +33,23 @@ interface ResolvedCountRow {
 }
 
 interface MockDbChain {
-  select: jest.Mock<MockDbChain, []>;
+  select: jest.Mock<MockDbChain, [Record<string, unknown>]>;
   from: jest.Mock<MockDbChain, [unknown]>;
   leftJoin: jest.Mock<MockDbChain, [unknown]>;
   where: jest.Mock<MockDbChain, [unknown]>;
   groupBy: jest.Mock<Promise<ResolvedCountRow[]>, [unknown]>;
 }
 
-function createMockDbChain(finalResult: ResolvedCountRow[]): MockDbChain {
+function createMockDbChain(
+  finalResult: ResolvedCountRow[],
+  onSelect?: (fields: Record<string, unknown>) => void,
+): MockDbChain {
   const chain = {} as MockDbChain;
 
-  chain.select = jest.fn(() => chain);
+  chain.select = jest.fn((fields: Record<string, unknown>) => {
+    onSelect?.(fields);
+    return chain;
+  });
   chain.from = jest.fn(() => chain);
   chain.leftJoin = jest.fn(() => chain);
   chain.where = jest.fn(() => chain);
@@ -127,5 +149,52 @@ describe('getSelectedGamesCount', () => {
     const result = await getSelectedGamesCount(db, 9);
 
     expect(result).toBe(5);
+  });
+
+  // LS-9925: a matchupPlayerGames row can be terminally marked
+  // noGameDataFound (no per-game box scores available for that
+  // player/season — LS-9122) instead of getting a real gameIdentifier. The
+  // resolved-slot CASE WHEN must treat that as resolved too, or a single
+  // such player permanently caps the whole matchup's count below
+  // gamesPerMatchup — autoSelectGames then keeps recomputing the same
+  // "next" game number forever instead of advancing.
+  it('includes no_game_data_found in the resolved-slot CASE WHEN', async () => {
+    let capturedFields: Record<string, unknown> | undefined;
+    const db = createMockDbChain([], (fields) => {
+      capturedFields = fields;
+    });
+
+    await getSelectedGamesCount(db, 10);
+
+    const rendered = renderSqlChunks(
+      capturedFields?.count as Parameters<typeof renderSqlChunks>[0],
+    );
+    expect(rendered).toContain('no_game_data_found');
+  });
+});
+
+describe('getSelectedGamesCountBatch', () => {
+  // LS-9925: same CASE WHEN gap as getSelectedGamesCount, in the batch path.
+  it('includes no_game_data_found in the resolved-slot CASE WHEN', async () => {
+    let capturedFields: Record<string, unknown> | undefined;
+    const db = createMockDbChain([], (fields) => {
+      capturedFields = fields;
+    });
+
+    await getSelectedGamesCountBatch(db, [10, 11]);
+
+    const rendered = renderSqlChunks(
+      capturedFields?.count as Parameters<typeof renderSqlChunks>[0],
+    );
+    expect(rendered).toContain('no_game_data_found');
+  });
+
+  it('returns an empty map for an empty matchupIds array without querying', async () => {
+    const db = createMockDbChain([]);
+
+    const result = await getSelectedGamesCountBatch(db, []);
+
+    expect(result.size).toBe(0);
+    expect(db.select).not.toHaveBeenCalled();
   });
 });

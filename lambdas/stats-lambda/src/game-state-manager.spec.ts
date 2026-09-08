@@ -253,4 +253,53 @@ describe('checkMatchupCompletion', () => {
 
     expect(result).toBe('completed');
   });
+
+  // LS-9925: a matchupPlayerGames row can be terminally marked
+  // noGameDataFound (no per-game box scores available for that
+  // player/season — LS-9122) instead of getting a real gameIdentifier. The
+  // resolved-slot CASE WHEN must treat that as resolved too, or a single
+  // such player permanently caps the matchup below gamesPerMatchup and it
+  // can never reach 'completed'.
+  it('includes no_game_data_found in the resolved-slot CASE WHEN', async () => {
+    let capturedFields: Record<string, unknown> | undefined;
+    let callCount = 0;
+    const db = {
+      select: jest.fn((fields: Record<string, unknown>) => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            from: jest.fn(() => ({
+              where: jest.fn(() => ({
+                limit: jest.fn(() => Promise.resolve([{ gamesPerMatchup: 2 }])),
+              })),
+            })),
+          };
+        }
+        capturedFields = fields;
+        return {
+          from: jest.fn(() => ({
+            leftJoin: jest.fn(() => ({
+              where: jest.fn(() => ({
+                groupBy: jest.fn(() => Promise.resolve([])),
+              })),
+            })),
+          })),
+        };
+      }),
+    };
+
+    await checkMatchupCompletion(db as never, 42);
+
+    const countSql = capturedFields?.count as {
+      queryChunks: Array<{ value?: unknown[] } | string | null | undefined>;
+    };
+    const rendered = countSql.queryChunks
+      .map((chunk) => {
+        if (chunk == null) return '';
+        if (typeof chunk === 'string') return chunk;
+        return Array.isArray(chunk.value) ? chunk.value.join('') : '';
+      })
+      .join('');
+    expect(rendered).toContain('mpg.noGameDataFound');
+  });
 });
