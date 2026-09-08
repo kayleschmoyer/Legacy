@@ -902,6 +902,17 @@ jobs:
   # apply's spot deaths conclude as `failure`, not `cancelled`) and accepted
   # for this job too, per LS-9451.
   #
+  # LS-9334: this job's own gate has to accept the same {failure, cancelled}
+  # set the detect-runner-shutdown action scans, not just 'cancelled'. A mid-
+  # job runner death cancels the killed job itself, but ci-pipeline.yml's
+  # downstream jobs (e.g. e2e-affected, Summarize & Report) that `needs` it
+  # conclude 'failure' when a dependency didn't succeed — and a reusable
+  # workflow's own conclusion is 'failure', not 'cancelled', whenever any of
+  # its jobs concludes 'failure' (GitHub prioritises failure over cancelled
+  # when aggregating). That made this job skip entirely on the exact failure
+  # it exists to report: no label, no comment, forcing a manual log-grep
+  # (confirmed against PR #6935 / run 31421732904).
+  #
   # The "CI: Runner Flake" label is cleared by a step in determine-scope at
   # the start of every subsequent CI run.
   # ============================================================================
@@ -911,7 +922,7 @@ jobs:
     if: >-
       always() &&
       needs.determine-scope.result != 'skipped' &&
-      needs.ci-pipeline.result == 'cancelled' &&
+      (needs.ci-pipeline.result == 'cancelled' || needs.ci-pipeline.result == 'failure') &&
       github.event.pull_request.number
     runs-on: ${{ needs.determine-scope.outputs.runner-label || 'ubuntu-latest' }}
     timeout-minutes: 5

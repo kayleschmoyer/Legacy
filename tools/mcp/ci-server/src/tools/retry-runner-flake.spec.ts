@@ -8,15 +8,23 @@ jest.mock('./retry-failed.js', () => ({
   retryFailed: jest.fn(),
 }));
 
+jest.mock('../logs.js', () => ({
+  fetchRunLogsRing: jest.fn(),
+}));
+
 import { retryRunnerFlake } from './retry-runner-flake.js';
 import * as retryFailedModule from './retry-failed.js';
 import * as githubApi from '../github-api.js';
+import * as logsModule from '../logs.js';
 
 const mockGet = githubApi.githubGet as unknown as jest.MockedFunction<
-  (path: string) => Promise<unknown>
+  (path: string, params?: Record<string, string>) => Promise<unknown>
 >;
 const mockRetryFailed = retryFailedModule.retryFailed as jest.MockedFunction<
   typeof retryFailedModule.retryFailed
+>;
+const mockFetchRunLogsRing = logsModule.fetchRunLogsRing as jest.MockedFunction<
+  typeof logsModule.fetchRunLogsRing
 >;
 
 function comment(body: string) {
@@ -30,6 +38,7 @@ describe('retryRunnerFlake', () => {
     mockRetryFailed.mockResolvedValue({
       content: [{ type: 'text', text: '{"originalRunId":12345}' }],
     });
+    mockFetchRunLogsRing.mockReset();
   });
 
   describe('validation', () => {
@@ -93,13 +102,19 @@ describe('retryRunnerFlake', () => {
   });
 
   describe('label absent, comment absent', () => {
-    it('returns a clear no-signal result naming both signals and makes no write calls', async () => {
+    it('returns a clear no-signal result when no completed run exists for the head SHA, making no write calls', async () => {
       mockGet.mockImplementation((path: string) => {
         if (path === '/issues/99') {
           return Promise.resolve({ labels: [{ name: 'some-other-label' }] });
         }
         if (path === '/issues/99/comments') {
           return Promise.resolve([comment('unrelated comment')]);
+        }
+        if (path === '/pulls/99') {
+          return Promise.resolve({ head: { sha: 'deadbeef' } });
+        }
+        if (path === '/actions/workflows/ci-orchestrator.yml/runs') {
+          return Promise.resolve({ workflow_runs: [] });
         }
         throw new Error(`unexpected path ${path}`);
       });
@@ -112,7 +127,124 @@ describe('retryRunnerFlake', () => {
       );
       expect(result.content[0].text).toContain('CI: Runner Flake');
       expect(result.content[0].text).toContain('bot comment');
+      expect(result.content[0].text).toContain('runner-shutdown signature');
       expect(mockRetryFailed).not.toHaveBeenCalled();
+      expect(mockFetchRunLogsRing).not.toHaveBeenCalled();
+    });
+
+    it('LS-9334: falls back to a job-log scan and retries when the shutdown signature is found in a run whose "Report Runner Shutdown" job was skipped', async () => {
+      mockGet.mockImplementation((path: string, params) => {
+        if (path === '/issues/200') {
+          return Promise.resolve({ labels: [{ name: 'some-other-label' }] });
+        }
+        if (path === '/issues/200/comments') {
+          return Promise.resolve([comment('unrelated comment')]);
+        }
+        if (path === '/pulls/200') {
+          return Promise.resolve({ head: { sha: 'abc123' } });
+        }
+        if (path === '/actions/workflows/ci-orchestrator.yml/runs') {
+          expect(params).toMatchObject({ head_sha: 'abc123' });
+          return Promise.resolve({
+            workflow_runs: [{ id: 31421732904, status: 'completed' }],
+          });
+        }
+        if (path === '/actions/runs/31421732904/jobs') {
+          return Promise.resolve({
+            total_count: 1,
+            jobs: [{ conclusion: 'cancelled' }],
+          });
+        }
+        throw new Error(`unexpected path ${path}`);
+      });
+      mockFetchRunLogsRing.mockResolvedValue({
+        lines: [],
+        totalLines: 1,
+        priorityLines: ['##[error]The runner has received a shutdown signal.'],
+      });
+
+      const result = await retryRunnerFlake({ prNumber: 200 });
+
+      expect(mockFetchRunLogsRing).toHaveBeenCalledWith(
+        { runId: 31421732904, failedOnly: true },
+        1,
+        expect.any(Function),
+      );
+      expect(mockRetryFailed).toHaveBeenCalledWith({ runId: 31421732904 });
+      expect(result.isError).toBeUndefined();
+    });
+
+    it('still refuses (does not retry) when the failed job logs contain no shutdown signature — a genuine test failure', async () => {
+      mockGet.mockImplementation((path: string) => {
+        if (path === '/issues/201') {
+          return Promise.resolve({ labels: [{ name: 'some-other-label' }] });
+        }
+        if (path === '/issues/201/comments') {
+          return Promise.resolve([comment('unrelated comment')]);
+        }
+        if (path === '/pulls/201') {
+          return Promise.resolve({ head: { sha: 'def456' } });
+        }
+        if (path === '/actions/workflows/ci-orchestrator.yml/runs') {
+          return Promise.resolve({
+            workflow_runs: [{ id: 555, status: 'completed' }],
+          });
+        }
+        if (path === '/actions/runs/555/jobs') {
+          return Promise.resolve({
+            total_count: 1,
+            jobs: [{ conclusion: 'failure' }],
+          });
+        }
+        throw new Error(`unexpected path ${path}`);
+      });
+      mockFetchRunLogsRing.mockResolvedValue({
+        lines: [],
+        totalLines: 1,
+        priorityLines: [],
+      });
+
+      const result = await retryRunnerFlake({ prNumber: 201 });
+
+      expect(result.isError).toBeUndefined();
+      expect(result.content[0].text).toContain(
+        'No runner-shutdown flake signal',
+      );
+      expect(mockRetryFailed).not.toHaveBeenCalled();
+    });
+
+    it('skips the log fetch entirely (never a false positive) when the latest completed run has no failed/cancelled jobs', async () => {
+      mockGet.mockImplementation((path: string) => {
+        if (path === '/issues/202') {
+          return Promise.resolve({ labels: [{ name: 'some-other-label' }] });
+        }
+        if (path === '/issues/202/comments') {
+          return Promise.resolve([comment('unrelated comment')]);
+        }
+        if (path === '/pulls/202') {
+          return Promise.resolve({ head: { sha: 'ghi789' } });
+        }
+        if (path === '/actions/workflows/ci-orchestrator.yml/runs') {
+          return Promise.resolve({
+            workflow_runs: [{ id: 777, status: 'completed' }],
+          });
+        }
+        if (path === '/actions/runs/777/jobs') {
+          return Promise.resolve({
+            total_count: 1,
+            jobs: [{ conclusion: 'success' }],
+          });
+        }
+        throw new Error(`unexpected path ${path}`);
+      });
+
+      const result = await retryRunnerFlake({ prNumber: 202 });
+
+      expect(mockFetchRunLogsRing).not.toHaveBeenCalled();
+      expect(mockRetryFailed).not.toHaveBeenCalled();
+      expect(result.content[0].text).toContain(
+        'No runner-shutdown flake signal',
+      );
     });
   });
 
