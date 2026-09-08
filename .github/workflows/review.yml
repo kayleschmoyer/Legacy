@@ -7,6 +7,16 @@ name: Reviewer (W1)
 # and on synchronize when bot:ready-for-review is present so agents don't
 # need to re-apply the label after each push to trigger a new cycle.
 #
+# review-bot-override is sticky STATE, not a one-shot event (LS-9575): while
+# the label is present on the PR, every synchronize and every
+# labeled:bot:ready-for-review event also passes the gate in auto-approve
+# mode, so a push after the override still gets a terminal bot-review status
+# instead of stranding the head SHA with none. Before this fix, the gate's
+# auto-approve branch matched only the exact label-add event, while every
+# other trigger was independently skipped by a `!contains(review-bot-override)`
+# guard — once the label was present, that guard made every subsequent
+# trigger a no-op forever.
+#
 # Queued-PR coverage (LS-8289/LS-8297): merge-when-ready deliberately does
 # NOT trigger this workflow. When a queued PR's head SHA is missing its
 # bot-review status (the deadlock that froze 30+ PRs on 2026-07-01), the
@@ -78,24 +88,30 @@ jobs:
     steps:
       # Single source of truth for "would the review job run for this event?".
       # Skip drafts, fork PRs, labeled events for irrelevant labels, and
-      # synchronize events when bot:ready-for-review is not present.
-      # When review-bot-override is labeled, fire in auto-approve mode (no LLM
-      # review). For all other triggers, skip when review-bot-override is
-      # present. Consumed by the review job's `if` AND the pending-footprint
-      # steps below so the conditions can never drift (LS-9209).
+      # synchronize events when neither bot:ready-for-review nor
+      # review-bot-override is present.
+      # review-bot-override is treated as STICKY STATE (LS-9575): once it is
+      # present on the PR (checked via the state array, not the triggering
+      # event), every synchronize and every labeled:bot:ready-for-review event
+      # also passes the gate — not just the original labeled:review-bot-override
+      # event — so REVIEWER_AUTO_APPROVE below can run in auto-approve mode on
+      # every subsequent trigger instead of leaving new head SHAs with no
+      # bot-review status. Consumed by the review job's `if` AND the
+      # pending-footprint steps below so the conditions can never drift (LS-9209).
       - name: Evaluate review gate
         id: gate
         env:
           SHOULD_REVIEW: >-
             ${{ github.event.pull_request.draft == false &&
                 github.event.pull_request.head.repo.full_name == github.repository &&
-                (github.event.label.name == 'review-bot-override' ||
-                 (!contains(github.event.pull_request.labels.*.name, 'review-bot-override') &&
-                  (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
-                   github.event.action == 'synchronize' && contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
-                   github.event.label.name == 'bot:ready-for-review' ||
-                   github.event.label.name == 'review-bot-degraded' ||
-                   github.event.label.name == 'bot:reset-cycle-counter'))) }}
+                (github.event.action != 'labeled' && github.event.action != 'synchronize' ||
+                 github.event.label.name == 'review-bot-override' ||
+                 github.event.label.name == 'bot:ready-for-review' ||
+                 github.event.label.name == 'review-bot-degraded' ||
+                 github.event.label.name == 'bot:reset-cycle-counter' ||
+                 github.event.action == 'synchronize' &&
+                   (contains(github.event.pull_request.labels.*.name, 'bot:ready-for-review') ||
+                    contains(github.event.pull_request.labels.*.name, 'review-bot-override'))) }}
         run: |
           echo "should-review=${SHOULD_REVIEW}" >> "$GITHUB_OUTPUT"
           echo "Review gate: should-review=${SHOULD_REVIEW}"
@@ -183,7 +199,14 @@ jobs:
           REVIEWER_BOT_APP_ID: ${{ vars.REVIEWER_BOT_APP_ID || '3142924' }}
           REVIEWER_BOT_APP_PRIVATE_KEY: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           REVIEWER_TELEMETRY_BUCKET: ${{ vars.REVIEWER_TELEMETRY_BUCKET || 'legacy-sports-dev-reviewer-telemetry' }}
-          REVIEWER_AUTO_APPROVE: ${{ github.event.label.name == 'review-bot-override' && 'true' || '' }}
+          # State-based (LS-9575), not event-based: true whenever review-bot-override
+          # is present on the PR, regardless of which trigger let this run through
+          # the gate above — so a push after the override is applied still
+          # auto-approves instead of running (or skipping) a normal LLM review.
+          # The gate above is the only thing that can let a run reach this step
+          # when the label is NOT present, so this never widens auto-approve to
+          # PRs without the override.
+          REVIEWER_AUTO_APPROVE: ${{ contains(github.event.pull_request.labels.*.name, 'review-bot-override') && 'true' || '' }}
           CYCLE_RESET_SENDER: ${{ github.event.action == 'labeled' && github.event.label.name == 'bot:reset-cycle-counter' && github.event.sender.login || '' }}
           TRIGGERED_BY_SYNCHRONIZE: ${{ github.event.action == 'synchronize' && 'true' || '' }}
         run: |
