@@ -103,6 +103,12 @@ primary: LS-1234
 
 If `legacy-sports-github` re-authenticates mid-session, prefer switching back to `github_open_pr({ jiraKey: "LS-####" })` for its auto-prepend convenience rather than continuing to hand-author the marker on the generic tool.
 
+> **The write path is fine — do not treat a missing marker as proof the hand-authored comment was stripped (LS-8694).** It is tempting to conclude `create_pull_request`/`update_pull_request` sanitize literal `<!-- ... -->` comments out of the `body` before GitHub stores it; LS-8694 tested that directly and found otherwise. Method: write a body containing the marker via `create_pull_request`, then a follow-up body via `update_pull_request` (including the inline `<!-- jira-link primary: LS-#### -->` form), and read the **stored** GitHub body back through a channel the built-in tools' own display stripping doesn't touch — `legacy-sports-github`'s `github_view_pr({ fields: ["body"] })`, which returns GitHub's API response directly. In both cases the literal comment came back byte-for-byte intact. So: the write path does not strip. Every apparent "the marker vanished" report (this ticket included, and its predecessors LS-9202/LS-8934/LS-9227/LS-9228 below) is the [read-path false-negative](#seeing-and-fixing-linkage-on-an-open-pr) — checking your own write by reading it back through `pull_request_read`/`list_pull_requests`/the built-in tool's own echo, all of which strip on **display** regardless of what's stored. Practical takeaways:
+>
+> - **Never verify a marker write by reading it back** through anything but `github_view_pr` on the hosted connector (or don't verify at all — see [below](#seeing-and-fixing-linkage-on-an-open-pr)). A "the comment is gone" read-back proves nothing about what GitHub actually stored.
+> - **Hand-authoring the marker on this path works** — write it in the initial body as documented above and trust it landed.
+> - **The title is still the durable safety net regardless** — put the ticket key in the PR title too, so [Jira Link Check's auto-repair](#jira-link-check-repairs-the-marker-for-you-ls-9279) covers you on the rare case the marker really is missing or malformed for an unrelated reason.
+
 **Always put the ticket key in the PR title on this path** — the title is the only linkage signal that survives every read path, it is what `jira-branch-sync` falls back to, and it is what Jira Link Check repairs the marker from when the body's marker is missing or malformed.
 
 #### Seeing and fixing linkage on an open PR
@@ -169,14 +175,33 @@ the rest. Escalate only when Jira Link Check itself fails.
 Historical context, since the prior tickets read the other way: LS-9202 and
 LS-8934 concluded the _write_ path strips (LS-8934 attributing it to
 intermittency and prescribing a read-back-and-retry loop), and LS-9227 /
-LS-9228 were both closed **Won't Do** on that basis. Whether the write path
-ever stripped is unresolved — the reports may have been accurate then, may have
-been this same misdiagnosis, or the platform may have changed since. What is
-verifiable now is above. The asymmetry is what makes it confusing:
-`mcp__github__add_issue_comment` round-trips HTML comments intact on both write
-and read, so testing the behaviour through comments suggests the body write
-path is the broken one. It isn't — or at least, that is not what a read-back
-demonstrates.
+LS-9228 were both closed **Won't Do** on that basis, reasoning that those
+reports were the same read-path false-negative documented above rather than a
+real write-side bug.
+
+**LS-8694 confirms the Won't Do reasoning and closes the ambiguity: the write
+path does not strip.** Its own report described the same symptom pattern —
+write a body containing the marker via `create_pull_request` (and separately
+via `update_pull_request`, including the inline `<!-- jira-link primary: LS-#### -->`
+form), read it back, comment is gone — that reads exactly like real stripping
+if the read-back goes through any of the built-in tools' own display paths
+(`pull_request_read`, `list_pull_requests`, or the create/update call's own
+echoed response), all independently confirmed above to strip on **display**
+regardless of what GitHub actually stored. LS-8694 isolated the write path by
+reading the result through `github_view_pr` on the hosted `legacy-sports-github`
+connector instead — a channel that fetches GitHub's API response directly and
+is not part of any built-in tool's read path. Both the `create_pull_request`
+body and the follow-up `update_pull_request` body came back with the literal
+HTML comment intact, byte-for-byte, including the inline form. There is
+nothing to fix or route around on the write side: **root cause of every
+"the marker got stripped" report in this ticket chain, including LS-8694's
+own, is the documented read-path display stripping being mistaken for a write
+bug**, not a sanitization step and not a markdown-processing bug. Given three
+tickets now landing on the same conclusion (LS-9227, LS-9228, and now LS-8694
+directly testing it), do not re-open this question on a future report without
+first checking whether the report's "stored/returned body" was actually read
+through the hosted connector's `github_view_pr` — if it wasn't, it is the same
+misdiagnosis, not new evidence.
 
 ### PR Body Template
 
