@@ -61,10 +61,26 @@ function isNodeModulesHealthy(nmPath) {
   const tsxBin = path.join(nmPath, '.bin', 'tsx');
   try {
     fs.lstatSync(tsxBin); // throws if absent; detects broken symlinks too
-    return fs.statSync(tsxBin).isFile(); // follows symlinks
+    if (!fs.statSync(tsxBin).isFile()) return false; // follows symlinks
   } catch {
     return false;
   }
+  // pnpm writes .modules.yaml as the last step of a successful install, so
+  // its absence means node_modules was assembled by something other than a
+  // completed `pnpm install` even when tsx itself resolves fine — nx's
+  // project-graph plugin then refuses to run against the tree ("pnpm
+  // lockfile detected, but node_modules/.modules.yaml is missing", LS-9210).
+  // scripts/modules-pool/link.mjs's assessSlot() already checks for this
+  // (used by .claude/cloud-setup.sh's SessionStart health check), but this
+  // shim runs earlier — before the first MCP server launch — and has its own
+  // separate, dependency-free check, so it needs the same signature added
+  // here to catch it before cloud-setup.sh's own repair pass would (LS-8698).
+  try {
+    fs.lstatSync(path.join(nmPath, '.modules.yaml'));
+  } catch {
+    return false;
+  }
+  return true;
 }
 
 // Detect both worktree patterns before branching:
