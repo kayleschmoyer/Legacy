@@ -99,6 +99,20 @@ If a Packer config change ships to `main` without the `rebuild-runner-ami` label
 
 Recovery: open a carrier PR per the section above.
 
+## Pre-commit checks for `.pkr.hcl` changes
+
+Every PR touching `terraform/runners/packer/**/*.hcl` should pass a formatting and syntax check before pushing. Prefer the MCP tools over shelling out to `packer fmt` / `packer validate` directly — no need to `cd terraform/runners/packer` or worry about PATH/Windows quirks:
+
+```
+packer_build({ action: "fmt", hclPath: "terraform/runners/packer/runner-ami.pkr.hcl" })
+// -> { ok, diff } — ok:false means the file needs `packer fmt` applied
+
+packer_build({ action: "validate", hclPath: "terraform/runners/packer/runner-ami.pkr.hcl" })
+// -> { ok, errors[] } — HCL syntax check, no AWS credentials needed (syntaxOnly defaults true)
+```
+
+Both are synchronous (no job polling) and pass through the underlying `packer` exit code via `ok`. See the [substitution table](../../mcp-first/SKILL.md#aws-operations) for the shell-command mapping.
+
 ## Prerequisites
 
 1. **AWS SSO authenticated**: check with `aws_sso_status()` (MCP) or `aws sts get-caller-identity` — if expired, **stop and prompt the user** to run `aws sso login` (user-only, AGENTS.md Tier 1; see [aws-sso-login.md](aws-sso-login.md))

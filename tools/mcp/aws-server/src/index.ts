@@ -661,8 +661,14 @@ server.tool(
 // --- packer_build ---
 server.tool(
   'packer_build',
-  'Run `packer build` against an HCL template. The build (including `packer init`) always runs in the background; by default this call waits up to 45s and returns either the finished structured result (amiId, name, durationSec, snapshotId, tags, logPath) or a running snapshot with a buildId + re-arm hint. Use packer_build_status to poll or packer_build_wait for a bounded wait. Pass runInBackground=true to return immediately with the buildId.',
+  '`action: "build"` (default) runs `packer build` in the background; by default this call waits up to 45s and returns either the finished result (amiId, name, durationSec, snapshotId, tags, logPath) or a running snapshot with a buildId + re-arm hint — poll with packer_build_status/packer_build_wait, or pass runInBackground=true to return immediately. `action: "fmt"`/`"validate"` are low-cost sync checks — prefer over shelling out; return `{ ok, diff }` / `{ ok, errors[] }`, capped at 5000 chars.',
   {
+    action: z
+      .enum(['build', 'fmt', 'validate'])
+      .default('build')
+      .describe(
+        '"build": async AMI build (runInBackground/maxWaitSeconds). "fmt": packer fmt (check/diff). "validate": packer validate (syntaxOnly).',
+      ),
     hclPath: z
       .string()
       .describe(
@@ -672,7 +678,7 @@ server.tool(
       .record(z.string(), z.string())
       .optional()
       .describe(
-        'Packer variable overrides passed as `-var key=value`. Names must match [A-Za-z0-9_-]+; values must not contain quotes, backticks, backslashes, newlines, or shell operators. Example: { vpc_id: "vpc-0abc123", subnet_id: "subnet-0abc123", playwright_version: "1.50.0" }.',
+        'build only. Packer `-var key=value` overrides. Names: [A-Za-z0-9_-]+; values must not contain quotes, backticks, backslashes, newlines, or shell operators. Example: { vpc_id: "vpc-0abc123", subnet_id: "subnet-0abc123" }.',
       ),
     worktreePath: z
       .string()
@@ -684,7 +690,7 @@ server.tool(
       .boolean()
       .default(false)
       .describe(
-        'When true, skip the initial wait and return immediately with a buildId. The build always runs in the background either way. Default: false (wait up to maxWaitSeconds, then return a running snapshot if not finished).',
+        'build only. When true, return immediately with a buildId instead of waiting up to maxWaitSeconds. Default: false.',
       ),
     maxWaitSeconds: z.coerce
       .number()
@@ -693,7 +699,21 @@ server.tool(
       .max(55)
       .default(45)
       .describe(
-        'Max seconds to wait for completion before returning a running snapshot (default: 45, cap: 55). Ignored when runInBackground=true.',
+        'build only. Max seconds to wait before returning a running snapshot (default: 45, cap: 55).',
+      ),
+    check: z
+      .boolean()
+      .default(true)
+      .describe('fmt only. Pass `-check` to packer fmt. Default: true.'),
+    diff: z
+      .boolean()
+      .default(true)
+      .describe('fmt only. Pass `-diff` to packer fmt. Default: true.'),
+    syntaxOnly: z
+      .boolean()
+      .default(true)
+      .describe(
+        'validate only. Pass `-syntax-only` to packer validate. Default: true.',
       ),
   },
   async (params) => packerBuild(params),

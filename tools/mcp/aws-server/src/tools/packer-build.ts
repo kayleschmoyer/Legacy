@@ -1,8 +1,33 @@
 import { join, isAbsolute, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createJobRunner, type JobSnapshot } from '@legacy-sports/mcp-jobs';
-import { getRepoRoot, runCommand } from '../run-command.js';
+import {
+  getRepoRoot,
+  runCommand,
+  runCommandCaptureExit,
+} from '../run-command.js';
 import type { ToolResult } from '../types.js';
+
+// Lightweight, synchronous companions to the async `packer build` action
+// below (LS-4951): every PR touching terraform/runners/packer/**/*.hcl runs
+// `packer fmt -check -diff` and `packer validate -syntax-only` today via raw
+// shell. Output is capped so a large diff/error dump can't blow out the
+// tool-result payload.
+const MAX_CHECK_OUTPUT_CHARS = 5000;
+
+function truncateOutput(text: string): string {
+  return text.length > MAX_CHECK_OUTPUT_CHARS
+    ? `${text.slice(0, MAX_CHECK_OUTPUT_CHARS)}\n...[truncated]`
+    : text;
+}
+
+/** Split packer's blank-line-delimited error blocks into individual entries. */
+function splitPackerErrors(raw: string): string[] {
+  return raw
+    .split(/\n{2,}/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
 
 // Parses: "==> amazon-ebs.runner: AMI: ami-0abc1234def56789a"
 const AMI_PATTERN = /AMI: (ami-[0-9a-f]+)/;
@@ -225,11 +250,15 @@ async function finishedResult(snapshot: JobSnapshot): Promise<ToolResult> {
 // ---- packer_build ----
 
 export interface PackerBuildParams {
+  action?: 'build' | 'fmt' | 'validate';
   hclPath: string;
   vars?: Record<string, string>;
   worktreePath?: string;
   runInBackground?: boolean;
   maxWaitSeconds?: number;
+  check?: boolean;
+  diff?: boolean;
+  syntaxOnly?: boolean;
 }
 
 // Validate inputs at the interpolation boundary: hclPath and vars reach the
@@ -254,6 +283,13 @@ function invalidInput(error: string): ToolResult {
 export async function packerBuild(
   params: PackerBuildParams,
 ): Promise<ToolResult> {
+  const action = params.action ?? 'build';
+  if (action === 'fmt') return packerFmt(params);
+  if (action === 'validate') return packerValidate(params);
+  return packerBuildRun(params);
+}
+
+async function packerBuildRun(params: PackerBuildParams): Promise<ToolResult> {
   const { hclPath, vars = {}, runInBackground = false } = params;
 
   if (!HCL_PATH_RE.test(hclPath)) {
@@ -326,6 +362,121 @@ export async function packerBuild(
   if (!snapshot) return notFoundResult(buildId);
   if (snapshot.status === 'running') return runningSnapshot(snapshot);
   return finishedResult(snapshot);
+}
+
+/** Shared path resolution + validation for the fmt/validate actions. */
+function resolveHcl(
+  params: PackerBuildParams,
+): { cwd: string; resolvedHcl: string } | ToolResult {
+  if (!HCL_PATH_RE.test(params.hclPath)) {
+    return invalidInput(
+      `Invalid hclPath ${JSON.stringify(params.hclPath)}: must be a plain path to a .pkr.hcl file with no spaces, quotes, or shell metacharacters.`,
+    );
+  }
+  const cwd = params.worktreePath
+    ? resolve(params.worktreePath)
+    : getRepoRoot();
+  const resolvedHcl = isAbsolute(params.hclPath)
+    ? params.hclPath
+    : join(cwd, params.hclPath);
+  return { cwd, resolvedHcl };
+}
+
+function isToolResult(
+  value: { cwd: string; resolvedHcl: string } | ToolResult,
+): value is ToolResult {
+  return 'content' in value;
+}
+
+// ---- packer_build (action: "fmt") ----
+
+/**
+ * Synchronous `packer fmt` check — formatting drift only, no plugin
+ * downloads or infra side effects, so it runs inline rather than on the job
+ * runner. Defaults to `check: true, diff: true` (report-only, never rewrites
+ * the file), matching the shell invocation this replaces.
+ */
+async function packerFmt(params: PackerBuildParams): Promise<ToolResult> {
+  const resolved = resolveHcl(params);
+  if (isToolResult(resolved)) return resolved;
+  const { cwd, resolvedHcl } = resolved;
+  const { check = true, diff = true } = params;
+
+  const args = ['fmt'];
+  if (check) args.push('-check');
+  if (diff) args.push('-diff');
+  args.push(resolvedHcl);
+
+  try {
+    const { stdout, stderr, code } = await runCommandCaptureExit(
+      'packer',
+      args,
+      cwd,
+    );
+    const output = truncateOutput([stdout, stderr].filter(Boolean).join('\n'));
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ ok: code === 0, diff: output }),
+        },
+      ],
+      isError: code !== 0,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      content: [
+        { type: 'text', text: JSON.stringify({ ok: false, error: message }) },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// ---- packer_build (action: "validate") ----
+
+/**
+ * Synchronous `packer validate` check. Defaults to `syntaxOnly: true` so it
+ * never needs cloud credentials or plugin downloads — matching the shell
+ * invocation this replaces.
+ */
+async function packerValidate(params: PackerBuildParams): Promise<ToolResult> {
+  const resolved = resolveHcl(params);
+  if (isToolResult(resolved)) return resolved;
+  const { cwd, resolvedHcl } = resolved;
+  const { syntaxOnly = true } = params;
+
+  const args = ['validate'];
+  if (syntaxOnly) args.push('-syntax-only');
+  args.push(resolvedHcl);
+
+  try {
+    const { stdout, stderr, code } = await runCommandCaptureExit(
+      'packer',
+      args,
+      cwd,
+    );
+    const raw = truncateOutput([stderr, stdout].filter(Boolean).join('\n'));
+    const errors = code === 0 ? [] : splitPackerErrors(raw);
+    return {
+      content: [
+        { type: 'text', text: JSON.stringify({ ok: code === 0, errors }) },
+      ],
+      isError: code !== 0,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ ok: false, errors: [message] }),
+        },
+      ],
+      isError: true,
+    };
+  }
 }
 
 // ---- packer_build_status ----

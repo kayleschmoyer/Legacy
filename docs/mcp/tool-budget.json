@@ -3,7 +3,7 @@
   "_regenerate": "node scripts/generate-mcp-api-reference.mjs --update-budget",
   "total": {
     "tools": 262,
-    "tokens": 92162
+    "tokens": 92398
   },
   "servers": {
     "legacy-sports-android": {
@@ -12,7 +12,7 @@
     },
     "legacy-sports-aws": {
       "tools": 25,
-      "tokens": 9024
+      "tokens": 9261
     },
     "legacy-sports-browser": {
       "tools": 8,
@@ -20,7 +20,7 @@
     },
     "legacy-sports-ci": {
       "tools": 22,
-      "tokens": 11173
+      "tokens": 11172
     },
     "legacy-sports-db-admin": {
       "tools": 4,

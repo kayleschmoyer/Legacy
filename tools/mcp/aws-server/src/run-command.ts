@@ -100,3 +100,61 @@ export function runCommand(
     );
   });
 }
+
+export interface CommandExitResult {
+  stdout: string;
+  stderr: string;
+  code: number;
+}
+
+/**
+ * Like `runCommand`, but resolves with the exit code instead of rejecting on
+ * a non-zero one. Callers that need to distinguish "the command ran and
+ * reported a failure" (e.g. `packer fmt -check`, `packer validate`, where a
+ * non-zero exit is an expected, structured result) from "the command could
+ * not run at all" (missing binary) use this instead of parsing runCommand's
+ * thrown Error message.
+ */
+export function runCommandCaptureExit(
+  command: string,
+  args: string[],
+  cwd: string,
+  extraEnv: Record<string, string> = {},
+  timeout: number = COMMAND_TIMEOUT,
+  maxBuffer: number = DEFAULT_MAX_BUFFER,
+): Promise<CommandExitResult> {
+  return new Promise((resolvePromise, reject) => {
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      AWS_PAGER: '',
+      PYTHONIOENCODING: 'utf-8:replace',
+      PYTHONUTF8: '1',
+      ...extraEnv,
+    };
+
+    execFile(
+      command,
+      args,
+      { cwd, timeout, shell: false, env, maxBuffer, windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err?.code === 'ENOENT') {
+          reject(
+            new Error(
+              `${command} CLI not found (spawn ${command} ENOENT): the "${command}" binary is not installed ` +
+                `or not on PATH in this environment. This is expected in Claude Code Remote (CCR) sessions, ` +
+                `which do not have the AWS CLI or Terraform installed — aws-server MCP tools cannot run there. ` +
+                `If running locally, install and configure the ${command} CLI.`,
+            ),
+          );
+          return;
+        }
+        const code = typeof err?.code === 'number' ? err.code : err ? 1 : 0;
+        resolvePromise({
+          stdout: (stdout || '').trim(),
+          stderr: (stderr || '').trim(),
+          code,
+        });
+      },
+    );
+  });
+}

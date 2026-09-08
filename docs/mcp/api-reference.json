@@ -7907,8 +7907,19 @@
         },
         {
           "name": "packer_build",
-          "description": "Run `packer build` against an HCL template. The build (including `packer init`) always runs in the background; by default this call waits up to 45s and returns either the finished structured result (amiId, name, durationSec, snapshotId, tags, logPath) or a running snapshot with a buildId + re-arm hint. Use packer_build_status to poll or packer_build_wait for a bounded wait. Pass runInBackground=true to return immediately with the buildId.",
+          "description": "`action: \"build\"` (default) runs `packer build` in the background; by default this call waits up to 45s and returns either the finished result (amiId, name, durationSec, snapshotId, tags, logPath) or a running snapshot with a buildId + re-arm hint — poll with packer_build_status/packer_build_wait, or pass runInBackground=true to return immediately. `action: \"fmt\"`/`\"validate\"` are low-cost sync checks — prefer over shelling out; return `{ ok, diff }` / `{ ok, errors[] }`, capped at 5000 chars.",
           "inputs": {
+            "action": {
+              "type": "enum",
+              "optional": true,
+              "enum": [
+                "build",
+                "fmt",
+                "validate"
+              ],
+              "default": "build",
+              "description": "\"build\": async AMI build (runInBackground/maxWaitSeconds). \"fmt\": packer fmt (check/diff). \"validate\": packer validate (syntaxOnly)."
+            },
             "hclPath": {
               "type": "string",
               "optional": false,
@@ -7921,7 +7932,7 @@
                 "type": "string",
                 "optional": false
               },
-              "description": "Packer variable overrides passed as `-var key=value`. Names must match [A-Za-z0-9_-]+; values must not contain quotes, backticks, backslashes, newlines, or shell operators. Example: { vpc_id: \"vpc-0abc123\", subnet_id: \"subnet-0abc123\", playwright_version: \"1.50.0\" }."
+              "description": "build only. Packer `-var key=value` overrides. Names: [A-Za-z0-9_-]+; values must not contain quotes, backticks, backslashes, newlines, or shell operators. Example: { vpc_id: \"vpc-0abc123\", subnet_id: \"subnet-0abc123\" }."
             },
             "worktreePath": {
               "type": "string",
@@ -7932,7 +7943,7 @@
               "type": "boolean",
               "optional": true,
               "default": false,
-              "description": "When true, skip the initial wait and return immediately with a buildId. The build always runs in the background either way. Default: false (wait up to maxWaitSeconds, then return a running snapshot if not finished)."
+              "description": "build only. When true, return immediately with a buildId instead of waiting up to maxWaitSeconds. Default: false."
             },
             "maxWaitSeconds": {
               "type": "number",
@@ -7944,7 +7955,25 @@
                 "max 55"
               ],
               "default": 45,
-              "description": "Max seconds to wait for completion before returning a running snapshot (default: 45, cap: 55). Ignored when runInBackground=true."
+              "description": "build only. Max seconds to wait before returning a running snapshot (default: 45, cap: 55)."
+            },
+            "check": {
+              "type": "boolean",
+              "optional": true,
+              "default": true,
+              "description": "fmt only. Pass `-check` to packer fmt. Default: true."
+            },
+            "diff": {
+              "type": "boolean",
+              "optional": true,
+              "default": true,
+              "description": "fmt only. Pass `-diff` to packer fmt. Default: true."
+            },
+            "syntaxOnly": {
+              "type": "boolean",
+              "optional": true,
+              "default": true,
+              "description": "validate only. Pass `-syntax-only` to packer validate. Default: true."
             }
           },
           "transports": [

@@ -1,6 +1,7 @@
 jest.mock('../run-command.js', () => ({
   getRepoRoot: () => '/repo',
   runCommand: jest.fn(),
+  runCommandCaptureExit: jest.fn(),
 }));
 
 // packer-build runs its builds on the shared job runner (LS-8564). Mock the
@@ -24,7 +25,7 @@ jest.mock('@legacy-sports/mcp-jobs', () => {
 });
 
 import type { JobSnapshot } from '@legacy-sports/mcp-jobs';
-import { runCommand } from '../run-command.js';
+import { runCommand, runCommandCaptureExit } from '../run-command.js';
 import {
   packerBuild,
   packerBuildStatus,
@@ -32,6 +33,9 @@ import {
 } from './packer-build.js';
 
 const mockedRun = runCommand as jest.MockedFunction<typeof runCommand>;
+const mockedCaptureExit = runCommandCaptureExit as jest.MockedFunction<
+  typeof runCommandCaptureExit
+>;
 const { __mock: runnerMock } = jest.requireMock('@legacy-sports/mcp-jobs') as {
   __mock: {
     startJob: jest.Mock;
@@ -98,6 +102,7 @@ function mockCommands(): void {
 
 beforeEach(() => {
   mockedRun.mockReset();
+  mockedCaptureExit.mockReset();
   runnerMock.startJob.mockReset();
   runnerMock.snapshotJob.mockReset();
   runnerMock.waitForJob.mockReset();
@@ -337,5 +342,145 @@ describe('packerBuildStatus', () => {
     expect(parsed.ok).toBe(false);
     expect(parsed.status).toBe('orphaned');
     expect(String(parsed.hint)).toMatch(/previous MCP server process/);
+  });
+});
+
+describe('packerBuild action: "fmt"', () => {
+  it('rejects an hclPath with shell metacharacters without invoking packer', async () => {
+    const { parsed, isError } = body(
+      await packerBuild({
+        action: 'fmt',
+        hclPath: 'x.pkr.hcl; rm -rf /',
+      }),
+    );
+    expect(isError).toBe(true);
+    expect(String(parsed.error)).toMatch(/Invalid hclPath/);
+    expect(mockedCaptureExit).not.toHaveBeenCalled();
+  });
+
+  it('runs packer fmt -check -diff by default and reports ok:true on a clean file', async () => {
+    mockedCaptureExit.mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+
+    const { parsed, isError } = body(
+      await packerBuild({ action: 'fmt', hclPath: 'x.pkr.hcl' }),
+    );
+    expect(isError).toBe(false);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.diff).toBe('');
+    expect(mockedCaptureExit).toHaveBeenCalledWith(
+      'packer',
+      ['fmt', '-check', '-diff', '/repo/x.pkr.hcl'],
+      '/repo',
+    );
+  });
+
+  it('passes through a non-zero exit as ok:false with the diff output', async () => {
+    mockedCaptureExit.mockResolvedValue({
+      stdout: '-x\n+y',
+      stderr: '',
+      code: 1,
+    });
+
+    const { parsed, isError } = body(
+      await packerBuild({ action: 'fmt', hclPath: 'x.pkr.hcl' }),
+    );
+    expect(isError).toBe(true);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.diff).toBe('-x\n+y');
+  });
+
+  it('honors check:false / diff:false by omitting those flags', async () => {
+    mockedCaptureExit.mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+
+    await packerBuild({
+      action: 'fmt',
+      hclPath: 'x.pkr.hcl',
+      check: false,
+      diff: false,
+    });
+    expect(mockedCaptureExit).toHaveBeenCalledWith(
+      'packer',
+      ['fmt', '/repo/x.pkr.hcl'],
+      '/repo',
+    );
+  });
+
+  it('caps diff output at 5000 chars', async () => {
+    mockedCaptureExit.mockResolvedValue({
+      stdout: 'x'.repeat(6000),
+      stderr: '',
+      code: 1,
+    });
+
+    const { parsed } = body(
+      await packerBuild({ action: 'fmt', hclPath: 'x.pkr.hcl' }),
+    );
+    expect(String(parsed.diff).length).toBeLessThanOrEqual(5000 + 20);
+  });
+
+  it('reports a missing packer binary as ok:false without throwing', async () => {
+    mockedCaptureExit.mockRejectedValue(
+      new Error('packer CLI not found (spawn packer ENOENT): ...'),
+    );
+
+    const { parsed, isError } = body(
+      await packerBuild({ action: 'fmt', hclPath: 'x.pkr.hcl' }),
+    );
+    expect(isError).toBe(true);
+    expect(parsed.ok).toBe(false);
+    expect(String(parsed.error)).toMatch(/packer CLI not found/);
+  });
+});
+
+describe('packerBuild action: "validate"', () => {
+  it('runs packer validate -syntax-only by default and reports ok:true', async () => {
+    mockedCaptureExit.mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+
+    const { parsed, isError } = body(
+      await packerBuild({ action: 'validate', hclPath: 'x.pkr.hcl' }),
+    );
+    expect(isError).toBe(false);
+    expect(parsed.ok).toBe(true);
+    expect(parsed.errors).toEqual([]);
+    expect(mockedCaptureExit).toHaveBeenCalledWith(
+      'packer',
+      ['validate', '-syntax-only', '/repo/x.pkr.hcl'],
+      '/repo',
+    );
+  });
+
+  it('returns structured errors[] on a syntax error', async () => {
+    mockedCaptureExit.mockResolvedValue({
+      stdout: '',
+      stderr: 'Error: Invalid reference\n\n  on x.pkr.hcl line 3:\n   bad',
+      code: 1,
+    });
+
+    const { parsed, isError } = body(
+      await packerBuild({ action: 'validate', hclPath: 'x.pkr.hcl' }),
+    );
+    expect(isError).toBe(true);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.errors).toEqual([
+      'Error: Invalid reference\n\n  on x.pkr.hcl line 3:\n   bad'.split(
+        /\n{2,}/,
+      )[0],
+      'on x.pkr.hcl line 3:\n   bad',
+    ]);
+  });
+
+  it('honors syntaxOnly:false by omitting the flag', async () => {
+    mockedCaptureExit.mockResolvedValue({ stdout: '', stderr: '', code: 0 });
+
+    await packerBuild({
+      action: 'validate',
+      hclPath: 'x.pkr.hcl',
+      syntaxOnly: false,
+    });
+    expect(mockedCaptureExit).toHaveBeenCalledWith(
+      'packer',
+      ['validate', '/repo/x.pkr.hcl'],
+      '/repo',
+    );
   });
 });
