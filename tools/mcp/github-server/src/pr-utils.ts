@@ -4,7 +4,7 @@ import { githubGraphQL } from './github-api.js';
 interface PRNodeIdResponse {
   repository: {
     pullRequest: { id: string } | null;
-  };
+  } | null;
 }
 
 const PR_NODE_ID_QUERY = `
@@ -16,7 +16,13 @@ query($owner: String!, $repo: String!, $number: Int!) {
 
 /**
  * Resolve the GraphQL node ID for a pull request.
- * Returns the node ID string (e.g. "PR_..."), or null if not found.
+ * Returns the node ID string (e.g. "PR_..."), or null if the PR itself is
+ * not found (repository resolved, pull request did not).
+ *
+ * Throws with the underlying GraphQL error text (attached as `warnings` by
+ * `githubGraphQL`) when `repository` itself resolves to null — e.g. a
+ * permission-gated or per-field GraphQL error — rather than letting callers
+ * dereference `.pullRequest` off null and surface a raw TypeError.
  */
 export async function resolvePullRequestNodeId(
   prNumber: number,
@@ -27,6 +33,12 @@ export async function resolvePullRequestNodeId(
     repo: repo.name,
     number: prNumber,
   });
+  if (!result.data.repository) {
+    const warningText = result.warnings?.map((w) => w.message).join('; ');
+    throw new Error(
+      `GitHub GraphQL could not resolve the repository for PR #${prNumber}${warningText ? `: ${warningText}` : ' (no error details returned).'}`,
+    );
+  }
   return result.data.repository.pullRequest?.id ?? null;
 }
 
