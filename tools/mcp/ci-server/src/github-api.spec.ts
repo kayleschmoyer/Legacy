@@ -13,6 +13,7 @@ import { generateKeyPairSync } from 'node:crypto';
 // importing github-api.ts directly.
 import {
   fetchWithRetry,
+  formatGithubApiError,
   isAlreadyRunningError,
   isTransientServerError,
   withRetryOnAlreadyRunning,
@@ -191,6 +192,57 @@ describe('fetchWithRetry (githubGetArrayBuffer retry logic)', () => {
     expect(backoffDelays).toContain(30_000);
 
     setSpy.mockRestore();
+  });
+});
+
+describe('formatGithubApiError (LS-8740)', () => {
+  const savedCcr = process.env['CLAUDE_CODE_REMOTE'];
+
+  afterEach(() => {
+    if (savedCcr === undefined) delete process.env['CLAUDE_CODE_REMOTE'];
+    else process.env['CLAUDE_CODE_REMOTE'] = savedCcr;
+  });
+
+  it('does not append the CCR hint outside a CCR session', () => {
+    delete process.env['CLAUDE_CODE_REMOTE'];
+
+    const message = formatGithubApiError(401, '{"message":"Bad credentials"}');
+
+    expect(message).toBe('GitHub API 401: {"message":"Bad credentials"}');
+  });
+
+  it('does not append the CCR hint for a non-401 status even in a CCR session', () => {
+    process.env['CLAUDE_CODE_REMOTE'] = 'true';
+
+    const message = formatGithubApiError(403, 'Forbidden');
+
+    expect(message).toBe('GitHub API 403: Forbidden');
+  });
+
+  it('appends the CCR hint for a 401 in a CCR session (LS-8740)', () => {
+    process.env['CLAUDE_CODE_REMOTE'] = 'true';
+
+    const message = formatGithubApiError(401, '{"message":"Bad credentials"}');
+
+    expect(message).toMatch(/^GitHub API 401: \{"message":"Bad credentials"\}/);
+    expect(message).toContain('LS-8740');
+    expect(message).toContain('legacy-sports-ci');
+  });
+
+  it('preserves the "GitHub API <status>" prefix used by isAlreadyRunningError/isTransientServerError', () => {
+    process.env['CLAUDE_CODE_REMOTE'] = 'true';
+
+    // 401 is the only status this helper annotates — confirm the prefix these
+    // sibling matchers key on survives the CCR hint being appended.
+    const message = formatGithubApiError(
+      401,
+      'Bad credentials',
+      ' (attempt 2/3)',
+    );
+
+    expect(
+      message.startsWith('GitHub API 401 (attempt 2/3): Bad credentials'),
+    ).toBe(true);
   });
 });
 

@@ -5,13 +5,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { readGitRemoteUrl } from './git-config.js';
 import {
   fetchWithRetry,
+  formatGithubApiError,
   HttpStatusError,
   sanitizeErrorBody,
   withRetryOnAlreadyRunning,
 } from './http-retry.js';
 import { getRepoRoot } from './repo-root.js';
 
-export { sanitizeErrorBody } from './http-retry.js';
+export { formatGithubApiError, sanitizeErrorBody } from './http-retry.js';
 // getRepoRoot lives in ./repo-root.js so its `import.meta.url` usage stays
 // out of CommonJS-compiled specs (LS-8322, mirroring the LS-5982 pattern) —
 // re-exported here for the one existing consumer (audit-session-bash.ts).
@@ -332,7 +333,7 @@ export async function getInstallationRateLimit(): Promise<{
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
+    throw new Error(formatGithubApiError(res.status, body));
   }
 
   const data = (await res.json()) as {
@@ -649,7 +650,7 @@ export async function githubGet<T>(
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
+    throw new Error(formatGithubApiError(res.status, body));
   }
 
   logRateLimit(res, `GET ${path}`);
@@ -673,7 +674,7 @@ export async function githubGetText(path: string): Promise<string> {
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(body)}`);
+    throw new Error(formatGithubApiError(res.status, body));
   }
 
   logRateLimit(res, `GET ${path} (text)`);
@@ -737,7 +738,7 @@ export async function githubPut<T>(path: string, body?: unknown): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(text)}`);
+    throw new Error(formatGithubApiError(res.status, text));
   }
 
   logRateLimit(res, `PUT ${path}`);
@@ -762,7 +763,7 @@ export async function githubPost<T>(path: string, body?: unknown): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`GitHub API ${res.status}: ${sanitizeErrorBody(text)}`);
+    throw new Error(formatGithubApiError(res.status, text));
   }
 
   logRateLimit(res, `POST ${path}`);

@@ -61,6 +61,51 @@ export function sanitizeErrorBody(text: string, maxLen = 500): string {
 }
 
 /**
+ * Format a GitHub REST API error message, appending a Claude Code Remote
+ * (CCR) hint on a bare 401 when `CLAUDE_CODE_REMOTE=true` (LS-8740).
+ *
+ * `ci_retry_runner_flake` (and other tools that call `githubGet`/`githubPost`
+ * directly) were observed failing with `GitHub API 401: Bad credentials` in
+ * CCR sessions even though `GH_TOKEN`/`GITHUB_TOKEN`/
+ * `AGENT_AUTHOR_APP_PRIVATE_KEY` were all present in the environment, while
+ * the hosted `legacy-sports-ci` server worked fine for the same repo/PR at
+ * the same moment. Root cause: the CCR session's network proxy only injects
+ * working GitHub credentials for the pinned `gh` CLI / GitHub-MCP request
+ * paths (see AGENTS.md's CCR watch-to-merge guidance and
+ * `.agents/skills/cloud-agent-mode/SKILL.md` Quirk 10) — a stdio server's
+ * own direct `fetch()` calls to the GitHub REST API fall outside that
+ * pinned set, so the credential the environment carries is not honored the
+ * same way and GitHub legitimately rejects it. This is a platform/proxy
+ * limitation outside this repo's reach; the hint below is a documentation-
+ * only mitigation that makes the failure self-diagnosing instead of a bare
+ * 401 the caller has to research from scratch.
+ *
+ * Deliberately scoped to 401 only — other statuses (403 permission errors,
+ * 5xx transient errors, etc.) are unrelated to this gap and must not carry
+ * the hint, since several callers (`isAlreadyRunningError`,
+ * `isTransientServerError`) pattern-match the leading `GitHub API <status>`
+ * prefix of this same message and must keep matching unchanged.
+ */
+export function formatGithubApiError(
+  status: number,
+  body: string,
+  suffix = '',
+): string {
+  const base = `GitHub API ${status}${suffix}: ${sanitizeErrorBody(body)}`;
+  if (status !== 401 || process.env['CLAUDE_CODE_REMOTE'] !== 'true') {
+    return base;
+  }
+  return (
+    `${base} — known Claude Code Remote (CCR) gap (LS-8740): the session's network proxy ` +
+    'only injects working GitHub credentials for the pinned `gh` CLI / GitHub-MCP request ' +
+    "paths; a stdio MCP server's own direct REST calls fall outside that pinned set and can " +
+    'be rejected even though GH_TOKEN/GITHUB_TOKEN/AGENT_AUTHOR_APP_PRIVATE_KEY are present. ' +
+    'Fall back to the hosted legacy-sports-ci server (e.g. ' +
+    'mcp__legacy-sports-ci__ci_retry_failed({ runId })) or a built-in mcp__github__* tool.'
+  );
+}
+
+/**
  * Fetch a URL with retry-with-backoff on transient gateway errors (502, 503,
  * 504) and on 410 (see RETRIABLE_STATUSES). Up to 3 attempts; honors
  * `retry-after` header; falls back to 2^attempt seconds of exponential
@@ -94,7 +139,7 @@ export async function fetchWithRetry(
         attempt > 1 ? ` (attempt ${attempt}/${LOG_BLOB_MAX_ATTEMPTS})` : '';
       throw new HttpStatusError(
         res.status,
-        `GitHub API ${res.status}${suffix}: ${sanitizeErrorBody(body)}`,
+        formatGithubApiError(res.status, body, suffix),
       );
     }
 

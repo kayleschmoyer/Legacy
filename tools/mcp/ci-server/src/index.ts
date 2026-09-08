@@ -23,9 +23,9 @@ import { workflowInfo } from './tools/workflow-info.js';
 import { workflowSetState } from './tools/workflow-state.js';
 import {
   buildHeaders,
+  formatGithubApiError,
   getInstallationRateLimit,
   getToken,
-  sanitizeErrorBody,
 } from './github-api.js';
 
 /**
@@ -1061,7 +1061,7 @@ export function createServer(): McpServer {
                   {
                     configured: false,
                     source,
-                    error: `GitHub API ${userRes.status}: ${sanitizeErrorBody(body)}`,
+                    error: formatGithubApiError(userRes.status, body),
                   },
                   null,
                   2,
