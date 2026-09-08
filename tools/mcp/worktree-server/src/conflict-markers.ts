@@ -36,18 +36,46 @@ export interface ConflictedFile {
 }
 
 /**
+ * Fallback scan for conflict markers baked into working-tree files that git
+ * no longer considers unmerged — e.g. rerere auto-completed a rebase/merge
+ * with a bad cached resolution, committing the literal markers instead of a
+ * real fix. `git diff --diff-filter=U` only reports files the index still
+ * marks unmerged, so it misses this case entirely. Only invoked when that
+ * scan finds nothing.
+ */
+export function scanWorkingTreeForConflictMarkers(
+  cwd: string,
+  run: RunShellFn,
+): string[] {
+  try {
+    return run("git grep -l -E '^(<<<<<<<|=======|>>>>>>>)'", cwd)
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Lists unmerged (conflicted) files with conflict-marker line ranges and
  * previews of each side. Works off `git diff --diff-filter=U`, so it applies
  * equally to conflicts left mid-rebase or mid-merge — used by both
  * `worktree_conflict_info` and `worktree_merge_main`'s conflict report so the
- * two report identically-shaped conflict info.
+ * two report identically-shaped conflict info. Falls back to a working-tree
+ * marker scan when git reports no unmerged files, so a rerere auto-completed
+ * rebase/merge that baked bad markers into otherwise "clean" files still
+ * surfaces them (see `scanWorkingTreeForConflictMarkers`).
  */
 export function getConflictInfo(
   cwd: string,
   run: RunShellFn,
 ): { files: ConflictedFile[] } {
   const rawConflicts = run('git diff --name-only --diff-filter=U -z', cwd);
-  const conflictedPaths = rawConflicts.split('\0').filter(Boolean);
+  let conflictedPaths = rawConflicts.split('\0').filter(Boolean);
+  if (conflictedPaths.length === 0) {
+    conflictedPaths = scanWorkingTreeForConflictMarkers(cwd, run);
+  }
   const files: ConflictedFile[] = [];
   for (const filePath of conflictedPaths) {
     const fullPath = join(cwd, filePath);
