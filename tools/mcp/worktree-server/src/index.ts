@@ -71,6 +71,7 @@ import {
   type RebaseContinueResult,
   rebaseContinueStep,
 } from './rebase-continue-step';
+import { rerereForgetPaths } from './rerere-forget';
 import { resolveAmendAddArgs } from './resolve-amend-add-args';
 import { resolveCommitArgs } from './resolve-commit-args';
 import { resolveCommitish } from './resolve-commitish';
@@ -1332,6 +1333,29 @@ server.setRequestHandler(ListToolsRequestSchema, () => ({
               'Ticket key, absolute path, or omit for active worktree',
           },
         },
+      },
+    },
+    {
+      name: 'worktree_rerere_forget',
+      description:
+        'Clear the cached rerere resolution for one or more files, for recovery when rerere has stored a bad resolution during a rebase/merge conflict. If a file no longer has conflict markers (rerere already auto-applied its resolution), it is reset to the conflicted state first (`git checkout --merge`) before forgetting — this is the default, unconditional behavior, since it is the only safe way to clear rerere for an already-resolved file. Never throws on partial failure; returns { cleared, failed } per-file so recovery can continue with manual conflict resolution.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          paths: {
+            anyOf: [
+              { type: 'string' as const },
+              { type: 'array' as const, items: { type: 'string' } },
+            ],
+            description: 'File path(s) to clear the rerere cache for.',
+          },
+          worktree: {
+            type: 'string',
+            description:
+              'Ticket key, absolute path, or omit for active worktree',
+          },
+        },
+        required: ['paths'],
       },
     },
     {
@@ -3854,6 +3878,56 @@ const handleCallTool = async (
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // worktree_rerere_forget
+    // -----------------------------------------------------------------------
+    case 'worktree_rerere_forget': {
+      const { paths: rawPaths, worktree: wtKey } = args as {
+        paths?: unknown;
+        worktree?: string;
+      };
+
+      const pathsResult = normalizeFilesParam(rawPaths);
+      if (
+        pathsResult &&
+        typeof pathsResult === 'object' &&
+        !Array.isArray(pathsResult) &&
+        'error' in pathsResult
+      ) {
+        return {
+          content: [{ type: 'text', text: pathsResult.error }],
+          isError: true,
+        };
+      }
+      if (!pathsResult || pathsResult.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: 'Missing required "paths" parameter: at least one file path is required.',
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const target = resolveTargetDir(wtKey);
+      if ('error' in target) {
+        return {
+          content: [{ type: 'text', text: target.error }],
+          isError: true,
+        };
+      }
+      const cwd = target.path;
+
+      const { cleared, failed } = rerereForgetPaths(pathsResult, cwd, runGit);
+
+      return {
+        content: [{ type: 'text', text: minifiedJson({ cleared, failed }) }],
+        isError: failed.length > 0,
+      };
     }
 
     // -----------------------------------------------------------------------

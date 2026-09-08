@@ -1,7 +1,7 @@
 {
   "generatedFrom": "tools/mcp/*/src/{index,lambda}.ts",
   "serverCount": 12,
-  "toolCount": 262,
+  "toolCount": 263,
   "servers": [
     {
       "dir": "worktree-server",
@@ -14,7 +14,7 @@
       "transports": [
         "stdio"
       ],
-      "toolCount": 61,
+      "toolCount": 62,
       "tools": [
         {
           "name": "auth_check_all",
@@ -1150,6 +1150,39 @@
               "type": "string",
               "optional": true,
               "description": "Ticket key or absolute path whose session to rename. Omit to use the active worktree (or main repo if none active)."
+            }
+          },
+          "transports": [
+            "stdio"
+          ]
+        },
+        {
+          "name": "worktree_rerere_forget",
+          "description": "Clear the cached rerere resolution for one or more files, for recovery when rerere has stored a bad resolution during a rebase/merge conflict. If a file no longer has conflict markers (rerere already auto-applied its resolution), it is reset to the conflicted state first (`git checkout --merge`) before forgetting — this is the default, unconditional behavior, since it is the only safe way to clear rerere for an already-resolved file. Never throws on partial failure; returns { cleared, failed } per-file so recovery can continue with manual conflict resolution.",
+          "inputs": {
+            "paths": {
+              "type": "union",
+              "optional": false,
+              "variants": [
+                {
+                  "type": "string",
+                  "optional": true
+                },
+                {
+                  "type": "array",
+                  "optional": true,
+                  "items": {
+                    "type": "string",
+                    "optional": true
+                  }
+                }
+              ],
+              "description": "File path(s) to clear the rerere cache for."
+            },
+            "worktree": {
+              "type": "string",
+              "optional": true,
+              "description": "Ticket key, absolute path, or omit for active worktree"
             }
           },
           "transports": [
