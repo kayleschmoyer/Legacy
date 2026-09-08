@@ -21,9 +21,11 @@ jest.mock('@legacy-sports/logging', () => ({
 
 import {
   buildEligibilityConditions,
+  DraftUserInputError,
   filterPlayerIdsByLeagueEligibility,
   findFailedEligibilityRule,
   resolveEraRange,
+  validateDraftRequest,
 } from './DraftUtils';
 import type { PublicDb } from '../index';
 
@@ -362,5 +364,23 @@ describe('findFailedEligibilityRule', () => {
       minCareerSeasons: 3,
     });
     expect(failed).toBeNull();
+  });
+});
+
+describe('validateDraftRequest', () => {
+  // Rollbar item #247 / LS-9910: automated + non-random selection previously
+  // threw a plain Error, which DraftService.startDraft logged as an
+  // unexpected server fault instead of classifying it as caller input. The
+  // mode/method cross-check runs before any DB access, so this rejects
+  // synchronously without needing a real league or DB connection.
+  it('rejects automated draftMode with a non-random selectionMethod as user input', async () => {
+    await expect(
+      validateDraftRequest({
+        leagueId: 1,
+        draftMode: 'automated',
+        selectionMethod: 'standard',
+        skipUserValidation: true,
+      }),
+    ).rejects.toThrow(DraftUserInputError);
   });
 });

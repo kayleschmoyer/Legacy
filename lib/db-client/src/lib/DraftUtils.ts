@@ -277,9 +277,13 @@ export async function validateDraftRequest(
   // Validate selection method
   validateSelectionMethod(selectionMethod);
 
-  // Cross-validate: automated drafts only support 'random' selection method
+  // Cross-validate: automated drafts only support 'random' selection method.
+  // This is caller input, not a server fault — throw DraftUserInputError (like
+  // every other check in this function) so DraftService.startDraft classifies
+  // it as errorType: 'user_input' instead of logging it as an unexpected
+  // server error on every occurrence (LS-9910).
   if (draftMode === 'automated' && selectionMethod !== 'random') {
-    throw new Error(
+    throw new DraftUserInputError(
       `Automated drafts only support the 'random' selection method. Got: '${selectionMethod}'`,
     );
   }

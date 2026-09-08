@@ -1533,6 +1533,19 @@ builder.mutationField('startDraft', (t) =>
           savedDraft?.draftOrder ??
           'snake') as 'snake' | 'linear';
 
+        // Cross-validate the resolved mode/method combo before touching the
+        // DB or SQS: an explicit draftMode override combined with a stale
+        // saved selectionMethod (e.g. 'automated' passed as an arg while the
+        // league's saved draft is still 'standard' from before it was ever
+        // switched) can produce an invalid combo even though
+        // updateDraftSettings already blocks saving one directly (LS-9910).
+        // Mirrors the same check in update-draft-settings.ts.
+        if (draftMode === 'automated' && selectionMethod !== 'random') {
+          throw UserInputError(
+            "Automated drafts only support the 'random' selection method.",
+          );
+        }
+
         // If no draft record exists, create one so settings are always persisted
         if (!savedDraft) {
           await createDraftForLeague({
