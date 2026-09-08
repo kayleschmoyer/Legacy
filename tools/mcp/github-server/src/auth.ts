@@ -47,6 +47,16 @@ const OAUTH_CLIENT_ID = 'Ov23liYQljVEXzJsFCl5';
 const OAUTH_SCOPE = 'repo';
 
 /**
+ * On Windows, spawning the extension-less `git` can ENOENT when the MCP
+ * server's child-process environment doesn't carry a PATHEXT that resolves
+ * it to `git.exe` — the same failure mode already fixed for `gh` (see
+ * `tryGhAuthToken` below) and for git elsewhere in this codebase
+ * (rebase-pr.ts, ci-server/github-api.ts) under LS-4599. This is the one
+ * remaining plain `execFile('git', ...)` call site (LS-4776).
+ */
+const GIT_CMD = process.platform === 'win32' ? 'git.exe' : 'git';
+
+/**
  * GitHub App defaults — Agent Author app.
  * Overridable via GITHUB_APP_ID / GITHUB_INSTALLATION_ID env vars.
  */
@@ -1083,7 +1093,7 @@ export async function getRepoOwnerName(): Promise<{
     }
     remoteUrl = await new Promise<string>((res, reject) => {
       execFile(
-        'git',
+        GIT_CMD,
         ['remote', 'get-url', 'origin'],
         { cwd: repoRoot, timeout: 5_000 },
         (err, stdout) => {

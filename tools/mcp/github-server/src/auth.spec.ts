@@ -26,6 +26,14 @@ jest.mock('node:fs/promises', () => ({
   unlink: jest.fn(),
 }));
 
+// getRepoOwnerName falls back to `execFile('git', ...)` when readGitRemoteUrl
+// can't find a `.git/config` (e.g. getRepoRoot mocked to a nonexistent path
+// above). Mock child_process so that fallback can be asserted without
+// spawning a real process (LS-4776).
+jest.mock('node:child_process', () => ({
+  execFile: jest.fn(),
+}));
+
 type MockedFsPromises = {
   mkdir: jest.Mock;
   writeFile: jest.Mock;
@@ -39,6 +47,10 @@ type MockedFsPromises = {
 // reset so the handle matches the instances the imported module uses.
 function freshFsPromisesMock(): MockedFsPromises {
   return jest.requireMock<MockedFsPromises>('node:fs/promises');
+}
+
+function freshChildProcessMock(): { execFile: jest.Mock } {
+  return jest.requireMock<{ execFile: jest.Mock }>('node:child_process');
 }
 
 const ENV_KEYS = [
@@ -402,6 +414,79 @@ describe('github-server auth token cache (LS-5982)', () => {
 
       await expect(getAuthorToken()).rejects.toThrow(
         /Could not provision a GitHub token for PR authorship/,
+      );
+    });
+  });
+
+  describe('getRepoOwnerName git remote fallback (LS-4776)', () => {
+    const originalPlatform = process.platform;
+    const savedGithubRepository = process.env['GITHUB_REPOSITORY'];
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
+      if (savedGithubRepository === undefined) {
+        delete process.env['GITHUB_REPOSITORY'];
+      } else {
+        process.env['GITHUB_REPOSITORY'] = savedGithubRepository;
+      }
+    });
+
+    function forcePlatform(platform: NodeJS.Platform): void {
+      Object.defineProperty(process, 'platform', { value: platform });
+    }
+
+    function stubGitRemoteExec(stdout: string): void {
+      const cp = freshChildProcessMock();
+      cp.execFile.mockImplementation(
+        (
+          _cmd: string,
+          _args: string[],
+          _opts: unknown,
+          cb: (err: Error | null, stdout: string) => void,
+        ) => {
+          cb(null, stdout);
+        },
+      );
+    }
+
+    it('spawns `git.exe` (not the extension-less `git`) on Windows to avoid ENOENT', async () => {
+      forcePlatform('win32');
+      delete process.env['GITHUB_REPO_OWNER'];
+      delete process.env['GITHUB_REPO_NAME'];
+      delete process.env['GITHUB_REPOSITORY'];
+      delete process.env['AWS_LAMBDA_FUNCTION_NAME'];
+      stubGitRemoteExec('https://github.com/foo/bar.git\n');
+
+      const { getRepoOwnerName } = await import('./auth');
+      const result = await getRepoOwnerName();
+
+      expect(result).toEqual({ owner: 'foo', name: 'bar' });
+      const cp = freshChildProcessMock();
+      expect(cp.execFile).toHaveBeenCalledWith(
+        'git.exe',
+        ['remote', 'get-url', 'origin'],
+        expect.any(Object),
+        expect.any(Function),
+      );
+    });
+
+    it('spawns the extension-less `git` on non-Windows platforms', async () => {
+      forcePlatform('linux');
+      delete process.env['GITHUB_REPO_OWNER'];
+      delete process.env['GITHUB_REPO_NAME'];
+      delete process.env['GITHUB_REPOSITORY'];
+      delete process.env['AWS_LAMBDA_FUNCTION_NAME'];
+      stubGitRemoteExec('https://github.com/foo/bar.git\n');
+
+      const { getRepoOwnerName } = await import('./auth');
+      await getRepoOwnerName();
+
+      const cp = freshChildProcessMock();
+      expect(cp.execFile).toHaveBeenCalledWith(
+        'git',
+        ['remote', 'get-url', 'origin'],
+        expect.any(Object),
+        expect.any(Function),
       );
     });
   });
