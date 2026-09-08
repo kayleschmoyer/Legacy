@@ -215,6 +215,25 @@ use the per-service checks instead: `github_auth_status`, `jira_auth_status`, `c
 
 **This check is credential-presence only — it cannot detect a live-session failure** like [Mid-Session Auth-Server Incompatibility](#mid-session-auth-server-incompatibility-does-not-support-dynamic-client-registration-ls-9439) above, which reported `allAuthenticated: true` throughout a real outage (LS-9439). Trust an actual tool-call error over a green `auth_check_all` result.
 
+## Skill Tool Returns Boilerplate Instead of SKILL.md Content (LS-8719)
+
+Distinct from the MCP server connectivity failures above — this is the `Skill` tool itself (not an MCP server), and it can misbehave even when every MCP server is healthy.
+
+**Symptom:** `Skill(skill: "<name>", args: "...")` returns a generic, self-referential turn instructing the agent to "invoke `Skill(skill: '<name>')` immediately" — i.e. a directive to call the same tool again — instead of delivering the actual `SKILL.md` procedure text. A follow-up `Skill(skill: "<name>")` call made per that instruction can also **drop the passed argument entirely** (e.g. a ticket key rendered as `****` or substituted with an unrelated key from earlier in the transcript), so retrying doesn't recover the lost context either. Observed repeatedly across sessions and environments (LS-8503, LS-6259, and again live during LS-8719 itself, where the ticket key was corrupted to a different ticket's key on retry) — this is a harness/platform-level defect in the `Skill` tool invocation mechanism, not a per-skill or per-repo issue, and is outside this repo's fix surface.
+
+**Do not loop on retrying `Skill(...)`.** A second or third call has been observed returning the same non-actionable boilerplate, or actively corrupting the argument — it will not converge to the real content.
+
+**Recovery — read the skill's files directly from disk:**
+
+```
+Glob(pattern: ".agents/skills/<skill-name>/**")
+Read(file_path: ".agents/skills/<skill-name>/SKILL.md")
+```
+
+Then `Read` any `references/*.md` files the `SKILL.md` frontmatter/body points to for the mode you're routing into (e.g. `references/leaf-mode.md` for `work-ticket`). This delivers the identical procedure content the `Skill` tool would have loaded, and preserves any ticket key or argument you were passed — it never round-trips through the tool call that lost it. Continue following the skill's steps exactly as if `Skill(...)` had returned them; nothing else about the workflow changes.
+
+This is a documented stopgap, not a fix for the underlying tool-invocation defect — apply it whenever `Skill(...)` returns generic re-invocation boilerplate or loses an argument, for any skill, not just `work-ticket`.
+
 ## See Also
 
 - [LS-9439](https://bkrupa.atlassian.net/browse/LS-9439) — tracking ticket for the auth-server-incompatibility failure mode above; root cause still open
