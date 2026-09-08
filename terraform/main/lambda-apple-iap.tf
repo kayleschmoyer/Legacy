@@ -102,7 +102,13 @@ resource "aws_iam_role_policy_attachment" "apple_iap_lambda_secrets" {
 
 # RDS Proxy access for database connectivity
 resource "aws_iam_policy" "apple_iap_lambda_rds" {
-  name        = "${local.name_prefix}-apple-iap-lambda-rds"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-apple-iap-lambda-rds-"
   description = "Allow Apple IAP Lambda to connect to RDS via Proxy"
 
   policy = jsonencode({
@@ -119,16 +125,33 @@ resource "aws_iam_policy" "apple_iap_lambda_rds" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "apple_iap_lambda_rds" {
   policy_arn = aws_iam_policy.apple_iap_lambda_rds.arn
   role       = aws_iam_role.apple_iap_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Policy granting WebSocket notification permissions (DynamoDB + execute-api)
 resource "aws_iam_policy" "apple_iap_lambda_websocket" {
-  name        = "${local.name_prefix}-apple-iap-lambda-websocket"
+  # name_prefix, not name: `description` (like `name` itself) is ForceNew on
+  # aws_iam_policy -- IAM has no update API for either -- so editing the
+  # description replaces the policy. With a fixed name the create-before-destroy
+  # replacement collides with the policy it is replacing and the whole
+  # `terraform apply` aborts on `409 EntityAlreadyExists` (LS-9876, and
+  # LS-6675 before it). A generated name makes the replacement always safe.
+  name_prefix = "${local.name_prefix}-apple-iap-lambda-websocket-"
   description = "Allow Apple IAP Lambda to send WebSocket notifications"
 
   policy = jsonencode({
@@ -155,11 +178,22 @@ resource "aws_iam_policy" "apple_iap_lambda_websocket" {
   })
 
   tags = local.common_tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role_policy_attachment" "apple_iap_lambda_websocket" {
   policy_arn = aws_iam_policy.apple_iap_lambda_websocket.arn
   role       = aws_iam_role.apple_iap_lambda.name
+
+  # Paired with create_before_destroy on the policy above: the new attachment
+  # is made before the old one is removed, so the role is never left without
+  # this policy mid-apply.
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # CloudWatch Log Group
