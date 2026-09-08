@@ -1,5 +1,12 @@
 # Handoff: Players Tab — Card Feed Redesign (option 1c)
 
+> **LS-9902 scope note (responsive-coverage audit).** This bundle was flagged by the LS-9418 design-coverage audit as a "sub-660px layout gap," but it does not fit that audit's web-breakpoint model and was intentionally **not** given xxs(375)/660px breakpoint frames under LS-9902. Reasons:
+> - This is a design target for the **Android app's Players tab** (React Native/Tamagui, `apps/app/`), not an `apps/web` page — the canonical seven-band web breakpoint system (`docs/agents/pages/PROMPT.md`, `lib/design-tokens/src/lib/breakpoints.ts`) doesn't apply to a native mobile screen the way it does to a responsive web page.
+> - `Players Tab.dc.html` is an **exploration/comparison canvas** (options 1a–1f, each a fixed ~428px-wide Android device frame), not a single committed page mockup like the other three LS-9902 bundles (Scoreboard, Create League, Profile Settings). Only option 1c has been promoted to a real handoff (this README); 1a/1b/1d/1e/1f remain exploratory alternatives.
+> - Retrofitting breakpoint frames onto the comparison canvas would misrepresent it as a multi-breakpoint web layout it was never designed to be.
+>
+> **Follow-up**: if this screen is ever needed at a wider form factor (tablet app layout, or a future web equivalent), that should be scoped as its own ticket that first decides the target surface, rather than bolted onto this exploration doc.
+
 ## Overview
 Redesign of the Android app's **Players tab** (`apps/app/src/app/(app)/(tabs)/players.tsx`) replacing the current Stats/Compare segmented control + sport pills + desktop-scale stats shell with a mobile-first **card feed**: a compact branded header, sport toggle, always-visible search, a position chip rail in the canonical position colors, FPTS-first player cards with trend indicators, and an inline premium teaser.
 

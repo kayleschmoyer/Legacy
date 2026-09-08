@@ -271,9 +271,9 @@
       "title": "Players Tab — Card Feed Redesign",
       "slug": "legacy-sports-players-card-feed",
       "status": "archived",
-      "lastSyncedHash": "ea62fa17dec75f9d8bcfedbdd970f43dd49ce4576389fc66a8c99589cb74f36e",
-      "lastSyncedAt": "2026-07-29T00:00:00.000Z",
-      "jiraKey": "LS-8832",
+      "lastSyncedHash": "sha256-5427169d3a13f1d07a47ebfd88c9c15df754748100f1dbf3e09ced709121c07c",
+      "lastSyncedAt": "2026-09-08T00:00:00.000Z",
+      "jiraKey": "LS-9902",
       "source": "manual-local-sync"
     },
     {
