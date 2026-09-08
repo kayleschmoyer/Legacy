@@ -9,6 +9,7 @@ import {
   ec2DescribeImage,
   ec2Instances,
   ec2LaunchTemplateInspect,
+  ec2NetworkInspect,
 } from './ec2.js';
 
 const mockedRun = runCommand as jest.MockedFunction<typeof runCommand>;
@@ -200,5 +201,220 @@ describe('ec2LaunchTemplateInspect resolveSsmParam validation', () => {
     expect(parsed.launchTemplates[0].imageId).toBe('resolve:ssm:/bad;rm -rf /');
     // describe-launch-templates + describe-versions only — no get-parameter.
     expect(mockedRun).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('ec2NetworkInspect', () => {
+  const vpcResponse = JSON.stringify({
+    Vpcs: [
+      {
+        VpcId: 'vpc-0abc123',
+        CidrBlock: '10.0.0.0/16',
+        Tags: [{ Key: 'Name', Value: 'legacy-sports-dev-vpc' }],
+      },
+    ],
+  });
+  const subnetsResponse = JSON.stringify({ Subnets: [] });
+
+  function mockRunFor(handlers: Record<string, () => string>): void {
+    mockedRun.mockImplementation(async (_cmd, args) => {
+      const a = args as string[];
+      if (a.includes('describe-vpcs')) return vpcResponse;
+      if (a.includes('describe-subnets')) return subnetsResponse;
+      for (const [key, handler] of Object.entries(handlers)) {
+        if (a.includes(key)) return handler();
+      }
+      throw new Error('unexpected runCommand call: ' + a.join(' '));
+    });
+  }
+
+  async function body(
+    params: Parameters<typeof ec2NetworkInspect>[0],
+  ): Promise<Record<string, unknown>> {
+    const result = await ec2NetworkInspect(params);
+    const block = result.content[0];
+    if (!block || block.type !== 'text') throw new Error('expected text block');
+    return JSON.parse(block.text) as Record<string, unknown>;
+  }
+
+  it('omits all optional sections by default', async () => {
+    mockRunFor({});
+    const parsed = await body({ environment: 'dev' });
+    expect(parsed.routeTables).toBeUndefined();
+    expect(parsed.networkAcls).toBeUndefined();
+    expect(parsed.internetGateways).toBeUndefined();
+    expect(parsed.dnsAttributes).toBeUndefined();
+  });
+
+  it('includeRouteTables returns routes with destination + target', async () => {
+    mockRunFor({
+      'describe-route-tables': () =>
+        JSON.stringify({
+          RouteTables: [
+            {
+              RouteTableId: 'rtb-1',
+              Associations: [{ SubnetId: 'subnet-1' }, { Main: true }],
+              Routes: [
+                {
+                  DestinationCidrBlock: '0.0.0.0/0',
+                  GatewayId: 'igw-1',
+                  State: 'active',
+                },
+                {
+                  DestinationCidrBlock: '10.0.0.0/16',
+                  GatewayId: 'local',
+                  State: 'active',
+                },
+              ],
+            },
+          ],
+        }),
+    });
+    const parsed = await body({
+      environment: 'dev',
+      includeRouteTables: true,
+    });
+    const routeTables = parsed.routeTables as {
+      items: Array<{
+        id: string;
+        associations: string[];
+        routes: Array<{
+          destination: string;
+          targetType: string;
+          target: string;
+        }>;
+      }>;
+      truncated: boolean;
+    };
+    expect(routeTables.truncated).toBe(false);
+    expect(routeTables.items).toHaveLength(1);
+    expect(routeTables.items[0].id).toBe('rtb-1');
+    expect(routeTables.items[0].associations).toEqual(['subnet-1', 'main']);
+    expect(routeTables.items[0].routes[0]).toEqual({
+      destination: '0.0.0.0/0',
+      targetType: 'gateway',
+      target: 'igw-1',
+      state: 'active',
+    });
+  });
+
+  it('includeNacls splits entries into inbound/outbound', async () => {
+    mockRunFor({
+      'describe-network-acls': () =>
+        JSON.stringify({
+          NetworkAcls: [
+            {
+              NetworkAclId: 'acl-1',
+              IsDefault: true,
+              Associations: [{ SubnetId: 'subnet-1' }],
+              Entries: [
+                {
+                  RuleNumber: 100,
+                  Protocol: '-1',
+                  RuleAction: 'allow',
+                  Egress: false,
+                  CidrBlock: '0.0.0.0/0',
+                },
+                {
+                  RuleNumber: 100,
+                  Protocol: '-1',
+                  RuleAction: 'allow',
+                  Egress: true,
+                  CidrBlock: '0.0.0.0/0',
+                },
+              ],
+            },
+          ],
+        }),
+    });
+    const parsed = await body({ environment: 'dev', includeNacls: true });
+    const nacls = parsed.networkAcls as {
+      items: Array<{ inbound: unknown[]; outbound: unknown[] }>;
+      truncated: boolean;
+    };
+    expect(nacls.items).toHaveLength(1);
+    expect(nacls.items[0].inbound).toHaveLength(1);
+    expect(nacls.items[0].outbound).toHaveLength(1);
+  });
+
+  it('includeGateways returns attached internet gateways', async () => {
+    mockRunFor({
+      'describe-internet-gateways': () =>
+        JSON.stringify({
+          InternetGateways: [
+            {
+              InternetGatewayId: 'igw-1',
+              Attachments: [{ VpcId: 'vpc-0abc123', State: 'available' }],
+              Tags: [{ Key: 'Name', Value: 'legacy-sports-dev-igw' }],
+            },
+          ],
+        }),
+    });
+    const parsed = await body({ environment: 'dev', includeGateways: true });
+    const gateways = parsed.internetGateways as {
+      items: Array<{ id: string; state: string; vpcId: string; name: string }>;
+      truncated: boolean;
+    };
+    expect(gateways.items).toEqual([
+      {
+        id: 'igw-1',
+        state: 'available',
+        vpcId: 'vpc-0abc123',
+        name: 'legacy-sports-dev-igw',
+      },
+    ]);
+  });
+
+  it('includeDnsAttributes returns both DNS attribute values', async () => {
+    mockedRun.mockImplementation(async (_cmd, args) => {
+      const a = args as string[];
+      if (a.includes('describe-vpcs')) return vpcResponse;
+      if (a.includes('describe-subnets')) return subnetsResponse;
+      if (a.includes('describe-vpc-attribute')) {
+        const attrIdx = a.indexOf('--attribute');
+        const attribute = a[attrIdx + 1];
+        if (attribute === 'enableDnsSupport') {
+          return JSON.stringify({
+            VpcId: 'vpc-0abc123',
+            EnableDnsSupport: { Value: true },
+          });
+        }
+        return JSON.stringify({
+          VpcId: 'vpc-0abc123',
+          EnableDnsHostnames: { Value: false },
+        });
+      }
+      throw new Error('unexpected runCommand call: ' + a.join(' '));
+    });
+    const parsed = await body({
+      environment: 'dev',
+      includeDnsAttributes: true,
+    });
+    expect(parsed.dnsAttributes).toEqual({
+      enableDnsSupport: true,
+      enableDnsHostnames: false,
+    });
+  });
+
+  it('caps route tables at 50 entries and reports truncated: true', async () => {
+    const manyRouteTables = Array.from({ length: 60 }, (_, i) => ({
+      RouteTableId: `rtb-${i}`,
+      Associations: [],
+      Routes: [],
+    }));
+    mockRunFor({
+      'describe-route-tables': () =>
+        JSON.stringify({ RouteTables: manyRouteTables }),
+    });
+    const parsed = await body({
+      environment: 'dev',
+      includeRouteTables: true,
+    });
+    const routeTables = parsed.routeTables as {
+      items: unknown[];
+      truncated: boolean;
+    };
+    expect(routeTables.items).toHaveLength(50);
+    expect(routeTables.truncated).toBe(true);
   });
 });

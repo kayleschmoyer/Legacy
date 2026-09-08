@@ -623,6 +623,204 @@ export async function ec2LaunchTemplateInspect(
 export interface NetworkInspectParams {
   environment?: string;
   subnetType?: 'public' | 'private' | 'all';
+  includeRouteTables?: boolean;
+  includeNacls?: boolean;
+  includeGateways?: boolean;
+  includeDnsAttributes?: boolean;
+}
+
+const MAX_ARRAY_ENTRIES = 50;
+
+function capEntries<T>(items: T[]): { items: T[]; truncated: boolean } {
+  if (items.length <= MAX_ARRAY_ENTRIES) {
+    return { items, truncated: false };
+  }
+  return { items: items.slice(0, MAX_ARRAY_ENTRIES), truncated: true };
+}
+
+interface AwsRoute {
+  DestinationCidrBlock?: string;
+  DestinationIpv6CidrBlock?: string;
+  DestinationPrefixListId?: string;
+  GatewayId?: string;
+  NatGatewayId?: string;
+  InstanceId?: string;
+  TransitGatewayId?: string;
+  VpcPeeringConnectionId?: string;
+  LocalGatewayId?: string;
+  CarrierGatewayId?: string;
+  State?: string;
+}
+
+interface AwsRouteTableAssociation {
+  SubnetId?: string;
+  Main?: boolean;
+}
+
+interface AwsRouteTable {
+  RouteTableId?: string;
+  Routes?: AwsRoute[];
+  Associations?: AwsRouteTableAssociation[];
+  Tags?: Ec2Tag[];
+}
+
+interface DescribeRouteTablesResponse {
+  RouteTables?: AwsRouteTable[];
+}
+
+function mapRoute(route: AwsRoute): {
+  destination: string | null;
+  targetType: string | null;
+  target: string | null;
+  state: string | null;
+} {
+  const destination =
+    route.DestinationCidrBlock ??
+    route.DestinationIpv6CidrBlock ??
+    route.DestinationPrefixListId ??
+    null;
+  const targets: Array<[string, string | undefined]> = [
+    ['gateway', route.GatewayId],
+    ['natGateway', route.NatGatewayId],
+    ['instance', route.InstanceId],
+    ['transitGateway', route.TransitGatewayId],
+    ['vpcPeeringConnection', route.VpcPeeringConnectionId],
+    ['localGateway', route.LocalGatewayId],
+    ['carrierGateway', route.CarrierGatewayId],
+  ];
+  const match = targets.find(([, value]) => value !== undefined);
+  return {
+    destination,
+    targetType: match?.[0] ?? null,
+    target: match?.[1] ?? null,
+    state: route.State ?? null,
+  };
+}
+
+function mapRouteTable(table: AwsRouteTable): Record<string, unknown> {
+  const { items: routes, truncated } = capEntries(
+    (table.Routes ?? []).map(mapRoute),
+  );
+  return {
+    id: table.RouteTableId ?? null,
+    associations: (table.Associations ?? [])
+      .map((a) => (a.Main ? 'main' : a.SubnetId))
+      .filter((v): v is string => Boolean(v)),
+    routes,
+    routesTruncated: truncated,
+    name: getTag(table.Tags, 'Name') ?? null,
+  };
+}
+
+interface AwsNaclEntry {
+  RuleNumber?: number;
+  Protocol?: string;
+  RuleAction?: string;
+  Egress?: boolean;
+  CidrBlock?: string;
+  Ipv6CidrBlock?: string;
+  PortRange?: { From?: number; To?: number };
+}
+
+interface AwsNaclAssociation {
+  SubnetId?: string;
+}
+
+interface AwsNacl {
+  NetworkAclId?: string;
+  IsDefault?: boolean;
+  Entries?: AwsNaclEntry[];
+  Associations?: AwsNaclAssociation[];
+  Tags?: Ec2Tag[];
+}
+
+interface DescribeNetworkAclsResponse {
+  NetworkAcls?: AwsNacl[];
+}
+
+function mapNaclEntry(entry: AwsNaclEntry): Record<string, unknown> {
+  return {
+    ruleNumber: entry.RuleNumber ?? null,
+    protocol: entry.Protocol ?? null,
+    ruleAction: entry.RuleAction ?? null,
+    cidrBlock: entry.CidrBlock ?? entry.Ipv6CidrBlock ?? null,
+    portRange: entry.PortRange
+      ? { from: entry.PortRange.From ?? null, to: entry.PortRange.To ?? null }
+      : null,
+  };
+}
+
+function mapNacl(nacl: AwsNacl): Record<string, unknown> {
+  const entries = nacl.Entries ?? [];
+  const { items: inbound, truncated: inboundTruncated } = capEntries(
+    entries.filter((e) => !e.Egress).map(mapNaclEntry),
+  );
+  const { items: outbound, truncated: outboundTruncated } = capEntries(
+    entries.filter((e) => e.Egress).map(mapNaclEntry),
+  );
+  return {
+    id: nacl.NetworkAclId ?? null,
+    isDefault: nacl.IsDefault ?? false,
+    associations: (nacl.Associations ?? [])
+      .map((a) => a.SubnetId)
+      .filter((v): v is string => Boolean(v)),
+    inbound,
+    outbound,
+    entriesTruncated: inboundTruncated || outboundTruncated,
+    name: getTag(nacl.Tags, 'Name') ?? null,
+  };
+}
+
+interface AwsIgwAttachment {
+  VpcId?: string;
+  State?: string;
+}
+
+interface AwsInternetGateway {
+  InternetGatewayId?: string;
+  Attachments?: AwsIgwAttachment[];
+  Tags?: Ec2Tag[];
+}
+
+interface DescribeInternetGatewaysResponse {
+  InternetGateways?: AwsInternetGateway[];
+}
+
+function mapInternetGateway(igw: AwsInternetGateway): Record<string, unknown> {
+  return {
+    id: igw.InternetGatewayId ?? null,
+    state: igw.Attachments?.[0]?.State ?? null,
+    vpcId: igw.Attachments?.[0]?.VpcId ?? null,
+    name: getTag(igw.Tags, 'Name') ?? null,
+  };
+}
+
+interface VpcAttributeResponse {
+  EnableDnsSupport?: { Value?: boolean };
+  EnableDnsHostnames?: { Value?: boolean };
+}
+
+async function describeVpcAttribute(
+  vpcId: string,
+  attribute: 'enableDnsSupport' | 'enableDnsHostnames',
+  cwd: string,
+): Promise<boolean | null> {
+  const output = await runCommand(
+    'aws',
+    [
+      'ec2',
+      'describe-vpc-attribute',
+      '--vpc-id',
+      vpcId,
+      '--attribute',
+      attribute,
+      '--output',
+      'json',
+    ],
+    cwd,
+  );
+  const data = JSON.parse(output) as VpcAttributeResponse;
+  return data.EnableDnsSupport?.Value ?? data.EnableDnsHostnames?.Value ?? null;
 }
 
 interface AwsVpc {
@@ -664,7 +862,14 @@ export async function ec2NetworkInspect(
   params: NetworkInspectParams,
 ): Promise<ToolResult> {
   const repoRoot = getRepoRoot();
-  const { environment = 'dev', subnetType = 'all' } = params;
+  const {
+    environment = 'dev',
+    subnetType = 'all',
+    includeRouteTables = false,
+    includeNacls = false,
+    includeGateways = false,
+    includeDnsAttributes = false,
+  } = params;
 
   // Step 1: locate the project VPC. Try the project Name tag first
   // (legacy-sports-{env}-vpc); fall back to the Environment tag.
@@ -794,6 +999,107 @@ export async function ec2NetworkInspect(
     if (t.Key !== undefined) vpcTags[t.Key] = t.Value ?? '';
   }
 
+  // Step 3: optional depth flags — each is an independent describe-* call,
+  // run in parallel. A failure in one does not block the others; it is
+  // reported as an `error` field alongside the requested section instead of
+  // failing the whole tool call, since the caller already has the VPC and
+  // subnet data by this point.
+  const vpcId = vpc.VpcId;
+
+  const [routeTablesResult, naclsResult, gatewaysResult, dnsResult] =
+    await Promise.all([
+      includeRouteTables
+        ? (async () => {
+            try {
+              const output = await runCommand(
+                'aws',
+                [
+                  'ec2',
+                  'describe-route-tables',
+                  '--output',
+                  'json',
+                  '--filters',
+                  `Name=vpc-id,Values=${vpcId}`,
+                ],
+                repoRoot,
+              );
+              const data = JSON.parse(output) as DescribeRouteTablesResponse;
+              const { items, truncated } = capEntries(data.RouteTables ?? []);
+              return { items: items.map(mapRouteTable), truncated };
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              return { error: message };
+            }
+          })()
+        : undefined,
+      includeNacls
+        ? (async () => {
+            try {
+              const output = await runCommand(
+                'aws',
+                [
+                  'ec2',
+                  'describe-network-acls',
+                  '--output',
+                  'json',
+                  '--filters',
+                  `Name=vpc-id,Values=${vpcId}`,
+                ],
+                repoRoot,
+              );
+              const data = JSON.parse(output) as DescribeNetworkAclsResponse;
+              const { items, truncated } = capEntries(data.NetworkAcls ?? []);
+              return { items: items.map(mapNacl), truncated };
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              return { error: message };
+            }
+          })()
+        : undefined,
+      includeGateways
+        ? (async () => {
+            try {
+              const output = await runCommand(
+                'aws',
+                [
+                  'ec2',
+                  'describe-internet-gateways',
+                  '--output',
+                  'json',
+                  '--filters',
+                  `Name=attachment.vpc-id,Values=${vpcId}`,
+                ],
+                repoRoot,
+              );
+              const data = JSON.parse(
+                output,
+              ) as DescribeInternetGatewaysResponse;
+              const { items, truncated } = capEntries(
+                data.InternetGateways ?? [],
+              );
+              return { items: items.map(mapInternetGateway), truncated };
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              return { error: message };
+            }
+          })()
+        : undefined,
+      includeDnsAttributes && vpcId
+        ? (async () => {
+            try {
+              const [enableDnsSupport, enableDnsHostnames] = await Promise.all([
+                describeVpcAttribute(vpcId, 'enableDnsSupport', repoRoot),
+                describeVpcAttribute(vpcId, 'enableDnsHostnames', repoRoot),
+              ]);
+              return { enableDnsSupport, enableDnsHostnames };
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              return { error: message };
+            }
+          })()
+        : undefined,
+    ]);
+
   return {
     content: [
       {
@@ -813,6 +1119,10 @@ export async function ec2NetworkInspect(
             private: finalSubnets.private.length,
             database: finalSubnets.database.length,
           },
+          ...(routeTablesResult ? { routeTables: routeTablesResult } : {}),
+          ...(naclsResult ? { networkAcls: naclsResult } : {}),
+          ...(gatewaysResult ? { internetGateways: gatewaysResult } : {}),
+          ...(dnsResult ? { dnsAttributes: dnsResult } : {}),
         }),
       },
     ],

@@ -606,7 +606,7 @@ server.tool(
 // --- aws_ec2_network_inspect ---
 server.tool(
   'aws_ec2_network_inspect',
-  'Discover the project VPC and its subnets in one call. Returns the VPC (id, CIDR, name, tags) plus subnets grouped into public/private/database categories using the Name tag (and falling back to MapPublicIpOnLaunch). Used to find a public subnet for Packer / temporary build instances without chaining describe-vpcs + describe-subnets via Bash.',
+  'Discover the project VPC + subnets in one call. Optional flags add route tables, NACLs, internet gateways, and VPC DNS attributes for reachability debugging.',
   {
     environment: z
       .enum(['dev', 'prod'])
@@ -615,9 +615,14 @@ server.tool(
     subnetType: z
       .enum(['public', 'private', 'all'])
       .default('all')
-      .describe(
-        'Subnet category to return (default: all). "public" or "private" filter the response; "all" returns every category including database subnets.',
-      ),
+      .describe('Subnet category to return (default: all).'),
+    includeRouteTables: z.boolean().default(false).describe('Route tables.'),
+    includeNacls: z.boolean().default(false).describe('Network ACLs.'),
+    includeGateways: z.boolean().default(false).describe('Internet gateways.'),
+    includeDnsAttributes: z
+      .boolean()
+      .default(false)
+      .describe('VPC DNS attributes.'),
   },
   async (params) => ec2NetworkInspect(params),
 );
