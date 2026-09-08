@@ -139,7 +139,7 @@ adminTest.describe(
         expect(captured.current?.faabBudgetDefault).toBe(250);
         expect(captured.current?.salaryCapEnabled).toBe(true);
         expect(captured.current?.salaryCap).toBe(200000000);
-        expect(captured.current?.eraFilter).toBe('super_bowl');
+        expect(captured.current?.eraFilter).toBe('super_bowl_era');
         expect(captured.current?.schedulingStrategy).toBe('divisional');
         expect(captured.current?.schedulingDivisionalWeightPct).toBe(80);
       },

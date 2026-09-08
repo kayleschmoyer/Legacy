@@ -8,6 +8,7 @@
  * server is what actually keeps malformed leagues out of the database.
  */
 
+import { PublicSchema } from '@legacy-sports/db-client';
 import {
   CUSTOM_ERA_MIN_YEAR_BY_SPORT,
   FREE_ERA_IDS_BY_SPORT,
@@ -52,7 +53,7 @@ describe('sport-validation', () => {
     });
     it('rejects football-only eras under baseball', () => {
       expect(isEraValidForSport('baseball', 'pioneer')).toBe(false);
-      expect(isEraValidForSport('baseball', 'super_bowl')).toBe(false);
+      expect(isEraValidForSport('baseball', 'super_bowl_era')).toBe(false);
       expect(isEraValidForSport('baseball', 'single_platoon')).toBe(false);
     });
     it('rejects baseball-only eras under football', () => {
@@ -78,7 +79,7 @@ describe('sport-validation', () => {
       expect(isEraFreeForSport('football', 'all')).toBe(true);
       expect(isEraFreeForSport('football', 'spread_offense')).toBe(true);
       expect(isEraFreeForSport('football', 'pioneer')).toBe(false);
-      expect(isEraFreeForSport('football', 'super_bowl')).toBe(false);
+      expect(isEraFreeForSport('football', 'super_bowl_era')).toBe(false);
       expect(isEraFreeForSport('football', 'custom')).toBe(false);
     });
     it('agrees with FREE_ERA_IDS_BY_SPORT for every entry', () => {
@@ -227,5 +228,99 @@ describe('sport-validation', () => {
       expect(CUSTOM_ERA_MIN_YEAR_BY_SPORT.baseball).toBe(1871);
       expect(CUSTOM_ERA_MIN_YEAR_BY_SPORT.football).toBe(1920);
     });
+  });
+});
+
+/**
+ * The guard that keeps the era vocabulary from splitting in three (LS-9914).
+ *
+ * `eraFilter` reaches the database as a value of the `era_filter` Postgres
+ * enum, so three name spaces have to agree: the enum itself, this validator
+ * (the server-side authority for what a client may send), and the client
+ * option lists. They drifted quietly under LS-4633 — the validator learned
+ * football's eras as `super_bowl` / `salary_cap` while the enum and the
+ * client config used `super_bowl_era` / `salary_cap_era`. Neither spelling
+ * could complete a round trip: the suffixed form was rejected by
+ * `isEraValidForSport`, and the unsuffixed form passed validation and then
+ * failed to persist, because it is not an enum member. Both eras are
+ * premium, so the whole failure sat behind the paywall where nothing
+ * exercised it.
+ *
+ * The invariant below needs no hand-maintained per-sport list: `all` and
+ * `custom` are shared, every other enum member belongs to exactly one sport,
+ * and between them the two validator sets must account for the enum exactly.
+ * Adding an era to the enum without teaching this validator about it — or
+ * misspelling it on the way — now fails the build instead of failing a
+ * paying customer's league creation.
+ */
+describe('VALID_ERAS_BY_SPORT pins the era_filter Postgres enum (LS-9914)', () => {
+  const ERA_FILTER_ENUM_VALUES: readonly string[] =
+    PublicSchema.eraFilter.enumValues;
+
+  /** Eras that are meaningful for every sport, so they appear in both sets. */
+  const SHARED_ERAS = ['all', 'custom'] as const;
+
+  it('exposes the enum through the drizzle schema', () => {
+    // Guards the import itself: an empty list would make every assertion
+    // below vacuously pass.
+    expect(ERA_FILTER_ENUM_VALUES.length).toBeGreaterThan(0);
+    expect(new Set(ERA_FILTER_ENUM_VALUES).size).toBe(
+      ERA_FILTER_ENUM_VALUES.length,
+    );
+  });
+
+  it('covers the enum exactly — every member is valid for some sport', () => {
+    const union = new Set([
+      ...VALID_ERAS_BY_SPORT.baseball,
+      ...VALID_ERAS_BY_SPORT.football,
+    ]);
+    expect([...union].sort()).toEqual([...ERA_FILTER_ENUM_VALUES].sort());
+  });
+
+  it('admits no era the enum cannot store, per sport', () => {
+    const enumMembers = new Set(ERA_FILTER_ENUM_VALUES);
+    for (const sport of ['baseball', 'football'] as const) {
+      for (const era of VALID_ERAS_BY_SPORT[sport]) {
+        // A value that passes validation but is not an enum member reaches
+        // the INSERT and dies there.
+        expect({ sport, era, storable: enumMembers.has(era) }).toEqual({
+          sport,
+          era,
+          storable: true,
+        });
+      }
+    }
+  });
+
+  it('shares exactly `all` and `custom` between the sports', () => {
+    const shared = [...VALID_ERAS_BY_SPORT.baseball].filter((era) =>
+      VALID_ERAS_BY_SPORT.football.has(era),
+    );
+    expect(shared.sort()).toEqual([...SHARED_ERAS].sort());
+  });
+
+  it('assigns every sport-specific enum member to exactly one sport', () => {
+    const shared = new Set<string>(SHARED_ERAS);
+    for (const era of ERA_FILTER_ENUM_VALUES) {
+      if (shared.has(era)) continue;
+      const owners = (['baseball', 'football'] as const).filter((sport) =>
+        VALID_ERAS_BY_SPORT[sport].has(era),
+      );
+      expect({ era, owners }).toEqual({ era, owners: [owners[0]] });
+    }
+  });
+
+  it('only marks storable eras as free', () => {
+    const enumMembers = new Set(ERA_FILTER_ENUM_VALUES);
+    for (const sport of ['baseball', 'football'] as const) {
+      for (const era of FREE_ERA_IDS_BY_SPORT[sport]) {
+        expect({ sport, era, storable: enumMembers.has(era) }).toEqual({
+          sport,
+          era,
+          storable: true,
+        });
+        expect(VALID_ERAS_BY_SPORT[sport].has(era)).toBe(true);
+      }
+    }
   });
 });

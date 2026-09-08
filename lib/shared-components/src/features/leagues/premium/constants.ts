@@ -65,7 +65,7 @@ export const ERAS_BY_SPORT: Record<LeagueSport, ReadonlyArray<EraOption>> = {
       premium: true,
     },
     {
-      id: 'super_bowl',
+      id: 'super_bowl_era',
       name: 'Super Bowl Era',
       years: '1960 – 1977',
       premium: true,
@@ -77,7 +77,7 @@ export const ERAS_BY_SPORT: Record<LeagueSport, ReadonlyArray<EraOption>> = {
       premium: true,
     },
     {
-      id: 'salary_cap',
+      id: 'salary_cap_era',
       name: 'Salary Cap',
       years: '1994 – 2010',
       premium: true,
